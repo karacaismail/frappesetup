@@ -1,0 +1,6 @@
+{
+  "name": "press-ai",
+  "version": "0.1.0",
+  "description": "Skills and agents for Press operations and Frappe custom app development with the press-ai MCP server",
+  "author": {"name": "karacaismail"}
+}

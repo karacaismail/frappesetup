@@ -1,0 +1,701 @@
+{
+  "guide": {
+    "source_id": "pressguide",
+    "path": "src/data/guide.json",
+    "steps_total": 67
+  },
+  "steps": [
+    {
+      "id": "team",
+      "guide_status": "historical",
+      "role": "operation",
+      "operations": [
+        "release_group.create",
+        "team.context"
+      ],
+      "note": "Grup oluşturma; Team kaynak sahibidir, Administrator genel kural değildir."
+    },
+    {
+      "id": "server",
+      "guide_status": "historical",
+      "role": "operation",
+      "operations": [
+        "release_group.add_server",
+        "server.get"
+      ],
+      "note": "Sunucu hazırlığı Hüseyin Cengiz'de; Add Row sunucu kurmaz."
+    },
+    {
+      "id": "apps",
+      "guide_status": "historical",
+      "role": "operation",
+      "operations": [
+        "release_group.add_app",
+        "release_group.get",
+        "app_source.get"
+      ],
+      "note": "Uygulamalar bağımlılık sırasıyla ve doğru Source ile eklenir."
+    },
+    {
+      "id": "new-app",
+      "guide_status": "historical",
+      "role": "operation",
+      "operations": [
+        "app.create",
+        "app.get",
+        "app.inspect"
+      ],
+      "note": "App adı hooks.py app_name ile aynı olmalı."
+    },
+    {
+      "id": "source",
+      "guide_status": "historical",
+      "role": "operation",
+      "operations": [
+        "app_source.get",
+        "app_source.create"
+      ],
+      "note": "Doğru App'e bağlı Source seçilir; yoksa yeni Source."
+    },
+    {
+      "id": "identity-error",
+      "guide_status": "historical",
+      "role": "diagnosis",
+      "operations": [
+        "app.inspect",
+        "app.get"
+      ],
+      "note": "education hooks.py: app_name ve required_apps=erpnext."
+    },
+    {
+      "id": "branch",
+      "guide_status": "historical",
+      "role": "verification",
+      "operations": [
+        "app_source.branches"
+      ],
+      "note": "Branch varlığı uyum garantisi değildir; release commit'i okunur."
+    },
+    {
+      "id": "source-form",
+      "guide_status": "historical",
+      "role": "operation",
+      "operations": [
+        "app_source.create",
+        "app_source.get"
+      ],
+      "note": "Frappe kutusu yalnız framework kaynağında."
+    },
+    {
+      "id": "release",
+      "guide_status": "historical",
+      "role": "operation",
+      "operations": [
+        "app_release.create",
+        "app_release.get"
+      ],
+      "note": "Release oluşması build veya kurulum kanıtı değildir."
+    },
+    {
+      "id": "source-selection",
+      "guide_status": "historical",
+      "role": "operation",
+      "operations": [
+        "release_group.add_app",
+        "release_group.get"
+      ],
+      "note": "Apps tablosunda boş Source veya yanlış App kalmaz."
+    },
+    {
+      "id": "candidate",
+      "guide_status": "historical",
+      "role": "operation",
+      "operations": [
+        "deploy_candidate.create",
+        "deploy_candidate.get"
+      ],
+      "note": "Create Deploy Candidate; Duplicate ve Change Server farklı işlemlerdir."
+    },
+    {
+      "id": "schedule",
+      "guide_status": "historical",
+      "role": "operation",
+      "operations": [
+        "build.start",
+        "build.get",
+        "deploy.start"
+      ],
+      "note": "Önce yalnız build; Success sonrası ayrı deploy. Schedule Build and Deploy kullanılmaz."
+    },
+    {
+      "id": "preparing",
+      "guide_status": "historical",
+      "role": "diagnosis",
+      "operations": [
+        "build.get",
+        "build.triage",
+        "error_log.list"
+      ],
+      "note": "Preparing başarı değildir; sonuç görülmeden yeni build açılmaz."
+    },
+    {
+      "id": "site",
+      "guide_status": "live",
+      "role": "operation",
+      "operations": [
+        "site.create_options",
+        "site.create",
+        "site.legal_acceptance",
+        "site.get",
+        "site.jobs",
+        "site.https_check",
+        "site.setup_wizard",
+        "cluster.catalog_label",
+        "dns.record"
+      ],
+      "note": "Site insan tarafından oluşturulur; MCP durum, işler ve HTTPS ile doğrular. Yasal kabul hesap sahibinde."
+    },
+    {
+      "id": "live-press",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "release_group.list",
+        "bench.list",
+        "server.list"
+      ],
+      "note": "Sayaçlar altyapı kaydını gösterir; sağlık kanıtı değildir."
+    },
+    {
+      "id": "live-apps",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "release_group.get",
+        "app.inspect"
+      ],
+      "note": "Eski grupta ERPNext yoktu; bağımlılık eklenmeden build başlatılmaz."
+    },
+    {
+      "id": "live-failure",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "deploy_candidate.get",
+        "build.get",
+        "build.triage"
+      ],
+      "note": "Son build açılır ve Pre-build ayrıntısı incelenir."
+    },
+    {
+      "id": "live-error",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "build.get",
+        "build.triage"
+      ],
+      "note": "'Required app not found' çıktısı bağımlılık hatasıdır."
+    },
+    {
+      "id": "live-new-site",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "site.create_options"
+      ],
+      "note": "Genel New Site formunda sürüm seçeneği boştu; doğru yol grubun Sites sayfası."
+    },
+    {
+      "id": "live-saved",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "release_group.get"
+      ],
+      "note": "Grup kimliği (bench-NNNN) Title'dan ayrıdır; kayıt çalışan Bench/Site kanıtı değildir."
+    },
+    {
+      "id": "live-runtime",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "release_group.dependencies",
+        "deploy_candidate.get"
+      ],
+      "note": "Runtime alanları yapılandırmadır; gerçek runtime build logundan."
+    },
+    {
+      "id": "live-correct-apps",
+      "guide_status": "live",
+      "role": "operation",
+      "operations": [
+        "release_group.add_app",
+        "release_group.get",
+        "app_source.get"
+      ],
+      "note": "Beş satır doğru Source ile ve bağımlılık sırasıyla."
+    },
+    {
+      "id": "live-new-candidate",
+      "guide_status": "live",
+      "role": "operation",
+      "operations": [
+        "deploy_candidate.create",
+        "deploy_candidate.get"
+      ],
+      "note": "Candidate kaydı build/deploy/site kanıtı değildir."
+    },
+    {
+      "id": "live-candidate-content",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "deploy_candidate.get",
+        "app_release.get"
+      ],
+      "note": "Source, Release ve Hash alanları dolu ve grupla aynı."
+    },
+    {
+      "id": "live-build-complete",
+      "guide_status": "live",
+      "role": "operation",
+      "operations": [
+        "build.start",
+        "build.get"
+      ],
+      "note": "Complete seçenek adıdır; yalnız build başlatılır."
+    },
+    {
+      "id": "live-build-start",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "build.get",
+        "build.triage"
+      ],
+      "note": "Durum aynı kayıt ve loglarla izlenir."
+    },
+    {
+      "id": "live-framework-source",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "app_source.get"
+      ],
+      "note": "Framework Source yalnız frappe satırında; diğer uygulamalara bağlanmaz."
+    },
+    {
+      "id": "live-erpnext-source",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "app_source.get",
+        "release_group.get"
+      ],
+      "note": "ERPNext Education'dan önce."
+    },
+    {
+      "id": "live-payments-source",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "app_source.get",
+        "release_group.get"
+      ],
+      "note": "Payments LMS'ten önce; ödeme yöntemiyle ilgisi yok."
+    },
+    {
+      "id": "live-education-source",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "app_source.get",
+        "app.get"
+      ],
+      "note": "App adı education; educator kullanılmaz."
+    },
+    {
+      "id": "live-lms-source",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "app_source.get",
+        "release_group.get"
+      ],
+      "note": "LMS main branch; uyum seçili commit'ten okunur."
+    },
+    {
+      "id": "live-dashboard-bench",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "release_group.list",
+        "bench.list"
+      ],
+      "note": "Başka bir Active bench yeni grubun hazır olduğunu göstermez."
+    },
+    {
+      "id": "live-dashboard-empty",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "release_group.create",
+        "release_group.get"
+      ],
+      "note": "press.api.bench.options public kaynak yoksa boş/hata; Desk yolu kullanıldı."
+    },
+    {
+      "id": "live-agent-pong",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "server.ping_agent"
+      ],
+      "note": "pong yalnız temel bağlantıdır."
+    },
+    {
+      "id": "live-agent-version",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "server.agent_version"
+      ],
+      "note": "Repo HEAD çalışan kodu tek başına tanımlamaz."
+    },
+    {
+      "id": "live-press-version",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "press.version"
+      ],
+      "note": "Panel Frappe v15; hedef grup Version 16."
+    },
+    {
+      "id": "live-current-failure",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "build.get",
+        "build.triage"
+      ],
+      "note": "Status Failure; deploy başlatılmadı."
+    },
+    {
+      "id": "live-upload-row",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "build.get",
+        "build.triage"
+      ],
+      "note": "İlk Failure satırı Upload Build Context; sonrakiler Pending."
+    },
+    {
+      "id": "live-agent-http500",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "error_log.list",
+        "logs.read",
+        "server.disk_check"
+      ],
+      "note": "HTTP 500 nedeni disk doluluğu; Nginx ve df okumaları altyapı sahibinde."
+    },
+    {
+      "id": "live-previous-build-detail",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "build.get",
+        "build.triage"
+      ],
+      "note": "Eski ve yeni ilk Failure adımları yan yana karşılaştırılır."
+    },
+    {
+      "id": "live-previous-candidate-count",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "deploy_candidate.get"
+      ],
+      "note": "Candidate'a bağlı build kimlikleri eşleştirilir."
+    },
+    {
+      "id": "live-previous-candidates",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "deploy_candidate.list"
+      ],
+      "note": "Candidate'lar gruba göre ayrılır."
+    },
+    {
+      "id": "live-candidate-menu",
+      "guide_status": "live",
+      "role": "operation",
+      "operations": [
+        "deploy_candidate.create",
+        "deploy_candidate.duplicate"
+      ],
+      "note": "Create ve Create Duplicate ayrı eylemlerdir."
+    },
+    {
+      "id": "live-group-list",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "release_group.list"
+      ],
+      "note": "İşlemler yalnız hedef grupta yapılır; çalışan siteleri barındıran gruplar değiştirilmez."
+    },
+    {
+      "id": "live-draft-runtime",
+      "guide_status": "live",
+      "role": "operation",
+      "operations": [
+        "release_group.create",
+        "release_group.dependencies"
+      ],
+      "note": "Taslak kaydedilir, sonra runtime alanları okunur."
+    },
+    {
+      "id": "live-site-form-initial",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "site.create_options"
+      ],
+      "note": "Genel formda seçenek görünmedi; site oluşturulmadı."
+    },
+    {
+      "id": "live-old-rgv1",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "release_group.get"
+      ],
+      "note": "Eski grup korunur, yeniden adlandırılmaz."
+    },
+    {
+      "id": "live-site-header",
+      "guide_status": "live",
+      "role": "handoff",
+      "operations": [
+        "payment.method"
+      ],
+      "note": "Ödeme yöntemi hesap sahibinde; uyarı build hatasıyla ilişkilendirilmez."
+    },
+    {
+      "id": "live-no-error-at-preparing",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "error_log.list"
+      ],
+      "note": "reference_name filtresi build kimliğiyle; boş sonuç kapsamıyla yorumlanır."
+    },
+    {
+      "id": "live-no-job-at-preparing",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "agent_job.list"
+      ],
+      "note": "Filtreli boş liste 'iş yok' değildir."
+    },
+    {
+      "id": "hata-tanisi",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "build.get",
+        "build.triage",
+        "error_log.list",
+        "agent_job.list",
+        "server.ping_agent",
+        "server.agent_version",
+        "press.version",
+        "server.disk_check",
+        "logs.read",
+        "server.build_cache_cleanup",
+        "server.restart_services",
+        "registry.repository_check",
+        "deploy.status"
+      ],
+      "note": "Adım adım teşhis zinciri; SSH ölçümleri, temizlik ve registry işleri Hüseyin Cengiz'e devredilir."
+    },
+    {
+      "id": "live-agent-jobs",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "agent_job.list",
+        "agent_job.get"
+      ],
+      "note": "Başka işin Success olması hatayı kaldırmaz; ham Request Data paylaşılmaz."
+    },
+    {
+      "id": "live-builder-success",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "agent_job.get"
+      ],
+      "note": "Karşı örnek başka referansa aittir."
+    },
+    {
+      "id": "live-redis-enospc",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "agent_job.get",
+        "logs.read",
+        "server.disk_check"
+      ],
+      "note": "6 Ekim Redis hatası tarihseldir; güncel ölçümler ayrı."
+    },
+    {
+      "id": "live-cleanup-crm",
+      "guide_status": "live",
+      "role": "operation",
+      "operations": [
+        "server.build_cache_cleanup",
+        "server.disk_check",
+        "release_group.add_app",
+        "release_group.get"
+      ],
+      "note": "Yalnız build cache onaylı temizlendi; crm satırı eklendi."
+    },
+    {
+      "id": "live-candidate-two",
+      "guide_status": "live",
+      "role": "operation",
+      "operations": [
+        "deploy_candidate.create",
+        "deploy_candidate.get",
+        "app_release.get",
+        "build.start"
+      ],
+      "note": "Altı uygulamalı candidate ve tek build."
+    },
+    {
+      "id": "live-npm-range-validation",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "build.triage",
+        "press.code_fix",
+        "server.restart_services",
+        "build.start"
+      ],
+      "note": "Hata Press ayrıştırıcısındaydı; düzeltme geliştirici + altyapı devridir."
+    },
+    {
+      "id": "live-prebuild-upload-success",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "build.get",
+        "build.triage"
+      ],
+      "note": "Ara aşama Success tüm build'in başarısı değildir."
+    },
+    {
+      "id": "live-ecr-push-failure",
+      "guide_status": "live",
+      "role": "handoff",
+      "operations": [
+        "build.triage",
+        "registry.repository_check",
+        "build.start"
+      ],
+      "note": "Eksik ECR deposu altyapı sahibince oluşturuldu."
+    },
+    {
+      "id": "live-build-success",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "build.get",
+        "registry.repository_check",
+        "deploy.start"
+      ],
+      "note": "28/28 Success ve image doğrulandıktan sonra tek deploy."
+    },
+    {
+      "id": "live-bench-active",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "deploy.status",
+        "bench.get",
+        "agent_job.get",
+        "site.jobs"
+      ],
+      "note": "Build, Bench ve Site durumları ayrı okunur."
+    },
+    {
+      "id": "live-site-active-apps",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "site.get",
+        "site.jobs"
+      ],
+      "note": "Site Active ve altı uygulama; bench list-apps okuması altyapı tarafında."
+    },
+    {
+      "id": "live-site-https-login",
+      "guide_status": "live",
+      "role": "operation",
+      "operations": [
+        "site.https_check",
+        "site.setup_wizard"
+      ],
+      "note": "HTTPS TLS doğrulamalı; kurulum sihirbazını site sahibi tamamlar."
+    },
+    {
+      "id": "live-site-desk",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "site.setup_wizard",
+        "site.https_check"
+      ],
+      "note": "setup_complete salt okunur doğrulanır; ekranlar iş akışı testi değildir."
+    },
+    {
+      "id": "live-site-education",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "site.get"
+      ],
+      "note": "Ekran gezintisi insan doğrulamasıdır; kayıt oluşturulmaz."
+    },
+    {
+      "id": "live-site-lms",
+      "guide_status": "live",
+      "role": "verification",
+      "operations": [
+        "site.get"
+      ],
+      "note": "Ekran gezintisi insan doğrulamasıdır; kurs veya sınıf oluşturulmaz."
+    },
+    {
+      "id": "live-analytics-daily-usage",
+      "guide_status": "live",
+      "role": "diagnosis",
+      "operations": [
+        "site.usage",
+        "error_log.list",
+        "press_settings.flags",
+        "press.code_fix",
+        "server.restart_services"
+      ],
+      "note": "Log server yok; No data sıfır kullanım değildir."
+    }
+  ]
+}

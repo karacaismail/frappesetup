@@ -1,0 +1,1777 @@
+{
+  "family": "bench_site",
+  "operations": [
+    {
+      "id": "bench.list",
+      "family": "bench_site",
+      "title": "Grubun bench'lerini (sürüm/Active/Installing) listele",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.bench.versions (team) ve get_list Bench (operator) runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-press",
+        "live-dashboard-bench"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup",
+          "sitemap_node_ids": [
+            "dashboard-discovered-groups"
+          ]
+        },
+        {
+          "surface": "desk",
+          "path": "Bench List",
+          "sitemap_node_ids": [
+            "desk-admin-live-bench-list",
+            "desk-live-type-bench-list"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Bench",
+          "fields": [
+            "name",
+            "status",
+            "group",
+            "candidate",
+            "build",
+            "server",
+            "creation"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.versions",
+          "args": {
+            "name": "Release Group adı"
+          },
+          "returns": "[{name, status, is_ssh_proxy_setup, proxy_server, sites[], version, deployed_on}]",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              582,
+              653
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Bench",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "group": "<grup>"
+            },
+            "fields": [
+              "name",
+              "status",
+              "candidate",
+              "build",
+              "server",
+              "creation"
+            ]
+          },
+          "returns": "Bench satırları",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_group"
+        ],
+        "properties": {
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Eğitim grubunun kendi bench'i ayırt edilir; başka bir Active bench yeni grubun hazır olduğunu göstermez.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Liste boş",
+            "meaning": "Grup henüz deploy edilmedi (Awaiting Deploy)",
+            "next": "deploy.status"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Bench durumları: Pending | Installing | Updating | Active | Broken | Archived."
+      ]
+    },
+    {
+      "id": "bench.get",
+      "family": "bench_site",
+      "title": "Tek bench kaydını (uygulamalar, sunucu, durum) oku",
+      "kind": "read",
+      "status": "planned",
+      "status_reason": "Ayrı okuma aracı uygulanmadı; durum deploy.status ve bench.list ile okunur.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-bench-active"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Bench kaydı",
+          "sitemap_node_ids": [
+            "desk-admin-live-bench-record"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → bench",
+          "sitemap_node_ids": [
+            "dashboard-discovered-groups"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Bench",
+          "fields": [
+            "name",
+            "status",
+            "group",
+            "candidate",
+            "build",
+            "server",
+            "cluster"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Bench App",
+              "fields": [
+                "app",
+                "source",
+                "release",
+                "hash"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.client.get",
+          "args": {
+            "doctype": "Bench",
+            "name": "<bench>"
+          },
+          "returns": "dashboard_fields: apps, name, group, status, cluster, is_ssh_proxy_setup, inplace_update_docker_image",
+          "permission": "Bench ALLOWED_DOCTYPES içinde; belge erişimi",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/client.py",
+            "lines": [
+              234,
+              275
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Bench",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "name": "<bench>"
+            },
+            "fields": [
+              "name",
+              "status",
+              "group",
+              "candidate",
+              "build",
+              "server"
+            ]
+          },
+          "returns": "Açık alanlar; config/bench_config alınmaz",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Bench Active ve beklenen candidate/build'e bağlı.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Installing",
+            "meaning": "Kurulum sürüyor",
+            "next": "Bekle"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "site.create_options",
+      "family": "bench_site",
+      "title": "New Site seçeneklerini (sürüm, bench, bölge, plan) oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.site.options_for_new runtime'da okunur.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "site",
+        "live-new-site",
+        "live-site-form-initial"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Sites → New Site (/dashboard/groups/<grup>/sites/new)",
+          "sitemap_node_ids": [
+            "dashboard-group-sites-component-3"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Sites → New Site",
+          "sitemap_node_ids": [
+            "dashboard-global-sites-component-7"
+          ]
+        }
+      ],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.options_for_new",
+          "args": {
+            "for_bench": "Release Group adı | null",
+            "for_server": "Server adı | null"
+          },
+          "returns": "Sürümler, gruplar, bölgeler ve planlar (takıma göre)",
+          "permission": "@frappe.whitelist(); takım get_current_team",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              1033,
+              1140
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_group"
+        ],
+        "properties": {
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Grubun kendi sayfasından açılan formda sürüm/bench seçeneği okunur; genel formda boş seçenek grubun hazır olmadığını gösterebilir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Sürüm seçenekleri boş",
+            "meaning": "Active bench yok veya grup görünürlüğü/kaynak paylaşımı",
+            "next": "Formu grubun kendi Sites sayfasından aç; grup görünürlüğünü değiştirme"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Dedicated server seçimi ayrı akıştır (press.api.site.new içinde)."
+      ]
+    },
+    {
+      "id": "site.create",
+      "family": "bench_site",
+      "title": "Grup bench'inde yeni site oluştur",
+      "kind": "human",
+      "status": "read_only",
+      "status_reason": "Plan, ödeme ve bölgesel yasal metin kabulü hesap sahibinde; MCP siteyi oluşturmaz, sonucu site.get/site.jobs ile doğrular.",
+      "authority": [
+        "account_holder",
+        "team"
+      ],
+      "owner_handoff": {
+        "role": "account_holder",
+        "person": null,
+        "steps": [
+          "Bench Active olduktan sonra grubun Sites sayfasından New Site aç.",
+          "Uygulamaları (Education için ERPNext, LMS için Payments) seç; ad, sürüm ve domain gir.",
+          "Planı ve bölgeyi seç; yasal kutuyu yalnız metni okuyup kabul edersen işaretle; isteğe bağlı kutuyu kapalı bırak.",
+          "Create site ile bir kez gönder; sonuç görülmeden tekrar gönderme."
+        ],
+        "acceptance": "Site Active; New Site ve Add Site to Upstream işleri Success; HTTPS ve uygulama listesi ayrıca doğrulandı."
+      },
+      "guide_steps": [
+        "site"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Sites → New Site",
+          "sitemap_node_ids": [
+            "dashboard-group-sites-component-3"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site",
+          "fields": [
+            "name",
+            "status",
+            "group",
+            "bench",
+            "server",
+            "team",
+            "cluster",
+            "plan",
+            "setup_wizard_complete",
+            "host_name"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Site App",
+              "fields": [
+                "app"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "Agent Job",
+          "fields": [
+            "name",
+            "job_type",
+            "status",
+            "site",
+            "bench",
+            "server",
+            "start",
+            "end",
+            "duration"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "account_holder",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Dashboard New Site formu (plan, bölge, yasal metin onayı).",
+          "source": null
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.new",
+          "args": {
+            "site": {
+              "name": "subdomain",
+              "apps": "[app]",
+              "version": "str",
+              "group": "str",
+              "cluster": "str",
+              "plan": "str",
+              "server": "str | null"
+            }
+          },
+          "returns": "{site, job} ya da özel bench akışı sonucu",
+          "permission": "@frappe.whitelist(); takım get_current_team (MCP çağırmaz)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              413,
+              502
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "bench.active",
+          "description": "Grubun bench'i Active (Installing hazır değildir).",
+          "machine": false
+        },
+        {
+          "id": "legal.accepted_by_account_holder",
+          "description": "Bölgesel yasal metin hesap sahibince okunup kabul edildi.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Site kaydı ve New Site Agent Job; Add Site to Upstream işi; ücretlendirme planına bağlanır."
+      ],
+      "async": null,
+      "success": "Site Active; New Site ve Add Site to Upstream işleri Success; HTTPS ve uygulama listesi ayrı doğrulandı.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Site Installing'de takılı",
+            "meaning": "Install Apps adımı sürüyor",
+            "next": "site.jobs ile işi izle; formu tekrar gönderme, siteyi silme"
+          }
+        ],
+        "timeout": "MCP yürütmez.",
+        "retry": "Form tekrar gönderilmez.",
+        "rollback": "Silme/arşivleme insan kararıdır."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get",
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Cluster title/country boşsa yasal metinde null görünebilir; katalog etiketi düzeltmesi cluster.catalog_label'dır."
+      ]
+    },
+    {
+      "id": "site.get",
+      "family": "bench_site",
+      "title": "Site durumunu, grubunu ve kurulu uygulamaları oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.site.get (team, projekte edilmiş alanlar) ve get_list (operator) runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "site",
+        "live-site-active-apps",
+        "live-site-education",
+        "live-site-lms"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Sites → site → Overview / Apps",
+          "sitemap_node_ids": [
+            "dashboard-site-overview",
+            "dashboard-site-apps",
+            "dashboard-site-apps-component-2"
+          ]
+        },
+        {
+          "surface": "desk",
+          "path": "Site kaydı",
+          "sitemap_node_ids": [
+            "desk-admin-live-site-record",
+            "desk-admin-live-site-record-tab-3"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site",
+          "fields": [
+            "name",
+            "status",
+            "group",
+            "bench",
+            "server",
+            "team",
+            "cluster",
+            "plan",
+            "setup_wizard_complete",
+            "host_name"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Site App",
+              "fields": [
+                "app"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.get",
+          "args": {
+            "name": "site adı (FQDN)"
+          },
+          "returns": "Runtime yalnız name, host_name, status, group, team, server, frappe_version, setup_wizard_complete alanlarını projekte eder; iletişim ve sahip bilgisi atılır",
+          "permission": "@frappe.whitelist(); @protected(\"Site\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              1725,
+              1835
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Site",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "name": "<site>"
+            },
+            "fields": [
+              "name",
+              "status",
+              "group",
+              "bench",
+              "server",
+              "team",
+              "setup_wizard_complete"
+            ],
+            "child_tables": "Site App (parent=<site>): app"
+          },
+          "returns": "Açık alanlar; admin_password ve config alınmaz",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ],
+        "properties": {
+          "site": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 253,
+            "pattern": "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Site durumu (Pending | Installing | Updating | Recovering | Active | Inactive | Broken | Archived | Suspended) ve uygulama listesi okunur. Kurulu uygulama iş akışının test edildiği anlamına gelmez.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "PermissionError",
+            "meaning": "Site takımın değil",
+            "next": "Takımı doğrula"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "setup_wizard_complete Press'te önbellek alanıdır; güncellenmemiş olabilir."
+      ]
+    },
+    {
+      "id": "site.https_check",
+      "family": "bench_site",
+      "title": "Sitenin HTTPS yanıtını TLS doğrulamasıyla kontrol et",
+      "kind": "analysis",
+      "status": "implemented",
+      "status_reason": "Press'in doğruladığı site adına TLS doğrulamalı GET runtime'da (https transport).",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "site",
+        "live-site-https-login",
+        "live-site-desk"
+      ],
+      "ui": [],
+      "doctypes": [
+        {
+          "doctype": "Site",
+          "fields": [
+            "name",
+            "host_name",
+            "status"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "https",
+          "doctype": null,
+          "method": "GET https://<site>/",
+          "args": {
+            "verify_tls": true,
+            "follow_redirects": false
+          },
+          "returns": "HTTP durum kodu, TLS doğrulama sonucu",
+          "permission": "Yalnız press.api.site.get ile bu principal için doğrulanan siteye",
+          "reason": null,
+          "source": null
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.get",
+          "args": {
+            "name": "site"
+          },
+          "returns": "Site varlığı ve sahipliği",
+          "permission": "@frappe.whitelist(); @protected(\"Site\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              1725,
+              1835
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "https",
+          "doctype": null,
+          "method": "GET https://<site>/",
+          "args": {
+            "verify_tls": true,
+            "follow_redirects": false
+          },
+          "returns": "HTTP durum kodu, TLS doğrulama sonucu",
+          "permission": "Operator için Press'te bulunan siteye",
+          "reason": null,
+          "source": null
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ],
+        "properties": {
+          "site": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 253,
+            "pattern": "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [
+        "Siteye tek bir dış HTTPS isteği."
+      ],
+      "async": null,
+      "success": "TLS doğrulaması açıkken geçerli sertifika ve 2xx/3xx yanıt. Giriş ekranı ve HTTP 200 uygulama modüllerinin çalıştığını kanıtlamaz.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "TLS hatası",
+            "meaning": "Sertifika geçersiz/eksik",
+            "next": "DNS ve sertifika devri (dns.record); insecure kullanma"
+          },
+          {
+            "signal": "Bağlantı hatası",
+            "meaning": "DNS veya proxy yönlendirmesi",
+            "next": "dns.record devri; Add Site to Upstream işini oku"
+          }
+        ],
+        "timeout": "Zaman aşımı unknown; tekrar denenebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "partial",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Kaynak Press değildir; sonuç dış ağ durumuna bağlıdır."
+      ]
+    },
+    {
+      "id": "site.setup_wizard",
+      "family": "bench_site",
+      "title": "Site kurulum sihirbazını tamamla (Setup Site)",
+      "kind": "human",
+      "status": "read_only",
+      "status_reason": "Kişisel hesap alanları ve parola site sahibince girilir; MCP sihirbazı yürütmez, setup_wizard_complete değerini site.get ile okur.",
+      "authority": [
+        "account_holder"
+      ],
+      "owner_handoff": {
+        "role": "account_holder",
+        "person": null,
+        "steps": [
+          "Dashboard site sayfasında Setup Site seç; kişisel alanları ve parolayı kendin gir.",
+          "Dil, ülke, saat dilimi, para birimi, şirket, hesap planı ve mali yıl seçimlerini yap; demo veriyi bilinçli seç.",
+          "Kurulum işlenirken tekrar gönderme."
+        ],
+        "acceptance": "Desk açılır ve setup_complete=1 (salt okunur doğrulama)."
+      },
+      "guide_steps": [
+        "site",
+        "live-site-https-login",
+        "live-site-desk"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Sites → site → Setup Site",
+          "sitemap_node_ids": [
+            "dashboard-site-overview"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site",
+          "fields": [
+            "name",
+            "setup_wizard_complete"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "account_holder",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Site üzerinde kurulum sihirbazı.",
+          "source": null
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.setup_wizard_complete",
+          "args": {
+            "name": "site"
+          },
+          "returns": "Site.is_setup_wizard_complete() sonucu (siteyi sorgular, alanı günceller)",
+          "permission": "@frappe.whitelist(); @protected(\"Site\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              2264,
+              2267
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "site.active_and_https_valid",
+          "description": "Site Active ve HTTPS doğrulandı.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Sitede kullanıcı ve şirket kayıtları oluşur."
+      ],
+      "async": null,
+      "success": "setup_wizard_complete = 1 ve Desk açılır; iş akışları ayrıca test edilir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Sihirbaz takıldı",
+            "meaning": "Sunucu tarafı hata",
+            "next": "Site loglarını insan okur; tekrar gönderme"
+          }
+        ],
+        "timeout": "MCP yürütmez.",
+        "retry": "Yok.",
+        "rollback": "Yok."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get",
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Parola veya kişisel veri rehbere, bilete ya da çıktıya yazılmaz.",
+        "press.api.site.setup_wizard_complete okuması henüz runtime'da değil."
+      ]
+    },
+    {
+      "id": "site.install_app",
+      "family": "bench_site",
+      "title": "Siteye bench'te mevcut bir uygulamayı kur",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "press.api.site.install_app (team, operator) runtime'da öneri/onay/izleme ile uygulanır.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Sites → site → Apps → Install App",
+          "sitemap_node_ids": [
+            "dashboard-site-apps-component-1"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site",
+          "fields": [
+            "name",
+            "status",
+            "group",
+            "bench",
+            "server",
+            "team",
+            "cluster",
+            "plan",
+            "setup_wizard_complete",
+            "host_name"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Site App",
+              "fields": [
+                "app"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "Agent Job",
+          "fields": [
+            "name",
+            "job_type",
+            "status",
+            "site",
+            "bench",
+            "server",
+            "start",
+            "end",
+            "duration"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.install_app",
+          "args": {
+            "name": "site",
+            "app": "App adı",
+            "plan": "daima null"
+          },
+          "returns": "None (iş adı döndürülmez)",
+          "permission": "@frappe.whitelist(); @protected(\"Site\"); Site.install_app @site_action([\"Active\"])",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              2322,
+              2325
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.available_apps",
+          "args": {
+            "name": "site"
+          },
+          "returns": "Bench'te olup sitede kurulu olmayan uygulamalar",
+          "permission": "@frappe.whitelist(); @protected(\"Site\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              1991,
+              2041
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.install_app",
+          "args": {
+            "name": "site",
+            "app": "App",
+            "plan": "daima null"
+          },
+          "returns": "None",
+          "permission": "System User @protected ve site_action durum denetimini atlar",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/site/site.py",
+            "lines": [
+              1064,
+              1079
+            ]
+          }
+        },
+        {
+          "principal": "account_holder",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Plan verilirse Press Marketplace aboneliği açar (install_marketplace_conf → create_marketplace_app_subscription); ücretli plan kararı Dashboard'da hesap sahibindedir.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/site/site.py",
+            "lines": [
+              1015,
+              1032
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "site",
+          "app"
+        ],
+        "properties": {
+          "site": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 253,
+            "pattern": "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+"
+          },
+          "app": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "[a-z][a-z0-9_]{0,63}"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "site.owned_by_team",
+          "description": "Team principal'da site takıma ait.",
+          "machine": true
+        },
+        {
+          "id": "site.no_running_jobs",
+          "description": "Sitede Pending/Running Agent Job yok.",
+          "machine": true
+        },
+        {
+          "id": "proposal.no_unknown_outcome",
+          "description": "Bilinmeyen sonuçlu öneri yok.",
+          "machine": true
+        },
+        {
+          "id": "site.active",
+          "description": "Site Active.",
+          "machine": true
+        },
+        {
+          "id": "site.app_available",
+          "description": "Uygulama bench'te var ve sitede kurulu değil.",
+          "machine": true
+        },
+        {
+          "id": "team.resolved_matches_config",
+          "description": "Team principal'da çözülen takım yapılandırılan takımla aynı.",
+          "machine": true
+        },
+        {
+          "id": "site.recent_backup",
+          "description": "Son 24 saatte başarılı yedek.",
+          "machine": true
+        }
+      ],
+      "side_effects": [
+        "Agent Job 'Install App on Site'; site durumu Pending olur; Site Activity kaydı.",
+        "Plan gönderilmediği için Press ücretsiz uygulama aboneliği kaydeder (create_free_app_subscription); ücretli abonelik açılmaz."
+      ],
+      "async": {
+        "returns": "None; izleme yürütme zamanından sonra açılan site işini bulur",
+        "track": "track.site_job",
+        "terminal_success": [
+          "Success"
+        ],
+        "terminal_failure": [
+          "Failure",
+          "Delivery Failure"
+        ],
+        "intermediate": [
+          "Undelivered",
+          "Pending",
+          "Running"
+        ]
+      },
+      "success": "Install App on Site işi Success, site yeniden Active ve uygulama Apps listesinde.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Dönüş None ve iş yok",
+            "meaning": "Uygulama zaten kurulu (Site.install_app iş açmadan döner)",
+            "next": "Runtime bunu no_op raporlar"
+          },
+          {
+            "signal": "'Site is in ... state'",
+            "meaning": "Site Active değil (site_action)",
+            "next": "Site durumunu düzelt; bekle"
+          },
+          {
+            "signal": "İş Failure",
+            "meaning": "Kurulum/migrasyon hatası",
+            "next": "agent_job.get çıktısını oku; yedekten dönüş insan kararı"
+          }
+        ],
+        "timeout": "Zaman aşımında unknown; site.jobs ile oku, tekrar gönderme.",
+        "retry": "Neden giderilince tek yeni öneri.",
+        "rollback": "Otomatik geri alma yok; uninstall ayrı insan kararıdır (veri kaybı riski)."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "press_propose",
+          "proposal_get",
+          "press_execute",
+          "press_track"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "site.migrate",
+      "family": "bench_site",
+      "title": "Sitede migrate çalıştır",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "press.api.site.migrate (team, operator) runtime'da öneri/çift onay/izleme ile uygulanır.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Site → Actions → Migrate",
+          "sitemap_node_ids": [
+            "desk-admin-live-site-record-menu-actions-6"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site",
+          "fields": [
+            "name",
+            "status",
+            "group",
+            "bench",
+            "server",
+            "team",
+            "cluster",
+            "plan",
+            "setup_wizard_complete",
+            "host_name"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Site App",
+              "fields": [
+                "app"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "Agent Job",
+          "fields": [
+            "name",
+            "job_type",
+            "status",
+            "site",
+            "bench",
+            "server",
+            "start",
+            "end",
+            "duration"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.migrate",
+          "args": {
+            "name": "site",
+            "skip_failing_patches": "bool=false"
+          },
+          "returns": "None (iş adı döndürülmez)",
+          "permission": "@frappe.whitelist(); @protected(\"Site\"); Site.migrate @site_action([Active, Broken, Inactive])",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              2169,
+              2172
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.migrate",
+          "args": {
+            "name": "site",
+            "skip_failing_patches": "false"
+          },
+          "returns": "None",
+          "permission": "System User site_action denetimini atlar",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/site/site.py",
+            "lines": [
+              1317,
+              1335
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ],
+        "properties": {
+          "site": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 253,
+            "pattern": "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+"
+          },
+          "skip_failing_patches": {
+            "type": "boolean"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "site.owned_by_team",
+          "description": "Team principal'da site takıma ait.",
+          "machine": true
+        },
+        {
+          "id": "site.no_running_jobs",
+          "description": "Sitede Pending/Running Agent Job yok.",
+          "machine": true
+        },
+        {
+          "id": "proposal.no_unknown_outcome",
+          "description": "Bilinmeyen sonuçlu öneri yok.",
+          "machine": true
+        },
+        {
+          "id": "team.resolved_matches_config",
+          "description": "Team principal'da çözülen takım yapılandırılan takımla aynı.",
+          "machine": true
+        },
+        {
+          "id": "site.active",
+          "description": "Site Active (Press Broken/Inactive'e de izin verir; burada daha sıkı).",
+          "machine": true
+        },
+        {
+          "id": "site.recent_backup",
+          "description": "Son 24 saatte başarılı yedek.",
+          "machine": true
+        }
+      ],
+      "side_effects": [
+        "Agent Job 'Migrate Site'; site Pending olur; yamalar çalışır."
+      ],
+      "async": {
+        "returns": "None; izleme yürütme zamanından sonra açılan site işini bulur",
+        "track": "track.site_job",
+        "terminal_success": [
+          "Success"
+        ],
+        "terminal_failure": [
+          "Failure",
+          "Delivery Failure"
+        ],
+        "intermediate": [
+          "Undelivered",
+          "Pending",
+          "Running"
+        ]
+      },
+      "success": "Migrate Site işi Success ve site yeniden Active.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "İş Failure",
+            "meaning": "Yama hatası",
+            "next": "Çıktıyı oku; skip_failing_patches varsayılan false kalır"
+          },
+          {
+            "signal": "check_fatal_site_update hatası",
+            "meaning": "Önceki ölümcül güncelleme",
+            "next": "İnsan inceler"
+          }
+        ],
+        "timeout": "Zaman aşımında unknown; tekrar migrate başlatma.",
+        "retry": "Neden giderilince tek öneri.",
+        "rollback": "Yedekten dönüş (site.restore) insan kararıdır."
+      },
+      "risk": "write",
+      "approval": "double",
+      "mcp": {
+        "tools": [
+          "press_propose",
+          "proposal_get",
+          "press_execute",
+          "press_track"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "site.update",
+      "family": "bench_site",
+      "title": "Siteyi grubun yeni bench'ine güncelle",
+      "kind": "mutation",
+      "status": "planned",
+      "status_reason": "Kaynak doğrulandı (press.api.site.update → Site.schedule_update); kılavuzda kullanılmadı ve migrasyon/kesinti riski nedeniyle uygulanmadı.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Site → Actions → Update",
+          "sitemap_node_ids": [
+            "desk-admin-live-site-record-menu-actions-7"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site",
+          "fields": [
+            "name",
+            "status",
+            "group",
+            "bench",
+            "server",
+            "team",
+            "cluster",
+            "plan",
+            "setup_wizard_complete",
+            "host_name"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Site App",
+              "fields": [
+                "app"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.update",
+          "args": {
+            "name": "site",
+            "skip_failing_patches": "bool=false",
+            "skip_backups": "bool=false"
+          },
+          "returns": "Site.schedule_update sonucu",
+          "permission": "@frappe.whitelist(); @protected(\"Site\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              2137,
+              2142
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "site.recent_backup",
+          "description": "Yedek alınmış.",
+          "machine": true
+        },
+        {
+          "id": "site.no_running_jobs",
+          "description": "Süren iş yok.",
+          "machine": true
+        }
+      ],
+      "side_effects": [
+        "Site Update kaydı; yedek, taşıma ve migrate işleri."
+      ],
+      "async": null,
+      "success": "Site Update Success ve site Active.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Site Update Failure",
+            "meaning": "Güncelleme/yama hatası",
+            "next": "İnsan inceler"
+          }
+        ],
+        "timeout": "Uygulanmadı.",
+        "retry": "Uygulanmadı.",
+        "rollback": "Press geri alma adımlarını insan izler."
+      },
+      "risk": "write",
+      "approval": "double",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "skip_backups=true önerilmez."
+      ]
+    },
+    {
+      "id": "site.jobs",
+      "family": "bench_site",
+      "title": "Sitenin Agent Job listesini ve adımlarını oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.site.jobs / press.api.site.job (team) ve get_list (operator) runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "site",
+        "live-bench-active",
+        "live-site-active-apps"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Sites → site → Insights → Jobs",
+          "sitemap_node_ids": [
+            "dashboard-site-insights-jobs",
+            "dashboard-site-insights-jobs-component-4"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Agent Job",
+          "fields": [
+            "name",
+            "job_type",
+            "status",
+            "site",
+            "bench",
+            "server",
+            "start",
+            "end",
+            "duration"
+          ],
+          "child_tables": []
+        },
+        {
+          "doctype": "Agent Job Step",
+          "fields": [
+            "agent_job",
+            "step_name",
+            "status",
+            "start",
+            "end",
+            "duration",
+            "output"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.jobs",
+          "args": {
+            "filters": {
+              "site": "site (ilk anahtar olmalı)"
+            },
+            "limit_page_length": "int"
+          },
+          "returns": "[{name, job_type, creation, status (Undelivered → Pending), start, end, duration}]",
+          "permission": "@frappe.whitelist(); @protected(\"Site\") (filters ilk değeri)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              670,
+              685
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.job",
+          "args": {
+            "job": "Agent Job adı"
+          },
+          "returns": "{name, job_type, status, steps[{step_name, status, output}]}",
+          "permission": "@frappe.whitelist(); işin site/bench/server takımı denetlenir",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              702,
+              723
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Agent Job",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "site": "<site>"
+            },
+            "fields": [
+              "name",
+              "job_type",
+              "status",
+              "creation",
+              "start",
+              "end"
+            ]
+          },
+          "returns": "İş listesi",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ],
+        "properties": {
+          "site": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 253,
+            "pattern": "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "New Site / Install App / Migrate / Backup işlerinin durumu (Undelivered | Pending | Running | Success | Failure | Delivery Failure) okunur.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Boş liste",
+            "meaning": "Filtre veya zaman aralığı",
+            "next": "Boş sonucu 'iş yok' diye yorumlama"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read",
+          "press_track"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": []
+    }
+  ]
+}

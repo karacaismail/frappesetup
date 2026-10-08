@@ -1,0 +1,328 @@
+{
+  "versions": {
+    "v15": {
+      "source_id": "frappe_v15",
+      "ref": "version-15",
+      "commit": "b0b5b99a1d9d2cb3d54b32293d3854bf2c15f4a4"
+    },
+    "v16": {
+      "source_id": "frappe_v16",
+      "ref": "version-16",
+      "commit": "6b450a166e076dd842e4db7ea0843f62881e62ac"
+    }
+  },
+  "decision_order": [
+    "fixtures_custom_field_property_setter",
+    "doc_events",
+    "extend_doctype_class",
+    "override_doctype_class",
+    "override_whitelisted_methods",
+    "core_patch_forbidden"
+  ],
+  "extension_points": [
+    {
+      "id": "fixtures.custom_field_property_setter",
+      "kind": "fixture",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Standart DocType'a alan veya özellik eklemek (Custom Field, Property Setter) — kod yazmadan ilk tercih.",
+      "risks": "Filtresiz fixture başka uygulamaların kayıtlarını da dışa aktarır; v16'da DocType ve Page fixture olarak dışa aktarılamaz, prefix ve fixture_auto_order eklenmiştir.",
+      "source": {
+        "source_id": "frappe_v16",
+        "path": "frappe/utils/fixtures.py",
+        "lines": [
+          67,
+          114
+        ]
+      }
+    },
+    {
+      "id": "hooks.doc_events",
+      "kind": "hook",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Belge yaşam döngüsü olaylarına (validate, on_submit vb.) işleyici bağlamak.",
+      "risks": "İşleyici hatası kaydı engeller; '*' tüm DocType'lara uygulanır. v15 kaynağı: frappe/__init__.py get_doc_hooks.",
+      "source": {
+        "source_id": "frappe_v16",
+        "path": "frappe/__init__.py",
+        "lines": [
+          948,
+          962
+        ]
+      }
+    },
+    {
+      "id": "hooks.extend_doctype_class",
+      "kind": "hook",
+      "v15": "absent",
+      "v16": "supported",
+      "use_for": "Controller'a mixin ile davranış eklemek; birden çok uygulama MRO ile birleşir.",
+      "risks": "v15'te yoktur; v15 hedefinde override_doctype_class'a düşer ve tek kazanan kuralı geçerlidir.",
+      "source": {
+        "source_id": "frappe_v16",
+        "path": "frappe/model/base_document.py",
+        "lines": [
+          179,
+          208
+        ]
+      }
+    },
+    {
+      "id": "hooks.override_doctype_class",
+      "kind": "hook",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Controller'ı tamamen değiştirmek (son çare).",
+      "risks": "Yalnız son uygulamanın girdisi kullanılır ([-1]); başka uygulamanın override'ı sessizce ezilir; sınıf BaseDocument alt sınıfı olmalıdır.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/model/base_document.py",
+        "lines": [
+          76,
+          110
+        ]
+      }
+    },
+    {
+      "id": "hooks.override_whitelisted_methods",
+      "kind": "hook",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Whitelist edilmiş bir metodu başka uygulamadaki uygulamayla değiştirmek.",
+      "risks": "Son girdi kazanır; API sözleşmesi bozulabilir.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/__init__.py",
+        "lines": [
+          2553,
+          2556
+        ]
+      }
+    },
+    {
+      "id": "patches.pre_post_model_sync",
+      "kind": "patch",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Veri yamaları; şema senkronundan önce/sonra çalışacak bölüm seçimi.",
+      "risks": "Yeni şemaya bağlı yama pre_model_sync'e konursa başarısız olur.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/modules/patch_handler.py",
+        "lines": [
+          115,
+          136
+        ]
+      }
+    },
+    {
+      "id": "hooks.required_apps",
+      "kind": "config",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Uygulama bağımlılıklarını bildirmek (ör. education → erpnext).",
+      "risks": "Bildirilmeyen bağımlılık Press build'inde 'Required app not found' üretir.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/installer.py",
+        "lines": [
+          287,
+          287
+        ]
+      }
+    },
+    {
+      "id": "hooks.before_after_migrate",
+      "kind": "hook",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Migrate öncesi/sonrası tekrar çalıştırılabilir işler.",
+      "risks": "İdempotent olmayan iş her migrate'te tekrarlanır.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/migrate.py",
+        "lines": [
+          114,
+          114
+        ]
+      }
+    },
+    {
+      "id": "hooks.app_include_assets",
+      "kind": "hook",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Desk'e JS/CSS paketi eklemek (app_include_js/app_include_css).",
+      "risks": "Her Desk sayfasında yüklenir; v15 /app, v16 /desk yolu (v16 frappe/www/desk.py).",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/www/app.py",
+        "lines": [
+          47,
+          47
+        ]
+      }
+    },
+    {
+      "id": "hooks.has_permission",
+      "kind": "hook",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Belge düzeyinde ek izin denetimi.",
+      "risks": "Yanlış dönüş erişimi açar veya kapatır; güvenlik incelemesi gerekir.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/permissions.py",
+        "lines": [
+          463,
+          463
+        ]
+      }
+    },
+    {
+      "id": "translations.csv_po",
+      "kind": "config",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Uygulama çevirileri: translations/*.csv ve gettext PO katalogları.",
+      "risks": "İki biçimin birlikte kullanımı proje kararıdır; PO derlenmeden yüklenmez.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/gettext/translate.py",
+        "lines": [
+          57,
+          58
+        ]
+      }
+    },
+    {
+      "id": "tests.base_class",
+      "kind": "config",
+      "v15": "supported",
+      "v16": "supported",
+      "use_for": "Test taban sınıfı: v15 FrappeTestCase, v16 IntegrationTestCase/UnitTestCase (FrappeTestCase uyumluluk takma adı).",
+      "risks": "v15 testinde v16 sınıfı içe aktarılamaz.",
+      "source": {
+        "source_id": "frappe_v16",
+        "path": "frappe/tests/classes/integration_test_case.py",
+        "lines": [
+          20,
+          20
+        ]
+      }
+    }
+  ],
+  "rules": [
+    {
+      "id": "core_patch_forbidden",
+      "severity": "error",
+      "description": "Frappe, ERPNext veya başka uygulamanın çekirdek dosyaları değiştirilmez; genişletme yalnız hooks, fixtures ve patch ile yapılır.",
+      "source": null
+    },
+    {
+      "id": "extend_doctype_class_requires_v16",
+      "severity": "error",
+      "description": "extend_doctype_class yalnız version-16'da vardır; v15 hedefinde kullanılamaz.",
+      "source": {
+        "source_id": "frappe_v16",
+        "path": "frappe/model/base_document.py",
+        "lines": [
+          179,
+          208
+        ]
+      }
+    },
+    {
+      "id": "override_doctype_class_single_winner",
+      "severity": "warning",
+      "description": "override_doctype_class'ta yalnız son uygulamanın sınıfı kullanılır; çakışma denetlenir.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/model/base_document.py",
+        "lines": [
+          76,
+          110
+        ]
+      }
+    },
+    {
+      "id": "fixtures_must_be_filtered",
+      "severity": "warning",
+      "description": "Custom Field/Property Setter fixture'ları uygulamaya özgü filtreyle tanımlanır.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/utils/fixtures.py",
+        "lines": [
+          63,
+          87
+        ]
+      }
+    },
+    {
+      "id": "fixtures_disallowed_doctypes_v16",
+      "severity": "error",
+      "description": "v16'da DocType ve Page fixture olarak dışa aktarılamaz.",
+      "source": {
+        "source_id": "frappe_v16",
+        "path": "frappe/utils/fixtures.py",
+        "lines": [
+          13,
+          13
+        ]
+      }
+    },
+    {
+      "id": "schema_dependent_patch_post_model_sync",
+      "severity": "warning",
+      "description": "Yeni şemaya bağlı yamalar [post_model_sync] bölümüne yazılır.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/modules/patch_handler.py",
+        "lines": [
+          115,
+          136
+        ]
+      }
+    },
+    {
+      "id": "required_apps_declared",
+      "severity": "warning",
+      "description": "Kullanılan her uygulama hooks.py required_apps içinde bildirilir.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/installer.py",
+        "lines": [
+          287,
+          287
+        ]
+      }
+    },
+    {
+      "id": "override_whitelisted_methods_last_wins",
+      "severity": "warning",
+      "description": "Aynı metoda birden çok override varsa yalnız sonuncusu geçerlidir.",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/__init__.py",
+        "lines": [
+          2553,
+          2556
+        ]
+      }
+    },
+    {
+      "id": "test_base_class_by_version",
+      "severity": "warning",
+      "description": "Test sınıfı hedef sürüme göre seçilir (v15 FrappeTestCase, v16 IntegrationTestCase).",
+      "source": {
+        "source_id": "frappe_v15",
+        "path": "frappe/tests/utils.py",
+        "lines": [
+          20,
+          20
+        ]
+      }
+    }
+  ]
+}

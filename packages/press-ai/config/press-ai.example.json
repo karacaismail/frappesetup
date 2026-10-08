@@ -1,0 +1,22 @@
+{
+  "press": {
+    "base_url": "https://press.example.com",
+    "principal": "operator",
+    "team": "TEAM-NAME",
+    "credentials": {"source": "keychain", "service": "press-ai", "account": "press.example.com"},
+    "timeout_seconds": 30,
+    "enabled_mutations": []
+  },
+  "workspace": {
+    "root": "/ABSOLUTE/PATH/frappe-bench/apps",
+    "allow_writes": false
+  },
+  "approval": {
+    "state_dir": "~/.local/state/press-ai",
+    "approval_ttl_seconds": 900,
+    "proposal_ttl_seconds": 3600
+  },
+  "references": {
+    "pressguide_sitemap": null
+  }
+}

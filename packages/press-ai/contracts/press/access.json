@@ -1,0 +1,511 @@
+{
+  "family": "access",
+  "operations": [
+    {
+      "id": "team.context",
+      "family": "access",
+      "title": "Oturumdaki kullanıcı ve takımı oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.account.current_team (çözülen takım) ve frappe.auth.get_logged_user runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "team"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Settings → Team",
+          "sitemap_node_ids": [
+            "dashboard-settings-team"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Team",
+          "fields": [
+            "name",
+            "enabled"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.account.current_team",
+          "args": {},
+          "returns": "Press'in çözdüğü takım (yalnız name okunur; üye/iletişim alanları atılır)",
+          "permission": "@frappe.whitelist(); oturum",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/account.py",
+            "lines": [
+              703,
+              711
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": "get_current_team",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Kullanıcı X-Press-Team takımının üyesi değilse Press hata vermeden varsayılan takıma geçer.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/utils/__init__.py",
+            "lines": [
+              145,
+              147
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {}
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "resolved_team == team_header (team_matches_config true). Değilse Press başka takımda çalışıyordur; team mutasyonları team.resolved_matches_config ile engellenir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "TeamHeaderNotInRequestError",
+            "meaning": "X-Press-Team başlığı yok",
+            "next": "Yapılandırmada takımı ayarla"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read",
+          "kit_status"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Oturum kullanıcısı ayrıca frappe.auth.get_logged_user ile okunur.",
+        "Operator'da (System User) takım çözülmez; resolved_team null döner."
+      ]
+    },
+    {
+      "id": "team.roles",
+      "family": "access",
+      "title": "Takım rollerini ve kullanıcı izinlerini oku",
+      "kind": "read",
+      "status": "planned",
+      "status_reason": "Kaynak doğrulandı (press.api.account.user_permissions, Press Role); okuma henüz uygulanmadı.",
+      "authority": [
+        "team"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Settings → Roles",
+          "sitemap_node_ids": [
+            "dashboard-settings-permissions-roles",
+            "dashboard-settings-permissions-roles-component-3"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Press Role",
+          "fields": [
+            "name",
+            "title",
+            "team",
+            "admin_access",
+            "allow_site_creation",
+            "allow_bench_creation",
+            "all_sites",
+            "all_release_groups"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.account.user_permissions",
+          "args": {},
+          "returns": "Kullanıcının izin haritası",
+          "permission": "@frappe.whitelist()",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/account.py",
+            "lines": [
+              1199,
+              1261
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Kullanıcının grup/site oluşturma izinleri okunur.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmadı.",
+        "retry": "Uygulanmadı.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "press_settings.flags",
+      "family": "access",
+      "title": "Press Settings bayraklarını (log_server, suspend_builds vb.) oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "Operator principal ile frappe.client.get_value yalnız izinli alanlar için runtime'da; tam belge token alanları nedeniyle okunmaz.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-analytics-daily-usage"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Press Settings",
+          "sitemap_node_ids": [
+            "desk-live-press-settings",
+            "desk-schema-press-settings-field-log_server",
+            "desk-schema-press-settings-field-suspend_builds",
+            "desk-schema-press-settings-field-branch"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Press Settings",
+          "fields": [
+            "suspend_builds",
+            "use_new_deploy_flow",
+            "use_agent_job_callbacks",
+            "log_server",
+            "monitor_server",
+            "build_server",
+            "offsite_backups_count"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "method",
+          "doctype": null,
+          "method": "frappe.client.get_value",
+          "args": {
+            "doctype": "Press Settings",
+            "fieldname": [
+              "suspend_builds",
+              "use_new_deploy_flow",
+              "use_agent_job_callbacks",
+              "enable_mcp",
+              "log_server",
+              "monitor_server",
+              "build_server",
+              "offsite_backups_count"
+            ]
+          },
+          "returns": "Yalnız istenen alanlar",
+          "permission": "@frappe.whitelist(); Press Settings okuma izni (System User)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              125,
+              179
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "github_access_token ve agent_github_access_token Data tipindedir; tam belge (frappe.client.get) bunları düz metin döndürür.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/press_settings/press_settings.json",
+            "lines": [
+              916,
+              917
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {}
+      },
+      "preconditions": [
+        {
+          "id": "principal.operator",
+          "description": "System User.",
+          "machine": true
+        }
+      ],
+      "side_effects": [],
+      "async": null,
+      "success": "log_server boşsa analytics verisi yoktur; suspend_builds açıksa build başlamaz.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Alan yok",
+            "meaning": "Kurulu Press sürümünde alan farklı",
+            "next": "unknown olarak raporla"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Press Settings → Branch global agent ayarıdır; Use for Build kutusu uç nokta oluşturmaz; Update Agent/Ansible rastgele çalıştırılmaz.",
+        "enable_mcp alanı runtime isteğinde yer alır; DocType JSON'unda bu kontrat için doğrulanmadı."
+      ]
+    },
+    {
+      "id": "payment.method",
+      "family": "access",
+      "title": "Ödeme yöntemi ekle / ödeme uyarısını ele al",
+      "kind": "human",
+      "status": "unsupported",
+      "status_reason": "Ödeme ve kart bilgisi hesap sahibindedir; MCP yapmaz.",
+      "authority": [
+        "account_holder"
+      ],
+      "owner_handoff": {
+        "role": "account_holder",
+        "person": null,
+        "steps": [
+          "Billing → Payment Methods'u yalnız hesap sahibi kullanır.",
+          "Uyarı ile build/upload hataları arasında bağlantı varsayılmaz."
+        ],
+        "acceptance": "Hesap sahibi kararı kayıtlı; kart bilgisi hiçbir çıktıda yok."
+      },
+      "guide_steps": [
+        "live-site-header"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Billing → Payment Methods",
+          "sitemap_node_ids": [
+            "dashboard-billing-payment-methods",
+            "dashboard-billing-payment-methods-component-1"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Sites → Add payment mode uyarısı",
+          "sitemap_node_ids": [
+            "dashboard-global-sites-component-8"
+          ]
+        }
+      ],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "account_holder",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Ödeme sağlayıcı formu.",
+          "source": null
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Ücretlendirme."
+      ],
+      "async": null,
+      "success": "Desteklenmez; hesap sahibi yapar.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Uygulanmaz."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "unverified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "site.legal_acceptance",
+      "family": "access",
+      "title": "Site oluştururken bölgesel yasal metni kabul et",
+      "kind": "human",
+      "status": "unsupported",
+      "status_reason": "Yasal kabul hesap sahibinin açık kararıdır; Press'te ayrı API doğrulanmadı ve MCP işaretlemez.",
+      "authority": [
+        "account_holder"
+      ],
+      "owner_handoff": {
+        "role": "account_holder",
+        "person": null,
+        "steps": [
+          "Metni oku; kabul ediyorsan kutuyu kendin işaretle.",
+          "İsteğe bağlı ortak kutusunu kapalı bırak."
+        ],
+        "acceptance": "Kabul hesap sahibinin eylemiyle verildi."
+      },
+      "guide_steps": [
+        "site"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "New Site formu → bölgesel yasal kutu",
+          "sitemap_node_ids": [
+            "dashboard-group-sites-component-3"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Cluster",
+          "fields": [
+            "title",
+            "country"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "account_holder",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Dashboard New Site formu.",
+          "source": null
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Desteklenmez; hesap sahibi yapar.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Metinde bölge null",
+            "meaning": "Cluster title/country boş",
+            "next": "cluster.catalog_label devri"
+          }
+        ],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Uygulanmaz."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "unverified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    }
+  ]
+}

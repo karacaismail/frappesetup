@@ -1,0 +1,2624 @@
+{
+  "family": "app_dev",
+  "operations": [
+    {
+      "id": "app.inspect",
+      "family": "app_dev",
+      "title": "Workspace'teki Frappe uygulamasının yapısını oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "app_inspect workspace içi salt okunur yapı okuması runtime'da.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "new-app",
+        "identity-error",
+        "live-apps"
+      ],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_inspect",
+          "args": {
+            "app_path": "workspace içi yol",
+            "files": "isteğe bağlı, en çok 20 göreli yol"
+          },
+          "returns": "app_name (hooks.py), required_apps, modüller, DocType'lar, patches.txt bölümleri, fixtures; files verilirse içerik ve sha256 aynı okumada, güvenilmeyen veri zarfında",
+          "permission": "Workspace kökü",
+          "reason": null,
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "Frappe yeni uygulama iskeleti (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/utils/boilerplate.py",
+            "lines": [
+              134,
+              205
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "Frappe yeni uygulama iskeleti (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/utils/boilerplate.py",
+            "lines": [
+              136,
+              213
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "app_path"
+        ],
+        "properties": {
+          "app_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "[A-Za-z0-9_.][A-Za-z0-9_./-]*"
+          },
+          "files": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300,
+              "pattern": "[A-Za-z0-9_][A-Za-z0-9_./-]*"
+            }
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "hooks.py app_name, required_apps ve modül yapısı okunur (ör. education → required_apps erpnext); files ile okunan sha256 app_file.write için expected_sha256 değeridir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "hooks.py yok",
+            "meaning": "Frappe uygulaması değil ya da yanlış yol",
+            "next": "Doğru app_path ver"
+          }
+        ],
+        "timeout": "Yerel; yok.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "app_inspect"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Kılavuzdaki App kimliği doğrulaması (educator değil education) bu okumayla yapılır."
+      ]
+    },
+    {
+      "id": "app.check",
+      "family": "app_dev",
+      "title": "Uygulamayı statik kurallarla denetle (hedef Frappe sürümüne göre)",
+      "kind": "analysis",
+      "status": "implemented",
+      "status_reason": "app_check frappe-extension-points.json kurallarıyla runtime'da; hedef sürüm yoksa sürüme bağlı kurallar unknown.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_check",
+          "args": {
+            "app_path": "yol",
+            "target_frappe": "version-15 | version-16 | null"
+          },
+          "returns": "Kural ihlalleri (error/warning) ve unknown kurallar",
+          "permission": "Workspace kökü",
+          "reason": null,
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "override_doctype_class (v15: son uygulama kazanır)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/model/base_document.py",
+            "lines": [
+              76,
+              110
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "extend_doctype_class (yalnız v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/model/base_document.py",
+            "lines": [
+              179,
+              208
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "app_path"
+        ],
+        "properties": {
+          "app_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "pattern": "[A-Za-z0-9_.][A-Za-z0-9_./-]*"
+          },
+          "target_frappe": {
+            "type": "string",
+            "enum": [
+              "v15",
+              "v16"
+            ]
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "app.target_frappe_known",
+          "description": "Hedef Frappe sürümü (version-15 / version-16) belirtildi; bilinmiyorsa sürüme bağlı kurallar unknown.",
+          "machine": false
+        }
+      ],
+      "side_effects": [],
+      "async": null,
+      "success": "Kural sonuçları kaynak satırlarıyla döner; kural geçişi işlev testi değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "unknown kurallar",
+            "meaning": "Hedef sürüm verilmedi",
+            "next": "target_frappe ver"
+          }
+        ],
+        "timeout": "Yerel; yok.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "app_check"
+        ]
+      },
+      "skill": "frappe-app-extension",
+      "agent": "frappe-change-reviewer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Bağımsız inceleme yazarla aynı ajan tarafından yapılmaz."
+      ]
+    },
+    {
+      "id": "app.scaffold",
+      "family": "app_dev",
+      "title": "Yeni Frappe uygulaması iskeleti oluştur",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "app_propose_change (change.kind=new_app) → insan onayı → app_apply ile workspace'e atomik yazım runtime'da.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_propose_change → app_apply",
+          "args": {
+            "change.kind": "new_app"
+          },
+          "returns": "Dosya planı, diff, sha256; onaydan sonra atomik yazım",
+          "permission": "Yalnız yapılandırılmış workspace kökü; insan onayı",
+          "reason": "Frappe davranış kaynağı aşağıdaki girdilerdedir.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "bench make-app / boilerplate (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/utils/boilerplate.py",
+            "lines": [
+              22,
+              30
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "bench make-app / boilerplate (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/utils/boilerplate.py",
+            "lines": [
+              23,
+              31
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "app_name",
+          "app_title",
+          "publisher",
+          "email",
+          "description",
+          "license",
+          "target_frappe"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "new_app"
+          },
+          "app_name": {
+            "type": "string",
+            "pattern": "[a-z][a-z0-9_]{1,63}"
+          },
+          "app_title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._()&'-]{0,79}"
+          },
+          "publisher": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[^\\x00-\\x1f\\x7f\\\"\\\\]{1,300}"
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "[^\\x00-\\x1f\\x7f\\\"\\\\]{1,300}"
+          },
+          "license": {
+            "type": "string",
+            "pattern": "[A-Za-z0-9.+-]{2,40}"
+          },
+          "target_frappe": {
+            "type": "string",
+            "enum": [
+              "v15",
+              "v16"
+            ]
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "app.target_frappe_known",
+          "description": "Hedef Frappe sürümü (version-15 / version-16) belirtildi; bilinmiyorsa sürüme bağlı kurallar unknown.",
+          "machine": false
+        },
+        {
+          "id": "app.license_chosen",
+          "description": "Lisans kullanıcı tarafından seçildi.",
+          "machine": false
+        },
+        {
+          "id": "workspace.write_scope",
+          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Workspace'teki uygulama dosyaları değişir; bench/site değişmez."
+      ],
+      "async": null,
+      "success": "Uygulama dizini hooks.py, modules.txt, patches.txt ([pre_model_sync]/[post_model_sync]), pyproject.toml ve lisansla oluşur.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Taban dosya hash'i değişti",
+            "meaning": "Öneriden sonra workspace değişti",
+            "next": "Yeni öneri üret; eski öneri uygulanmaz"
+          },
+          {
+            "signal": "Yol workspace dışında / sembolik bağ",
+            "meaning": "Güvenlik sınırı",
+            "next": "app_path'i workspace içinde ver"
+          },
+          {
+            "signal": "Şema doğrulama hatası (publisher/description/email)",
+            "meaning": "Denetim karakteri, çift tırnak veya ters bölü içeren yayıncı/açıklama ya da geçersiz e-posta reddedilir; üretilen hooks.py/pyproject.toml dizeleri güvenli literal yazılır",
+            "next": "Değeri düz metin olarak düzelt ve yeni öneri üret"
+          }
+        ],
+        "timeout": "Yerel işlem; zaman aşımı yok.",
+        "retry": "Öneri yeniden üretilebilir.",
+        "rollback": "app_apply atomik yazar; geri alma insan veya VCS ile."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "app_propose_change",
+          "app_apply"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Lisans zorunludur; varsayılan atanmaz.",
+        "pyproject requires-python hedef sürüme göre farklıdır (v15 ve v16 iskeletleri ayrı)."
+      ]
+    },
+    {
+      "id": "doctype.create",
+      "family": "app_dev",
+      "title": "Uygulamaya yeni DocType ekle",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "app_propose_change (change.kind=new_doctype) → insan onayı → app_apply ile workspace'e atomik yazım runtime'da.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_propose_change → app_apply",
+          "args": {
+            "change.kind": "new_doctype"
+          },
+          "returns": "Dosya planı, diff, sha256; onaydan sonra atomik yazım",
+          "permission": "Yalnız yapılandırılmış workspace kökü; insan onayı",
+          "reason": "Frappe davranış kaynağı aşağıdaki girdilerdedir.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "DocType doğrulaması (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/core/doctype/doctype/doctype.py",
+            "lines": [
+              185,
+              231
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "DocType doğrulaması (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/core/doctype/doctype/doctype.py",
+            "lines": [
+              187,
+              232
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "module",
+          "doctype",
+          "fields"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "new_doctype"
+          },
+          "module": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 61,
+            "pattern": "[A-Za-z][A-Za-z0-9 ]{0,60}"
+          },
+          "doctype": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 61,
+            "pattern": "[A-Z][A-Za-z0-9 ]{1,60}"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 150,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "fieldname",
+                "fieldtype",
+                "label"
+              ],
+              "properties": {
+                "fieldname": {
+                  "type": "string",
+                  "pattern": "[a-z][a-z0-9_]{0,63}"
+                },
+                "fieldtype": {
+                  "type": "string",
+                  "enum": [
+                    "Data",
+                    "Int",
+                    "Float",
+                    "Currency",
+                    "Percent",
+                    "Check",
+                    "Date",
+                    "Datetime",
+                    "Time",
+                    "Duration",
+                    "Link",
+                    "Dynamic Link",
+                    "Select",
+                    "Small Text",
+                    "Text",
+                    "Long Text",
+                    "Text Editor",
+                    "Markdown Editor",
+                    "Code",
+                    "JSON",
+                    "Attach",
+                    "Attach Image",
+                    "Phone",
+                    "Rating",
+                    "Color",
+                    "Read Only",
+                    "Table",
+                    "Table MultiSelect",
+                    "Section Break",
+                    "Column Break",
+                    "Tab Break",
+                    "HTML",
+                    "Signature",
+                    "Geolocation"
+                  ]
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 140
+                },
+                "options": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "reqd": {
+                  "type": "boolean"
+                },
+                "in_list_view": {
+                  "type": "boolean"
+                },
+                "unique": {
+                  "type": "boolean"
+                },
+                "read_only": {
+                  "type": "boolean"
+                },
+                "default": {
+                  "type": "string",
+                  "maxLength": 140
+                }
+              }
+            }
+          },
+          "istable": {
+            "type": "boolean"
+          },
+          "naming_rule": {
+            "type": "string",
+            "maxLength": 140
+          },
+          "permissions": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "role"
+              ],
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 140
+                },
+                "read": {
+                  "type": "boolean"
+                },
+                "write": {
+                  "type": "boolean"
+                },
+                "create": {
+                  "type": "boolean"
+                },
+                "delete": {
+                  "type": "boolean"
+                },
+                "submit": {
+                  "type": "boolean"
+                },
+                "cancel": {
+                  "type": "boolean"
+                },
+                "amend": {
+                  "type": "boolean"
+                },
+                "report": {
+                  "type": "boolean"
+                },
+                "export": {
+                  "type": "boolean"
+                },
+                "share": {
+                  "type": "boolean"
+                },
+                "print": {
+                  "type": "boolean"
+                },
+                "email": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "target_frappe": {
+            "type": "string",
+            "enum": [
+              "v15",
+              "v16"
+            ]
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "workspace.write_scope",
+          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Workspace'teki uygulama dosyaları değişir; bench/site değişmez."
+      ],
+      "async": null,
+      "success": "DocType JSON + controller + test iskeleti modül altında oluşur; migrate ile senkronize edilir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Taban dosya hash'i değişti",
+            "meaning": "Öneriden sonra workspace değişti",
+            "next": "Yeni öneri üret; eski öneri uygulanmaz"
+          },
+          {
+            "signal": "Yol workspace dışında / sembolik bağ",
+            "meaning": "Güvenlik sınırı",
+            "next": "app_path'i workspace içinde ver"
+          }
+        ],
+        "timeout": "Yerel işlem; zaman aşımı yok.",
+        "retry": "Öneri yeniden üretilebilir.",
+        "rollback": "app_apply atomik yazar; geri alma insan veya VCS ile."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "app_propose_change",
+          "app_apply"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "İzinler (permissions[]) oluştururken verilir; sonradan değişiklik doctype.permissions kapsamındadır."
+      ]
+    },
+    {
+      "id": "child_table.create",
+      "family": "app_dev",
+      "title": "Alt tablo DocType'ı ve üst DocType'ta Table alanı ekle",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "app_propose_change (change.kind=add_child_table) → insan onayı → app_apply ile workspace'e atomik yazım runtime'da.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_propose_change → app_apply",
+          "args": {
+            "change.kind": "add_child_table"
+          },
+          "returns": "Dosya planı, diff, sha256; onaydan sonra atomik yazım",
+          "permission": "Yalnız yapılandırılmış workspace kökü; insan onayı",
+          "reason": "Frappe davranış kaynağı aşağıdaki girdilerdedir.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "istable alanı (v15 DocType şeması)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/core/doctype/doctype/doctype.json",
+            "lines": [
+              132,
+              133
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "istable alanı (v16 DocType şeması)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/core/doctype/doctype/doctype.json",
+            "lines": [
+              137,
+              138
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "module",
+          "parent_doctype",
+          "child_doctype",
+          "table_fieldname",
+          "label",
+          "fields"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_child_table"
+          },
+          "module": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 61,
+            "pattern": "[A-Za-z][A-Za-z0-9 ]{0,60}"
+          },
+          "parent_doctype": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 61,
+            "pattern": "[A-Z][A-Za-z0-9 ]{1,60}"
+          },
+          "child_doctype": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 61,
+            "pattern": "[A-Z][A-Za-z0-9 ]{1,60}"
+          },
+          "table_fieldname": {
+            "type": "string",
+            "pattern": "[a-z][a-z0-9_]{0,63}"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "fieldname",
+                "fieldtype",
+                "label"
+              ],
+              "properties": {
+                "fieldname": {
+                  "type": "string",
+                  "pattern": "[a-z][a-z0-9_]{0,63}"
+                },
+                "fieldtype": {
+                  "type": "string",
+                  "enum": [
+                    "Data",
+                    "Int",
+                    "Float",
+                    "Currency",
+                    "Percent",
+                    "Check",
+                    "Date",
+                    "Datetime",
+                    "Time",
+                    "Duration",
+                    "Link",
+                    "Dynamic Link",
+                    "Select",
+                    "Small Text",
+                    "Text",
+                    "Long Text",
+                    "Text Editor",
+                    "Markdown Editor",
+                    "Code",
+                    "JSON",
+                    "Attach",
+                    "Attach Image",
+                    "Phone",
+                    "Rating",
+                    "Color",
+                    "Read Only",
+                    "Table",
+                    "Table MultiSelect",
+                    "Section Break",
+                    "Column Break",
+                    "Tab Break",
+                    "HTML",
+                    "Signature",
+                    "Geolocation"
+                  ]
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 140
+                },
+                "options": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "reqd": {
+                  "type": "boolean"
+                },
+                "in_list_view": {
+                  "type": "boolean"
+                },
+                "unique": {
+                  "type": "boolean"
+                },
+                "read_only": {
+                  "type": "boolean"
+                },
+                "default": {
+                  "type": "string",
+                  "maxLength": 140
+                }
+              }
+            }
+          },
+          "target_frappe": {
+            "type": "string",
+            "enum": [
+              "v15",
+              "v16"
+            ]
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "workspace.write_scope",
+          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Workspace'teki uygulama dosyaları değişir; bench/site değişmez."
+      ],
+      "async": null,
+      "success": "istable=1 alt DocType ve üst DocType'ta options'ı alt tabloya işaret eden Table alanı oluşur.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Taban dosya hash'i değişti",
+            "meaning": "Öneriden sonra workspace değişti",
+            "next": "Yeni öneri üret; eski öneri uygulanmaz"
+          },
+          {
+            "signal": "Yol workspace dışında / sembolik bağ",
+            "meaning": "Güvenlik sınırı",
+            "next": "app_path'i workspace içinde ver"
+          }
+        ],
+        "timeout": "Yerel işlem; zaman aşımı yok.",
+        "retry": "Öneri yeniden üretilebilir.",
+        "rollback": "app_apply atomik yazar; geri alma insan veya VCS ile."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "app_propose_change",
+          "app_apply"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "hooks.doc_event",
+      "family": "app_dev",
+      "title": "hooks.py doc_events ile belge olayına işleyici bağla",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "app_propose_change (change.kind=add_doc_event) → insan onayı → app_apply ile workspace'e atomik yazım runtime'da.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_propose_change → app_apply",
+          "args": {
+            "change.kind": "add_doc_event"
+          },
+          "returns": "Dosya planı, diff, sha256; onaydan sonra atomik yazım",
+          "permission": "Yalnız yapılandırılmış workspace kökü; insan onayı",
+          "reason": "Frappe davranış kaynağı aşağıdaki girdilerdedir.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "get_doc_hooks (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/__init__.py",
+            "lines": [
+              1580,
+              1594
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "Document.run_method (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/model/document.py",
+            "lines": [
+              1002,
+              1023
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "get_doc_hooks (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/__init__.py",
+            "lines": [
+              948,
+              962
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "Document.run_method (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/model/document.py",
+            "lines": [
+              1247,
+              1269
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "doctype",
+          "event",
+          "handler"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_doc_event"
+          },
+          "doctype": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 61,
+            "pattern": "[A-Z][A-Za-z0-9 ]{1,60}"
+          },
+          "event": {
+            "type": "string",
+            "enum": [
+              "before_validate",
+              "validate",
+              "before_insert",
+              "after_insert",
+              "before_save",
+              "on_update",
+              "before_submit",
+              "on_submit",
+              "before_cancel",
+              "on_cancel",
+              "on_trash",
+              "after_delete",
+              "on_change",
+              "on_update_after_submit",
+              "before_rename",
+              "after_rename"
+            ]
+          },
+          "handler": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "[a-z_][a-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "workspace.write_scope",
+          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Workspace'teki uygulama dosyaları değişir; bench/site değişmez."
+      ],
+      "async": null,
+      "success": "hooks.py doc_events girdisi ve işleyici fonksiyonu eklenir; çekirdek dosyalara dokunulmaz.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Taban dosya hash'i değişti",
+            "meaning": "Öneriden sonra workspace değişti",
+            "next": "Yeni öneri üret; eski öneri uygulanmaz"
+          },
+          {
+            "signal": "Yol workspace dışında / sembolik bağ",
+            "meaning": "Güvenlik sınırı",
+            "next": "app_path'i workspace içinde ver"
+          }
+        ],
+        "timeout": "Yerel işlem; zaman aşımı yok.",
+        "retry": "Öneri yeniden üretilebilir.",
+        "rollback": "app_apply atomik yazar; geri alma insan veya VCS ile."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "app_propose_change",
+          "app_apply"
+        ]
+      },
+      "skill": "frappe-app-extension",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Karar sırasında fixtures/Custom Field'dan sonra ilk tercih edilen kod genişletmesidir."
+      ]
+    },
+    {
+      "id": "hooks.extend_class",
+      "family": "app_dev",
+      "title": "DocType controller'ını genişlet (v16 extend_doctype_class) ya da geçersiz kıl (override_doctype_class)",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "app_propose_change (change.kind=extend_doctype_class) → insan onayı → app_apply ile workspace'e atomik yazım runtime'da.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_propose_change → app_apply",
+          "args": {
+            "change.kind": "extend_doctype_class"
+          },
+          "returns": "Dosya planı, diff, sha256; onaydan sonra atomik yazım",
+          "permission": "Yalnız yapılandırılmış workspace kökü; insan onayı",
+          "reason": "Frappe davranış kaynağı aşağıdaki girdilerdedir.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "override_doctype_class (v15, son uygulama kazanır)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/model/base_document.py",
+            "lines": [
+              76,
+              110
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "override_doctype_class (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/model/base_document.py",
+            "lines": [
+              97,
+              140
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "extend_doctype_class (yalnız v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/model/base_document.py",
+            "lines": [
+              179,
+              208
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "doctype",
+          "base_class",
+          "mode",
+          "target_frappe"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "extend_doctype_class"
+          },
+          "doctype": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 61,
+            "pattern": "[A-Z][A-Za-z0-9 ]{1,60}"
+          },
+          "base_class": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "[a-z_][a-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "extend",
+              "override"
+            ]
+          },
+          "target_frappe": {
+            "type": "string",
+            "enum": [
+              "v15",
+              "v16"
+            ]
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "app.target_frappe_known",
+          "description": "Hedef Frappe sürümü (version-15 / version-16) belirtildi; bilinmiyorsa sürüme bağlı kurallar unknown.",
+          "machine": false
+        },
+        {
+          "id": "workspace.write_scope",
+          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Workspace'teki uygulama dosyaları değişir; bench/site değişmez."
+      ],
+      "async": null,
+      "success": "mode=extend yalnız v16'da uygulanır; v15'te yalnız override ve tek kazanan uyarısıyla.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Taban dosya hash'i değişti",
+            "meaning": "Öneriden sonra workspace değişti",
+            "next": "Yeni öneri üret; eski öneri uygulanmaz"
+          },
+          {
+            "signal": "Yol workspace dışında / sembolik bağ",
+            "meaning": "Güvenlik sınırı",
+            "next": "app_path'i workspace içinde ver"
+          }
+        ],
+        "timeout": "Yerel işlem; zaman aşımı yok.",
+        "retry": "Öneri yeniden üretilebilir.",
+        "rollback": "app_apply atomik yazar; geri alma insan veya VCS ile."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "app_propose_change",
+          "app_apply"
+        ]
+      },
+      "skill": "frappe-app-extension",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "v15 hedefinde extend istenirse öneri reddedilir (frappe-extension-points.json)."
+      ]
+    },
+    {
+      "id": "patch.create",
+      "family": "app_dev",
+      "title": "patches.txt'e veri yaması ekle (pre/post_model_sync)",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "app_propose_change (change.kind=add_patch) → insan onayı → app_apply ile workspace'e atomik yazım runtime'da.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_propose_change → app_apply",
+          "args": {
+            "change.kind": "add_patch"
+          },
+          "returns": "Dosya planı, diff, sha256; onaydan sonra atomik yazım",
+          "permission": "Yalnız yapılandırılmış workspace kökü; insan onayı",
+          "reason": "Frappe davranış kaynağı aşağıdaki girdilerdedir.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "patches.txt bölümleri (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/modules/patch_handler.py",
+            "lines": [
+              115,
+              136
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "patches.txt bölümleri (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/modules/patch_handler.py",
+            "lines": [
+              132,
+              153
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "patch_name",
+          "description",
+          "section"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_patch"
+          },
+          "patch_name": {
+            "type": "string",
+            "pattern": "[a-z][a-z0-9_]{2,80}"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "pattern": "[^\\x00-\\x1f\\x7f\\\"\\\\]{1,300}"
+          },
+          "section": {
+            "type": "string",
+            "enum": [
+              "pre_model_sync",
+              "post_model_sync"
+            ]
+          },
+          "folder": {
+            "type": "string",
+            "pattern": "v[0-9]{1,2}_[0-9]{1,2}"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "workspace.write_scope",
+          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Workspace'teki uygulama dosyaları değişir; bench/site değişmez."
+      ],
+      "async": null,
+      "success": "Yama modülü ve patches.txt satırı doğru bölüme eklenir; eski şemaya bağlı yamalar post_model_sync'e.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Taban dosya hash'i değişti",
+            "meaning": "Öneriden sonra workspace değişti",
+            "next": "Yeni öneri üret; eski öneri uygulanmaz"
+          },
+          {
+            "signal": "Yol workspace dışında / sembolik bağ",
+            "meaning": "Güvenlik sınırı",
+            "next": "app_path'i workspace içinde ver"
+          },
+          {
+            "signal": "Şema doğrulama hatası (description)",
+            "meaning": "Denetim karakteri, çift tırnak veya ters bölü içeren açıklama reddedilir",
+            "next": "Açıklamayı düz metin olarak düzelt ve yeni öneri üret"
+          }
+        ],
+        "timeout": "Yerel işlem; zaman aşımı yok.",
+        "retry": "Öneri yeniden üretilebilir.",
+        "rollback": "app_apply atomik yazar; geri alma insan veya VCS ile."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "app_propose_change",
+          "app_apply"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "fixtures.filter",
+      "family": "app_dev",
+      "title": "hooks.py fixtures girdisine filtreli DocType ekle (Custom Field / Property Setter)",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "app_propose_change (change.kind=add_fixture_filter) → insan onayı → app_apply ile workspace'e atomik yazım runtime'da.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_propose_change → app_apply",
+          "args": {
+            "change.kind": "add_fixture_filter"
+          },
+          "returns": "Dosya planı, diff, sha256; onaydan sonra atomik yazım",
+          "permission": "Yalnız yapılandırılmış workspace kökü; insan onayı",
+          "reason": "Frappe davranış kaynağı aşağıdaki girdilerdedir.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "export_fixtures (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/utils/fixtures.py",
+            "lines": [
+              63,
+              87
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "export_fixtures (v16: prefix, fixture_auto_order, yasaklı DocType'lar)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/utils/fixtures.py",
+            "lines": [
+              67,
+              114
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "doctype",
+          "filters"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_fixture_filter"
+          },
+          "doctype": {
+            "type": "string",
+            "enum": [
+              "Custom Field",
+              "Property Setter",
+              "Role",
+              "Custom DocPerm",
+              "Workflow",
+              "Workflow State",
+              "Workflow Action Master",
+              "Print Format",
+              "Report",
+              "Client Script"
+            ]
+          },
+          "filters": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": [
+                  "string",
+                  "array"
+                ],
+                "maxLength": 140
+              }
+            }
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "workspace.write_scope",
+          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Workspace'teki uygulama dosyaları değişir; bench/site değişmez."
+      ],
+      "async": null,
+      "success": "fixtures girdisi filtreyle eklenir; dışa aktarma yalnız uygulamanın kendi kayıtlarını içerir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Taban dosya hash'i değişti",
+            "meaning": "Öneriden sonra workspace değişti",
+            "next": "Yeni öneri üret; eski öneri uygulanmaz"
+          },
+          {
+            "signal": "Yol workspace dışında / sembolik bağ",
+            "meaning": "Güvenlik sınırı",
+            "next": "app_path'i workspace içinde ver"
+          }
+        ],
+        "timeout": "Yerel işlem; zaman aşımı yok.",
+        "retry": "Öneri yeniden üretilebilir.",
+        "rollback": "app_apply atomik yazar; geri alma insan veya VCS ile."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "app_propose_change",
+          "app_apply"
+        ]
+      },
+      "skill": "frappe-app-extension",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Filtresiz Custom Field fixture'ı başka uygulamaların alanlarını da taşır; filtre zorunlu tutulur."
+      ]
+    },
+    {
+      "id": "tests.scaffold",
+      "family": "app_dev",
+      "title": "DocType için test iskeleti ekle",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "app_propose_change (change.kind=add_test) → insan onayı → app_apply ile workspace'e atomik yazım runtime'da.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_propose_change → app_apply",
+          "args": {
+            "change.kind": "add_test"
+          },
+          "returns": "Dosya planı, diff, sha256; onaydan sonra atomik yazım",
+          "permission": "Yalnız yapılandırılmış workspace kökü; insan onayı",
+          "reason": "Frappe davranış kaynağı aşağıdaki girdilerdedir.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "FrappeTestCase (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/tests/utils.py",
+            "lines": [
+              20,
+              20
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "IntegrationTestCase (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/tests/classes/integration_test_case.py",
+            "lines": [
+              20,
+              20
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "FrappeTestCase uyumluluk takma adı (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Frappe kaynak kanıtı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/tests/utils/__init__.py",
+            "lines": [
+              75,
+              75
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "doctype",
+          "target_frappe"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_test"
+          },
+          "doctype": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 61,
+            "pattern": "[A-Z][A-Za-z0-9 ]{1,60}"
+          },
+          "target_frappe": {
+            "type": "string",
+            "enum": [
+              "v15",
+              "v16"
+            ]
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "app.target_frappe_known",
+          "description": "Hedef Frappe sürümü (version-15 / version-16) belirtildi; bilinmiyorsa sürüme bağlı kurallar unknown.",
+          "machine": false
+        },
+        {
+          "id": "workspace.write_scope",
+          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Workspace'teki uygulama dosyaları değişir; bench/site değişmez."
+      ],
+      "async": null,
+      "success": "Hedef sürüme uygun test sınıfıyla dosya oluşur; testler insan tarafından bench'te çalıştırılır.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Taban dosya hash'i değişti",
+            "meaning": "Öneriden sonra workspace değişti",
+            "next": "Yeni öneri üret; eski öneri uygulanmaz"
+          },
+          {
+            "signal": "Yol workspace dışında / sembolik bağ",
+            "meaning": "Güvenlik sınırı",
+            "next": "app_path'i workspace içinde ver"
+          }
+        ],
+        "timeout": "Yerel işlem; zaman aşımı yok.",
+        "retry": "Öneri yeniden üretilebilir.",
+        "rollback": "app_apply atomik yazar; geri alma insan veya VCS ile."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "app_propose_change",
+          "app_apply"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "doctype.permissions",
+      "family": "app_dev",
+      "title": "Var olan DocType'ın rol izinlerini değiştir",
+      "kind": "mutation",
+      "status": "planned",
+      "status_reason": "DocPerm kaynağı doğrulandı; izin değişikliği güvenlik incelemesi gerektirdiğinden ayrı değişiklik türü henüz yok. write_file izin değişikliğini kod düzeyinde reddeder.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "DocPerm alanları (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/core/doctype/docperm/docperm.json",
+            "lines": [
+              41,
+              42
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "has_permission hook'u (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/permissions.py",
+            "lines": [
+              76,
+              206
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Rol erişimi değişir."
+      ],
+      "async": null,
+      "success": "İzin değişikliği bağımsız incelemeden geçer.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmadı.",
+        "retry": "Uygulanmadı.",
+        "rollback": "VCS ile geri alınır."
+      },
+      "risk": "write",
+      "approval": "double",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "assets.include",
+      "family": "app_dev",
+      "title": "Desk JS/CSS paketini hooks.py ile dahil et",
+      "kind": "mutation",
+      "status": "planned",
+      "status_reason": "app_include_js/css davranışı doğrulandı. JS/CSS dosyaları ve hooks satırı app_file.write ile insan onayıyla yazılabilir; ayrı tipli değişiklik türü (build ve paket boyutu denetimiyle) planlı.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_include_js (v15 /app)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/www/app.py",
+            "lines": [
+              47,
+              47
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_include_js (v16 /desk)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/www/desk.py",
+            "lines": [
+              68,
+              68
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Desk'te her sayfaya yüklenen varlık."
+      ],
+      "async": null,
+      "success": "Varlık bench build sonrası yüklenir.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmadı.",
+        "retry": "Uygulanmadı.",
+        "rollback": "hooks satırı kaldırılır."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "v16'da Desk yolu /desk'tir (kılavuz: /desk/education)."
+      ]
+    },
+    {
+      "id": "localization.translations",
+      "family": "app_dev",
+      "title": "Uygulama çevirilerini yönet (CSV / PO)",
+      "kind": "mutation",
+      "status": "planned",
+      "status_reason": "v15 ve v16'da hem translations/*.csv hem gettext PO katalogları var. .csv/.po/.pot dosyaları app_file.write ile insan onayıyla yazılabilir; biçim seçimi proje kararı olduğundan ayrı tipli tür planlı.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "CSV çeviri okuma (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/translate.py",
+            "lines": [
+              192,
+              195
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "PO kataloğu (v15 gettext)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/gettext/translate.py",
+            "lines": [
+              57,
+              58
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "PO kataloğu (v16 gettext)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/gettext/translate.py",
+            "lines": [
+              57,
+              58
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Çeviriler seçilen biçimde ve derlenmiş olarak yüklenir.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmadı.",
+        "retry": "Uygulanmadı.",
+        "rollback": "Dosya değişikliği geri alınır."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "app.install_local",
+      "family": "app_dev",
+      "title": "Uygulamayı yerel geliştirme sitesine kur",
+      "kind": "human",
+      "status": "unsupported",
+      "status_reason": "Yerel bench komutu; MCP shell çalıştırmaz, komut metni geliştiriciye verilir.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": {
+        "role": "app_developer",
+        "person": null,
+        "steps": [
+          "Geliştirme sitesinde çalıştır: bench --site <site> install-app <app>",
+          "Çıktıyı ve çıkış kodunu kaydet."
+        ],
+        "acceptance": "install-app çıkış kodu 0 ve uygulama sitede kurulu."
+      },
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "human",
+          "doctype": null,
+          "method": "bench --site <site> install-app <app>",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Yerel terminal.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "install-app (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Komutun Frappe kaynağı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/commands/site.py",
+            "lines": [
+              477,
+              509
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "install-app (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Komutun Frappe kaynağı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/commands/site.py",
+            "lines": [
+              505,
+              537
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "site.development_only",
+          "description": "Üretim sitesinde çalıştırılmaz.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Geliştirme sitesinin veritabanı değişir."
+      ],
+      "async": null,
+      "success": "install-app çıkış kodu 0 ve uygulama sitede kurulu.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Komut hata kodu",
+            "meaning": "Kurulum/migrasyon/test hatası",
+            "next": "Çıktıyı app.check ve inceleme ile değerlendir"
+          }
+        ],
+        "timeout": "İnsan yürütür.",
+        "retry": "İnsan karar verir.",
+        "rollback": "Geliştirme sitesi yedekten döner."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "app.migrate_local",
+      "family": "app_dev",
+      "title": "Yerel geliştirme sitesinde migrate çalıştır",
+      "kind": "human",
+      "status": "unsupported",
+      "status_reason": "Yerel bench komutu; MCP shell çalıştırmaz, komut metni geliştiriciye verilir.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": {
+        "role": "app_developer",
+        "person": null,
+        "steps": [
+          "Geliştirme sitesinde çalıştır: bench --site <site> migrate",
+          "Çıktıyı ve çıkış kodunu kaydet."
+        ],
+        "acceptance": "migrate çıkış kodu 0; yamalar ve fixtures uygulandı."
+      },
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "human",
+          "doctype": null,
+          "method": "bench --site <site> migrate",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Yerel terminal.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "migrate (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Komutun Frappe kaynağı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/commands/site.py",
+            "lines": [
+              683,
+              698
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "migrate (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Komutun Frappe kaynağı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/commands/site.py",
+            "lines": [
+              712,
+              726
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "site.development_only",
+          "description": "Üretim sitesinde çalıştırılmaz.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Geliştirme sitesinin veritabanı değişir."
+      ],
+      "async": null,
+      "success": "migrate çıkış kodu 0; yamalar ve fixtures uygulandı.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Komut hata kodu",
+            "meaning": "Kurulum/migrasyon/test hatası",
+            "next": "Çıktıyı app.check ve inceleme ile değerlendir"
+          }
+        ],
+        "timeout": "İnsan yürütür.",
+        "retry": "İnsan karar verir.",
+        "rollback": "Geliştirme sitesi yedekten döner."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "app.run_tests_local",
+      "family": "app_dev",
+      "title": "Uygulama testlerini yerel sitede çalıştır",
+      "kind": "human",
+      "status": "unsupported",
+      "status_reason": "Yerel bench komutu; MCP shell çalıştırmaz, komut metni geliştiriciye verilir.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": {
+        "role": "app_developer",
+        "person": null,
+        "steps": [
+          "Geliştirme sitesinde çalıştır: bench --site <site> run-tests --app <app>",
+          "Çıktıyı ve çıkış kodunu kaydet."
+        ],
+        "acceptance": "Testler geçti; çıktı kaydedildi."
+      },
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "human",
+          "doctype": null,
+          "method": "bench --site <site> run-tests --app <app>",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Yerel terminal.",
+          "source": null
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "run-tests (v15)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Komutun Frappe kaynağı",
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/commands/utils.py",
+            "lines": [
+              752,
+              809
+            ]
+          }
+        },
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "run-tests (v16)",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Komutun Frappe kaynağı",
+          "source": {
+            "source_id": "frappe_v16",
+            "path": "frappe/commands/testing.py",
+            "lines": [
+              320,
+              382
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "site.development_only",
+          "description": "Üretim sitesinde çalıştırılmaz.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Geliştirme sitesinin veritabanı değişir."
+      ],
+      "async": null,
+      "success": "Testler geçti; çıktı kaydedildi.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Komut hata kodu",
+            "meaning": "Kurulum/migrasyon/test hatası",
+            "next": "Çıktıyı app.check ve inceleme ile değerlendir"
+          }
+        ],
+        "timeout": "İnsan yürütür.",
+        "retry": "İnsan karar verir.",
+        "rollback": "Geliştirme sitesi yedekten döner."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "app_file.write",
+      "family": "app_dev",
+      "title": "Uygulamada tek dosya oluştur veya güncelle (geliştiricinin yazdığı kod/test/metin)",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "app_propose_change (change.kind=write_file) → insan onayı → app_apply ile tek dosyanın atomik yazımı runtime'da.",
+      "authority": [
+        "app_developer"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "local",
+          "doctype": null,
+          "method": "app_propose_change → app_apply",
+          "args": {
+            "change.kind": "write_file",
+            "path": "uygulamaya göre göreli",
+            "content": "≤ 200 KiB metin (kayıtta bir kez saklanır; kayıt sınırı 1 MiB)",
+            "purpose": "str",
+            "expected_sha256": "var olan dosyada zorunlu (app_inspect files çıktısından); yalnız yeni dosyada null"
+          },
+          "returns": "Diff ve sha256 içeren öneri; onaydan sonra atomik yazım (taban sha256 değiştiyse reddedilir, tek kullanım)",
+          "permission": "Yalnız yapılandırılmış workspace; uzantılar .py .js .ts .vue .json .html .css .scss .md .txt .csv .po .pot",
+          "reason": "Python yalnız ast.parse, JSON yalnız json.loads ile denetlenir; kod çalıştırılmaz veya import edilmez.",
+          "source": null
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "path",
+          "content",
+          "purpose"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "write_file"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "[A-Za-z0-9_][A-Za-z0-9_./-]*"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 204800
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "pattern": "[^\\x00-\\x1f\\x7f\\\"\\\\]{1,300}"
+          },
+          "expected_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "[0-9a-f]{64}"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "workspace.write_scope",
+          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "machine": false
+        },
+        {
+          "id": "file.base_hash_matches",
+          "description": "Var olan dosyada expected_sha256 zorunlu ve diskteki dosyayla aynı (değer app_inspect files çıktısından); yeni dosyada dosya yok.",
+          "machine": false
+        },
+        {
+          "id": "file.no_permission_change",
+          "description": "DocType JSON permissions değişikliği, izinli yeni DocType JSON'u ve izin/rol fixture'ı yazılmaz; resmi uygulamalar (press dahil) salt okunur.",
+          "machine": false
+        },
+        {
+          "id": "file.extension_allowed",
+          "description": "Uzantı izinli listede ve içerik ≤ 200 KiB.",
+          "machine": false
+        },
+        {
+          "id": "python.rules_clean",
+          "description": "Python içeriği EXT001 (resmi modül monkey patch) ve SEC002 (biçimlenmiş SQL) içermez.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Workspace'te tek dosya oluşur veya değişir; bench/site değişmez."
+      ],
+      "async": null,
+      "success": "Dosya önerilen sha256 ile yazıldı; davranış ancak geliştiricinin koştuğu testlerin gerçek çıktısıyla doğrulanır.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "denied_path",
+            "meaning": "Yol workspace dışında, gizli bileşenli ya da yasaklı adlı",
+            "next": "Uygulama içinde izinli bir yol seç"
+          },
+          {
+            "signal": "official_app_read_only",
+            "meaning": "Resmi uygulama deposu/paketi salt okunur",
+            "next": "Değişikliği kendi uygulamanda hooks/fixtures ile yap"
+          },
+          {
+            "signal": "conflict",
+            "meaning": "Taban sha256 değişti ya da var olan dosyada expected_sha256 verilmedi",
+            "next": "app_inspect files ile dosyayı yeniden oku ve yeni öneri üret"
+          },
+          {
+            "signal": "invalid syntax / JSON",
+            "meaning": "ast.parse veya json.loads başarısız (sunucu Python'u uygulamanın requires-python alt sınırına yetişiyorsa kesin)",
+            "next": "İçeriği düzelt"
+          },
+          {
+            "signal": "syntax_unknown_on_older_server",
+            "meaning": "Sunucu Python'u hedefe yetişmiyor; dosya UNCHECKED: yalnız metin taraması (EXT001/SEC002) yapılır, onay çift olur ve ifade 'UNCHECKED <yol>'",
+            "next": "Geliştirici hedef Python'la doğrular"
+          },
+          {
+            "signal": "masked_content_refused",
+            "meaning": "İçerik mevcut dosyada olmayan [REDACTED] maskesi taşıyor",
+            "next": "app_inspect files birebir metni döndürür; maskesiz içerikle yeni öneri"
+          },
+          {
+            "signal": "case_mismatch",
+            "meaning": "Yol diskteki adla birebir (büyük/küçük harf) aynı değil",
+            "next": "Diskteki adı app_inspect ile oku"
+          },
+          {
+            "signal": "failed_partial",
+            "meaning": "app_apply çok dosyada bir yolu geri alamadı; sonuç geri alınamayan yolları listeler",
+            "next": "Listelenen yolları git ile insan düzeltir"
+          },
+          {
+            "signal": "permission_change_refused",
+            "meaning": "DocType izinleri, izinli yeni DocType veya izin/rol fixture'ı",
+            "next": "İzin değişikliği ayrı incelemeyle insan tarafından yapılır (doctype.permissions planned)"
+          },
+          {
+            "signal": "blocked rule (EXT001 / SEC002)",
+            "meaning": "Monkey patch veya biçimlenmiş SQL",
+            "next": "Genişletme noktası ve parametreli sorgu kullan"
+          },
+          {
+            "signal": "writes_disabled",
+            "meaning": "Yapılandırmada yazma kapalı",
+            "next": "Yapılandırmayı insan açar"
+          }
+        ],
+        "timeout": "Yerel işlem; zaman aşımı yok.",
+        "retry": "Öneri yeniden üretilebilir.",
+        "rollback": "git ile dosya geri alınır (MCP silmez)."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "app_propose_change",
+          "proposal_get",
+          "app_apply"
+        ]
+      },
+      "skill": "frappe-custom-app",
+      "agent": "frappe-app-developer",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Diğer değişiklik türleri iskelet üretir; bu işlem geliştiricinin yazdığı gerçek kod ve testler içindir.",
+        "approval single; UNCHECKED dosyada (sunucu Python'u hedefe yetişmiyor) runtime çift onay ister: 'UNCHECKED <yol>'."
+      ]
+    }
+  ]
+}

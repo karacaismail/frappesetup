@@ -1,0 +1,1063 @@
+{
+  "family": "jobs_diagnostics",
+  "operations": [
+    {
+      "id": "agent_job.list",
+      "family": "jobs_diagnostics",
+      "title": "Agent Job listesini tür, sunucu ve referansa göre filtrele",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "Operator açık alanlı get_list; team site/bench/server iş listeleri runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-no-job-at-preparing",
+        "hata-tanisi",
+        "live-agent-jobs"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Agent Job List (Job Type, Server, Reference Name filtreleri)",
+          "sitemap_node_ids": [
+            "desk-live-type-agent-job-list"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Jobs",
+          "sitemap_node_ids": [
+            "dashboard-group-jobs",
+            "dashboard-group-jobs-component-4"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Agent Job",
+          "fields": [
+            "name",
+            "job_type",
+            "status",
+            "server",
+            "bench",
+            "site",
+            "reference_doctype",
+            "reference_name",
+            "request_path",
+            "request_method",
+            "start",
+            "end",
+            "duration",
+            "output",
+            "traceback"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Agent Job",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": "reference_doctype, reference_name, job_type, server, bench, site, status",
+            "fields": [
+              "name",
+              "job_type",
+              "status",
+              "creation",
+              "start",
+              "end",
+              "duration",
+              "server",
+              "bench",
+              "site",
+              "reference_doctype",
+              "reference_name"
+            ]
+          },
+          "returns": "İş satırları; request_data/request_files/data alınmaz",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.jobs",
+          "args": {
+            "filters": {
+              "name": "Release Group adı (anahtar 'name')"
+            }
+          },
+          "returns": "Grubun bench işleri (Undelivered → Pending)",
+          "permission": "@frappe.whitelist(); @protected(\"Release Group\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              883,
+              901
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.jobs",
+          "args": {
+            "filters": {
+              "site": "site"
+            }
+          },
+          "returns": "Site işleri",
+          "permission": "@frappe.whitelist(); @protected(\"Site\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              670,
+              685
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.server.jobs",
+          "args": {
+            "filters": {
+              "server": "Server"
+            }
+          },
+          "returns": "Sunucu işleri",
+          "permission": "@frappe.whitelist(); @protected([\"Server\", \"Database Server\"])",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/server.py",
+            "lines": [
+              992,
+              1007
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "site": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 253,
+            "pattern": "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+"
+          },
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "reference_doctype": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "reference_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "job_type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "server": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Run Remote Builder / New Bench / New Site işleri build, bench veya site kimliği ve zamanla eşleştirildi.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Filtreli liste boş",
+            "meaning": "Build kaydındaki Connections filtresi işi göstermeyebilir",
+            "next": "Filtreyi kaldırıp tür, sunucu ve tarihle ayrıca listele; boş sonucu 'iş yok' sayma"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Başka bir işin Success olması incelenen build'in hatasını ortadan kaldırmaz."
+      ]
+    },
+    {
+      "id": "agent_job.get",
+      "family": "jobs_diagnostics",
+      "title": "Tek Agent Job'un durumunu, adımlarını ve çıktısını oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "Operator açık alanlı get_list (+ Agent Job Step), team press.api.site.job runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-agent-jobs",
+        "live-builder-success",
+        "live-redis-enospc",
+        "live-bench-active"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Agent Job kaydı (Status, Request Path, Reference Name, Steps)",
+          "sitemap_node_ids": [
+            "desk-live-form-agent-job",
+            "desk-schema-agent-job"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Agent Job",
+          "fields": [
+            "name",
+            "job_type",
+            "status",
+            "server",
+            "bench",
+            "site",
+            "reference_doctype",
+            "reference_name",
+            "request_path",
+            "request_method",
+            "start",
+            "end",
+            "duration",
+            "output",
+            "traceback"
+          ],
+          "child_tables": []
+        },
+        {
+          "doctype": "Agent Job Step",
+          "fields": [
+            "agent_job",
+            "step_name",
+            "status",
+            "output",
+            "traceback",
+            "start",
+            "end",
+            "duration"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Agent Job",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "name": "<job>"
+            },
+            "fields": "name, job_type, status, server, bench, site, reference_doctype, reference_name, request_path, request_method, start, end, duration, output, traceback",
+            "steps": "Agent Job Step filters {agent_job}: step_name, status, start, end, duration, output, traceback"
+          },
+          "returns": "Redakte edilmiş ve kırpılmış çıktı",
+          "permission": "System User; request_data, request_files ve data asla istenmez (registry parolası, build token)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.job",
+          "args": {
+            "job": "Agent Job adı"
+          },
+          "returns": "{name, job_type, creation, status, start, end, duration, steps[]}",
+          "permission": "@frappe.whitelist(); işin site/bench/server takımı denetlenir",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              702,
+              723
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "job"
+        ],
+        "properties": {
+          "job": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "İş durumu (Undelivered | Pending | Running | Success | Failure | Delivery Failure), request_path ve reference birlikte okundu.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Çıktıda secret izi",
+            "meaning": "Ham istek/çıktı",
+            "next": "Runtime redaksiyonu; ham Request Data ekranı paylaşılmaz"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read",
+          "press_track"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Agent Job Success değeri image push başarısı değildir; build adımları ayrıca okunur."
+      ]
+    },
+    {
+      "id": "error_log.list",
+      "family": "jobs_diagnostics",
+      "title": "Build/kayıt için Error Log satırlarını referansla oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "Operator principal ile açık alanlı get_list runtime'da; Error Log Dashboard ALLOWED_DOCTYPES içinde değil.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "preparing",
+        "live-agent-http500",
+        "live-no-error-at-preparing",
+        "hata-tanisi",
+        "live-analytics-daily-usage"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Build → Connections → Error Log (reference_name filtresi)",
+          "sitemap_node_ids": [
+            "desk-admin-live-deploy-candidate-build-record-tab-0"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Error Log",
+          "fields": [
+            "name",
+            "creation",
+            "method",
+            "error",
+            "reference_doctype",
+            "reference_name"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Error Log",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "reference_doctype": "Deploy Candidate Build",
+              "reference_name": "<build>"
+            },
+            "fields": [
+              "name",
+              "creation",
+              "method",
+              "reference_doctype",
+              "reference_name",
+              "error"
+            ]
+          },
+          "returns": "Başlık ve redakte edilmiş traceback kuyruğu",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Press log_error, doc=... verildiğinde reference_doctype/reference_name alanlarını belgeye bağlar.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/utils/__init__.py",
+            "lines": [
+              49,
+              95
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "reference_doctype": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "reference_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "method_contains": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 80,
+            "pattern": "[A-Za-z0-9 ._:/-]{3,80}"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "include_text": {
+            "type": "boolean"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "principal.operator",
+          "description": "System User.",
+          "machine": true
+        }
+      ],
+      "side_effects": [],
+      "async": null,
+      "success": "Build kimliğiyle eşleşen Error Log (ör. Deploy Candidate Build Exception) okunur; method/path/HTTP yanıtı ayrılır.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Boş sonuç",
+            "meaning": "Preparing sırasında henüz kayıt yok ya da filtre yanlış",
+            "next": "Failure sonrasında aynı filtreyle tekrar oku"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Traceback'te secret olabilir; tam traceback, agent token veya config paylaşılmaz.",
+        "BufferedReader/JSONDecodeError gibi ikincil hatalar birincil HTTP 500'den ayrılır."
+      ]
+    },
+    {
+      "id": "server.ping_agent",
+      "family": "jobs_diagnostics",
+      "title": "Sunucu agent'ına ping at (pong)",
+      "kind": "read",
+      "status": "planned",
+      "status_reason": "Kaynak doğrulandı (Server.ping_agent); yalnız temel bağlantıyı gösterdiği ve canlı agent isteği attığı için henüz uygulanmadı.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-agent-pong",
+        "hata-tanisi"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Server → Ping → Ping Agent (uygulama sunucusu menü öğesi sitemap'te yakalanmadı)",
+          "sitemap_node_ids": [
+            "desk-live-server-menu"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Server",
+          "fields": [
+            "name",
+            "status"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "doc_method",
+          "doctype": "Server",
+          "method": "ping_agent",
+          "args": {},
+          "returns": "'pong'",
+          "permission": "@frappe.whitelist() doc metodu; frappe.handler.run_doc_method, Desk doc izni (System User)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/server/server.py",
+            "lines": [
+              740,
+              743
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Agent'a GET /ping isteği."
+      ],
+      "async": null,
+      "success": "Yanıt pong. Upload ve build uç noktaları bununla doğrulanmaz.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Zaman aşımı/bağlantı hatası",
+            "meaning": "Agent erişilemiyor",
+            "next": "Altyapı sahibine aktar"
+          }
+        ],
+        "timeout": "Uygulanmadı.",
+        "retry": "Uygulanmadı.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "server.agent_version",
+      "family": "jobs_diagnostics",
+      "title": "Agent commit'ini oku (Show Agent Version)",
+      "kind": "read",
+      "status": "planned",
+      "status_reason": "Kaynak doğrulandı (Server.show_agent_version); repo HEAD çalışan kodu tanımlamadığı için henüz uygulanmadı.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-agent-version",
+        "hata-tanisi"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Server → Actions → Show Agent Version",
+          "sitemap_node_ids": [
+            "desk-live-server-actions"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Server",
+          "fields": [
+            "name"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "doc_method",
+          "doctype": "Server",
+          "method": "show_agent_version",
+          "args": {},
+          "returns": "Agent repo commit kimliği",
+          "permission": "@frappe.whitelist() doc metodu; frappe.handler.run_doc_method, Desk doc izni (System User)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/server/server.py",
+            "lines": [
+              1952,
+              1954
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": "show_agent_password",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Komşu doc metodu agent parolasını döndürür; hiçbir izin listesinde yer almaz.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/server/server.py",
+            "lines": [
+              1956,
+              1958
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Agent'a GET /version isteği."
+      ],
+      "async": null,
+      "success": "Commit kaydedildi; çalışan süreç kodu ayrıca (SSH ile) karşılaştırılır.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "HEAD aynı ama çalışma ağacı değişik",
+            "meaning": "Yerel değişiklikler",
+            "next": "Agent kodunu değiştirme; altyapı sahibine aktar"
+          }
+        ],
+        "timeout": "Uygulanmadı.",
+        "retry": "Uygulanmadı.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "press.version",
+      "family": "jobs_diagnostics",
+      "title": "Press panelindeki uygulama sürümlerini oku (Help → About)",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "Operator principal ile frappe.utils.change_log.get_versions runtime'da.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-press-version",
+        "hata-tanisi"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Help → About",
+          "sitemap_node_ids": [
+            "desk-live-help-about"
+          ]
+        }
+      ],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "method",
+          "doctype": null,
+          "method": "frappe.utils.change_log.get_versions",
+          "args": {},
+          "returns": "{app: {title, version, branch, branch_version?}}",
+          "permission": "@frappe.whitelist(); oturum",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/utils/change_log.py",
+            "lines": [
+              100,
+              131
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {}
+      },
+      "preconditions": [
+        {
+          "id": "principal.operator",
+          "description": "System User.",
+          "machine": true
+        }
+      ],
+      "side_effects": [],
+      "async": null,
+      "success": "Press ve Framework sürümleri kaydedildi; yönetim paneli version-15 ile hedef grubun Version 16 ayrımı korunur.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Commit bilgisi yok",
+            "meaning": "get_versions branch/sürüm verir, commit vermez",
+            "next": "Kurulu commit 'unknown' kalır"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "partial",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Kaynak frappe version-15 dal ucudur; kurulu panelin tam commit'i bilinmiyor."
+      ]
+    },
+    {
+      "id": "site.usage",
+      "family": "jobs_diagnostics",
+      "title": "Site Daily Usage analitiğini oku",
+      "kind": "read",
+      "status": "planned",
+      "status_reason": "Kaynak doğrulandı (press.api.analytics.daily_usage); log server yapılandırılmadığından veri yok, okuma henüz uygulanmadı.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-analytics-daily-usage"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Sites → site → Overview → Daily Usage",
+          "sitemap_node_ids": [
+            "dashboard-site-overview-component-6",
+            "dashboard-site-insights-analytics-component-4"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site",
+          "fields": [
+            "name",
+            "plan"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.analytics.daily_usage",
+          "args": {
+            "name": "site",
+            "timezone": "IANA saat dilimi"
+          },
+          "returns": "{data[{value, date}], plan_limit}",
+          "permission": "@frappe.whitelist(); @protected(\"Site\"); 15 dk önbellek",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/analytics.py",
+            "lines": [
+              1024,
+              1048
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "press_settings.log_server_configured",
+          "description": "Press Settings log_server yapılandırılmış olmalı; değilse veri boştur.",
+          "machine": false
+        }
+      ],
+      "side_effects": [],
+      "async": null,
+      "success": "data ve plan_limit okunur; data [] sıfır kullanım veya kesinti anlamına gelmez.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "InternalServerError (geçmiş)",
+            "meaning": "Log server yokken aggregations hatası",
+            "next": "press.code_fix ile düzeltildi; tekrarında Error Log oku"
+          }
+        ],
+        "timeout": "Uygulanmadı.",
+        "retry": "Uygulanmadı.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Metrik yokluğu açık bir yetenek eksikliğidir; sahte sıfır veri eklenmez."
+      ]
+    },
+    {
+      "id": "logs.read",
+      "family": "jobs_diagnostics",
+      "title": "Sunucu loglarını (Nginx error.log, Redis) incele",
+      "kind": "external",
+      "status": "unsupported",
+      "status_reason": "Kılavuzun ihtiyacı sunucu Nginx error.log ve redis-cli okumasıdır; SSH gerektirir ve MCP yetkisi dışındadır.",
+      "authority": [
+        "infrastructure_owner"
+      ],
+      "owner_handoff": {
+        "role": "infrastructure_owner",
+        "person": "Hüseyin Cengiz",
+        "steps": [
+          "Doğru uygulama sunucusunda Nginx error.log satırlarını build kimliği ve /agent/builder/upload ile eşleştir (UTC ↔ TSİ +3).",
+          "redis-cli INFO persistence ile yazım durumunu oku.",
+          "Yalnız gerekli satırları secret ve IP olmadan aktar."
+        ],
+        "acceptance": "Hata satırı ve zamanı build kimliğiyle eşleşti; tam log veya kimlik bilgisi paylaşılmadı."
+      },
+      "guide_steps": [
+        "live-agent-http500",
+        "hata-tanisi",
+        "live-redis-enospc"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Sites → site → Insights → Logs (yalnız site/bench logları)",
+          "sitemap_node_ids": [
+            "dashboard-site-insights-logs"
+          ]
+        }
+      ],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "infrastructure_owner",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "SSH ile sunucu logları; MCP çalıştırmaz.",
+          "source": null
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.log_browser.get_log",
+          "args": {
+            "log_type": "bench | site",
+            "doc_name": "str",
+            "log_name": "str"
+          },
+          "returns": "Biçimlenmiş site/bench log satırları (Nginx sunucu logu değil)",
+          "permission": "@frappe.whitelist(); @protected([\"Site\", \"Bench\"])",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/log_browser.py",
+            "lines": [
+              318,
+              338
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Desteklenmez; devirle sağlanır.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Uygulanmaz."
+      },
+      "risk": "read",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "partial",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Press log tarayıcısı site/bench loglarını okur; ileride ayrı okuma olarak planlanabilir."
+      ]
+    }
+  ]
+}

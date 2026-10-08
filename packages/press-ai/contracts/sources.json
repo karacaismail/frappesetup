@@ -1,0 +1,88 @@
+{
+  "sources": [
+    {
+      "id": "frappe_press",
+      "repo": "https://github.com/frappe/press",
+      "commit": "ebf3e2272dc386e9ceb5e064d6c911d7e2adb7c9",
+      "ref": "develop",
+      "date": "2026-10-08",
+      "license": "AGPL-3.0 (license.txt)",
+      "use": "Press API, DocType ve Desk eylemlerinin statik doğrulaması; yol + satır atfı, kod kopyalanmadı. Kurulu canlı Press'in commit'i bilinmiyor."
+    },
+    {
+      "id": "frappe_v15",
+      "repo": "https://github.com/frappe/frappe",
+      "commit": "b0b5b99a1d9d2cb3d54b32293d3854bf2c15f4a4",
+      "ref": "version-15",
+      "date": "2026-10-06",
+      "license": "MIT",
+      "use": "Panel tarafı Frappe istemci uç noktaları (get_list, get_value, run_doc_method, get_versions) ve v15 uzantı noktaları; dal ucu, kurulu commit değil."
+    },
+    {
+      "id": "frappe_v16",
+      "repo": "https://github.com/frappe/frappe",
+      "commit": "6b450a166e076dd842e4db7ea0843f62881e62ac",
+      "ref": "version-16",
+      "date": "2026-10-07",
+      "license": "MIT",
+      "use": "v16 uzantı noktaları (extend_doctype_class, test sınıfları, fixtures kuralları); dal ucu."
+    },
+    {
+      "id": "pressguide",
+      "repo": "https://github.com/karacaismail/pressguide",
+      "path": "src/data/guide.json",
+      "commit": "2b83441b01db520f62480e21ba6d5fc51745a47f",
+      "ref": "main",
+      "date": "2026-10-08",
+      "license": "LICENSE dosyası yok (aynı yazar); metin kopyalanmaz",
+      "use": "67 kılavuz adımı (54 live, 13 historical); adım kimlikleri ve sıra."
+    },
+    {
+      "id": "press_sitemap",
+      "repo": "https://github.com/karacaismail/pressguide",
+      "path": "src/data/press-sitemap.json",
+      "commit": "2b83441b01db520f62480e21ba6d5fc51745a47f",
+      "ref": "main",
+      "date": "2026-10-08",
+      "license": "LICENSE dosyası yok (aynı yazar)",
+      "use": "11 729 UI metadata düğümü (hepsi executed:false, functionalTest:not_run, auditPhase:in_progress); yalnız var olan düğüm kimlikleri atıf için; işlev kanıtı değildir."
+    },
+    {
+      "id": "frappe_skills",
+      "repo": "https://github.com/frappe/skills",
+      "commit": "0bef982e933705c30706efc1db3bc3bc5e7aca62",
+      "ref": "main",
+      "date": "2026-09-30",
+      "license": "LICENSE dosyası yok; metin kopyalanmaz",
+      "use": "Karşılaştırma ve atıf; içerik alınmadı."
+    },
+    {
+      "id": "frappe_mcp",
+      "repo": "https://github.com/frappe/mcp",
+      "commit": "11d5076b1bf4483b2ff6751a13e0736f5396b1e6",
+      "ref": "main",
+      "date": "2026-05-29",
+      "license": "MIT",
+      "use": "Karşılaştırma ve atıf; kod alınmadı."
+    },
+    {
+      "id": "huf",
+      "repo": "https://github.com/tridz-dev/huf",
+      "commit": "e6cdcd559ab011e01ef4ce16e1e5be4a95db0a9e",
+      "ref": "develop",
+      "date": "2026-09-24",
+      "license": "AGPL-3.0",
+      "use": "Karşılaştırma ve atıf (ham press.api.* çağrıları); kod alınmadı."
+    },
+    {
+      "id": "press_mcp_local",
+      "path": "~/Documents/Codex/2026-10-07/press-ana-ekran-x20-https-press/outputs/press-mcp/server.py",
+      "commit": null,
+      "sha256": "7fce56cc8b08e21c10f97d43cfc3a271d9445752703a184413fe422290143e7f",
+      "ref": "yerel dosya",
+      "date": "2026-10-07",
+      "license": "Lisans dosyası yok (yerel, yayımlanmamış)",
+      "use": "Eski özel SSH MCP'si (stdio, SSH ControlMaster, --full-admin keyfi komut). Bu paket onu çağırmaz, değiştirmez ve yerine geçmez; hedef sunucu bilgisi yazılmadı."
+    }
+  ]
+}

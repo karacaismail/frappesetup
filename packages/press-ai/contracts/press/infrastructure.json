@@ -1,0 +1,863 @@
+{
+  "family": "infrastructure",
+  "operations": [
+    {
+      "id": "server.list",
+      "family": "infrastructure",
+      "title": "Sunucuları listele",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.server.all (team) ve açık alanlı get_list (operator) runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-press"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Servers",
+          "sitemap_node_ids": [
+            "dashboard-global-servers"
+          ]
+        },
+        {
+          "surface": "desk",
+          "path": "Server List",
+          "sitemap_node_ids": [
+            "desk-live-server-list"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Server",
+          "fields": [
+            "name",
+            "title",
+            "status",
+            "cluster",
+            "team",
+            "is_self_hosted"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.server.all",
+          "args": {
+            "server_filter": "{server_type, tag} | null"
+          },
+          "returns": "Takımın sunucuları",
+          "permission": "@frappe.whitelist(); takım",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/server.py",
+            "lines": [
+              74,
+              139
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Server",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": "{team: <yapılandırılan takım>}",
+            "fields": [
+              "name",
+              "title",
+              "status",
+              "cluster",
+              "team"
+            ]
+          },
+          "returns": "Sunucular; ip/private_ip ve parolalar alınmaz",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "App/database/proxy sunucuları ve durumları okunur.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Boş liste",
+            "meaning": "Takımın kendi sunucusu yok",
+            "next": "Paylaşılan sunucular listelenmez"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "server.get",
+      "family": "infrastructure",
+      "title": "Tek sunucu kaydını oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.server.get (team) ve açık alanlı get_list (operator) runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "server"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Servers → sunucu → Overview",
+          "sitemap_node_ids": [
+            "dashboard-server-overview"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Server",
+          "fields": [
+            "name",
+            "title",
+            "status",
+            "cluster",
+            "team",
+            "is_self_hosted"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.server.get",
+          "args": {
+            "name": "Server"
+          },
+          "returns": "{name, title, status, team, app_server, region_info, tags, type}",
+          "permission": "@frappe.whitelist(); @protected([\"Server\", \"Database Server\"])",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/server.py",
+            "lines": [
+              148,
+              166
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Server",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "name": "<server>"
+            },
+            "fields": [
+              "name",
+              "title",
+              "status",
+              "cluster",
+              "team"
+            ]
+          },
+          "returns": "Açık alanlar",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "server"
+        ],
+        "properties": {
+          "server": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Sunucu durumu okunur; bu kayıt sağlık veya agent erişimi kanıtı değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "PermissionError",
+            "meaning": "Sunucu takımın değil",
+            "next": "Takımı doğrula"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "server.disk_check",
+      "family": "infrastructure",
+      "title": "Sunucu disk/inode/Docker kullanımını ölç",
+      "kind": "external",
+      "status": "unsupported",
+      "status_reason": "df -h, df -i ve docker system df SSH gerektirir; Press'in depolama analitiği bu ölçümlerin yerine geçmez.",
+      "authority": [
+        "infrastructure_owner"
+      ],
+      "owner_handoff": {
+        "role": "infrastructure_owner",
+        "person": "Hüseyin Cengiz",
+        "steps": [
+          "Doğru sunucuda df -h, df -i, docker system df okumalarını al.",
+          "Sonuçları build kimliği ve zamanla birlikte aktar."
+        ],
+        "acceptance": "Blok ve inode doluluğu ayrı raporlandı; temizlik kararı açık onaya bağlandı."
+      },
+      "guide_steps": [
+        "live-agent-http500",
+        "hata-tanisi",
+        "live-redis-enospc",
+        "live-cleanup-crm"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Servers → sunucu → Analytics → Disk Space",
+          "sitemap_node_ids": [
+            "dashboard-server-analytics-component-4"
+          ]
+        }
+      ],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "infrastructure_owner",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "SSH ölçümü.",
+          "source": null
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.client.run_doc_method",
+          "args": {
+            "dt": "Server",
+            "dn": "<server>",
+            "method": "get_storage_usage"
+          },
+          "returns": "Agent /server/storage-breakdown",
+          "permission": "@dashboard_whitelist (kılavuz ölçümlerinin yerine geçtiği doğrulanmadı)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/server/server.py",
+            "lines": [
+              284,
+              290
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Desteklenmez; devirle sağlanır.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Uygulanmaz."
+      },
+      "risk": "read",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "partial",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Kılavuz: kök dosya sistemi %100 doluydu; inode %63 (blok alanı sorunu)."
+      ]
+    },
+    {
+      "id": "server.build_cache_cleanup",
+      "family": "infrastructure",
+      "title": "Yalnız kullanılmayan Docker build cache'i temizle",
+      "kind": "external",
+      "status": "unsupported",
+      "status_reason": "docker builder prune --all --force SSH ve açık kullanıcı onayı gerektirir; Press'in Cleanup Unused Files işinin kapsamı agent deposunda olduğundan doğrulanmadı.",
+      "authority": [
+        "infrastructure_owner"
+      ],
+      "owner_handoff": {
+        "role": "infrastructure_owner",
+        "person": "Hüseyin Cengiz",
+        "steps": [
+          "Yalnız build cache için açık onay al.",
+          "docker builder prune --all --force çalıştır; çıkış kodunu kaydet.",
+          "df -h ile yeniden ölç; container ve Redis yazımını kontrol et.",
+          "Site, image, container, backup, Redis ve veritabanını silme."
+        ],
+        "acceptance": "Prune exit 0; boş alan arttı; çalışan container ve siteler etkilenmedi."
+      },
+      "guide_steps": [
+        "hata-tanisi",
+        "live-cleanup-crm"
+      ],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "infrastructure_owner",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "SSH komutu açık onayla.",
+          "source": null
+        },
+        {
+          "principal": "operator",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": "Server.cleanup_unused_files",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Agent işi 'Cleanup Unused Files' (server/cleanup) ve disk doluysa break_glass; agent tarafı kapsamı bu depoda yok, ikame edilmez.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/server/server.py",
+            "lines": [
+              1114,
+              1127
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Build cache silinir; sonraki build'ler cache'siz daha uzun sürebilir."
+      ],
+      "async": null,
+      "success": "Desteklenmez; devirle sağlanır.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Silinen cache geri gelmez; yeniden build ile oluşur."
+      },
+      "risk": "destructive",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "partial",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "server.restart_services",
+      "family": "infrastructure",
+      "title": "Press worker veya web sürecini yeniden başlat",
+      "kind": "external",
+      "status": "unsupported",
+      "status_reason": "Servis yeniden başlatma altyapı sahibinin işidir; MCP shell veya supervisor erişimi taşımaz.",
+      "authority": [
+        "infrastructure_owner"
+      ],
+      "owner_handoff": {
+        "role": "infrastructure_owner",
+        "person": "Hüseyin Cengiz",
+        "steps": [
+          "Yalnız gereken süreci (boşta build worker'ları veya Press web) yeniden başlat; Redis ve müşteri bench'lerine dokunma.",
+          "Etki ve geri dönüş planını önceden yaz."
+        ],
+        "acceptance": "Hedef süreç ayakta; müşteri siteleri etkilenmedi."
+      },
+      "guide_steps": [
+        "hata-tanisi",
+        "live-npm-range-validation",
+        "live-analytics-daily-usage"
+      ],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "infrastructure_owner",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Sunucu süreç yönetimi.",
+          "source": null
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Kısa süreli hizmet kesintisi."
+      ],
+      "async": null,
+      "success": "Desteklenmez; devirle sağlanır.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Uygulanmaz."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "unverified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Bench.restart (dashboard) müşteri bench süreçleridir; bu işlemin yerine geçmez."
+      ]
+    },
+    {
+      "id": "registry.repository_check",
+      "family": "infrastructure",
+      "title": "Registry (ECR) deposunu doğrula, yalnız eksikse oluştur",
+      "kind": "external",
+      "status": "unsupported",
+      "status_reason": "AWS/registry hesabı ve kimlik bilgileri altyapı sahibindedir; Press bu işlem için API sunmaz.",
+      "authority": [
+        "infrastructure_owner"
+      ],
+      "owner_handoff": {
+        "role": "infrastructure_owner",
+        "person": "Hüseyin Cengiz",
+        "steps": [
+          "Hesap, bölge ve namespace eşleşmesini secret yazdırmadan kontrol et.",
+          "describe_repository; yalnız RepositoryNotFoundException ise depoyu oluştur.",
+          "Şifreleme, tarama ve tag mutability ayarlarını mevcut depolarla eşleştir; describe ile doğrula.",
+          "Sonraki build sonrası describe_images ile tam tag'i doğrula."
+        ],
+        "acceptance": "Depo var; yeni build'in image'ı tam tag ile registry'de."
+      },
+      "guide_steps": [
+        "hata-tanisi",
+        "live-ecr-push-failure",
+        "live-build-success"
+      ],
+      "ui": [],
+      "doctypes": [
+        {
+          "doctype": "Deploy Candidate Build",
+          "fields": [
+            "docker_image",
+            "docker_image_repository",
+            "docker_image_tag"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "infrastructure_owner",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Registry konsolu/CLI.",
+          "source": null
+        },
+        {
+          "principal": "operator",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "check_image_in_registry yalnız registry.frappe.cloud için denetler; başka registry'de True döner.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/deploy_candidate_build/deploy_candidate_build.py",
+            "lines": [
+              802,
+              809
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Yeni registry deposu."
+      ],
+      "async": null,
+      "success": "Desteklenmez; devirle sağlanır.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Uygulanmaz."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "partial",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Push adımını atlamak veya Failure build'i elle Success yapmak yasaktır."
+      ]
+    },
+    {
+      "id": "dns.record",
+      "family": "infrastructure",
+      "title": "Site/sunucu için DNS kaydı (GoDaddy)",
+      "kind": "external",
+      "status": "unsupported",
+      "status_reason": "DNS Press dışındadır; GoDaddy hesabı Asistan Hüseyin'de, teknik gereksinim ve doğrulama Hüseyin Cengiz'dedir.",
+      "authority": [
+        "dns_owner"
+      ],
+      "owner_handoff": {
+        "role": "dns_owner",
+        "person": "Hüseyin Cengiz",
+        "steps": [
+          "Hüseyin Cengiz kayıt türü/adı/değerini hazırlar.",
+          "Asistan Hüseyin GoDaddy'de uygular.",
+          "Hüseyin Cengiz HTTPS ve sertifika sonucunu doğrular."
+        ],
+        "acceptance": "Kayıt yayıldı; site.https_check TLS doğrulamalı başarılı."
+      },
+      "guide_steps": [
+        "site"
+      ],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "dns_owner",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "GoDaddy paneli; MCP erişmez.",
+          "source": null
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Genel DNS değişikliği."
+      ],
+      "async": null,
+      "success": "Desteklenmez; devirle sağlanır.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Önceki kayıt değeri devirde not edilir."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "unverified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "cluster.catalog_label",
+      "family": "infrastructure",
+      "title": "Cluster katalog etiketini (title, country) düzelt",
+      "kind": "human",
+      "status": "unsupported",
+      "status_reason": "Ayrı güvenli API yok; Desk form düzenlemesidir ve genel set_value önerilmez.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": {
+        "role": "operator",
+        "person": null,
+        "steps": [
+          "Önceki title/country değerlerini kaydet.",
+          "Desk'te Cluster formunda yalnız title ve country alanlarını güncelle.",
+          "Sunucu, sağlayıcı veya ağ ayarına dokunma."
+        ],
+        "acceptance": "Yasal metin doğru bölgeyi gösterir; başka alan değişmedi."
+      },
+      "guide_steps": [
+        "site"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Cluster → kayıt (Title, Country)",
+          "sitemap_node_ids": [
+            "desk-live-infrastructure-cluster-form",
+            "desk-live-infrastructure-cluster-list"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Cluster",
+          "fields": [
+            "name",
+            "title",
+            "country",
+            "region",
+            "cloud_provider"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Desk form; Cluster belgesinde Data tipli erişim anahtarları bulunduğundan tam belge okunmaz.",
+          "source": null
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Yalnız katalog etiketi değişir."
+      ],
+      "async": null,
+      "success": "Desteklenmez; insan yapar.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Önceki değerler geri yazılır."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Bu düzeltme altyapı konum denetimi değildir."
+      ]
+    },
+    {
+      "id": "press.code_fix",
+      "family": "infrastructure",
+      "title": "Press kaynak kodunda hedefli düzeltme",
+      "kind": "external",
+      "status": "unsupported",
+      "status_reason": "Press kodu değişikliği geliştirici incelemesi, yedek/SHA, regresyon testi ve altyapı sahibinin dağıtımını gerektirir; MCP yapmaz.",
+      "authority": [
+        "infrastructure_owner",
+        "app_developer"
+      ],
+      "owner_handoff": {
+        "role": "infrastructure_owner",
+        "person": "Hüseyin Cengiz",
+        "steps": [
+          "Özgün dosyanın yedeğini ve SHA'sını al.",
+          "Önce başarısız regresyon testi, sonra hedefli düzeltme; bağımsız inceleme.",
+          "Yalnız ilgili süreci yeniden başlat (build worker'ları veya Press web)."
+        ],
+        "acceptance": "Testler önce RED sonra GREEN; hedef davranış canlıda tek kez doğrulandı."
+      },
+      "guide_steps": [
+        "live-npm-range-validation",
+        "live-analytics-daily-usage"
+      ],
+      "ui": [],
+      "doctypes": [],
+      "api": [
+        {
+          "principal": "app_developer",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Kod değişikliği MCP kapsamı dışında.",
+          "source": null
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Press davranışı değişir; upstream ile ayrışma oluşur."
+      ],
+      "async": null,
+      "success": "Desteklenmez; devirle sağlanır.",
+      "failure": {
+        "modes": [],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Yedekten özgün dosya geri yüklenir."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "unverified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Doğrulamayı kapatmak, Node gereksinimini silmek veya hatayı maskelemek çözüm değildir."
+      ]
+    }
+  ]
+}

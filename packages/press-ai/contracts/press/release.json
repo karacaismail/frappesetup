@@ -1,0 +1,2312 @@
+{
+  "family": "release",
+  "operations": [
+    {
+      "id": "release_group.list",
+      "family": "release",
+      "title": "Release Group (bench grubu) listesini oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "Takım için press.api.bench.all, operator için açık alanlı get_list okuması runtime'da uygulanır.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-press",
+        "live-dashboard-bench",
+        "live-group-list"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Release Group List",
+          "sitemap_node_ids": [
+            "desk-admin-live-release-group-list",
+            "desk-live-type-release-group-list"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches",
+          "sitemap_node_ids": [
+            "dashboard-discovered-groups"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Release Group",
+          "fields": [
+            "name",
+            "title",
+            "version",
+            "team",
+            "enabled",
+            "public",
+            "creation"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.all",
+          "args": {
+            "server": "str | null",
+            "bench_filter": "{status, tag} | null"
+          },
+          "returns": "[{name, title, version, creation, number_of_sites, number_of_apps, tags[], status: Active | Awaiting Deploy}]",
+          "permission": "@frappe.whitelist(); takım + alt takımların enabled=1, public=0 grupları (get_current_team)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              115,
+              173
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Release Group",
+          "method": "frappe.client.get_list",
+          "args": {
+            "fields": [
+              "name",
+              "title",
+              "team",
+              "version",
+              "enabled",
+              "creation"
+            ],
+            "filters": "{enabled: 1, team: <yapılandırılan takım>}"
+          },
+          "returns": "Açık alan listesi; Password alanı (redis_password) alınmaz",
+          "permission": "System User, Desk liste izni",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Liste okundu; 'Awaiting Deploy' etiketi Active bench olmadığını gösterir, hata kanıtı değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "PermissionError / boş liste",
+            "meaning": "Takım başlığı yanlış ya da grup başka takımda",
+            "next": "kit_status ile takımı doğrula; boş listeyi 'grup yok' diye yorumlama"
+          }
+        ],
+        "timeout": "Okuma zaman aşımı: sonuç unknown; tekrar okumak güvenlidir.",
+        "retry": "Okuma tekrarı güvenli.",
+        "rollback": "Yok (yan etkisiz okuma)."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Sayı (number_of_sites) işlev veya sağlık kanıtı değildir."
+      ]
+    },
+    {
+      "id": "release_group.get",
+      "family": "release",
+      "title": "Release Group kaydını, uygulama ve Source satırlarını oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.bench.get + press.api.bench.apps (team) ve açık alanlı get_list (operator) runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "apps",
+        "source-selection",
+        "live-apps",
+        "live-saved",
+        "live-correct-apps",
+        "live-erpnext-source",
+        "live-payments-source",
+        "live-lms-source",
+        "live-dashboard-empty",
+        "live-old-rgv1",
+        "live-cleanup-crm"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Release Group → kayıt formu (Apps, Servers, Dependencies)",
+          "sitemap_node_ids": [
+            "desk-admin-live-release-group-record",
+            "desk-admin-live-release-group-record-tab-1",
+            "desk-admin-live-release-group-record-tab-1-grid-apps-headers"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Apps",
+          "sitemap_node_ids": [
+            "dashboard-group-apps",
+            "dashboard-group-apps-component-2"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Release Group",
+          "fields": [
+            "name",
+            "title",
+            "team",
+            "version",
+            "enabled",
+            "public",
+            "check_dependent_apps"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Release Group App",
+              "fields": [
+                "app",
+                "source",
+                "enable_auto_deploy"
+              ]
+            },
+            {
+              "field": "servers",
+              "doctype": "Release Group Server",
+              "fields": [
+                "server",
+                "default"
+              ]
+            },
+            {
+              "field": "dependencies",
+              "doctype": "Release Group Dependency",
+              "fields": [
+                "dependency",
+                "version",
+                "is_custom"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.get",
+          "args": {
+            "name": "Release Group adı (bench-NNNN biçiminde)"
+          },
+          "returns": "{name, title, team, version, status, saas_app, public, no_sites, tags}",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              85,
+              104
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.apps",
+          "args": {
+            "name": "Release Group adı"
+          },
+          "returns": "[{name, title, frappe, branch, repository, repository_owner, repository_url, hash, deployed, update_available, branch_deleted}]",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              417,
+              480
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Release Group",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "name": "<grup>"
+            },
+            "fields": [
+              "name",
+              "title",
+              "team",
+              "version",
+              "enabled",
+              "public",
+              "check_dependent_apps"
+            ],
+            "child_tables": "Release Group App / Release Group Server / Release Group Dependency, parent=<grup>"
+          },
+          "returns": "Açık alanlar; redis_password alınmaz",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_group"
+        ],
+        "properties": {
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Apps sırası ve her satırın Source kaydı okundu. Kayıtlı tablo yapılandırma kanıtıdır; build başarısı değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "PermissionError",
+            "meaning": "Grup bu takımın değil",
+            "next": "Doğru takım başlığını kullan; System User yetkisini körlemesine isteme"
+          },
+          {
+            "signal": "DoesNotExistError",
+            "meaning": "Grup adı (bench-xxxx) yanlış",
+            "next": "release_group.list ile kimliği doğrula; Title ile name farklıdır"
+          }
+        ],
+        "timeout": "Okuma zaman aşımı unknown; tekrar okunabilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Grup kimliği (bench-NNNN) ile Title ayrıdır; işlemler kimlikle yapılır.",
+        "Status alanı hesaplanır: Active bench yoksa 'Awaiting Deploy' (press/api/bench.py get_group_status)."
+      ]
+    },
+    {
+      "id": "release_group.create",
+      "family": "release",
+      "title": "Yeni Release Group oluştur",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "press.api.bench.new team principal ile öneri → insan onayı → yürütme → izleme akışında uygulanır.",
+      "authority": [
+        "team"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "team",
+        "live-dashboard-empty",
+        "live-draft-runtime"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Release Group List → Add Release Group (kılavuzun izlediği operator yolu)",
+          "sitemap_node_ids": [
+            "desk-admin-live-release-group-list-component-15"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → New Bench",
+          "sitemap_node_ids": [
+            "dashboard-discovered-groups"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Release Group",
+          "fields": [
+            "name",
+            "title",
+            "team",
+            "version",
+            "enabled",
+            "public",
+            "check_dependent_apps"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Release Group App",
+              "fields": [
+                "app",
+                "source",
+                "enable_auto_deploy"
+              ]
+            },
+            {
+              "field": "servers",
+              "doctype": "Release Group Server",
+              "fields": [
+                "server",
+                "default"
+              ]
+            },
+            {
+              "field": "dependencies",
+              "doctype": "Release Group Dependency",
+              "fields": [
+                "dependency",
+                "version",
+                "is_custom"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.new",
+          "args": {
+            "bench": {
+              "title": "str",
+              "version": "Frappe Version adı (ör. Version 16)",
+              "apps": "[{name, source}]",
+              "cluster": "Cluster adı",
+              "saas_app": "str ('' olabilir)",
+              "server": "Server adı | null"
+            }
+          },
+          "returns": "Release Group adı (str)",
+          "permission": "@frappe.whitelist(); @protected yok: takım get_current_team ile belirlenir; server verilirse System User ya da Server.team == takım olmalı",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              55,
+              82
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.exists",
+          "args": {
+            "title": "str"
+          },
+          "returns": "bool (takımda aynı başlık var mı)",
+          "permission": "@frappe.whitelist()",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              203,
+              206
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.options",
+          "args": {},
+          "returns": "{versions[{name, status, apps[]}], clusters[]}",
+          "permission": "@frappe.whitelist(); yalnız etkin, public App Source'lar listelenir; yoksa throw",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              254,
+              291
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Desk: Release Group List → Add Release Group (Title, Version, Team); kılavuz bu yolu izledi. MCP Desk insert yapmaz.",
+          "source": null
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "version",
+          "cluster",
+          "apps"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "cluster": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "server": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "apps": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "app",
+                "source"
+              ],
+              "properties": {
+                "app": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "[a-z][a-z0-9_]{0,63}"
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 140,
+                  "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+                }
+              }
+            }
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "principal.team",
+          "description": "Çağrı team principal ile yapılır.",
+          "machine": true
+        },
+        {
+          "id": "team.resolved_matches_config",
+          "description": "Team principal'da press.api.account.current_team ile çözülen takım yapılandırılan X-Press-Team ile aynı (Press üyelik yoksa sessizce varsayılan takıma düşer); operator'da geçerli.",
+          "machine": true
+        },
+        {
+          "id": "release_group.title_available",
+          "description": "press.api.bench.exists {title} false olmalı.",
+          "machine": true
+        },
+        {
+          "id": "app_source.matches_app",
+          "description": "apps[] çiftleri press.api.bench.options ile doğrulanır; bu uç yalnız çerçeve (frappe=1) kaynaklarını döndürür, diğer uygulama çiftleri doğrulanamaz (None) ve oluşturmadan sonra release_group.add_app ile eklenir.",
+          "machine": true
+        },
+        {
+          "id": "proposal.no_unknown_outcome",
+          "description": "Aynı hedefte sonucu bilinmeyen öneri yok.",
+          "machine": true
+        },
+        {
+          "id": "team.owns_app_sources",
+          "description": "Seçilen App Source kayıtları takımın veya public olmalı; Team alanı kaynak sahipliğiyle uyumlu.",
+          "machine": false
+        },
+        {
+          "id": "server.owned_or_system_user",
+          "description": "server verilirse Server.team == takım (ya da System User).",
+          "machine": false
+        },
+        {
+          "id": "version.options_available",
+          "description": "press.api.bench.options seçenek döndürmeli; kılavuzda Dashboard listesi boştu (live-dashboard-empty).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Release Group kaydı insert edilir (new_release_group); bench, build veya deploy başlamaz.",
+        "cluster verilip server verilmezse uygun bir Active sunucu otomatik seçilir (use_for_new_benches)."
+      ],
+      "async": {
+        "returns": "Release Group adı (eşzamanlı insert)",
+        "track": "track.release_group",
+        "terminal_success": [
+          "present"
+        ],
+        "terminal_failure": [
+          "absent"
+        ],
+        "intermediate": []
+      },
+      "success": "Dönen Release Group adı yeniden okunur ve Title/Version/Team/Apps beklenenle aynıdır. Kayıt varlığı çalışan Bench veya Site kanıtı değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "'A bench group with this name already exists'",
+            "meaning": "Başlık takımda kullanılıyor",
+            "next": "Farklı başlık seç ya da mevcut grubu kullan"
+          },
+          {
+            "signal": "'You can only create benches on your servers'",
+            "meaning": "Sunucu takımın değil",
+            "next": "Sunucuyu boş bırak veya takımın sunucusunu seç"
+          },
+          {
+            "signal": "'There are no available servers to place new benches on'",
+            "meaning": "Cluster'da uygun sunucu yok",
+            "next": "Sunucu hazırlığını altyapı sahibine devret"
+          },
+          {
+            "signal": "KeyError (title/version/apps/cluster/saas_app/server)",
+            "meaning": "Press 'bench' sözlüğündeki anahtarları doğrudan okur",
+            "next": "Tüm anahtarları gönder; saas_app '' ve server null olabilir"
+          },
+          {
+            "signal": "bench.options boş / throw",
+            "meaning": "Etkin public kaynak yok (kılavuz: New Bench sürüm alanı boş)",
+            "next": "Desk yolunu kullan; kaynak/Team paylaşımını incele"
+          }
+        ],
+        "timeout": "Zaman aşımında sonuç unknown: aynı başlıkla tekrar gönderme; release_group.list ile varlığı oku.",
+        "retry": "Yalnız grup yoksa ve neden giderildiyse yeni öneri.",
+        "rollback": "Otomatik geri alma yok; yanlış grup silinmez veya yeniden adlandırılmaz, insan karar verir (kılavuz: eski grup korundu)."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "press_propose",
+          "proposal_get",
+          "press_execute",
+          "press_track"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Administrator görünen Team bir kayıt adıdır; her kurulumda zorunlu değildir (kılavuz team adımı).",
+        "Taslak grupta Dependencies tablosu elle doldurulmaz; kayıttan sonra runtime alanları okunur (live-draft-runtime)."
+      ]
+    },
+    {
+      "id": "release_group.add_server",
+      "family": "release",
+      "title": "Gruba hazır app sunucusunu bağla",
+      "kind": "mutation",
+      "status": "planned",
+      "status_reason": "Kaynak doğrulandı (Release Group.add_server doc metodu); sunucunun hazırlığı altyapı sahibinde olduğu ve deploy=True yeni bench kurabildiği için bilinçli olarak uygulanmadı.",
+      "authority": [
+        "operator",
+        "infrastructure_owner"
+      ],
+      "owner_handoff": {
+        "role": "infrastructure_owner",
+        "person": "Hüseyin Cengiz",
+        "steps": [
+          "Ayrı app sunucusunu Press'te hazırla (kapasite, agent erişimi, roller, güvenli ağ).",
+          "DNS gerekirse kayıt türü/adı/değerini hazırla; Asistan Hüseyin GoDaddy'de uygular.",
+          "Sunucu Active olduktan sonra Desk'te Actions → Add Server ile gruba ekle; mevcut servisleri yeniden başlatma."
+        ],
+        "acceptance": "Server kaydı Active; Ping Agent yanıtı alınır; grup Servers tablosunda tek satır; build/deploy sonucu ayrıca doğrulanır."
+      },
+      "guide_steps": [
+        "server"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Release Group → Actions → Add Server (ya da Servers → Add Row)",
+          "sitemap_node_ids": [
+            "desk-admin-live-release-group-record-menu-actions-4"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Release Group",
+          "fields": [
+            "name"
+          ],
+          "child_tables": [
+            {
+              "field": "servers",
+              "doctype": "Release Group Server",
+              "fields": [
+                "server",
+                "default"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "doc_method",
+          "doctype": "Release Group",
+          "method": "add_server",
+          "args": {
+            "server": "Server adı",
+            "deploy": "bool=false",
+            "force_new_build": "bool=false"
+          },
+          "returns": "None ya da deploy=True ise deploy_on_server sonucu",
+          "permission": "@frappe.whitelist() doc metodu; frappe.handler.run_doc_method, Desk doc izni (System User)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/release_group/release_group.py",
+            "lines": [
+              1843,
+              1854
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Bu işlem için takım uç noktası doğrulanmadı; Dashboard bölge ekleme (add_region) farklı işlemdir.",
+          "source": null
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "server.prepared_by_infrastructure_owner",
+          "description": "Sunucu Press'te ayrı ve hazır (Active) olmalı; Add Row Hetzner sunucusu kurmaz.",
+          "machine": false
+        },
+        {
+          "id": "release_group.server_not_listed",
+          "description": "Aynı sunucu ikinci kez eklenemez (validate_servers).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Servers tablosuna satır eklenir ve grup kaydedilir.",
+        "deploy=True ise son başarılı candidate için o sunucuda deploy/yeni build başlayabilir."
+      ],
+      "async": null,
+      "success": "Grup Servers tablosunda beklenen sunucu tek satır; deploy istenmediyse yeni Deploy açılmamıştır.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "'Servers can be added only once'",
+            "meaning": "Sunucu zaten listede",
+            "next": "Tabloyu oku; tekrar ekleme"
+          }
+        ],
+        "timeout": "Sonuç unknown ise grubu okuyarak doğrula.",
+        "retry": "Neden giderilmeden tekrar yok.",
+        "rollback": "Satırı kaldırmak insan kararıdır; çalışan bench'lere dokunulmaz."
+      },
+      "risk": "write",
+      "approval": "double",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Change Server (Actions) farklı bir işlemdir ve mevcut sunucuyu değiştirir; bu kontrata dahil değildir."
+      ]
+    },
+    {
+      "id": "release_group.add_app",
+      "family": "release",
+      "title": "Gruba App + App Source satırı ekle",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "press.api.bench.add_app (team ve operator) runtime'da öneri/onay/izleme ile uygulanır.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "apps",
+        "source-selection",
+        "live-correct-apps",
+        "live-cleanup-crm"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Release Group → Apps → Add Row (App + Source); Check Dependent Apps; Save",
+          "sitemap_node_ids": [
+            "desk-admin-live-release-group-record-tab-1-grid-apps-headers"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Apps → Add App",
+          "sitemap_node_ids": [
+            "dashboard-group-apps-component-1"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Release Group",
+          "fields": [
+            "name",
+            "check_dependent_apps"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Release Group App",
+              "fields": [
+                "app",
+                "source",
+                "title"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "App Source",
+          "fields": [
+            "app",
+            "repository_url",
+            "branch",
+            "enabled",
+            "team",
+            "public"
+          ],
+          "child_tables": [
+            {
+              "field": "versions",
+              "doctype": "App Source Version",
+              "fields": [
+                "version"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.add_app",
+          "args": {
+            "name": "Release Group adı",
+            "source": "App Source adı",
+            "app": "App adı"
+          },
+          "returns": "None",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              561,
+              564
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.add_apps",
+          "args": {
+            "name": "Release Group adı",
+            "apps": "[{app, source}]"
+          },
+          "returns": "None",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              567,
+              573
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.add_app",
+          "args": {
+            "name": "...",
+            "source": "...",
+            "app": "..."
+          },
+          "returns": "None",
+          "permission": "System User @protected denetimini atlar",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              561,
+              564
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_group",
+          "app",
+          "source"
+        ],
+        "properties": {
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "app": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "[a-z][a-z0-9_]{0,63}"
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "team.resolved_matches_config",
+          "description": "Team principal'da press.api.account.current_team ile çözülen takım yapılandırılan X-Press-Team ile aynı (Press üyelik yoksa sessizce varsayılan takıma düşer); operator'da geçerli.",
+          "machine": true
+        },
+        {
+          "id": "release_group.owned_by_team",
+          "description": "Team principal'da grup takıma ait olmalı.",
+          "machine": true
+        },
+        {
+          "id": "release_group.app_absent",
+          "description": "Uygulama grupta yoksa eklenir.",
+          "machine": true
+        },
+        {
+          "id": "app_source.matches_app",
+          "description": "Operator: App Source satırı (app, enabled, sürüm). Team: yalnız press.api.bench.all_apps'teki public Marketplace kaynağı doğrulanır; özel kaynak team için doğrulanamaz (None).",
+          "machine": true
+        },
+        {
+          "id": "release_group.no_deploy_in_progress",
+          "description": "deploy_information bayrakları (deploy_in_progress, has_running_release_pipeline, bench_creation_underway) yanlış VE grupta Pending/Installing bench yok VE (operator) Queued New Bench Queue yok. Press'in deploy_in_progress'i bench kurulumunu görmez (last_benches_info Bench.candidate'ı build adıyla karşılaştırır); team kuyruğu okuyamaz.",
+          "machine": true
+        },
+        {
+          "id": "proposal.no_unknown_outcome",
+          "description": "Aynı hedefte bilinmeyen sonuçlu öneri yok.",
+          "machine": true
+        },
+        {
+          "id": "app.identity_from_hooks",
+          "description": "App adı uygulamanın hooks.py app_name değeriyle aynı (educator değil education).",
+          "machine": false
+        },
+        {
+          "id": "dependencies.before_dependents",
+          "description": "Bağımlı uygulamalar (ERPNext → Education, Payments → LMS) kendilerine ihtiyaç duyanlardan önce eklenir.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "ReleaseGroup.update_source: geçersiz eski satır kaldırılır, yeni satır sona eklenir ve grup kaydedilir.",
+        "Build veya deploy başlamaz; yeni Deploy Candidate ayrıca oluşturulur."
+      ],
+      "async": {
+        "returns": "None (eşzamanlı kayıt)",
+        "track": "track.release_group",
+        "terminal_success": [
+          "present"
+        ],
+        "terminal_failure": [
+          "absent"
+        ],
+        "intermediate": []
+      },
+      "success": "Grup yeniden okunduğunda App satırı beklenen Source ile var ve bağımlılık sırası korunmuş. Kayıtlı tablo build başarısı değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "PermissionError",
+            "meaning": "Grup veya Source takımın değil",
+            "next": "Takımı ve Source sahipliğini kontrol et"
+          },
+          {
+            "signal": "ValidationError (duplicate app)",
+            "meaning": "Uygulama zaten grupta",
+            "next": "release_group.get ile satırı oku"
+          },
+          {
+            "signal": "Sonraki build: 'Required app not found'",
+            "meaning": "Bağımlı uygulama eksik ya da App kimliği yanlış",
+            "next": "Bağımlılığı önce ekle; build.triage çıktısını izle"
+          }
+        ],
+        "timeout": "Zaman aşımında unknown; grubu okumadan tekrar ekleme.",
+        "retry": "Satır yoksa ve neden giderildiyse yeni öneri.",
+        "rollback": "Otomatik geri alma yok; satırı kaldırmak (press.api.bench.remove_app) ayrı insan kararıdır."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "press_propose",
+          "proposal_get",
+          "press_execute",
+          "press_track"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Release Group App sırası grid'de sürüklenerek değişir; add_app satırı sona ekler. Sıra kılavuzdaki bağımlılık düzenine göre kurulmalı."
+      ]
+    },
+    {
+      "id": "release_group.dependencies",
+      "family": "release",
+      "title": "Grup runtime bağımlılıklarını (Python, Node, Bench, Pip) oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.bench.dependencies runtime'da okunur.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-runtime",
+        "live-draft-runtime"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Release Group → Dependencies tablosu",
+          "sitemap_node_ids": [
+            "desk-admin-live-release-group-record"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Release Group",
+          "fields": [
+            "name",
+            "version"
+          ],
+          "child_tables": [
+            {
+              "field": "dependencies",
+              "doctype": "Release Group Dependency",
+              "fields": [
+                "dependency",
+                "version",
+                "is_custom"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.dependencies",
+          "args": {
+            "name": "Release Group adı"
+          },
+          "returns": "{active_dependencies[{key, value}], supported_dependencies, dependency_title, internal_dependencies, update_available}",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              367,
+              389
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_group"
+        ],
+        "properties": {
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Grup formundaki runtime değerleri okundu. Bunlar yapılandırmadır; sunucuda çalışan sürüm ölçümü değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "PermissionError",
+            "meaning": "Grup takımın değil",
+            "next": "Takımı doğrula"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Uyumluluk branch ucundan değil candidate release commit'lerindeki pyproject.toml/package.json gereksinimlerinden okunur.",
+        "update_dependencies yazma uç noktasıdır; bu kontrat yalnız okur."
+      ]
+    },
+    {
+      "id": "app.get",
+      "family": "release",
+      "title": "App (teknik uygulama kimliği) kaydını oku",
+      "kind": "read",
+      "status": "planned",
+      "status_reason": "App DocType'ı Dashboard ALLOWED_DOCTYPES listesinde yok; operator okuması henüz uygulanmadı. Grup bağlamındaki uygulama adı release_group.get ile okunur.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "new-app",
+        "identity-error",
+        "live-education-source"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "App List → App kaydı",
+          "sitemap_node_ids": [
+            "desk-live-type-app-list"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "App",
+          "fields": [
+            "name",
+            "title",
+            "frappe",
+            "enabled",
+            "team",
+            "public"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "App",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "name": "<app>"
+            },
+            "fields": [
+              "name",
+              "title",
+              "frappe",
+              "enabled",
+              "team",
+              "public"
+            ]
+          },
+          "returns": "App alanları",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "App, press/api/client.py ALLOWED_DOCTYPES içinde değil; takım okuması press.api.bench.apps üzerinden.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/client.py",
+            "lines": [
+              31,
+              31
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "App adı repo'daki hooks.py app_name ile aynı; Frappe kutusu yalnız frappe kaydında açık.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "DoesNotExistError",
+            "meaning": "App yok",
+            "next": "app.create planı veya doğru adı ara"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "educator gibi ikinci teknik kimlik oluşturmak yanlıştır; mevcut yanlış kayıt körlemesine silinmez."
+      ]
+    },
+    {
+      "id": "app.create",
+      "family": "release",
+      "title": "App teknik kimliğini oluştur",
+      "kind": "mutation",
+      "status": "planned",
+      "status_reason": "Kaynak doğrulandı; App kimliği hooks.py ile insan doğrulaması gerektirdiğinden (educator hatası) ve takım yolu Source/Grup değişikliğini birleştirdiğinden henüz uygulanmadı.",
+      "authority": [
+        "operator",
+        "team"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "new-app"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "App List → New App (Name = app_name, Title, Frappe yalnız frappe için)",
+          "sitemap_node_ids": [
+            "desk-live-type-app-list"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Apps → Add App (GitHub URL)",
+          "sitemap_node_ids": [
+            "dashboard-group-apps-component-1"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "App",
+          "fields": [
+            "name",
+            "title",
+            "frappe",
+            "enabled",
+            "team",
+            "public"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.client.run_doc_method",
+          "args": {
+            "dt": "Release Group",
+            "dn": "<grup>",
+            "method": "add_app",
+            "args": {
+              "app": {
+                "name": "app_name",
+                "title": "str",
+                "repository_url": "https://github.com/<owner>/<repo>",
+                "branch": "str",
+                "github_installation_id": "str | null"
+              }
+            }
+          },
+          "returns": "Güncel Release Group (frappe.response.docs)",
+          "permission": "press.api.client.run_doc_method yalnız @dashboard_whitelist metotları; Release Group.add_app App yoksa new_app ile oluşturur, Source ekler ve gruba bağlar",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/release_group/release_group.py",
+            "lines": [
+              1923,
+              1963
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.app.new",
+          "args": {
+            "app": {
+              "name": "str",
+              "title": "str",
+              "group": "Release Group",
+              "repository_url": "str",
+              "branch": "str"
+            }
+          },
+          "returns": "Release Group adı",
+          "permission": "@frappe.whitelist(); @protected yok (grup sahipliği yalnız doc kaydı izinlerine kalır; doğrulanmadı)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/app.py",
+            "lines": [
+              18,
+              41
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Desk: App kaydını Name = gerçek app_name ile oluştur, sonra Source bağla.",
+          "source": null
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "app.identity_from_hooks",
+          "description": "Name, repo'daki uygulama klasörü ve hooks.py app_name ile aynı.",
+          "machine": false
+        },
+        {
+          "id": "app.not_existing",
+          "description": "Aynı teknik kimlik zaten yok; varsa mevcut kayıt kullanılır.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "App kaydı oluşur; takım yolu ayrıca App Source oluşturur ve grubu kaydeder."
+      ],
+      "async": null,
+      "success": "App kaydı doğru teknik adla var ve doğru Source'a bağlı.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Sonraki build: 'Required app not found' ya da yanlış hooks yolu",
+            "meaning": "App adı paket adıyla uyuşmuyor",
+            "next": "Gerçek app_name'i hooks.py'den oku"
+          }
+        ],
+        "timeout": "Sonuç unknown ise App listesini oku.",
+        "retry": "Kimlik doğrulanmadan tekrar yok.",
+        "rollback": "Yanlış kayıt silinmez; bağlantılar incelenip insan karar verir."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "partial",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "press.api.app.new'in grup sahipliği denetimi kaynakta açıkça görünmez; bu yol önerilmez."
+      ]
+    },
+    {
+      "id": "app_source.get",
+      "family": "release",
+      "title": "App Source (repo, branch, sürüm, gerekli uygulamalar) kaydını oku",
+      "kind": "read",
+      "status": "planned",
+      "status_reason": "App Source Dashboard ALLOWED_DOCTYPES içinde değil; runtime yalnız ön koşul için operator get_list kullanır, ayrı okuma aracı uygulanmadı.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "apps",
+        "source",
+        "source-form",
+        "live-correct-apps",
+        "live-framework-source",
+        "live-erpnext-source",
+        "live-payments-source",
+        "live-education-source",
+        "live-lms-source"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "App Source List → kayıt (App, Repository URL, Branch, Versions, Frappe, Enabled)",
+          "sitemap_node_ids": [
+            "desk-live-app-source-list",
+            "desk-live-app-source-form",
+            "desk-schema-app-source"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "App Source",
+          "fields": [
+            "name",
+            "app",
+            "repository_url",
+            "repository",
+            "repository_owner",
+            "branch",
+            "frappe",
+            "enabled",
+            "team",
+            "public",
+            "last_github_poll_failed"
+          ],
+          "child_tables": [
+            {
+              "field": "versions",
+              "doctype": "App Source Version",
+              "fields": [
+                "version"
+              ]
+            },
+            {
+              "field": "required_apps",
+              "doctype": "Required Apps",
+              "fields": [
+                "repository_url"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "App Source",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "name": "<SRC-...>"
+            },
+            "fields": [
+              "name",
+              "app",
+              "repository_url",
+              "branch",
+              "frappe",
+              "enabled",
+              "team",
+              "public"
+            ],
+            "child_tables": "App Source Version, Required Apps (parent=<source>)"
+          },
+          "returns": "Alanlar; github_installation_id ve last_github_response alınmaz",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.apps",
+          "args": {
+            "name": "Release Group adı"
+          },
+          "returns": "Grup satırlarında branch, repository, repository_url",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              417,
+              480
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Her Source satırında App, repository ve branch eşleşmesi okunur; SRC adı uygulama kimliği değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Yanlış App alanı",
+            "meaning": "Source başka uygulamaya bağlı (ör. frappe kaynağı education satırında)",
+            "next": "Doğru Source'u seç"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Frappe kutusu yalnız framework kaynağında açık olur.",
+        "Public alanı GitHub görünürlüğüyle aynı karar değildir."
+      ]
+    },
+    {
+      "id": "app_source.create",
+      "family": "release",
+      "title": "App Source oluştur (repo + branch + sürüm + Team)",
+      "kind": "mutation",
+      "status": "planned",
+      "status_reason": "Kaynak doğrulandı; branch/sürüm uyumu ve Team sahipliği insan kararı istediğinden henüz uygulanmadı.",
+      "authority": [
+        "operator",
+        "team"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "source",
+        "source-form"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "App Source → New (App, Repository URL, Branch, Versions, Team, Enabled)",
+          "sitemap_node_ids": [
+            "desk-live-app-source-form"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Apps → Add App",
+          "sitemap_node_ids": [
+            "dashboard-group-apps-component-1"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "App Source",
+          "fields": [
+            "app",
+            "repository_url",
+            "branch",
+            "team",
+            "enabled",
+            "frappe",
+            "public"
+          ],
+          "child_tables": [
+            {
+              "field": "versions",
+              "doctype": "App Source Version",
+              "fields": [
+                "version"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.client.run_doc_method",
+          "args": {
+            "dt": "Release Group",
+            "dn": "<grup>",
+            "method": "add_app",
+            "args": {
+              "app": "{name, title, repository_url, branch}"
+            }
+          },
+          "returns": "Güncel Release Group",
+          "permission": "@dashboard_whitelist; Source oluşturur ve gruba ekler (validate_frappe_version_for_branch hataları bastırılır)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/release_group/release_group.py",
+            "lines": [
+              1923,
+              1963
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "human",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Desk: App Source formu; uygun Source varsa yenisini oluşturma.",
+          "source": null
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "branch.exists_and_supports_version",
+          "description": "Branch repoda var ve hedef Frappe sürümünü destekliyor; hareketli branch tek başına uyum garantisi değildir.",
+          "machine": false
+        },
+        {
+          "id": "app_source.not_duplicate",
+          "description": "Aynı App + repo + branch için uygun Source varsa o kullanılır.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "App Source kaydı oluşur; takım yolu ayrıca grubu kaydeder."
+      ],
+      "async": null,
+      "success": "Source kaydı App = gerçek app_name, doğru repo/branch ve sürümle var.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "'This doesn't look like a valid Git repository URL'",
+            "meaning": "URL eksik",
+            "next": "Tam GitHub URL'si ver"
+          }
+        ],
+        "timeout": "Sonuç unknown ise Source listesini oku.",
+        "retry": "Doğrulamadan tekrar yok.",
+        "rollback": "Yanlış Source silinmeden önce bağlantıları incelenir."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "partial",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Kılavuzda yeni Source oluşturulmadı; hazır SRC-* kayıtları kullanıldı."
+      ]
+    },
+    {
+      "id": "app_source.branches",
+      "family": "release",
+      "title": "Uygulamanın git branch'lerini listele / branch'i doğrula",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.bench.branch_list runtime'da okunur.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "branch"
+      ],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Apps → uygulama → Change Branch",
+          "sitemap_node_ids": [
+            "dashboard-group-apps-component-2"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "App Source",
+          "fields": [
+            "repository_owner",
+            "repository",
+            "branch",
+            "public"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.branch_list",
+          "args": {
+            "name": "Release Group adı",
+            "app": "App adı"
+          },
+          "returns": "[{name}] GitHub branch listesi (marketplace uygulamasında izinli branch'ler)",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              935,
+              951
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.validate_branch",
+          "args": {
+            "name": "...",
+            "app": "...",
+            "branch": "str"
+          },
+          "returns": "GitHub branch nesnesi ya da hata",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              954,
+              979
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_group",
+          "app"
+        ],
+        "properties": {
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "app": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "[a-z][a-z0-9_]{0,63}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [
+        "GitHub API'ye Press sunucusundan istek yapılır."
+      ],
+      "async": null,
+      "success": "İstenen branch listede var. Varlık sürüm uyumu değildir; uyum release commit'inden okunur.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "'This app isn't part of the bench group'",
+            "meaning": "Uygulama grupta değil",
+            "next": "Önce release_group.add_app"
+          },
+          {
+            "signal": "GitHub hata metni",
+            "meaning": "Repo erişimi veya kurulum kimliği sorunu",
+            "next": "Source'un repo/installation bilgisini insan kontrol eder"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "LMS örneğinde branch main idi; her uygulamaya version-16 yazmak genel kural değildir."
+      ]
+    },
+    {
+      "id": "app_release.create",
+      "family": "release",
+      "title": "Source için en güncel commit'ten App Release oluştur",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "press.api.bench.fetch_latest_app_update runtime'da uygulanır; enable_auto_deploy yalnız operator ile okunabildiğinden team principal'da release_group.auto_deploy_off doğrulanamaz ve öneri engellenir (pratikte operator).",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "release"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "App Source → Actions → Create Release",
+          "sitemap_node_ids": [
+            "desk-live-app-source-form-action-1"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "App Release",
+          "fields": [
+            "name",
+            "app",
+            "source",
+            "hash",
+            "status",
+            "message",
+            "author",
+            "team",
+            "timestamp"
+          ],
+          "child_tables": []
+        },
+        {
+          "doctype": "Release Group",
+          "fields": [
+            "name"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Release Group App",
+              "fields": [
+                "app",
+                "source",
+                "enable_auto_deploy"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.fetch_latest_app_update",
+          "args": {
+            "name": "Release Group adı",
+            "app": "App adı"
+          },
+          "returns": "None (create_release sonucu döndürülmez)",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              555,
+              558
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "doc_method",
+          "doctype": "App Source",
+          "method": "create_release",
+          "args": {
+            "force": "bool=false",
+            "commit_hash": "str | null"
+          },
+          "returns": "App Release adı ya da None (GitHub yoklaması başarısız / commit bilgisi yok); hata Error Log 'Create Release Error'",
+          "permission": "@frappe.whitelist() doc metodu; frappe.handler.run_doc_method, Desk doc izni (System User)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/app_source/app_source.py",
+            "lines": [
+              177,
+              199
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_group",
+          "app"
+        ],
+        "properties": {
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "app": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "[a-z][a-z0-9_]{0,63}"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "team.resolved_matches_config",
+          "description": "Team principal'da press.api.account.current_team ile çözülen takım yapılandırılan X-Press-Team ile aynı (Press üyelik yoksa sessizce varsayılan takıma düşer); operator'da geçerli.",
+          "machine": true
+        },
+        {
+          "id": "release_group.owned_by_team",
+          "description": "Team principal'da grup takıma ait.",
+          "machine": true
+        },
+        {
+          "id": "release_group.app_present",
+          "description": "Uygulama grupta olmalı (get_app_source).",
+          "machine": true
+        },
+        {
+          "id": "proposal.no_unknown_outcome",
+          "description": "Bilinmeyen sonuçlu öneri yok.",
+          "machine": true
+        },
+        {
+          "id": "release_group.auto_deploy_off",
+          "description": "Bu kaynağı enable_auto_deploy=1 ile kullanan hiçbir Release Group App satırı (tüm gruplar) yok (varsa False). Press Settings deploy_marker tanımlıysa sonuç None: yeni commit'in mesajı adlandırılan bir grubu (<işaret>-<grup>, etiket gerekmez) ya da takımın auto-deploy gruplarını dağıtabilir ve önceden doğrulanamaz. Team bu alanları okuyamaz → None. None/False öneriyi engeller.",
+          "machine": true
+        },
+        {
+          "id": "press_settings.deploy_marker_absent_in_commit",
+          "description": "Press Settings deploy_marker commit mesajında geçmemeli; geçerse 'auto-deploy' etiketli gruplar deploy edilir.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "App Source.create_release(force=True): aynı (app, source, hash) release varsa yenisi oluşmaz, mevcut döner.",
+        "Yeni App Release after_insert: release farkları ve auto_deploy kuyruğa alınır; enable_auto_deploy veya deploy_marker varsa candidate + schedule_build_and_deploy tetiklenebilir."
+      ],
+      "async": {
+        "returns": "None; izleme Source'un en yeni App Release kaydını okur",
+        "track": "track.app_release",
+        "terminal_success": [
+          "Draft",
+          "Approved"
+        ],
+        "terminal_failure": [
+          "Rejected",
+          "Yanked",
+          "absent"
+        ],
+        "intermediate": [
+          "Awaiting Approval"
+        ]
+      },
+      "success": "Source için branch ucundaki hash'e karşılık gelen App Release var (yeni ya da önceden var olan). Release oluşması build veya kurulum kanıtı değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Dönüş None ve yeni release yok",
+            "meaning": "GitHub yoklaması başarısız ya da commit bilgisi alınamadı",
+            "next": "Error Log 'Create Release Error' (reference App Source) oku; Source repo/branch'i kontrol et"
+          },
+          {
+            "signal": "Beklenmeyen yeni Deploy Candidate/Build",
+            "meaning": "auto_deploy tetiklendi",
+            "next": "Build'i izle; deploy ayrımını insanla değerlendir"
+          },
+          {
+            "signal": "Ön koşul None (team principal)",
+            "meaning": "Team, Release Group App.enable_auto_deploy alanını okuyamaz",
+            "next": "Operator principal ile öner ya da insan Desk'te doğrular"
+          },
+          {
+            "signal": "İzleme failed: last_github_poll_failed",
+            "meaning": "Press kaynağı yoklayamadı; create_release release açmadan döndü",
+            "next": "Kaynak erişimini düzelt; sonra yeni öneri"
+          },
+          {
+            "signal": "İzleme failed: yeni Create Release Error",
+            "meaning": "Yoklama başarılı ama _create_release istisnası yutuldu ve Error Log'a yazıldı (operator snapshot farkı)",
+            "next": "error_log.list ile kaydı oku"
+          },
+          {
+            "signal": "İzleme unknown",
+            "meaning": "Principal Error Log okuyamıyor; yutulan hata no_op'tan ayırt edilemez",
+            "next": "Operator ile doğrula"
+          }
+        ],
+        "timeout": "Zaman aşımında unknown; App Release listesini okumadan tekrar çağırma.",
+        "retry": "Release yoksa ve neden giderildiyse yeni öneri.",
+        "rollback": "Release silinmez; yanlış release ile candidate oluşturulmaz."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "press_propose",
+          "proposal_get",
+          "press_execute",
+          "press_track"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Marketplace kaynaklarında deploy için Approved release gerekir (deploy_candidate.get_unpublished_marketplace_releases); özel kaynaklarda Draft kullanımı statik okumaya dayanır, canlı doğrulanmadı."
+      ]
+    },
+    {
+      "id": "app_release.get",
+      "family": "release",
+      "title": "App Release (Source, hash, commit mesajı, durum) oku",
+      "kind": "read",
+      "status": "planned",
+      "status_reason": "Ayrı okuma aracı uygulanmadı; candidate satırlarındaki release/hash deploy_candidate.get ile okunur.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "release",
+        "live-candidate-content",
+        "live-candidate-two"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "App Release kaydı (Source, Hash, Status)",
+          "sitemap_node_ids": [
+            "desk-live-app-release-form",
+            "desk-live-app-release-list"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "App Release",
+          "fields": [
+            "name",
+            "app",
+            "source",
+            "hash",
+            "message",
+            "author",
+            "status"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.client.get",
+          "args": {
+            "doctype": "App Release",
+            "name": "<release>"
+          },
+          "returns": "dashboard_fields: app, source, message, hash, author, status",
+          "permission": "App Release ALLOWED_DOCTYPES içinde; takım erişim denetimi",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/client.py",
+            "lines": [
+              234,
+              275
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "App Release",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "name": "<release>"
+            },
+            "fields": [
+              "name",
+              "app",
+              "source",
+              "hash",
+              "status",
+              "timestamp"
+            ]
+          },
+          "returns": "Alanlar; output/clone_directory alınmaz",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Candidate'taki her release doğru Source'a ve tam hash'e bağlı.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Hash kısaltılmış",
+            "meaning": "Liste görünümü kısaltır",
+            "next": "Tam hash App Release kaydından okunur"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    }
+  ]
+}

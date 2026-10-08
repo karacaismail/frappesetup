@@ -1,0 +1,569 @@
+{
+  "family": "backups",
+  "operations": [
+    {
+      "id": "site.backups",
+      "family": "backups",
+      "title": "Sitenin kullanılabilir yedeklerini listele",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.site.backups runtime'da; indirme URL alanları atılır.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Sites → site → Backups",
+          "sitemap_node_ids": [
+            "dashboard-site-backups",
+            "dashboard-site-backups-component-4"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site Backup",
+          "fields": [
+            "name",
+            "site",
+            "status",
+            "with_files",
+            "offsite",
+            "files_availability",
+            "creation",
+            "database_size",
+            "job"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.backups",
+          "args": {
+            "name": "site"
+          },
+          "returns": "files_availability=Available yedekler (yerel son 10 + offsite); URL alanları runtime'da atılır",
+          "permission": "@frappe.whitelist(); @protected(\"Site\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              749,
+              790
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ],
+        "properties": {
+          "site": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 253,
+            "pattern": "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "En yeni Success yedek ve zamanı okunur; devam eden yedek bu listede görünmez.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Liste boş",
+            "meaning": "Henüz yedek yok ya da dosyalar Unavailable",
+            "next": "site.backup önerisi"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Yedek zaman damgası Press sunucusunun saat dilimindedir."
+      ]
+    },
+    {
+      "id": "site.backup",
+      "family": "backups",
+      "title": "Site yedeği al (isteğe bağlı dosyalarla)",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "press.api.site.backup (team, operator) runtime'da öneri/onay/izleme ile uygulanır.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Sites → site → Backups → Schedule Backup",
+          "sitemap_node_ids": [
+            "dashboard-site-backups-component-3"
+          ]
+        },
+        {
+          "surface": "desk",
+          "path": "Site → Actions → Backup",
+          "sitemap_node_ids": [
+            "desk-admin-live-site-record-menu-actions-2"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site Backup",
+          "fields": [
+            "name",
+            "site",
+            "status",
+            "with_files",
+            "job",
+            "files_availability"
+          ],
+          "child_tables": []
+        },
+        {
+          "doctype": "Agent Job",
+          "fields": [
+            "name",
+            "job_type",
+            "status",
+            "site",
+            "bench",
+            "server",
+            "start",
+            "end",
+            "duration"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.backup",
+          "args": {
+            "name": "site",
+            "with_files": "bool=false"
+          },
+          "returns": "None (Site Backup adı döndürülmez)",
+          "permission": "@frappe.whitelist(); @protected(\"Site\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              2151,
+              2154
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.backup",
+          "args": {
+            "name": "site",
+            "with_files": "bool"
+          },
+          "returns": "None",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/site/site.py",
+            "lines": [
+              1584,
+              1619
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "site"
+        ],
+        "properties": {
+          "site": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 253,
+            "pattern": "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+"
+          },
+          "with_files": {
+            "type": "boolean"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "site.owned_by_team",
+          "description": "Team principal'da site takıma ait.",
+          "machine": true
+        },
+        {
+          "id": "site.no_running_jobs",
+          "description": "Sitede Pending/Running Agent Job yok.",
+          "machine": true
+        },
+        {
+          "id": "proposal.no_unknown_outcome",
+          "description": "Bilinmeyen sonuçlu öneri yok.",
+          "machine": true
+        },
+        {
+          "id": "site.active",
+          "description": "Site Active (Press askıdaki sitede de yedeğe izin verir; burada daha sıkı).",
+          "machine": true
+        },
+        {
+          "id": "team.resolved_matches_config",
+          "description": "Team principal'da çözülen takım yapılandırılan takımla aynı.",
+          "machine": true
+        }
+      ],
+      "side_effects": [
+        "Site Backup kaydı insert edilir; Agent Job 'Backup Site'; depolama kullanılır."
+      ],
+      "async": {
+        "returns": "None; izleme yürütme zamanından sonra açılan Backup Site işini/Site Backup kaydını bulur",
+        "track": "track.site_backup",
+        "terminal_success": [
+          "Success"
+        ],
+        "terminal_failure": [
+          "Failure",
+          "Delivery Failure"
+        ],
+        "intermediate": [
+          "Pending",
+          "Running",
+          "Undelivered"
+        ]
+      },
+      "success": "Yürütmeden sonra açılan tek Backup Site işi Success ve dosyalar Available; birden çok yeni yedek işi varsa (zamanlanmış yedek) sonuç unknown kalır.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "'You cannot take more than 3 backups after site suspension'",
+            "meaning": "Askıdaki site sınırı",
+            "next": "Hesap sahibine aktar"
+          },
+          {
+            "signal": "Backup Site Failure",
+            "meaning": "Disk/izin/agent hatası",
+            "next": "agent_job.get; disk devri"
+          }
+        ],
+        "timeout": "Zaman aşımında unknown; yeni yedek açmadan iş listesini oku.",
+        "retry": "Neden giderilince tek öneri.",
+        "rollback": "Yedek silinmez."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "press_propose",
+          "proposal_get",
+          "press_execute",
+          "press_track"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "site.restore_preflight",
+      "family": "backups",
+      "title": "Geri yükleme öncesi denetim (yedek, durum, alan)",
+      "kind": "analysis",
+      "status": "planned",
+      "status_reason": "Press'te press.api.site.validate_restoration_space_requirements var; birleşik ön denetim henüz uygulanmadı.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Sites → site → Actions → Restore",
+          "sitemap_node_ids": [
+            "dashboard-site-actions-component-7"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site Backup",
+          "fields": [
+            "name",
+            "status",
+            "files_availability",
+            "database_size"
+          ],
+          "child_tables": []
+        },
+        {
+          "doctype": "Site",
+          "fields": [
+            "name",
+            "status",
+            "group",
+            "bench",
+            "server",
+            "team",
+            "cluster",
+            "plan",
+            "setup_wizard_complete",
+            "host_name"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Site App",
+              "fields": [
+                "app"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.validate_restoration_space_requirements",
+          "args": {
+            "name": "site",
+            "db_file_size": "int",
+            "public_file_size": "int",
+            "private_file_size": "int"
+          },
+          "returns": "Alan yeterliliği",
+          "permission": "@frappe.whitelist(); @protected(\"Site\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              2204,
+              2253
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "local",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "site.get + site.backups + site.jobs çıktılarından birleşik değerlendirme.",
+          "source": null
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Geri yüklenecek yedek doğrulandı, sitede süren iş yok, alan yeterli; karar yine insandadır.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Alan yetersiz",
+            "meaning": "Sunucu diski",
+            "next": "server.disk_check devri"
+          }
+        ],
+        "timeout": "Uygulanmadı.",
+        "retry": "Uygulanmadı.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "site.restore",
+      "family": "backups",
+      "title": "Siteyi yedekten geri yükle",
+      "kind": "mutation",
+      "status": "unsupported",
+      "status_reason": "Yıkıcı işlem: mevcut site verisinin üzerine yazar; MCP yürütmez, insan devri zorunludur.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": {
+        "role": "team",
+        "person": null,
+        "steps": [
+          "Yedeği ve hedef siteyi doğrula; önce güncel yedek al.",
+          "Dashboard'da Restore'u bilerek başlat; işi izle."
+        ],
+        "acceptance": "Restore Site işi Success, site Active, veri beklenen yedekle uyumlu."
+      },
+      "guide_steps": [],
+      "ui": [
+        {
+          "surface": "dashboard",
+          "path": "Sites → site → Actions → Restore",
+          "sitemap_node_ids": [
+            "dashboard-site-actions-component-7",
+            "dashboard-site-actions-component-8"
+          ]
+        },
+        {
+          "surface": "desk",
+          "path": "Site → Dangerous Actions → Restore",
+          "sitemap_node_ids": [
+            "desk-admin-live-site-record-menu-dangerous-actions-4"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Site",
+          "fields": [
+            "name",
+            "status",
+            "group",
+            "bench",
+            "server",
+            "team",
+            "cluster",
+            "plan",
+            "setup_wizard_complete",
+            "host_name"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Site App",
+              "fields": [
+                "app"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.site.restore",
+          "args": {
+            "name": "site",
+            "files": "{database, public, private, config}",
+            "skip_failing_patches": "bool=false"
+          },
+          "returns": "Site.restore_site sonucu (iş)",
+          "permission": "@frappe.whitelist(); @protected(\"Site\"); dosyaların takıma ait olduğu denetlenir",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/site.py",
+            "lines": [
+              2181,
+              2201
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Sitenin veritabanı/dosyaları yedekle değiştirilir."
+      ],
+      "async": null,
+      "success": "Desteklenmez; insan yürütür.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Restore Failure",
+            "meaning": "Yedek/yama hatası",
+            "next": "İnsan inceler"
+          }
+        ],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Önceki yedekten tekrar geri yükleme insan kararıdır."
+      },
+      "risk": "destructive",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    }
+  ]
+}

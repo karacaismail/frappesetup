@@ -1,0 +1,2135 @@
+{
+  "family": "build_deploy",
+  "operations": [
+    {
+      "id": "deploy_candidate.create",
+      "family": "build_deploy",
+      "title": "Gruptan Deploy Candidate oluştur (tüm uygulamalar en güncel release ile)",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "Operator principal ile Release Group.create_deploy_candidate (argümansız) doc metodu runtime'da uygulanır; takım uç noktası argüman kayması nedeniyle kullanılmaz.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "candidate",
+        "live-new-candidate",
+        "live-candidate-menu",
+        "live-candidate-two"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Release Group → Actions → Create Deploy Candidate",
+          "sitemap_node_ids": [
+            "desk-admin-live-release-group-record-menu-actions-0"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Deploy Candidate",
+          "fields": [
+            "name",
+            "group",
+            "team",
+            "intel_build",
+            "arm_build",
+            "requires_arm_build",
+            "requires_intel_build",
+            "creation"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Deploy Candidate App",
+              "fields": [
+                "app",
+                "source",
+                "release",
+                "hash"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "Release Group",
+          "fields": [
+            "name",
+            "enabled"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Release Group App",
+              "fields": [
+                "app",
+                "source"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "doc_method",
+          "doctype": "Release Group",
+          "method": "create_deploy_candidate",
+          "args": {},
+          "returns": "Deploy Candidate dokümanı (adı deploy-<grup>-NNNNNN); grup devre dışıysa None",
+          "permission": "@frappe.whitelist() doc metodu; frappe.handler.run_doc_method, Desk doc izni (System User)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/release_group/release_group.py",
+            "lines": [
+              916,
+              974
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Desk düğmesinin çağırdığı yol kanıtı: release_group.js 'Create Deploy Candidate' → frm.call('create_deploy_candidate') argümansız.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/release_group/release_group.js",
+            "lines": [
+              11,
+              11
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": "press.api.bench.create_deploy_candidate",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "press.api.bench.create_deploy_candidate(name, apps_to_ignore) değeri apps_to_update olarak geçirir; boş liste hiçbir uygulamaya güncelleme seçmez (son deploy edilen release'ler korunur). Kılavuzun 'en güncel release' anlamı bu yolla elde edilmez.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              875,
+              880
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_group"
+        ],
+        "properties": {
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "principal.operator",
+          "description": "Doc metodu System User ile çağrılır.",
+          "machine": true
+        },
+        {
+          "id": "release_group.owned_by_team",
+          "description": "Hedef grup var ve öneriyle aynı grup.",
+          "machine": true
+        },
+        {
+          "id": "release_group.no_deploy_in_progress",
+          "description": "deploy_information bayrakları (deploy_in_progress, has_running_release_pipeline, bench_creation_underway) yanlış VE grupta Pending/Installing bench yok VE (operator) Queued New Bench Queue yok. Press'in deploy_in_progress'i bench kurulumunu görmez (last_benches_info Bench.candidate'ı build adıyla karşılaştırır); team kuyruğu okuyamaz.",
+          "machine": true
+        },
+        {
+          "id": "proposal.no_unknown_outcome",
+          "description": "Bilinmeyen sonuçlu öneri yok.",
+          "machine": true
+        },
+        {
+          "id": "release_group.apps_have_sources",
+          "description": "Apps tablosunda boş Source ve yanlış App kimliği yok.",
+          "machine": false
+        },
+        {
+          "id": "server.storage_sufficient",
+          "description": "check_app_server_storage: sunucuda son image boyutu kadar boş alan; yoksa InsufficientSpaceOnServer.",
+          "machine": false
+        },
+        {
+          "id": "servers.not_scaled_up",
+          "description": "check_auto_scales: sunucu ölçeklenmiş veya auto-scale sürüyorsa hata.",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Deploy Candidate insert edilir (apps, dependencies, packages, environment_variables, build_token).",
+        "Build veya deploy başlamaz."
+      ],
+      "async": {
+        "returns": "Deploy Candidate adı",
+        "track": "track.candidate",
+        "terminal_success": [
+          "present"
+        ],
+        "terminal_failure": [
+          "absent"
+        ],
+        "intermediate": []
+      },
+      "success": "Candidate gruba bağlı ve Apps & Deps satırlarının her birinde Source, Release ve Hash dolu; sıra grupla aynı. Candidate kaydı build/deploy/site kanıtı değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "'Following apps [...] not found. Potentially due to not approved App Releases.'",
+            "meaning": "Bir uygulama için uygun release yok",
+            "next": "app_release.create ve onay durumunu kontrol et"
+          },
+          {
+            "signal": "'... branch is no longer compatible with bench of <sürüm>'",
+            "meaning": "Source grup sürümünü desteklemiyor",
+            "next": "Doğru Source/branch seç"
+          },
+          {
+            "signal": "InsufficientSpaceOnServer",
+            "meaning": "Sunucu diski yetersiz",
+            "next": "server.disk_check devri"
+          },
+          {
+            "signal": "'Server(s) are scaled up currently ...'",
+            "meaning": "Ölçekleme sürüyor",
+            "next": "Ölçekleme bitene kadar bekle"
+          },
+          {
+            "signal": "None",
+            "meaning": "Grup enabled=0",
+            "next": "Grubu incele; yeni candidate açma"
+          }
+        ],
+        "timeout": "Zaman aşımında unknown; candidate listesini (deploy_candidate.list) okumadan tekrar oluşturma.",
+        "retry": "Yalnız candidate oluşmadıysa ve neden giderildiyse yeni öneri.",
+        "rollback": "Candidate silinmez; tarihsel kayıt olarak kalır."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "press_propose",
+          "proposal_get",
+          "press_execute",
+          "press_track"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Create Duplicate Deploy Candidate farklıdır: son deploy edilen release'leri tekrarlar (deploy_candidate.duplicate).",
+        "Yeni candidate yalnız sonuç görüldükten ve neden giderildikten sonra açılır; Preparing durumunda yeni candidate açılmaz."
+      ]
+    },
+    {
+      "id": "deploy_candidate.list",
+      "family": "build_deploy",
+      "title": "Grubun Deploy Candidate kayıtlarını listele",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "Takım için press.api.bench.candidates, operator için get_list + son build durumu runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-previous-candidates"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Deploy Candidate List (Release Group filtresi)",
+          "sitemap_node_ids": [
+            "desk-admin-live-deploy-candidate-list",
+            "desk-live-type-deploy-candidate-list"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Deploys",
+          "sitemap_node_ids": [
+            "dashboard-group-deploys",
+            "dashboard-group-deploys-component-3"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Deploy Candidate",
+          "fields": [
+            "name",
+            "group",
+            "creation"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Deploy Candidate App",
+              "fields": [
+                "app"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "Deploy Candidate Build",
+          "fields": [
+            "name",
+            "deploy_candidate",
+            "status",
+            "creation"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.candidates",
+          "args": {
+            "filters": {
+              "group": "Release Group adı"
+            },
+            "order_by": "str | null",
+            "limit_start": "int | null",
+            "limit_page_length": "int | null"
+          },
+          "returns": "[{name, creation, status, apps[]}] — status sütunu Deploy Candidate DocType'ında artık yok; değer eski olabilir",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py) (ad filters'ın ilk değerinden okunur)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              690,
+              714
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Deploy Candidate",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "group": "<grup>"
+            },
+            "fields": [
+              "name",
+              "creation"
+            ]
+          },
+          "returns": "Candidate adları; durum Deploy Candidate Build'den",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_group"
+        ],
+        "properties": {
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Her candidate'ın ait olduğu grup okunur; ad deploy-<grup numarası>-NNNNNN biçimindedir, eski ve yeni grubun candidate'ları karıştırılmaz.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Beklenenden az candidate",
+            "meaning": "Draft candidate'lar team listesinde hariç tutulur",
+            "next": "Operator listesiyle karşılaştır"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "partial",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Durum kaynağı Deploy Candidate Build.status'tur (Draft | Scheduled | Pending | Preparing | Running | Success | Failure)."
+      ]
+    },
+    {
+      "id": "deploy_candidate.get",
+      "family": "build_deploy",
+      "title": "Candidate içeriğini (App, Source, Release, Hash) ve bağlı build'leri oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.bench.candidate (team) ve açık alanlı get_list (operator) runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "candidate",
+        "live-failure",
+        "live-runtime",
+        "live-new-candidate",
+        "live-candidate-content",
+        "live-previous-candidate-count",
+        "live-candidate-two"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Deploy Candidate → Details / Apps & Deps / Connections",
+          "sitemap_node_ids": [
+            "desk-admin-live-deploy-candidate-record",
+            "desk-admin-live-deploy-candidate-record-tab-0",
+            "desk-admin-live-deploy-candidate-record-tab-1"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Deploy Candidate",
+          "fields": [
+            "name",
+            "group",
+            "team",
+            "intel_build",
+            "arm_build",
+            "requires_arm_build",
+            "requires_intel_build",
+            "creation"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Deploy Candidate App",
+              "fields": [
+                "app",
+                "source",
+                "release",
+                "hash"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "Deploy Candidate Build",
+          "fields": [
+            "name",
+            "deploy_candidate",
+            "status",
+            "creation"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.candidate",
+          "args": {
+            "name": "Deploy Candidate adı"
+          },
+          "returns": "{name, status, creation, build_steps, build_start, build_end, build_duration, apps, jobs} — en son build'in verisi",
+          "permission": "@frappe.whitelist(); @protected(\"Deploy Candidate\")",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              717,
+              754
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Deploy Candidate",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "name": "<candidate>"
+            },
+            "fields": [
+              "name",
+              "group",
+              "creation",
+              "intel_build",
+              "arm_build"
+            ],
+            "child_tables": "Deploy Candidate App (parent=<candidate>): app, source, release, hash",
+            "builds": "Deploy Candidate Build filters {deploy_candidate}: name, status, creation"
+          },
+          "returns": "Açık alanlar; user_private_key, user_certificate, build_token alınmaz",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "deploy_candidate"
+        ],
+        "properties": {
+          "deploy_candidate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Her satırda Source, Release ve tam Hash dolu ve Source kimlikleri grup tablosuyla aynı; bağlı build sayısı ve kimlikleri okunur.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Build olmayan candidate'ta team okuması hata verebilir",
+            "meaning": "press.api.bench.candidate son build'i varsayar",
+            "next": "Operator build listesiyle oku"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Uyumluluk release commit'lerindeki pyproject.toml/hooks.py'den okunur; branch sonradan değişebilir.",
+        "intel_build/arm_build yalnız Success build'le doldurulur (update_deploy_candidate_with_build)."
+      ]
+    },
+    {
+      "id": "deploy_candidate.duplicate",
+      "family": "build_deploy",
+      "title": "Son deploy edilen release'lerle kopya Deploy Candidate oluştur",
+      "kind": "mutation",
+      "status": "planned",
+      "status_reason": "Kaynak doğrulandı; kılavuz bu eylemi Create Deploy Candidate'tan ayırmayı ister ve kullanmadı, bu yüzden uygulanmadı.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "live-candidate-menu"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Release Group → Actions → Create Duplicate Deploy Candidate",
+          "sitemap_node_ids": [
+            "desk-admin-live-release-group-record-menu-actions-1"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Deploy Candidate",
+          "fields": [
+            "name",
+            "group",
+            "team",
+            "intel_build",
+            "arm_build",
+            "requires_arm_build",
+            "requires_intel_build",
+            "creation"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Deploy Candidate App",
+              "fields": [
+                "app",
+                "source",
+                "release",
+                "hash"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "doc_method",
+          "doctype": "Release Group",
+          "method": "create_duplicate_deploy_candidate",
+          "args": {},
+          "returns": "Deploy Candidate dokümanı",
+          "permission": "@frappe.whitelist() doc metodu; frappe.handler.run_doc_method, Desk doc izni (System User)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/release_group/release_group.py",
+            "lines": [
+              814,
+              816
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": "press.api.bench.create_deploy_candidate",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Takım uç noktasının varsayılanı (apps_to_ignore=[] → apps_to_update=[]) pratikte kopya anlamı taşır; ad yanıltıcı olduğu için önerilmez.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              875,
+              880
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [
+        {
+          "id": "release_group.no_deploy_in_progress",
+          "description": "Süren deploy yok.",
+          "machine": true
+        }
+      ],
+      "side_effects": [
+        "Deploy Candidate insert edilir; uygulamalar güncelleme almaz."
+      ],
+      "async": null,
+      "success": "Kopya candidate son deploy edilen release/hash'lerle oluşur.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Beklenmeyen eski release",
+            "meaning": "Kopya güncelleme almaz",
+            "next": "Güncel release isteniyorsa deploy_candidate.create"
+          }
+        ],
+        "timeout": "Sonuç unknown ise candidate listesini oku.",
+        "retry": "Tekrar oluşturma.",
+        "rollback": "Candidate silinmez."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": []
+    },
+    {
+      "id": "build.start",
+      "family": "build_deploy",
+      "title": "Candidate için yalnız build başlat (Build → Complete)",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "Operator principal ile Deploy Candidate.build doc metodu (no_push/no_build/no_cache false) runtime'da uygulanır.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "schedule",
+        "live-build-complete",
+        "live-candidate-two",
+        "live-npm-range-validation",
+        "live-ecr-push-failure"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Deploy Candidate → Build → Complete",
+          "sitemap_node_ids": [
+            "desk-admin-live-deploy-candidate-record-tab-0-action-1"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Deploy Candidate",
+          "fields": [
+            "name",
+            "group",
+            "team",
+            "intel_build",
+            "arm_build",
+            "requires_arm_build",
+            "requires_intel_build",
+            "creation"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Deploy Candidate App",
+              "fields": [
+                "app",
+                "source",
+                "release",
+                "hash"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "Deploy Candidate Build",
+          "fields": [
+            "name",
+            "deploy_candidate",
+            "group",
+            "status",
+            "build_start",
+            "build_end",
+            "build_duration",
+            "build_error",
+            "docker_image",
+            "platform",
+            "no_cache",
+            "no_push",
+            "deploy_after_build",
+            "team"
+          ],
+          "child_tables": [
+            {
+              "field": "build_steps",
+              "doctype": "Deploy Candidate Build Step",
+              "fields": [
+                "stage",
+                "step",
+                "stage_slug",
+                "step_slug",
+                "status",
+                "output",
+                "duration",
+                "cached"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "doc_method",
+          "doctype": "Deploy Candidate",
+          "method": "build",
+          "args": {
+            "no_push": "bool=false",
+            "no_build": "bool=false",
+            "no_cache": "bool=false"
+          },
+          "returns": "{error: false, message: <Deploy Candidate Build adı>}; no_build=true ise None",
+          "permission": "@frappe.whitelist() doc metodu; frappe.handler.run_doc_method, Desk doc izni (System User)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/deploy_candidate/deploy_candidate.py",
+            "lines": [
+              225,
+              241
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Desk 'Complete' düğmesi kanıtı (deploy_candidate.js): build {no_push:false, no_build:false, no_cache:false}.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/deploy_candidate/deploy_candidate.js",
+            "lines": [
+              14,
+              14
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Dashboard'da yalnız-build yolu yok: press.api.bench.deploy ve Release Group.initial_deploy/redeploy build ile deploy'u birleştirir.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              764,
+              781
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "deploy_candidate"
+        ],
+        "properties": {
+          "deploy_candidate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "no_cache": {
+            "type": "boolean"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "principal.operator",
+          "description": "System User.",
+          "machine": true
+        },
+        {
+          "id": "release_group.owned_by_team",
+          "description": "Candidate'ın grubu hedef grupla aynı.",
+          "machine": true
+        },
+        {
+          "id": "deploy_candidate.apps_released",
+          "description": "Her satırda release ve hash dolu.",
+          "machine": true
+        },
+        {
+          "id": "deploy_candidate.no_active_build",
+          "description": "Candidate için Scheduled/Pending/Preparing/Running build yok.",
+          "machine": true
+        },
+        {
+          "id": "proposal.no_unknown_outcome",
+          "description": "Bilinmeyen sonuçlu öneri yok.",
+          "machine": true
+        },
+        {
+          "id": "builds.not_suspended",
+          "description": "Press Settings suspend_builds kapalı.",
+          "machine": false
+        },
+        {
+          "id": "servers.deployments_not_stopped",
+          "description": "Grup sunucularında stop_deployments kapalı (create_build hata verir).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Deploy Candidate Build insert edilir; after_insert pre_build ile durum Draft → Pending olur ve uzak builder işine (Run Remote Builder) gönderilir.",
+        "Build sunucusunda disk/ağ kaynağı kullanılır; deploy başlamaz."
+      ],
+      "async": {
+        "returns": "Deploy Candidate Build adı",
+        "track": "track.build",
+        "terminal_success": [
+          "Success"
+        ],
+        "terminal_failure": [
+          "Failure"
+        ],
+        "intermediate": [
+          "Draft",
+          "Scheduled",
+          "Pending",
+          "Preparing",
+          "Running"
+        ]
+      },
+      "success": "Build Status Success ve tüm Build Steps (son Upload Docker Image dahil) Success. Complete seçenek adıdır; Preparing/Running başarı değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Build Failure, ilk Failure Pre-build: 'Required app not found'",
+            "meaning": "Bağımlı App/Source eksik veya yanlış kimlik",
+            "next": "build.triage → release_group.add_app"
+          },
+          {
+            "signal": "Pre-build: 'Invalid simple block'",
+            "meaning": "Press npm aralığı ayrıştırma hatası",
+            "next": "press.code_fix devri"
+          },
+          {
+            "signal": "Upload Build Context HTTP 500",
+            "meaning": "Agent tarafında disk dolu (Nginx geçici dosya)",
+            "next": "server.disk_check devri"
+          },
+          {
+            "signal": "Upload Docker Image Failure",
+            "meaning": "Registry deposu yok/erişim",
+            "next": "registry.repository_check devri"
+          },
+          {
+            "signal": "'Deployments on this server are currently halted'",
+            "meaning": "stop_deployments açık",
+            "next": "Altyapı sahibine sor"
+          },
+          {
+            "signal": "Uzun Preparing/Pending",
+            "meaning": "Worker/scheduler kuyruğu",
+            "next": "Kanıtla Hüseyin Cengiz'e aktar; yeni build açma"
+          }
+        ],
+        "timeout": "Zaman aşımında sonuç unknown; build.get ile oku, yeni build açma.",
+        "retry": "Yalnız neden giderildikten sonra aynı candidate için tek yeni build.",
+        "rollback": "Build geri alınmaz; Failure kayıtları tarihsel kanıt olarak silinmez."
+      },
+      "risk": "write",
+      "approval": "single",
+      "mcp": {
+        "tools": [
+          "press_propose",
+          "proposal_get",
+          "press_execute",
+          "press_track"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Schedule Build and Deploy build ile deploy'u birlikte başlatır; bu kontratın parçası değildir (build_and_deploy.schedule)."
+      ]
+    },
+    {
+      "id": "build.get",
+      "family": "build_deploy",
+      "title": "Deploy Candidate Build durumunu ve Build Steps'i oku",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.client.get (team, dashboard_fields) ve açık alanlı get_list (operator) runtime'da.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "schedule",
+        "preparing",
+        "live-failure",
+        "live-error",
+        "live-build-complete",
+        "live-build-start",
+        "live-current-failure",
+        "live-upload-row",
+        "live-previous-build-detail",
+        "hata-tanisi",
+        "live-prebuild-upload-success",
+        "live-build-success"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Deploy Candidate Build → Details / Output (Build Steps, Error Log bağlantısı)",
+          "sitemap_node_ids": [
+            "desk-admin-live-deploy-candidate-build-record",
+            "desk-admin-live-deploy-candidate-build-record-tab-0",
+            "desk-admin-live-deploy-candidate-build-record-tab-1",
+            "desk-admin-live-deploy-candidate-build-list"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Deploys → build",
+          "sitemap_node_ids": [
+            "dashboard-group-deploys-component-3"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Deploy Candidate Build",
+          "fields": [
+            "name",
+            "deploy_candidate",
+            "group",
+            "status",
+            "build_start",
+            "build_end",
+            "build_duration",
+            "build_error",
+            "docker_image",
+            "platform",
+            "no_cache",
+            "no_push",
+            "deploy_after_build",
+            "team"
+          ],
+          "child_tables": [
+            {
+              "field": "build_steps",
+              "doctype": "Deploy Candidate Build Step",
+              "fields": [
+                "stage",
+                "step",
+                "stage_slug",
+                "step_slug",
+                "status",
+                "output",
+                "duration",
+                "cached"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.client.get",
+          "args": {
+            "doctype": "Deploy Candidate Build",
+            "name": "<build>"
+          },
+          "returns": "dashboard_fields: name, status, creation, build_steps, build_start, build_end, build_duration, build_error, group, retry_count, team, deploy_candidate (+ is_cache_failure)",
+          "permission": "Deploy Candidate Build ALLOWED_DOCTYPES içinde; X-Press-Team + belge erişimi",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/client.py",
+            "lines": [
+              234,
+              275
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Deploy Candidate Build",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "name": "<build>"
+            },
+            "fields": [
+              "name",
+              "status",
+              "deploy_candidate",
+              "group",
+              "creation",
+              "build_start",
+              "build_end",
+              "build_error"
+            ],
+            "child_tables": "Deploy Candidate Build Step (parent=<build>): idx, stage, step, stage_slug, step_slug, status, duration, cached, output"
+          },
+          "returns": "Açık alanlar; build_output/build_directory alınmaz",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "build"
+        ],
+        "properties": {
+          "build": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Durum ve adım sayıları okunur. Adım durumları: Pending | Running | Success | Failure. Pending satırları ayrı hata değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "DoesNotExistError",
+            "meaning": "Build adı yanlış",
+            "next": "deploy_candidate.get ile bağlı build kimliklerini oku"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Ekrandaki anlık görüntü (Running) son sonuç değildir; son durum yeniden okunur.",
+        "Step output'ta secret olabilir; runtime redaksiyon uygular ve kuyruğu kırpar."
+      ]
+    },
+    {
+      "id": "build.triage",
+      "family": "build_deploy",
+      "title": "Başarısız build'in ilk Failure adımını sınıfla ve sonraki adımı öner",
+      "kind": "analysis",
+      "status": "implemented",
+      "status_reason": "press_triage_build: build.get verisi üzerinde yerel kalıp sınıflaması (pressguide olaylarından).",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "preparing",
+        "live-failure",
+        "live-error",
+        "live-build-start",
+        "live-current-failure",
+        "live-upload-row",
+        "live-previous-build-detail",
+        "hata-tanisi",
+        "live-npm-range-validation",
+        "live-prebuild-upload-success",
+        "live-ecr-push-failure"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Build Steps → ilk Failure → Output → Connections / Error Log",
+          "sitemap_node_ids": [
+            "desk-admin-live-deploy-candidate-build-record-tab-1"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Deploy Candidate Build",
+          "fields": [
+            "name",
+            "deploy_candidate",
+            "group",
+            "status",
+            "build_start",
+            "build_end",
+            "build_duration",
+            "build_error",
+            "docker_image",
+            "platform",
+            "no_cache",
+            "no_push",
+            "deploy_after_build",
+            "team"
+          ],
+          "child_tables": [
+            {
+              "field": "build_steps",
+              "doctype": "Deploy Candidate Build Step",
+              "fields": [
+                "stage",
+                "step",
+                "stage_slug",
+                "step_slug",
+                "status",
+                "output",
+                "duration",
+                "cached"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "local",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Ağsız analiz: build.get (veya deploy_candidate.get) çıktısında ilk Failure satırı, çıktı kuyruğu ve kılavuz sınıfları.",
+          "source": null
+        },
+        {
+          "principal": "operator",
+          "transport": "local",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Aynı analiz operator okumasıyla.",
+          "source": null
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {
+          "build": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          },
+          "candidate": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "Sınıf (required_app_not_found, npm_range_parse, disk_full, upload_context_http_error, docker_image_push_failed, clone_failed, runtime_incompatible, unclassified) ve sahip döner; kalıp eşleşmesi kesin neden değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "unclassified",
+            "meaning": "Bilinen olayla eşleşmedi",
+            "next": "İlk Failure çıktısını tümüyle ve Error Log'u oku; neden belirlenmeden yeni build açma"
+          },
+          {
+            "signal": "status_steps_inconsistent",
+            "meaning": "Success etiketi ama Success olmayan adım",
+            "next": "Build'i yeniden oku; image varlığını altyapı sahibiyle doğrula"
+          }
+        ],
+        "timeout": "Yerel analiz; zaman aşımı yok.",
+        "retry": "Veri yenilenince tekrar sınıflanabilir.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_triage_build"
+        ]
+      },
+      "skill": "press-build-triage",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "partial",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Boş Error Log/Agent Job filtresi 'hata yok' demek değildir.",
+        "Sınıflar kılavuzdaki gerçek olaylardan türetildi; Press'in tüm hata türlerini kapsamaz."
+      ]
+    },
+    {
+      "id": "build_and_deploy.schedule",
+      "family": "build_deploy",
+      "title": "Build ve deploy'u birlikte başlat (Schedule Build and Deploy)",
+      "kind": "mutation",
+      "status": "unsupported",
+      "status_reason": "Kılavuz build Success görülmeden deploy başlatılmamasını ister; build ile deploy'u birleştiren bu yol bilinçli olarak desteklenmez.",
+      "authority": [
+        "operator",
+        "team"
+      ],
+      "owner_handoff": {
+        "role": "operator",
+        "person": null,
+        "steps": [
+          "Gerekirse insan Desk'te sonuçlarını bilerek kullanır; ajan bu eylemi önermez.",
+          "Çalışan siteleri barındıran grupta deploy, migration ve yeniden başlatma etkisi değerlendirilir."
+        ],
+        "acceptance": "Kullanılırsa build Success, Deploy, Bench Active ve site durumları yine ayrı doğrulanır."
+      },
+      "guide_steps": [],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Deploy Candidate → Deploy → Schedule Build and Deploy",
+          "sitemap_node_ids": [
+            "desk-admin-live-deploy-candidate-record-tab-0-action-2"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Deploys → Deploy",
+          "sitemap_node_ids": [
+            "dashboard-group-deploys-component-2"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Deploy Candidate",
+          "fields": [
+            "name",
+            "group",
+            "team",
+            "intel_build",
+            "arm_build",
+            "requires_arm_build",
+            "requires_intel_build",
+            "creation"
+          ],
+          "child_tables": [
+            {
+              "field": "apps",
+              "doctype": "Deploy Candidate App",
+              "fields": [
+                "app",
+                "source",
+                "release",
+                "hash"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "Deploy Candidate Build",
+          "fields": [
+            "name",
+            "deploy_candidate",
+            "group",
+            "status",
+            "build_start",
+            "build_end",
+            "build_duration",
+            "build_error",
+            "docker_image",
+            "platform",
+            "no_cache",
+            "no_push",
+            "deploy_after_build",
+            "team"
+          ],
+          "child_tables": [
+            {
+              "field": "build_steps",
+              "doctype": "Deploy Candidate Build Step",
+              "fields": [
+                "stage",
+                "step",
+                "stage_slug",
+                "step_slug",
+                "status",
+                "output",
+                "duration",
+                "cached"
+              ]
+            }
+          ]
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "doc_method",
+          "doctype": "Deploy Candidate",
+          "method": "schedule_build_and_deploy",
+          "args": {
+            "run_now": "bool=true"
+          },
+          "returns": "{error, name: <build>}",
+          "permission": "@frappe.whitelist() doc metodu; frappe.handler.run_doc_method, Desk doc izni (System User)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/deploy_candidate/deploy_candidate.py",
+            "lines": [
+              255,
+              277
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.deploy",
+          "args": {
+            "name": "Release Group adı",
+            "apps": "[{app, release?}]"
+          },
+          "returns": "Deploy Candidate Build adı",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py); grup sahibi takım ve süren deploy yok",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              764,
+              781
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.client.run_doc_method",
+          "args": {
+            "dt": "Release Group",
+            "dn": "<grup>",
+            "method": "initial_deploy | redeploy"
+          },
+          "returns": "build adı / None",
+          "permission": "@dashboard_whitelist",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/release_group/release_group.py",
+            "lines": [
+              823,
+              827
+            ]
+          }
+        }
+      ],
+      "params": null,
+      "preconditions": [],
+      "side_effects": [
+        "Build ve ardından otomatik Deploy (deploy_after_build)."
+      ],
+      "async": null,
+      "success": "Desteklenmez; kullanılırsa her aşama ayrı doğrulanır.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Build Failure sonrası deploy beklentisi",
+            "meaning": "Deploy yalnız Success'te oluşur",
+            "next": "build.triage"
+          }
+        ],
+        "timeout": "Uygulanmaz.",
+        "retry": "Uygulanmaz.",
+        "rollback": "Uygulanmaz."
+      },
+      "risk": "write",
+      "approval": "human_only",
+      "mcp": {
+        "tools": [
+          "contract_get"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "not_applicable",
+        "live": "not_run"
+      },
+      "notes": [
+        "Kılavuz schedule ve live-build-complete adımlarında bu yolu kullanmamayı ve yalnız Build → Complete seçmeyi söyler.",
+        "App Release auto_deploy da aynı birleşik yolu çağırır (app_release.create ön koşulu)."
+      ]
+    },
+    {
+      "id": "deploy.start",
+      "family": "build_deploy",
+      "title": "Başarılı build'den Deploy oluştur (yeni bench)",
+      "kind": "mutation",
+      "status": "implemented",
+      "status_reason": "Operator principal ile Deploy Candidate Build.deploy doc metodu; Press Success denetlemediği için ön koşullar runtime'da zorlanır.",
+      "authority": [
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "schedule",
+        "live-build-success"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Deploy Candidate Build → Deploy → Deploy (yalnız Status Success iken görünür)",
+          "sitemap_node_ids": [
+            "desk-admin-live-deploy-candidate-build-record-tab-0-action-2"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Deploy Candidate Build",
+          "fields": [
+            "name",
+            "deploy_candidate",
+            "group",
+            "status",
+            "build_start",
+            "build_end",
+            "build_duration",
+            "build_error",
+            "docker_image",
+            "platform",
+            "no_cache",
+            "no_push",
+            "deploy_after_build",
+            "team"
+          ],
+          "child_tables": [
+            {
+              "field": "build_steps",
+              "doctype": "Deploy Candidate Build Step",
+              "fields": [
+                "stage",
+                "step",
+                "stage_slug",
+                "step_slug",
+                "status",
+                "output",
+                "duration",
+                "cached"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "Deploy",
+          "fields": [
+            "name",
+            "group",
+            "candidate",
+            "staging"
+          ],
+          "child_tables": [
+            {
+              "field": "benches",
+              "doctype": "Deploy Bench",
+              "fields": [
+                "server",
+                "bench"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "New Bench Queue",
+          "fields": [
+            "name",
+            "status",
+            "bench",
+            "group"
+          ],
+          "child_tables": []
+        },
+        {
+          "doctype": "Bench",
+          "fields": [
+            "name",
+            "status",
+            "candidate",
+            "build",
+            "server"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "operator",
+          "transport": "doc_method",
+          "doctype": "Deploy Candidate Build",
+          "method": "deploy",
+          "args": {},
+          "returns": "{error: false, message: <Deploy adı>} ya da her istisnada None (log_error 'Deploy Creation Error')",
+          "permission": "@frappe.whitelist() doc metodu; frappe.handler.run_doc_method, Desk doc izni (System User)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/deploy_candidate_build/deploy_candidate_build.py",
+            "lines": [
+              1218,
+              1225
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Var olan Deploy araması {group, candidate: self.name} ile yapılır; self.name build adıdır, Deploy.candidate ise candidate'tır → Press'in tekilleştirmesi eşleşmez.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/deploy_candidate_build/deploy_candidate_build.py",
+            "lines": [
+              1188,
+              1203
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "check_image_in_registry yalnız docker_registry_url == registry.frappe.cloud iken denetler; başka registry'de (ör. ECR) her zaman True döner.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/deploy_candidate_build/deploy_candidate_build.py",
+            "lines": [
+              802,
+              809
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": null,
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Başarılı build'den yalnız deploy açan takım uç noktası doğrulanmadı; press.api.bench.deploy yeni candidate + build+deploy açar.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              764,
+              781
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "build"
+        ],
+        "properties": {
+          "build": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [
+        {
+          "id": "principal.operator",
+          "description": "System User.",
+          "machine": true
+        },
+        {
+          "id": "release_group.owned_by_team",
+          "description": "Build'in grubu hedef grupla aynı.",
+          "machine": true
+        },
+        {
+          "id": "build.success_all_steps",
+          "description": "Build Status Success ve tüm adımlar Success (Press bu metotta denetlemez).",
+          "machine": true
+        },
+        {
+          "id": "deploy.artifact_matches_build",
+          "description": "Press imajı çağrılan build'den değil, her grup sunucusunun platformuna göre candidate.intel_build/arm_build'den alır; bu alan her sunucu için bu build olmalı ve docker_image dolu olmalı. Önizlemede artifact {build, docker_image, servers, auto_update_sites} ve ham değerin artifact_sha256 özeti sabitlenir (onay özetine girer); yürütmede özet farklıysa (başka build, imaj, sunucu kümesi ya da otomatik güncellenecek site kümesi) öneri yürütülmez.",
+          "machine": true
+        },
+        {
+          "id": "deploy.not_created_for_candidate",
+          "description": "Candidate için Deploy yok (Deploy.candidate = candidate adıyla aranır).",
+          "machine": true
+        },
+        {
+          "id": "release_group.no_deploy_in_progress",
+          "description": "deploy_information bayrakları (deploy_in_progress, has_running_release_pipeline, bench_creation_underway) yanlış VE grupta Pending/Installing bench yok VE (operator) Queued New Bench Queue yok. Press'in deploy_in_progress'i bench kurulumunu görmez (last_benches_info Bench.candidate'ı build adıyla karşılaştırır); team kuyruğu okuyamaz.",
+          "machine": true
+        },
+        {
+          "id": "proposal.no_unknown_outcome",
+          "description": "Bilinmeyen sonuçlu öneri yok.",
+          "machine": true
+        },
+        {
+          "id": "registry.image_present",
+          "description": "Image registry'de tam tag ile var (ECR'de Press denetlemez; altyapı sahibi describe_images ile doğrular).",
+          "machine": false
+        }
+      ],
+      "side_effects": [
+        "Deploy insert edilir; after_insert her sunucu için New Bench Queue oluşturur (Deploy Bench.bench → New Bench Queue).",
+        "Image candidate.intel_build/arm_build'den alınır (son Success build), deploy() çağrılan build'den değil; deploy.artifact_matches_build bunu onaylanan build'e bağlar.",
+        "Yeni bench kurulur (Agent Job 'New Bench').",
+        "Press schedule_updates her 15 dakikada Active/Inactive/Suspended, skip_auto_updates kapalı ve fatal güncellemesi olmayan siteleri yeni bench'e taşıyabilir (migrate dahil; site_update.py sites_with_available_update). Broken siteler otomatik güncellenmez. Önizleme siteleri listeler; onay ifadesi sayıyı içerir: DEPLOY <build> AUTO-UPDATE <n>. 500 ve üzeri sitede önizleme kapalı başarısız olur (preview_incomplete)."
+      ],
+      "async": {
+        "returns": "Deploy adı (ya da None)",
+        "track": "track.deploy",
+        "terminal_success": [
+          "Active"
+        ],
+        "terminal_failure": [
+          "Broken",
+          "Archived",
+          "Failure"
+        ],
+        "intermediate": [
+          "Queued",
+          "Started",
+          "Pending",
+          "Installing"
+        ]
+      },
+      "success": "Deploy Bench satırlarındaki beklenen her sunucuda yalnız bu deploy'un kuyruğunun işaret ettiği bench Active, New Bench Agent Job Success ve Bench.build onaylanan deploys_build ile aynı; kuyruk ya da bench yoksa in_progress. HTTP 200 + message None başarı değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "HTTP 200, message None",
+            "meaning": "Deploy oluşmadı veya bilinmiyor (istisna yakalanıp loglandı)",
+            "next": "Error Log 'Deploy Creation Error' (reference = build) oku; körlemesine tekrar çağırma"
+          },
+          {
+            "signal": "ImageNotFoundInRegistry (Error Log)",
+            "meaning": "registry.frappe.cloud'da image yok",
+            "next": "Yeni build gerekir"
+          },
+          {
+            "signal": "Bench Broken / New Bench Agent Job Failure",
+            "meaning": "Bench kurulumu başarısız",
+            "next": "agent_job.get ile işi oku; altyapı sahibine aktar"
+          },
+          {
+            "signal": "İkinci Deploy kaydı",
+            "meaning": "Press tekilleştirmesi build adıyla aradığı için eşleşmedi",
+            "next": "deploy.not_created_for_candidate ön koşulu tekrarı engeller"
+          },
+          {
+            "signal": "deploy.artifact_matches_build yürütmede başarısız",
+            "meaning": "Onaydan sonra candidate başka bir başarılı build'e geçti veya imaj değişti",
+            "next": "Yeni öneri ve yeni onay gerekir"
+          },
+          {
+            "signal": "New Bench Queue Failure",
+            "meaning": "Kuyruk işlenemedi",
+            "next": "Sunucu bazında kanıtı oku; altyapı sahibine aktar"
+          },
+          {
+            "signal": "İzleme failed: bench başka build'den",
+            "meaning": "Bench.build onaylanan deploys_build'den farklı",
+            "next": "İnsan inceler; yeni öneri"
+          },
+          {
+            "signal": "preview_incomplete",
+            "meaning": "Grupta 500 veya daha fazla site; otomatik güncelleme kümesi tam listelenemez",
+            "next": "Deploy'u insan Press'te inceler"
+          }
+        ],
+        "timeout": "Zaman aşımında unknown: Deploy listesini candidate adıyla oku; yeni deploy başlatma.",
+        "retry": "Yalnız Deploy yoksa ve neden giderildiyse; tek deploy.",
+        "rollback": "Otomatik geri alma yok; bench arşivleme insan kararıdır."
+      },
+      "risk": "write",
+      "approval": "double",
+      "mcp": {
+        "tools": [
+          "press_propose",
+          "proposal_get",
+          "press_execute",
+          "press_track"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-operator",
+      "verification": {
+        "source": "verified",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "Kılavuz: 28/28 adımı Success olan build'den sonra Deploy → Deploy bir kez başlatıldı; bench önce Installing, sonra Active.",
+        "Karışık platformlu (x86_64 + arm64) grupta tek build her sunucuya gitmez; deploy.artifact_matches_build öneriyi engeller.",
+        "Deploy Candidate yalnız açık alanlarla okunur (user_private_key, build_token alınmaz)."
+      ]
+    },
+    {
+      "id": "deploy.status",
+      "family": "build_deploy",
+      "title": "Deploy, New Bench Queue, Bench ve New Bench işini izle",
+      "kind": "read",
+      "status": "implemented",
+      "status_reason": "press.api.bench.deploy_information bayrakları + doğrudan bench okuması (Pending/Installing) + operator için Queued New Bench Queue runtime'da; team kuyruğu okuyamaz.",
+      "authority": [
+        "team",
+        "operator"
+      ],
+      "owner_handoff": null,
+      "guide_steps": [
+        "hata-tanisi",
+        "live-bench-active"
+      ],
+      "ui": [
+        {
+          "surface": "desk",
+          "path": "Deploy List / Bench → Deploy Candidate bağlantısı",
+          "sitemap_node_ids": [
+            "desk-live-type-deploy-list",
+            "desk-admin-live-bench-list-component-4"
+          ]
+        },
+        {
+          "surface": "dashboard",
+          "path": "Benches → grup → Deploys / Jobs",
+          "sitemap_node_ids": [
+            "dashboard-group-deploys",
+            "dashboard-group-jobs"
+          ]
+        }
+      ],
+      "doctypes": [
+        {
+          "doctype": "Deploy",
+          "fields": [
+            "name",
+            "group",
+            "candidate"
+          ],
+          "child_tables": [
+            {
+              "field": "benches",
+              "doctype": "Deploy Bench",
+              "fields": [
+                "server",
+                "bench"
+              ]
+            }
+          ]
+        },
+        {
+          "doctype": "Bench",
+          "fields": [
+            "name",
+            "status",
+            "candidate",
+            "build",
+            "server",
+            "group"
+          ],
+          "child_tables": []
+        },
+        {
+          "doctype": "Agent Job",
+          "fields": [
+            "name",
+            "job_type",
+            "status",
+            "bench",
+            "start",
+            "end"
+          ],
+          "child_tables": []
+        }
+      ],
+      "api": [
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.deploy_information",
+          "args": {
+            "name": "Release Group adı"
+          },
+          "returns": "{deploy_in_progress, has_running_release_pipeline, bench_creation_underway, last_deploy, update_available, ...}",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py) (operator da aynı ucu kullanır)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              757,
+              761
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "unavailable",
+          "doctype": null,
+          "method": "ReleaseGroup.deploy_in_progress",
+          "args": null,
+          "returns": null,
+          "permission": null,
+          "reason": "Meşgul bayrağının kaynağı: son Deploy Candidate Build, onun bench'leri ve yerinde güncelleme işleri. press.api.bench.deploy_status yalnız Release Pipeline'a bakar ve Desk build'ini kaçırır.",
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/press/doctype/release_group/release_group.py",
+            "lines": [
+              1349,
+              1366
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "New Bench Queue",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "group": "<grup>",
+              "status": "Queued"
+            },
+            "fields": [
+              "name",
+              "status"
+            ]
+          },
+          "returns": "Henüz bench'i oluşmamış deploy kuyrukları",
+          "permission": "System User (rol izni sahada doğrulanmadı)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        },
+        {
+          "principal": "operator",
+          "transport": "get_list",
+          "doctype": "Bench",
+          "method": "frappe.client.get_list",
+          "args": {
+            "filters": {
+              "group": "<grup>",
+              "status": [
+                "not in",
+                [
+                  "Archived"
+                ]
+              ]
+            },
+            "fields": [
+              "name",
+              "status",
+              "server",
+              "candidate",
+              "build",
+              "creation"
+            ]
+          },
+          "returns": "Bench'ler ve durumları (Pending | Installing | Updating | Active | Broken | Archived)",
+          "permission": "System User",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_v15",
+            "path": "frappe/client.py",
+            "lines": [
+              27,
+              78
+            ]
+          }
+        },
+        {
+          "principal": "team",
+          "transport": "method",
+          "doctype": null,
+          "method": "press.api.bench.versions",
+          "args": {
+            "name": "Release Group adı"
+          },
+          "returns": "[{name, status, sites[], deployed_on}] arşivlenmemiş bench'ler",
+          "permission": "@frappe.whitelist(); press.api.site.protected: takım sahipliği + role_guard; System User denetimi atlar (press/api/site.py)",
+          "reason": null,
+          "source": {
+            "source_id": "frappe_press",
+            "path": "press/api/bench.py",
+            "lines": [
+              582,
+              653
+            ]
+          }
+        }
+      ],
+      "params": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "release_group"
+        ],
+        "properties": {
+          "release_group": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140,
+            "pattern": "[A-Za-z0-9][A-Za-z0-9 ._@:()+-]{0,139}"
+          }
+        }
+      },
+      "preconditions": [],
+      "side_effects": [],
+      "async": null,
+      "success": "busy = deploy_information bayraklarından biri, Pending/Installing bench veya (operator) Queued New Bench Queue. Build, Bench ve Site durumları ayrı okunur; biri diğerinin başarısı değildir.",
+      "failure": {
+        "modes": [
+          {
+            "signal": "Bench Installing uzun sürüyor",
+            "meaning": "Kurulum sürüyor",
+            "next": "Bekle ve yeniden oku; site oluşturma"
+          },
+          {
+            "signal": "press.api.bench.candidate jobs boş",
+            "meaning": "Deploy Bench.bench New Bench Queue'ya bağlı; Agent Job.bench Bench'e",
+            "next": "Bench.candidate ile ara"
+          }
+        ],
+        "timeout": "Okuma tekrar edilebilir.",
+        "retry": "Güvenli.",
+        "rollback": "Yok."
+      },
+      "risk": "read",
+      "approval": "none",
+      "mcp": {
+        "tools": [
+          "press_read",
+          "press_track"
+        ]
+      },
+      "skill": "press-operations",
+      "agent": "press-diagnoser",
+      "verification": {
+        "source": "partial",
+        "fixture": "required",
+        "live": "not_run"
+      },
+      "notes": [
+        "press.api.bench.deploy_status Release Pipeline (yeni deploy akışı) içindir; kılavuzun Desk deploy'u için değildir.",
+        "Tek bir deploy'un sunucu bazında izlenmesi deploy.start izleyicisindedir (Deploy Bench → New Bench Queue → Bench + New Bench işi)."
+      ]
+    }
+  ]
+}
