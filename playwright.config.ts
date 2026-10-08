@@ -2,7 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 // Üretim çıktısına (astro build → astro preview) karşı çalışır; base '/frappesetup/'.
 // `--ignore-lock`: Astro 7 preview kilit dosyası tutar; test sunucusu ondan bağımsız ön planda çalışır.
-const PORT = 4329;
+// PW_PORT: aynı makinede başka bir preview sunucusu (ör. ikinci çalışma ağacı) 4329'u tutuyorsa.
+const PORT = Number(process.env.PW_PORT ?? 4329);
 export const BASE_URL = `http://127.0.0.1:${PORT}/frappesetup/`;
 
 export default defineConfig({

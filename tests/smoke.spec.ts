@@ -357,18 +357,42 @@ test.describe('requirements explorer', () => {
     await noHorizontalOverflow(page);
   });
 
+  // Regresyon (rapor Y-10): ada JS'i gecikirken bir kez yazılan metin kaybolmamalı ve filtre uygulanmalı.
+  // JS isteği bekletilir; yazım hidrasyondan önce tek sefer yapılır, test yazmayı yinelemez.
+  test('text typed once before hydration is kept and applied (slow island JS)', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(/\/_astro\/RequirementsExplorer\.[^/]+\.js$/, async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await page.goto('gereksinimler/', { waitUntil: 'domcontentloaded' });
+    const island = page.locator('astro-island[component-url*="RequirementsExplorer"]');
+    const search = page.getByRole('textbox', { name: 'Ara' });
+    const detail = page.getByRole('switch', { name: 'Ayrıntıları göster' });
+    await expect(island).toHaveAttribute('ssr', '');
+    await search.fill('Keycloak');
+    await detail.uncheck();
+    // Girdi anında ada hâlâ sunucu HTML'idir (React bağlı değil).
+    await expect(island).toHaveAttribute('ssr', '');
+    release();
+    await expect(page.getByTestId('req-count')).toContainText(`${keycloakCount} / ${requirements.length}`);
+    await expect(search).toHaveValue('Keycloak');
+    await expect(detail).not.toBeChecked();
+    await expect(page.locator('.req-detail')).toHaveCount(0);
+    await expect(island).not.toHaveAttribute('ssr', '');
+  });
+
   test('search text and focus survive orientation change', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('gereksinimler/');
     await waitForHydration(page);
     const search = page.getByRole('textbox', { name: 'Ara' });
     const count = page.getByTestId('req-count');
-    // React 19 hidrasyonu eşzamansızdır: filtre gerçekten uygulanana kadar yazmayı yinele
-    // (değer DOM'a yazıldı ama React henüz dinlemiyorsa sayaç değişmez).
-    await expect(async () => {
-      await search.fill('Keycloak');
-      await expect(count).toContainText(`${keycloakCount} / ${requirements.length}`, { timeout: 1_000 });
-    }).toPass({ timeout: 20_000 });
+    // Tek yazım: hidrasyon sırasında yazılan metni bileşen kendisi korur (yukarıdaki regresyon testi).
+    await search.fill('Keycloak');
+    await expect(count).toContainText(`${keycloakCount} / ${requirements.length}`);
     await page.setViewportSize({ width: 844, height: 390 });
     await expect(search).toHaveValue('Keycloak');
     await expect(count).toContainText(`${keycloakCount} / ${requirements.length}`);

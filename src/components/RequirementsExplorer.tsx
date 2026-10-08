@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Badge,
   Box,
@@ -92,6 +92,18 @@ function Explorer({ items }: Props) {
   const [rail, setRail] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(true);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const detailRef = useRef<HTMLInputElement>(null);
+
+  // Ada JS'i inmeden önce sunucu HTML'ine yazılan metin DOM'da kalır, ama React durumu boş başlar:
+  // React 19 hidrasyonda DOM değerini korur, değer izleyicisini bu değerle başlatır ve değişikliği
+  // onChange olarak yeniden oynatmaz. Bağlanınca erken girdiyi (arama metni, ayrıntı anahtarı) duruma al.
+  useEffect(() => {
+    const early = searchRef.current?.value ?? '';
+    if (early) setQ(early);
+    const detail = detailRef.current;
+    if (detail && !detail.checked) setShowDetail(false);
+  }, []);
 
   const sorted = useMemo(() => [...items].sort(byId), [items]);
 
@@ -171,6 +183,7 @@ function Explorer({ items }: Props) {
 
       <div className="req-filters">
         <TextInput
+          ref={searchRef}
           label="Ara"
           placeholder="örn. iyzico, Keycloak, G-45"
           value={q}
@@ -222,6 +235,7 @@ function Explorer({ items }: Props) {
             <strong>{filtered.length}</strong> / {items.length} gereksinim
           </Text>
           <Switch
+            ref={detailRef}
             label="Ayrıntıları göster"
             checked={showDetail}
             onChange={(e) => setShowDetail(e.currentTarget.checked)}
