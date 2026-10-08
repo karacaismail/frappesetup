@@ -1,0 +1,54 @@
+{
+  "_not": "Kullanıcının karar olarak verdiği araştırma notları. words: wc -w (zip için açılmış dosyaların toplamı). Yeni sayfalar bu toplamı aşan kelime üretemez (tests/karar-katalogu.spec.ts).",
+  "sources": [
+    {
+      "code": "KC",
+      "file": "Keycloak + Headless Frappe Kimlik Rehberi ve Yol Haritası.md",
+      "date": "29 Eylül 2026",
+      "words": 5143,
+      "kd": "KD-38"
+    },
+    {
+      "code": "AE",
+      "file": "Frappe AI Ekosistemi.md",
+      "date": "4 Ekim 2026",
+      "words": 5954,
+      "kd": "KD-39"
+    },
+    {
+      "code": "KS",
+      "file": "Capability-Agent_Kaizen_Kurulum_Sartnamesi.md",
+      "date": "12 Eylül 2026",
+      "words": 1722,
+      "kd": "KD-40"
+    },
+    {
+      "code": "KP",
+      "file": "Capability-Agent_Kaizen_Kalite_Paketi.zip",
+      "date": "12 Eylül 2026",
+      "words": 3719,
+      "kd": "KD-41"
+    },
+    {
+      "code": "AM",
+      "file": "Capability-Adaptive Mobile-First UI Delivery and AI-Driven Cross-Device QA.md",
+      "date": "8 Ekim 2026",
+      "words": 8501,
+      "kd": "KD-42"
+    },
+    {
+      "code": "A1",
+      "file": "Capability-First Adaptive UI 320 CSS px iphone 4 first.md",
+      "date": "8 Ekim 2026",
+      "words": 3979,
+      "kd": "KD-43"
+    },
+    {
+      "code": "A2",
+      "file": "Capability-First Adaptive UI 320 CSS px iphone 4 first-2.md",
+      "date": "8 Ekim 2026",
+      "words": 4196,
+      "kd": "KD-44"
+    }
+  ]
+}

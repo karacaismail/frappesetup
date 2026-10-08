@@ -15,7 +15,7 @@ Bu plan, [Press yetkinlik matrisindeki](../ai-press-yetkinlik/) boşlukları ve 
 | Press teşhisi | Press MCP (`enable_mcp`) | Teşhis sırası skill'i | Araçlar hazır, sıra bilgisi yok |
 | Press kurulum ve dağıtım | — | **Press komut MCP'si + skill'ler** | Hiçbir depo karşılamıyor |
 | Site içi veri araçları | Frappe Assistant Core veya `frappe_mcp` + kendi araçlarımız | `platform_core.ai_tools` | Kullanıcı kimliğiyle, AI Action Log'a yazan araç gerekir |
-| Kullanıcıya dönük asistan | Flow (v16) veya Ask ALYF değerlendirilir | Agent servisi (Rail 5) | Keycloak delege token, kiracı kotası, Press kredi ölçümü hiçbirinde yok |
+| Kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); Jarvis ve Huf staging'de denenir | Agent servisi (Rail 5) | Keycloak delege token, kiracı kotası, Press kredi ölçümü hiçbirinde yok |
 
 AGPL bileşenleri (Flow, huf, Jarvis, Ask ALYF, Raven) kendi kodumuzla aynı süreçte birleştirilmeden önce lisans uyumu kullanıcıyla netleştirilir; yeni depolara lisans onaysız seçilmez.
 

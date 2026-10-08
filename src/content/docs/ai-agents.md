@@ -44,8 +44,8 @@ Bu sayfa, Frappe içinde çalışan on altı AI asistanı, ajan ve ilgili kanal 
 
 | Hedef | Önerilen | Neden |
 | --- | --- | --- |
-| Kiracı sitesinde kullanıcıya dönük asistan | Flow (v16) veya Ask ALYF; mimari referans için Jarvis | yazmada kod düzeyinde onay, Frappe izinleri |
-| Sayfa/site kurma | Builder + `frappe-builder` skill | zaten resmi ve testli |
+| Kiracı sitesinde kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); staging'de Jarvis ve Huf; mimari referans Jarvis (KD-39, AI-08, AI-09) | yazmada kod düzeyinde onay, Frappe izinleri |
+| Sayfa/site kurma | Builder + `frappe-builder` skill, yalnız pazarlama sayfası ve onay kapısı açık (not: sınıf B/C, çok yeni) | resmi; karar AI-08 |
 | Mesajlaşmada bot | Raven AI | yalnız okuma ağırlıklı kullanılmalı; yazmaya onay ekleyin |
 | WhatsApp | `frappe_whatsapp` kanalı | AI'yı ayrı katmandan bağlayın (lisans) |
 | Press yönetimi | **hiçbiri üretime hazır değil** | huf `fc_*` araçları esin kaynağı; onay ve ayrıştırma eksik |

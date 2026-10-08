@@ -41,6 +41,11 @@ export const COLLAPSIBLE_GROUPS: Record<string, IconName> = { AI: 'sparkles' };
 export const SECTIONS: Record<string, SectionMeta> = {
   kararlar: { group: 'Çerçeve', icon: 'scale', summary: 'On sabit karar, kapsam sınırı ve roller.' },
   raylar: { group: 'Çerçeve', icon: 'route', summary: 'Altı rayın sahiplik, sözleşme ve tüketim sınırları.' },
+  'karar-katalogu': {
+    group: 'Çerçeve',
+    icon: 'checklist',
+    summary: 'Araştırma notlarından çıkan kimlik, AI, arayüz ve kalite kararları; çelişkiler açık kararlara bağlı.',
+  },
   'rail-1-press': { group: 'Raylar', icon: 'server', summary: 'Abonelik, plan, marketplace, iyzico ve ödeme planı.' },
   'rail-2-yapilandirma': { group: 'Raylar', icon: 'settings', summary: 'Kiracı site yapılandırması ve Türkiye temel çizgisi.' },
   'rail-2-gelistirme': { group: 'Raylar', icon: 'code', summary: 'platform_core: Access Rule motoru, meta API, outbox.' },
