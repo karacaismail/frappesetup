@@ -51,7 +51,7 @@ Her sütundaki kalem manifestin 3–5. maddelerinin uygulamaya özgü doldurulmu
 - **Helpdesk kategorisi ve SLA kademesi:** app, HD Ticket için ürün etiketini (`cronhr`, `crm`, `webshop`), varsayılan `HD Team` atamasını ve plan kademesine göre SLA'yı bildirir (SA-31).
 - **Kredi maliyeti tablosu:** app'in `ai_tools` manifestindeki her ücretli araç için birim kredi maliyeti ve kota etiketi; agent servisi bunu `AI Credit Plan` Usage Record'una yazar (SA-15).
 - **Faturalama kalemi eşlemesi:** app'in Marketplace App Plan'ı operasyon sitesinde `APP-<ad>` Item'ına ve KDV şablonuna eşlenir; `create-fc-invoice` alıcısı bu eşlemeyle Sales Invoice satırı üretir (SA-19).
-- **Müşteri 360 özeti:** app, operatör paneli için salt okur özet sağlayıcısını (`platform_core.api.ops.customer_360` eklentisi: kullanım, son etkinlik, açık onaylar) bildirir (SA-24).
+- **Müşteri 360 özeti:** app, operatör paneli için salt okur özet sağlayıcısını (`platform_core.api.ops.customer_360` eklentisi: kullanım, son etkinlik, açık onaylar) bildirir; özet aşağıdaki yaşam döngüsü sinyalleriyle aynı outbox yoluyla operasyon sitesine akar, Müşteri 360 kiracı sitesini çağırmaz (SA-24).
 - **Destek oturumu kapsamı:** app, ekranlarında maskelenecek hassas alanları (TCKN, IBAN, maaş) `support_mask_fields` ile bildirir; awareness katmanı bu alanları operatöre göstermez (SA-27, SA-36).
 - **Yaşam döngüsü sinyalleri:** app, churn/kullanım sinyallerini (`last_activity`, kurulu ama 30 gün kullanılmayan modül) outbox olayı olarak yayınlar; operasyon sitesi bunları CRM Deal/ticket akışına bağlar (SA-38).
 

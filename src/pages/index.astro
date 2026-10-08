@@ -210,8 +210,11 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   .hero {
     container-type: inline-size;
   }
+  /* Tek sütun kapsayıcı genişliğindedir (minmax(0, 1fr)): örtük auto sütun büyük kök yazıda başlığın en uzun sözcüğüne
+     açılıp sayfayı taşırıyordu; sığmayan sözcük artık .page'in break-word ağıyla satır sonunda kırılır. */
   .hero-grid {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 1.75rem;
   }
   @container (min-width: 46rem) {
@@ -330,6 +333,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .rail-body {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.05rem;
     min-width: 0;
   }
@@ -346,7 +350,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   /* Sayılar */
   .stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
     gap: 0.75rem 1.5rem;
     padding: 1.25rem 0.25rem;
     margin: 1.5rem 0;
@@ -545,6 +549,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .section-text {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.15rem;
     min-width: 0;
   }

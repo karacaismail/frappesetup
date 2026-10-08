@@ -158,6 +158,68 @@ const embeds = EMBEDS[entry.id] ?? [];
     window.addEventListener('resize', onScroll, { passive: true });
     update();
   }
+
+  // 4) Satır içi kod metinle akar; satırına sığmayan kesintisiz dizinin parçası olan kod `data-scroll` alır ve kendi
+  //    kutusunda kayar (global.css). Dizi kod tek başına ya da bitişik kod/metinle (ör. `a`/`b`) oluşabilir; kutuya
+  //    alınan kodun iki yanı kırılabilir olur. Karar her geçişte aynı ölçüyle verilir (kodlar satır içi, satır kutusunda
+  //    break-word ağı kapalı: kodun satırı taşıyor mu?), böylece durum salınmaz. Yalnız gerçekten taşan kaydırma kutusu
+  //    Tab sırasına girer. Sayfanın boyutu (genişlik, kök yazı, yazı tipi), yazı tipi yüklemesi ve gezginin yeniden
+  //    çizimi durumu yeniler; kutunun kaydırma konumu korunur.
+  const CODE = '.prose :not(pre, a) > code, .req-code';
+  const lineBox = (code: HTMLElement) => {
+    let box = code.parentElement!;
+    while (box.parentElement && getComputedStyle(box).display === 'inline') box = box.parentElement;
+    return box;
+  };
+  const markScrollingCode = () => {
+    const codes = Array.from(document.querySelectorAll<HTMLElement>(CODE)).filter((c) => c.getClientRects().length > 0);
+    const boxes = codes.map(lineBox);
+    const unique = Array.from(new Set(boxes));
+    const scrolled = codes.map((c) => c.scrollLeft);
+    for (const c of codes) c.removeAttribute('data-scroll');
+    for (const b of unique) b.style.setProperty('overflow-wrap', 'normal');
+    // Satır kutusunun içerik kenarından taşan parçalar (yalnız sığmayan kesintisiz dizilerin satırları).
+    const overflowing = new Map<HTMLElement, DOMRect[]>();
+    for (const b of unique) {
+      const cs = getComputedStyle(b);
+      const right = b.getBoundingClientRect().right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
+      const range = document.createRange();
+      range.selectNodeContents(b);
+      overflowing.set(b, Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.right > right + 0.05));
+    }
+    const long = codes.map((c, i) => {
+      const lines = overflowing.get(boxes[i])!;
+      if (lines.length === 0) return false;
+      return Array.from(c.getClientRects()).some((q) => lines.some((o) => o.top < q.bottom - 1 && q.top < o.bottom - 1));
+    });
+    for (const b of unique) {
+      b.style.removeProperty('overflow-wrap');
+      if (!b.getAttribute('style')) b.removeAttribute('style');
+    }
+    codes.forEach((c, i) => {
+      if (long[i]) c.setAttribute('data-scroll', '');
+    });
+    const overflows = codes.map((c, i) => long[i] && c.scrollWidth > c.clientWidth);
+    codes.forEach((c, i) => {
+      if (overflows[i]) {
+        c.setAttribute('tabindex', '0');
+        c.scrollLeft = scrolled[i];
+      } else c.removeAttribute('tabindex');
+    });
+  };
+  let frame = 0;
+  const schedule = () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(markScrollingCode);
+  };
+  // Ölçüm başlayınca satır içi kodda break-word ağı kapanır (global.css); betik yoksa ağ yerinde kalır.
+  document.documentElement.setAttribute('data-code-measured', '');
+  markScrollingCode();
+  new ResizeObserver(schedule).observe(document.body);
+  document.fonts.addEventListener('loadingdone', schedule);
+  document.fonts.ready.then(schedule);
+  const explorer = document.querySelector('.explorer');
+  if (explorer) new MutationObserver(schedule).observe(explorer, { childList: true, subtree: true });
 </script>
 
 <style>

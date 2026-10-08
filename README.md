@@ -10,6 +10,7 @@ Yayın: **https://karacaismail.github.io/frappesetup/**
 - [Mantine 9](https://mantine.dev) + React 19 — kabuk (AppShell), gezgin, tema ve renk şeması
 - [Mermaid 12](https://mermaid.js.org) — markdown içindeki ```` ```mermaid ```` blokları istemcide, yalnız ilgili sayfada çizilir
 - [Playwright](https://playwright.dev) — Chromium / Firefox / WebKit × 320–1366 px kapıları, axe, ağ bütçesi
+- Yazı tipleri: Outfit ve JetBrains Mono (SIL OFL 1.1), fontsource paketleriyle kendinden barındırılır
 - GitHub Pages — `.github/workflows/deploy.yml`: `npm ci`, derleme ve Playwright kapısı geçince Pages artifact'ı yüklenir
 
 ## Yapı
@@ -28,7 +29,8 @@ src/
   components/Rails.astro / Timeline.astro   statik SVG diyagramlar (scripts/gen-diagrams.py üretir)
   layouts/Site.astro, pages/index.astro, pages/[slug].astro
   theme.ts, styles/global.css   tasarım tokenları, tipografi, tablo, odak göstergesi
-tests/smoke.spec.ts        taşma, metin boyutu, odak, gezgin, hidrasyon, diyagram, axe, ağ bütçesi
+tests/smoke.spec.ts        taşma, metin boyutu, sözcük bölünmesi, uzun satır içi kod, odak, dokunma hedefi, tema, gezgin, hidrasyon, diyagram, axe, ağ bütçesi
+tests/visual.spec.ts       Linux görsel regresyon (referanslar tests/__screenshots__)
 tests/consistency.spec.ts  gereksinim/faz/karar/bağlantı tutarlılığı
 ```
 

@@ -110,6 +110,7 @@ Entegratör seçimi ve yükümlülük takvimi P2 başında ürün sahibi ve mali
 | DNS / TLS | Route 53 hosted zone + sınırlı IAM; Root Domain dns\_provider='AWS Route 53'; wildcard certbot `--dns-route53` | Hüseyin Cengiz (Route 53/IAM, sonuç doğrulama) |
 | NS delegasyonu | `app.<marka>.com.tr` NS kayıtları GoDaddy'de Route 53'e; kiracılar `<kiracı>.app.<marka>.com.tr`, sabit host'lar GoDaddy'de (K-2) | Asistan Hüseyin (uygular), Hüseyin Cengiz (değer, doğrulama) |
 | Operasyon sitesi (Rail 6) | Kendi Team'inde Release Group 'ops'; `ops.<marka>.com.tr`; P2 finans çekirdeği, P6 CRM/Helpdesk (SA-17) | Hüseyin Cengiz; DNS Asistan Hüseyin |
+| Operatör modu ve `ops-bff` (Rail 6) | `operator.<marka>.com.tr`: aynı SPA'nın operatör modu ve BFF'i, ters vekil arkasında; yalnız Tailscale/özel ağ, `press.` ile aynı sınır, Press Desk'ten ayrı origin (G-119, K-16) | Hüseyin Cengiz (kayıt değeri, erişim sınırı, TLS); DNS kaydını Asistan Hüseyin GoDaddy'de uygular |
 | Hocuspocus (Rail 6 destek oturumu) | Ayrı Node servisi + Redis, reverse proxy TLS (SA-29) | Hüseyin Cengiz |
 | Sürüm takibi | v0.155.x+ staging Press'te `bench migrate` + press\_tr testleri + aktivasyon E2E, sonra prod bakım penceresi | Hüseyin Cengiz |
 | Trace / Analytics (SHOULD) | Trace Server (GlitchTip), Analytics Server (Plausible; birinci taraf ürün analitiği adayı, rıza kapısı ve yüzey kuralları G-134) | Hüseyin Cengiz |

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Badge,
   Box,
@@ -64,7 +64,8 @@ function byId(a: Requirement, b: Requirement) {
   return pa - pb || na - nb;
 }
 
-// `kod` parçalarını <code> olarak gösterir; başka markdown işlenmez.
+// `kod` parçalarını <code> olarak gösterir; başka markdown işlenmez. Kod dışı parçalar sarmalayıcısız düz metindir
+// (Gereksinimler HTML bütçesi; görünüm aynı).
 function inlineCode(text: string): ReactNode[] {
   return text.split('`').map((part, i) =>
     i % 2 === 1 ? (
@@ -72,7 +73,7 @@ function inlineCode(text: string): ReactNode[] {
         {part}
       </code>
     ) : (
-      <span key={i}>{part}</span>
+      <Fragment key={i}>{part}</Fragment>
     ),
   );
 }
@@ -224,7 +225,6 @@ function Explorer({ items }: Props) {
           value={q}
           onChange={(e) => setQ(e.currentTarget.value)}
           leftSection={<IconSearch size={18} aria-hidden />}
-          className="req-filter req-filter-search"
         />
       </div>
 
@@ -284,14 +284,9 @@ function Explorer({ items }: Props) {
               <code className="req-id">{r.id}</code>
               <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
             </div>
-            <Text fw={600} className="req-card-title">
-              {r.title}
-            </Text>
-            {showDetail && (
-              <Text c="dimmed" className="req-card-detail">
-                {inlineCode(r.detail)}
-              </Text>
-            )}
+            {/* Liste satırlarında Mantine Text yerine sade <p>: aynı görünüm global.css'teki sınıf kurallarından. */}
+            <p className="req-card-title">{r.title}</p>
+            {showDetail && <p className="req-card-detail">{inlineCode(r.detail)}</p>}
             <div className="req-meta">{meta(r)}</div>
           </li>
         ))}
@@ -329,18 +324,10 @@ function Explorer({ items }: Props) {
                     <code className="req-id">{r.id}</code>
                   </Table.Td>
                   <Table.Td>
-                    <Text fw={600}>{r.title}</Text>
-                    {showDetail && (
-                      <Text c="dimmed" mt={4} className="req-detail">
-                        {inlineCode(r.detail)}
-                      </Text>
-                    )}
-                    {/* Sahip ayrı sütun değil: tablo 1280 px ve üzerinde yatay kaydırmasız sığar (ölçüldü, testli; kart görünümüyle aynı bilgi). */}
-                    {r.owner && (
-                      <Text mt={4} className="req-owner">
-                        Sahip: {r.owner}
-                      </Text>
-                    )}
+                    <p className="req-title">{r.title}</p>
+                    {showDetail && <p className="req-detail">{inlineCode(r.detail)}</p>}
+                    {/* Sahip ayrı sütun değil, kart görünümündeki gibi gereksinim hücresindedir; içerik sığmazsa tablo kendi kapsayıcısında kayar. */}
+                    {r.owner && <p className="req-owner">Sahip: {r.owner}</p>}
                   </Table.Td>
                   <Table.Td>{r.rail}</Table.Td>
                   <Table.Td>

@@ -30,6 +30,9 @@
   /* Etkili dokunma alanı görsel boyuttan ayrı tokendır: tek başına duran kontrol ≥ 44 CSS px, kaba işaretçi
      varsa (hibrit cihaz dahil) ≥ 48. Metin içi bağlantılar politikanın açık istisnasıdır. */
   --fs-hit: 44px;
+  /* Başlığın kenar simge düğmelerinin görsel kutusu (önceki Mantine ActionIcon lg). Etkili alan (--fs-hit) bundan
+     büyüktür; fark başlığın iç boşluğuna taşar, simgeler kenar boşluğuna göre aynı hizada kalır. */
+  --fs-icon-box: 34px;
 }
 
 @media (any-pointer: coarse) {
@@ -79,7 +82,6 @@ html {
 body {
   background: var(--fs-surface);
   color: var(--fs-ink);
-  font-feature-settings: 'cv11', 'ss01', 'ss03';
   text-rendering: optimizeLegibility;
 }
 
@@ -143,15 +145,30 @@ body {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.5rem;
   min-width: 0;
   min-height: var(--fs-hit);
 }
+/* Menü düğmesi: etkili alan sabittir (esnek öğe olarak daralmaz); çizgiler iç boşluksuz kutuda ortalanır, kök yazı
+   büyüyünce (çizgi boyu rem) de ortada kalır. */
 .site-header .burger {
+  display: grid;
+  place-items: center;
+  flex: none;
   width: var(--fs-hit);
   height: var(--fs-hit);
+  padding: 0;
+}
+/* Kenardaki düğmelerin görsel kutusu ile etkili alanı arasındaki fark başlığın iç boşluğuna taşar: simgeler eski
+   hizasında kalır, 320 px'te marka adı kısalmadan sığar. */
+.site-header .burger {
+  margin-inline-start: calc((var(--fs-icon-box) - var(--fs-hit)) / 2);
+}
+.header-end > :last-child {
+  margin-inline-end: calc((var(--fs-icon-box) - var(--fs-hit)) / 2);
 }
 .brand-mark {
+  flex: none;
   display: grid;
   place-items: center;
   width: 28px;
@@ -280,9 +297,19 @@ body {
   box-shadow: inset 2px 0 0 var(--fs-accent);
 }
 
+/* Satır kırılımı: metin sözcük aralarından (ve tireden sonra) doğal sarılır. `break-word` yalnız satırın tamamından
+   uzun tek dizgiyi (büyük yazı ölçeğinde uzun sözcük, kod dışı uzun tanımlayıcı) satır sonunda kırar; içsel genişliği
+   değiştirmez, tablo sütunu ve esnek öğe sığan sözcüğü bölmez. `overflow-wrap: anywhere` ve `word-break: break-all`
+   kullanılmaz; satır içi kod hiç bölünmez (aşağıda). */
 .page {
   max-width: min(100%, 80rem);
   margin: 0 auto;
+  overflow-wrap: break-word;
+}
+.footer-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--fs-hit);
 }
 .site-footer {
   max-width: min(100%, 80rem);
@@ -337,8 +364,6 @@ body {
 .prose p,
 .prose li {
   text-wrap: pretty;
-  /* Güvenlik ağı: yalnız satıra sığmayan tek belirteç kırılır; sığan kelimeler asla bölünmez */
-  overflow-wrap: anywhere;
 }
 .prose td,
 .prose th {
@@ -413,7 +438,28 @@ body {
   background: var(--fs-tint);
   padding: 0.1em 0.35em;
   border-radius: 4px;
-  overflow-wrap: anywhere;
+}
+/* Satır içi kod metinle birlikte akar ve yalnız tarayıcının doğal fırsatlarında sarılır; bitişik noktalama ve ekler
+   ("’dan", "),") koddan ayrı satıra düşmez. Satırının tamamından uzun kodu sayfa betiği `data-scroll` ile işaretler:
+   kod bölünmez, kendi kutusunda yatay kayar (tüm karakterler yerinde) ve yalnız gerçekten taşan kutu Tab sırasına
+   girer (WebKit taşan kutuyu kendiliğinden odaklamaz). Betik çalışmadan önce ya da hiç çalışmazsa `.page`'in break-word
+   ağı uzun kodu satır sonunda kırar, sayfa taşmaz. Tablo hücresindeki kod sarılmaz (sütun genişler, tablo kendi
+   kapsayıcısında kayar); bağlantı içindeki kod satır içi kalır. */
+[data-code-measured] .prose code,
+[data-code-measured] .req-code {
+  /* Betik ölçtükten sonra ağ satır içi kodda kapanır: Gecko ağ açıkken kodun bitiş dolgusunu sığma hesabına katıp
+     satırına sığan kodu da bölüyor. Satırdan uzun dizileri kod kutuları çözer. */
+  overflow-wrap: normal;
+}
+.prose :not(pre, a) > code[data-scroll],
+.req-code[data-scroll] {
+  display: inline-block;
+  max-width: 100%;
+  overflow: auto hidden;
+  overflow-wrap: normal;
+  vertical-align: bottom;
+  line-height: 1.5;
+  scrollbar-width: thin;
 }
 .prose pre {
   margin: 0 0 1.25rem;
@@ -611,8 +657,24 @@ body {
 .req-explorer .mantine-Input-input {
   min-height: var(--fs-hit);
 }
+/* Gezgin düğmeleri: etiket dar kapsayıcıda (uzun ray adı, büyük kök yazı) sözcük aralarından sarılır, düğme kapsayıcıyı
+   aşmaz; etkili alan korunur, etiket dikeyde ortalanır. Tek satırlık etikette görünüm değişmez. */
 .req-explorer .mantine-Button-root {
+  height: auto;
   min-height: var(--fs-hit);
+}
+.req-explorer .mantine-Button-inner {
+  min-height: inherit;
+}
+.req-explorer .mantine-Button-label {
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+}
+/* Öncelik rozeti hiçbir genişlikte kısalmaz: Mantine Badge taşmayı gizlediği için içerik katkısı ~0'dır ve sütun ya da
+   kart başlığı rozeti daraltıp etiketi kesiyordu. Rozet tam genişliğini ayırır; dar kart başlığında alt satıra sarılır. */
+.req-explorer .mantine-Badge-root {
+  min-width: max-content;
 }
 .req-explorer .mantine-Switch-body {
   min-height: var(--fs-hit);
@@ -670,13 +732,33 @@ body {
   background: var(--fs-tint);
   padding: 0.05em 0.3em;
   border-radius: 4px;
-  overflow-wrap: anywhere;
 }
-/* Ayrıntıdaki uzun teknik tanımlayıcılar (ör. a/b/c_d) bölünemez tek sözcük sayılıp sütunu genişletmesin: kart
-   görünümüyle aynı kural. Sütunun 24rem alt sınırı normal sözcüklerin bölünmesini önler; başlık ve ID etkilenmez. */
+/* Kart ve tablo satırının metinleri sade <p>'dir (Gereksinimler HTML bütçesi). Mantine Text kökünün etkili stilleri
+   aynı tokenlarla: md yazı boyutu ve satır yüksekliği, dış boşluk yok; başlık 600, ayrıntı ikincil renk, tabloda
+   ayrıntı ve sahip 0.25rem üst boşlukla. Aşağıdaki özel kurallar (satır yüksekliği, en fazla 60ch) bunları daraltır. */
+.req-card-title,
+.req-card-detail,
+.req-title,
+.req-detail,
+.req-owner {
+  margin: 0;
+  font-size: var(--mantine-font-size-md);
+  line-height: var(--mantine-line-height-md);
+}
+.req-card-title,
+.req-title {
+  font-weight: 600;
+}
+.req-card-detail,
+.req-detail {
+  color: var(--mantine-color-dimmed);
+}
+.req-detail,
+.req-owner {
+  margin-top: calc(0.25rem * var(--mantine-scale));
+}
 .req-detail {
   max-width: 60ch;
-  overflow-wrap: anywhere;
 }
 .req-owner {
   color: var(--fs-quiet);
@@ -705,17 +787,16 @@ body {
 }
 .req-card-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
 }
 .req-card-title {
   line-height: 1.4;
-  overflow-wrap: break-word;
 }
 .req-card-detail {
   line-height: 1.5;
-  overflow-wrap: anywhere;
 }
 .req-meta {
   display: flex;
@@ -724,5 +805,8 @@ body {
   color: var(--fs-quiet);
   font-size: 1rem;
   line-height: 1.4;
-  overflow-wrap: anywhere;
+}
+/* Uzun sahip adı gibi öğe satırdan genişse satır genişliğine iner ve sözcük aralarından sarılır (kart taşmaz). */
+.req-meta > * {
+  min-width: 0;
 }

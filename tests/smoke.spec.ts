@@ -109,6 +109,106 @@ async function expectMinFont(page: Page, rootPct = 100) {
   );
 }
 
+// Satır kırılımı (kalıcı kural, AGENTS.md): metin sözcük aralarından ve tarayıcının doğal fırsatlarından (tire, eğik
+// çizgi, noktalama) sarılır. Zorlayıcı kural (overflow-wrap: anywhere, word-break: break-all/break-word, line-break: anywhere) yoktur; bunlar
+// içsel genişliği küçültüp tablo sütununda ve esnek öğede sığan sözcüğü böler. overflow-wrap: break-word yalnız satırın
+// tamamından uzun dizgide devreye giren güvenlik ağıdır.
+async function forcedBreakRules(page: Page) {
+  return page.evaluate(() => {
+    const out = new Set<string>();
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>('body *'))) {
+      if (el.closest('svg')) continue;
+      const cs = getComputedStyle(el);
+      if (cs.overflowWrap === 'anywhere' || ['break-all', 'break-word'].includes(cs.wordBreak) || cs.lineBreak === 'anywhere') {
+        out.add(`${el.tagName}.${String(el.className).split(' ')[0]}: overflow-wrap ${cs.overflowWrap}, word-break ${cs.wordBreak}, line-break ${cs.lineBreak}`);
+      }
+    }
+    return [...out].slice(0, 10);
+  });
+}
+
+// Gerçek sözcük ortası bölünme: iki satıra yayılan belirtecin kırılma noktası iki tanımlayıcı karakteri (harf, rakam,
+// alt çizgi) arasındaysa ve (a) belirteç satır içi koddaysa (kod bölünmez, kendi kutusunda kayar), (b) başlık, kimlik ya
+// da başlık/model adıysa (`names`: %100 yazıda; büyük yazıda satırdan uzun ad satır sonunda kırılabilir) ya da (c)
+// bölünmemiş doğal genişliği satır genişliğinden en az 1 px darsa (sığan sözcük) ihlaldir. Satırdan uzun dizginin satır
+// sonunda kırılması güvenlik ağıdır. Doğal genişlik aynı ebeveynde görünmez, sarılmayan bir kopyayla ölçülür: bölünmüş
+// parçaların toplamı alt piksel ve kerning farkı taşır, yarım piksellik sınır durumunu sığıyor gösterebilir.
+const NAME_TEXT = 'h1, h2, h3, h4, th, td:first-child, .req-id, .req-title, .req-card-title, .brand-name, .nav-link-label, .toc-link';
+async function midWordSplits(page: Page, { names = true }: { names?: boolean } = {}) {
+  return page.evaluate(
+    ({ names, nameText }) => {
+      const out: string[] = [];
+      const lineWidth = (el: HTMLElement) => {
+        let box: HTMLElement | null = el;
+        while (box && getComputedStyle(box).display === 'inline') box = box.parentElement;
+        if (!box) return Infinity;
+        const cs = getComputedStyle(box);
+        return box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      };
+      const naturalWidth = (parent: HTMLElement, word: string) => {
+        const probe = document.createElement('span');
+        probe.textContent = word;
+        probe.style.cssText = 'position:absolute;top:0;left:0;visibility:hidden;white-space:nowrap';
+        parent.appendChild(probe);
+        const width = probe.getBoundingClientRect().width;
+        probe.remove();
+        return width;
+      };
+      // Tanımlayıcı karakterleri (harf, rakam, alt çizgi) arasında doğal satır fırsatı yoktur.
+      const wordChar = /[\p{L}\p{N}_]/u;
+      const walker = document.createTreeWalker(document.querySelector('main') ?? document.body, NodeFilter.SHOW_TEXT);
+      const nodes: Text[] = [];
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as Text);
+      for (const node of nodes) {
+        if (out.length >= 10) break;
+        const parent = node.parentElement;
+        const text = node.textContent ?? '';
+        if (!parent || !/\S/.test(text) || parent.closest('pre, svg, script, style')) continue;
+        const whole = document.createRange();
+        whole.selectNodeContents(node);
+        const lines = new Set(Array.from(whole.getClientRects()).filter((r) => r.width > 0).map((r) => Math.round(r.top)));
+        if (lines.size < 2) continue;
+        const re = /\S+/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(text))) {
+          const range = document.createRange();
+          range.setStart(node, m.index);
+          range.setEnd(node, m.index + m[0].length);
+          const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0);
+          if (new Set(rects.map((r) => Math.round(r.top))).size < 2) continue;
+          let at = -1;
+          let prev: number | null = null;
+          for (let i = 0; i < m[0].length; i++) {
+            const c = document.createRange();
+            c.setStart(node, m.index + i);
+            c.setEnd(node, m.index + i + 1);
+            const r = c.getClientRects()[0];
+            if (!r || r.width === 0) continue;
+            const top = Math.round(r.top);
+            if (prev !== null && top > prev + 2) {
+              at = i;
+              break;
+            }
+            prev = top;
+          }
+          if (at <= 0 || !wordChar.test(m[0][at - 1]) || !wordChar.test(m[0][at])) continue;
+          const inCode = Boolean(parent.closest('code'));
+          const isName = names && Boolean(parent.closest(nameText));
+          const line = lineWidth(parent);
+          const natural = naturalWidth(parent, m[0]);
+          if (inCode || isName || natural <= line - 1) {
+            const where = `${parent.tagName}.${String(parent.className).split(' ')[0]}`;
+            const why = inCode ? 'kod' : isName ? 'ad' : 'sığan sözcük';
+            out.push(`${where} "${m[0].slice(0, 40)}" ${at}. karakterde (${why}; doğal ${natural.toFixed(1)} / satır ${line.toFixed(1)} px)`);
+          }
+        }
+      }
+      return out;
+    },
+    { names, nameText: NAME_TEXT },
+  );
+}
+
 // Belgede görünür outline taşıyan öğeler (tek odak göstergesi kuralı için).
 async function outlinedElements(page: Page) {
   return page.evaluate(() =>
@@ -137,6 +237,8 @@ test.describe('viewport matrix', () => {
           await expect(page.locator('figure.mermaid-figure[data-state="error"]'), 'Mermaid ayrıştırma hatası').toHaveCount(0);
           await noHorizontalOverflow(page);
           await expectMinFont(page);
+          expect(await forcedBreakRules(page), 'zorlayıcı satır kırma kuralı').toEqual([]);
+          expect(await midWordSplits(page), 'sözcük ortasından bölünme').toEqual([]);
         });
       }
     });
@@ -164,6 +266,8 @@ test.describe('text scaling', () => {
         await waitForMermaid(page);
         await noHorizontalOverflow(page);
         await expectMinFont(page, root);
+        // Büyük yazıda satırdan uzun sözcük ya da ad satır sonunda kırılabilir (güvenlik ağı); satırına sığan sözcük bölünmez.
+        expect(await midWordSplits(page, { names: false }), 'sözcük ortasından bölünme').toEqual([]);
         // Sabit başlık çubuğu scrollWidth'e yansımaz: eylem düğmesi görünür alanda kalmalı (işlev kaybı yok).
         const toggle = await page.getByTestId('color-scheme-toggle').boundingBox();
         expect(toggle, 'tema düğmesi çizilmeli').not.toBeNull();
@@ -181,6 +285,43 @@ test.describe('text scaling', () => {
 
 /* ------------------------------------------------------------------ */
 test.describe('shell', () => {
+  test.describe('narrow header', () => {
+    test.use({ viewport: { width: 320, height: 640 } });
+    test('brand name and header actions fit at 320 px with fine and coarse pointers @touch', async ({ page }) => {
+      await page.goto('');
+      await waitForHydration(page);
+      const name = await page.locator('.brand-name').evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+      expect(name.scroll, 'marka adı kısalmaz').toBeLessThanOrEqual(name.client);
+      for (const sel of ['.burger', '.header-end .icon-btn[href]', '[data-testid="color-scheme-toggle"]']) {
+        const b = await page.locator(sel).boundingBox();
+        expect(b, sel).not.toBeNull();
+        expect(b!.x, `${sel} görünür alanda`).toBeGreaterThanOrEqual(0);
+        expect(b!.x + b!.width, `${sel} görünür alanda`).toBeLessThanOrEqual(320);
+      }
+      // Menü simgesi kendi etkili alanında ortalanır.
+      const offset = await page.locator('.burger').evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        const g = el.querySelector('.mantine-Burger-burger')!.getBoundingClientRect();
+        return Math.abs(r.left + r.width / 2 - (g.left + g.width / 2));
+      });
+      expect(offset, 'menü simgesi ortada').toBeLessThanOrEqual(1);
+    });
+  });
+
+  test('active section link is scrolled into view in the navigation list', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 700 });
+    for (const path of ['izlenebilirlik/', 'gereksinimler/', '']) {
+      await page.goto(path);
+      await waitForHydration(page);
+      const inside = await page.evaluate(() => {
+        const nav = document.querySelector('.nav-scroll')!.getBoundingClientRect();
+        const a = document.querySelector('.nav-link[data-active]')!.getBoundingClientRect();
+        return a.top >= nav.top - 1 && a.bottom <= nav.bottom + 1;
+      });
+      expect(inside, `/${path}: etkin bağlantı gezinme listesinde görünür`).toBe(true);
+    }
+  });
+
   test('mobile burger opens navigation without overflow and navigates @touch', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto('');
@@ -259,33 +400,64 @@ test.describe('shell', () => {
   });
 });
 
-// Çerçeve üreten tüm hesaplanmış stiller (outline, box-shadow, kenarlık) — belge sırasıyla. outline-style 'none' ise
-// genişlik/renk görünmez olduğundan 'none' sayılır (WebKit odak kaybında bu değerleri farklı raporlar).
-async function frameStyles(page: Page) {
+// Çerçeve üreten hesaplanmış stiller (outline, box-shadow, kenarlık), belge sırasıyla. Ölçüm ve karşılaştırma sayfada
+// yapılır: her Tab adımında Node'a yalnız sonuç (değişen çerçeveler, çizili göstergeler) döner, büyük DOM listesi taşınmaz.
+// outline-style 'none' ise genişlik/renk görünmez olduğundan 'none' sayılır (WebKit odak kaybında bu değerleri farklı
+// raporlar); saydam outline (ör. Mantine Burger çizgisinin yüksek kontrast modu için taşıdığı) gösterge sayılmaz.
+type FrameProbe = {
+  __fsCollect: () => { tag: string; outline: string; frame: string; focused: boolean; proxy: boolean; opaque: boolean }[];
+  __fsBase: ReturnType<FrameProbe['__fsCollect']>;
+};
+async function installFrameProbe(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as FrameProbe;
+    w.__fsCollect = () => {
+      const active = document.activeElement as HTMLElement | null;
+      // Görsel vekil: odaklanan kontrol görünmezse (Switch'in opacity 0 input'u) göstergeyi aynı kapsayıcıdaki kardeş çizer.
+      const activeHidden = active ? getComputedStyle(active).opacity === '0' : false;
+      return Array.from(document.querySelectorAll<HTMLElement>('body *')).map((el) => {
+        const cs = getComputedStyle(el);
+        const transparent = cs.outlineColor === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(cs.outlineColor);
+        const drawn = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 && !transparent;
+        return {
+          tag: `${el.tagName}.${String(el.className).split(' ')[0]}`,
+          outline: drawn ? `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor}` : 'none',
+          frame: [
+            cs.boxShadow,
+            cs.borderTopColor,
+            cs.borderRightColor,
+            cs.borderBottomColor,
+            cs.borderLeftColor,
+            cs.borderTopWidth,
+            cs.borderBottomWidth,
+          ].join(' | '),
+          focused: el === active,
+          proxy: Boolean(active && activeHidden && el !== active && active.parentElement?.contains(el)),
+          opaque: cs.opacity !== '0' && el.getClientRects().length > 0,
+        };
+      });
+    };
+    w.__fsBase = w.__fsCollect();
+  });
+}
+// Karşılaştırma tabanını yeniler (ör. açılan bölümden sonra).
+async function frameBaseline(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as FrameProbe;
+    w.__fsBase = w.__fsCollect();
+  });
+}
+async function frameStep(page: Page) {
   return page.evaluate(() => {
-    const active = document.activeElement as HTMLElement | null;
-    // Görsel vekil: odaklanan kontrol görünmezse (Switch'in opacity 0 input'u) göstergeyi aynı kapsayıcıdaki kardeş çizer.
-    const activeHidden = active ? getComputedStyle(active).opacity === '0' : false;
-    return Array.from(document.querySelectorAll<HTMLElement>('body *')).map((el) => {
-      const cs = getComputedStyle(el);
-      const drawn = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0;
-      return {
-        tag: `${el.tagName}.${String(el.className).split(' ')[0]}`,
-        outline: drawn ? `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor}` : 'none',
-        frame: [
-          cs.boxShadow,
-          cs.borderTopColor,
-          cs.borderRightColor,
-          cs.borderBottomColor,
-          cs.borderLeftColor,
-          cs.borderTopWidth,
-          cs.borderBottomWidth,
-        ].join(' | '),
-        focused: el === active,
-        proxy: Boolean(active && activeHidden && el !== active && active.parentElement?.contains(el)),
-        opaque: cs.opacity !== '0',
-      };
-    });
+    const w = window as unknown as FrameProbe;
+    const now = w.__fsCollect();
+    const base = w.__fsBase;
+    return {
+      sameLength: now.length === base.length,
+      secondFrames: now.filter((s, j) => base[j] && s.frame !== base[j].frame).map((s) => s.tag),
+      focused: now.find((s) => s.focused)?.tag ?? null,
+      drawn: now.filter((s) => s.opaque && s.outline !== 'none').map(({ tag, focused, proxy }) => ({ tag, focused, proxy })),
+    };
   });
 }
 
@@ -306,41 +478,35 @@ test.describe('focus', () => {
     const seen = new Set<string>();
     // Bir Tab adımı: kenarlık/gölge hiçbir öğede değişmez; görünür gösterge tam bir tanedir ve odaklanan öğede ya da
     // görünmez kontrolün görsel vekilindedir (Switch girdisi opaklık 0, gösterge izde).
-    const step = async (baseline: Awaited<ReturnType<typeof frameStyles>>) => {
+    const step = async () => {
       await page.keyboard.press(tab);
-      const now = await frameStyles(page);
-      expect(now.length).toBe(baseline.length);
-      const changed = now
-        .map((s, j) => ({ s, b: baseline[j] }))
-        .filter(({ s, b }) => s.outline !== b.outline || s.frame !== b.frame);
-      const focused = now.find((s) => s.focused);
-      expect(focused, 'odaklanan öğe yok').toBeTruthy();
-      seen.add(focused!.tag);
-      for (const { s, b } of changed) {
-        expect(s.frame, `odakta ikinci çerçeve (kenarlık/gölge): ${s.tag}`).toBe(b.frame);
-      }
-      const visible = changed.filter(({ s }) => s.opaque && s.outline !== 'none');
-      for (const { s } of visible) expect(s.focused || s.proxy, `odak dışı öğede gösterge: ${s.tag}`).toBe(true);
-      expect(visible.length, `tek görünür odak göstergesi: ${focused!.tag}`).toBe(1);
-      return { indicator: visible[0].s, tag: focused!.tag };
+      const r = await frameStep(page);
+      expect(r.sameLength, 'öğe sayısı değişmez').toBe(true);
+      expect(r.focused, 'odaklanan öğe yok').toBeTruthy();
+      seen.add(r.focused!);
+      expect(r.secondFrames, `odakta ikinci çerçeve (kenarlık/gölge): ${r.focused}`).toEqual([]);
+      // Belgenin tamamında çizili gösterge tam bir tanedir: önceki öğede takılı kalan outline da yakalanır.
+      for (const d of r.drawn) expect(d.focused || d.proxy, `odak dışı öğede gösterge: ${d.tag}`).toBe(true);
+      expect(r.drawn.length, `tek görünür odak göstergesi: ${r.focused}`).toBe(1);
+      return { indicator: r.drawn[0], tag: r.focused! };
     };
     const isActive = (selector: string) => page.locator(selector).evaluate((el) => el === document.activeElement);
 
     // 1) Öncelik düğmeleri ve metin kutusundan süzgeç bölümünün özetine kadar.
-    const closed = await frameStyles(page);
-    for (let i = 0; i < 60 && !(await isActive('.req-more > summary')); i++) await step(closed);
+    await installFrameProbe(page);
+    for (let i = 0; i < 60 && !(await isActive('.req-more > summary')); i++) await step();
     expect(await isActive('.req-more > summary')).toBe(true);
     expect([...seen].some((t) => t.startsWith('INPUT')), `metin kutusuna ulaşılmadı: ${[...seen].join(', ')}`).toBe(true);
 
     // 2) Özet Enter ile açılır; içindeki süzgeç düğmeleri ve ayrıntı anahtarı aynı kurala tabidir.
     await page.keyboard.press('Enter');
     await expect(page.locator('.req-more')).toHaveAttribute('open', '');
-    const opened = await frameStyles(page);
+    await frameBaseline(page);
     const switchInput = '.req-explorer input[role="switch"]';
     let switchIndicator: { proxy: boolean } | undefined;
     let facetButtons = 0;
     for (let i = 0; i < 60; i++) {
-      const { indicator, tag } = await step(opened);
+      const { indicator, tag } = await step();
       if (tag.startsWith('BUTTON')) facetButtons++;
       if (await isActive(switchInput)) {
         switchIndicator = indicator;
@@ -409,6 +575,7 @@ const STANDALONE_CONTROLS = [
   '.nav-link',
   '.toc-link',
   '.pager-link',
+  '.footer-link',
   '.btn',
   '.more',
   '.rail',
@@ -524,16 +691,42 @@ test.describe('requirements explorer', () => {
     await expect(page.getByRole('listbox')).toHaveCount(0);
   });
 
-  test('requirements table fits its container at common laptop widths', async ({ page }) => {
-    // Sahip gereksinim hücresinde, ayrıntıdaki uzun tanımlayıcılar sarılır: altı sütun 1280 px ve üzerinde kaydırmasız sığar.
-    for (const width of [1280, 1366]) {
+  test('titles and details keep every character in table and cards', async ({ page }) => {
+    // Metin işlenmez: gezgin yalnız `kod` parçalarını <code> yapar; satır fırsatı eklenmez (<wbr>, U+200B, U+00AD yok).
+    const strip = (t: string) => t.replace(/`/g, '');
+    const titles = requirements.map((r) => r.title).sort();
+    const details = requirements.map((r) => strip(r.detail)).sort();
+    for (const v of [
+      { width: 1366, title: '.req-table .req-title', detail: '.req-table .req-detail' },
+      { width: 390, title: '.req-card-title', detail: '.req-card-detail' },
+    ]) {
+      await page.setViewportSize({ width: v.width, height: 900 });
+      await page.goto('gereksinimler/');
+      await waitForHydration(page);
+      const got = await page.evaluate(
+        ({ t, d }) => ({
+          titles: Array.from(document.querySelectorAll(t)).map((el) => el.textContent ?? ''),
+          details: Array.from(document.querySelectorAll(d)).map((el) => el.textContent ?? ''),
+          inserted: document.querySelectorAll('main wbr').length + ((document.querySelector('main')?.textContent ?? '').match(/[\u200b\u00ad]/g) ?? []).length,
+        }),
+        { t: v.title, d: v.detail },
+      );
+      expect(got.titles.sort(), `${v.width}px başlıklar`).toEqual(titles);
+      expect(got.details.sort(), `${v.width}px ayrıntılar`).toEqual(details);
+      expect(got.inserted, `${v.width}px eklenmiş satır fırsatı`).toBe(0);
+    }
+  });
+
+  test('requirements table keeps six columns and scrolls only inside its own container', async ({ page }) => {
+    // Sığma kabul ölçütü değildir: içerik gerektirirse tablo kendi kapsayıcısında kayar, sayfa yatay taşmaz.
+    for (const width of [1024, 1366]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('gereksinimler/');
       await waitForHydration(page);
       const region = page.getByRole('region', { name: 'Gereksinim tablosu (yatay kaydırılabilir)' });
-      const m = await region.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
-      expect(m.scroll, `${width}px: tablo kapsayıcısını aşmaz`).toBeLessThanOrEqual(m.client);
       await expect(region.locator('thead th')).toHaveCount(6);
+      expect(await region.evaluate((el) => getComputedStyle(el).overflowX)).toBe('auto');
+      await noHorizontalOverflow(page);
     }
   });
 
@@ -618,6 +811,81 @@ test.describe('requirements explorer', () => {
     await expect(search).toHaveValue('Keycloak');
     await expect(count).toHaveText(exactCount(keycloakCount));
     await expect(search).toBeFocused();
+    await noHorizontalOverflow(page);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+// Uzun satır içi kod bölünmez; satırdan uzunsa kendi kutusunda kayar (global.css). Yalnız gerçekten taşan kutu Tab
+// sırasındadır (sayfa betiği; WebKit taşan kutuyu kendiliğinden odaklamaz), ok tuşuyla kayar, sığınca sıradan çıkar.
+const INLINE_CODE = '.prose :not(pre, a) > code, .req-code';
+async function codeBoxes(page: Page) {
+  return page.evaluate((sel) =>
+    Array.from(document.querySelectorAll<HTMLElement>(sel))
+      .filter((c) => c.getClientRects().length > 0)
+      .map((c) => {
+        // Yalnız kaydırma kutusu taşabilir: satır içi (display: inline) kod kutu değildir (Firefox satır içi öğede de
+        // scrollWidth raporlar); taşma, kaydırılabilecek en az bir piksel demektir.
+        const cs = getComputedStyle(c);
+        const box = cs.display !== 'inline' && ['auto', 'scroll'].includes(cs.overflowX);
+        return { overflows: box && c.scrollWidth > c.clientWidth, tabbable: c.getAttribute('tabindex') === '0' };
+      }),
+  INLINE_CODE);
+}
+const mismatched = async (page: Page) => (await codeBoxes(page)).filter((c) => c.overflows !== c.tabbable).length;
+
+test.describe('long inline code', () => {
+  test('scrolls in its own box, is keyboard reachable while it overflows and leaves the tab order when it fits', async ({
+    page,
+    browserName,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('rail-6-operasyon/');
+    await expect(page.locator('h1')).toBeVisible();
+    await page.evaluate(() => document.fonts.ready);
+    await expect.poll(async () => (await codeBoxes(page)).filter((c) => c.overflows).length, 'taşan kod kutusu').toBeGreaterThan(0);
+    await expect.poll(() => mismatched(page), 'yalnız taşan kod Tab sırasında').toBe(0);
+    await noHorizontalOverflow(page);
+
+    // Klavye: Tab sırasında hedeften önceki öğeden tek Tab ile ilk taşan koda gelinir; ok tuşu kutuyu kaydırır.
+    const hasPrev = await page.evaluate((sel) => {
+      const target = Array.from(document.querySelectorAll<HTMLElement>(sel)).find((c) => c.getAttribute('tabindex') === '0')!;
+      target.setAttribute('data-test-code', '');
+      const order = Array.from(
+        document.querySelectorAll<HTMLElement>('main a[href], main button, main input, main summary, main [tabindex="0"]'),
+      ).filter((el) => el.getClientRects().length > 0);
+      const prev = order[order.indexOf(target) - 1];
+      prev?.setAttribute('data-test-prev', '');
+      return Boolean(prev);
+    }, INLINE_CODE);
+    await page.locator(hasPrev ? '[data-test-prev]' : '#icerik').focus();
+    await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
+    const code = page.locator('[data-test-code]');
+    await expect(code).toBeFocused();
+    expect(await code.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none')).toBe(true);
+    // WebKit odak değişiminden sonraki ilk ok tuşunu kaydırmaya kullanmaz (ikincisi kaydırır): en çok üç basış.
+    for (let i = 0; i < 3 && (await code.evaluate((el) => el.scrollLeft)) === 0; i++) {
+      await page.keyboard.press('ArrowRight');
+      await page.waitForTimeout(250);
+    }
+    expect(await code.evaluate((el) => el.scrollLeft), 'ok tuşu kod kutusunu kaydırır').toBeGreaterThan(0);
+    expect(await page.evaluate(() => window.scrollX), 'sayfa yatay kaymaz').toBe(0);
+
+    // Geniş ekranda aynı kod sığar: Tab sırasından çıkar.
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await expect.poll(() => mismatched(page), '1366 px: yalnız taşan kod Tab sırasında').toBe(0);
+    await expect.poll(() => code.evaluate((el) => el.hasAttribute('tabindex')), '1366 px: sığan kod Tab sırasında değil').toBe(false);
+  });
+
+  test('requirement card code stays keyboard reachable after filtering re-renders the cards', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    await page.evaluate(() => document.fonts.ready);
+    await expect.poll(async () => (await codeBoxes(page)).filter((c) => c.overflows).length).toBeGreaterThan(0);
+    await expect.poll(() => mismatched(page)).toBe(0);
+    await page.getByRole('textbox', { name: 'Ara' }).fill('press');
+    await expect.poll(() => mismatched(page), 'süzme sonrası yalnız taşan kod Tab sırasında').toBe(0);
     await noHorizontalOverflow(page);
   });
 });
@@ -712,38 +980,20 @@ test.describe('content', () => {
     await page.setViewportSize({ width: 320, height: 640 });
     for (const path of ['raylar/', 'yol-haritasi/']) {
       await page.goto(path);
+      await page.evaluate(() => document.fonts.ready);
       const wrap = page.locator('.prose .table-wrap').first();
-      const m = await wrap.evaluate((el) => {
-        const cells = Array.from(el.querySelectorAll<HTMLElement>('tbody tr > :first-child'));
-        const split: string[] = [];
-        for (const cell of cells) {
-          const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
-          let node: Node | null;
-          while ((node = walker.nextNode())) {
-            const text = node.textContent ?? '';
-            const re = /\S+/g;
-            let mt: RegExpExecArray | null;
-            while ((mt = re.exec(text))) {
-              const range = document.createRange();
-              range.setStart(node, mt.index);
-              range.setEnd(node, mt.index + mt[0].length);
-              const lines = new Set(Array.from(range.getClientRects()).map((r) => Math.round(r.top)));
-              if (lines.size > 1) split.push(mt[0]);
-            }
-          }
-        }
-        return {
-          overflowX: getComputedStyle(el).overflowX,
-          scrollWidth: el.scrollWidth,
-          clientWidth: el.clientWidth,
-          tabIndex: (el as HTMLElement).tabIndex,
-          split,
-        };
-      });
+      const m = await wrap.evaluate((el) => ({
+        overflowX: getComputedStyle(el).overflowX,
+        scrollWidth: el.scrollWidth,
+        clientWidth: el.clientWidth,
+        tabIndex: (el as HTMLElement).tabIndex,
+      }));
       expect(m.overflowX).toBe('auto');
       expect(m.scrollWidth).toBeGreaterThan(m.clientWidth);
       expect(m.tabIndex).toBe(0);
-      expect(m.split, `kelime ortasından bölünen: ${m.split.join(', ')}`).toEqual([]);
+      // İlk sütun ad sayılır: sözcük yalnız doğal fırsatta (boşluk, tire, eğik çizgi) sarılır, iki harf/rakam arasında
+      // hiçbir genişlikte bölünmez (midWordSplits `names`).
+      expect(await midWordSplits(page), `/${path}: sözcük ortasından bölünme`).toEqual([]);
       await wrap.click({ position: { x: 10, y: 10 } });
       expect(await wrap.evaluate((el) => el.matches(':focus-visible'))).toBe(false);
     }

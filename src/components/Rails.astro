@@ -3,7 +3,7 @@
 ---
 <figure class="diagram diagram-rails">
 <div class="diagram-scroll" tabindex="0" role="region" aria-label="Mimari raylar diyagramı (yatay kaydırılabilir)">
-<svg viewBox='0 0 1040 940' role='img' aria-labelledby='rails-title rails-desc' font-size='16' style='font-family: var(--mantine-font-family), Inter, system-ui, sans-serif'>
+<svg viewBox='0 0 1040 940' role='img' aria-labelledby='rails-title rails-desc' font-size='16' style='font-family: var(--mantine-font-family), "Outfit Variable", Outfit, system-ui, sans-serif'>
 <title id='rails-title'>Altı mimari ray ve iki taban bandı</title>
 <desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 Press kontrol düzlemi (Frappe v15), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, kiracıya site aracı belirteciyle frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm rolleri. Yatay sözleşmeler: Press→Kiracı site_config sk_app ve Agent Job; Press→Ops create-fc-invoice (press_tr_finance), delete-fc-team, press_ops_bridge; Ops→Press press_tr.api.ops. Taban bantları: ortak sözleşmeler (host'a bağlı oturum, has_permission, tasarım tokenları, audit) ve Hetzner bare-metal self-host altyapısı.</desc>
 <defs><marker id='arr' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0 0L10 5L0 10z' fill='var(--fs-line)'/></marker></defs>

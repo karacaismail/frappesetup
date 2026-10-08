@@ -172,7 +172,7 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
       </a>
       <AppShell.Header className="site-header">
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap" className="header-start">
+          <Group gap={0} wrap="nowrap" className="header-start">
             <Burger
               className="burger"
               opened={opened}
@@ -190,7 +190,7 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
               <span className="brand-name">frappesetup</span>
             </Anchor>
           </Group>
-          <Group gap="xs" wrap="nowrap" className="header-end">
+          <Group gap={0} wrap="nowrap" className="header-end">
             <Text c="dimmed" size="sm" visibleFrom="sm" className="as-of">
               {asOf}
             </Text>
@@ -233,13 +233,13 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
             frappesetup · Frappe Headless SaaS mimari karar çerçevesi · son güncelleme {asOf}
           </Text>
           <Group gap="md" wrap="wrap">
-            <Anchor href={repoUrl} size="sm">
+            <Anchor href={repoUrl} size="sm" className="footer-link">
               GitHub
             </Anchor>
-            <Anchor href={`${repoUrl}/blob/main/LICENSE`} size="sm">
+            <Anchor href={`${repoUrl}/blob/main/LICENSE`} size="sm" className="footer-link">
               Kod: MIT
             </Anchor>
-            <Anchor href={`${repoUrl}/blob/main/LICENSE-CONTENT`} size="sm">
+            <Anchor href={`${repoUrl}/blob/main/LICENSE-CONTENT`} size="sm" className="footer-link">
               İçerik: CC BY 4.0
             </Anchor>
           </Group>

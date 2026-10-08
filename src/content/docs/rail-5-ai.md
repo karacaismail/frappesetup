@@ -51,6 +51,8 @@ flowchart LR
 
 frappe\_mcp'nin Frappe v16 uyumu P3 başında kurulumla teyit edilir (doğrulanacak); uyum sağlanamazsa aynı araç şeması platform\_core içinde Streamable HTTP uç noktası olarak sunulur.
 
+**Araç katmanı (karar).** Frappe REST/RPC modele ham açılmaz: tipli domain adaptörü → semantik araç katmanı (arama, detay, analiz, taslak, rapor, metadata) → MCP/agent araçları. Her araç kapsamını (belge türü, alan, işlem) ve gereken yetkiyi bildirir; yetki sunucuda doğrulanır (G-84, G-85). DocType alan, zorunluluk, seçenek, ilişki, izin ve workflow metadata'sı semantik form ve yetenek şemasına, rapor tanımı filtre, metrik, grafik, tablo ve detay modeline derlenir; tablodaki belge araçları bu adaptör üzerinden kapsamlıdır.
+
 ## 8.2 Agent servisi (G-83)
 
 - Claude Agent SDK (TypeScript) üzerinde stateless işçiler; Docker Engine konteyneri, PostgreSQL (konuşma, önizleme, kota sayaçları), Redis (kuyruk, oran sınırı), SSE akış ucu, imzalı webhook alıcısı. Konteyner, DB, TLS ve ağ kuralları: Hüseyin Cengiz. `agent.<marka>.com.tr` A kaydının değerini Hüseyin Cengiz hazırlar; apex bölgesi GoDaddy'de kaldığı sürece Asistan Hüseyin uygular, Hüseyin Cengiz doğrular.
@@ -95,7 +97,7 @@ Uygulamalar `ai_tools` hook'uyla araç şemasını, gereken rolü, `destructive/
 | Araç çağrısı adımları | ThoughtChain |
 | Önizle / onayla / iptal | Actions |
 
-Bileşen adları kurulu @ant-design/x sürümünde doğrulanır (doğrulanacak). Panel 320 px'te tam ekran Drawer, geniş ekranda sağ sütun; tasarım tokenları ConfigProvider üzerinden (G-67); tek `:focus-visible` göstergesi, ≥1rem metin, tüm aksiyonlar klavyeyle erişilir. Press bildirimleri ve başarısız Agent Job'lar aksiyon alınabilir öğe olarak panele düşer (G-100); plan yükselt / uygulama etkinleştir / kredi yükle aynı önizle+onayla ile (G-27, G-30, SA-6). Playwright matrisi (G-74) AI panelini kapsar.
+Bileşen adları kurulu @ant-design/x sürümünde doğrulanır (doğrulanacak). Yapılandırılmış mesaj, katalog içeriği ve artifact X Cards (A2UI) ile çizilir; AI yalnız onaylı katalogdan deklaratif tanım üretir, açık üretken UI yalnız izole sandbox'tadır ([Rail 3](/frappesetup/rail-3-frontend/), SEC-10). Panel 320 px'te tam ekran Drawer, geniş ekranda sağ sütun; tasarım tokenları ConfigProvider üzerinden (G-67); tek `:focus-visible` göstergesi, ≥1rem metin, WCAG 2.2 AA, tüm aksiyonlar klavyeyle erişilir. Press bildirimleri ve başarısız Agent Job'lar aksiyon alınabilir öğe olarak panele düşer (G-100); plan yükselt / uygulama etkinleştir / kredi yükle aynı önizle+onayla ile (G-27, G-30, SA-6). Playwright matrisi (G-74) AI panelini kapsar.
 
 ## 8.5 Yetki eşitliği ve prompt injection (G-85, G-89, X-14)
 

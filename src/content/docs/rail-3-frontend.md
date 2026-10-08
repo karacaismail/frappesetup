@@ -4,7 +4,7 @@ nav: "Rail 3 · Frontend"
 order: 6
 ---
 
-Rail 3, tek bir React SPA build'inin her sitenin kendi host'undan sunulmasını sağlar: kiracı host'unda (`https://<kiracı>.app.<marka>.com.tr/panel`, Frappe v16 `/api/v2`) ve Press sitesinin public alan adında (`https://panel.<marka>.com.tr`, `press.api.*` / `press_tr.api.*`, Frappe v15). Her site kendi host'una bağlı oturum ve CSRF belirteciyle çalışır; ortak oturum ve CORS yoktur (G-13, G-45, G-75, G-119); aynı kabuk Keycloak operatör rolüyle superadmin moduna geçer (SA-24). Tüm ekranlar DocType meta'sından üretilir; elle kodlanan tek şey kabuk, eşleme katmanı ve açık override kayıtlarıdır (G-69). Bu bölüm P1 çıkış ölçütlerinin frontend tarafını tanımlar.
+Rail 3, tek bir React SPA build'inin her sitenin kendi host'undan sunulmasını sağlar: kiracı host'unda (`https://<kiracı>.app.<marka>.com.tr/panel`, Frappe v16 `/api/v2`) ve Press sitesinin public alan adında (`https://panel.<marka>.com.tr`, `press.api.*` / `press_tr.api.*`, Frappe v15). Her site kendi host'una bağlı oturum ve CSRF belirteciyle çalışır; ortak oturum ve CORS yoktur (G-13, G-45, G-75, G-119); aynı kabuğun operatör (superadmin) modu yalnız özel ağdaki `operator.<marka>.com.tr` origin'inde, operatör BFF'iyle (`ops-bff`) aynı origin'den sunulur (SA-24, G-119). Tüm ekranlar DocType meta'sından üretilir; elle kodlanan tek şey kabuk, eşleme katmanı ve açık override kayıtlarıdır (G-69). Bu bölüm P1 çıkış ölçütlerinin frontend tarafını tanımlar.
 
 ## 1. Monorepo ve paket sınırları (G-66, G-103)
 
@@ -19,6 +19,12 @@ Rail 3, tek bir React SPA build'inin her sitenin kendi host'undan sunulmasını 
 | `@apps/<ad>` | `AppModule` arayüzü: rota ağacı, override'lar, çeviri, Prompts, onboarding | G-103 |
 
 pnpm workspaces + Vite; uygulama paketleri yalnızca `get_bootstrap` kurulu uygulama listesinde geçenler için dinamik import edilir; CI'da Lighthouse bütçesi (ilk yük JS ≤ 300 KB gzip, LCP ≤ 2,5 s 4G) kapı görevi görür (G-66, X-13). Ant Design 6 + `@ant-design/x` 2 ile başlanır (`@ant-design/x` 2.9.0 eş bağımlılığı `antd ^6.1.1`; doğrulandı: npm, 2026-10-08).
+
+**AI-first UI katmanı (karar).**
+
+- **Bileşen ailesi:** Ant Design + Pro Components deterministik iş ve CRUD ekranları, Ant Design X agent etkileşimi, X Cards (A2UI) yapılandırılmış mesaj, katalog içeriği ve artifact yüzeyleri içindir. Registry, runtime ve politikanın yerine geçmez; kurulu sürüm ve uyum doğrulanacak (SUS-05).
+- **Semantik yol:** kullanıcı niyeti → UI niyeti → Semantic UI modeli → politika ve doğrulama → bileşen registry'si (`@platform/meta-ui`) → runtime → UI. AI yalnız onaylı katalogdan deklaratif tanım üretir, keyfi React/HTML/CSS/JS üretmez (SEC-10). Kritik CRUD, kayıt düzenleme ve onay controlled UI'dır; dashboard, analiz, rapor ve workspace declarative UI; açık üretken UI yalnız izole, geçici artifact sandbox'ında; MCP Apps harici, araca ait yüzeydir.
+- **Rol haritası (aday; hepsi birden kurulmaz):** OpenUI ana GenUI dil ve runtime adayı, satıcıdan bağımsız adaptör; AG-UI/CopilotKit agent ile frontend arası akış, durum, araç, olay ve insan onayı omurgası; A2UI taşınabilir deklaratif sözleşme; json-render, Tambo ve assistant-ui alternatif; Vercel AI SDK model, araç ve akış katmanı. Semantic UI modeli ve registry bu adaptörlerden bağımsızdır.
 
 ## 2. Shell yerleşimi (G-93, G-94, G-88)
 
@@ -74,7 +80,7 @@ Türkçe birinci dil, İngilizce ikinci. AntD `trTR` locale, dayjs `tr`, biçiml
 
 - Marka kimliği yalnızca `ConfigProvider theme.token` + `theme.components` ile; her renk, boşluk, radius ve gölge değeri token referansıdır; light/dark algoritma `theme.algorithm`.
 - Tek `:focus-visible` göstergesi token olarak (`colorPrimaryBorder` türevi, zeminle ≥3:1); gösterge yalnızca klavye odağındaki kontrolde görünür, kapsayıcılar ve tablo satırları fare/dokunma seçiminde odak göstergesinden bağımsız kalır (G-70).
-- Tüm okunabilir metin ≥1rem: `fontSize`, `fontSizeSM`, `fontSizeHeading*` tokenları 16 px tabanından türetilir, kök font kullanıcı tercihini korur.
+- Yazı tipi Outfit (başlık ve gövdede font-family listesinin ilk ailesi), kod için monospace; lisans ve dağıtım hakkı doğrulanacak. Tüm okunabilir metin ≥1rem ve semantik ölçekle: gövde, tablo, input ve yardımcı metin 1rem/400; menü, buton ve etiket 1rem/500; bölüm başlığı 1.125–1.25rem/600; sayfa başlığı 1.5–2rem/600. AntD, Pro Components ve X tokenları (`fontFamily`, `fontFamilyCode`, `fontSize`, `fontSizeSM`, `fontSizeHeading*`, satır yüksekliği) birlikte ayarlanır; kök font kullanıcı tercihini korur, kurulu sürümün rem davranışı ölçülür.
 - Kenarlık yalnızca işlevsel (form alanı, tablo ızgarası, seçili durum); ayrım boşluk ve yüzey hiyerarşisiyle.
 - Select/Dropdown/DatePicker açılır panelleri aynı token setinden markalanır.
 - Tenant Branding (logo, birincil renk) `get_bootstrap` ile gelir ve `theme.token.colorPrimary` üzerine çalışma zamanında bindirilir; kontrast denetimi (≥4,5:1 metin) uygulanır.
@@ -91,4 +97,4 @@ Türkçe birinci dil, İngilizce ikinci. AntD `trTR` locale, dayjs `tr`, biçiml
 | Performans | Lighthouse CI + Playwright ağ ölçümü | G-66 bütçesi; koşullu yükleme ağ isteğiyle kanıtlanır (G-149) |
 | Gerçek cihaz | macOS/iOS Safari, Android Chrome | emülasyondan ayrı pass/fail/not\_run |
 
-Uygulama sırası 320 → 360 → 375 → 390 → yatay telefon → tablet → masaüstü; kapsam 320 kabulü sağlandıktan sonra genişler. Yön değişimi, sanal klavye, safe area (`env(safe-area-inset-*)`), zoom %200 ve `prefers-reduced-motion` her kritik yolculukta kontrol edilir. Raporda tarayıcı/OS/viewport/giriş profili, komut ve trace kaydı bulunur; çalıştırılmayan kontrol `not_run` olarak yazılır. P1 çıkışı: çekirdek doctype'larda liste/form/CRUD meta'dan üretilmiş, sidebar bootstrap'tan türemiş, CSRF/CORS sözleşmesi doğrulanmış ve bu matris yeşil.
+Erişilebilirlik ölçütü WCAG 2.2 AA'dır. Uygulama sırası 320 → 360 → 375 → 390 → yatay telefon → tablet → masaüstü; kapsam 320 kabulü sağlandıktan sonra genişler. Yön değişimi, sanal klavye, safe area (`env(safe-area-inset-*)`), zoom %200 ve `prefers-reduced-motion` her kritik yolculukta kontrol edilir. Raporda tarayıcı/OS/viewport/giriş profili, komut ve trace kaydı bulunur; çalıştırılmayan kontrol `not_run` olarak yazılır. P1 çıkışı: çekirdek doctype'larda liste/form/CRUD meta'dan üretilmiş, sidebar bootstrap'tan türemiş, CSRF/CORS sözleşmesi doğrulanmış ve bu matris yeşil.

@@ -81,7 +81,7 @@ export default function Mermaid() {
         startOnLoad: false,
         securityLevel: 'strict',
         theme: 'base',
-        fontFamily: token('--mantine-font-family', 'Inter, system-ui, sans-serif'),
+        fontFamily: token('--mantine-font-family', '"Outfit Variable", Outfit, system-ui, sans-serif'),
         fontSize: 16,
         // 1rem kuralı: diyagram türlerinin kendi varsayılan yazı boyutları (12–14px) 16'ya çekilir.
         sequence: { actorFontSize: 16, noteFontSize: 16, messageFontSize: 16, wrap: true },

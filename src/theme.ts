@@ -38,12 +38,12 @@ export const theme = createTheme({
   // amber-7 (L≈0.38) üzerinde koyu metin, sea-8 / gray-7 (L<0.2) üzerinde beyaz metin.
   luminanceThreshold: 0.3,
   fontFamily:
-    '"Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    '"Outfit Variable", Outfit, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
   fontFamilyMonospace:
     '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
   headings: {
     fontFamily:
-      '"Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+      '"Outfit Variable", Outfit, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
     fontWeight: '650',
     sizes: {
       h1: { fontSize: '2rem', lineHeight: '1.2' },

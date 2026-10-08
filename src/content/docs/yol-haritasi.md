@@ -40,10 +40,10 @@ P1 çıkışında bir HR ekranı tüm katmanlardan uçtan uca geçer. AI ve dest
 - G-76 Keycloak HA ve G-144 sertleştirme P0'da; G-12 Press girişi, G-16 davet, G-79 kayıt ve G-81 identity-sync P1'dedir (P0 çıkışı Press girişini şart koşmaz).
 - G-5 Agent `upload_offsite_backup` yaması ilk prod kiracıdan önce; G-55 binlog kurtarma tatbikatı P0 çıkışında koşar.
 - G-119 host'a bağlı oturum, G-45 CSRF enjeksiyonu ve G-75 yerleşimi SPA'nın ilk kiracı isteğinden önce hazırdır; G-120 kalıcı kimlik eşlemesi ilk girişten önce.
-- G-148 aracı belirteci + G-59 adaptörünün asgari hali (P1, G-129 prototipi) → tam G-59/G-85 (P3); frappe\_mcp'nin v16 uyumu P3 başında teyit edilir (doğrulanacak).
+- G-148 aracı belirteci + G-59 adaptörünün asgari hali (P1: G-129 ve SA-40 prototipleri; SA-40 için G-82'nin asgarisi: `press-service` audience kapsamı, `ops-bff` girişi ve token exchange daraltması) → tam G-59/G-82/G-85 (P3); frappe\_mcp'nin v16 uyumu P3 başında teyit edilir (doğrulanacak).
 - G-42 başsız setup wizard → G-41 TR temel çizgisi → G-31 Product Trial yükü.
 - G-19 iyzico + G-20 Invoice override + G-125 durum makinesi → G-29 ücretli App Plan → G-30 aktivasyon → G-95 mağaza UX.
-- SA-17/SA-19/SA-35 operasyon sitesi finans çekirdeği + SA-41 matrisi (K-13, mali müşavir) → P2 çıkışındaki e-belge kabulü; SA-6/SA-8 → SA-21/SA-34 (P2) → SA-33 hak ediş mutabakatı (P6); SA-15 AI tüketim ölçümü (P3) SA-21'in tahakkuk kuralını kullanır (P3 → P2 yönünde).
+- SA-17/SA-19/SA-35 operasyon sitesi finans çekirdeği + SA-41 matrisi (K-13, mali müşavir) → P2 çıkışındaki e-belge kabulü; SA-6/SA-8 → SA-21/SA-34 (P2) → SA-33 hak ediş mutabakatı (P6); SA-21 (P2) → SA-15 (P3): AI tüketim ölçümü P2'deki tahakkuk kuralını kullanır.
 - G-35 `get_subscription_info` → G-106 özellik kapıları → G-127 uygulama durum modeli → CronHR plan farklılaştırması.
 - G-102..G-107 ve G-141 sözleşmeleri P4'te CronHR, P5'te CRM/Webshop ile aynı X-09 uyumluluk listesinden geçer.
 - SA-1/SA-2 operatör kimliği (P1) → SA-25 → SA-24 Müşteri 360; SA-40 destek prototipi (P1) → SA-27/SA-28 → SA-42..SA-44 kapsam modeli → SA-29 Hocuspocus (Hüseyin Cengiz).

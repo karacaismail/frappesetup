@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-FONT = "style='font-family: var(--mantine-font-family), Inter, system-ui, sans-serif'"
+FONT = "style='font-family: var(--mantine-font-family), \"Outfit Variable\", Outfit, system-ui, sans-serif'"
 
 
 def figure(cls: str, label: str, svg: str, caption: str, source: str) -> str:
