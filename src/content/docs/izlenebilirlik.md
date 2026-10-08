@@ -96,6 +96,13 @@ Her satır 2026-10-08'de doğrulandı. Hareketli dal tek başına kanıt sayılm
 | KD-35 | `Referrer-Policy: strict-origin` aynı origin dahil yalnız origin gönderir; varsayılan `strict-origin-when-cross-origin` aynı origin'de tam adres gönderir; `document.referrer` gezinme isteğinin referrer'ıdır | [Referrer Policy](https://w3c.github.io/webappsec-referrer-policy/#determine-requests-referrer), [HTML](https://html.spec.whatwg.org/multipage/document-lifecycle.html#initialise-the-document-object), [MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Referrer-Policy) | ED 2026-03-20; HTML LS 2026-10-07 | Spesifikasyon + doküman |
 | KD-36 | Yandex Metrica `hit` adres, `referer` ve `title` alır; adres verilmezse `window.location.href` | [hit](https://yandex.com/support/metrica/en/objects/hit.html) | Güncel doküman | Resmi doküman |
 | KD-37 | Belirteçteki roller istemcinin ve uygulanan kapsamların rol eşlemesiyle sınırlıdır; Audience Resolve belirteçte istemci rolü olan istemciyi `aud`'a ekler | [role scope](https://www.keycloak.org/docs/26.8.0/server_admin/index.html#_role_scope_mappings), [audience resolve](https://www.keycloak.org/docs/26.8.0/server_admin/index.html#_audience_resolve) | 26.8.0 | Resmi doküman |
+| KD-38 | Kimlik kararları (KM-01..KM-31); kullanıcının notu | Keycloak + Headless Frappe Kimlik Rehberi ve Yol Haritası, 29 Eylül 2026 | Dosya, 5143 kelime | Kullanıcı notu |
+| KD-39 | AI ekosistemi kararları (AI-01..AI-21); GitHub sayıları gecikmeli | Frappe AI Ekosistemi, 4 Ekim 2026 | Dosya, 5954 kelime | Kullanıcı notu |
+| KD-40 | Kaizen şartnamesi (KZ-01..KZ-18); uygulanmış sistem değil | Capability-Agent_Kaizen_Kurulum_Sartnamesi, 12 Eylül 2026 | Dosya, 1722 kelime | Kullanıcı notu |
+| KD-41 | Kaizen paketi; şablonlar, kurallar, kabul testleri; hiçbir dosya bu depoya eklenmedi | Capability-Agent_Kaizen_Kalite_Paketi | Zip, 3719 kelime | Kullanıcı notu |
+| KD-42 | Adaptif arayüz kararları (AU-01..AU-30) | Capability-Adaptive Mobile-First UI Delivery and AI-Driven Cross-Device QA | Dosya, 8501 kelime | Kullanıcı notu |
+| KD-43 | Adaptif arayüz, yetenek öncelikli teslimat | Capability-First Adaptive UI 320 CSS px iphone 4 first | Dosya, 3979 kelime | Kullanıcı notu |
+| KD-44 | Adaptif arayüz, kapsam ve test matrisi, destek seviyeleri | Capability-First Adaptive UI 320 CSS px iphone 4 first-2 | Dosya, 4196 kelime | Kullanıcı notu |
 
 ## Bu sitenin QA kanıtı
 

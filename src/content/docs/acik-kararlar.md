@@ -52,6 +52,37 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | K-32 | Bu deponun lisans onay kaydı (kod MIT, içerik CC BY 4.0) | Ürün sahibi | Lisans dosyaları değiştirilmedi; onayın kaydı depoda yok | Ürün sahibi onayı ADR olarak yazılır; onay yoksa lisans kararı yeniden açılır |
 | K-36 | Docs sitesi kabuk JS bütçesinin kapsamı | Ürün sahibi | Kapandı (8 Ekim 2026): kapsam ilk görünümün toplam JS'idir, giriş parçalarıyla daraltılmaz. Önceki "85 KB" bildirimi yalnız giriş parçalarını sayıyordu; aynı derlemenin toplamı 125,2 KB idi | Kabuk hafifletildi: toplam 96,9 KB, giriş parçaları 77,9 KB (ayrı raporlanır; güncel ölçüm İzlenebilirlik QA tablosunda); ağ testi her CI koşusunda toplamı ≤ 100 KB ile denetler |
 
+## Karar notlarından gelen kararlar ve çelişkiler
+
+[Karar kataloğu](/frappesetup/karar-katalogu/) bu satırların karar metnini taşır; burada yalnız seçenekler ve repodaki karşılık yazılır. K-37..K-44 notun açık bıraktıklarıdır, K-45..K-60 repo verisiyle çelişen noktalardır; çelişen satırlarda repo verisi değiştirilmedi. Notlardaki faz adları P0–P6 ile eşlenmedi.
+
+| # | Karar | Tür | Seçenekler | Öneri | Faz |
+| --- | --- | --- | --- | --- | --- |
+| K-37 | Tenant modeli (KM-04) | Ürün sahibi | Tek Frappe site + organizasyon izolasyonu / müşteri başına site (repo: K2 sabit, müşteri başına bir site) | Onay bekliyor | — |
+| K-38 | Magic link (KM-10) | Ürün sahibi | Özgün eklenti (bağımsız güvenlik incelemesiyle) / Phase Two ile ticari lisans / ertele | Notta öneri yok | — |
+| K-39 | Telefonla giriş (KM-11) | Ürün sahibi | E-postayla tanıma + SMS kodu / telefon = kullanıcı adı / özgün authenticator | Notta öneri yok; ilk seçenek bugün mümkün | — |
+| K-40 | E-postasız hesap (KM-12) | Ürün sahibi | E-posta zorunlu / ayrı model | Repo e-posta zorunlu varsayar | — |
+| K-41 | Oturum süreleri (KM-14) | Ürün sahibi | Keycloak boşta ve azami; Frappe oturumu | Repoda G-78: SSO boşta 30 dk, azami 12 saat, erişim belirteci 5 dk; K-8: 8–24 saat | — |
+| K-42 | Giriş süresi hedefi (KM-15) | Ürün sahibi | Yük altında azami süre | PERF-01 k6 hipotezdir, sayı yok | — |
+| K-43 | Teknik inceleyici (KM-16) | Ürün sahibi | Ekipten geliştirici / dış güvenlik danışmanı | Notta öneri yok | — |
+| K-44 | Casdoor yeniden değerlendirme (KM-13) | Ürün sahibi | Hedef sürümde CERT/CC bildirimlerinin ve CVE-2026-90942'nin düzeldiği gösterilir; yeni imza/anahtar sınıfı kritik açık yok; bildirimlere yanıt veren güvenlik süreci | Koşullar sağlanana kadar aday değil | — |
+| K-45 | Keycloak sürüm serisi (KM-01) | Teknik | 26.7 serisi sabit / repo: 26.x, son 26.8.0 (G-76) | Onay bekliyor | — |
+| K-46 | Organizations (KM-02) | Teknik | MVP'de kullanılmaz / repo: her Press Team bir Organization (G-77), identity-sync açar | Onay bekliyor | — |
+| K-47 | Frappe kimlik köprüsü (KM-03) | Teknik + güvenlik | Kendi köprü; ilk bağ doğrulanmış e-postayla; e-posta değişikliği köprüde / repo: Social Login Key + `(iss, sub)` kancası, önceden provizyonlu kullanıcı, e-posta değişikliği identity-sync `rename_doc` (G-44, G-12, G-120) | Onay bekliyor | — |
+| K-48 | Kimlik veri modeli (KM-05) | Ürün sahibi + teknik | Notun DocType'ları / repo: Custom Field + Press Team (G-120, G-16, G-77); KYC/KYB repoda yok | Onay bekliyor | — |
+| K-49 | Alan adı düzeni (KM-06) | Teknik | Tek ana alan, `/crm` yolları / repo: `id.`, `panel.`, `<kiracı>.app.`, `operator.`, `ops.` (K-2) | Onay bekliyor | — |
+| K-50 | Passkey zorunluluğu (KM-07) | Ürün sahibi + güvenlik | Yönetici ve KYC için passkey zorunlu / repo: TOTP ve passkey kabul (G-78) | Onay bekliyor | — |
+| K-51 | Depo düzeni (KM-08) | Teknik | Dört depo / repo: `press_tr`, `platform_core`, pnpm monorepo | Onay bekliyor | — |
+| K-52 | Lisans kapısı (KM-09) | Ürün sahibi + hukuk | AGPL yasak, SBOM her PR / repo: AGPL bileşenleri kullanılır (K-1 açık), SEC-09 her sürümde SBOM | Onay bekliyor | — |
+| K-53 | AI yazma yetkisi (AI-04) | Ürün sahibi + hukuk | Seviye 3–4 yalnız taslak / repo: önizle + onayla ile `submit` ve `delete` (rail-5-ai) | Onay bekliyor | — |
+| K-54 | Dış LLM'e veri (AI-11) | Hukuk | Yerel modelle sınırlı / repo: maskelenmiş alanlar Anthropic API'ye (G-90) | Onay bekliyor | — |
+| K-55 | Kaizen hook ve global talimat (KZ-10, KZ-11) | Ürün sahibi | Uygula / kullanıcının kalıcı politikası: kural değişikliği yalnız açık talimatla, genel hook otomatik kurulmaz | Uygulanmadı; bu depoya hook veya global dosya eklenmedi | — |
+| K-56 | Kanıt sonuç değerleri (KZ-12) | Teknik | pass, fail, blocked, unknown / repo: pass, fail, not_run, not_applicable | Onay bekliyor | — |
+| K-57 | Bütçe kümeleri (AU-17) | Ürün sahibi + teknik | Not: 20/8 KB kritik CSS, 150/250 ya da 120 KB JS / repo: G-66 ilk yük JS ≤ 300 KB, docs kabuğu ≤ 100 KB | Onay bekliyor | — |
+| K-58 | Notun küçük ölçüleri (AU-05) | Ürün sahibi | 15 px clamp, 32 px hedef / kalıcı kural: ≥ 1rem, 44/48 px | Kalıcı kural geçerli; notun değerleri uygulanmadı | — |
+| K-59 | Doğrulanamayan AI olguları (AI-15) | Ürün sahibi | Not: üç depo var, OpenAEC MIT / 8 Ekim klon denemesi: 404, LGPL v3 metni | Depoya dayanan öneriler doğrulanana kadar uygulanmaz | — |
+| K-60 | Mimari adı (AU-01) | Ürün sahibi | Üç not, üç ad | Resmi ad kaydı yok | — |
+
 ## Başlıca riskler ve azaltımlar
 
 | Risk | Etki | Azaltım |
