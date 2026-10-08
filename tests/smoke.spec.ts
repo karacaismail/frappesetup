@@ -281,6 +281,9 @@ test.describe('focus', () => {
 test.describe('requirements explorer', () => {
   const shouldCount = requirements.filter((r) => r.priority === 'SHOULD').length;
   const mayCount = requirements.filter((r) => r.priority === 'MAY').length;
+  const keycloakCount = requirements.filter((r) =>
+    `${r.id} ${r.title} ${r.detail} ${r.owner ?? ''}`.toLocaleLowerCase('tr').includes('keycloak'),
+  ).length;
   const shouldIyzico = requirements.filter(
     (r) =>
       r.priority === 'SHOULD' &&
@@ -359,9 +362,16 @@ test.describe('requirements explorer', () => {
     await page.goto('gereksinimler/');
     await waitForHydration(page);
     const search = page.getByRole('textbox', { name: 'Ara' });
-    await search.fill('Keycloak');
+    const count = page.getByTestId('req-count');
+    // React 19 hidrasyonu eşzamansızdır: filtre gerçekten uygulanana kadar yazmayı yinele
+    // (değer DOM'a yazıldı ama React henüz dinlemiyorsa sayaç değişmez).
+    await expect(async () => {
+      await search.fill('Keycloak');
+      await expect(count).toContainText(`${keycloakCount} / ${requirements.length}`, { timeout: 1_000 });
+    }).toPass({ timeout: 20_000 });
     await page.setViewportSize({ width: 844, height: 390 });
     await expect(search).toHaveValue('Keycloak');
+    await expect(count).toContainText(`${keycloakCount} / ${requirements.length}`);
     await expect(search).toBeFocused();
     await noHorizontalOverflow(page);
   });
