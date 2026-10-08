@@ -262,6 +262,30 @@ body {
 .icon-btn:hover {
   background: var(--mantine-primary-color-light-hover);
 }
+.nav-wrapper {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.nav-wrapper .nav-link-label {
+  flex: 1;
+}
+.nav-wrapper-chevron {
+  flex: none;
+  transition: transform var(--fs-dur) var(--fs-ease);
+}
+.nav-wrapper[aria-expanded='true'] .nav-wrapper-chevron {
+  transform: rotate(180deg);
+}
+.nav-wrapper-panel {
+  padding-inline-start: 0.875rem;
+}
 .nav-foot {
   border-top: 1px solid var(--fs-grid);
   display: grid;

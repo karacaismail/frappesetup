@@ -12,9 +12,10 @@ import {
   useMantineColorScheme,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
-import { IconBrandGithub, IconMoon, IconSun } from '@tabler/icons-react';
+import { IconBrandGithub, IconChevronDown, IconMoon, IconSun } from '@tabler/icons-react';
 import { cssVariablesResolver, theme } from '../theme';
 import { sectionIcon } from './icons';
+import { COLLAPSIBLE_GROUPS } from '../data/sections';
 
 export interface NavItem {
   href: string;
@@ -108,6 +109,44 @@ function useScrollSpy(slugs: string[]) {
     };
   }, [slugs.join('|')]);
   return active;
+}
+
+// Kenar çubuğu sarmalayıcı grubu: gerçek <button> (klavyeyle odaklanır/açılır) + aria-expanded; Mantine bileşeni yok.
+function CollapsibleGroup({
+  id,
+  label,
+  icon,
+  defaultOpened,
+  children,
+}: {
+  id: string;
+  label: string;
+  icon: string;
+  defaultOpened: boolean;
+  children: ReactNode;
+}) {
+  const [opened, setOpened] = useState(defaultOpened);
+  const GroupIcon = sectionIcon(icon);
+  const panelId = `nav-group-${id}`;
+  return (
+    <>
+      <button
+        type="button"
+        className="nav-link nav-wrapper"
+        aria-expanded={opened}
+        aria-controls={panelId}
+        data-testid={`nav-wrapper-${id}`}
+        onClick={() => setOpened((v) => !v)}
+      >
+        <GroupIcon size={18} stroke={1.75} aria-hidden className="nav-link-icon" />
+        <span className="nav-link-label">{label}</span>
+        <IconChevronDown size={18} aria-hidden className="nav-wrapper-chevron" />
+      </button>
+      <div id={panelId} hidden={!opened} className="nav-wrapper-panel">
+        <Stack gap={2}>{children}</Stack>
+      </div>
+    </>
+  );
 }
 
 function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, children }: ShellProps) {
@@ -205,14 +244,31 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
       <AppShell.Navbar id="site-nav" p="sm" aria-label="Bölümler" className="site-nav">
         <AppShell.Section grow className="nav-scroll" ref={navRef}>
           <Stack gap={2}>{top.map(renderLink)}</Stack>
-          {groups.map(([group, items]) => (
-            <Box key={group} mt="md">
-              <Text component="p" className="nav-group">
-                {group}
-              </Text>
-              <Stack gap={2}>{items.map(renderLink)}</Stack>
-            </Box>
-          ))}
+          {groups.map(([group, items]) => {
+            const wrapperIcon = COLLAPSIBLE_GROUPS[group];
+            if (wrapperIcon) {
+              return (
+                <Box key={group} mt="md">
+                  <CollapsibleGroup
+                    id={group.toLowerCase()}
+                    label={group}
+                    icon={wrapperIcon}
+                    defaultOpened={items.some((item) => item.href === current)}
+                  >
+                    {items.map(renderLink)}
+                  </CollapsibleGroup>
+                </Box>
+              );
+            }
+            return (
+              <Box key={group} mt="md">
+                <Text component="p" className="nav-group">
+                  {group}
+                </Text>
+                <Stack gap={2}>{items.map(renderLink)}</Stack>
+              </Box>
+            );
+          })}
         </AppShell.Section>
         <AppShell.Section pt="sm" className="nav-foot">
           <Text size="sm" c="dimmed">

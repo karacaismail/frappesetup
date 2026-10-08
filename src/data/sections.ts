@@ -21,15 +21,22 @@ export type IconName =
   | 'chart'
   | 'help'
   | 'checklist'
+  | 'plug'
+  | 'book'
+  | 'robot'
+  | 'tools'
   | 'file';
 
 export interface SectionMeta {
-  group: 'Çerçeve' | 'Raylar' | 'Sözleşmeler' | 'Teslim';
+  group: 'Çerçeve' | 'Raylar' | 'Sözleşmeler' | 'Teslim' | 'AI';
   icon: IconName;
   summary: string;
 }
 
-export const GROUP_ORDER: SectionMeta['group'][] = ['Çerçeve', 'Raylar', 'Sözleşmeler', 'Teslim'];
+export const GROUP_ORDER: SectionMeta['group'][] = ['Çerçeve', 'Raylar', 'Sözleşmeler', 'Teslim', 'AI'];
+
+// Kenar çubuğunda açılır-kapanır tek bir üst öğe olarak çizilen gruplar (grup adı → ikon).
+export const COLLAPSIBLE_GROUPS: Record<string, IconName> = { AI: 'sparkles' };
 
 export const SECTIONS: Record<string, SectionMeta> = {
   kararlar: { group: 'Çerçeve', icon: 'scale', summary: 'On sabit karar, kapsam sınırı ve roller.' },
@@ -71,6 +78,12 @@ export const SECTIONS: Record<string, SectionMeta> = {
     icon: 'checklist',
     summary: 'Değerlendirme raporu maddelerinin kapanışı ve kaynak defteri.',
   },
+  'ai-bakis': { group: 'AI', icon: 'sparkles', summary: 'Hazır depolar nasıl kullanılır; üç katmanlı AI yığını ve karar özeti.' },
+  'ai-mcp': { group: 'AI', icon: 'plug', summary: 'Resmi ve topluluk MCP sunucuları: araçlar, kimlik, güvenlik, boşluklar.' },
+  'ai-skills': { group: 'AI', icon: 'book', summary: 'Resmi ve topluluk skill paketleri: kapsam, kalite, v16 durumu.' },
+  'ai-agents': { group: 'AI', icon: 'robot', summary: 'Frappe içi AI asistan ve ajan uygulamaları: mimari, güvenlik, olgunluk.' },
+  'ai-press-yetkinlik': { group: 'AI', icon: 'server', summary: 'Press kılavuzundaki işlemler hangi araçla yapılabilir? Kanıtlı yetkinlik matrisi.' },
+  'ai-gelistirme': { group: 'AI', icon: 'tools', summary: 'Kendi skill, MCP ve ajanlarınızı geliştirme planı; öncelik, tasarım, kabul ölçütü.' },
 };
 
 export const RAILS = [
