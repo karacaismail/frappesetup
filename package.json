@@ -1,0 +1,45 @@
+{
+  "name": "frappesetup",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report"
+  },
+  "dependencies": {
+    "@astrojs/react": "^7.0.1",
+    "@astrojs/sitemap": "^3.7.4",
+    "@mantine/code-highlight": "^9.7.1",
+    "@mantine/core": "^9.7.1",
+    "@mantine/hooks": "^9.7.1",
+    "@tabler/icons-react": "^3.49.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "astro": "^7.3.7",
+    "mermaid": "^12.1.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "allowScripts": {
+    "esbuild": true
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "postcss-preset-mantine": "^1.18.0",
+    "postcss-simple-vars": "^7.0.1"
+  },
+  "description": "Frappe Headless SaaS — mimari karar çerçevesi ve yol haritası (Astro + Mantine, GitHub Pages)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/karacaismail/frappesetup.git"
+  },
+  "homepage": "https://karacaismail.github.io/frappesetup/"
+}

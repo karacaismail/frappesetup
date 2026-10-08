@@ -1,0 +1,148 @@
+---
+import { getCollection, render } from 'astro:content';
+import Site from '../layouts/Site.astro';
+import Mermaid from '../components/Mermaid.tsx';
+import RequirementsExplorer from '../components/RequirementsExplorer.tsx';
+import Rails from '../components/Rails.astro';
+import Timeline from '../components/Timeline.astro';
+import requirements from '../data/requirements.json';
+
+export async function getStaticPaths() {
+  const docs = await getCollection('docs');
+  return docs.map((entry) => ({ params: { slug: entry.id }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Content, headings } = await render(entry);
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+const docs = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
+const index = docs.findIndex((d) => d.id === entry.id);
+const prev = index > 0 ? docs[index - 1] : null;
+const next = index < docs.length - 1 ? docs[index + 1] : null;
+
+const hasMermaid = (entry.body ?? '').includes('```mermaid');
+const embed = entry.id === 'raylar' ? 'rails' : entry.id === 'yol-haritasi' ? 'timeline' : null;
+---
+
+<Site title={entry.data.title} current={`${base}/${entry.id}/`} headings={headings}>
+  <article class="doc">
+    <header class="doc-header">
+      <p class="eyebrow">Bölüm {entry.data.order} / {docs.length}</p>
+      <h1>{entry.data.title}</h1>
+    </header>
+
+    {embed === 'rails' && <div data-embed-source="rails"><Rails /></div>}
+    {embed === 'timeline' && <div data-embed-source="timeline"><Timeline /></div>}
+
+    {
+      entry.id === 'gereksinimler' && (
+        <div class="explorer">
+          <RequirementsExplorer client:visible items={requirements} />
+        </div>
+      )
+    }
+
+    <div class="prose">
+      <Content />
+    </div>
+
+    <nav class="pager" aria-label="Bölümler arası geçiş">
+      {
+        prev ? (
+          <a class="pager-link" href={`${base}/${prev.id}/`} rel="prev">
+            <span class="pager-kicker">← Önceki</span>
+            <span class="pager-title">{prev.data.nav}</span>
+          </a>
+        ) : (
+          <a class="pager-link" href={`${base}/`} rel="prev">
+            <span class="pager-kicker">← Başa dön</span>
+            <span class="pager-title">Genel bakış</span>
+          </a>
+        )
+      }
+      {
+        next && (
+          <a class="pager-link pager-next" href={`${base}/${next.id}/`} rel="next">
+            <span class="pager-kicker">Sonraki →</span>
+            <span class="pager-title">{next.data.nav}</span>
+          </a>
+        )
+      }
+    </nav>
+  </article>
+
+  {hasMermaid && <Mermaid client:idle />}
+</Site>
+
+<script>
+  // Diyagramı, metindeki yer tutucunun bulunduğu noktaya taşır; JS yoksa başlığın altında kalır.
+  const target = document.querySelector('[data-embed]');
+  const source = document.querySelector('[data-embed-source]');
+  if (target && source) target.replaceWith(source);
+</script>
+
+<style>
+  .doc {
+    padding-block: 0.5rem 3rem;
+  }
+  .doc-header {
+    margin-bottom: 1.75rem;
+  }
+  .eyebrow {
+    margin: 0 0 0.4rem;
+    color: var(--fs-quiet);
+    font-size: 1rem;
+    letter-spacing: 0.02em;
+  }
+  .doc-header h1 {
+    margin: 0;
+    font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.25rem);
+    line-height: 1.2;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    max-width: 30ch;
+  }
+  .explorer {
+    margin: 0 0 2.5rem;
+  }
+  .pager {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--fs-grid);
+  }
+  @media (min-width: 36em) {
+    .pager {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .pager-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.9rem 1rem;
+    border-radius: var(--mantine-radius-md);
+    background: var(--fs-surface-2);
+    color: inherit;
+    text-decoration: none;
+    min-height: 44px;
+  }
+  .pager-link:hover {
+    background: var(--fs-tint);
+  }
+  .pager-next {
+    text-align: right;
+    align-items: flex-end;
+  }
+  .pager-kicker {
+    color: var(--fs-quiet);
+    font-size: 1rem;
+  }
+  .pager-title {
+    font-weight: 650;
+    font-size: 1.0625rem;
+  }
+</style>

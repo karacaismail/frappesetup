@@ -1,0 +1,240 @@
+/* Semantik tokenlar — Mantine tokenlarının üstünde, sayfa düzeyi kimlik */
+:root {
+  --fs-ink: var(--mantine-color-text);
+  --fs-quiet: var(--mantine-color-dimmed);
+  --fs-line: var(--mantine-color-gray-5);
+  --fs-grid: var(--mantine-color-gray-3);
+  --fs-surface: var(--mantine-color-white);
+  --fs-surface-2: var(--mantine-color-gray-0);
+  --fs-accent: var(--mantine-color-sea-7);
+  --fs-accent-soft: var(--mantine-color-sea-0);
+  --fs-tint: var(--mantine-color-gray-1);
+  --fs-focus: var(--mantine-color-sea-7);
+  --fs-content-max: 76ch;
+  --fs-gutter: 1rem;
+}
+
+[data-mantine-color-scheme='dark'] {
+  --fs-line: var(--mantine-color-dark-3);
+  --fs-grid: var(--mantine-color-dark-4);
+  --fs-surface: var(--mantine-color-dark-7);
+  --fs-surface-2: var(--mantine-color-dark-6);
+  --fs-accent: var(--mantine-color-sea-4);
+  --fs-accent-soft: rgba(69, 179, 163, 0.14);
+  --fs-tint: var(--mantine-color-dark-5);
+  --fs-focus: var(--mantine-color-sea-3);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  background: var(--fs-surface);
+  color: var(--fs-ink);
+  overflow-x: hidden;
+}
+
+/* Tek odak göstergesi: yalnız klavye odağında, yalnız odaklanan kontrolde */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--fs-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.mantine-focus-auto:focus-visible {
+  outline: 2px solid var(--fs-focus);
+  outline-offset: 2px;
+}
+
+/* İçerik tipografisi */
+/* Metin satır uzunluğu 76ch ile sınırlı; tablo, diyagram ve kod blokları sütunun tamamını kullanır */
+.prose {
+  max-width: 100%;
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+.prose > p,
+.prose > ul,
+.prose > ol,
+.prose > blockquote,
+.prose h2,
+.prose h3,
+.prose h4 {
+  max-width: var(--fs-content-max);
+}
+.prose > :first-child {
+  margin-top: 0;
+}
+.prose h2 {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  margin: 2.5rem 0 0.75rem;
+  padding-top: 0.25rem;
+  scroll-margin-top: 5rem;
+}
+.prose h3 {
+  font-size: 1.2rem;
+  line-height: 1.35;
+  margin: 1.75rem 0 0.5rem;
+  scroll-margin-top: 5rem;
+}
+.prose p {
+  margin: 0 0 1rem;
+}
+.prose a {
+  color: var(--fs-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+.prose ul,
+.prose ol {
+  padding-left: 1.4rem;
+  margin: 0 0 1rem;
+}
+.prose li {
+  margin: 0.35rem 0;
+}
+.prose li > ul,
+.prose li > ol {
+  margin-bottom: 0;
+}
+.prose strong {
+  font-weight: 650;
+}
+.prose code {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 1rem;
+  background: var(--fs-tint);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+.prose pre {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--mantine-radius-md);
+  overflow-x: auto;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+.prose pre code {
+  background: none;
+  padding: 0;
+  font-size: 1rem;
+}
+.prose blockquote {
+  margin: 0 0 1rem;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid var(--fs-accent);
+  color: var(--fs-quiet);
+}
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--fs-grid);
+  margin: 2rem 0;
+}
+
+/* Akışkan tablolar: sütunlar okunabilir genişliğini korur, tablo kendi sarmalayıcısında kayar.
+   Dar ekranda sütunları sıkıştırmak yerine tablo 64rem'e kadar genişleyip kaydırılır. */
+.table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0.5rem 0 1.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+.table-wrap:focus-visible {
+  outline: 2px solid var(--fs-focus);
+  outline-offset: 2px;
+}
+.prose table {
+  width: max-content;
+  min-width: 100%;
+  max-width: max(100%, 64rem);
+  border-collapse: collapse;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.prose thead th {
+  text-align: left;
+  font-weight: 650;
+  background: var(--fs-surface-2);
+  border-bottom: 1px solid var(--fs-line);
+  position: sticky;
+  top: 0;
+}
+.prose th,
+.prose td {
+  padding: 0.55rem 0.75rem;
+  vertical-align: top;
+  border-bottom: 1px solid var(--fs-grid);
+  min-width: 9rem;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+}
+.prose th:first-child,
+.prose td:first-child {
+  min-width: 6rem;
+}
+/* Hücre içindeki kod tanımlayıcıları kelime ortasından bölünmez; tablo gerekirse kayar */
+.prose td code,
+.prose th code {
+  overflow-wrap: normal;
+}
+.prose td:nth-child(2) {
+  min-width: 18rem;
+}
+.prose tbody tr:nth-child(odd) td {
+  background: color-mix(in srgb, var(--fs-surface-2) 55%, transparent);
+}
+
+/* Mermaid */
+.mermaid-figure {
+  margin: 0.5rem 0 1.5rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+.mermaid-figure svg {
+  max-width: none;
+  height: auto;
+}
+.mermaid-figure[data-state='error'] pre {
+  color: var(--mantine-color-red-7);
+}
+
+/* Diyagram kapsayıcısı */
+.diagram {
+  margin: 0.5rem 0 1.75rem;
+  overflow-x: auto;
+}
+.diagram svg {
+  width: 100%;
+  min-width: 65rem; /* 1040px: 16 birimlik SVG yazısı ≥ 1rem kalır */
+  height: auto;
+  display: block;
+}
+.diagram-note {
+  color: var(--fs-quiet);
+  font-size: 1rem;
+  margin: 0 0 1rem;
+}
+
+/* Dar ekran */
+@media (max-width: 48em) {
+  .prose h2 {
+    margin-top: 2rem;
+  }
+}

@@ -1,0 +1,365 @@
+---
+import { getCollection } from 'astro:content';
+import Site from '../layouts/Site.astro';
+import Rails from '../components/Rails.astro';
+import Timeline from '../components/Timeline.astro';
+import requirements from '../data/requirements.json';
+import phases from '../data/phases.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const docs = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
+
+const musts = requirements.filter((r) => r.priority === 'MUST').length;
+const g = requirements.filter((r) => r.id.startsWith('G-')).length;
+const sa = requirements.filter((r) => r.id.startsWith('SA-')).length;
+
+const decisions = [
+  { id: 'K1', title: 'Kontrol düzlemi', text: 'Press v0.154.x (master) + Frappe v15 + Python 3.11 — Press\'in test edildiği tek hat.' },
+  { id: 'K2', title: 'Müşteri siteleri', text: 'ERPNext v16.50 + Frappe v16; müşteri başına bir Frappe sitesi, Press\'in kurduğu bench\'lerde.' },
+  { id: 'K3', title: 'Altyapı', text: 'Hetzner bare-metal, self-host; KVKK için AB içi veri yerleşimi. Sunucular Hüseyin Cengiz\'de.' },
+  { id: 'K4', title: 'Frontend', text: '%100 headless React SPA; Ant Design tek tasarım sistemi, @ant-design/x AI arayüzlerinde birinci sınıf, TanStack veri katmanı.' },
+  { id: 'K5', title: 'Metadata-driven', text: 'DocType meta çalışma zamanında API\'den okunur; alan tipi → bileşen eşleme motoru + doctype bazlı override.' },
+  { id: 'K6', title: 'Navigasyon', text: 'Sidebar Workspace + kurulu app + izin verisinden türer; hiçbir menü elle kodlanmaz.' },
+  { id: 'K7', title: 'Kimlik', text: 'Keycloak tüm uygulamalar için tek giriş/kayıt sağlayıcısı; Frappe ve Press OIDC ile bağlanır.' },
+  { id: 'K8', title: 'Erişim', text: 'Zoho/Odoo düzeyinde yetki: ReBAC/ABAC kayıt kuralları, hiyerarşi ve alan düzeyi — platform_core Access Rule motoru.' },
+  { id: 'K9', title: 'AI-first', text: 'Press ve siteler MCP ile yönetilir; Claude Agent SDK servisi; yazma eylemleri önizleme + onay, her eylem audit\'e düşer.' },
+  { id: 'K10', title: 'Ürünler', text: 'Ayrı Frappe app\'leri: CronHR → CRM → Webshop; ortak admin shell; etkinleştirme Press Marketplace / App Plan üzerinden.' },
+];
+
+const groups = [
+  { label: 'Çerçeve', ids: ['kararlar', 'raylar'] },
+  { label: 'Raylar', ids: ['rail-1-press', 'rail-2-yapilandirma', 'rail-2-gelistirme', 'rail-3-frontend', 'rail-4-keycloak', 'rail-5-ai', 'rail-6-operasyon'] },
+  { label: 'Teslim', ids: ['gereksinimler', 'admin-shell', 'app-cercevesi', 'yol-haritasi', 'acik-kararlar'] },
+];
+const byId = new Map(docs.map((d) => [d.id, d]));
+---
+
+<Site title="Frappe Headless SaaS — mimari karar çerçevesi" current={`${base}/`}>
+  <section class="hero">
+    <p class="eyebrow">Mimari karar çerçevesi · Press · ERPNext v16 · Keycloak · headless React · AI · operasyon düzlemi</p>
+    <h1>Frappe üzerinde çok kiracılı SaaS: on sabit karar, altı ray, {requirements.length} numaralı gereksinim</h1>
+    <p class="lede">
+      Self-host Hetzner altyapısında Press kontrol düzlemi (Frappe v15) ile ERPNext v16 müşteri sitelerini,
+      Keycloak kimliğini, Ant Design tabanlı headless paneli, MCP/Claude Agent SDK AI katmanını ve superadmin
+      operasyon düzlemini tek bir plan altında birleştiren karar dokümanı. Yalnızca olması gerekenler yazılır;
+      her madde numaralı, sahipli ve fazlıdır.
+    </p>
+    <div class="actions">
+      <a class="btn btn-primary" href={`${base}/kararlar/`}>Kararlardan başla</a>
+      <a class="btn" href={`${base}/gereksinimler/`}>Gereksinim gezgini</a>
+      <a class="btn" href={`${base}/yol-haritasi/`}>Yol haritası</a>
+    </div>
+  </section>
+
+  <section class="stats" aria-label="Özet sayılar">
+    <div class="stat"><span class="stat-n">10</span><span class="stat-l">sabit karar</span></div>
+    <div class="stat"><span class="stat-n">6</span><span class="stat-l">mimari ray</span></div>
+    <div class="stat"><span class="stat-n">{requirements.length}</span><span class="stat-l">gereksinim · {g} G + {sa} SA</span></div>
+    <div class="stat"><span class="stat-n">{musts}</span><span class="stat-l">MUST maddesi</span></div>
+    <div class="stat"><span class="stat-n">{phases.length + 1}</span><span class="stat-l">faz · 42 hafta</span></div>
+  </section>
+
+  <section class="block" aria-labelledby="decisions-h">
+    <div class="block-head">
+      <h2 id="decisions-h">Sabitlenen on karar</h2>
+      <a href={`${base}/kararlar/`}>Gerekçeler ve kapsam →</a>
+    </div>
+    <ol class="decisions">
+      {decisions.map((d) => (
+        <li class="decision">
+          <span class="decision-id">{d.id}</span>
+          <div>
+            <h3>{d.title}</h3>
+            <p>{d.text}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="block" aria-labelledby="rails-h">
+    <div class="block-head">
+      <h2 id="rails-h">Altı ray ve sorumluluk sınırları</h2>
+      <a href={`${base}/raylar/`}>Sözleşme tablosu →</a>
+    </div>
+    <Rails />
+  </section>
+
+  <section class="block" aria-labelledby="roadmap-h">
+    <div class="block-head">
+      <h2 id="roadmap-h">Yol haritası</h2>
+      <a href={`${base}/yol-haritasi/`}>Faz tablosu ve ilk dikey dilim →</a>
+    </div>
+    <Timeline />
+    <ul class="phases">
+      {phases.map((p) => (
+        <li class="phase">
+          <h3>{p.title}</h3>
+          <p>{p.goal}</p>
+        </li>
+      ))}
+      <li class="phase">
+        <h3>P6 Operasyon düzlemi</h3>
+        <p>Operasyon sitesi (ERPNext + Frappe CRM + Helpdesk), press_ops_bridge, kredi/tahakkuk muhasebesi, iyzico hak ediş ve EFT mutabakatı, superadmin operatör modu, izinli destek oturumu (Support Session + Hocuspocus), KVKK saklama matrisi.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section class="block" aria-labelledby="sections-h">
+    <div class="block-head">
+      <h2 id="sections-h">Doküman bölümleri</h2>
+    </div>
+    {groups.map((grp) => (
+      <div class="group">
+        <h3 class="group-label">{grp.label}</h3>
+        <ul class="sections">
+          {grp.ids.map((id) => {
+            const d = byId.get(id);
+            return d ? (
+              <li>
+                <a class="section-card" href={`${base}/${d.id}/`}>
+                  <span class="section-order">{String(d.data.order).padStart(2, '0')}</span>
+                  <span class="section-nav">{d.data.nav}</span>
+                  <span class="section-title">{d.data.title}</span>
+                </a>
+              </li>
+            ) : null;
+          })}
+        </ul>
+      </div>
+    ))}
+  </section>
+
+  <footer class="foot">
+    <p>
+      Kod MIT, içerik CC BY 4.0 lisanslıdır. Kaynak: <a href="https://github.com/karacaismail/frappesetup">github.com/karacaismail/frappesetup</a>.
+      Sürüm referansları 8 Ekim 2026 itibarıyladır; "(doğrulanacak)" işaretli maddeler ilgili bölümde açıklanır.
+    </p>
+  </footer>
+</Site>
+
+<style>
+  .hero {
+    padding-block: 1rem 2rem;
+    max-width: 62rem;
+  }
+  .eyebrow {
+    margin: 0 0 0.75rem;
+    color: var(--fs-accent);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  h1 {
+    margin: 0 0 1rem;
+    font-size: clamp(1.8rem, 1.2rem + 2.4vw, 3rem);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  .lede {
+    margin: 0 0 1.5rem;
+    font-size: 1.125rem;
+    line-height: 1.65;
+    color: var(--fs-quiet);
+    max-width: 68ch;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0.55rem 1.1rem;
+    border-radius: var(--mantine-radius-md);
+    background: var(--fs-surface-2);
+    color: inherit;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+  .btn:hover {
+    background: var(--fs-tint);
+  }
+  .btn-primary {
+    background: var(--fs-accent);
+    color: var(--mantine-color-white);
+  }
+  .btn-primary:hover {
+    background: var(--mantine-color-sea-8);
+  }
+  :global([data-mantine-color-scheme='dark']) .btn-primary {
+    color: var(--mantine-color-dark-9);
+  }
+  :global([data-mantine-color-scheme='dark']) .btn-primary:hover {
+    background: var(--mantine-color-sea-3);
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.75rem 1.5rem;
+    padding: 1.25rem 0;
+    margin-bottom: 1.5rem;
+    border-top: 1px solid var(--fs-grid);
+    border-bottom: 1px solid var(--fs-grid);
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+  .stat-n {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .stat-l {
+    color: var(--fs-quiet);
+    font-size: 1rem;
+  }
+
+  .block {
+    margin: 2.5rem 0;
+  }
+  .block-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 1rem;
+  }
+  .block-head h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    letter-spacing: -0.01em;
+  }
+  .block-head a {
+    color: var(--fs-accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .block-head a:hover {
+    text-decoration: underline;
+  }
+
+  .decisions {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+    gap: 0.75rem;
+  }
+  .decision {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    padding: 1rem 1.1rem;
+    border-radius: var(--mantine-radius-lg);
+    background: var(--fs-surface-2);
+  }
+  .decision-id {
+    font-family: var(--mantine-font-family-monospace);
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--fs-accent);
+    padding-top: 0.15rem;
+  }
+  .decision h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1.125rem;
+  }
+  .decision p {
+    margin: 0;
+    color: var(--fs-quiet);
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .phases {
+    list-style: none;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+    gap: 0.75rem 1.25rem;
+  }
+  .phase h3 {
+    margin: 0 0 0.25rem;
+    font-size: 1.0625rem;
+  }
+  .phase p {
+    margin: 0;
+    color: var(--fs-quiet);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .group {
+    margin-bottom: 1.25rem;
+  }
+  .group-label {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+    color: var(--fs-quiet);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .sections {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+    gap: 0.6rem;
+  }
+  .section-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 0.75rem;
+    row-gap: 0.15rem;
+    padding: 0.85rem 1rem;
+    border-radius: var(--mantine-radius-md);
+    background: var(--fs-surface-2);
+    color: inherit;
+    text-decoration: none;
+    min-height: 44px;
+  }
+  .section-card:hover {
+    background: var(--fs-tint);
+  }
+  .section-order {
+    grid-row: 1 / span 2;
+    font-family: var(--mantine-font-family-monospace);
+    color: var(--fs-accent);
+    font-weight: 600;
+    font-size: 1rem;
+  }
+  .section-nav {
+    font-weight: 650;
+    font-size: 1.0625rem;
+  }
+  .section-title {
+    color: var(--fs-quiet);
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+
+  .foot {
+    margin-top: 3rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--fs-grid);
+    color: var(--fs-quiet);
+    font-size: 1rem;
+  }
+  .foot a {
+    color: var(--fs-accent);
+  }
+</style>

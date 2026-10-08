@@ -1,0 +1,38 @@
+[
+ {
+  "id": "P0",
+  "title": "P0 Altyapı",
+  "goal": "Hetzner bare-metal üzerinde Press v0.154.x kontrol düzlemi (Frappe v15 / Python 3.11), proxy-app-db-registry-monitor-log sunucuları, Keycloak HA, Hetzner Object Storage offsite yedek, ağ sertleştirme ve ERPNext v16 TR Release Group için ilk Deploy Candidate derlemesinin tamamlanması.",
+  "exit": "Press staging ve prod ayakta; Route 53 wildcard TLS alınmış; 'erpnext-v16-tr-staging' Release Group'unda imaj derlenip bir test sitesi Active olmuş; offsite yedek Hetzner bucket'ında listelenmiş ve geri yüklenmiş; Keycloak realm üzerinden Press'e sosyal giriş yapılmış; tüm sunucular Press doctype'larıyla envanterde ve izleme uyarıları Telegram/e-postaya düşüyor."
+ },
+ {
+  "id": "P1",
+  "title": "P1 Platform çekirdeği",
+  "goal": "press_tr ve platform_core uygulamalarının temeli, kiracı sitelerde Keycloak SSO/SLO, Türkiye temel çizgisi, Access Rule yetki motoru, meta-driven CRUD + shell + metadata sidebar ve mobil öncelikli tasarım token sistemi.",
+  "exit": "Bir ERPNext v16 test kiracısında Keycloak ile giriş/çıkış çalışıyor; sidebar Workspace Sidebar + installed apps + yetkilerden türüyor; çekirdek doctype'larda liste/form/CRUD meta'dan üretiliyor; kayıt kuralı, hiyerarşi kapsamı ve alan düzeyi yetki testleri geçiyor; CSRF/CORS same-site sözleşmesi doğrulanmış; Playwright 320/360/375/390 + Chromium/Firefox/WebKit matrisi yeşil; TR System Settings değerleri setup wizard sonrası korunuyor."
+ },
+ {
+  "id": "P2",
+  "title": "P2 Ticari katman",
+  "goal": "TRY fiyatlandırma, iyzico tahsilat, KDV ve e-Arşiv/e-Fatura, sözleşme/KVKK onayları, dunning, özel alan adı, panel faturalama ekranları ve hukuki/KVKK programı.",
+  "exit": "Sandbox ve prod'da 3DS ile plan satın alma, saklı karttan aylık tahsilat, iade ve Havale/EFT akışları Press Invoice durum makinesiyle uçtan uca geçmiş; finans sitesinde e-Arşiv/e-Fatura üretilip PDF panelde görünmüş; askıya alma/arşiv zaman çizelgesi test edilip sözleşmeye yazılmış; KVKK aktarım bildirimi ve VERBİS kaydı hukuk tarafından onaylanmış."
+ },
+ {
+  "id": "P3",
+  "title": "P3 AI",
+  "goal": "Claude Agent SDK tabanlı agent servisi, Press MCP + press_tr MCP + kiracı MCP, kullanıcı kimliğiyle delegasyon, önizle+onayla, AI Action Log ve @ant-design/x sağ panel.",
+  "exit": "Panelden en az üç 'tek tık' akışı prod'da çalışıyor; yıkıcı/ücretli aksiyonlar confirm olmadan yalnızca önizleme döndürüyor; her araç çağrısı kullanıcının Frappe/Press yetkisiyle yürütülüp AI Action Log'a düşüyor; prompt injection ve yetki aşımı negatif testleri geçiyor; Anthropic aktarımı KVKK envanterine işlenmiş."
+ },
+ {
+  "id": "P4",
+  "title": "P4 İlk app (CronHR)",
+  "goal": "App çerçevesinin (backend iskelet, frontend modül, yetki/AI/abonelik sözleşmeleri) CronHR ile ilk kez uygulanması; Marketplace App, App Plan, Product Trial ve aktivasyon UX.",
+  "exit": "Yeni müşteri Keycloak ile kayıt → 14 günlük deneme sitesi → 'Etkinleştir' → Agent Job → sidebar'da CronHR başlığı akışı E2E testte ve ilk ödeyen müşteride çalışıyor; CronHR TR bordro kabul senaryoları geçiyor; subscription info ile özellik kapıları doğrulanmış."
+ },
+ {
+  "id": "P5",
+  "title": "P5 CRM/Webshop",
+  "goal": "CRM ve Webshop uygulamalarının aynı kontrol listesiyle yayına alınması, tek Release Group içinde çoklu uygulama, ileri Press yetenekleri (partner, sürüm yükseltme, site devri) ve e-belge kapsamının kiracı satış faturalarına genişlemesi.",
+  "exit": "Her iki uygulama Marketplace App olarak etkinleştirilebiliyor ve yalnızca kurulan uygulamalar sidebar'da görünüyor; ERPNext v17 hazırlık planı Version Upgrade ile belgelenmiş; kiracı e-belge (tr_edocs) kararı segment bazında verilmiş."
+ }
+]
