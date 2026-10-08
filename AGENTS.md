@@ -24,6 +24,7 @@ Astro 7 + React 19 + Mantine 9 statik dokümantasyon sitesi; GitHub Pages'te `ht
 - Gezgin ada JS'i inmeden yazılan arama metnini ve anahtar durumunu bağlanınca duruma alır (React 19.3 hidrasyonda erken girdiyi yeniden oynatmaz); durum tutmayan düğmelere hidrasyondan önce yapılan tıklama işlem yapmaz (veri kaybı yok, bilinçli kabul).
 - Yazı tipleri kendinden barındırılır (`@fontsource-variable/outfit`, `@fontsource/jetbrains-mono`; SIL OFL 1.1); üçüncü taraf font isteği yoktur (KVKK). Varsayılan arayüz ve belge fontu Outfit'tir (başlık, gövde, diyagram; `src/theme.ts`, `scripts/gen-diagrams.py`, `Mermaid.tsx` yedeği), kod JetBrains Mono. Outfit latin + latin-ext ile gelir (Türkçe harfler dahil); Yunanca gibi diğer betikler sistem yedeğinden çizilir.
 - Genel sabitler (`AS_OF`, `REPO_URL`, hafta sayısı) `src/data/site.ts`; bölüm üst verisi ve gruplar (Çerçeve, Raylar, Sözleşmeler, Teslim) `src/data/sections.ts`.
+- Kenar çubuğunda `AI` grubu (`ai-*` sayfaları: genel bakış, MCP, skills, agents, Press yetkinliği, geliştirme planı) açılır-kapanır tek üst öğedir (`COLLAPSIBLE_GROUPS` → `Shell.tsx` `CollapsibleGroup`: gerçek `<button aria-expanded>` + `hidden` panel; bağlantılar kapalıyken de HTML'dedir). AI sayfalarının içeriği depo incelemesine dayanır; kanıt tarihi ve "bulunamadı" ifadesi korunur, doğrulanmamış yetenek "çalışıyor" diye yazılmaz.
 - Renk şeması: `ColorSchemeScript defaultColorScheme="auto"` + `data-mantine-color-scheme`; koyu tema tokenları `global.css` içinde yeniden tanımlanır.
 
 ## Arayüz kuralları (kalıcı)
