@@ -335,7 +335,7 @@ function Explorer({ items }: Props) {
                         {inlineCode(r.detail)}
                       </Text>
                     )}
-                    {/* Sahip ayrı sütun değil: tablo 1248 px ve üzerinde yatay kaydırmasız sığar (kart görünümüyle aynı bilgi). */}
+                    {/* Sahip ayrı sütun değil: tablo 1280 px ve üzerinde yatay kaydırmasız sığar (ölçüldü, testli; kart görünümüyle aynı bilgi). */}
                     {r.owner && (
                       <Text mt={4} className="req-owner">
                         Sahip: {r.owner}

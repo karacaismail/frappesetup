@@ -524,6 +524,19 @@ test.describe('requirements explorer', () => {
     await expect(page.getByRole('listbox')).toHaveCount(0);
   });
 
+  test('requirements table fits its container at common laptop widths', async ({ page }) => {
+    // Sahip gereksinim hücresinde, ayrıntıdaki uzun tanımlayıcılar sarılır: altı sütun 1280 px ve üzerinde kaydırmasız sığar.
+    for (const width of [1280, 1366]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('gereksinimler/');
+      await waitForHydration(page);
+      const region = page.getByRole('region', { name: 'Gereksinim tablosu (yatay kaydırılabilir)' });
+      const m = await region.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+      expect(m.scroll, `${width}px: tablo kapsayıcısını aşmaz`).toBeLessThanOrEqual(m.client);
+      await expect(region.locator('thead th')).toHaveCount(6);
+    }
+  });
+
   test('shows cards at 320px and priority chips filter @touch', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('gereksinimler/');

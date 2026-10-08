@@ -672,8 +672,11 @@ body {
   border-radius: 4px;
   overflow-wrap: anywhere;
 }
+/* Ayrıntıdaki uzun teknik tanımlayıcılar (ör. a/b/c_d) bölünemez tek sözcük sayılıp sütunu genişletmesin: kart
+   görünümüyle aynı kural. Sütunun 24rem alt sınırı normal sözcüklerin bölünmesini önler; başlık ve ID etkilenmez. */
 .req-detail {
   max-width: 60ch;
+  overflow-wrap: anywhere;
 }
 .req-owner {
   color: var(--fs-quiet);
