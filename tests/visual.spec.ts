@@ -62,6 +62,11 @@ test.describe('visual regression', () => {
       await page.keyboard.press(tab);
     }
     await expect(search).toBeFocused();
-    await expect(page.locator('.req-filters')).toHaveScreenshot('search-focus-1366-light.png');
+    // Kırpma, outline (2 px) ve ofsetini (2 px) tam içerecek kadar girdinin kutusundan geniştir.
+    const box = await search.boundingBox();
+    expect(box).not.toBeNull();
+    await expect(page).toHaveScreenshot('search-focus-1366-light.png', {
+      clip: { x: box!.x - 8, y: box!.y - 8, width: box!.width + 16, height: box!.height + 16 },
+    });
   });
 });
