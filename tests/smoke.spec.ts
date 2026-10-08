@@ -838,6 +838,20 @@ async function codeBoxes(page: Page) {
   INLINE_CODE);
 }
 const mismatched = async (page: Page) => (await codeBoxes(page)).filter((c) => c.overflows !== c.tabbable).length;
+// Satır içi kod ve kaydırma kutusu, satır kutusunun içerik sağ kenarını aşmaz (yarım piksel tolerans).
+async function codeOutsideLine(page: Page) {
+  return page.evaluate((sel) => {
+    const out: string[] = [];
+    for (const c of Array.from(document.querySelectorAll<HTMLElement>(sel)).filter((c) => c.getClientRects().length > 0)) {
+      let box = c.parentElement!;
+      while (box.parentElement && getComputedStyle(box).display === 'inline') box = box.parentElement;
+      const cs = getComputedStyle(box);
+      const right = box.getBoundingClientRect().right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
+      for (const r of Array.from(c.getClientRects())) if (r.right > right + 0.5) out.push(`${(c.textContent ?? '').slice(0, 30)} ${Math.round(r.right - right)} px`);
+    }
+    return out.slice(0, 5);
+  }, INLINE_CODE);
+}
 
 test.describe('long inline code', () => {
   test('scrolls in its own box, is keyboard reachable while it overflows and leaves the tab order when it fits', async ({
@@ -868,26 +882,25 @@ test.describe('long inline code', () => {
     const code = page.locator('[data-test-code]');
     await expect(code).toBeFocused();
     expect(await code.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none')).toBe(true);
-    // WebKit odak değişiminden sonraki ilk ok tuşunu kaydırmaya kullanmaz (ikincisi kaydırır): en çok üç basış.
-    for (let i = 0; i < 3 && (await code.evaluate((el) => el.scrollLeft)) === 0; i++) {
+    // WebKit odak değişiminden sonraki ilk ok tuşunu kaydırmaya kullanmaz ve kaydırmayı canlandırır: her basıştan sonra
+    // sonuç 1 sn'ye kadar beklenir, en çok üç basış.
+    const scrolled = async () => {
+      for (let t = 0; t < 10; t++) {
+        if ((await code.evaluate((el) => el.scrollLeft)) > 0) return true;
+        await page.waitForTimeout(100);
+      }
+      return false;
+    };
+    let moved = false;
+    for (let i = 0; i < 3 && !moved; i++) {
       await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(250);
+      moved = await scrolled();
     }
-    expect(await code.evaluate((el) => el.scrollLeft), 'ok tuşu kod kutusunu kaydırır').toBeGreaterThan(0);
+    expect(moved, 'ok tuşu kod kutusunu kaydırır').toBe(true);
     expect(await page.evaluate(() => window.scrollX), 'sayfa yatay kaymaz').toBe(0);
 
     // Satır içi kod ve kaydırma kutusu satır kutusunun içerik kenarını aşmaz.
-    expect(await page.evaluate((sel) => {
-      const out: string[] = [];
-      for (const c of Array.from(document.querySelectorAll<HTMLElement>(sel)).filter((c) => c.getClientRects().length > 0)) {
-        let box = c.parentElement!;
-        while (box.parentElement && getComputedStyle(box).display === 'inline') box = box.parentElement;
-        const cs = getComputedStyle(box);
-        const right = box.getBoundingClientRect().right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
-        for (const r of Array.from(c.getClientRects())) if (r.right > right + 0.5) out.push(`${(c.textContent ?? '').slice(0, 30)} ${Math.round(r.right - right)} px`);
-      }
-      return out.slice(0, 5);
-    }, INLINE_CODE), 'kod satır kutusunu aşmaz').toEqual([]);
+    expect(await codeOutsideLine(page), 'kod satır kutusunu aşmaz').toEqual([]);
 
     // Geniş ekranda aynı kod sığar: odaktayken odak kaybolmaz; odak ayrılınca Tab sırasından çıkar.
     await page.setViewportSize({ width: 1366, height: 900 });
@@ -907,6 +920,7 @@ test.describe('long inline code', () => {
     await expect.poll(() => mismatched(page)).toBe(0);
     await page.getByRole('textbox', { name: 'Ara' }).fill('press');
     await expect.poll(() => mismatched(page), 'süzme sonrası yalnız taşan kod Tab sırasında').toBe(0);
+    expect(await codeOutsideLine(page), 'kart kodu satır kutusunu aşmaz').toEqual([]);
     await noHorizontalOverflow(page);
   });
 });

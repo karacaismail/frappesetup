@@ -99,32 +99,32 @@ Her satır 2026-10-08'de doğrulandı. Hareketli dal tek başına kanıt sayılm
 
 ## Bu sitenin QA kanıtı
 
-Durumlar: pass, fail, not\_run. Durum, bu sayfanın yayımlandığı commit'in ağacı içindir; koşulmamış kontrol not\_run yazılır. Emülasyon gerçek cihaz yerine geçmez; yerel geçiş CI geçişi sayılmaz. Yerel sonuçlar macOS'ta Playwright 1.64.0 ile alınır; Linux (ubuntu-24.04) kanıtı ayrı satırdadır.
+Durumlar: pass, fail, not\_run. Her satır kontrolün koşulduğu commit'i yazar; sonraki yalnız belge ve referans görüntü commit'leri koşulan kodu değiştirmez; koşulmamış kontrol not\_run yazılır. Emülasyon gerçek cihaz yerine geçmez; yerel geçiş CI geçişi sayılmaz. Yerel sonuçlar macOS'ta Playwright 1.64.0 ile alınır; Linux (ubuntu-24.04) kanıtı ayrı satırdadır.
 
 | Kontrol | Kapsam | Durum |
 | --- | --- | --- |
-| Derleme | `npm run build` | not\_run |
-| Playwright kapısı | Chromium, Firefox, WebKit × 320–1366 px; iPhone 13 emülasyonu yalnız `@touch` senaryolarında | not\_run |
-| axe | Tüm sayfalar × açık/koyu tema; WCAG 2.0/2.1/2.2 A ve AA + best-practice kuralları; her etki düzeyi başarısızlıktır | not\_run; otomatik kural kapsamıdır, tam AA uyumu iddiası değildir |
-| Odak | Klavye odağında belgede tek gerçek görünür outline, odaklanan öğede (görünmez Switch girdisinde izdeki görsel vekil); süzgeç bölümü klavyeyle açılır; kenarlık ve gölge ikinci çerçeve üretmez; fare tıklaması gösterge üretmez | not\_run |
-| Dokunma hedefi | Tek başına duran kontrollerin etkili alanı ince işaretçide ≥ 44, kaba işaretçide ≥ 48 CSS px (`--fs-hit`); metin içi bağlantılar istisna; 320 px başlıkta marka adı tam görünür, eylem düğmeleri görünür alanda | not\_run |
-| Satır kırılımı | Satırına sığan sözcük, başlık, kimlik ve model adı iki harf arasından bölünmez; zorlayıcı kural (`overflow-wrap: anywhere`, `word-break: break-all`) yoktur; satırdan uzun düz metin dizgisi yalnız satır sonunda kırılır | not\_run |
-| Uzun satır içi kod | Bölünmez; satırdan uzunsa kendi kutusunda kayar, tüm karakterler korunur; yalnız taşan kutu Tab sırasındadır ve ok tuşuyla kayar | not\_run |
+| Derleme | `npm run build` | pass (yerel, 837f2e4; Linux: Actions run 37797285107) |
+| Playwright kapısı | Chromium, Firefox, WebKit × 320–1366 px; iPhone 13 emülasyonu yalnız `@touch` senaryolarında | pass (yerel): tam kapı 3bcc006'da 396 passed / 0 failed / 44 skipped; sonraki farklar hedefli: c41294c ve e20d576 (belge) tutarlılık, bütçe, etkilenen sayfalar; 837f2e4 (kapanış) 262 passed / 0 failed / 20 skipped. Linux tam karşılaştırma bu commit'in Actions koşusundadır |
+| axe | Tüm sayfalar × açık/koyu tema; WCAG 2.0/2.1/2.2 A ve AA + best-practice kuralları; her etki düzeyi başarısızlıktır | pass (yerel, üç motor; tüm sayfalar 3bcc006, değişen sayfalar c41294c ve 837f2e4); otomatik kural kapsamıdır, tam AA uyumu iddiası değildir |
+| Odak | Klavye odağında belgede tek gerçek görünür outline, odaklanan öğede (görünmez Switch girdisinde izdeki görsel vekil); süzgeç bölümü klavyeyle açılır; kenarlık ve gölge ikinci çerçeve üretmez; fare tıklaması gösterge üretmez | pass (yerel, üç motor, 837f2e4) |
+| Dokunma hedefi | Tek başına duran kontrollerin etkili alanı ince işaretçide ≥ 44, kaba işaretçide ≥ 48 CSS px (`--fs-hit`); metin içi bağlantılar istisna; 320 px başlıkta marka adı tam görünür, eylem düğmeleri görünür alanda | pass (yerel, üç motor): 44/48 px 3bcc006; 320 px başlık 837f2e4 |
+| Satır kırılımı | Satırına sığan sözcük, başlık, kimlik ve model adı iki harf arasından bölünmez; zorlayıcı kural (`overflow-wrap: anywhere`, `word-break: break-all`) yoktur; satırdan uzun düz metin dizgisi yalnız satır sonunda kırılır | pass (yerel, üç motor, 837f2e4) |
+| Uzun satır içi kod | Bölünmez; satırdan uzunsa kendi kutusunda kayar, tüm karakterler korunur; yalnız taşan kutu Tab sırasındadır ve ok tuşuyla kayar | pass (yerel, üç motor; 837f2e4 ve bu commit'in test dosyası) |
 | WCAG 2.2 | Standart WCAG 2.2 AA. axe-core 4.13.0'da 2.2'ye özgü otomatik kural yalnız `target-size` (wcag22aa); 2.4.11 odak örtülmemesi, 2.5.7, 3.2.6, 3.3.7 ve 3.3.8 elle denetlenir | otomatik kısım axe satırında; elle denetim not\_run |
 | Tipografi kabulü | Metin ≥ 1rem; Outfit ilk aile; semantik ölçek eşlemesi, gerçek glif ve yedek font seti, WCAG metin aralığı (1.4.12), gerçek işletim sistemi ve cihaz karşılaştırması | ≥ 1rem Playwright kapısında; Outfit ilk aile elle doğrulandı (Chromium CDP: platform fontu Outfit, Türkçe harfler ve kullanılan ağırlıklar), kapıda değil; diğerleri not\_run |
-| Tema | İşletim sistemi koyu, kayıtlı tercih yokken düğme "Açık temaya geç" der ve tek tıklama açığa geçirir; kayıtlı tercih hidrasyondan önce uygulanır | not\_run |
-| Tutarlılık | Gereksinim kimlikleri, G/SA/K atıfları, iç bağlantılar ve derlenmiş HTML'deki çapalar, faz sırası ve zaman çizelgesi, paragrafa dönüşen tablo satırı, eski adlar (kaçışlı yazımlar dahil), README sayıları | not\_run |
-| Yazı ölçeği | Kök yazı %100, %125 (320 px) ve %200 (390 ve 1366 px): kök boyut beklenen değerde, taşma yok, metin ≥ 1rem, başlık düğmeleri görünür; Mermaid hata çıktısı yok | not\_run |
-| Ağ bütçesi | Kabuğun ilk görünüm toplam JS'i ≤ 100 KB, gezgin adasının ek JS'i ≤ 30 KB, Gereksinimler HTML ≤ 200 KB (gzip); diyagramsız bölüm kabuk dışında JS indirmez; yarıda kalan istek yok | not\_run |
-| Hidrasyon | Ada JS'i bekletilip bir kez yazılan metin korunur (masaüstü ve 320 px dokunma); düzeltme olmadan test başarısız | not\_run |
-| Görsel regresyon | 7 görüntü × 3 motor, ubuntu-24.04'te üretilen referanslarla karşılaştırma | not\_run: referanslar bağımsız onaydan geçip commit edilene ve aynı ortamda karşılaştırma koşusu geçene kadar |
+| Tema | İşletim sistemi koyu, kayıtlı tercih yokken düğme "Açık temaya geç" der ve tek tıklama açığa geçirir; kayıtlı tercih hidrasyondan önce uygulanır | pass (yerel, üç motor, 3bcc006) |
+| Tutarlılık | Gereksinim kimlikleri, G/SA/K atıfları, iç bağlantılar ve derlenmiş HTML'deki çapalar, faz sırası ve zaman çizelgesi, paragrafa dönüşen tablo satırı, eski adlar (kaçışlı yazımlar dahil), README sayıları | pass (Chromium, 837f2e4) |
+| Yazı ölçeği | Kök yazı %100, %125 (320 px) ve %200 (390 ve 1366 px): kök boyut beklenen değerde, taşma yok, metin ≥ 1rem, başlık düğmeleri görünür; Mermaid hata çıktısı yok | pass (yerel, üç motor, 837f2e4) |
+| Ağ bütçesi | Kabuğun ilk görünüm toplam JS'i ≤ 100 KB, gezgin adasının ek JS'i ≤ 30 KB, Gereksinimler HTML ≤ 200 KB (gzip); diyagramsız bölüm kabuk dışında JS indirmez; yarıda kalan istek yok | pass (Chromium, 837f2e4): kabuk 96,9 KB, ada 17,3 KB, Gereksinimler HTML 198,8 KB; yazı tipi ilk görünüm 88,0 KB (ayrı ölçüm) |
+| Hidrasyon | Ada JS'i bekletilip bir kez yazılan metin korunur (masaüstü ve 320 px dokunma); düzeltme olmadan test başarısız | pass (yerel, üç motor, 837f2e4) |
+| Görsel regresyon | 7 görüntü × 3 motor, ubuntu-24.04'te üretilen referanslarla karşılaştırma | Referanslar bağımsız onaylı (17'si 3bcc006 run 37792505431, 4'ü 837f2e4 run 37797285107); karşılaştırma bu commit'in Actions koşusunda, bu sayfada not\_run |
 | Gerçek macOS/iOS Safari, Android | — | not\_run |
 
 ## Açık işler
 
 | İş | Gerekçe | Kabul | Sahip |
 | --- | --- | --- | --- |
-| Gereksinimler sayfası HTML payı | 198,5 KB / 200 KB: kart ve tablo görünümü ikisi de sunucuda üretilir, veri ada özelliklerinde üçüncü kez taşınır; satır işaretlemesi sadeleştirildi (−3,6 KB) | SSR'da tek görünüm (diğeri istemcide) ya da verinin tek kopyası; ölçüm ≤ 180 KB | Depo sahibi |
+| Gereksinimler sayfası HTML payı | 198,8 KB / 200 KB: kart ve tablo görünümü ikisi de sunucuda üretilir, veri ada özelliklerinde üçüncü kez taşınır; satır işaretlemesi sadeleştirildi (−3,6 KB) | SSR'da tek görünüm (diğeri istemcide) ya da verinin tek kopyası; ölçüm ≤ 180 KB | Depo sahibi |
 | Düz metindeki uzun tanımlayıcılar | Gereksinim ayrıntılarında ters tırnaksız yazılmış uzun tanımlayıcılar satırdan uzunsa satır sonunda kırılır (320 px'te ≈ 50 kart dizgisi); kod biçimindekiler bölünmez, kendi kutusunda kayar | İlgili dizgiler kod biçiminde; 320 px'te güvenlik ağı kırılımı yok | Depo sahibi |
 | Tipografi semantik ölçeği | Ortak ölçek gövde 1rem/1,5 ve sayfa başlığı 1,5–2rem ister; bu sitede gövde 1,0625rem/1,65, sayfa başlığı en çok 2,4rem (ana sayfa 3,1rem) | Tokenlar ölçeğe taşınır, görsel referanslar onayla yenilenir | Depo sahibi |
 | Dar ekran + büyük kök yazı (kabul matrisi dışı) | 320 ve 360 px'te %200 kök yazıda ana sayfa eylem düğmesi etiketi kahraman kutusunda kırpılır; kabul profilleri (%125 320 px, %200 390 ve 1366 px) etkilenmez | Etiket tam görünür, belge taşmaz | Depo sahibi |
