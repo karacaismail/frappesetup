@@ -98,9 +98,11 @@ def app_propose_change(ctx, args):
     if core:
         # Orijinal core varsayılan olarak reddedilir: ilk istek yalnız uyarı döner. Aynı istek (aynı argümanlar ve aynı
         # dosya tabanları) uyarı süresi içinde açıkça tekrarlanırsa öneri oluşur; onu insan CORE ifadesiyle onaylar.
+        # Üretilen içerik özete girmez: tipli türler zaman damgası yazar; içerik öneri özetinde zaten bağlıdır.
+        bases = [{key: f[key] for key in ("path", "action", "base_sha256")} for f in plan["files"]]
         request_digest = sha256_hex(canonical_json({"workspace_root": ws.root, "operation": operation,
                                                     "app_path": args["app_path"], "change": args["change"],
-                                                    "files": files}))
+                                                    "files": bases}))
         warning = ctx.store.core_gate(request_digest, core)
         if warning is not None:
             return {"proposal_id": None, "state": "core_warning", "operation": operation, "core": core,

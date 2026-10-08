@@ -65,17 +65,28 @@ def parse_python(source: str, filename: str, target_min):
 
 _TEXT_EXT001 = re.compile(r"^(?:setattr\(\s*)?(?:{})(?:\.[A-Za-z_]\w*)+\s*(?:=(?!=)|,)".format(
     "|".join(OFFICIAL_MODULES)), re.M)
-_TEXT_SEC002 = re.compile(r"frappe\.db\.sql\(\s*(?:f[\"']|[\"'][^\"'\n]*[\"']\s*(?:%|\.format\())")
+_TEXT_STRING = r"(?:[rRbBuU]{0,2}(?:\"\"\"[\s\S]*?\"\"\"|'''[\s\S]*?'''|\"[^\"\n]*\"|'[^'\n]*'))"
+_TEXT_SEC002 = re.compile(r"frappe\.db\.sql\(\s*(?:[rR]?[fF][rR]?[\"']|" + _TEXT_STRING +
+                          r"\s*(?:%|\+|\.format\()|[A-Za-z_][\w.]*\s*(?:%|\+))")
+_TEXT_GUEST = re.compile(r"allow_guest\s*=\s*True")
+_TEXT_IGNORE_PERMISSIONS = re.compile(r"ignore_permissions\s*=\s*True")
 
 
 def text_rule_scan(source: str) -> list:
     """Ayrıştırılamayan dosya için en iyi çaba metin taraması: modül düzeyinde resmi modüle atama ya da setattr
-    (EXT001) ve biçimlenmiş SQL (SEC002). İçe aktarma takma adlarını görmez; bu yüzden çift onay eşlik eder."""
+    (EXT001), biçimlenmiş SQL (SEC002) ve misafir uç noktası olan dosyada `ignore_permissions=True` (SEC003; işlev
+    sınırı görülemediği için temkinli). İçe aktarma takma adlarını görmez; bu yüzden çift onay eşlik eder."""
     found = []
-    for rule, pattern in (("EXT001", _TEXT_EXT001), ("SEC002", _TEXT_SEC002)):
+    line = lambda match: source.count("\n", 0, match.start()) + 1  # noqa: E731
+    for rule, severity, pattern in (("EXT001", "warning", _TEXT_EXT001), ("SEC002", "error", _TEXT_SEC002)):
         for match in pattern.finditer(source):
-            found.append({"rule": rule, "severity": "error", "line": source.count("\n", 0, match.start()) + 1,
+            found.append({"rule": rule, "severity": severity, "line": line(match),
                           "message": "text scan: " + match.group(0).strip()[:80]})
+    if _TEXT_GUEST.search(source):
+        for match in _TEXT_IGNORE_PERMISSIONS.finditer(source):
+            found.append({"rule": "SEC003", "severity": "error", "line": line(match),
+                          "message": "text scan: ignore_permissions in a file with a guest endpoint (allow_guest=True); "
+                                     "run press-ai with the app's Python for an exact check"})
     return found
 RESERVED_FIELDS = {"name", "owner", "creation", "modified", "modified_by", "docstatus", "idx", "parent", "parentfield",
                    "parenttype", "doctype", "_user_tags", "_comments", "_assign", "_liked_by", "_seen"}
@@ -256,7 +267,8 @@ class _Finder(ast.NodeVisitor):
     def visit_Assign(self, node):
         for target in node.targets:
             if isinstance(target, ast.Attribute) and self._root(target) in self.official and not self.function_stack:
-                self.add("EXT001", "error", node, "Module-level assignment to an official app attribute "
+                # Özel koddaki resmi modül yaması engellenmez: risk uyarısıdır (yazım akışıyla aynı ciddiyet).
+                self.add("EXT001", "warning", node, "Module-level assignment to an official app attribute "
                                                   "(monkey patch). Use hooks (doc_events, extend/override class).")
             if (isinstance(target, ast.Attribute) and target.attr == "ignore_permissions"
                     and isinstance(node.value, ast.Constant) and node.value.value is True):
@@ -267,7 +279,7 @@ class _Finder(ast.NodeVisitor):
         func = node.func
         if isinstance(func, ast.Name) and func.id == "setattr" and node.args and \
                 self._root(node.args[0]) in self.official and not self.function_stack:
-            self.add("EXT001", "error", node, "setattr on an official app module at import time (monkey patch).")
+            self.add("EXT001", "warning", node, "setattr on an official app module at import time (monkey patch).")
         for kw in node.keywords:
             if kw.arg == "ignore_permissions" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
                 self._permission_bypass(node)

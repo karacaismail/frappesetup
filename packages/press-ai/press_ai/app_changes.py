@@ -714,6 +714,12 @@ def build_plan(ws, app_path: str, change: dict) -> dict:
             _write_file(plan, ws, info, change, None, app_path)
         else:
             GENERATORS[kind](plan, ws, info, change, change.get("target_frappe"))
+        if is_official(info["name"]):
+            # Resmi uygulama başka bir dizin adıyla klonlanmış olabilir (ör. erpnext-15/): depo kökündeki dosyalar da core.
+            prefix = (info["repo"] or info["package"]) + "/"
+            for item in plan.files:
+                if item["path"].startswith(prefix):
+                    plan._core(item["path"], info["name"])
         app_name = info["name"]
     result = plan.result()
     if not result["files"]:

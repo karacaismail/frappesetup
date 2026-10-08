@@ -182,8 +182,9 @@ metni insana verilir.
   yetişiyorsa ayrıştırma o sürümün dilbilgisiyle yapılır (`feature_version`) ve sözdizimi hatası kesindir. Yetişmiyorsa
   (ör. 3.9 sunucu, 3.10+ hedef) dosya `UNCHECKED` olur: yalnız en iyi çaba metin taraması koşar ve öneri `UNCHECKED <yol>`
   onay ifadeli çift onay ister. Biçimlenmiş SQL (SEC002) ve guest uç noktasında `ignore_permissions` (SEC003 error)
-  içeren Python önerisi (ağaçtan ya da metin taramasından) reddedilir. Özel koddaki resmi modül monkey patch'i (EXT001)
-  engellenmez ve core akışına girmez; önizlemede risk uyarısı olarak görünür. İçerik, mevcut dosyada bulunmayan `[REDACTED]` içeriyorsa reddedilir (maskelenmiş bir okumanın
+  içeren Python önerisi (ağaçtan ya da metin taramasından) reddedilir; metin taraması SEC003'ü temkinli uygular (dosyada
+  `allow_guest=True` ile `ignore_permissions=True` birlikte). Özel koddaki resmi modül monkey patch'i (EXT001) engellenmez
+  ve core akışına girmez; `app_check` ve önizleme onu uyarı (`warning`) olarak gösterir. İçerik, mevcut dosyada bulunmayan `[REDACTED]` içeriyorsa reddedilir (maskelenmiş bir okumanın
   geri yazılmasını önler). Özel geliştirme yetkilidir: DocType JSON'unda `permissions` değişikliği, izinli yeni DocType
   JSON'u ve izin/rol fixture'ı engellenmez; önizleme notu rolleri önce/sonra listeler ve Guest/All rollerini açıklar.
   Davranış, geliştirici testleri koşup gerçek çıktıyı gösterene kadar doğrulanmamış sayılır.

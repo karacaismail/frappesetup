@@ -2,6 +2,7 @@
 import ast
 import json
 import os
+import shutil
 import sys
 import unittest
 from unittest import mock
@@ -137,7 +138,7 @@ class StaticChecks(unittest.TestCase):
     def test_check_finds_the_planted_problems(self):
         result = app_static.check(self.ws, "school_ext", "v15")
         rules = self.rules(result)
-        expected = {("EXT001", "error"), ("SEC001", "warning"), ("SEC002", "error"), ("SEC003", "error"),
+        expected = {("EXT001", "warning"), ("SEC001", "warning"), ("SEC002", "error"), ("SEC003", "error"),
                     ("SEC004", "info"), ("HOOK001", "error"), ("PERF001", "warning"), ("EXT002", "warning"),
                     ("EXT003", "info"), ("MIG003", "error"), ("MIG004", "warning"), ("FIX001", "warning"),
                     ("DOC003", "error"), ("DOC004", "error"), ("DOC006", "error"), ("DOC008", "warning"),
@@ -399,6 +400,56 @@ class WriteFileFlow(unittest.TestCase):
                 self.propose(path, "app_name = 'x'\n")
         self.assertEqual(core_banner(self.ctx.store.load(
             self.propose("clean_app/events/plain.py", self.LOGIC, expected_sha256=None)["proposal_id"])), [])
+
+    def test_official_checkout_with_another_directory_name_is_core(self):  # C2
+        shutil.copytree(os.path.join(self.root, "erpnext"), os.path.join(self.root, "erpnext-15"))
+        warned = self.propose("requirements.txt", "frappe\n", app_path="erpnext-15", expected_sha256=None)
+        self.assertEqual((warned["state"], warned["core"]["apps"]), ("core_warning", ["erpnext"]))
+        self.assertEqual(warned["core"]["files"], ["erpnext-15/requirements.txt"])
+
+    def test_core_repeat_matches_typed_changes_that_write_timestamps(self):  # C3
+        change = {"kind": "new_doctype", "module": "Accounts", "doctype": "Ledger Note", "target_frappe": "v15",
+                  "fields": [{"fieldname": "note", "fieldtype": "Data", "label": "Note"}],
+                  "permissions": [{"role": "Accounts Manager", "read": True}]}
+        call = lambda: self.tools.call("app_propose_change", {"app_path": "erpnext", "change": change})  # noqa: E731
+        with mock.patch("press_ai.app_changes._now", return_value="2026-10-08 12:00:00.000000"):
+            self.assertEqual(call()["state"], "core_warning")
+        with mock.patch("press_ai.app_changes._now", return_value="2026-10-08 12:00:07.000000"):
+            repeated = call()  # kullanıcı birkaç saniye sonra aynısını yineler; zaman damgası farklı
+        self.assertEqual((repeated["state"], repeated["approval_level"]), ("pending", "double"))
+
+    def test_corrupt_core_warning_record_is_reissued_not_locked(self):  # C4
+        rel, body = "erpnext/accounts/utils.py", "def get_balance_on(account=None):\n\treturn 3\n"
+        base = self.read(rel, app_path="erpnext")[rel]["sha256"]
+        call = lambda: self.propose(rel, body, app_path="erpnext", expected_sha256=base)  # noqa: E731
+        self.assertEqual(call()["state"], "core_warning")
+        folder = os.path.join(self.config.approval.state_dir, "core_warnings")
+        [name] = os.listdir(folder)
+        for garbage in (b"", b"[]", b"{not json"):
+            with open(os.path.join(folder, name), "wb") as handle:
+                handle.write(garbage)
+            self.assertEqual(call()["state"], "core_warning", garbage)  # bozuk kayıt tekrar sayılmaz
+        self.assertEqual(call()["state"], "pending")
+        os.unlink(os.path.join(folder, name)) if os.path.exists(os.path.join(folder, name)) else None
+        self.assertEqual(call()["state"], "core_warning")
+        os.replace(os.path.join(folder, name), os.path.join(folder, name + ".real"))
+        os.symlink(os.path.join(folder, name + ".real"), os.path.join(folder, name))
+        with self.assertRaises(ApprovalError):  # sembolik bağ tahrifattır
+            call()
+
+    def test_unparsed_files_still_refuse_guest_permission_bypass_and_formatted_sql(self):  # C1
+        head = ("import frappe\n\n\ndef kind(value):\n\tmatch value:\n\t\tcase 1:\n\t\t\treturn 'one'\n"
+                "\treturn 'other'\n\n\n")
+        guest = head + ("@frappe.whitelist(allow_guest=True)\ndef sign_up(email):\n"
+                        "\tdoc = frappe.get_doc({'doctype': 'Lead', 'email_id': email})\n"
+                        "\tdoc.insert(ignore_permissions=True)\n")
+        concat = head + "def run(x):\n\treturn frappe.db.sql(\"select name from tabLead where email_id='\" + x + \"'\")\n"
+        triple = head + "def run(x):\n\treturn frappe.db.sql(\"\"\"select name from tabLead where email_id='%s'\"\"\" % x)\n"
+        for name, code in (("guest.py", guest), ("concat.py", concat), ("triple.py", triple)):
+            with self.assertRaises(ValidationError, msg=name):  # 3.9'da metin taraması, 3.10+'da ağaç
+                self.propose("clean_app/" + name, code, expected_sha256=None)
+        safe = head + "def run(x):\n\treturn frappe.db.sql(\"\"\"select name from tabLead where email_id=%s\"\"\", (x,))\n"
+        self.assertEqual(self.propose("clean_app/safe.py", safe, expected_sha256=None)["state"], "pending")
 
     def test_apply_refuses_core_paths_without_core_approval(self):
         proposal = self.propose("clean_app/vendor/frappe/x.py", "x = 1\n", expected_sha256=None)

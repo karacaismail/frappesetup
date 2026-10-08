@@ -122,11 +122,22 @@ class ProposalStore:
             raise KitError("invalid request digest")
         path = os.path.join(self._dir("core_warnings"), request_digest + ".json")
         now = self.clock()
-        existing = self._read(path)
+        try:
+            existing = self._read(path)
+        except ApprovalError:
+            try:
+                info = os.lstat(path)
+            except FileNotFoundError:
+                info = None
+            if info is not None and (stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode)
+                                     or info.st_uid != os.getuid()):
+                raise
+            existing = {}  # okunamayan ya da yarım kayıt tekrar sayılmaz: silinir, yeniden uyarı verilir
         if existing is not None:
             try:
                 os.unlink(path)  # tek kullanım; yarışta ikinci istek yeni bir uyarı alır
-                live = existing.get("request_digest") == request_digest and parse_iso(existing["expires_at"]) > now
+                live = (isinstance(existing, dict) and existing.get("request_digest") == request_digest
+                        and parse_iso(existing["expires_at"]) > now)
             except FileNotFoundError:
                 live = False
             except (KeyError, TypeError, ValueError):
@@ -139,7 +150,7 @@ class ProposalStore:
         try:
             write_private_file(path, canonical_json(record), exclusive=True)
         except FileExistsError:
-            return self._read(path) or record  # aynı anda gelen eş istek uyarıyı yazdı
+            return record  # aynı anda gelen eş istek uyarıyı yazdı; bu çağrı da yalnız uyarı döner
         self.audit({"event": "core_warning_issued", "request_digest": request_digest,
                     "apps": summary.get("apps"), "files": summary.get("files")})
         return record

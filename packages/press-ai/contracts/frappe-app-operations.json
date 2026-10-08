@@ -2566,7 +2566,7 @@
           },
           {
             "signal": "syntax_unknown_on_older_server",
-            "meaning": "Sunucu Python'u hedefe yetişmiyor; dosya UNCHECKED: yalnız metin taraması (EXT001/SEC002) yapılır, onay çift olur ve ifade 'UNCHECKED <yol>'",
+            "meaning": "Sunucu Python'u hedefe yetişmiyor; dosya UNCHECKED: yalnız metin taraması (EXT001/SEC002/SEC003) yapılır, onay çift olur ve ifade 'UNCHECKED <yol>'",
             "next": "Geliştirici hedef Python'la doğrular"
           },
           {
