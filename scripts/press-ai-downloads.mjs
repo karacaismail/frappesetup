@@ -4,7 +4,7 @@
 // `python3 -I packages/press-ai/server.py ...` ve `--plugin-dir packages/press-ai` komutları açılan dizinde çalışır.
 // Bağımlılık yok: deflate ve CRC-32 Node'un zlib modülünden (Node >= 22.2).
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crc32, deflateRawSync } from 'node:zlib';
@@ -63,13 +63,21 @@ function globToRegExp(glob) {
   return new RegExp(`^${re}$`);
 }
 
+// Sembolik bağ izlenmez: beyaz listeye uyan adla depo dışı bayt yayımlanamasın; bağ görülürse derleme durur.
+function regular(full, label) {
+  const info = lstatSync(full);
+  if (info.isSymbolicLink()) throw new Error(`press-ai indirmeleri: sembolik bağ izlenmez: ${label}`);
+  if (!info.isFile() && !info.isDirectory()) throw new Error(`press-ai indirmeleri: normal dosya değil: ${label}`);
+  return info;
+}
+
 function walk(dir, base = dir) {
   const out = [];
   for (const name of readdirSync(dir).sort()) {
     const full = join(dir, name);
     const rel = relative(base, full).split('\\').join('/');
     if (NEVER.test(rel)) continue;
-    if (statSync(full).isDirectory()) out.push(...walk(full, base));
+    if (regular(full, rel).isDirectory()) out.push(...walk(full, base));
     else out.push(rel);
   }
   return out;
@@ -140,7 +148,7 @@ export function generatePressAiDownloads(root) {
   const pkgDir = join(root, PACKAGE_DIR);
   const out = join(root, OUT_DIR);
   const tree = walk(pkgDir);
-  const licenses = LICENSES.map((name) => ({ name, data: readFileSync(join(root, name)) }));
+  const licenses = LICENSES.map((name) => (regular(join(root, name), name), { name, data: readFileSync(join(root, name)) }));
   const fromPackage = (files) => files.map((f) => ({ name: `${PACKAGE_DIR}/${f}`, data: readFileSync(join(pkgDir, f)) }));
   const archive = (files) =>
     zip([...licenses, ...fromPackage(files)].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)));
@@ -178,7 +186,8 @@ export function generatePressAiDownloads(root) {
     .sort((a, b) => (a.path < b.path ? -1 : 1))
     .map((f) => `${f.sha256}  ${f.path}`)
     .join('\n');
-  writeFileSync(join(out, 'SHA256SUMS'), `${sums}\n`);
+  // Uzantılı ad: astro preview (trailingSlash: always) uzantısız yolu 404'ler; kaydedilen ad bağlantıda SHA256SUMS.
+  writeFileSync(join(out, 'SHA256SUMS.txt'), `${sums}\n`);
   writeFileSync(join(out, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
 }

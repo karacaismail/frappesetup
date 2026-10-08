@@ -1,11 +1,14 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, posix, relative } from 'node:path';
 import { crc32, inflateRawSync } from 'node:zlib';
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { generatePressAiDownloads } from '../scripts/press-ai-downloads.mjs';
 
 // press-ai indirmeleri: derlenmiş çıktıdaki dosyalar (dist/downloads/press-ai/) gerçek içerikle, sayfadaki bağlantılar
 // gerçek tarayıcı indirmesiyle denetlenir. ZIP'ler üreticiden bağımsız iki okuyucuyla (aşağıdaki yerel ayrıştırıcı ve
@@ -94,6 +97,7 @@ function packageTree(): string[] {
     for (const name of readdirSync(dir)) {
       const full = join(dir, name);
       if (name === '__pycache__' || name === '.DS_Store' || name.endsWith('.pyc')) continue;
+      if (lstatSync(full).isSymbolicLink()) throw new Error(`paket ağacında sembolik bağ: ${full}`);
       if (statSync(full).isDirectory()) walk(full);
       else files.push(relative(PKG, full).split('\\').join('/'));
     }
@@ -140,17 +144,30 @@ test.describe('press-ai downloads: artifacts', () => {
     };
     expect(existsSync(DIST), `${DIST} derlemede üretilmeli`).toBe(true);
     walk(DIST);
-    expect(files.sort()).toEqual([...ARTIFACTS.map((a) => a.path), 'SHA256SUMS', 'manifest.json'].sort());
+    expect(files.sort()).toEqual([...ARTIFACTS.map((a) => a.path), 'SHA256SUMS.txt', 'manifest.json'].sort());
 
     const m = manifest();
     expect(m.files.map((f) => f.path).sort()).toEqual(ARTIFACTS.map((a) => a.path).sort());
-    const sums = readFileSync(join(DIST, 'SHA256SUMS'), 'utf8').trim().split('\n');
+    const sums = readFileSync(join(DIST, 'SHA256SUMS.txt'), 'utf8').trim().split('\n');
     expect(sums).toEqual(ARTIFACTS.map((a) => a.path).sort().map((p) => `${sha256(readFileSync(join(DIST, p)))}  ${p}`));
     for (const f of m.files) {
       const body = readFileSync(join(DIST, f.path));
       expect(f.bytes, f.path).toBe(body.length);
       expect(f.sha256, f.path).toBe(sha256(body));
       expect(f.save, f.path).toBe(ARTIFACTS.find((a) => a.path === f.path)!.save);
+    }
+  });
+
+  test('the generator refuses symbolic links instead of following them', () => {
+    const tmp = mkdtempSync(join(tmpdir(), 'press-ai-link-'));
+    try {
+      mkdirSync(join(tmp, 'packages/press-ai/references'), { recursive: true });
+      writeFileSync(join(tmp, 'outside.txt'), 'outside bytes\n');
+      symlinkSync(join(tmp, 'outside.txt'), join(tmp, 'packages/press-ai/references/leak.md'));
+      expect(() => generatePressAiDownloads(tmp)).toThrow(/sembolik bağ/);
+      expect(existsSync(join(tmp, 'public')), 'hata öncesi hiçbir şey yazılmaz').toBe(false);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
     }
   });
 
@@ -299,8 +316,11 @@ test.describe('press-ai downloads: pages', () => {
         expect(sha256(await res.body()), `${path} sunulan bayt = manifest`).toBe(art.sha256);
         if (path.endsWith('.zip')) expect(res.headers()['content-type'], path).toContain('application/zip');
       }
-      const sums = block.locator(`a[href="${prefix}SHA256SUMS"]`);
+      const sums = block.locator(`a[href="${prefix}SHA256SUMS.txt"]`);
       await expect(sums).toHaveAttribute('download', 'SHA256SUMS');
+      const served = await page.request.get(new URL(`${prefix}SHA256SUMS.txt`, baseURL).href);
+      expect(served.status(), 'SHA256SUMS.txt önizlemede sunulur').toBe(200);
+      expect(sha256(await served.body()), 'SHA256SUMS sunulan bayt').toBe(sha256(readFileSync(join(DIST, 'SHA256SUMS.txt'))));
       await expect(block.locator('script, astro-island')).toHaveCount(0);
     });
   }

@@ -15,7 +15,8 @@ bu dosyaya göre doğrular; bir kimlik veya alan değişecekse önce burası de�
 | `press_ai/`, `server.py` | MCP stdio runtime ve insan onay CLI'si (Python 3.9+, yalnız stdlib) |
 | `tests/`, `config/` | Birim/güvenlik/senaryo testleri, sahte Press sunucusu, örnek yapılandırma |
 
-Kod MIT (`LICENSE`), içerik CC BY 4.0 (`LICENSE-CONTENT`). Lisanssız kaynaktan (pressguide: LICENSE yok, aynı yazar;
+Kod MIT (`LICENSE`); `LICENSE-CONTENT` (CC BY 4.0) yalnız sitenin `src/content/` ve `src/data/` içeriğini kapsar.
+Lisanssız kaynaktan (pressguide: LICENSE yok, aynı yazar;
 frappe/skills: LICENSE yok) metin kopyalanmaz; yol + commit ile atıf yapılır. Gizli değer, müşteri ya da kişisel veri yazılmaz.
 
 ## Kaynaklar ve doğrulama düzeyi

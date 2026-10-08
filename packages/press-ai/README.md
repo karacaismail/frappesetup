@@ -88,5 +88,6 @@ Testler yerel sahte Press'e karşı koşar; birim testleri ve `check-contract` (
 `deploy.yml` kapısında da koşar. Canlı Press ve gerçek MCP istemcisi oturumu `not_run`dır. Kontrat frappe/press `ebf3e22` (develop) kaynağına göre statik doğrulanmıştır;
 kurulu Press'in sürümü farklıysa uç nokta farkı `press_not_found` olarak görünür.
 
-Lisans: kod MIT (`LICENSE`), belgeler CC BY 4.0 (`LICENSE-CONTENT`). Üçüncü taraf kaynaklar yalnız yol ve commit ile
-atıflanır, kod kopyalanmaz.
+Lisans: kod MIT (`LICENSE`). `LICENSE-CONTENT` (CC BY 4.0) yalnız sitenin `src/content/` ve `src/data/` içeriğini ve
+bunlardan üretilen sayfaları kapsar; indirme ZIP'lerinde iki dosya da bulunur. Üçüncü taraf kaynaklar yalnız yol ve
+commit ile atıflanır, kod kopyalanmaz.
