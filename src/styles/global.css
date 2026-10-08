@@ -101,6 +101,16 @@ body {
   outline: 2px solid var(--fs-focus);
   outline-offset: 2px;
 }
+/* Mantine girişleri (TextInput, Select): varsayılan :focus kuralı outline'ı kaldırıp kenarlık rengini
+   değiştirir (ikinci, 1px'lik bir gösterge). Kenarlık odakta sabit kalır; tek gösterge :focus-visible
+   outline'ıdır. Hata/başarı kenarlık renkleri Mantine'in kendi odak kurallarıyla korunur. */
+[data-mantine-color-scheme] .mantine-Input-wrapper[data-variant] {
+  --input-bd-focus: var(--input-bd);
+}
+.mantine-Input-input:focus-visible {
+  outline: 2px solid var(--fs-focus);
+  outline-offset: 2px;
+}
 
 /* ------------------------------------------------------------------
    Kabuk: başlık, marka, navigasyon, içindekiler, alt bilgi
@@ -110,10 +120,19 @@ body {
   -webkit-backdrop-filter: saturate(1.4) blur(10px);
   background: color-mix(in srgb, var(--fs-surface) 86%, transparent);
 }
+/* Büyük kök yazıda dar başlık çubuğu: eylem düğmeleri her zaman görünür kalır, marka adı kısalır
+   (erişilebilir ad DOM'da tamdır). */
+.header-start {
+  min-width: 0;
+}
+.header-end {
+  flex-shrink: 0;
+}
 .brand {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
+  min-width: 0;
 }
 .brand-mark {
   display: grid;
@@ -131,6 +150,10 @@ body {
   font-weight: 700;
   font-size: 1.125rem;
   letter-spacing: -0.015em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .as-of {
   letter-spacing: 0.01em;
@@ -145,15 +168,65 @@ body {
   text-transform: uppercase;
   color: var(--fs-quiet);
 }
+/* Gezinme bağlantısı: Mantine NavLink'in 'light' varyantıyla aynı tokenlar, React bileşeni olmadan (kabuk JS bütçesi). */
 .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.6875rem;
+  padding: 0.5rem 0.75rem;
   border-radius: var(--mantine-radius-sm);
+  color: var(--mantine-color-text);
+  text-decoration: none;
+  font-size: 1rem;
+  line-height: 1.6;
   transition:
     background-color var(--fs-dur) var(--fs-ease),
     color var(--fs-dur) var(--fs-ease);
 }
+.nav-link-icon {
+  flex: none;
+}
+.nav-link-label {
+  min-width: 0;
+}
+.nav-link:hover {
+  background: var(--mantine-color-gray-0);
+}
+[data-mantine-color-scheme='dark'] .nav-link:hover {
+  background: var(--mantine-color-dark-6);
+}
 .nav-link[data-active] {
+  background: var(--mantine-primary-color-light);
+  color: var(--mantine-primary-color-light-color);
   font-weight: 650;
   box-shadow: inset 3px 0 0 var(--fs-accent);
+}
+.nav-link[data-active]:hover {
+  background: var(--mantine-primary-color-light-hover);
+}
+/* Gezinme listesi kendi içinde yerel kaydırma ile kayar (ScrollArea yok). */
+.nav-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+/* Simge düğmesi: Mantine ActionIcon 'subtle' lg (34px, radius md) ile aynı tokenlar. */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: calc(2.125rem * var(--mantine-scale));
+  height: calc(2.125rem * var(--mantine-scale));
+  padding: 0;
+  border: 0;
+  border-radius: var(--mantine-radius-md);
+  background: transparent;
+  color: var(--mantine-primary-color-light-color);
+  cursor: pointer;
+  transition: background-color var(--fs-dur) var(--fs-ease);
+}
+.icon-btn:hover {
+  background: var(--mantine-primary-color-light-hover);
 }
 .nav-foot {
   border-top: 1px solid var(--fs-grid);
@@ -292,6 +365,10 @@ body {
 }
 .prose a:hover {
   color: var(--fs-accent-strong);
+}
+/* Bağlantı içindeki kod: kod zemini (--fs-tint) üzerinde AA kontrastı için mürekkep tonu; alt çizgi bağlantıyı belirtir. */
+.prose a code {
+  color: var(--fs-accent-ink);
 }
 .prose ul,
 .prose ol {
@@ -451,11 +528,15 @@ body {
 .diagram {
   margin: 0.5rem 0 1.75rem;
   padding: 0.75rem;
-  overflow-x: auto;
   border-radius: var(--mantine-radius-lg);
   background: var(--fs-surface-2);
 }
-.diagram:focus-visible,
+/* Kaydırma bölgesi figürün içindedir (figcaption'lı figure role=region alamaz). */
+.diagram-scroll {
+  overflow-x: auto;
+  border-radius: var(--mantine-radius-md);
+}
+.diagram-scroll:focus-visible,
 .mermaid-figure:focus-visible {
   outline: 2px solid var(--fs-focus);
   outline-offset: 2px;
@@ -506,6 +587,33 @@ body {
   .req-filter-search {
     grid-column: auto;
   }
+}
+/* Faz, ray, kaynak süzgeçleri: yerel açılır bölüm (JS gerektirmez) + aria-pressed düğme grupları. */
+.req-more {
+  margin: 0 0 0.75rem;
+  border-radius: var(--mantine-radius-md);
+  background: var(--fs-surface-2);
+}
+.req-more > summary {
+  display: list-item;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--mantine-radius-md);
+  font-weight: 600;
+  cursor: pointer;
+}
+.req-more-body {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0.25rem 0.9rem 0.9rem;
+}
+.req-toggle-group {
+  display: grid;
+  gap: 0.35rem;
+}
+.req-toggle-label {
+  font-size: 1rem;
+  color: var(--fs-quiet);
 }
 .req-bar {
   display: flex;
@@ -570,6 +678,7 @@ body {
 }
 .req-card-title {
   line-height: 1.4;
+  overflow-wrap: break-word;
 }
 .req-card-detail {
   line-height: 1.5;

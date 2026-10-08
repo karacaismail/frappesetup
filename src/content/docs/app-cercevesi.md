@@ -1,7 +1,7 @@
 ---
 title: "Satılan her app için çerçeve şablonu"
 nav: "App çerçevesi"
-order: 12
+order: 16
 ---
 
 Satılan her uygulama (CronHR, CRM, Webshop ve sonrakiler) aynı çerçeveden geçer: ortak admin shell'in içine oturur, aynı yetki/AI/abonelik sözleşmelerini uygular ve Press'e aynı zincirle kaydolur. Çerçeve bir manifesttir; uygulama ekibi her kalemi doldurur, CI ve X-09 uyumluluk betiği doğrular, Marketplace App yayımı bu listenin tamamlanmasına bağlıdır.
@@ -11,13 +11,13 @@ Satılan her uygulama (CronHR, CRM, Webshop ve sonrakiler) aynı çerçeveden ge
 | # | Katman | Zorunlu çıktı | Gereksinim |
 | --- | --- | --- | --- |
 | 1 | Backend iskelet | `bench new-app` şablonu; `pyproject.toml` + `[tool.bench.frappe-dependencies] frappe = ">=16.0.0 <17.0.0"`; `hooks.py` (idempotent `after_install`, `setup_wizard_complete`, `after_migrate`, `fixtures` ön ek filtresi, `user_data_fields`); Module Def; `locale/main.pot` + `tr.po`; `bench run-tests` + ruff; CHANGELOG | G-102, G-14, G-52 |
-| 2 | Frontend modül | `@apps/<ad>` paketi `AppModule` arayüzüyle: TanStack Router rota ağacı, `overrides/<doctype>.tsx` registry, ikon/çeviri, dashboard widget'ları, onboarding adımları, AI Prompts; yalnızca tasarım tokenları; dinamik import | G-103, G-66, G-67, G-69 |
+| 2 | Frontend modül | `@apps/<ad>` paketi `AppModule` arayüzüyle: TanStack Router rota ağacı, `overrides/<doctype>.tsx` registry, ikon/çeviri, dashboard widget'ları, yardım konuları, tur ve keşif kuralları (G-141), AI Prompts; yalnızca tasarım tokenları; dinamik import | G-103, G-66, G-67, G-69 |
 | 3 | Yetki sözleşmesi | Ön ekli roller (`<App> Admin/Manager/Employee`), Role Profile ve Module Profile fixture'ları, hiyerarşi alanları, varsayılan Access Rule şablonları, hassas alan permlevel şablonu; yetki matrisi testi | G-104, G-60, G-61, G-62 |
 | 4 | AI sözleşmesi | `ai_tools` hook'u: araç adı, TR/EN açıklama, şema, gereken rol, `destructive`/`billable` bayrağı, önizleme üretici, birim kredi maliyeti; tek tık akışları Prompts olarak; golden test + yetki negatif testi | G-105, G-84, G-86, SA-15 |
 | 5 | Abonelik kapıları | `platform_core.subscription.has_feature(app, feature)` hem whitelisted metot/doc\_events'te hem UI feature flag'inde; deneme/düşürme/askı durumunda salt okunur mod | G-106, G-35 |
 | 6 | Fixture ve sidebar | Workspace + Workspace Sidebar `standard=1, app=<uygulama>` modül dosyası; Role/Custom Field/Property Setter/Workflow/Email Template yalnızca ön ek filtreli `hooks.fixtures`; Notification kanalları Email + System Notification | G-107, G-94 |
 | 7 | Press kaydı | App + App Source (branch, `versions` = Version 16, `required_apps`), staging/prod Release Group üyeliği, Marketplace App, en az bir enabled App Plan (ücretsiz plan `price_usd=0`), `run_after_install_script=1` | G-29, G-32, G-14 |
-| 8 | Shell entegrasyonu | Aktivasyon sonrası sidebar yeniden türetilir; Module Onboarding + demo veri seçeneği; `user_data_fields` ile KVKK indirme/silme talepleri | G-95, G-97, G-52 |
+| 8 | Shell entegrasyonu | Aktivasyon sonrası sidebar yeniden türetilir; tur ve görev listesi (G-139) + demo veri seçeneği; `user_data_fields` ile KVKK indirme/silme talepleri | G-95, G-97, G-52 |
 | 9 | Operasyon kaydı | Helpdesk ürün etiketi + SLA kademesi, `APP-<ad>` Item eşlemesi, Müşteri 360 özet sağlayıcısı, `support_mask_fields`, yaşam döngüsü sinyalleri (aşağıda) | SA-15, SA-19, SA-24, SA-31, SA-36, SA-38 |
 | 10 | Kabul | Playwright 320→masaüstü, Chromium/Firefox/WebKit; E2E: trial → Etkinleştir → Agent Job Success → sidebar başlığı; Lighthouse bütçesi | G-74, G-111, G-30 |
 

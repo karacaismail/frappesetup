@@ -16,15 +16,20 @@ export type IconName =
   | 'apps'
   | 'map'
   | 'alert'
+  | 'shield'
+  | 'link'
+  | 'chart'
+  | 'help'
+  | 'checklist'
   | 'file';
 
 export interface SectionMeta {
-  group: 'Çerçeve' | 'Raylar' | 'Teslim';
+  group: 'Çerçeve' | 'Raylar' | 'Sözleşmeler' | 'Teslim';
   icon: IconName;
   summary: string;
 }
 
-export const GROUP_ORDER: SectionMeta['group'][] = ['Çerçeve', 'Raylar', 'Teslim'];
+export const GROUP_ORDER: SectionMeta['group'][] = ['Çerçeve', 'Raylar', 'Sözleşmeler', 'Teslim'];
 
 export const SECTIONS: Record<string, SectionMeta> = {
   kararlar: { group: 'Çerçeve', icon: 'scale', summary: 'On sabit karar, kapsam sınırı ve roller.' },
@@ -36,11 +41,36 @@ export const SECTIONS: Record<string, SectionMeta> = {
   'rail-4-keycloak': { group: 'Raylar', icon: 'key', summary: "Realm, client'lar, SSO/SLO ve identity-sync." },
   'rail-5-ai': { group: 'Raylar', icon: 'sparkles', summary: 'Agent servisi, MCP, önizle + onayla, KVKK.' },
   'rail-6-operasyon': { group: 'Raylar', icon: 'headset', summary: 'Superadmin, CRM/Helpdesk, muhasebe ve destek oturumu.' },
-  gereksinimler: { group: 'Teslim', icon: 'list', summary: 'G-1..G-118 ve SA-1..SA-39 ana listesi, süzülebilir gezgin.' },
+  'kalite-kurallari': {
+    group: 'Sözleşmeler',
+    icon: 'shield',
+    summary: 'Güvenlik, performans ve sürdürülebilirlik için MUST/SHOULD/MAY kuralları.',
+  },
+  'paylasim-url': {
+    group: 'Sözleşmeler',
+    icon: 'link',
+    summary: 'İnsan odaklı URL, paylaşım bağlantıları ve kapalı panel için güvenli önizleme.',
+  },
+  'olcum-gozlem': {
+    group: 'Sözleşmeler',
+    icon: 'chart',
+    summary: 'Ölçüm adapterları, rıza kapısı, BI ve gözlemlenebilirlik rolleri.',
+  },
+  'yardim-tur': {
+    group: 'Sözleşmeler',
+    icon: 'help',
+    summary: 'Yardım kulakçığı, kendi kendine destek modu, tur ve keşif motoru.',
+  },
+  gereksinimler: { group: 'Teslim', icon: 'list', summary: 'G ve SA serisi gereksinimlerin ana listesi, süzülebilir gezgin.' },
   'admin-shell': { group: 'Teslim', icon: 'sidebar', summary: 'Her SaaS admin shell için olmazsa olmazlar.' },
   'app-cercevesi': { group: 'Teslim', icon: 'apps', summary: 'Satılan her app için çerçeve şablonu.' },
   'yol-haritasi': { group: 'Teslim', icon: 'map', summary: 'P0–P6 fazları, kapılar ve ilk dikey dilim.' },
   'acik-kararlar': { group: 'Teslim', icon: 'alert', summary: 'Açık kararlar, riskler ve dış bağımlılıklar.' },
+  izlenebilirlik: {
+    group: 'Teslim',
+    icon: 'checklist',
+    summary: 'Değerlendirme raporu maddelerinin kapanışı ve kaynak defteri.',
+  },
 };
 
 export const RAILS = [

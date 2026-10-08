@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Badge,
   Box,
   Button,
   Group,
   MantineProvider,
-  Select,
   Switch,
   Table,
   Text,
@@ -82,7 +81,45 @@ function options(values: string[], order?: string[]) {
   const uniq = Array.from(new Set(values));
   if (order) uniq.sort((a, b) => order.indexOf(a) - order.indexOf(b));
   else uniq.sort((a, b) => a.localeCompare(b, 'tr'));
-  return uniq.map((v) => ({ value: v, label: v }));
+  return uniq;
+}
+
+function countBy(items: Requirement[], key: 'priority' | 'phase' | 'rail' | 'source') {
+  const m = new Map<string, number>();
+  for (const r of items) m.set(r[key], (m.get(r[key]) ?? 0) + 1);
+  return m;
+}
+
+// Tek seçimli süzgeç: açılır liste yerine aria-pressed düğme grubu (kabuk/ada JS bütçesi; açılır panel kodu yok).
+function ToggleGroup(props: {
+  label: string;
+  values: string[];
+  counts: Map<string, number>;
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="req-toggle-group">
+      <Text component="span" id={id} fw={600} className="req-toggle-label">
+        {props.label}
+      </Text>
+      <Group gap="xs" wrap="wrap" role="group" aria-labelledby={id}>
+        {props.values.map((v) => (
+          <Button
+            key={v}
+            size="compact-md"
+            radius="xl"
+            variant={props.value === v ? 'filled' : 'default'}
+            aria-pressed={props.value === v}
+            onClick={() => props.onChange(props.value === v ? null : v)}
+          >
+            {v} · {props.counts.get(v) ?? 0}
+          </Button>
+        ))}
+      </Group>
+    </div>
+  );
 }
 
 function Explorer({ items }: Props) {
@@ -99,10 +136,8 @@ function Explorer({ items }: Props) {
   // React 19 hidrasyonda DOM değerini korur, değer izleyicisini bu değerle başlatır ve değişikliği
   // onChange olarak yeniden oynatmaz. Bağlanınca erken girdiyi (arama metni, ayrıntı anahtarı) duruma al.
   useEffect(() => {
-    const early = searchRef.current?.value ?? '';
-    if (early) setQ(early);
-    const detail = detailRef.current;
-    if (detail && !detail.checked) setShowDetail(false);
+    if (searchRef.current) setQ(searchRef.current.value);
+    if (detailRef.current) setShowDetail(detailRef.current.checked);
   }, []);
 
   const sorted = useMemo(() => [...items].sort(byId), [items]);
@@ -120,11 +155,11 @@ function Explorer({ items }: Props) {
     });
   }, [sorted, q, priority, phase, rail, source]);
 
-  const priorityCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of items) m.set(r.priority, (m.get(r.priority) ?? 0) + 1);
-    return m;
-  }, [items]);
+  const priorityCounts = useMemo(() => countBy(items, 'priority'), [items]);
+  const phaseCounts = useMemo(() => countBy(items, 'phase'), [items]);
+  const railCounts = useMemo(() => countBy(items, 'rail'), [items]);
+  const sourceCounts = useMemo(() => countBy(items, 'source'), [items]);
+  const facetCount = [phase, rail, source].filter(Boolean).length;
 
   const active = Boolean(q || priority || phase || rail || source);
   const reset = () => {
@@ -191,43 +226,36 @@ function Explorer({ items }: Props) {
           leftSection={<IconSearch size={18} aria-hidden />}
           className="req-filter req-filter-search"
         />
-        <Select
-          label="Öncelik"
-          placeholder="Hepsi"
-          data={options(items.map((r) => r.priority), PRIORITIES)}
-          value={priority}
-          onChange={setPriority}
-          clearable
-          className="req-filter"
-        />
-        <Select
-          label="Faz"
-          placeholder="Hepsi"
-          data={options(items.map((r) => r.phase))}
-          value={phase}
-          onChange={setPhase}
-          clearable
-          className="req-filter"
-        />
-        <Select
-          label="Ray"
-          placeholder="Hepsi"
-          data={options(items.map((r) => r.rail), RAIL_ORDER)}
-          value={rail}
-          onChange={setRail}
-          clearable
-          className="req-filter req-filter-wide"
-        />
-        <Select
-          label="Kaynak"
-          placeholder="Hepsi"
-          data={options(items.map((r) => r.source), ['native', 'configure', 'develop', 'integrate'])}
-          value={source}
-          onChange={setSource}
-          clearable
-          className="req-filter"
-        />
       </div>
+
+      <details className="req-more">
+        <summary>
+          Faz, ray ve kaynak süzgeçleri{facetCount > 0 ? ` · ${facetCount} etkin` : ''}
+        </summary>
+        <div className="req-more-body">
+          <ToggleGroup
+            label="Faz"
+            values={options(items.map((r) => r.phase))}
+            counts={phaseCounts}
+            value={phase}
+            onChange={setPhase}
+          />
+          <ToggleGroup
+            label="Ray"
+            values={options(items.map((r) => r.rail), RAIL_ORDER)}
+            counts={railCounts}
+            value={rail}
+            onChange={setRail}
+          />
+          <ToggleGroup
+            label="Kaynak"
+            values={options(items.map((r) => r.source), ['native', 'configure', 'develop', 'integrate'])}
+            counts={sourceCounts}
+            value={source}
+            onChange={setSource}
+          />
+        </div>
+      </details>
 
       <div className="req-bar">
         <Group gap="md" wrap="wrap">

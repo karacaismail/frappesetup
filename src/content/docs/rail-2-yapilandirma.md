@@ -11,7 +11,7 @@ Bu ray, kiracı bench'lerinde (Frappe v16 + ERPNext v16) yalnızca ayar ve kayı
 | Katman | Press kaynağı | Yayılma |
 | --- | --- | --- |
 | Platform varsayılanı | Press Settings.bench\_configuration | Yalnızca yeni bench (doğrulandı) |
-| Release Group ortak (allow\_cors, mail\_\*, workers) | common\_site\_config\_table → `update_config` | Mevcut bench'lere yayılır |
+| Release Group ortak (mail\_\*, workers; `allow_cors` tanımlanmaz, G-119) | common\_site\_config\_table → `update_config` | Mevcut bench'lere yayılır |
 | Site'a özgü (encryption\_key, keycloak\_client\_secret, sk\_\&lt;app&gt;) | Site.configuration | Tek site |
 
 Site Config Key tohumlama press\_tr fixture'ıdır: Password → `mail_password`, `encryption_key`, `backup_encryption_key`, `keycloak_client_secret`; internal=1 → `host_name`, `server_script_enabled`, `plan_limit`. Kabul: mevcut bench'te `bench show-config` güncel değeri gösterir.
@@ -23,14 +23,15 @@ Site Config Key tohumlama press\_tr fixture'ıdır: Password → `mail_password`
 | Şema kaynağı | developer\_mode=0, server\_script\_enabled=0; DocType değişikliği yalnızca uygulama modül dosyaları ve fixture'lardan |
 | Oturum/parola | session\_expiry '12:00', enable\_password\_policy=1, minimum\_password\_score=3, allow\_consecutive\_login\_attempts=5, allow\_login\_after\_fail=300, logout\_on\_password\_reset=1, reset\_password\_link\_expiry\_duration=900, password\_reset\_limit=3; Keycloak SSO Session Idle/Max aynı değerlerle (G-78) |
 | Kimlik | Social Login Key provider 'Keycloak', base\_url `https://<idp>/realms/<realm>`, sign\_ups='Deny', user\_id\_property='sub'; Keycloak doğrulandıktan sonra disable\_user\_pass\_login=1, login\_with\_email\_link=0, Website Settings.disable\_signup=1; MFA Keycloak'ta; Administrator break-glass yalnızca Agent set-admin-password ile |
-| Oran sınırı | Site Plan.cpu\_time\_per\_day → rate\_limit (duvar saati ölçer, doğrulandı); ağır raporlar 'reports' kuyruğunda; AI ve ödeme uçları `@frappe.rate_limit` |
+| Oran sınırı | Site Plan.cpu\_time\_per\_day → rate\_limit: istek işleme süresinin site geneli toplamını ölçer, CPU'yu ve kullanıcı/IP'yi ayırmaz (doğrulandı); kaynak izolasyonu değildir. Ağır raporlar 'reports' kuyruğunda; AI ve ödeme uçları `@frappe.rate_limit` (istek sayar) |
+| API yüzeyi | Önce kullanılan uçların envanteri, sonra nginx'te `/api/method/*` için allowlist; Server Script, System Console ve test uçları kapalı (G-143, G-40) |
 | Desk sınırı | System Manager yalnızca operatörde; kiracı admin Role Profile + 'Role Permission for Page and Report'; platform\_core `before_request` 'Platform Operator' rolü olmayan /app\* isteklerini SPA'ya yönlendirir; enable\_onboarding=0, Website Settings.home\_page SPA |
 | Impersonation | `user_impersonate` izin türü hiçbir role varsayılan verilmez; yalnız Support Session süresince platform\_core tarafından açılır; her kiracı sitede giden Email Account 'Security Alert' için hazır (SA-28) |
 
-## CORS, CSRF ve same-site (G-45, G-13)
+## Origin, CSRF ve oturum (G-45, G-119)
 
-- Panel, Press ve kiracı siteleri aynı registrable domain altında; `allow_cors` yalnızca `https://app.<marka>.com.tr` değerini taşır ve Release Group `common_site_config` ile tüm bench'lere yazılır.
-- SPA istekleri credentials include + `X-Frappe-CSRF-Token`; çerez SameSite=Lax, Secure.
+- Kiracı SPA'sı kendi sitesinden (`<kiracı>.app.<marka>.com.tr/panel` veya özel alan adı) aynı origin'le çalışır; panel host'u Press sitesinin kendi alan adıdır. Bu yüzden `allow_cors` hiçbir sitede tanımlanmaz; `"*"` asla kullanılmaz (Frappe origin'i kimlik bilgisiyle yansıtır, doğrulandı).
+- Oturum çerezi host'a bağlıdır (Domain özniteliği yok, Secure, HttpOnly, SameSite=Lax); SPA istekleri `X-Frappe-CSRF-Token` taşır.
 - CSRF token yalnızca www/desk render'ında üretildiği için (doğrulandı) SPA kabuğu platform\_core `www/<panel>.py` sayfasından servis edilir ve `context.csrf_token` enjekte edilir.
 - Kabul: giriş sonrası csrf\_token dolu; tokensiz PATCH 400, tokenli 200.
 

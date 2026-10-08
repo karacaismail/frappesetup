@@ -4,7 +4,7 @@ nav: "Kararlar"
 order: 1
 ---
 
-Aşağıdaki on karar sabittir; dokümandaki her plan bu kararların üzerine kurulur ve hiçbirini yeniden tartışmaz.
+Aşağıdaki on karar sabittir; dokümandaki her plan bu kararların üzerine kurulur ve hiçbirini yeniden tartışmaz. Ürün sahibi, mali müşavir veya hukuk kararı isteyen konular ve önerilen teknik varsayımlar [açık kararlar](/frappesetup/acik-kararlar/) sayfasında türleriyle ayrıdır.
 
 | # | Karar | Gerekçe | Sonuç |
 | --- | --- | --- | --- |
@@ -19,9 +19,12 @@ Aşağıdaki on karar sabittir; dokümandaki her plan bu kararların üzerine ku
 | K9 | **AI-first**: Press ve siteler MCP ile yönetilir; Claude Agent SDK tabanlı agent servisi; panelde sağ AI paneli; AI eylemleri aynı sunucu izinlerinden geçer, yazma eylemleri önizleme + onay ister, her eylem audit'e düşer | Tek tıkla aksiyon ve kararlı orkestrasyon | Modeller: `claude-sonnet-5-5` / `claude-opus-5-5` eylem, `claude-haiku-4-5` sınıflandırma; KVKK uyumu zorunlu |
 | K10 | Ürünler ayrı Frappe app'leri olarak satılır: **HRMS (CronHR)** önce, sonra **CRM**, **Webshop**; hepsi ortak **admin shell** çerçevesine uyar; modül etkinleştirme **Press Marketplace / App Plan** üzerinden | Zoho/Odoo tarzı "etkinleştir" deneyimi | Her app bu dokümandaki app çerçevesi şablonunu karşılar |
 
+K3 notu: Hetzner'in AB'de olması KVKK yurt dışı aktarım şartlarını tek başına karşılamaz; aktarım mekanizması hukukça belirlenir (G-90, G-116).
+
 ## Kapsam
 
-- **Kapsam içi:** Press'in self-host yapılandırması ve ticari katmanı (Rail 1), müşteri sitesi backend'inin yapılandırması ve platform çekirdek app'i (Rail 2), headless admin shell ve metadata motoru (Rail 3), Keycloak kimlik katmanı (Rail 4), AI katmanı (Rail 5), gereksinim çerçevesi, app şablonu ve yol haritası.
+- **Kapsam içi:** Press'in self-host yapılandırması ve ticari katmanı (Rail 1), müşteri sitesi backend'inin yapılandırması ve platform çekirdek app'i (Rail 2), headless admin shell ve metadata motoru (Rail 3), Keycloak kimlik katmanı (Rail 4), AI katmanı (Rail 5), operasyon düzlemi (Rail 6), ürün sözleşmeleri (kalite kuralları, URL ve paylaşım, ölçüm, yardım ve tur), gereksinim çerçevesi, app şablonu ve yol haritası.
+- **Durum:** Bu doküman tasarım ve karar çerçevesidir; SaaS henüz kurulmadı. Tanımlanan kontroller gereksinimdir, uygulanmış veya test edilmiş güvenlik sayılmaz.
 - **Kapsam dışı:** Pazarlama web sitesi ve müşteri sitelerinin iş kuralları (bunlar app'lerin kendi dokümanlarında yer alır).
 
 ## Roller
@@ -31,3 +34,5 @@ Aşağıdaki on karar sabittir; dokümandaki her plan bu kararların üzerine ku
 | Ürün sahibi | Mimari ve ürün kararları, bu dokümandaki açık kararların kapatılması |
 | Hüseyin Cengiz (kıdemli DevOps) | Hetzner sunucuları, Press kurulumu, Keycloak, CI/CD, deploy ve rollback |
 | Asistan Hüseyin | GoDaddy hesabı, domain ve DNS değişiklikleri (teknik gereksinimi Hüseyin Cengiz hazırlar) |
+| Finans/Muhasebe ve mali müşavir | Vergi ve belge zamanlaması, finans olay–belge matrisi (K-13, SA-41) |
+| Hukuk | KVKK, rıza ve aktarım mekanizması, lisans değerlendirmesi (K-1, K-27, K-28) |

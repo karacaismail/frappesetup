@@ -12,7 +12,7 @@
  {
   "id": "G-2",
   "title": "Root Domain, Route 53 ve NS delegasyonu",
-  "detail": "Kiracı kök alanı (örn. `app.<marka>.com.tr`) için Press Root Domain kaydı dns_provider='AWS Route 53' ile açılır; Hüseyin Cengiz hosted zone ve IAM politikasını hazırlar, Asistan Hüseyin GoDaddy'de NS kayıtlarını Route 53'e delege eder, Hüseyin Cengiz wildcard sertifikanın alındığını doğrular. Press wildcard TLS için yalnızca certbot `--dns-route53` çağırır (doğrulandı).",
+  "detail": "Kiracı kök alanı `app.<marka>.com.tr`'dir; kiracı siteleri `<kiracı>.app.<marka>.com.tr` adresini alır (alt bölge delegasyonu kardeş host'ları kapsamaz; `panel.`, `press.`, `id.`, `ops.`, `agent.` GoDaddy'deki ana bölgede kalır). Bu alan için Press Root Domain kaydı dns_provider='AWS Route 53' ile açılır; Hüseyin Cengiz hosted zone ve IAM politikasını hazırlar, Asistan Hüseyin GoDaddy'de NS kayıtlarını Route 53'e delege eder, Hüseyin Cengiz wildcard sertifikanın alındığını doğrular. Press wildcard TLS için yalnızca certbot `--dns-route53` çağırır (doğrulandı).",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P0",
@@ -61,8 +61,8 @@
  },
  {
   "id": "G-7",
-  "title": "press_tr uygulaması: Press fork edilmez, tüm uzantılar burada yaşar",
-  "detail": "Press bench'ine kurulan `press_tr` Frappe uygulaması ödeme (iyzico), TRY, e-belge köprüsü, fixture temizliği, auth allowlist, MCP ticari araçları, Keycloak sarmalayıcıları ve Türkçe e-posta şablonlarını `hooks`, `override_doctype_class`, `doc_events`, Custom Field/Property Setter ile sağlar. Press'te düzeltme gerektiren üç nokta (Site.validate_encryption_key `or`→`and` ölü kodu, Agent 'Complete Setup Wizard' çağıranının olmaması, Site Plan/Team Tier fixture'ları) press_tr'de kapatılır ve upstream PR olarak açılır; semantic-release güncellemeleri staging'de denenir.",
+  "title": "press_tr uygulaması: Press uzantılarının tek evi ve takipli geçici yama",
+  "detail": "Press bench'ine kurulan `press_tr` Frappe uygulaması ödeme (iyzico), TRY, e-belge köprüsü, fixture temizliği, auth allowlist, MCP ticari araçları, Keycloak sarmalayıcıları ve Türkçe e-posta şablonlarını `hooks`, `override_doctype_class`, `doc_events`, Custom Field/Property Setter ile sağlar. Press'te düzeltme gerektiren üç nokta (Site.validate_encryption_key `or`→`and` ölü kodu, Agent 'Complete Setup Wizard' çağıranının olmaması, Site Plan/Team Tier fixture'ları) press_tr'de kapatılır ve upstream PR olarak açılır; semantic-release güncellemeleri staging'de denenir. Fork-sıfır mutlak kural değildir: upstream düzeltmesi bekleyen nokta için geçici yama yalnız yama kaydıyla (upstream issue/PR bağlantısı, sahip, kaldırılma koşulu, test) tutulur ve her yükseltmede yeniden doğrulanır (ör. Agent offsite yaması G-5).",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P1",
@@ -112,7 +112,7 @@
  {
   "id": "G-12",
   "title": "Press'e Keycloak ile giriş ve yerel kimlik yüzeyinin kapatılması",
-  "detail": "Social Login Key: social_login_provider='Keycloak' (v15 yerleşik, doğrulandı), custom_base_url=1, base_url `https://<idp>/realms/<realm>`, openid-connect auth/token/userinfo uçları, auth_url_data {response_type: code, scope: openid}, sign_ups='Allow', user_id_property='sub'; ilk girişte press_tr kancası Account Request → Team oluşturur ve Keycloak sub'ını Team/User'a bağlar. press_tr `before_request` Press'in `press.api.account.signup/send_otp/verify_otp/send_login_link/login_using_key/reset_password/enable_2fa/verify_2fa` ve `product_trial.send_verification_code_for_login` uçlarını 403 ile reddeder; `/login`, `/signup`, `/dashboard/login` panel/Keycloak'a yönlendirilir; User 2FA zorunluluğu etkinleştirilmez (MFA Keycloak'ta); Press Vue `/dashboard` yalnızca iç operasyon için kalır ve panel alan adından dışarıya kapatılır.",
+  "detail": "Social Login Key: social_login_provider='Keycloak' (v15 yerleşik, doğrulandı), custom_base_url=1, base_url `https://<idp>/realms/<realm>`, openid-connect auth/token/userinfo uçları, auth_url_data {response_type: code, scope: openid}, sign_ups='Allow', user_id_property='sub'; ilk girişte press_tr kancası Account Request → Team oluşturur ve kullanıcıyı `(iss, sub)` çiftiyle bağlar (G-120). press_tr `before_request` Press'in `press.api.account.signup/send_otp/verify_otp/send_login_link/login_using_key/reset_password/enable_2fa/verify_2fa` ve `product_trial.send_verification_code_for_login` uçlarını 403 ile reddeder; `/login`, `/signup`, `/dashboard/login` panel/Keycloak'a yönlendirilir; User 2FA zorunluluğu etkinleştirilmez (MFA Keycloak'ta); Press Vue `/dashboard` yalnızca iç operasyon için kalır ve panel alan adından dışarıya kapatılır.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P1",
@@ -121,8 +121,8 @@
  },
  {
   "id": "G-13",
-  "title": "Panel–Press oturum, CORS ve realtime sözleşmesi",
-  "detail": "Panel (panel.<marka>.com.tr), Press (press.<marka>.com.tr) ve kiracı siteleri (<kiracı>.<marka>.com.tr) aynı registrable domain altında çalışır; Press site_config `allow_cors` panel origin'ine ayarlanır, çerez SameSite=Lax/Secure, socket.io Press nginx arkasından aynı origin kuralıyla yayınlanır. `press.api.client` ve realtime abonelikleri Frappe oturum çerezine dayanır (doğrulandı).",
+  "title": "Panel–Press oturum ve realtime sözleşmesi",
+  "detail": "`panel.<marka>.com.tr` Press sitesinin public alan adıdır (press_tr www sayfası SPA'yı sunar); panel ile Press API'si aynı origin'dedir, Press'te `allow_cors` tanımlanmaz. Press oturumu host'a bağlı `sid` çerezidir (Domain özniteliği yok, Secure, HttpOnly, SameSite=Lax); `press.<marka>.com.tr` Desk/operatör host'u ayrı oturum taşır ve yalnız Tailscale/özel ağdan erişilir (G-6). socket.io panel host'unda aynı origin'dendir. Kiracı SPA'sı Press'e doğrudan istek atmaz; mağaza, faturalama ve takım ekranları panel host'unda açılır (G-119). `press.api.client` ve realtime abonelikleri Frappe oturum çerezine dayanır (doğrulandı).",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P1",
@@ -211,8 +211,8 @@
  },
  {
   "id": "G-22",
-  "title": "e-Arşiv/e-Fatura: finans sitesi köprüsü, belge eşleme tablosu ve GİB PDF",
-  "detail": "Press Settings.frappe_url şirketin kendi ERPNext v16 finans sitesine ayarlanır (disable_frappe_auth=0); press_tr Invoice override finalize sonrası (status Unpaid veya Paid, type Subscription, total > 0) `create_invoice_on_frappeio` ile gönderir çünkü VUK 231/5 faturanın 7 gün içinde düzenlenmesini ister ve Press yalnızca ödenmişleri gönderir (Press kodu doğrulandı; VUK yorumu mali müşavir teyidi). Finans sitesinde `press_tr_finance` uygulaması `create-fc-invoice` alıcısını, Sales Invoice → GİB özel entegratör (UBL-TR) gönderimini ve eşleme tablosunu (Subscription → Sales Invoice + e-belge, Prepaid Credits → alınan avans Payment Entry, NEFT → banka mutabakatı, Refunded → iade/Credit Note, Payment Dispute → şüpheli alacak, iyzico hakediş mutabakatı) uygular; Press Invoice'a e_invoice_type, ettn, gib_status, e_invoice_pdf/xml geri yazılır ve `fetch_invoice_pdf` override'ı GİB onaylı PDF'i Invoice.invoice_pdf'e koyar (Press print format kullanılmaz).",
+  "title": "e-Arşiv/e-Fatura: operasyon sitesi köprüsü, olay–belge matrisi ve GİB PDF",
+  "detail": "Press Settings.frappe_url şirketin kendi ERPNext v16 operasyon sitesine ayarlanır (disable_frappe_auth=0); alıcı ve e-belge köprüsü orada `press_tr_finance` uygulamasındadır (SA-19, SA-35). Gönderim tetiği ve belge türleri SA-41 olay–belge matrisine göredir: Press yerel olarak yalnız ödenmiş faturayı gönderir (doğrulandı); faturanın kesinleşmesinde (Unpaid/Paid) gönderim ise VUK 231/5 yedi gün yorumuna bağlı bir seçenektir ve mali müşavir kararıyla (K-13) seçilir; seçilmeyen yol devre dışıdır, aynı fatura iki yoldan gönderilmez. Eşleme: Subscription → Sales Invoice + e-belge, Prepaid Credits → K-13 seçeneğine göre satış faturası veya alınan avans, NEFT → banka mutabakatı, Refunded → iade/Credit Note, Payment Dispute → şüpheli alacak, iyzico hak ediş mutabakatı; Press Invoice'a e_invoice_type, ettn, gib_status, e_invoice_pdf/xml geri yazılır ve `fetch_invoice_pdf` override'ı GİB onaylı PDF'i Invoice.invoice_pdf'e koyar.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P2",
@@ -252,7 +252,7 @@
  {
   "id": "G-26",
   "title": "Kiracı için özel alan adı (Site Domain)",
-  "detail": "Panelde 'Alan adı ekle' akışı Press yerel API'leriyle: `press.api.site.check_dns`, `add_domain`, `retry_add_domain`, `set_host_name`, `set_redirect/unset_redirect`, `remove_domain`; müşteri kendi DNS'inde CNAME → `<site>.<root domain>` tanımlar, dns_response panelde gösterilir; TLS certbot `--webroot` ile alınır (proxy 80 açık), yenileme `renew_tls_certificates` saatlik (doğrulandı); Playwright E2E.",
+  "detail": "Panelde 'Alan adı ekle' akışı Press yerel API'leriyle: `press.api.site.check_dns`, `add_domain`, `retry_add_domain`, `set_host_name`, `set_redirect/unset_redirect`, `remove_domain`; müşteri kendi DNS'inde CNAME → `<site>.<root domain>` tanımlar, dns_response panelde gösterilir; TLS certbot `--webroot` ile alınır (proxy 80 açık), yenileme `renew_tls_certificates` saatlik (doğrulandı); kimlik akışı (redirect URI, çıkış, CSRF, realtime) G-124 ile; Playwright E2E.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P2",
@@ -332,7 +332,7 @@
  {
   "id": "G-34",
   "title": "Kapasite ve kaynak limitleri politikası",
-  "detail": "Release Group worker sınırları (max/min gunicorn ve background workers), `Server.scale_workers`, Site Plan cpu/disk limitleri ve `site_usages` Prometheus verisi kullanılır; bench başına site ve sunucu başına bench üst sınırı, `Server.use_for_new_sites` devir kuralı, disk/CPU aşımında panel uyarısı ve AI sağ panelde plan yükseltme önerisi; 14 günlük disk aşımı askıya alma kuralı sözleşmede yer alır.",
+  "detail": "Release Group worker sınırları (max/min gunicorn ve background workers), `Server.scale_workers`, Site Plan `cpu_time_per_day` (istek işleme süresi kotası; CPU ölçümü değildir, G-46) ve disk limitleri ve `site_usages` Prometheus verisi kullanılır; bench başına site ve sunucu başına bench üst sınırı, `Server.use_for_new_sites` devir kuralı, disk/CPU aşımında panel uyarısı ve AI sağ panelde plan yükseltme önerisi; 14 günlük disk aşımı askıya alma kuralı sözleşmede yer alır.",
   "rail": "R1 Press",
   "priority": "SHOULD",
   "phase": "P2",
@@ -392,7 +392,7 @@
  {
   "id": "G-40",
   "title": "developer_mode ve server_script kapalı; şema yalnızca uygulama kodundan",
-  "detail": "Kiracı bench'lerinde developer_mode ve server_script_enabled kapalıdır (Press public bench'te reddeder); DocType/şema değişiklikleri yalnızca uygulama modül dosyaları ve fixture'lardan gelir; kiracı Custom Field/Property Setter özelleştirmeleri site DB'sinde kalır ve meta'nın site başına farklı olmasının kaynağıdır; ileri düzey kiracılar için private bench planı tanımlanır.",
+  "detail": "Kiracı bench'lerinde developer_mode ve server_script_enabled kapalıdır (Press public bench'te reddeder); DocType/şema değişiklikleri yalnızca uygulama modül dosyaları ve fixture'lardan gelir; kiracı Custom Field/Property Setter özelleştirmeleri site DB'sinde kalır ve meta'nın site başına farklı olmasının kaynağıdır; System Console ve test uçları (`allow_tests`) kapalıdır, API yüzeyi allowlist ile daraltılır (G-143); ileri düzey kiracılar için private bench planı tanımlanır.",
   "rail": "R2 Frappe yapılandırma",
   "priority": "MUST",
   "phase": "P1",
@@ -441,8 +441,8 @@
  },
  {
   "id": "G-45",
-  "title": "Same-site origin, allow_cors ve CSRF belirteç teslimi",
-  "detail": "SPA ve kiracı siteleri aynı registrable domain altında; `allow_cors` ['https://app.<marka>.com.tr'] Release Group common_site_config ile tüm bench'lere yazılır ('*' kullanılmaz); SPA istekleri credentials include + X-Frappe-CSRF-Token; ignore_csrf ve allowed_referrers kullanılmaz. `get_csrf_token` whitelisted değildir ve token yalnızca www/desk render'ında üretilir, REST-only oturumda CSRF denetimi fiilen kapalıdır (doğrulandı); bu nedenle SPA kabuğu platform_core `www/<panel>.py` sayfasıyla servis edilir ve `context.csrf_token = frappe.sessions.get_csrf_token()` enjekte edilir. Kabul: giriş sonrası csrf_token dolu, tokensiz PATCH 400, tokenli 200.",
+  "title": "Kiracı origin'i, CORS ve CSRF belirteç teslimi",
+  "detail": "Kiracı SPA'sı kendi sitesinden sunulur (`<kiracı>.app.<marka>.com.tr/panel` veya özel alan adı), bu yüzden kiracı sitelerinde `allow_cors` tanımlanmaz ve `\"*\"` hiçbir sitede kullanılmaz (G-119); oturum çerezi kiracı host'una bağlıdır. SPA istekleri credentials include + X-Frappe-CSRF-Token; ignore_csrf ve allowed_referrers kullanılmaz. `get_csrf_token` whitelisted değildir ve token yalnızca www/desk render'ında üretilir, REST-only oturumda CSRF denetimi fiilen kapalıdır (doğrulandı); bu nedenle SPA kabuğu platform_core `www/<panel>.py` sayfasıyla servis edilir ve `context.csrf_token = frappe.sessions.get_csrf_token()` enjekte edilir. Kabul: giriş sonrası csrf_token dolu, tokensiz PATCH 400, tokenli 200; başka origin'den kimlik bilgili istek reddedilir.",
   "rail": "R2 Frappe yapılandırma",
   "priority": "MUST",
   "phase": "P1",
@@ -452,7 +452,7 @@
  {
   "id": "G-46",
   "title": "Oran sınırları ve uç nokta koruması",
-  "detail": "Site Plan.cpu_time_per_day Press tarafından `rate_limit`'e yazılır; Frappe RateLimiter duvar-saati istek süresini ölçer, CPU zamanını değil (doğrulandı), bu yüzden ağır rapor/dışa aktarım işleri arka plan kuyruğuna alınır. max_signups_allowed_per_hour, rate_limit_email_link_login ve password_reset_limit sıkılaştırılır; AI ve ödeme uçları platform_core/press_tr'de `@frappe.rate_limit` ile korunur.",
+  "detail": "Site Plan.cpu_time_per_day Press tarafından `rate_limit`'e yazılır; Frappe RateLimiter duvar-saati istek süresini ölçer, CPU zamanını değil (doğrulandı), ve sayaç anahtarı kullanıcı/IP içermediğinden bütçe tüm site için ortaktır (doğrulandı: frappe/rate_limiter.py v16.51.0); bu bir kaynak izolasyonu değildir (G-147, G-149), bu yüzden ağır rapor/dışa aktarım işleri arka plan kuyruğuna alınır. max_signups_allowed_per_hour, rate_limit_email_link_login ve password_reset_limit sıkılaştırılır; AI ve ödeme uçları platform_core/press_tr'de `@frappe.rate_limit` ile korunur.",
   "rail": "R2 Frappe yapılandırma",
   "priority": "SHOULD",
   "phase": "P2",
@@ -492,7 +492,7 @@
  {
   "id": "G-50",
   "title": "İşçi, zamanlayıcı ve kuyruk boyutlandırması",
-  "detail": "Release Group min/max gunicorn 2/8, background 2/6, gunicorn_threads_per_worker=2, use_rq_workerpool=1, merge_default_and_short_rq_queues=1; Bench.auto_scale_workers=1; common_site_config scheduler_tick_interval=60 ve 'workers': {'long': {'timeout': 3000}} + 'reports' kuyruğu; System Settings.enable_scheduler=1 her yeni sitede doğrulanır; AI görevleri P3'te kendi kuyruğunu alır. Başlangıç değerleri app sunucusu çekirdek sayısına göre ölçeklenir.",
+  "detail": "Release Group min/max gunicorn 2/8, background 2/6, gunicorn_threads_per_worker=2, use_rq_workerpool=1, merge_default_and_short_rq_queues=1; Bench.auto_scale_workers=1; common_site_config scheduler_tick_interval=60 ve 'workers': {'long': {'timeout': 3000}} + 'reports' kuyruğu; System Settings.enable_scheduler=1 her yeni sitede doğrulanır; AI görevleri P3'te kendi kuyruğunu alır. Bunlar başlangıç değerleridir: worker türü ve thread sayısı birlikte seçilir (`threads` yalnız gthread worker'ı etkiler; sync worker'da 1'den büyük değer gthread'e geçirir, doğrulandı: gunicorn ayarları) ve değerler yük ölçümüyle ayarlanır (G-149).",
   "rail": "R2 Frappe yapılandırma",
   "priority": "MUST",
   "phase": "P0",
@@ -502,7 +502,7 @@
  {
   "id": "G-51",
   "title": "PDF üretimi chrome headless_shell ile",
-  "detail": "Print Settings.pdf_generator='chrome'; Press imajı chrome-headless-shell'i Frappe'nin aradığı `frappe-bench/chromium/chrome-linux/headless_shell` yoluna önceden koyar (doğrulandı), bu yüzden `chromium_path` yazılmaz; site_config chromium_max_concurrent=2; Türkçe karakterler için fonts-liberation + Noto Sans imajda doğrulanır; ERPNext standart formatları kabul testinden geçinceye kadar Print Format düzeyinde wkhtmltopdf korunur. Kabul: PDF logunda 'downloading' yok.",
+  "detail": "Print Settings.pdf_generator='chrome'; Press imajı chrome-headless-shell'i Frappe'nin aradığı `frappe-bench/chromium/chrome-linux/headless_shell` yoluna önceden koyar (doğrulandı), bu yüzden `chromium_path` yazılmaz; site_config chromium_max_concurrent=2; Türkçe karakterler için fonts-liberation + Noto Sans imajda doğrulanır; ERPNext standart formatları kabul testinden geçinceye kadar Print Format düzeyinde wkhtmltopdf korunur. İşleyici G-146 izolasyon kuralına uyar: dış URL çekimi kapalı/allowlist'li, yerel dosya erişimi yok; üretimde ayrı render konteyneri hedeflenir, bench imajındaki yerel çalıştırma yalnız geliştirme ortamındadır. Kabul: PDF logunda 'downloading' yok; SSRF test yükleri reddedilir.",
   "rail": "R2 Frappe yapılandırma",
   "priority": "SHOULD",
   "phase": "P1",
@@ -562,7 +562,7 @@
  {
   "id": "G-57",
   "title": "Kullanıcı provizyonu: System User, Role Profile ve e-posta değişmezliği",
-  "detail": "OAuth otomatik oluşturma 'Website User' üretir (doğrulandı), bu yüzden kullanıcılar Keycloak admin event/identity-sync ile platform_core `api.identity.provision` üzerinden önceden 'System User' tipinde, Role Profile'lı ve `User.role_profiles` (Table MultiSelect) ile çoklu uygulama profilli açılır; Frappe v16 'User Invitation' doctype'ı davet için değerlendirilir. Frappe eşlemesi e-posta ile yapıldığından (login_oauth_user get_email, doğrulandı) Keycloak'ta e-posta değişikliği self-service'te kapalıdır ve değişim yalnızca provisioning akışıyla `rename_doc('User')` olarak işlenir; Keycloak kullanıcı silme/devre dışı → User.enabled=0 ve Press `remove_team_member`.",
+  "detail": "OAuth otomatik oluşturma 'Website User' üretir (doğrulandı), bu yüzden kullanıcılar Keycloak admin event/identity-sync ile platform_core `api.identity.provision` üzerinden önceden 'System User' tipinde, Role Profile'lı ve `User.role_profiles` (Table MultiSelect) ile çoklu uygulama profilli açılır; Frappe v16 'User Invitation' doctype'ı davet için değerlendirilir. Kalıcı anahtar `(iss, sub)` çiftidir (G-120); Frappe'nin yerel eşlemesi e-posta ile yapıldığından (login_oauth_user get_email, doğrulandı) Keycloak'ta e-posta değişikliği self-service'te kapalıdır ve değişim yalnızca provisioning akışıyla `rename_doc('User')` olarak işlenir; Keycloak kullanıcı silme/devre dışı → User.enabled=0 ve Press `remove_team_member`.",
   "rail": "R2 Frappe geliştirme",
   "priority": "MUST",
   "phase": "P1",
@@ -581,8 +581,8 @@
  },
  {
   "id": "G-59",
-  "title": "Keycloak JWT doğrulayan auth_hooks adaptörü (servis ve AI çağrıları)",
-  "detail": "Frappe `validate_oauth` yalnızca kendi OAuth Bearer Token kayıtlarını tanır (doğrulandı). platform_core `auth_hooks` içinde `Authorization: Bearer <Keycloak access token>` başlığını realm JWKS (RS256), issuer, audience ve exp ile doğrulayıp e-posta claim'inden `frappe.set_user` yapan adaptör; aynı kütüphane press_tr'de Press için kullanılır. Böylece agent servisi kiracı verisine kullanıcının kendi kimliğiyle ve Frappe'nin olağan yetki katmanından geçerek erişir; Keycloak standart token exchange V2 (iç istemciler) panel → agent delegasyonunu sağlar; CSRF token akışında uygulanmaz.",
+  "title": "auth_hooks adaptörü: site aracı belirteçleri ve servis JWT'leri",
+  "detail": "Frappe `validate_oauth` yalnızca kendi OAuth Bearer Token kayıtlarını tanır (doğrulandı). platform_core `auth_hooks` iki tür bearer'ı yerelde doğrular: (1) kiracı sitesinin oturumdan bastığı kısa ömürlü aracı belirteci (G-148: site anahtarıyla imzalı, `aud` hedef servis + site, `exp` dakikalar, `jti` tek kullanım ve iptal listesi, kapsam), (2) servis hesaplarının Keycloak client-credentials JWT'si (identity-sync; JWKS, `iss`, `aud`, `azp`, `exp`, sabit algoritma). Kullanıcı `(iss, sub)` ile eşlenir (G-120), e-postayla değil. Böylece agent servisi kiracı verisine kullanıcının kimliğiyle ve Frappe'nin olağan yetki katmanından geçerek erişir; aynı kütüphane press_tr'de Press için kullanılır; CSRF akışında uygulanmaz. K-25'te tarayıcı belirteci modeli seçilirse adaptör Keycloak kullanıcı belirtecini de aynı denetimlerle doğrular. P1 prototipi (G-129) bu adaptörün asgari halini staging'de kullanır.",
   "rail": "R2 Frappe geliştirme",
   "priority": "MUST",
   "phase": "P3",
@@ -592,7 +592,7 @@
  {
   "id": "G-60",
   "title": "Access Rule yetki motoru: kayıt kuralları ve hiyerarşi kapsamı (ReBAC/ABAC)",
-  "detail": "platform_core 'Access Rule' doctype'ı (doctype, role, kapsam: own/team/department/company/all, filtre ifadesi JSON, read/write/create/delete/submit bayrakları, is_active) Odoo record rule / Zoho data sharing dengi sağlar; uygulanması Frappe yerel `permission_query_conditions` (liste sorguları) ve `has_permission` (tek belge) hook'larıyla yapılır, hook kayıtları Access Rule tablosundaki doctype listesi için hooks yükünde üretilir (Frappe hook'larının doctype başına kayıt istediği doğrulandı; dinamik kayıt yöntemi: olası). Hiyerarşi: Employee.reports_to ve Department ağacından 'team/department' kapsamı çözülür, Frappe User Permission (is_group ağaç dahil) ve Access Rule birlikte kullanılır; sonuçlar istek başına önbelleklenir; AI araçları aynı yoldan geçer.",
+  "detail": "platform_core 'Access Rule' doctype'ı (doctype, role, kapsam: own/team/department/company/all, filtre ifadesi JSON, read/write/create/delete/submit bayrakları, is_active) Odoo record rule / Zoho data sharing dengi sağlar; uygulanması Frappe yerel `permission_query_conditions` (liste sorguları) ve `has_permission` (tek belge) hook'larıyla yapılır, hook kayıtları Access Rule tablosundaki doctype listesi için hooks yükünde üretilir (Frappe hook'larının doctype başına kayıt istediği doğrulandı; dinamik kayıt yöntemi: olası). Hiyerarşi: Employee.reports_to ve Department ağacından 'team/department' kapsamı çözülür, Frappe User Permission (is_group ağaç dahil) ve Access Rule birlikte kullanılır; sonuçlar istek başına önbelleklenir; AI araçları aynı yoldan geçer. Birleşim kuralı: DocPerm izin verir, Access Rule'lar daraltır; kullanıcıya uyan kurallar OR ile birleşir ve DocPerm ile AND'lenir; deny kuralı yoktur; kuralı olmayan belge türünde DocPerm sonucu geçerlidir, kuralı olan belge türünde hiçbir kural uymazsa erişim yoktur; `priority` yalnız `explain_permission` sırasıdır, sonucu değiştirmez. Create/update'te yeni değerler en az bir yazma kuralının filtresini sağlamalıdır (kaydı kapsam dışına taşıyan güncelleme reddedilir). İlişki türleri P1'de own/team/department/company; DocShare ve takım/proje üyeliği G-122 (P5).",
   "rail": "R2 Frappe geliştirme",
   "priority": "MUST",
   "phase": "P1",
@@ -622,7 +622,7 @@
  {
   "id": "G-63",
   "title": "Shell bootstrap ve meta API",
-  "detail": "platform_core `api.shell.get_bootstrap` tek çağrıda: kullanıcı/roller, kurulu uygulamalar (`frappe.get_installed_apps`), rollere göre filtrelenmiş Workspace Sidebar + Workspace ağacı, Marketplace app → üst menü eşlemesi, abonelik özellik kapıları, System Settings biçim bilgisi, Tenant Branding, csrf; `api.meta.get_doctype` Frappe `/api/v2` + `frappe.desk.form.load.getdoctype` çıktısını Custom Field/Property Setter dahil efektif izinlerle döner; her yanıt meta hash/ETag taşır ve SPA önbelleği site + hash ile anahtarlanır (kiracı özelleştirmesi anında yansır).",
+  "detail": "platform_core `api.shell.get_bootstrap` tek çağrıda: kullanıcı/roller, kurulu uygulamalar (`frappe.get_installed_apps`), rollere göre filtrelenmiş Workspace Sidebar + Workspace ağacı, Marketplace app → üst menü eşlemesi, abonelik özellik kapıları, System Settings biçim bilgisi, Tenant Branding, csrf; `api.meta.get_doctype` Frappe `/api/v2` + `frappe.desk.form.load.getdoctype` çıktısını Custom Field/Property Setter dahil efektif izinlerle döner; her yanıt meta hash/ETag taşır. Önbellek iki katmanlıdır: şema katmanı (DocType + Custom Field + Property Setter) site + `meta_hash` ile anahtarlanır ve tarayıcıda IndexedDB'de tutulabilir; kullanıcıya bağlı efektif izin katmanı (site, kullanıcı, `perm_version`) ile anahtarlanır ve yalnız bellekte tutulur; rol, Role Profile, User Permission veya Access Rule değişimi `perm_version`'ı artırır; çıkış ve kiracı değişiminde tarayıcı katmanları silinir. Kabul: aynı DocType için iki kullanıcı testi ve izin değişiminde geçersizleme.",
   "rail": "R2 Frappe geliştirme",
   "priority": "MUST",
   "phase": "P1",
@@ -652,7 +652,7 @@
  {
   "id": "G-66",
   "title": "Frontend teknoloji yığını, monorepo ve koşullu yükleme",
-  "detail": "React + TypeScript + Vite monorepo (pnpm workspaces): `@platform/shell`, `@platform/frappe-sdk`, `@platform/meta-ui`, `@platform/design-tokens`, `@platform/ai-sidebar`, uygulama paketleri (`@apps/cronhr` ...); Ant Design v5 (v6 kararlı sürümde tek majör geçişi ADR ile), @ant-design/x tüm AI/sohbet/agent UI'ında birinci sınıf, TanStack Query/Router/Table/Form. Uygulama modülleri yalnızca kurulu uygulamalar için dinamik import ile yüklenir; performans bütçesi (ilk yük JS ≤ 300 KB gzip, LCP ≤ 2,5 s 4G) CI'da Lighthouse ile ölçülür.",
+  "detail": "React + TypeScript + Vite monorepo (pnpm workspaces): `@platform/shell`, `@platform/frappe-sdk`, `@platform/meta-ui`, `@platform/design-tokens`, `@platform/ai-sidebar`, uygulama paketleri (`@apps/cronhr` ...); Ant Design 6 + @ant-design/x 2 (X 2.9.0 eş bağımlılığı `antd ^6.1.1`; doğrulandı: npm, 2026-10-08), @ant-design/x tüm AI/sohbet/agent UI'ında birinci sınıf, TanStack Query/Router/Table/Form. Uygulama modülleri yalnızca kurulu uygulamalar için dinamik import ile yüklenir; performans bütçesi (ilk yük JS ≤ 300 KB gzip, LCP ≤ 2,5 s 4G) CI'da Lighthouse ile ölçülür.",
   "rail": "R3 Frontend",
   "priority": "MUST",
   "phase": "P1",
@@ -742,7 +742,7 @@
  {
   "id": "G-75",
   "title": "SPA teslimi ve origin yerleşimi",
-  "detail": "Tek SPA build'i platform_core içinde paketlenir ve her kiracı sitede `https://<kiracı>.<marka>.com.tr/panel` www sayfasıyla servis edilir (CSRF ve same-site çerez için, bkz. G-45); kiracı öncesi akışlar (Keycloak dönüşü, takım/site seçimi, deneme başlatma, faturalama) `https://panel.<marka>.com.tr` üzerinde press_tr www sayfasıyla aynı SPA'dan sunulur; Press deploy'u frontend deploy'udur (Deploy Candidate), ek CDN gerekmez; CSP, HSTS ve Referrer-Policy başlıkları nginx'te tanımlanır.",
+  "detail": "Tek SPA build'i platform_core içinde paketlenir ve her kiracı sitede `https://<kiracı>.app.<marka>.com.tr/panel` (veya kiracının özel alan adı) www sayfasıyla aynı origin'den servis edilir (CSRF ve host'a bağlı çerez için, bkz. G-45, G-119); kiracı öncesi akışlar (Keycloak dönüşü, takım/site seçimi, deneme başlatma) ve Press ekranları (mağaza, faturalama) Press sitesinin public alan adı `https://panel.<marka>.com.tr` üzerinde press_tr www sayfasıyla aynı SPA'dan sunulur; Press deploy'u frontend deploy'udur (Deploy Candidate), ek CDN gerekmez; CSP, HSTS, Referrer-Policy ve Permissions-Policy başlıkları nginx'te tanımlanır (G-145); Permissions-Policy paylaşım için `web-share` özelliğini kapatmaz (G-131).",
   "rail": "R3 Frontend",
   "priority": "MUST",
   "phase": "P1",
@@ -752,7 +752,7 @@
  {
   "id": "G-76",
   "title": "Keycloak kurulumu: HA, PostgreSQL, yedek ve olay günlüğü",
-  "detail": "Keycloak 26.x (sürüm: olası, kurulumda doğrulanır) Hetzner'de en az iki düğüm + PostgreSQL (streaming replika), Press proxy veya ayrı nginx arkasında `https://id.<marka>.com.tr`, Infinispan küme, günlük şifreli DB yedeği ikinci lokasyona, admin konsolu yalnızca Tailscale/özel ağdan; kullanıcı ve admin olayları (login, logout, login_error, update_email, admin events) etkin ve Log Server'a aktarılır, saklama KVKK/5651 ile hizalı.",
+  "detail": "Keycloak 26.x (sürüm: olası, kurulumda doğrulanır) Hetzner'de en az iki düğüm + PostgreSQL (streaming replika), Press proxy veya ayrı nginx arkasında `https://id.<marka>.com.tr`, Infinispan küme, günlük şifreli DB yedeği ikinci lokasyona, admin konsolu ve Admin REST API yalnızca Tailscale/özel ağdan, public host'ta reverse proxy düzeyinde kapalı (ayrı `hostname-admin` tek başına yetmez; G-144); kullanıcı ve admin olayları (login, logout, login_error, update_email, admin events) etkin ve Log Server'a aktarılır, saklama KVKK/5651 ile hizalı.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P0",
@@ -762,7 +762,7 @@
  {
   "id": "G-77",
   "title": "Realm ve client modeli: tek realm, Organizations, kiracı client'ları",
-  "detail": "Tek realm 'platform'; client'lar: `panel-spa` (public, PKCE, redirect panel + kiracı /panel), `press` (confidential, Press Social Login Key), kiracı başına `site-<kiracı>` confidential client (Frappe Social Login Key redirect `https://<kiracı>.<marka>.com.tr/api/method/frappe.integrations.oauth2_logins.login_via_keycloak`; Keycloak host wildcard'ı desteklemediği için identity-sync Admin API ile oluşturur, olası), `agent-service` (service account), `identity-sync` (Admin API). Keycloak Organizations ile her Press Team bir Organization'dır (üyelik, alan adı, davet, token'da organization claim'i; Organizations 26'da GA: olası); roller Frappe'ye değil Press Role/Frappe Role Profile'a eşlenir (yetki kaynağı uygulama tarafıdır).",
+  "detail": "Tek realm 'platform'; client'lar: `press` (confidential, Press Social Login Key), kiracı başına `site-<kiracı>` confidential client (Frappe Social Login Key redirect `https://<kiracı>.app.<marka>.com.tr/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` ve özel alan adı varsa onun tam adresi, G-124; Keycloak host joker'ı desteklemediği için identity-sync Admin API ile oluşturur, olası), `agent-service` (service account), `identity-sync` (Admin API). Önerilen belirteç modelinde (K-25, G-148) tarayıcıya belirteç veren public `panel-spa` istemcisi açılmaz; tarayıcı belirteci modeli seçilirse PKCE S256 zorunlu public istemci olarak eklenir. Keycloak Organizations ile her Press Team bir Organization'dır (üyelik, alan adı, davet, token'da organization claim'i; Organizations 26.0'dan beri tam destekli, doğrulandı: Keycloak 26.0.0 duyurusu); organization claim'i yetki kaynağı değildir, üyelik Press Team kaydına karşı doğrulanır (G-16); roller Press Role/Frappe Role Profile'a eşlenir.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P1",
@@ -802,7 +802,7 @@
  {
   "id": "G-81",
   "title": "identity-sync servisi: Keycloak olayları → Press ve Frappe provizyonu",
-  "detail": "Keycloak Event Listener SPI (webhook) veya admin event polling ile user create/update/delete/disable, organization membership ve email değişikliği olayları alınır; press_tr `api.identity.*` ve platform_core `api.identity.*` uçlarına imzalı çağrılarla Team üyeliği, kiracı client oluşturma, Frappe System User provizyonu, rename_doc ve deprovisyon yapılır; idempotent, yeniden denemeli, ölü-mektup kuyruğu ve mutabakat (nightly reconcile) işi; kod agent servisiyle aynı depoda ayrı süreç olarak yaşar.",
+  "detail": "Keycloak Event Listener SPI (tek izinli SPI istisnası: küçük, sürümlü, her minor sürüme karşı sözleşme testli; G-152) veya admin event polling ile user create/update/delete/disable, organization membership ve email değişikliği olayları alınır; press_tr `api.identity.*` ve platform_core `api.identity.*` uçlarına imzalı çağrılarla Team üyeliği, kiracı client oluşturma, Frappe System User provizyonu, rename_doc ve deprovisyon yapılır; idempotent, yeniden denemeli, ölü-mektup kuyruğu ve mutabakat (nightly reconcile) işi; kod agent servisiyle aynı depoda ayrı süreç olarak yaşar.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P1",
@@ -811,8 +811,8 @@
  },
  {
   "id": "G-82",
-  "title": "Servis kimlikleri ve delegasyon: client credentials ve token exchange",
-  "detail": "`agent-service` ve `identity-sync` client credentials ile Keycloak'a; panel → agent delegasyonu Keycloak standart token exchange V2 (iç istemciler, destekleniyor; harici exchange preview, kullanılmaz) ile kullanıcı adına kısa ömürlü, audience kısıtlı token üretir ve agent bu token'ı platform_core auth_hooks (G-59) üzerinden kiracı siteye, Press OAuth Client bearer'ını (G-28) Press'e taşır; token'larda `azp`, `aud` ve organization claim'i denetlenir; hiçbir servis kullanıcı adına uzun ömürlü API key saklamaz.",
+  "title": "Servis kimlikleri ve delegasyon: client credentials, aracı belirteci, token exchange",
+  "detail": "`agent-service` ve `identity-sync` client credentials ile Keycloak'a bağlanır. Kullanıcı adına delegasyon önerilen modelde (K-25) kiracı sitesinin bastığı aracı belirteciyle yapılır (G-148); agent bu belirteçle kiracı siteye (G-59), Press OAuth Client bearer'ıyla Press'e (G-28) gider. Keycloak standart token exchange V2 (26.2'den beri destekli ve varsayılan açık, yalnız iç istemciler arası; doğrulandı) yalnız servisler arası audience değişimi gerekirse veya K-25'te tarayıcı belirteci modeli seçilirse kullanılır; harici exchange (preview) kullanılmaz. Belirteçlerde `azp`, `aud` ve kapsam denetlenir; hiçbir servis kullanıcı adına uzun ömürlü API key saklamaz.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P3",
@@ -842,7 +842,7 @@
  {
   "id": "G-85",
   "title": "Yetki eşitliği: AI aksiyonları kullanıcının kimliğiyle ve aynı sunucu taraflı katmandan",
-  "detail": "Kiracı verisine erişen her araç çağrısı kullanıcının Keycloak token'ıyla (G-59/G-82) yapılır; agent'ın kendi hesabı kiracı verisine erişmez; Frappe has_permission, Access Rule ve alan yetkileri aynen uygulanır; Press ticari aksiyonları kullanıcıya bağlı Press bearer'ı ile; negatif testler: yetkisiz doctype, kayıt kuralı dışı belge, permlevel alanı, başka takımın sitesi → reddedilir ve AI Action Log'a 'denied' yazılır.",
+  "detail": "Kiracı verisine erişen her araç çağrısı kullanıcının kimliğini taşıyan aracı belirteciyle (G-148, G-59) yapılır; agent'ın kendi hesabı kiracı verisine erişmez; Frappe has_permission, Access Rule ve alan yetkileri aynen uygulanır; Press ticari aksiyonları kullanıcıya bağlı Press bearer'ı ile; negatif testler: yetkisiz doctype, kayıt kuralı dışı belge, permlevel alanı, başka takımın sitesi → reddedilir ve AI Action Log'a 'denied' yazılır.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -851,8 +851,8 @@
  },
  {
   "id": "G-86",
-  "title": "Önizle + onayla ve yıkıcı aksiyon sınıflandırması",
-  "detail": "Sil, iptal, onayla (submit), toplu güncelleme, ödeme/plan/kurulum ve dış sisteme gönderim araçları 'destructive' veya 'billable' işaretlidir; confirm=false çağrısı etkilenecek kayıtların diff/özetini ve maliyet etkisini döner, UI @ant-design/x Actions ile onay ister, confirm=true yalnızca aynı önizleme hash'i ile kabul edilir (süre sınırlı); haiku sınıflandırıcı serbest metin isteğini aksiyon sınıfına atar ve belirsizlikte onay zorunlu kılar; otomatik zincirleme yıkıcı aksiyon yapılmaz.",
+  "title": "Önizle + onayla: her yazma, sunucuda bağlanan onay",
+  "detail": "Insert ve update dahil her yazma, silme, iptal, onaylama (submit), toplu güncelleme, ödeme/plan/kurulum ve dış sisteme gönderim aracı aynı sunucu tarafı sözleşmeden geçer: `confirm=false` etkilenecek kayıtların diff/özetini ve maliyet etkisini döner, UI @ant-design/x Actions ile onay ister. Risk sınıfı modelin sınıflandırmasıyla değil, araç manifesti ve sunucu tarafından belirlenir; haiku sınıflandırıcı yalnız yönlendirme ipucudur. Onay belirteci kullanıcı, site, araç, hedef belge ve sürümü (`modified`), fiyat sürümü ve önizleme özetine bağlıdır, tek kullanımlıktır ve TTL'lidir; uygulama anında yetki yeniden denetlenir; belge veya fiyat değiştiyse yeniden önizleme istenir; yeniden oynatma ve çift uygulama reddedilir; otomatik zincirleme yazma yapılmaz. Kabul: replay, süresi dolmuş onay, değişmiş belge ve başka kullanıcının onayı negatif testleri.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -872,7 +872,7 @@
  {
   "id": "G-88",
   "title": "Sağ AI paneli @ant-design/x ile, bağlam farkındalığı ve tek tık akışları",
-  "detail": "Shell sağ paneli (320 px'te tam ekran Drawer) @ant-design/x Bubble, Sender, Conversations, Prompts, Suggestion, ThoughtChain, Actions, Attachments bileşenleriyle; SSE akışı; açık sayfa bağlamı (doctype, belge, seçili satırlar, filtreler) yapılandırılmış olarak gönderilir; her uygulama 'tek tık' akışlarını (örn. 'bu çalışanın izin bakiyesini güncelle ve yöneticiye bildir') Prompts olarak bildirir; haiku ile niyet yönlendirme; panelden Press ticari aksiyonları (plan yükselt, uygulama etkinleştir) aynı önizle+onayla ile; klavye erişilebilirliği ve tek odak göstergesi.",
+  "detail": "Shell sağ paneli (yardım paneliyle aynı sağ yuva, G-137; 390 px ve altında tam ekran çekmece) @ant-design/x Bubble, Sender, Conversations, Prompts, Suggestion, ThoughtChain, Actions, Attachments bileşenleriyle; SSE akışı; açık sayfa bağlamı (doctype, belge, seçili satırlar, filtreler) yapılandırılmış olarak gönderilir; her uygulama 'tek tık' akışlarını (örn. 'bu çalışanın izin bakiyesini güncelle ve yöneticiye bildir') Prompts olarak bildirir; haiku ile niyet yönlendirme; panelden Press ticari aksiyonları (plan yükselt, uygulama etkinleştir) aynı önizle+onayla ile; klavye erişilebilirliği ve tek odak göstergesi.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -891,8 +891,8 @@
  },
  {
   "id": "G-90",
-  "title": "KVKK: Anthropic API aktarımı, PII azaltma ve veri saklama",
-  "detail": "Anthropic API çağrısı yurt dışına aktarımdır; standart sözleşme/bildirim kapsamına Anthropic eklenir, aydınlatma metni ve veri envanterinde 'AI işleme' alıcı olarak yer alır, kiracı admin AI özelliğini takım düzeyinde kapatabilir; TCKN/IBAN/kart gibi tanımlayıcılar haiku + regex ile gönderim öncesi maskelenir; Anthropic veri saklama/eğitim dışı tutma koşulları sözleşmede teyit edilir (koşul: teyit gerekli); konuşma içerikleri Hetzner dışında saklanmaz.",
+  "title": "KVKK: AI aktarımı, ilk dış çağrıdan önce yerel maskeleme ve saklama",
+  "detail": "Saklama, işleme ve aktarım ayrı tanımlanır: konuşma kayıtları Hetzner'deki agent veritabanında saklanır; model çağrısı Anthropic API'de işlenir ve yurt dışına aktarımdır. İlk dış model çağrısından (haiku sınıflandırıcı dahil) önce yerel ve deterministik veri seçimi ve maskeleme uygulanır: araç yalnız gereken alanları döner, permlevel ile gizli alanlar gönderilmez, TCKN/VKN/IBAN/kart ve ortak sözlükteki kişisel veri sınıfları regex + alan sınıfıyla maskelenir; ham kişisel veri hiçbir dış modele maskelenmeden gitmez. Hetzner'in AB'de olması KVKK yurt dışı aktarım şartlarını tek başına karşılamaz; Türkiye dışındaki saklama ve işleme için uygun aktarım mekanizması hukukça belirlenir (G-116). Anthropic veri saklama/eğitim dışı tutma koşulları sözleşmede teyit edilir (koşul: teyit gerekli); kiracı admin AI özelliğini takım düzeyinde kapatabilir. Kabul: maskeleme golden testleri ve ağ kaydında ham değer olmadığının kanıtı.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -942,7 +942,7 @@
  {
   "id": "G-95",
   "title": "Uygulama mağazası, aktivasyon UX ve onboarding",
-  "detail": "Zoho/Odoo tarzı katalog (`press.api.marketplace.get_apps_with_plans` TRY sarmalayıcı), uygulama detayı, 'Etkinleştir' → plan seçimi → ödeme yöntemi kontrolü (iyzico saklı kart) → `install_app` → Agent Job ilerleme (realtime) → sidebar yenilenir; Site Active değilken kuyruğa alma; kaldırma geri bildirimli, plan değiştirme önizle+onayla (G-30); kurulumdan sonra uygulamanın Module Onboarding adımları ve demo verisi seçeneği headless onboarding paneli olarak sunulur; ücretsiz uygulamalar aynı akıştan tek adımda.",
+  "detail": "Zoho/Odoo tarzı katalog (`press.api.marketplace.get_apps_with_plans` TRY sarmalayıcı), uygulama detayı, 'Etkinleştir' → plan seçimi → ödeme yöntemi kontrolü (iyzico saklı kart) → `install_app` → Agent Job ilerleme (realtime) → sidebar yenilenir; Site Active değilken kuyruğa alma; kaldırma geri bildirimli, plan değiştirme önizle+onayla (G-30); kurulumdan sonra uygulamanın turu ve görev listesi G-139 motoruyla (kullanıcı başına sürümlü ilerleme; Module Onboarding tamamlanma bayrağı site düzeyinde olduğundan ilerleme kaynağı değildir) ve demo verisi seçeneği sunulur; ücretsiz uygulamalar aynı akıştan tek adımda.",
   "rail": "Shell",
   "priority": "MUST",
   "phase": "P4",
@@ -1002,7 +1002,7 @@
  {
   "id": "G-101",
   "title": "Denetim görüntüleyici, destek erişimi onayı ve yardım",
-  "detail": "Admin için Activity Log, Version farkları, Permission Log, AI Action Log ve Press Site Activity görüntüleyici (filtre, dışa aktarım); Support Access taleplerini onaylama/süre verme ekranı (G-18); yardım menüsü: dokümantasyon, durum sayfası, destek talebi (Helpdesk entegrasyonu MAY), özel alan adı ve yedek indirme akışları buradan erişilir.",
+  "detail": "Admin için Activity Log, Version farkları, Permission Log, AI Action Log ve Press Site Activity görüntüleyici (filtre, dışa aktarım); Support Access taleplerini onaylama/süre verme ekranı (G-18); yardım menüsü: dokümantasyon, durum sayfası, destek talebi (Helpdesk entegrasyonu MAY); sayfa/alan yardımı G-137/G-138 yardım kulakçığıyla, özel alan adı ve yedek indirme akışları buradan erişilir.",
   "rail": "Shell",
   "priority": "SHOULD",
   "phase": "P2",
@@ -1022,7 +1022,7 @@
  {
   "id": "G-103",
   "title": "Frontend uygulama modülü sözleşmesi",
-  "detail": "Her uygulama `@apps/<ad>` paketi dışa aktarır: TanStack Router rota ağacı, per-doctype override'lar, ikon/çeviri, dashboard widget'ları, onboarding adımları, AI Prompts ve araç manifesti; Shell paketi yalnızca kurulu uygulamalar için dinamik import eder; paket tasarım tokenlarını kullanır, kendi tema/sabit değer taşımaz; sözleşme TypeScript arayüzüyle (`AppModule`) tiplenir ve CI'da doğrulanır.",
+  "detail": "Her uygulama `@apps/<ad>` paketi dışa aktarır: TanStack Router rota ağacı, per-doctype override'lar, ikon/çeviri, dashboard widget'ları, yardım konuları, tur ve keşif tanımları (G-141), AI Prompts ve araç manifesti; Shell paketi yalnızca kurulu uygulamalar için dinamik import eder; paket tasarım tokenlarını kullanır, kendi tema/sabit değer taşımaz; sözleşme TypeScript arayüzüyle (`AppModule`) tiplenir ve CI'da doğrulanır.",
   "rail": "App çerçevesi",
   "priority": "MUST",
   "phase": "P4",
@@ -1102,7 +1102,7 @@
  {
   "id": "G-111",
   "title": "CI/CD boru hattı",
-  "detail": "GitHub Actions: backend ruff + `bench run-tests` (MariaDB servis), çeviri derleme, frontend lint/typecheck/unit/Playwright matrisi/Lighthouse bütçesi, bağımlılık ve secret taraması; etiketle App Release (Press GitHub App) → staging auto deploy → E2E aktivasyon testi (trial → etkinleştir → sidebar) → prod zamanlanmış deploy; Press ve Agent güncellemeleri staging'de denenir; Git yazar koruması ve bot co-author yasağı korunur, hook'lar atlanmaz.",
+  "detail": "GitHub Actions: backend ruff + `bench run-tests` (MariaDB servis), çeviri derleme, frontend lint/typecheck/unit/Playwright matrisi/Lighthouse bütçesi, bağımlılık ve secret taraması (OSV/`npm audit`/`pip-audit` kapısı, Actions tam commit SHA'sına sabitli, sürüm başına SBOM); etiketle App Release (Press GitHub App) → staging auto deploy → E2E aktivasyon testi (trial → etkinleştir → sidebar) → prod zamanlanmış deploy; Press ve Agent güncellemeleri staging'de denenir; Git yazar koruması ve bot co-author yasağı korunur, hook'lar atlanmaz.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P1",
@@ -1122,7 +1122,7 @@
  {
   "id": "G-113",
   "title": "İzleme, uyarı, hata izleme ve kapasite",
-  "detail": "Press Monitor Server (Prometheus/Grafana) ve Log Server (Elasticsearch/Kibana) + Incident Settings (G-36); Frappe v16 Sentry yalnızca FRAPPE_SENTRY_DSN/SENTRY_* ortam değişkenlerinden başlar (doğrulandı) → Release Group environment_variables ile self-host GlitchTip'e, before_send ile PII temizliği, Press Settings.agent_sentry_dsn; common_site_config 'monitor': 1; harici uptime kontrolü; SLO hedefleri (aylık %99,5 kullanılabilirlik) ve kapasite/maliyet modeli (sunucu başına bench/site, Object Storage GFS maliyeti) üç ayda bir güncellenir.",
+  "detail": "Press Monitor Server (Prometheus/Grafana) ve Log Server (Elasticsearch/Kibana) + Incident Settings (G-36); Frappe v16 Sentry yalnızca FRAPPE_SENTRY_DSN/SENTRY_* ortam değişkenlerinden başlar (doğrulandı) → Release Group environment_variables ile self-host GlitchTip'e, before_send ile PII temizliği, Press Settings.agent_sentry_dsn; common_site_config 'monitor': 1; harici uptime kontrolü; roller ayrıdır: log/metrik/iz işletme içindir, birinci taraf RUM performans içindir (G-149), pazarlama analitiği rıza kapısına bağlıdır (G-134, G-135), iş zekâsı Metabase'dir (G-136), denetim kayıtları ayrı saklama matrisine bağlıdır; `X-Request-Id` log ve izlerde ortaktır, pazarlama araçlarına gönderilmez; SLO hedefleri (aylık %99,5 kullanılabilirlik, öneri) ve kapasite/maliyet modeli (sunucu başına bench/site, Object Storage GFS maliyeti) üç ayda bir güncellenir.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P0",
@@ -1142,7 +1142,7 @@
  {
   "id": "G-115",
   "title": "Uygulama güvenliği",
-  "detail": "TLS 1.2+, HSTS, CSP (SPA ve Keycloak teması), Referrer-Policy, çerez Secure/SameSite=Lax; bağımlılık güncellemeleri (Dependabot/Renovate) ve CVE taraması; yayın öncesi bağımsız sızma testi (panel, Press API, Keycloak, agent); Wazuh/YARA kararı ve Server Firewall; sorumlu açıklama (security.txt) politikası; yetki ve CSRF negatif testleri CI'da.",
+  "detail": "TLS 1.2+, HSTS, CSP (SPA ve Keycloak teması; panel kuralları G-145), SSRF savunması (G-146), Referrer-Policy, çerez Secure/SameSite=Lax; bağımlılık güncellemeleri (Dependabot/Renovate) ve CVE taraması; yayın öncesi bağımsız sızma testi (panel, Press API, Keycloak, agent); Wazuh/YARA kararı ve Server Firewall; sorumlu açıklama (security.txt) politikası; yetki ve CSRF negatif testleri CI'da.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P2",
@@ -1152,7 +1152,7 @@
  {
   "id": "G-116",
   "title": "KVKK programı ve kiracı ayrılış/silme SLA'sı",
-  "detail": "Her kiracıyla veri işleyen–veri sorumlusu sözleşmesi, VERBİS kaydı, veri envanteri (Hetzner DE/FI, SMTP sağlayıcısı, GlitchTip, Anthropic dahil tüm yurt dışı alıcılar), Kurul standart sözleşmesi ve 5 iş günü içinde bildirim (7499 değişikliği: olası, hukuk teyidi), veri ihlali 72 saat runbook'u, panel ilk girişte aydınlatma kaydı, saklama/imha politikası (G-24, G-52 süreleriyle aynı). Ayrılış: `Site.archive(create_offsite_backup=True)` → sözleşmedeki saklama süresi (karar: 30 gün) sonunda `delete_offsite_backups(keep_latest=False)` + `delete_physical_backups`, Site Config'teki Password sırlarının temizliği, Hetzner nesnelerinin silindiğinin doğrulanması ve imzalı silme teyidi; Press'in kendi kişisel verileri (Team, Account Request, Site Activity) için ayrı süre; Team Deletion Request akışı belgelenir.",
+  "detail": "Her kiracıyla veri işleyen–veri sorumlusu sözleşmesi, VERBİS kaydı, veri envanteri (Hetzner DE/FI barındırma da Türkiye dışı aktarımdır; SMTP sağlayıcısı, GlitchTip, Anthropic ve etkinleştirilen ölçüm satıcıları dahil tüm yurt dışı alıcılar), Kurul standart sözleşmesi ve imzadan sonra 5 iş günü içinde Kurula bildirim (7499 sonrası KVKK duyurusu; uygulanabilirliği ve aktarım mekanizması hukuk teyidi), veri ihlali 72 saat runbook'u, panel ilk girişte aydınlatma kaydı, saklama/imha politikası (G-24, G-52 süreleriyle aynı). Ayrılış: `Site.archive(create_offsite_backup=True)` → sözleşmedeki saklama süresi (karar: 30 gün) sonunda `delete_offsite_backups(keep_latest=False)` + `delete_physical_backups`, Site Config'teki Password sırlarının temizliği, Hetzner nesnelerinin silindiğinin doğrulanması ve imzalı silme teyidi; Press'in kendi kişisel verileri (Team, Account Request, Site Activity) için ayrı süre; Team Deletion Request akışı belgelenir.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P2",
@@ -1172,12 +1172,372 @@
  {
   "id": "G-118",
   "title": "Repo görünürlüğü, lisans ve Git yazarlık politikası",
-  "detail": "Platform depoları (press_tr, platform_core, tr_localization, panel monorepo, agent) varsayılan olarak public/açık kaynak; lisans seçimi (örn. AGPL-3.0 Frappe uyumu veya MIT) ürün sahibinin açık onayıyla ve onaysız değiştirilmez; sırlar, gerçek .env ve yedekler depoya girmez (G-112); public kaynak kod servisleri internete açma talimatı değildir, Tailscale/özel ağ kuralları korunur; tüm commit'ler karacaismail yazar/committer kimliğiyle, bot co-author ve üretim imzası olmadan, yazar koruması atlanmadan yapılır.",
+  "detail": "Platform depoları (press_tr, press_tr_finance, press_ops_bridge, platform_core, tr_localization, panel monorepo, agent) varsayılan olarak public/açık kaynak; lisans seçimi ürün sahibinin açık onayı ve hukuk değerlendirmesiyle yapılır (K-1) ve onaysız değiştirilmez. Bağımlılık lisansları karar girdisidir, hüküm değildir: Frappe Framework MIT, ERPNext/HRMS GPL-3.0, Press/Agent/CRM/Helpdesk AGPL-3.0 (doğrulandı); kod ilişkisi (aynı süreçte genişletme mi, API üzerinden mi) ve dağıtım biçimi birlikte değerlendirilir; karar sonrası SPDX başlıkları ve CI lisans taraması. Sırlar, gerçek .env ve yedekler depoya girmez (G-112); public kaynak kod servisleri internete açma talimatı değildir, Tailscale/özel ağ kuralları korunur; tüm commit'ler karacaismail yazar/committer kimliğiyle, bot co-author ve üretim imzası olmadan, yazar koruması atlanmadan yapılır.",
   "rail": "Çapraz",
   "priority": "SHOULD",
   "phase": "P0",
   "source": "configure",
   "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-119",
+  "title": "Host'a bağlı oturum ve origin sözleşmesi",
+  "detail": "Press, panel, operasyon sitesi ve her kiracı kendi host'una bağlı `sid` çerezini kullanır (Domain özniteliği yok, Secure, HttpOnly, SameSite=Lax); tek Keycloak SSO oturumu Frappe siteleri arasında ortak oturum anlamına gelmez, her site kendi OIDC dönüşüyle oturum açar. `panel.<marka>.com.tr` Press sitesinin public alan adıdır ve SPA'yı press_tr www sayfasıyla sunar; panel → Press istekleri aynı origin'dedir. `press.<marka>.com.tr` Press Desk/operatör host'udur, yalnız Tailscale/özel ağdan erişilir (G-6) ve oturumu ayrıdır. Kiracı SPA'sı yalnız kendi sitesine istek atar. Bu yüzden hiçbir Frappe sitesinde `allow_cors` gerekmez; ileride gerekirse tam eşleşmeli liste kullanılır, `\"*\"` asla (Frappe joker alt alan desteklemez ve `\"*\"` origin'i kimlik bilgisiyle yansıtır; doğrulandı: frappe/app.py v16.51.0). Agent servisi ve Hocuspocus çerez kullanmaz: site tarafından basılan aracı belirteci/bilet taşınır (G-148) ve Origin kayıtlı kiracı host'larına karşı denetlenir. CSRF belirteci her sitenin www sayfasından (G-45), realtime kimliği aynı host'un oturumundan gelir. Kabul: Press/panel/kiracı/özel alan adı giriş-çıkış E2E; başka origin'den kimlik bilgili istek CORS izni almaz; bir kiracının çerezi diğer kiracıya ve press. host'una gönderilmez; CSRF'siz yazma 400.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi + Hüseyin Cengiz (nginx/CORS yapılandırması)"
+ },
+ {
+  "id": "G-120",
+  "title": "Kalıcı kullanıcı kimliği: (issuer, sub) eşlemesi",
+  "detail": "Kullanıcının kalıcı anahtarı e-posta değil Keycloak `(iss, sub)` çiftidir; Press User, kiracı User ve operasyon sitesi kullanıcısı bu çifti Custom Field olarak taşır (tekil indeks) ve OIDC dönüşünde eşleme önce bu alanla yapılır; e-posta yalnız iletişim özniteliğidir. Frappe'nin e-postayla eşleyen `login_oauth_user` davranışı platform_core/press_tr giriş kancasıyla sarılır; eşleşmeyen `sub` için hesap otomatik bağlanmaz, provizyon kuyruğuna düşer. Kabul: e-posta değişimi, hesabın Keycloak'ta silinip aynı e-postayla yeniden açılması (yeni `sub` eski kayda bağlanmaz), davet, devre dışı bırakma ve yeniden etkinleştirme testleri üç sistemde aynı sonucu verir.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-121",
+  "title": "Veri yüzeyi yetki kapsama matrisi ve negatif testler",
+  "detail": "Her veri yüzeyi aynı yetki kararını vermelidir: `/api/v2/document` liste ve belge, rapor ve Query Report, `frappe.desk.search.search_link` ve global arama, dışa aktarım, yazdırma/PDF, dosya ve ekler, arka plan işleri, özel whitelisted metotlar, MCP araçları ve realtime olayları. Matris her yüzey için kullanılan Frappe yolunu (`get_list` izin uygular, `get_all` uygulamaz; doğrulandı: Frappe Database API), Access Rule ve permlevel uygulamasını ve testi listeler; kullanıcı yüzeyli kodda `get_all`/ham SQL yalnız gerekçeli istisnayla ve lint kuralıyla. Kabul: yetkisiz kayıt ve permlevel alanı için UI'sız doğrudan API negatif testleri her yüzeyde CI'da kırmızı/yeşil kanıtla.",
+  "rail": "R2 Frappe geliştirme",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-122",
+  "title": "İlişki tabanlı paylaşım kataloğu: DocShare, takım/proje üyeliği, müşteri sahipliği",
+  "detail": "G-60'ın P1 kapsamı (own, reports_to ağacı, Department ağacı, company) CRM ve Webshop için ilişki türleriyle genişler: kayıt paylaşımı (Frappe DocShare), takım/proje üyeliği, müşteri/portal sahipliği ve atama (`_assign`). Her ilişki türü tek tanımlı bir yüklemdir ve aynı birleşim kuralına uyar (izin veren kurallar OR, DocPerm ile AND, kural yoksa DocPerm). Zoho/Odoo düzeyi iddiası somut yetenek matrisiyle (ilişki türü × liste/belge/rapor/dışa aktarım) karşılanır. Kabul: matris satırlarının her biri için olumlu ve olumsuz test.",
+  "rail": "R2 Frappe geliştirme",
+  "priority": "MUST",
+  "phase": "P5",
+  "source": "develop",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-123",
+  "title": "Desk davranış uyumluluk matrisi ve güvenli ifade yorumlayıcı",
+  "detail": "Metadata bütün iş ekranlarını kendiliğinden üretmez. Temsilî ekranlar (hrms Leave Application, ERPNext Sales Invoice, CRM Lead) için her davranış üç sınıftan birine yazılır: sunucuda mevcut (controller/validate, panelde ek iş yok), metadata ile karşılanan (`depends_on`, `fetch_from`, `mandatory_depends_on`) ve yeniden geliştirilecek (form script hesaplamaları, özel düğmeler, sorgu filtreleri; override registry'ye iş kalemi). `eval:` ifadeleri `eval`/`new Function` olmadan güvenli bir ayrıştırıcıyla yorumlanır; desteklenmeyen ifade alanı görünür bırakır ve doğrulamayı sunucuya bırakır. Kabul: matris her temsilî ekranda tam; yorumlayıcı golden testleri; CSP `unsafe-eval` gerektirmez.",
+  "rail": "R3 Frontend",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Frontend ekibi + Platform ekibi"
+ },
+ {
+  "id": "G-124",
+  "title": "Özel alan adında kimlik akışı",
+  "detail": "Müşteri alan adı (G-26) ayrı bir kayıtlı alandır: çerez host'a bağlıdır, panel SPA'sı aynı host'tan sunulur (G-119), CSRF www sayfasından gelir, realtime aynı origin'dedir. identity-sync `add_domain`/`remove_domain` olayında `site-<kiracı>` client'ına yalnız o host'un tam redirect ve post-logout URI'sini ekler/çıkarır; joker redirect yoktur. Kabul: özel alan adında giriş, çıkış (RP-initiated + back-channel), CSRF'li yazma ve realtime E2E; kaldırılan alan adına dönüş Keycloak'ta reddedilir.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P2",
+  "source": "develop",
+  "owner": "Platform ekibi; TLS Hüseyin Cengiz"
+ },
+ {
+  "id": "G-125",
+  "title": "Ödeme–abonelik–kurulum durum makinesi ve telafi",
+  "detail": "Satın alma tek durum makinesidir: checkout başladı → ödeme onayı (iyzico callback + retrieve) → Subscription → Agent Job (install_app) → etkin; her geçiş idempotensi anahtarı taşır (iyzico `conversationId` = Press checkout/fatura adı, Agent Job adı). Yinelenen callback tek geçiş üretir; kaybolan iş sonucu mutabakat işiyle sorgulanır; ödeme alınıp kurulum başarısızsa yeniden deneme, sonra kredi iadesi veya iade + destek kaydı (telafi) çalışır; aynı uygulama için ikinci aktivasyon reddedilir. Kabul: yinelenen callback, kayıp iş sonucu, ödeme var/kurulum yok ve çift aktivasyon senaryoları staging'de geçer.",
+  "rail": "R1 Press",
+  "priority": "MUST",
+  "phase": "P2",
+  "source": "develop",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-126",
+  "title": "API sahiplik kaydı",
+  "detail": "Her özel uç nokta kayıtta bir satırdır: durum (upstream hazır / yeni özel / upstream yaması), sahip uygulama ve dosya (`press_tr`, `press_tr_finance`, `press_ops_bridge`, `platform_core`), kimlik, izin, hata biçimi ve sürüm. Ad alanı sahibi uygulamayla aynıdır: operatör ticari uçları `press_tr.api.ops.*` (eski taslaktaki `press.api.ops` adı kullanılmaz; Press çekirdeğine kod eklenmez); `create-fc-invoice` ve `delete-fc-team` adları Press'in istemci kodunda sabit olduğu için operasyon sitesinde `press_tr_finance` içindeki whitelisted fonksiyona `override_whitelisted_methods` ile bağlanır (eşleme doğrulandı: frappe/handler.py v16.51.0). Kabul: uygulamaların `api_manifest`'i ile kayıt CI'da karşılaştırılır; kayıtsız whitelisted metot derlemeyi düşürür.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-127",
+  "title": "Uygulama durum modeli: kurulu, abone, etkin, askıda, salt okunur",
+  "detail": "Satılan her uygulama için beş durum ayrı tutulur: `installed` (bench'te ve sitede kurulu), `subscribed` (Marketplace App Subscription aktif), `enabled` (kiracı admin açık), `suspended` (dunning/askı) ve `read_only` (deneme bitişi, plan düşürme). Sunucu kapısı (`has_feature`, `@require_feature`) duruma göre okuma/yazma/dışa aktarma kararını verir; geçişte `subscription_update_hook` + `meta_changed` önbelleği düşürür (G-35 önbelleği dahil). KVKK gereği askıda ve salt okunur durumda veri dışa aktarımı açık kalır. Kabul: her geçiş için sunucu kapısı ve önbellek iptali testi; askıdaki uygulamaya API yazması 403.",
+  "rail": "App çerçevesi",
+  "priority": "MUST",
+  "phase": "P4",
+  "source": "develop",
+  "owner": "Platform ekibi + App ekibi"
+ },
+ {
+  "id": "G-128",
+  "title": "Kaynak ve doğrulama defteri",
+  "detail": "Sürüm, davranış ve lisans iddiaları kaynak defterine yazılır: iddia, kalıcı kaynak (etiket veya commit SHA'lı bağlantı, resmi doküman), sürüm, doğrulama türü (kod okuma / resmi doküman / sürüm notu / deney) ve tarih. Dokümandaki '(doğrulandı)' işaretleri defter kaydına dayanır; hareketli dal (`master`, `develop`) tek başına kanıt sayılmaz; sürüm değişince ilgili kayıtlar yeniden doğrulanır. Kabul: yeni eklenen her doğrulanmış iddianın defterde karşılığı var.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P0",
+  "source": "configure",
+  "owner": "Platform ekibi (belge sorumlusu)"
+ },
+ {
+  "id": "G-129",
+  "title": "P1 AI yetki devri prototipi (staging, tek araç)",
+  "detail": "İlk dikey dilimin AI adımı tam P3 teslimi değildir: staging'de tek araç (`cronhr.approve_leave`) site tarafından basılan kısa ömürlü aracı belirteciyle (G-148) kullanıcının kimliğinde çalışır, onay G-86 sözleşmesiyle sunucuda bağlanır ve AI Action Log'a yazılır. Kapsam dışı: niyet sınıflandırıcı, kredi ölçümü, müşteriye açılış. Kabul: yetkisiz kullanıcı için `denied`, onaysız yazma reddi, onaydan sonra belge değişmişse yeniden önizleme; tam teslim P3'te G-59, G-84..G-86 ile.",
+  "rail": "R5 AI",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-130",
+  "title": "Bağlantı önizlemesi: kimlik doğrulamalı derin bağlantılar için güvenli yanıt",
+  "detail": "Oturumsuz bir istek (WhatsApp, sosyal ağ veya mesajlaşma tarayıcısı ya da girişsiz kullanıcı) panel derin bağlantısına geldiğinde site 200 ile küçük bir HTML döner: Open Graph etiketleri (X kartları OG'ye düşer) yalnız rota kalıbından üretilir (ürün/uygulama adı, ekran türü, kiracı markası yalnız kiracı izin verdiyse); kayıt okunmaz, kayıt var/yok yanıtı aynıdır; istek yolundaki kimlik yalnız kaçışlanarak `og:url` ve `rel=canonical`'a yansır, kayıt başlığı ve alan değeri yansımaz; `og:image` ekran türüne ait statik görseli gösterir; `X-Robots-Tag: noindex, nofollow`, `Cache-Control: private, no-store` ve `Vary: Cookie`; insan ziyaretçi doğrulanmış dönüş adresiyle girişe yönlendirilir. noindex erişim kontrolü değildir; veri koruması oturum ve yetki katmanındadır. Asgari koruma (oturumsuz istekte veri yok, noindex, doğrulanmış dönüş) P1'de G-119/G-132 ile gelir; önizleme kartı P4'te. Kabul: oturumsuz tarama yanıtında kayıt başlığı, kişi adı veya alan değeri yok; aynı yanıt var olmayan kayıt için de döner; önizleme hata ayıklayıcılarında başlık, açıklama ve görsel görünür.",
+  "rail": "Shell",
+  "priority": "MUST",
+  "phase": "P4",
+  "source": "develop",
+  "owner": "Platform ekibi + Frontend ekibi"
+ },
+ {
+  "id": "G-131",
+  "title": "Paylaş düğmesi ve yetkili paylaşım bağlantıları",
+  "detail": "Her kayıt ve liste görünümünde Paylaş: kanonik bağlantıyı kopyalar, mobilde Web Share API ile doğrudan paylaşır (yoksa kopyala). Varsayılan bağlantı gizli bilgi taşımaz; alıcı giriş yapar ve kendi yetkisiyle görür. Belirli bir kullanıcıya erişim verme Frappe DocShare ile yapılır (paylaşma izni gerekir). Yetkisi olmayan alıcı 'Erişim iste' akışını görür: ekran kaydın olmadığı ve yetkinin olmadığı durumda aynıdır, istek kayıt sahibine ve paylaşma izni olanlara gider, kullanıcı başına sınırlıdır, onay DocShare üretir ve adımlar denetime yazılır. 'Bağlantıya sahip herkes' modu varsayılan kapalıdır; kiracı politikasıyla açılırsa belirteç tek kayda, salt okumaya, süreye bağlıdır, iptal edilebilir, denetlenir, hassas alanları göstermez ve sayfası `Referrer-Policy: no-referrer` ile sunulur (K-29). Paylaşım belirteci oturum veya izleme parametresi değildir. Kabul: yetkisiz alıcı kayıt verisi görmez; iptal edilen bağlantı 410; paylaşım ve erişim isteği olayları denetimde.",
+  "rail": "Shell",
+  "priority": "MUST",
+  "phase": "P4",
+  "source": "develop",
+  "owner": "Platform ekibi + Frontend ekibi"
+ },
+ {
+  "id": "G-132",
+  "title": "İnsan odaklı URL sözleşmesi",
+  "detail": "URL ekranı anlatır ve elle düzenlenince çalışır: kiracı kapsamı host'tur (`<kiracı>.app.<marka>.com.tr` veya özel alan adı), panel yolu `/<uygulama>/<belge-türü>` liste ve `/<uygulama>/<belge-türü>/<kimlik>` kayıttır (ör. `/ik/izin-talebi/HR-LAP-2026-00042`); okunur slug yalnız kişisel veri içermiyorsa kalıcı kimliğin önüne eklenir ve kanonik adres slug'sızdır. Adı kişisel veri olan belge türlerinde (User adı e-postadır; 'Full Name' adlandırmalı Employee; Contact) URL vekil kalıcı kimlik kullanır, Link filtre değerleri de bu kimliği taşır. Panel host'unda takım yolları press_tr'deki tekil, okunur takım kısa adıyla kurulur (`/t/<takım>/faturalama`; Press Team adı hash'tir). Filtre, sıralama ve sayfalama okunur sorgu parametreleridir (meta alan adlarından), tanınmayan parametre yok sayılır; kanonik adres yalnız birincil host + yol + kanonik parametreleri içerir; yeniden adlandırma ve slug yönlendirmesi (301) yalnız oturumlu ve okuma izni olan istekte yapılır (oturumsuz yönlendirme kaydın varlığını sızdırır, G-130); derin bağlantı aynı ekran durumunu geri kurar. URL'ye kişisel veri, e-posta, vergi kimliği veya gizli değer girmez. Kabul: rota sözleşme testleri, filtreli derin bağlantı geri yükleme, E2E boyunca toplanan URL'lerde e-posta/telefon/TCKN/VKN deseni sıfır.",
+  "rail": "Shell",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Frontend ekibi + Platform ekibi"
+ },
+ {
+  "id": "G-133",
+  "title": "Kampanya atıf parametreleri ve URL hijyeni",
+  "detail": "Sistem varsayılan olarak `utm_*`, `gclid`, `gbraid`, `wbraid`, `fbclid`, `yclid`, `msclkid`, `ttclid` ve `li_fat_id` parametrelerini tanır: giriş noktasında (public site, panel kayıt/checkout) yakalar, giriş ve kayıt yönlendirmelerinde `state` içinde korur, ilk ve son temas olarak sunucu tarafında (Account Request/Team) saklar (cihazda saklama rıza gerektirir, K-28), kampanya → oturum → izinli kullanıcı/işlem atfını bu birinci taraf kayıttan kurar (varsayılan; satıcıya aktarım gerekmez), yakaladıktan sonra adres çubuğundan `history.replaceState` ile temizler, kanonik adrese ve paylaşım bağlantısına koymaz. İzleme parametresi hiçbir zaman yetki vermez; yetki/paylaşım belirteci ölçüm araçlarına gönderilmez. Kabul: yönlendirme zincirinde parametre kaybı yok; canonical ve paylaşım bağlantısı temiz; sayfa adresi analitiğe giderken belirteç ve kişisel veri ayıklanmış.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P2",
+  "source": "develop",
+  "owner": "Frontend ekibi + Platform ekibi; saklama dayanağı Hukuk"
+ },
+ {
+  "id": "G-134",
+  "title": "Ölçüm adapter çerçevesi ve rıza kapısı",
+  "detail": "Panel ve public yüzeyler tek olay veri yolu kullanır: normalleştirilmiş olay şeması (`page_view`, `sign_up`, `trial_started`, `purchase`, `app_activated`, yardım ve tur olayları `help_opened`, `tour_completed` ...), `window.dataLayer`, rota değişiminde tek `page_view` (yönlendirici düzeyinde, render başına değil), `event_id` ile tekilleştirme ve rota şablonu (`/ik/izin-talebi/:kimlik`) ile adres. Kullanıcı/oturum sürekliliği yalnız rastgele takma kimlikle sağlanır: (kiracı, amaç, satıcı) başına ayrı, e-posta/TCKN/kullanıcı kimliğinden türetilmez, eşleme yalnız birinci tarafta, rıza geri alma ve kiracı değişiminde yenilenir, silme talebinde silinir, kiracılar arasında bağlanmaz; takma kimlikli veri anonim sayılmaz. Adapterlar platformda varsayılan kurulu ve etkindir; satıcıya veri aktarımı ancak (1) kiracı veya platform hesabı yapılandırılmışsa, (2) ilgili amaç için rıza veya kayıtlı hukuki dayanak varsa ve (3) yüzey hassas değilse başlar; bu koşullar sağlanmadan satıcı betiği indirilmez. Rıza geri alınınca gönderim durur, satıcı rıza API'si çağrılır, birinci taraf çerezleri silinir. Kiracılar arası olay ve kimlik karışmaz. Her rota bir yüzey sınıfı bildirir (sınıflanmamış rota hassas sayılır); satıcı betiği yüklenmiş bir sayfadan hassas rotaya geçiş tam sayfa yüklemesiyle yapılır, çünkü yüklenmiş betik SPA'dan kaldırılamaz. Frappe'nin kendi telemetrisi (Pulse) yalnız `pulse_api_key` tanımlıysa açılır (doğrulandı: frappe/pulse/client.py v16.51.0); kiracı ve operasyon sitelerinde `pulse_api_key` ve `pulse_force_enabled` tanımlanmaz. Kabul: rıza yok → satıcıya istek yok (ağ kanıtı); geri alma sonrası istek yok; hassas ekranda yalnız birinci taraf RUM.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P2",
+  "source": "develop",
+  "owner": "Frontend ekibi + Platform ekibi; rıza metinleri Hukuk"
+ },
+ {
+  "id": "G-135",
+  "title": "Hazır ve etkin adapterlar: GTM, GA4, Google Ads, Yandex Metrica, Meta Pixel, Criteo, AdRoll",
+  "detail": "Her adapter aynı sözleşmeyi uygular: yapılandırma anahtarları (kimlik kiracı/platform ayarında, depoda değil), izinli yüzeyler, rıza amacı, olay eşlemesi, SPA davranışı, tekilleştirme, hassas alan maskeleme ve rıza geri alma. Oturum kaydı (Yandex Metrica Session Replay/Webvisor) hassas ekranlarda kapalı, diğerlerinde giriş alanları maskeli. Genişleme: yeni adapter aynı arayüzle eklenir (ör. Microsoft Advertising UET — `msclkid` zaten yakalanır —, Microsoft Clarity, LinkedIn Insight, TikTok Pixel). Kiracının kendi GTM kapsayıcısı kiracı uygulama panelinde yüklenmez (rastgele etiket enjekte edebilir, CSP ile çelişir; G-145); yalnız public yüzeylerde (Webshop vitrini) kullanılabilir (öneri). Gerçek hesaba bağlama bu gereksinimin kapsamı değildir; testler sahte uç noktalarla yapılır. Kabul: her adapter için rıza, SPA rota, tekilleştirme ve geri alma sözleşme testi.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P2",
+  "source": "integrate",
+  "owner": "Frontend ekibi; hesap kimlikleri Ürün sahibi"
+ },
+ {
+  "id": "G-136",
+  "title": "Metabase iş zekâsı (BI)",
+  "detail": "Metabase pazarlama etiketi veya log aracı değildir; operasyon sitesi ve Press verisinden (salt okur replika veya ayrı rapor şeması) MRR, churn, tahsilat, AI kredi tüketimi ve destek metriklerini raporlar. Kullanıcı isteğine göre platformda varsayılan hazır ve etkindir (kurulum P6); veri kaynağı bağlantısı ve kullanıcı erişimi operatör rolüne bağlıdır. Operatör paneline gömme JWT imzalı misafir gömme ile yapılır (kilitli parametre; açık kaynak sürümde mevcut, statik gömme eski yöntem); kiracıya gömülü BI ve satır/sütun güvenliği ticari sürüm veya kiracı başına şema gerektirir (K-30). Kişisel veri en aza indirilir. Kabul: operatör rolü dışındaki hesap gömülü panoyu açamaz; kilitli parametre istemciden değiştirilemez.",
+  "rail": "R6 Operasyon düzlemi",
+  "priority": "MUST",
+  "phase": "P6",
+  "source": "integrate",
+  "owner": "Hüseyin Cengiz (kurulum) + Platform ekibi + Finans/Muhasebe"
+ },
+ {
+  "id": "G-137",
+  "title": "Yardım kulakçığı ve kendi kendine destek modu",
+  "detail": "Sayfanın sağ kenarında yapışkan 'Yardım' kulakçığı (`button`, `aria-expanded`); açılan panel sayfa yardımını, sık görevleri ve 'Kendi kendine destek modu' anahtarını (`role=switch`, kullanıcı tercihine kaydedilir) içerir. Mod açıkken alan, bileşen ve sayfa düzeyindeki yardım işaretleri ve yönlendiriciler (ilgili tur, belge, destek talebi) görünür; kapalıyken arayüz sade kalır. Panel AI paneliyle aynı sağ yuvayı paylaşır; 390 px ve altında tam ekran çekmece olur; odak panele taşınır, Escape kapatıp odağı paneli açan öğeye (kulakçık veya alan işareti) döndürür; yardım işaretleri ekran okuyucuya alan adıyla duyurulur. Kabul: 320→masaüstü, fare/dokunma/klavye, ekran okuyucu adları, yön değişiminde açık panel ve girdi korunur.",
+  "rail": "Shell",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Frontend ekibi"
+ },
+ {
+  "id": "G-138",
+  "title": "Yardım içeriği modeli ve metadata eşlemesi",
+  "detail": "platform_core 'Help Topic' kaydı (uygulama, belge türü, alan adı veya bileşen kimliği veya rota kalıbı, dil, sürüm, hedef roller, sahip, durum) yardım içeriğini metadata'ya bağlar; özel alanlar (Custom Field) dahil. Geri düşüş sırası: kiracı içeriği → uygulama içeriği → Frappe alan `description` → genel 'Bu alan için yardım yok' + yardım iste eylemi. Kullanıcının okuyamadığı alanın (permlevel) yardımı gösterilmez; içerik veri içermez. Sahiplik: standart alanlar uygulama ekibi, özel alanlar kiracı admini, kabuk platform ekibi; yayın gözden geçirme akışıyla. Kabul: kapsama raporu (yardımı olan alan oranı) ve geri düşüş testleri.",
+  "rail": "R2 Frappe geliştirme",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi + içerik sahipleri"
+ },
+ {
+  "id": "G-139",
+  "title": "Tur ve onboarding motoru",
+  "detail": "Yeni bir sayfaya ilk ziyarette, kullanıcıya gerçek fayda sağlayan kısa tur veya görev listesi açılır: atla, ertele, yeniden başlat ve kaldığı yerden devam; ilerleme kullanıcı + tur + sürüm anahtarıyla saklanır (tur sürümü değişince yalnız yeni adımlar gösterilir). Hedef kitle rol, kiracı, plan ve yetki koşuluyla seçilir; adım hedefleri metadata'dan (belge türü + alan adı) veya kararlı `data-tour-id` ile çözülür, hedef yoksa adım atlanır. Tur kirli formu terk ettirmez, kullanıcı girdisini silmez, yazmayı engellemez. Frappe Form Tour ve Module Onboarding kayıtları içerik kaynağı olarak kullanılabilir; kullanıcı başına ilerleme platform_core'dadır. Erişilebilirlik: kipsiz iletişim kutusu, klavyeyle ileri/geri, Escape ertele, `aria-live` duyuru, azaltılmış hareket. Kabul: ilk ziyaret tetiklemesi, devam, sürüm yükseltmesi ve girdi koruma testleri.",
+  "rail": "Shell",
+  "priority": "MUST",
+  "phase": "P4",
+  "source": "develop",
+  "owner": "Frontend ekibi + Platform ekibi"
+ },
+ {
+  "id": "G-140",
+  "title": "Keşif motoru",
+  "detail": "Uygulamaların bildirdiği kurallar sunucuda kullanıcının yetkisiyle değerlendirilir ve sıradaki anlamlı görevi önerir (ör. izin türü yoksa 'İzin türlerini tanımla'); öneriler yardım panelinde ve ana sayfada görünür, kapatılabilir, sıklık sınırlıdır ve etkinleşme ölçütleriyle ölçülür. Kabul: yetkisiz göreve öneri yok; kapatılan öneri tekrar çıkmaz.",
+  "rail": "Shell",
+  "priority": "SHOULD",
+  "phase": "P4",
+  "source": "develop",
+  "owner": "Platform ekibi + App ekibi"
+ },
+ {
+  "id": "G-141",
+  "title": "Uygulama yardım, tur ve keşif içeriği yükümlülüğü",
+  "detail": "Satılan her uygulama yayın kapısında (X-09) kendi belge türleri için yardım konularını, en az bir başlangıç turunu ve keşif kurallarını getirir; kapsama oranı uygulama bazında kabul edilir ve raporlanır. Kabul: uyumluluk betiği eksik yardım/tur bildirimini yayın engeli sayar.",
+  "rail": "App çerçevesi",
+  "priority": "MUST",
+  "phase": "P4",
+  "source": "develop",
+  "owner": "App ekibi"
+ },
+ {
+  "id": "G-142",
+  "title": "Güvenlik danışmanlığı izleme, uygulanabilirlik ve acil yama süreci",
+  "detail": "Frappe, ERPNext, HRMS, Press, Agent, CRM, Helpdesk, Keycloak, Hocuspocus ve frontend bağımlılıkları için GitHub danışmanlıkları, NVD ve satıcı sürüm notları izlenir. Her danışmanlık dağıtılmış sürüm, etkilenen sürüm aralığı, özelliğin/yapılandırmanın açık olup olmadığı, saldırı önkoşulu ve düzeltilmiş sürümle değerlendirilir; karar (hemen uygula / planla / uygulanamaz + gerekçe) kayda geçer. Acil yama rutin yükseltme takvimini beklemez; hedef süreler ürün sahibi onayıyla taahhüt olur (K-26). Kabul: her yüksek/kritik danışmanlık için karar kaydı; uygulanamaz kararında sürüm ve yapılandırma kanıtı.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P0",
+  "source": "configure",
+  "owner": "Hüseyin Cengiz + Platform ekibi"
+ },
+ {
+  "id": "G-143",
+  "title": "Kiracı API yüzeyi envanteri ve proxy allowlist",
+  "detail": "Önce gerçekten kullanılan uçlar (SPA, MCP, entegrasyonlar) erişim günlüğü ve kod taramasıyla çıkarılır; Desk uçlarından gerekenler (`search_link`, `getdoctype`, `upload_file`, `query_report.run` gibi) platform_core sarmalayıcılarına taşınır veya gerekçeyle allowlist'e alınır; sonra nginx `/api/method/*` için varsayılan reddi uygular. `/api/v2/document` açık kalır ama DocType, kayıt ve alan yetkisi sunucuda zorlanır (G-121). Server Script, System Console ve test uçları kapalıdır (G-40). Kabul: allowlist dışı uç 403; allowlist değişikliği test içeren PR ile; mevcut akışlar kırılmadan geçiş (önce gözlem modu).",
+  "rail": "R2 Frappe yapılandırma",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi + Hüseyin Cengiz (nginx)"
+ },
+ {
+  "id": "G-144",
+  "title": "Keycloak sertleştirme kontrol listesi",
+  "detail": "Yönetim konsolu ve Admin REST API public host'ta reverse proxy düzeyinde engellenir; ayrı `hostname-admin` tek başına Admin REST API erişimini engellemez (doğrulandı: Keycloak hostname rehberi). Anonim dinamik istemci kaydı kapalı kalır ve doğrulanır, redirect URI'leri tam adrestir (joker yok), public istemci varsa PKCE S256 zorunlu, implicit ve parola grant kapalı; kullanılmayan özellikler (JWT Authorization Grant, stateless mod) kapatılır; brute-force koruması, passkey/WebAuthn ve yönetici olaylarının Log Server'a akışı açıktır; her minor yükseltme Upgrading Guide'a göre staging'de denenir. Kabul: public host'tan `/admin` ve `/admin/realms/*` 403; kontrol listesi her yükseltmede yeniden koşar.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P0",
+  "source": "configure",
+  "owner": "Hüseyin Cengiz + Platform ekibi"
+ },
+ {
+  "id": "G-145",
+  "title": "HTML sanitizasyonu, CSP ve Trusted Types",
+  "detail": "Zengin metin, yorum, e-posta ve yazdırma önizlemesi sunucuda `sanitize_html`, istemcide DOMPurify allowlist'iyle temizlenir; `dangerouslySetInnerHTML` yalnız tek `SafeHtml` sarmalayıcısında kullanılır. CSP nonce tabanlıdır, `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'self'`; destekleyen tarayıcılarda `require-trusted-types-for 'script'`; önce rapor modunda, sonra zorunlu. Yazdırma önizlemesi sandbox iframe'dedir. HttpOnly çerez belirteç çalınmasını azaltır, XSS'in kullanıcı adına işlem yapmasını tek başına engellemez; bu yüzden bu katman zorunludur. Kabul: XSS yük seti testleri; CSP ihlal raporu sıfırda zorunlu moda geçiş.",
+  "rail": "R3 Frontend",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Frontend ekibi + Hüseyin Cengiz (başlıklar)"
+ },
+ {
+  "id": "G-146",
+  "title": "SSRF savunması ve PDF/HTML işleyici izolasyonu",
+  "detail": "Sunucunun dış URL çektiği her yol (PDF üretimi, web sayfası/görsel getirme, webhook) şema allowlist'i, DNS çözümünden sonra özel/yerel/meta veri adres bloklarının reddi, varsayılan kapalı yönlendirme ve her yönlendirmede yeniden denetimle çalışır; PDF işleyici (G-51) ayrı konteynerde, dosya sistemi erişimi ve ağı kısıtlı çalışır. Uygulama sunucusu çıkış (egress) allowlist'i derinlemesine savunmadır, tek kontrol değildir. Kabul: özel adres, yönlendirme zinciri ve DNS yeniden bağlama test yükleri reddedilir.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi + Hüseyin Cengiz"
+ },
+ {
+  "id": "G-147",
+  "title": "Hassas müşteri izolasyon kademeleri",
+  "detail": "Release Group/bench bir güvenlik sınırı değildir; aynı makine, dosya sistemi ve servis kimliklerini paylaşan bench'ler ortak etki alanındadır. Kademeler: (1) paylaşımlı bench (varsayılan), (2) ayrı bench + ayrı DB kullanıcısı ve `encryption_key`, (3) ayrı sunucu/VM, ayrı ağ ve sırlar. Her kademede neyin paylaşıldığı (süreç, konteyner, dosya, ağ, sır) yazılıdır; kademe veri hassasiyeti ve sözleşmeyle seçilir (K-34). Kabul: kademe 2 ve 3 için izolasyon testleri (başka sitenin dosyası/DB'si erişilemez).",
+  "rail": "Çapraz",
+  "priority": "SHOULD",
+  "phase": "P5",
+  "source": "configure",
+  "owner": "Hüseyin Cengiz + Ürün sahibi"
+ },
+ {
+  "id": "G-148",
+  "title": "Tarayıcı belirteç modeli: BFF ve kısa ömürlü aracı belirteçleri",
+  "detail": "Önerilen teknik varsayım (K-25): tarayıcı kalıcı erişim veya yenileme belirteci tutmaz. Frappe siteleri OIDC kodunu sunucuda alır (Social Login Key) ve HttpOnly oturum + CSRF ile çalışır; agent servisi ve Hocuspocus için kiracı sitesi (platform_core) oturumdan tek amaçlı, kısa ömürlü (dakikalar), audience'ı tek servise ve tek siteye bağlı, `jti`'li bir aracı belirteci basar; belirteç yalnız bellekte tutulur, yeniden kullanımı ve kapsam dışı kullanımı sunucuda reddedilir. Press ticari araçları için Press OAuth belirteci agent servisinde kalır (G-28). Kabul: tarayıcı depolamasında belirteç yok; süresi dolan veya başka siteye sunulan belirteç reddedilir; oturum kapanınca yeni belirteç basılmaz.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-149",
+  "title": "Ölçüm önce performans: RUM, Server-Timing ve yük deneyleri",
+  "detail": "Optimizasyon ölçülen darboğaza göre seçilir. Birinci taraf RUM (web-vitals, rota şablonu, örnekleme; üçüncü taraf yok), `Server-Timing` başlıkları, MariaDB yavaş sorgu günlüğü, Frappe istek/iş süreleri ve RQ kuyruk bekleme süresi Grafana'da p75/p95 olarak izlenir; gerçek kullanıcı yolculuklarından k6 yük senaryoları deney olarak koşar. Deney sayıları (kullanıcı/site, site/bench, süre hedefleri) ölçülmüş kapasite veya ürün taahhüdü değildir; kabul edilmiş tek frontend bütçesi G-66'dır. Kabul: P1 sonunda temel ölçüm raporu; her performans değişikliği önce/sonra ölçümüyle.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi + Frontend ekibi + Hüseyin Cengiz"
+ },
+ {
+  "id": "G-150",
+  "title": "Sunucu tarafı sayfalama, alan seçimi ve sorgu planına göre indeks",
+  "detail": "Liste uçları açık alan listesi, sunucu tarafı sayfalama/sıralama/filtre kullanır; pahalı tam sayım yerine gerekirse yaklaşık sayım; büyük alt tablolar ayrı uçtan sunucuda sayfalanır (yalnız istemcide sayfalama ağ ve sunucu maliyetini azaltmaz). İndeks sorgu planına (EXPLAIN) göre seçilir, her Custom Field'a otomatik indeks verilmez (yazma ve göç maliyeti). Denetim kayıtları (Version, Activity Log) performans için kapatılmaz; yalnız kullanılmayan yan yazımlar kaldırılır. Kabul: yavaş sorgu günlüğünde liste uçları için plan kanıtı; büyük alt tabloda sayfalı uç.",
+  "rail": "R2 Frappe geliştirme",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-151",
+  "title": "Destek yaşam döngüsü ve yükseltme takvimi",
+  "detail": "Destek durumu son etiket tarihinden çıkarılmaz: ERPNext resmi destek tablosu (v15 2027 sonu, v16 2029 sonu, planlı; v14 31 Ocak 2026'da bitti) izlenir; Frappe Framework için ayrı tablo yoktur, ERPNext tablosu ve dal etkinliği izlenir; Press sürümleri (`master` etiketleri) ve Keycloak minor sürümleri takip edilir; Node/Python çalışma zamanı sonları kayıtlıdır. Rutin yükseltme: Frappe/ERPNext minor aylık, Press etiketi aylık staging denemesiyle, Keycloak her minor Upgrading Guide ile, frontend bağımlılıkları gruplu; acil güvenlik yaması bu takvimi beklemez (G-142). Staging'de bir sonraki sürüm için gece kanaryası. Kabul: aylık yaşam döngüsü raporu; her yükseltme staging E2E kanıtıyla.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P0",
+  "source": "configure",
+  "owner": "Hüseyin Cengiz + Ürün sahibi"
+ },
+ {
+  "id": "G-152",
+  "title": "Realm-as-code ve SPI istisna politikası",
+  "detail": "Realm, client, rol ve akış tanımları Git'te sürümlenir ve uygulanır; elle değişiklik haftalık sapma kontrolüyle raporlanır. Özel Keycloak SPI'ı varsayılan olarak yazılmaz; tek istisna identity-sync olay köprüsüdür: küçük, sürümlü ve her Keycloak minor sürümüne karşı sözleşme testli bir Event Listener ya da yönetici olayı yoklamasıyla değiştirilebilir tasarım. Tema Keycloakify ile (Java kodu yok). Kabul: sapma raporu sıfır; SPI sözleşme testi yükseltme kapısında.",
+  "rail": "R4 Keycloak",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi + Hüseyin Cengiz"
+ },
+ {
+  "id": "G-153",
+  "title": "Kiracı özelleştirme yönetişimi",
+  "detail": "Customize Form ve Custom Field yalnız izinli belge türlerinde, ön ekli ad ve adet sınırıyla açılır; kiracı özelleştirmeleri dışa/içe aktarılabilir; özelleştirilmiş kiracılarda yükseltme ön testi (X-21) koşar; platform özelleştirmeleri yalnız uygulama fixture'larında yaşar. Kabul: izinsiz belge türünde özelleştirme reddi; yükseltme öncesi özelleştirme raporu.",
+  "rail": "R2 Frappe yapılandırma",
+  "priority": "SHOULD",
+  "phase": "P1",
+  "source": "configure",
+  "owner": "Platform ekibi"
+ },
+ {
+  "id": "G-154",
+  "title": "Rıza tercih merkezi (CMP)",
+  "detail": "Public yüzeyler, kayıt/ödeme hunisi ve uygulama paneli için tek rıza arayüzü: amaç bazında (performans, ürün analitiği, reklam ölçümü, kişiselleştirme) ve gerektiğinde satıcı bazında seçim; 'Kabul et', 'Reddet' ve 'Tercihler' eşit ağırlıkta; anonim ziyaretçi için rastgele rıza kimliğiyle SA-36 kaydı; tek adımda geri alma ve geri almanın G-134 sırasını tetiklemesi; ≥1rem metin, klavye ve ekran okuyucu erişimi, 320 px. Kabul: rıza vermeden satıcıya istek yok; geri alma sonrası istek yok; tercih değişikliği denetim kaydında.",
+  "rail": "Çapraz",
+  "priority": "MUST",
+  "phase": "P2",
+  "source": "develop",
+  "owner": "Frontend ekibi + Hukuk"
  },
  {
   "id": "SA-1",
@@ -1252,7 +1612,7 @@
  {
   "id": "SA-8",
   "title": "EFT/havale akışı ve ödeme referans kodu",
-  "detail": "press.api.ops.record_bank_transfer(team, amount, currency, reference, invoice=None) System User uç noktası Balance Transaction (source Prepaid Credits) ve ilgili Invoice'u payment_mode=NEFT, status=Paid, payment_date, transaction_amount dolu olarak kapatır; banka referansı ile idempotenttir ve dekont dosyası Invoice'a eklenir. Invoice finalize anında custom_payment_reference (PRS-<team>-<seq>) üretilir ve fatura e-postası, PDF, tenant SPA ve Sales Invoice'ta IBAN ile birlikte gösterilir.",
+  "detail": "press_tr.api.ops.record_bank_transfer(team, amount, currency, reference, invoice=None) System User uç noktası Balance Transaction (source Prepaid Credits) ve ilgili Invoice'u payment_mode=NEFT, status=Paid, payment_date, transaction_amount dolu olarak kapatır; banka referansı ile idempotenttir ve dekont dosyası Invoice'a eklenir. Invoice finalize anında custom_payment_reference (PRS-<team>-<seq>) üretilir ve fatura e-postası, PDF, tenant SPA ve Sales Invoice'ta IBAN ile birlikte gösterilir.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P2",
@@ -1262,7 +1622,7 @@
  {
   "id": "SA-9",
   "title": "İade, kısmi iade ve alacak dekontu zinciri",
-  "detail": "press.api.ops.refund_invoice(invoice, amount, reason) kısmi tutarı destekler, iyzico refund/cancel çağırır, kredi söz konusuysa negatif Balance Transaction (yeni source 'Refund') yazar ve Invoice'a refunded_amount alanı ekler. press_ops_bridge aynı olayı ops sitesinde is_return=1 Sales Invoice ve e-Arşiv iptal/iade olarak üretir.",
+  "detail": "press_tr.api.ops.refund_invoice(invoice, amount, reason) kısmi tutarı destekler, iyzico refund/cancel çağırır, kredi söz konusuysa negatif Balance Transaction (yeni source 'Refund') yazar ve Invoice'a refunded_amount alanı ekler. press_ops_bridge aynı olayı ops sitesinde is_return=1 Sales Invoice ve e-Arşiv iptal/iade olarak üretir.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P2",
@@ -1302,7 +1662,7 @@
  {
   "id": "SA-13",
   "title": "Yapılandırılabilir ve Türkçe tahsilat (dunning) zinciri",
-  "detail": "suspend_sites.SUSPENSION_DAYS, site.ARCHIVE_AFTER_SUSPEND_DAYS, NOTIFY_BEFORE_ARCHIVAL_DAYS ve arşiv sonrası yedek saklama süresi press_tr ile Press Settings alanlarına taşınır; suspended_sites, payment_failed, payment_method_invalid e-posta şablonlarının Türkçe karşılıkları eklenir. mark_as_uncollectible için açık zamanlama veya press.api.ops uç noktası tanımlanır; ERPNext Dunning/Dunning Type ile resmi ihtar üretilir ve Press Invoice'a yorum olarak yazılır.",
+  "detail": "suspend_sites.SUSPENSION_DAYS, site.ARCHIVE_AFTER_SUSPEND_DAYS, NOTIFY_BEFORE_ARCHIVAL_DAYS ve arşiv sonrası yedek saklama süresi press_tr ile Press Settings alanlarına taşınır; suspended_sites, payment_failed, payment_method_invalid e-posta şablonlarının Türkçe karşılıkları eklenir. mark_as_uncollectible için açık zamanlama veya press_tr.api.ops uç noktası tanımlanır; ERPNext Dunning/Dunning Type ile resmi ihtar üretilir ve Press Invoice'a yorum olarak yazılır.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P2",
@@ -1322,7 +1682,7 @@
  {
   "id": "SA-15",
   "title": "AI kredi ölçümü: AI Credit Plan ve Agent servisinden Usage Record",
-  "detail": "Yeni 'AI Credit Plan' (Plan alt sınıfı, price_try/unit) tanımlanır; Agent servisi her ücretli çağrıyı System User servis hesabıyla Usage Record (plan_type 'AI Credit Plan', interval Daily) olarak yazar ve Balance Transaction source listesine 'AI Consumption' eklenir. Çağrı öncesi Team.get_balance ve apply_limits/spending_limit kontrol edilir; eşik altında ücretli araçlar intent→preview→confirm ile kilitlenir ve receive_budget_alerts akışı SPA'da ayarlanabilir olur.",
+  "detail": "Yeni 'AI Credit Plan' (Plan alt sınıfı, price_try/unit) tanımlanır; Agent servisi her ücretli çağrıyı System User servis hesabıyla Usage Record (plan_type 'AI Credit Plan', interval Daily) olarak yazar ve Balance Transaction source listesine 'AI Consumption' eklenir. Kredi atomik rezervasyonla düşülür: reserve (tahmini üst sınır, idempotensi anahtarı = tur kimliği) → consume (gerçek kullanım) → release (artan); işlem koşullu güncelleme veya satır kilidiyle yarışa dayanıklıdır, eşzamanlı iki çağrı aynı bakiyeyi harcayamaz, zaman aşımında rezervasyon düşer, tekrar teslim çift faturalamaz; Team.get_balance ve apply_limits/spending_limit rezervasyonda kontrol edilir; eşik altında ücretli araçlar intent→preview→confirm ile kilitlenir ve receive_budget_alerts akışı SPA'da ayarlanabilir olur. Kabul: eşzamanlılık, zaman aşımı ve tekrar teslim testleri.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P3",
@@ -1342,10 +1702,10 @@
  {
   "id": "SA-17",
   "title": "Operasyon sitesinin Press tarafından dağıtımı",
-  "detail": "Sahibin kendi Team'inde ayrı Release Group 'ops' ile ERPNext v16.50 sitesi kurulur: erpnext@version-16, crm@main (frappe >=15,<17), helpdesk@main (frappe >=15.116.1,<17) + telephony, platform core ve e-belge köprüsü. Hüseyin Cengiz bench/server ve günlük yedek + offsite kopya (RPO/RTO belgelenir); Asistan Hüseyin ops.<domain> DNS kaydını GoDaddy'de uygular; Hüseyin Cengiz TLS ve site erişimini doğrular.",
+  "detail": "Sahibin kendi Team'inde ayrı Release Group 'ops' ile ERPNext v16.50 sitesi kurulur. P2 finans çekirdeği: erpnext@version-16, platform core, `press_tr_finance` (create-fc-invoice alıcısı, e-belge köprüsü); P6'da aynı gruba crm@main (frappe >=15,<17), helpdesk@main (frappe >=15.116.1,<17) + telephony eklenir. Hüseyin Cengiz bench/server ve günlük yedek + offsite kopya (RPO/RTO belgelenir); Asistan Hüseyin ops.<domain> DNS kaydını GoDaddy'de uygular; Hüseyin Cengiz TLS ve site erişimini doğrular.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
-  "phase": "P6",
+  "phase": "P2",
   "source": "configure",
   "owner": "Hüseyin Cengiz (server/bench) + Asistan Hüseyin (DNS) + Platform ekibi (apps)"
  },
@@ -1355,17 +1715,17 @@
   "detail": "Company TRY ve tr_chart_of_accounts.json (Tek Düzen Hesap Planı) ile açılır; Fiscal Year takvim yılı, aylık Accounting Period kapanışı; KDV %20/%10/%1 Sales Taxes and Charges Template ve Item Tax Template'ler, 'Yurt dışı / İstisna' Tax Category elle tanımlanır (country_wise_tax.json 'VAT 18%' kullanılmaz). Item kataloğu PLAN-, APP-, AI-CREDIT-, SERVICE- önekleriyle; Customer.custom_press_team zorunlu tekil alan.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
-  "phase": "P6",
+  "phase": "P2",
   "source": "configure",
   "owner": "Finans/Muhasebe"
  },
  {
   "id": "SA-19",
   "title": "create-fc-invoice alıcı sözleşmesi",
-  "detail": "Platform core whitelisted metodu team, address, invoice form alanlarını JSON string olarak alır, frappe.parse_json uygular, Press Invoice adına göre idempotent (custom_press_invoice tekil) Sales Invoice (+ Payment Entry veya avans) oluşturup submit eder ve message içinde Sales Invoice adını döndürür. Press Settings frappe_url/frappeio_api_key/secret bu siteye ve ayrılmış API kullanıcısına (Sales Invoice read + print) ayarlanır, disable_frappe_auth=0 kalır ve print_format adı sitede var olan Print Format ile eşleşir.",
+  "detail": "Operasyon sitesine kurulan `press_tr_finance` uygulamasındaki whitelisted fonksiyon, Press'in istemci kodundaki sabit `create-fc-invoice` adına `override_whitelisted_methods` ile bağlanır (eşleme doğrulandı, G-126); team, address, invoice form alanlarını JSON string olarak alır, frappe.parse_json uygular, Press Invoice adına göre idempotent (custom_press_invoice tekil) Sales Invoice (+ Payment Entry veya avans) oluşturup submit eder ve message içinde Sales Invoice adını döndürür; hangi olayda hangi belgenin üretileceği SA-41 matrisine uyar. Press Settings frappe_url/frappeio_api_key/secret bu siteye ve ayrılmış API kullanıcısına (Sales Invoice read + print) ayarlanır, disable_frappe_auth=0 kalır ve print_format adı sitede var olan Print Format ile eşleşir. Faz P2: P2 çıkışındaki e-belge kabulü bu alıcıya dayanır.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
-  "phase": "P6",
+  "phase": "P2",
   "source": "develop",
   "owner": "Platform ekibi (backend) + Finans/Muhasebe"
  },
@@ -1382,37 +1742,37 @@
  {
   "id": "SA-21",
   "title": "Kredi, tahakkuk ve avans muhasebe kuralı",
-  "detail": "Prepaid Credits Invoice faturalanan olaydır (avans mı satış mı Finans kararı); kredi ile kapanan Subscription faturaları (amount_paid==0, senkronlanmaz) ay sonu takım bazlı Usage Record toplamıyla gelir tahakkuku Journal Entry'si olarak kaydedilir; Balance Transaction unallocated_amount toplamı müşteri avansı yükümlülüğü ile günlük mutabakat edilir. write_off_amount (±0.1 yuvarlama) ve free_credits için ayrı hesaplar tanımlanır; alternatif olarak Press'e amount_paid==0 faturaları da senkronlayan yama değerlendirilir.",
+  "detail": "Kredi yükleme ve tüketiminin belgesi SA-41 matrisindeki seçeneğe göre üretilir (K-13, mali müşavir): seçenek A yüklemeyi satış faturası sayar; seçenek B yüklemeyi alınan avans (Payment Entry) sayar ve tüketimi ay sonu takım bazlı Usage Record toplamıyla gelir tahakkuku Journal Entry'si olarak yazar. Kredi ile kapanan Subscription faturaları (amount_paid==0) Press'in yerel senkronunda gönderilmez; bu boşluk seçilen seçeneğin gerektirdiği yolla (B'de JE, A'da gerekirse press_tr senkron yaması) kapanır, iki yol birlikte açılmaz. Balance Transaction unallocated_amount toplamı müşteri avansı yükümlülüğü ile günlük mutabakat edilir; write_off_amount (±0.1 yuvarlama) ve free_credits için ayrı hesaplar tanımlanır. Faz P2.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
-  "phase": "P6",
+  "phase": "P2",
   "source": "develop",
   "owner": "Finans/Muhasebe + Platform ekibi (backend)"
  },
  {
   "id": "SA-22",
   "title": "press_ops_bridge Press uygulaması (outbound senkron)",
-  "detail": "Press'e kurulan press_ops_bridge; Team (after_insert/on_update → Customer upsert, billing_name yeniden adlandırma), Balance Transaction (on_submit → avans/kredi kaydı), Marketplace App Subscription (on_update → abonelik kaydı), Support Access (on_update → ticket yorumu) doc_events ile ops sitesine frappe.enqueue + Integration Request günlüğü üzerinden yazar. Yeniden deneme, ölü-mektup kuyruğu ve idempotensi anahtarı (doctype:name:modified) zorunludur; Press Webhook takım kapsamlı olduğu için kullanılmaz.",
+  "detail": "Press'e kurulan press_ops_bridge; Team (after_insert/on_update → Customer upsert, billing_name yeniden adlandırma), Balance Transaction (on_submit → avans/kredi kaydı), Marketplace App Subscription (on_update → abonelik kaydı), Support Access (on_update → ticket yorumu) doc_events ile ops sitesine frappe.enqueue + Integration Request günlüğü üzerinden yazar. Yeniden deneme, ölü-mektup kuyruğu ve idempotensi anahtarı (doctype:name:modified) zorunludur; Press Webhook takım kapsamlı olduğu için kullanılmaz. Faz: Team ve Balance Transaction olayları P2 finans çekirdeğiyle; Marketplace App Subscription ve Support Access olayları P6'da.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
-  "phase": "P6",
+  "phase": "P2",
   "source": "develop",
   "owner": "Platform ekibi (backend)"
  },
  {
   "id": "SA-23",
-  "title": "press.api.ops modülü (System User only)",
-  "detail": "allocate_credit(team, amount, source, reason), record_bank_transfer, refund_invoice, extend_payment_due, suspend_team/unsuspend_team, create_team(email, company, country, currency, free_credits), create_support_access_on_behalf uç noktaları yalnız frappe.local.system_user() ile çalışır. Her çağrı zorunlu reason alır, Comment + Version (track_changes) yazar ve panelin tek ticari yazma yoludur.",
+  "title": "press_tr.api.ops modülü (System User only)",
+  "detail": "allocate_credit(team, amount, source, reason), record_bank_transfer, refund_invoice, extend_payment_due, suspend_team/unsuspend_team, create_team(email, company, country, currency, free_credits), create_support_access_on_behalf uç noktaları yalnız frappe.local.system_user() ile çalışır. Her çağrı zorunlu reason alır, Comment + Version (track_changes) yazar ve panelin tek ticari yazma yoludur. Ad alanı sahibi uygulamayla aynıdır (`press_tr`, Press çekirdeğinde `press.api.ops` açılmaz; G-126). Faz: finans uçları (record_bank_transfer, refund_invoice, allocate_credit, extend_payment_due) P2'de; create_support_access_on_behalf ve operatör ekranlarının kullandığı uçlar P6'da.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
-  "phase": "P6",
+  "phase": "P2",
   "source": "develop",
   "owner": "Platform ekibi (backend)"
  },
  {
   "id": "SA-24",
   "title": "Superadmin paneli operatör modu ekranları",
-  "detail": "React kabuğu Keycloak operatör rolüyle operatör moduna geçer: Müşteri 360, Tahsilat ve kredi (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), Abonelik ve modüller, Destek (HD Ticket + Support Access + Support Session), Tahsilat aşaması, KVKK denetim raporu, gece mutabakat farkları. Ant Design tokenları, 320 px'den başlayan akışkan yerleşim; panel kendi veri tabanı tutmaz, yazma press.api.ops veya ops sitesine gider.",
+  "detail": "React kabuğu Keycloak operatör rolüyle operatör moduna geçer: Müşteri 360, Tahsilat ve kredi (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), Abonelik ve modüller, Destek (HD Ticket + Support Access + Support Session), Tahsilat aşaması, KVKK denetim raporu, gece mutabakat farkları. Ant Design tokenları, 320 px'den başlayan akışkan yerleşim; panel kendi veri tabanı tutmaz, yazma press_tr.api.ops veya ops sitesine gider.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
@@ -1422,7 +1782,7 @@
  {
   "id": "SA-25",
   "title": "İki katmanlı operatör yetkisi",
-  "detail": "Site düzeyi destek eylemleri (login_as_admin, Site/Release Group işlemleri) panelden Press Support Agent + Accepted Support Access ile press.api.client.run_doc_method üzerinden yapılır; ticari tekil okuma/yazmalar (Team, Invoice, Balance Transaction) yalnız System User servis hesabı + press.api.ops ile. get_list skip bayrağı kullanımı loglanır ve KVKK envanterine işlenir.",
+  "detail": "Site düzeyi destek eylemleri (login_as_admin, Site/Release Group işlemleri) panelden Press Support Agent + Accepted Support Access ile press.api.client.run_doc_method üzerinden yapılır; ticari tekil okuma/yazmalar (Team, Invoice, Balance Transaction) yalnız System User servis hesabı + press_tr.api.ops ile. get_list skip bayrağı kullanımı loglanır ve KVKK envanterine işlenir.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
@@ -1442,7 +1802,7 @@
  {
   "id": "SA-27",
   "title": "Rızaya dayalı login-as zinciri ve Support Session doctype'ı",
-  "detail": "Panel → Press Support Access (resources=[Site], login_as_administrator=1, allowed_for, reason) → tenant SPA onay bandı (Pending 7 gün sonra düşer) → Site.login_as_admin (Site Activity) veya Frappe v16 POST frappe.core.doctype.user.user.impersonate(user, reason). Platform core 'Support Session' doctype'ı rıza sürümü, operatör, kapsam kademesi (görüntüle/takip/login-as/kontrol), başlangıç/bitiş ve Keycloak oturumunu tutar; press.api.account.switch_team denetim kaydı bırakmadığı için operatör paneli bunu kullanmaz.",
+  "detail": "Panel → Press Support Access (resources=[Site], login_as_administrator=1, allowed_for, reason) → tenant SPA onay bandı (Pending 7 gün sonra düşer) → Site.login_as_admin (Site Activity) veya Frappe v16 POST frappe.core.doctype.user.user.impersonate(user, reason). Platform core 'Support Session' doctype'ı rıza sürümü, operatör, kapsam kademesi (görüntüle/takip/login-as/kontrol), başlangıç/bitiş ve Keycloak oturumunu tutar; press.api.account.switch_team denetim kaydı bırakmadığı için operatör paneli bunu kullanmaz. Kapsamlar, süreler ve iptal davranışı SA-42'ye; login-as varsayılanı Administrator değildir (SA-44).",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
@@ -1452,7 +1812,7 @@
  {
   "id": "SA-28",
   "title": "Tenant sitelerde impersonation'ın fiilen çalışır kılınması",
-  "detail": "impersonate Permission Type'ı (frappe/core/permission_type/user_impersonate) Role Permission Manager'da ayrılmış destek rolüne verilir ve Custom DocPerm fixture'ı olarak platform core'a eklenir; her tenant sitede default_outgoing Email Account kurulur, aksi halde 'Security Alert' yalnız Notification Log'a düşer. Sunucu tarafında restrict_ip, enabled ve hedefin System Manager olmaması platform core tarafından doğrulanır (user.py yalnız has_permission kontrol eder).",
+  "detail": "impersonate Permission Type'ı (frappe/core/permission_type/user_impersonate) Role Permission Manager'da ayrılmış destek rolüne verilir ve Custom DocPerm fixture'ı olarak platform core'a eklenir; her tenant sitede default_outgoing Email Account kurulur, aksi halde 'Security Alert' yalnız Notification Log'a düşer. Sunucu tarafında restrict_ip, enabled ve hedefin System Manager olmaması platform core tarafından doğrulanır (user.py yalnız has_permission kontrol eder); her istekte aktif Support Session ve temsil kapsamı denetlenir, iptalde temsil oturumu sonlandırılır (SA-42, SA-44).",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
@@ -1462,7 +1822,7 @@
  {
   "id": "SA-29",
   "title": "Hocuspocus servisi ve uygulama içi uzaktan yardım",
-  "detail": "Hocuspocus v4.7.x Hetzner'de ayrı Node servisi (reverse proxy TLS, extension-redis, extension-webhook, extension-logger); onAuthenticate Keycloak JWT ve aktif Support Session doğrular; oda support-session:{site}:{id}, oturum kapanınca silinir. Tenant SPA provider-react ile awareness (imleç, route, seçim, takip) paylaşır; uzaktan kontrol Y.Map 'proposal' olarak gelir ve müşteri 'İzin ver' demeden uygulanmaz; tüm olaylar webhook ile Press/ops denetim kaydına akar.",
+  "detail": "Hocuspocus v4.7.x (MIT, doğrulandı: npm @hocuspocus/server 4.7.0) Hetzner'de ayrı Node servisi (reverse proxy TLS, extension-redis, extension-webhook, extension-logger); bağlantı kiracı sitesinin bastığı tek kullanımlık, kısa ömürlü bilet (G-148) ve aktif Support Session ile `onAuthenticate`'te doğrulanır; oda support-session:{site}:{id}, oturum kapanınca silinir; iptal ve süre dolumunda sunucu açık bağlantıları kapatır ve yeniden kimlik doğrulamayı reddeder (SA-42). Tenant SPA provider-react ile awareness (imleç, route, seçim, takip) ve paylaşılan ekran durumunu (SA-43) taşır; uzaktan kontrol Y.Map 'proposal' olarak gelir ve müşteri 'İzin ver' demeden uygulanmaz (SA-44); oturum olayları webhook ile Press/ops denetim kaydına akar, imleç akışı saklanmaz.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
@@ -1492,7 +1852,7 @@
  {
   "id": "SA-32",
   "title": "CRM huni senkronu ve dönüşüm",
-  "detail": "Account Request → CRM Lead (email, ad, company→organization, country→territory, industry, no_of_employees, referral_source→CRM Lead Source, custom_press_account_request); Product Trial Request 'Site Created' → Lead 'Trial'; ilk Paid Invoice → convert_to_deal + Deal 'Won'; operatör kaynaklı Deal Won → press.api.ops.create_team. ERPNext CRM Settings.create_customer_on_status_change kapalı; CRM Organization ↔ Press Team ↔ Customer eşlemesi tek tabloda.",
+  "detail": "Account Request → CRM Lead (email, ad, company→organization, country→territory, industry, no_of_employees, referral_source→CRM Lead Source, custom_press_account_request); Product Trial Request 'Site Created' → Lead 'Trial'; ilk Paid Invoice → convert_to_deal + Deal 'Won'; operatör kaynaklı Deal Won → press_tr.api.ops.create_team. ERPNext CRM Settings.create_customer_on_status_change kapalı; CRM Organization ↔ Press Team ↔ Customer eşlemesi tek tabloda.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "SHOULD",
   "phase": "P5",
@@ -1512,20 +1872,20 @@
  {
   "id": "SA-34",
   "title": "EFT banka mutabakatı ve bekleyen EFT kuyruğu",
-  "detail": "Bank Account tanımları, Bank Statement Import (CSV/MT940), Bank Transaction Rule ile açıklamadaki PRS- referansının yakalanması, Payment Entry oluşturma ve Bank Reconciliation Tool; eşleşince press.api.ops.record_bank_transfer idempotent çağrılır. Eşleşmeyen hareketler panelde 'Bekleyen EFT' kuyruğunda dekont yükleme ve onay düğmesiyle çözülür; iyzico 'Korumalı Havale/EFT' (BANK_TRANSFER_AUTH) tamamlayıcı olarak değerlendirilir (doğrulanacak).",
+  "detail": "Bank Account tanımları, Bank Statement Import (CSV/MT940), Bank Transaction Rule ile açıklamadaki PRS- referansının yakalanması, Payment Entry oluşturma ve Bank Reconciliation Tool; eşleşince press_tr.api.ops.record_bank_transfer idempotent çağrılır. P2'de asgari mutabakat operasyon sitesinde Finans tarafından yürütülür; eşleşmeyen hareketlerin panelde 'Bekleyen EFT' kuyruğunda dekont yükleme ve onay düğmesiyle çözülmesi P6 operatör ekranlarıyla (SA-24) gelir; iyzico 'Korumalı Havale/EFT' (BANK_TRANSFER_AUTH) tamamlayıcı olarak değerlendirilir (doğrulanacak).",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
-  "phase": "P6",
+  "phase": "P2",
   "source": "configure",
   "owner": "Finans/Muhasebe + Platform ekibi (backend)"
  },
  {
   "id": "SA-35",
   "title": "e-Fatura/e-Arşiv köprüsü",
-  "detail": "Sales Invoice submit → e-belge kuyruğu; custom_efatura_mukellef=1 ve VKN varsa e-Fatura (UBL-TR), aksi halde e-Arşiv; ETTN/UUID, durum, XML/PDF Sales Invoice'ta saklanır; GİB mükellef sorgusu fatura kesmeden önce ve gece işi olarak çalışır; başarısızlık kuyruğu panelde görünür. Entegratör soyutlaması Turkish Delight TD EInvoice Integrator/Settings kalıbını (URL, kimlik, test/prod, Jinja XML şablonu, birim/kalem eşleme) referans alır; Press Settings.print_format e-Arşiv PDF'ini döndüren formata işaret eder.",
+  "detail": "Sales Invoice submit → e-belge kuyruğu; custom_efatura_mukellef=1 ve VKN varsa e-Fatura (UBL-TR), aksi halde e-Arşiv; ETTN/UUID, durum, XML/PDF Sales Invoice'ta saklanır; GİB mükellef sorgusu fatura kesmeden önce ve gece işi olarak çalışır; başarısızlık kuyruğu panelde görünür. Entegratör soyutlaması Turkish Delight TD EInvoice Integrator/Settings kalıbını (URL, kimlik, test/prod, Jinja XML şablonu, birim/kalem eşleme) referans alır; Press Settings.print_format e-Arşiv PDF'ini döndüren formata işaret eder. Faz P2: köprü `press_tr_finance` içinde yaşar.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
-  "phase": "P6",
+  "phase": "P2",
   "source": "integrate",
   "owner": "Platform ekibi (backend) + Finans/Muhasebe"
  },
@@ -1568,5 +1928,55 @@
   "phase": "P3",
   "source": "develop",
   "owner": "AI ekibi + Hüseyin Cengiz"
+ },
+ {
+  "id": "SA-40",
+  "title": "P1 destek görüntüleme prototipi (staging, tek oda)",
+  "detail": "İlk dikey dilimin destek adımı tam P6 teslimi değildir: staging'de Support Access → Support Session (yalnız görüntüle) → tek route için paylaşılan durum (rota, imleç, filtre; alan değeri yok) çalışır; Hocuspocus bağlantısı site tarafından basılan tek kullanımlık bilet ile açılır (G-148). Kapsam dışı: takip, kontrol, login-as, Helpdesk. Kabul: müşteri Revoke ettiğinde operatörün WebSocket bağlantısı 2 sn içinde kapanır ve yeniden bağlanma reddedilir; tam teslim P6'da SA-42..SA-44.",
+  "rail": "R6 Operasyon düzlemi",
+  "priority": "MUST",
+  "phase": "P1",
+  "source": "develop",
+  "owner": "Platform ekibi + Frontend ekibi; staging Hocuspocus Hüseyin Cengiz"
+ },
+ {
+  "id": "SA-41",
+  "title": "Finans olay–belge matrisi ve tek kayıt kuralı",
+  "detail": "Hizmet tahakkuku, Press faturasının kesinleşmesi, kart tahsilatı, EFT, kredi yükleme, kredi tüketimi, iade/kısmi iade ve itiraz için tek tablo: Press kaydı, operasyon sitesi belgesi, tetik, idempotensi anahtarı ve karar sahibi. Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi ya satış faturası ya avans kaydı olur, ikisi birden olmaz; aynı ekonomik olay iki yoldan kaydedilmez. Vergi ve belge zamanlaması (yükleme anında fatura mı, tüketimde mi; ödenmemiş faturanın e-belge zamanı) mali müşavirle kapanır (K-13); G-22, SA-19 ve SA-21 bu matrise göre uygulanır. Bu doküman yeni vergi veya muhasebe politikası seçmez. Kabul: her satır için çift kayıt ve eksik kayıt testi; gece mutabakatında fark sıfır.",
+  "rail": "R6 Operasyon düzlemi",
+  "priority": "MUST",
+  "phase": "P2",
+  "source": "develop",
+  "owner": "Finans/Muhasebe + Mali müşavir + Platform ekibi"
+ },
+ {
+  "id": "SA-42",
+  "title": "Destek oturumu kapsam, izin ve iptal modeli",
+  "detail": "Görüntüle, takip et, kontrol ve temsil (impersonation) dört ayrı kapsamdır; her biri ayrı rıza, ayrı süre ve sunucuda zorlanan ayrı izin ister; görüntüleme rızası yönetici erişimine dönüşmez. Müşteri ekranında sürekli görünür gösterge (operatör adları, kapsam, kalan süre, 'Oturumu bitir'); çoklu destekçide her operatörün ayrı izni ve tek kontrol kilidi; müşteri bağlantısı koparsa kontrol hemen düşer (fail-closed), yeniden bağlanmada yeniden verilir. İptal ya da süre dolumu: Hocuspocus bağlantıları sunucudan kapatılır ve yeniden kimlik doğrulama reddedilir, temsil oturumları sonlandırılır, bekleyen kontrol önerileri düşer, verilmiş biletler iptal listesine girer. Olaylar (talep, rıza, kapsam değişimi, kontrol devri, temsil başlangıcı/bitişi, iptal) denetime yazılır; imleç akışı saklanmaz. K-19'un 'varsayılan Administrator' önerisi kaldırılır. Kabul: Revoke sonrası 2 sn içinde açık WebSocket kapanır ve temsil oturumundaki API çağrısı 401/403.",
+  "rail": "R6 Operasyon düzlemi",
+  "priority": "MUST",
+  "phase": "P6",
+  "source": "develop",
+  "owner": "Platform ekibi + Frontend ekibi; Hocuspocus Hüseyin Cengiz"
+ },
+ {
+  "id": "SA-43",
+  "title": "Paylaşılan ekran durumu ve maskeleme sözleşmesi",
+  "detail": "Awareness tek başına ekran görüntüsü aktarmaz. Görüntüle/takip kapsamında müşteri istemcisi paylaşılan belgeye rota, filtre, sıralama, sayfa, kaydırma, seçim, görünen satırların maskelenmiş özeti ve form taslağının maskelenmemiş alanlarını yazar; operatör bu durumu kendi kiracı API oturumu olmadan aynı bileşenlerle çizer. Maskeleme kaynakta uygulanır: permlevel ile gizli alanlar, uygulamanın `support_mask_fields` listesi ve kişisel veri sınıfları (TCKN, IBAN, kart, maaş) hiç gönderilmez; operatör imleci ve vurgusu müşteri ekranında görünür. Piksel/video ekran paylaşımı kapsam dışıdır; gerekirse ayrı rıza ve ayrı gereksinimle eklenir. Kabul: maskeli alan değeri ağ kaydında yok; operatör görünümü müşteri durumuyla eşleşir.",
+  "rail": "R6 Operasyon düzlemi",
+  "priority": "MUST",
+  "phase": "P6",
+  "source": "develop",
+  "owner": "Frontend ekibi"
+ },
+ {
+  "id": "SA-44",
+  "title": "Kontrol modu ve kiracı adına işlem",
+  "detail": "Kontrol kapsamında operatör eylemi önerir; eylem müşterinin tarayıcısında müşterinin oturumu ve yetkisiyle çalışır. Varsayılan her eylem tek tek onay ister; müşteri süreli kontrol devri verebilir, ancak silme, iptal, onaylama (submit) ve ücretli eylemler her zaman ayrı onay ister. Kayıtlar (Version, Activity Log) `support_session` ve operatör bilgisini taşır. Temsil (impersonation) ayrı kapsamdır: belirli kullanıcının veya kapsamı daraltılmış destek kullanıcısının rızasıyla Frappe `user.impersonate` yoluyla açılır; Administrator yalnız ayrı yükseltme rızasıyla ve daha kısa süreyle. Kabul: onaysız eylem uygulanmaz; kiracı adına yapılan her yazma denetimde operatörle ilişkilidir; temsil oturumu süresi dolunca sunucuda kapanır.",
+  "rail": "R6 Operasyon düzlemi",
+  "priority": "MUST",
+  "phase": "P6",
+  "source": "develop",
+  "owner": "Platform ekibi + Frontend ekibi"
  }
 ]

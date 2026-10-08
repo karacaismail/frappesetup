@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      visual_baseline:
+        description: 'Görsel referansları Linux ortamında üret ve artifact olarak yükle (yayın yapılmaz)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -18,8 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -28,21 +33,36 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium firefox webkit
       - name: Playwright gate (Chromium, Firefox, WebKit, iPhone 13 × 320–1366)
+        if: ${{ !inputs.visual_baseline }}
         run: npx playwright test
-      - uses: actions/upload-artifact@v7
-        if: failure()
+      - name: Visual baselines (yalnız elle tetiklenince; inceleme sonrası commit edilir)
+        if: ${{ inputs.visual_baseline }}
+        run: npx playwright test tests/visual.spec.ts --update-snapshots=all
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ inputs.visual_baseline }}
+        with:
+          name: visual-baselines
+          path: tests/__screenshots__/
+          retention-days: 30
+      # Rapor her koşuda saklanır (başarılı koşunun kanıtı da paylaşılabilir olsun).
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
         with:
           name: playwright-report
           path: playwright-report/
-          retention-days: 7
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+          retention-days: 30
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.visual_baseline }}
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.visual_baseline }}
         with:
           path: dist
 
   deploy:
     name: Deploy
     needs: build
+    # Yalnız main'den ve referans üretim modu dışında yayın yapılır; dal üzerinde elle tetikleme yalnız kapıyı koşar.
+    if: ${{ github.ref == 'refs/heads/main' && !inputs.visual_baseline }}
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -52,4 +72,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

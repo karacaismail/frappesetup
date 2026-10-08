@@ -1,17 +1,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
-  ActionIcon,
   Anchor,
   AppShell,
   Box,
   Burger,
   Group,
   MantineProvider,
-  NavLink,
-  ScrollArea,
   Stack,
   Text,
-  Tooltip,
   useMantineColorScheme,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -44,6 +40,8 @@ interface ShellProps {
 }
 
 // Yerleşim sabitleri (px): AppShell bunları CSS değişkenlerine çevirir; global.css --fs-header-h ile eşleşir.
+// Kabuk JS bütçesi (AGENTS.md): yalnız kabuğun gerçekten gerektirdiği Mantine bileşenleri kullanılır; gezinme bağlantısı
+// ve simge düğmeleri sade öğelerdir ve aynı tokenlarla global.css'te çizilir (Tooltip/ScrollArea/NavLink/ActionIcon yok).
 const HEADER_HEIGHT = 60;
 const NAVBAR_WIDTH = 280;
 const ASIDE_WIDTH = 248;
@@ -55,17 +53,16 @@ function ColorSchemeToggle() {
   const dark = mounted && colorScheme === 'dark';
   const label = dark ? 'Açık temaya geç' : 'Koyu temaya geç';
   return (
-    <Tooltip label={label} withArrow>
-      <ActionIcon
-        variant="subtle"
-        size="lg"
-        aria-label={label}
-        data-testid="color-scheme-toggle"
-        onClick={() => setColorScheme(dark ? 'light' : 'dark')}
-      >
-        {dark ? <IconSun size={20} /> : <IconMoon size={20} />}
-      </ActionIcon>
-    </Tooltip>
+    <button
+      type="button"
+      className="icon-btn"
+      aria-label={label}
+      title={label}
+      data-testid="color-scheme-toggle"
+      onClick={() => setColorScheme(dark ? 'light' : 'dark')}
+    >
+      {dark ? <IconSun size={20} aria-hidden /> : <IconMoon size={20} aria-hidden />}
+    </button>
   );
 }
 
@@ -134,17 +131,17 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
     const Icon = sectionIcon(item.icon);
     const isCurrent = item.href === current;
     return (
-      <NavLink
+      <a
         key={item.href}
         href={item.href}
-        label={item.label}
-        leftSection={<Icon size={18} stroke={1.75} aria-hidden />}
-        active={isCurrent}
+        className="nav-link"
+        data-active={isCurrent ? 'true' : undefined}
         aria-current={isCurrent ? 'page' : undefined}
         onClick={close}
-        variant="light"
-        className="nav-link"
-      />
+      >
+        <Icon size={18} stroke={1.75} aria-hidden className="nav-link-icon" />
+        <span className="nav-link-label">{item.label}</span>
+      </a>
     );
   };
 
@@ -160,7 +157,7 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
       </a>
       <AppShell.Header className="site-header">
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
-          <Group gap="sm" wrap="nowrap">
+          <Group gap="sm" wrap="nowrap" className="header-start">
             <Burger
               opened={opened}
               onClick={toggle}
@@ -177,28 +174,20 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
               <span className="brand-name">frappesetup</span>
             </Anchor>
           </Group>
-          <Group gap="xs" wrap="nowrap">
+          <Group gap="xs" wrap="nowrap" className="header-end">
             <Text c="dimmed" size="sm" visibleFrom="sm" className="as-of">
               {asOf}
             </Text>
-            <Tooltip label="GitHub deposu" withArrow>
-              <ActionIcon
-                component="a"
-                href={repoUrl}
-                variant="subtle"
-                size="lg"
-                aria-label="GitHub deposu"
-              >
-                <IconBrandGithub size={20} />
-              </ActionIcon>
-            </Tooltip>
+            <a className="icon-btn" href={repoUrl} aria-label="GitHub deposu" title="GitHub deposu">
+              <IconBrandGithub size={20} aria-hidden />
+            </a>
             <ColorSchemeToggle />
           </Group>
         </Group>
       </AppShell.Header>
 
       <AppShell.Navbar id="site-nav" p="sm" aria-label="Bölümler" className="site-nav">
-        <AppShell.Section grow component={ScrollArea} type="auto" offsetScrollbars>
+        <AppShell.Section grow className="nav-scroll">
           <Stack gap={2}>{top.map(renderLink)}</Stack>
           {groups.map(([group, items]) => (
             <Box key={group} mt="md">

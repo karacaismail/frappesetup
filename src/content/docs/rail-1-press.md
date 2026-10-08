@@ -42,7 +42,7 @@ sequenceDiagram
     S->>PR: get_subscription_info(sk_cronhr) → özellik kapıları
 ```
 
-Sabit kurallar: `install_app` yalnızca Site `Active` iken kabul edilir; Pending/Updating durumunda panel düğmeyi pasifler ve isteği kuyruğa alır (G-30). Her Free/Freemium uygulama için `price_usd=0` olan enabled bir Marketplace App Plan ve `run_after_install_script=1` şarttır; aksi halde Subscription ve `sk_<app>` anahtarı yazılmaz (doğrulandı, G-29). Kaldırma `press.api.client.run_doc_method(dt='Site', method='uninstall_app', args={app, create_offsite_backup, feedback})`, plan değişimi `change_app_plan` / `change_plan` + Site Plan Change ile yapılır. Ücret etkili her aksiyon önizle → onayla sözleşmesinden geçer; AI sağ paneli aynı araçları `press_tr.mcp.handler` üzerinden `confirm` bayrağıyla çağırır (G-27).
+Satın alma ödeme → abonelik → kurulum geçişleri tek durum makinesidir; yinelenen callback, kayıp iş sonucu ve ödeme alınıp kurulumun başarısız olduğu durumların telafisi G-125'tedir. Sabit kurallar: `install_app` yalnızca Site `Active` iken kabul edilir; Pending/Updating durumunda panel düğmeyi pasifler ve isteği kuyruğa alır (G-30). Her Free/Freemium uygulama için `price_usd=0` olan enabled bir Marketplace App Plan ve `run_after_install_script=1` şarttır; aksi halde Subscription ve `sk_<app>` anahtarı yazılmaz (doğrulandı, G-29). Kaldırma `press.api.client.run_doc_method(dt='Site', method='uninstall_app', args={app, create_offsite_backup, feedback})`, plan değişimi `change_app_plan` / `change_plan` + Site Plan Change ile yapılır. Ücret etkili her aksiyon önizle → onayla sözleşmesinden geçer; AI sağ paneli aynı araçları `press_tr.mcp.handler` üzerinden `confirm` bayrağıyla çağırır (G-27).
 
 ## 2. Plan ve tier modeli (G-9, G-10, G-25)
 
@@ -72,8 +72,8 @@ Kabul (P2): sandbox ve prod'da 3DS ile plan satın alma, saklı karttan aylık t
 
 Press ödenen faturayı `create_invoice_on_frappeio` ile dış ERPNext'e gönderir ve PDF'ini çeker (doğrulandı); bu yerel köprü şirketin kendi ERPNext v16 operasyon sitesine (Rail 6) yönlendirilir:
 
-- Press `Settings.frappe_url` = operasyon sitesi, disable\_frappe\_auth=0. `press_tr` Invoice override gönderimi finalize sonrasında (status Unpaid veya Paid, type Subscription, total &gt; 0) tetikler; VUK 231/5 faturanın 7 gün içinde düzenlenmesini ister (mali müşavir teyidi).
-- Operasyon sitesinde `press_tr_finance` uygulaması `create-fc-invoice` alıcısını, Sales Invoice → GİB özel entegratör (UBL-TR) gönderimini ve eşleme tablosunu uygular: Subscription → Sales Invoice + e-belge; Prepaid Credits → alınan avans Payment Entry; NEFT → banka mutabakatı; Refunded → iade/Credit Note; Payment Dispute → şüpheli alacak; iyzico hakediş mutabakatı (SA-19, SA-21, SA-33).
+- Press `Settings.frappe_url` = operasyon sitesi, disable\_frappe\_auth=0. Gönderim tetiği finans olay–belge matrisine göredir (SA-41): Press yerel olarak yalnız ödenmiş faturayı gönderir (doğrulandı); kesinleşmede (Unpaid/Paid) gönderim VUK 231/5 yedi gün yorumuna bağlı bir seçenektir ve mali müşavir kararıyla seçilir (K-13); aynı fatura iki yoldan gönderilmez.
+- Operasyon sitesinde (P2 finans çekirdeği) `press_tr_finance` uygulaması `create-fc-invoice` alıcısını, Sales Invoice → GİB özel entegratör (UBL-TR) gönderimini ve eşleme tablosunu uygular: Subscription → Sales Invoice + e-belge; Prepaid Credits → K-13 seçeneğine göre satış faturası veya alınan avans; NEFT → banka mutabakatı; Refunded → iade/Credit Note; Payment Dispute → şüpheli alacak; iyzico hakediş mutabakatı (SA-19, SA-21, SA-33).
 - Press Invoice'a e\_invoice\_type, ettn, gib\_status, `e_invoice_pdf/xml` geri yazılır; `fetch_invoice_pdf` override GİB onaylı PDF'i Invoice.invoice\_pdf'e koyar, panel bunu indirir (G-96).
 - VKN (10 hane) / TCKN (11 hane) algoritmik doğrulama, vergi dairesi, MERSIS ve e-Fatura mükellefi bayrağı Address Custom Field'larıdır (`doc_events validate: press_tr.api.billing.validate_tax_id`); checkout'ta `Team.billing_address` zorunlu ve Team.country == Address.country doğrulanır (Press ön koşulu, doğrulandı). Kayıtlı e-Fatura mükellefine e-Fatura, diğerlerine e-Arşiv düzenlenir.
 - Mesafeli satış, ön bilgilendirme ve KVKK aydınlatma onayları Team üzerinde `consent_version/consent_at/consent_ip` ile; pazarlama onayı ayrı alan + İYS kaydı.
@@ -99,7 +99,7 @@ Entegratör seçimi ve yükümlülük takvimi P2 başında ürün sahibi ve mali
 
 | Bileşen | Press doctype / ayar | Sahip |
 | --- | --- | --- |
-| Press host (Frappe v15, Python 3.11, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4), allow\_cors = panel origin | Hüseyin Cengiz |
+| Press host (Frappe v15, Python 3.11, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); `panel.` Press'in kendi alan adı, `allow_cors` yok (G-119) | Hüseyin Cengiz |
 | n1 proxy (nginx, proxysql, wireguard, ssh\_proxy) | Proxy Server | Hüseyin Cengiz |
 | f1 app + build (x86\_64) | Server use\_for\_new\_sites=1, use\_for\_build=1 | Hüseyin Cengiz |
 | m1 veritabanı | Database Server (binlog, audit log, replika — G-55) | Hüseyin Cengiz |
@@ -108,10 +108,11 @@ Entegratör seçimi ve yükümlülük takvimi P2 başında ürün sahibi ve mali
 | Yedek | Backup Bucket endpoint `https://fsn1.your-objectstorage.com`, GFS rotasyonu, fsn1→nbg1 `rclone sync --immutable`, Agent endpoint\_url yaması (upstream PR), RPO ≤ 24 s, aylık Backup Restoration Test | Hüseyin Cengiz |
 | Cluster | 'hetzner-fsn1' cloud\_provider='Generic' (bare metal); Hetzner Cloud VM'ler 'Hetzner' | Hüseyin Cengiz |
 | DNS / TLS | Route 53 hosted zone + sınırlı IAM; Root Domain dns\_provider='AWS Route 53'; wildcard certbot `--dns-route53` | Hüseyin Cengiz (Route 53/IAM, sonuç doğrulama) |
-| NS delegasyonu | `app.<marka>.com.tr` NS kayıtları GoDaddy'de Route 53'e | Asistan Hüseyin |
-| Operasyon sitesi (Rail 6) | Kendi Team'inde Release Group 'ops'; `ops.<marka>.com.tr` (SA-17) | Hüseyin Cengiz; DNS Asistan Hüseyin |
+| NS delegasyonu | `app.<marka>.com.tr` NS kayıtları GoDaddy'de Route 53'e; kiracılar `<kiracı>.app.<marka>.com.tr`, sabit host'lar GoDaddy'de (K-2) | Asistan Hüseyin (uygular), Hüseyin Cengiz (değer, doğrulama) |
+| Operasyon sitesi (Rail 6) | Kendi Team'inde Release Group 'ops'; `ops.<marka>.com.tr`; P2 finans çekirdeği, P6 CRM/Helpdesk (SA-17) | Hüseyin Cengiz; DNS Asistan Hüseyin |
 | Hocuspocus (Rail 6 destek oturumu) | Ayrı Node servisi + Redis, reverse proxy TLS (SA-29) | Hüseyin Cengiz |
 | Sürüm takibi | v0.155.x+ staging Press'te `bench migrate` + press\_tr testleri + aktivasyon E2E, sonra prod bakım penceresi | Hüseyin Cengiz |
-| Trace / Analytics (SHOULD) | Trace Server (GlitchTip), Analytics Server (Plausible) | Hüseyin Cengiz |
+| Trace / Analytics (SHOULD) | Trace Server (GlitchTip), Analytics Server (Plausible; birinci taraf ürün analitiği adayı, rıza kapısı ve yüzey kuralları G-134) | Hüseyin Cengiz |
+| Güvenlik danışmanlığı | Danışmanlık izleme ve karar kaydı; acil yama rutin takvimi beklemez (G-142, K-26) | Hüseyin Cengiz |
 
 Kabul (P0): `dig NS` Route 53 sunucularını döner, wildcard TLS Certificate Active, test sitesi Active, offsite yedek bucket'ta listelenir ve geri yüklenir, Grafana/Kibana uyarıları Telegram'a düşer.

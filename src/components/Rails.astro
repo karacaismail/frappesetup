@@ -1,10 +1,11 @@
 ---
 // Mimari raylar diyagramı — scripts/gen-diagrams.py üretir; elle düzenlemeyin.
 ---
-<figure class="diagram diagram-rails" tabindex="0" role="region" aria-label="Mimari raylar diyagramı (yatay kaydırılabilir)">
+<figure class="diagram diagram-rails">
+<div class="diagram-scroll" tabindex="0" role="region" aria-label="Mimari raylar diyagramı (yatay kaydırılabilir)">
 <svg viewBox='0 0 1040 940' role='img' aria-labelledby='rails-title rails-desc' font-size='16' style='font-family: var(--mantine-font-family), Inter, system-ui, sans-serif'>
 <title id='rails-title'>Altı mimari ray ve iki taban bandı</title>
-<desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 Press kontrol düzlemi (Frappe v15), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden Press'e press.api ve realtime, kiracıya /api/v2 ve bootstrap/meta, operasyona customer_360 ve HD Ticket, AI servisine SSE, Keycloak'a OIDC PKCE; AI servisinden Press'e press.mcp, kiracıya frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm rolleri. Yatay sözleşmeler: Press→Kiracı site_config sk_app ve Agent Job; Press→Ops create-fc-invoice, delete-fc-team, press_ops_bridge; Ops→Press press.api.ops. Taban bantları: ortak sözleşmeler (Keycloak JWT, has_permission, tasarım tokenları, audit) ve Hetzner bare-metal self-host altyapısı.</desc>
+<desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 Press kontrol düzlemi (Frappe v15), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, kiracıya site aracı belirteciyle frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm rolleri. Yatay sözleşmeler: Press→Kiracı site_config sk_app ve Agent Job; Press→Ops create-fc-invoice (press_tr_finance), delete-fc-team, press_ops_bridge; Ops→Press press_tr.api.ops. Taban bantları: ortak sözleşmeler (host'a bağlı oturum, has_permission, tasarım tokenları, audit) ve Hetzner bare-metal self-host altyapısı.</desc>
 <defs><marker id='arr' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'><path d='M0 0L10 5L0 10z' fill='var(--fs-line)'/></marker></defs>
 <text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>Altı ray, iki taban bandı: her ray kendi alanının tek doğruluk kaynağı</text>
 <text x='24' y='60' fill='var(--fs-quiet)'>Oklar adlandırılmış sözleşmeleri gösterir; yatay sözleşmeler altta listelenir</text>
@@ -12,7 +13,7 @@
 <rect x='40' y='90' width='960' height='140' rx='12' fill='var(--fs-surface-2)' stroke='var(--fs-line)' stroke-width='1.5'/>
 <rect x='40' y='90' width='6' height='140' rx='3' fill='var(--fs-line)'/>
 <text x='60' y='120' font-size='18' font-weight='650' fill='var(--fs-ink)'>Rail 3 — Headless panel</text>
-<text x='60' y='144' fill='var(--fs-quiet)'>React · Ant Design · @ant-design/x · TanStack · panel.&lt;marka&gt; ve &lt;kiracı&gt;/panel</text>
+<text x='60' y='144' fill='var(--fs-quiet)'>React · Ant Design · @ant-design/x · TanStack · panel.&lt;marka&gt; ve &lt;kiracı&gt;.app/panel</text>
 <text x='60' y='174' fill='var(--fs-ink)'>@platform/shell · meta-ui · frappe-sdk · design-tokens · ai-sidebar · @apps/*</text>
 <text x='60' y='198' fill='var(--fs-ink)'>Superadmin operatör modu (Rail 6'nın kullanıcı yüzü)</text>
 </g>
@@ -22,17 +23,17 @@
 <text x='140' y='330' font-size='18' font-weight='650' fill='var(--fs-ink)'>Rail 5 — AI</text>
 <text x='140' y='354' fill='var(--fs-quiet)'>Claude Agent SDK · PostgreSQL/Redis</text>
 <text x='140' y='384' fill='var(--fs-ink)'>Model yönlendirme · önizle+onayla</text>
-<text x='140' y='408' fill='var(--fs-ink)'>PII maskeleme · kota · AI Action Log</text>
-<text x='140' y='432' fill='var(--fs-ink)'>Keycloak token exchange</text>
+<text x='140' y='408' fill='var(--fs-ink)'>Yerel maskeleme · kota · AI Action Log</text>
+<text x='140' y='432' fill='var(--fs-ink)'>Site aracı belirteci (K-25)</text>
 </g>
 <g>
 <rect x='600' y='300' width='340' height='170' rx='12' fill='var(--fs-surface-2)' stroke='var(--fs-line)' stroke-width='1.5'/>
 <rect x='600' y='300' width='6' height='170' rx='3' fill='var(--fs-line)'/>
 <text x='620' y='330' font-size='18' font-weight='650' fill='var(--fs-ink)'>Rail 4 — Keycloak</text>
 <text x='620' y='354' fill='var(--fs-quiet)'>id.&lt;marka&gt; · realm platform · HA</text>
-<text x='620' y='384' fill='var(--fs-ink)'>Client'lar: panel-spa · press</text>
-<text x='620' y='408' fill='var(--fs-ink)'>site-&lt;kiracı&gt; · agent-service</text>
-<text x='620' y='432' fill='var(--fs-ink)'>identity-sync · Organizations · MFA</text>
+<text x='620' y='384' fill='var(--fs-ink)'>Client'lar: press · site-&lt;kiracı&gt;</text>
+<text x='620' y='408' fill='var(--fs-ink)'>agent-service · identity-sync</text>
+<text x='620' y='432' fill='var(--fs-ink)'>Organizations · MFA · passkey</text>
 </g>
 <g>
 <rect x='40' y='570' width='280' height='170' rx='12' fill='var(--fs-surface-2)' stroke='var(--fs-line)' stroke-width='1.5'/>
@@ -41,13 +42,13 @@
 <text x='60' y='624' fill='var(--fs-quiet)'>Frappe v15 · press.&lt;marka&gt;</text>
 <text x='60' y='654' fill='var(--fs-ink)'>Team · Site · Plan · Marketplace</text>
 <text x='60' y='678' fill='var(--fs-ink)'>Abonelik · Fatura · Agent Job</text>
-<text x='60' y='702' fill='var(--fs-ink)'>press_tr · press_tr_finance</text>
+<text x='60' y='702' fill='var(--fs-ink)'>press_tr · press_ops_bridge</text>
 </g>
 <g>
 <rect x='360' y='570' width='320' height='170' rx='12' fill='var(--fs-surface-2)' stroke='var(--fs-line)' stroke-width='1.5'/>
 <rect x='360' y='570' width='6' height='170' rx='3' fill='var(--fs-line)'/>
 <text x='380' y='600' font-size='18' font-weight='650' fill='var(--fs-ink)'>Rail 2 — Kiracı siteleri</text>
-<text x='380' y='624' fill='var(--fs-quiet)'>ERPNext v16 · &lt;kiracı&gt;.&lt;marka&gt;</text>
+<text x='380' y='624' fill='var(--fs-quiet)'>ERPNext v16 · &lt;kiracı&gt;.app.&lt;marka&gt;</text>
 <text x='380' y='654' fill='var(--fs-ink)'>Site + DB kiracı başına</text>
 <text x='380' y='678' fill='var(--fs-ink)'>platform_core · tr_localization</text>
 <text x='380' y='702' fill='var(--fs-ink)'>CronHR · CRM · Webshop app'leri</text>
@@ -58,13 +59,13 @@
 <text x='740' y='600' font-size='18' font-weight='650' fill='var(--fs-ink)'>Rail 6 — Operasyon</text>
 <text x='740' y='624' fill='var(--fs-quiet)'>ERPNext v16 · ops.&lt;marka&gt;</text>
 <text x='740' y='654' fill='var(--fs-ink)'>Cari · Sales Invoice · e-belge</text>
-<text x='740' y='678' fill='var(--fs-ink)'>Frappe CRM · Helpdesk · SLA</text>
+<text x='740' y='678' fill='var(--fs-ink)'>press_tr_finance · CRM · Helpdesk</text>
 <text x='740' y='702' fill='var(--fs-ink)'>Support Session · Hocuspocus</text>
 </g>
 <line x1='290' y1='230' x2='290' y2='300' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#arr)'/>
 <text x='300' y='280' text-anchor='start' fill='var(--fs-quiet)' stroke='var(--fs-surface)' stroke-width='6' paint-order='stroke' stroke-linejoin='round'>SSE akışı (ai-sidebar)</text>
 <line x1='770' y1='230' x2='770' y2='300' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#arr)'/>
-<text x='760' y='280' text-anchor='end' fill='var(--fs-quiet)' stroke='var(--fs-surface)' stroke-width='6' paint-order='stroke' stroke-linejoin='round'>OIDC PKCE (panel-spa)</text>
+<text x='760' y='280' text-anchor='end' fill='var(--fs-quiet)' stroke='var(--fs-surface)' stroke-width='6' paint-order='stroke' stroke-linejoin='round'>OIDC yönlendirmesi</text>
 <line x1='80' y1='230' x2='80' y2='570' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#arr)'/>
 <text x='92' y='256' text-anchor='start' fill='var(--fs-quiet)' stroke='var(--fs-surface)' stroke-width='6' paint-order='stroke' stroke-linejoin='round'>press.api.* · press_tr.api.* · realtime</text>
 <line x1='530' y1='230' x2='530' y2='570' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#arr)'/>
@@ -74,7 +75,7 @@
 <line x1='190' y1='470' x2='190' y2='570' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#arr)'/>
 <text x='200' y='498' text-anchor='start' fill='var(--fs-quiet)' stroke='var(--fs-surface)' stroke-width='6' paint-order='stroke' stroke-linejoin='round'>press.mcp · press_tr.mcp</text>
 <line x1='420' y1='470' x2='420' y2='570' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#arr)'/>
-<text x='432' y='522' text-anchor='start' fill='var(--fs-quiet)' stroke='var(--fs-surface)' stroke-width='6' paint-order='stroke' stroke-linejoin='round'>frappe_mcp (kullanıcı token'ı)</text>
+<text x='432' y='522' text-anchor='start' fill='var(--fs-quiet)' stroke='var(--fs-surface)' stroke-width='6' paint-order='stroke' stroke-linejoin='round'>frappe_mcp (aracı belirteci)</text>
 <line x1='650' y1='470' x2='650' y2='570' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#arr)'/>
 <text x='662' y='498' text-anchor='start' fill='var(--fs-quiet)' stroke='var(--fs-surface)' stroke-width='6' paint-order='stroke' stroke-linejoin='round'>Social Login Key · JWKS · SLO</text>
 <line x1='880' y1='470' x2='880' y2='570' stroke='var(--fs-line)' stroke-width='1.5' marker-end='url(#arr)'/>
@@ -82,12 +83,13 @@
 <path d='M612 470 L612 550 L300 550 L300 570' fill='none' stroke='var(--fs-line)' stroke-width='1.5' stroke-dasharray='5 5' marker-end='url(#arr)'/>
 <text x='320' y='544' text-anchor='start' fill='var(--fs-quiet)' stroke='var(--fs-surface)' stroke-width='6' paint-order='stroke' stroke-linejoin='round'>Social Login Key press</text>
 <text x='40' y='782' font-weight='650' fill='var(--fs-ink)'>Yatay sözleşmeler (Rail 1 ↔ Rail 2 ↔ Rail 6)</text>
-<text x='40' y='808' fill='var(--fs-quiet)'>Press → Kiracı: site_config sk_&lt;app&gt;, plan_limit, Agent Job · Ops → Press: press.api.ops</text>
-<text x='40' y='832' fill='var(--fs-quiet)'>Press → Ops: create-fc-invoice, delete-fc-team, press_ops_bridge olayları</text>
+<text x='40' y='808' fill='var(--fs-quiet)'>Press → Kiracı: site_config sk_&lt;app&gt;, plan_limit, Agent Job · Ops → Press: press_tr.api.ops</text>
+<text x='40' y='832' fill='var(--fs-quiet)'>Press → Ops: create-fc-invoice (press_tr_finance), delete-fc-team, press_ops_bridge olayları</text>
 <rect x='40' y='856' width='960' height='28' rx='6' fill='var(--fs-accent-soft)' stroke='var(--fs-accent)' stroke-width='1'/>
-<text x='520' y='875' text-anchor='middle' fill='var(--fs-ink)'>Taban bandı 1 — Ortak sözleşmeler: Keycloak JWT · has_permission · tasarım tokenları · audit</text>
+<text x='520' y='875' text-anchor='middle' fill='var(--fs-ink)'>Taban bandı 1 — Ortak sözleşmeler: host'a bağlı oturum · has_permission · tasarım tokenları · audit</text>
 <rect x='40' y='892' width='960' height='28' rx='6' fill='var(--fs-tint)' stroke='var(--fs-grid)' stroke-width='1'/>
-<text x='520' y='911' text-anchor='middle' fill='var(--fs-ink)'>Taban bandı 2 — Hetzner bare-metal, self-host (Hüseyin Cengiz) · DNS: GoDaddy → Route 53 (Asistan Hüseyin)</text>
+<text x='520' y='911' text-anchor='middle' fill='var(--fs-ink)'>Taban bandı 2 — Hetzner bare-metal, self-host (Hüseyin Cengiz) · DNS: GoDaddy, app. alt bölgesi Route 53</text>
 </svg>
-<figcaption class="diagram-note">Plan, fatura ve abonelik yalnızca Rail 1'de yazılır; DocType meta ve sidebar yalnızca Rail 2'den türer; muhasebe, cari ve ticket'ın tek doğrusu Rail 6'dır; her MCP aracı çağıran kullanıcının kimliğiyle aynı has_permission yolundan geçer.</figcaption>
+</div>
+<figcaption class="diagram-note">Plan, fatura ve abonelik yalnızca Rail 1'de yazılır; DocType meta ve sidebar yalnızca Rail 2'den türer; muhasebe, cari ve ticket'ın tek doğrusu Rail 6'dır; her oturum kendi host'una bağlıdır ve her MCP aracı çağıran kullanıcının kimliğiyle aynı has_permission yolundan geçer.</figcaption>
 </figure>

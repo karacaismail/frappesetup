@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 // Markdown'daki ```mermaid bloklarını (Shiki dışında bırakıldı) istemcide çizer.
 // - Renkleri sayfanın tasarım tokenlarından okur, tema değişiminde yeniden çizer.
 // - SVG genişliği doğal genişliğe (rem) sabitlenir: metin 1rem altına küçülmez, figür yatay kayar.
-// - Erişilebilir ad önceki başlıktan türer; kaynak metin <details> içinde korunur.
+// - Erişilebilir ad önceki etiket paragrafından veya başlıktan türer ve sayfada benzersizdir; kaynak metin <details> içinde korunur.
 export default function Mermaid() {
   useEffect(() => {
     let disposed = false;
@@ -11,11 +11,16 @@ export default function Mermaid() {
     const blocks = Array.from(document.querySelectorAll<HTMLElement>('pre > code.language-mermaid'));
     if (blocks.length === 0) return;
 
-    const headingBefore = (el: Element): string | null => {
+    // Ad: bloktan hemen önceki yalnız-kalın etiket paragrafı (ör. **Giriş — …**) ya da en yakın başlık.
+    const labelBefore = (el: Element): string | null => {
       let node: Element | null = el;
       while (node) {
         let sib = node.previousElementSibling;
         while (sib) {
+          const only = sib.children.length === 1 ? sib.firstElementChild : null;
+          if (sib.tagName === 'P' && only?.tagName === 'STRONG' && sib.textContent?.trim() === only.textContent?.trim()) {
+            return only.textContent?.trim() ?? null;
+          }
           if (/^H[1-4]$/.test(sib.tagName)) return sib.textContent?.replace(/#\s*$/, '').trim() ?? null;
           sib = sib.previousElementSibling;
         }
@@ -23,6 +28,13 @@ export default function Mermaid() {
         if (!node || node.classList.contains('prose')) break;
       }
       return null;
+    };
+    // Bölge (region) adları sayfada benzersiz olmalı: aynı ad yinelenirse sıra numarası eklenir.
+    const used = new Map<string, number>();
+    const uniqueLabel = (label: string) => {
+      const n = (used.get(label) ?? 0) + 1;
+      used.set(label, n);
+      return n === 1 ? label : `${label} (${n})`;
     };
 
     const figures = blocks.map((code, i) => {
@@ -35,8 +47,8 @@ export default function Mermaid() {
       // Kaydırılabilir bölge: klavyeyle kaydırma için odaklanabilir; SVG'nin kendisi gizlenir, ad figürde.
       fig.setAttribute('role', 'region');
       fig.tabIndex = 0;
-      const heading = headingBefore(pre);
-      fig.setAttribute('aria-label', heading ? `Akış diyagramı: ${heading}` : `Akış diyagramı ${i + 1}`);
+      const heading = labelBefore(pre);
+      fig.setAttribute('aria-label', uniqueLabel(heading ? `Akış diyagramı: ${heading}` : `Akış diyagramı ${i + 1}`));
 
       const details = document.createElement('details');
       details.className = 'mermaid-details';

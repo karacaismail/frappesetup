@@ -3,8 +3,10 @@ import { getCollection, render } from 'astro:content';
 import { IconArrowLeft, IconArrowRight, IconClock } from '@tabler/icons-react';
 import Site from '../layouts/Site.astro';
 import Mermaid from '../components/Mermaid.tsx';
+import PhaseTable from '../components/PhaseTable.astro';
 import RequirementsExplorer from '../components/RequirementsExplorer.tsx';
 import Rails from '../components/Rails.astro';
+import RequirementSummary from '../components/RequirementSummary.astro';
 import Timeline from '../components/Timeline.astro';
 import { sectionIcon } from '../components/icons';
 import { SECTIONS } from '../data/sections';
@@ -30,7 +32,13 @@ const words = (entry.body ?? '').split(/\s+/).filter(Boolean).length;
 const minutes = Math.max(1, Math.round(words / 180));
 
 const hasMermaid = (entry.body ?? '').includes('```mermaid');
-const embed = entry.id === 'raylar' ? 'rails' : entry.id === 'yol-haritasi' ? 'timeline' : null;
+// Derleme anında üretilen bloklar: markdown'daki <div data-embed="ad"> yer tutucusuna sayfa betiğiyle taşınır.
+const EMBEDS: Record<string, string[]> = {
+  raylar: ['rails'],
+  'yol-haritasi': ['phase-table', 'timeline'],
+  gereksinimler: ['req-summary'],
+};
+const embeds = EMBEDS[entry.id] ?? [];
 ---
 
 <Site
@@ -55,8 +63,22 @@ const embed = entry.id === 'raylar' ? 'rails' : entry.id === 'yol-haritasi' ? 't
       {meta?.summary && <p class="doc-summary">{meta.summary}</p>}
     </header>
 
-    {embed === 'rails' && <div data-embed-source="rails"><Rails /></div>}
-    {embed === 'timeline' && <div data-embed-source="timeline"><Timeline /></div>}
+    {embeds.includes('rails') && <div data-embed-source="rails"><Rails /></div>}
+    {
+      embeds.includes('phase-table') && (
+        <div data-embed-source="phase-table" class="prose">
+          <PhaseTable />
+        </div>
+      )
+    }
+    {embeds.includes('timeline') && <div data-embed-source="timeline"><Timeline /></div>}
+    {
+      embeds.includes('req-summary') && (
+        <div data-embed-source="req-summary" class="prose">
+          <RequirementSummary />
+        </div>
+      )
+    }
 
     {
       entry.id === 'gereksinimler' && (
@@ -99,10 +121,11 @@ const embed = entry.id === 'raylar' ? 'rails' : entry.id === 'yol-haritasi' ? 't
 </Site>
 
 <script>
-  // 1) Diyagramı metindeki yer tutucuya taşı (JS yoksa başlığın altında kalır).
-  const target = document.querySelector('[data-embed]');
-  const source = document.querySelector('[data-embed-source]');
-  if (target && source) target.replaceWith(source);
+  // 1) Derleme anında üretilen blokları metindeki yer tutucularına taşı (JS yoksa başlığın altında kalır).
+  for (const source of document.querySelectorAll<HTMLElement>('[data-embed-source]')) {
+    const target = document.querySelector(`[data-embed="${source.dataset.embedSource}"]`);
+    if (target) target.replaceWith(source);
+  }
 
   // 2) Başlık bağlantıları: h2/h3 kimliğine kopyalanabilir # bağlantısı.
   for (const h of document.querySelectorAll<HTMLElement>('.prose h2[id], .prose h3[id]')) {

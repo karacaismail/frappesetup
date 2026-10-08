@@ -1,0 +1,68 @@
+---
+// Faz tablosu — hedef, çıkış ve sahip src/data/phases.json'dan; gereksinim kimlikleri requirements.json'daki
+// faz alanından derleme anında türetilir (elle kopya yok, faz–gereksinim çelişkisi oluşamaz).
+import phases from '../data/phases.json';
+import requirements from '../data/requirements.json';
+
+// Ardışık kimlikleri aralığa sıkıştırır: G-7, G-8, G-9 → G-7..G-9.
+function compress(ids: string[]): string {
+  const out: string[] = [];
+  for (const prefix of ['G', 'SA']) {
+    const nums = ids
+      .filter((id) => id.startsWith(`${prefix}-`))
+      .map((id) => Number(id.split('-')[1]))
+      .sort((a, b) => a - b);
+    let i = 0;
+    while (i < nums.length) {
+      let j = i;
+      while (j + 1 < nums.length && nums[j + 1] === nums[j] + 1) j++;
+      out.push(j - i >= 2 ? `${prefix}-${nums[i]}..${prefix}-${nums[j]}` : nums.slice(i, j + 1).map((n) => `${prefix}-${n}`).join(', '));
+      i = j + 1;
+    }
+  }
+  return out.join(', ');
+}
+
+const rows = phases.map((p) => {
+  const ids = requirements.filter((r) => r.phase === p.id).map((r) => r.id);
+  return { ...p, weeks: p.end - p.start, ids: compress(ids), count: ids.length };
+});
+---
+
+<div class="table-wrap" tabindex="0" role="region" aria-label="Tablo: Faz tablosu (yatay kaydırılabilir)">
+  <table class="phase-table">
+    <thead>
+      <tr>
+        <th scope="col">Faz</th>
+        <th scope="col">Hedef</th>
+        <th scope="col">Çıkış ölçütü</th>
+        <th scope="col">Gereksinimler (fazına göre)</th>
+        <th scope="col">Sahip</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((p) => (
+          <tr>
+            <th scope="row">
+              <strong>{p.title}</strong> <span class="nowrap">({p.start}–{p.end}. hafta,</span> <span class="nowrap">≈{p.weeks} hafta)</span>
+            </th>
+            <td>{p.goal}</td>
+            <td>{p.exit}</td>
+            <td>
+              {p.count} kalem: {p.ids}
+            </td>
+            <td>{p.owner}</td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>
+
+<style>
+  /* Hafta aralığı tek parça kalır: "(18–30." gibi bir dizgi tire sonrasında satır kırmaz. */
+  .nowrap {
+    white-space: nowrap;
+  }
+</style>

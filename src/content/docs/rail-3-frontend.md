@@ -4,7 +4,7 @@ nav: "Rail 3 · Frontend"
 order: 6
 ---
 
-Rail 3, tek bir React SPA'nın hem kiracı sitesini (`https://<kiracı>.<marka>.com.tr/panel`, Frappe v16 `/api/v2`) hem Press'i (`press.api.*` / `press_tr.api.*`, Frappe v15) aynı oturum çerezi ve CSRF sözleşmesiyle (G-13, G-45, G-75) sürmesini sağlar; aynı kabuk Keycloak operatör rolüyle superadmin moduna geçer (SA-24). Tüm ekranlar DocType meta'sından üretilir; elle kodlanan tek şey kabuk, eşleme katmanı ve açık override kayıtlarıdır (G-69). Bu bölüm P1 çıkış ölçütlerinin frontend tarafını tanımlar.
+Rail 3, tek bir React SPA build'inin her sitenin kendi host'undan sunulmasını sağlar: kiracı host'unda (`https://<kiracı>.app.<marka>.com.tr/panel`, Frappe v16 `/api/v2`) ve Press sitesinin public alan adında (`https://panel.<marka>.com.tr`, `press.api.*` / `press_tr.api.*`, Frappe v15). Her site kendi host'una bağlı oturum ve CSRF belirteciyle çalışır; ortak oturum ve CORS yoktur (G-13, G-45, G-75, G-119); aynı kabuk Keycloak operatör rolüyle superadmin moduna geçer (SA-24). Tüm ekranlar DocType meta'sından üretilir; elle kodlanan tek şey kabuk, eşleme katmanı ve açık override kayıtlarıdır (G-69). Bu bölüm P1 çıkış ölçütlerinin frontend tarafını tanımlar.
 
 ## 1. Monorepo ve paket sınırları (G-66, G-103)
 
@@ -13,19 +13,20 @@ Rail 3, tek bir React SPA'nın hem kiracı sitesini (`https://<kiracı>.<marka>.
 | `@platform/design-tokens` | AntD `theme.token`/`theme.components` semantik token seti, light/dark algoritması, Tenant Branding çalışma zamanı katmanı | G-67, G-97 |
 | `@platform/frappe-sdk` | `/api/v2` + `press.api.*` istemcisi, CSRF, hata eşlemesi, socket.io, TanStack Query anahtar sözleşmesi | G-68 |
 | `@platform/meta-ui` | Field type → AntD eşlemesi, liste/form/CRUD üreticileri, override registry, çekirdek doctype codegen tipleri | G-69, G-70, G-71 |
-| `@platform/shell` | Layout, metadata sidebar, komut paleti, bildirim merkezi, ayarlar/yetki/faturalama ekranları, destek rıza bandı, operatör modu | G-93–G-101, SA-24, SA-27 |
+| `@platform/shell` | Layout, metadata sidebar, komut paleti, bildirim merkezi, ayarlar/yetki/faturalama ekranları, URL sözleşmesi ve paylaşım, yardım kulakçığı, tur ve keşif, ölçüm adapterları ve rıza merkezi, destek rıza bandı, operatör modu | G-93–G-101, G-130–G-135, G-137, G-139, G-140, G-154, SA-24, SA-27 |
 | `@platform/ai-sidebar` | `@ant-design/x` sağ panel, SSE akışı, önizle+onayla UI | G-86, G-88 |
 | `@platform/support-session` | Hocuspocus provider, awareness/imleç katmanı, takip modu, uzaktan kontrol teklifi; yalnız aktif Support Session varken dinamik yüklenir | SA-29 |
 | `@apps/<ad>` | `AppModule` arayüzü: rota ağacı, override'lar, çeviri, Prompts, onboarding | G-103 |
 
-pnpm workspaces + Vite; uygulama paketleri yalnızca `get_bootstrap` kurulu uygulama listesinde geçenler için dinamik import edilir; CI'da Lighthouse bütçesi (ilk yük JS ≤ 300 KB gzip, LCP ≤ 2,5 s 4G) kapı görevi görür (G-66, X-13). Ant Design v5 ile başlanır; v6 geçişi tek ADR ile tek majör sıçrama olarak planlanır (sürüm durumu doğrulanacak).
+pnpm workspaces + Vite; uygulama paketleri yalnızca `get_bootstrap` kurulu uygulama listesinde geçenler için dinamik import edilir; CI'da Lighthouse bütçesi (ilk yük JS ≤ 300 KB gzip, LCP ≤ 2,5 s 4G) kapı görevi görür (G-66, X-13). Ant Design 6 + `@ant-design/x` 2 ile başlanır (`@ant-design/x` 2.9.0 eş bağımlılığı `antd ^6.1.1`; doğrulandı: npm, 2026-10-08).
 
 ## 2. Shell yerleşimi (G-93, G-94, G-88)
 
 - **Üst bar**: takım/site değiştirici (`press.api.account.switch_team`), global arama + komut paleti (`frappe.utils.global_search.search`, `frappe.desk.search.search_link`, navigasyon ve AI prompt'ları tek listede), bildirim sayacı, AI panel düğmesi, hesap menüsü.
 - **Sol sidebar**: yalnızca G-63 bootstrap'ından türetilir; 320 px'te AntD Drawer olur, odak Drawer içinde tutulur, Escape kapatır.
-- **İçerik**: TanStack Router rota ağacı `/<app>/<doctype>` liste ve `/<app>/<doctype>/<name>` form; iskelet yükleme, boş/hata/çevrimdışı durumları tokenlı bileşenlerle.
-- **Sağ AI paneli**: 320 px'te tam ekran Drawer; sayfa bağlamı (doctype, belge, seçili satırlar, filtreler) yapılandırılmış olarak gönderilir (G-88).
+- **İçerik**: TanStack Router rota ağacı URL sözleşmesine uyar (G-132): `/<uygulama>/<belge-türü>` liste, `/<uygulama>/<belge-türü>/<kimlik>` kayıt, filtre/sıralama/sayfa okunur sorgu parametreleri; iskelet yükleme, boş/hata/çevrimdışı durumları tokenlı bileşenlerle.
+- **Yardım kulakçığı**: sağ kenarda yapışkan; kendi kendine destek modu alan, bileşen ve sayfa yardımını açar (G-137, G-138).
+- **Sağ yuva (AI paneli veya yardım paneli)**: aynı anda biri açıktır; 390 px ve altında tam ekran çekmece; sayfa bağlamı (doctype, belge, seçili satırlar, filtreler) yapılandırılmış olarak gönderilir (G-88).
 - **Destek bandı**: Pending Support Access talebi ve aktif destek oturumu göstergesi (operatör presence, 'takip ediyor' durumu, 'Oturumu bitir') her sayfanın üstünde; uzaktan kontrol teklifi ayrı onay iletişim kutusuyla (SA-27, SA-29).
 - **Operatör modu**: Keycloak operatör rolü bootstrap'ta geldiğinde sidebar operatör navigasyonuna (Müşteri 360, Tahsilat, Destek, KVKK raporu) geçer; tenant verisi ile operatör verisi aynı ekranda karışmaz (SA-24).
 - Yön değişiminde form verisi, odak ve açık panel korunur; her eylemin klavye ve dokunma yolu vardır.
@@ -47,7 +48,7 @@ pnpm workspaces + Vite; uygulama paketleri yalnızca `get_bootstrap` kurulu uygu
 | Color, Rating, Duration, Geolocation, Signature | `ColorPicker`, `Rate`, süre girişi, harita, imza kanvası | Signature/Geolocation ayrı bileşen (doğrulanacak) |
 | Section Break, Column Break, Tab Break | `Row`/`Col`, `Tabs`, `Collapse` | form yerleşimi |
 
-Motor her alan için `read_only`, `reqd`, `hidden`, `depends_on`/`mandatory_depends_on`/`read_only_depends_on` ifadelerini, `fetch_from`, `set_only_once` ve efektif permlevel iznini (G-61) değerlendirir; sunucuyla aynı kural UI'da uygulanır. Override registry `overrides/<doctype>.tsx` alan, bölüm, aksiyon ve liste sütunu düzeyinde açık kaçış kapısıdır. Çekirdek doctype tipleri (User, Employee, Sales Invoice gibi) CI'da v16 meta'sından codegen ile üretilir; kalan her şey çalışma zamanı `GET /api/v2/doctype/<doctype>/meta` (doğrulandı: Frappe version-16 `api/v2.py`) + `getdoctype` çıktısından okunur. Önbellek anahtarı `site + meta hash/ETag`'tır; Site Update Success ve Customize Form kaydı `meta_changed` realtime olayıyla önbelleği düşürür (G-63, X-12).
+Motor her alan için `read_only`, `reqd`, `hidden`, `depends_on`/`mandatory_depends_on`/`read_only_depends_on` ifadelerini, `fetch_from`, `set_only_once` ve efektif permlevel iznini (G-61) değerlendirir; sunucuyla aynı kural UI'da uygulanır. Metadata bütün ekranları kendiliğinden üretmez: temsilî ekranlarda her davranış sunucuda mevcut / metadata ile karşılanan / yeniden geliştirilecek sınıfına yazılır (G-123); `eval:` ifadeleri `eval` veya `new Function` olmadan güvenli ayrıştırıcıyla yorumlanır, desteklenmeyen ifade alanı görünür bırakır ve doğrulamayı sunucuya bırakır. Override registry `overrides/<doctype>.tsx` alan, bölüm, aksiyon ve liste sütunu düzeyinde açık kaçış kapısıdır. Çekirdek doctype tipleri (User, Employee, Sales Invoice gibi) CI'da v16 meta'sından codegen ile üretilir; kalan her şey çalışma zamanı `GET /api/v2/doctype/<doctype>/meta` (doğrulandı: Frappe version-16 `api/v2.py`) + `getdoctype` çıktısından okunur. Önbellek iki katmanlıdır (G-63, X-12): şema katmanı `site + meta hash/ETag` ile anahtarlanır ve IndexedDB'de tutulabilir; kullanıcıya bağlı izin katmanı (site, kullanıcı, `perm_version`) yalnız bellektedir; çıkış ve kiracı değişimi tarayıcı katmanlarını siler; Site Update Success ve Customize Form kaydı `meta_changed` realtime olayıyla önbelleği düşürür.
 
 ## 4. Workspace'ten navigasyon (G-94)
 
@@ -61,9 +62,9 @@ Sidebar şu veriden kurulur: kurulu uygulama → üst öğe (Marketplace App iko
 | Belge CRUD | `GET/POST/PATCH/DELETE /api/v2/document/<dt>/<name>` | `press.api.client.get/insert/set_value/delete` |
 | Metot | `POST /api/v2/method/<path>`, `/api/v2/method/run_doc_method` | `press.api.client.run_doc_method`, `press_tr.api.*` |
 | Meta / bootstrap | `platform_core.api.meta.get_doctype`, `api.shell.get_bootstrap` | `press.api.site.get_plans`, `press_tr.api.billing.*` |
-| Operatör modu | `platform_core.api.ops.customer_360` (operasyon sitesi) | `press.api.client.*` + `press.api.ops` (BFF, operatör API key) (SA-23, SA-25) |
+| Operatör modu | `platform_core.api.ops.customer_360` (operasyon sitesi, BFF üzerinden; tarayıcıdan doğrudan istek yok) | `press.api.client.*` + `press_tr.api.ops` (BFF, operatör kimliği) (SA-23, SA-25, K-16) |
 
-SDK kuralları: `credentials: include` + `X-Frappe-CSRF-Token` (token `www/<panel>.py` enjeksiyonundan, G-45); `_server_messages`/`exc_type` eşlemesi — `ValidationError` → alan hataları, `PermissionError` → yetki ekranı + `explain_permission` (G-62), `CSRFTokenError` → token yenile ve bir kez tekrar dene; TanStack Query anahtarları `[site, doctype, 'list'|'doc'|'meta', params]`; mutasyon sonrası ilgili anahtarlar geçersizlenir. Realtime: kiracıda socket.io `doc_subscribe`/`doctype_subscribe` ile `doc_update`, `list_update`, `meta_changed`; Press'te `agent_job_update` (G-15) aktivasyon ilerlemesini ve site durumunu besler; her iki bağlantı same-site çerezle açılır (G-13).
+SDK kuralları: `credentials: include` + `X-Frappe-CSRF-Token` (token `www/<panel>.py` enjeksiyonundan, G-45); `_server_messages`/`exc_type` eşlemesi — `ValidationError` → alan hataları, `PermissionError` → yetki ekranı + `explain_permission` (G-62), `CSRFTokenError` → token yenile ve bir kez tekrar dene; TanStack Query anahtarları `[site, doctype, 'list'|'doc'|'meta', params]`; mutasyon sonrası ilgili anahtarlar geçersizlenir. Realtime: kiracıda socket.io `doc_subscribe`/`doctype_subscribe` ile `doc_update`, `list_update`, `meta_changed`; Press'te `agent_job_update` (G-15) aktivasyon ilerlemesini ve site durumunu besler; her bağlantı kendi host'unun oturumuyla, aynı origin'den açılır (G-119).
 
 ## 6. i18n (G-73)
 
@@ -87,7 +88,7 @@ Türkçe birinci dil, İngilizce ikinci. AntD `trTR` locale, dayjs `tr`, biçiml
 | E2E kritik yolculuk | Playwright: giriş (Keycloak), sidebar, liste, form, aktivasyon, ödeme, destek rızası | Chromium/Firefox/WebKit × 320/360/375/390/yatay/tablet/masaüstü |
 | Etkileşim | fare, dokunma, Tab/Shift+Tab, Escape, ok tuşları | tek odak göstergesi, Drawer odak tuzağı |
 | Görsel regresyon | Playwright screenshot + DOM/ARIA denetimi | 320'de sayfa genişliği viewport'a eşit, tablo kendi kapsayıcısında kaydırır |
-| Performans | Lighthouse CI | G-66 bütçesi |
+| Performans | Lighthouse CI + Playwright ağ ölçümü | G-66 bütçesi; koşullu yükleme ağ isteğiyle kanıtlanır (G-149) |
 | Gerçek cihaz | macOS/iOS Safari, Android Chrome | emülasyondan ayrı pass/fail/not\_run |
 
 Uygulama sırası 320 → 360 → 375 → 390 → yatay telefon → tablet → masaüstü; kapsam 320 kabulü sağlandıktan sonra genişler. Yön değişimi, sanal klavye, safe area (`env(safe-area-inset-*)`), zoom %200 ve `prefers-reduced-motion` her kritik yolculukta kontrol edilir. Raporda tarayıcı/OS/viewport/giriş profili, komut ve trace kaydı bulunur; çalıştırılmayan kontrol `not_run` olarak yazılır. P1 çıkışı: çekirdek doctype'larda liste/form/CRUD meta'dan üretilmiş, sidebar bootstrap'tan türemiş, CSRF/CORS sözleşmesi doğrulanmış ve bu matris yeşil.

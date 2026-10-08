@@ -42,6 +42,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
 
 <Site title="Frappe Headless SaaS — mimari karar çerçevesi" current={`${base}/`}>
   <section class="hero">
+    <div class="hero-grid">
     <div class="hero-copy">
       <p class="eyebrow">Mimari karar çerçevesi · {AS_OF}</p>
       <h1>Frappe üzerinde çok kiracılı SaaS: on sabit karar, altı ray, {requirements.length} numaralı gereksinim</h1>
@@ -74,6 +75,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
         </li>
       ))}
     </ol>
+    </div>
   </section>
 
   <section class="stats" aria-label="Özet sayılar">
@@ -203,8 +205,17 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     -webkit-mask-image: linear-gradient(90deg, transparent, black 30%, black 70%, transparent);
     z-index: -1;
   }
-  @media (min-width: 62em) {
-    .hero {
+  /* İki sütun kapsayıcının gerçek genişliğine bağlı (rem kök yazıyla büyür): kullanıcı yazı boyutunu
+     büyütünce ya da gezinme çubuğu genişleyince ızgara tek sütuna döner, başlık sıkışmaz. */
+  .hero {
+    container-type: inline-size;
+  }
+  .hero-grid {
+    display: grid;
+    gap: 1.75rem;
+  }
+  @container (min-width: 46rem) {
+    .hero-grid {
       grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 1fr);
       align-items: start;
     }
@@ -278,7 +289,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     gap: 0.5rem;
     align-self: center;
   }
-  @media (min-width: 62em) {
+  @container (min-width: 46rem) {
     .railmap {
       grid-template-columns: 1fr;
     }
@@ -400,6 +411,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
 
   /* Kararlar */
   .decisions {
+    container-type: inline-size;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -409,7 +421,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .decision {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 0.85rem;
     padding: 1.1rem 1.15rem;
     border-radius: var(--mantine-radius-lg);
@@ -450,6 +462,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
 
   /* Fazlar */
   .phases {
+    container-type: inline-size;
     list-style: none;
     margin: 0.75rem 0 0;
     padding: 0;
@@ -459,7 +472,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .phase {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 0.75rem;
     padding: 0.5rem 0.25rem;
   }
@@ -495,6 +508,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     font-weight: 600;
   }
   .sections {
+    container-type: inline-size;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -504,7 +518,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .section-card {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 0.85rem;
     padding: 0.9rem 1rem;
     border-radius: var(--mantine-radius-lg);
@@ -536,6 +550,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .section-nav {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     gap: 0.5rem;
     font-weight: 650;
@@ -552,5 +567,19 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     font-size: 1rem;
     line-height: 1.45;
     text-wrap: pretty;
+  }
+  /* Büyük kök yazıda dar kapsayıcı: numara/ikon üstte, metin tam genişlikte; kırılamayan uzun dizgi
+     yalnız sığmadığında satır sonunda kırılır. Varsayılan yazıda 320 px'te yerleşim değişmez (14rem = 224px). */
+  @container (max-width: 14rem) {
+    .decision,
+    .phase,
+    .section-card {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .decision,
+  .phase,
+  .section-card {
+    overflow-wrap: break-word;
   }
 </style>

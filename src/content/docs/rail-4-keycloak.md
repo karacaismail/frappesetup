@@ -12,21 +12,35 @@ Keycloak; panel, Press, operasyon sitesi ve tüm kiracı siteleri için tek kiml
 | --- | --- | --- |
 | Realm | `platform` (prod), `platform-staging` (X-02) | — |
 | Müşteri takımı | Organization (alan adı, üyelik, davet) | Press Team `keycloak_org_id` Custom Field (press\_tr) |
-| Kullanıcı | User; kimlik anahtarı `sub`, eşleme anahtarı `email` | Press User + Team üyesi; kiracı sitede System User (G-57) |
+| Kullanıcı | User; kalıcı anahtar `(iss, sub)` (G-120), e-posta yalnız iletişim özniteliği | Press User + Team üyesi; kiracı sitede System User (G-57) |
 | Operatör (sahibin personeli) | `platform-operator` grubu; realm rolleri `ops-admin`, `ops-billing`, `ops-support`, `ops-finance` | Press System User + Press Ops Billing / Support Agent rolleri; operasyon sitesi rolleri (SA-1, SA-2, SA-3) |
-| Panel | `panel-spa` (public, PKCE; redirect `panel.<marka>.com.tr`, `*.<marka>.com.tr/panel`) | — |
+| Panel | Ayrı istemci yok (K-25): panel host'u Press sitesidir ve `press` istemcisiyle oturum açar; tarayıcıya belirteç verilmez | — |
 | Press | `press` (confidential) | Press Social Login Key provider 'Keycloak' (G-12) |
 | Kiracı sitesi | `site-<kiracı>` (confidential; identity-sync Admin API ile açar) | Frappe Social Login Key, redirect `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` (G-44) |
 | Operasyon sitesi | `site-ops` (confidential) | Frappe Social Login Key; yalnız `platform-operator` grubu girer (SA-3) |
-| Servisler | `agent-service`, `identity-sync`, `hocuspocus` (service account / JWT doğrulama) | Press OAuth Client + platform\_core `auth_hooks` (G-28, G-59); Hocuspocus `onAuthenticate` (SA-29) |
+| Servisler | `agent-service`, `identity-sync` (service account) | Press OAuth Client + platform\_core `auth_hooks` (G-28, G-59); Hocuspocus Keycloak istemcisi kullanmaz, site biletini doğrular (SA-29, G-148) |
 
-Her iki Social Login Key'de `user_id_property='sub'` yazılır; Frappe v16 varsayılanı `preferred_username`'dir (doğrulandı: `social_login_key.py` providers\['Keycloak'\]). Frappe'nin OAuth ile kendiliğinden açtığı kullanıcı 'Website User' tipindedir ve eşleme e-posta ile yapılır (doğrulandı: `frappe/utils/oauth.py` `login_oauth_user`); bu yüzden kiracı sitede `sign_ups='Deny'` + ön provizyon (bölüm 4), Press'te `sign_ups='Allow'` + press\_tr on\_login kancasıyla Team oluşturma geçerlidir. Hedef sürüm Keycloak 26.x (son sürüm 26.8.0, 2026-10-01; doğrulandı); Organizations 26.0'dan beri tam destekli, standart token exchange 26.2'den beri iç istemciler arasında destekli (doğrulandı: release notes).
+Her iki Social Login Key'de `user_id_property='sub'` yazılır; Frappe v16 varsayılanı `preferred_username`'dir (doğrulandı: `social_login_key.py` providers\['Keycloak'\]). Frappe'nin OAuth ile kendiliğinden açtığı kullanıcı 'Website User' tipindedir ve eşleme e-posta ile yapılır (doğrulandı: `frappe/utils/oauth.py` `login_oauth_user`); bu yüzden kiracı sitede `sign_ups='Deny'` + ön provizyon (bölüm 4), Press'te `sign_ups='Allow'` + press\_tr on\_login kancasıyla Team oluşturma geçerlidir. Kalıcı eşleme giriş kancasında `(iss, sub)` ile yapılır; e-posta değişimi kimliği değiştirmez, aynı e-postayla yeniden açılan hesap eski kayda bağlanmaz (G-120). Hedef sürüm Keycloak 26.x (son sürüm 26.8.0, 2026-10-01; doğrulandı); Organizations 26.0'dan beri tam destekli, standart token exchange 26.2'den beri iç istemciler arasında destekli (doğrulandı: release notes).
+
+## Origin ve oturum sözleşmesi (G-119)
+
+Tek Keycloak SSO oturumu her siteye etkileşimsiz OIDC dönüşüyle ayrı bir site oturumu açtırır; ortak parent-domain `sid` yoktur. Bu tablo tasarım sözleşmesidir; uygulanmadı ve test edilmedi.
+
+| Host | Sunan | Oturum | CSRF kaynağı | CORS | Realtime / WS kimliği |
+| --- | --- | --- | --- | --- | --- |
+| `panel.<marka>.com.tr` | Press sitesi (press\_tr www, SPA) | Host'a bağlı `sid` | www sayfası | Yok (aynı origin) | Press socket.io, aynı origin |
+| `press.<marka>.com.tr` | Press Desk (operatör; yalnız Tailscale) | Ayrı `sid` | Desk | Yok | Desk |
+| `<kiracı>.app.<marka>.com.tr` | Kiracı sitesi (platform\_core www, SPA) | Host'a bağlı `sid` | `www/<panel>.py` | Yok | Kiracı socket.io, aynı origin |
+| Özel alan adı | Aynı kiracı sitesi | O host'a bağlı `sid` | Aynı | Yok | Aynı origin; redirect URI tam adres (G-124) |
+| `ops.<marka>.com.tr` | Operasyon sitesi (personel Desk; operatör modu BFF üzerinden) | Host'a bağlı `sid` | Desk / www | Yok | — |
+| `agent.` ve Hocuspocus | Agent servisi, Hocuspocus | Çerez yok; aracı belirteci / tek kullanımlık bilet (G-148) | Gerekmez | Yalnız kayıtlı kiracı origin'leri, kimlik bilgisiz | Bilet + aktif Support Session |
+| `id.<marka>.com.tr` | Keycloak | Yalnız Keycloak SSO oturumu | Keycloak | Yok | — |
 
 ## 2. Akışlar
 
 `get_oauth2_authorize_url` whitelisted değildir (doğrulandı); SPA authorize URL'sini `press_tr.api.auth.get_login_url(redirect_to)` ve `platform_core.api.auth.get_login_url` sarmalayıcılarından alır, state sunucuda üretilir.
 
-**Giriş — tek SSO oturumu, panel → Press → kiracı sitesi**
+**Giriş — tek SSO oturumu, host'a bağlı site oturumları**
 
 ```mermaid
 sequenceDiagram
@@ -43,13 +57,13 @@ sequenceDiagram
   U->>K: parola + TOTP/passkey (G-78)
   K-->>U: 302 code, login_via_keycloak (Press)
   PR->>K: token + userinfo
-  PR->>PR: sub ile User eşle, Team yoksa press_tr oluşturur (G-12), sid çerezi
+  PR->>PR: (iss, sub) ile User eşle (G-120), Team yoksa press_tr oluşturur (G-12), host'a bağlı sid
   PR-->>P: 302 redirect_to
   P->>S: kiracı /panel (401)
   P->>S: platform_core.api.auth.get_login_url
   S-->>U: 302 Keycloak authorize (client site-kiraci)
   K-->>S: SSO oturumu var, etkileşimsiz code, token + userinfo
-  S->>S: email ile System User eşle (sign_ups=Deny, G-44/G-57), sid + csrf_token (G-45)
+  S->>S: (iss, sub) ile System User eşle (sign_ups=Deny, G-120), host'a bağlı sid + csrf_token (G-45)
   S-->>P: get_bootstrap (G-63)
 ```
 
@@ -64,7 +78,7 @@ sequenceDiagram
   participant IS as identity-sync
   participant PR as Press / press_tr
   U->>P: Ücretsiz dene
-  P-->>U: 302 /realms/platform/protocol/openid-connect/registrations (client panel-spa)
+  P-->>U: 302 /realms/platform/protocol/openid-connect/registrations (client press)
   U->>K: kayıt formu (markalı tema G-80), e-posta doğrulama
   K-->>IS: Event Listener: REGISTER, VERIFY_EMAIL
   IS->>K: Admin API: Organization oluştur, kullanıcıyı ekle
@@ -102,16 +116,16 @@ sequenceDiagram
 
 | Çağıran → Hedef | Belirteç | Doğrulayan | Denetlenen |
 | --- | --- | --- | --- |
-| SPA → kiracı site / Press | Frappe `sid` çerezi (Secure, SameSite=Lax) + `X-Frappe-CSRF-Token` | Frappe oturum katmanı | same-site origin, `allow_cors` (G-13, G-45) |
-| Agent → kiracı site | Keycloak access token (RS256, 5 dk), standart token exchange ile | platform\_core `auth_hooks` (G-59) | realm JWKS, `iss`, `aud=site-<kiracı>`, `azp=agent-service`, `exp`, `organization`; e-posta → `frappe.set_user` |
+| SPA → kiracı site / Press | Host'a bağlı Frappe `sid` (Secure, HttpOnly, SameSite=Lax) + `X-Frappe-CSRF-Token` | Frappe oturum katmanı | aynı origin; CORS yok (G-119, G-45) |
+| Agent → kiracı site | Kiracı sitesinin oturumdan bastığı kısa ömürlü aracı belirteci (G-148, K-25) | platform\_core `auth_hooks` (G-59) | imza, `aud` (agent + site), `exp` (dakikalar), `jti` tek kullanım ve iptal, kapsam; kullanıcı `(iss, sub)` ile |
 | Agent → Press | Press OAuth Bearer Token (authorization code + PKCE) | Frappe `validate_oauth` (G-28) | Press OAuth Client, kullanıcıya bağlı, kısa ömür |
 | Keycloak → site/Press | `logout_token` | platform\_core / press\_tr (G-58) | JWKS, `events`, `sid`/`sub` |
 | identity-sync → Press/platform\_core | client credentials JWT | press\_tr / platform\_core `auth_hooks` | `azp=identity-sync`, IP allowlist (G-81) |
 | Servisler → Keycloak Admin/Token API | client credentials | Keycloak | service account rolleri `manage-users`, `manage-clients`, `view-organizations` (G-82) |
 | Operatör BFF → Press | operatör başına Press API key/secret + `X-Press-Team` | Press | Keycloak operatör rolü → Press hesabı eşlemesi; her çağrı Operator Audit'te (SA-1, SA-25) |
-| Tarayıcı → Hocuspocus | Keycloak access token (destek odası) | Hocuspocus `onAuthenticate` → platform\_core Support Session doğrulaması | `sub`, oda kimliği, aktif Support Session (SA-29) |
+| Tarayıcı → Hocuspocus | Kiracı sitesinin bastığı tek kullanımlık bilet (G-148) | Hocuspocus `onAuthenticate` → platform\_core | bilet, oda, aktif Support Session ve kapsam, Origin; iptalde bağlantı sunucudan kapanır (SA-42) |
 
-JWKS 10 dakika önbelleklenir ve bilinmeyen `kid` görülünce yenilenir; saat toleransı 30 sn; tüm servis belirteçleri kısa ömürlü ve audience kısıtlıdır (G-82).
+Servis JWT'leri için JWKS 10 dakika önbelleklenir ve bilinmeyen `kid` görülünce yenilenir; saat toleransı 30 sn; tüm servis belirteçleri kısa ömürlü ve audience kısıtlıdır (G-82).
 
 ## 4. Provizyon — identity-sync (G-81)
 
@@ -140,7 +154,7 @@ Social Login Key: provider 'Keycloak', `custom_base_url=1`, `base_url=https://id
 
 ## 7. Realm politikaları (G-43, G-78, G-80)
 
-Login with email, Verify email Required, brute force detection (5 deneme / 300 sn), parola ≥12 + geçmiş + yaygın parola listesi, TOTP + WebAuthn/passkey, SSO Session Idle 30 dk / Max 12 saat (Frappe `session_expiry` ile hizalı), access token 5 dk, refresh token rotation, Remember me kapalı. Tema: Keycloakify ile `@platform/design-tokens`'tan türetilir, Türkçe birinci dil, 320 px kabul, Playwright E2E (X-16).
+Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse proxy'de kapalı (ayrı `hostname-admin` tek başına yetmez; doğrulandı: Keycloak hostname rehberi), anonim dinamik istemci kaydı kapalı, redirect URI'leri tam adres, kullanılmayan özellikler (JWT Authorization Grant, stateless mod) kapalı, her minor sürüm Upgrading Guide ile staging'de. Politikalar: Login with email, Verify email Required, brute force detection (5 deneme / 300 sn), parola ≥12 + geçmiş + yaygın parola listesi, TOTP + WebAuthn/passkey, SSO Session Idle 30 dk / Max 12 saat (Frappe `session_expiry` ile hizalı), access token 5 dk, refresh token rotation, Remember me kapalı. Tema: Keycloakify ile `@platform/design-tokens`'tan türetilir, Türkçe birinci dil, 320 px kabul, Playwright E2E (X-16).
 
 ## 8. HA kurulum ve sahipler (G-76)
 
@@ -153,4 +167,4 @@ Login with email, Verify email Required, brute force detection (5 deneme / 300 s
 | identity-sync konteyneri, sırlar age/sops (G-112) | Hüseyin Cengiz |
 | Realm/client/Organization tanımları realm JSON + identity-sync kodunda sürümlü | platform ekibi |
 
-**Kabul (P0/P1):** Keycloak ile Press'e giriş (P0); test kiracısında etkileşimsiz SSO; panel çıkışı sonrası Keycloak account console'da oturum yok; 'Sign out all sessions' sonrası Frappe 60 sn içinde 401; davet edilen kullanıcı tek hesapla panel, Press ve kiracı sitede oturum açar; e-posta değişikliği yalnızca identity-sync yoluyla; bir Keycloak düğümü kapatıldığında giriş kesintisiz.
+**Kabul (P0/P1/P2):** Keycloak HA ve public host'ta yönetim uçlarının kapalı olması (P0); Keycloak ile Press'e giriş ve `(iss, sub)` eşleme testleri (P1); özel alan adında giriş-çıkış (P2, G-124); test kiracısında etkileşimsiz SSO; panel çıkışı sonrası Keycloak account console'da oturum yok; 'Sign out all sessions' sonrası Frappe 60 sn içinde 401; davet edilen kullanıcı tek hesapla panel, Press ve kiracı sitede oturum açar; e-posta değişikliği yalnızca identity-sync yoluyla; bir Keycloak düğümü kapatıldığında giriş kesintisiz.

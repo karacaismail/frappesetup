@@ -8,6 +8,7 @@ import { ColorSchemeScript } from '@mantine/core';
 import { getCollection } from 'astro:content';
 import Shell, { type Heading } from '../components/Shell.tsx';
 import { SECTIONS } from '../data/sections';
+import requirements from '../data/requirements.json';
 import { AS_OF, REPO_URL, SITE_TITLE } from '../data/site';
 
 interface Props {
@@ -19,7 +20,7 @@ interface Props {
 
 const {
   title,
-  description = 'Frappe Headless SaaS — Press, ERPNext v16, Keycloak, headless React panel, AI katmanı ve operasyon düzlemi için mimari karar çerçevesi, 157 numaralı gereksinim ve yol haritası.',
+  description = `Frappe Headless SaaS — Press, ERPNext v16, Keycloak, headless React panel, AI katmanı ve operasyon düzlemi için mimari karar çerçevesi, ${requirements.length} numaralı gereksinim ve yol haritası.`,
   current,
   headings = [],
 } = Astro.props;

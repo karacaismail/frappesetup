@@ -1,7 +1,7 @@
 ---
 title: "SaaS admin shell olmazsa olmazları"
 nav: "Admin shell"
-order: 11
+order: 15
 ---
 
 Bu kontrol listesi, satılan her uygulamanın (CronHR, CRM, Webshop) içine oturduğu ortak kabuğun asgari kapsamıdır. Her kalem backend kaynağını, uygulama yöntemini (native = Press/Frappe/Keycloak yerleşik; configure = yalnızca ayar/kayıt; develop = özel kod, yaşadığı uygulama parantezde) ve bağlı gereksinimi gösterir. Liste aynı zamanda X-09 "Admin Shell Uyumluluk Listesi"nin shell tarafıdır: bir uygulama Marketplace'te yayımlanmadan önce bu kalemlerin tamamı kabul testinden geçmiş olmalıdır.
@@ -16,13 +16,16 @@ Bu kontrol listesi, satılan her uygulamanın (CronHR, CRM, Webshop) içine otur
 | Takım/site değiştirici, çok siteli kullanıcı | `press.api.account.switch_team`, Team üyeliği | native | G-16, X-11 |
 | Meta önbelleği: ETag/hash anahtarı, Site Update Success ve Customize Form kaydında geçersizleme | meta hash, realtime `meta_changed` olayı | develop (platform\_core) | G-63, X-12 |
 
+| İnsan odaklı URL, derin bağlantı, Paylaş düğmesi ve oturumsuz güvenli önizleme | Rota kalıbı, DocShare, platform\_core www | develop | G-130, G-131, G-132, G-133 |
+| Ölçüm adapterları ve rıza tercih merkezi | Adapter kaydı, Legal Document Acceptance | develop | G-134, G-135, G-154 |
+
 ## 2. Kimlik, oturum ve hesap
 
 | Kalem | Backend kaynağı | Yöntem | G-id |
 | --- | --- | --- | --- |
-| Keycloak SSO girişi; `panel-spa` public client + PKCE | Social Login Key provider 'Keycloak' (Press v15, kiracı v16) | configure | G-12, G-44, G-77 |
+| Keycloak SSO girişi; her site kendi OIDC dönüşüyle (kod sunucuda), tarayıcıya belirteç verilmez (K-25) | Social Login Key provider 'Keycloak' (Press v15, kiracı v16) | configure | G-12, G-44, G-77 |
 | Tekli çıkış: RP-initiated + back-channel | `on_logout`, `keycloak_backchannel_logout`; press\_tr aynı mekanizma | develop (platform\_core, press\_tr) | G-58 |
-| Same-site çerez, CSRF token enjeksiyonu, `allow_cors` panel origin'i | `www/<panel>.py` csrf\_token; Release Group common\_site\_config (Hüseyin Cengiz) | develop + configure | G-13, G-45, G-75 |
+| Host'a bağlı oturum çerezi, CSRF token enjeksiyonu; CORS yok (G-119) | `www/<panel>.py` csrf\_token; Release Group common\_site\_config (Hüseyin Cengiz) | develop + configure | G-13, G-45, G-75 |
 | Profil (ad, avatar, dil, saat dilimi); parola/MFA/passkey/oturumlar Keycloak Account Console'a markalı yönlendirme (doğrulanacak: v3 tema desteği) | Frappe User, Keycloak Account Console | native | G-78, G-99 |
 | "Hesabımı sil" → KVKK talebi | Personal Data Deletion Request, Team Deletion Request | native | G-52, G-116 |
 
@@ -34,7 +37,7 @@ Bu kontrol listesi, satılan her uygulamanın (CronHR, CRM, Webshop) içine otur
 | Etkinleştir → plan → ödeme yöntemi kontrolü → `install_app` → Agent Job realtime → sidebar yenileme; Site Active değilken kuyruk | `press.api.site.install_app`, `agent_job_update` | native | G-30, G-95 |
 | Kaldırma (geri bildirimli) ve plan değişimi önizle+onayla | `press.api.client.run_doc_method(Site.uninstall_app)`, `change_app_plan`, `change_plan` | native | G-30 |
 | Özellik kapıları UI + sunucu aynı kaynaktan | `get_subscription_info` → `platform_core.subscription.has_feature` | native + develop | G-35, G-106 |
-| Kurulum sonrası onboarding paneli ve demo veri seçeneği | Module Onboarding doctype (doğrulanacak: v16 headless API yolu) | develop | G-95 |
+| Kurulum sonrası tur, görev listesi ve demo veri seçeneği | Tur motoru (kullanıcı başına sürümlü ilerleme); Form Tour ve Module Onboarding içerik kaynağı (doğrulandı; tamamlanma bayrakları site düzeyinde olduğu için ilerleme kaynağı değil) | develop | G-95, G-139 |
 
 ## 4. Abonelik ve faturalama
 
@@ -91,7 +94,7 @@ Bu kontrol listesi, satılan her uygulamanın (CronHR, CRM, Webshop) içine otur
 | Denetim görüntüleyici: Activity Log, Version farkı, Permission Log, AI Action Log, Site Activity | ilgili doctype'lar, filtre + dışa aktarım | native + develop | G-64, G-101 |
 | Support Access onayı ve süre verme | Support Access doctype, `expire_pending_requests` | native | G-18, G-101 |
 | Yedek indirme ve "verimi al" | `press.api.site.backup`, `get_backup_links` | native | G-37 |
-| Yardım menüsü: dokümantasyon, durum sayfası, destek talebi | X-08 destek süreci, Incident doctype, Helpdesk widget'ı (SA-30) | develop | G-101, X-08 |
+| Yardım kulakçığı ve kendi kendine destek modu; dokümantasyon, durum sayfası, destek talebi | X-08 destek süreci, Incident doctype, Helpdesk widget'ı (SA-30) | develop | G-101, X-08 |
 
 ## 9. Ortak zemin: meta-driven CRUD çekirdeği
 
@@ -111,12 +114,12 @@ Her bölüm yukarıdaki ekranları aynı katmandan üretir; bu katman olmadan sh
 | Uygulama içi destek widget'ı: site/ürün/sürüm/kullanıcı bağlamını toplar, agent servisi üzerinden HD Ticket açar, ticket durumunu listeler, aydınlatma metnini gösterir | Frappe Helpdesk `HD Ticket` (operasyon sitesi), agent servisi relay | develop (`@platform/shell`, agent servisi) | SA-30 |
 | Destek rızası bandı: Pending Support Access talebini (operatör, reason, allowed\_for, kapsam) gösterir; Accept/Reject yalnız takım yöneticisine açık | Press `Support Access` (`press.api.access.status`, `run_doc_method`) | develop (`@platform/shell`) | SA-27 |
 | Aktif destek oturumu göstergesi: operatör presence avatarları, 'görüntülüyor/takip ediyor' durumu, uzaktan kontrol teklifi için 'İzin ver / Reddet', her an 'Oturumu bitir' | platform\_core `Support Session`, Hocuspocus awareness | develop (`@platform/support-session`) | SA-27, SA-29 |
-| Hocuspocus provider ve awareness katmanı: çoklu imleç, seçim ve route paylaşımı; yalnız aktif Support Session varken dinamik import | Hocuspocus (`onAuthenticate` Keycloak JWT) | develop (`@platform/support-session`) | SA-29 |
+| Hocuspocus provider ve awareness katmanı: çoklu imleç, seçim ve route paylaşımı; yalnız aktif Support Session varken dinamik import | Hocuspocus (`onAuthenticate` site bileti, G-148); paylaşılan ekran durumu ve kaynakta maskeleme (SA-43) | develop (`@platform/support-session`) | SA-29 |
 | AI kredi sayacı: bakiye, `spending_limit`/uyarı eşiği, düşük bakiyede ücretli araçların kilitli olduğu durum, iyzico ile 'Kredi yükle' | Press `Team.get_balance`, `Balance Transaction`, `press_tr.api.billing.buy_credits_iyzico` | native (veri) + develop (UI) | SA-6, SA-15 |
 | Faturalama sayfası: geçmiş faturalar + e-Arşiv PDF'i, yaklaşan fatura, EFT talimatı (ödeme referans kodu PRS-… ve IBAN), iyzico Checkout Form, ödeme yöntemi değiştirme | `press.api.billing.past_invoices`, `invoice_pdf`, `upcoming_invoice`, `press_tr.api.billing.*` | native (API) + develop (UI) | SA-4, SA-8, G-96 |
 | Sürümlü yasal belge onay kapısı: aydınlatma, açık rıza, çerez ve abonelik sözleşmesi sürümü değişince yeniden onay | platform\_core `Legal Document Acceptance` (belge, sürüm, hash, kullanıcı, zaman) | develop (platform\_core, `@platform/shell`) | SA-36, G-23 |
 | Bildirim merkezi ek türleri: Security Alert (impersonation), Support Access durum değişimi, ödeme hatırlatma ve askıya alma uyarıları | Frappe Notification Log, Press Notification | configure + develop (UI) | SA-28, SA-13, G-100 |
-| Operatör modu anahtarı: Keycloak `ops-*` rolü için aynı kabuk operatör navigasyonunu (Müşteri 360, Tahsilat ve kredi, Abonelik ve modüller, Destek, Tahsilat aşaması, KVKK denetim raporu, gece mutabakat farkları) açar; tenant verisi ile operatör verisi aynı ekranda karışmaz | `platform_core.api.ops.customer_360`, `press.api.client.*`, `press.api.ops` (BFF) | develop (`@platform/shell`, BFF) | SA-24, SA-25 |
+| Operatör modu anahtarı: Keycloak `ops-*` rolü için aynı kabuk operatör navigasyonunu (Müşteri 360, Tahsilat ve kredi, Abonelik ve modüller, Destek, Tahsilat aşaması, KVKK denetim raporu, gece mutabakat farkları) açar; tenant verisi ile operatör verisi aynı ekranda karışmaz | `platform_core.api.ops.customer_360`, `press.api.client.*`, `press_tr.api.ops` (BFF) | develop (`@platform/shell`, BFF) | SA-24, SA-25 |
 | Modül aktivasyon durumu: Marketplace App Subscription durumuna göre Workspace/modül görünürlüğü ve 'Modül satın al / plan değiştir' eylemi | Press `Marketplace App Subscription`, `press.api.marketplace.change_app_plan`, `get_subscription_info` | native (API) + develop (UI) | SA-16, G-30, G-95 |
 
 ## 11. Kabul ölçütleri

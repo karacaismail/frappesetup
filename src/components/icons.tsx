@@ -1,19 +1,24 @@
 import {
   IconAlertTriangle,
   IconApps,
+  IconChartDots,
+  IconChecklist,
   IconCode,
   IconFileText,
   IconHeadset,
+  IconHelpCircle,
   IconHome,
   IconKey,
   IconLayoutDashboard,
   IconLayoutSidebar,
+  IconLink,
   IconListCheck,
   IconMap,
   IconRoute,
   IconScale,
   IconServerCog,
   IconSettings,
+  IconShieldCheck,
   IconSparkles,
 } from '@tabler/icons-react';
 import type { IconName } from '../data/sections';
@@ -36,6 +41,11 @@ export const ICONS: Record<IconName, TablerIcon> = {
   apps: IconApps,
   map: IconMap,
   alert: IconAlertTriangle,
+  shield: IconShieldCheck,
+  link: IconLink,
+  chart: IconChartDots,
+  help: IconHelpCircle,
+  checklist: IconChecklist,
   file: IconFileText,
 };
 

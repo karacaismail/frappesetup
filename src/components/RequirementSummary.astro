@@ -1,0 +1,57 @@
+---
+// Gereksinim dağılım özeti — src/data/requirements.json'dan derleme anında hesaplanır (elle kopya yok).
+import requirements from '../data/requirements.json';
+import phases from '../data/phases.json';
+
+const RAIL_ORDER = [
+  'R1 Press',
+  'R2 Frappe yapılandırma',
+  'R2 Frappe geliştirme',
+  'R3 Frontend',
+  'R4 Keycloak',
+  'R5 AI',
+  'Shell',
+  'App çerçevesi',
+  'Çapraz',
+  'R6 Operasyon düzlemi',
+];
+const PRIORITIES = ['MUST', 'SHOULD', 'MAY'];
+const PHASES = [...phases.map((p) => p.id)].sort();
+
+type Row = { label: string; items: typeof requirements; strong?: boolean };
+const rows: Row[] = RAIL_ORDER.map((rail) => ({ label: rail, items: requirements.filter((r) => r.rail === rail) }));
+rows.push({ label: 'Toplam G', items: requirements.filter((r) => r.id.startsWith('G-')), strong: true });
+rows.push({ label: 'Toplam SA', items: requirements.filter((r) => r.id.startsWith('SA-')), strong: true });
+rows.push({ label: 'Genel toplam', items: requirements, strong: true });
+const count = (items: typeof requirements, key: 'priority' | 'phase', value: string) =>
+  items.filter((r) => r[key] === value).length;
+---
+
+<div class="table-wrap" tabindex="0" role="region" aria-label="Tablo: Gereksinim dağılımı (yatay kaydırılabilir)">
+  <table class="req-summary">
+    <thead>
+      <tr>
+        <th scope="col">Grup</th>
+        <th scope="col">Adet</th>
+        {PRIORITIES.map((p) => <th scope="col">{p}</th>)}
+        {PHASES.map((p) => <th scope="col">{p}</th>)}
+      </tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((row) => (
+          <tr>
+            <th scope="row">{row.strong ? <strong>{row.label}</strong> : row.label}</th>
+            <td>{row.items.length}</td>
+            {PRIORITIES.map((p) => (
+              <td>{count(row.items, 'priority', p)}</td>
+            ))}
+            {PHASES.map((p) => (
+              <td>{count(row.items, 'phase', p)}</td>
+            ))}
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>

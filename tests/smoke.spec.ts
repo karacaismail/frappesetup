@@ -1,9 +1,11 @@
+import { readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { gzipSync } from 'node:zlib';
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const require = createRequire(import.meta.url);
-const requirements: { id: string; title: string; detail: string; priority: string; owner?: string }[] =
+const requirements: { id: string; title: string; detail: string; priority: string; phase: string; owner?: string }[] =
   require('../src/data/requirements.json');
 
 // Kabul: 320→360→375→390→yatay telefon→tablet→masaüstü; yatay taşma yok; metin ≥ 1rem (SVG dahil);
@@ -18,23 +20,12 @@ const VIEWPORTS = [
   { name: 'desktop', width: 1366, height: 900 },
 ];
 
-const ALL_PAGES = [
-  '',
-  'kararlar/',
-  'raylar/',
-  'rail-1-press/',
-  'rail-2-yapilandirma/',
-  'rail-2-gelistirme/',
-  'rail-3-frontend/',
-  'rail-4-keycloak/',
-  'rail-5-ai/',
-  'rail-6-operasyon/',
-  'gereksinimler/',
-  'admin-shell/',
-  'app-cercevesi/',
-  'yol-haritasi/',
-  'acik-kararlar/',
-];
+// Sayfa listesi içerik dizininden türer: yeni bölüm eklendiğinde testler kendiliğinden kapsar.
+const DOC_SLUGS = readdirSync(new URL('../src/content/docs/', import.meta.url))
+  .filter((f) => f.endsWith('.md'))
+  .map((f) => f.replace(/\.md$/, ''))
+  .sort();
+const ALL_PAGES = ['', ...DOC_SLUGS.map((slug) => `${slug}/`)];
 const KEY_PAGES = ['', 'kararlar/', 'raylar/', 'gereksinimler/', 'yol-haritasi/', 'rail-4-keycloak/'];
 
 async function noHorizontalOverflow(page: Page) {
@@ -103,11 +94,13 @@ async function waitForMermaid(page: Page) {
   );
 }
 
+// Alt sınır 1rem: kök yazı boyutu büyütülmüşse (ör. %125, %200) ölçüt de onunla büyür.
 async function expectMinFont(page: Page) {
+  const rootPx = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize));
   const { min, count, where } = await minEffectiveFontPx(page);
   expect(count).toBeGreaterThan(20);
   expect(Number.isFinite(min)).toBe(true);
-  expect(min, `en küçük etkin yazı boyutu ${min}px: ${where}`).toBeGreaterThanOrEqual(15.95);
+  expect(min, `en küçük etkin yazı boyutu ${min}px (1rem = ${rootPx}px): ${where}`).toBeGreaterThanOrEqual(rootPx - 0.05);
 }
 
 // Belgede görünür outline taşıyan öğeler (tek odak göstergesi kuralı için).
@@ -143,19 +136,33 @@ test.describe('viewport matrix', () => {
 });
 
 test.describe('text scaling', () => {
-  test('125% root font at 320px keeps layout without overflow', async ({ page }) => {
-    await page.setViewportSize({ width: 320, height: 640 });
-    await page.addInitScript(() => {
-      document.addEventListener('DOMContentLoaded', () => {
-        document.documentElement.style.fontSize = '125%';
-      });
+  // Kullanıcının kök yazı boyutu (tarayıcı ayarı) büyüdüğünde: taşma yok, tüm metin yeni 1rem'in altına inmez.
+  const SCALES = [
+    { root: 125, viewport: { width: 320, height: 640 } },
+    { root: 200, viewport: { width: 390, height: 844 } },
+    { root: 200, viewport: { width: 1366, height: 900 } },
+  ];
+  for (const { root, viewport } of SCALES) {
+    test(`${root}% root font at ${viewport.width}px keeps layout and text >= 1rem`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript((pct) => {
+        document.addEventListener('DOMContentLoaded', () => {
+          document.documentElement.style.fontSize = `${pct}%`;
+        });
+      }, root);
+      for (const path of ['', 'kararlar/', 'gereksinimler/', 'yol-haritasi/', 'rail-4-keycloak/']) {
+        await page.goto(path);
+        await expect(page.locator('h1')).toBeVisible();
+        await waitForMermaid(page);
+        await noHorizontalOverflow(page);
+        await expectMinFont(page);
+        // Sabit başlık çubuğu scrollWidth'e yansımaz: eylem düğmesi görünür alanda kalmalı (işlev kaybı yok).
+        const toggle = await page.getByTestId('color-scheme-toggle').boundingBox();
+        expect(toggle, 'tema düğmesi çizilmeli').not.toBeNull();
+        expect(toggle!.x + toggle!.width, 'tema düğmesi görünür alanda').toBeLessThanOrEqual(viewport.width);
+      }
     });
-    for (const path of ['kararlar/', 'gereksinimler/', '']) {
-      await page.goto(path);
-      await expect(page.locator('h1')).toBeVisible();
-      await noHorizontalOverflow(page);
-    }
-  });
+  }
 
   test('reduced motion disables smooth scrolling', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -185,12 +192,12 @@ test.describe('shell', () => {
     await expect(page.locator('h1')).toContainText('Sabitlenen kararlar');
   });
 
-  test('desktop navbar lists 15 entries, marks the current page, skip link works', async ({ page, browserName }) => {
+  test('desktop navbar lists every section, marks the current page, skip link works', async ({ page, browserName }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('raylar/');
     await waitForHydration(page);
     const nav = page.getByRole('navigation', { name: 'Bölümler', exact: true });
-    await expect(nav.getByRole('link')).toHaveCount(15);
+    await expect(nav.getByRole('link')).toHaveCount(ALL_PAGES.length);
     const current = nav.getByRole('link', { name: 'Raylar', exact: true });
     await expect(current).toHaveAttribute('data-active', 'true');
     await expect(current).toHaveAttribute('aria-current', 'page');
@@ -229,8 +236,77 @@ test.describe('shell', () => {
   });
 });
 
+// Çerçeve üreten tüm hesaplanmış stiller (outline, box-shadow, kenarlık) — belge sırasıyla. outline-style 'none' ise
+// genişlik/renk görünmez olduğundan 'none' sayılır (WebKit odak kaybında bu değerleri farklı raporlar).
+async function frameStyles(page: Page) {
+  return page.evaluate(() => {
+    const active = document.activeElement as HTMLElement | null;
+    // Görsel vekil: odaklanan kontrol görünmezse (Switch'in opacity 0 input'u) göstergeyi aynı kapsayıcıdaki kardeş çizer.
+    const activeHidden = active ? getComputedStyle(active).opacity === '0' : false;
+    return Array.from(document.querySelectorAll<HTMLElement>('body *')).map((el) => {
+      const cs = getComputedStyle(el);
+      const drawn = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0;
+      return {
+        tag: `${el.tagName}.${String(el.className).split(' ')[0]}`,
+        outline: drawn ? `${cs.outlineStyle} ${cs.outlineWidth} ${cs.outlineColor}` : 'none',
+        frame: [
+          cs.boxShadow,
+          cs.borderTopColor,
+          cs.borderRightColor,
+          cs.borderBottomColor,
+          cs.borderLeftColor,
+          cs.borderTopWidth,
+          cs.borderBottomWidth,
+        ].join(' | '),
+        focused: el === active,
+        proxy: Boolean(active && activeHidden && el !== active && active.parentElement?.contains(el)),
+        opaque: cs.opacity !== '0',
+      };
+    });
+  });
+}
+
 /* ------------------------------------------------------------------ */
 test.describe('focus', () => {
+  // Klavye odağı yalnız odaklanan öğenin outline'ını değiştirir: box-shadow/kenarlık ikinci çerçeve
+  // üretmez, başka hiçbir öğe (kapsayıcı, satır, bölüm) değişmez. Gezgindeki metin kutusuna kadar Tab.
+  test('keyboard focus adds only one outline; border and box-shadow never form a second frame', async ({
+    page,
+    browserName,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    await page.mouse.move(1, 1);
+    const baseline = await frameStyles(page);
+    const tab = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
+    const seen = new Set<string>();
+    for (let i = 0; i < 60; i++) {
+      await page.keyboard.press(tab);
+      const now = await frameStyles(page);
+      expect(now.length).toBe(baseline.length);
+      const changed = now
+        .map((s, j) => ({ s, b: baseline[j] }))
+        .filter(({ s, b }) => s.outline !== b.outline || s.frame !== b.frame);
+      const focused = now.find((s) => s.focused);
+      expect(focused, 'odaklanan öğe yok').toBeTruthy();
+      seen.add(focused!.tag);
+      for (const { s, b } of changed) {
+        expect(s.frame, `odakta ikinci çerçeve (kenarlık/gölge): ${s.tag}`).toBe(b.frame);
+      }
+      // Görünür gösterge tam bir tanedir ve odaklanan öğede ya da görünmez kontrolün görsel vekilindedir.
+      const visible = changed.filter(({ s }) => s.opaque && s.outline !== 'none');
+      for (const { s } of visible) expect(s.focused || s.proxy, `odak dışı öğede gösterge: ${s.tag}`).toBe(true);
+      expect(visible.length, `tek görünür odak göstergesi: ${focused!.tag}`).toBe(1);
+      // Metin kutusundan sonra süzgeç açılır bölümünün özetine kadar devam: düğme, metin kutusu ve özet kapsanır.
+      if (await page.locator('.req-more > summary').evaluate((el) => el === document.activeElement)) break;
+    }
+    const inputs = [...seen].filter((t) => t.startsWith('INPUT'));
+    expect(inputs.length, `Tab metin kutusuna ulaşmadı: ${[...seen].join(', ')}`).toBeGreaterThanOrEqual(1);
+    expect(await page.locator('.req-more > summary').evaluate((el) => el === document.activeElement)).toBe(true);
+  });
+
   test('mouse never shows a ring; keyboard shows exactly one, radius unchanged', async ({ page, browserName }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('kararlar/');
@@ -296,8 +372,10 @@ test.describe('requirements explorer', () => {
     await waitForHydration(page);
     const count = page.getByTestId('req-count');
     await expect(count).toContainText(`${requirements.length} / ${requirements.length}`);
-    await page.getByRole('combobox', { name: 'Öncelik' }).click();
-    await page.getByRole('option', { name: 'SHOULD', exact: true }).click();
+    // Erken girdi yokken hidrasyon varsayılanı değiştirmez: ayrıntılar açık kalır.
+    await expect(page.getByRole('switch', { name: 'Ayrıntıları göster' })).toBeChecked();
+    await expect(page.locator('.req-detail').first()).toBeVisible();
+    await page.getByRole('button', { name: new RegExp(`^SHOULD · ${shouldCount}$`) }).click();
     await expect(count).toContainText(`${shouldCount} / ${requirements.length}`);
     await page.getByRole('textbox', { name: 'Ara' }).fill('iyzico');
     await expect(count).toContainText(`${shouldIyzico} / ${requirements.length}`);
@@ -305,25 +383,29 @@ test.describe('requirements explorer', () => {
     await expect(count).toContainText(`${requirements.length} / ${requirements.length}`);
   });
 
-  test('Select is fully keyboard operable (ArrowDown, Enter, Escape, focus return)', async ({ page }) => {
+  test('facet filters are keyboard operable toggle groups (no dropdown code)', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('gereksinimler/');
     await waitForHydration(page);
-    const combo = page.getByRole('combobox', { name: 'Öncelik' });
-    await combo.focus();
-    // ArrowDown listeyi açar ve ilk seçeneği (MUST) vurgular; Enter seçer.
-    await page.keyboard.press('ArrowDown');
-    await expect(page.getByRole('listbox')).toBeVisible();
+    const count = page.getByTestId('req-count');
+    const summary = page.locator('.req-more > summary');
+    await summary.focus();
     await page.keyboard.press('Enter');
-    await expect(page.getByTestId('req-count')).toContainText(
-      `${requirements.filter((r) => r.priority === 'MUST').length} / ${requirements.length}`,
-    );
-    await expect(combo).toBeFocused();
-    await page.keyboard.press('ArrowDown');
-    await expect(page.getByRole('listbox')).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('listbox')).toBeHidden();
-    await expect(combo).toBeFocused();
+    await expect(page.locator('.req-more')).toHaveAttribute('open', '');
+    const p1 = requirements.filter((r) => r.phase === 'P1').length;
+    const phaseGroup = page.getByRole('group', { name: 'Faz' });
+    const p1Button = phaseGroup.getByRole('button', { name: new RegExp(`^P1 · ${p1}$`) });
+    await p1Button.focus();
+    await page.keyboard.press('Space');
+    await expect(p1Button).toHaveAttribute('aria-pressed', 'true');
+    await expect(count).toContainText(`${p1} / ${requirements.length}`);
+    await expect(summary).toContainText('1 etkin');
+    await page.keyboard.press('Enter');
+    await expect(p1Button).toHaveAttribute('aria-pressed', 'false');
+    await expect(count).toContainText(`${requirements.length} / ${requirements.length}`);
+    // Açılır liste yok: combobox/listbox rolü ve floating-ui portalı sayfada bulunmaz.
+    await expect(page.getByRole('combobox')).toHaveCount(0);
+    await expect(page.getByRole('listbox')).toHaveCount(0);
   });
 
   test('shows cards at 320px and priority chips filter @touch', async ({ page }) => {
@@ -358,31 +440,41 @@ test.describe('requirements explorer', () => {
   });
 
   // Regresyon (rapor Y-10): ada JS'i gecikirken bir kez yazılan metin kaybolmamalı ve filtre uygulanmalı.
-  // JS isteği bekletilir; yazım hidrasyondan önce tek sefer yapılır, test yazmayı yinelemez.
-  test('text typed once before hydration is kept and applied (slow island JS)', async ({ page }) => {
-    await page.setViewportSize({ width: 1366, height: 900 });
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    await page.route(/\/_astro\/RequirementsExplorer\.[^/]+\.js$/, async (route) => {
-      await gate;
-      await route.continue();
+  // JS isteği bekletilir; yazım hidrasyondan önce tek sefer yapılır, test yazmayı yinelemez. Sayaç kesin metinle
+  // eşleşir (alt dizgi değil): süzülmemiş "N / N" metni hiçbir veri durumunda kabul edilmez.
+  const exactCount = (n: number) => new RegExp(`^${n} / ${requirements.length} gereksinim$`);
+  for (const vp of [
+    { name: 'desktop', width: 1366, height: 900, detailSelector: '.req-detail', tag: '' },
+    { name: '320', width: 320, height: 640, detailSelector: '.req-card-detail', tag: ' @touch' },
+  ]) {
+    test(`text typed once before hydration is kept and applied at ${vp.name} (slow island JS)${vp.tag}`, async ({ page }) => {
+      expect(keycloakCount).toBeGreaterThan(0);
+      expect(keycloakCount).toBeLessThan(requirements.length);
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      await page.route(/\/_astro\/RequirementsExplorer\.[^/]+\.js$/, async (route) => {
+        await gate;
+        await route.continue();
+      });
+      await page.goto('gereksinimler/', { waitUntil: 'domcontentloaded' });
+      const island = page.locator('astro-island[component-url*="RequirementsExplorer"]');
+      const search = page.getByRole('textbox', { name: 'Ara' });
+      const detail = page.getByRole('switch', { name: 'Ayrıntıları göster' });
+      await expect(island).toHaveAttribute('ssr', '');
+      await expect(page.locator(vp.detailSelector).first()).toBeVisible();
+      await search.fill('Keycloak');
+      await detail.uncheck();
+      // Girdi anında ada hâlâ sunucu HTML'idir (React bağlı değil).
+      await expect(island).toHaveAttribute('ssr', '');
+      release();
+      await expect(page.getByTestId('req-count')).toHaveText(exactCount(keycloakCount));
+      await expect(search).toHaveValue('Keycloak');
+      await expect(detail).not.toBeChecked();
+      await expect(page.locator('.req-detail, .req-card-detail')).toHaveCount(0);
+      await expect(island).not.toHaveAttribute('ssr', '');
     });
-    await page.goto('gereksinimler/', { waitUntil: 'domcontentloaded' });
-    const island = page.locator('astro-island[component-url*="RequirementsExplorer"]');
-    const search = page.getByRole('textbox', { name: 'Ara' });
-    const detail = page.getByRole('switch', { name: 'Ayrıntıları göster' });
-    await expect(island).toHaveAttribute('ssr', '');
-    await search.fill('Keycloak');
-    await detail.uncheck();
-    // Girdi anında ada hâlâ sunucu HTML'idir (React bağlı değil).
-    await expect(island).toHaveAttribute('ssr', '');
-    release();
-    await expect(page.getByTestId('req-count')).toContainText(`${keycloakCount} / ${requirements.length}`);
-    await expect(search).toHaveValue('Keycloak');
-    await expect(detail).not.toBeChecked();
-    await expect(page.locator('.req-detail')).toHaveCount(0);
-    await expect(island).not.toHaveAttribute('ssr', '');
-  });
+  }
 
   test('search text and focus survive orientation change', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -392,10 +484,10 @@ test.describe('requirements explorer', () => {
     const count = page.getByTestId('req-count');
     // Tek yazım: hidrasyon sırasında yazılan metni bileşen kendisi korur (yukarıdaki regresyon testi).
     await search.fill('Keycloak');
-    await expect(count).toContainText(`${keycloakCount} / ${requirements.length}`);
+    await expect(count).toHaveText(exactCount(keycloakCount));
     await page.setViewportSize({ width: 844, height: 390 });
     await expect(search).toHaveValue('Keycloak');
-    await expect(count).toContainText(`${keycloakCount} / ${requirements.length}`);
+    await expect(count).toHaveText(exactCount(keycloakCount));
     await expect(search).toBeFocused();
     await noHorizontalOverflow(page);
   });
@@ -531,24 +623,116 @@ test.describe('content', () => {
 
 /* ------------------------------------------------------------------ */
 test.describe('accessibility (axe)', () => {
+  // Kapı: WCAG 2.0/2.1/2.2 A ve AA kuralları + axe best-practice; HER etki düzeyi (minor dahil) başarısızlıktır.
+  // Bu, otomatik kuralların kapsadığı kadarını kanıtlar; tam WCAG AA uyumu iddiası değildir (elle denetim ayrı).
   for (const scheme of ['light', 'dark'] as const) {
-    for (const path of ['', 'gereksinimler/', 'raylar/']) {
+    for (const path of ALL_PAGES) {
       test(`axe ${scheme} /${path}`, async ({ page }) => {
         await page.setViewportSize({ width: 1366, height: 900 });
         await page.emulateMedia({ colorScheme: scheme });
         await page.goto(path);
         await expect(page.locator('h1')).toBeVisible();
+        await waitForMermaid(page);
         const results = await new AxeBuilder({ page })
-          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
           .analyze();
-        const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
         expect(
-          serious.map(
+          results.violations.map(
             (v) =>
-              `${v.id}: ${v.nodes.length} × ${v.nodes[0]?.target.join(' ')} — ${v.nodes[0]?.any?.[0]?.message ?? ''}`,
+              `${v.impact} ${v.id}: ${v.nodes.length} × ${v.nodes[0]?.target.join(' ')} — ${v.nodes[0]?.any?.[0]?.message ?? ''}`,
           ),
         ).toEqual([]);
       });
     }
   }
+});
+
+/* ------------------------------------------------------------------ */
+// Ağ bütçesi (AGENTS.md tablosu): her rota gerçekten indirdiği varlıklarla ölçülür; gzip boyutu `gzip -c` ile
+// aynı yöntemle (zlib, varsayılan düzey) hesaplanır. Koşullu yükleme de burada kanıtlanır.
+test.describe('network budget', () => {
+  type Asset = { url: string; kind: string; gz: number };
+  async function load(page: Page, path: string): Promise<Asset[]> {
+    const assets: Asset[] = [];
+    const pending: Promise<void>[] = [];
+    // Dinleyici yalnız bu yükleme süresince açıktır: sonraki sayfaların istekleri bu listeye karışmaz.
+    const onResponse = (res: import('@playwright/test').Response) => {
+      const url = res.url();
+      if (!url.includes('/frappesetup/') || res.status() !== 200) return;
+      pending.push(
+        res
+          .body()
+          .then((body) => {
+            const kind = url.endsWith('.js')
+              ? 'js'
+              : url.endsWith('.css')
+                ? 'css'
+                : /\.woff2?$/.test(url)
+                  ? 'font'
+                  : res.request().resourceType() === 'document'
+                    ? 'html'
+                    : 'other';
+            // Yazı tipleri zaten sıkıştırılmıştır: aktarılan bayt olarak sayılır.
+            assets.push({ url, kind, gz: kind === 'font' ? body.length : gzipSync(body).length });
+          })
+          .catch(() => undefined),
+      );
+    };
+    page.on('response', onResponse);
+    try {
+      await page.goto(path, { waitUntil: 'networkidle' });
+      await waitForHydration(page);
+      await waitForMermaid(page);
+      await page.waitForLoadState('networkidle');
+      await Promise.all(pending);
+    } finally {
+      page.off('response', onResponse);
+    }
+    return assets;
+  }
+  const kb = (assets: Asset[], kind: string, filter: (a: Asset) => boolean = () => true) =>
+    assets.filter((a) => a.kind === kind && filter(a)).reduce((sum, a) => sum + a.gz, 0) / 1024;
+  const isMermaid = (a: Asset) => /mermaid|cytoscape|dagre|katex|elk|d3/i.test(a.url.split('/').pop() ?? '');
+  const isExplorer = (a: Asset) => /RequirementsExplorer/.test(a.url);
+
+  test('budgets per route and conditional loading', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'Bayt bütçesi tarayıcıdan bağımsızdır; tek motorda ölçülür.');
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1366, height: 900 });
+
+    const home = await load(page, '');
+    expect(kb(home, 'html'), 'ana sayfa HTML').toBeLessThanOrEqual(25);
+    // Kabuk bütçesinin kapsamı kabuğun ilk görünümde gerektirdiği TOPLAM JS'tir (giriş parçaları + paylaşılan
+    // Mantine/tema ve React parçaları). Giriş parçaları ayrıca raporlanır, bütçe onlarla daraltılmaz.
+    const shellEntry = (a: Asset) => /\/(client|Shell)\.[^/]+\.js$/.test(a.url);
+    const shellTotal = kb(home, 'js');
+    test.info().annotations.push({
+      type: 'ölçüm',
+      description: `kabuk ilk görünüm JS toplam ${shellTotal.toFixed(1)} KB gzip; giriş parçaları (client + Shell) ${kb(home, 'js', shellEntry).toFixed(1)} KB`,
+    });
+    console.log(`[bütçe] kabuk toplam JS ${shellTotal.toFixed(1)} KB; giriş parçaları ${kb(home, 'js', shellEntry).toFixed(1)} KB`);
+    expect(shellTotal, 'kabuk: ilk görünümde gerekli toplam JS').toBeLessThanOrEqual(100);
+    expect(kb(home, 'css'), 'CSS').toBeLessThanOrEqual(70);
+    expect(kb(home, 'font'), 'ilk görünüm yazı tipleri').toBeLessThanOrEqual(200);
+    expect(home.filter(isExplorer), 'gezgin adası yalnız Gereksinimler sayfasında').toEqual([]);
+    expect(home.filter(isMermaid), 'mermaid yalnız diyagramlı sayfada').toEqual([]);
+
+    const section = await load(page, 'kararlar/');
+    expect(kb(section, 'html'), 'tipik bölüm HTML').toBeLessThanOrEqual(25);
+    expect(section.filter(isMermaid), 'diyagramsız bölümde mermaid yok').toEqual([]);
+
+    const reqs = await load(page, 'gereksinimler/');
+    expect(kb(reqs, 'html'), 'Gereksinimler HTML').toBeLessThanOrEqual(200);
+    // Ada bütçesi: Gereksinimler sayfasının kabuğa EK olarak indirdiği tüm JS (adanın kendi parçası + yalnız onun
+    // çektiği paylaşılmayan parçalar).
+    const shellUrls = new Set(home.filter((a) => a.kind === 'js').map((a) => a.url));
+    const islandExtra = kb(reqs, 'js', (a) => !shellUrls.has(a.url));
+    expect(kb(reqs, 'js', isExplorer), 'gezgin adası yüklendi').toBeGreaterThan(0);
+    test.info().annotations.push({ type: 'ölçüm', description: `gezgin adası ek JS ${islandExtra.toFixed(1)} KB gzip` });
+    console.log(`[bütçe] gezgin adası ek JS ${islandExtra.toFixed(1)} KB`);
+    expect(islandExtra, 'gezgin adasının kabuğa ek JS toplamı').toBeLessThanOrEqual(30);
+
+    const diagram = await load(page, 'rail-4-keycloak/');
+    expect(diagram.filter(isMermaid).length, 'diyagramlı sayfada mermaid dinamik yüklenir').toBeGreaterThan(0);
+  });
 });

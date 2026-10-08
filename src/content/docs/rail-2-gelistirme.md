@@ -4,7 +4,7 @@ nav: "Rail 2 · Geliştirme"
 order: 5
 ---
 
-Bu ray, Frappe v16 / ERPNext v16 kiracı sitelerinde özel kodun tek evi olan `platform_core` uygulamasını (G-56) tasarlar. Uygulama, Frappe'nin yerel yetki, meta, denetim ve zamanlayıcı mekanizmalarını kullanır; özel kod yalnızca Frappe'nin sunmadığı altı yeteneğe ayrılır: Access Policy motoru, Meta API, denetim izi, özellik bayrakları, işlemsel outbox ve API sözleşme politikası. Tüm bileşenler P1'de teslim edilir; Keycloak JWT adaptörü (G-59) P3'e, Support Session ve `api.ops.customer_360` (SA-23, SA-27) P6'ya bağlıdır.
+Bu ray, Frappe v16 / ERPNext v16 kiracı sitelerinde özel kodun tek evi olan `platform_core` uygulamasını (G-56) tasarlar. Uygulama, Frappe'nin yerel yetki, meta, denetim ve zamanlayıcı mekanizmalarını kullanır; özel kod yalnızca Frappe'nin sunmadığı altı yeteneğe ayrılır: Access Policy motoru, Meta API, denetim izi, özellik bayrakları, işlemsel outbox ve API sözleşme politikası. Tüm bileşenler P1'de teslim edilir; aracı belirteci adaptörünün (G-59, G-148) asgari hali P1 prototipine (G-129), tamamı P3'e, Support Session ve `api.ops.customer_360` (SA-24, SA-27) P6'ya bağlıdır.
 
 ## platform\_core modül haritası
 
@@ -18,7 +18,7 @@ Bu ray, Frappe v16 / ERPNext v16 kiracı sitelerinde özel kodun tek evi olan `p
 | `identity` | provision, SLO, JWT auth\_hooks | `auth_hooks`, `on_logout`, Social Login Key | G-57, G-58, G-59 |
 | `baseline` | TR System Settings, Desk yönlendirme, SPA www sayfası | `setup_wizard_complete`, `before_request`, `www/` | G-41, G-45, G-53, G-75 |
 | `support` | Support Session doctype, impersonate kapısı, Hocuspocus `onAuthenticate` doğrulama ucu | `user.impersonate`, Activity Log, Notification Log | SA-27, SA-28, SA-29 |
-| `ops` | `api.ops.customer_360` (operatör modu, salt okur birleştirme) | Press API + yerel doctype'lar | SA-23, SA-24 |
+| `ops` | `api.ops.customer_360` (operatör modu, salt okur birleştirme) | Press API + yerel doctype'lar | SA-24 |
 
 ## Access Policy motoru: ABAC/ReBAC kuralları Frappe hook'larına derlenir
 
@@ -26,13 +26,13 @@ Yetki üç katmanda çözülür ve her katmanın görevi sabittir: **Role/DocPer
 
 **Access Rule** doctype alanları: `document_type`, `role`, `scope` (own / team / department / company / all), `filters` (JSON; `[["status","=","Open"],["company","=","$user.company"]]` biçiminde ABAC yüklemleri), `read/write/create/delete/submit/cancel` bayrakları, `priority`, `is_active`, `app` (ön ek, fixture filtresi için). Özne nitelikleri `$user`, `$user.employee`, `$user.department`, `$user.company`, `$reports_to_tree` (`Employee.reports_to` zinciri) ve Department ağacı (`lft`/`rgt`) ile çözülür; ReBAC kapsamı budur.
 
-**Derleme:** Access Rule kaydedildiğinde `platform_core.access.compiler` her kuralı iki ürüne çevirir: liste sorguları için parametreli SQL parçası, tek belge için Python yüklemi. Ürünler `frappe.cache()`'te (site, doctype, kural sürümü) anahtarıyla saklanır; Access Rule, User Permission, `Employee.reports_to` veya Department değişikliği önbelleği düşürür. Aynı kullanıcıya uygulanan kurallar birleşimle (OR) bağlanır; kuralı olmayan doctype'ta DocPerm sonucu geçerli kalır. Çözülen özne nitelikleri istek başına `frappe.local` üzerinde tutulur. Alan düzeyi (G-61): permlevel + Custom DocPerm; kiracı admin API'si (G-62) alanları Property Setter ile permlevel gruplarına atar. AI araçları aynı yoldan geçer (G-85); `platform_core.api.access.explain_permission` hangi kuralın reddettiğini döner.
+**Derleme:** Access Rule kaydedildiğinde `platform_core.access.compiler` her kuralı iki ürüne çevirir: liste sorguları için parametreli SQL parçası, tek belge için Python yüklemi. Ürünler `frappe.cache()`'te (site, doctype, kural sürümü) anahtarıyla saklanır; Access Rule, User Permission, `Employee.reports_to` veya Department değişikliği önbelleği düşürür. Birleşim kuralı: DocPerm izin verir, Access Rule daraltır; kullanıcıya uyan kurallar OR ile birleşir ve DocPerm ile AND'lenir; deny kuralı yoktur; kuralı olmayan doctype'ta DocPerm sonucu geçerlidir, kuralı olan doctype'ta hiçbir kural uymazsa erişim yoktur; `priority` yalnız `explain_permission` sırasıdır. Create/update'te yeni değerler en az bir yazma kuralının filtresini sağlamalıdır (kaydı kapsam dışına taşıyan güncelleme reddedilir). DocShare, takım/proje üyeliği ve müşteri sahipliği ilişkileri G-122 (P5) ile eklenir. Çözülen özne nitelikleri istek başına `frappe.local` üzerinde tutulur. Alan düzeyi (G-61): permlevel + Custom DocPerm; kiracı admin API'si (G-62) alanları Property Setter ile permlevel gruplarına atar. AI araçları aynı yoldan geçer (G-85); `platform_core.api.access.explain_permission` hangi kuralın reddettiğini döner.
 
 ```mermaid
 flowchart TD
   A[İstek: SPA /api/v2 veya MCP aracı] --> B{Kimlik}
   B -->|Oturum çerezi + CSRF| C[frappe.session.user]
-  B -->|Bearer Keycloak JWT| D[platform_core auth_hooks: JWKS, iss, aud, exp → frappe.set_user]
+  B -->|Bearer aracı belirteci veya servis JWT| D[platform_core auth_hooks: imza, aud, exp, jti, kapsam → frappe.set_user]
   C --> E
   D --> E
   E{İşlem türü} -->|Tek belge| F[frappe.has_permission]
@@ -51,9 +51,24 @@ flowchart TD
   P --> Q
 ```
 
+### Veri yüzeyi kapsama matrisi (G-121)
+
+Hook'un varlığı her kod yolunu kapsamaz; her yüzey aynı kararı vermeli ve UI'sız doğrudan API negatif testiyle kanıtlanmalıdır.
+
+| Yüzey | Frappe yolu | Yetki uygulaması |
+| --- | --- | --- |
+| Liste, sayım, rapor | `get_list`, `DatabaseQuery`, Query/Script Report | `permission_query_conditions` + rapor rol izni; Query Report yazımı yalnız operatör |
+| Tek belge, yazdırma/PDF | `get_doc` + `has_permission`, `download_pdf` | `has_permission` hook'u + permlevel; yazdırma aynı kontrolden |
+| Link arama, global arama | `search_link`, global search | Sarmalayıcı aynı sorgu koşulunu uygular (G-143) |
+| Dışa aktarım, Data Import | `export_query`, Data Import | Liste koşulu + dışa aktarım izni; içe aktarma yalnız yetkili rol |
+| Dosya ve ekler | `File`, private dosya uçları | Ekin bağlı olduğu belgenin izni |
+| Özel metotlar, arka plan işleri | whitelisted metot, `frappe.enqueue` | Metot içinde `has_permission`; işler kullanıcı bağlamını taşır |
+| MCP araçları, realtime | `frappe_mcp`, socket.io | Kullanıcı kimliğiyle aynı yol (G-85); oda aboneliğinde `has_permission` |
+| Sistem bağlamı | `frappe.get_all`, ham SQL | İzin uygulamaz (doğrulandı: Frappe Database API); kullanıcı yüzeyli kodda yalnız gerekçeli istisna + lint |
+
 ## Meta API ve shell bootstrap
 
-`platform_core.api.meta.get_doctype` Frappe v16'nın yerel `/api/v2/doctype/<doctype>/meta` ucunu (doğrulandı) ve `frappe.desk.form.load.getdoctype` çıktısını sarar; Custom Field, Property Setter ve Custom DocPerm dahil **efektif** alan izinlerini (read/write/hidden) ve Access Rule özetini ekler (G-63). Her yanıt, DocType + Custom Field + Property Setter + Custom DocPerm tablolarının en büyük `modified` değerinden türetilen `meta_hash` taşır; SPA önbelleği site + hash ile anahtarlanır (X-12). Customize Form ve Custom Field `on_update` doc\_event'i `frappe.publish_realtime("meta_changed")` yayınlar ve bir outbox olayı yazar. `api.shell.get_bootstrap` tek çağrıda kullanıcı/roller, kurulu uygulamalar, rollere göre filtrelenmiş Workspace Sidebar ağacı (G-94), özellik kapıları, biçim bilgisi, Tenant Branding, aktif Support Session durumu ve csrf döner.
+`platform_core.api.meta.get_doctype` Frappe v16'nın yerel `/api/v2/doctype/<doctype>/meta` ucunu (doğrulandı) ve `frappe.desk.form.load.getdoctype` çıktısını sarar; Custom Field, Property Setter ve Custom DocPerm dahil **efektif** alan izinlerini (read/write/hidden) ve Access Rule özetini ekler (G-63). Her yanıt, DocType + Custom Field + Property Setter + Custom DocPerm tablolarının en büyük `modified` değerinden türetilen `meta_hash` taşır. Önbellek iki katmanlıdır (X-12): şema katmanı site + `meta_hash` ile anahtarlanır ve tarayıcıda IndexedDB'de tutulabilir; kullanıcıya bağlı efektif izin katmanı (site, kullanıcı, `perm_version`) yalnız bellekte tutulur. Rol, Role Profile, User Permission veya Access Rule değişimi `perm_version`'ı artırır; çıkış ve kiracı değişimi tarayıcı katmanlarını siler. Customize Form ve Custom Field `on_update` doc\_event'i `frappe.publish_realtime("meta_changed")` yayınlar ve bir outbox olayı yazar. `api.shell.get_bootstrap` tek çağrıda kullanıcı/roller, kurulu uygulamalar, rollere göre filtrelenmiş Workspace Sidebar ağacı (G-94), özellik kapıları, biçim bilgisi, Tenant Branding, aktif Support Session durumu ve csrf döner.
 
 ## Denetim izi
 
@@ -69,7 +84,7 @@ flowchart TD
 
 ## Özellik bayrakları ve abonelik kapıları
 
-Üç kaynak, tek okuma noktası: (1) plan kapıları `platform_core.subscription.has_feature(app, feature)` Press Developer API sonucunu `sk_<app>` anahtarıyla çeker ve 15 dakika önbellekler (G-35, G-106); (2) operasyonel bayraklar Press Site.configuration üzerinden site\_config'te tutulur (G-38); (3) kiracı admin anahtarları (örn. `ai_enabled`, G-90) `Platform Settings` Single doctype'ında yaşar. Sunucu tarafı `@require_feature(app, feature)` dekoratörü whitelisted metotları ve doc\_events kontrolünü kapatır; UI aynı değeri bootstrap'tan okur. Deneme bitişi, plan düşürme ve askıya almada salt okunur mod kapıdan türetilir.
+Üç kaynak, tek okuma noktası: (1) plan kapıları `platform_core.subscription.has_feature(app, feature)` Press Developer API sonucunu `sk_<app>` anahtarıyla çeker ve 15 dakika önbellekler (G-35, G-106); (2) operasyonel bayraklar Press Site.configuration üzerinden site\_config'te tutulur (G-38); (3) kiracı admin anahtarları (örn. `ai_enabled`, G-90) `Platform Settings` Single doctype'ında yaşar. Sunucu tarafı `@require_feature(app, feature)` dekoratörü whitelisted metotları ve doc\_events kontrolünü kapatır; UI aynı değeri bootstrap'tan okur. Uygulama durumları ayrı tutulur (G-127): `installed`, `subscribed`, `enabled`, `suspended`, `read_only`; sunucu kapısı duruma göre okuma/yazma/dışa aktarma kararını verir, geçiş `meta_changed` ve abonelik önbelleğini düşürür; askıda ve salt okunur durumda KVKK gereği dışa aktarım açık kalır.
 
 ## Outbox: işlemsel giden kutusu
 
@@ -80,16 +95,29 @@ flowchart TD
 - **Taşıma:** belge CRUD ve meta için Frappe v16 `/api/v2` (`/document/<doctype>`, `/doctype/<doctype>/meta`, `/method/<method>`; doğrulandı); özel uçlar `platform_core.api.<alan>.<fiil>` ad alanında, `@frappe.whitelist(methods=[...])` ile HTTP fiili açık; `allow_guest` yalnızca `keycloak_backchannel_logout` (G-58).
 - **Sürümleme:** değişiklikler eklemelidir; kırıcı değişiklik yeni metot adı (`_v2`) ve iki minor sürüm boyunca eski adın korunmasıyla yapılır; uygulamalar `api_manifest` hook'u ile whitelisted metot listesini bildirir, X-09 uyumluluk betiği CI'da manifest ile kodu karşılaştırır.
 - **Hata biçimi:** Frappe `exc_type` + `_server_messages` korunur; `platform_core.exceptions.PlatformError` makine okunur `error_code` ekler, `@platform/frappe-sdk` (G-68) bunu alan hatası / yetki ekranı / CSRF yenileme olarak eşler.
-- **Koruma:** oturum çerezi + `X-Frappe-CSRF-Token` ve `allow_cors` same-site sözleşmesi (G-45), `@frappe.rate_limit` AI ve yetki yönetimi uçlarında (G-46), meta yanıtlarında ETag.
+- **Koruma:** host'a bağlı oturum çerezi + `X-Frappe-CSRF-Token`, CORS yok (G-45, G-119), `@frappe.rate_limit` AI ve yetki yönetimi uçlarında (G-46), meta yanıtlarında ETag.
 - **Tip üretimi:** çekirdek doctype tipleri ve whitelisted metot imzaları CI'da `bench`-tabanlı bir betikle TypeScript'e üretilir; betik seçimi (doğrulanacak).
+- **Sahiplik kaydı (G-126):** her özel uç durum, sahip uygulama, kimlik ve izinle kayıtlıdır; ad alanı sahibi uygulamayla aynıdır.
+
+| Uç | Durum | Sahip uygulama | Kimlik ve izin |
+| --- | --- | --- | --- |
+| `/api/v2/document/<doctype>` | upstream hazır | frappe | Oturum + CSRF; DocType, Access Rule, permlevel (G-121) |
+| `platform_core.api.shell.get_bootstrap`, `api.meta.get_doctype` | yeni özel | platform\_core | Oturum; kullanıcıya bağlı efektif meta |
+| `platform_core.api.access.explain_permission` | yeni özel | platform\_core | Oturum; yalnız kendi kararını açıklar |
+| `platform_core.api.keycloak_backchannel_logout` | yeni özel | platform\_core | `allow_guest`; `logout_token` imzası |
+| `press_tr.api.ops.*` | yeni özel | press\_tr (Press bench'i) | System User servis hesabı; operatör kimliği denetime |
+| `create-fc-invoice`, `delete-fc-team` | upstream istemci adı, yeni alıcı | press\_tr\_finance (operasyon sitesi) | `override_whitelisted_methods` ile bağlı; ayrılmış API kullanıcısı |
+| `press.api.site.install_app` ve diğer `press.api.*` | upstream hazır | press | Press oturumu + Press Role (G-16) |
+| Kiracı MCP (`frappe_mcp` + `ai_tools`) | upstream deneysel + özel | frappe\_mcp, platform\_core | Aracı belirteci (G-148, G-59) |
+
 
 ## Teslim sırası ve kabul
 
 | Sıra | Kalem | Kabul ölçütü |
 | --- | --- | --- |
 | P1-a | `platform_core` iskeleti, baseline, SPA www sayfası | Test kiracısında `setup_complete=1`, TR değerleri korunmuş (G-41), csrf dolu (G-45) |
-| P1-b | Access Rule motoru + wildcard hook'lar | own/team/department/company senaryoları liste ve tek belgede aynı sonucu verir; permlevel alanı yanıtta yok; `explain_permission` reddeden kuralı adlandırır |
+| P1-b | Access Rule motoru + wildcard hook'lar + veri yüzeyi matrisi | own/team/department/company senaryoları liste, tek belge, rapor, arama, dışa aktarım ve PDF'te aynı sonucu verir (G-121); permlevel alanı yanıtta yok; `explain_permission` reddeden kuralı adlandırır |
 | P1-c | Meta API + bootstrap + outbox | Custom Field eklendiğinde 5 sn içinde `meta_changed` olayı ve yeni `meta_hash`; Dead olay sayısı 0 |
 | P1-d | Denetim + saklama işleri | 366 günlük Permission Log kaydı silinir; AI Action Log Version'a bağlı |
-| P3 | JWT auth\_hooks adaptörü | Keycloak bearer ile yapılan MCP çağrısı Access Rule'dan geçer; yetkisiz çağrı `denied` olarak loglanır (G-85) |
+| P1 (asgari) / P3 (tam) | auth\_hooks adaptörü: aracı belirteci ve servis JWT'si (G-59, G-148) | Aracı belirteciyle yapılan MCP çağrısı Access Rule'dan geçer; süresi dolmuş, başka siteye ait veya yeniden kullanılan belirteç reddedilir; yetkisiz çağrı `denied` olarak loglanır (G-85) |
 | P6 | `support` ve `ops` modülleri | Support Session olmadan `user.impersonate` reddedilir; `customer_360` yalnız operatör rolüyle döner ve her çağrı Operator Audit'e yazılır (SA-25, SA-26) |
