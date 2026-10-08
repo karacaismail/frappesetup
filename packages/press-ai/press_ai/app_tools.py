@@ -8,9 +8,18 @@ from . import app_changes, app_static
 from .errors import ApprovalError, KitError, WorkspaceError
 from .proposals import approval_command
 from .redaction import envelope_exact
-from .util import sha256_hex
+from .util import canonical_json, sha256_hex
 
 _KIND_TO_OPERATION = {kind: op for op, kind in app_changes.OPERATION_KINDS.items()}
+CORE_WARNING = ("Original core code is refused by default. A bench update or a Press build from the app's own "
+                "repository and branch replaces local core edits or conflicts with them; they are not in your custom "
+                "app's history and every upgrade must re-apply them by hand. Prefer an extension from a custom app "
+                "(hooks, doc_events, extend/override_doctype_class, patches, fixtures).")
+
+
+def core_phrase(core: dict, unchecked: list) -> str:
+    """İkinci onay ifadesi: değişen orijinal core uygulama(lar)ını açıkça adlandırır."""
+    return " ".join(["CORE"] + (["UNCHECKED"] if unchecked else []) + [",".join(core["apps"])])
 
 
 def app_inspect(ctx, args):
@@ -85,10 +94,32 @@ def app_propose_change(ctx, args):
         stored_params["change"]["content"] = None
         stored_params["change"]["content_sha256"] = sha256_hex(args["change"]["content"].encode("utf-8"))
     files = [{key: f[key] for key in ("path", "action", "base_sha256", "sha256")} for f in plan["files"]]
+    core = plan["core"]
+    if core:
+        # Orijinal core varsayılan olarak reddedilir: ilk istek yalnız uyarı döner. Aynı istek (aynı argümanlar ve aynı
+        # dosya tabanları) uyarı süresi içinde açıkça tekrarlanırsa öneri oluşur; onu insan CORE ifadesiyle onaylar.
+        request_digest = sha256_hex(canonical_json({"workspace_root": ws.root, "operation": operation,
+                                                    "app_path": args["app_path"], "change": args["change"],
+                                                    "files": files}))
+        warning = ctx.store.core_gate(request_digest, core)
+        if warning is not None:
+            return {"proposal_id": None, "state": "core_warning", "operation": operation, "core": core,
+                    "warning": CORE_WARNING, "warning_expires_at": warning["expires_at"],
+                    "preview": {"files": files, "diff": plan["diff"], "notes": plan["notes"]},
+                    "next": "Nothing was proposed or written. Show this warning to the user. Only if the user "
+                            "explicitly asks for this same change again, call app_propose_change again with exactly "
+                            "the same arguments before warning_expires_at; the proposal then needs the human's core "
+                            "approval in a separate terminal."}
     stored_preview = {"manual_merge": plan["manual_merge"], "human_commands": plan["human_commands"],
                       "notes": plan["notes"], "files": files}
-    # Ayrıştırılamayan Python (sunucu hedef sürüme yetişmiyor) çift onay ister: onay ifadesi bunu açıkça söyler.
-    level, phrase = ("double", "UNCHECKED " + plan["unchecked"][0]) if plan["unchecked"] else ("single", None)
+    # Çift onay: core değişikliği (CORE ...) ya da ayrıştırılamayan Python (UNCHECKED ...); ifade nedeni adlandırır.
+    if core:
+        level, phrase = "double", core_phrase(core, plan["unchecked"])
+        stored_preview["core"] = dict(core, warning=CORE_WARNING)
+    elif plan["unchecked"]:
+        level, phrase = "double", "UNCHECKED " + plan["unchecked"][0]
+    else:
+        level, phrase = "single", None
     stored_preview["unchecked"] = plan["unchecked"]
     record = ctx.store.create("workspace", operation, {"workspace_root": ws.root}, args["app_path"], stored_params,
                               request, stored_preview, level, phrase)
@@ -112,8 +143,14 @@ def app_apply(ctx, args):
     if not ws.allow_writes:
         raise WorkspaceError("workspace.allow_writes is false; a human must enable writes in the config",
                              code="writes_disabled")
+    core = record["preview"].get("core") or {}
+    core_approved = bool(core) and record["approval_level"] == "double" and \
+        (record.get("confirm_phrase") or "").startswith("CORE ")
     for item in files:  # Önce doğrula: onay yalnız taban hâlâ aynıysa tüketilir.
-        app_changes.check_mutation_path(ws, item["path"])
+        app = app_changes.check_mutation_path(ws, item["path"])
+        if app and not (core_approved and item["path"] in core.get("files", [])):
+            raise ApprovalError("{} is original core code ({}) but this proposal was not approved as a core change; "
+                                "propose it again".format(item["path"], app), code="core_not_approved")
         if sha256_hex(item["content"].encode("utf-8")) != item["sha256"]:
             raise ApprovalError("Proposal content does not match its file hash", code="state_tampered")
         current = ws.sha256(item["path"])

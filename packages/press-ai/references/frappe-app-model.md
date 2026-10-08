@@ -108,4 +108,4 @@ frappe/skills `0bef982`, skills/frappe-app-dev/references ve skills/deep-app-aud
 | `extend_doctype_class` | yok | var | Mixin; temel sınıfın önüne eklenir (frappe/model/base_document.py v16 180–207) |
 | `override_doctype_class` | var | var | `super()` çağrılır; son uygulama kazanır; v16'da alt sınıf olmak zorunlu (base_document.py v15 88–96, v16 109–123) |
 | `override_whitelisted_methods` | var | var | İmza ve dönüş sözleşmesi korunur; her yükseltmede yeniden test |
-| Çekirdek yama, fork | — | — | Yapılmaz; ayrıntı frappe-app-extension skill'inde |
+| Çekirdek yama, fork | — | — | Varsayılan değil; core akışı (uyarı, açık tekrar, CORE onayı) frappe-app-extension skill'inde |

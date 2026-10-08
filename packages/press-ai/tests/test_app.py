@@ -321,7 +321,8 @@ class WriteFileFlow(unittest.TestCase):
         self.home = TempHome()
         self.root = self.home.workspace()
         _, self.config = make_config(self.home, workspace=self.root, allow_writes=True)
-        self.ctx = Context(self.config, clock=Clock())
+        self.clock = Clock()
+        self.ctx = Context(self.config, clock=self.clock)
         self.tools = Toolbox(self.ctx)
 
     def tearDown(self):
@@ -358,19 +359,58 @@ class WriteFileFlow(unittest.TestCase):
             self.tools.call("app_apply", {"proposal_id": proposal["proposal_id"]})
         self.assertEqual(caught.exception.code, "conflict")
 
-    def test_official_app_is_read_only_for_every_change(self):
-        with self.assertRaises(WorkspaceError) as caught:
-            self.propose("erpnext/accounts/utils.py", "def get_balance_on(account=None):\n\treturn 1\n",
-                         app_path="erpnext")
-        self.assertEqual(caught.exception.code, "official_app_read_only")
-        with self.assertRaises(WorkspaceError):
-            self.tools.call("app_propose_change", {"app_path": "erpnext", "change": {
-                "kind": "add_patch", "patch_name": "sneaky", "description": "x" * 5, "section": "post_model_sync"}})
+    def test_core_change_warns_first_then_needs_explicit_repeat_and_core_approval(self):
+        from press_ai.cli import core_banner
+        rel, body = "erpnext/accounts/utils.py", "def get_balance_on(account=None):\n\treturn 1\n"
+        base = self.read(rel, app_path="erpnext")[rel]["sha256"]  # core okunabilir
+        first = self.propose(rel, body, app_path="erpnext", expected_sha256=base)
+        self.assertEqual(first["state"], "core_warning")
+        self.assertIsNone(first["proposal_id"])
+        self.assertEqual(first["core"]["apps"], ["erpnext"])
+        self.assertEqual(first["core"]["files"], ["erpnext/erpnext/accounts/utils.py"])
+        self.assertIn("refused by default", first["warning"])
+        self.assertIn("+\treturn 1", first["preview"]["diff"])
+        self.assertEqual(self.ctx.store.list(), [])  # uyarı öneri değildir
+        # Başka bir değişiklik kendi uyarısını alır; ilk uyarıyı tüketmez.
+        other = self.propose(rel, body.replace("1", "2"), app_path="erpnext", expected_sha256=base)
+        self.assertEqual(other["state"], "core_warning")
+        second = self.propose(rel, body, app_path="erpnext", expected_sha256=base)  # kullanıcı aynısını açıkça yineler
+        self.assertEqual(second["state"], "pending")
+        self.assertEqual(second["approval_level"], "double")
+        record = self.ctx.store.load(second["proposal_id"])
+        self.assertEqual(record["confirm_phrase"], "CORE erpnext")
+        banner = "\n".join(core_banner(record))
+        self.assertIn("ORIGINAL CORE CHANGE", banner)
+        self.assertIn("core file : erpnext/erpnext/accounts/utils.py", banner)
+        # Uyarı tek kullanımlıktır: bir sonraki aynı istek yeniden uyarı alır.
+        self.assertEqual(self.propose(rel, body, app_path="erpnext", expected_sha256=base)["state"], "core_warning")
+        self.assertIn("return 0", Workspace(self.root).read_text("erpnext/erpnext/accounts/utils.py"))
+        approve(self.ctx, second["proposal_id"])
+        self.assertEqual(self.tools.call("app_apply", {"proposal_id": second["proposal_id"]})["state"], "succeeded")
+        self.assertEqual(Workspace(self.root).read_text("erpnext/erpnext/accounts/utils.py"), body)
+        # Tipli türler de aynı akıştan geçer.
+        patch = {"kind": "add_patch", "patch_name": "core_fix", "description": "Core fix", "section": "post_model_sync"}
+        call = lambda: self.tools.call("app_propose_change", {"app_path": "erpnext", "change": patch})  # noqa: E731
+        self.assertEqual(call()["state"], "core_warning")
+        self.assertEqual(self.ctx.store.load(call()["proposal_id"])["confirm_phrase"], "CORE erpnext")
         # Özel uygulamadan resmi uygulama dosyasına göreli yol yok (şema veya workspace sınırı reddeder).
         for path in ("../erpnext/erpnext/hooks.py", "clean_app/../../erpnext/erpnext/hooks.py"):
             with self.assertRaises((WorkspaceError, ValidationError), msg=path):
                 self.propose(path, "app_name = 'x'\n")
-        self.assertIn("return 0", Workspace(self.root).read_text("erpnext/erpnext/accounts/utils.py"))
+        self.assertEqual(core_banner(self.ctx.store.load(
+            self.propose("clean_app/events/plain.py", self.LOGIC, expected_sha256=None)["proposal_id"])), [])
+
+    def test_apply_refuses_core_paths_without_core_approval(self):
+        proposal = self.propose("clean_app/vendor/frappe/x.py", "x = 1\n", expected_sha256=None)
+        self.assertEqual(proposal["approval_level"], "single")
+        approve(self.ctx, proposal["proposal_id"])
+        os.makedirs(os.path.join(self.root, "clean_app/clean_app/vendor/frappe"))
+        with open(os.path.join(self.root, "clean_app/clean_app/vendor/frappe/hooks.py"), "w") as handle:
+            handle.write("app_name = 'frappe'\n")  # yol öneriden sonra resmi uygulama içine düştü
+        with self.assertRaises(ApprovalError) as caught:
+            self.tools.call("app_apply", {"proposal_id": proposal["proposal_id"]})
+        self.assertEqual(caught.exception.code, "core_not_approved")
+        self.assertEqual(self.ctx.store.status(proposal["proposal_id"])["state"], "approved")  # tüketilmedi
 
     def test_denied_paths_and_types(self):
         for path in ("clean_app/.env", ".git/config", ".github/workflows/x.yml", "clean_app/site_config.json",
@@ -392,9 +432,12 @@ class WriteFileFlow(unittest.TestCase):
             broken = self.propose("clean_app/broken.py", "def broken(:\n")
             self.assertEqual(broken["approval_level"], "double")
             self.assertTrue(any("UNCHECKED" in n for n in broken["preview"]["notes"]))
-        with self.assertRaises(ValidationError):
-            self.propose("clean_app/patcher.py", "import frappe\nfrappe.get_doc = None\n")
-        with self.assertRaises(ValidationError):
+        # Özel koddaki resmi modül yaması (EXT001) normal yetkili akıştadır: core uyarısı/onayı ve engel yok, risk notu var.
+        patcher = self.propose("clean_app/patcher.py", "import frappe\nfrappe.get_doc = None\n")
+        self.assertEqual((patcher["state"], patcher["approval_level"]), ("pending", "single"))
+        self.assertNotIn("core", patcher["preview"])
+        self.assertTrue(any(note.startswith("Warning EXT001 line 2") for note in patcher["preview"]["notes"]))
+        with self.assertRaises(ValidationError):  # biçimlenmiş SQL güvenlik kuralıdır, reddedilir
             self.propose("clean_app/report.py", "import frappe\n\ndef run(x):\n\treturn frappe.db.sql(f'select {x}')\n")
         with self.assertRaises(ValidationError):
             self.propose("clean_app/data.json", "{not json")
@@ -455,10 +498,13 @@ class WriteFileFlow(unittest.TestCase):
         else:
             self.assertEqual(self.propose("clean_app/aliases.py", type_alias, expected_sha256=None)["approval_level"],
                              "double")
-        # Ayrıştırılamayan dosyada bile resmi modüle atama ve biçimlenmiş SQL reddedilir.
-        sneaky = match_code + "frappe.get_doc = None\n"
-        with self.assertRaises(ValidationError):
-            self.propose("clean_app/sneaky.py", "import frappe\n" + sneaky, expected_sha256=None)
+        # Ayrıştırılamayan dosyada da metin taraması koşar: özel koddaki resmi modül yaması uyarıdır, core akışı değil.
+        sneaky = "import frappe\n" + match_code + "frappe.get_doc = None\n"
+        warned = self.propose("clean_app/sneaky.py", sneaky, expected_sha256=None)
+        self.assertEqual(warned["state"], "pending")
+        self.assertNotIn("core", warned["preview"])
+        self.assertTrue(any(note.startswith("Warning EXT001") for note in warned["preview"]["notes"]))
+        self.assertEqual(warned["approval_level"], "single" if sys.version_info[:2] >= (3, 10) else "double")
         sql = match_code + "def run(x):\n\treturn frappe.db.sql(f'select {x}')\n"
         with self.assertRaises(ValidationError):
             self.propose("clean_app/sql.py", "import frappe\n" + sql, expected_sha256=None)
@@ -488,9 +534,10 @@ class WriteFileFlow(unittest.TestCase):
         current = self.read(rel)[rel]
         meta = json.loads(current["content"])
         meta["permissions"].append({"role": "Guest", "read": 1})
-        with self.assertRaises((WorkspaceError, ValidationError)):
+        with self.assertRaises(WorkspaceError) as caught:
             self.propose("clean_app/clean_app/DocType/course_plan/course_plan.json", json.dumps(meta, indent=1),
                          expected_sha256=current["sha256"])
+        self.assertEqual(caught.exception.code, "case_mismatch")
         with self.assertRaises(WorkspaceError):
             self.read("clean_app/Clean_App/doctype/course_plan/course_plan.json")
 
@@ -511,22 +558,28 @@ class WriteFileFlow(unittest.TestCase):
         self.assertIn("+\tdef validate(self):", changes)
         self.assertIn("data_notice", full["detail"])
 
-    def test_permission_changes_are_refused(self):  # N4
+    def test_custom_doctype_permissions_are_allowed_and_noted(self):  # N4 yerine: özel geliştirme yetkili
         rel = "clean_app/clean_app/doctype/course_plan/course_plan.json"
         current = self.read(rel)[rel]
         meta = json.loads(current["content"])
         changed = dict(meta, permissions=meta["permissions"] + [{"role": "Guest", "read": 1}])
-        with self.assertRaises(ValidationError):
-            self.propose(rel, json.dumps(changed, indent=1), expected_sha256=current["sha256"])
-        other = dict(meta, description="Course plans")
-        ok = self.propose(rel, json.dumps(other, indent=1), expected_sha256=current["sha256"])
-        self.assertEqual(ok["state"], "pending")
-        with self.assertRaises(ValidationError):
-            self.propose("clean_app/fixtures/custom_docperm.json", "[]", expected_sha256=None)
+        proposal = self.propose(rel, json.dumps(changed, indent=1), expected_sha256=current["sha256"])
+        self.assertEqual((proposal["state"], proposal["approval_level"]), ("pending", "single"))
+        notes = " ".join(proposal["preview"]["notes"])
+        self.assertIn("permission rows change", notes)
+        self.assertIn("Guest means visitors who are not logged in", notes)
+        approve(self.ctx, proposal["proposal_id"])
+        self.assertEqual(self.tools.call("app_apply", {"proposal_id": proposal["proposal_id"]})["state"], "succeeded")
+        written = json.loads(Workspace(self.root).read_text("clean_app/" + rel))
+        self.assertIn({"role": "Guest", "read": 1}, written["permissions"])
+        fixture = self.propose("clean_app/fixtures/custom_docperm.json", "[]", expected_sha256=None)
+        self.assertEqual(fixture["state"], "pending")
+        self.assertIn("Permission or role fixture", " ".join(fixture["preview"]["notes"]))
         new_doc = {"doctype": "DocType", "name": "Room", "module": "Clean App", "fields": [],
                    "permissions": [{"role": "System Manager", "read": 1}]}
-        with self.assertRaises(ValidationError):
-            self.propose("clean_app/clean_app/doctype/room/room.json", json.dumps(new_doc), expected_sha256=None)
+        room = self.propose("clean_app/clean_app/doctype/room/room.json", json.dumps(new_doc), expected_sha256=None)
+        self.assertEqual(room["state"], "pending")
+        self.assertIn("roles before: none; after: System Manager", " ".join(room["preview"]["notes"]))
 
     def test_large_file_fits_the_record(self):  # N5
         content = "".join("def f{0}(doc):\n\treturn doc.get('field_{0}') or \"value\"\n\n".format(i)
@@ -537,11 +590,14 @@ class WriteFileFlow(unittest.TestCase):
         proposal = self.propose("clean_app/generated_rules.py", content, expected_sha256=None)
         self.assertEqual(proposal["state"], "pending")
 
-    def test_press_checkout_is_read_only(self):  # N6
-        with self.assertRaises(WorkspaceError) as caught:
-            self.propose("press/api/x.py", "x = 1\n", app_path="press", expected_sha256=None)
-        self.assertEqual(caught.exception.code, "official_app_read_only")
-
+    def test_press_checkout_is_core_and_warning_expires(self):  # N6
+        first = self.propose("press/api/x.py", "x = 1\n", app_path="press", expected_sha256=None)
+        self.assertEqual((first["state"], first["core"]["apps"]), ("core_warning", ["press"]))
+        self.clock.advance(seconds=self.config.approval.proposal_ttl + 1)  # süresi geçen uyarı tekrar sayılmaz
+        late = self.propose("press/api/x.py", "x = 1\n", app_path="press", expected_sha256=None)
+        self.assertEqual(late["state"], "core_warning")
+        now = self.propose("press/api/x.py", "x = 1\n", app_path="press", expected_sha256=None)
+        self.assertEqual(self.ctx.store.load(now["proposal_id"])["confirm_phrase"], "CORE press")
 
 if __name__ == "__main__":
     unittest.main()

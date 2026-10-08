@@ -222,8 +222,11 @@ TOOLS = [
     ("app_propose_change", "Plan a change to a custom Frappe app as files and a diff. Skeleton kinds (new_app, "
                            "new_doctype, add_child_table, add_patch, add_fixture_filter, add_doc_event, "
                            "extend_doctype_class, add_test) produce empty bodies, not behaviour. write_file carries real "
-                           "code or test text for one file; it is parsed, never run or imported. Official apps are "
-                           "read-only. Writes nothing; a human approves it.",
+                           "code or test text for one file; it is parsed, never run or imported. Original core "
+                           "files (official apps) are refused by default: the first request returns state "
+                           "core_warning and no proposal; only if the user explicitly repeats the same request does "
+                           "a proposal follow, with core approval. Custom app files follow the normal flow. Writes "
+                           "nothing; a human approves it.",
      _schema(["app_path", "change"], app_path=app_tools.APP_PATH, change=OPEN_OBJECT), app_tools.app_propose_change,
      _annotations(False, open_world=False)),
     ("app_apply", "Write one human-approved app change into the workspace if the files are unchanged since the "

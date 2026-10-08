@@ -28,11 +28,19 @@ testleriyle doğrulanır.
   kapsar, `app_apply` tam o içeriği yazar ve taban değiştiyse reddeder.
 - MCP kodu çalıştırmaz ve içe aktarmaz; yalnız Python ve JSON sözdizimini denetler. Sunucu Python'u uygulamanın
   `requires-python` alt sınırına yetişiyorsa ayrıştırma o sürümün dilbilgisiyle yapılır ve hata kesindir (ör. `>=3.10`
-  uygulamada `type X = …` reddedilir). Yetişmiyorsa (ör. 3.9 sunucu) dosya UNCHECKED olur: metin taramasındaki ret kuralları
-  (EXT001, SEC002) yine uygulanır, öneri `UNCHECKED <yol>` onay ifadesiyle çift onaya düşer ve kod elle incelemeye ve teste
-  bırakılır. Resmi modüle monkey patch ve f-string ya da format ile kurulmuş SQL içeren Python reddedilir.
-  `.git`, `.env`, `.github`, `sites`, `env`, `logs`, `node_modules`, secret, yapılandırma, veritabanı ve ikili dosyalar
-  yazılmaz. Resmi uygulamaların (Press dahil) deposu salt okunurdur; Press kod düzeltmesi `press.code_fix` devridir.
+  uygulamada `type X = …` reddedilir). Yetişmiyorsa (ör. 3.9 sunucu) dosya UNCHECKED olur: metin taraması yine koşar, öneri
+  `UNCHECKED <yol>` onay ifadesiyle çift onaya düşer ve kod elle incelemeye ve teste bırakılır.
+- Reddedilen: f-string ya da format ile kurulmuş SQL (SEC002) ve misafir uçta `ignore_permissions` (SEC003). Mutlak sınırlar:
+  secret, `.git`, `.github`, `.env`, çalışma zamanı dizinleri (`sites`, `env`, `logs`, `node_modules`), workspace dışı,
+  `case_mismatch`, `[REDACTED]`, yapılandırma, veritabanı ve ikili dosyalar.
+- Özel koddaki resmi modül monkey patch'i (EXT001) engellenmez; önizlemede `Warning EXT001 line N` risk uyarısıdır. Önerilmez:
+  hooks, override ya da extend tercih edilir.
+- Resmi uygulama (core) dosyaları (Press dahil) varsayılan olarak reddedilir: ilk istek `core_warning` döner ve öneri
+  oluşmaz. Ajan uyarıyı (uygulamalar, dosyalar, gerekçeler, diff) kullanıcıya gösterir ve durur; kendiliğinden tekrar
+  çağırmaz. Kullanıcı aynı değişikliği açıkça yeniden isterse aynı argümanlarla bir kez daha çağırır; öneri ayrı terminalde
+  `APPROVE <digest12>` ve `CORE <uygulama>` (doğrulanmamış dosyada `CORE UNCHECKED <uygulama>`) onayı ister; `app_apply`
+  CORE onayı olmayan core yolunu `core_not_approved` ile reddeder. Önerilen yol yine özel uygulama ve genişletme
+  noktalarıdır; canlı Press'e dağıtım `press.code_fix` devridir, yerel press checkout düzenlemesi bu core akışıdır.
 - Davranış yalnız geliştiricinin koştuğu `bench --site <site> run-tests --app <app>` gerçek çıktısıyla "geçti" sayılır;
   çıktı yoksa sonuç `not_run`dır. `bench migrate` ve testler yerelde insan komutudur.
 
@@ -87,10 +95,11 @@ Kullanma: ERPNext, HRMS, CRM gibi resmi uygulamanın davranışını değiştirm
 | `add_test` | `tests.scaffold` | Test tabanı sürüme göre |
 | `write_file` | `app_file.write` | Tek dosya, tam metin; mevcut dosyada beklenen sha256 zorunlu |
 
-İzin değişikliği `write_file` ile yapılmaz: DocType JSON'unda izin değişikliği, izin taşıyan yeni DocType JSON'u ve izin ya
-da rol fixture'ı kod düzeyinde reddedilir. Mevcut DocType'ın izinleri (`doctype.permissions`) planlıdır ve ayrı inceleme
-ister; yeni DocType'ın izinleri `new_doctype` ile verilir. Asset (`assets.include`) ve çeviri (`localization.translations`)
-dosyaları, ayrı türleri planlı olduğu için `write_file` ile onaylı yazılır. Her durumda sonra `app_check`.
+Özel DocType izinleri (DocType JSON'unda izin değişikliği, izin taşıyan yeni DocType JSON'u) ve izin ya da rol fixture'ları
+`write_file` ile önerilebilir; engellenmez, önizlemede rollerin önce ve sonrası not olarak görünür (Guest: giriş yapmamış
+ziyaretçi, All: her kullanıcı). Bu notu kullanıcıya açıkça göster; Guest ya da All genişlemesi gerekçe ister. Ayrı tipli
+`doctype.permissions`, `assets.include` ve `localization.translations` türleri planlıdır; bu dosyalar `write_file` ile onaylı
+yazılır. Her durumda sonra `app_check`.
 
 ## Karar kuralları
 
@@ -110,7 +119,7 @@ dosyaları, ayrı türleri planlı olduğu için `write_file` ile onaylı yazıl
 ## Yapılmaz
 
 Dosyayı doğrudan yazmak; bench, git veya kabuk çalıştırmak; lisans seçmek; üretim sitesinde geliştirici modunu açmak;
-uygulama mantığını Server Script'e koymak; resmi uygulamanın deposuna yazmak; iskeleti ya da onaylanmış kodu çalışan davranış
+uygulama mantığını Server Script'e koymak; core akışı dışında resmi uygulama dosyasına yazmak; iskeleti ya da onaylanmış kodu çalışan davranış
 saymak (test çıktısı yoksa `not_run`); kendi önerisini onaylamak.
 
 ## Başvurular

@@ -217,7 +217,7 @@
     {
       "id": "core_patch_forbidden",
       "severity": "error",
-      "description": "Frappe, ERPNext veya başka uygulamanın çekirdek dosyaları değiştirilmez; genişletme yalnız hooks, fixtures ve patch ile yapılır.",
+      "description": "Orijinal core DOSYALARI (Frappe, ERPNext, press veya başka resmi uygulamanın deposu/paketi içindeki dosyalar) varsayılan olarak reddedilir; önce hooks, fixtures ve patch kullanılır. Kullanıcı açıkça tekrar isterse değişiklik yalnız core uyarısı ve CORE <uygulama> çift onayıyla yazılır. Özel koddaki resmi modül yaması (EXT001) bu kurala girmez ve core onayı istemez; risk uyarısıdır, hooks/override/extend tercih edilir.",
       "source": null
     },
     {

@@ -51,6 +51,18 @@ def _workspace_preview(config, record) -> list:
     return app_tools.render_changes(app_tools.workspace_for(config, record), record)
 
 
+def core_banner(record) -> list:
+    """Orijinal core değişikliği onay ekranında diff'ten önce ayrıca ve açıkça gösterilir."""
+    core = record["preview"].get("core") if record.get("kind") == "workspace" else None
+    if not core:
+        return []
+    lines = ["!" * 72, "ORIGINAL CORE CHANGE: refused by default. Approve only if you explicitly want this exact change."]
+    lines += ["core app  : " + app for app in core.get("apps", [])]
+    lines += ["core file : " + path for path in core.get("files", [])]
+    lines += [core.get("warning", ""), "!" * 72]
+    return lines
+
+
 def _require_tty() -> None:
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         raise KitError("This command must be run by a human in an interactive terminal", code="tty_required")
@@ -85,6 +97,8 @@ def cmd_approve(args) -> int:
     show("target    : {}".format(record["target"]))
     show("authority : {}".format(json.dumps(record["authority"], ensure_ascii=False)))
     show("expires   : {}".format(record["expires_at"]))
+    for line in core_banner(record):
+        show(line)
     show("params    :")
     show(json.dumps(record["params"], ensure_ascii=False, indent=2))
     if record["kind"] == "workspace":

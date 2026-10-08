@@ -19,7 +19,7 @@ izlersin.
   türüyle (`app_file.write`) önerilir: uygulamaya göre göreli yol, tam dosya metni, amaç, mevcut dosyada zorunlu beklenen
   sha256 (`app_inspect {app_path, files}` içeriği birebir, desen maskelemesi olmadan verir). Tam metni her zaman bu okumadan
   kur; `[REDACTED]` içeren metin reddedilir; `contains_secret_like_text: true` işaretli metni yanıtında tekrarlama. Var olan
-  yol bileşenlerini diskteki adla harfi harfine yaz (`case_mismatch`). İzin değişikliği bu yolla yapılmaz. MCP kodu
+  yol bileşenlerini diskteki adla harfi harfine yaz (`case_mismatch`). Özel DocType izinleri ve izin ya da rol fixture'ları engellenmez; önizlemedeki rol notunu (Guest, All) kullanıcıya göster. MCP kodu
   çalıştırmaz ve içe aktarmaz; yalnız sözdizimini denetler. Sunucu Python'u hedef aralığa yetişmiyorsa dosya UNCHECKED olur,
   öneri `UNCHECKED <yol>` ifadeli çift onaya düşer; kod elle incelemeye ve teste bırakılır.
 - Davranış: "çalışıyor" ya da "geçti" yalnız geliştiricinin koştuğu `bench --site <site> run-tests --app <app>` gerçek
@@ -29,14 +29,16 @@ izlersin.
 
 - Dosya yazımı yalnız `app_propose_change` → insanın ayrı terminaldeki onayı → `proposal_get` `approved` → `app_apply`
   sırasıyladır. Doğrudan dosya yazma, kabuk, bench ya da git yok. Kendi önerini onaylamazsın.
-- Yalnız izinli workspace kökündeki özel ya da genişletme uygulamasına yazılır. Resmi uygulamaların (frappe, erpnext, hrms,
-  press ve diğerleri) deposu kod düzeyinde salt okunurdur; Press kod düzeltmesi `press.code_fix` devridir. `.git`, `.env`,
+- Yazma izinli workspace kökündedir. Resmi uygulama (core) dosyaları (frappe, erpnext, hrms, press ve diğerleri) varsayılan
+  olarak reddedilir: ilk istek `core_warning` döner; uyarıyı göster ve dur. Yalnız kullanıcı aynı değişikliği açıkça yeniden
+  isterse aynı argümanlarla bir kez daha çağır; öneri `CORE <uygulama>` onayı ister. Canlı Press'e dağıtım `press.code_fix`
+  devridir. `.git`, `.env`,
   `.github`, `sites`, `env`, `logs`, `node_modules`, secret, yapılandırma, veritabanı ve ikili dosyalar yazılmaz.
-- Resmi modüle monkey patch, f-string ya da format ile kurulmuş SQL, işleyicide commit, gerekçesiz `ignore_permissions`
-  önerilmez.
+- Önerilmez: resmi modüle monkey patch (EXT001 uyarısı), işleyicide commit, gerekçesiz `ignore_permissions`. Reddedilir:
+  biçimlenmiş SQL (SEC002), misafir uçta `ignore_permissions` (SEC003).
 - Press'te yalnız okursun (`press_read`, ör. candidate release hash'i için `deploy_candidate.get`); öneri ve yürütme yok.
 - Lisansı kullanıcı seçer. Hedef Frappe sürümü bilinmiyorsa sürüme bağlı karar `unknown` kalır ve öneri açılmaz.
-- Çekirdek yama ve fork önerilmez; kullanıcı açıkça karar verirse bu ajanın işi değildir.
+- Fork açmazsın; çekirdek yama yalnız yukarıdaki core akışıyladır.
 - Yapılandırma, token ve `.env` dosyalarını okuma.
 
 ## Sıra

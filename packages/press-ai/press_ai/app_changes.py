@@ -170,8 +170,14 @@ def check_canonical_case(ws, path: str) -> None:
         return  # bu bileşen yok: yeni dosya/dizin
 
 
-def check_mutation_path(ws, path: str) -> None:
-    """Her app mutasyonunda: workspace içi, gizli/secret/state yolu değil ve resmi uygulama çekirdeğinde değil."""
+def core_app_name(ws, owner: str) -> str:
+    return ws.root.rstrip("/").rsplit("/", 1)[-1] if owner == "." else owner.rsplit("/", 1)[-1]
+
+
+def check_mutation_path(ws, path: str) -> str | None:
+    """Her app mutasyonunda mutlak sınır: workspace içi, diskteki adla birebir, gizli/secret/state/çalışma zamanı yolu
+    değil. Dönüş: yol orijinal core (resmi uygulama) içindeyse o uygulamanın adı, değilse None. Core yolu burada
+    reddedilmez; çağıran onu varsayılan-ret akışına sokar (önce uyarı, aynı isteğin açık tekrarı, CORE onayı)."""
     check_canonical_case(ws, path)
     parts = split_relative(path)
     for index, part in enumerate(parts):
@@ -183,9 +189,7 @@ def check_mutation_path(ws, path: str) -> None:
     if _DENIED_NAME.fullmatch(parts[-1]):
         raise WorkspaceError("File name looks like a secret, config, database or binary: " + path, code="denied_path")
     owner = official_owner(ws, path)
-    if owner:
-        raise WorkspaceError("Official app code is read-only ({}); extend it from a custom app with hooks".format(owner),
-                             code="official_app_read_only")
+    return core_app_name(ws, owner) if owner else None
 
 
 class Plan:
@@ -196,28 +200,41 @@ class Plan:
         self.followups = []
         self.notes = []
         self.unchecked = []
+        self.core_files = []
+
+    def _core(self, path, app):
+        if app and all(f["path"] != path for f in self.core_files):
+            self.core_files.append({"path": path, "app": app})
 
     def create(self, path, content):
-        check_mutation_path(self.ws, path)  # Öneri aşamasında da workspace dışı ve yasak yol reddedilir.
+        app = check_mutation_path(self.ws, path)  # Öneri aşamasında da workspace dışı ve yasak yol reddedilir.
         if self.ws.exists(path):
             raise WorkspaceError("Refusing to overwrite existing file " + path, code="conflict")
         if any(f["path"] == path for f in self.files):
             return
         self.files.append({"path": path, "action": "create", "base_sha256": None, "content": content,
                            "sha256": sha256_hex(content.encode("utf-8"))})
+        self._core(path, app)
 
     def create_if_missing(self, path, content):
         if not self.ws.exists(path):
             self.create(path, content)
 
     def modify(self, path, new_content):
-        check_mutation_path(self.ws, path)
+        app = check_mutation_path(self.ws, path)
         old = self.ws.read_text(path)
         if old == new_content:
             return
         self.files.append({"path": path, "action": "modify", "base_sha256": sha256_hex(old.encode("utf-8")),
                            "content": new_content, "sha256": sha256_hex(new_content.encode("utf-8")),
                            "_old": old})
+        self._core(path, app)
+
+    def core(self) -> dict | None:
+        """Orijinal core dosyalarına dokunan değişikliğin özeti; özel uygulama dosyaları hiçbir zaman core değildir."""
+        if not self.core_files:
+            return None
+        return {"apps": sorted({f["app"] for f in self.core_files}), "files": [f["path"] for f in self.core_files]}
 
     def result(self) -> dict:
         diff = []
@@ -230,7 +247,8 @@ class Plan:
             raise KitError("Plan is too large to review ({} bytes); split the change".format(size),
                            code="proposal_too_large")
         return {"files": self.files, "diff": "".join(diff), "manual_merge": self.manual,
-                "human_commands": self.followups, "notes": self.notes, "unchecked": self.unchecked}
+                "human_commands": self.followups, "notes": self.notes, "unchecked": self.unchecked,
+                "core": self.core()}
 
 
 def _hooks_append(plan, package, key, value_source, snippet_note):
@@ -559,38 +577,49 @@ def _add_test(plan, ws, info, c, target):
     plan.followups.append("bench --site <site> run-tests --app {} --doctype \"{}\"".format(info["name"], c["doctype"]))
 
 
-_BLOCKING_RULES = {"EXT001", "SEC002"}
+_BLOCKING_RULES = {"SEC002"}  # güvenlik; özel koddaki EXT001 normal uyarıdır (özel geliştirme yetkili)
 _DOCTYPE_JSON = re.compile(r"(?:^|/)doctype/([^/]+)/\1\.json$", re.I)
 _PERMISSION_FIXTURE = re.compile(r"(?i)(?:^|/)fixtures/[^/]*(docperm|role)[^/]*\.json$")
 
 
-def _refuse_permission_change(ws, rel, content, current_sha):
-    """İzin değişikliği (`doctype.permissions`) ayrı bir güvenlik incelemesi ister ve kontratta `planned`dır:
-    write_file mevcut DocType JSON'unun `permissions` dizisini değiştiremez, izinli yeni DocType JSON'u yazamaz ve
-    izin/rol fixture'ı oluşturamaz. Yeni DocType izinleri tipli `new_doctype` türüyle önerilir."""
+def _roles(perms) -> list:
+    return sorted({str(p["role"]) for p in perms if isinstance(p, dict) and p.get("role")}) if isinstance(perms, list) \
+        else []
+
+
+def _note_permission_change(plan, ws, rel, content, current_sha):
+    """Özel geliştirme yetkilidir: DocType izinleri ve izin/rol fixture'ları engellenmez. Onaylayan insan görsün diye
+    önizlemeye not düşülür; Guest ve All rolleri kaydı herkese açar."""
     if _PERMISSION_FIXTURE.search(rel):
-        raise ValidationError("Permission or role fixtures cannot be written with write_file (doctype.permissions "
-                              "needs a separate reviewed path): " + rel)
+        plan.notes.append("Permission or role fixture {} is imported on migrate/install; review its rows before "
+                          "approving.".format(rel))
+        return
     if not _DOCTYPE_JSON.search(rel):
         return
     try:
         new = json.loads(content)
+        old = json.loads(ws.read_text(rel)) if current_sha is not None else {}
     except ValueError:
         return  # JSON hatası ayrıca raporlanır
     new_perms = new.get("permissions") if isinstance(new, dict) else None
-    if current_sha is None:
-        if new_perms:
-            raise ValidationError("New DocType JSON with permissions: use the new_doctype change instead: " + rel)
+    old_perms = old.get("permissions") if isinstance(old, dict) else None
+    if (new_perms or []) == (old_perms or []):
         return
-    old = json.loads(ws.read_text(rel))
-    if (old.get("permissions") if isinstance(old, dict) else None) != new_perms:
-        raise ValidationError("write_file cannot change DocType permissions (doctype.permissions is planned and "
-                              "needs a separate security review): " + rel)
+    after = _roles(new_perms)
+    text = "DocType permission rows change in {} (roles before: {}; after: {}).".format(
+        rel, ", ".join(_roles(old_perms)) or "none", ", ".join(after) or "none")
+    if any(role.casefold() == "guest" for role in after):
+        text += " Guest means visitors who are not logged in."
+    if any(role.casefold() == "all" for role in after):
+        text += " All means every user account."
+    plan.notes.append(text + " Custom development is allowed; review the rows before approving.")
 
 
 def _write_file(plan, ws, info, c, target, app_path):
     """Geliştiricinin yazdığı tek kaynak dosyası: metin olarak alınır, ast/json ile yalnız sözdizimi denetlenir;
-    kod çalıştırılmaz ve import edilmez. Resmi uygulama, gizli/secret/state yolu ve ikili dosya yazılmaz."""
+    kod çalıştırılmaz ve import edilmez. Gizli/secret/state yolu ve ikili dosya yazılmaz; orijinal core dosyası core
+    akışına girer (varsayılan ret, uyarı, açık tekrar, CORE onayı). Özel koddaki resmi modül yaması (EXT001) normal
+    yetkili akışta kalır; önizlemede risk uyarısı olur."""
     rel = app_path.rstrip("/") + "/" + c["path"]
     split_relative(c["path"])
     if not rel.endswith(WRITE_FILE_SUFFIXES):
@@ -609,7 +638,7 @@ def _write_file(plan, ws, info, c, target, app_path):
         raise WorkspaceError("File exists but expected_sha256 is null (new file expected): " + rel, code="conflict")
     if expected is not None and expected != current:
         raise WorkspaceError("File changed since it was read (expected_sha256 differs): " + rel, code="conflict")
-    _refuse_permission_change(ws, rel, content, current)
+    _note_permission_change(plan, ws, rel, content, current)
     if "[REDACTED]" in content and (current is None or "[REDACTED]" not in ws.read_text(rel)):
         # Maskelenmiş bir okumanın geri yazılması dosyayı bozar; içerik app_inspect files ile birebir okunur.
         raise ValidationError("Content contains [REDACTED], which the current file does not: read the file again "
@@ -635,8 +664,11 @@ def _write_file(plan, ws, info, c, target, app_path):
         blocking = [f for f in findings if f["rule"] in _BLOCKING_RULES
                     or (f["rule"] == "SEC003" and f["severity"] == "error")]
         if blocking:
-            raise ValidationError("Proposed code breaks extension or safety rules: " + "; ".join(
+            raise ValidationError("Proposed code breaks safety rules: " + "; ".join(
                 "{} line {}: {}".format(f["rule"], f["line"], f["message"]) for f in blocking))
+        plan.notes += ["Warning EXT001 line {}: monkey patch of an official module. It changes official behaviour "
+                       "for every site on the bench and can break silently on upgrade; prefer hooks, doc_events or "
+                       "extend/override_doctype_class.".format(f["line"]) for f in findings if f["rule"] == "EXT001"]
     elif rel.endswith(".json"):
         try:
             json.loads(content)
@@ -677,9 +709,7 @@ def build_plan(ws, app_path: str, change: dict) -> dict:
     else:
         info = locate_app(ws, app_path)
         check_canonical_case(ws, info["package"] + "/hooks.py")
-        if is_official(info["name"]) or official_owner(ws, info["package"] + "/hooks.py"):
-            raise WorkspaceError("{} is an official app and is read-only; extend it from a custom app".format(
-                info["name"]), code="official_app_read_only")
+        # Resmi uygulamadaki her dosya Plan'da core olarak işaretlenir; öneri yalnız uyarı ve açık tekrardan sonra oluşur.
         if kind == "write_file":
             _write_file(plan, ws, info, change, None, app_path)
         else:

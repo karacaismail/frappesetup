@@ -11,8 +11,9 @@ olandan başlayarak seçilir; her üst basamak, alttakinin neden yetmediği yaz�
 
 MCP mekanizmanın iskeletini üretir (fixture filtresi, hooks girdisi ile boş `doc_events` işleyicisi, yalnız
 `super().validate()` çağıran extend veya override sınıfı); genişletmenin asıl kodu genişletme uygulamasındaki dosyaya
-`write_file` (`app_file.write`) önerisiyle yazılır. Her öneri insan onayından geçer; resmi uygulamanın deposu kod düzeyinde
-salt okunurdur. İskelet ya da onaylanmış kod, geliştiricinin koştuğu test çıktısı olmadan çalışan davranış sayılmaz.
+`write_file` (`app_file.write`) önerisiyle yazılır. Her öneri insan onayından geçer; resmi uygulama dosyasına değişiklik
+varsayılan olarak reddedilir ve yalnız core akışıyla (uyarı, kullanıcının açık tekrarı, `CORE <uygulama>` onayı) yazılır.
+İskelet ya da onaylanmış kod, geliştiricinin koştuğu test çıktısı olmadan çalışan davranış sayılmaz.
 
 ## Kullan, kullanma
 
@@ -40,7 +41,7 @@ Kullanma: yeni ve bağımsız bir uygulama (frappe-custom-app); Press'te dağıt
 | 3 | `extend_doctype_class` | Sınıfa metot veya özellik eklemek, `super()` ile sarmak | yok | var | Mixin zinciri; `super()` kırılırsa diğer uzantılar düşer |
 | 4 | `override_doctype_class` | Sınıfın davranışını değiştirmek | var | var | Son kurulan app kazanır; v16'da sınıf asıl sınıfın alt sınıfı olmak zorunda; `super()` çağrılır |
 | 5 | `override_whitelisted_methods` | Bir API metodunu değiştirmek | var | var | İmza ve dönüş sözleşmesi korunur; son app kazanır; her yükseltmede yeniden test |
-| 6 | Çekirdek yama, fork | — | — | — | Yapılmaz |
+| 6 | Çekirdek yama, fork | İstisna | core akışı | core akışı | Yükseltmede çakışma ve bakım yükü; yalnız kullanıcının açık tekrarı ve CORE onayıyla; fork ajan işi değil |
 
 v15 hedefinde `extend_doctype_class` önerilmez. Kural: önce 1 ve 2 yeterli mi diye bak; sınıf mekanizması yalnız davranış
 olayla ifade edilemiyorsa.
@@ -48,8 +49,8 @@ olayla ifade edilemiyorsa.
 ## Sıra
 
 1. Resmi uygulamanın ilgili kodunu sabit commit'te oku: DocType denetleyicisi, değiştirilecek metot ve imzası, resmi
-   uygulamanın kendi hooks girdileri. `app_inspect` resmi app yolu üzerinde salt okunur çalışır; yazma yalnız genişletme
-   uygulamasına.
+   uygulamanın kendi hooks girdileri. `app_inspect` resmi app kodunu okur; yazma genişletme uygulamasına yapılır,
+   resmi dosyaya yazma core akışına girer.
 2. Çakışma taraması: kurulu diğer uygulamaların aynı DocType veya metot için `override_doctype_class`,
    `override_whitelisted_methods`, `doc_events` ve fixture girdileri. Aynı sınıfı iki app override ediyorsa biri sessizce
    kaybolur; bunu raporla ve dur.
@@ -70,10 +71,11 @@ olayla ifade edilemiyorsa.
 
 ## Yapılmaz
 
-- Resmi uygulamanın dizinindeki dosyaya öneri yazmak ya da onu değiştirmek.
+- Core akışı dışında resmi uygulama dosyasına yazmak. İlk istek `core_warning` döner; uyarıyı göster ve dur. Yalnız kullanıcı
+  aynı değişikliği açıkça yeniden isterse aynı argümanlarla bir kez daha çağır; onay `CORE <uygulama>` ister.
 - Varsayılan olarak fork. Fork yalnız kullanıcının açık kararıyla, sorumlusu, yukarı akışa dönüş planı ve bakım maliyeti
   yazılarak yapılır; ajan fork açmaz.
-- İçe aktarma anında monkey patch; Server Script ya da Client Script ile uygulama mantığı; Customize Form'da yapılıp dışa
+- İçe aktarma anında monkey patch (EXT001 uyarısı: engellenmez ama önerilmez; hooks, override ya da extend tercih edilir); Server Script ya da Client Script ile uygulama mantığı; Customize Form'da yapılıp dışa
   aktarılmayan değişikliği kod saymak.
 - İzin kancalarıyla yetki genişletmek; `ignore_permissions` ile denetimi aşmak; işleyicide commit.
 

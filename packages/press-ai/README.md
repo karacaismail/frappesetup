@@ -41,8 +41,12 @@ hooks, patches, fixtures, DocType şeması, sürüme bağlı özellikler). `app_
   kodu ve test içeriği; tek dosya, diff ve sha256 ile önizlenir, insan onaylar, `app_apply` atomik yazar. Kod
   çalıştırılmaz ve import edilmez; yalnız sözdizimi ve kural denetimi yapılır.
 
-Davranışın doğru olduğu ancak `bench run-tests` (yerelde insan komutu) gerçek çıktısıyla söylenir. Resmi uygulamaların
-kodu her app mutasyonunda salt okunurdur; değişiklik özel uygulamada hooks ve genişletme noktalarıyla yapılır.
+Davranışın doğru olduğu ancak `bench run-tests` (yerelde insan komutu) gerçek çıktısıyla söylenir. Önerilen yol özel
+uygulamada hooks ve genişletme noktalarıdır. Orijinal core dosyaları (resmi uygulamalar, `press` dahil) varsayılan
+olarak reddedilir: ilk istek yalnız `core_warning` döner; kullanıcı aynı değişikliği açıkça yeniden isterse öneri oluşur ve
+insan ayrı terminalde `APPROVE <digest12>` ile `CORE <uygulama>` yazarak onaylar. Özel uygulama dosyaları normal yetkili
+akıştadır: özel DocType izinleri ve izin/rol fixture'ları engellenmez, özel koddaki resmi modül yaması (EXT001) da
+engellenmez; ikisi de önizlemede not/uyarı olarak görünür. Secret, `.git` ve gizli yol sınırı mutlaktır.
 
 ## Kurulum
 

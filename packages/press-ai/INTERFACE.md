@@ -181,16 +181,25 @@ metni insana verilir.
   Python `ast.parse`, JSON `json.loads` ile ayrıştırılır. Sunucu Python'u uygulamanın `requires-python` alt sınırına
   yetişiyorsa ayrıştırma o sürümün dilbilgisiyle yapılır (`feature_version`) ve sözdizimi hatası kesindir. Yetişmiyorsa
   (ör. 3.9 sunucu, 3.10+ hedef) dosya `UNCHECKED` olur: yalnız en iyi çaba metin taraması koşar ve öneri `UNCHECKED <yol>`
-  onay ifadeli çift onay ister. Resmi modül monkey patch'i (EXT001) ve biçimlenmiş SQL (SEC002) içeren Python önerisi
-  (ağaçtan ya da metin taramasından) reddedilir. İçerik, mevcut dosyada bulunmayan `[REDACTED]` içeriyorsa reddedilir
-  (maskelenmiş bir okumanın geri yazılmasını önler). DocType JSON'unda `permissions` değişikliği, izinli yeni DocType JSON'u ve izin/rol
-  fixture'ı reddedilir (`doctype.permissions` ayrı inceleme ister; yeni DocType izinleri `new_doctype` ile). Davranış,
-  geliştirici testleri koşup gerçek çıktıyı gösterene kadar doğrulanmamış sayılır.
-- Bütün app mutasyonlarında kod düzeyinde: resmi uygulama deposu/paketi (adı resmi modül listesinde — `press` dahil — ve
-  `hooks.py` taşıyan dizin) salt okunurdur; gizli bileşenli yol (`.git`, `.env`, `.github`), `sites`/`env`/`logs`/
-  `node_modules`, secret/config/veritabanı/ikili dosya adı yazılmaz ve `app_inspect {files}` ile de okunmaz; workspace dışına
-  ve sembolik bağdan geçen yol reddedilir. Ad karşılaştırmaları harften bağımsızdır ve var olan her yol bileşeni diskteki
-  adla birebir yazılmalıdır (harf duyarsız APFS'de `Erpnext/` ya da `DocType/` ile atlatma yok). Resmi uygulama kodu
+  onay ifadeli çift onay ister. Biçimlenmiş SQL (SEC002) ve guest uç noktasında `ignore_permissions` (SEC003 error)
+  içeren Python önerisi (ağaçtan ya da metin taramasından) reddedilir. Özel koddaki resmi modül monkey patch'i (EXT001)
+  engellenmez ve core akışına girmez; önizlemede risk uyarısı olarak görünür. İçerik, mevcut dosyada bulunmayan `[REDACTED]` içeriyorsa reddedilir (maskelenmiş bir okumanın
+  geri yazılmasını önler). Özel geliştirme yetkilidir: DocType JSON'unda `permissions` değişikliği, izinli yeni DocType
+  JSON'u ve izin/rol fixture'ı engellenmez; önizleme notu rolleri önce/sonra listeler ve Guest/All rollerini açıklar.
+  Davranış, geliştirici testleri koşup gerçek çıktıyı gösterene kadar doğrulanmamış sayılır.
+- Bütün app mutasyonlarında kod düzeyinde mutlak sınır: gizli bileşenli yol (`.git`, `.env`, `.github`), `sites`/`env`/
+  `logs`/`node_modules`, secret/config/veritabanı/ikili dosya adı yazılmaz ve `app_inspect {files}` ile de okunmaz;
+  workspace dışına ve sembolik bağdan geçen yol reddedilir. Ad karşılaştırmaları harften bağımsızdır ve var olan her yol
+  bileşeni diskteki adla birebir yazılmalıdır (harf duyarsız APFS'de `Erpnext/` ya da `DocType/` ile atlatma yok).
+- Orijinal core dosyaları varsayılan olarak reddedilir ama mutlak yasak değildir. Core dosyası: resmi uygulama
+  deposu/paketi (adı resmi modül listesinde — `press` dahil — ve `hooks.py` taşıyan dizin) içindeki her dosya. Özel uygulama
+  dosyaları bu kurala girmez. İlk istek öneri oluşturmaz: `app_propose_change` `{state: core_warning, proposal_id: null,
+  core: {apps, files}, warning, warning_expires_at, preview}` döner ve istek özetine bağlı tek kullanımlık uyarı kaydı yazar.
+  Ajan uyarıyı kullanıcıya gösterir; kullanıcı aynı değişikliği açıkça yeniden isterse aynı argümanlarla ikinci çağrı
+  (uyarı süresi içinde, dosya tabanları değişmeden) öneriyi oluşturur. Bu öneri çift onaylıdır: `APPROVE <digest12>` ve
+  `CORE <uygulama>` (ayrıştırılamıyorsa `CORE UNCHECKED <uygulama>`); onay ekranı diff'ten önce core uygulamalarını,
+  dosyaları ve riski gösterir. Uyarı onay değildir; model bayrağı yoktur. `app_apply` core
+  yolunu yalnız CORE onaylı öneride ve öneride listelenmişse yazar, değilse `core_not_approved`. Resmi uygulama kodu
   okunabilir (genişletilecek kodun görülmesi için).
 - Çok dosyalı yazım hep ya da hiç: geri alma da başarısız olursa sonuç `failed_partial` olur ve geri alınamayan yollar
   raporlanır.

@@ -394,7 +394,7 @@
         },
         {
           "id": "workspace.write_scope",
-          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "description": "Mutlak sınırlar: gizli/secret/state/çalışma zamanı yolları (sites/env/logs/node_modules dahil), .git/.github/.env, workspace dışı ve sembolik bağ, büyük/küçük harf uyuşmazlığı, [REDACTED] içerik, boyut ve uzantı sınırı. Core = yalnız resmi uygulama deposu/paketi (press dahil) içindeki dosyalar: varsayılan olarak reddedilir; ilk istek core_warning döner (öneri yok, istek özetine bağlı tek kullanımlık uyarı); kullanıcı aynı değişikliği açıkça yeniden isterse çift onaylı öneri oluşur (APPROVE <digest12> + CORE <uygulama>; ayrıştırılamıyorsa CORE UNCHECKED <uygulama>). Özel koddaki resmi modül yaması (EXT001) bu akışa girmez; önizlemede risk uyarısıdır.",
           "machine": false
         }
       ],
@@ -693,7 +693,7 @@
       "preconditions": [
         {
           "id": "workspace.write_scope",
-          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "description": "Mutlak sınırlar: gizli/secret/state/çalışma zamanı yolları (sites/env/logs/node_modules dahil), .git/.github/.env, workspace dışı ve sembolik bağ, büyük/küçük harf uyuşmazlığı, [REDACTED] içerik, boyut ve uzantı sınırı. Core = yalnız resmi uygulama deposu/paketi (press dahil) içindeki dosyalar: varsayılan olarak reddedilir; ilk istek core_warning döner (öneri yok, istek özetine bağlı tek kullanımlık uyarı); kullanıcı aynı değişikliği açıkça yeniden isterse çift onaylı öneri oluşur (APPROVE <digest12> + CORE <uygulama>; ayrıştırılamıyorsa CORE UNCHECKED <uygulama>). Özel koddaki resmi modül yaması (EXT001) bu akışa girmez; önizlemede risk uyarısıdır.",
           "machine": false
         }
       ],
@@ -943,7 +943,7 @@
       "preconditions": [
         {
           "id": "workspace.write_scope",
-          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "description": "Mutlak sınırlar: gizli/secret/state/çalışma zamanı yolları (sites/env/logs/node_modules dahil), .git/.github/.env, workspace dışı ve sembolik bağ, büyük/küçük harf uyuşmazlığı, [REDACTED] içerik, boyut ve uzantı sınırı. Core = yalnız resmi uygulama deposu/paketi (press dahil) içindeki dosyalar: varsayılan olarak reddedilir; ilk istek core_warning döner (öneri yok, istek özetine bağlı tek kullanımlık uyarı); kullanıcı aynı değişikliği açıkça yeniden isterse çift onaylı öneri oluşur (APPROVE <digest12> + CORE <uygulama>; ayrıştırılamıyorsa CORE UNCHECKED <uygulama>). Özel koddaki resmi modül yaması (EXT001) bu akışa girmez; önizlemede risk uyarısıdır.",
           "machine": false
         }
       ],
@@ -1138,7 +1138,7 @@
       "preconditions": [
         {
           "id": "workspace.write_scope",
-          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "description": "Mutlak sınırlar: gizli/secret/state/çalışma zamanı yolları (sites/env/logs/node_modules dahil), .git/.github/.env, workspace dışı ve sembolik bağ, büyük/küçük harf uyuşmazlığı, [REDACTED] içerik, boyut ve uzantı sınırı. Core = yalnız resmi uygulama deposu/paketi (press dahil) içindeki dosyalar: varsayılan olarak reddedilir; ilk istek core_warning döner (öneri yok, istek özetine bağlı tek kullanımlık uyarı); kullanıcı aynı değişikliği açıkça yeniden isterse çift onaylı öneri oluşur (APPROVE <digest12> + CORE <uygulama>; ayrıştırılamıyorsa CORE UNCHECKED <uygulama>). Özel koddaki resmi modül yaması (EXT001) bu akışa girmez; önizlemede risk uyarısıdır.",
           "machine": false
         }
       ],
@@ -1316,7 +1316,7 @@
         },
         {
           "id": "workspace.write_scope",
-          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "description": "Mutlak sınırlar: gizli/secret/state/çalışma zamanı yolları (sites/env/logs/node_modules dahil), .git/.github/.env, workspace dışı ve sembolik bağ, büyük/küçük harf uyuşmazlığı, [REDACTED] içerik, boyut ve uzantı sınırı. Core = yalnız resmi uygulama deposu/paketi (press dahil) içindeki dosyalar: varsayılan olarak reddedilir; ilk istek core_warning döner (öneri yok, istek özetine bağlı tek kullanımlık uyarı); kullanıcı aynı değişikliği açıkça yeniden isterse çift onaylı öneri oluşur (APPROVE <digest12> + CORE <uygulama>; ayrıştırılamıyorsa CORE UNCHECKED <uygulama>). Özel koddaki resmi modül yaması (EXT001) bu akışa girmez; önizlemede risk uyarısıdır.",
           "machine": false
         }
       ],
@@ -1466,7 +1466,7 @@
       "preconditions": [
         {
           "id": "workspace.write_scope",
-          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "description": "Mutlak sınırlar: gizli/secret/state/çalışma zamanı yolları (sites/env/logs/node_modules dahil), .git/.github/.env, workspace dışı ve sembolik bağ, büyük/küçük harf uyuşmazlığı, [REDACTED] içerik, boyut ve uzantı sınırı. Core = yalnız resmi uygulama deposu/paketi (press dahil) içindeki dosyalar: varsayılan olarak reddedilir; ilk istek core_warning döner (öneri yok, istek özetine bağlı tek kullanımlık uyarı); kullanıcı aynı değişikliği açıkça yeniden isterse çift onaylı öneri oluşur (APPROVE <digest12> + CORE <uygulama>; ayrıştırılamıyorsa CORE UNCHECKED <uygulama>). Özel koddaki resmi modül yaması (EXT001) bu akışa girmez; önizlemede risk uyarısıdır.",
           "machine": false
         }
       ],
@@ -1629,7 +1629,7 @@
       "preconditions": [
         {
           "id": "workspace.write_scope",
-          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "description": "Mutlak sınırlar: gizli/secret/state/çalışma zamanı yolları (sites/env/logs/node_modules dahil), .git/.github/.env, workspace dışı ve sembolik bağ, büyük/küçük harf uyuşmazlığı, [REDACTED] içerik, boyut ve uzantı sınırı. Core = yalnız resmi uygulama deposu/paketi (press dahil) içindeki dosyalar: varsayılan olarak reddedilir; ilk istek core_warning döner (öneri yok, istek özetine bağlı tek kullanımlık uyarı); kullanıcı aynı değişikliği açıkça yeniden isterse çift onaylı öneri oluşur (APPROVE <digest12> + CORE <uygulama>; ayrıştırılamıyorsa CORE UNCHECKED <uygulama>). Özel koddaki resmi modül yaması (EXT001) bu akışa girmez; önizlemede risk uyarısıdır.",
           "machine": false
         }
       ],
@@ -1793,7 +1793,7 @@
         },
         {
           "id": "workspace.write_scope",
-          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "description": "Mutlak sınırlar: gizli/secret/state/çalışma zamanı yolları (sites/env/logs/node_modules dahil), .git/.github/.env, workspace dışı ve sembolik bağ, büyük/küçük harf uyuşmazlığı, [REDACTED] içerik, boyut ve uzantı sınırı. Core = yalnız resmi uygulama deposu/paketi (press dahil) içindeki dosyalar: varsayılan olarak reddedilir; ilk istek core_warning döner (öneri yok, istek özetine bağlı tek kullanımlık uyarı); kullanıcı aynı değişikliği açıkça yeniden isterse çift onaylı öneri oluşur (APPROVE <digest12> + CORE <uygulama>; ayrıştırılamıyorsa CORE UNCHECKED <uygulama>). Özel koddaki resmi modül yaması (EXT001) bu akışa girmez; önizlemede risk uyarısıdır.",
           "machine": false
         }
       ],
@@ -1842,7 +1842,7 @@
       "title": "Var olan DocType'ın rol izinlerini değiştir",
       "kind": "mutation",
       "status": "planned",
-      "status_reason": "DocPerm kaynağı doğrulandı; izin değişikliği güvenlik incelemesi gerektirdiğinden ayrı değişiklik türü henüz yok. write_file izin değişikliğini kod düzeyinde reddeder.",
+      "status_reason": "DocPerm kaynağı doğrulandı. Özel DocType izinleri app_file.write ile artık engellenmez (önizleme rolleri önce/sonra listeler, Guest/All'ı açıklar); ayrı tipli izin değişikliği türü planlı.",
       "authority": [
         "app_developer"
       ],
@@ -2508,7 +2508,7 @@
       "preconditions": [
         {
           "id": "workspace.write_scope",
-          "description": "Resmi uygulama deposu/paketi (resmi modül adı + hooks.py) salt okunur; .git/.env/.github gibi gizli bileşenli yollar, sites/env/logs/node_modules ve secret/config/veritabanı/ikili dosya adları yazılmaz (runtime kod kuralı).",
+          "description": "Mutlak sınırlar: gizli/secret/state/çalışma zamanı yolları (sites/env/logs/node_modules dahil), .git/.github/.env, workspace dışı ve sembolik bağ, büyük/küçük harf uyuşmazlığı, [REDACTED] içerik, boyut ve uzantı sınırı. Core = yalnız resmi uygulama deposu/paketi (press dahil) içindeki dosyalar: varsayılan olarak reddedilir; ilk istek core_warning döner (öneri yok, istek özetine bağlı tek kullanımlık uyarı); kullanıcı aynı değişikliği açıkça yeniden isterse çift onaylı öneri oluşur (APPROVE <digest12> + CORE <uygulama>; ayrıştırılamıyorsa CORE UNCHECKED <uygulama>). Özel koddaki resmi modül yaması (EXT001) bu akışa girmez; önizlemede risk uyarısıdır.",
           "machine": false
         },
         {
@@ -2517,8 +2517,8 @@
           "machine": false
         },
         {
-          "id": "file.no_permission_change",
-          "description": "DocType JSON permissions değişikliği, izinli yeni DocType JSON'u ve izin/rol fixture'ı yazılmaz; resmi uygulamalar (press dahil) salt okunur.",
+          "id": "file.permission_change_reviewed",
+          "description": "DocType JSON permissions değişikliği, izinli yeni DocType JSON'u ve izin/rol fixture'ı engellenmez (özel geliştirme yetkili); önizleme rolleri önce/sonra listeler ve Guest/All erişimini açıklar.",
           "machine": false
         },
         {
@@ -2528,7 +2528,7 @@
         },
         {
           "id": "python.rules_clean",
-          "description": "Python içeriği EXT001 (resmi modül monkey patch) ve SEC002 (biçimlenmiş SQL) içermez.",
+          "description": "SEC002 (biçimlenmiş SQL) ve SEC003-error (guest uçta ignore_permissions) reddedilir; özel koddaki EXT001 (resmi modül yaması) engellenmez, önizlemede 'Warning EXT001 line N' risk uyarısıdır.",
           "machine": false
         }
       ],
@@ -2545,9 +2545,14 @@
             "next": "Uygulama içinde izinli bir yol seç"
           },
           {
-            "signal": "official_app_read_only",
-            "meaning": "Resmi uygulama deposu/paketi salt okunur",
-            "next": "Değişikliği kendi uygulamanda hooks/fixtures ile yap"
+            "signal": "core_warning",
+            "meaning": "İlk istek resmi uygulama deposu/paketi içindeki bir dosyaya dokunuyor; öneri oluşmaz, uyarı döner (core özeti {apps, files})",
+            "next": "Önce genişletme noktalarını öner; kullanıcı açıkça tekrar isterse aynı argümanlarla ikinci çağrı çift onaylı öneri oluşturur"
+          },
+          {
+            "signal": "core_not_approved",
+            "meaning": "app_apply, CORE onayı olmayan ya da öneride listelenmeyen core yoluna yazmak istedi",
+            "next": "Öneriyi CORE ifadesiyle yeniden onaylat"
           },
           {
             "signal": "conflict",
@@ -2580,14 +2585,9 @@
             "next": "Listelenen yolları git ile insan düzeltir"
           },
           {
-            "signal": "permission_change_refused",
-            "meaning": "DocType izinleri, izinli yeni DocType veya izin/rol fixture'ı",
-            "next": "İzin değişikliği ayrı incelemeyle insan tarafından yapılır (doctype.permissions planned)"
-          },
-          {
-            "signal": "blocked rule (EXT001 / SEC002)",
-            "meaning": "Monkey patch veya biçimlenmiş SQL",
-            "next": "Genişletme noktası ve parametreli sorgu kullan"
+            "signal": "blocked rule (SEC002 / SEC003)",
+            "meaning": "Biçimlenmiş SQL ya da guest uçta ignore_permissions",
+            "next": "Parametreli sorgu kullan; guest uçta izin denetimini koru"
           },
           {
             "signal": "writes_disabled",
@@ -2617,7 +2617,10 @@
       },
       "notes": [
         "Diğer değişiklik türleri iskelet üretir; bu işlem geliştiricinin yazdığı gerçek kod ve testler içindir.",
-        "approval single; UNCHECKED dosyada (sunucu Python'u hedefe yetişmiyor) runtime çift onay ister: 'UNCHECKED <yol>'."
+        "approval single; UNCHECKED dosyada (sunucu Python'u hedefe yetişmiyor) runtime çift onay ister: 'UNCHECKED <yol>'.",
+        "Core dosyası değişikliğinde onay double'dır: CORE <uygulama> (ayrıştırılamıyorsa CORE UNCHECKED <uygulama>); core uyarısı ve tekrar akışıdır, model bayrağı yoktur.",
+        "Özel koddaki EXT001 (resmi modül yaması) engellenmez ve core onayına girmez; onay single kalır (UNCHECKED dosyada çift), hooks/override/extend tercih edilir.",
+        "İzin değişikliği engellenmez; önizlemedeki önce/sonra rol listesi ve Guest/All notu insan onayının dayanağıdır."
       ]
     }
   ]

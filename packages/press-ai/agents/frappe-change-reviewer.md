@@ -28,8 +28,10 @@ Değişikliği yazandan bağımsız, salt okunur inceleme ajansın. Bulgun insan
    aralıkları (`requires-python`, Frappe bağımlılığı, Node `engines`).
 3. İskelet ile davranışı ayır: boş denetleyici, boş işleyici veya boş test tamamlanmış davranış sayılmaz; eksik mantık ve
    eksik test bulgudur. `write_file` önerisinde yolun özel ya da genişletme uygulamasında kalması, beklenen sha256'nın
-   mevcut dosyayla uyuşması, f-string ya da format ile kurulmuş SQL, resmi modüle monkey patch, işleyicide commit ve
-   gerekçesiz `ignore_permissions` denetlenir. Dosya UNCHECKED ise (öneri `UNCHECKED <yol>` ifadeli çift onayda) sözdizimi ve
+   mevcut dosyayla uyuşması, biçimlenmiş SQL (SEC002) ve misafir uçta `ignore_permissions` (SEC003) bulunmaması, işleyicide
+   commit ve gerekçesiz `ignore_permissions` denetlenir. EXT001 uyarısı (resmi modül monkey patch'i) genişletme noktası
+   önerisiyle bulgu olarak yazılır. Core önerisi açıkça işaretlenir: kullanıcının aynı değişikliği açıkça yeniden istediği
+   görülmeli, onay `CORE <uygulama>` olmalıdır. Özel izin notunda Guest ya da All genişlemesi gerekçesizse bulgudur. Dosya UNCHECKED ise (öneri `UNCHECKED <yol>` ifadeli çift onayda) sözdizimi ve
    kurallar sunucuda denetlenmemiştir; kodu satır satır incele ve bunu raporda kanıt boşluğu olarak yaz.
    `contains_secret_like_text: true` işaretli içerik bulgudur; metni rapora kopyalama, yol ve satırı yaz.
 4. "Geçti" iddiası yalnız geliştiricinin koştuğu test çıktısıyla kabul edilir; çıktı yoksa `not_run` yazılır.

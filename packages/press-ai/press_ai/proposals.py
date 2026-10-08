@@ -113,6 +113,37 @@ class ProposalStore:
             raise ApprovalError("Proposal content does not match its digest", code="state_tampered")
         return record
 
+    # -- orijinal core uyarısı ---------------------------------------------------------------------
+    def core_gate(self, request_digest: str, summary: dict) -> dict | None:
+        """Orijinal core değişikliğinin ilk isteği tek kullanımlık bir uyarı kaydı yazar ve onu döndürür; öneri
+        oluşmaz. Aynı istek (aynı özet) uyarı süresi içinde yeniden gelirse kayıt tüketilir ve None döner: öneri CORE
+        onayıyla oluşturulabilir. Bu bir onay değildir; onay yine ayrı terminalde insanla yazılır."""
+        if not isinstance(request_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", request_digest):
+            raise KitError("invalid request digest")
+        path = os.path.join(self._dir("core_warnings"), request_digest + ".json")
+        now = self.clock()
+        existing = self._read(path)
+        if existing is not None:
+            try:
+                os.unlink(path)  # tek kullanım; yarışta ikinci istek yeni bir uyarı alır
+                live = existing.get("request_digest") == request_digest and parse_iso(existing["expires_at"]) > now
+            except FileNotFoundError:
+                live = False
+            except (KeyError, TypeError, ValueError):
+                live = False
+            if live:
+                self.audit({"event": "core_warning_repeated", "request_digest": request_digest})
+                return None
+        record = {"request_digest": request_digest, "created_at": iso(now),
+                  "expires_at": iso(now + _dt.timedelta(seconds=self.config.proposal_ttl)), "summary": summary}
+        try:
+            write_private_file(path, canonical_json(record), exclusive=True)
+        except FileExistsError:
+            return self._read(path) or record  # aynı anda gelen eş istek uyarıyı yazdı
+        self.audit({"event": "core_warning_issued", "request_digest": request_digest,
+                    "apps": summary.get("apps"), "files": summary.get("files")})
+        return record
+
     def _approval(self, proposal_id: str) -> dict | None:
         return self._read(self._path("approvals", proposal_id))
 

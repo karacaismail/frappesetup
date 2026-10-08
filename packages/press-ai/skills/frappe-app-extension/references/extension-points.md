@@ -58,9 +58,11 @@ A11 `required_apps`, A16 özel alan öneki, A27 son kazanan kancalar, A28 izin k
 
 ## 6. Çekirdek yama ve fork
 
-Resmi uygulamanın dosyasını değiştirmek ya da çatallamak varsayılan değildir ve ajan tarafından yapılmaz. Kullanıcı açıkça
-karar verirse karar kaydı şunları içerir: neden genişletme noktalarının yetmediği, sorumlu kişi, yukarı akışa katkı veya
-dönüş planı, her yükseltmedeki birleştirme maliyeti.
+Resmi uygulamanın dosyasını değiştirmek varsayılan değildir. press-ai'de core akışı: ilk istek `core_warning` döner ve öneri
+oluşmaz; ajan uyarıyı gösterip durur; kullanıcı aynı değişikliği açıkça yeniden isterse öneri oluşur ve ayrı terminalde
+`APPROVE <digest12>` ile `CORE <uygulama>` (doğrulanmamış dosyada `CORE UNCHECKED <uygulama>`) onayı ister; onaysız core yolu
+`core_not_approved` ile reddedilir. Fork ajan tarafından açılmaz. Her iki durumda karar kaydı: neden genişletme noktalarının
+yetmediği, sorumlu kişi, yukarı akışa katkı veya dönüş planı, her yükseltmedeki birleştirme maliyeti.
 
 ## Diğer noktalar
 

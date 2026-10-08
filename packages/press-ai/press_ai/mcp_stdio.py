@@ -19,7 +19,9 @@ INSTRUCTIONS = (
     "press-ai reads Press state with the user's own Press authority and plans Frappe app changes inside a "
     "configured workspace. Start with kit_status and contract_search. Reads are direct. Every mutation is a "
     "proposal (press_propose / app_propose_change) that a human approves in a separate terminal; this server "
-    "has no approve tool and ignores confirm flags. A Press enqueue or HTTP 200 is not success: use press_track. "
+    "has no approve tool and ignores confirm flags. Original core changes are refused by default: show a "
+    "core_warning to the user and repeat the same request only if the user explicitly asks again. "
+    "A Press enqueue or HTTP 200 is not success: use press_track. "
     "If an outcome is unknown, stop and report; do not retry blindly. Shell, SSH and server work are out of scope."
 )
 
