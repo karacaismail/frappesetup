@@ -82,6 +82,16 @@ async function minEffectiveFontPx(page: Page) {
   });
 }
 
+// Tüm Astro adaları hidrasyonunu bitirene kadar bekler (ssr özniteliği hidrasyonda kalkar).
+async function waitForHydration(page: Page) {
+  // client:visible adalar görünür olmadan hidrate olmaz: önce görünür alana getir.
+  await page.evaluate(() => {
+    document.querySelectorAll('astro-island[ssr]').forEach((el) => el.scrollIntoView({ block: 'center' }));
+  });
+  await page.waitForFunction(() => !document.querySelector('astro-island[ssr]'), undefined, { timeout: 20_000 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
 // Mermaid blokları varsa çizimin bitmesini bekler (ölçümler yerleşmiş SVG üzerinde yapılır).
 async function waitForMermaid(page: Page) {
   await page.waitForFunction(
@@ -159,6 +169,7 @@ test.describe('shell', () => {
   test('mobile burger opens navigation without overflow and navigates @touch', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto('');
+    await waitForHydration(page);
     const burger = page.getByRole('button', { name: 'Menüyü aç' });
     await expect(burger).toBeVisible();
     await expect(burger).toHaveAttribute('aria-expanded', 'false');
@@ -177,6 +188,7 @@ test.describe('shell', () => {
   test('desktop navbar lists 15 entries, marks the current page, skip link works', async ({ page, browserName }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('raylar/');
+    await waitForHydration(page);
     const nav = page.getByRole('navigation', { name: 'Bölümler', exact: true });
     await expect(nav.getByRole('link')).toHaveCount(15);
     const current = nav.getByRole('link', { name: 'Raylar', exact: true });
@@ -193,6 +205,7 @@ test.describe('shell', () => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.emulateMedia({ colorScheme: 'light' });
     await page.goto('');
+    await waitForHydration(page);
     await expect(page.locator('html')).toHaveAttribute('data-mantine-color-scheme', 'light');
     await page.getByTestId('color-scheme-toggle').click();
     await expect(page.locator('html')).toHaveAttribute('data-mantine-color-scheme', 'dark');
@@ -221,6 +234,7 @@ test.describe('focus', () => {
   test('mouse never shows a ring; keyboard shows exactly one, radius unchanged', async ({ page, browserName }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('kararlar/');
+    await waitForHydration(page);
 
     // Fare: odaklanabilir bir kontrole (tema düğmesi) ve içeriğe tıkla → hiçbir yerde outline yok.
     const toggle = page.getByTestId('color-scheme-toggle');
@@ -276,6 +290,7 @@ test.describe('requirements explorer', () => {
   test('filters by priority and search with exact counts', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('gereksinimler/');
+    await waitForHydration(page);
     const count = page.getByTestId('req-count');
     await expect(count).toContainText(`${requirements.length} / ${requirements.length}`);
     await page.getByRole('combobox', { name: 'Öncelik' }).click();
@@ -290,6 +305,7 @@ test.describe('requirements explorer', () => {
   test('Select is fully keyboard operable (ArrowDown, Enter, Escape, focus return)', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('gereksinimler/');
+    await waitForHydration(page);
     const combo = page.getByRole('combobox', { name: 'Öncelik' });
     await combo.focus();
     // ArrowDown listeyi açar ve ilk seçeneği (MUST) vurgular; Enter seçer.
@@ -310,6 +326,7 @@ test.describe('requirements explorer', () => {
   test('shows cards at 320px and priority chips filter @touch', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('gereksinimler/');
+    await waitForHydration(page);
     const cards = page.locator('.req-cards .req-card');
     await expect(cards.first()).toBeVisible();
     await expect(cards).toHaveCount(requirements.length);
@@ -322,6 +339,7 @@ test.describe('requirements explorer', () => {
   test('table scrolls inside its own container at 1024px', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.goto('gereksinimler/');
+    await waitForHydration(page);
     const table = page.getByTestId('req-table');
     await table.scrollIntoViewIfNeeded();
     await expect(table).toBeVisible();
@@ -339,6 +357,7 @@ test.describe('requirements explorer', () => {
   test('search text and focus survive orientation change', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('gereksinimler/');
+    await waitForHydration(page);
     const search = page.getByRole('textbox', { name: 'Ara' });
     await search.fill('Keycloak');
     await page.setViewportSize({ width: 844, height: 390 });
