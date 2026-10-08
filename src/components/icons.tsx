@@ -19,7 +19,11 @@ import {
   IconServerCog,
   IconSettings,
   IconShieldCheck,
+  IconBook2,
+  IconPlug,
+  IconRobot,
   IconSparkles,
+  IconTools,
 } from '@tabler/icons-react';
 import type { IconName } from '../data/sections';
 
@@ -46,6 +50,10 @@ export const ICONS: Record<IconName, TablerIcon> = {
   chart: IconChartDots,
   help: IconHelpCircle,
   checklist: IconChecklist,
+  plug: IconPlug,
+  book: IconBook2,
+  robot: IconRobot,
+  tools: IconTools,
   file: IconFileText,
 };
 

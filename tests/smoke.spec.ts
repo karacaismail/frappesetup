@@ -346,7 +346,8 @@ test.describe('shell', () => {
     await page.goto('raylar/');
     await waitForHydration(page);
     const nav = page.getByRole('navigation', { name: 'Bölümler', exact: true });
-    await expect(nav.getByRole('link')).toHaveCount(ALL_PAGES.length);
+    // Kapalı AI grubunun bağlantıları da DOM'dadır (hidden); varsayılan rol sorgusu bunları saymaz.
+    await expect(nav.getByRole('link', { includeHidden: true })).toHaveCount(ALL_PAGES.length);
     const current = nav.getByRole('link', { name: 'Raylar', exact: true });
     await expect(current).toHaveAttribute('data-active', 'true');
     await expect(current).toHaveAttribute('aria-current', 'page');
@@ -460,6 +461,28 @@ async function frameStep(page: Page) {
     };
   });
 }
+
+/* ------------------------------------------------------------------ */
+test.describe('AI nav group', () => {
+  test('wrapper is collapsed elsewhere, open on AI pages, keyboard operable', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto('kararlar/');
+    await waitForHydration(page);
+    const wrapper = page.getByTestId('nav-wrapper-ai');
+    const links = page.locator('#site-nav a[href*="/ai-"]');
+    await expect(wrapper).toBeVisible();
+    await expect(links.first()).toBeHidden();
+    await wrapper.focus();
+    await page.keyboard.press('Enter');
+    await expect(links).toHaveCount(6);
+    await expect(links.first()).toBeVisible();
+
+    await page.goto('ai-mcp/');
+    await waitForHydration(page);
+    await expect(links).toHaveCount(6);
+    await expect(page.locator('#site-nav a[aria-current="page"]')).toHaveText(/MCP sunucuları/);
+  });
+});
 
 /* ------------------------------------------------------------------ */
 test.describe('focus', () => {
