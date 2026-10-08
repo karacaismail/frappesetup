@@ -21,10 +21,16 @@ Yol: `packages/press-ai/agents/<ad>.md` (Claude Code biçimi; ilgili skill önce
 | --- | --- | --- | --- |
 | `press-diagnoser` | Press build, deploy, bench, site ve metrik sorunlarını teşhis eder | Okuma araçları, `press_triage_build`, `press_track` | Öneri, yürütme, onay |
 | `press-operator` | Öneri hazırlar, onaylanmış öneriyi bir kez yürütür, izler | Okuma, `press_propose`, `press_execute`, `press_track` | Onay vermek, dosya yazmak, kabuk, SSH |
-| `frappe-app-developer` | Yapıyı okur, statik denetler; iskeleti ve gerçek kodu (`write_file`) önerir, onay sonrası yazar | `app_inspect`, `app_check`, `app_propose_change`, `app_apply`; Press'te yalnız `press_read` | Doğrudan dosya yazmak, resmi uygulamaya (Press dahil) yazmak, izin değişikliğini kodla yazmak, Press'te öneri ve yürütme, bench, test çıktısı olmadan "geçti" demek |
+| `frappe-app-developer` | Yapıyı okur, statik denetler; iskeleti ve gerçek kodu (`write_file`) önerir, onay sonrası yazar | `app_inspect`, `app_check`, `app_propose_change`, `app_apply`; Press'te yalnız `press_read` | Doğrudan dosya yazmak, core akışı dışında resmi uygulamaya (Press dahil) yazmak, Press'te öneri ve yürütme, bench, test çıktısı olmadan "geçti" demek |
 | `frappe-change-reviewer` | Uygulama ve Press önerilerini bağımsız inceler | Okuma, `app_check`, `press_read` | Onay, yazma, puan |
 
 Onay akışı: ajan öneriyi hazırlar ve durur; insan ayrı terminalde onay komutunu çalıştırır; ajan sonraki çağrıda öneri durumunu okur, `approved` ise bir kez yürütür ve sonucu izler. Komut ve kurulum [geliştirme planındadır](/frappesetup/ai-gelistirme/).
+
+## İndir
+
+Ajan dosyası tek başına `.claude/agents/` altına konur; ajanlar ilgili skill'leri önceden yükler. Skill'ler ve başvurularla birlikte kurmak için tüm paket kullanılır.
+
+<div data-embed="dl-agents"></div>
 
 ## Hazır ajan uygulamaları: kanıt
 

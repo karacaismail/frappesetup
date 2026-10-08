@@ -30,9 +30,15 @@ AGPL bileşenleri (Flow, huf, Jarvis, Ask ALYF, Raven) kendi kodumuzla aynı sü
 | Paylaşılan başvurular | `packages/press-ai/references/` | Press modeli ve gizli alanlar, devirler, Frappe modeli, senaryolar |
 | Testler | `packages/press-ai/tests/` | Sonuç sayısı son koşudan; bu sayfada sayı yazılmaz |
 
+## İndir
+
+Tüm paket ZIP'i depo yerleşimini izler: kökte lisans dosyaları ve `packages/press-ai/`. Aşağıdaki komutlar ZIP'in açıldığı dizinde de aynen çalışır.
+
+<div data-embed="dl-package"></div>
+
 ## Kurulum ve çalıştırma
 
-1. Depo public ve açık kaynaktır (kod MIT, içerik CC BY 4.0): `git clone https://github.com/karacaismail/frappesetup.git`. Python 3.9+ yeterlidir; ek paket yoktur.
+1. Depo public ve açık kaynaktır (kod MIT, içerik CC BY 4.0): `git clone https://github.com/karacaismail/frappesetup.git` ya da yukarıdaki tüm paket ZIP'i. Python 3.9+ yeterlidir; ek paket yoktur.
 2. Yapılandırma: base host, rol (`team` ya da `operator`), takım ve izinli workspace kökü. API anahtarı keychain'de ya da yalnız sahibinin okuyabildiği dosyadadır; depoya, sohbete ve belgelere yazılmaz.
 3. Denetim ve testler:
 
@@ -66,7 +72,7 @@ AGPL bileşenleri (Flow, huf, Jarvis, Ask ALYF, Raven) kendi kodumuzla aynı sü
 - Deploy önizlemesi otomatik güncellenecek site kümesini (Broken siteler ayrı) listeler ve onay ifadesi otomatik migrate'i içerir; 500'den fazla sitede önizleme eksikse öneri engellenir. Build, image, sunucu platformu ve site kümesi önizlemede sabitlenir, yürütmede farklıysa yürütme engellenir.
 - Deploy başarısı her beklenen sunucuda okunur: bench Active, New Bench işi Success ve bench'in build'i onaylanan build.
 - Uygulama kurulumu ücretli plan seçmez; ücretli Marketplace planı hesap sahibindedir.
-- Uygulama kodu tek dosyalık onaylı öneriyle yazılır, çalıştırılmaz; resmi uygulamaların deposu salt okunurdur; "geçti" yalnız geliştiricinin test çıktısıyla söylenir.
+- Uygulama kodu tek dosyalık onaylı öneriyle yazılır, çalıştırılmaz; resmi uygulama dosyası varsayılan olarak reddedilir, yalnız uyarı, kullanıcının açık tekrarı ve `CORE <uygulama>` onayıyla yazılır; "geçti" yalnız geliştiricinin test çıktısıyla söylenir.
 
 ## Kalan sınırlar
 

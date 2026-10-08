@@ -600,6 +600,7 @@ const STANDALONE_CONTROLS = [
   '.pager-link',
   '.footer-link',
   '.btn',
+  '.dl-link',
   '.more',
   '.rail',
   '.section-card',
@@ -636,7 +637,7 @@ async function expectHitAreas(page: Page, expectCoarse: boolean) {
 test.describe('touch targets', () => {
   test('standalone controls keep a 44 px hit area with a fine pointer', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
-    for (const path of ['', 'kararlar/', 'rail-4-keycloak/', 'gereksinimler/']) {
+    for (const path of ['', 'kararlar/', 'rail-4-keycloak/', 'gereksinimler/', 'ai-skills/']) {
       await page.goto(path);
       await waitForHydration(page);
       await waitForMermaid(page);
@@ -656,6 +657,9 @@ test.describe('touch targets', () => {
     await page.goto('gereksinimler/');
     await waitForHydration(page);
     await page.locator('.req-more > summary').tap();
+    await expectHitAreas(page, true);
+    await page.goto('ai-skills/');
+    await waitForHydration(page);
     await expectHitAreas(page, true);
   });
 });

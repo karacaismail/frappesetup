@@ -4,6 +4,7 @@ import { IconArrowLeft, IconArrowRight, IconClock } from '@tabler/icons-react';
 import Site from '../layouts/Site.astro';
 import Mermaid from '../components/Mermaid.tsx';
 import PhaseTable from '../components/PhaseTable.astro';
+import PressAiDownloads from '../components/PressAiDownloads.astro';
 import RequirementsExplorer from '../components/RequirementsExplorer.tsx';
 import Rails from '../components/Rails.astro';
 import RequirementSummary from '../components/RequirementSummary.astro';
@@ -37,6 +38,11 @@ const EMBEDS: Record<string, string[]> = {
   raylar: ['rails'],
   'yol-haritasi': ['phase-table', 'timeline'],
   gereksinimler: ['req-summary'],
+  // press-ai indirme blokları (dl-<grup>): statik bağlantılar, dosyalar derlemede üretilir.
+  'ai-mcp': ['dl-mcp'],
+  'ai-skills': ['dl-skills'],
+  'ai-agents': ['dl-agents'],
+  'ai-gelistirme': ['dl-package'],
 };
 const embeds = EMBEDS[entry.id] ?? [];
 ---
@@ -78,6 +84,16 @@ const embeds = EMBEDS[entry.id] ?? [];
           <RequirementSummary />
         </div>
       )
+    }
+
+    {
+      embeds
+        .filter((e) => e.startsWith('dl-'))
+        .map((e) => (
+          <div data-embed-source={e}>
+            <PressAiDownloads group={e.slice(3) as 'mcp' | 'skills' | 'agents' | 'package'} />
+          </div>
+        ))
     }
 
     {

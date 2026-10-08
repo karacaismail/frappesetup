@@ -1,0 +1,186 @@
+---
+// press-ai indirme bloğu (statik HTML, JS yok). Dosyalar derlemede scripts/press-ai-downloads.mjs ile üretilir;
+// boyut ve SHA-256 aynı derlemenin manifestinden okunur. Bağlantılar aynı kökenli `download` bağlantılarıdır.
+// Düğme görünümü ana sayfadaki .btn ile aynı token'lardan gelir; odak global :focus-visible kuralıdır.
+import { readPressAiManifest } from '../../scripts/press-ai-downloads.mjs';
+
+type Group = 'mcp' | 'skills' | 'agents' | 'package';
+type File = { kind: string; name: string; path: string; save: string; bytes: number; sha256: string };
+interface Props {
+  group: Group;
+}
+
+const { group } = Astro.props;
+const manifest: { version: string; files: File[] } = readPressAiManifest();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const href = (f: File | string) => `${base}/downloads/press-ai/${typeof f === 'string' ? f : f.path}`;
+const kb = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const size = (f: File) => `${kb.format(f.bytes / 1024)} KB`;
+const short = (f: File) => f.sha256.slice(0, 12);
+const of = (kind: string) => manifest.files.filter((f) => f.kind === kind);
+const one = (kind: string, name?: string) => manifest.files.find((f) => f.kind === kind && (!name || f.name === name))!;
+
+const pkg = one('package');
+const mcp = one('mcp');
+const skills = of('skill-file').map((file) => ({ name: file.name, file, zip: one('skill-zip', file.name) }));
+const agents = of('agent-file');
+---
+
+<div class="dl" data-group={group}>
+  {
+    group === 'mcp' && (
+      <ul class="dl-list" role="list">
+        <li class="dl-item">
+          <div class="dl-actions">
+            <a class="dl-link" href={href(mcp)} download={mcp.save}>
+              MCP sunucusu (ZIP) <span class="dl-size">{size(mcp)}</span>
+            </a>
+          </div>
+          <p class="dl-meta">server.py, press_ai, kontratlar, örnek yapılandırma · SHA-256 {short(mcp)}</p>
+        </li>
+      </ul>
+    )
+  }
+  {
+    group === 'skills' && (
+      <ul class="dl-list" role="list">
+        {skills.map((s) => (
+          <li class="dl-item">
+            <p class="dl-name">{s.name}</p>
+            <div class="dl-actions">
+              <a
+                class="dl-link"
+                href={href(s.file)}
+                download={s.file.save}
+                aria-label={`SKILL.md ${size(s.file)}, ${s.name}`}
+              >
+                SKILL.md <span class="dl-size">{size(s.file)}</span>
+              </a>
+              <a
+                class="dl-link"
+                href={href(s.zip)}
+                download={s.zip.save}
+                aria-label={`ZIP, başvurularla ${size(s.zip)}, ${s.name}`}
+              >
+                ZIP, başvurularla <span class="dl-size">{size(s.zip)}</span>
+              </a>
+            </div>
+            <p class="dl-meta">SHA-256 {short(s.file)} · {short(s.zip)}</p>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+  {
+    group === 'agents' && (
+      <ul class="dl-list" role="list">
+        {agents.map((a) => (
+          <li class="dl-item">
+            <div class="dl-actions">
+              <a class="dl-link" href={href(a)} download={a.save}>
+                {a.save} <span class="dl-size">{size(a)}</span>
+              </a>
+            </div>
+            <p class="dl-meta">SHA-256 {short(a)}</p>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+  <div class="dl-package">
+    <div class="dl-actions">
+      <a class="dl-link dl-primary" href={href(pkg)} download={pkg.save}>
+        Tüm paket (ZIP) <span class="dl-size">{size(pkg)}</span>
+      </a>
+    </div>
+    <p class="dl-meta">press-ai {manifest.version} · MCP, skills, agents, başvurular, testler · SHA-256 {short(pkg)}</p>
+  </div>
+  <p class="dl-note">
+    ZIP kökü: <code>LICENSE</code> (MIT), <code>LICENSE-CONTENT</code> (CC BY 4.0), <code>packages/press-ai/</code>.
+    Özetler: <a href={href('SHA256SUMS')} download="SHA256SUMS">SHA256SUMS</a>.
+  </p>
+</div>
+
+<style>
+  .dl {
+    display: grid;
+    gap: var(--mantine-spacing-md);
+    margin: var(--mantine-spacing-md) 0 var(--mantine-spacing-lg);
+  }
+  .dl-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--mantine-spacing-md);
+  }
+  .dl-item,
+  .dl-package {
+    margin: 0;
+    display: grid;
+    gap: var(--mantine-spacing-xs);
+  }
+  .dl-name,
+  .dl-meta,
+  .dl-note {
+    margin: 0;
+    font-size: var(--mantine-font-size-sm);
+  }
+  .dl-name {
+    font-weight: var(--fs-weight-strong);
+  }
+  .dl-meta,
+  .dl-note {
+    color: var(--fs-quiet);
+  }
+  .dl-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--mantine-spacing-sm);
+  }
+  /* index.astro .btn ile aynı görünüm (global.css --fs-control-* token'ları); odak yalnız global outline. */
+  .dl-link {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fs-control-gap);
+    min-height: var(--fs-hit);
+    padding: var(--fs-control-pad-block) var(--fs-control-pad-inline);
+    border-radius: var(--mantine-radius-md);
+    background: var(--fs-surface);
+    box-shadow: var(--fs-control-edge);
+    color: var(--fs-ink);
+    text-decoration: none;
+    font-weight: var(--fs-weight-strong);
+    font-size: var(--mantine-font-size-sm);
+    transition:
+      background-color var(--fs-dur) var(--fs-ease),
+      box-shadow var(--fs-dur) var(--fs-ease),
+      transform var(--fs-dur) var(--fs-ease);
+  }
+  .dl-link:hover {
+    background: var(--fs-tint);
+    color: var(--fs-ink);
+  }
+  .dl-primary {
+    background: var(--fs-accent);
+    color: var(--fs-on-accent);
+    box-shadow: var(--fs-shadow-1);
+  }
+  .dl-primary:hover {
+    background: var(--fs-accent-strong);
+    color: var(--fs-on-accent);
+    transform: translateY(var(--fs-control-lift));
+  }
+  .dl-size {
+    font-weight: var(--fs-weight-regular);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dl-link {
+      transition: none;
+    }
+    .dl-primary:hover {
+      transform: none;
+    }
+  }
+</style>

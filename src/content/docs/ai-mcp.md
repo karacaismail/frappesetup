@@ -36,8 +36,14 @@ Notlar: Assistant Core'un riskli yüzeyi `run_python_code` ve `run_database_quer
 - **Kimlik:** kullanıcının kendi Press API anahtarı (keychain ya da yalnız sahibinin okuyabildiği dosya); `team` ve `operator` rolleri. Mutasyonlar yapılandırmada açılmadıkça kapalıdır. `team` rolünde Press, üye olunmayan takım başlığında sessizce varsayılan takıma geçer; araç Press'in çözdüğü takımı yapılandırılanla karşılaştırır.
 - **Onay:** ayrı terminalde, sunucuyla aynı işletim sistemi hesabıyla verilir (`same_os_account`). Model MCP üzerinden onay veremez, ama aynı hesapta kabuk erişimi olan bir süreç onay CLI'sini çalıştırabilir: hız kesicidir, güvenlik sınırı değildir. Ayrı onaylayıcı hesabı desteklenmez.
 - **Yok:** onay aracı; `confirm`, `approved`, `force` alanı; kabuk, SSH, Server Script, ham SQL, ham Python. Eski özel SSH MCP'si ayrı kalır, değiştirilmez ve bu kararların yerine geçmez.
-- **Uygulama araçları** yapı okur, statik kural denetler, iskelet üretir ve tek dosyalık kod önerisini (`write_file`) insan onayından sonra yazar. Kod çalıştırılmaz ve içe aktarılmaz; resmi uygulamaların deposu salt okunurdur. `bench migrate` ve test koşusu insan komutudur; davranış ancak test çıktısıyla doğrulanır.
+- **Uygulama araçları** yapı okur, statik kural denetler, iskelet üretir ve tek dosyalık kod önerisini (`write_file`) insan onayından sonra yazar. Kod çalıştırılmaz ve içe aktarılmaz. Resmi uygulama (core) dosyaları varsayılan olarak reddedilir; yalnız uyarı, kullanıcının açık tekrarı ve `CORE <uygulama>` onayıyla yazılır. Biçimlenmiş SQL (SEC002) ve misafir uçta `ignore_permissions` (SEC003) reddedilir; özel izin değişikliği önizlemede not olarak görünür. `bench migrate` ve test koşusu insan komutudur; davranış ancak test çıktısıyla doğrulanır.
 - **Durum:** taslak. Bağımsız statik inceleme yapıldı; bulguların düzeltmeleri fixture testleriyle doğrulanır. Gerçek MCP istemci oturumu ve canlı Press `not_run`.
+
+### İndir
+
+MCP ZIP'i yalnız çalışma zamanını taşır: `server.py`, `press_ai`, kontratlar, örnek yapılandırma ve lisanslar. Açılan dizinde `python3 -I packages/press-ai/server.py check-contract` ile denetlenir.
+
+<div data-embed="dl-mcp"></div>
 
 Kurulum ve onay komutları [geliştirme planındadır](/frappesetup/ai-gelistirme/); hangi işlemin uygulandığı [Press yetkinliği](/frappesetup/ai-press-yetkinlik/) sayfasındaki kapsam tablosundadır.
 

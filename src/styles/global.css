@@ -33,6 +33,15 @@
   /* Başlığın kenar simge düğmelerinin görsel kutusu (önceki Mantine ActionIcon lg). Etkili alan (--fs-hit) bundan
      büyüktür; fark başlığın iç boşluğuna taşar, simgeler kenar boşluğuna göre aynı hizada kalır. */
   --fs-icon-box: 34px;
+  /* Düğme biçimli kontrol (indirme bağlantıları): iç boşluk, öğe arası, kenar, hover kalkışı ve ağırlık.
+     Ölçüler ana sayfanın .btn görünümüyle aynıdır; odak yalnız global :focus-visible kuralıdır. */
+  --fs-control-pad-block: 0.55rem;
+  --fs-control-pad-inline: 1.1rem;
+  --fs-control-gap: 0.4rem;
+  --fs-control-edge: inset 0 0 0 1px var(--fs-grid);
+  --fs-control-lift: -1px;
+  --fs-weight-strong: 600;
+  --fs-weight-regular: 400;
 }
 
 @media (any-pointer: coarse) {

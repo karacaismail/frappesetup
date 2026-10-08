@@ -21,20 +21,29 @@ Yol: `packages/press-ai/skills/<ad>/SKILL.md`; paylaşılan başvurular `package
 | `press-operations` | Gruba app ekleme, release, candidate, build, deploy, siteye app, migrate, yedek | `kit_status` takımı ve rolü; hedef kimlik; sonucu bilinmeyen öneri yok | Onay vermez; site oluşturma, yasal kutu, ödeme, geri yükleme, SSH |
 | `press-build-triage` | Build Failure, takılan build, belirsiz deploy, bench ya da site işi, "No data" | Build ya da candidate kimliği; Error Log için `operator` | Build, deploy, temizlik başlatmaz |
 | `frappe-custom-app` | Yeni app, DocType, child table, patch, fixture, iş mantığı, test | Hedef Frappe sürümü; lisansı kullanıcı seçer | Dosyayı doğrudan yazmaz (yalnız onaylı öneri); bench çalıştırmaz; test çıktısı olmadan "geçti" demez |
-| `frappe-app-extension` | ERPNext, HRMS gibi resmi uygulamanın davranışını değiştirme | Resmi uygulamanın sabit commit'i; hedef sürüm | Resmi uygulamaya yazmaz; çekirdek yama ve fork yok; v15'te `extend_doctype_class` yok |
+| `frappe-app-extension` | ERPNext, HRMS gibi resmi uygulamanın davranışını değiştirme | Resmi uygulamanın sabit commit'i; hedef sürüm | Çekirdek dosyaya yalnız core akışıyla (uyarı, açık tekrar, CORE onayı) yazar; fork yok; v15'te `extend_doctype_class` yok |
+
+## İndir
+
+Tekil `SKILL.md` tek dosya içindir; başvurularıyla kurmak için skill ZIP'i ya da tüm paket. ZIP'ler `packages/press-ai/` yerleşimindedir; aşağıdaki komutlar açılan dizinde çalışır.
+
+<div data-embed="dl-skills"></div>
 
 ## Kurulum
 
 MCP sunucusu eklentiye gömülü değildir, ayrıca kaydedilir (komut [geliştirme planında](/frappesetup/ai-gelistirme/)); ajanların araç listeleri `mcp__press-ai__` önekini bekler.
 
-```sh
-# Eklenti denetimi ve oturumluk deneme (paketin .claude-plugin/plugin.json manifesti ile)
-claude plugin validate packages/press-ai --strict
-claude --plugin-dir packages/press-ai plugin details press-ai   # 4 skill, 4 ajan, MCP sunucusu 0
-claude --plugin-dir packages/press-ai
-# skill: /press-ai:press-operations, ajan: press-ai:press-operator
+Eklenti denetimi ve oturumluk deneme (paketin `.claude-plugin/plugin.json` manifestiyle; `plugin details` 4 skill, 4 ajan ve 0 MCP sunucusu listeler; skill `/press-ai:press-operations`, ajan `press-ai:press-operator` olarak çağrılır):
 
-# Kalıcı proje kurulumu: skills ve references aynı üst dizinde kalmalı (references kopyalanmazsa contract_get esastır)
+```sh
+claude plugin validate packages/press-ai --strict
+claude --plugin-dir packages/press-ai plugin details press-ai
+claude --plugin-dir packages/press-ai
+```
+
+Kalıcı proje kurulumu; `skills` ve `references` aynı üst dizinde kalır (`references` kopyalanmazsa `contract_get` esastır):
+
+```sh
 mkdir -p .claude/skills .claude/agents
 cp -R packages/press-ai/skills/. .claude/skills/
 cp -R packages/press-ai/references .claude/references

@@ -30,3 +30,6 @@ playwright-report/
 # python
 __pycache__/
 *.pyc
+
+# press-ai indirmeleri (scripts/press-ai-downloads.mjs derlemede üretir)
+/public/downloads/
