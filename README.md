@@ -11,7 +11,7 @@ Yayın: **https://karacaismail.github.io/frappesetup/**
 - [Mermaid 12](https://mermaid.js.org) — markdown içindeki ```` ```mermaid ```` blokları istemcide, yalnız ilgili sayfada çizilir
 - [Playwright](https://playwright.dev) — Chromium / Firefox / WebKit × 320–1366 px kapıları, axe, ağ bütçesi
 - Yazı tipleri: Outfit ve JetBrains Mono (SIL OFL 1.1), fontsource paketleriyle kendinden barındırılır
-- GitHub Pages — `.github/workflows/deploy.yml`: `npm ci`, derleme ve Playwright kapısı geçince Pages artifact'ı yüklenir
+- GitHub Pages — `.github/workflows/deploy.yml`: `press-ai` Python testleri, `npm ci`, derleme ve Playwright kapısı geçince Pages artifact'ı yüklenir
 
 ## Yapı
 
@@ -32,6 +32,7 @@ src/
 tests/smoke.spec.ts        taşma, metin boyutu, sözcük bölünmesi, uzun satır içi kod, odak, dokunma hedefi, tema, gezgin, hidrasyon, diyagram, axe, ağ bütçesi
 tests/visual.spec.ts       Linux görsel regresyon (referanslar tests/__screenshots__)
 tests/consistency.spec.ts  gereksinim/faz/karar/bağlantı tutarlılığı
+packages/press-ai/         Press ve Frappe uygulama geliştirme için stdio MCP sunucusu, kontrat, skills, agents (Python 3.9+ stdlib; kendi README'si)
 ```
 
 ## Komutlar

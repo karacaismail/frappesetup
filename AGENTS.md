@@ -27,6 +27,13 @@ Astro 7 + React 19 + Mantine 9 statik dokümantasyon sitesi; GitHub Pages'te `ht
 - Kenar çubuğunda `AI` grubu (`ai-*` sayfaları: genel bakış, MCP, skills, agents, Press yetkinliği, geliştirme planı) açılır-kapanır tek üst öğedir (`COLLAPSIBLE_GROUPS` → `Shell.tsx` `CollapsibleGroup`: gerçek `<button aria-expanded>` + `hidden` panel; bağlantılar kapalıyken de HTML'dedir). AI sayfalarının içeriği depo incelemesine dayanır; kanıt tarihi ve "bulunamadı" ifadesi korunur, doğrulanmamış yetenek "çalışıyor" diye yazılmaz.
 - Renk şeması: `ColorSchemeScript defaultColorScheme="auto"` + `data-mantine-color-scheme`; koyu tema tokenları `global.css` içinde yeniden tanımlanır.
 
+## AI paketi (`packages/press-ai`)
+
+- Press operasyonları ve Frappe uygulama geliştirme için stdio MCP sunucusu (`press-ai`, 14 araç), operasyon kontratı (`contracts/`), skills, agents. Python 3.9+ yalnız stdlib; site derlemesinden bağımsızdır. Arayüz sözleşmesi `packages/press-ai/INTERFACE.md`; işlem kimlikleri ve araç adları oradan değişir.
+- Yetki: kullanıcının kendi Press API anahtarı (keychain/0600 dosya); `team` (Dashboard API) ve `operator` (Desk, System User) rolleri. Mutasyonlar yapılandırmada açılmadıkça kapalı, her biri öneri → ayrı terminalde insan onayı (`server.py approve`, TTY) → tek seferlik yürütme → `press_track`. Onay aracı yok; onay aynı OS hesabıyla yazılır ve yalnız hız kesicidir (güvenlik sınırı değildir; ayrı onaylayıcı hesabı desteklenmez, `approval.approver_uid` reddedilir). Shell/SSH/Server Script yok; eski yerel SSH MCP'si ayrı kalır ve değiştirilmez.
+- Kontrat ile runtime birbirine testle bağlıdır: `implemented` statüsü, params şeması ve makine ön koşulları runtime'daki kod izin listesine eşit olmalı. Kontrat değişince `python3 -I packages/press-ai/server.py check-contract --guide <pressguide>/src/data/guide.json --sitemap <pressguide>/src/data/press-sitemap.json` 0 hata vermeli ve `ai-press-yetkinlik.md` kapsam bloğu `server.py coverage-markdown` ile yeniden üretilmeli.
+- Kontroller: `python3 -I -m unittest discover -s packages/press-ai/tests` (sahte Press ve fixture uygulamalarla) ve `python3 -I packages/press-ai/server.py check-contract`; ikisi `ci.yml` ve `deploy.yml` içinde Playwright'tan önce koşar (koşucunun python3'ü, pressguide verisi olmadan). `PRESSGUIDE_DATA` verilmezse kılavuz sırası/sitemap kimlik denetimi atlanır. Canlı Press ve gerçek MCP istemci oturumu `not_run`.
+
 ## Arayüz kuralları (kalıcı)
 
 - Standart WCAG 2.2 AA; ortak tipografi ve AI-first kararları `~/.claude/skills/coding-standards/references/ai-first-ui.md`. Bu sitede Outfit ve ≥ 1rem uygulanır; semantik ölçek eşlemesi açık iştir (İzlenebilirlik). axe 4.13.0'da 2.2'ye özgü otomatik kural yalnız `target-size`; diğer 2.2 ölçütleri elle.

@@ -4,96 +4,92 @@ nav: "Geliştirme planı"
 order: 25
 ---
 
-Bu plan, [Press yetkinlik matrisindeki](../ai-press-yetkinlik/) boşlukları ve Frappe'de özel uygulama geliştirme ile resmi uygulamaları genişletme ihtiyacını kapatır. Kural: hazır olanı kullan, eksik olanı küçük ve denetlenebilir parçalarla yaz. Mimari kararlar [Rail 5](../rail-5-ai/) ile uyumludur: Claude Agent SDK, `frappe_mcp`, Keycloak/Press kimliği, önizle + onayla, AI Action Log.
+Bu sayfa [Press yetkinliğindeki](/frappesetup/ai-press-yetkinlik/) boşlukları kapatan `packages/press-ai` paketinin kararlarını, kurulumunu, kabul ölçütlerini ve kalan sınırlarını verir. Kural: hazır olanı kullan, eksik olanı küçük ve denetlenebilir parçalarla yaz. Mimari [Rail 5](/frappesetup/rail-5-ai/) ile uyumludur; bütün SaaS mimarisi bu pakette koda çevrilmez. Durum: kod taslakları var; bağımsız statik inceleme yapıldı, bulguların düzeltmeleri test sonuçlarıyla son koşuda doğrulanır; canlı Press doğrulaması `not_run`.
 
 ## Ne hazır alınır, ne yazılır
 
 | Alan | Hazır kullan | Yaz | Gerekçe |
 | --- | --- | --- | --- |
-| Frappe uygulama geliştirme bilgisi | `frappe/skills` (`frappe-app-dev`, `deep-app-audit`, `code-style`) | Türkiye ve platform_core ince katmanı | Resmi, derin, bakımlı; lisans dosyası netleşene kadar sürüm sabitle |
-| Sözdizimi/hata ansiklopedisi | OpenAEC (seçilmiş skill'ler) | — | Geniş; ama lisans çelişkisi ve doğrulanmamış Press içeriği var |
-| Press teşhisi | Press MCP (`enable_mcp`) | Teşhis sırası skill'i | Araçlar hazır, sıra bilgisi yok |
-| Press kurulum ve dağıtım | — | **Press komut MCP'si + skill'ler** | Hiçbir depo karşılamıyor |
-| Site içi veri araçları | Frappe Assistant Core veya `frappe_mcp` + kendi araçlarımız | `platform_core.ai_tools` | Kullanıcı kimliğiyle, AI Action Log'a yazan araç gerekir |
+| Frappe uygulama geliştirme bilgisi | `frappe/skills` (`frappe-app-dev`, `deep-app-audit`), atıfla | `frappe-custom-app`, `frappe-app-extension` | Resmi ve derin; lisans dosyası yok, metin kopyalanmaz |
+| Press teşhisi | Press içi MCP (`enable_mcp`) | `press-build-triage`, `press-diagnoser` | Araçlar hazır, teşhis sırası yok |
+| Press kurulum ve dağıtım | — | `press-ai` MCP, `press-operations`, `press-operator` | Hiçbir hazır depo onaylı biçimde karşılamıyor |
+| Site içi veri araçları | `frappe/mcp` çatısı ya da kullanıcı kimlikli sunucu | `platform_core` araçları (Rail 5) | Kullanıcı kimliği ve denetim izi gerekir |
 | Kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); Jarvis ve Huf staging'de denenir | Agent servisi (Rail 5) | Keycloak delege token, kiracı kotası, Press kredi ölçümü hiçbirinde yok |
 
 AGPL bileşenleri (Flow, huf, Jarvis, Ask ALYF, Raven) kendi kodumuzla aynı süreçte birleştirilmeden önce lisans uyumu kullanıcıyla netleştirilir; yeni depolara lisans onaysız seçilmez.
 
-## 1. Skill'ler (önce bunlar, en ucuz ve en çok kazanç)
+## Paketin parçaları
 
-Her skill: `SKILL.md` (tetikleyici açıklama, 150 satırı aşmaz) + `references/` + en az üç değerlendirme vakası. İlk kaynak, `pressguide` içindeki canlı kanıtlı adımlardır.
-
-| Skill | İçerik | Kabul ölçütü |
+| Parça | Yol | Durum |
 | --- | --- | --- |
-| `press-release-group` | Team seçimi, sunucu bağlama, uygulama sırası, App Source alanları, "Frappe kutusu yalnız framework" | Beş vakada doğru sıra; yanlış sahiplikte durur |
-| `press-build-deploy` | Create Deploy Candidate → yalnız Build → Success → ayrı Deploy; `Schedule Build and Deploy` uyarısı; formu tekrar göndermeme | "Build Success olmadan deploy" ihlali sıfır |
-| `press-build-triage` | İlk Failure satırı, Pending'i hata saymama, Required app not found, Upload HTTP 500 ve disk %100, boş filtre yorumu | Kılavuzdaki 6 gerçek olayı doğru sınıflar |
-| `press-site-create` | Plan, bölge, yasal kutu (yalnız kullanıcı kabul ederse), Active ≠ başarı, HTTPS ve giriş ayrı doğrulama | Yasal kutuyu kendi işaretlemez |
-| `frappe-custom-app-v16` | `frappe/skills` kurallarına bağlı yeni app iskeleti, `required_apps`, sürüm dalları, fixtures kuralları | `deep-app-audit` temiz |
-| `frappe-extend-official-app` | ERPNext/HRMS gibi resmi uygulamaları genişletme: önce `doc_events` ve Custom Field (kodda), sonra `override_doctype_class` + `super()`, monkey patch yok | Denetim A-serisi kuralları geçer |
-| `platform-core-tr` | Access Rule motoru, Türkiye temel çizgisi, KVKK kuralları | Rail 2 gereksinimlerine izlenir |
+| Arayüz sözleşmesi | `packages/press-ai/INTERFACE.md` | İşlem kimlikleri, araç adları, statü sözlüğü buradan değişir |
+| Operasyon kontratı | `packages/press-ai/contracts/` | Statik kaynak doğrulaması; kapsamı Press yetkinliği sayfasında |
+| MCP runtime ve onay CLI | `packages/press-ai/server.py`, `packages/press-ai/press_ai/` | Taslak; fixture testleri ve CI'da paket testleri |
+| Skill'ler | `packages/press-ai/skills/` | Dört skill; davranış senaryoları yazıldı, koşu `not_run` |
+| Ajanlar | `packages/press-ai/agents/` | Dört tanım; araç listeleri rol ayrımına göre |
+| Paylaşılan başvurular | `packages/press-ai/references/` | Press modeli ve gizli alanlar, devirler, Frappe modeli, senaryolar |
+| Testler | `packages/press-ai/tests/` | Sonuç sayısı son koşudan; bu sayfada sayı yazılmaz |
 
-Not: eval sistemi `frappe-ui/skills/frappe-ui/evals/` yapısından alınır (vaka seti + puanlayıcı betik). Başarısız vaka, skill'i geçerli saymak için gevşetilmez.
+## Kurulum ve çalıştırma
 
-## 2. Press komut MCP'si (`press_tr.mcp.handler` genişletmesi)
+1. Depo public ve açık kaynaktır (kod MIT, içerik CC BY 4.0): `git clone https://github.com/karacaismail/frappesetup.git`. Python 3.9+ yeterlidir; ek paket yoktur.
+2. Yapılandırma: base host, rol (`team` ya da `operator`), takım ve izinli workspace kökü. API anahtarı keychain'de ya da yalnız sahibinin okuyabildiği dosyadadır; depoya, sohbete ve belgelere yazılmaz.
+3. Denetim ve testler:
 
-Mevcut Press MCP salt-teşhis ağırlıklıdır. Komut katmanı **ayrı bir sunucu** olur; kullanıcının kendi Press bearer'ı ile çalışır (G-28), paylaşılan API anahtarı kullanmaz.
+   ```sh
+   python3 -I packages/press-ai/server.py check-contract --guide <pressguide>/src/data/guide.json --sitemap <pressguide>/src/data/press-sitemap.json
+   python3 -I -m unittest discover -s packages/press-ai/tests
+   ```
 
-| Araç | Sınıf | Güvence |
-| --- | --- | --- |
-| `list_release_groups`, `get_release_group`, `get_build`, `get_deploy_status` | okuma | Press izinleri |
-| `preview_add_app_source`, `preview_add_app_to_group` | önizleme | Değişiklik yazmaz; fark ve tek kullanımlık onay jetonu döner |
-| `apply_add_app_source`, `apply_add_app_to_group` | uygulama | Jeton + kullanıcı onayı; idempotent |
-| `create_deploy_candidate` | uygulama | Aynı gruptaki açık candidate'ı yeniden kullanır |
-| `start_build` | uygulama | **Deploy başlatmaz**; yalnız build |
-| `start_deploy` | yüksek risk | Yalnız build Success ve ayrı onay; canlı sitelerin bulunduğu gruplarda ikinci onay |
-| `preview_create_site`, `apply_create_site` | yüksek risk | Yasal kutu ve ödeme yalnız insanda; çift gönderimi engeller |
+4. MCP kaydı (yerel kapsam; ajan araç listeleri `mcp__press-ai__` önekini bekler):
 
-Tasarım ilkeleri:
+   ```sh
+   claude mcp add press-ai -- python3 -I /mutlak/yol/packages/press-ai/server.py serve --config /mutlak/yol/yapılandırma
+   ```
 
-- **Önizle → onayla → uygula** iki ayrı çağrıdır; onay jetonu kullanıcı, işlem ve parametreye bağlıdır, tek kullanımlıktır.
-- **Yan etki sınırları kodla zorlanır**, istemle değil: `start_build` içinde deploy yoktur; `archive`, `drop`, `reboot` araçları bu sunucuda hiç yoktur.
-- **Kararsız API** (`press.api.*`) bir ince adaptör katmanında tutulur; sürüm uyumu testle korunur. Press'e eklenebilecek resmi uç noktalar için yukarı akış katkısı değerlendirilir.
-- Çıktılar Press MCP'nin maskeleme (`redaction`) kuralıyla geçer; araç sonucu "veri" zarfında sunulur (prompt-injection önlemi).
-- Her çağrı AI Action Log'a (kullanıcı, araç, parametre özeti, Agent Job kimliği) yazılır.
-- `frappe_mcp` Frappe v16 uyumu P3 başında kurulumla doğrulanır; olmazsa aynı şema `platform_core` içinde Streamable HTTP uç noktasıdır.
+5. Skill ve ajanlar: oturumluk `claude --plugin-dir packages/press-ai` (önce `claude plugin validate packages/press-ai --strict`) ya da `.claude/` altına kopya (adımlar [Skills](/frappesetup/ai-skills/) sayfasında). MCP sunucusu eklentiye gömülü değildir, 4. adımla ayrıca kaydedilir.
+6. İnsan onayı her öneri için ayrı terminalde, TTY ile:
 
-## 3. Ajanlar (Claude Agent SDK alt ajanları)
+   ```sh
+   python3 -I packages/press-ai/server.py approve <öneri-kimliği> --config /mutlak/yol/yapılandırma
+   ```
 
-| Ajan | Yetki | Çıktı | Bağımsız kontrol |
-| --- | --- | --- | --- |
-| `press-diagnoser` | yalnız okuma (Press MCP) | Hata sınıfı + kanıt + önerilen sonraki adım | Çıktı insan onayına sunulur |
-| `press-operator` | önizleme ve uygulama (komut MCP) | Önizleme fark kartı | Uygulama yalnız kullanıcı onayıyla |
-| `app-builder` | izole bench/worktree içinde kod yazar | Pull request | `app-reviewer` ve CI |
-| `app-reviewer` | yalnız okuma; `deep-app-audit` | Bulgu listesi | Yazan ajanla aynı olamaz |
+## Kabul ölçütleri
 
-İlkeler: yazan ajan kendi işinin tek onaylayıcısı olmaz; ajan oturumu kullanıcı kimliğiyle çalışır ve yetkisini aşamaz; sistem/sunucu sahibi işleri ajana verilmez.
+- Deploy önerisi yalnız aynı build'in tüm adımları Success iken açılır; build ile deploy'u birleştiren yol uygulanmaz.
+- Yürütme sonucu "kabul edildi"dir; başarı yalnız Press durumundan okunur.
+- Yürütme aynı işlem ve hedef için uçuş kilidi alır (süreç ölünce işletim sistemi bırakır), istekten önce sonucu `unknown` kaydeder; zaman aşımı, kesilen yürütme ve sonucu yazılmamış tüketilmiş öneri `unknown`dır ve insan `resolve` ile kapatana kadar o hedefe yeni öneriyi engeller.
+- Onay özete bağlı, tek kullanımlık ve sürelidir; modelde onay aracı ya da `confirm` alanı yoktur.
+- Takım yapılandırmadan gelir; `team` rolünde Press'in çözdüğü takım yapılandırılanla eşleşmeden mutasyon yoktur; operatör rolünde de hedef kaydın takıma ait olduğu okunur.
+- Gizli alanlar (build token, özel anahtar, Agent Job istek verisi, GitHub token, imzalı yedek adresi) hiç istenmez.
+- Yeni release, aynı App Source'u `enable_auto_deploy` açık kullanan bir grup varken, Press'te deploy işareti tanımlıyken ya da bu okunamıyorken önerilmez; insan karar verir.
+- Deploy önizlemesi otomatik güncellenecek site kümesini (Broken siteler ayrı) listeler ve onay ifadesi otomatik migrate'i içerir; 500'den fazla sitede önizleme eksikse öneri engellenir. Build, image, sunucu platformu ve site kümesi önizlemede sabitlenir, yürütmede farklıysa yürütme engellenir.
+- Deploy başarısı her beklenen sunucuda okunur: bench Active, New Bench işi Success ve bench'in build'i onaylanan build.
+- Uygulama kurulumu ücretli plan seçmez; ücretli Marketplace planı hesap sahibindedir.
+- Uygulama kodu tek dosyalık onaylı öneriyle yazılır, çalıştırılmaz; resmi uygulamaların deposu salt okunurdur; "geçti" yalnız geliştiricinin test çıktısıyla söylenir.
 
-## 4. Özel uygulama ve resmi uygulama genişletme akışı
+## Kalan sınırlar
 
-1. `frappe-custom-app-v16` ile iskelet; `required_apps` ve sürüm dalı bildirilir.
-2. Resmi uygulama (ERPNext vb.) davranışı değişecekse sırayla: Custom Field/Property Setter (kodda), `doc_events`, `override_doctype_class` + `super()`; çekirdek dosya değişmez.
-3. `app-reviewer` `deep-app-audit` çalıştırır; bulgu kapanmadan birleştirme yok.
-4. Temiz bench kurulumu testi (`A13`) ve v16 dalıyla derleme CI'da koşar.
-5. Press'te yeni App Source + Release Group ekleme `press-operator` ile **önizleme** olarak hazırlanır; build ve deploy ayrı onaylanır.
+- Canlı Press ve gerçek MCP istemci oturumu `not_run`; kurulu Press'in commit'i bilinmiyor. CI (ci.yml, deploy.yml) paket birim testlerini ve kontrat denetimini koşar; kılavuz sırası ve sitemap denetimi yalnız yerelde kılavuz verisiyle (`PRESSGUIDE_DATA`) yapılır.
+- Kimlik kişisel API anahtarı ya da System User'dır; planlanan OAuth2 delegasyonu (G-28) ve servis kimlikleri (G-82) yoktur.
+- Onay sunucuyla aynı işletim sistemi hesabında yazılır (`same_os_account`); aynı hesapta kabuk erişimi olan bir süreç onay CLI'sini çalıştırabilir. Bu hız kesicidir, güvenlik sınırı değildir. Ayrı onaylayıcı hesabı desteklenmez; `approval.approver_uid` yapılandırmada reddedilir.
+- AI denetim izi ve Press defterine kredi ölçümü (G-87, G-92) pakette yoktur.
+- Uygulanmayan işler: site oluşturma, yasal kutu, ödeme, geri yükleme, sunucu ekleme, SSH, registry, DNS, Press kod düzeltmesinin kurulumu.
+- Frappe sürüm kuralları v15 ve v16 dallarının statik okumasıdır; hedef sürüm bilinmeden sürüme bağlı karar `unknown` kalır.
+- Prompt injection savunması (G-89) ajan kurallarında Press çıktısını güvenilmeyen veri saymaktan ibarettir; güvenlik test programı (X-14) koşulmadı.
 
-## 5. Aşamalar, sahipler, kabul
+## Sonraki aşamalar
 
 | Aşama | Görev | Sahip | Bağımlılık | Kabul |
 | --- | --- | --- | --- | --- |
-| A0 | Press'te `enable_mcp` açmanın etkisini incelemek, System User hesabı ve IP allowlist | Hüseyin Cengiz | — | Okuma araçları yalnız izinli ağdan çalışır; mevcut servisler yeniden başlatılmaz |
-| A1 | İlk üç skill (`press-release-group`, `press-build-deploy`, `press-build-triage`) + eval | Geliştirme ekibi | pressguide | 3 vaka × 3 skill geçer |
-| A2 | `press-diagnoser` (yalnız okuma) | Geliştirme ekibi | A0, A1 | Kılavuzdaki Upload HTTP 500 olayını doğru sınıflar |
-| A3 | Komut MCP'si: okuma + önizleme araçları | Geliştirme ekibi | A2 | Önizleme hiçbir şey yazmaz (test) |
-| A4 | Uygulama araçları, onay jetonu, AI Action Log | Geliştirme ekibi; güvenlik incelemesi Hüseyin Cengiz | A3 | Jeton olmadan uygulama reddedilir; çift gönderim engellenir |
-| A5 | DNS ve alan adı gereksinimi çıktısı | Hüseyin Cengiz hazırlar, Asistan Hüseyin GoDaddy'de uygular, Hüseyin Cengiz doğrular | A3 | Ajan DNS'e dokunmaz; yalnız kayıt gereksinimi üretir |
-| A6 | Uygulama geliştirme ajanları (`app-builder`, `app-reviewer`) | Geliştirme ekibi | A1 | Bir örnek özel uygulama denetimden geçer |
+| A1 | Fixture testleri, bağımsız inceleme, senaryo koşusu | Geliştirme ekibi | — | Testler ve senaryolar geçer; başarısız vaka gevşetilmez |
+| A2 | Canlı olmayan bir Press ortamında yalnız okuma araçları | Geliştirme ekibi; ortam Hüseyin Cengiz | A1 | Okuma sonuçları kontrat alanlarıyla eşleşir; gizli alan dönmez |
+| A3 | Aynı ortamda tek zincir: app ekleme, release, candidate, build, deploy | Geliştirme ekibi; altyapı Hüseyin Cengiz | A2 | Her adımda insan onayı; build Success olmadan deploy önerisi reddedilir |
+| A4 | DNS gereksinimi çıktısı | Hüseyin Cengiz hazırlar, Asistan Hüseyin GoDaddy'de uygular, Hüseyin Cengiz doğrular | A3 | Ajan DNS'e dokunmaz; yalnız kayıt gereksinimi üretir |
+| A5 | OAuth2 delegasyonu ve AI denetim izi | Geliştirme ekibi | Rail 5 | G-28 ve G-87 kabul ölçütleri |
 
-Güvenlik testleri (X-14) her aşamanın kapısıdır: prompt-injection içeren bir destek talebi metninin araç çağrısını yönlendirememesi, çift gönderim, yetkisiz kullanıcı, jeton yeniden kullanımı.
+## Riskler
 
-## 6. Riskler
-
-- `press.api.*` kararlı sözleşme değildir; adaptör testleri her Press sürümünde koşar.
-- Yazma yetkili bir MCP, tek hatada canlı sitelere dokunabilir; bu yüzden `start_deploy` ayrı ve ikinci onaylıdır.
-- Lisans: yeni depolar için lisansı kullanıcı onaylamadan seçmeyiz; AGPL bileşenleri aynı süreçte karıştırmayız.
-- Bu sayfa depo incelemesine dayanır; hiçbir hazır araç canlı Press'te denenmedi. Her araç, bizim test ortamımızda doğrulanmadan "çalışıyor" sayılmaz.
+- `press.api.*` kararlı genel sözleşme değildir; her Press sürümünde kontrat yeniden doğrulanır.
+- Yazma yetkili bir MCP tek hatada canlı sitelere dokunabilir. Deploy ve migrate çift onaylıdır; deploy onayı, otomatik güncellemesi açık sitelerin kendiliğinden migrate olmasını da kapsar. Mutasyonlar yapılandırmada açılmadıkça kapalıdır.
+- Bu sayfa statik kaynak okumasına dayanır; hiçbir araç bizim ortamımızda doğrulanmadan "çalışıyor" sayılmaz.

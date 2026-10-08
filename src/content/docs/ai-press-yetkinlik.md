@@ -4,48 +4,67 @@ nav: "Press yetkinliği"
 order: 24
 ---
 
-Soru şudur: [Press kılavuzundaki](https://karacaismail.github.io/pressguide/) işlemleri mevcut skill, MCP ve ajan depoları yapabilir mi? Kılavuz sekiz ana adım ve ek yardımcı işlemlerden oluşur (Release Group, sunucu, app ekleme, App Source, Deploy Candidate, build/deploy, site oluşturma, hata teşhisi). Karşılaştırma üç kaynağa dayanır: dokuz topluluk MCP'si, resmi `frappe/press` içindeki Press MCP'si (`press/mcp`) ve `huf` ajanı. Tarih: 8 Ekim 2026; yüzeysel klonlar okundu, hiçbir araç çalıştırılmadı.
+Soru: [Press kılavuzundaki](https://karacaismail.github.io/pressguide/) işlemlerden hangisi hangi araçla yapılabilir ve hangi kural nerede zorlanır? Kapsam tablosu paketin operasyon kontratından (`packages/press-ai/contracts/`) üretilir; elle yazılmaz. Kaynaklar: frappe/press develop `ebf3e22` (statik), pressguide `2b83441` (67 adım: 54 canlı, 13 tarihsel). Kurulu Press'in commit'i bilinmiyor; canlı uyum `unknown`, canlı Press doğrulaması `not_run`.
 
-## Okuma anahtarı
+## Statüler
 
-- **Tam**: işlem için ayrılmış araç var.
-- **Kısmi**: dolaylı yol var (genel istek aracı, ham API çağrısı) veya yalnız bazı alt adımlar.
-- **Yok**: araç bulunamadı.
-- **İnsan**: kılavuz bilinçli olarak insan onayı veya altyapı sahibi ister.
+- `implemented` (uygulandı): runtime işlemi yürütür (öneri, insan onayı, yürütme, izleme) ya da okumayı yapar; fixture testi vardır.
+- `read_only`: MCP durumu okur; eylemi insan arayüzde yapar.
+- `planned`: kaynak doğrulandı, bilerek henüz uygulanmadı.
+- `unsupported`: bu MCP'nin yetkisiyle yapılmaz (SSH, GoDaddy, yasal kutu, ödeme, yıkıcı işlem); devir zorunlu.
+- `not_applicable`, `unknown`: işlem değil ya da kaynak doğrulanamadı.
 
-## Matris
+Kılavuzun arayüz haritasındaki 11 729 düğüm işlev kanıtı değildir (hepsi `executed: false`, `functionalTest: not_run`, `auditPhase: in_progress`).
 
-| # | Press işlemi | Press API'de karşılığı | Press MCP | Topluluk MCP | huf ajanı | Skill |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | Release Group oluştur (Team, Version) | `press.api.bench.new` | Yok | Yok | Kısmi (`bench.new`, bench olarak) | Yok |
-| 2 | Hazır app sunucusunu bağla | `Release Group.add_server` | Yok | Yok | Yok | Yok |
-| 3 | Uygulamaları sırayla ekle | `press.api.bench.add_app(s)` | Yok | Yok | Kısmi (`add_app`) | Yok |
-| 4 | App Source formu (repo, branch, Frappe kutusu) | `press.api.app.new`, App Source DocType | Yok | Yok | Yok | Yok |
-| 5 | Deploy Candidate oluştur | `Release Group.create_deploy_candidate` | Yok | Yok | Yok | Yok |
-| 6 | Build başlat, sonra ayrı deploy | `Deploy Candidate Build.build/deploy`, `bench.deploy` | Yok | Yok | Yok | Yok |
-| 7 | Site oluştur (plan, bölge, yasal kutu) | `press.api.site.new` | Yok | Kısmi (skaslam1407 `fc_request`) | Kısmi (`site.new`) | Kısmi (genel) |
-| 8 | Build hatasını izle (Build Steps, Agent Job) | DocType okuma | **Tam** (`get_document`, `get_agent_jobs_for_document`) | Yok | Kısmi | Yok |
-| 9 | Disk, Nginx, Redis, log teşhisi | sunucu komutları | **Tam** (`get_disk_usage_in_*`, `tail_*`, `grep_*`, `get_server_storage_breakdown`) | Yok | Yok | Yok |
-| 10 | Telemetri, yavaşlık, hata eğilimi | Prometheus/Elasticsearch | **Tam** (~30 araç) | Yok | Yok | Yok |
-| 11 | Güvenli temizlik (`docker builder prune`) | SSH | İnsan (yalnız supervisor/systemctl komutları, `confirm`) | Yok | Yok | Yok |
-| 12 | Servis yeniden başlatma | `restart_bench`, `reboot_in_server` | Tam (`confirm` ister) | Yok | Kısmi | Yok |
-| 13 | DNS kaydı (GoDaddy) | Press dışı | İnsan | Yok | Yok | Yok |
-| 14 | Yasal kutu ve ödeme onayı | Dashboard formu | İnsan | İnsan | İnsan | İnsan |
+## Kapsam
 
-## Okumalar
+<!-- press-ai:coverage:start -->
 
-1. **Teşhis (satır 8–10) hazır ve güçlüdür.** Press MCP kılavuzdaki "Build Steps → ilk Failure → Output", "Agent Job" ve "`df -h`, Nginx error.log, `docker system df`" okumalarının büyük bölümünü karşılar. Gizli değerler maskelenir (`guardrails/redaction.py`) ve yazma eylemleri `confirm=True` ister. Yalnız System Manager ve System User erişir.
-2. **Kurulum ve dağıtım (satır 1–7) için hazır, onaylı ve denetli hiçbir araç yoktur.** En yakın şey `huf`'un ham `press.api.*` çağrılarıdır; bunlar Release Group, App Source, Deploy Candidate ve build/deploy ayrımını modellemez, yıkıcı araçlarda onay bayrağı bulunamadı ve Press'in kararlı olmayan iç API'sine bağlıdır.
-3. **Kılavuzun asıl değeri sıralama kuralıdır**, hiçbir depoda yoktur: "build Success olmadan deploy yok", "form gönderildiyse sonuç görülmeden tekrar gönderme", "Required app not found önce App/Source bağımlılığına bakılır", "Pending satırlarını hata sayma", "boş filtreyi 'iş yok' diye yorumlama". Bunlar skill olarak yazılmalıdır.
-4. **Sınır işleri insanda kalır** (satır 11, 13, 14): servis yeniden başlatma ve disk temizliği (Hüseyin Cengiz), GoDaddy DNS (Asistan Hüseyin uygular, Hüseyin Cengiz doğrular), bölgesel yasal kutunun kabulü ve ödeme. Bir ajan bunları kendi başına yapmamalı; "hazırla, önizle, onay iste" ile sınırlanmalıdır.
-5. **Mevcut depolar Frappe izinleri açısından uygun değildir.** Press işlemleri Frappe Cloud/Press'in Team ve rol modeline göredir; harici proxy'lerdeki paylaşılan API anahtarı bu modeli aşar. Çözüm, kullanıcı başına Press bearer ile çalışan bir MCP'dir (mimaride `press_tr.mcp.handler`, G-28).
+| Aile | uygulandı | salt okuma | planlı | desteklenmez | uygulanamaz | bilinmiyor | Toplam |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| App, Source, Release Group | 7 | 0 | 6 | 0 | 0 | 0 | 13 |
+| Candidate, build, deploy | 8 | 0 | 1 | 1 | 0 | 0 | 10 |
+| Bench ve site | 7 | 2 | 2 | 0 | 0 | 0 | 11 |
+| İşler ve teşhis | 4 | 0 | 3 | 1 | 0 | 0 | 8 |
+| Yedek | 2 | 0 | 1 | 1 | 0 | 0 | 4 |
+| Sunucu ve altyapı | 2 | 0 | 0 | 7 | 0 | 0 | 9 |
+| Erişim ve ayarlar | 2 | 0 | 1 | 2 | 0 | 0 | 5 |
+| Uygulama geliştirme | 11 | 0 | 3 | 3 | 0 | 0 | 17 |
+| **Toplam** | 43 | 2 | 17 | 15 | 0 | 0 | **77** |
 
-## Sonuç
+Kılavuzun 67 adımı, adımdaki en zayıf işlemin statüsüne göre: 36 uygulandı, 2 salt okuma, 19 planlı, 10 desteklenmez. En az bir işlemi uygulanmış adım: 60. Canlı Press doğrulaması: `not_run`.
 
-| Alan | Durum |
-| --- | --- |
-| Press'i izlemek ve hata aramak | **Hazır** (Press MCP) — bizim ek işimiz: kılavuzdaki teşhis sırasını skill yapmak |
-| Press'te bench/site/app kurmak ve dağıtmak | **Boşluk** — yeni MCP aracı + skill gerekir |
-| Altyapı sahibi işleri (disk, DNS, yasal onay) | **İnsan kapısı** — ajan yalnız hazırlar |
+<!-- press-ai:coverage:end -->
 
-Kapatma planı: [Geliştirme planı](../ai-gelistirme/).
+"Uygulandı" sayısı statik kaynak ve fixture kanıtıdır; paket taslak aşamasındadır, bağımsız statik inceleme bulgularının düzeltmeleri son koşuda doğrulanır.
+
+## Kılavuz kuralları nerede zorlanır
+
+| Kural | Kılavuz adımı | Nerede |
+| --- | --- | --- |
+| Önce build, Success'ten sonra ayrı deploy | `schedule`, `live-build-success` | Deploy önerisi aynı build'in tüm adımları Success iken açılır; Press'in deploy metodu bunu denetlemez |
+| Build ile deploy'u birleştiren yol kullanılmaz | `schedule` | Dashboard'un birleşik deploy çağrısı ve Schedule Build and Deploy uygulanmaz |
+| Bir candidate için tek deploy | `live-build-success` | Press'in tekilleştirmesi build adına bakıp kaydı candidate adıyla yazar; denetim pakette candidate adıyla yapılır |
+| Sonuç görülmeden tekrar gönderilmez | `site`, `preparing` | Öneri tek kullanımlıktır; aynı işlem ve hedef için uçuş kilidi; istekten önce sonuç `unknown`; zaman aşımı ya da kesilen yürütme `unknown` kalır ve insan `resolve` ile kapatana kadar o hedefe yeni öneri açılmaz |
+| Yeni release otomatik deploy tetikleyebilir | `release` | Aynı App Source'u `enable_auto_deploy` açık kullanan herhangi bir grup varsa release önerilmez. Press Settings'te deploy işareti tanımlıysa dağıtılacak grubu commit mesajı belirler; ön koşul doğrulanamaz ve öneri engellenir. Kanıt okunamıyorsa (ör. `team` rolü) da önerilmez, insan karar verir |
+| Deploy çalışan sitelerde migrate'e yol açabilir | `schedule` | Deploy siteleri doğrudan taşımaz; Press'in 15 dakikalık zamanlayıcısı otomatik güncellemesi kapalı olmayan sitelerde migrate dahil güncelleme açar. Önizleme bu kümeyi listeler (Broken siteler ayrı), onay bunu kabul etmektir; 500'den fazla sitede önizleme eksikse öneri engellenir; build, image, platform ve site kümesi yürütmede farklıysa yürütme engellenir |
+| İlk Failure satırı okunur; Pending satırları hata değildir | `hata-tanisi`, `live-upload-row` | `press-build-triage` sırası |
+| Boş filtre "iş yok" ya da "hata yok" değildir | `live-no-error-at-preparing`, `live-no-job-at-preparing` | Terminal durumdan sonra ve filtresiz yeniden okuma |
+| "Required app not found" önce App ve Source bağımlılığıdır | `live-error`, `identity-error` | Sınıflama; düzeltme grup yapılandırmasında |
+| Kuyruğa alınma başarı değildir | `site`, `live-site-active-apps` | Yedek, migrate ve app kurma iş adı döndürmez; sonuç site iş listesinden izlenir; zaten kurulu app `no_op` |
+| "No data" sıfır kullanım değildir | `live-analytics-daily-usage` | Log server yoksa kullanım verisi boş döner |
+| Yasal kutu ve ödeme yalnız insanda | `site`, `live-site-header` | Uygulanmaz; hesap sahibine devir |
+
+## İnsan kapıları
+
+| İş | Sorumlu | Kabul ölçütü |
+| --- | --- | --- |
+| Disk ölçümü, onaylı build cache temizliği, servis yeniden başlatma, registry deposu, sunucu hazırlığı | Hüseyin Cengiz | Önce ve sonra ölçüm; ardından tek build ya da iş sonucu |
+| GoDaddy DNS kaydı | Hüseyin Cengiz kaydı hazırlar ve doğrular; Asistan Hüseyin uygular | Çözümleme ve TLS doğrulaması açık HTTPS sonucu |
+| Bölgesel yasal kutu, ödeme, plan ve ücretli Marketplace planı, site oluşturma formu | Hesap sahibi | İnsanın kendi işlemi; ajan işaretlemez, uygulama kurarken plan seçmez |
+| Press kod düzeltmesi | Geliştirici yazar, bağımsız inceleme; kurulum Hüseyin Cengiz | Yedek ve SHA, önce kırmızı sonra yeşil test, yalnız gereken sürecin yeniden başlatılması |
+| Geri yükleme | Site sahibi karar verir | Yedek durumu ve dosya erişilebilirliği önceden okunur |
+
+## Hazır araçlarla fark
+
+Press içi MCP telemetri, log ve disk teşhisinde güçlüdür ama kurulum ve dağıtım aracı taşımaz. `huf` Press API'sini çağırır ama onay ve takım ayrımı yoktur. skaslam1407'nin genel `fc_request` aracı onay kapılıdır, fakat grup, candidate ve build/deploy ayrımını modellemez. Ayrıntı: [MCP sunucuları](/frappesetup/ai-mcp/).
