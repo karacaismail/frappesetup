@@ -1,0 +1,53 @@
+// Bölüm üst verisi: navigasyon grubu, ikon adı ve tek cümlelik özet.
+// İçeriğin kendisi src/content/docs içindedir; burada yalnızca sunum bilgisi tutulur.
+export type IconName =
+  | 'home'
+  | 'scale'
+  | 'route'
+  | 'server'
+  | 'settings'
+  | 'code'
+  | 'layout'
+  | 'key'
+  | 'sparkles'
+  | 'headset'
+  | 'list'
+  | 'sidebar'
+  | 'apps'
+  | 'map'
+  | 'alert'
+  | 'file';
+
+export interface SectionMeta {
+  group: 'Çerçeve' | 'Raylar' | 'Teslim';
+  icon: IconName;
+  summary: string;
+}
+
+export const GROUP_ORDER: SectionMeta['group'][] = ['Çerçeve', 'Raylar', 'Teslim'];
+
+export const SECTIONS: Record<string, SectionMeta> = {
+  kararlar: { group: 'Çerçeve', icon: 'scale', summary: 'On sabit karar, kapsam sınırı ve roller.' },
+  raylar: { group: 'Çerçeve', icon: 'route', summary: 'Altı rayın sahiplik, sözleşme ve tüketim sınırları.' },
+  'rail-1-press': { group: 'Raylar', icon: 'server', summary: 'Abonelik, plan, marketplace, iyzico ve ödeme planı.' },
+  'rail-2-yapilandirma': { group: 'Raylar', icon: 'settings', summary: 'Kiracı site yapılandırması ve Türkiye temel çizgisi.' },
+  'rail-2-gelistirme': { group: 'Raylar', icon: 'code', summary: 'platform_core: Access Rule motoru, meta API, outbox.' },
+  'rail-3-frontend': { group: 'Raylar', icon: 'layout', summary: 'Headless panel, metadata-driven CRUD ve shell.' },
+  'rail-4-keycloak': { group: 'Raylar', icon: 'key', summary: "Realm, client'lar, SSO/SLO ve identity-sync." },
+  'rail-5-ai': { group: 'Raylar', icon: 'sparkles', summary: 'Agent servisi, MCP, önizle + onayla, KVKK.' },
+  'rail-6-operasyon': { group: 'Raylar', icon: 'headset', summary: 'Superadmin, CRM/Helpdesk, muhasebe ve destek oturumu.' },
+  gereksinimler: { group: 'Teslim', icon: 'list', summary: 'G-1..G-118 ve SA-1..SA-39 ana listesi, süzülebilir gezgin.' },
+  'admin-shell': { group: 'Teslim', icon: 'sidebar', summary: 'Her SaaS admin shell için olmazsa olmazlar.' },
+  'app-cercevesi': { group: 'Teslim', icon: 'apps', summary: 'Satılan her app için çerçeve şablonu.' },
+  'yol-haritasi': { group: 'Teslim', icon: 'map', summary: 'P0–P6 fazları, kapılar ve ilk dikey dilim.' },
+  'acik-kararlar': { group: 'Teslim', icon: 'alert', summary: 'Açık kararlar, riskler ve dış bağımlılıklar.' },
+};
+
+export const RAILS = [
+  { n: 1, name: 'Press', detail: 'Frappe v15 · Python 3.11', slug: 'rail-1-press' },
+  { n: 2, name: 'Kiracı siteleri', detail: 'ERPNext v16 · Frappe v16', slug: 'rail-2-yapilandirma' },
+  { n: 3, name: 'Headless panel', detail: 'React · Ant Design · TanStack', slug: 'rail-3-frontend' },
+  { n: 4, name: 'Keycloak', detail: 'OIDC · Organizations · MFA', slug: 'rail-4-keycloak' },
+  { n: 5, name: 'AI', detail: 'Claude Agent SDK · MCP', slug: 'rail-5-ai' },
+  { n: 6, name: 'Operasyon', detail: 'ERPNext · CRM · Helpdesk', slug: 'rail-6-operasyon' },
+];

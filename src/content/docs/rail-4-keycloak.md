@@ -115,7 +115,7 @@ JWKS 10 dakika önbelleklenir ve bilinmeyen `kid` görülünce yenilenir; saat t
 
 ## 4. Provizyon — identity-sync (G-81)
 
-- Kaynak: Keycloak Event Listener SPI (webhook eklentisi; eklenti seçimi doğrulanacak) + saatlik admin event polling yedeği; olaylar REGISTER, VERIFY\_EMAIL, UPDATE\_EMAIL, DELETE\_ACCOUNT, admin USER create/update/delete, ORGANIZATION\_MEMBERSHIP (doğrulanacak).
+- Kaynak: Keycloak Event Listener SPI (webhook eklentisi; eklenti seçimi doğrulanacak) + saatlik admin event polling yedeği; olaylar REGISTER, VERIFY\_EMAIL, UPDATE\_EMAIL, DELETE\_ACCOUNT, admin USER create/update/delete, `ORGANIZATION_MEMBERSHIP` (doğrulanacak).
 - Hedefler: `press_tr.api.identity.*` (Team/üyelik, `remove_team_member`), `platform_core.api.identity.provision` (System User, `role_profiles`, `enabled`), Admin API ile `site-<kiracı>` client yaşam döngüsü ve secret'ın Site Config'e Password olarak yazımı (G-39, G-112).
 - E-posta değişikliği yalnızca identity-sync üzerinden `rename_doc('User')` ile uygulanır; Keycloak self-service e-posta alanı kapalıdır (G-57). Silme/devre dışı → tüm sitelerde `User.enabled=0` + Press üyeliği kaldırma (X-11).
 - Idempotent, yeniden denemeli, ölü-mektup kuyruğu, gece mutabakatı (Keycloak ↔ Press ↔ kiracı kullanıcı farkı raporu).

@@ -64,7 +64,7 @@ Bu bölüm ürün sahibinin kapatması gereken kararları, planı en çok etkile
 | frappe/mcp | main, "experimental" | v16 uyumu (doğrulanacak) | P3 kurulum testi |
 | ueberdosis/hocuspocus | v4.7.x (MIT) | extension-redis/webhook API'si, Yjs sürümü | Destek oturumu E2E |
 | Keycloak | 26.x (26.8.0, doğrulandı) | Organizations, token exchange V2, Account Console v3 | Realm regresyon + tema E2E |
-| Ant Design / @ant-design/x | v5; v6 tek geçiş ADR ile | breaking changes, X bileşen API'si | Playwright görsel regresyon |
+| Ant Design / `@ant-design/x` | v5; v6 tek geçiş ADR ile | breaking changes, X bileşen API'si | Playwright görsel regresyon |
 | TanStack Query/Router/Table/Form | güncel majör | Router API | Typecheck + E2E |
 | Node / Python | 24.x / 3.14 (G-54) | Bench Dependency Version | İlk Deploy Candidate (Hüseyin Cengiz) |
 | iyzico iyzipay-python | güncel | 3DS v2, webhook imzası (`X-IYZ-SIGNATURE-V3`), Card Storage, hak ediş SFTP | Sandbox regresyon |

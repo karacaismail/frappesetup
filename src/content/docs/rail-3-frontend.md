@@ -14,7 +14,7 @@ Rail 3, tek bir React SPA'nın hem kiracı sitesini (`https://<kiracı>.<marka>.
 | `@platform/frappe-sdk` | `/api/v2` + `press.api.*` istemcisi, CSRF, hata eşlemesi, socket.io, TanStack Query anahtar sözleşmesi | G-68 |
 | `@platform/meta-ui` | Field type → AntD eşlemesi, liste/form/CRUD üreticileri, override registry, çekirdek doctype codegen tipleri | G-69, G-70, G-71 |
 | `@platform/shell` | Layout, metadata sidebar, komut paleti, bildirim merkezi, ayarlar/yetki/faturalama ekranları, destek rıza bandı, operatör modu | G-93–G-101, SA-24, SA-27 |
-| `@platform/ai-sidebar` | @ant-design/x sağ panel, SSE akışı, önizle+onayla UI | G-86, G-88 |
+| `@platform/ai-sidebar` | `@ant-design/x` sağ panel, SSE akışı, önizle+onayla UI | G-86, G-88 |
 | `@platform/support-session` | Hocuspocus provider, awareness/imleç katmanı, takip modu, uzaktan kontrol teklifi; yalnız aktif Support Session varken dinamik yüklenir | SA-29 |
 | `@apps/<ad>` | `AppModule` arayüzü: rota ağacı, override'lar, çeviri, Prompts, onboarding | G-103 |
 

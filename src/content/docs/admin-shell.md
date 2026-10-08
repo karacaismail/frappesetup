@@ -76,7 +76,7 @@ Bu kontrol listesi, satılan her uygulamanın (CronHR, CRM, Webshop) içine otur
 
 | Kalem | Backend kaynağı | Yöntem | G-id |
 | --- | --- | --- | --- |
-| @ant-design/x Bubble/Sender/Conversations/Prompts/ThoughtChain/Actions, SSE akışı, 320 px'te Drawer | agent servisi (Claude Agent SDK) | develop (`@platform/ai-sidebar`, agent) | G-83, G-88 |
+| `@ant-design/x` Bubble/Sender/Conversations/Prompts/ThoughtChain/Actions, SSE akışı, 320 px'te Drawer | agent servisi (Claude Agent SDK) | develop (`@platform/ai-sidebar`, agent) | G-83, G-88 |
 | Sayfa bağlamı ve uygulamanın tek tık Prompts manifesti | `AppModule` AI sözleşmesi, `ai_tools` hook | develop | G-88, G-105 |
 | Yetki eşitliği: kullanıcının Keycloak token'ı ve Press bearer'ı | `auth_hooks` adaptörü, Press OAuth Client | develop + configure | G-59, G-82, G-85 |
 | Önizle+onayla, yıkıcı/ücretli sınıflandırma | confirm bayrağı + önizleme hash'i | develop (agent, press\_tr MCP) | G-27, G-86 |
@@ -121,7 +121,7 @@ Her bölüm yukarıdaki ekranları aynı katmandan üretir; bu katman olmadan sh
 
 ## 11. Kabul ölçütleri
 
-- Playwright matrisi: Chromium/Firefox/WebKit × 320/360/375/390/tablet/masaüstü; giriş, sidebar, liste, form, aktivasyon, ödeme, destek rızası yolculukları; gerçek Safari/iOS ayrı raporlanır (G-74, X-20).
+- Playwright matrisi: Chromium/Firefox/WebKit × 320, 360, 375, 390, tablet ve masaüstü; giriş, sidebar, liste, form, aktivasyon, ödeme, destek rızası yolculukları; gerçek Safari/iOS ayrı raporlanır (G-74, X-20).
 - Tasarım tokenları, tek `:focus-visible` göstergesi, ≥1rem metin, markalı Select (G-67).
 - Performans bütçesi: ilk yük JS ≤ 300 KB gzip, LCP ≤ 2,5 s 4G, Lighthouse CI'da (G-66, X-13); destek oturumu paketi yalnız aktif oturumda yüklenir.
 - Uygulama modülleri yalnızca kurulu uygulamalar için dinamik import (G-66, G-103).

@@ -1,9 +1,14 @@
 ---
 import '@mantine/core/styles.css';
+import '@fontsource-variable/inter/index.css';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/600.css';
 import '../styles/global.css';
 import { ColorSchemeScript } from '@mantine/core';
 import { getCollection } from 'astro:content';
 import Shell, { type Heading } from '../components/Shell.tsx';
+import { SECTIONS } from '../data/sections';
+import { AS_OF, REPO_URL, SITE_TITLE } from '../data/site';
 
 interface Props {
   title: string;
@@ -19,14 +24,18 @@ const {
   headings = [],
 } = Astro.props;
 
-export const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
-export const REPO_URL = 'https://github.com/karacaismail/frappesetup';
-export const AS_OF = '8 Ekim 2026';
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 const docs = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
 const nav = [
-  { href: `${BASE}/`, label: 'Genel bakış', order: 0 },
-  ...docs.map((d) => ({ href: `${BASE}/${d.id}/`, label: d.data.nav, order: d.data.order })),
+  { href: `${BASE}/`, label: 'Genel bakış', order: 0, group: '', icon: 'home' },
+  ...docs.map((d) => ({
+    href: `${BASE}/${d.id}/`,
+    label: d.data.nav,
+    order: d.data.order,
+    group: SECTIONS[d.id]?.group ?? '',
+    icon: SECTIONS[d.id]?.icon ?? 'file',
+  })),
 ];
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 ---
@@ -35,22 +44,18 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
 <html lang="tr" dir="ltr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>{title} · frappesetup</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title} · {SITE_TITLE}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <meta property="og:title" content={`${title} · frappesetup`} />
+    <meta property="og:title" content={`${title} · ${SITE_TITLE}`} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content="tr_TR" />
+    <meta name="theme-color" content="#077c6a" />
     <link rel="icon" href={`${BASE}/favicon.svg`} type="image/svg+xml" />
     <link rel="sitemap" href={`${BASE}/sitemap-index.xml`} />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=JetBrains+Mono:wght@400;600&display=swap"
-      rel="stylesheet"
-    />
     <ColorSchemeScript defaultColorScheme="auto" />
   </head>
   <body>

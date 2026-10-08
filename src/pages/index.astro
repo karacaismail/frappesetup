@@ -1,10 +1,14 @@
 ---
 import { getCollection } from 'astro:content';
+import { IconArrowRight } from '@tabler/icons-react';
 import Site from '../layouts/Site.astro';
 import Rails from '../components/Rails.astro';
 import Timeline from '../components/Timeline.astro';
+import { sectionIcon } from '../components/icons';
+import { GROUP_ORDER, RAILS, SECTIONS } from '../data/sections';
 import requirements from '../data/requirements.json';
 import phases from '../data/phases.json';
+import { AS_OF, DECISION_COUNT, RAIL_COUNT, ROADMAP_WEEKS } from '../data/site';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const docs = (await getCollection('docs')).sort((a, b) => a.data.order - b.data.order);
@@ -14,55 +18,79 @@ const g = requirements.filter((r) => r.id.startsWith('G-')).length;
 const sa = requirements.filter((r) => r.id.startsWith('SA-')).length;
 
 const decisions = [
-  { id: 'K1', title: 'Kontrol düzlemi', text: 'Press v0.154.x (master) + Frappe v15 + Python 3.11 — Press\'in test edildiği tek hat.' },
-  { id: 'K2', title: 'Müşteri siteleri', text: 'ERPNext v16.50 + Frappe v16; müşteri başına bir Frappe sitesi, Press\'in kurduğu bench\'lerde.' },
-  { id: 'K3', title: 'Altyapı', text: 'Hetzner bare-metal, self-host; KVKK için AB içi veri yerleşimi. Sunucular Hüseyin Cengiz\'de.' },
+  { id: 'K1', title: 'Kontrol düzlemi', text: "Press v0.154.x (master) + Frappe v15 + Python 3.11 — Press'in test edildiği tek hat." },
+  { id: 'K2', title: 'Müşteri siteleri', text: "ERPNext v16.50 + Frappe v16; müşteri başına bir Frappe sitesi, Press'in kurduğu bench'lerde." },
+  { id: 'K3', title: 'Altyapı', text: "Hetzner bare-metal, self-host; KVKK için AB içi veri yerleşimi. Sunucular Hüseyin Cengiz'de." },
   { id: 'K4', title: 'Frontend', text: '%100 headless React SPA; Ant Design tek tasarım sistemi, @ant-design/x AI arayüzlerinde birinci sınıf, TanStack veri katmanı.' },
-  { id: 'K5', title: 'Metadata-driven', text: 'DocType meta çalışma zamanında API\'den okunur; alan tipi → bileşen eşleme motoru + doctype bazlı override.' },
+  { id: 'K5', title: 'Metadata-driven', text: "DocType meta çalışma zamanında API'den okunur; alan tipi → bileşen eşleme motoru + doctype bazlı override." },
   { id: 'K6', title: 'Navigasyon', text: 'Sidebar Workspace + kurulu app + izin verisinden türer; hiçbir menü elle kodlanmaz.' },
   { id: 'K7', title: 'Kimlik', text: 'Keycloak tüm uygulamalar için tek giriş/kayıt sağlayıcısı; Frappe ve Press OIDC ile bağlanır.' },
   { id: 'K8', title: 'Erişim', text: 'Zoho/Odoo düzeyinde yetki: ReBAC/ABAC kayıt kuralları, hiyerarşi ve alan düzeyi — platform_core Access Rule motoru.' },
-  { id: 'K9', title: 'AI-first', text: 'Press ve siteler MCP ile yönetilir; Claude Agent SDK servisi; yazma eylemleri önizleme + onay, her eylem audit\'e düşer.' },
-  { id: 'K10', title: 'Ürünler', text: 'Ayrı Frappe app\'leri: CronHR → CRM → Webshop; ortak admin shell; etkinleştirme Press Marketplace / App Plan üzerinden.' },
+  { id: 'K9', title: 'AI-first', text: "Press ve siteler MCP ile yönetilir; Claude Agent SDK servisi; yazma eylemleri önizleme + onay, her eylem audit'e düşer." },
+  { id: 'K10', title: 'Ürünler', text: "Ayrı Frappe app'leri: CronHR → CRM → Webshop; ortak admin shell; etkinleştirme Press Marketplace / App Plan üzerinden." },
 ];
 
-const groups = [
-  { label: 'Çerçeve', ids: ['kararlar', 'raylar'] },
-  { label: 'Raylar', ids: ['rail-1-press', 'rail-2-yapilandirma', 'rail-2-gelistirme', 'rail-3-frontend', 'rail-4-keycloak', 'rail-5-ai', 'rail-6-operasyon'] },
-  { label: 'Teslim', ids: ['gereksinimler', 'admin-shell', 'app-cercevesi', 'yol-haritasi', 'acik-kararlar'] },
-];
 const byId = new Map(docs.map((d) => [d.id, d]));
+const groups = GROUP_ORDER.map((label) => ({
+  label,
+  docs: docs.filter((d) => SECTIONS[d.id]?.group === label),
+}));
+
+// phases.json yol haritası sırasındadır (P6 operasyon düzlemi P5'ten önce başlar).
+const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }));
 ---
 
 <Site title="Frappe Headless SaaS — mimari karar çerçevesi" current={`${base}/`}>
   <section class="hero">
-    <p class="eyebrow">Mimari karar çerçevesi · Press · ERPNext v16 · Keycloak · headless React · AI · operasyon düzlemi</p>
-    <h1>Frappe üzerinde çok kiracılı SaaS: on sabit karar, altı ray, {requirements.length} numaralı gereksinim</h1>
-    <p class="lede">
-      Self-host Hetzner altyapısında Press kontrol düzlemi (Frappe v15) ile ERPNext v16 müşteri sitelerini,
-      Keycloak kimliğini, Ant Design tabanlı headless paneli, MCP/Claude Agent SDK AI katmanını ve superadmin
-      operasyon düzlemini tek bir plan altında birleştiren karar dokümanı. Yalnızca olması gerekenler yazılır;
-      her madde numaralı, sahipli ve fazlıdır.
-    </p>
-    <div class="actions">
-      <a class="btn btn-primary" href={`${base}/kararlar/`}>Kararlardan başla</a>
-      <a class="btn" href={`${base}/gereksinimler/`}>Gereksinim gezgini</a>
-      <a class="btn" href={`${base}/yol-haritasi/`}>Yol haritası</a>
+    <div class="hero-copy">
+      <p class="eyebrow">Mimari karar çerçevesi · {AS_OF}</p>
+      <h1>Frappe üzerinde çok kiracılı SaaS: on sabit karar, altı ray, {requirements.length} numaralı gereksinim</h1>
+      <p class="lede">
+        Self-host Hetzner altyapısında Press kontrol düzlemi (Frappe v15) ile ERPNext v16 müşteri sitelerini,
+        Keycloak kimliğini, Ant Design tabanlı headless paneli, MCP/Claude Agent SDK AI katmanını ve superadmin
+        operasyon düzlemini tek plan altında birleştirir. Yalnızca olması gerekenler yazılır; her madde
+        numaralı, sahipli ve fazlıdır.
+      </p>
+      <div class="actions">
+        <a class="btn btn-primary" href={`${base}/kararlar/`}>
+          Kararlardan başla
+          <IconArrowRight size={18} stroke={2} aria-hidden />
+        </a>
+        <a class="btn" href={`${base}/gereksinimler/`}>Gereksinim gezgini</a>
+        <a class="btn" href={`${base}/yol-haritasi/`}>Yol haritası</a>
+      </div>
     </div>
+
+    <ol class="railmap" aria-label="Altı mimari ray">
+      {RAILS.map((r) => (
+        <li>
+          <a class="rail" href={`${base}/${r.slug}/`}>
+            <span class="rail-n" aria-hidden>R{r.n}</span>
+            <span class="rail-body">
+              <span class="rail-name">Rail {r.n} · {r.name}</span>
+              <span class="rail-detail">{r.detail}</span>
+            </span>
+          </a>
+        </li>
+      ))}
+    </ol>
   </section>
 
   <section class="stats" aria-label="Özet sayılar">
-    <div class="stat"><span class="stat-n">10</span><span class="stat-l">sabit karar</span></div>
-    <div class="stat"><span class="stat-n">6</span><span class="stat-l">mimari ray</span></div>
+    <div class="stat"><span class="stat-n">{DECISION_COUNT}</span><span class="stat-l">sabit karar</span></div>
+    <div class="stat"><span class="stat-n">{RAIL_COUNT}</span><span class="stat-l">mimari ray</span></div>
     <div class="stat"><span class="stat-n">{requirements.length}</span><span class="stat-l">gereksinim · {g} G + {sa} SA</span></div>
     <div class="stat"><span class="stat-n">{musts}</span><span class="stat-l">MUST maddesi</span></div>
-    <div class="stat"><span class="stat-n">{phases.length + 1}</span><span class="stat-l">faz · 42 hafta</span></div>
+    <div class="stat"><span class="stat-n">{phaseCards.length}</span><span class="stat-l">faz · {ROADMAP_WEEKS} hafta</span></div>
   </section>
 
   <section class="block" aria-labelledby="decisions-h">
     <div class="block-head">
-      <h2 id="decisions-h">Sabitlenen on karar</h2>
-      <a href={`${base}/kararlar/`}>Gerekçeler ve kapsam →</a>
+      <div>
+        <p class="kicker">Çerçeve</p>
+        <h2 id="decisions-h">Sabitlenen on karar</h2>
+      </div>
+      <a class="more" href={`${base}/kararlar/`}>Gerekçeler ve kapsam <IconArrowRight size={16} aria-hidden /></a>
     </div>
     <ol class="decisions">
       {decisions.map((d) => (
@@ -79,90 +107,131 @@ const byId = new Map(docs.map((d) => [d.id, d]));
 
   <section class="block" aria-labelledby="rails-h">
     <div class="block-head">
-      <h2 id="rails-h">Altı ray ve sorumluluk sınırları</h2>
-      <a href={`${base}/raylar/`}>Sözleşme tablosu →</a>
+      <div>
+        <p class="kicker">Mimari</p>
+        <h2 id="rails-h">Altı ray ve sorumluluk sınırları</h2>
+      </div>
+      <a class="more" href={`${base}/raylar/`}>Sözleşme tablosu <IconArrowRight size={16} aria-hidden /></a>
     </div>
     <Rails />
   </section>
 
   <section class="block" aria-labelledby="roadmap-h">
     <div class="block-head">
-      <h2 id="roadmap-h">Yol haritası</h2>
-      <a href={`${base}/yol-haritasi/`}>Faz tablosu ve ilk dikey dilim →</a>
+      <div>
+        <p class="kicker">Teslim</p>
+        <h2 id="roadmap-h">Yol haritası</h2>
+      </div>
+      <a class="more" href={`${base}/yol-haritasi/`}>Faz tablosu ve ilk dikey dilim <IconArrowRight size={16} aria-hidden /></a>
     </div>
     <Timeline />
-    <ul class="phases">
-      {phases.map((p) => (
+    <ol class="phases">
+      {phaseCards.map((p) => (
         <li class="phase">
-          <h3>{p.title}</h3>
-          <p>{p.goal}</p>
+          <span class="phase-n" aria-hidden>{p.id}</span>
+          <div>
+            <h3>{p.title}</h3>
+            <p>{p.goal}</p>
+          </div>
         </li>
       ))}
-      <li class="phase">
-        <h3>P6 Operasyon düzlemi</h3>
-        <p>Operasyon sitesi (ERPNext + Frappe CRM + Helpdesk), press_ops_bridge, kredi/tahakkuk muhasebesi, iyzico hak ediş ve EFT mutabakatı, superadmin operatör modu, izinli destek oturumu (Support Session + Hocuspocus), KVKK saklama matrisi.</p>
-      </li>
-    </ul>
+    </ol>
   </section>
 
   <section class="block" aria-labelledby="sections-h">
     <div class="block-head">
-      <h2 id="sections-h">Doküman bölümleri</h2>
+      <div>
+        <p class="kicker">İçindekiler</p>
+        <h2 id="sections-h">Doküman bölümleri</h2>
+      </div>
     </div>
     {groups.map((grp) => (
       <div class="group">
         <h3 class="group-label">{grp.label}</h3>
         <ul class="sections">
-          {grp.ids.map((id) => {
-            const d = byId.get(id);
-            return d ? (
+          {grp.docs.map((d) => {
+            const Icon = sectionIcon(SECTIONS[d.id]?.icon);
+            return (
               <li>
                 <a class="section-card" href={`${base}/${d.id}/`}>
-                  <span class="section-order">{String(d.data.order).padStart(2, '0')}</span>
-                  <span class="section-nav">{d.data.nav}</span>
-                  <span class="section-title">{d.data.title}</span>
+                  <span class="section-icon" aria-hidden><Icon size={22} stroke={1.75} /></span>
+                  <span class="section-text">
+                    <span class="section-nav">
+                      <span class="section-order">{String(d.data.order).padStart(2, '0')}</span>
+                      {d.data.nav}
+                    </span>
+                    <span class="section-title">{SECTIONS[d.id]?.summary ?? d.data.title}</span>
+                  </span>
                 </a>
               </li>
-            ) : null;
+            );
           })}
         </ul>
       </div>
     ))}
   </section>
-
-  <footer class="foot">
-    <p>
-      Kod MIT, içerik CC BY 4.0 lisanslıdır. Kaynak: <a href="https://github.com/karacaismail/frappesetup">github.com/karacaismail/frappesetup</a>.
-      Sürüm referansları 8 Ekim 2026 itibarıyladır; "(doğrulanacak)" işaretli maddeler ilgili bölümde açıklanır.
-    </p>
-  </footer>
 </Site>
 
 <style>
+  /* Hero */
   .hero {
-    padding-block: 1rem 2rem;
-    max-width: 62rem;
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    gap: 1.75rem;
+    padding: clamp(1.25rem, 1rem + 2vw, 2.5rem);
+    margin-top: 0.25rem;
+    border-radius: var(--mantine-radius-xl);
+    background:
+      radial-gradient(60rem 24rem at 100% -20%, var(--fs-accent-tint), transparent 60%),
+      linear-gradient(180deg, var(--fs-surface-2), var(--fs-surface));
+    overflow: hidden;
+  }
+  .hero::before {
+    /* Ray motifi: altı ince yatay çizgi */
+    content: '';
+    position: absolute;
+    inset: auto -10% -2.5rem;
+    height: 7rem;
+    background: repeating-linear-gradient(
+      180deg,
+      var(--fs-grid) 0 1px,
+      transparent 1px 1.1rem
+    );
+    opacity: 0.55;
+    mask-image: linear-gradient(90deg, transparent, black 30%, black 70%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, black 30%, black 70%, transparent);
+    z-index: -1;
+  }
+  @media (min-width: 62em) {
+    .hero {
+      grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 1fr);
+      align-items: start;
+    }
   }
   .eyebrow {
     margin: 0 0 0.75rem;
     color: var(--fs-accent);
     font-size: 1rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
+    font-weight: 650;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
   }
   h1 {
     margin: 0 0 1rem;
-    font-size: clamp(1.8rem, 1.2rem + 2.4vw, 3rem);
-    line-height: 1.12;
-    letter-spacing: -0.02em;
+    font-size: clamp(1.85rem, 1.2rem + 2.6vw, 3.1rem);
+    line-height: 1.1;
+    letter-spacing: -0.025em;
     text-wrap: balance;
+    max-width: 22ch;
   }
   .lede {
     margin: 0 0 1.5rem;
     font-size: 1.125rem;
     line-height: 1.65;
     color: var(--fs-quiet);
-    max-width: 68ch;
+    max-width: 62ch;
+    text-wrap: pretty;
   }
   .actions {
     display: flex;
@@ -172,38 +241,104 @@ const byId = new Map(docs.map((d) => [d.id, d]));
   .btn {
     display: inline-flex;
     align-items: center;
+    gap: 0.4rem;
     min-height: 44px;
     padding: 0.55rem 1.1rem;
     border-radius: var(--mantine-radius-md);
-    background: var(--fs-surface-2);
+    background: var(--fs-surface);
+    box-shadow: inset 0 0 0 1px var(--fs-grid);
     color: inherit;
     text-decoration: none;
     font-weight: 600;
     font-size: 1rem;
+    transition:
+      background-color var(--fs-dur) var(--fs-ease),
+      box-shadow var(--fs-dur) var(--fs-ease),
+      transform var(--fs-dur) var(--fs-ease);
   }
   .btn:hover {
     background: var(--fs-tint);
   }
   .btn-primary {
     background: var(--fs-accent);
-    color: var(--mantine-color-white);
+    color: var(--fs-on-accent);
+    box-shadow: var(--fs-shadow-1);
   }
   .btn-primary:hover {
-    background: var(--mantine-color-sea-8);
-  }
-  :global([data-mantine-color-scheme='dark']) .btn-primary {
-    color: var(--mantine-color-dark-9);
-  }
-  :global([data-mantine-color-scheme='dark']) .btn-primary:hover {
-    background: var(--mantine-color-sea-3);
+    background: var(--fs-accent-strong);
+    transform: translateY(-1px);
   }
 
+  .railmap {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 0.5rem;
+    align-self: center;
+  }
+  @media (min-width: 62em) {
+    .railmap {
+      grid-template-columns: 1fr;
+    }
+  }
+  .rail {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: var(--mantine-radius-md);
+    background: color-mix(in srgb, var(--fs-surface) 72%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fs-grid) 70%, transparent);
+    color: inherit;
+    text-decoration: none;
+    min-height: 44px;
+    transition:
+      background-color var(--fs-dur) var(--fs-ease),
+      transform var(--fs-dur) var(--fs-ease),
+      box-shadow var(--fs-dur) var(--fs-ease);
+  }
+  .rail:hover {
+    background: var(--fs-surface);
+    box-shadow: var(--fs-shadow-1);
+    transform: translateX(2px);
+  }
+  .rail-n {
+    display: grid;
+    place-items: center;
+    min-width: 2.6rem;
+    height: 2.1rem;
+    border-radius: 999px;
+    background: var(--fs-accent-soft);
+    color: var(--fs-chip-ink);
+    font-family: var(--mantine-font-family-monospace);
+    font-weight: 600;
+    font-size: 1rem;
+  }
+  .rail-body {
+    display: grid;
+    gap: 0.05rem;
+    min-width: 0;
+  }
+  .rail-name {
+    font-weight: 650;
+    font-size: 1rem;
+  }
+  .rail-detail {
+    color: var(--fs-quiet);
+    font-size: 1rem;
+    line-height: 1.35;
+  }
+
+  /* Sayılar */
   .stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
     gap: 0.75rem 1.5rem;
-    padding: 1.25rem 0;
-    margin-bottom: 1.5rem;
+    padding: 1.25rem 0.25rem;
+    margin: 1.5rem 0;
     border-top: 1px solid var(--fs-grid);
     border-bottom: 1px solid var(--fs-grid);
   }
@@ -213,41 +348,57 @@ const byId = new Map(docs.map((d) => [d.id, d]));
     gap: 0.1rem;
   }
   .stat-n {
-    font-size: 1.75rem;
+    font-size: 1.85rem;
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+    color: var(--fs-accent-ink);
   }
   .stat-l {
     color: var(--fs-quiet);
     font-size: 1rem;
   }
 
+  /* Bloklar */
   .block {
-    margin: 2.5rem 0;
+    margin: 3rem 0;
   }
   .block-head {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: flex-end;
     justify-content: space-between;
     gap: 0.5rem 1rem;
-    margin-bottom: 1rem;
+    margin-bottom: 1.1rem;
+  }
+  .kicker {
+    margin: 0 0 0.2rem;
+    color: var(--fs-accent);
+    font-size: 1rem;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
   .block-head h2 {
     margin: 0;
-    font-size: 1.5rem;
-    letter-spacing: -0.01em;
+    font-size: clamp(1.4rem, 1.2rem + 0.8vw, 1.75rem);
+    letter-spacing: -0.015em;
   }
-  .block-head a {
+  .more {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
     color: var(--fs-accent);
     text-decoration: none;
     font-weight: 600;
+    min-height: 44px;
   }
-  .block-head a:hover {
+  .more:hover {
     text-decoration: underline;
   }
 
+  /* Kararlar */
   .decisions {
     list-style: none;
     margin: 0;
@@ -259,36 +410,65 @@ const byId = new Map(docs.map((d) => [d.id, d]));
   .decision {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 0.75rem;
-    padding: 1rem 1.1rem;
+    gap: 0.85rem;
+    padding: 1.1rem 1.15rem;
     border-radius: var(--mantine-radius-lg);
     background: var(--fs-surface-2);
+    transition:
+      transform var(--fs-dur) var(--fs-ease),
+      box-shadow var(--fs-dur) var(--fs-ease);
+  }
+  .decision:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--fs-shadow-1);
   }
   .decision-id {
+    display: inline-grid;
+    place-items: center;
+    align-self: start;
+    min-width: 2.6rem;
+    height: 1.85rem;
+    border-radius: 999px;
+    background: var(--fs-accent-soft);
+    color: var(--fs-chip-ink);
     font-family: var(--mantine-font-family-monospace);
     font-weight: 600;
     font-size: 1rem;
-    color: var(--fs-accent);
-    padding-top: 0.15rem;
   }
   .decision h3 {
     margin: 0 0 0.25rem;
     font-size: 1.125rem;
+    letter-spacing: -0.01em;
   }
   .decision p {
     margin: 0;
     color: var(--fs-quiet);
     font-size: 1rem;
     line-height: 1.55;
+    text-wrap: pretty;
   }
 
+  /* Fazlar */
   .phases {
     list-style: none;
-    margin: 0.5rem 0 0;
+    margin: 0.75rem 0 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
     gap: 0.75rem 1.25rem;
+  }
+  .phase {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    padding: 0.5rem 0.25rem;
+  }
+  .phase-n {
+    font-family: var(--mantine-font-family-monospace);
+    font-size: 1rem;
+    color: var(--fs-accent);
+    font-weight: 600;
+    padding-top: 0.15rem;
   }
   .phase h3 {
     margin: 0 0 0.25rem;
@@ -299,67 +479,78 @@ const byId = new Map(docs.map((d) => [d.id, d]));
     color: var(--fs-quiet);
     font-size: 1rem;
     line-height: 1.5;
+    text-wrap: pretty;
   }
 
+  /* Bölüm kartları */
   .group {
-    margin-bottom: 1.25rem;
+    margin-bottom: 1.5rem;
   }
   .group-label {
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.6rem;
     font-size: 1rem;
     color: var(--fs-quiet);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
+    font-weight: 600;
   }
   .sections {
     list-style: none;
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
     gap: 0.6rem;
   }
   .section-card {
     display: grid;
     grid-template-columns: auto 1fr;
-    grid-template-rows: auto auto;
-    column-gap: 0.75rem;
-    row-gap: 0.15rem;
-    padding: 0.85rem 1rem;
-    border-radius: var(--mantine-radius-md);
+    gap: 0.85rem;
+    padding: 0.9rem 1rem;
+    border-radius: var(--mantine-radius-lg);
     background: var(--fs-surface-2);
     color: inherit;
     text-decoration: none;
     min-height: 44px;
+    transition:
+      transform var(--fs-dur) var(--fs-ease),
+      box-shadow var(--fs-dur) var(--fs-ease);
   }
   .section-card:hover {
-    background: var(--fs-tint);
+    transform: translateY(-2px);
+    box-shadow: var(--fs-shadow-1);
   }
-  .section-order {
-    grid-row: 1 / span 2;
-    font-family: var(--mantine-font-family-monospace);
-    color: var(--fs-accent);
-    font-weight: 600;
-    font-size: 1rem;
+  .section-icon {
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: var(--mantine-radius-md);
+    background: var(--fs-accent-soft);
+    color: var(--fs-chip-ink);
+  }
+  .section-text {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
   }
   .section-nav {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
     font-weight: 650;
     font-size: 1.0625rem;
+  }
+  .section-order {
+    font-family: var(--mantine-font-family-monospace);
+    color: var(--fs-quiet);
+    font-weight: 500;
+    font-size: 1rem;
   }
   .section-title {
     color: var(--fs-quiet);
     font-size: 1rem;
     line-height: 1.45;
-  }
-
-  .foot {
-    margin-top: 3rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--fs-grid);
-    color: var(--fs-quiet);
-    font-size: 1rem;
-  }
-  .foot a {
-    color: var(--fs-accent);
+    text-wrap: pretty;
   }
 </style>

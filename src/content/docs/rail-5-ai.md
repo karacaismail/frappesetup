@@ -84,7 +84,7 @@ frappe\_mcp'nin Frappe v16 uyumu P3 başında kurulumla teyit edilir (doğrulana
 | destructive | delete, cancel, submit, bulk\_update, apply\_workflow | önizle + onayla zorunlu |
 | billable | install\_app, change\_app\_plan, change\_site\_plan, buy\_credits | önizle + onayla + Press Role allow\_billing/allow\_apps (G-16) |
 
-Uygulamalar `ai_tools` hook'uyla araç şemasını, gereken rolü, destructive/billable bayrağını, önizleme üreticisini ve Prompts (tek tık akışları) bildirir (G-105); CronHR ilk örnektir: izin onayı, bordro kontrol özeti (G-108).
+Uygulamalar `ai_tools` hook'uyla araç şemasını, gereken rolü, `destructive/billable` bayrağını, önizleme üreticisini ve Prompts (tek tık akışları) bildirir (G-105); CronHR ilk örnektir: izin onayı, bordro kontrol özeti (G-108).
 
 ## 8.4 @ant-design/x arayüzü (G-88)
 

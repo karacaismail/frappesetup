@@ -1,4 +1,7 @@
-/* Semantik tokenlar — Mantine tokenlarının üstünde, sayfa düzeyi kimlik */
+/* ------------------------------------------------------------------
+   Semantik tokenlar — Mantine tokenlarının üstünde sayfa düzeyi kimlik.
+   Bileşenler yalnız bu değişkenleri kullanır; sabit değer yazılmaz.
+   ------------------------------------------------------------------ */
 :root {
   --fs-ink: var(--mantine-color-text);
   --fs-quiet: var(--mantine-color-dimmed);
@@ -6,12 +9,24 @@
   --fs-grid: var(--mantine-color-gray-3);
   --fs-surface: var(--mantine-color-white);
   --fs-surface-2: var(--mantine-color-gray-0);
-  --fs-accent: var(--mantine-color-sea-7);
+  --fs-surface-3: var(--mantine-color-gray-1);
+  --fs-accent: var(--mantine-color-sea-8);
+  --fs-accent-strong: var(--mantine-color-sea-9);
+  --fs-accent-ink: var(--mantine-color-sea-9);
   --fs-accent-soft: var(--mantine-color-sea-0);
+  --fs-accent-tint: var(--mantine-color-sea-1);
+  --fs-on-accent: var(--mantine-color-white);
+  --fs-chip-ink: var(--mantine-color-sea-8);
+  --fs-warn-soft: var(--mantine-color-amber-0);
   --fs-tint: var(--mantine-color-gray-1);
-  --fs-focus: var(--mantine-color-sea-7);
+  --fs-focus: var(--mantine-primary-color-filled);
+  --fs-shadow-1: 0 1px 2px rgba(10, 30, 28, 0.06), 0 10px 28px -16px rgba(10, 30, 28, 0.22);
+  --fs-shadow-2: 0 2px 4px rgba(10, 30, 28, 0.08), 0 20px 40px -20px rgba(10, 30, 28, 0.3);
+  --fs-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --fs-dur: 160ms;
   --fs-content-max: 76ch;
   --fs-gutter: 1rem;
+  --fs-header-h: 60px;
 }
 
 [data-mantine-color-scheme='dark'] {
@@ -19,45 +34,196 @@
   --fs-grid: var(--mantine-color-dark-4);
   --fs-surface: var(--mantine-color-dark-7);
   --fs-surface-2: var(--mantine-color-dark-6);
+  --fs-surface-3: var(--mantine-color-dark-5);
   --fs-accent: var(--mantine-color-sea-4);
+  --fs-accent-strong: var(--mantine-color-sea-3);
+  --fs-accent-ink: var(--mantine-color-sea-1);
   --fs-accent-soft: rgba(69, 179, 163, 0.14);
+  --fs-accent-tint: rgba(69, 179, 163, 0.24);
+  --fs-on-accent: var(--mantine-color-dark-9);
+  --fs-chip-ink: var(--mantine-color-sea-2);
+  --fs-warn-soft: rgba(255, 177, 27, 0.14);
   --fs-tint: var(--mantine-color-dark-5);
-  --fs-focus: var(--mantine-color-sea-3);
+  --fs-focus: var(--mantine-primary-color-filled);
+  --fs-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -16px rgba(0, 0, 0, 0.6);
+  --fs-shadow-2: 0 2px 4px rgba(0, 0, 0, 0.35), 0 20px 40px -20px rgba(0, 0, 0, 0.7);
 }
 
+/* ------------------------------------------------------------------ */
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 5rem;
+  scroll-padding-top: calc(var(--fs-header-h) + 1rem);
   -webkit-text-size-adjust: 100%;
 }
-
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
 }
 
 body {
   background: var(--fs-surface);
   color: var(--fs-ink);
-  overflow-x: hidden;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  text-rendering: optimizeLegibility;
 }
 
-/* Tek odak göstergesi: yalnız klavye odağında, yalnız odaklanan kontrolde */
-:focus {
-  outline: none;
-}
+/* Tek odak göstergesi: yalnız klavye odağında, yalnız odaklanan kontrolde.
+   Yarıçap kontrolün kendisinden gelir; outline-radius tarayıcıda otomatik izler. */
 :focus-visible {
   outline: 2px solid var(--fs-focus);
   outline-offset: 2px;
-  border-radius: 4px;
+}
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 300;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--mantine-radius-md);
+  background: var(--fs-accent);
+  color: var(--fs-on-accent);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform var(--fs-dur) var(--fs-ease);
+}
+.skip-link:focus-visible {
+  transform: none;
 }
 .mantine-focus-auto:focus-visible {
   outline: 2px solid var(--fs-focus);
   outline-offset: 2px;
 }
 
-/* İçerik tipografisi */
+/* ------------------------------------------------------------------
+   Kabuk: başlık, marka, navigasyon, içindekiler, alt bilgi
+   ------------------------------------------------------------------ */
+.site-header {
+  backdrop-filter: saturate(1.4) blur(10px);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px);
+  background: color-mix(in srgb, var(--fs-surface) 86%, transparent);
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--fs-accent);
+  color: var(--fs-on-accent);
+  font-weight: 800;
+  font-size: 1rem;
+  box-shadow: var(--fs-shadow-1);
+}
+.brand-name {
+  font-weight: 700;
+  font-size: 1.125rem;
+  letter-spacing: -0.015em;
+}
+.as-of {
+  letter-spacing: 0.01em;
+}
+
+.nav-group {
+  margin: 0 0 0.35rem;
+  padding: 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fs-quiet);
+}
+.nav-link {
+  border-radius: var(--mantine-radius-sm);
+  transition:
+    background-color var(--fs-dur) var(--fs-ease),
+    color var(--fs-dur) var(--fs-ease);
+}
+.nav-link[data-active] {
+  font-weight: 650;
+  box-shadow: inset 3px 0 0 var(--fs-accent);
+}
+.nav-foot {
+  border-top: 1px solid var(--fs-grid);
+  display: grid;
+  gap: 0.15rem;
+}
+
+.toc {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.toc-link {
+  display: block;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--mantine-radius-sm);
+  color: var(--fs-quiet);
+  text-decoration: none;
+  font-size: 1rem;
+  line-height: 1.4;
+  box-shadow: inset 2px 0 0 var(--fs-grid);
+  transition:
+    color var(--fs-dur) var(--fs-ease),
+    box-shadow var(--fs-dur) var(--fs-ease);
+}
+.toc-link:hover {
+  color: var(--fs-ink);
+}
+.toc-link[aria-current='true'] {
+  color: var(--fs-accent);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--fs-accent);
+}
+
+.page {
+  max-width: min(100%, 80rem);
+  margin: 0 auto;
+}
+.site-footer {
+  max-width: min(100%, 80rem);
+  margin: 3rem auto 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--fs-grid);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+}
+
+/* Okuma ilerlemesi */
+.progress {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--fs-header-h);
+  height: 2px;
+  z-index: 150;
+  pointer-events: none;
+}
+.progress > span {
+  display: block;
+  height: 100%;
+  width: var(--progress, 0%);
+  background: var(--fs-accent);
+  transition: width 80ms linear;
+}
+
+/* ------------------------------------------------------------------
+   İçerik tipografisi
+   ------------------------------------------------------------------ */
 /* Metin satır uzunluğu 76ch ile sınırlı; tablo, diyagram ve kod blokları sütunun tamamını kullanır */
 .prose {
   max-width: 100%;
@@ -76,18 +242,44 @@ body {
 .prose > :first-child {
   margin-top: 0;
 }
+.prose p,
+.prose li {
+  text-wrap: pretty;
+  /* Güvenlik ağı: yalnız satıra sığmayan tek belirteç kırılır; sığan kelimeler asla bölünmez */
+  overflow-wrap: anywhere;
+}
+.prose td,
+.prose th {
+  overflow-wrap: normal;
+}
 .prose h2 {
+  position: relative;
   font-size: 1.5rem;
   line-height: 1.3;
-  margin: 2.5rem 0 0.75rem;
+  letter-spacing: -0.01em;
+  margin: 2.75rem 0 0.75rem;
   padding-top: 0.25rem;
-  scroll-margin-top: 5rem;
+  scroll-margin-top: calc(var(--fs-header-h) + 1rem);
 }
 .prose h3 {
+  position: relative;
   font-size: 1.2rem;
   line-height: 1.35;
   margin: 1.75rem 0 0.5rem;
-  scroll-margin-top: 5rem;
+  scroll-margin-top: calc(var(--fs-header-h) + 1rem);
+}
+.heading-anchor {
+  margin-left: 0.4rem;
+  color: var(--fs-quiet);
+  text-decoration: none;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity var(--fs-dur) var(--fs-ease);
+}
+.prose h2:hover .heading-anchor,
+.prose h3:hover .heading-anchor,
+.heading-anchor:focus-visible {
+  opacity: 1;
 }
 .prose p {
   margin: 0 0 1rem;
@@ -98,6 +290,9 @@ body {
   text-decoration-thickness: 1px;
   text-underline-offset: 0.15em;
 }
+.prose a:hover {
+  color: var(--fs-accent-strong);
+}
 .prose ul,
 .prose ol {
   padding-left: 1.4rem;
@@ -105,6 +300,9 @@ body {
 }
 .prose li {
   margin: 0.35rem 0;
+}
+.prose li::marker {
+  color: var(--fs-quiet);
 }
 .prose li > ul,
 .prose li > ol {
@@ -128,17 +326,29 @@ body {
   overflow-x: auto;
   font-size: 1rem;
   line-height: 1.55;
+  background: var(--fs-surface-2);
 }
 .prose pre code {
   background: none;
   padding: 0;
   font-size: 1rem;
 }
+/* Shiki çift tema: koyu şemada --shiki-dark değişkenleri uygulanır */
+[data-mantine-color-scheme='dark'] .astro-code,
+[data-mantine-color-scheme='dark'] .astro-code span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+}
 .prose blockquote {
-  margin: 0 0 1rem;
-  padding: 0.5rem 1rem;
-  border-left: 3px solid var(--fs-accent);
-  color: var(--fs-quiet);
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1rem 0.85rem 1.1rem;
+  border-radius: var(--mantine-radius-md);
+  background: var(--fs-accent-soft);
+  box-shadow: inset 3px 0 0 var(--fs-accent);
+  color: var(--fs-ink);
+}
+.prose blockquote > :last-child {
+  margin-bottom: 0;
 }
 .prose hr {
   border: 0;
@@ -146,12 +356,17 @@ body {
   margin: 2rem 0;
 }
 
-/* Akışkan tablolar: sütunlar okunabilir genişliğini korur, tablo kendi sarmalayıcısında kayar.
-   Dar ekranda sütunları sıkıştırmak yerine tablo 64rem'e kadar genişleyip kaydırılır. */
+/* ------------------------------------------------------------------
+   Akışkan tablolar: sütunlar okunabilir genişliğini korur, tablo kendi
+   sarmalayıcısında kayar. Dar ekranda sütunları sıkıştırmak yerine tablo
+   64rem'e kadar genişleyip kaydırılır.
+   ------------------------------------------------------------------ */
 .table-wrap {
   max-width: 100%;
   overflow-x: auto;
-  margin: 0.5rem 0 1.5rem;
+  margin: 0.75rem 0 1.75rem;
+  border-radius: var(--mantine-radius-md);
+  box-shadow: inset 0 0 0 1px var(--fs-grid);
   -webkit-overflow-scrolling: touch;
 }
 .table-wrap:focus-visible {
@@ -162,7 +377,8 @@ body {
   width: max-content;
   min-width: 100%;
   max-width: max(100%, 64rem);
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   margin: 0;
   font-size: 1rem;
   line-height: 1.5;
@@ -172,12 +388,10 @@ body {
   font-weight: 650;
   background: var(--fs-surface-2);
   border-bottom: 1px solid var(--fs-line);
-  position: sticky;
-  top: 0;
 }
 .prose th,
 .prose td {
-  padding: 0.55rem 0.75rem;
+  padding: 0.6rem 0.85rem;
   vertical-align: top;
   border-bottom: 1px solid var(--fs-grid);
   min-width: 9rem;
@@ -185,40 +399,66 @@ body {
   word-break: normal;
   hyphens: manual;
 }
+.prose tbody tr:last-child td {
+  border-bottom: 0;
+}
 .prose th:first-child,
 .prose td:first-child {
   min-width: 6rem;
 }
-/* Hücre içindeki kod tanımlayıcıları kelime ortasından bölünmez; tablo gerekirse kayar */
-.prose td code,
-.prose th code {
-  overflow-wrap: normal;
-}
 .prose td:nth-child(2) {
   min-width: 18rem;
 }
-.prose tbody tr:nth-child(odd) td {
-  background: color-mix(in srgb, var(--fs-surface-2) 55%, transparent);
+.prose td code,
+.prose th code {
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+.prose tbody tr:hover td {
+  background: color-mix(in srgb, var(--fs-surface-2) 70%, transparent);
 }
 
-/* Mermaid */
+/* ------------------------------------------------------------------
+   Diyagramlar
+   ------------------------------------------------------------------ */
 .mermaid-figure {
   margin: 0.5rem 0 1.5rem;
+  padding: 0.75rem;
   overflow-x: auto;
-  padding: 0.5rem 0;
+  border-radius: var(--mantine-radius-md);
+  background: var(--fs-surface-2);
 }
 .mermaid-figure svg {
-  max-width: none;
   height: auto;
+  display: block;
+}
+.mermaid-details {
+  margin: -0.75rem 0 1.5rem;
+  font-size: 1rem;
+}
+.mermaid-details summary {
+  cursor: pointer;
+  color: var(--fs-quiet);
+  padding: 0.35rem 0.25rem;
+}
+.mermaid-details pre {
+  margin: 0.25rem 0 0;
 }
 .mermaid-figure[data-state='error'] pre {
   color: var(--mantine-color-red-7);
 }
 
-/* Diyagram kapsayıcısı */
 .diagram {
   margin: 0.5rem 0 1.75rem;
+  padding: 0.75rem;
   overflow-x: auto;
+  border-radius: var(--mantine-radius-lg);
+  background: var(--fs-surface-2);
+}
+.diagram:focus-visible,
+.mermaid-figure:focus-visible {
+  outline: 2px solid var(--fs-focus);
+  outline-offset: 2px;
 }
 .diagram svg {
   width: 100%;
@@ -229,12 +469,118 @@ body {
 .diagram-note {
   color: var(--fs-quiet);
   font-size: 1rem;
-  margin: 0 0 1rem;
+  margin: 0.75rem 0.25rem 0;
+  max-width: var(--fs-content-max);
 }
 
-/* Dar ekran */
-@media (max-width: 48em) {
-  .prose h2 {
-    margin-top: 2rem;
+/* ------------------------------------------------------------------
+   Gereksinim gezgini
+   ------------------------------------------------------------------ */
+.req-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.req-head > div:first-child {
+  max-width: 62ch;
+}
+.req-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.req-filter-search {
+  grid-column: 1 / -1;
+}
+.req-explorer {
+  container-type: inline-size;
+}
+@container (min-width: 60rem) {
+  .req-filters {
+    grid-template-columns: minmax(14rem, 2fr) repeat(4, minmax(8rem, 1fr));
   }
+  .req-filter-search {
+    grid-column: auto;
+  }
+}
+.req-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.req-id,
+.req-code {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 1rem;
+}
+.req-id {
+  font-weight: 600;
+  color: var(--fs-chip-ink);
+  background: var(--fs-accent-soft);
+  padding: 0.1em 0.45em;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.req-code {
+  background: var(--fs-tint);
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+.req-detail {
+  max-width: 60ch;
+}
+.req-owner {
+  color: var(--fs-quiet);
+}
+.req-table thead th {
+  background: var(--fs-surface-2);
+}
+.req-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.req-cards,
+.req-card,
+.req-card > * {
+  min-width: 0;
+}
+.req-card {
+  padding: 0.9rem 1rem;
+  border-radius: var(--mantine-radius-md);
+  background: var(--fs-surface-2);
+  display: grid;
+  gap: 0.4rem;
+}
+.req-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.req-card-title {
+  line-height: 1.4;
+}
+.req-card-detail {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.req-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  color: var(--fs-quiet);
+  font-size: 1rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }

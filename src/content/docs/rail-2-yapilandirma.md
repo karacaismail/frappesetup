@@ -29,26 +29,26 @@ Site Config Key tohumlama press\_tr fixture'ıdır: Password → `mail_password`
 
 ## CORS, CSRF ve same-site (G-45, G-13)
 
-- Panel, Press ve kiracı siteleri aynı registrable domain altında; `allow_cors` yalnızca `https://app.<marka>.com.tr` değerini taşır ve Release Group common\_site\_config ile tüm bench'lere yazılır.
+- Panel, Press ve kiracı siteleri aynı registrable domain altında; `allow_cors` yalnızca `https://app.<marka>.com.tr` değerini taşır ve Release Group `common_site_config` ile tüm bench'lere yazılır.
 - SPA istekleri credentials include + `X-Frappe-CSRF-Token`; çerez SameSite=Lax, Secure.
 - CSRF token yalnızca www/desk render'ında üretildiği için (doğrulandı) SPA kabuğu platform\_core `www/<panel>.py` sayfasından servis edilir ve `context.csrf_token` enjekte edilir.
 - Kabul: giriş sonrası csrf\_token dolu; tokensiz PATCH 400, tokenli 200.
 
 ## Giden e-posta (G-47)
 
-Release Group common\_site\_config: mail\_server, mail\_port=587, use\_tls=1, mail\_login, mail\_password (Password), auto\_email\_id `bildirim@<marka>`, always\_use\_account\_email\_id\_as\_sender=1, always\_use\_account\_name\_as\_sender\_name=1, email\_sender\_name=\&lt;marka&gt;. System Settings: welcome/reset\_password şablonları platform Email Template'lerine bağlı, email\_footer\_address dolu, disable\_standard\_email\_footer=1, email\_retry\_limit=3. Relay Hetzner'de Postfix veya AB bölgeli sağlayıcı (KVKK envanterine girer): Hüseyin Cengiz relay'i kurar ve SPF/DKIM/DMARC/PTR değerlerini hazırlar, Asistan Hüseyin GoDaddy'de kayıtları uygular, Hüseyin Cengiz teslimatı doğrular. Kiracı kendi gönderici domainini Email Domain + Email Account ile panelden tanımlar; kota App Plan features'a bağlıdır.
+Release Group `common_site_config`: mail\_server, mail\_port=587, use\_tls=1, mail\_login, mail\_password (Password), auto\_email\_id `bildirim@<marka>`, always\_use\_account\_email\_id\_as\_sender=1, always\_use\_account\_name\_as\_sender\_name=1, email\_sender\_name=\&lt;marka&gt;. System Settings: `welcome/reset_password` şablonları platform Email Template'lerine bağlı, `email_footer_address` dolu, disable\_standard\_email\_footer=1, email\_retry\_limit=3. Relay Hetzner'de Postfix veya AB bölgeli sağlayıcı (KVKK envanterine girer): Hüseyin Cengiz relay'i kurar ve SPF/DKIM/DMARC/PTR değerlerini hazırlar, Asistan Hüseyin GoDaddy'de kayıtları uygular, Hüseyin Cengiz teslimatı doğrular. Kiracı kendi gönderici domainini Email Domain + Email Account ile panelden tanımlar; kota App Plan features'a bağlıdır.
 
 ## Dosya depolama (G-48)
 
-P1'de dosyalar bench yerel diskinde ('with files' yedekleri kapsar); System Settings max\_file\_size=25, allowed\_file\_extensions beyaz listesi, strip\_exif\_metadata\_from\_uploaded\_images=1, allow\_guests\_to\_upload\_files=0, only\_allow\_system\_managers\_to\_upload\_public\_files=1; kota Site Plan.max\_storage\_usage. P2'de 'ERPNext S3 Integration' Hetzner Object Storage üzerinde tek bucket + site prefix ile pilotlanır (v16 uyumu doğrulanacak).
+P1'de dosyalar bench yerel diskinde ('with files' yedekleri kapsar); System Settings max\_file\_size=25, `allowed_file_extensions` beyaz listesi, strip\_exif\_metadata\_from\_uploaded\_images=1, allow\_guests\_to\_upload\_files=0, only\_allow\_system\_managers\_to\_upload\_public\_files=1; kota Site `Plan.max_storage_usage`. P2'de 'ERPNext S3 Integration' Hetzner Object Storage üzerinde tek bucket + site prefix ile pilotlanır (v16 uyumu doğrulanacak).
 
 ## Yedek, şifreleme, veritabanı ve işçiler (G-49, G-50, G-55, G-5, G-37)
 
 Bu bölümün sahibi Hüseyin Cengiz'dir.
 
-- Her sitede System Settings.encrypt\_backup=1 (gpg); backup\_encryption\_key ve Fernet encryption\_key Site.configuration'da Password tipli; anahtar biçimi press\_tr Site validate kancasında doğrulanır (Press'in Fernet doğrulaması ölü kod, doğrulandı). Press DB yedeği ayrı, age/KMS şifreli, iki konumda.
-- Database Server doctype'ı: innodb\_buffer\_pool\_size ≈ RAM %60-70, max\_connections ≥ Σ worker×thread + background + marj, is\_performance\_schema\_enabled=1, enable\_physical\_backup, binlog\_retention\_days + enable\_binlog\_indexing (point-in-time), is\_replication\_setup DR replikası, is\_database\_audit\_log\_enabled=1, audit\_log\_retention\_days=365. Kabul: binlog'dan 1 saatlik geri kazanım tatbikatı pass.
-- İşçiler: Release Group gunicorn 2/8, background 2/6, gunicorn\_threads\_per\_worker=2, use\_rq\_workerpool=1; Bench.auto\_scale\_workers=1; common\_site\_config scheduler\_tick\_interval=60, `workers.long.timeout=3000`, 'reports' kuyruğu; her yeni sitede enable\_scheduler=1 doğrulanır.
+- Her sitede System Settings.encrypt\_backup=1 (gpg); `backup_encryption_key` ve Fernet encryption\_key Site.configuration'da Password tipli; anahtar biçimi press\_tr Site validate kancasında doğrulanır (Press'in Fernet doğrulaması ölü kod, doğrulandı). Press DB yedeği ayrı, age/KMS şifreli, iki konumda.
+- Database Server doctype'ı: `innodb_buffer_pool_size` ≈ RAM %60-70, max\_connections ≥ Σ worker×thread + background + marj, is\_performance\_schema\_enabled=1, `enable_physical_backup`, `binlog_retention_days` + `enable_binlog_indexing` (point-in-time), `is_replication_setup` DR replikası, is\_database\_audit\_log\_enabled=1, audit\_log\_retention\_days=365. Kabul: binlog'dan 1 saatlik geri kazanım tatbikatı pass.
+- İşçiler: Release Group gunicorn 2/8, background 2/6, gunicorn\_threads\_per\_worker=2, use\_rq\_workerpool=1; Bench.auto\_scale\_workers=1; `common_site_config` scheduler\_tick\_interval=60, `workers.long.timeout=3000`, 'reports' kuyruğu; her yeni sitede enable\_scheduler=1 doğrulanır.
 - Offsite: Hetzner Object Storage GFS, RPO ≤ 24 saat, `alert_on_sites_with_missing_backups`, aylık Backup Restoration Test (G-5, G-37).
 
 ## Lokalizasyon ve ERPNext TR kurulumu (G-41, G-42, G-51, G-54, G-65)
@@ -64,7 +64,7 @@ Bu bölümün sahibi Hüseyin Cengiz'dir.
 ## Fixture stratejisi (G-8, G-39, G-40, G-107)
 
 - Press: `press_tr.after_migrate` her migrate'te FC Site Plan'larını (kendi setimiz dışında) enabled=0 yapar, Team Tier değerlerini TRY/USD tablosuyla değiştirir, `run_signup_e2e` scheduler kaydını kapatır; sync\_fixtures after\_migrate'ten önce çalışır (doğrulandı).
-- Uygulama: module/is\_standard taşıyan kayıtlar (DocType, Workspace, Workspace Sidebar standard=1, Print Format, Report, Notification) modül dosyasında; Role, Custom Field, Property Setter, Workflow, Role Profile, Email Template `hooks.fixtures` ön ek filtresiyle dışa aktarılır.
+- Uygulama: `module/is_standard` taşıyan kayıtlar (DocType, Workspace, Workspace Sidebar standard=1, Print Format, Report, Notification) modül dosyasında; Role, Custom Field, Property Setter, Workflow, Role Profile, Email Template `hooks.fixtures` ön ek filtresiyle dışa aktarılır.
 - Kiracı Custom Field/Property Setter kayıtları site DB'sinde kalır; meta site başına çalışma zamanında okunur (G-63).
 - Sırlar yalnızca Password tipli Site Config Key'lerde yaşar (G-112).
 
