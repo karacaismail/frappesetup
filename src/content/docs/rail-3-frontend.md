@@ -26,7 +26,7 @@ pnpm workspaces + Vite; uygulama paketleri yalnızca `get_bootstrap` kurulu uygu
 - **Sol sidebar**: yalnızca G-63 bootstrap'ından türetilir; 320 px'te AntD Drawer olur, odak Drawer içinde tutulur, Escape kapatır.
 - **İçerik**: TanStack Router rota ağacı URL sözleşmesine uyar (G-132): `/<uygulama>/<belge-türü>` liste, `/<uygulama>/<belge-türü>/<kimlik>` kayıt, filtre/sıralama/sayfa okunur sorgu parametreleri; iskelet yükleme, boş/hata/çevrimdışı durumları tokenlı bileşenlerle.
 - **Yardım kulakçığı**: sağ kenarda yapışkan; kendi kendine destek modu alan, bileşen ve sayfa yardımını açar (G-137, G-138).
-- **Sağ yuva (AI paneli veya yardım paneli)**: aynı anda biri açıktır; 390 px ve altında tam ekran çekmece; sayfa bağlamı (doctype, belge, seçili satırlar, filtreler) yapılandırılmış olarak gönderilir (G-88).
+- **Sağ yuva (AI paneli veya yardım paneli)**: aynı anda biri açıktır; içerik sütunu ile panel yan yana sığmadığında (eşik içerikten belirlenir) tam ekran çekmece; sayfa bağlamı (doctype, belge, seçili satırlar, filtreler) yapılandırılmış olarak gönderilir (G-88).
 - **Destek bandı**: Pending Support Access talebi ve aktif destek oturumu göstergesi (operatör presence, 'takip ediyor' durumu, 'Oturumu bitir') her sayfanın üstünde; uzaktan kontrol teklifi ayrı onay iletişim kutusuyla (SA-27, SA-29).
 - **Operatör modu**: Keycloak operatör rolü bootstrap'ta geldiğinde sidebar operatör navigasyonuna (Müşteri 360, Tahsilat, Destek, KVKK raporu) geçer; tenant verisi ile operatör verisi aynı ekranda karışmaz (SA-24).
 - Yön değişiminde form verisi, odak ve açık panel korunur; her eylemin klavye ve dokunma yolu vardır.

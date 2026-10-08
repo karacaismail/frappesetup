@@ -64,14 +64,30 @@ test.describe('content consistency', () => {
     expect(missing).toEqual([]);
   });
 
-  test('internal links point to existing pages', () => {
+  test('internal links point to existing pages and anchors', () => {
     const slugs = new Set(docs.map((d) => d.slug));
-    const broken: string[] = [];
-    for (const d of docs) {
-      for (const m of d.text.matchAll(/\]\(\/frappesetup\/([^/)#]*)\/?(#[^)]*)?\)/g)) {
-        if (m[1] && !slugs.has(m[1])) broken.push(`${d.slug} → ${m[1]}`);
+    // Çapalar derlenmiş HTML'deki gerçek id'lere karşı denetlenir (başlık kimliği üreticisi kaynakta tahmin edilmez).
+    const anchorCache = new Map<string, Set<string>>();
+    const anchorsOf = (slug: string) => {
+      if (!anchorCache.has(slug)) {
+        const html = readFileSync(new URL(slug ? `dist/${slug}/index.html` : 'dist/index.html', root), 'utf8');
+        anchorCache.set(slug, new Set([...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1])));
       }
+      return anchorCache.get(slug)!;
+    };
+    const broken: string[] = [];
+    let anchors = 0;
+    const check = (from: string, slug: string, fragment?: string) => {
+      if (slug && !slugs.has(slug)) return broken.push(`${from} → ${slug}`);
+      if (!fragment) return;
+      anchors++;
+      if (!anchorsOf(slug).has(decodeURIComponent(fragment))) broken.push(`${from} → ${slug || '/'}#${fragment}`);
+    };
+    for (const d of docs) {
+      for (const m of d.text.matchAll(/\]\(\/frappesetup\/([^/)#]*)\/?(?:#([^)\s]+))?\)/g)) check(d.slug, m[1], m[2]);
+      for (const m of d.text.matchAll(/\]\(#([^)\s]+)\)/g)) check(d.slug, d.slug, m[1]);
     }
+    expect(anchors, 'en az bir çapa denetlenmeli').toBeGreaterThan(0);
     expect(broken).toEqual([]);
   });
 
@@ -88,6 +104,27 @@ test.describe('content consistency', () => {
     expect(p0exit).not.toMatch(/Press'e (sosyal )?giriş/);
   });
 
+  test('built pages have no table rows rendered as paragraphs', () => {
+    // Tablo içindeki boş satır markdown tablosunu böler; kalan satırlar `<p>| …` olarak yayımlanır.
+    const dist = new URL('dist/', root);
+    const pages = readdirSync(dist, { recursive: true, encoding: 'utf8' }).filter((f) => f.endsWith('.html'));
+    expect(pages.length).toBeGreaterThan(docs.length);
+    const broken = pages.filter((f) => /<p>\s*\|/.test(readFileSync(new URL(f, dist), 'utf8')));
+    expect(broken).toEqual([]);
+  });
+
+  test('phase order has no backward dependency and the timeline matches phases.json', () => {
+    const ph = Object.fromEntries(phases.map((p) => [p.id, p]));
+    // Belgelenen bağımlılıklar: bağımlı faz önkoşulun bitişinden sonra başlar. P2'nin tek ara kapısı P1 içindeki
+    // Keycloak adımıdır (14. hafta, yol haritası metni).
+    const after: [string, string][] = [['P1', 'P0'], ['P2', 'P0'], ['P3', 'P1'], ['P4', 'P1'], ['P6', 'P2'], ['P5', 'P4']];
+    for (const [dep, pre] of after) expect(ph[dep].start, `${dep} ${pre} bitmeden başlıyor`).toBeGreaterThanOrEqual(ph[pre].end);
+    expect(ph.P2.start).toBeGreaterThan(ph.P1.start);
+    const timeline = read('src/components/Timeline.astro');
+    for (const p of phases) expect(timeline, `zaman çizelgesi ${p.id}`).toContain(`${p.start}–${p.end}. hafta`);
+    expect(timeline).toContain(`${Math.max(...phases.map((p) => p.end))} haftalık plan`);
+  });
+
   test('README counts match the requirement data', () => {
     const readme = read('README.md');
     const g = reqs.filter((r) => r.id.startsWith('G-')).length;
@@ -96,13 +133,24 @@ test.describe('content consistency', () => {
     expect(readme).toContain(`${docs.length} bölüm`);
   });
 
-  test('superseded names and hosts do not reappear in pages', () => {
+  test('superseded names and hosts do not reappear in pages or requirements', () => {
+    // Kaçışlı yazımlar (\\<kiracı\\>, &lt;kiracı&gt;) da yakalanır: metin önce normalleştirilir.
+    const norm = (t: string) => t.replace(/\\([<>_])/g, '$1').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+    const RULES: [RegExp, string][] = [
+      // Adın geçersiz olduğunu söyleyen yasak cümleleri ("... adı kullanılmaz", "... açılmaz") muaftır.
+      [/(?<![_\w])press\.api\.ops(?!.{0,40}(kullanılmaz|açılmaz))/, 'press.api.ops (press_tr.api.ops olmalı)'],
+      [/<kiracı>\.<marka>\.com\.tr/, '<kiracı>.<marka>.com.tr (app. alt bölgesi olmalı)'],
+      [/buy_credits_iyzico|press\.api\.billing\.create_iyzico/, 'iyzico ucu press_tr.api.billing.create_iyzico_checkout_form olmalı'],
+      [/kullanıcının Keycloak token/, 'kiracı verisi kullanıcının Keycloak belirteciyle değil aracı belirteciyle (G-148)'],
+    ];
     const offenders: string[] = [];
-    for (const d of docs) {
-      if (/(?<![_\w])press\.api\.ops/.test(d.text)) offenders.push(`${d.slug}: press.api.ops`);
-      if (/<kiracı>\.<marka>\.com\.tr/.test(d.text)) offenders.push(`${d.slug}: <kiracı>.<marka>.com.tr`);
-      if (/panel-spa/.test(d.text) && !/K-25/.test(d.text)) offenders.push(`${d.slug}: panel-spa`);
-    }
+    const scan = (where: string, text: string) => {
+      const t = norm(text);
+      for (const [re, why] of RULES) if (re.test(t)) offenders.push(`${where}: ${why}`);
+      if (/panel-spa/.test(t) && !/K-25/.test(t)) offenders.push(`${where}: panel-spa`);
+    };
+    for (const d of docs) scan(d.slug, d.text);
+    for (const r of reqs) scan(r.id, `${r.title} ${r.detail}`);
     expect(offenders).toEqual([]);
   });
 });

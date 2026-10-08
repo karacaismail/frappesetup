@@ -94,13 +94,19 @@ async function waitForMermaid(page: Page) {
   );
 }
 
-// Alt sınır 1rem: kök yazı boyutu büyütülmüşse (ör. %125, %200) ölçüt de onunla büyür.
-async function expectMinFont(page: Page) {
+// Alt sınır 1rem = tarayıcı varsayılanı (16 px) × testin kök ölçeği (%100, %125, %200). Kök boyut da denetlenir:
+// site `html` yazısını küçülterek (ör. %87,5) kuralı dolaylı biçimde aşamaz.
+const BROWSER_DEFAULT_PX = 16;
+async function expectMinFont(page: Page, rootPct = 100) {
+  const expectedRoot = (BROWSER_DEFAULT_PX * rootPct) / 100;
   const rootPx = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize));
+  expect(rootPx, `kök yazı boyutu ${rootPx}px, beklenen ${expectedRoot}px`).toBeCloseTo(expectedRoot, 1);
   const { min, count, where } = await minEffectiveFontPx(page);
   expect(count).toBeGreaterThan(20);
   expect(Number.isFinite(min)).toBe(true);
-  expect(min, `en küçük etkin yazı boyutu ${min}px (1rem = ${rootPx}px): ${where}`).toBeGreaterThanOrEqual(rootPx - 0.05);
+  expect(min, `en küçük etkin yazı boyutu ${min}px (1rem = ${expectedRoot}px): ${where}`).toBeGreaterThanOrEqual(
+    expectedRoot - 0.05,
+  );
 }
 
 // Belgede görünür outline taşıyan öğeler (tek odak göstergesi kuralı için).
@@ -127,6 +133,8 @@ test.describe('viewport matrix', () => {
           await page.goto(path);
           await expect(page.locator('h1')).toBeVisible();
           await waitForMermaid(page);
+          // Ayrıştırılamayan diyagram (ör. mesajda ';') hata çıktısıyla yayımlanmaz.
+          await expect(page.locator('figure.mermaid-figure[data-state="error"]'), 'Mermaid ayrıştırma hatası').toHaveCount(0);
           await noHorizontalOverflow(page);
           await expectMinFont(page);
         });
@@ -155,7 +163,7 @@ test.describe('text scaling', () => {
         await expect(page.locator('h1')).toBeVisible();
         await waitForMermaid(page);
         await noHorizontalOverflow(page);
-        await expectMinFont(page);
+        await expectMinFont(page, root);
         // Sabit başlık çubuğu scrollWidth'e yansımaz: eylem düğmesi görünür alanda kalmalı (işlev kaybı yok).
         const toggle = await page.getByTestId('color-scheme-toggle').boundingBox();
         expect(toggle, 'tema düğmesi çizilmeli').not.toBeNull();
@@ -220,6 +228,21 @@ test.describe('shell', () => {
     await expect(page.locator('html')).toHaveAttribute('data-mantine-color-scheme', 'dark');
   });
 
+  test('color scheme toggle follows a dark OS preference when nothing is stored', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('');
+    await waitForHydration(page);
+    const html = page.locator('html');
+    await expect(html).toHaveAttribute('data-mantine-color-scheme', 'dark');
+    // 'auto' tercihte düğme gerçek şemaya göre adlanır; tek tıklama açık temaya geçirir.
+    const toggle = page.getByTestId('color-scheme-toggle');
+    await expect(toggle).toHaveAccessibleName('Açık temaya geç');
+    await toggle.click();
+    await expect(html).toHaveAttribute('data-mantine-color-scheme', 'light');
+    await expect(toggle).toHaveAccessibleName('Koyu temaya geç');
+  });
+
   test('stored color scheme applies before hydration (ColorSchemeScript)', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light' });
     await page.addInitScript(() => {
@@ -279,10 +302,11 @@ test.describe('focus', () => {
     await page.goto('gereksinimler/');
     await waitForHydration(page);
     await page.mouse.move(1, 1);
-    const baseline = await frameStyles(page);
     const tab = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
     const seen = new Set<string>();
-    for (let i = 0; i < 60; i++) {
+    // Bir Tab adımı: kenarlık/gölge hiçbir öğede değişmez; görünür gösterge tam bir tanedir ve odaklanan öğede ya da
+    // görünmez kontrolün görsel vekilindedir (Switch girdisi opaklık 0, gösterge izde).
+    const step = async (baseline: Awaited<ReturnType<typeof frameStyles>>) => {
       await page.keyboard.press(tab);
       const now = await frameStyles(page);
       expect(now.length).toBe(baseline.length);
@@ -295,16 +319,37 @@ test.describe('focus', () => {
       for (const { s, b } of changed) {
         expect(s.frame, `odakta ikinci çerçeve (kenarlık/gölge): ${s.tag}`).toBe(b.frame);
       }
-      // Görünür gösterge tam bir tanedir ve odaklanan öğede ya da görünmez kontrolün görsel vekilindedir.
       const visible = changed.filter(({ s }) => s.opaque && s.outline !== 'none');
       for (const { s } of visible) expect(s.focused || s.proxy, `odak dışı öğede gösterge: ${s.tag}`).toBe(true);
       expect(visible.length, `tek görünür odak göstergesi: ${focused!.tag}`).toBe(1);
-      // Metin kutusundan sonra süzgeç açılır bölümünün özetine kadar devam: düğme, metin kutusu ve özet kapsanır.
-      if (await page.locator('.req-more > summary').evaluate((el) => el === document.activeElement)) break;
+      return { indicator: visible[0].s, tag: focused!.tag };
+    };
+    const isActive = (selector: string) => page.locator(selector).evaluate((el) => el === document.activeElement);
+
+    // 1) Öncelik düğmeleri ve metin kutusundan süzgeç bölümünün özetine kadar.
+    const closed = await frameStyles(page);
+    for (let i = 0; i < 60 && !(await isActive('.req-more > summary')); i++) await step(closed);
+    expect(await isActive('.req-more > summary')).toBe(true);
+    expect([...seen].some((t) => t.startsWith('INPUT')), `metin kutusuna ulaşılmadı: ${[...seen].join(', ')}`).toBe(true);
+
+    // 2) Özet Enter ile açılır; içindeki süzgeç düğmeleri ve ayrıntı anahtarı aynı kurala tabidir.
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.req-more')).toHaveAttribute('open', '');
+    const opened = await frameStyles(page);
+    const switchInput = '.req-explorer input[role="switch"]';
+    let switchIndicator: { proxy: boolean } | undefined;
+    let facetButtons = 0;
+    for (let i = 0; i < 60; i++) {
+      const { indicator, tag } = await step(opened);
+      if (tag.startsWith('BUTTON')) facetButtons++;
+      if (await isActive(switchInput)) {
+        switchIndicator = indicator;
+        break;
+      }
     }
-    const inputs = [...seen].filter((t) => t.startsWith('INPUT'));
-    expect(inputs.length, `Tab metin kutusuna ulaşmadı: ${[...seen].join(', ')}`).toBeGreaterThanOrEqual(1);
-    expect(await page.locator('.req-more > summary').evaluate((el) => el === document.activeElement)).toBe(true);
+    expect(facetButtons, 'açılan bölümdeki süzgeç düğmeleri Tab sırasında').toBeGreaterThan(0);
+    expect(switchIndicator, 'Tab ayrıntı anahtarına ulaşmadı').toBeTruthy();
+    expect(switchIndicator!.proxy, 'anahtarın göstergesi izde (görsel vekil) çizilir').toBe(true);
   });
 
   test('mouse never shows a ring; keyboard shows exactly one, radius unchanged', async ({ page, browserName }) => {
@@ -354,6 +399,77 @@ test.describe('focus', () => {
 });
 
 /* ------------------------------------------------------------------ */
+// Etkili dokunma alanı (AGENTS.md, --fs-hit): tek başına duran kontrol ince işaretçide ≥ 44, kaba işaretçi varsa ≥ 48
+// CSS px. Metin içi bağlantılar politikanın açık istisnasıdır ve ölçülmez. Görünmeyen (kapalı panel) öğeler atlanır.
+const STANDALONE_CONTROLS = [
+  '.skip-link',
+  '.icon-btn',
+  '.burger',
+  '.brand',
+  '.nav-link',
+  '.toc-link',
+  '.pager-link',
+  '.btn',
+  '.more',
+  '.rail',
+  '.section-card',
+  '.req-explorer .mantine-Button-root',
+  '.req-more > summary',
+  '.req-explorer .mantine-Switch-body',
+  '.req-explorer .mantine-Input-input',
+  'details.mermaid-details > summary',
+].join(', ');
+
+async function hitAreas(page: Page) {
+  return page.evaluate((sel) => {
+    const coarse = matchMedia('(any-pointer: coarse)').matches;
+    const rows = Array.from(document.querySelectorAll<HTMLElement>(sel))
+      .filter((el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden')
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        const name = `${el.tagName}.${String(el.className).split(' ')[0]} "${(el.textContent || '').trim().slice(0, 24)}"`;
+        return { name, w: r.width, h: r.height };
+      });
+    return { coarse, rows };
+  }, STANDALONE_CONTROLS);
+}
+
+async function expectHitAreas(page: Page, expectCoarse: boolean) {
+  const { coarse, rows } = await hitAreas(page);
+  expect(coarse, 'any-pointer: coarse profili').toBe(expectCoarse);
+  const min = coarse ? 48 : 44;
+  expect(rows.length, 'ölçülen kontrol sayısı').toBeGreaterThan(3);
+  const small = rows.filter((r) => r.w < min - 0.5 || r.h < min - 0.5).map((r) => `${r.name} ${r.w.toFixed(0)}×${r.h.toFixed(0)}`);
+  expect(small, `etkili alan < ${min} CSS px`).toEqual([]);
+}
+
+test.describe('touch targets', () => {
+  test('standalone controls keep a 44 px hit area with a fine pointer', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    for (const path of ['', 'kararlar/', 'rail-4-keycloak/', 'gereksinimler/']) {
+      await page.goto(path);
+      await waitForHydration(page);
+      await waitForMermaid(page);
+      if (path === 'gereksinimler/') await page.locator('.req-more > summary').click();
+      await expectHitAreas(page, false);
+    }
+  });
+
+  test('standalone controls keep a 48 px hit area with a coarse pointer @touch', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'Kaba işaretçi profili (iPhone 13) gerekir; ince işaretçi 44 px testinde.');
+    await page.goto('');
+    await waitForHydration(page);
+    await expectHitAreas(page, true);
+    await page.getByRole('button', { name: 'Menüyü aç' }).tap();
+    await expect(page.locator('.nav-link').first()).toBeVisible();
+    await expectHitAreas(page, true);
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    await page.locator('.req-more > summary').tap();
+    await expectHitAreas(page, true);
+  });
+});
+
 test.describe('requirements explorer', () => {
   const shouldCount = requirements.filter((r) => r.priority === 'SHOULD').length;
   const mayCount = requirements.filter((r) => r.priority === 'MAY').length;
@@ -678,7 +794,13 @@ test.describe('network budget', () => {
           .catch(() => undefined),
       );
     };
+    // Yarıda kalan istek ölçümü eksik bırakır: aynı origin'de başarısız istek testi düşürür.
+    const failed: string[] = [];
+    const onFailed = (req: import('@playwright/test').Request) => {
+      if (req.url().includes('/frappesetup/')) failed.push(`${req.url()} ${req.failure()?.errorText ?? ''}`);
+    };
     page.on('response', onResponse);
+    page.on('requestfailed', onFailed);
     try {
       await page.goto(path, { waitUntil: 'networkidle' });
       await waitForHydration(page);
@@ -687,7 +809,9 @@ test.describe('network budget', () => {
       await Promise.all(pending);
     } finally {
       page.off('response', onResponse);
+      page.off('requestfailed', onFailed);
     }
+    expect(failed, `yarıda kalan istek: /${path}`).toEqual([]);
     return assets;
   }
   const kb = (assets: Asset[], kind: string, filter: (a: Asset) => boolean = () => true) =>
@@ -717,15 +841,22 @@ test.describe('network budget', () => {
     expect(home.filter(isExplorer), 'gezgin adası yalnız Gereksinimler sayfasında').toEqual([]);
     expect(home.filter(isMermaid), 'mermaid yalnız diyagramlı sayfada').toEqual([]);
 
+    // Koşullu yükleme ad bağımsız denetlenir: kabuk dışındaki her JS parçası "ek" sayılır.
+    const shellUrls = new Set(home.filter((a) => a.kind === 'js').map((a) => a.url));
+    const extraJs = (assets: Asset[]) => assets.filter((a) => a.kind === 'js' && !shellUrls.has(a.url)).map((a) => a.url);
+
     const section = await load(page, 'kararlar/');
     expect(kb(section, 'html'), 'tipik bölüm HTML').toBeLessThanOrEqual(25);
     expect(section.filter(isMermaid), 'diyagramsız bölümde mermaid yok').toEqual([]);
+    expect(extraJs(section), 'adasız ve diyagramsız bölüm kabuk dışında JS indirmez').toEqual([]);
 
     const reqs = await load(page, 'gereksinimler/');
-    expect(kb(reqs, 'html'), 'Gereksinimler HTML').toBeLessThanOrEqual(200);
+    const reqsHtml = kb(reqs, 'html');
+    test.info().annotations.push({ type: 'ölçüm', description: `Gereksinimler HTML ${reqsHtml.toFixed(1)} KB gzip (bütçe 200)` });
+    console.log(`[bütçe] Gereksinimler HTML ${reqsHtml.toFixed(1)} KB`);
+    expect(reqsHtml, 'Gereksinimler HTML').toBeLessThanOrEqual(200);
     // Ada bütçesi: Gereksinimler sayfasının kabuğa EK olarak indirdiği tüm JS (adanın kendi parçası + yalnız onun
     // çektiği paylaşılmayan parçalar).
-    const shellUrls = new Set(home.filter((a) => a.kind === 'js').map((a) => a.url));
     const islandExtra = kb(reqs, 'js', (a) => !shellUrls.has(a.url));
     expect(kb(reqs, 'js', isExplorer), 'gezgin adası yüklendi').toBeGreaterThan(0);
     test.info().annotations.push({ type: 'ölçüm', description: `gezgin adası ek JS ${islandExtra.toFixed(1)} KB gzip` });
@@ -734,5 +865,6 @@ test.describe('network budget', () => {
 
     const diagram = await load(page, 'rail-4-keycloak/');
     expect(diagram.filter(isMermaid).length, 'diyagramlı sayfada mermaid dinamik yüklenir').toBeGreaterThan(0);
+    expect(extraJs(diagram).length, 'diyagram parçaları kabuğa ek olarak yalnız burada iner').toBeGreaterThan(0);
   });
 });

@@ -46,9 +46,10 @@ Tek Keycloak SSO oturumu her siteye etkileşimsiz OIDC dönüşüyle ayrı bir s
 sequenceDiagram
   autonumber
   participant U as Kullanıcı
-  participant P as Panel SPA
+  participant P as Panel SPA (panel.)
   participant PR as Press
   participant K as Keycloak
+  participant T as Kiracı SPA (kiracı host'u)
   participant S as Kiracı sitesi
   U->>P: panel adresi
   P->>PR: press.api.account.get (401)
@@ -59,12 +60,14 @@ sequenceDiagram
   PR->>K: token + userinfo
   PR->>PR: (iss, sub) ile User eşle (G-120), Team yoksa press_tr oluşturur (G-12), host'a bağlı sid
   PR-->>P: 302 redirect_to
-  P->>S: kiracı /panel (401)
-  P->>S: platform_core.api.auth.get_login_url
+  U->>T: site bağlantısı (kiracı host'una tam sayfa gezinme)
+  T->>S: get_bootstrap (401, aynı origin)
+  T->>S: platform_core.api.auth.get_login_url
   S-->>U: 302 Keycloak authorize (client site-kiraci)
-  K-->>S: SSO oturumu var, etkileşimsiz code, token + userinfo
+  K-->>U: SSO oturumu var, etkileşimsiz 302 code
+  S->>K: token + userinfo
   S->>S: (iss, sub) ile System User eşle (sign_ups=Deny, G-120), host'a bağlı sid + csrf_token (G-45)
-  S-->>P: get_bootstrap (G-63)
+  S-->>T: get_bootstrap (G-63, aynı origin)
 ```
 
 **Kayıt — yalnızca deneme akışı (G-79, G-31)**

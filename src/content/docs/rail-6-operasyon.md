@@ -4,7 +4,7 @@ nav: "Rail 6 · Operasyon"
 order: 9
 ---
 
-**Karar:** Superadmin paneli olmalıdır; Press (master 7a4384d) plan, abonelik, kullanım ölçümü, fatura, ön ödemeli kredi defteri, modül aboneliği, kart tahsilatı ve rızaya dayalı destek erişimi için **ticari kayıt sistemi** olarak yeter, ancak cari hesap, resmi muhasebe, e-Fatura/e-Arşiv, helpdesk, CRM, TRY/KDV, iyzico ve EFT için hiçbir şey sunmaz; bu işleri Press'in kendisi de dış bir ERPNext'e devreder (`create-fc-invoice`, `delete-fc-team` çağrıları repoda vardır, alıcıları yoktur). İdeal kurulum üç evdir: Press = kontrol düzlemi + faturalama motoru; operasyon sitesi = sahibin kendi ERPNext v16 sitesi (dogfooding) ve muhasebenin tek doğrusu; superadmin paneli = aynı React kabuğunun iki kaynağı birleştiren operatör modu.
+**Karar:** Superadmin paneli olmalıdır; Press (v0.155.3, `8493bf8`) plan, abonelik, kullanım ölçümü, fatura, ön ödemeli kredi defteri, modül aboneliği, kart tahsilatı ve rızaya dayalı destek erişimi için **ticari kayıt sistemi** olarak yeter, ancak cari hesap, resmi muhasebe, e-Fatura/e-Arşiv, helpdesk, CRM, TRY/KDV, iyzico ve EFT için hiçbir şey sunmaz; bu işleri Press'in kendisi de dış bir ERPNext'e devreder (`create-fc-invoice`, `delete-fc-team` çağrıları repoda vardır, alıcıları yoktur). İdeal kurulum üç evdir: Press = kontrol düzlemi + faturalama motoru; operasyon sitesi = sahibin kendi ERPNext v16 sitesi (dogfooding) ve muhasebenin tek doğrusu; superadmin paneli = aynı React kabuğunun iki kaynağı birleştiren operatör modu.
 
 ## Üç ev: Press · Superadmin paneli · Operasyon sitesi
 
@@ -31,7 +31,7 @@ order: 9
 
 Panel, tenant SPA ile aynı kabuktur; Keycloak operatör realm'inde `ops-admin`, `ops-billing`, `ops-support`, `ops-finance` rolleri kabuğu operatör moduna alır. Ekranlar: **Müşteri 360** (Team, Site'lar, Subscription, Invoice, Balance Transaction, Support Access + Customer, açık Sales Invoice, son Payment Entry, HD Ticket, CRM Deal), **Tahsilat ve kredi** (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), **Abonelik ve modüller**, **Destek** (ticket + Support Access + Support Session), **Tahsilat aşaması** (Unpaid → Suspended → Archive scheduled → Archived → Uncollectible), **KVKK denetim raporu**, **Gece mutabakat farkları**.
 
-Press erişimi iki katmanlıdır ve gerekçesi koddur: `press.api.client` `get/set_value/delete/run_doc_method` Support Access'i tanır (client.py L246-260, L336-375), fakat başka takımın Team/Invoice/BT tekil yazması yalnız `frappe.local.system_user()` ile açılır (ownership.py L80-105). Bu yüzden **site düzeyi destek eylemleri** Press Support Agent + Accepted Support Access ile `press.api.client.run_doc_method` üzerinden, **ticari yazmalar** ise System User servis hesabı + `press_tr.api.ops` üzerinden yapılır. Panelin BFF'i operatör başına Press API key/secret ve `X-Press-Team` başlığı kullanır; paylaşımlı anahtar yoktur. `press.api.client.get_list` + `skip_team_filter_for_system_user_and_support_agent` bayrağı Press Support Agent'a Support Access'siz çapraz-kiracı liste okuması verdiği için (client.py L164-170) bu rol KVKK envanterinde ayrıcalıklı sayılır ve her çağrı loglanır. Gerçek zamanlılık: panel verisi TanStack Query ile yenilenir; destek oturumu presence'ı Hocuspocus odasından gelir; ops sitesi `frappe.realtime` kanalı ticket güncellemeleri için kullanılır (doğrulanacak).
+Press erişimi iki katmanlıdır ve gerekçesi koddur: `press.api.client` `get/set_value/delete/run_doc_method` Support Access'i tanır (client.py L246-260, L336-375), fakat başka takımın Team/Invoice/BT tekil yazması yalnız `frappe.local.system_user()` ile açılır (client.py L442-447, takım sahipliği ownership.py L80-105; v0.155.3). Bu yüzden **site düzeyi destek eylemleri** Press Support Agent + Accepted Support Access ile `press.api.client.run_doc_method` üzerinden, **ticari yazmalar** ise System User servis hesabı + `press_tr.api.ops` üzerinden yapılır. Panelin BFF'i operatör başına Press API key/secret ve `X-Press-Team` başlığı kullanır; paylaşımlı anahtar yoktur. `press.api.client.get_list` + `skip_team_filter_for_system_user_and_support_agent` bayrağı Press Support Agent'a Support Access'siz çapraz-kiracı liste okuması verdiği için (client.py L164-170) bu rol KVKK envanterinde ayrıcalıklı sayılır ve her çağrı loglanır. Gerçek zamanlılık: panel verisi TanStack Query ile yenilenir; destek oturumu presence'ı Hocuspocus odasından gelir; ops sitesi `frappe.realtime` kanalı ticket güncellemeleri için kullanılır (doğrulanacak).
 
 ## Operasyon sitesi
 
@@ -66,7 +66,7 @@ Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi y
 
 ## İzinli destek oturumu
 
-**Yaşam döngüsü.** HD Ticket → operatör Support Access talebi (`resources=[Site]`, `login_as_administrator`, `allowed_for` 3–168 saat, `reason`) → tenant SPA onay bandı (Pending talepler 7 gün sonra `expire_pending_requests` ile düşer; saatlik değil) → Accepted → platform core `Support Session` kaydı (operatör, kapsam, başlangıç/bitiş, rıza sürümü) → bitiş: süre dolumu, müşteri Revoke, operatör Forfeit.
+**Yaşam döngüsü.** HD Ticket → operatör Support Access talebi (`resources=[Site]`, kapsam, `allowed_for` 3–168 saat, `reason`; görüntüle ve takip talebinde `login_as_administrator=0`) → tenant SPA onay bandı (Pending talep 7 gün sonra saatlik `expire_pending_requests` işiyle düşer; Press v0.155.3) → Accepted → Press, kiracı sitesindeki `platform_core`'da servis JWT'siyle `Support Session` açar (operatör, kapsam, başlangıç/bitiş, rıza sürümü) → bitiş: süre dolumu, müşteri Revoke, operatör Forfeit. Temsil ve Administrator yükseltmesi aynı talebin parçası değildir; her biri ayrı talep ve ayrı rızadır.
 
 **Kapsamlar ve izinler (SA-42..SA-44).** Bu bölüm tasarım sözleşmesidir; uygulanmadı ve test edilmedi. Görüntüleme rızası yönetici erişimine dönüşmez; her kapsam ayrı rıza, ayrı süre ve sunucuda zorlanan ayrı izindir.
 
@@ -75,7 +75,7 @@ Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi y
 | Görüntüle | Paylaşılan ekran durumu: rota, filtre, sıralama, sayfa, kaydırma, seçim, maskeli satır özeti, form taslağının maskesiz alanları, imleç; kiracı API oturumu yok | Support Access (3–168 saat) | Bilet + aktif Support Session; maskeleme kaynakta (SA-43) |
 | Takip | Operatör görünümü müşterininkine kilitlenir | Ayrı onay | Aynı |
 | Kontrol | Operatör eylem önerir; eylem müşterinin tarayıcısında, müşterinin oturumu ve yetkisiyle çalışır; varsayılan tek tek onay, silme/iptal/submit/ücretli eylem her zaman ayrı onay; tek kontrol kilidi | Ayrı onay, kısa süre (K-33) | Öneri ve onaylar denetimde; kayıtlar `support_session` ve operatörle işaretli (SA-44) |
-| Temsil | Ayrı oturum: belirli kullanıcının rızasıyla `user.impersonate` veya kapsamı daraltılmış destek kullanıcısı; Administrator yalnız yükseltme rızasıyla | Ayrı rıza, en kısa süre (K-19, K-33) | Her istekte aktif Support Session ve kapsam; Security Alert (SA-28) |
+| Temsil | Ayrı oturum: belirli kullanıcının rızasıyla `platform_core` kapısından `user.impersonate` veya kapsamı daraltılmış destek kullanıcısı; operatöre Administrator oturumu verilmez. Administrator (`login_as_administrator=1`, `Site.login_as_admin`) yalnız ayrı, daha kısa süreli yükseltme talebiyle | Ayrı rıza, en kısa süre (K-19, K-33) | Her istekte aktif Support Session ve kapsam; Security Alert (SA-28) |
 
 - **Gösterge:** müşteri ekranında sürekli görünür bant: operatör adları, kapsam, kalan süre, klavyeyle erişilen "Oturumu bitir".
 - **Çoklu destekçi:** her operatörün ayrı izni vardır; kontrol kilidi tek operatördedir.
@@ -83,29 +83,31 @@ Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi y
 - **İptal:** Revoke veya süre dolumu Hocuspocus bağlantılarını sunucudan kapatır, yeniden kimlik doğrulamayı reddeder, temsil oturumunu sonlandırır, bekleyen önerileri düşürür ve biletleri iptal listesine alır. Kabul: 2 sn içinde WebSocket kapanır, temsil oturumundaki API çağrısı 401/403.
 - **Maskeleme:** permlevel ile gizli alanlar, uygulamanın `support_mask_fields` listesi ve kişisel veri sınıfları (TCKN, IBAN, kart, maaş) ağa hiç çıkmaz.
 
-**Hocuspocus.** v4.7.0 (MIT) Hetzner'de ayrı servis (owner: Hüseyin Cengiz): Node + reverse proxy TLS, `extension-redis` (çoklu düğüm), `extension-webhook` (olaylar Press/ops denetim kaydına), `onAuthenticate` kiracı sitesinin bastığı tek kullanımlık bilet (G-148) + aktif Support Session doğrular; oda `support-session:{site}:{id}`; oturum kapanınca oda silinir. İptal ve süre dolumunda sunucu açık bağlantıları kapatır ve yeniden kimlik doğrulamayı reddeder; imleç akışı saklanmaz (K-18).
+**Hocuspocus.** v4.7.0 (MIT) Hetzner'de ayrı servis (owner: Hüseyin Cengiz): Node + reverse proxy TLS, `extension-redis` (çoklu düğüm), `extension-webhook` (olaylar Press/ops denetim kaydına), `onAuthenticate` kiracı sitesinin (`platform_core`) bastığı tek kullanımlık bileti (G-148), aktif Support Session'ı ve kapsamı doğrular. Biletleri tek yayıncı basar: müşteri kendi site oturumuyla, operatör ise ops BFF'nin servis JWT'si ve operatör kimliğiyle aynı siteden alır; operatörün kiracı API oturumu yoktur; oda `support-session:{site}:{id}`; oturum kapanınca oda silinir. İptal ve süre dolumunda sunucu açık bağlantıları kapatır ve yeniden kimlik doğrulamayı reddeder; imleç akışı saklanmaz (K-18).
 
 ```mermaid
 sequenceDiagram
-    participant Op as Operatör (panel)
+    participant Op as Operatör paneli (ops BFF)
     participant P as Press
     participant T as Tenant SPA
+    participant S as Tenant site (platform_core)
     participant H as Hocuspocus
-    participant S as Tenant site (Frappe v16)
-    Op->>P: Support Access talebi (Site, login_as_administrator, allowed_for, reason)
+    Op->>P: Support Access talebi (Site, kapsam: görüntüle, login_as_administrator=0, allowed_for, reason)
     P-->>T: Pending bildirimi (onay bandı)
     T->>P: Accept (yalnız hedef takım yöneticisi)
-    P->>P: Support Session oluştur (kapsam: görüntüle)
-    Op->>H: odaya bağlan (site bileti + session id)
-    H->>P: onAuthenticate: Support Session aktif mi?
-    T->>H: awareness (route, imleç)
-    Op->>H: kontrol önerisi veya temsil talebi
+    P->>S: Support Session aç (servis JWT, kapsam: görüntüle)
+    T->>S: bilet (müşteri oturumu)
+    Op->>S: bilet (servis JWT + operatör kimliği)
+    Op->>H: odaya bağlan (tek kullanımlık bilet)
+    H->>S: onAuthenticate: bilet, aktif Support Session, kapsam
+    T->>H: awareness (rota, imleç, maskeli durum)
+    Op->>H: kontrol önerisi
     H-->>T: "İzin ver?" iletişim kutusu
-    T->>H: onay
-    Op->>P: Site.login_as_admin / user.impersonate(reason)
-    P->>S: sid / Activity Log 'Impersonate' + Security Alert
-    H->>P: extension-webhook: oturum olayları → denetim kaydı
-    T->>P: Revoke veya süre dolumu → bağlantılar kapanır, temsil oturumu sonlanır
+    T->>H: onay (eylem müşterinin oturumuyla çalışır)
+    Note over Op,S: Temsil ve Administrator yükseltmesi ayrı talep ve ayrı rızadır
+    H->>S: extension-webhook: oturum olayları → denetim kaydı
+    T->>P: Revoke veya süre dolumu
+    P->>S: Support Session kapat → bağlantılar kapanır, biletler iptal, temsil sonlanır
 ```
 
 **Denetim ve KVKK.** Support Access, Support Session, Team Member Impersonation, Site Activity, Activity Log, HD Ticket ve AI denetim kayıtları tek raporda; `Legal Document Acceptance` (belge, sürüm, içerik hash'i, kullanıcı, zaman) rızayı sürümler; saklama/legal hold matrisi silme işlerini (`Team Deletion Request`, yedek silme, anonimleştirme) durdurabilir.
@@ -118,7 +120,7 @@ sequenceDiagram
 - Kart tahsilatı: iyzico webhook/payment record, saklı kart veya abonelik ürünü.
 - Dunning: `suspend_sites.execute`, `Payment Due Extension`, arşiv ve yedek saklama (yapılandırılabilir hale getirilmiş).
 - Modül aboneliği ve aktivasyon sinyali (`Marketplace App Subscription`, `subscription_update_hook`).
-- Rıza ve süre modeli: `Support Access`, `Site.login_as_admin`, `Team.impersonate`.
+- Rıza ve süre modeli: `Support Access` (kapsam ve süre), `Site.login_as_admin` (yalnız Administrator yükseltmesi), `Team.impersonate`.
 - Müşteri silme akışı: `Team Deletion Request` (`process_team_deletion_requests` cron 15 2,4 \* \* \*).
 - Partner programı: `Partner Lead`, `Partner Tier`, `Payout Order`, Paid By Partner.
 - Altyapı: bench/server/site aksiyonları, Press Desk ve Press MCP (infra allow-list).
@@ -130,7 +132,7 @@ sequenceDiagram
 - **Ops sitesi / Agent servisi → Press (`press_tr.api.ops`, System User only):** `record_bank_transfer`, `allocate_credit`, `refund_invoice`, `extend_payment_due`, `suspend_team`/`unsuspend_team`, `create_team`, `create_support_access_on_behalf`; her çağrı `reason` + Comment + Version.
 - **Agent servisi → Press:** `Usage Record` (plan\_type `AI Credit Plan`, interval Daily) System User servis hesabıyla; öncesinde `Team.get_balance` ve `spending_limit`.
 - **Tenant app → Press (guest, secret\_key):** `press.api.developer.marketplace.get_subscription_info`, `change_site_plan`.
-- **Shell → Press (X-Press-Team):** `press.api.billing.past_invoices`, `upcoming_invoice`, `get_balance_credit`, `create_iyzico_checkout_form`; `press.api.access.status`; Support Access Accept/Reject `run_doc_method`.
+- **Shell → Press (X-Press-Team):** `press.api.billing.past_invoices`, `upcoming_invoice`, `get_balance_credit`; `press_tr.api.billing.create_iyzico_checkout_form`; `press.api.access.status`; Support Access Accept/Reject `run_doc_method`.
 - **Shell → ops sitesi (agent servisi relay):** HD Ticket aç/listele; `platform_core.api.ops.customer_360(team)` (yeni) (operatör modu, Keycloak kimliği).
 - **iyzico → Press:** HPP webhook (`token`, `iyziEventType`, `status` SUCCESS/INIT\_\*/PENDING\_CREDIT/FAILURE), `X-IYZ-SIGNATURE-V3`; 15 dk aralıkla 3 yineleme; SUCCESS sonrası CF retrieve zorunlu.
-- **Hocuspocus → Press/ops:** `extension-webhook` oturum olayları; `onAuthenticate` → site bileti + `Support Session` durumu ve kapsamı.
+- **Hocuspocus → kiracı sitesi ve ops:** `extension-webhook` oturum olayları; `onAuthenticate` → kiracı sitesi (`platform_core`): bilet, `Support Session` durumu ve kapsamı.

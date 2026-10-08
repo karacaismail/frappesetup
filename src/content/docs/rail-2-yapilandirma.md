@@ -12,7 +12,7 @@ Bu ray, kiracı bench'lerinde (Frappe v16 + ERPNext v16) yalnızca ayar ve kayı
 | --- | --- | --- |
 | Platform varsayılanı | Press Settings.bench\_configuration | Yalnızca yeni bench (doğrulandı) |
 | Release Group ortak (mail\_\*, workers; `allow_cors` tanımlanmaz, G-119) | common\_site\_config\_table → `update_config` | Mevcut bench'lere yayılır |
-| Site'a özgü (encryption\_key, keycloak\_client\_secret, sk\_\&lt;app&gt;) | Site.configuration | Tek site |
+| Site'a özgü (encryption\_key, keycloak\_client\_secret, sk\_&lt;app&gt;) | Site.configuration | Tek site |
 
 Site Config Key tohumlama press\_tr fixture'ıdır: Password → `mail_password`, `encryption_key`, `backup_encryption_key`, `keycloak_client_secret`; internal=1 → `host_name`, `server_script_enabled`, `plan_limit`. Kabul: mevcut bench'te `bench show-config` güncel değeri gösterir.
 
@@ -37,7 +37,7 @@ Site Config Key tohumlama press\_tr fixture'ıdır: Password → `mail_password`
 
 ## Giden e-posta (G-47)
 
-Release Group `common_site_config`: mail\_server, mail\_port=587, use\_tls=1, mail\_login, mail\_password (Password), auto\_email\_id `bildirim@<marka>`, always\_use\_account\_email\_id\_as\_sender=1, always\_use\_account\_name\_as\_sender\_name=1, email\_sender\_name=\&lt;marka&gt;. System Settings: `welcome/reset_password` şablonları platform Email Template'lerine bağlı, `email_footer_address` dolu, disable\_standard\_email\_footer=1, email\_retry\_limit=3. Relay Hetzner'de Postfix veya AB bölgeli sağlayıcı (KVKK envanterine girer): Hüseyin Cengiz relay'i kurar ve SPF/DKIM/DMARC/PTR değerlerini hazırlar, Asistan Hüseyin GoDaddy'de kayıtları uygular, Hüseyin Cengiz teslimatı doğrular. Kiracı kendi gönderici domainini Email Domain + Email Account ile panelden tanımlar; kota App Plan features'a bağlıdır.
+Release Group `common_site_config`: mail\_server, mail\_port=587, use\_tls=1, mail\_login, mail\_password (Password), auto\_email\_id `bildirim@<marka>`, always\_use\_account\_email\_id\_as\_sender=1, always\_use\_account\_name\_as\_sender\_name=1, email\_sender\_name=&lt;marka&gt;. System Settings: `welcome/reset_password` şablonları platform Email Template'lerine bağlı, `email_footer_address` dolu, disable\_standard\_email\_footer=1, email\_retry\_limit=3. Relay Hetzner'de Postfix veya AB bölgeli sağlayıcı (KVKK envanterine girer): Hüseyin Cengiz relay'i kurar ve SPF/DKIM/DMARC/PTR değerlerini hazırlar, Asistan Hüseyin GoDaddy'de kayıtları uygular, Hüseyin Cengiz teslimatı doğrular. Kiracı kendi gönderici domainini Email Domain + Email Account ile panelden tanımlar; kota App Plan features'a bağlıdır.
 
 ## Dosya depolama (G-48)
 

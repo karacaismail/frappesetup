@@ -81,9 +81,9 @@ def timeline() -> str:
         o.append(f"<text x='{tx:.1f}' y='{ny}' text-anchor='{anchor}'{fw} fill='var(--fs-ink)'>{name}</text>")
     o.append("</svg>")
     caption = (
-        "P2 ticari katman P1'in Keycloak adımı biter bitmez başlar ve operasyon sitesinin finans çekirdeğini içerir; "
-        "P3 AI ve P4 CronHR ilk dikey dilimden sonra paralel yürür; P6 operasyon düzlemi P2'nin finans çekirdeği "
-        "teslim edildikten sonra açılır; P5 ilk ödeyen müşteriden sonra gelir."
+        "P2 ticari katman P1'in Keycloak ara kapısından (14. hafta) başlar ve operasyon sitesinin finans çekirdeğini "
+        "içerir; P3 AI ve P4 CronHR ilk dikey dilimden sonra paralel yürür; P6 operasyon düzlemi P2 tamamlanınca açılır; "
+        "P5 ilk ödeyen müşteriden sonra gelir."
     )
     return figure("diagram-timeline", "Yol haritası zaman çizelgesi", "\n".join(o), caption, "Yol haritası zaman çizelgesi")
 

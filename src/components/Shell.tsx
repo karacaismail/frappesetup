@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Anchor,
   AppShell,
@@ -8,6 +8,7 @@ import {
   MantineProvider,
   Stack,
   Text,
+  useComputedColorScheme,
   useMantineColorScheme,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -47,10 +48,12 @@ const NAVBAR_WIDTH = 280;
 const ASIDE_WIDTH = 248;
 
 function ColorSchemeToggle() {
-  const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const { setColorScheme } = useMantineColorScheme();
+  // 'auto' tercih (kayıt yok) işletim sistemi şemasına çözülür; ilk değer efektte okunur, SSR çıktısıyla aynı başlar.
+  const computed = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  const dark = mounted && colorScheme === 'dark';
+  const dark = mounted && computed === 'dark';
   const label = dark ? 'Açık temaya geç' : 'Koyu temaya geç';
   return (
     <button
@@ -109,6 +112,18 @@ function useScrollSpy(slugs: string[]) {
 
 function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, children }: ShellProps) {
   const [opened, { toggle, close }] = useDisclosure(false);
+  const navRef = useRef<HTMLDivElement>(null);
+  // Etkin bölüm bağlantısı gezinme listesinin görünür alanında değilse yalnız liste kaydırılır (odak ve sayfa
+  // kaydırması değişmez); mobil çekmece açılınca da aynı denetim yapılır.
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('.nav-link[data-active]');
+    if (!nav || !active) return;
+    const n = nav.getBoundingClientRect();
+    const a = active.getBoundingClientRect();
+    if (n.height === 0) return;
+    if (a.top < n.top || a.bottom > n.bottom) nav.scrollTop += a.top - n.top - (n.height - a.height) / 2;
+  }, [opened]);
   const toc = headings.filter((h) => h.depth === 2);
   const active = useScrollSpy(toc.map((h) => h.slug));
 
@@ -159,6 +174,7 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap" className="header-start">
             <Burger
+              className="burger"
               opened={opened}
               onClick={toggle}
               hiddenFrom="md"
@@ -187,7 +203,7 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
       </AppShell.Header>
 
       <AppShell.Navbar id="site-nav" p="sm" aria-label="Bölümler" className="site-nav">
-        <AppShell.Section grow className="nav-scroll">
+        <AppShell.Section grow className="nav-scroll" ref={navRef}>
           <Stack gap={2}>{top.map(renderLink)}</Stack>
           {groups.map(([group, items]) => (
             <Box key={group} mt="md">

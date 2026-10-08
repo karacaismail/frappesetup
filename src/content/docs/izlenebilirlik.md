@@ -11,7 +11,7 @@ Bu sayfa değerlendirme raporundaki her maddenin sonucunu ve bu sürümdeki doğ
 | Madde | Konu | Sonuç | Nerede |
 | --- | --- | --- | --- |
 | T-03 | Araştırmanın kararlara izlenebilir bağlanması | Kapatıldı: kaynak defteri (aşağıda) ve kalıcı kayıt kuralı G-128 | Bu sayfa |
-| Y-01 | P2'nin P6 çıktısına bağımlılığı | Kapatıldı: operasyon sitesi finans çekirdeği P2'ye alındı (SA-17, SA-18, SA-19, SA-21, SA-22, SA-23, SA-34, SA-35) | [Yol haritası](/frappesetup/yol-haritasi/) |
+| Y-01 | P2'nin P6 çıktısına bağımlılığı | Kapatıldı: operasyon sitesi finans çekirdeği P2'ye alındı (SA-17, SA-18, SA-19, SA-21, SA-22, SA-23, SA-34, SA-35); P6 P2 tamamlanınca (26. hafta) başlar; faz sırası tutarlılık testinde | [Yol haritası](/frappesetup/yol-haritasi/) |
 | Y-02 | P1 dilimi ve P0 kabulünün sonraki faz kalemlerine bağımlılığı | Kapatıldı: AI ve destek adımları ayrı kabullü prototip (G-129, SA-40); P0 çıkışı yalnız P0 kalemlerine dayanır | [Yol haritası](/frappesetup/yol-haritasi/) |
 | Y-03 | SSO ile site oturumunun karışması, origin | Kapatıldı: host'a bağlı oturum ve origin tablosu, CORS yok (G-119); tarayıcı belirteç modeli önerisi | [Rail 4](/frappesetup/rail-4-keycloak/); karar bekliyor K-25 |
 | Y-04 | DNS delegasyonu ile kiracı adresi | Kapatıldı: kiracılar `<kiracı>.app.<marka>.com.tr` | [Raylar](/frappesetup/raylar/), K-2 |
@@ -20,7 +20,7 @@ Bu sayfa değerlendirme raporundaki her maddenin sonucunu ve bu sürümdeki doğ
 | Y-07 | "Veri Hetzner'de" ile AI aktarımı, maskeleme sırası | Kapatıldı: saklama, işleme, aktarım ayrı; ilk dış çağrıdan önce yerel maskeleme (G-90); aktarım mekanizması hukuk kararı | [Rail 5](/frappesetup/rail-5-ai/), G-116 |
 | Y-08 | Lisans gerekçesi | Gerekçe düzeltildi (Frappe MIT, ERPNext GPL-3.0); seçim karar bekliyor; bu deponun onay kaydı karar bekliyor | K-1, K-32 |
 | Y-09 | WBS yerine teknik ağaç | Kapatıldı: kod ağacı, çalışma/veri ağacı ve teslim WBS'si | [Raylar](/frappesetup/raylar/), [Yol haritası](/frappesetup/yol-haritasi/) |
-| Y-10 | Hidrasyon düzeltmesinin testte kalması | Kapatıldı: ürün kök neden düzeltmesi + yinelemesiz regresyon testi; ara yayın commit'i `692a380` | Bu depo |
+| Y-10 | Hidrasyon düzeltmesinin testte kalması | Kapatıldı: ürün kök neden düzeltmesi + yinelemesiz regresyon testi; ara yayın `692a380` main'de ([CI koşusu](https://github.com/karacaismail/frappesetup/actions/runs/37760273507): Ubuntu'da 230 passed, Pages dağıtımı başarılı) | Bu depo |
 | Y-11 | axe ve görsel doğrulamanın kapsamı | axe kapısı tüm sayfalar, tüm etki düzeyleri ve best-practice; görsel regresyon durumu aşağıda | Bu sayfa, QA kanıtı |
 | E-01 | Kalıcı kullanıcı kimliği | Kapatıldı: `(iss, sub)` eşlemesi (G-120) | [Rail 4](/frappesetup/rail-4-keycloak/) |
 | E-02 | ReBAC kapsamı ve birleşim | Kapatıldı: birleşim kuralı (G-60), ilişki kataloğu P5 (G-122) | [Rail 2 geliştirme](/frappesetup/rail-2-gelistirme/) |
@@ -63,7 +63,7 @@ Her satır 2026-10-08'de doğrulandı. Hareketli dal tek başına kanıt sayılm
 | KD-02 | ERPNext ve HRMS GPL-3.0 | [erpnext](https://github.com/frappe/erpnext/blob/v16.50.0/license.txt), [hrms](https://github.com/frappe/hrms/blob/v16.50.0/license.txt) | v16.50.0 (`7474d9e`, `7c03769`) | Kaynak dosya |
 | KD-03 | Press, Agent, CRM, Helpdesk AGPL-3.0 | [press](https://github.com/frappe/press/blob/v0.155.3/license.txt) | press v0.155.3 `8493bf8`; crm v1.86.0; helpdesk v1.30.1 | Kaynak dosya |
 | KD-04 | ERPNext destek: v14 31 Ocak 2026'da bitti, v15 2027 sonu, v16 2029 sonu (planlı) | [Supported Versions](https://github.com/frappe/erpnext/wiki/Supported-Versions/304a17ecd1c1e7d12576dc8c1745dda0d0e57c1c) | wiki `304a17e` | Resmi wiki revizyonu |
-| KD-05 | Press son sürüm ve Frappe aralığı beyanı (`>=15,<17`; v16 çalışması doğrulanmadı) | [pyproject](https://github.com/frappe/press/blob/a5abd7d50256a1af98bcec46d7f5bf3ede684669/pyproject.toml#L91-L92) | v0.155.3 (2026-10-08) | Kaynak dosya |
+| KD-05 | Press son sürüm ve Frappe aralığı beyanı (`>=15,<17`; v16 çalışması doğrulanmadı) | [pyproject](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/pyproject.toml#L91-L92) | v0.155.3, `8493bf8` (etiket commit'i) | Kaynak dosya |
 | KD-06 | `allow_cors` tam eşleşme; `"*"` origin'i kimlik bilgisiyle yansıtır | [app.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/app.py#L319-L353) | `6b450a1` | Kod okuma |
 | KD-07 | Site `rate_limit` istek süresi toplamını site geneli ölçer | [rate\_limiter.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/rate_limiter.py#L48-L97) | `6b450a1` | Kod okuma |
 | KD-08 | `get_all` izin uygulamaz | [Database API](https://docs.frappe.io/framework/user/en/api/database) | Güncel doküman | Resmi doküman |
@@ -83,20 +83,33 @@ Her satır 2026-10-08'de doğrulandı. Hareketli dal tek başına kanıt sayılm
 | KD-22 | Çerezlerde açık rıza ölçütleri | [KVKK Çerez Rehberi](https://www.kvkk.gov.tr/SharedFolderServer/CMSFiles/fb193dbb-b159-4221-8a7b-3addc083d33f.pdf) | Temmuz 2025 | Resmi rehber |
 | KD-23 | Metabase gömme türleri ve lisansı | [Metabase](https://www.metabase.com/docs/latest/embedding/introduction) | v0.64 | Resmi doküman |
 | KD-24 | Frappe Pulse yalnız `pulse_api_key` ile açılır | [client.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/utils/telemetry/pulse/client.py#L10-L20) | `6b450a1` | Kod okuma |
+| KD-25 | Pending Support Access 7 gün sonra saatlik `expire_pending_requests` işiyle düşer | [hooks.py](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/press/hooks.py#L256-L264), [support\_access.py](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/press/press/doctype/support_access/support_access.py#L14) | v0.155.3, `8493bf8` | Kod okuma |
+| KD-26 | `press.api.client` Support Access'i tanır; başka takımın belgesi yalnız `system_user` ile açılır | [client.py](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/press/api/client.py#L442-L447), [ownership.py](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/press/access/ownership.py#L80-L105) | v0.155.3, `8493bf8` | Kod okuma |
 
 ## Bu sitenin QA kanıtı
 
-Durumlar: pass, fail, not\_run. Emülasyon gerçek cihaz yerine geçmez; yerel geçiş CI geçişi sayılmaz.
+Durumlar: pass, fail, not\_run. Emülasyon gerçek cihaz yerine geçmez; yerel geçiş CI geçişi sayılmaz. Yerel sonuçlar macOS'ta Playwright 1.64.0 ile alındı; Linux (ubuntu-24.04) kanıtı ayrı satırdadır.
 
 | Kontrol | Kapsam | Durum |
 | --- | --- | --- |
-| Derleme | `npm run build` | pass (yerel); CI sonucu teslim notunda |
-| Playwright kapısı | Chromium, Firefox, WebKit; iPhone 13 emülasyonu yalnız dokunma senaryolarında | Sonuç teslim notunda |
+| Derleme | `npm run build` | pass (yerel) |
+| Playwright kapısı | Chromium, Firefox, WebKit × 320–1366 px; iPhone 13 emülasyonu yalnız `@touch` senaryolarında | pass (yerel); Linux CI sonucu aşağıda |
 | axe | Tüm sayfalar × açık/koyu tema; WCAG 2.0/2.1/2.2 A ve AA + best-practice kuralları; her etki düzeyi başarısızlıktır | pass; otomatik kural kapsamıdır, tam AA uyumu iddiası değildir |
-| Odak | Klavye odağında tek görünür outline yalnız odaklanan öğede (Switch'te görünmez girdinin izinde); kenarlık ve gölge ikinci çerçeve üretmez; fare tıklaması gösterge üretmez | pass (üç motor) |
-| Tutarlılık | Gereksinim kimlikleri, G/SA/K atıfları, iç bağlantılar, faz kararları, eski adlar, README sayıları | pass (Chromium) |
-| Yazı ölçeği | Kök yazı %125 (320 px) ve %200 (390 ve 1366 px): taşma yok, metin ≥ 1rem, başlık düğmeleri görünür | pass (üç motor) |
-| Ağ bütçesi | Kabuğun ilk görünüm toplam JS'i ≤ 100 KB, gezgin adasının ek JS'i ≤ 30 KB, HTML/CSS/yazı tipi, koşullu mermaid | pass (Chromium) |
-| Hidrasyon | Ada JS'i bekletilip bir kez yazılan metin korunur; düzeltme olmadan test başarısız | pass |
-| Görsel regresyon | Linux referans görüntüleriyle karşılaştırma | Teslim notunda |
+| Odak | Klavye odağında tek görünür outline yalnız odaklanan öğede; süzgeç bölümü klavyeyle açılır, içindeki düğmeler ve ayrıntı anahtarı (görünmez girdi, gösterge izde) dahil; kenarlık ve gölge ikinci çerçeve üretmez; fare tıklaması gösterge üretmez | pass (üç motor) |
+| Dokunma hedefi | Tek başına duran kontrollerin etkili alanı ince işaretçide ≥ 44, kaba işaretçide ≥ 48 CSS px (`--fs-hit`); metin içi bağlantılar istisna | pass (üç motor, 1366 px); pass (iPhone 13, kaba işaretçi) |
+| Tema | İşletim sistemi koyu, kayıtlı tercih yokken düğme "Açık temaya geç" der ve tek tıklama açığa geçirir; kayıtlı tercih hidrasyondan önce uygulanır | pass (üç motor); düzeltmeden önce üç motorda fail |
+| Tutarlılık | Gereksinim kimlikleri, G/SA/K atıfları, iç bağlantılar ve derlenmiş HTML'deki çapalar, faz sırası ve zaman çizelgesi, paragrafa dönüşen tablo satırı, eski adlar (kaçışlı yazımlar dahil), README sayıları | pass (Chromium) |
+| Yazı ölçeği | Kök yazı %100, %125 (320 px) ve %200 (390 ve 1366 px): kök boyut beklenen değerde, taşma yok, metin ≥ 1rem, başlık düğmeleri görünür; Mermaid hata çıktısı yok | pass (üç motor) |
+| Ağ bütçesi | Kabuğun ilk görünüm toplam JS'i 96,9 KB ≤ 100 (giriş parçaları 77,9 KB); gezgin adasının ek JS'i 17,3 KB ≤ 30; Gereksinimler HTML 196,5 KB ≤ 200; diyagramsız bölüm kabuk dışında JS indirmez; yarıda kalan istek yok | pass (Chromium) |
+| Hidrasyon | Ada JS'i bekletilip bir kez yazılan metin korunur (masaüstü ve 320 px dokunma); düzeltme olmadan test başarısız | pass |
+| Görsel regresyon | 7 görüntü × 3 motor, ubuntu-24.04'te üretilen referanslarla karşılaştırma | not\_run: referanslar bağımsız onaydan geçip commit edilene ve aynı ortamda karşılaştırma koşusu geçene kadar |
 | Gerçek macOS/iOS Safari, Android | — | not\_run |
+
+## Açık işler
+
+| İş | Gerekçe | Kabul | Sahip |
+| --- | --- | --- | --- |
+| Gereksinimler sayfası HTML payı | 196,5 KB / 200 KB: kart ve tablo görünümü ikisi de sunucuda üretilir; birkaç yeni gereksinim kapıyı aşar | SSR'da tek görünüm (diğeri istemcide) ya da tablo verisinin tek kopyası; ölçüm ≤ 180 KB | Depo sahibi |
+| Gerçek cihaz doğrulaması | WebKit ve iPhone 13 emülasyondur | Gerçek macOS/iOS Safari ve Android'de odak, dokunma, kaydırma ve tema senaryoları `pass/fail` kaydıyla | Depo sahibi |
+| Görsel referans kapsamı | Referanslar yedi görünüm içindir; mobil gezinme çekmecesi ve Teslim grubu gezinmesi görüntüde yok (davranış testleri var) | Gerekirse ek referans, bağımsız onayla | Depo sahibi |
+| Action güncellemeleri | Action'lar commit SHA'sına sabittir; otomatik güncelleme işi kurulmadı (zamanlanmış iş kurma kararı kullanıcıdadır) | Güncellemede etiket → SHA eşleşmesi doğrulanır, CI geçer | Hüseyin Cengiz |

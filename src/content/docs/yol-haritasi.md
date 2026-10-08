@@ -4,7 +4,7 @@ nav: "Yol haritası"
 order: 17
 ---
 
-Yol haritası yedi fazdan oluşur (P0–P5 ve P6 operasyon düzlemi); her faz bir yetenek kapısıdır ve sonraki fazın yayın kararı yalnızca çıkış ölçütleri kanıtlandığında verilir. Bir fazın önkoşulu her zaman kendisinden önce teslim edilir: P2'nin e-belge ve EFT kabulü P2 içindeki operasyon sitesi finans çekirdeğine, P0'ın kabulü yalnız P0 kalemlerine dayanır. Süreler göreli haftadır ve ekip kapasitesiyle doğrulanmamış tahmindir; fazlar bağımlılıkların izin verdiği yerde paralel yürür. `G-nn` ana gereksinim listesine, `SA-nn` Rail 6 gereksinimlerine, `X-nn` çapraz kalemlere işaret eder.
+Yol haritası yedi fazdan oluşur (P0–P5 ve P6 operasyon düzlemi); her faz bir yetenek kapısıdır ve sonraki fazın yayın kararı yalnızca çıkış ölçütleri kanıtlandığında verilir. Bir fazın önkoşulu her zaman kendisinden önce teslim edilir ve bağımlılık yalnız ileri yöndedir: P2'nin e-belge ve EFT kabulü P2 içindeki operasyon sitesi finans çekirdeğine, P0'ın kabulü yalnız P0 kalemlerine dayanır; P6 P2 tamamlanınca açılır. Tek ara kapı P1 içindedir: Keycloak girişi, davet, kayıt ve identity-sync (G-12, G-16, G-79, G-81) 14. haftada biter ve P2 bu kapıdan başlar. Süreler göreli haftadır ve ekip kapasitesiyle doğrulanmamış tahmindir; fazlar bağımlılıkların izin verdiği yerde paralel yürür. `G-nn` ana gereksinim listesine, `SA-nn` Rail 6 gereksinimlerine, `X-nn` çapraz kalemlere işaret eder.
 
 ## Faz tablosu
 
@@ -18,7 +18,7 @@ Eksen hafta cinsindendir; çubuklar bağımlılıkla zincirlenir, takvim tarihi 
 
 <div data-embed="timeline"></div>
 
-P2 ticari katman P1'in Keycloak adımı biter bitmez başlar ve operasyon sitesinin finans çekirdeğini (SA-17, SA-19, SA-35, SA-41) içerir; P3 AI ve P4 CronHR ilk dikey dilimden sonra paralel yürür; P6 operasyon düzlemi P2 finans çekirdeği teslim edildikten sonra açılır; P5 ilk ödeyen müşteriden sonra gelir.
+P2 ticari katman P1'in Keycloak ara kapısından (14. hafta) başlar ve operasyon sitesinin finans çekirdeğini (SA-17, SA-19, SA-35, SA-41) içerir; P3 AI ve P4 CronHR ilk dikey dilimden (P1 çıkışı) sonra paralel yürür; P6 operasyon düzlemi P2 tamamlanınca (26. hafta) açılır; P5 ilk ödeyen müşteriden sonra gelir.
 
 ## İlk dikey dilim: İzin talebi (Leave Application)
 
@@ -43,7 +43,7 @@ P1 çıkışında bir HR ekranı tüm katmanlardan uçtan uca geçer. AI ve dest
 - G-148 aracı belirteci + G-59 adaptörünün asgari hali (P1, G-129 prototipi) → tam G-59/G-85 (P3); frappe\_mcp'nin v16 uyumu P3 başında teyit edilir (doğrulanacak).
 - G-42 başsız setup wizard → G-41 TR temel çizgisi → G-31 Product Trial yükü.
 - G-19 iyzico + G-20 Invoice override + G-125 durum makinesi → G-29 ücretli App Plan → G-30 aktivasyon → G-95 mağaza UX.
-- SA-17/SA-19/SA-35 operasyon sitesi finans çekirdeği + SA-41 matrisi (K-13, mali müşavir) → P2 çıkışındaki e-belge kabulü; SA-6/SA-8/SA-15 → SA-21/SA-34 (P2) → SA-33 hak ediş mutabakatı (P6).
+- SA-17/SA-19/SA-35 operasyon sitesi finans çekirdeği + SA-41 matrisi (K-13, mali müşavir) → P2 çıkışındaki e-belge kabulü; SA-6/SA-8 → SA-21/SA-34 (P2) → SA-33 hak ediş mutabakatı (P6); SA-15 AI tüketim ölçümü (P3) SA-21'in tahakkuk kuralını kullanır (P3 → P2 yönünde).
 - G-35 `get_subscription_info` → G-106 özellik kapıları → G-127 uygulama durum modeli → CronHR plan farklılaştırması.
 - G-102..G-107 ve G-141 sözleşmeleri P4'te CronHR, P5'te CRM/Webshop ile aynı X-09 uyumluluk listesinden geçer.
 - SA-1/SA-2 operatör kimliği (P1) → SA-25 → SA-24 Müşteri 360; SA-40 destek prototipi (P1) → SA-27/SA-28 → SA-42..SA-44 kapsam modeli → SA-29 Hocuspocus (Hüseyin Cengiz).

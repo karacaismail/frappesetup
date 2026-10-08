@@ -50,7 +50,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | --- | --- | --- | --- | --- |
 | K-31 | Kişi adlarının bu public sitede yayını (Hüseyin Cengiz, Asistan Hüseyin) | Ürün sahibi | Adlar görev sahipliği için yazılı; yayın tercihi kayıtlı değil | Ürün sahibi kaydeder; tercih rol adıysa adlar rol adlarıyla değiştirilir |
 | K-32 | Bu deponun lisans onay kaydı (kod MIT, içerik CC BY 4.0) | Ürün sahibi | Lisans dosyaları değiştirilmedi; onayın kaydı depoda yok | Ürün sahibi onayı ADR olarak yazılır; onay yoksa lisans kararı yeniden açılır |
-| K-36 | Docs sitesi kabuk JS bütçesinin kapsamı | Ürün sahibi | Ağ testi, daha önce "85 KB" diye bildirilen kabuğun ilk görünümde paylaşılan Mantine/tema parçasıyla birlikte ≈125 KB gzip indirdiğini ölçtü; kabul edilmiş satır (giriş parçaları ≤ 100 KB) karşılanıyor | Ya toplam ilk görünüm JS için bütçe yeniden onaylanır ya da kabuk statik Astro + küçük betiğe taşınır (ayrı iş); ölçüm her CI koşusunda rapora yazılır |
+| K-36 | Docs sitesi kabuk JS bütçesinin kapsamı | Ürün sahibi | Kapandı (8 Ekim 2026): kapsam ilk görünümün toplam JS'idir, giriş parçalarıyla daraltılmaz. Önceki "85 KB" bildirimi yalnız giriş parçalarını sayıyordu; aynı derlemenin toplamı 125,2 KB idi | Kabuk hafifletildi: toplam 96,9 KB, giriş parçaları 77,9 KB (ayrı raporlanır; güncel ölçüm İzlenebilirlik QA tablosunda); ağ testi her CI koşusunda toplamı ≤ 100 KB ile denetler |
 
 ## Başlıca riskler ve azaltımlar
 

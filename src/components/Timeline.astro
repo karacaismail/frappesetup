@@ -5,8 +5,8 @@
 <div class="diagram-scroll" tabindex="0" role="region" aria-label="Yol haritası zaman çizelgesi (yatay kaydırılabilir)">
 <svg viewBox='0 0 1040 600' role='img' aria-labelledby='tl-title tl-desc' font-size='16' style='font-family: var(--mantine-font-family), Inter, system-ui, sans-serif'>
 <title id='tl-title'>Yol haritası zaman çizelgesi</title>
-<desc id='tl-desc'>42 haftalık plan; P0 Altyapı 0–6, P1 Platform çekirdeği 6–18, P2 Ticari katman 14–26, P3 AI 18–30, P4 İlk app (CronHR) 18–30, P6 Operasyon düzlemi 24–36, P5 CRM · Webshop 30–42. Kapılar: M1 ilk dikey dilim 18. hafta, M2 ilk ödeyen müşteri 30. hafta, M3 operasyon canlı 36. hafta, M4 CRM/Webshop 42. hafta.</desc>
-<text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>42 haftalık plan: ilk ödeyen müşteri 30., operasyon düzlemi 36. haftada</text>
+<desc id='tl-desc'>42 haftalık plan; P0 Altyapı 0–6, P1 Platform çekirdeği 6–18, P2 Ticari katman 14–26, P3 AI 18–30, P4 İlk app (CronHR) 18–30, P6 Operasyon düzlemi 26–38, P5 CRM · Webshop 30–42. Kapılar: M1 ilk dikey dilim 18. hafta, M2 ilk ödeyen müşteri 30. hafta, M3 operasyon canlı 38. hafta, M4 CRM/Webshop 42. hafta.</desc>
+<text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>42 haftalık plan: ilk ödeyen müşteri 30., operasyon düzlemi 38. haftada</text>
 <text x='24' y='60' fill='var(--fs-quiet)'>Göreli süre (hafta); fazlar bağımlılıkla zincirlenir, takvim tarihi yoktur (tahmin)</text>
 <line x1='290.0' x2='290.0' y1='96' y2='532' stroke='var(--fs-grid)'/>
 <text x='290.0' y='88' text-anchor='middle' fill='var(--fs-quiet)'>0. hafta</text>
@@ -46,9 +46,9 @@
 <rect x='592.6' y='336' width='201.7' height='24' rx='7' fill='var(--fs-line)' fill-opacity='0.18' stroke='var(--fs-line)' stroke-width='1.5'/>
 <text x='600.6' y='330' fill='var(--fs-quiet)'>18–30. hafta</text>
 <text x='24' y='354' fill='var(--fs-ink)'>P4 İlk app (CronHR)</text>
-<line x1='290' x2='693.4' y1='400' y2='400' stroke='var(--fs-grid)'/>
-<rect x='693.4' y='388' width='201.7' height='24' rx='7' fill='var(--fs-accent)' fill-opacity='0.18' stroke='var(--fs-accent)' stroke-width='1.5'/>
-<text x='701.4' y='382' fill='var(--fs-quiet)'>24–36. hafta</text>
+<line x1='290' x2='727.0' y1='400' y2='400' stroke='var(--fs-grid)'/>
+<rect x='727.0' y='388' width='201.7' height='24' rx='7' fill='var(--fs-accent)' fill-opacity='0.18' stroke='var(--fs-accent)' stroke-width='1.5'/>
+<text x='735.0' y='382' fill='var(--fs-quiet)'>26–38. hafta</text>
 <text x='24' y='406' font-weight='650' fill='var(--fs-ink)'>P6 Operasyon düzlemi</text>
 <line x1='290' x2='794.3' y1='452' y2='452' stroke='var(--fs-grid)'/>
 <rect x='794.3' y='440' width='201.7' height='24' rx='7' fill='var(--fs-line)' fill-opacity='0.18' stroke='var(--fs-line)' stroke-width='1.5'/>
@@ -59,11 +59,11 @@
 <text x='592.6' y='500' text-anchor='middle' fill='var(--fs-ink)'>M1 İlk dikey dilim</text>
 <path d='M794.3 510l10 10l-10 10l-10 -10z' fill='var(--fs-accent)'/>
 <text x='804.3' y='556' text-anchor='end' font-weight='650' fill='var(--fs-ink)'>M2 İlk ödeyen müşteri</text>
-<path d='M895.1 510l10 10l-10 10l-10 -10z' fill='var(--fs-line)'/>
-<text x='895.1' y='500' text-anchor='middle' fill='var(--fs-ink)'>M3 Operasyon canlı</text>
+<path d='M928.8 510l10 10l-10 10l-10 -10z' fill='var(--fs-line)'/>
+<text x='928.8' y='500' text-anchor='middle' fill='var(--fs-ink)'>M3 Operasyon canlı</text>
 <path d='M996.0 510l10 10l-10 10l-10 -10z' fill='var(--fs-line)'/>
 <text x='1016.0' y='556' text-anchor='end' fill='var(--fs-ink)'>M4 CRM/Webshop</text>
 </svg>
 </div>
-<figcaption class="diagram-note">P2 ticari katman P1'in Keycloak adımı biter bitmez başlar ve operasyon sitesinin finans çekirdeğini içerir; P3 AI ve P4 CronHR ilk dikey dilimden sonra paralel yürür; P6 operasyon düzlemi P2'nin finans çekirdeği teslim edildikten sonra açılır; P5 ilk ödeyen müşteriden sonra gelir.</figcaption>
+<figcaption class="diagram-note">P2 ticari katman P1'in Keycloak ara kapısından (14. hafta) başlar ve operasyon sitesinin finans çekirdeğini içerir; P3 AI ve P4 CronHR ilk dikey dilimden sonra paralel yürür; P6 operasyon düzlemi P2 tamamlanınca açılır; P5 ilk ödeyen müşteriden sonra gelir.</figcaption>
 </figure>

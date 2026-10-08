@@ -12,7 +12,7 @@ Bu sayfa tasarım sözleşmesidir; yardım, tur ve keşif katmanları henüz uyg
 
 | Kural | Düzey | Sahip | Bağımlılık | Kabul |
 | --- | --- | --- | --- | --- |
-| **320–390 px:** kulakçık üst bardaki "Yardım" düğmesine dönüşür; panel tam ekran kipli çekmecedir (`aria-modal`, alttaki sayfa `inert`) ve AI paneliyle aynı yuvayı paylaşır | MUST | Frontend ekibi | G-137, G-88 | 320'de yatay taşma yok; form alanı örtülmez |
+| **Dar düzen** (içerik sütunu ile panelin asgari genişliği yan yana sığmadığında; eşik içerikten belirlenir, test genişlikleri eşik değildir): kulakçık üst bardaki "Yardım" düğmesine dönüşür; panel tam ekran kipli çekmecedir (`aria-modal`, alttaki sayfa `inert`) ve AI paneliyle aynı yuvayı paylaşır | MUST | Frontend ekibi | G-137, G-88 | 320'de yatay taşma yok; form alanı örtülmez |
 | **Yatay telefon:** sanal klavye açıkken kulakçık gizlenir; panel tam yükseklik kipli çekmecedir; yalnız genişlik arttı diye tablet düzenine geçilmez | MUST | Frontend ekibi | G-137, G-74 | Yön değişiminde açık panel, odak ve girdi korunur |
 | **Tablet ve masaüstü:** yapışkan sağ kulakçık içerikte kendi boşluğunda durur; panel sağ yuvada sütundur (dar tablette kipli çekmece); yardım ve AI panelinden aynı anda biri açıktır | MUST | Frontend ekibi | G-137, G-88 | Odaktaki öğe örtülmez (WCAG 2.4.11); geçişte iki panelin durumu korunur |
 | **Klavye:** kulakçık `button`, `aria-expanded`, `aria-controls` taşır; açılınca odak panel başlığına gider; Escape kapatır, odağı açan öğeye döndürür; kısayol metin girişinde çalışmaz | MUST | Frontend ekibi | G-137, G-67 | Tab/Shift+Tab sırası tutarlı; tek `:focus-visible` göstergesi |

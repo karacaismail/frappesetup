@@ -305,7 +305,7 @@ function Explorer({ items }: Props) {
       {/* Geniş ekran: tablo, kendi kapsayıcısında yatay kayar */}
       <Box visibleFrom="sm">
         <Table.ScrollContainer
-          minWidth={showDetail ? 960 : 760}
+          minWidth={showDetail ? 936 : 808}
           type="native"
           tabIndex={0}
           role="region"
@@ -315,12 +315,11 @@ function Explorer({ items }: Props) {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th style={{ minWidth: '5.5rem' }}>ID</Table.Th>
-                <Table.Th style={{ minWidth: showDetail ? '26rem' : '16rem' }}>Gereksinim</Table.Th>
+                <Table.Th style={{ minWidth: showDetail ? '24rem' : '16rem' }}>Gereksinim</Table.Th>
                 <Table.Th style={{ minWidth: '10rem' }}>Ray</Table.Th>
                 <Table.Th style={{ minWidth: '7rem' }}>Öncelik</Table.Th>
                 <Table.Th style={{ minWidth: '5rem' }}>Faz</Table.Th>
                 <Table.Th style={{ minWidth: '7rem' }}>Kaynak</Table.Th>
-                <Table.Th style={{ minWidth: '11rem' }}>Sahip</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -336,6 +335,12 @@ function Explorer({ items }: Props) {
                         {inlineCode(r.detail)}
                       </Text>
                     )}
+                    {/* Sahip ayrı sütun değil: tablo 1248 px ve üzerinde yatay kaydırmasız sığar (kart görünümüyle aynı bilgi). */}
+                    {r.owner && (
+                      <Text mt={4} className="req-owner">
+                        Sahip: {r.owner}
+                      </Text>
+                    )}
                   </Table.Td>
                   <Table.Td>{r.rail}</Table.Td>
                   <Table.Td>
@@ -343,12 +348,11 @@ function Explorer({ items }: Props) {
                   </Table.Td>
                   <Table.Td>{r.phase}</Table.Td>
                   <Table.Td>{r.source}</Table.Td>
-                  <Table.Td className="req-owner">{r.owner ?? '—'}</Table.Td>
                 </Table.Tr>
               ))}
               {filtered.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={7}>
+                  <Table.Td colSpan={6}>
                     <Text c="dimmed">Bu filtrelerle eşleşen gereksinim yok.</Text>
                   </Table.Td>
                 </Table.Tr>

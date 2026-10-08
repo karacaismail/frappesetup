@@ -99,7 +99,7 @@ Bileşen adları kurulu @ant-design/x sürümünde doğrulanır (doğrulanacak).
 
 ## 8.5 Yetki eşitliği ve prompt injection (G-85, G-89, X-14)
 
-- Kiracı verisine erişen her araç çağrısı kullanıcının Keycloak token'ıyla Frappe `has_permission`, Access Rule (G-60) ve permlevel (G-61) katmanından geçer; Press aksiyonları kullanıcıya bağlı Press bearer ile yürür.
+- Kiracı verisine erişen her araç çağrısı, kiracı sitesinin kullanıcı adına bastığı kısa ömürlü aracı belirteciyle (G-148, G-59; K-25) Frappe `has_permission`, Access Rule (G-60) ve permlevel (G-61) katmanından geçer; Press aksiyonları kullanıcıya bağlı Press bearer ile yürür.
 - Araç sonuçları ve belge içerikleri yapılandırılmış veri bloğu olarak iletilir; operatör talimatı yalnızca system kanalındadır.
 - Tur başına üst sınırlar: 12 araç çağrısı, 120 s süre, 16K çıktı token; takım başına Redis oran sınırı ve plan kotası (G-92).
 - Şüpheli talimat kalıbında aksiyon durur ve kullanıcıya gösterilir; negatif testler (yetkisiz doctype, kayıt kuralı dışı belge, permlevel alanı, başka takımın sitesi, confirm'siz yıkıcı çağrı) AI Action Log'a `denied` yazar ve CI kırmızı takım eval setinde koşar.

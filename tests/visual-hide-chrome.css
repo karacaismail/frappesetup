@@ -1,0 +1,6 @@
+/* Görsel testler: diyagram öğe görüntülerinde sabit başlık ve okuma çubuğu figürü örtmesin.
+   Başlığın kendisi görünüm (viewport) görüntülerinde kapsanır. */
+.site-header,
+.progress {
+  visibility: hidden !important;
+}

@@ -15,7 +15,6 @@ Bu kontrol listesi, satılan her uygulamanın (CronHR, CRM, Webshop) içine otur
 | Global arama ve komut paleti (navigasyon + aksiyon + AI prompt) | `frappe.utils.global_search.search`, `frappe.desk.search.search_link` | native (API) + develop (UI) | G-93 |
 | Takım/site değiştirici, çok siteli kullanıcı | `press.api.account.switch_team`, Team üyeliği | native | G-16, X-11 |
 | Meta önbelleği: ETag/hash anahtarı, Site Update Success ve Customize Form kaydında geçersizleme | meta hash, realtime `meta_changed` olayı | develop (platform\_core) | G-63, X-12 |
-
 | İnsan odaklı URL, derin bağlantı, Paylaş düğmesi ve oturumsuz güvenli önizleme | Rota kalıbı, DocShare, platform\_core www | develop | G-130, G-131, G-132, G-133 |
 | Ölçüm adapterları ve rıza tercih merkezi | Adapter kaydı, Legal Document Acceptance | develop | G-134, G-135, G-154 |
 
@@ -81,7 +80,7 @@ Bu kontrol listesi, satılan her uygulamanın (CronHR, CRM, Webshop) içine otur
 | --- | --- | --- | --- |
 | `@ant-design/x` Bubble/Sender/Conversations/Prompts/ThoughtChain/Actions, SSE akışı, 320 px'te Drawer | agent servisi (Claude Agent SDK) | develop (`@platform/ai-sidebar`, agent) | G-83, G-88 |
 | Sayfa bağlamı ve uygulamanın tek tık Prompts manifesti | `AppModule` AI sözleşmesi, `ai_tools` hook | develop | G-88, G-105 |
-| Yetki eşitliği: kullanıcının Keycloak token'ı ve Press bearer'ı | `auth_hooks` adaptörü, Press OAuth Client | develop + configure | G-59, G-82, G-85 |
+| Yetki eşitliği: sitenin kullanıcı adına bastığı kısa ömürlü aracı belirteci (G-148) ve kullanıcıya bağlı Press bearer'ı | `auth_hooks` adaptörü, Press OAuth Client | develop + configure | G-59, G-82, G-85 |
 | Önizle+onayla, yıkıcı/ücretli sınıflandırma | confirm bayrağı + önizleme hash'i | develop (agent, press\_tr MCP) | G-27, G-86 |
 | AI Action Log, kullanım ve kota göstergesi, takım düzeyinde AI kapatma | AI Action Log doctype, App Plan features | develop | G-64, G-87, G-90, G-92 |
 
@@ -115,8 +114,8 @@ Her bölüm yukarıdaki ekranları aynı katmandan üretir; bu katman olmadan sh
 | Destek rızası bandı: Pending Support Access talebini (operatör, reason, allowed\_for, kapsam) gösterir; Accept/Reject yalnız takım yöneticisine açık | Press `Support Access` (`press.api.access.status`, `run_doc_method`) | develop (`@platform/shell`) | SA-27 |
 | Aktif destek oturumu göstergesi: operatör presence avatarları, 'görüntülüyor/takip ediyor' durumu, uzaktan kontrol teklifi için 'İzin ver / Reddet', her an 'Oturumu bitir' | platform\_core `Support Session`, Hocuspocus awareness | develop (`@platform/support-session`) | SA-27, SA-29 |
 | Hocuspocus provider ve awareness katmanı: çoklu imleç, seçim ve route paylaşımı; yalnız aktif Support Session varken dinamik import | Hocuspocus (`onAuthenticate` site bileti, G-148); paylaşılan ekran durumu ve kaynakta maskeleme (SA-43) | develop (`@platform/support-session`) | SA-29 |
-| AI kredi sayacı: bakiye, `spending_limit`/uyarı eşiği, düşük bakiyede ücretli araçların kilitli olduğu durum, iyzico ile 'Kredi yükle' | Press `Team.get_balance`, `Balance Transaction`, `press_tr.api.billing.buy_credits_iyzico` | native (veri) + develop (UI) | SA-6, SA-15 |
-| Faturalama sayfası: geçmiş faturalar + e-Arşiv PDF'i, yaklaşan fatura, EFT talimatı (ödeme referans kodu PRS-… ve IBAN), iyzico Checkout Form, ödeme yöntemi değiştirme | `press.api.billing.past_invoices`, `invoice_pdf`, `upcoming_invoice`, `press_tr.api.billing.*` | native (API) + develop (UI) | SA-4, SA-8, G-96 |
+| AI kredi sayacı: bakiye, `spending_limit`/uyarı eşiği, düşük bakiyede ücretli araçların kilitli olduğu durum, iyzico ile 'Kredi yükle' | Press `Team.get_balance`, `Balance Transaction`, `press_tr.api.billing.create_iyzico_checkout_form` | native (veri) + develop (UI) | SA-6, SA-15 |
+| Faturalama sayfası: geçmiş faturalar + e-Arşiv PDF'i, yaklaşan fatura, EFT talimatı (ödeme referans kodu PRS-… ve IBAN), iyzico Checkout Form, ödeme yöntemi değiştirme | `press.api.billing.past_invoices`, `invoice_pdf`, `upcoming_invoice`, `press_tr.api.billing.create_iyzico_checkout_form` | native (API) + develop (UI) | SA-4, SA-8, G-96 |
 | Sürümlü yasal belge onay kapısı: aydınlatma, açık rıza, çerez ve abonelik sözleşmesi sürümü değişince yeniden onay | platform\_core `Legal Document Acceptance` (belge, sürüm, hash, kullanıcı, zaman) | develop (platform\_core, `@platform/shell`) | SA-36, G-23 |
 | Bildirim merkezi ek türleri: Security Alert (impersonation), Support Access durum değişimi, ödeme hatırlatma ve askıya alma uyarıları | Frappe Notification Log, Press Notification | configure + develop (UI) | SA-28, SA-13, G-100 |
 | Operatör modu anahtarı: Keycloak `ops-*` rolü için aynı kabuk operatör navigasyonunu (Müşteri 360, Tahsilat ve kredi, Abonelik ve modüller, Destek, Tahsilat aşaması, KVKK denetim raporu, gece mutabakat farkları) açar; tenant verisi ile operatör verisi aynı ekranda karışmaz | `platform_core.api.ops.customer_360`, `press.api.client.*`, `press_tr.api.ops` (BFF) | develop (`@platform/shell`, BFF) | SA-24, SA-25 |

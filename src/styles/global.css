@@ -27,6 +27,15 @@
   --fs-content-max: 76ch;
   --fs-gutter: 1rem;
   --fs-header-h: 60px;
+  /* Etkili dokunma alanı görsel boyuttan ayrı tokendır: tek başına duran kontrol ≥ 44 CSS px, kaba işaretçi
+     varsa (hibrit cihaz dahil) ≥ 48. Metin içi bağlantılar politikanın açık istisnasıdır. */
+  --fs-hit: 44px;
+}
+
+@media (any-pointer: coarse) {
+  :root {
+    --fs-hit: 48px;
+  }
 }
 
 [data-mantine-color-scheme='dark'] {
@@ -85,6 +94,9 @@ body {
   top: 0.5rem;
   left: 0.5rem;
   z-index: 300;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--fs-hit);
   padding: 0.6rem 0.9rem;
   border-radius: var(--mantine-radius-md);
   background: var(--fs-accent);
@@ -133,6 +145,11 @@ body {
   align-items: center;
   gap: 0.55rem;
   min-width: 0;
+  min-height: var(--fs-hit);
+}
+.site-header .burger {
+  width: var(--fs-hit);
+  height: var(--fs-hit);
 }
 .brand-mark {
   display: grid;
@@ -173,7 +190,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  min-height: 2.6875rem;
+  min-height: var(--fs-hit);
   padding: 0.5rem 0.75rem;
   border-radius: var(--mantine-radius-sm);
   color: var(--mantine-color-text);
@@ -211,12 +228,12 @@ body {
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
-/* Simge düğmesi: Mantine ActionIcon 'subtle' lg (34px, radius md) ile aynı tokenlar. */
+/* Simge düğmesi: Mantine ActionIcon 'subtle' renk tokenları; boyut etkili dokunma alanıdır (--fs-hit). */
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: calc(2.125rem * var(--mantine-scale));
-  height: calc(2.125rem * var(--mantine-scale));
+  width: var(--fs-hit);
+  height: var(--fs-hit);
   padding: 0;
   border: 0;
   border-radius: var(--mantine-radius-md);
@@ -240,7 +257,9 @@ body {
   padding: 0;
 }
 .toc-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  min-height: var(--fs-hit);
   padding: 0.35rem 0.75rem;
   border-radius: var(--mantine-radius-sm);
   color: var(--fs-quiet);
@@ -486,6 +505,18 @@ body {
 .prose td:nth-child(2) {
   min-width: 18rem;
 }
+/* Sayısal dağılım özeti: grup adı kelime aralarından sarılır, sayı sütunları dar ve hizalı. */
+.prose table.req-summary th,
+.prose table.req-summary td {
+  min-width: 3.5rem;
+}
+.prose table.req-summary th:first-child {
+  min-width: 10rem;
+}
+.prose table.req-summary td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 .prose td code,
 .prose th code {
   overflow-wrap: normal;
@@ -516,7 +547,8 @@ body {
 .mermaid-details summary {
   cursor: pointer;
   color: var(--fs-quiet);
-  padding: 0.35rem 0.25rem;
+  min-height: var(--fs-hit);
+  padding: 0.6rem 0.25rem;
 }
 .mermaid-details pre {
   margin: 0.25rem 0 0;
@@ -568,25 +600,23 @@ body {
 .req-head > div:first-child {
   max-width: 62ch;
 }
+/* Arama tek alandır (süzgeçler aşağıdaki düğme gruplarında): okunur genişlikte, ızgara yok. */
 .req-filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
-  gap: 0.75rem;
+  max-width: 36rem;
   margin-bottom: 0.75rem;
-}
-.req-filter-search {
-  grid-column: 1 / -1;
 }
 .req-explorer {
   container-type: inline-size;
 }
-@container (min-width: 60rem) {
-  .req-filters {
-    grid-template-columns: minmax(14rem, 2fr) repeat(4, minmax(8rem, 1fr));
-  }
-  .req-filter-search {
-    grid-column: auto;
-  }
+.req-explorer .mantine-Input-input {
+  min-height: var(--fs-hit);
+}
+.req-explorer .mantine-Button-root {
+  min-height: var(--fs-hit);
+}
+.req-explorer .mantine-Switch-body {
+  min-height: var(--fs-hit);
+  align-items: center;
 }
 /* Faz, ray, kaynak süzgeçleri: yerel açılır bölüm (JS gerektirmez) + aria-pressed düğme grupları. */
 .req-more {
@@ -596,7 +626,7 @@ body {
 }
 .req-more > summary {
   display: list-item;
-  min-height: 2.75rem;
+  min-height: var(--fs-hit);
   padding: 0.6rem 0.9rem;
   border-radius: var(--mantine-radius-md);
   font-weight: 600;

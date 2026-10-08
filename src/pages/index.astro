@@ -81,7 +81,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   <section class="stats" aria-label="Özet sayılar">
     <div class="stat"><span class="stat-n">{DECISION_COUNT}</span><span class="stat-l">sabit karar</span></div>
     <div class="stat"><span class="stat-n">{RAIL_COUNT}</span><span class="stat-l">mimari ray</span></div>
-    <div class="stat"><span class="stat-n">{requirements.length}</span><span class="stat-l">gereksinim · {g} G + {sa} SA</span></div>
+    <div class="stat"><span class="stat-n">{requirements.length}</span><span class="stat-l">gereksinim · {g}&nbsp;G + {sa}&nbsp;SA</span></div>
     <div class="stat"><span class="stat-n">{musts}</span><span class="stat-l">MUST maddesi</span></div>
     <div class="stat"><span class="stat-n">{phaseCards.length}</span><span class="stat-l">faz · {ROADMAP_WEEKS} hafta</span></div>
   </section>
@@ -253,7 +253,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    min-height: 44px;
+    min-height: var(--fs-hit);
     padding: 0.55rem 1.1rem;
     border-radius: var(--mantine-radius-md);
     background: var(--fs-surface);
@@ -305,7 +305,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fs-grid) 70%, transparent);
     color: inherit;
     text-decoration: none;
-    min-height: 44px;
+    min-height: var(--fs-hit);
     transition:
       background-color var(--fs-dur) var(--fs-ease),
       transform var(--fs-dur) var(--fs-ease),
@@ -403,7 +403,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     color: var(--fs-accent);
     text-decoration: none;
     font-weight: 600;
-    min-height: 44px;
+    min-height: var(--fs-hit);
   }
   .more:hover {
     text-decoration: underline;
@@ -525,7 +525,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     background: var(--fs-surface-2);
     color: inherit;
     text-decoration: none;
-    min-height: 44px;
+    min-height: var(--fs-hit);
     transition:
       transform var(--fs-dur) var(--fs-ease),
       box-shadow var(--fs-dur) var(--fs-ease);

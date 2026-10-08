@@ -182,7 +182,7 @@
  {
   "id": "G-19",
   "title": "iyzico ödeme ağ geçidi ve ödeme yolları (3DS, saklı kart, kredi, Havale/EFT)",
-  "detail": "press_tr doctype'ları: Iyzico Settings (api key/secret, sandbox/prod), Iyzico Payment Record, Iyzico Webhook Log, Iyzico Stored Card (Team başına cardUserKey/cardToken); akışlar ThreedsInitialize → callback → ThreedsPayment, InstallmentInfo taksit, Refund; Payment Gateway kaydı gateway='iyzico'. Kart eklendiğinde press_tr Team.payment_mode='Card' ve `default_payment_provider`='iyzico' Custom Field'ını yazar (aksi halde `can_install_paid_apps`/`can_create_site` engeller, doğrulandı); kart doğrulaması için 1 TL ön provizyon + iptal. `press_tr.api.billing.buy_credits_iyzico` 3DS sonrası Balance Transaction + Invoice(type='Prepaid Credits') oluşturur; Havale/EFT için Invoice.payment_mode 'NEFT' değeri korunur, 'Havale/EFT' etiketi yalnızca panelde gösterilir (Select değeri Property Setter ile değiştirilemez, doğrulandı) ve finans ekibi Balance Transaction işler.",
+  "detail": "press_tr doctype'ları: Iyzico Settings (api key/secret, sandbox/prod), Iyzico Payment Record, Iyzico Webhook Log, Iyzico Stored Card (Team başına cardUserKey/cardToken); akışlar ThreedsInitialize → callback → ThreedsPayment, InstallmentInfo taksit, Refund; Payment Gateway kaydı gateway='iyzico'. Kart eklendiğinde press_tr Team.payment_mode='Card' ve `default_payment_provider`='iyzico' Custom Field'ını yazar (aksi halde `can_install_paid_apps`/`can_create_site` engeller, doğrulandı); kart doğrulaması için 1 TL ön provizyon + iptal. kredi yükleme Checkout Form ile `press_tr.api.billing.create_iyzico_checkout_form` üzerinden yapılır ve Balance Transaction + Invoice(type='Prepaid Credits') üretir (SA-6); Havale/EFT için Invoice.payment_mode 'NEFT' değeri korunur, 'Havale/EFT' etiketi yalnızca panelde gösterilir (Select değeri Property Setter ile değiştirilemez, doğrulandı) ve finans ekibi Balance Transaction işler.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P2",
@@ -872,7 +872,7 @@
  {
   "id": "G-88",
   "title": "Sağ AI paneli @ant-design/x ile, bağlam farkındalığı ve tek tık akışları",
-  "detail": "Shell sağ paneli (yardım paneliyle aynı sağ yuva, G-137; 390 px ve altında tam ekran çekmece) @ant-design/x Bubble, Sender, Conversations, Prompts, Suggestion, ThoughtChain, Actions, Attachments bileşenleriyle; SSE akışı; açık sayfa bağlamı (doctype, belge, seçili satırlar, filtreler) yapılandırılmış olarak gönderilir; her uygulama 'tek tık' akışlarını (örn. 'bu çalışanın izin bakiyesini güncelle ve yöneticiye bildir') Prompts olarak bildirir; haiku ile niyet yönlendirme; panelden Press ticari aksiyonları (plan yükselt, uygulama etkinleştir) aynı önizle+onayla ile; klavye erişilebilirliği ve tek odak göstergesi.",
+  "detail": "Shell sağ paneli (yardım paneliyle aynı sağ yuva, G-137; içerik ile panel yan yana sığmadığında tam ekran çekmece) @ant-design/x Bubble, Sender, Conversations, Prompts, Suggestion, ThoughtChain, Actions, Attachments bileşenleriyle; SSE akışı; açık sayfa bağlamı (doctype, belge, seçili satırlar, filtreler) yapılandırılmış olarak gönderilir; her uygulama 'tek tık' akışlarını (örn. 'bu çalışanın izin bakiyesini güncelle ve yöneticiye bildir') Prompts olarak bildirir; haiku ile niyet yönlendirme; panelden Press ticari aksiyonları (plan yükselt, uygulama etkinleştir) aynı önizle+onayla ile; klavye erişilebilirliği ve tek odak göstergesi.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -1362,7 +1362,7 @@
  {
   "id": "G-137",
   "title": "Yardım kulakçığı ve kendi kendine destek modu",
-  "detail": "Sayfanın sağ kenarında yapışkan 'Yardım' kulakçığı (`button`, `aria-expanded`); açılan panel sayfa yardımını, sık görevleri ve 'Kendi kendine destek modu' anahtarını (`role=switch`, kullanıcı tercihine kaydedilir) içerir. Mod açıkken alan, bileşen ve sayfa düzeyindeki yardım işaretleri ve yönlendiriciler (ilgili tur, belge, destek talebi) görünür; kapalıyken arayüz sade kalır. Panel AI paneliyle aynı sağ yuvayı paylaşır; 390 px ve altında tam ekran çekmece olur; odak panele taşınır, Escape kapatıp odağı paneli açan öğeye (kulakçık veya alan işareti) döndürür; yardım işaretleri ekran okuyucuya alan adıyla duyurulur. Kabul: 320→masaüstü, fare/dokunma/klavye, ekran okuyucu adları, yön değişiminde açık panel ve girdi korunur.",
+  "detail": "Sayfanın sağ kenarında yapışkan 'Yardım' kulakçığı (`button`, `aria-expanded`); açılan panel sayfa yardımını, sık görevleri ve 'Kendi kendine destek modu' anahtarını (`role=switch`, kullanıcı tercihine kaydedilir) içerir. Mod açıkken alan, bileşen ve sayfa düzeyindeki yardım işaretleri ve yönlendiriciler (ilgili tur, belge, destek talebi) görünür; kapalıyken arayüz sade kalır. Panel AI paneliyle aynı sağ yuvayı paylaşır; içerik sütunu ile panel yan yana sığmadığında (eşik içerikten belirlenir; 320–390 px yalnız test genişliğidir) tam ekran çekmece olur; odak panele taşınır, Escape kapatıp odağı paneli açan öğeye (kulakçık veya alan işareti) döndürür; yardım işaretleri ekran okuyucuya alan adıyla duyurulur. Kabul: 320→masaüstü, fare/dokunma/klavye, ekran okuyucu adları, yön değişiminde açık panel ve girdi korunur.",
   "rail": "Shell",
   "priority": "MUST",
   "phase": "P1",
@@ -1591,8 +1591,8 @@
  },
  {
   "id": "SA-6",
-  "title": "iyzico tek seferlik kredi yükleme (Checkout Form) Press içinde",
-  "detail": "Press Settings'e iyzico_api_key, iyzico_secret_key (Password), iyzico_base_url eklenir; 'Iyzico Webhook Log' allow_guest handler X-IYZ-SIGNATURE-V3 HMAC-SHA256 doğrular ve iyziReferenceCode/token ile idempotent çalışır; 'Iyzico Payment Record' durumları HPP listesine (SUCCESS, INIT_*, PENDING_CREDIT, FAILURE) göre yazılır. press.api.billing.create_iyzico_checkout_form(amount) TRY ve buyer.identityNumber ile formu başlatır; yalnız SUCCESS + sunucu tarafı CF retrieve sonrası Team.allocate_credit_amount ve 'Prepaid Credits' tipi Paid Invoice (amount_paid, transaction_amount/fee/net dolu) üretilir.",
+  "title": "iyzico tek seferlik kredi yükleme (Checkout Form) press_tr içinde",
+  "detail": "Anahtarlar press_tr Iyzico Settings'te (Password, sandbox/prod; G-19); 'Iyzico Webhook Log' allow_guest handler X-IYZ-SIGNATURE-V3 HMAC-SHA256 doğrular ve iyziReferenceCode/token ile idempotent çalışır; 'Iyzico Payment Record' durumları HPP listesine (SUCCESS, INIT_*, PENDING_CREDIT, FAILURE) göre yazılır. press_tr.api.billing.create_iyzico_checkout_form(amount) TRY ve buyer.identityNumber ile formu başlatır; yalnız SUCCESS + sunucu tarafı CF retrieve sonrası Team.allocate_credit_amount ve 'Prepaid Credits' tipi Paid Invoice (amount_paid, transaction_amount/fee/net dolu) üretilir.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P2",
@@ -1782,7 +1782,7 @@
  {
   "id": "SA-25",
   "title": "İki katmanlı operatör yetkisi",
-  "detail": "Site düzeyi destek eylemleri (login_as_admin, Site/Release Group işlemleri) panelden Press Support Agent + Accepted Support Access ile press.api.client.run_doc_method üzerinden yapılır; ticari tekil okuma/yazmalar (Team, Invoice, Balance Transaction) yalnız System User servis hesabı + press_tr.api.ops ile. get_list skip bayrağı kullanımı loglanır ve KVKK envanterine işlenir.",
+  "detail": "Site düzeyi destek eylemleri (Site/Release Group işlemleri; login_as_admin yalnız ayrı Administrator yükseltme talebiyle, SA-44) panelden Press Support Agent + Accepted Support Access ile press.api.client.run_doc_method üzerinden yapılır; ticari tekil okuma/yazmalar (Team, Invoice, Balance Transaction) yalnız System User servis hesabı + press_tr.api.ops ile. get_list skip bayrağı kullanımı loglanır ve KVKK envanterine işlenir.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
@@ -1801,8 +1801,8 @@
  },
  {
   "id": "SA-27",
-  "title": "Rızaya dayalı login-as zinciri ve Support Session doctype'ı",
-  "detail": "Panel → Press Support Access (resources=[Site], login_as_administrator=1, allowed_for, reason) → tenant SPA onay bandı (Pending 7 gün sonra düşer) → Site.login_as_admin (Site Activity) veya Frappe v16 POST frappe.core.doctype.user.user.impersonate(user, reason). Platform core 'Support Session' doctype'ı rıza sürümü, operatör, kapsam kademesi (görüntüle/takip/login-as/kontrol), başlangıç/bitiş ve Keycloak oturumunu tutar; press.api.account.switch_team denetim kaydı bırakmadığı için operatör paneli bunu kullanmaz. Kapsamlar, süreler ve iptal davranışı SA-42'ye; login-as varsayılanı Administrator değildir (SA-44).",
+  "title": "Rızaya dayalı destek erişimi zinciri ve Support Session doctype'ı",
+  "detail": "Panel → Press Support Access (resources=[Site], kapsam, allowed_for, reason) → tenant SPA onay bandı (Pending 7 gün sonra saatlik expire_pending_requests ile düşer) → Accept sonrası Press, kiracı sitesindeki platform_core'da servis JWT'siyle Support Session açar. Görüntüle ve takip talepleri login_as_administrator=0 taşır ve operatöre site oturumu açmaz. Temsil ayrı talep ve ilgili kullanıcının rızasıyla platform_core kapısından Frappe v16 frappe.core.doctype.user.user.impersonate(user, reason) yoluyla açılır; operatöre Administrator oturumu verilmez. Administrator (login_as_administrator=1, Site.login_as_admin) yalnız ayrı ve daha kısa süreli yükseltme talebiyle (K-19, K-33). Support Session rıza sürümü, operatör, kapsam (görüntüle/takip/kontrol/temsil), başlangıç/bitiş ve Keycloak oturumunu tutar; press.api.account.switch_team denetim kaydı bırakmadığı için operatör paneli bunu kullanmaz. Kapsamlar, süreler ve iptal SA-42'de, kontrol ve temsil SA-44'tedir.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",

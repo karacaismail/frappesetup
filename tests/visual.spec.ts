@@ -1,10 +1,14 @@
+import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '@playwright/test';
 
-// Görsel regresyon (rapor Y-11): referans görüntüler yalnız Linux CI ortamında (ubuntu-latest + Playwright'ın kendi
+// Görsel regresyon (rapor Y-11): referans görüntüler yalnız Linux CI ortamında (ubuntu-24.04 + Playwright'ın kendi
 // tarayıcıları) üretilir ve karşılaştırılır. Yazı tipi işleme işletim sistemine göre değiştiği için macOS yerel
 // koşusunda bu testler atlanır ve not_run sayılır. Referanslar yalnız `deploy.yml` elle tetiklenip `visual_baseline`
 // seçilince üretilir; sessiz veya toplu güncelleme yapılmaz, yeni referans incelemeden sonra commit edilir.
 test.skip(process.platform !== 'linux', 'Görsel referanslar Linux CI ortamına aittir; bu platformda not_run.');
+
+// Diyagram öğe görüntüleri: sabit başlık uzun figürün üstünü örtmesin (yalnız görüntü alınırken uygulanır).
+const HIDE_CHROME = fileURLToPath(new URL('./visual-hide-chrome.css', import.meta.url));
 
 async function settle(page: Page) {
   await page.waitForFunction(() => !document.querySelector('astro-island[ssr]'), undefined, { timeout: 20_000 });
@@ -40,7 +44,7 @@ test.describe('visual regression', () => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('yol-haritasi/');
     await settle(page);
-    await expect(page.locator('.diagram-timeline')).toHaveScreenshot('timeline-1366-light.png');
+    await expect(page.locator('.diagram-timeline')).toHaveScreenshot('timeline-1366-light.png', { stylePath: HIDE_CHROME });
   });
 
   test('diagram rails dark', async ({ page }) => {
@@ -48,7 +52,7 @@ test.describe('visual regression', () => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('raylar/');
     await settle(page);
-    await expect(page.locator('.diagram-rails')).toHaveScreenshot('rails-1366-dark.png');
+    await expect(page.locator('.diagram-rails')).toHaveScreenshot('rails-1366-dark.png', { stylePath: HIDE_CHROME });
   });
 
   test('keyboard focus on search input', async ({ page, browserName }) => {

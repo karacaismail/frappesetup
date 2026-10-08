@@ -14,7 +14,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
+  # Yayın kuyruğu yalnız main'de ortaktır: dal üzerindeki elle koşular bekleyen bir main dağıtımını iptal ettiremez.
+  group: ${{ github.ref == 'refs/heads/main' && 'pages' || format('pages-{0}', github.ref) }}
   cancel-in-progress: false
 
 jobs:
