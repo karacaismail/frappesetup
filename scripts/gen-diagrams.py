@@ -104,9 +104,14 @@ def rails() -> str:
         return out
 
     def label(text, x, y, anchor="start"):
+        # Hale, erişilebilirlik ağacından gizli ayrı bir kopyadır; dolgu metni onun üstüne çizilir. Tek <text> üzerinde
+        # paint-order='stroke' Firefox'ta başka yazı tipi dosyasından gelen glifi (latin-ext 'ş') ayrı çizim parçası
+        # yapınca o parçanın halesi önceki glifleri örtüyordu.
+        pos = f"x='{x}' y='{y}' text-anchor='{anchor}'"
         return (
-            f"<text x='{x}' y='{y}' text-anchor='{anchor}' fill='var(--fs-quiet)' stroke='var(--fs-surface)' "
-            f"stroke-width='6' paint-order='stroke' stroke-linejoin='round'>{text}</text>"
+            f"<text class='halo' aria-hidden='true' {pos} fill='none' stroke='var(--fs-surface)' stroke-width='6' "
+            f"stroke-linejoin='round'>{text}</text>\n"
+            f"<text {pos} fill='var(--fs-quiet)'>{text}</text>"
         )
 
     def arrow(x1, y1, x2, y2, text, lx, ly, anchor="start", dashed=False):

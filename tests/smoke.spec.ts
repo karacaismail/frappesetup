@@ -156,7 +156,7 @@ async function midWordSplits(page: Page, { names = true }: { names?: boolean } =
       };
       // Tanımlayıcı karakterleri (harf, rakam, alt çizgi) arasında doğal satır fırsatı yoktur.
       const wordChar = /[\p{L}\p{N}_]/u;
-      const walker = document.createTreeWalker(document.querySelector('main') ?? document.body, NodeFilter.SHOW_TEXT);
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
       const nodes: Text[] = [];
       for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as Text);
       for (const node of nodes) {
@@ -718,14 +718,19 @@ test.describe('requirements explorer', () => {
   });
 
   test('requirements table keeps six columns and scrolls only inside its own container', async ({ page }) => {
-    // Sığma kabul ölçütü değildir: içerik gerektirirse tablo kendi kapsayıcısında kayar, sayfa yatay taşmaz.
-    for (const width of [1024, 1366]) {
+    // 1280 ve 1366 px'te altı sütun kapsayıcıya sığar (uzun kod ayrıntı hücresinde kendi kutusunda kayar, sütunu
+    // genişletmez); daha dar kapsayıcıda tablo kendi kapsayıcısında kayar, sayfa yatay taşmaz.
+    for (const width of [1024, 1280, 1366]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('gereksinimler/');
       await waitForHydration(page);
       const region = page.getByRole('region', { name: 'Gereksinim tablosu (yatay kaydırılabilir)' });
       await expect(region.locator('thead th')).toHaveCount(6);
       expect(await region.evaluate((el) => getComputedStyle(el).overflowX)).toBe('auto');
+      if (width >= 1280) {
+        const m = await region.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+        expect(m.scroll, `${width}px: tablo kapsayıcısına sığar`).toBeLessThanOrEqual(m.client);
+      }
       await noHorizontalOverflow(page);
     }
   });
@@ -871,8 +876,24 @@ test.describe('long inline code', () => {
     expect(await code.evaluate((el) => el.scrollLeft), 'ok tuşu kod kutusunu kaydırır').toBeGreaterThan(0);
     expect(await page.evaluate(() => window.scrollX), 'sayfa yatay kaymaz').toBe(0);
 
-    // Geniş ekranda aynı kod sığar: Tab sırasından çıkar.
+    // Satır içi kod ve kaydırma kutusu satır kutusunun içerik kenarını aşmaz.
+    expect(await page.evaluate((sel) => {
+      const out: string[] = [];
+      for (const c of Array.from(document.querySelectorAll<HTMLElement>(sel)).filter((c) => c.getClientRects().length > 0)) {
+        let box = c.parentElement!;
+        while (box.parentElement && getComputedStyle(box).display === 'inline') box = box.parentElement;
+        const cs = getComputedStyle(box);
+        const right = box.getBoundingClientRect().right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
+        for (const r of Array.from(c.getClientRects())) if (r.right > right + 0.5) out.push(`${(c.textContent ?? '').slice(0, 30)} ${Math.round(r.right - right)} px`);
+      }
+      return out.slice(0, 5);
+    }, INLINE_CODE), 'kod satır kutusunu aşmaz').toEqual([]);
+
+    // Geniş ekranda aynı kod sığar: odaktayken odak kaybolmaz; odak ayrılınca Tab sırasından çıkar.
     await page.setViewportSize({ width: 1366, height: 900 });
+    await page.waitForTimeout(300);
+    await expect(code, '1366 px: odaktaki kod kutusu odakta kalır').toBeFocused();
+    await page.locator('#icerik').focus();
     await expect.poll(() => mismatched(page), '1366 px: yalnız taşan kod Tab sırasında').toBe(0);
     await expect.poll(() => code.evaluate((el) => el.hasAttribute('tabindex')), '1366 px: sığan kod Tab sırasında değil').toBe(false);
   });
@@ -931,7 +952,8 @@ test.describe('diagrams', () => {
       for (const svg of Array.from(document.querySelectorAll<SVGSVGElement>('.diagram svg'))) {
         const vbW = svg.viewBox.baseVal.width;
         const vbH = svg.viewBox.baseVal.height;
-        const texts = Array.from(svg.querySelectorAll('text'));
+        // Hale kopyaları (.halo) dolgu metninin altındaki çizimdir, ayrı etiket sayılmaz.
+        const texts = Array.from(svg.querySelectorAll('text:not(.halo)'));
         const boxes = texts.map((t) => ({ t, b: t.getBBox() }));
         for (const { t, b } of boxes) {
           if (b.x < 0 || b.x + b.width > vbW + 0.5 || b.y + b.height > vbH + 0.5) {

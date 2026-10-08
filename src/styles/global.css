@@ -760,6 +760,11 @@ body {
 .req-detail {
   max-width: 60ch;
 }
+/* Tabloda ayrıntı sütun genişliğine katılmaz (içsel genişliği yok sayılır): tek satırdaki bölünemez kod sütunu 60ch'e
+   zorlamaz, sütun başlık/sahip ve 24rem alt sınırıyla belirlenir; satırdan uzun kod kendi kutusunda kayar. */
+.req-table .req-detail {
+  contain: inline-size;
+}
 .req-owner {
   color: var(--fs-quiet);
 }

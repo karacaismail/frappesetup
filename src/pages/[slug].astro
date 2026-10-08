@@ -176,6 +176,8 @@ const embeds = EMBEDS[entry.id] ?? [];
     const boxes = codes.map(lineBox);
     const unique = Array.from(new Set(boxes));
     const scrolled = codes.map((c) => c.scrollLeft);
+    const was = codes.map((c) => c.hasAttribute('data-scroll'));
+    const focused = document.activeElement;
     for (const c of codes) c.removeAttribute('data-scroll');
     for (const b of unique) b.style.setProperty('overflow-wrap', 'normal');
     // Satır kutusunun içerik kenarından taşan parçalar (yalnız sığmayan kesintisiz dizilerin satırları).
@@ -197,11 +199,15 @@ const embeds = EMBEDS[entry.id] ?? [];
       if (!b.getAttribute('style')) b.removeAttribute('style');
     }
     codes.forEach((c, i) => {
-      if (long[i]) c.setAttribute('data-scroll', '');
+      if (long[i] || (c === focused && was[i])) c.setAttribute('data-scroll', '');
     });
     const overflows = codes.map((c, i) => long[i] && c.scrollWidth > c.clientWidth);
     codes.forEach((c, i) => {
-      if (overflows[i]) {
+      if (c === focused) {
+        // Odaktaki kod kutusu durumunu korur (tabindex kalkarsa odak gövdeye düşer); odak çıkınca yeniden ölçülür.
+        c.scrollLeft = scrolled[i];
+        c.addEventListener('blur', schedule, { once: true });
+      } else if (overflows[i]) {
         c.setAttribute('tabindex', '0');
         c.scrollLeft = scrolled[i];
       } else c.removeAttribute('tabindex');
