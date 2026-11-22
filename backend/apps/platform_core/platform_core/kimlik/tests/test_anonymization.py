@@ -223,6 +223,37 @@ class TestAnonymizeUser(FrappeAPITestCase):
 			frappe.db.exists("Deleted Document", {"deleted_doctype": "File", "deleted_name": personal})
 		)
 
+	def test_communication_redacts_only_the_deleted_sender(self):
+		body = "<p>Shared name and personal signature</p>"
+		phone = "+90 000 000 00 01"
+		names = {}
+		for sender, recipient in ((DELETED, NAMESAKE), (NAMESAKE, DELETED)):
+			message = frappe.get_doc(
+				{
+					"doctype": "Communication",
+					"communication_type": "Communication",
+					"sent_or_received": "Sent",
+					"subject": "Sender privacy fixture",
+					"sender": sender,
+					"recipients": recipient,
+					"sender_full_name": frappe.db.get_value("User", DELETED, "full_name"),
+					"content": body,
+					"phone_no": phone,
+				}
+			).insert()
+			names[sender] = message.name
+			self.addCleanup(frappe.delete_doc, "Communication", message.name, force=True)
+		h.refresh()
+		self.assertEqual(self.call().status_code, 200)
+		h.refresh()
+		fields = ["content", "phone_no"]
+		with self.subTest(sender="namesake"):
+			self.assertEqual(frappe.db.get_value("Communication", names[NAMESAKE], fields), (body, phone))
+		with self.subTest(sender="deleted"):
+			content, phone_no = frappe.db.get_value("Communication", names[DELETED], fields)
+			self.assertEqual(content, "[REDACTED]")
+			self.assertFalse(phone_no)
+
 	def test_namesake_sender_and_direct_user_address(self):
 		message = frappe.get_doc(
 			{

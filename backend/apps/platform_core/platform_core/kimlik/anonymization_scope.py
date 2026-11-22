@@ -399,7 +399,7 @@ def _extra_records(user: str, anon: str, full_name: str, owned: frappe._dict) ->
 		}
 		values = {f: v for f, v in values.items() if v != row[f]}
 		if (row["sender"] or "").lower() == user.lower():
-			values["sender_full_name"] = REDACTED
+			values.update(sender_full_name=REDACTED, phone_no=None, content=REDACTED)
 		if values:
 			frappe.db.set_value("Communication", row["name"], values, update_modified=False)
 	for row in _rows("Email Queue", filters={"sender": ("like", f"%{user}%")}, fields=["name", "sender"]):
