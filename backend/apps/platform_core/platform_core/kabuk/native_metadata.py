@@ -65,26 +65,39 @@ def resolve_request_target(request, command):
 
 
 def resolve_method(method: str, *, legacy: bool = False, doctype: str | None = None):
+	if not isinstance(method, str):
+		raise _unresolved_method_error()
 	if legacy and method == "login":
 		return LEGACY_LOGIN
 	if doctype:
 		try:
 			module = load_doctype_module(doctype)
-		except Exception:
-			raise frappe.ValidationError("The requested method could not be resolved.") from None
+		except (frappe.DoesNotExistError, ImportError):
+			raise _unresolved_method_error() from None
 		method = module.__name__ + "." + method
 
-	if not isinstance(method, str):
-		raise frappe.ValidationError("The requested method could not be resolved.")
 	method = frappe.override_whitelisted_method(method)
 	if get_server_script_map().get("_api", {}).get(method):
 		return SERVER_SCRIPT
+	if not legacy and "." not in method:
+		raise _unresolved_method_error()
 
 	get_method = get_legacy_attr if legacy else frappe.get_attr
 	try:
 		return get_method(method)
-	except Exception:
-		raise frappe.ValidationError("The requested method could not be resolved.") from None
+	except (frappe.AppNotInstalledError, ImportError, AttributeError):
+		raise _unresolved_method_error() from None
+	except KeyError:
+		# Frappe resolves undotted legacy names through its handler globals.
+		if legacy and "." not in method:
+			raise _unresolved_method_error() from None
+		raise
+
+
+def _unresolved_method_error() -> frappe.ValidationError:
+	return frappe.ValidationError(
+		frappe._("The requested method could not be resolved.", context="shell.request")
+	)
 
 
 def website_method_allowed(target) -> bool:
