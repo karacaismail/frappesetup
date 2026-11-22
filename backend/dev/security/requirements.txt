@@ -1,5 +1,5 @@
 # Regenerate with backend/dev/security/compile-lock.
-# Manifest SHA256: 4557ef7f037299ab2c221b794d5db7923e08923289a3fe2536099c4eb15e27f0
+# Manifest SHA256: f88d26f1d7cc212cd0773362f6a38ce18079e2060fe2d41b1a6cef3530bbd854
 annotated-types==0.8.0
 certifi==2026.11.20
 cffi==2.1.1 ; platform_python_implementation != 'PyPy'
