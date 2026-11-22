@@ -267,9 +267,8 @@ def rewrite(data: bytes, rules: tuple[Rule, ...], path: str) -> bytes:
         return data
     try:
         source = data.decode("utf-8")
-    except UnicodeDecodeError:
-        print(f"Skipped non-UTF-8 file: {path}", file=sys.stderr)
-        return data
+    except UnicodeDecodeError as error:
+        raise ValueError(f"Cannot rename non-UTF-8 source: {path}") from error
     translation = {"translations", "locale"}.intersection(PurePosixPath(path).parts)
     if translation and suffix in {".csv", ".po"}:
         return rewrite_translation(source, rules, suffix).encode("utf-8")

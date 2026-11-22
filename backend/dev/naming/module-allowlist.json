@@ -37,6 +37,10 @@
   },
   {
     "path": "backend/apps/platform_core/platform_core/api/ai.py",
+    "line_text": "\"\"\"Endpoints of the AI access layer. The business rules live in the `platform_core.yapay_zeka` module."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/api/ai.py",
     "line_text": "\"\"\"Yapay zekâ erişim katmanının uçları. İş kuralı `platform_core.yapay_zeka` modülündedir."
   },
   {
@@ -90,6 +94,10 @@
   {
     "path": "backend/contracts/platform_core-access.openapi.yaml",
     "line_text": "This contract describes the endpoints of the `platform_core.erisim` module."
+  },
+  {
+    "path": "backend/contracts/platform_core-ai.openapi.yaml",
+    "line_text": "This contract describes the endpoints of the `platform_core.yapay_zeka` module."
   },
   {
     "path": "backend/contracts/platform_core-ai.openapi.yaml",

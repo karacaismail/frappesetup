@@ -97,6 +97,25 @@ Yamayı önce eski verinin bir kopyasında sınayın.
 
 ## Dalda uygulama
 
+### Orkestratör
+
+Orkestratör komutları `backend` dalının kökünde çalıştırır.
+Çalışma ağacı temiz olmalıdır. İlk komut değişiklikleri önizler.
+
+```sh
+test -z "$(git status --porcelain=v1 --untracked-files=all)" &&
+  python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD" --dry-run
+```
+
+Önizlemeyi inceleyin. Uygulamak için şu komutu çalıştırın.
+
+```sh
+test -z "$(git status --porcelain=v1 --untracked-files=all)" &&
+  python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD"
+```
+
+### İşçi dalı
+
 1. Orkestratör önce `backend` dalında ad geçişini tamamlar.
 2. İşçi temiz çalışma ağacında `backend` dalını birleştirir.
 3. İşçi birleşen dalın betiğiyle önizleme yapar.
@@ -115,7 +134,9 @@ PYTHON=python3.14 backend/dev/naming/apply-to-branch -- \
 
 Geçiş komutuna kendi işinizin Python testlerini verin.
 Komut temiz çalışma ağacı ister. Komut yerel `backend` dalının birleştiğini denetler.
-Komut adları uygular. Sonra modül adlarını, ad kurallarını ve verilen testi denetler.
+Komut adları uygular. Sonra eski adları ve verilen testi denetler.
+Komut ad haritasındaki eski adları bulursa durur.
+Komut genel ad kurallarının bulgularını uyarı olarak gösterir.
 Tüm denetimler geçerse komut değişiklikleri tek Git kaydına alır.
 Denetim durursa değişiklikler inceleme için çalışma ağacında kalır.
 Yeni değişiklik yoksa komut yeni Git kaydı oluşturmaz.

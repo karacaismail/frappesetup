@@ -100,9 +100,50 @@ class BranchCommandTests(unittest.TestCase):
         self.assertEqual(outcome.returncode, 7, outcome.stderr)
         self.assertEqual(self.git("rev-parse", "HEAD"), initial)
 
+    def use_real_name_checker(self, source):
+        shutil.copy2(NAMING / "check_names.py", self.tools)
+        (self.tools / "rename-map.json").write_text(
+            '[{"old":"obsolete","new":"replacement_name","type":"identifier"}]\n'
+        )
+        self.target.write_text(source)
+        self.git("add", ".")
+        self.git("commit", "-qm", "Ad denetimi örneğini ekle")
+
+    def test_mapped_legacy_name_stops_before_tests(self):
+        self.use_real_name_checker("legacy = True\nobsolete = True\n")
+        initial = self.git("rev-parse", "HEAD")
+        outcome = self.run_command("print('branch tests ran')")
+        self.assertNotEqual(outcome.returncode, 0)
+        self.assertIn("Error:", outcome.stdout)
+        self.assertIn("[legacy-name]", outcome.stdout)
+        self.assertNotIn("branch tests ran", outcome.stdout)
+        self.assertEqual(self.git("rev-parse", "HEAD"), initial)
+
+    def test_general_name_warnings_are_reported_and_allow_commit(self):
+        self.use_real_name_checker("legacy = True\nresult = True\n")
+        outcome = self.run_command("print('branch tests ran')")
+        self.assertEqual(outcome.returncode, 0, outcome.stdout + outcome.stderr)
+        self.assertIn("Warning:", outcome.stdout)
+        self.assertIn("[discouraged-name]", outcome.stdout)
+        self.assertIn("branch tests ran", outcome.stdout)
+        self.assertEqual(self.git("log", "-1", "--format=%s"), MESSAGE)
+
     def test_test_side_effects_are_never_committed(self):
         initial = self.git("rev-parse", "HEAD")
         outcome = self.run_command("from pathlib import Path; Path('backend/generated.py').touch()")
         self.assertNotEqual(outcome.returncode, 0)
         self.assertIn("changed", outcome.stderr.lower())
         self.assertEqual(self.git("rev-parse", "HEAD"), initial)
+
+
+class TransitionInstructionsTests(unittest.TestCase):
+    def test_backend_instructions_require_clean_tree_and_direct_application(self):
+        decision = NAMING.parents[1] / "docs/kararlar/0009-naming-history-fix.md"
+        instructions = decision.read_text().split("## Dalda uygulama", 1)[1]
+        orchestrator = instructions.split("### İşçi dalı", 1)[0]
+        clean_guard = 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
+        apply = 'python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD"'
+        self.assertIn(clean_guard + " &&", orchestrator)
+        self.assertIn(apply + " --dry-run", orchestrator)
+        self.assertIn(apply + "\n", orchestrator)
+        self.assertNotIn("apply-to-branch --", orchestrator)

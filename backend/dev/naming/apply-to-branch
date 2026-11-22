@@ -45,7 +45,7 @@ git add -A -- backend/
 planned_tree="$(git write-tree)"
 
 "$python_bin" -B "$naming_dir/apply_renames.py" --check-modules
-"$python_bin" -B "$naming_dir/check_names.py" --root "$PWD"
+"$python_bin" -B "$naming_dir/check_names.py" --root "$PWD" --transition
 PYTHONDONTWRITEBYTECODE=1 "$@" || {
     test_status=$?
     printf 'The branch tests failed. Review the uncommitted changes with git status.\n' >&2

@@ -141,6 +141,58 @@ class RenameTests(unittest.TestCase):
         self.assertIn("kimlik-realm.md", report.stdout)
         self.assertEqual(source.read_text(), content)
 
+    def test_module_allowlist_covers_english_ai_copy(self):
+        self.write(
+            "backend/apps/platform_core/platform_core/api/ai.py",
+            '"""Endpoints of the AI access layer. The business rules live in the '
+            '`platform_core.yapay_zeka` module.\n"""\n',
+        )
+        self.write(
+            "backend/contracts/platform_core-ai.openapi.yaml",
+            "description: |\n"
+            "  This contract describes the endpoints of the `platform_core.yapay_zeka` module.\n",
+        )
+        self.git("add", ".")
+        result = self.rename(None, "--check-modules")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_non_utf8_source_stops_before_any_changes(self):
+        source = self.write("backend/sample.txt", "legacy\n")
+        invalid = self.write("backend/unreadable.txt", "")
+        invalid.write_bytes(b"legacy\xff\n")
+        self.git("add", ".")
+        rules = [{"old": "legacy", "new": "updated", "type": "identifier"}]
+        result = self.rename(rules)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("backend/unreadable.txt", result.stderr)
+        self.assertEqual(source.read_text(), "legacy\n")
+        self.assertEqual(invalid.read_bytes(), b"legacy\xff\n")
+
+    def test_real_map_uses_specific_keycloak_test_names(self):
+        source = self.write("backend/identity/keycloak/tests/example.py", "deger = 'x'\nveri = {}\n")
+        self.git("add", ".")
+        outcome = self.rename(None)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+        self.assertEqual(source.read_text(), "environment_value = 'x'\nrequest_body = {}\n")
+
+    def test_email_diagnostics_name_the_current_settings(self):
+        base = "backend/identity/keycloak/themes/atonota/test/tests"
+        self.write(
+            f"{base}/eposta.spec.ts",
+            "const magicKc = process.env.SIHIRLI_KC_URL;\n"
+            "test.skip(!magicKc, 'Eklentili Keycloak adresi (SIHIRLI_KC_URL) verilmedi. "
+            "Tema deneme ortamında eklenti yok.');\n"
+            "const token = process.env.SIHIRLI_ADMIN_TOKEN;\n"
+            "if (!token) throw new Error('SIHIRLI_ADMIN_TOKEN gerekli');\n",
+        )
+        self.git("add", ".")
+        result = self.rename(None)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = (self.root / base / "email.spec.ts").read_text()
+        self.assertEqual(output.count("KC_MAGIC_LINK_URL"), 2)
+        self.assertEqual(output.count("KC_MAGIC_LINK_ADMIN_TOKEN"), 2)
+        self.assertNotIn("SIHIRLI_", output)
+
     def test_real_map_distinguishes_email_properties_slugs_and_copy(self):
         directory = "backend/identity/keycloak/themes/atonota/test/tests"
         pattern = "const pattern = /https?:\\/\\/[^\\s\"'<>]+/g;\n"
@@ -221,18 +273,17 @@ class RenameTests(unittest.TestCase):
         markup = self.write("backend/view.ftl", '<div class="durum">Son durum</div>\n')
         contract = self.write("backend/contracts/example.yaml", "summary: >-\n  Son durum\n")
         properties = self.write("backend/view.properties", "caption=Son durum\n")
-        non_utf8 = self.write("backend/legacy.txt", "")
-        non_utf8.write_bytes(b"\xe9")
+        binary = self.write("backend/sample.bin", "")
+        binary.write_bytes(b"\0durum\xff")
         self.git("add", ".")
         entries = [{"old": "durum", "new": "status", "type": "identifier"}]
         result = self.rename(entries)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Skipped non-UTF-8 file: backend/legacy.txt", result.stderr)
+        self.assertEqual(binary.read_bytes(), b"\0durum\xff")
         self.assertEqual(template.read_text(), "const label = `Durum: ${status}`;\n")
         self.assertEqual(markup.read_text(), '<div class="status">Son durum</div>\n')
         self.assertEqual(contract.read_text(), "summary: >-\n  Son durum\n")
         self.assertEqual(properties.read_text(), "caption=Son durum\n")
-        self.assertEqual(non_utf8.read_bytes(), b"\xe9")
 
     def test_rejects_a_module_binding_collision(self):
         source = self.write("backend/collision.py", "name = 1\nad = 2\n")

@@ -225,10 +225,10 @@ def check_python(path: Path, relative: str, avoid: set[str], names, roots, legac
             continue
         if binding == "_":
             emit(path, "translation-binding", "The name '_' is reserved for translation.", line)
-        elif not binding.isascii():
-            emit(path, "python-name", f"Python name {binding!r} must use ASCII.", line)
         elif not legacy and mapped != binding:
             emit(path, "legacy-name", f"Replace the mapped legacy name {binding!r}.", line)
+        elif not binding.isascii():
+            emit(path, "python-name", f"Python name {binding!r} must use ASCII.", line)
         elif (not legacy or binding == mapped) and has_turkish_root(binding, roots):
             emit(path, "turkish-name", f"Use an English name in place of {binding!r}.", line)
         elif not attribute and (
@@ -378,7 +378,9 @@ def check_web(path, relative, roots, names, legacy, emit):
     source = path.read_text(encoding="utf-8")
     for spelling, line in set(web_names(source, path.suffix)):
         mapped = replacement(names, spelling, relative, {"identifier", "reference"})
-        if not spelling.isascii() or (mapped == spelling or not legacy) and has_turkish_root(spelling, roots):
+        if not legacy and mapped != spelling:
+            emit(path, "legacy-name", f"Replace the mapped legacy name {spelling!r}.", line)
+        elif not spelling.isascii() or mapped == spelling and has_turkish_root(spelling, roots):
             emit(path, "turkish-name", f"Use an English ASCII name in place of {spelling!r}.", line)
 
 
@@ -613,6 +615,11 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--legacy", action="store_true", help="Recognize explicitly mapped legacy names.")
     mode.add_argument("--source-text", action="store_true", help="Find Turkish in visible source text.")
+    mode.add_argument(
+        "--transition",
+        action="store_true",
+        help="Fail only for mapped legacy names; show other findings as warnings.",
+    )
     parser.add_argument("--map", type=Path, default=DEFAULT_MAP)
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
@@ -641,7 +648,12 @@ def main() -> int:
         print(json.dumps([asdict(finding) for finding in findings]))
     else:
         for finding in findings:
-            print(f"{finding.path}:{finding.line} [{finding.rule}] {finding.message}")
+            level = ""
+            if arguments.transition:
+                level = "Error: " if finding.rule == "legacy-name" else "Warning: "
+            print(f"{level}{finding.path}:{finding.line} [{finding.rule}] {finding.message}")
+    if arguments.transition:
+        return int(any(finding.rule == "legacy-name" for finding in findings))
     return int(bool(findings))
 
 
