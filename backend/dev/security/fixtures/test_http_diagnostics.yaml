@@ -2,7 +2,7 @@ rules:
   - id: test-raw-http-diagnostic
     languages: [python]
     severity: ERROR
-    message: "Test hata iletisine ham yanıt yerine durum kodunu yazın."
+    message: "Use the status code instead of the raw response in test failure messages."
     mode: taint
     paths:
       include:

@@ -2,7 +2,7 @@ rules:
   - id: http-raw-request-log
     languages: [python]
     severity: ERROR
-    message: "Günlüğe ham istek adresi yerine sabit işlem adını yazın."
+    message: "Log a fixed operation name instead of the raw request URL."
     mode: taint
     pattern-sources:
       - exact: true
