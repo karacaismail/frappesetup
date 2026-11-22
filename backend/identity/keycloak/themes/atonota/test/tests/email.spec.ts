@@ -1,8 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { KC, MAILPIT, REALM, admin, createUser, screen } from './helpers';
+import { KC, MAILPIT, REALM, admin, createUser, loginUrl, screen } from './helpers';
 
 // Atonota e-posta temasının testleri. E-postalar Mailpit kutusundan okunur.
 // Her test kendi uydurma alıcısını açar ve yalnız o alıcının postasını arar.
@@ -324,18 +325,31 @@ test.describe('e-posta ileti dosyaları', () => {
     }
   });
 
-  test('sihirli bağlantı şablonu eklentinin beklediği adı ve değişkenleri kullanır', () => {
-    // Ad ve değişkenler sky-cloak/keycloak-magic-link v0.3.0 dosyasından okundu:
-    // şablon skycloak-magic-link-email.ftl, konu anahtarı magicLinkEmailSubject, değişkenler link ve clientName.
-    for (const kind of ['html', 'text']) {
-      const path = join(emailDir, kind, 'skycloak-magic-link-email.ftl');
-      expect(existsSync(path), path).toBe(true);
-      const source = readFileSync(path, 'utf8');
-      expect(source).toMatch(/\blink\b/);
-      // Eklenti süre değişkeni vermez. Şablon verilmeyen değişkene dayanmamalıdır.
-      expect(source).not.toMatch(/linkExpiration/);
+  test('sihirli bağlantı şablonları ve konu anahtarı kurulu eklentiyle eşleşir', () => {
+    const jar = process.env.MAGIC_LINK_PROVIDER_JAR;
+    test.skip(!jar, 'Kurulu eklentinin arşiv yolu MAGIC_LINK_PROVIDER_JAR ile verilir.');
+    if (!jar) return;
+
+    const entries = execFileSync('unzip', ['-Z1', jar], { encoding: 'utf8' }).trim().split(/\r?\n/);
+    const templates = entries.flatMap((entry) => {
+      const template = /^theme-resources\/templates\/((?:html|text)\/[^/]+\.ftl)$/.exec(entry);
+      return template ? [template[1]] : [];
+    });
+    expect(templates.map((template) => template.split('/')[0]).sort()).toEqual(['html', 'text']);
+
+    const messagesEntry = 'theme-resources/messages/messages_en.properties';
+    expect(entries).toContain(messagesEntry);
+    const messages = execFileSync('unzip', ['-p', jar, messagesEntry], { encoding: 'utf8' });
+    const subjectKeys = [...messages.matchAll(/^([^#=\s]+[Ss]ubject)\s*=/gm)].map((match) => match[1]);
+    expect(subjectKeys).toHaveLength(1);
+
+    const missing = templates.filter((template) => !existsSync(join(emailDir, template)));
+    for (const lang of ['tr', 'en'] as const) {
+      if (!readMessages(lang).get(subjectKeys[0])?.trim()) {
+        missing.push(`messages/messages_${lang}.properties: ${subjectKeys[0]}`);
+      }
     }
-    for (const lang of ['tr', 'en'] as const) expect(readMessages(lang).has('magicLinkEmailSubject')).toBe(true);
+    expect(missing, 'temada eksik e-posta şablonu veya konu anahtarı').toEqual([]);
   });
 });
 
@@ -413,17 +427,13 @@ test.describe('sihirli bağlantı e-postası', () => {
         body: JSON.stringify({ username: email, email, enabled: true, emailVerified: true, attributes: { locale: [lang] } }),
       });
       expect(created.status).toBe(201);
-      const sent = await fetch(`${base}/realms/${realmName}/skycloak-magic-link`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          email,
-          clientId: 'account-console',
-          redirectUri: `${base}/realms/${realmName}/account/`,
-          send: true,
-        }),
-      });
-      expect(sent.ok, `sihirli bağlantı isteği: ${sent.status}`).toBe(true);
+      await page.goto(loginUrl(lang, realmName, base));
+      const alternative = page.locator('form:has([name="tryAnotherWay"])');
+      await alternative.evaluate((form: HTMLFormElement) => form.requestSubmit());
+      await page.getByRole('button', { name: /magiclink-display-name|magic link|sihirli bağlantı/i }).click();
+      const username = page.locator('input[name="username"]:visible');
+      await username.fill(email);
+      await username.evaluate((input: HTMLInputElement) => input.form!.requestSubmit());
 
       const mail = await waitMail(email, mailpit);
       const expected: Record<Lang, Copy & { expiry: string; browser: string }> = {

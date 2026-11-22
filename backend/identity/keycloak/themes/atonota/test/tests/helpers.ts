@@ -164,17 +164,17 @@ export function base32Decode(text: string): Buffer {
 }
 
 /** Giriş ekranını açar. Hesap konsolu istemcisi PKCE ister, bu yüzden sabit bir sınama değeri verilir. */
-export function loginUrl(locale?: string, realm = REALM): string {
+export function loginUrl(locale?: string, realm = REALM, server = KC): string {
   const params = new URLSearchParams({
     client_id: 'account-console',
-    redirect_uri: `${KC}/realms/${realm}/account/`,
+    redirect_uri: `${server}/realms/${realm}/account/`,
     response_type: 'code',
     scope: 'openid',
     code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
     code_challenge_method: 'S256',
   });
   if (locale) params.set('ui_locales', locale);
-  return `${KC}/realms/${realm}/protocol/openid-connect/auth?${params}`;
+  return `${server}/realms/${realm}/protocol/openid-connect/auth?${params}`;
 }
 
 export async function openLogin(page: Page, locale?: string): Promise<void> {

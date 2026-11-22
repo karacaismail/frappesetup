@@ -91,9 +91,9 @@ E-posta teması `email/` klasöründedir. Tema dört e-postayı kapsar:
 | E-posta doğrulama | `email-verification.ftl` |
 | Parola sıfırlama | `password-reset.ftl` |
 | Yöneticinin istediği işlem | `executeActions.ftl` |
-| Sihirli bağlantı | `skycloak-magic-link-email.ftl` |
+| Sihirli bağlantı | `magiclink-email.ftl` |
 
-Sihirli bağlantı, parola yazmadan oturum açtıran e-posta bağlantısıdır. Bu e-postayı `sky-cloak/keycloak-magic-link` eklentisi gönderir. Eklentiyi kimlik-realm işi seçti.
+Sihirli bağlantı, parola yazmadan oturum açtıran e-posta bağlantısıdır. Bu e-postayı `cloudflightio/keycloak-magic-link` eklentisi gönderir. Eklentiyi kimlik-realm işi seçti.
 
 - Her e-postanın HTML ve düz metin sürümü vardır.
 - Ortak düzen `email/html/template.ftl` dosyasındadır. Renk ve yazı değerleri bu dosyanın başındadır.
@@ -279,7 +279,8 @@ Görüntüler `test/reference/` klasörüne yazılır. Bu görüntüler macOS'ta
 - Kayıt formuna seçmeli alan eklenirse Keycloak işletim sisteminin açılır listesini çizer. Bu liste markalı değildir. Realm'e seçmeli profil alanı eklemeyin.
 - Geçiş anahtarının tarihini ve bağlantı türünü Keycloak yazar. Örneğin “USB” yazısı Keycloak'tan gelir.
 - Sihirli bağlantı eklentisinin giriş ekranı iletileri çevrildi ama canlı denenmedi. Deneme ortamında eklenti kurulu değildir.
-- Sihirli bağlantı e-postası canlı denenmedi. Şablonun adı ve değişkenleri eklentinin jar dosyasından okundu. Eklentili bir Keycloak'ta `MAGIC_LINK_KC_URL` ve `MAGIC_LINK_ADMIN_TOKEN` değişkenleriyle `tests/email.spec.ts` testini çalıştırın.
+- E-posta sözleşmesi testi şablon adlarını ve konu anahtarını kurulu eklentinin arşivinden okur. Arşiv yolunu `MAGIC_LINK_PROVIDER_JAR` ile verin.
+- Eklentili Keycloak adresini `MAGIC_LINK_KC_URL` ile verin. Deneme hesabı açmak için `MAGIC_LINK_ADMIN_TOKEN` gerekir. Canlı test bağlantıyı giriş ekranından ister.
 - E-postalar gerçek e-posta programlarında denenmedi. Örneğin Gmail ve Outlook denenmedi.
 
 - Gerçek telefon ve gerçek Safari denemesi yapılmadı. WebKit öykünmesi gerçek Safari değildir.
