@@ -40,6 +40,15 @@ class SessionDeliveryTest(TestCase):
 		self.assertEqual(insert.call_args.kwargs["delivery_pending"], 1)
 		self.send.assert_not_called()
 
+	def test_already_closed_session_does_not_log_a_pending_warning(self):
+		sid = "closed-session"
+		self.db.get_values.return_value = [
+			SimpleNamespace(name=sessions._session_key(sid), delivery_pending=0),
+		]
+		sessions.revoke_after_commit([(sid, None)])
+		self.logger.return_value.warning.assert_not_called()
+		self.send.assert_not_called()
+
 	def test_transient_acknowledgment_errors_roll_back_the_acknowledgment(self):
 		for method, error in (
 			(self.db.set_value, frappe.QueryDeadlockError),

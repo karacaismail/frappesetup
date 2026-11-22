@@ -64,6 +64,7 @@ def revoke_after_commit(sessions, *, remote=True):
 	)
 	persisted = {row.name: row for row in rows}
 	pending = []
+	missing_subject = False
 	retry_keys = []
 	cancel_keys = []
 	now = int(time.time())
@@ -71,6 +72,8 @@ def revoke_after_commit(sessions, *, remote=True):
 		deliver = remote and valid_keycloak_id(subject)
 		key = keys[sid]
 		row = persisted.get(key)
+		if remote and not deliver and (row is None or row.delivery_pending):
+			missing_subject = True
 		if row is None:
 			persisted[key] = insert_metadata(
 				REVOKED_SESSION,
@@ -95,7 +98,7 @@ def revoke_after_commit(sessions, *, remote=True):
 			REVOKED_SESSION, {"name": ["in", retry_keys]}, "last_delivery_attempt_at", str(now)
 		)
 
-	if remote and any(not valid_keycloak_id(subject) for _unused, subject in targets):
+	if missing_subject:
 		frappe.logger("mobile_sessions").warning(
 			"Mobile session closure is pending because the Keycloak subject is unavailable."
 		)
