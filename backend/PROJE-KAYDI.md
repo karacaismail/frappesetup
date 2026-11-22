@@ -230,7 +230,7 @@ Bu turda gerçek kişisel veri yoktur. Saklama süresi ve silme yolu MVP yayın�
 | Kayıt | Kişisel veri | Saklama | Silme yolu |
 | --- | --- | --- | --- |
 | “User” ve kimlik bağı | E-posta, ad, Keycloak kimliği | Hesap açık kaldıkça | Hesap silme isteği |
-| “AI Action Log” | Kullanıcı adı, IP adresi | 365 gün (Rail 5) | `platform_core.api.ai.purge_logs` komutu elle çalışır |
+| “AI Action Log” | Kullanıcı adı, IP adresi, hedef kaydın adı (`target_name`). Hedef adı e-posta olabilir | 365 gün (Rail 5) | `platform_core.api.ai.purge_logs` komutu elle çalışır |
 | “AI Usage Log” | Kullanıcı adı | 365 gün. Bütçe ve fatura denetimi bu süreyi ister | Aynı silme komutu elle çalışır |
 | “AI Action Proposal” | Kullanıcı adı ve önizlemedeki kişi bilgisi. Örneğin çalışan adı ve izin tarihleri | Karar ya da süre dolumundan sonra 30 gün | Aynı silme komutu elle çalışır. Önizleme yalnız gerekli bilgiyi tutar |
 | Hesap silme isteği (O-27) | E-posta ve Keycloak kimliği | İş bitene kadar | İş bitince kayıt anonim yapılır |
@@ -245,6 +245,8 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
+| `BORC(mvp)`: Dış MCP istemcileri OAuth 2.1 ile giremez | Dış yapay zekâ istemcisi yalnız oturum ya da API anahtarıyla bağlanır | platform-core-yz | MCP ucu OAuth 2.1 yetkilendirmesini Keycloak üzerinden destekler |
+| `BORC(mvp)`: Üretim işçi sayısı ölçülmedi | 50 eşzamanlı telefonda 4 Gunicorn işçisiyle istemci p95 1 saniyeyi aştı. Sunucu süresi sınırın altında kaldı | DevOps sorumlusu | Üretim kapasite ölçümü yapılır ve işçi sayısı ölçümle seçilir |
 | `BORC(mvp)`: identity-sync canlı Keycloak, Press ve kiracı ile denenmedi | Sahte hedeflerin kaçırdığı uyumsuzluk üretimde çıkabilir | integration-e2e | Uçtan uca test gerçek servislerle geçer |
 | `BORC(mvp)`: `list_identities` uçları yok | Mutabakat gerçek hedeflerde çalışmaz | press-tr ve platform-core-kimlik | İki uç sözleşmeye uygun yazılır ve sayfalı yanıt verir |
 | `BORC(mvp)`: Yeni kiracının Keycloak istemcisini açan komut yok | Yeni kiracı istemcisi elle açılır | kimlik-realm | Elle başlatılan, insan onaylı komut yazılır |
