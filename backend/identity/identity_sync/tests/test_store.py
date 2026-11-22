@@ -161,6 +161,48 @@ class StoreTest(unittest.TestCase):
         store.begin(EVENT)
         self.assertEqual((store.dead_letters()[0].state, store.dead_letters()[0].attempts), ("unknown", 1))
 
+    def test_operation_journal_survives_a_crash_between_steps(self) -> None:
+        steps = ["keycloak.create_user", "keycloak.add_organization_member", "keycloak.send_execute_actions_email"]
+        store = self.open()
+        store.operation_begin("onay-1", "invite_user", "o-1", steps)
+        store.operation_step("onay-1", steps[0], "writing")
+        store.operation_step("onay-1", steps[0], "done", subject="u-9")
+        store.operation_step("onay-1", steps[1], "writing")
+        store.close()  # the process dies here
+
+        (operation,) = self.open().operations()
+        self.assertEqual(operation["operation_id"], "onay-1")
+        self.assertEqual(operation["subject"], "u-9")
+        # A step that was started and never finished has an unknown outcome.
+        self.assertEqual(operation["state"], "unknown")
+        self.assertEqual([s["status"] for s in operation["steps"]], ["done", "unknown", "pending"])
+
+    def test_finished_operation_is_not_listed(self) -> None:
+        store = self.open()
+        store.operation_begin("onay-1", "invite_user", "o-1", ["a"])
+        store.operation_step("onay-1", "a", "writing")
+        store.operation_step("onay-1", "a", "done")
+        store.operation_finish("onay-1", "done")
+        self.assertEqual(store.operations(), [])
+
+    def test_failed_operation_is_listed_until_a_human_resolves_it(self) -> None:
+        store = self.open()
+        store.operation_begin("onay-1", "invite_user", "o-1", ["a", "b"])
+        store.operation_step("onay-1", "a", "writing")
+        store.operation_step("onay-1", "a", "failed")
+        store.operation_finish("onay-1", "failed")
+        self.assertEqual(store.operations()[0]["state"], "failed")
+
+        self.assertTrue(store.operation_resolve("onay-1", "abandoned"))
+        self.assertEqual(store.operations(), [])
+        self.assertFalse(store.operation_resolve("onay-1", "abandoned"))
+        self.assertFalse(store.operation_resolve("yok", "completed"))
+
+    def test_operation_journal_stores_no_email(self) -> None:
+        store = self.open()
+        store.operation_begin("onay-1", "invite_user", "o-1", ["a"])
+        self.assertNotIn("@", repr(store.operations()))
+
     def test_old_database_file_gets_the_state_column(self) -> None:
         import sqlite3
 

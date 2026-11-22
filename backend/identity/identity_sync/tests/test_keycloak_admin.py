@@ -30,7 +30,7 @@ class AdminCase(unittest.TestCase):
             "test-client-secret",
             timeout=5,
         )
-        self.admin = KeycloakAdmin(self.kc.url, "platform", tokens, admin_scope="admin-api", timeout=5)
+        self.admin = KeycloakAdmin(self.kc.url, "platform", tokens, admin_scope=fakes.ADMIN_SCOPE, timeout=5)
         self.base = self.kc.admin
 
     def writes(self) -> list[fakes.Recorded]:
@@ -127,29 +127,68 @@ class OrganizationTest(AdminCase):
 
         self.assertTrue(outcome.executed)
 
-    def test_ensure_organization_reuses_existing_one(self) -> None:
-        self.kc.on("GET", f"{self.base}/organizations", (200, [{"id": ORG_ID, "name": "x", "alias": "kiraci2"}]))
-        self.kc.on("POST", f"{self.base}/organizations/{ORG_ID}/members", (201, None))
+    def test_find_organization_searches_by_name_and_checks_the_alias(self) -> None:
+        self.kc.on("GET", f"{self.base}/organizations", (200, [{"id": ORG_ID, "name": "Kiracı 2", "alias": "kiraci2"}]))
 
-        org_id = self.admin.ensure_organization_with_member("kiraci2", "Kiracı 2", SUBJECT)
-
-        self.assertEqual(org_id, ORG_ID)
-        self.assertEqual(self.kc.calls("POST", f"{self.base}/organizations"), [])
+        self.assertEqual(self.admin.find_organization("Kiracı 2", "kiraci2").id, ORG_ID)
         search = self.kc.calls("GET", f"{self.base}/organizations")[0]
-        # Keycloak arama ucu ada bakar, takma ada bakmaz (OrganizationsResource.java).
+        # Keycloak's search looks at the name, not the alias (OrganizationsResource.java).
         self.assertEqual(search.query["search"], ["Kiracı 2"])
         self.assertEqual(search.query["exact"], ["true"])
 
-    def test_ensure_organization_ignores_similar_alias(self) -> None:
+    def test_find_organization_ignores_a_similar_alias(self) -> None:
         self.kc.on("GET", f"{self.base}/organizations", (200, [{"id": "baska", "name": "Kiracı 2", "alias": "kiraci20"}]))
+
+        self.assertIsNone(self.admin.find_organization("Kiracı 2", "kiraci2"))
+
+    def test_join_adds_the_member_to_exactly_the_planned_organization(self) -> None:
+        # The plan named the organization by its id. No new lookup may pick another target.
+        self.kc.on("POST", f"{self.base}/organizations/{ORG_ID}/members", (201, None))
+
+        self.admin.ensure_organization_member("kiraci2", "Kiracı 2", SUBJECT, ORG_ID)
+
+        self.assertEqual([(r.method, r.path) for r in self.kc.requests if "/admin/" in r.path],
+                         [("POST", f"{self.base}/organizations/{ORG_ID}/members")])
+
+    def test_create_makes_a_new_organization_then_adds_the_member(self) -> None:
         self.kc.on(
-            "POST",
-            f"{self.base}/organizations",
-            (201, None, {"Location": f"{self.kc.url}{self.base}/organizations/{ORG_ID}"}),
+            "POST", f"{self.base}/organizations", (201, None, {"Location": f"{self.kc.url}{self.base}/organizations/{ORG_ID}"})
         )
         self.kc.on("POST", f"{self.base}/organizations/{ORG_ID}/members", (201, None))
 
-        self.assertEqual(self.admin.ensure_organization_with_member("kiraci2", "Kiracı 2", SUBJECT), ORG_ID)
+        self.admin.ensure_organization_member("kiraci2", "Kiracı 2", SUBJECT, None)
+
+        self.assertEqual([r.path for r in self.writes()],
+                         [f"{self.base}/organizations", f"{self.base}/organizations/{ORG_ID}/members"])
+
+    def test_create_fails_when_the_organization_appeared_meanwhile(self) -> None:
+        # The plan said "create". Keycloak now has that name. The member is not added to the other one.
+        self.kc.on("POST", f"{self.base}/organizations", (409, {"errorMessage": "exists"}))
+
+        with self.assertRaises(HttpError):
+            self.admin.ensure_organization_member("kiraci2", "Kiracı 2", SUBJECT, None)
+        self.assertEqual(len(self.writes()), 1)
+
+
+class RolesTest(AdminCase):
+    """The fake follows the roles in docs/sozlesmeler.md, section 2."""
+
+    def test_token_without_admin_scope_is_refused(self) -> None:
+        tokens = TokenProvider(
+            f"{self.kc.url}/realms/platform/protocol/openid-connect/token", "identity-sync", "test-client-secret", timeout=5
+        )
+        for scope in ("", "aud-site-kiraci1", "aud-press", "admin-api"):
+            with self.subTest(scope=scope):
+                admin = KeycloakAdmin(self.kc.url, "platform", tokens, admin_scope=scope, timeout=5)
+                with self.assertRaises(HttpError) as caught:
+                    admin.get_user(SUBJECT)
+                self.assertEqual(caught.exception.status, 403)
+
+    def test_client_administration_is_not_among_the_roles(self) -> None:
+        # ensure_site_client needs manage-clients. The contract does not grant it.
+        with self.assertRaises(HttpError) as caught:
+            self.admin.ensure_site_client("kiraci2", TENANT_URL)
+        self.assertEqual(caught.exception.status, 403)
 
 
 class InviteTest(AdminCase):
@@ -247,6 +286,12 @@ class InviteTest(AdminCase):
 
 
 class SiteClientTest(AdminCase):
+    """These tests grant manage-clients to the fake. The real service account does not have it yet."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.kc.extra_role_paths = ("/clients",)
+
     def test_creates_confidential_client_with_exact_urls(self) -> None:
         found: list[object] = []
         self.kc.on("GET", f"{self.base}/clients", lambda _r: (200, list(found)))
@@ -306,6 +351,32 @@ class SiteClientTest(AdminCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 self.admin.ensure_site_client(bad, TENANT_URL)
         self.assertEqual(self.kc.requests, [])
+
+    def test_invite_reports_each_step_before_and_after_the_write(self) -> None:
+        self.kc.on("GET", f"{self.base}/users", (200, []))
+        self.kc.on("POST", f"{self.base}/users", (201, None, {"Location": f"{self.kc.url}{self.base}/users/{SUBJECT}"}))
+        self.kc.on("POST", f"{self.base}/organizations/{ORG_ID}/members", (201, None))
+        steps: list[tuple[str, str, int]] = []
+
+        def on_step(step: str, status: str) -> None:
+            steps.append((step, status, len(self.writes())))
+
+        self.kc.on("PUT", f"{self.base}/users/{SUBJECT}/execute-actions-email", (500, None))
+        with self.assertRaises(HttpError):
+            self.admin.invite_user("davetli@example.test", "Deniz", "Örnek", ORG_ID, on_step=on_step)
+
+        # "writing" is recorded before the request leaves; "done" after the answer.
+        self.assertEqual(
+            steps,
+            [
+                ("keycloak.create_user", "writing", 0),
+                ("keycloak.create_user", "done", 1),
+                ("keycloak.add_organization_member", "writing", 1),
+                ("keycloak.add_organization_member", "done", 2),
+                ("keycloak.send_execute_actions_email", "writing", 2),
+                ("keycloak.send_execute_actions_email", "failed", 3),
+            ],
+        )
 
 
 if __name__ == "__main__":

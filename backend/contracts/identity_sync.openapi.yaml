@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.4.0
+  version: 0.5.0
   summary: Kullanıcı eşitleme servisinin uçları
   description: |
     Bu servis Keycloak'taki kullanıcı değişikliklerini Press'e ve kiracı sitelerine taşır (G-81).
@@ -47,7 +47,15 @@ info:
 
     Özet yazılacak her şeyi kapsar: her işin adını, hedefini ve bütün alan değerlerini.
     Örneğin e-posta ya da ad önizlemeden sonra değişirse özet tutmaz.
-    Özet bir karma değerdir. E-posta ve ad özetten okunamaz. Önizleme metni de bu değerleri taşımaz.
+    Özet anahtarlı bir karma değerdir: HMAC-SHA256. Anahtar `IDENTITY_SYNC_DIGEST_KEY` ortam sırrındadır.
+    Anahtarı yalnız servis bilir. Bu yüzden özeti gören biri bir e-posta tahminini özetle karşılaştıramaz.
+    Günlükteki özet de aynı anahtarlı değerdir. Önizleme metni e-posta ve ad taşımaz.
+    Özet, kuruluş açan ya da kuruluşa üye ekleyen işte kuruluşun gerçek Keycloak kimliğini de kapsar.
+    Servis kuruluşu plan sırasında arar. Yürütmede yeniden aramaz.
+    Kuruluş önizlemeden sonra oluştuysa ya da başka bir kuruluş bulunduysa özet tutmaz.
+
+    Bir istek birden çok olay kapsayabilir. Herhangi bir olayın planı değiştiyse bütün istek 409 döner.
+    Servis o istekte hiçbir olayı yazmaz.
     Servis yürütme anında planı bir kez daha hesaplar. Plan birebir aynı değilse iş yürümez.
 
     Servis iki istemci listesi tutar.
@@ -149,8 +157,10 @@ paths:
       operationId: postEvent
       summary: Bir Keycloak olayını alır ve işler.
       description: |
-        Seçilen olay kaynağı eklentisiz yoldur (karar notu 0001).
-        Bu ucu bizim işlemlerimiz çağırır. Sonradan bir eklenti eklenirse eklenti de bu uca gönderir.
+        Olay kaynağı Keycloak'a kurulan olay dinleyici eklentisidir (`docs/sozlesmeler.md`, 7. bölüm).
+        Eklentiyi kimlik-realm işi kurar. Eklenti kullanıcı ve yönetim olaylarını imzalı olarak bu uca gönderir.
+        Bizim işlemlerimiz de bu ucu çağırabilir.
+        Olay kaybolabilir. Yedek yol elle başlatılan mutabakattır. O uç `/v1/reconcile` adresidir.
 
         Servis olayı aynı istekte işler. Eylem başarısız olursa olay bekleme kuyruğuna girer.
         Bu durumda yanıt yine 202 olur. Çünkü olayı artık servis saklar.
@@ -376,10 +386,11 @@ paths:
         Yürütme isteği `preview_digest` ve `approval_id` alanlarını taşımalıdır.
         Plan önizlemeden sonra değiştiyse servis 409 döner ve hiçbir olayı işlemez.
 
-        Servis her olayı yalnız onaylanan planıyla yürütür.
-        Servis her olaydan hemen önce planı yeniden hesaplar.
-        Bir olayın planı arada değiştiyse o olay `preview_changed` sonucunu alır ve yürütülmez.
-        Önizlemesi üretilemeyen olay da yürütülmez. Bu olayın sonucu `failed` olur.
+        Servis bütün isteği iş kilidi altında yürütür.
+        Servis önce bütün olayların planını hesaplar ve özeti denetler.
+        Herhangi bir olayın planı onaylanan plandan farklıysa servis 409 döner. Hiçbir olay yazılmaz.
+        Özet tutarsa servis tam o planları yazar. Denetim ile yazma arasında yeniden okuma yapmaz.
+        Önizlemesi üretilemeyen olay yürütülmez. Bu olayın sonucu `failed` olur.
         Bir olay Organization açtıysa sonraki işler yeni bir önizleme ve yeni bir onay ister.
         O olay kuyrukta kalır.
 
@@ -416,6 +427,85 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "409":
           $ref: "#/components/responses/PreviewChanged"
+  /v1/operations:
+    get:
+      operationId: listOperations
+      summary: Yarıda kalan çok adımlı işleri listeler.
+      description: |
+        Bu uç `operations` komutunun HTTP karşılığıdır. Uç yalnız okur.
+        Davet Keycloak'a üç adımda yazar: kullanıcıyı açar, üye yapar ve e-posta gönderir.
+        Servis her adımı yazmadan önce kaydeder. Adım bitince kaydı günceller.
+        Süreç yarıda durursa kayıt hangi adımın belirsiz kaldığını gösterir.
+        Biten işler listede görünmez. Kayıt e-posta taşımaz.
+        Önizleme listesindeki ve yürütme listesindeki istemciler bu ucu çağırabilir.
+      x-durum: uygulandi
+      x-yikici: false
+      x-yurutme: yalniz-okur
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: Yarıda kalan işler. En eski iş ilk sıradadır.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/operations/{operation_id}/resolve:
+    post:
+      operationId: resolveOperation
+      summary: Yarıda kalan bir işi kapatır.
+      description: |
+        Bu uç `resolve-operation` komutunun HTTP karşılığıdır.
+        İnsan önce hedefi denetler. Örneğin Keycloak'ta kullanıcının açılıp açılmadığına bakar.
+        Sonra işi `completed` ya da `abandoned` sonucuyla kapatır.
+        `completed` değeri işin hedefte tamamlandığını söyler. `abandoned` değeri işten vazgeçildiğini söyler.
+        Bu uç yalnız servisin kendi kaydını değiştirir. Hedefe yazmaz.
+        Bu ucu yalnız onay katmanı çağırabilir. Servis çağıranı ve sonucu günlüğe yazar.
+      x-durum: uygulandi
+      x-yikici: false
+      x-yurutme: yalniz-onay-katmani
+      security:
+        - serviceToken: []
+      parameters:
+        - name: operation_id
+          in: path
+          required: true
+          description: İşin kimliği. Bu değer işi başlatan onayın `approval_id` değeridir.
+          schema:
+            $ref: "#/components/schemas/ApprovalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolveRequest"
+      responses:
+        "200":
+          description: İş kapandı.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResolveResult"
+        "400":
+          description: Gövde hatalı. Örneğin `resolution` değeri geçersiz.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Bu kimlikle yarıda kalan bir iş yok. Hata kodu `not_found` olur.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /v1/tenants/{tenant}/client:
     post:
       operationId: ensureTenantClient
@@ -542,6 +632,12 @@ components:
       bearerFormat: JWT
       description: |
         Keycloak servis belirteci. Kurallar ortak sözleşmenin 3. bölümündedir.
+        Bu belirteç servise gelen isteklerin belirtecidir.
+        Servisin Keycloak Admin API'ye giderken kullandığı belirteç ayrıdır.
+        O belirteç `scope=admin-api kc-admin-api` ile istenir (ortak sözleşme, 2. bölüm).
+        Servis hesabının Keycloak rolleri yalnız o belirtece girer.
+        Roller `view-users`, `query-users`, `manage-users` ve kuruluş için gereken en az roldür.
+        Kiracıya ve Press'e giden belirteç bu rolleri taşımaz.
         Servis belirteci ortak `oidc_verify` kitaplığıyla doğrular.
         Belirtecin `aud` değeri yalnız `identity-sync` olmalıdır.
         Belirtecin `azp` değeri iki listeden birinde olmalıdır.
@@ -687,7 +783,7 @@ components:
       properties:
         status:
           type: string
-          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed, preview_changed]
+          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed]
           description: |
             `processed` değeri bütün eylemlerin kesin başarıyla bittiğini gösterir.
             `duplicate` değeri olayın daha önce işlendiğini gösterir.
@@ -700,8 +796,6 @@ components:
             Yeniden işleme yanıtında `unknown` değeri olayın atlandığını gösterir.
             `preview` değeri yalnız önizleme üretildiğini gösterir.
             `failed` değeri önizlemenin üretilemediğini gösterir. Örneğin Keycloak yanıt vermedi.
-            `preview_changed` değeri yalnız onaylı yeniden işlemede döner.
-            Olayın planı onaydan sonra değişmiştir. Servis olayı yürütmedi.
         actions:
           type: array
           description: Kesin başarıyla biten eylemlerin adları.
@@ -718,7 +812,7 @@ components:
       type: string
       pattern: "^[0-9a-f]{64}$"
       description: |
-        Yalnız `preview` durumunda döner. Bu olayın planının SHA-256 özetidir.
+        Yalnız `preview` durumunda döner. Bu olayın planının anahtarlı özetidir (HMAC-SHA256).
         Özet her işin adını, hedefini ve bütün alan değerlerini kapsar.
         Değer bir karmadır. E-posta ve ad bu değerden okunamaz.
     Preview:
@@ -759,7 +853,7 @@ components:
       type: string
       pattern: "^[0-9a-f]{64}$"
       description: |
-        Önizlemenin SHA-256 özeti. Onay bu özete bağlanır.
+        Önizlemenin anahtarlı özeti (HMAC-SHA256). Onay bu özete bağlanır.
         Yürütme isteği aynı özeti taşımalıdır.
     ApprovalId:
       type: string
@@ -854,7 +948,7 @@ components:
           type: string
         status:
           type: string
-          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed, preview_changed]
+          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed]
         actions:
           type: array
           items:
@@ -931,6 +1025,71 @@ components:
             $ref: "#/components/schemas/Preview"
         preview_digest:
           $ref: "#/components/schemas/PreviewDigest"
+    OperationList:
+      type: object
+      required: [operations]
+      properties:
+        operations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Operation"
+    Operation:
+      type: object
+      description: Yarıda kalan çok adımlı bir iş. E-posta taşımaz.
+      required: [operation_id, operation, organization_id, subject, state, steps]
+      properties:
+        operation_id:
+          $ref: "#/components/schemas/ApprovalId"
+        operation:
+          type: string
+          enum: [invite_user]
+        organization_id:
+          type: string
+        subject:
+          type: [string, "null"]
+          description: Kullanıcının Keycloak kimliği. Kullanıcı henüz açılmadıysa boştur.
+        state:
+          type: string
+          enum: [failed, unknown]
+          description: |
+            `failed` değeri bir adımın kesin olarak başarısız olduğunu gösterir.
+            `unknown` değeri bir adımın sonucunun bilinmediğini gösterir. Örneğin süreç yazma sırasında durdu.
+        steps:
+          type: array
+          items:
+            type: object
+            required: [step, status]
+            properties:
+              step:
+                type: string
+                description: Adımın adı. Örneğin `keycloak.send_execute_actions_email`.
+              status:
+                type: string
+                enum: [pending, done, failed, unknown]
+                description: |
+                  `pending` değeri adımın hiç başlamadığını gösterir.
+                  `done` değeri adımın bittiğini gösterir.
+                  `failed` değeri Keycloak'ın adımı reddettiğini gösterir.
+                  `unknown` değeri adımın başladığını ama sonucunun bilinmediğini gösterir.
+    ResolveRequest:
+      type: object
+      required: [resolution]
+      properties:
+        resolution:
+          type: string
+          enum: [completed, abandoned]
+    ResolveResult:
+      type: object
+      required: [operation_id, state, resolution]
+      properties:
+        operation_id:
+          $ref: "#/components/schemas/ApprovalId"
+        state:
+          type: string
+          const: resolved
+        resolution:
+          type: string
+          enum: [completed, abandoned]
     ReconcileRequest:
       description: Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.
       oneOf:

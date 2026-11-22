@@ -45,6 +45,17 @@ CREATE TABLE IF NOT EXISTS used_signatures (
     signature TEXT PRIMARY KEY,
     expires_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS operations (
+    operation_id TEXT PRIMARY KEY,
+    operation TEXT NOT NULL,
+    organization_id TEXT NOT NULL,
+    subject TEXT,
+    steps TEXT NOT NULL,
+    state TEXT NOT NULL,
+    resolution TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS used_approvals (
     approval_id TEXT PRIMARY KEY,
     preview_digest TEXT NOT NULL,
@@ -210,6 +221,95 @@ class Store:
                 "INSERT OR IGNORE INTO used_approvals (approval_id, preview_digest, operation, used_at) "
                 "VALUES (?, ?, ?, ?)",
                 (approval_id, preview_digest, operation, self._clock()),
+            )
+            return cursor.rowcount == 1
+
+    # --- operation journal: multi-step writes that are not events (for example an invitation) ---
+
+    def operation_begin(self, operation_id: str, operation: str, organization_id: str, steps: list[str]) -> None:
+        """Record an operation and its planned steps before the first write.
+
+        The record holds ids only. It stores no e-mail.
+        """
+        now = self._clock()
+        plan = json.dumps([{"step": step, "status": "pending"} for step in steps])
+        with self._transaction():
+            self._db.execute(
+                "INSERT INTO operations (operation_id, operation, organization_id, steps, state, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, 'running', ?, ?)",
+                (operation_id, operation, organization_id, plan, now, now),
+            )
+
+    def operation_step(self, operation_id: str, step: str, status: str, *, subject: str | None = None) -> None:
+        """Record a step's status. `writing` is written before the request leaves.
+
+        A step left at `writing` means the process stopped mid-write: its outcome is unknown.
+        """
+        if status not in ("writing", "done", "failed", "unknown"):
+            raise ValueError("invalid step status")
+        with self._transaction():
+            row = self._db.execute("SELECT steps FROM operations WHERE operation_id = ?", (operation_id,)).fetchone()
+            if row is None:
+                raise KeyError(operation_id)
+            steps = json.loads(row[0])
+            for item in steps:
+                if item["step"] == step:
+                    item["status"] = status
+            self._db.execute(
+                "UPDATE operations SET steps = ?, subject = COALESCE(?, subject), updated_at = ? WHERE operation_id = ?",
+                (json.dumps(steps), subject, self._clock(), operation_id),
+            )
+
+    def operation_subject(self, operation_id: str, subject: str) -> None:
+        """Record the Keycloak id of the user the operation works on."""
+        with self._transaction():
+            self._db.execute(
+                "UPDATE operations SET subject = ?, updated_at = ? WHERE operation_id = ?",
+                (subject, self._clock(), operation_id),
+            )
+
+    def operation_finish(self, operation_id: str, state: str) -> None:
+        if state not in ("done", "failed", "unknown"):
+            raise ValueError("invalid operation state")
+        with self._transaction():
+            self._db.execute(
+                "UPDATE operations SET state = ?, updated_at = ? WHERE operation_id = ?",
+                (state, self._clock(), operation_id),
+            )
+
+    def operations(self) -> list[dict[str, object]]:
+        """Unfinished operations, oldest first. A human checks the target and resolves each one."""
+        rows = self._db.execute(
+            "SELECT operation_id, operation, organization_id, subject, steps, state FROM operations "
+            "WHERE state NOT IN ('done', 'resolved') ORDER BY created_at, operation_id"
+        ).fetchall()
+        result = []
+        for operation_id, operation, organization_id, subject, steps, state in rows:
+            parsed = json.loads(steps)
+            for item in parsed:
+                if item["status"] == "writing":
+                    item["status"] = "unknown"  # started, never finished
+            if state == "running":
+                state = "unknown"  # the process stopped before it recorded the end
+            result.append(
+                {
+                    "operation_id": operation_id,
+                    "operation": operation,
+                    "organization_id": organization_id,
+                    "subject": subject,
+                    "state": state,
+                    "steps": parsed,
+                }
+            )
+        return result
+
+    def operation_resolve(self, operation_id: str, resolution: str) -> bool:
+        """Close an unfinished operation after a human settled it on the target. False if there is none."""
+        with self._transaction():
+            cursor = self._db.execute(
+                "UPDATE operations SET state = 'resolved', resolution = ?, updated_at = ? "
+                "WHERE operation_id = ? AND state NOT IN ('done', 'resolved')",
+                (resolution, self._clock(), operation_id),
             )
             return cursor.rowcount == 1
 

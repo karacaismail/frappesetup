@@ -22,12 +22,8 @@ class ReconcilePlan:
 
     differences: tuple[Difference, ...]
     actions: tuple[Action, ...]
-
-    @property
-    def digest(self) -> str:
-        """Digest of the differences and of everything the repair would write."""
-        differences = [difference.to_dict() for difference in self.differences]
-        return digest_of({"differences": differences, "plan": plan_digest(self.actions)})
+    # Keyed digest of the differences and of everything the repair would write.
+    digest: str
 
     def report(self) -> dict[str, object]:
         """The report for a human. It carries no e-mail: users are named by `sub`."""
@@ -48,6 +44,14 @@ class App:
     tenant_client: TenantClient
     processor: Processor
 
+    @property
+    def digest_key(self) -> bytes:
+        return self.settings.digest_key.encode("utf-8")
+
+    def digest(self, value: object) -> str:
+        """Keyed digest of a preview. See `mapping.digest_of`."""
+        return digest_of(value, self.digest_key)
+
     def reconcile_plan(self) -> ReconcilePlan:
         """Compare Keycloak with Press and the tenants. Reads only. Started by hand, never scheduled."""
         memberships: dict[str, list[Organization]] = {}
@@ -64,7 +68,13 @@ class App:
             users, self.press.list_identities(), tenant_records, issuer=self.settings.issuer, tenants=tenants
         )
         actions = plan_repairs(differences, users, issuer=self.settings.issuer, tenants=tenants)
-        return ReconcilePlan(tuple(differences), actions)
+        digest = self.digest(
+            {
+                "differences": [difference.to_dict() for difference in differences],
+                "plan": plan_digest(actions, self.digest_key),
+            }
+        )
+        return ReconcilePlan(tuple(differences), actions, digest)
 
     def reconcile_execute(self, expected_digest: str) -> dict[str, object]:
         """Run the approved repair.
@@ -109,6 +119,7 @@ def build_app(settings: Settings, *, sleep: Callable[[float], object] = time.sle
         press=press,
         tenant_client=tenant_client,
         store=store,
+        digest_key=settings.digest_key.encode("utf-8"),
         sleep=sleep,
     )
     return App(settings, store, keycloak, press, tenant_client, processor)

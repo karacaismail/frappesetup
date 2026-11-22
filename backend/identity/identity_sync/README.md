@@ -44,13 +44,17 @@ Komutları `backend/identity/identity_sync` klasöründe çalıştırın. Her ko
 | Komut | İşi | HTTP karşılığı |
 | --- | --- | --- |
 | `python3 -m identity_sync serve` | HTTP sunucusunu başlatır. | Yok |
-| `python3 -m identity_sync reconcile` | Keycloak, Press ve kiracı kullanıcılarını karşılaştırır. Yalnız farkı raporlar. | `POST /v1/reconcile` |
+| `python3 -m identity_sync reconcile` | Keycloak, Press ve kiracı kullanıcılarını karşılaştırır. Farkı ve düzeltme planını gösterir. | `POST /v1/reconcile` |
+| `python3 -m identity_sync operations` | Yarıda kalan çok adımlı işleri listeler. | `GET /v1/operations` |
+| `python3 -m identity_sync resolve-operation` | Yarıda kalan bir işi kapatır. | `POST /v1/operations/<kimlik>/resolve` |
 | `python3 -m identity_sync dead-letters` | Bekleme kuyruğunu listeler. | `GET /v1/dead-letters` |
 | `python3 -m identity_sync replay-dead-letters` | Bekleyen olayları bir kez yeniden işler. | `POST /v1/dead-letters/replay` |
 
 - `replay-dead-letters --dry-run` hiçbir kaydı değiştirmez. Komut yalnız çalışacak işleri gösterir.
 - `replay-dead-letters` sonucu bilinmeyen olayı atlar. `--include-unknown` bu olayları da işletir. Önce hedefi denetleyin.
 - `reconcile` fark bulursa 1 koduyla biter. Fark yoksa 0 koduyla biter.
+- `reconcile` varsayılan olarak yalnız rapor üretir. Hiçbir kaydı değiştirmez.
+- `reconcile --execute --preview-digest <özet> --approval-id <onay>` raporda gösterilen düzeltmeyi yürütür. Plan değiştiyse komut hiçbir şey yazmaz.
 - Ayar ya da bağlantı hatasında komut 2 koduyla biter.
 
 ## Önizleme
@@ -78,7 +82,31 @@ Yapay zekâ bu servisin yazma uçlarını doğrudan yürütemez. Kural ortak sö
 8. Servis yalnız onaylanan planı yürütür. Servis her olaydan hemen önce planı bir kez daha denetler.
 9. Servis çağıranı, onay kimliğini, özeti ve sonucu günlüğe yazar.
 
-Özet yazılacak her şeyi kapsar: her işin adını, hedefini ve bütün alan değerlerini. Örneğin e-posta önizlemeden sonra değişirse özet tutmaz. Özet bir karma değerdir. E-posta özetten okunamaz.
+Özet yazılacak her şeyi kapsar: her işin adını, hedefini ve bütün alan değerlerini. Örneğin e-posta önizlemeden sonra değişirse özet tutmaz.
+
+Özet anahtarlıdır. Servis özeti HMAC-SHA256 ile üretir. Anahtar `IDENTITY_SYNC_DIGEST_KEY` ortam sırrındadır. Anahtarı bilmeyen biri bir e-posta tahminini özetle karşılaştıramaz.
+
+Özet kuruluşun gerçek Keycloak kimliğini de kapsar. Servis kuruluşu plan sırasında arar. Yürütmede yeniden aramaz. Kuruluş önizlemeden sonra oluştuysa özet tutmaz.
+
+Bir istek birden çok olay kapsayabilir. Herhangi bir olayın planı değiştiyse servis bütün isteği reddeder ve hiçbir olayı yazmaz.
+
+## Yarıda kalan davet
+
+Davet Keycloak'a üç adımda yazar: kullanıcıyı açar, üye yapar ve e-posta gönderir.
+
+1. Servis her adımı yazmadan önce kaydeder.
+2. Adım bitince servis kaydı günceller.
+3. Süreç yarıda durursa kayıt hangi adımın belirsiz kaldığını gösterir.
+
+`python3 -m identity_sync operations` komutu yarıda kalan işleri listeler. HTTP karşılığı `GET /v1/operations` ucudur.
+
+İnsan önce Keycloak'ı denetler. Sonra işi kapatır:
+
+```bash
+python3 -m identity_sync resolve-operation <kimlik> --resolution completed
+```
+
+`completed` değeri işin hedefte tamamlandığını söyler. `abandoned` değeri işten vazgeçildiğini söyler. HTTP karşılığı `POST /v1/operations/<kimlik>/resolve` ucudur. Bu ucu yalnız onay katmanı çağırabilir.
 
 `serve` komutu günlüğü standart hata akışına yazar. İşlem günlüğü satırı `execute operation=` ile başlar.
 
@@ -103,6 +131,20 @@ Servis yanıttaki son durumu istediği durumla da karşılaştırır. Örneğin 
 - Servis bu olayı işlenmiş saymaz. Servis olayı kendiliğinden yeniden denemez.
 - Aynı olay yeniden gelirse servis yazmayı tekrarlamaz.
 - İnsan hedefi denetler. Sonra olayı `--include-unknown` seçeneğiyle yeniden işletir.
+
+## Mutabakat
+
+Olay kaybolabilir. Örneğin Keycloak eklentisi olayı gönderemeyebilir. Mutabakat yedek yoldur. Komut zamanlanmaz. İnsan komutu elle başlatır.
+
+Komut Keycloak'taki bütün kullanıcıları Press ve kiracı kayıtlarıyla karşılaştırır. Örnek farklar şunlardır:
+
+- Kullanıcı Keycloak'ta kapalı ama kiracıda açık.
+- Kullanıcının kiracıda bağı yok.
+- Kullanıcı Press'te yanlış takımın üyesi.
+
+Rapor e-posta taşımaz. Rapor her fark için düzeltme işini de gösterir. Düzeltme önizleme ve onay akışından geçer. Servis yalnız onaylanan planı yürütür.
+
+Bazı farkların güvenli bir düzeltmesi yoktur. Servis bunları yalnız raporlar. Örneğin Press'te kapalı bir kullanıcıyı açan uç yoktur.
 
 ## Yarıda kalan iş
 
@@ -174,4 +216,5 @@ Bu komutta hiçbir test atlanmamalıdır. Testler RSA anahtarını kendisi üret
 - Servis belirteci için `aud-identity-sync` kapsamı ortak sözleşmede henüz yok.
 - Onay katmanının istemci adı ortak sözleşmede henüz yok.
 - Bu dalda Press'in ve kiracının sözleşme dosyaları yok. Testler o dosyalara göre yazılmış sahte hedefler kullanır. Gerçek bütünleşme testi `integration-e2e` işindedir.
-- Olayı gönderen yol olayı göndermezse servis değişikliği öğrenmez. Mutabakat komutu bu farkı gösterir. Farkı düzelten akış sıradaki iştir.
+- Mutabakat Press'te ve kiracıda kullanıcı listesi veren uç ister. Bu uçlar o sözleşmelerde henüz yok.
+- `ensure_site_client` işlevi Keycloak'ta `manage-clients` rolünü ister. Ortak sözleşme servis hesabına bu rolü vermez.

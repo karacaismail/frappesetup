@@ -24,6 +24,7 @@ def environment(keycloak: str, press: str, tenant: str, db: str) -> dict[str, st
         "IDENTITY_SYNC_TENANTS": json.dumps([{"name": "kiraci1", "base_url": tenant, "organization": "kiraci1"}]),
         "IDENTITY_SYNC_WEBHOOK_SECRET": "test-webhook-secret",
         "IDENTITY_SYNC_DB": db,
+        "IDENTITY_SYNC_DIGEST_KEY": "test-digest-key-0123456789",
         "IDENTITY_SYNC_REALM_ID": fakes.REALM_ID,
         "IDENTITY_SYNC_EXECUTE_AZP": "approval-service",
         "IDENTITY_SYNC_PREVIEW_AZP": "ai-agent, ops-bff",
@@ -49,6 +50,19 @@ class ConfigTest(unittest.TestCase):
 
         self.assertEqual(settings.execute_azp, frozenset({"approval-service"}))
         self.assertEqual(settings.preview_azp, frozenset({"ai-agent", "ops-bff"}))
+
+    def test_admin_scope_defaults_to_the_contract_value(self) -> None:
+        # docs/sozlesmeler.md, section 2: the Admin API token is requested with this scope.
+        self.assertEqual(load_settings(self.ENV).admin_scope, "admin-api kc-admin-api")
+
+    def test_digest_key_is_required_and_hidden(self) -> None:
+        missing = {k: v for k, v in self.ENV.items() if k != "IDENTITY_SYNC_DIGEST_KEY"}
+        with self.assertRaises(ConfigError) as caught:
+            load_settings(missing)
+        self.assertIn("IDENTITY_SYNC_DIGEST_KEY", str(caught.exception))
+        with self.assertRaises(ConfigError):
+            load_settings({**self.ENV, "IDENTITY_SYNC_DIGEST_KEY": "kisa"})
+        self.assertNotIn("test-digest-key", repr(load_settings(self.ENV)))
 
     def test_client_cannot_be_in_both_lists(self) -> None:
         with self.assertRaises(ConfigError):
@@ -258,6 +272,24 @@ class CliTest(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("preview", err.getvalue())
         self.assertEqual(self.writes(), [])
+
+    def test_operations_lists_and_resolves_unfinished_work(self) -> None:
+        from identity_sync.app import build_app
+
+        app = build_app(load_settings(self.env), sleep=lambda _s: None)
+        app.store.operation_begin("onay-9", "invite_user", ORG_ID, ["keycloak.create_user"])
+        app.store.operation_step("onay-9", "keycloak.create_user", "writing")
+        app.close()
+
+        code, body = self.run_cli("operations")
+        self.assertEqual((code, body["operations"][0]["operation_id"], body["operations"][0]["state"]), (1, "onay-9", "unknown"))
+
+        code, body = self.run_cli("resolve-operation", "onay-9", "--resolution", "abandoned")
+        self.assertEqual((code, body), (0, {"operation_id": "onay-9", "state": "resolved", "resolution": "abandoned"}))
+        self.assertEqual(self.run_cli("operations"), (0, {"operations": []}))
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(["resolve-operation", "onay-9", "--resolution", "abandoned"], env=self.env), 2)
 
     def test_missing_settings_exit_with_two(self) -> None:
         err = io.StringIO()

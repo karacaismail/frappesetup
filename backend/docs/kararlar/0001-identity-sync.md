@@ -124,6 +124,20 @@ Uç bu yüzden şöyle korunur:
 - Servis Keycloak'ın kendi olay biçimini servis zarfına çevirebilir. Çeviri kodu yazıldı ve sınandı.
 - Servis eylemi olayın içeriğinden değil kullanıcının güncel durumundan seçer. Bu yüzden eksik ya da geç gelen olay yanlış sonuç üretmez.
 
+## Güncelleme: olay kaynağı değişti
+
+Orkestratör 22 Kasım 2026 Pazar günü olay kaynağını değiştirdi. Karar ortak sözleşmenin 7. bölümündedir.
+
+- Keycloak'a bir olay dinleyici eklentisi kurulur. Eklentiyi kimlik-realm işi seçer ve kurar.
+- Eklentinin lisansı Apache-2.0 ya da MIT olmalıdır. Seçim o işin karar notuna yazılır.
+- Eklenti olayları imzalı olarak `/v1/events` ucuna gönderir. Servisin ucu değişmedi.
+- Olay kaybolabilir. Elle başlatılan mutabakat komutu yedek yoldur.
+- Zamanlanmış iş yine yoktur.
+
+Bu notun eklentiler tablosu 22 Kasım 2026 Pazar günkü durumu gösterir. Tablodaki bir uyarı hâlâ geçerlidir: Keycloak 26.8.2 üye ekleme olayında kullanıcının kimliğini vermez. Servis bu olayı işleyemez. Mutabakat bu farkı yakalar.
+
+Eklenti servisin imza biçimini üretmelidir. Biçim `contracts/identity_sync.openapi.yaml` dosyasının `webhookSignature` bölümündedir. İmza zaman damgasını ve işlem kipini kapsar.
+
 ## Geri dönüş
 
 - Yol C'den Yol B'ye geçiş yalnız eklentiyi eklemeyi gerektirir. Servis aynı kalır.

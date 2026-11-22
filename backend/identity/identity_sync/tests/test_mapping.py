@@ -99,7 +99,7 @@ class RegistrationTest(unittest.TestCase):
         # Kayıt akışı: servis Organization açar ve kullanıcıyı ekler.
         self.assertEqual(
             plan(event("user", "VERIFY_EMAIL"), user(orgs=())),
-            (EnsureOrganization(alias=f"t-{SUB}", name=f"t-{SUB}", subject=SUB),),
+            (EnsureOrganization(alias=f"t-{SUB}", name=f"t-{SUB}", subject=SUB, organization_id=None),),
         )
 
     def test_verified_member_gets_team_and_tenant_user(self) -> None:
@@ -241,6 +241,33 @@ class PreviewTest(unittest.TestCase):
         preview = PROVISION.preview()
         self.assertFalse(preview.destructive)
         self.assertNotIn("ayse@example.test", preview.summary)
+
+    def test_organization_preview_says_whether_it_creates_or_joins(self) -> None:
+        # The approver must see the real target: a new organization, or an existing one by its id.
+        new = EnsureOrganization(alias="t-x", name="t-x", subject=SUB, organization_id=None).preview()
+        existing = EnsureOrganization(alias="t-x", name="t-x", subject=SUB, organization_id="o-77").preview()
+
+        self.assertIn("Create", new.summary)
+        self.assertNotIn("Create", existing.summary)
+        self.assertIn("o-77", existing.summary)
+
+    def test_digest_needs_the_key(self) -> None:
+        # An unkeyed SHA-256 would let a reader test an e-mail guess offline. The digest is an HMAC.
+        import hashlib
+        import json
+
+        from identity_sync.mapping import digest_of
+
+        value = {"email": "ayse@example.test"}
+        plain = hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+        first, second = digest_of(value, b"key-one"), digest_of(value, b"key-two")
+        self.assertRegex(first, r"^[0-9a-f]{64}$")
+        self.assertNotEqual(first, second)
+        self.assertNotIn(plain, (first, second))
+        self.assertEqual(first, digest_of(dict(value), b"key-one"))
+        with self.assertRaises(ValueError):
+            digest_of(value, b"")
 
     def test_preview_tells_the_human_that_press_disables_the_user(self) -> None:
         # The approver must see the full effect: Press disables the user and revokes the API keys.

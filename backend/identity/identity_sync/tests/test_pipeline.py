@@ -73,7 +73,7 @@ class ProvisionTest(PipelineCase):
         self.assertEqual(team.headers["authorization"], "Bearer token-for:aud-press")
         self.assertEqual(provision.headers["authorization"], "Bearer token-for:aud-site-kiraci1")
         admin_reads = self.stack.keycloak.calls("GET", f"{self.stack.keycloak.admin}/users/{SUBJECT}")
-        self.assertEqual(admin_reads[0].headers["authorization"], "Bearer token-for:admin-api")
+        self.assertEqual(admin_reads[0].headers["authorization"], f"Bearer token-for:{fakes.ADMIN_SCOPE}")
 
     def test_token_request_uses_client_credentials(self) -> None:
         self.add_member()
@@ -82,7 +82,7 @@ class ProvisionTest(PipelineCase):
 
         token_calls = self.stack.keycloak.calls("POST", "/realms/platform/protocol/openid-connect/token")
         scopes = sorted(call.form()["scope"][0] for call in token_calls)
-        self.assertEqual(scopes, ["admin-api", "aud-press", "aud-site-kiraci1"])
+        self.assertEqual(scopes, [fakes.ADMIN_SCOPE, "aud-press", "aud-site-kiraci1"])
         form = token_calls[0].form()
         self.assertEqual(form["grant_type"], ["client_credentials"])
         self.assertEqual(form["client_id"], ["identity-sync"])
@@ -678,14 +678,30 @@ class ApprovedPlanTest(PipelineCase):
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
 
     def digest(self) -> str:
-        from identity_sync.mapping import digest_of
         from identity_sync.pipeline import replay_report
 
-        return digest_of(replay_report(self.stack.app.processor.replay_dead_letters(dry_run=True)))
+        return self.stack.app.digest(replay_report(self.stack.app.processor.replay_dead_letters(dry_run=True)))
 
-    def test_user_disabled_between_digest_check_and_execution_is_not_deprovisioned(self) -> None:
-        # Onay "kullanıcıyı hazırla" planını gösterdi. Kullanıcı özet denetiminden hemen sonra kapatıldı.
-        # Servis onaylanmayan yıkıcı planı yürütmemelidir.
+    def test_plan_that_became_destructive_after_the_preview_is_refused(self) -> None:
+        # The approval showed "prepare the user". The user was disabled before the execution.
+        from identity_sync.pipeline import PreviewChanged
+
+        self.add_member()
+        self.queue_failed()
+        digest = self.digest()
+        self.stack.keycloak.add_user(keycloak_user(enabled=False), [self.org])
+        writes = len(self.stack.press.writes() + self.stack.tenant.writes())
+
+        with self.assertRaises(PreviewChanged):
+            self.stack.app.processor.replay_dead_letters(expected_digest=digest)
+
+        self.assertEqual(len(self.stack.press.writes() + self.stack.tenant.writes()), writes)
+        self.assertEqual(self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER), [])
+        self.assertEqual(len(self.stack.app.store.dead_letters()), 1)
+
+    def test_execution_writes_the_plan_it_checked_without_reading_again(self) -> None:
+        # Between the last check and the write there is no second read. So the written plan
+        # is exactly the checked one, even if Keycloak changes in between.
         self.add_member()
         self.queue_failed()
         digest = self.digest()
@@ -694,18 +710,70 @@ class ApprovedPlanTest(PipelineCase):
 
         def user_route(_req: fakes.Recorded) -> fakes.Reply:
             reads["count"] += 1
-            # 1. okuma: özet denetimi. 2. okuma: yürütme. Kullanıcı arada kapatıldı.
-            return 200, keycloak_user(enabled=reads["count"] < 2)
+            # Only the first read during the execution sees the approved state.
+            return 200, keycloak_user(email="ayse@example.test" if reads["count"] == 1 else "yeni@example.test")
 
         keycloak.on("GET", f"{keycloak.admin}/users/{SUBJECT}", user_route)
-        writes = len(self.stack.press.writes() + self.stack.tenant.writes())
 
         results = self.stack.app.processor.replay_dead_letters(expected_digest=digest)
 
-        self.assertEqual([r.status for _i, r in results], ["preview_changed"])
+        self.assertEqual([r.status for _i, r in results], ["processed"])
+        self.assertEqual(reads["count"], 1)
+        self.assertEqual(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["email"], "ayse@example.test")
+
+    def test_one_changed_event_refuses_the_whole_request(self) -> None:
+        # Two events wait. The plan of the second one changed after the preview.
+        # Nothing may be written, not even for the first event.
+        from identity_sync.pipeline import PreviewChanged
+
+        other = "99999999-9999-4999-8999-999999999999"
+        keycloak = self.stack.keycloak
+        self.add_member()
+        keycloak.add_user(keycloak_user(subject=other, email="ikinci@example.test"), [self.org])
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
+        self.stack.app.processor.handle(event(id_="e-1"))
+        second = Event(id="e-2", kind="user", type="VERIFY_EMAIL", realm="platform", time=2, user_id=other)
+        self.stack.app.processor.handle(second)
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
+        digest = self.digest()
+        keycloak.add_user(keycloak_user(subject=other, email="degisti@example.test"), [self.org])
+        writes = len(self.stack.press.writes() + self.stack.tenant.writes())
+
+        with self.assertRaises(PreviewChanged):
+            self.stack.app.processor.replay_dead_letters(expected_digest=digest)
+
         self.assertEqual(len(self.stack.press.writes() + self.stack.tenant.writes()), writes)
-        self.assertEqual(self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER), [])
-        self.assertEqual(len(self.stack.app.store.dead_letters()), 1)
+        self.assertEqual(len(self.stack.app.store.dead_letters()), 2)
+
+    def test_organization_that_appeared_after_the_preview_is_refused(self) -> None:
+        # The preview said "create a new organization". Someone created one with that name meanwhile.
+        # The member must not be added to that other organization under the old approval.
+        from identity_sync.pipeline import PreviewChanged
+
+        keycloak = self.stack.keycloak
+        keycloak.add_user(keycloak_user(), [])
+        alias = f"t-{SUBJECT}"
+        keycloak.on("GET", f"{keycloak.admin}/organizations", (503, None))
+        self.stack.app.processor.handle(event())
+        keycloak.on("GET", f"{keycloak.admin}/organizations", (200, []))
+        digest = self.digest()
+        keycloak.on("GET", f"{keycloak.admin}/organizations", (200, [{"id": "o-stranger", "name": alias, "alias": alias}]))
+
+        with self.assertRaises(PreviewChanged):
+            self.stack.app.processor.replay_dead_letters(expected_digest=digest)
+        self.assertEqual([r for r in keycloak.requests if r.method != "GET" and "/admin/" in r.path], [])
+
+    def test_existing_organization_is_named_by_its_id_in_the_plan(self) -> None:
+        keycloak = self.stack.keycloak
+        keycloak.add_user(keycloak_user(), [])
+        alias = f"t-{SUBJECT}"
+        keycloak.on("GET", f"{keycloak.admin}/organizations", (200, [{"id": ORG_ID, "name": alias, "alias": alias}]))
+
+        result = self.stack.app.processor.handle(event(), dry_run=True)
+
+        (preview,) = result.previews
+        self.assertEqual(preview.operation, "keycloak.ensure_organization")
+        self.assertIn(ORG_ID, preview.summary)
 
     def test_event_whose_preview_failed_is_not_executed(self) -> None:
         # Önizleme üretilemedi. İnsan bu olayın planını görmedi.
@@ -769,37 +837,16 @@ class ApprovedPlanTest(PipelineCase):
                 stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
                 stack.app.processor.handle(event(id_=f"f-{index}"))
                 stack.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
-                from identity_sync.mapping import digest_of
                 from identity_sync.pipeline import PreviewChanged, replay_report
 
                 preview = replay_report(stack.app.processor.replay_dead_letters(dry_run=True))
-                digest = digest_of(preview)
+                digest = stack.app.digest(preview)
                 stack.keycloak.add_user({**keycloak_user(), field: value}, [self.org])
                 writes = len(stack.press.writes() + stack.tenant.writes())
 
                 with self.assertRaises(PreviewChanged):
                     stack.app.processor.replay_dead_letters(expected_digest=digest)
                 self.assertEqual(len(stack.press.writes() + stack.tenant.writes()), writes)
-
-    def test_field_changed_right_before_execution_is_not_written(self) -> None:
-        # The global digest check passed. The e-mail changed before this event's turn.
-        self.add_member()
-        self.queue_failed()
-        digest = self.digest()
-        keycloak = self.stack.keycloak
-        reads = {"count": 0}
-
-        def user_route(_req: fakes.Recorded) -> fakes.Reply:
-            reads["count"] += 1
-            return 200, keycloak_user(email="ayse@example.test" if reads["count"] < 2 else "yeni@example.test")
-
-        keycloak.on("GET", f"{keycloak.admin}/users/{SUBJECT}", user_route)
-        writes = len(self.stack.press.writes() + self.stack.tenant.writes())
-
-        results = self.stack.app.processor.replay_dead_letters(expected_digest=digest)
-
-        self.assertEqual([r.status for _i, r in results], ["preview_changed"])
-        self.assertEqual(len(self.stack.press.writes() + self.stack.tenant.writes()), writes)
 
     def test_preview_report_carries_no_personal_data(self) -> None:
         import json
@@ -942,6 +989,8 @@ class OrganizationPassTest(PipelineCase):
 
         self.assertEqual(result.status, "dead_lettered")
         self.assertFalse(self.stack.app.store.is_processed("e-1"))
+        # The second pass must not create the organization a second time.
+        self.assertEqual(len(keycloak.calls("POST", f"{keycloak.admin}/organizations")), 1)
 
 
 class CrossProcessTest(unittest.TestCase):

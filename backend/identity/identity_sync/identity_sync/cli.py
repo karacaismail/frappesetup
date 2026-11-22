@@ -36,6 +36,12 @@ def _parser() -> argparse.ArgumentParser:
     reconcile.add_argument("--preview-digest", help="The preview_digest of the report a human approved.")
     reconcile.add_argument("--approval-id", help="The id of that approval. It works once.")
     commands.add_parser("dead-letters", help="List failed events that wait in the queue.")
+    commands.add_parser("operations", help="List unfinished multi-step work, for example a stopped invitation.")
+    resolve = commands.add_parser(
+        "resolve-operation", help="Close an unfinished operation after you settled it on the target."
+    )
+    resolve.add_argument("operation_id")
+    resolve.add_argument("--resolution", required=True, choices=("completed", "abandoned"))
     replay = commands.add_parser("replay-dead-letters", help="Process the waiting failed events once.")
     replay.add_argument("--dry-run", action="store_true", help="Show the planned actions without running them.")
     replay.add_argument(
@@ -114,6 +120,16 @@ def _run(args: argparse.Namespace, app: App) -> int:
         return _serve(app)
     if args.command == "reconcile":
         return _reconcile(args, app)
+    if args.command == "operations":
+        operations = app.store.operations()
+        _print({"operations": operations})
+        return EXIT_FOUND if operations else EXIT_OK
+    if args.command == "resolve-operation":
+        if not app.store.operation_resolve(args.operation_id, args.resolution):
+            print("no unfinished operation with this id", file=sys.stderr)
+            return EXIT_ERROR
+        _print({"operation_id": args.operation_id, "state": "resolved", "resolution": args.resolution})
+        return EXIT_OK
     if args.command == "dead-letters":
         _print({"dead_letters": [letter.to_dict() for letter in app.store.dead_letters()]})
         return EXIT_OK

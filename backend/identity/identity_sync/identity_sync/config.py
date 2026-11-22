@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 from identity_sync.mapping import Tenant
 
 PREFIX = "IDENTITY_SYNC_"
+DEFAULT_ADMIN_SCOPE = "admin-api kc-admin-api"
+MIN_DIGEST_KEY_LENGTH = 16
 _TENANT_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 
 
@@ -30,7 +32,12 @@ class Settings:
     tenants: tuple[Tenant, ...] = ()
     webhook_secret: str = field(default="", repr=False)
     db_path: str = ":memory:"
-    admin_scope: str = ""
+    # Scope of the Admin API token (docs/sozlesmeler.md, section 2). The service account's
+    # Keycloak roles reach only a token requested with this scope.
+    admin_scope: str = DEFAULT_ADMIN_SCOPE
+    # Secret key of the preview digests. Without a key, a digest would let a reader test
+    # an e-mail guess offline.
+    digest_key: str = field(default="", repr=False)
     http_timeout: float = 10.0
     keycloak_internal_url: str = ""
     host: str = "127.0.0.1"
@@ -98,7 +105,15 @@ def _names(raw: str) -> frozenset[str]:
 
 def load_settings(env: Mapping[str, str]) -> Settings:
     """Ayarları ortamdan okur. Eksik ayarların adlarını tek hatada listeler."""
-    required = ("KEYCLOAK_PUBLIC_URL", "CLIENT_SECRET", "PRESS_URL", "TENANTS", "WEBHOOK_SECRET", "DB")
+    required = (
+        "KEYCLOAK_PUBLIC_URL",
+        "CLIENT_SECRET",
+        "PRESS_URL",
+        "TENANTS",
+        "WEBHOOK_SECRET",
+        "DIGEST_KEY",
+        "DB",
+    )
     missing = [f"{PREFIX}{name}" for name in required if not env.get(f"{PREFIX}{name}")]
     if missing:
         raise ConfigError("missing settings: " + ", ".join(missing))
@@ -118,6 +133,8 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     if execute_azp & preview_azp:
         # Önizleme listesi yürütme izni vermez. İki listede birden duran istemci bu ayrımı bozar.
         raise ConfigError(f"a client cannot be in both {PREFIX}EXECUTE_AZP and {PREFIX}PREVIEW_AZP")
+    if len(get("DIGEST_KEY")) < MIN_DIGEST_KEY_LENGTH:
+        raise ConfigError(f"{PREFIX}DIGEST_KEY must be at least {MIN_DIGEST_KEY_LENGTH} characters long")
     internal = get("KEYCLOAK_INTERNAL_URL")
     return Settings(
         keycloak_public_url=_url(f"{PREFIX}KEYCLOAK_PUBLIC_URL", get("KEYCLOAK_PUBLIC_URL")),
@@ -125,7 +142,8 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         realm=get("REALM", "platform"),
         client_id=get("CLIENT_ID", "identity-sync"),
         client_secret=get("CLIENT_SECRET"),
-        admin_scope=get("ADMIN_SCOPE"),
+        admin_scope=get("ADMIN_SCOPE", DEFAULT_ADMIN_SCOPE),
+        digest_key=get("DIGEST_KEY"),
         press_url=_url(f"{PREFIX}PRESS_URL", get("PRESS_URL")),
         tenants=_tenants(get("TENANTS")),
         webhook_secret=get("WEBHOOK_SECRET"),

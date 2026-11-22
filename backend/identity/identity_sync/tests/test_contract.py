@@ -45,7 +45,7 @@ def request_schema(method: str, path: str) -> dict:
 
 class DocumentationTest(unittest.TestCase):
     def test_contract_lists_operations(self) -> None:
-        self.assertEqual(len(operations()), 7)
+        self.assertEqual(len(operations()), 9)
 
     def test_every_operation_is_documented(self) -> None:
         # Her uç özet, açıklama ve yıkıcılık bilgisi taşır (`docs/sozlesmeler.md`, 10. bölüm).
@@ -65,6 +65,12 @@ class DocumentationTest(unittest.TestCase):
             with self.subTest(operation=key):
                 schemas = CONTRACT["components"]["schemas"]
                 request = schemas[request_schema(*key)["$ref"].rsplit("/", 1)[-1]]
+                if key == ("POST", "/v1/operations/{operation_id}/resolve"):
+                    # This one writes only the service's own journal, never a target.
+                    # It has no preview. The approval layer is still the only caller.
+                    self.assertIs(operation["x-yikici"], False)
+                    self.assertIn("403", operation["responses"])
+                    continue
                 preview, execute = (schemas[option["$ref"].rsplit("/", 1)[-1]] for option in request["oneOf"])
                 # Çağıran seçimi açıkça yazar. Yürütme onay alanlarını zorunlu tutar.
                 self.assertIs(preview["properties"]["dry_run"]["const"], True)
@@ -186,7 +192,8 @@ class ImplementationTest(ServerCase):
         for (method, path), operation in operations().items():
             with self.subTest(operation=(method, path)):
                 body = b"{}" if method == "POST" else None
-                status, _reply = self.call(method, path.replace("{tenant}", "kiraci1"), body)
+                concrete = path.replace("{tenant}", "kiraci1").replace("{operation_id}", "onay-1")
+                status, _reply = self.call(method, concrete, body)
                 if path == "/healthz":
                     self.assertEqual(status, 200)
                 elif operation["x-durum"] == "uygulandi":
@@ -347,6 +354,29 @@ class SchemaTest(ServerCase):
         }
         self.assertEqual(len(used), 9)
         self.assertEqual(documented, used)
+
+    def test_operations(self) -> None:
+        kc = self.stack.keycloak
+        kc.on("GET", f"{kc.admin}/users", (200, []))
+        kc.on("POST", f"{kc.admin}/users", (201, None, {"Location": f"{kc.url}{kc.admin}/users/yeni-kullanici"}))
+        kc.on("POST", f"{kc.admin}/organizations/{ORG_ID}/members", (500, None))
+        invitation = {"email": "davetli@example.test", "organization_id": ORG_ID}
+        _status, preview = self.post_json("/v1/invitations", {**invitation, "dry_run": True})
+        execute = {**invitation, "dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-1"}
+        self.assert_response(self.post_json("/v1/invitations", execute), "POST", "/v1/invitations", 502)
+
+        listing = self.assert_response(
+            self.call("GET", "/v1/operations", None, self.bearer(PREVIEW_TOKEN)), "GET", "/v1/operations", 200
+        )
+        self.assertEqual([s["status"] for s in listing["operations"][0]["steps"]], ["done", "failed", "pending"])
+        path, template = "/v1/operations/onay-1/resolve", "/v1/operations/{operation_id}/resolve"
+        request = {"resolution": "abandoned"}
+        self.assertEqual(schema_errors(request, request_schema("POST", template), CONTRACT), [])
+        self.assert_response(self.post_json(path, request, PREVIEW_TOKEN), "POST", template, 403)
+        self.assert_response(self.post_json(path, {"resolution": "x"}), "POST", template, 400)
+        self.assert_response(self.post_json(path, request), "POST", template, 200)
+        self.assert_response(self.post_json(path, request), "POST", template, 404)
+        self.assert_response(self.call("POST", path, b"{}"), "POST", template, 401)
 
     def test_common_errors_use_the_error_schema(self) -> None:
         error = CONTRACT["components"]["schemas"]["Error"]

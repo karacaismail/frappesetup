@@ -61,7 +61,11 @@ class FakeServer:
                 )
                 owner.requests.append(recorded)
                 route = owner.routes.get((self.command, parts.path))
-                reply = route(recorded) if route else (404, {"error": "no route"})
+                denied = owner.authorize(recorded)
+                if denied is not None:
+                    reply = denied
+                else:
+                    reply = route(recorded) if route else (404, {"error": "no route"})
                 if reply is DONE:
                     # A test route asked for the site's own contract behaviour.
                     reply = owner._defaults[(self.command, parts.path)](recorded)
@@ -96,6 +100,10 @@ class FakeServer:
     def url(self) -> str:
         return f"http://127.0.0.1:{self._httpd.server_address[1]}"
 
+    def authorize(self, _req: Recorded) -> Reply | None:
+        """Return an error reply to refuse the request, or None to let it through."""
+        return None
+
     def on(self, method: str, path: str, reply: Reply | Route) -> None:
         self.routes[(method, path)] = reply if callable(reply) else (lambda _req: reply)
 
@@ -126,10 +134,21 @@ def keycloak_user(
     }
 
 
+ADMIN_SCOPE = "admin-api kc-admin-api"
+# Roles the identity-sync service account carries (docs/sozlesmeler.md, section 2). They reach only
+# a token requested with ADMIN_SCOPE. `manage-clients` is not among them.
+ADMIN_ROLE_PATHS = ("/users", "/organizations")
+
+
 class FakeKeycloak(FakeServer):
-    """Belirteç ucunu ve Admin API'nin kullanılan parçasını taklit eder."""
+    """Belirteç ucunu ve Admin API'nin kullanılan parçasını taklit eder.
+
+    The Admin API answers 403 unless the token was requested with ADMIN_SCOPE and the path
+    is covered by the service account's roles.
+    """
 
     def __post_init__(self) -> None:
+        self.extra_role_paths: tuple[str, ...] = ()
         super().__post_init__()
         self.users: dict[str, dict[str, object]] = {}
         self.memberships: dict[str, list[dict[str, object]]] = {}
@@ -140,6 +159,16 @@ class FakeKeycloak(FakeServer):
     @property
     def admin(self) -> str:
         return f"/admin/realms/{ISSUER_REALM}"
+
+    def authorize(self, req: Recorded) -> Reply | None:
+        prefix = self.admin
+        if not req.path.startswith(prefix):
+            return None
+        if req.headers.get("authorization") != f"Bearer token-for:{ADMIN_SCOPE}":
+            return 403, {"error": "HTTP 403 Forbidden"}
+        if not req.path[len(prefix) :].startswith(ADMIN_ROLE_PATHS + self.extra_role_paths):
+            return 403, {"error": "HTTP 403 Forbidden"}
+        return None
 
     def _token(self, req: Recorded) -> Reply:
         scope = (req.form().get("scope") or [""])[0]
@@ -430,7 +459,8 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
         tenants=tuple(tenants),
         webhook_secret=WEBHOOK_SECRET,
         db_path=db_path,
-        admin_scope="admin-api",
+        admin_scope=ADMIN_SCOPE,
+        digest_key="test-digest-key-0123456789",
         http_timeout=5.0,
         realm_id=REALM_ID,
         execute_azp=frozenset({"approval-service"}),

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 import urllib.parse
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from identity_sync.httpjson import HttpError, Response, TransportError, request_json
@@ -336,10 +336,19 @@ class KeycloakAdmin:
 
     # --- birleşik işler: tekrar edilebilir ---
 
-    def ensure_organization_with_member(self, alias: str, name: str, subject: str) -> str:
-        """Organization yoksa açar. Sonra kullanıcıyı üye yapar. Organization kimliğini döner."""
-        existing = self.find_organization(name, alias)
-        organization_id = existing.id if existing else str(self.create_organization(alias, name).value)
+    def ensure_organization_member(
+        self, alias: str, name: str, subject: str, organization_id: str | None
+    ) -> str:
+        """Add the user to the planned organization. Returns the organization id.
+
+        `organization_id` comes from the plan. None: create the organization, then add the
+        member. Otherwise: add the member to exactly that organization.
+        This function does not look the organization up. A new lookup could pick another
+        target than the one a human approved. If the name was taken meanwhile, Keycloak
+        rejects the create and the member is not added anywhere.
+        """
+        if organization_id is None:
+            organization_id = str(self.create_organization(alias, name).value)
         self.add_organization_member(organization_id, subject)
         return organization_id
 
@@ -359,13 +368,19 @@ class KeycloakAdmin:
         *,
         dry_run: bool = False,
         expected_previews: Sequence[Preview] | None = None,
+        on_step: Callable[[str, str], None] | None = None,
+        on_subject: Callable[[str], None] | None = None,
     ) -> InviteResult:
-        """Kullanıcıyı davet eder (G-16, G-79).
+        """Invite a user (G-16, G-79).
 
-        Kullanıcı yoksa açar. Sonra Organization'a ekler ve davet e-postasını gönderir.
-        `dry_run` doğruysa yalnız okur ve yapılacak işleri döner.
-        `expected_previews` onaylanan plandır. Güncel plan farklıysa `PlanChanged`
-        yükselir ve hiçbir şey yazılmaz.
+        Creates the user if missing, adds the user to the organization and sends the invitation
+        e-mail. With `dry_run` it only reads and returns the planned steps.
+        `expected_previews` is the approved plan. If the current plan differs, `PlanChanged`
+        is raised and nothing is written.
+
+        `on_step(step, status)` is called with `writing` right before each write and with
+        `done`, `failed` or `unknown` right after. The caller records it, so a stopped run
+        shows which step may have happened. `on_subject` reports the new user's id.
         """
         existing = self.find_user_by_email(email)
         subject = str(existing["id"]) if existing else None
@@ -379,10 +394,31 @@ class KeycloakAdmin:
             raise PlanChanged
         if dry_run:
             return InviteResult(subject=subject, previews=tuple(plan))
+
+        def step(name: str, write: Callable[[], Outcome]) -> Outcome:
+            if on_step:
+                on_step(name, "writing")
+            try:
+                outcome = write()
+            except HttpError:
+                if on_step:
+                    on_step(name, "failed")
+                raise
+            except TransportError:
+                if on_step:
+                    on_step(name, "unknown")  # the request may have reached Keycloak
+                raise
+            if on_step:
+                on_step(name, "done")
+            return outcome
+
         if subject is None:
-            subject = str(self.create_user(email, first_name, last_name).value)
-        self.add_organization_member(organization_id, subject)
-        self.send_execute_actions_email(subject, INVITE_ACTIONS)
+            subject = str(step("keycloak.create_user", lambda: self.create_user(email, first_name, last_name)).value)
+        if on_subject:
+            on_subject(subject)
+        user_id = subject
+        step("keycloak.add_organization_member", lambda: self.add_organization_member(organization_id, user_id))
+        step("keycloak.send_execute_actions_email", lambda: self.send_execute_actions_email(user_id, INVITE_ACTIONS))
         return InviteResult(subject=subject, previews=tuple(plan))
 
 def _organization(row: Mapping[str, object]) -> Organization:

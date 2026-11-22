@@ -30,8 +30,7 @@ from identity_sync.app import App
 from identity_sync.auth import TokenRejected, Verifier
 from identity_sync.events import RESOURCE_ID, EventError, from_keycloak, looks_like_keycloak, parse_event
 from identity_sync.httpjson import HttpError, TransportError
-from identity_sync.keycloak_admin import PlanChanged
-from identity_sync.mapping import digest_of
+from identity_sync.keycloak_admin import InviteResult, PlanChanged
 from identity_sync.pipeline import PreviewChanged, replay_report
 from identity_sync.store import Busy
 
@@ -47,6 +46,8 @@ _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _TIMESTAMP = re.compile(r"^[0-9]{1,12}$")
 _CONTENT_LENGTH = re.compile(r"^[0-9]{1,12}$")
 _LOG = logging.getLogger("identity_sync")
+RESOLUTIONS = ("completed", "abandoned")
+_RESOLVE_PATH = re.compile(r"^/v1/operations/([A-Za-z0-9_-]{1,128})/resolve$")
 
 Reply = tuple[int, object]
 Query = Mapping[str, list[str]]
@@ -205,7 +206,7 @@ class _Api:
         include_unknown = _flag(payload, "include_unknown", default=False)
         if dry_run:
             report = replay_report(self._app.processor.replay_dead_letters(dry_run=True, include_unknown=include_unknown))
-            return 200, {"results": report, "preview_digest": digest_of(report)}
+            return 200, {"results": report, "preview_digest": self._app.digest(report)}
         digest = self._approval("replay_dead_letters", payload, azp)
         try:
             results = self._app.processor.replay_dead_letters(include_unknown=include_unknown, expected_digest=digest)
@@ -227,8 +228,9 @@ class _Api:
         keycloak = self._app.keycloak
         preview = keycloak.invite_user(email, first_name, last_name, organization_id, dry_run=True)
         previews = [item.to_dict() for item in preview.previews]
-        # Özet isteğin alanlarını da kapsar. Bir davetin onayı başka davette kullanılamaz.
-        current = digest_of(
+        # The digest also covers the request fields: one invitation's approval does not fit another.
+        # It is keyed, so it cannot be used to test a guessed e-mail.
+        current = self._app.digest(
             {
                 "email": email.lower(),
                 "first_name": first_name,
@@ -242,19 +244,82 @@ class _Api:
         if digest != current:
             self._audit("invite_user", payload, azp, "preview_changed")
             return 409, {"error": "preview_changed"}
+        return self._run_invitation(payload, azp, email, first_name, last_name, organization_id, preview)
+
+    def _run_invitation(
+        self,
+        payload: Mapping[str, object],
+        azp: str,
+        email: str,
+        first_name: str,
+        last_name: str,
+        organization_id: str,
+        preview: InviteResult,
+    ) -> Reply:
+        """Run an approved invitation and keep a step journal.
+
+        Each step is recorded as `writing` before its request leaves. If the process stops,
+        the journal shows which step may have happened. A human then checks Keycloak and
+        resolves the operation. The journal is keyed by the approval id and stores no e-mail.
+        """
+        store = self._app.store
+        operation_id = str(payload["approval_id"])
+        store.operation_begin(operation_id, "invite_user", organization_id, [item.operation for item in preview.previews])
+        if preview.subject:
+            store.operation_subject(operation_id, preview.subject)
         try:
-            # Servis yalnız onaylanan planı yürütür. Plan arada değiştiyse hiçbir şey yazmaz.
-            result = keycloak.invite_user(
-                email, first_name, last_name, organization_id, expected_previews=preview.previews
+            # The service runs only the approved plan. If the plan changed, it writes nothing.
+            result = self._app.keycloak.invite_user(
+                email,
+                first_name,
+                last_name,
+                organization_id,
+                expected_previews=preview.previews,
+                on_step=lambda step, status: store.operation_step(operation_id, step, status),
+                on_subject=lambda subject: store.operation_subject(operation_id, subject),
             )
         except PlanChanged:
+            store.operation_resolve(operation_id, "plan_changed")  # no step was started
             self._audit("invite_user", payload, azp, "preview_changed")
             return 409, {"error": "preview_changed"}
-        except (HttpError, TransportError):
+        except HttpError:
+            store.operation_finish(operation_id, "failed")
             self._audit("invite_user", payload, azp, "upstream_failed")
             raise
+        except TransportError:
+            store.operation_finish(operation_id, "unknown")
+            self._audit("invite_user", payload, azp, "unknown")
+            raise
+        store.operation_finish(operation_id, "done")
         self._audit("invite_user", payload, azp, "executed")
         return 200, {"subject": result.subject, "previews": [item.to_dict() for item in result.previews]}
+
+    # --- unfinished multi-step work ---
+
+    def get_operations(self, _body: bytes, _azp: str) -> Reply:
+        return 200, {"operations": self._app.store.operations()}
+
+    def post_resolve_operation(self, operation_id: str, body: bytes, azp: str) -> Reply:
+        """Close an unfinished operation after a human settled it on the target.
+
+        This changes only the local journal. Only the approval layer may call it.
+        """
+        payload = _json_object(body)
+        if azp not in self._settings.execute_azp:
+            _LOG.warning("execute operation=resolve_operation azp=%s operation_id=%s outcome=forbidden", azp, operation_id)
+            raise _Forbidden
+        resolution = _text(payload, "resolution", required=True, max_length=20)
+        if resolution not in RESOLUTIONS:
+            raise _BadRequest
+        if not self._app.store.operation_resolve(operation_id, resolution):
+            return 404, {"error": "not_found"}
+        _LOG.info(
+            "execute operation=resolve_operation azp=%s operation_id=%s resolution=%s outcome=executed",
+            azp,
+            operation_id,
+            resolution,
+        )
+        return 200, {"operation_id": operation_id, "state": "resolved", "resolution": resolution}
 
 
 def make_server(
@@ -280,6 +345,7 @@ def make_server(
         "/v1/dead-letters": ("GET", api.get_dead_letters),
         "/v1/dead-letters/replay": ("POST", api.post_replay),
         "/v1/invitations": ("POST", api.post_invitation),
+        "/v1/operations": ("GET", api.get_operations),
     }
     methods = {"/healthz": "GET", "/v1/events": "POST", **{path: route[0] for path, route in token_routes.items()}}
 
@@ -332,8 +398,11 @@ def make_server(
 
         def _respond(self, path: str, query: Query) -> Reply:
             expected = methods.get(path)
+            resolve = _RESOLVE_PATH.fullmatch(path)
+            if expected is None and resolve is not None:
+                expected = "POST"
             if expected is None:
-                self.close_connection = True  # gövde okunmadı
+                self.close_connection = True  # the body was not read
                 return 404, {"error": "not_found"}
             if self.command != expected:
                 self.close_connection = True
@@ -354,6 +423,8 @@ def make_server(
                 return 401, {"error": "unauthorized"}
             if azp not in settings.known_azp:
                 return 403, {"error": "forbidden"}
+            if resolve is not None:
+                return api.post_resolve_operation(resolve.group(1), body, azp)
             return token_routes[path][1](body, azp)
 
         def _read_body(self) -> bytes | None:

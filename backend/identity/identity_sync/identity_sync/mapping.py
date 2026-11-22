@@ -10,6 +10,7 @@ Kuralların kaynağı karar sitesinin `rail-4-keycloak.md` sayfasının 4. böl�
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
@@ -36,13 +37,17 @@ class Preview:
         return asdict(self)
 
 
-def digest_of(value: object) -> str:
-    """Önizlemenin özetini döner. Onay bu özete bağlanır.
+def digest_of(value: object, key: bytes) -> str:
+    """Keyed digest of a preview. The approval is bound to it.
 
-    Yürütme isteği aynı özeti taşımalıdır. Plan önizlemeden sonra değiştiyse özet tutmaz.
+    The execute request must carry the same digest. It no longer matches when the plan
+    changed after the preview. The digest is an HMAC-SHA256 under a key only the service
+    knows: an unkeyed hash would let a reader check a guessed e-mail against it.
     """
+    if not key:
+        raise ValueError("digest key must not be empty")
     canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return hmac.new(key, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -76,18 +81,26 @@ class UserSnapshot:
 
 @dataclass(frozen=True)
 class EnsureOrganization:
-    """Organization'ı açar ve kullanıcıyı üye yapar."""
+    """Make the user a member of an organization.
+
+    `organization_id` is the real Keycloak id of the organization the member is added to.
+    None means the organization does not exist yet and is created. The plan step resolves it
+    before the preview, so the preview and the digest name the real target. Execution never
+    looks the organization up again.
+    """
 
     alias: str
     name: str
     subject: str
+    organization_id: str | None = None
 
     def preview(self) -> Preview:
+        if self.organization_id is None:
+            summary = f"Create organization {self.alias} and add user {self.subject} as member."
+        else:
+            summary = f"Add user {self.subject} to existing organization {self.organization_id} ({self.alias})."
         return Preview(
-            operation="keycloak.ensure_organization",
-            target=self.alias,
-            summary=f"Create organization {self.alias} if missing and add user {self.subject} as member.",
-            destructive=False,
+            operation="keycloak.ensure_organization", target=self.alias, summary=summary, destructive=False
         )
 
 

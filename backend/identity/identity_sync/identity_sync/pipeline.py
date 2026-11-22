@@ -1,20 +1,23 @@
-"""Olayı işleyen akış.
+"""The event pipeline.
 
-Sıra şudur: kullanıcının güncel durumunu oku, eylemleri planla, eylemleri çalıştır.
-Başarısız olay bekleme kuyruğuna girer. Kuyruk yalnız elle yeniden işlenir.
-Bu modülde zamanlanmış iş ve yoklama döngüsü yoktur (Proje kaydı D-6).
+Order of work: read the user's current state, plan the actions, run the actions.
+A failed event goes to the dead-letter queue. The queue is replayed only by hand.
+This module has no scheduled job and no polling loop (Proje kaydı D-6).
 
-Bir olayın işi iş kilidi altında yürür. Böylece sunucu ve `replay-dead-letters`
-komutu aynı olayı birlikte çalıştıramaz. Aynı kullanıcının iki olayı da sıraya girer.
-Geç kalan süreç kullanıcının durumunu yeniden okur. Kilit olay başına alınır.
-Her kayıt hemen kalıcıdır. Yeniden işleme yarıda kesilirse biten olaylar kaybolmaz.
+All work on an event runs under the work lock, so the server and the
+`replay-dead-letters` command cannot run the same event together, and two events of
+one user are serialized. Every record is durable at once.
+
+An approved replay holds the lock for the whole request: it plans every event, checks
+the digest, and then writes exactly those plans. If any plan differs from the approved
+one, nothing is written.
 """
 
 from __future__ import annotations
 
 import time
 from collections.abc import Callable, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import TypeVar
 
 from identity_sync.events import MEMBERSHIP_TYPES, Event, is_handled
@@ -38,14 +41,14 @@ from identity_sync.store import Store
 
 T = TypeVar("T")
 
-# Organization açıldıktan sonra durum bir kez daha okunur ve plan yenilenir.
+# After an organization was created, the state is read once more and the plan is renewed.
 _MAX_PASSES = 2
 _BACKOFF_SECONDS = 0.2
 
 
 @dataclass(frozen=True)
 class EventResult:
-    """`status` değerleri sözleşmedeki `EventResult` şemasındadır."""
+    """`status` values are in the `EventResult` schema of the contract."""
 
     status: str
     actions: tuple[str, ...] = ()
@@ -60,17 +63,19 @@ class EventResult:
         return body
 
 
-def plan_digest(actions: Sequence[Action]) -> str:
-    """Digest of everything a plan would write: each operation, its target and every field value.
+def plan_digest(actions: Sequence[Action], key: bytes) -> str:
+    """Keyed digest of everything a plan would write: each operation, its target and every field value.
 
     The preview text names no e-mail or person name, so two plans can read the same and still
-    write different values. The digest covers those values. It is a hash, so it exposes none.
+    write different values. The digest covers those values, and the real organization id of an
+    organization step. It is an HMAC, so it exposes none of them.
     """
     return digest_of(
         [
             {"operation": action.preview().operation, "target": action.preview().target, "fields": asdict(action)}
             for action in actions
-        ]
+        ],
+        key,
     )
 
 
@@ -82,11 +87,11 @@ def replay_report(results: ReplayResults) -> list[dict[str, object]]:
 
 
 class PreviewChanged(Exception):
-    """Plan önizlemeden sonra değişti. Onay eski plana aittir, yürütme yapılmaz."""
+    """The plan is not the approved one. The approval belongs to the old plan. Nothing is written."""
 
 
 class _Failed(Exception):
-    """Bir adım kalıcı olarak başarısız oldu. Metin kişisel veri taşımaz."""
+    """A step failed for good. The text carries no personal data."""
 
     def __init__(self, message: str, *, unknown: bool = False) -> None:
         super().__init__(message)
@@ -104,6 +109,7 @@ class Processor:
         press: PressClient,
         tenant_client: TenantClient,
         store: Store,
+        digest_key: bytes,
         max_attempts: int = 3,
         sleep: Callable[[float], object] = time.sleep,
     ) -> None:
@@ -114,98 +120,118 @@ class Processor:
         self._press = press
         self._tenant_client = tenant_client
         self._store = store
+        self._digest_key = digest_key
         self._max_attempts = max_attempts
         self._sleep = sleep
 
-    def handle(
-        self,
-        event: Event,
-        *,
-        dry_run: bool = False,
-        allow_unknown: bool = False,
-        approved: str | None = None,
-    ) -> EventResult:
-        """Olayı işler.
+    def handle(self, event: Event, *, dry_run: bool = False, allow_unknown: bool = False) -> EventResult:
+        """Process one event.
 
-        `dry_run` doğruysa yalnız okur ve önizleme döner.
-        `allow_unknown`: sonucu bilinmeyen olayı yeniden çalıştırma izni. Bu, insanın açık kararıdır.
-        `approved`: the `plan_digest` the human approved. If the current plan differs in any
-        operation, target or field value, nothing is written.
+        `dry_run`: only read and return the preview.
+        `allow_unknown`: permission to run an event whose earlier outcome is unknown.
+        That is a human's explicit decision.
         """
         if not is_handled(event) or event.realm != self._realm:
             return EventResult("ignored")
         if dry_run:
-            try:
-                actions = self._plan(event)
-            except _Failed:
-                return EventResult("failed")
-            return EventResult(
-                "preview", previews=tuple(a.preview() for a in actions), plan_digest=plan_digest(actions)
-            )
-        # Denetim, dış yazmalar ve kayıt tek iş kilidi altındadır.
+            return self._preview(event)[0]
+        # The duplicate check, the external writes and the record are under one work lock.
         with self._store.work_lock():
-            if self._store.is_processed(event.id):
-                # Olay kuyrukta kalmışsa kalıntıdır. Kalıntı yeniden işlemeyi sonsuza dek başarısız gösterir.
-                self._store.remove_dead_letter(event.id)
-                return EventResult("duplicate")
-            if not allow_unknown and self._store.dead_letter_state(event.id) == "unknown":
-                # Olay yeniden geldi ama önceki sonucu bilinmiyor. Aynı hedefe kör tekrar yapılmaz.
-                return EventResult("unknown")
-            # Keep the accepted event on record before any work. A crash must not lose it.
-            self._store.begin(event)
-            try:
-                names = self._run(event, approved)
-            except PreviewChanged:
-                return EventResult("preview_changed")
-            except _Failed as failure:
-                # Sonucu bilinmeyen olay işlenmiş sayılmaz (`docs/sozlesmeler.md`, 10. bölüm).
-                state = "unknown" if failure.unknown else "failed"
-                self._store.add_dead_letter(event, str(failure), state=state)
-                return EventResult("unknown" if failure.unknown else "dead_lettered")
-            self._store.mark_processed(event.id, "processed")
-            return EventResult("processed", actions=tuple(names))
+            return self._handle_locked(event, allow_unknown, planned=None)
+
+    def _preview(self, event: Event) -> tuple[EventResult, tuple[Action, ...] | None]:
+        """Plan the event and describe the plan. Reads only. The second value is None when planning failed."""
+        try:
+            actions = self._plan(event)
+        except _Failed:
+            return EventResult("failed"), None
+        result = EventResult(
+            "preview",
+            previews=tuple(action.preview() for action in actions),
+            plan_digest=plan_digest(actions, self._digest_key),
+        )
+        return result, actions
+
+    def _handle_locked(self, event: Event, allow_unknown: bool, planned: tuple[Action, ...] | None) -> EventResult:
+        """Run one event. The caller holds the work lock.
+
+        `planned` is a plan that was already checked against an approval. It is written as it is.
+        """
+        if self._store.is_processed(event.id):
+            # A row left in the queue is a leftover. It would make every replay look failed.
+            self._store.remove_dead_letter(event.id)
+            return EventResult("duplicate")
+        if not allow_unknown and self._store.dead_letter_state(event.id) == "unknown":
+            # The event came again but its earlier outcome is unknown. No blind repeat.
+            return EventResult("unknown")
+        # Keep the accepted event on record before any work. A crash must not lose it.
+        self._store.begin(event)
+        try:
+            names = self._run(event, planned)
+        except _Failed as failure:
+            # An event with an unknown outcome is not counted as processed (docs/sozlesmeler.md, section 10).
+            state = "unknown" if failure.unknown else "failed"
+            self._store.add_dead_letter(event, str(failure), state=state)
+            return EventResult("unknown" if failure.unknown else "dead_lettered")
+        self._store.mark_processed(event.id, "processed")
+        return EventResult("processed", actions=tuple(names))
 
     def replay_dead_letters(
         self, *, dry_run: bool = False, include_unknown: bool = False, expected_digest: str | None = None
     ) -> ReplayResults:
-        """Bekleme kuyruğundaki olayları bir kez yeniden işler. Bu iş elle başlatılır.
+        """Process the events in the dead-letter queue once. Started by hand.
 
-        Sonucu bilinmeyen olaylar atlanır. Çünkü aynı hedefe kör tekrar yapılmaz.
-        `include_unknown` doğruysa bu olaylar da işlenir. Bu, insanın açık kararıdır.
+        Events with an unknown outcome are skipped: no blind repeat on the same target.
+        `include_unknown` processes them too. That is a human's explicit decision.
 
-        `expected_digest` onaylanan önizlemenin özetidir. Özet tutmazsa `PreviewChanged`
-        yükselir ve hiçbir olay işlenmez. Özet tutarsa her olay yalnız onaylanan planıyla
-        yürür. Bir olayın planı arada değiştiyse o olay `preview_changed` sonucunu alır.
-        Önizlemesi üretilemeyen olay yürütülmez.
+        `expected_digest` is the digest of the approved preview. The whole request then runs
+        under the work lock: every event is planned, the digest is checked, and exactly those
+        plans are written. If the plan of any event differs, `PreviewChanged` is raised and
+        no event is written. An event whose preview could not be built is not run.
         """
-        letters = [
-            letter for letter in self._store.dead_letters() if include_unknown or letter.state != "unknown"
-        ]
-        skipped: ReplayResults = [
-            (letter.event.id, EventResult("unknown"))
-            for letter in self._store.dead_letters()
-            if letter.state == "unknown" and not include_unknown
-        ]
-        if dry_run or expected_digest is not None:
-            previews: ReplayResults = [(letter.event.id, self.handle(letter.event, dry_run=True)) for letter in letters]
-            ordered = self._ordered(previews + skipped)
-            if dry_run:
-                return ordered
-            if digest_of(replay_report(ordered)) != expected_digest:
-                raise PreviewChanged
-            results: ReplayResults = []
-            for letter, (_event_id, preview) in zip(letters, previews):
-                if preview.status != "preview":
-                    results.append((letter.event.id, preview))  # planı görülmeyen olay yürütülmez
-                    continue
-                result = self.handle(letter.event, allow_unknown=include_unknown, approved=preview.plan_digest)
-                results.append((letter.event.id, result))
+        if dry_run:
+            return self._ordered(self._replay_previews(include_unknown)[0])
+        if expected_digest is None:
+            letters, skipped = self._letters(include_unknown)
+            results = [(letter.event.id, self.handle(letter.event, allow_unknown=include_unknown)) for letter in letters]
             return self._ordered(results + skipped)
-        results = [(letter.event.id, self.handle(letter.event, allow_unknown=include_unknown)) for letter in letters]
-        return self._ordered(results + skipped)
+        with self._store.work_lock():
+            previews, plans = self._replay_previews(include_unknown)
+            if digest_of(replay_report(self._ordered(previews)), self._digest_key) != expected_digest:
+                raise PreviewChanged
+            letters, skipped = self._letters(include_unknown)
+            results: ReplayResults = []
+            for letter in letters:
+                plan = plans.get(letter.event.id)
+                if plan is None:
+                    results.append((letter.event.id, EventResult("failed")))  # no plan was seen: do not run
+                else:
+                    results.append((letter.event.id, self._handle_locked(letter.event, include_unknown, plan)))
+            return self._ordered(results + skipped)
+
+    def _letters(self, include_unknown: bool) -> tuple[list, ReplayResults]:
+        """Split the queue into events to run and events to skip."""
+        letters, skipped = [], []
+        for letter in self._store.dead_letters():
+            if letter.state == "unknown" and not include_unknown:
+                skipped.append((letter.event.id, EventResult("unknown")))
+            else:
+                letters.append(letter)
+        return letters, skipped
+
+    def _replay_previews(self, include_unknown: bool) -> tuple[ReplayResults, dict[str, tuple[Action, ...]]]:
+        letters, skipped = self._letters(include_unknown)
+        previews: ReplayResults = []
+        plans: dict[str, tuple[Action, ...]] = {}
+        for letter in letters:
+            result, actions = self._preview(letter.event)
+            previews.append((letter.event.id, result))
+            if actions is not None:
+                plans[letter.event.id] = actions
+        return previews + skipped, plans
 
     def _ordered(self, results: ReplayResults) -> ReplayResults:
-        """Sonuçları kuyruk sırasına dizer. Özet bu sıraya bağlıdır."""
+        """Put the results in queue order. The digest depends on this order."""
         order = {letter.event.id: index for index, letter in enumerate(self._store.dead_letters())}
         return sorted(results, key=lambda item: order.get(item[0], len(order)))
 
@@ -238,20 +264,37 @@ class Processor:
         if needs_organization and event.type in MEMBERSHIP_TYPES and event.organization_id:
             org_id = event.organization_id
             organization = self._retry("keycloak.read", lambda: self._keycloak.get_organization(org_id))
-        return plan_actions(
+        actions = plan_actions(
             event, snapshot, issuer=self._issuer, tenants=self._tenants, organization=organization
         )
+        return tuple(self._resolve(action) for action in actions)
 
-    def _run(self, event: Event, approved: str | None) -> list[str]:
+    def _resolve(self, action: Action) -> Action:
+        """Put the real organization id into an organization step.
+
+        The lookup happens here, at plan time. The preview and the digest then name the real
+        target, and the execution writes to exactly that target.
+        """
+        if not isinstance(action, EnsureOrganization):
+            return action
+        found = self._retry("keycloak.read", lambda: self._keycloak.find_organization(action.name, action.alias))
+        return replace(action, organization_id=found.id if found else None)
+
+    def _run(self, event: Event, planned: tuple[Action, ...] | None) -> list[str]:
         names: list[str] = []
         for pass_number in range(1, _MAX_PASSES + 1):
-            actions = self._plan(event)
-            if approved is not None:
-                if pass_number > 1:
+            if pass_number == 1 and planned is not None:
+                actions = planned  # already checked against the approval: no second read
+            else:
+                actions = self._plan(event)
+            if pass_number > 1:
+                if planned is not None:
                     # The follow-up actions were not in the preview. The human did not see them.
                     raise _Failed("follow-up actions need a new preview")
-                if plan_digest(actions) != approved:
-                    raise PreviewChanged
+                if any(isinstance(action, EnsureOrganization) for action in actions):
+                    # The organization was created but the membership is still not visible.
+                    # The team and tenant work did not run.
+                    raise _Failed("keycloak.ensure_organization: membership not visible yet")
             if actions and pass_number == 1:
                 # From the first external write on, a crash leaves the outcome unknown.
                 self._store.mark_writing(event.id)
@@ -260,14 +303,14 @@ class Processor:
             for action in actions:
                 preview = action.preview()
                 label = f"{preview.operation} {preview.target}"
-                # Başarısız adım öteki adımları durdurmaz. Örneğin Press yanıt vermese de
-                # kullanıcı bütün kiracılarda kapanır. Adımlar tekrar edilebilir.
+                # A failed step does not stop the others. For example the user is still disabled
+                # on every tenant when Press does not answer. The steps are repeatable.
                 try:
                     self._retry(label, lambda action=action: self._execute(action))
                 except _Failed as failure:
                     failures.append(str(failure))
                 except UnknownOutcome:
-                    # Sonuç bilinmiyor. Kör tekrar yapılmaz.
+                    # Unknown outcome. No blind repeat.
                     failures.append(f"{label}: unknown outcome")
                     unknown = True
                 else:
@@ -276,12 +319,11 @@ class Processor:
                 raise _Failed("; ".join(failures), unknown=unknown)
             if not any(isinstance(action, EnsureOrganization) for action in actions):
                 return names
-        # Organization açıldı ama üyelik hâlâ görünmüyor. Takım ve kiracı işleri çalışmadı.
         raise _Failed("keycloak.ensure_organization: membership not visible yet")
 
     def _execute(self, action: Action) -> None:
         if isinstance(action, EnsureOrganization):
-            self._keycloak.ensure_organization_with_member(action.alias, action.name, action.subject)
+            self._keycloak.ensure_organization_member(action.alias, action.name, action.subject, action.organization_id)
         elif isinstance(action, PressEnsureTeam):
             self._press.ensure_team(action)
         elif isinstance(action, PressRemoveTeamMember):
@@ -292,13 +334,13 @@ class Processor:
             self._tenant_client.set_enabled(action)
         elif isinstance(action, TenantChangeEmail):
             self._tenant_client.change_email(action)
-        else:  # pragma: no cover - yeni eylem türü eklenirse burada görünür
+        else:  # pragma: no cover - a new action type shows up here
             raise TypeError(f"unknown action: {type(action).__name__}")
 
     def _retry(self, label: str, call: Callable[[], T]) -> T:
-        """Geçici hatada sınırlı sayıda yeniden dener. Kalıcı hatada hemen bırakır.
+        """Retry a bounded number of times on a transient error. Give up at once on a permanent one.
 
-        `UnknownOutcome` yeniden denenmez ve çağırana geçer.
+        `UnknownOutcome` is not retried and passes to the caller.
         """
         for attempt in range(1, self._max_attempts + 1):
             try:
@@ -306,7 +348,7 @@ class Processor:
             except HttpError as error:
                 reason, transient = str(error), error.transient
             except TransportError as error:
-                # Bu metinler sabittir. Yanıt gövdesi taşımaz.
+                # These texts are fixed. They carry no response body.
                 reason, transient = str(error) or "network error", True
             if not transient or attempt == self._max_attempts:
                 raise _Failed(f"{label}: {reason}")

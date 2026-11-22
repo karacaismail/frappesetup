@@ -667,6 +667,107 @@ class ApprovalLayerTest(ServerCase):
         self.assertEqual(self.stack.keycloak.requests, [])
 
 
+class OperationJournalTest(ServerCase):
+    """An invitation writes to Keycloak in three steps. Each step is recorded before it runs."""
+
+    INVITATION = {"email": "davetli@example.test", "first_name": "Deniz", "organization_id": ORG_ID}
+
+    def setUp(self) -> None:
+        super().setUp()
+        kc = self.stack.keycloak
+        kc.on("GET", f"{kc.admin}/users", (200, []))
+        kc.on("POST", f"{kc.admin}/users", (201, None, {"Location": f"{kc.url}{kc.admin}/users/yeni-kullanici"}))
+        kc.on("POST", f"{kc.admin}/organizations/{ORG_ID}/members", (201, None))
+        self.email_path = f"{kc.admin}/users/yeni-kullanici/execute-actions-email"
+        kc.on("PUT", self.email_path, (204, None))
+
+    def invite(self, approval_id: str = "onay-d1") -> tuple[int, object]:
+        _status, preview = self.post_json("/v1/invitations", {**self.INVITATION, "dry_run": True})
+        execute = {**self.INVITATION, "dry_run": False, "preview_digest": preview["preview_digest"]}
+        return self.post_json("/v1/invitations", {**execute, "approval_id": approval_id})
+
+    def operations(self, token: str = PREVIEW_TOKEN) -> list[dict[str, object]]:
+        status, body = self.call("GET", "/v1/operations", None, self.bearer(token))
+        self.assertEqual(status, 200)
+        return body["operations"]
+
+    def test_finished_invitation_leaves_no_open_operation(self) -> None:
+        self.assertEqual(self.invite()[0], 200)
+        self.assertEqual(self.operations(), [])
+
+    def test_failed_step_is_listed_with_the_state_of_every_step(self) -> None:
+        self.stack.keycloak.on("PUT", self.email_path, (500, None))
+
+        self.assertEqual(self.invite()[0], 502)
+
+        (operation,) = self.operations()
+        self.assertEqual((operation["operation_id"], operation["operation"]), ("onay-d1", "invite_user"))
+        self.assertEqual((operation["state"], operation["subject"]), ("failed", "yeni-kullanici"))
+        self.assertEqual(
+            [(s["step"], s["status"]) for s in operation["steps"]],
+            [
+                ("keycloak.create_user", "done"),
+                ("keycloak.add_organization_member", "done"),
+                ("keycloak.send_execute_actions_email", "failed"),
+            ],
+        )
+        self.assertNotIn("example.test", json.dumps(operation))
+
+    def test_dropped_connection_leaves_the_step_unknown(self) -> None:
+        # Keycloak took the e-mail request, then the connection died. Nobody knows if the e-mail went out.
+        self.stack.keycloak.on("PUT", self.email_path, fakes.DROP)
+
+        self.assertEqual(self.invite()[0], 502)
+
+        (operation,) = self.operations()
+        self.assertEqual(operation["state"], "unknown")
+        self.assertEqual(operation["steps"][-1]["status"], "unknown")
+
+    def test_human_resolves_an_open_operation_through_the_approval_layer(self) -> None:
+        self.stack.keycloak.on("PUT", self.email_path, (500, None))
+        self.invite()
+        path = "/v1/operations/onay-d1/resolve"
+
+        self.assertEqual(self.post_json(path, {"resolution": "completed"}, PREVIEW_TOKEN), (403, {"error": "forbidden"}))
+        self.assertEqual(len(self.operations()), 1)
+        self.assertEqual(self.post_json(path, {"resolution": "belki"}), (400, {"error": "bad_request"}))
+
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            status, body = self.post_json(path, {"resolution": "completed"})
+
+        self.assertEqual((status, body), (200, {"operation_id": "onay-d1", "state": "resolved", "resolution": "completed"}))
+        self.assertEqual(self.operations(), [])
+        self.assertIn("resolve_operation", "\n".join(logs.output))
+        self.assertEqual(self.post_json(path, {"resolution": "completed"}), (404, {"error": "not_found"}))
+
+    def test_unknown_operation_id_is_not_found(self) -> None:
+        self.assertEqual(self.post_json("/v1/operations/yok/resolve", {"resolution": "abandoned"}), (404, {"error": "not_found"}))
+        self.assertEqual(self.post_json("/v1/operations/../resolve", {"resolution": "abandoned"})[0], 404)
+
+    def test_operations_need_a_service_token(self) -> None:
+        self.assertEqual(self.call("GET", "/v1/operations")[0], 401)
+        self.assertEqual(self.call("POST", "/v1/operations/onay-d1/resolve", b"{}")[0], 401)
+
+
+class BatchRefusalTest(ServerCase):
+    def test_one_changed_event_gets_409_and_nothing_is_written(self) -> None:
+        other = "99999999-9999-4999-8999-999999999999"
+        org = {"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}
+        self.stack.keycloak.add_user(keycloak_user(subject=other, email="ikinci@example.test"), [org])
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
+        self.post_event()
+        self.post_event({**EVENT, "id": "e-2", "user_id": other})
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, DONE)
+        _status, preview = self.post_json("/v1/dead-letters/replay", {"dry_run": True})
+        self.stack.keycloak.add_user(keycloak_user(subject=other, email="degisti@example.test"), [org])
+        writes = len(self.downstream_writes())
+        execute = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-t1"}
+
+        self.assertEqual(self.post_json("/v1/dead-letters/replay", execute), (409, {"error": "preview_changed"}))
+        self.assertEqual(len(self.downstream_writes()), writes)
+        self.assertEqual(len(self.stack.app.store.dead_letters()), 2)
+
+
 class DeadLetterEndpointTest(ServerCase):
     def test_list_shows_waiting_events(self) -> None:
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
