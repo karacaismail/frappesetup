@@ -21,7 +21,8 @@ class TestRuleCacheWithinARequest(ErisimTestCase):
 		# A real request has a request cache. The test process has none, so it gets one here.
 		frappe.local.request_cache = defaultdict(dict)
 		self.addCleanup(self.drop_request_cache)
-		frappe.db.commit()  # nosemgrep: start from a clean transaction
+		# Committed on purpose: start from a clean transaction.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def drop_request_cache(self) -> None:
 		frappe.set_user("Administrator")

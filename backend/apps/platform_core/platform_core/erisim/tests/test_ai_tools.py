@@ -243,6 +243,18 @@ class TestProposeRule(AiToolsTestCase):
 		self.assertEqual(changes["match_field"], "owner")
 		self.assertEqual(changes["allow_read"], 1)
 
+	def test_preview_text_follows_the_users_language(self):
+		"""A human reads the preview before approving. It is visible text."""
+		previous = frappe.local.lang
+		self.addCleanup(setattr, frappe.local, "lang", previous)
+		frappe.local.lang = "tr"
+
+		preview = self.call("propose_access_rule", ADMIN, "preview", **self.new_rule())
+
+		self.assertIn("oluştur", preview["summary"])
+		self.assertIn(FREE_DOCTYPE, preview["summary"])
+		self.assertIn("okuyamaz", preview["details"]["note"])
+
 	def test_preview_warns_which_roles_lose_access(self):
 		"""The first rule on a document type locks out every role without a rule."""
 		preview = self.call("propose_access_rule", ADMIN, "preview", **self.new_rule())
@@ -331,7 +343,8 @@ class TestProposeRuleChange(AiToolsTestCase):
 		rule = frappe.get_doc(RULE_DOCTYPE, self.rules[OWN_RULE])
 		rule.update({"is_active": 1, "scope": "own", "match_field": "employee", "allow_write": 1})
 		rule.save()
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def test_preview_names_the_target_and_its_version(self):
 		name = self.rules[OWN_RULE]

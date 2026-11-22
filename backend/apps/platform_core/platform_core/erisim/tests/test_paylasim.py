@@ -19,13 +19,15 @@ class TestSharing(ErisimTestCase):
 	def share_with_employee_1(self, name: str, **rights) -> None:
 		frappe.set_user("Administrator")
 		frappe.share.add_docshare(DOCTYPE, name, EMPLOYEE_1, read=1, **rights)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 		self.addCleanup(self.unshare, name)
 
 	def unshare(self, name: str) -> None:
 		frappe.set_user("Administrator")
 		frappe.db.delete("DocShare", {"share_doctype": DOCTYPE, "share_name": name})
-		frappe.db.commit()  # nosemgrep
+		# Committed on purpose: other connections must see this.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def test_shared_record_is_visible_on_list_and_document(self):
 		shared = self.records[EMPLOYEE_2]

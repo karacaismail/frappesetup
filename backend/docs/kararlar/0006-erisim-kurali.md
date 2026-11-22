@@ -500,7 +500,19 @@ Bütün özel arama işlevleri kurallı türde reddedilir. Ret bütün kullanıc
 
 Sonucu şudur: Bir kayıt türüne kural yazılınca o türün ERPNext'teki özel araması kapanır. Arama alanı standart aramaya dönmelidir.
 
-Motor Frappe'nin iki arama ucunu `override_whitelisted_methods` kancasıyla sarar (`__init__.py:1577`). İki sarmalayıcı aramadan önce `select` iznini arar. Güvenlik kapısı her uçta açık izin denetimi ister. Bunun bir yan etkisi vardır. “DocType” türünde okuma izni olmayan kullanıcı kayıt türü adı arayamaz.
+Motor Frappe'nin iki arama ucunu ve bağlantı doğrulama ucunu `override_whitelisted_methods` kancasıyla sarar (`__init__.py:1577`). İki sarmalayıcı aramadan önce `select` iznini arar. Güvenlik kapısı her uçta açık izin denetimi ister. Bunun bir yan etkisi vardır. “DocType” türünde okuma izni olmayan kullanıcı kayıt türü adı arayamaz.
+
+#### Bağlantı doğrulama ucu
+
+Frappe'nin bir ucu daha istemciden arama işlevi alır. Uç `frappe.client.validate_link_and_fetch` ucudur. Form bir bağlantı alanının değerini bu uçla doğrular. Uç aramayı Python'dan çağırır (`client.py:459`). Bu çağrı iki arama ucundaki kapıdan geçmez.
+
+Kural öz denetimi bu açığı buldu. Bir test açığı gerçek istekle gösterdi. Özel arama işlevi kaydı bulunca uç kaydın adını döndü. Kullanıcı göremediği bir kaydın var olduğunu öğrendi. Alan değerleri sızmadı, çünkü Frappe onları okuma izniyle getirir (`client.py:514`).
+
+Motor bu ucu da aynı kancayla sarar. Sarmalayıcı önce aynı kapıyı çağırır, sonra Frappe'nin işlevine devreder. Standart doğrulama değişmez.
+
+Bir test üç sarmalayıcının girdilerini Frappe'nin işlevleriyle karşılaştırır. Frappe yeni bir girdi eklerse test başarısız olur.
+
+Kapanmayan bir yol vardır. `address_query` işlevi “Address” türü için aramayı Python'dan çağırır (`contacts/doctype/address/address.py:331`). Bu yol yalnız iki koşul birlikte olursa açılır. “Address” türüne kural yazılmış olmalı. Bir uygulama da bu tür için `standard_queries` işlevi tanımlamış olmalı. Bugün ikisi de yoktur. Madde 18. bölümdeki ertelenen işlerdedir.
 
 #### Python'dan çağrı
 
@@ -570,7 +582,7 @@ Yapay zekâ katmanı ayrı bir yetki yolu kurmaz. Katman kullanıcının kimliğ
 | Yazma araçları | Onaydan sonra kaydın `save` yolu | Kayıt kancası çalışır. |
 | `run_report` | `frappe.desk.query_report.run`, Python'dan | Rapor kapısı çalışır. Kapı “Report” kaydının içindedir. Katman önce `erisim.api.report_guard` işlevini de çağırır. |
 
-- `erisim` modülü `yapay_zeka` modülünü içe aktarmaz. `yapay_zeka` da `erisim` modülünü içe aktarmaz. İki modül yalnız Frappe'nin kancalarında buluşur.
+- `erisim` modülü `yapay_zeka` modülünü içe aktarmaz. `yapay_zeka` modülü yalnız `platform_core.erisim.api` yolunu çağırır. Öteki bağ Frappe'nin kancalarıdır.
 - Yapay zekâ kuralları yalnız motorun kendi araçlarıyla değiştirir. Araçlar aşağıdaki tablodadır. Genel yazma araçları “Access Rule” türüne kapalıdır (O-28). Yazma yine öneri ve insan onayı ister.
 - Yapay zekâ alan seviyesini `yapay_zeka` modülünün yönetim araçlarıyla değiştirir. O dalda `set_field_property` ve `set_role_permission` araçları vardır.
 ### Motorun kendi araçları
@@ -742,7 +754,7 @@ Kod adları bu işte değişmedi. Örneğin `erisim` klasörünün adı aynıdı
 
 ## 17. Bağımlılık ve sınırlar
 
-- `erisim` modülü öteki `platform_core` modüllerini içe aktarmaz. Öteki modüller de `erisim` modülünü içe aktarmaz. Bu yön proje kaydındadır.
+- `erisim` modülü öteki `platform_core` modüllerini içe aktarmaz. Öteki modüller yalnız `platform_core.erisim.api` yolunu çağırır. Bu yön proje kaydındadır.
 - Motor “Employee”, “Department” ve “Company” kayıt türlerini adla kullanır. Bu türler ERPNext'ten gelir. Kiracı sitesi ERPNext taşır (proje kaydı, sürümler tablosu).
 - ERPNext kurulu değilse çalışana bağlı kapsam kaydedilemez. `own` kapsamı `owner` alanıyla yine çalışır.
 - Motor Frappe'nin ve ERPNext'in kodunu değiştirmez (M-4).
@@ -758,7 +770,25 @@ Kod adları bu işte değişmedi. Örneğin `erisim` klasörünün adı aynıdı
 | Süzgeçte `>`, `<` ve `like` işleçleri | Şimdilik ihtiyaç yok (A-5). | İhtiyaç doğunca |
 | Kiracı yöneticisi rolü (“Tenant Admin”) | Rol henüz tanımlı değil. Uçlar şimdilik “System Manager” ister. | G-62 |
 | Dosya, arka plan işi ve anlık bildirim yüzeyleri | Bu tur liste, kayıt, rapor ve dışa aktarmayı kapsar. | G-121 |
+| “Address” türünde `address_query` yolundaki arama | Yol yalnız türe kural ve `standard_queries` işlevi birlikte yazılırsa açılır. Bugün ikisi de yok. | “Address” türüne kural yazılmadan önce |
+| Seçenek değerlerinin Türkçesi (`own`, `team` gibi) | Çeviri dosyası ortaktır. Bağlamsız `all` satırı bütün uygulamayı etkiler. | Çeviri sahibinin kararı |
 
 ## 19. Geri dönüş
 
-Motor iki kanca satırıyla bağlanır. Satırlar silinirse Frappe'nin olağan izinleri geçerli olur. “Access Rule” kayıtları veritabanında kalır ama etkisizdir. Veri geçişi gerekmez.
+Motor `hooks.py` dosyasındaki kendi satırlarıyla bağlanır. Bu satırlar şunlardır:
+
+- iki izin kancası (`permission_query_conditions`, `has_permission`),
+- üç ucun yerine geçen `override_whitelisted_methods` satırları,
+- dört sınıf eki (`extend_doctype_class`),
+- “Role” ve “DocType” olaylarındaki `rules.clear_cache` satırları,
+- `after_install`, `after_migrate` ve `before_job` satırları,
+- `ai_tools` ve `ai_write_closed_doctypes` listelerindeki motor değerleri.
+
+Geri dönüşün iki yolu vardır.
+
+1. **Kuralları kapatmak.** Yönetici bütün “Access Rule” kayıtlarında `is_active` alanını kapatır. Hiçbir tür kurallı kalmaz. Frappe'nin olağan izinleri geçerli olur. Sorgu raporu, hazır rapor ve özel arama yeniden çalışır. Kod değişmez.
+2. **Satırları silmek.** Geliştirici yukarıdaki satırların hepsini siler. Yalnız iki izin kancasını silmek yetmez. Öteki satırlar kaldıkça rapor ve arama kapıları etkin kurallara bakmayı sürdürür.
+
+İki yolda da “Access Rule” kayıtları veritabanında kalır. Veri geçişi gerekmez.
+
+Motorun kapattığı e-posta raporları kendiliğinden açılmaz. Yönetici onları elle açar. Kapatılan kayıtların adları `migrate` sırasında günlüğe yazılır.

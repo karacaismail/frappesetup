@@ -5,11 +5,14 @@ function is refused, for every user. There is no allow-list: whether a function 
 permissions cannot be verified from its code.
 """
 
+import inspect
 import re
 from pathlib import Path
 from unittest.mock import patch
 
 import frappe
+from frappe import client as frappe_client
+from frappe.desk import search as frappe_search
 
 import platform_core
 from platform_core.erisim import api, link_search
@@ -17,6 +20,7 @@ from platform_core.erisim.tests.base import (
 	ADMIN,
 	DOCTYPE,
 	EMPLOYEE_1,
+	EMPLOYEE_2,
 	FREE_DOCTYPE,
 	HR,
 	NO_RULE,
@@ -25,6 +29,8 @@ from platform_core.erisim.tests.base import (
 
 SEARCH_LINK = "/api/method/frappe.desk.search.search_link"
 SEARCH_WIDGET = "/api/method/frappe.desk.search.search_widget"
+LINK_VALIDATION = "frappe.client.validate_link_and_fetch"
+VALIDATE_LINK = "/api/method/" + LINK_VALIDATION
 UNSAFE_QUERY = "platform_core.erisim.test_link_search.unscoped_query"
 SAFE_LOOKING_QUERY = "platform_core.erisim.test_link_search.safe_looking_query"
 SALARY = 987653
@@ -62,7 +68,8 @@ class TestLinkSearch(ErisimTestCase):
 	def setUpClass(cls):
 		super().setUpClass()
 		frappe.db.set_value(DOCTYPE, cls.records[EMPLOYEE_1], "salary_amount", SALARY)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def setUp(self):
 		super().setUp()
@@ -190,6 +197,77 @@ class TestLinkSearch(ErisimTestCase):
 		response = self.search(self.login(NO_RULE), doctype=FREE_DOCTYPE, query=SAFE_LOOKING_QUERY)
 
 		self.assertIn(name, self.values(response))
+
+	def validate_link(self, client, docname: str, **extra):
+		body = {"doctype": DOCTYPE, "docname": docname, **extra}
+		return self.send(client, "POST", VALIDATE_LINK, body=body)
+
+	def test_validate_link_and_fetch_guest_denied(self):
+		response = self.validate_link(self.anonymous(), self.records[EMPLOYEE_1], query=UNSAFE_QUERY)
+
+		self.assert_refused(response)
+
+	def test_validate_link_and_fetch_foreign_data_denied(self):
+		"""Frappe's link validation calls the search from Python and would run the custom function.
+
+		`frappe/client.py:459`. The careless function finds the record, and the endpoint would
+		then confirm that a record the user cannot see exists.
+		"""
+		foreign = self.records[EMPLOYEE_2]
+		for user in (EMPLOYEE_1, HR, ADMIN):
+			with self.subTest(user=user):
+				self.assert_refused(self.validate_link(self.login(user), foreign, query=UNSAFE_QUERY))
+
+	def test_link_validation_through_a_standard_query_hook_is_refused_too(self):
+		original = frappe.get_hooks
+
+		def with_standard_query(hook=None, *args, **kwargs):
+			hooks = original(hook, *args, **kwargs)
+			if hook is None:
+				hooks = frappe._dict(hooks)
+				hooks["standard_queries"] = {**(hooks.get("standard_queries") or {}), DOCTYPE: [UNSAFE_QUERY]}
+			return hooks
+
+		client = self.login(EMPLOYEE_1)
+		with patch.object(frappe, "get_hooks", with_standard_query):
+			response = self.validate_link(client, self.records[EMPLOYEE_2])
+
+		self.assert_refused(response)
+
+	def test_standard_link_validation_is_unchanged(self):
+		client = self.login(EMPLOYEE_1)
+		own = self.validate_link(client, self.records[EMPLOYEE_1])
+		foreign = self.validate_link(client, self.records[EMPLOYEE_2])
+
+		self.assertEqual(own.status_code, 200, own.get_data(as_text=True)[:300])
+		self.assertEqual(own.json["message"], {"name": self.records[EMPLOYEE_1]})
+		self.assertEqual(foreign.status_code, 200, foreign.get_data(as_text=True)[:300])
+		self.assertFalse(foreign.json["message"])
+
+	def test_replacements_accept_every_argument_of_the_frappe_function(self):
+		"""An argument the replacement does not know is dropped without a word. A Frappe upgrade shows here."""
+		pairs = (
+			(link_search.search_link, frappe_search.search_link),
+			(link_search.search_widget, frappe_search.search_widget),
+			(link_search.validate_link_and_fetch, frappe_client.validate_link_and_fetch),
+		)
+		for ours, theirs in pairs:
+			with self.subTest(function=ours.__name__):
+				missing = set(inspect.signature(theirs).parameters) - set(inspect.signature(ours).parameters)
+				self.assertEqual(missing, set())
+
+	def test_every_replacement_is_registered(self):
+		overrides = frappe.get_hooks("override_whitelisted_methods")
+		for name in ("frappe.desk.search.search_link", "frappe.desk.search.search_widget", LINK_VALIDATION):
+			with self.subTest(name=name):
+				self.assertEqual(
+					overrides.get(name), ["platform_core.erisim.link_search." + name.rsplit(".", 1)[1]]
+				)
+
+	def test_refusal_does_not_echo_markup_from_the_request(self):
+		response = self.search(self.login(EMPLOYEE_1), query="<img src=x onerror=alert(1)>" + UNSAFE_QUERY)
+
+		self.assertNotIn("<img", response.get_data(as_text=True))
 
 	def test_python_callers_get_the_same_refusal_from_the_public_guard(self):
 		frappe.set_user(EMPLOYEE_1)

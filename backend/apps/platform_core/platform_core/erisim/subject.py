@@ -40,6 +40,7 @@ def department_range(department: str | None) -> tuple[int, int] | None:
 	"""The range of the department in the tree. The child departments are inside this range."""
 	if not department or not has_doctype(DEPARTMENT):
 		return None
+	# The own read of the engine: tree position only, never returned to the user (exception to G-3).
 	row = frappe.db.get_value(DEPARTMENT, department, ["lft", "rgt"], as_dict=True)
 	return (row.lft, row.rgt) if row else None
 

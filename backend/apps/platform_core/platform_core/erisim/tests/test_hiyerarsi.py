@@ -72,4 +72,5 @@ class TestHierarchy(ErisimTestCase):
 		employee = frappe.get_doc("Employee", employee_of(user))
 		employee.reports_to = employee_of(manager)
 		employee.save()
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit

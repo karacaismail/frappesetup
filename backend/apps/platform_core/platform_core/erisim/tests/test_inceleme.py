@@ -114,7 +114,8 @@ class TestPreparedReport(ErisimTestCase):
 				is_standard="No",
 				query=f"select name as `Name:Data:200`, title as `Title:Data:200` from `tab{DOCTYPE}`",
 			).insert()
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def setUp(self):
 		super().setUp()
@@ -124,7 +125,8 @@ class TestPreparedReport(ErisimTestCase):
 	def drop_prepared_reports(self) -> None:
 		frappe.set_user("Administrator")
 		frappe.db.delete("Prepared Report", {"report_name": QUERY_REPORT})
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def test_narrowed_user_cannot_queue_a_prepared_report(self):
 		frappe.set_user(EMPLOYEE_1)
@@ -165,7 +167,8 @@ class TestRuleInput(ErisimTestCase):
 		frappe.db.delete("Property Setter", {"doc_type": RULE_DOCTYPE, "property": "permlevel"})
 		frappe.db.delete("Custom DocPerm", {"parent": RULE_DOCTYPE})
 		frappe.clear_cache(doctype=RULE_DOCTYPE)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def test_field_level_endpoints_refuse_protected_doctypes(self):
 		self.addCleanup(self.drop_rule_field_levels)
@@ -266,12 +269,14 @@ class TestDepartmentAndCompany(ErisimTestCase):
 		for user, department in ((EMPLOYEE_1, cls.parent), (EMPLOYEE_2, cls.child), (EMPLOYEE_3, cls.other)):
 			frappe.db.set_value("Employee", employee_of(user), "department", department)
 		frappe.db.set_value(DOCTYPE, cls.records[EMPLOYEE_3], "company", None)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	@classmethod
 	def tearDownClass(cls):
 		frappe.db.set_value("Employee", {"company": COMPANY}, "department", None)
-		frappe.db.commit()  # nosemgrep
+		# Committed on purpose: other connections must see this.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 		super().tearDownClass()
 
 	@classmethod
@@ -314,7 +319,8 @@ class TestDepartmentAndCompany(ErisimTestCase):
 class TestDeleteAndRename(ErisimTestCase):
 	def test_role_with_delete_rule_deletes(self):
 		name = self.insert_record(EMPLOYEE_1, title="Silinecek")
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 		response = self.rest_delete(self.login(HR), name)
 

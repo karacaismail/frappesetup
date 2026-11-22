@@ -55,6 +55,7 @@ class AccessRule(Document):
 					"name": ("!=", self.name or ""),
 				},
 				pluck="role",
+				limit=0,  # every active rule of the type; the rule table is small
 			)
 		)
 		if self.is_active:

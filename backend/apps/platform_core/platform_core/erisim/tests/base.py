@@ -212,7 +212,8 @@ def ensure_fixtures() -> None:
 	ensure_doctypes()
 	ensure_company()
 	ensure_people()
-	frappe.db.commit()  # nosemgrep: the request uses another connection
+	# Committed on purpose: the request uses another connection.
+	frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 
 class ErisimTestCase(IntegrationTestCase):
@@ -264,7 +265,8 @@ class ErisimTestCase(IntegrationTestCase):
 		for owner in RECORD_OWNERS:
 			cls.records[owner] = cls.insert_record(owner)
 		cls.owner_of = {name: owner for owner, name in cls.records.items()}
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	@classmethod
 	def tearDownClass(cls):
@@ -274,7 +276,8 @@ class ErisimTestCase(IntegrationTestCase):
 		frappe.db.delete(DOCTYPE)
 		for name in frappe.get_all(RULE_DOCTYPE, pluck="name"):
 			frappe.delete_doc(RULE_DOCTYPE, name, force=True)
-		frappe.db.commit()  # nosemgrep
+		# Committed on purpose: other connections must see this.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 		super().tearDownClass()
 
 	@classmethod
@@ -315,7 +318,8 @@ class ErisimTestCase(IntegrationTestCase):
 			kwargs["data"] = json.dumps(body)
 		if query:
 			kwargs["query_string"] = query
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 		try:
 			return make_request(client.open, args=(), kwargs=kwargs, site=self.site)
 		finally:

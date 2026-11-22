@@ -21,6 +21,8 @@ and code that calls Frappe directly all meet the same check.
 Decision note: `docs/kararlar/0006-erisim-kurali.md`, section 9.
 """
 
+import logging
+
 import frappe
 from frappe import _
 from frappe.utils import cint
@@ -53,6 +55,7 @@ def report_record(report_name: str | None):
 	name = report_name
 	while name and name not in seen:
 		seen.add(name)
+		# The own read of the gate: report type and reference only, never returned to the user.
 		record = frappe.db.get_value("Report", name, REPORT_FIELDS, as_dict=True)
 		if not record:
 			# The first name being unknown is Frappe's business. A broken reference is ours.
@@ -129,6 +132,7 @@ def guard(report_name: str | None, user: str | None = None) -> None:
 
 def prepared_report_closed(prepared_report: str | None) -> bool:
 	"""Is this stored result closed because its report touches governed data?"""
+	# The own read of the gate. Only the yes or no below leaves this function.
 	report_name = frappe.db.get_value(PREPARED_REPORT, prepared_report, "report_name")
 	return bool(report_name) and touches_governed(report_name)
 
@@ -163,6 +167,7 @@ def refuse_prepared_report_job(method: str | None = None, kwargs: dict | None = 
 	if not str(method or "").endswith(PREPARED_REPORT_JOB):
 		return
 	name = (kwargs or {}).get("prepared_report")
+	# Runs in the worker before the job, with no user to check. Only the report name is read.
 	report_name = frappe.db.get_value(PREPARED_REPORT, name, "report_name") if name else None
 	if not report_name or not touches_governed(report_name):
 		return
@@ -170,6 +175,7 @@ def refuse_prepared_report_job(method: str | None = None, kwargs: dict | None = 
 		"Prepared Report is switched off for {0}: the report reads data governed by Access Rules."
 	).format(frappe.bold(report_name))
 	# The job never starts, so nothing else would mark the record. Without this it stays queued.
+	# `set_value` and not `save`: saving would run the document's own hooks for a job that is refused.
 	frappe.db.set_value(PREPARED_REPORT, name, {"status": "Error", "error_message": reason})
 	frappe.db.commit()
 	frappe.throw(reason, frappe.PermissionError)
@@ -224,9 +230,24 @@ def switch_off_governed_auto_email_reports() -> None:
 	if not governed:
 		return
 	# System maintenance over every record, not a read for a user (exception to G-3).
-	for row in frappe.get_all(AUTO_EMAIL_REPORT, filters={"enabled": 1}, fields=["name", "report"]):
-		if touches_governed(row.report, governed):
-			frappe.db.set_value(AUTO_EMAIL_REPORT, row.name, "enabled", 0)
+	rows = frappe.get_all(
+		AUTO_EMAIL_REPORT,
+		filters={"enabled": 1},
+		fields=["name", "report"],
+		order_by="name asc",
+		limit=0,  # every enabled record must be looked at
+	)
+	switched_off = [row.name for row in rows if touches_governed(row.report, governed)]
+	for name in switched_off:
+		# `set_value` and not `save`: `validate` refuses a record on governed data, and the other
+		# fields of an old record must not be judged here.
+		frappe.db.set_value(AUTO_EMAIL_REPORT, name, "enabled", 0)
+	if switched_off:
+		# The names are the only trace of what was switched off. They hold no personal data.
+		logging.getLogger("platform_core.erisim").info(
+			"Auto Email Reports switched off, they read data governed by Access Rules: %s",
+			", ".join(switched_off),
+		)
 
 
 class GuardedAutoEmailReport:

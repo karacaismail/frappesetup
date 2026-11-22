@@ -26,7 +26,8 @@ class TestRuleChange(ErisimTestCase):
 		rule = frappe.get_doc(RULE_DOCTYPE, self.rules[OWN_RULE])
 		rule.update({"is_active": 1, "scope": "own", "match_field": "employee", "allow_read": 1})
 		rule.save()
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def test_widening_a_rule_over_rest_takes_effect_on_next_request(self):
 		admin = self.login(ADMIN)
@@ -96,7 +97,8 @@ class TestRuleChange(ErisimTestCase):
 		frappe.set_user("Administrator")
 		if frappe.db.exists(RULE_DOCTYPE, rule):
 			frappe.delete_doc(RULE_DOCTYPE, rule, force=True)
-		frappe.db.commit()  # nosemgrep
+		# Committed on purpose: other connections must see this.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def test_first_rule_warns_about_roles_that_lose_access(self):
 		"""Decision note, section 3: the warning lists the roles without a rule and does not stop the save."""

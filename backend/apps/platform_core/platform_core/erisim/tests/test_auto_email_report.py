@@ -52,7 +52,8 @@ class AutoEmailReportTestCase(ErisimTestCase):
 		self.addCleanup(self.cleanup)
 		# Frappe lets this role create and change Auto Email Reports. It is not a System Manager.
 		frappe.get_doc("User", HR).add_roles(REPORT_MANAGER)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def cleanup(self) -> None:
 		frappe.set_user("Administrator")
@@ -61,7 +62,8 @@ class AutoEmailReportTestCase(ErisimTestCase):
 			del frappe.local.job
 		frappe.get_doc("User", HR).remove_roles(REPORT_MANAGER)
 		frappe.db.delete(RECORD)
-		frappe.db.commit()  # nosemgrep
+		# Committed on purpose: other connections must see this.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def auto_report(self, report: str, user: str = ADMIN, report_type: str = "Report Builder", **values):
 		return frappe.get_doc(
@@ -83,7 +85,8 @@ class AutoEmailReportTestCase(ErisimTestCase):
 		doc = self.auto_report(report, ADMIN, report_type, **values)
 		doc.name = f"{report} legacy"
 		doc.db_insert()
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 		return doc.name
 
 	def gate_refuses(self, doc, caller: str) -> bool:
@@ -261,10 +264,15 @@ class TestSwitchOffOnInstallAndMigrate(AutoEmailReportTestCase):
 		governed = [self.legacy(report, report_type) for report, report_type in GOVERNED_REPORTS]
 		free = self.legacy(FREE_BUILDER_REPORT)
 
-		reports.switch_off_governed_auto_email_reports()
+		with self.assertLogs("platform_core.erisim", level="INFO") as logged:
+			reports.switch_off_governed_auto_email_reports()
 
 		self.assertEqual([self.enabled(name) for name in governed], [0, 0, 0])
 		self.assertEqual(self.enabled(free), 1)
+		# An administrator must be able to find out later which records were switched off.
+		for name in governed:
+			self.assertTrue(any(name in line for line in logged.output), name)
+		self.assertFalse(any(free in line for line in logged.output))
 
 
 class TestUngovernedData(AutoEmailReportTestCase):
@@ -272,7 +280,8 @@ class TestUngovernedData(AutoEmailReportTestCase):
 		frappe.set_user(HR)
 		name = self.auto_report(FREE_BUILDER_REPORT, HR).insert().name
 		frappe.set_user("Administrator")
-		frappe.db.commit()  # nosemgrep: the job reads committed data
+		# Committed on purpose: the job reads committed data.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 		with patch.object(Report, "get_data", return_value=([], [])) as get_data:
 			self.run_scheduler_job(name)

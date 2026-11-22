@@ -69,7 +69,8 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 		frappe.db.delete("Property Setter", {"doc_type": DOCTYPE, "property": "permlevel"})
 		frappe.db.delete("Custom DocPerm", {"parent": DOCTYPE})
 		frappe.clear_cache(doctype=DOCTYPE)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def setUp(self):
 		super().setUp()

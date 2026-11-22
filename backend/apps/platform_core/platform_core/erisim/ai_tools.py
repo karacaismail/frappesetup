@@ -193,7 +193,11 @@ def _rule_set_version(document_type: str) -> str:
 	"""Changes whenever any rule of the document type is added, changed or removed."""
 	# Version stamp only. The rows are not returned (exception to G-3).
 	rows = frappe.get_all(
-		RULE, filters={"document_type": document_type}, fields=["name", "modified"], order_by="name asc"
+		RULE,
+		filters={"document_type": document_type},
+		fields=["name", "modified"],
+		order_by="name asc",
+		limit=0,  # every rule of the type; the rule table is small
 	)
 	stamp = "|".join(f"{row.name}:{row.modified}" for row in rows)
 	return hashlib.sha256(stamp.encode()).hexdigest()
@@ -215,8 +219,9 @@ def preview_rule(**arguments) -> dict:
 	first = not rules.is_governed(doc.document_type)
 	operations = ", ".join(operation for operation in rules.OPERATIONS if doc.get(f"allow_{operation}"))
 	return {
-		"summary": f"Create an Access Rule on {doc.document_type} for role {doc.role}: "
-		f"scope {doc.scope}, operations {operations}.",
+		"summary": _("Create an Access Rule on {0} for role {1}: scope {2}, operations {3}.").format(
+			doc.document_type, doc.role, doc.scope, operations
+		),
 		"target_doctype": RULE,
 		"target_version": _rule_set_version(doc.document_type),
 		"changes": [
@@ -227,8 +232,9 @@ def preview_rule(**arguments) -> dict:
 		"details": {
 			"first_rule_on_document_type": first,
 			"roles_without_access": doc.roles_without_rule(),
-			"note": "Roles listed in roles_without_access can no longer read this document type "
-			"once the rule is active.",
+			"note": _(
+				"Roles listed in roles_without_access can no longer read this document type once the rule is active."
+			),
 		},
 	}
 
@@ -259,19 +265,23 @@ def _changed_rule(arguments: dict):
 
 def preview_rule_change(**arguments) -> dict:
 	"""Describe the change to a saved rule. Nothing is saved."""
+	# Version stamp only. `_changed_rule` checks the write permission before anything is returned.
 	version = frappe.db.get_value(RULE, arguments["name"], "modified")
 	doc, changes = _changed_rule(arguments)
 	fields = ", ".join(change["fieldname"] for change in changes)
 	return {
-		"summary": f"Change Access Rule {doc.name} ({doc.title}) on {doc.document_type}: {fields}.",
+		"summary": _("Change Access Rule {0} ({1}) on {2}: {3}.").format(
+			doc.name, doc.title, doc.document_type, fields
+		),
 		"target_doctype": RULE,
 		"target_name": doc.name,
 		"target_version": str(version),
 		"changes": changes,
 		"details": {
 			"roles_without_access": doc.roles_without_rule(),
-			"note": "Roles listed in roles_without_access can no longer read this document type "
-			"once the change is saved.",
+			"note": _(
+				"Roles listed in roles_without_access can no longer read this document type once the change is saved."
+			),
 		},
 	}
 

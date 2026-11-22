@@ -90,6 +90,8 @@ has_permission = {"*": "platform_core.erisim.hooks.has_permission"}
 override_whitelisted_methods = {
 	"frappe.desk.search.search_link": "platform_core.erisim.link_search.search_link",
 	"frappe.desk.search.search_widget": "platform_core.erisim.link_search.search_widget",
+	# Link validation hands a search function from the request to the same search.
+	"frappe.client.validate_link_and_fetch": "platform_core.erisim.link_search.validate_link_and_fetch",
 }
 # The report gate. Each extension class calls super(), so extensions of other apps keep running.
 extend_doctype_class = {

@@ -148,4 +148,5 @@ class TestTranslations(ErisimTestCase):
 		frappe.set_user("Administrator")
 		frappe.db.set_value("User", user, "language", language)
 		frappe.clear_cache(user=user)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit

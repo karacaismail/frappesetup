@@ -38,14 +38,16 @@ class TestStaleReader(ErisimTestCase):
 		rule = frappe.get_doc(RULE_DOCTYPE, self.rules[self.OWN_RULE])
 		rule.update({"is_active": 1})
 		rule.save()
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def test_reader_with_an_old_snapshot_cannot_restore_a_removed_permission(self):
 		admin = self.login("er.admin@example.test")
 		employee = self.login(EMPLOYEE_1)
 		own = self.records[EMPLOYEE_1]
 		self.addCleanup(self.restore)
-		frappe.db.commit()  # nosemgrep: start a fresh snapshot for the slow reader
+		# Committed on purpose: start a fresh snapshot for the slow reader.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 		# The slow reader opens its snapshot while the rule still grants access.
 		self.assertTrue(any(rule["role"] == ROLE_EMPLOYEE for rule in rules.rules_for(DOCTYPE)))

@@ -101,7 +101,8 @@ def ensure_reports() -> None:
 	ensure_report(BUILDER_REPORT, DOCTYPE, "Report Builder")
 	ensure_report(FREE_BUILDER_REPORT, FREE_DOCTYPE, "Report Builder")
 	ensure_report(SCRIPT_REPORT, DOCTYPE, "Script Report", report_script=SAFE_LOOKING_SCRIPT)
-	frappe.db.commit()  # nosemgrep: the request uses another connection
+	# Committed on purpose: the request uses another connection.
+	frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 
 class ReportRulesTestCase(ErisimTestCase):
@@ -222,7 +223,8 @@ class TestWhichReportRuns(ReportRulesTestCase):
 			(cls.LOOP_B, cls.LOOP_A),
 		):
 			frappe.db.set_value("Report", name, "reference_report", reference)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def setUp(self):
 		super().setUp()
@@ -233,7 +235,8 @@ class TestWhichReportRuns(ReportRulesTestCase):
 		frappe.db.rollback()
 		frappe.db.delete("Auto Email Report")
 		frappe.db.delete("Prepared Report")
-		frappe.db.commit()  # nosemgrep
+		# Committed on purpose: other connections must see this.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def test_stale_reference_does_not_hide_a_query_report(self):
 		"""Frappe runs the query. The leftover reference to a harmless list report means nothing."""
@@ -329,7 +332,8 @@ class TestReportsWithoutRules(ReportRulesTestCase):
 
 	def test_restricted_field_still_needs_its_level(self):
 		frappe.db.set_value(DOCTYPE, self.records[EMPLOYEE_1], "salary_amount", SALARY)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 		refused = self.run_report(self.login(MANAGER_1), SALARY_REPORT)
 		allowed = self.run_report(self.login(HR), SALARY_REPORT)
@@ -349,7 +353,8 @@ class TestScriptReportRule(ReportRulesTestCase):
 	def set_script(self, script: str) -> None:
 		frappe.set_user("Administrator")
 		frappe.db.set_value("Report", SCRIPT_REPORT, "report_script", script)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def setUp(self):
 		super().setUp()
@@ -428,7 +433,8 @@ class TestPreparedReportClosed(ReportRulesTestCase):
 			as_dict=True,
 		)
 		frappe.db.set_value("File", file.name, "owner", ADMIN)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 		return doc.name, file.name, file.file_url
 
 	def cleanup(self) -> None:
@@ -437,7 +443,8 @@ class TestPreparedReportClosed(ReportRulesTestCase):
 		frappe.db.delete("DocShare", {"share_doctype": "File"})
 		frappe.db.delete("File", {"attached_to_doctype": "Prepared Report"})
 		frappe.db.delete("Prepared Report", {"report_name": NAME_REPORT})
-		frappe.db.commit()  # nosemgrep
+		# Committed on purpose: other connections must see this.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def test_cannot_be_created_by_anyone(self):
 		for user in (EMPLOYEE_1, HR, ADMIN, "Administrator"):
@@ -472,7 +479,8 @@ class TestPreparedReportClosed(ReportRulesTestCase):
 
 	def test_stored_file_cannot_be_read_by_its_owner_or_through_a_share(self):
 		frappe.share.add_docshare("File", self.file, EMPLOYEE_1, read=1)
-		frappe.db.commit()  # nosemgrep: the request uses another connection
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 		for user in (ADMIN, EMPLOYEE_1):
 			with self.subTest(user=user):
@@ -517,7 +525,8 @@ class TestQueuedPreparedReport(ReportRulesTestCase):
 		doc.name = frappe.generate_hash(length=10)
 		doc.owner = ADMIN
 		doc.db_insert()
-		frappe.db.commit()  # nosemgrep: the job reads committed data
+		# Committed on purpose: the job reads committed data.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 		return doc.name
 
 	def cleanup(self) -> None:
@@ -527,7 +536,8 @@ class TestQueuedPreparedReport(ReportRulesTestCase):
 			del frappe.local.job
 		frappe.db.delete("File", {"attached_to_doctype": "Prepared Report"})
 		frappe.db.delete("Prepared Report")
-		frappe.db.commit()  # nosemgrep
+		# Committed on purpose: other connections must see this.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def run_job(self, prepared: str) -> None:
 		"""Run the queued job the way a worker does, as the System Manager who queued it."""
@@ -547,7 +557,8 @@ class TestQueuedPreparedReport(ReportRulesTestCase):
 			rule = frappe.get_doc("Access Rule", name)
 			rule.is_active = active
 			rule.save()
-		frappe.db.commit()  # nosemgrep: the job reads committed data
+		# Committed on purpose: the job reads committed data.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def files_of(self, prepared: str) -> int:
 		return frappe.db.count(
