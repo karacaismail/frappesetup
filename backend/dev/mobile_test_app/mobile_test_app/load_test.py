@@ -6,8 +6,10 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
 from uuid import uuid4
+
+from platform_core.mobil.tests.loopback_http import open_loopback
 
 from .load_accounts import LOAD_ACCOUNTS
 
@@ -25,14 +27,17 @@ def call(port, token, operation, payload):
 		method="POST",
 	)
 	try:
-		with urlopen(request, timeout=15) as response:
+		with open_loopback(request, timeout=15) as response:
 			return response.status, json.load(response)
 	except HTTPError as error:
 		with error:
-			try:
-				result = json.load(error)
-			except ValueError:
-				result = {"code": "invalid_error_response"}
+			if 300 <= error.code < 400:
+				result = {"code": "redirect_rejected"}
+			else:
+				try:
+					result = json.load(error)
+				except ValueError:
+					result = {"code": "invalid_error_response"}
 		return error.code, result
 	except (TimeoutError, URLError) as error:
 		return None, {"code": type(error).__name__}
@@ -66,7 +71,7 @@ def run_group(name, requests, send):
 
 	with ThreadPoolExecutor(max_workers=len(requests)) as pool:
 		results = list(pool.map(synchronized, requests))
-	counts = Counter(status for status, _ in results)
+	counts = Counter(status for status, _unused in results)
 	print(
 		json.dumps({"workload": name, "requests": len(requests), "503": counts[503], "statuses": counts}),
 		flush=True,
@@ -88,18 +93,18 @@ def main(port):
 
 	writes = run_group(
 		"concurrent_writes",
-		[(token, installation_id, str(uuid4())) for token, installation_id, _ in installations],
+		[(token, installation_id, str(uuid4())) for token, installation_id, _unused in installations],
 		lambda token, installation_id, record_id: write(port, token, installation_id, record_id),
 	)
 	pulls = run_group(
 		"concurrent_initial_pulls",
-		[(token, installation_id) for token, installation_id, _ in installations],
+		[(token, installation_id) for token, installation_id, _unused in installations],
 		lambda token, installation_id: call(port, token, "pull", {"installation_id": installation_id}),
 	)
-	for (_, _, seed_id), (status, result) in zip(installations, pulls, strict=True):
+	for (_unused, _unused, seed_id), (status, result) in zip(installations, pulls, strict=True):
 		if status == 200 and seed_id not in {change["record_id"] for change in result["message"]["changes"]}:
 			raise SystemExit("An initial pull omitted a seeded record")
-	return int(any(status != 200 for status, _ in (*writes, *pulls)))
+	return int(any(status != 200 for status, _unused in (*writes, *pulls)))
 
 
 if __name__ == "__main__":

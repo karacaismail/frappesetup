@@ -173,7 +173,7 @@ def _revoke_user_installations(body):
 	if not account:
 		raise MobileError("IdentityNotFound", 404)
 	try:
-		_, cutoff, _ = lock_revocation_scope(account)
+		_unused, cutoff, _unused = lock_revocation_scope(account)
 	except MobileError as error:
 		if error.code == "account_unavailable":
 			raise MobileError("IdentityNotFound", 404) from error
