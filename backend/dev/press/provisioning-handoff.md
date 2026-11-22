@@ -17,22 +17,58 @@ Ayrıntı [karar notundadır](../../docs/decisions/0018-press-ansible-python314.
 Press, kurulumu iş kuyruğuna ekler. Kuyruk, arka planda çalışacak işleri tutar.
 Yerel deneme, Press'in kurulum görevini çalıştırıp sonucunu yazdığını doğruladı.
 
-1. `fs-pd-press-provision` projesinde `press.localhost` sitesini hazırlayın.
-2. Aynı ağa `fs-pd-press-provision-target` adlı tek kullanımlık Ubuntu 22.04 container’ı ekleyin.
-3. Hedefte Python 3, SSH sunucusu, `sudo` ve `iproute2` hazır olsun.
-   Hedef, kendi ağ yolunu değiştirebilmeli.
-4. Press container’ında tek kullanımlık SSH anahtarı üretin.
-5. Hedefte yalnız açık anahtara izin verin. Press container’ında hedefin SSH kimliğini doğrulayın.
-6. Depo kökünde aşağıdaki komutu çalıştırın.
+1. Yerel geliştirme ayarlarını yükleyin. `PANE_PORT` değerini çalışma alanınızdan alın.
+2. `fs-pd-press-provision` projesinde `press.localhost` sitesini hazırlayın.
+   Site kurulumu için [Press geliştirme adımlarını](README.md) izleyin.
+3. Aşağıdaki komutla Ubuntu 22.04 hedefini aynı ağa ekleyin.
 
 ```sh
-PANE_PORT=47330 backend/dev/press/provisioning_smoke.sh
+provision_compose() {
+  backend/dev/press/compose.sh --project-name fs-pd-press-provision \
+    --file "$PWD/backend/dev/press/compose.provisioning.yaml" "$@"
+}
+provision_compose up -d --build target
+```
+
+Hedef imajının Ubuntu tabanı sabit özetle doğrulanır.
+Hedef, bilgisayara port açmaz. Betik hedefin ağ yolunu değiştirebilir.
+`FS_COLIMA_PROFILE` değeri `factory` veya `default` olabilir.
+Değer boşsa betik `factory` profilini kullanır.
+
+Yeni ortamda aşağıdaki komutları bir kez çalıştırın.
+Komutlar tek kullanımlık anahtar üretir ve yalnız açık anahtarı hedefe taşır.
+Press, hedefin kimliğini doğrudan hedefteki açık anahtar dosyasından alır.
+
+```sh
+provision_compose exec -T web sh -eu -c '
+  install -d -m 0700 "$HOME/.ssh"
+  test ! -e "$HOME/.ssh/id_ed25519"
+  ssh-keygen -q -t ed25519 -N "" -f "$HOME/.ssh/id_ed25519"
+'
+provision_compose exec -T web sh -ec 'cat "$HOME/.ssh/id_ed25519.pub"' |
+  provision_compose exec -T target sh -eu -c '
+    install -d -m 0700 /root/.ssh
+    umask 077
+    cat > /root/.ssh/authorized_keys
+  '
+target_ip="$(provision_compose exec -T target hostname -i)"
+target_public_key="$(provision_compose exec -T target cat /etc/ssh/ssh_host_ed25519_key.pub)"
+printf '%s %s\n' "$target_ip" "$target_public_key" |
+  provision_compose exec -T web sh -eu -c '
+    umask 077
+    cat >> "$HOME/.ssh/known_hosts"
+  '
+backend/dev/press/provisioning_smoke.sh
 ```
 
 Betik hedefin dış ağ yolunu kapatır. Paket indirme isteğini hedefin kendi içine yönlendirir.
 Press, `self_hosted.yml` dosyasını SSH üzerinden çalıştırır.
 Test, paket listesini yenileme hatasının görev kaydına yazılmasını bekler.
-Test bittiğinde hedefi ve tek kullanımlık anahtarı silin.
+Test bittiğinde geçici ortamı ve imajlarını silin. Tek kullanımlık anahtar da silinir.
+
+```sh
+provision_compose down --volumes --rmi local
+```
 
 ### Yerel sonuç
 

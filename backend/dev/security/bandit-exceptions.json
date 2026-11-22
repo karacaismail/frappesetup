@@ -2440,5 +2440,59 @@
     "reason": "The isolated template test deliberately disables default escaping to verify the application template escapes its values explicitly.",
     "owner": "press-tr",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/ansible_test_env.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Imports subprocess to inspect the operator-selected test interpreter.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/ansible_test_env.py",
+    "code": "completed_process = subprocess.run(",
+    "statementSha256": "e23e5ba153aa77684b82ca78a0596c0d791d9c34d34a9ec203bc8d5f6eac58f8",
+    "reason": "Uses the trusted test interpreter with a fixed Python expression and no shell to verify runtime versions.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/test_ansible_playbook_syntax.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Imports subprocess for the syntax-only Ansible regression test.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_ansible_playbook_syntax.py",
+    "code": "completed_process = subprocess.run(",
+    "statementSha256": "5b89eac4938c6852f5adcbd49510389d0d902196dc5b70e8b02018562f159",
+    "reason": "Runs syntax checks without a shell against two fixed playbook names and a localhost inventory.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/test_ansible_runner.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Imports subprocess to isolate the local Ansible harness.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_ansible_runner.py",
+    "code": "completed_process = subprocess.run(",
+    "statementSha256": "9418ce90faafa0ae02d4b3f77f59d5bd8de0448cdf11e4c2e9e9008aaf55dbdf",
+    "reason": "Runs the repository harness in isolated Python without a shell. The scenario and bridge mode come from test cases.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
   }
 ]

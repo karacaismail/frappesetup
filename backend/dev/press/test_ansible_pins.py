@@ -7,6 +7,7 @@ from pathlib import Path
 PRESS_DEV = Path(__file__).resolve().parent
 REPO = PRESS_DEV.parents[2]
 PINS = PRESS_DEV / "ansible-requirements.txt"
+LOCK = PRESS_DEV / "ansible-requirements.lock.txt"
 DECISION = REPO / "backend/docs/decisions/0018-press-ansible-python314.md"
 
 
@@ -40,6 +41,24 @@ class AnsiblePinTest(unittest.TestCase):
         for name, version in pins.items():
             with self.subTest(name=name):
                 self.assertEqual(overrides.get(name), version)
+
+    def test_hash_lock_covers_exact_direct_pins_and_transitive_packages(self):
+        entries = [
+            entry
+            for entry in LOCK.read_text().replace("\\\n", "").splitlines()
+            if entry and not entry.startswith("#")
+        ]
+        locked_pins = {}
+        for entry in entries:
+            requirement, *hashes = entry.split(" --hash=sha256:")
+            with self.subTest(requirement=requirement.strip()):
+                locked_pins.update(read_pins(requirement.split(";", 1)[0]))
+                self.assertTrue(hashes)
+                for digest in hashes:
+                    self.assertRegex(digest.strip(), r"^[0-9a-f]{64}$")
+        direct_pins = read_pins(PINS.read_text())
+        self.assertGreater(len(locked_pins), len(direct_pins))
+        self.assertEqual({name: locked_pins[name] for name in direct_pins}, direct_pins)
 
     def test_decision_note_and_readiness_guide_record_the_pinned_versions(self):
         pins = read_pins(PINS.read_text())

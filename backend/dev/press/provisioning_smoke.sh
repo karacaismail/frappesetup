@@ -9,13 +9,24 @@ target="$project-target"
 network="${project}_default"
 bench_dir=/home/frappe/benches/frappe-bench
 
-if [[ "${PANE_PORT:-}" != 47330 ]]; then
-	echo 'Set PANE_PORT=47330 for the disposable provisioning environment.' >&2
+if [[ ! "${PANE_PORT:-}" =~ ^[1-9][0-9]{3,4}$ ]] || (( PANE_PORT > 65526 )); then
+	echo 'PANE_PORT must be an integer from 1000 to 65526.' >&2
 	exit 2
 fi
 
-docker() { command docker --context colima-factory "$@"; }
+case "${FS_COLIMA_PROFILE:-factory}" in
+	factory) press_context=colima-factory ;;
+	default) press_context=colima ;;
+	*) echo 'FS_COLIMA_PROFILE must be factory or default.' >&2; exit 2 ;;
+esac
 
+docker() { command docker --context "$press_context" "$@"; }
+
+web_port="$((PANE_PORT + 3))"
+if [[ "$(docker port "$web" "$web_port/tcp")" != "127.0.0.1:$web_port" ]]; then
+	echo 'The Press web container must publish PANE_PORT + 3 on 127.0.0.1.' >&2
+	exit 2
+fi
 if ! docker exec -w "$bench_dir" "$web" test -f sites/press.localhost/site_config.json; then
 	echo 'Finish the Press site installation before running the smoke test.' >&2
 	exit 1

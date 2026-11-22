@@ -38,6 +38,14 @@ Testler Python 3.14 ve sabit Ansible ister. İki ortam değişkeni gerekir.
 `PRESS_TEST_PRESS_SOURCE` değişkeni temiz Press kaynağını gösterir.
 Değişkenler yoksa testler atlanır.
 
+Testler için ayrı bir Python ortamı açın. Paketleri özetlerini denetleyerek kurun.
+
+```sh
+uv venv --python 3.14 /path/to/venv
+uv pip sync --python /path/to/venv/bin/python --require-hashes \
+  backend/dev/press/ansible-requirements.lock.txt
+```
+
 ```sh
 PRESS_TEST_ANSIBLE_PYTHON=/path/to/venv/bin/python PRESS_TEST_PRESS_SOURCE=/path/to/press \
   python3.14 -B -m unittest discover -s backend/dev/press -p 'test_ansible_*.py'

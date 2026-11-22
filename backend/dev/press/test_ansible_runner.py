@@ -15,7 +15,7 @@ PRESS_TR = env.REPO / "backend/apps/press_tr"
 
 
 def run_harness(scenario, bridge):
-    result = subprocess.run(
+    completed_process = subprocess.run(
         [
             env.PYTHON,
             "-I",
@@ -33,9 +33,9 @@ def run_harness(scenario, bridge):
         text=True,
         timeout=600,
     )
-    if result.returncode != 0:
-        raise AssertionError(result.stdout + result.stderr)
-    return json.loads(result.stdout.splitlines()[-1])
+    if completed_process.returncode != 0:
+        raise AssertionError(completed_process.stdout + completed_process.stderr)
+    return json.loads(completed_process.stdout.splitlines()[-1])
 
 
 @env.requires_ansible_environment

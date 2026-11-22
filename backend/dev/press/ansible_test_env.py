@@ -31,12 +31,16 @@ def pinned_core_version():
 
 def assert_interpreter_matches_pins(test):
     """Fail loudly when the interpreter under test does not carry the pinned ansible-core."""
-    result = subprocess.run(
-        [PYTHON, "-c", "import ansible.release, sys; print(sys.version_info[0], sys.version_info[1], ansible.release.__version__)"],
+    completed_process = subprocess.run(
+        [
+            PYTHON,
+            "-c",
+            "import ansible.release, sys; print(*sys.version_info[:2], ansible.release.__version__)",
+        ],
         capture_output=True,
         text=True,
         check=True,
     )
-    major, minor, core = result.stdout.split()
+    major, minor, core = completed_process.stdout.split()
     test.assertEqual(core, pinned_core_version())
     test.assertEqual((major, minor), ("3", "14"), "the provisioning control node is Python 3.14")

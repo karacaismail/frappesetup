@@ -20,12 +20,14 @@ class ProvisioningPlaybookSyntaxTest(unittest.TestCase):
         playbooks = Path(env.PRESS_SOURCE) / "press" / "playbooks"
         for playbook in PLAYBOOKS:
             with self.subTest(playbook=playbook):
-                result = subprocess.run(
+                completed_process = subprocess.run(
                     [env.PYTHON, "-m", "ansible", "playbook", "--syntax-check", "-i", "localhost,", playbook],
                     cwd=playbooks,
                     capture_output=True,
                     text=True,
                     env={**os.environ, "ANSIBLE_DEPRECATION_WARNINGS": "0", "ANSIBLE_LOCALHOST_WARNING": "0"},
                 )
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn(f"playbook: {playbook}", result.stdout)
+                self.assertEqual(
+                    completed_process.returncode, 0, completed_process.stdout + completed_process.stderr
+                )
+                self.assertIn(f"playbook: {playbook}", completed_process.stdout)

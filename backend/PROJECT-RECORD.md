@@ -30,12 +30,14 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 | `platform_core` | `access` | Erişim kuralı motoru: kayıt kuralı, hiyerarşi ve alan düzeyi (K8) |
 | `platform_core` | `model_gateway` | Sağlayıcı, hesap, API ve model kaydı. Yönlendirme, model çağrısı ve kullanım kaydı. |
 | `press_tr` | `press_identity` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
+| `press_tr` | `ansible_bridge` | Press ile Ansible arasında görev sonuçlarını iletir. |
 | `identity_sync` | Yok | Keycloak ile Press ve kiracı siteleri arasında kullanıcı eşitleme |
 | `oidc_verify` | Yok | Belirteç doğrulama. Frappe'ye bağlı değildir. |
 
 ## Bağımlılık yönü
 
 - `platform_core.identity` ve `press_tr.press_identity` yalnız `oidc_verify` kitaplığını kullanır.
+- `press_tr.ansible_bridge` depo içindeki öteki modülleri çağırmaz. Bu modül başka modülün DocType kayıtlarına yazmaz.
 - `platform_core.shell` ile `platform_core.identity` birbirini çağırmaz.
 - `platform_core.mobile` yalnız `identity` modülünün açık doğrulama işlevini çağırabilir. Öteki modüller `mobile` modülünü çağırmaz.
 - `platform_core.access` öteki modülleri çağırmaz. Motor Frappe'nin izin kancalarıyla çalışır.
