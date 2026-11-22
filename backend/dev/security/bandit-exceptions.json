@@ -1,0 +1,130 @@
+[
+  {
+    "rule": "B404",
+    "file": "backend/dev/bootstrap.py",
+    "line": 7,
+    "reason": "Import for the validated development CLI.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/bootstrap.py",
+    "line": 74,
+    "reason": "Development container uses the installed bench executable with validated site and app names.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/bootstrap.py",
+    "line": 74,
+    "reason": "Development container uses the installed bench executable with validated site and app names.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/security/scans.py",
+    "line": 10,
+    "reason": "Import for fixed defensive tool invocations.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/security/scans.py",
+    "line": 38,
+    "reason": "The local Git executable reads source metadata with fixed invocations.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/scans.py",
+    "line": 38,
+    "reason": "The local Git executable reads source metadata with fixed invocations.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/scans.py",
+    "line": 131,
+    "reason": "Fixed tool and arguments are passed directly without a shell.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/scans.py",
+    "line": 149,
+    "reason": "Fixed scanner commands capture structured output without a shell.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/scans.py",
+    "line": 229,
+    "reason": "Fixed uv command reads package requirements from stdin.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/security/scans.py",
+    "line": 278,
+    "reason": "The only arguments are the configured OSV executable and its version flag.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/scans.py",
+    "line": 278,
+    "reason": "The only arguments are the configured OSV executable and its version flag.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/tests/test_environment.py",
+    "line": 5,
+    "reason": "Import for development test subprocesses.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/tests/test_environment.py",
+    "line": 23,
+    "reason": "Test invokes its configured Python and a fixed development script.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_environment.py",
+    "line": 23,
+    "reason": "Test invokes its configured Python and a fixed development script.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_environment.py",
+    "line": 55,
+    "reason": "Test invokes a fixed script and passes the rejected port in the environment.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_environment.py",
+    "line": 66,
+    "reason": "Test passes the invalid app name as a single argument to a fixed script.",
+    "owner": "dev-ortam",
+    "ignoreUntil": "2027-02-22"
+  }
+]

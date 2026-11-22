@@ -25,6 +25,18 @@ DevOps sorumlusu araç sürümlerini ve açık veritabanını günceller.
 Her yanlış alarm için sorumlu rolü ve gerekçeyi yazın.
 OSV istisnalarını `backend/dev/security/osv-exceptions.toml` dosyasına girin.
 Diğer araçlardaki istisna önerisini aynı işin karar kaydında incelemeye sunun.
-İlk sürüm hiçbir bulguyu istisna saymaz.
+Yalnız incelemesi tamamlanan bulguları istisna sayın.
 
 Yeni komutlar geri alınırsa mevcut `guvenlik-denetimi` komutu çalışmaya devam eder.
+
+## Tarama ve istisna kapsamı
+
+Bandit, Git'in izlediği `backend` altındaki Python dosyalarını tarar.
+Bilinen hatalı deneme dosyaları kaynak taramasına girmez.
+`packages/press-ai` Python taramasının kapsamı dışındadır.
+Bandit istisnası kural, dosya, satır, sahip, gerekçe ve bitiş tarihi taşır.
+Süresi geçen veya eşleşmeyen istisna denetimi durdurur.
+Gitleaks yalnız kural, dosya, satır, commit ve parmak izi gösterir.
+
+OSV-Scanner kökteki npm kilidini ve diğer izlenen kilitleri tarar.
+Paket bulguları sürüm raporuna yazılır. Paket sürümü bu komutla değişmez.

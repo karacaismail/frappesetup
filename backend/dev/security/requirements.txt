@@ -1,0 +1,7 @@
+# Regenerate with backend/dev/security/compile-lock.
+# Manifest SHA256: 8c11f0c4070a7abff6d3546c472c023debe671b56539989a86dd1419144c54f2
+annotated-types==0.8.0
+pydantic==2.12.5
+pydantic-core==2.41.5
+typing-extensions==4.16.0
+typing-inspection==0.4.5
