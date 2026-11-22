@@ -510,6 +510,72 @@ class GateTests(unittest.TestCase):
         )
         self.scan("sql")
 
+    def test_tool_sql_ignores_uncalled_and_other_app_functions(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.declarations.declare"]')
+        self.write(
+            f"{APP}/declarations.py",
+            'def declare(): return [{"handler": "sample_app.tools.run"}]',
+        )
+        self.write(
+            f"{APP}/tools.py",
+            """
+            import frappe
+            from other_app.service import external
+            def run():
+                safe()
+                external()
+            def safe():
+                pass
+            def unused():
+                frappe.db.sql("SELECT 1")
+            """,
+        )
+        self.write(
+            "apps/other_app/other_app/service.py",
+            """
+            import frappe
+            def external():
+                frappe.db.sql("SELECT 1")
+            """,
+        )
+        self.scan()
+
+    def test_registered_tool_follows_package_reexport(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.declare"]')
+        self.write(f"{APP}/__init__.py", "from .tools import declare")
+        self.write(
+            f"{APP}/tools.py",
+            """
+            import frappe
+            def declare():
+                return [{"handler": "sample_app.tools.run"}]
+            def run():
+                frappe.db.sql("SELECT 1")
+            """,
+        )
+        (finding,) = self.scan("sql")
+        self.assertEqual(finding["path"], f"{APP}/tools.py")
+
+    def test_tool_helper_follows_chained_package_reexports(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.declarations.declare"]')
+        self.write(
+            f"{APP}/declarations.py",
+            'def declare(): return [{"handler": "sample_app.tools.run"}]',
+        )
+        self.write(f"{APP}/__init__.py", "from .helpers import read")
+        self.write(f"{APP}/helpers/__init__.py", "from .queries import query as read")
+        self.write(f"{APP}/tools.py", "from . import read\ndef run(): read()")
+        self.write(
+            f"{APP}/helpers/queries.py",
+            """
+            import frappe
+            def query():
+                frappe.db.sql("SELECT 1")
+            """,
+        )
+        (finding,) = self.scan("sql")
+        self.assertEqual(finding["path"], f"{APP}/helpers/queries.py")
+
     def test_tool_helper_resolution_ignores_unrelated_local_alias(self):
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
         self.write(

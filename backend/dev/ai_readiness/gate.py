@@ -411,13 +411,25 @@ def provider_checks(path, tree, package, aliases, bindings, providers, emit):
                 emit(path, item.lineno, "provider", f"Provider import is forbidden: {name}.")
 
 
-def tool_sql_checks(targets, functions, sources, emit):
+def resolve_tool_function(name, functions, reexports):
+    app = name.partition(".")[0]
+    visited = set()
+    while name not in functions and name in reexports and name not in visited:
+        visited.add(name)
+        name = reexports[name]
+        if name.partition(".")[0] != app:
+            return None
+    return name if name in functions else None
+
+
+def tool_sql_checks(targets, functions, sources, reexports, emit):
     pending = []
     for target, (hook, line) in targets.items():
-        if target not in functions:
+        function = resolve_tool_function(target, functions, reexports)
+        if function is None:
             emit(hook, line, "sql", f"Cannot inspect registered AI tool {target}.")
         else:
-            pending.append(target)
+            pending.append(function)
     visited = set()
     referenced = set()
     while pending:
@@ -446,8 +458,10 @@ def tool_sql_checks(targets, functions, sources, emit):
             name = qualified(item.func, module_aliases | local_aliases)
             if isinstance(item.func, ast.Name) and name == item.func.id:
                 name = f"{module}.{name}"
-            if name in functions and name.partition(".")[0] == app and name not in visited:
-                pending.append(name)
+            if name.partition(".")[0] == app:
+                function = resolve_tool_function(name, functions, reexports)
+                if function is not None and function not in visited:
+                    pending.append(function)
     return referenced
 
 
@@ -513,11 +527,18 @@ def scan(root, commit_base=None):
         if target not in endpoints:
             emit(path, line, "endpoint", f"No whitelisted override target for {public}.")
 
+    reexports = {
+        f"{module}.{alias}": name
+        for module, (path, _, tree, _, _, package) in sources.items()
+        if path.stem == "__init__"
+        for alias, name in imported_aliases(tree.body, package).items()
+    }
     targets = dict(registered)
     for name, (hook, line) in registered.items():
-        if name not in functions:
+        function = resolve_tool_function(name, functions, reexports)
+        if function is None:
             continue
-        module, fn = functions[name]
+        module, fn = functions[function]
         path, _, tree, _, _, _ = sources[module]
         module_names = stable_bindings(tree.body)
         for target_line, target in declaration_targets(fn, module_names, METHOD_PATH):
@@ -526,7 +547,7 @@ def scan(root, commit_base=None):
             else:
                 targets[target] = hook, line
 
-    referenced.update(tool_sql_checks(targets, functions, sources, emit))
+    referenced.update(tool_sql_checks(targets, functions, sources, reexports, emit))
 
     for owner in set(ai_paths.values()):
         if not any(matches(module, owner) for module in sources):

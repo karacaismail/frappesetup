@@ -63,7 +63,9 @@ Kapı düz YAML eşlemelerini ve JSON biçimindeki OpenAPI dosyalarını okur.
 Kapı girintisiz YAML listelerini de kabul eder.
 Kapı işlem tanımında desteklenmeyen bir biçim görürse bulgu yazar.
 Kapı çalışma anında hesaplanan adreslerin tümünü çözemez.
-Kapı çalışma anında seçilen yardımcı işlevleri SQL için çözemez.
+Kapı aynı uygulamada `__init__.py` üzerinden dışa açılan işlevleri izler.
+Kapı, kayıtlı araçtan çıkan `Class().method()` ve `self.method()` çağrılarını izlemez.
+Kapı çalışma anında seçilen yardımcı işlevleri de SQL için çözemez.
 
 ## Yasaklı ad
 
