@@ -1,7 +1,8 @@
 import json
+from io import BytesIO
 from unittest import TestCase
 from unittest.mock import Mock, patch
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs
 
 from platform_core.mobil import identity_sync_client as client
@@ -68,6 +69,33 @@ class IdentitySyncClientTest(TestCase):
 		self.logger.warning.assert_called_once()
 		for sensitive in ("private-session", "fixture-bearer", "fixture-secret"):
 			self.assertNotIn(sensitive, str(self.logger.warning.call_args))
+
+	def test_forbidden_closure_is_logged_and_is_not_retried(self):
+		forbidden = ("private-session", "private-subject")
+		retryable = ("unavailable-session", "unavailable-subject")
+		error = HTTPError(
+			"https://sync.example.test/v1/sessions/revoke",
+			403,
+			"private-session private-subject fixture-bearer fixture-secret",
+			None,
+			BytesIO(b"private response body"),
+		)
+		self.open.side_effect = [
+			self.response(b'{"access_token":"fixture-bearer"}'),
+			error,
+			self.response(status=503),
+			self.response(),
+		]
+
+		self.assertEqual(
+			client.send_session_revocations([forbidden, retryable, ("closed", "subject")]), (retryable,)
+		)
+		self.assertEqual(self.open.call_count, 4)
+		self.logger.error.assert_called_once()
+		self.assertIn("403", str(self.logger.error.call_args))
+		self.assertTrue(error.fp.closed)
+		for value in (*forbidden, "fixture-bearer", "fixture-secret", "private response body"):
+			self.assertNotIn(value, str(self.logger.mock_calls))
 
 	def test_reuses_service_bearer_until_expiry(self):
 		self.open.side_effect = [

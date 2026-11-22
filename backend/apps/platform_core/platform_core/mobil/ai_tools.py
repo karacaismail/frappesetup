@@ -136,7 +136,7 @@ def _plan_revocation(account, installation_id=None):
 		for row in rows
 		if not row.revoked or is_session_closure_pending(row.session_id)
 	]
-	installation_ids = tuple(name for name, _ in targets)
+	installation_ids = tuple(name for name, _unused in targets)
 	if installation_id is not None and not installation_ids:
 		raise frappe.ValidationError(_("The mobile installation is unavailable."))
 	return RevocationPlan(
