@@ -27,11 +27,11 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 | `platform_core` | `kabuk` | Açılış verisi, kenar çubuğu verisi ve DocType tanımı uçları |
 | `press_tr` | `kimlik` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
 | `identity_sync` | Yok | Keycloak ile Press ve kiracı siteleri arasında kullanıcı eşitleme |
-| `oidc_dogrulama` | Yok | Belirteç doğrulama. Frappe'ye bağlı değildir. |
+| `oidc_verify` | Yok | Belirteç doğrulama. Frappe'ye bağlı değildir. |
 
 ## Bağımlılık yönü
 
-- `platform_core.kimlik` ve `press_tr.kimlik` yalnız `oidc_dogrulama` kitaplığını kullanır.
+- `platform_core.kimlik` ve `press_tr.kimlik` yalnız `oidc_verify` kitaplığını kullanır.
 - `platform_core.kabuk` ile `platform_core.kimlik` birbirini çağırmaz.
 - `identity_sync` sitelerin açık uçlarını HTTP ile çağırır. Siteler `identity_sync` kodunu çağırmaz.
 - Döngü yasaktır. MVP'de bu yönler otomatik denetlenir (B-10).
@@ -62,6 +62,16 @@ Kararlar 22 Kasım 2026 Pazar günü Pane kartıyla alındı.
   - Marka adı ve alan adı ayardan gelir. Kodda sabit yazılmaz.
 - **D-5. Son kullanıcı yalnız ayrı arayüzü görür.** Son kullanıcının türü “Website User” olur (Karar 10, G-16).
 - **D-6. Zamanlanmış iş kurulmaz.** Proje sahibi `cron` kurulumunu istemedi (V-9).
+
+## Orkestratörün seçtiği varsayılanlar
+
+Proje sahibi bu konularda karar vermedi. Orkestratör şu varsayılanları seçti. Proje sahibi bunları değiştirebilir.
+
+- **V-1. Ad dili.** Koddaki adlar İngilizcedir. Frappe ekosistemi bu dili kullanır.
+- **V-2. Mesaj dili.** Kaynak metin İngilizce yazılır. Türkçesi çeviri dosyasında durur (G-73).
+- **V-3. Modül adları.** Modül adları Türkçedir. Örneğin `kimlik` ve `kabuk` modülleri vardır.
+- **V-4. Ortak kitaplık.** Belirteç doğrulama tek kitaplıkta durur. `platform_core` ve `press_tr` aynı kodu kullanır (H-8).
+- **V-5. Container profili.** Geliştirme `colima-factory` profilinde yürür. Bu profilde daha çok bellek var.
 
 ## Açık kararlar ve çelişkiler
 

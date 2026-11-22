@@ -73,7 +73,7 @@ Realm politikaları G-78 ve G-144'ü uygular. Örneğin şu ayarlar vardır:
 
 ## 3. Belirteç doğrulama
 
-Bu kuralları `libs/oidc_dogrulama` kitaplığı uygular. `platform_core` ve `press_tr` bu kitaplığı kullanır.
+Bu kuralları `libs/oidc_verify` kitaplığı uygular. `platform_core` ve `press_tr` bu kitaplığı kullanır.
 
 ### Servis belirteci
 
@@ -95,6 +95,30 @@ Keycloak çıkışta `logout_token` gönderir. Doğrulamada şunları denetleyin
 - `events` içindeki `http://schemas.openid.net/event/backchannel-logout` anahtarı,
 - `sid` ya da `sub` değerinin varlığı,
 - `nonce` alanının yokluğu.
+
+### Kitaplığın arayüzü
+
+`press_tr` ve `platform_core` kitaplığı aynı anda kullanacak. Bu yüzden arayüz önceden belirlendi. Kitaplık Python 3.11 ve sonrasında çalışır. Frappe'ye bağlı değildir.
+
+```python
+from oidc_verify import (
+    JwksCache,
+    TokenError,
+    verify_access_token,
+    verify_id_token,
+    verify_logout_token,
+)
+
+cache = JwksCache(jwks_url, ttl_seconds=600)
+claims = verify_access_token(token, cache=cache, issuer=iss, audience="site-kiraci1", allowed_azp={"identity-sync"}, leeway=30)
+claims = verify_id_token(token, cache=cache, issuer=iss, client_id="press", nonce=nonce, leeway=30)
+claims = verify_logout_token(token, cache=cache, issuer=iss, client_id="press", leeway=30)
+```
+
+- Her işlev geçerli belirtecin alanlarını sözlük olarak döner.
+- Geçersiz belirteçte `TokenError` yükseltir. Hatanın `code` alanı nedeni söyler.
+- `code` değerleri şunlardır: `malformed`, `invalid_signature`, `unknown_kid`, `wrong_issuer`, `wrong_audience`, `wrong_azp`, `expired`, `not_yet_valid`, `wrong_nonce`, `not_logout_token`.
+- Kitaplık kimlik doğrulama sonucunu günlüğe yazmaz. Belirteci hiçbir yere yazmaz.
 
 ## 4. Kimlik bağı
 

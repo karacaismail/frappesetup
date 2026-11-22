@@ -36,7 +36,7 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `identity/keycloak/realm/` | Realm tanımı | kimlik-realm |
 | `identity/keycloak/themes/atonota/` | Atonota giriş teması | kimlik-tema |
 | `identity/identity_sync/` | Kullanıcı eşitleme servisi | identity-sync |
-| `libs/oidc_dogrulama/` | Ortak belirteç doğrulama kitaplığı | kimlik-realm |
+| `libs/oidc_verify/` | Ortak belirteç doğrulama kitaplığı | kimlik-realm |
 | `contracts/` | Uçların OpenAPI sözleşmeleri | Her uç kendi sahibinde |
 | `docs/`, `AGENTS.md`, `PROJE-KAYDI.md` | Talimat, kayıt ve sözleşme | Orkestratör |
 
