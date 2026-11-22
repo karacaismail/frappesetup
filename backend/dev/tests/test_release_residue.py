@@ -34,38 +34,6 @@ NAME_DIGESTS = {
     "8c16cba08149fcf9930855858704966ea3429ca407ba99b0564942b1dfd777aa",
 }
 
-# Temporary: site-kisi-adlari birleşince silinecek.
-# paradev/site-kisi-adlari replaces the names in exactly these site files.
-# Changing them here would break the Linux visual regression references.
-# Only the person-name check is skipped; every other check still runs.
-SITE_NAME_EXEMPT = {
-    "scripts/gen-diagrams.py",
-    "src/components/Rails.astro",
-    "src/content/docs/acik-kararlar.md",
-    "src/content/docs/admin-shell.md",
-    "src/content/docs/ai-bakis.md",
-    "src/content/docs/ai-gelistirme.md",
-    "src/content/docs/ai-mcp.md",
-    "src/content/docs/ai-press-yetkinlik.md",
-    "src/content/docs/gereksinimler.md",
-    "src/content/docs/izlenebilirlik.md",
-    "src/content/docs/kalite-kurallari.md",
-    "src/content/docs/kararlar.md",
-    "src/content/docs/olcum-gozlem.md",
-    "src/content/docs/paylasim-url.md",
-    "src/content/docs/rail-1-press.md",
-    "src/content/docs/rail-2-gelistirme.md",
-    "src/content/docs/rail-2-yapilandirma.md",
-    "src/content/docs/rail-4-keycloak.md",
-    "src/content/docs/rail-5-ai.md",
-    "src/content/docs/rail-6-operasyon.md",
-    "src/content/docs/raylar.md",
-    "src/content/docs/yol-haritasi.md",
-    "src/data/phases.json",
-    "src/data/requirements.json",
-    "src/pages/index.astro",
-}
-
 HOME_PATH = re.compile(
     r"/Users/[A-Za-z]"
     r"|/home/(?!frappe\b)[a-z]"
@@ -162,11 +130,10 @@ def scan_text(name, text):
     for number, line in enumerate(text.splitlines(), 1):
         if HOME_PATH.search(line):
             findings.append(("home-path", number))
-        if name not in SITE_NAME_EXEMPT:
-            words = re.findall(r"\w+", normalise(line))
-            pairs = (f"{a} {b}" for a, b in zip(words, words[1:]))
-            if any(hashlib.sha256(pair.encode()).hexdigest() in NAME_DIGESTS for pair in pairs):
-                findings.append(("person-name", number))
+        words = re.findall(r"\w+", normalise(line))
+        pairs = (f"{a} {b}" for a, b in zip(words, words[1:]))
+        if any(hashlib.sha256(pair.encode()).hexdigest() in NAME_DIGESTS for pair in pairs):
+            findings.append(("person-name", number))
         for match in EMAIL.finditer(line):
             if not RESERVED_DOMAIN.search(match.group(1)):
                 findings.append(("email", number))
@@ -268,18 +235,6 @@ class FileListTest(unittest.TestCase):
         (inner / "README.md").write_text("plain\n", encoding="utf-8")
         with self.assertRaisesRegex(RuntimeError, "Git root"):
             list(tracked_files(inner))
-
-
-class ExemptionTest(unittest.TestCase):
-    def test_exempt_files_still_get_every_other_check(self):
-        sample = "/" + "Users/someone/x kisi@" + "gercek-alan.com.tr +90 " + "532 481 27 36 AKIA" + "B" * 16
-        for name in sorted(SITE_NAME_EXEMPT):
-            kinds = {kind for kind, _ in scan_text(name, sample)}
-            self.assertEqual(kinds, {"home-path", "email", "phone", "secret"}, name)
-
-    def test_exempt_entries_are_real_files(self):
-        for name in sorted(SITE_NAME_EXEMPT):
-            self.assertTrue((REPO / name).is_file(), name)
 
 
 class ReleaseResidueTest(unittest.TestCase):
