@@ -5,7 +5,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 from werkzeug.datastructures import Headers
-from werkzeug.wrappers import Response
+from werkzeug.wrappers import Request, Response
 
 from platform_core.hooks import doc_events
 
@@ -30,16 +30,24 @@ class TestShellPermissionHooks(IntegrationTestCase):
 	def test_security_header_hook_preserves_existing_csp(self):
 		from platform_core.shell.headers import add_security_headers
 
-		name = "Content-Security-Policy"
-		policy = "default-src 'none'"
-		for apply_pending in (False, True):
-			with self.subTest(apply_pending=apply_pending):
-				response = Response(headers={} if apply_pending else {name: policy})
-				pending = Headers({name.lower(): policy} if apply_pending else {})
-				with patch.object(frappe.local, "response_headers", pending, create=True):
-					add_security_headers(response)
-				self.assertEqual(response.headers.getlist(name), [] if apply_pending else [policy])
-				self.assertEqual(pending.getlist(name), [policy] if apply_pending else [])
+		existing_headers = {"Content-Security-Policy": "default-src 'none'", "X-Frame-Options": "SAMEORIGIN"}
+		for request in (None, Request.from_values(path="/login")):
+			for apply_pending in (False, True):
+				with self.subTest(request=request, apply_pending=apply_pending):
+					response = Response(headers={} if apply_pending else existing_headers)
+					pending = Headers(
+						{key.lower(): header_value for key, header_value in existing_headers.items()}
+						if apply_pending
+						else {}
+					)
+					with patch.object(frappe.local, "response_headers", pending, create=True):
+						add_security_headers(response, request=request)
+					for name, header_value in existing_headers.items():
+						with self.subTest(header=name):
+							self.assertEqual(
+								response.headers.getlist(name), [] if apply_pending else [header_value]
+							)
+							self.assertEqual(pending.getlist(name), [header_value] if apply_pending else [])
 
 	def test_installed_auth_guard_follows_credentials_hooks(self):
 		hooks = frappe.get_hooks("auth_hooks")
