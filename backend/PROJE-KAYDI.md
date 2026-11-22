@@ -81,7 +81,9 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
 - **D-12. Yeni kod İngilizce adlarla yazılır.** Proje sahibi şöyle yazdı: “yeni dosya oluşturursen, türkçe değil, codebase ingilizce olsun, dosya adları ingilizce olsun”. Sonra şunu ekledi: “bundan sonrası için öylemiştim, geçmiş için değil.” Bu kararın uygulanışı şudur:
   - Bundan sonra oluşturulan dosya, klasör, modül, DocType, işlev ve değişken adları İngilizce olur.
   - Yeni yazılan koddaki yorumlar, hata iletileri ve günlük metinleri İngilizce olur.
-  - Var olan dosya, klasör ve modül adları değişmez. Örneğin `kimlik`, `kabuk` ve `PROJE-KAYDI.md` adları kalır.
+  - Bu madde Karar 40 ile değişti (proje sahibinin karar dosyası). Eski adlar da kurallara göre düzeltilir. Düzeltmeyi yalnız naming-history-fix işinin ortak betiği yapar (D-14). Öteki işçiler adları elle değiştirmez.
+  - Bütün kod adları İngilizce ve yalnız ASCII olur. Değişken, sabit, `class`, `id`, DocType, modül, alan, Select seçeneği, iş akışı durumu, çeviri anahtarı, API alanı ve dosya adı bu kapsamdadır.
+  - Görünen metnin kaynağı İngilizcedir. Python'da `frappe._`, JavaScript'te `__()` zorunludur. DocType JSON etiketleri de İngilizce yazılır. Türkçesi çeviri dosyasındadır.
   - Var olan bir klasörün içine yeni dosya eklenince yalnız yeni dosyanın adı İngilizce olur.
   - Kullanıcıya görünen yeni metnin kaynağı İngilizcedir. Türkçesi çeviri dosyasında durur (V-2).
 - **D-13. Başka bir projenin ürün adı bu depoda yasaktır.** Proje sahibi bu kararı 22 Kasım 2026 Pazar günü verdi. Ad bu projeyle ilgili değildir. Ad bir ajan tarafından yanlışlıkla belgelere eklenmişti.
@@ -109,7 +111,7 @@ Proje sahibi bu konularda karar vermedi. Orkestratör şu varsayılanları seçt
 
 - **V-1. Ad dili.** Koddaki adlar İngilizcedir. Frappe ekosistemi bu dili kullanır.
 - **V-2. Mesaj dili.** Kaynak metin İngilizce yazılır. Türkçesi çeviri dosyasında durur (G-73).
-- **V-3. Modül adları.** Var olan modül adları Türkçedir. Yeni modül adları D-12 gereği İngilizcedir. Örneğin `kimlik` ve `kabuk` modülleri vardır.
+- **V-3. Modül adları.** Modül adları İngilizcedir (Karar 40). Var olan Türkçe modül adlarını naming-history-fix işi değiştirir.
 - **V-4. Ortak kitaplık.** Belirteç doğrulama tek kitaplıkta durur. `platform_core` ve `press_tr` aynı kodu kullanır (H-8).
 - **V-5. Container profili.** Geliştirme `colima-factory` profilinde yürür. Bu profilde daha çok bellek var.
 

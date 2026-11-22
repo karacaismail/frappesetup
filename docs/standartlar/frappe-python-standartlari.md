@@ -130,9 +130,9 @@ MVC, model, görünüm ve denetleyici görevlerini ayıran bir yaklaşımdır. D
 
 **M-7 (ZORUNLU).** Olağan uç adresi işlevin tam Python adını kullanır. Adres değişirse A-6'yı uygulayın. Python yamasında `execute` tanımlayın. Olağan yükseltme için yamayı `patches.txt` dosyasına ekleyin. Yama bölümünü Python dışı belgeden seçin.
 
-**M-8 (ZORUNLU).** Projenin ad, girinti ve biçim kurallarına uyun. Tanımlı biçimlendiriciyi yalnız değişen dosyada çalıştırın. Biçim denetiminde R-10'u uygulayın.
+**M-8 (ZORUNLU).** Kod adlarını İngilizce ve ASCII yazın. Görünen metni İngilizce yazın ve `frappe._` ile sarın. Projenin ad, girinti ve biçim kurallarına uyun. Tanımlı biçimlendiriciyi yalnız değişen dosyada çalıştırın. Biçim denetiminde R-10'u uygulayın.
 
-**ÖNERİLİR.** Modülün dosya düzenini ve mevcut yama klasörünü izleyin. Yazım kuralı yoksa yakın kodu veya PEP 8'i izleyin. İşlevi küçük tutun. Açık adlar kullanın. Girdi ve dönüş türünü yazın. İşlev başındaki açıklamaya docstring denir. Gerekirse amacı, yan etkiyi ve nedeni yazın. Çeviri için `frappe._` kullanın. Günlük kuralı yoksa `frappe.logger` işlevine bakın.
+**ÖNERİLİR.** Modülün dosya düzenini ve mevcut yama klasörünü izleyin. Yazım kuralı yoksa yakın kodu veya PEP 8'i izleyin. İşlevi küçük tutun. Açık adlar kullanın. Girdi ve dönüş türünü yazın. İşlev başındaki açıklamaya docstring denir. Gerekirse amacı, yan etkiyi ve nedeni yazın. Günlük kuralı yoksa `frappe.logger` işlevine bakın.
 
 ### Alan planı, modül sınırı ve düşük bağımlılık
 
