@@ -11,6 +11,7 @@ class SqlAccessTests(unittest.TestCase):
             "frappe.local.db._conn",
             "getattr(frappe.db, '_cursor')",
             "database._conn",
+            "frappe.db.get_connection().cursor()",
         ):
             with self.subTest(expression=expression):
                 tree = ast.parse(f"database = frappe.db\nconnection = {expression}\n")
