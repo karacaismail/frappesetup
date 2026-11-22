@@ -390,6 +390,21 @@ Proje kaydı Keycloak kullanıcı kimliğini kişisel veri sayar. Servisin kayı
 - Günlük e-posta, belirteç ve oturum kimliği yazmaz.
 - Mutabakat raporu e-posta taşımaz. Kullanıcıyı Keycloak kimliğiyle anar.
 
+## Eksik işlerin kanıtları
+
+### Olay alıcısının canlı denemesi
+
+22 Kasım 2026 Pazar günü gerçek Keycloak olay eklentisiyle deneme yapıldı.
+Geçerli olay 202 aldı. Bozuk imza ve eski zaman damgası 401 aldı.
+Deneme `48974c6` kaydında belgelendi. Press ve kiracı hedefleri bu denemede sahtedir.
+Güncel otomatik kontroller `tests/test_server.py` dosyasındadır:
+
+- `test_signature_made_by_the_fork_is_accepted`
+- `test_broken_fork_signature_is_rejected`
+- `test_old_fork_timestamp_is_rejected`
+
+Bu testler canlı ortam denemesinin yerine geçmez. Canlı ortam bu çalışma sırasında yeniden açılmadı.
+
 ## Testler
 
 Testleri `backend/identity/identity_sync` klasöründe çalıştırın:
