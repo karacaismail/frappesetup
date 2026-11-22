@@ -234,6 +234,10 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Press çıkış bildirim ucunda imzası doğrulanan bildirim sayaca girmez. Reddedilen bildirim dakikada 120 ile sınırlıdır. Sözleşme bu kuralı yazar. Uç denetimi bu ucu kodla eşleşen istisnayla kabul eder.
   - Semgrep istisna özeti yalnız Git'in izlediği ve yok saymadığı dosyalardan hesaplanır. Böylece geliştiricinin ön bellek klasörü özeti değiştirmez.
   - Bandit istisna listeleri birleşirken iki taraf korunur. Kod imzası artık eşleşmeyen kayıtları güvenlik işi sonraki taramada temizler.
+- **O-38. identity-sync'te kiracı ve platform yetkisi ayrıdır.** Bir kiracının servis istemcisi bütün platformun kuyruğunu yeniden oynatabiliyordu. Bu açık şöyle kapanır:
+  - Kiracı servis istemcisi yürütme yetkisini korur. Yetki yalnız kendi kuruluşu içindir. Örneğin kendi kuruluşuna kullanıcı davet eder.
+  - Mutabakat, kuyruk yeniden oynatma ve platform listeleri yeni `IDENTITY_SYNC_OPERATOR_AZP` listesindeki istemcinindir.
+  - Operatör, önizleme ve silme listelerinde `site-` ile başlayan istemci olmaz. Ayrıntı sözleşmenin 7. bölümündedir.
 
 ## Karar sitesine işlenecek farklar
 
