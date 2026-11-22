@@ -91,3 +91,11 @@
   code: PLT AI Manager
   scope: platform_core role
   definition_tr: Bu rol model geçidi ayarlarını yönetebilir.
+- term_tr: İptal edilen telefon oturumu
+  code: plt_mobile_revoked_session
+  doctype: PLT Mobile Revoked Session
+  definition_tr: Bu kayıt iptal edilen oturumu tanır.
+- term_tr: Yapay zekâ yolu hedefi
+  code: plt_ai_route_target
+  doctype: PLT AI Route Target
+  definition_tr: Bu kayıt bir model yolunun hedefini tanımlar.

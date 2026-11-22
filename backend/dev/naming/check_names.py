@@ -48,7 +48,7 @@ PYTHON_COPY_CALLS = {"frappe._", "__", "frappe.throw", "frappe.msgprint", "msgpr
 JSON_STRING = re.compile(r'"(?:\\.|[^"\\])*"')
 JS_STRING = r"""(?:"(?:\\.|[^"\\\r\n])*"|'(?:\\.|[^'\\\r\n])*'|`(?:\\.|[^`\\])*`)"""
 JS_REGEX = (
-    r"(?:(?<=[({=,:;!?])|(?<=return)|(?<=throw))\s*/(?![/*])"
+    r"(?:(?<=[({=,:;!?])|(?<==>)|(?<=return)|(?<=throw))\s*/(?![/*])"
     r"(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\[\r\n])+/[a-z]*"
 )
 JS_TOKENS = re.compile(

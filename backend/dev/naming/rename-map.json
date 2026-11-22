@@ -6266,5 +6266,121 @@
     "paths": [
       "backend/dev/tests/test_gateway_decision.py"
     ]
+  },
+  {
+    "old": "platform_core\\.erisim",
+    "new": "platform_core\\.access",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/tests/test_static_files.py"
+    ]
+  },
+  {
+    "old": "platform_core.erisim.api",
+    "new": "platform_core.access.api",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/tests/test_static_files.py"
+    ]
+  },
+  {
+    "old": "platform_core.erisim.tests.performance.measure",
+    "new": "platform_core.access.tests.performance.measure",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/tests/performance.py"
+    ]
+  },
+  {
+    "old": "platform_core.yapay_zeka.retention.purge",
+    "new": "platform_core.ai.retention.purge",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/retention.py",
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "platform_core.model_gecidi.api.purge_usage",
+    "new": "platform_core.model_gateway.api.purge_usage",
+    "type": "module",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "TestKabukBoundary",
+    "new": "TestShellBoundary",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/kabuk/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "kabuk",
+    "new": "shell",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/kabuk/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_revoked_session/mobile_revoked_session.json",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_revoked_session/plt_mobile_revoked_session.json",
+    "type": "path"
+  },
+  {
+    "old": "mobile_revoked_session.json",
+    "new": "plt_mobile_revoked_session.json",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/*"
+    ]
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_revoked_session/mobile_revoked_session.py",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_revoked_session/plt_mobile_revoked_session.py",
+    "type": "path"
+  },
+  {
+    "old": "mobile_revoked_session.py",
+    "new": "plt_mobile_revoked_session.py",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/*"
+    ]
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_revoked_session",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_revoked_session",
+    "type": "path"
+  },
+  {
+    "old": "Mobile Revoked Session",
+    "new": "PLT Mobile Revoked Session",
+    "type": "doctype"
+  },
+  {
+    "old": "tabMobile Revoked Session",
+    "new": "tabPLT Mobile Revoked Session",
+    "type": "doctype"
+  },
+  {
+    "old": "MobileRevokedSession",
+    "new": "PLTMobileRevokedSession",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/*"
+    ]
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_revoked_session",
+    "new": "platform_core.mobile.doctype.plt_mobile_revoked_session",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_revoked_session.mobile_revoked_session",
+    "new": "platform_core.mobile.doctype.plt_mobile_revoked_session.plt_mobile_revoked_session",
+    "type": "reference"
   }
 ]

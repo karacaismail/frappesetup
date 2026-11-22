@@ -262,3 +262,13 @@ class NamingGateTests(unittest.TestCase):
         status, findings = self.gate_findings("--changed-files")
         self.assertEqual(status, 1)
         self.assertEqual([Path(item["path"]).name for item in findings], ["changed.py"])
+
+    def test_arrow_callback_regex_is_not_treated_as_code_names(self):
+        self.write(
+            self.root / "backend/identity/security.spec.ts",
+            "const matches = lines.filter((line) => /[çğıöşüÇĞİÖŞÜ]|Kullanım|Yalnız/.test(line));\n"
+            "const kullanım = matches.length;\n",
+        )
+        _, findings = self.gate_findings()
+        relevant = [item for item in findings if item["rule"] == "turkish-name"]
+        self.assertEqual([item["line"] for item in relevant], [2])

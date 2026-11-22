@@ -624,3 +624,76 @@ class RenameTests(unittest.TestCase):
         ):
             self.assertIn(item, output)
         self.assertEqual(other.read_text(), "tags: [arama]\n")
+
+    def test_scoped_module_paths_in_access_and_ai_text(self):
+        access = "backend/apps/platform_core/platform_core"
+        paths = (
+            (
+                f"{access}/erisim/tests/test_static_files.py",
+                f"{access}/access/tests/test_static_files.py",
+                'ENGINE_PATH = re.compile(r"platform_core\\.erisim(?:\\.\\w+)+")\n'
+                '"""Other modules call `platform_core.erisim.api`."""\n',
+                "platform_core\\.access",
+                "`platform_core.access.api`",
+            ),
+            (
+                f"{access}/erisim/tests/performance.py",
+                f"{access}/access/tests/performance.py",
+                '"""    bench --site <site> execute platform_core.erisim.tests.performance.measure\n"""\n',
+                "execute platform_core.access.tests.performance.measure",
+            ),
+            (
+                f"{access}/yapay_zeka/retention.py",
+                f"{access}/ai/retention.py",
+                '"""Run `bench --site <site> execute platform_core.yapay_zeka.retention.purge`."""\n',
+                "execute platform_core.ai.retention.purge",
+            ),
+            (
+                "backend/contracts/platform_core-yapay-zeka.openapi.yaml",
+                "backend/contracts/platform_core-ai.openapi.yaml",
+                "description: |\n  Call `platform_core.model_gecidi.api.purge_usage`.\n"
+                "  Run `bench --site <site> execute platform_core.yapay_zeka.retention.purge`.\n"
+                "  Keep this example `platform_core.erisim`.\n",
+                "`platform_core.model_gateway.api.purge_usage`",
+                "execute platform_core.ai.retention.purge",
+                "Keep this example `platform_core.erisim`.",
+            ),
+        )
+        for old_path, _, source, *_ in paths:
+            self.write(old_path, source)
+        self.git("add", ".")
+        outcome = self.rename(None)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+        for _, new_path, _, *expected in paths:
+            with self.subTest(path=new_path):
+                output = (self.root / new_path).read_text()
+                for part in expected:
+                    self.assertIn(part, output)
+
+    def test_move_removes_only_empty_old_directories(self):
+        self.write("backend/stale/empty/app.py", "pass\n")
+        self.write("backend/stale/keep/app.py", "pass\n")
+        self.git("add", ".")
+        helper = self.write("backend/stale/keep/local.txt", "keep\n")
+        rules = [{"old": "backend/stale", "new": "backend/current", "type": "path"}]
+        outcome = self.rename(rules)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+        self.assertFalse((self.root / "backend/stale/empty").exists())
+        self.assertEqual(helper.read_text(), "keep\n")
+
+    def test_revoked_session_record_hook_and_controller_rename_together(self):
+        app = "backend/apps/platform_core/platform_core"
+        directory = f"{app}/mobil/doctype/mobile_revoked_session"
+        self.write(f"{directory}/mobile_revoked_session.json", '{"name":"Mobile Revoked Session"}\n')
+        self.write(f"{directory}/mobile_revoked_session.py", "class MobileRevokedSession:\n    pass\n")
+        hook = self.write(f"{app}/hooks.py", 'ai_write_closed_doctypes = ["Mobile Revoked Session"]\n')
+        self.git("add", ".")
+        outcome = self.rename(None)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+        target = self.root / app / "mobile/doctype/plt_mobile_revoked_session"
+        self.assertEqual(
+            json.loads((target / "plt_mobile_revoked_session.json").read_text())["name"],
+            "PLT Mobile Revoked Session",
+        )
+        self.assertIn("class PLTMobileRevokedSession", (target / "plt_mobile_revoked_session.py").read_text())
+        self.assertIn('"PLT Mobile Revoked Session"', hook.read_text())

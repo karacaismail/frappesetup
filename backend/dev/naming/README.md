@@ -2,10 +2,22 @@
 
 ## İkinci kontrol noktası
 
-Orkestratör, birleşimler bitince Pane oturumundan çalışır.
+Orkestratör, geçiş onayı gelince Pane oturumundan çalışır.
 Depo kökünde Python 3.14 kullanır. İlk denemede kapı `advisory` kipinde kalır.
 
-### 1. Kuru çalıştırma
+### 1. Taban dalını hazırlama
+
+Orkestratör, geçiş onayı gelince önce `backend` dalını hazırlar.
+Sürücü `backend` ve `main` kopyalarında Git kaydı oluşturmaz.
+Karar notunun “Orkestratör” bölümündeki komutları kullanın.
+Notu geçişten önce `backend/docs/kararlar/0009-naming-history-fix.md` yolunda bulursunuz.
+Geçişten sonra not `backend/docs/decisions/0009-naming-history-fix.md` yoluna taşınır.
+O bölüm, belge yamasını, ad betiğini ve denetimleri sırayla çalıştırır.
+Yama `backend/dev/naming/docs-rename.patch` yolundadır.
+Denetim kalırsa taban kaydını oluşturmayın.
+İşçi dalları bu tabanı alınca 2. adımdaki denemeyi çalıştırın.
+
+### 2. Kuru çalıştırma
 
 Orkestratör depo kökünde şu komutu çalıştırır.
 
@@ -16,20 +28,11 @@ python3.14 -B backend/dev/naming/run_cp2.py > "$PANE_SCRATCH_DIR/cp2-dry.json"
 Orkestratör rapordaki `backend` ve `head` kayıtlarını kontrol eder.
 Sürücü yalnız Git'te kayıtlı içeriği kopyalar. Bekleyen yerel düzenlemeleri almaz.
 Sürücü `backend/dev/tests` testlerini çalıştırır. Gerekirse test komutunu `--` sonrasına yazın.
-Rapor durma nedenini gösterir. Bir dal eksikse veya test kalırsa önce sahibi düzeltir.
+Rapor durma nedenini gösterir. Bir dal eksikse veya test kalırsa sahibi durma nedenini bildirir.
 Sürücü hata varsa 1 koduyla çıkar. Diğer dalların sonucu da aynı raporda kalır.
+Eski modül atfı kalırsa işçi dosya ve satırı adlandırma işine bildirir.
+İşçi eski adı elle değiştirmez. Adlandırma işi dar kuralı hazırlar.
 Kuru çalıştırma kopyaları sonunda silinir.
-
-### 2. Taban dalını hazırlama
-
-Orkestratör, geçiş onayı gelince önce `backend` dalını hazırlar.
-Sürücü `backend` ve `main` kopyalarında Git kaydı oluşturmaz.
-Karar notunun “Orkestratör” bölümündeki komutları kullanın.
-Notu geçişten önce `backend/docs/kararlar/0009-naming-history-fix.md` yolunda bulursunuz.
-Geçişten sonra not `backend/docs/decisions/0009-naming-history-fix.md` yoluna taşınır.
-O bölüm, belge yamasını, ad betiğini ve denetimleri sırayla çalıştırır.
-Denetim kalırsa taban kaydını oluşturmayın.
-İşçi dalları bu tabanı alınca 1. adımdaki denemeyi tekrarlayın.
 
 ### 3. Geçici Git kayıtlarını oluşturma
 
@@ -63,7 +66,7 @@ cp2_target_commit="$(git rev-parse HEAD)"
 ```
 
 Geri dönüş için `cp2_target_commit` değerini rapora yazın.
-Dal ucu değiştiyse yeni kopyayla 1. adıma dönün.
+Dal ucu değiştiyse yeni kopyayla 2. adıma dönün.
 Yalnız bütün dallar ve kapı hazır olunca orkestratör `enforce` kipini açar.
 
 ### 5. Geri dönüş

@@ -107,10 +107,12 @@ test -z "$(git status --porcelain=v1 --untracked-files=all)" &&
   python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD" --dry-run
 ```
 
-Önizlemeyi inceleyin. Onaylı belge yamasının yolunu `cp2_docs_patch` değişkenine koyun.
+Önizlemeyi inceleyin. Onaylı yama `backend/dev/naming/docs-rename.patch` yolundadır.
+Taban değişmişse ve yama denetimi kalırsa adlandırma işi yamayı yeniler.
 Ardından aşağıdaki komutları tek blok olarak çalıştırın.
 
 ```sh
+cp2_docs_patch="${cp2_docs_patch:-backend/dev/naming/docs-rename.patch}"
 test -z "$(git status --porcelain=v1 --untracked-files=all)" &&
   git apply --check "$cp2_docs_patch" &&
   git apply "$cp2_docs_patch" &&
@@ -149,6 +151,9 @@ Komut genel ad kurallarının bulgularını uyarı olarak gösterir.
 Tüm denetimler geçerse komut değişiklikleri tek Git kaydına alır.
 Denetim durursa değişiklikler inceleme için çalışma ağacında kalır.
 Yeni değişiklik yoksa komut yeni Git kaydı oluşturmaz.
+Eski modül atfı kalırsa işçi dosya ve satırı adlandırma işine bildirir.
+İşçi eski adı elle değiştirmez. Adlandırma işi dar kuralı ekler.
+İşçi güncel kuralla temiz kopyada denemeyi tekrarlar.
 
 İş yarıda kesilirse önce `git status` ve `git diff HEAD` çalıştırın.
 Yalnız geçişe ait kaydedilmemiş değişiklikler varsa bunları geri alabilirsiniz.
@@ -208,3 +213,5 @@ python3.14 backend/dev/naming/apply_renames.py --repo "$PWD" --report-docs
 
 Bir dal eski proje kaydına ya da sözleşmeye satır eklediyse çakışma çıkabilir.
 İşçi eklediği satırı yeni dosyaya taşır. Eski yoldaki bağlantıyı korur.
+Taşınan bir klasöre yeni dosya eklenmişse dosyayı yeni klasör yoluna alın.
+İki dal aynı kod satırını değiştirdiyse ilgili sahipler iki değişikliği karşılaştırır.

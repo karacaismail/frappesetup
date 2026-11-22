@@ -8,10 +8,6 @@
     "line_text": "\"\"\"Other modules call the gate through `platform_core.erisim.api`.\"\"\""
   },
   {
-    "path": "backend/apps/platform_core/platform_core/ai/retention.py",
-    "line_text": "- `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs \"{'older_than_days': 365}\"`"
-  },
-  {
     "path": "backend/apps/platform_core/platform_core/ai/tests/base.py",
     "line_text": "The real gate is `platform_core.erisim.api.report_guard`. Without it the report tool is closed."
   },
@@ -102,10 +98,6 @@
   {
     "path": "backend/contracts/platform_core-ai.openapi.yaml",
     "line_text": "Bu sözleşme `platform_core.yapay_zeka` modülünün uçlarını tarif eder."
-  },
-  {
-    "path": "backend/contracts/platform_core-ai.openapi.yaml",
-    "line_text": "`bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs \"{'older_than_days': 365}\"`."
   },
   {
     "path": "backend/contracts/platform_core-identity.openapi.yaml",

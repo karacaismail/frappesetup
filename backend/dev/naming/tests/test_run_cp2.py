@@ -27,6 +27,8 @@ class DriverReadmeTests(unittest.TestCase):
         self.assertIn('test "$(git rev-parse HEAD)" = "$cp2_head"', instructions)
         self.assertIn("git cherry-pick --abort", instructions)
         self.assertIn("git revert --abort", instructions)
+        self.assertLess(instructions.index("### 1. Taban dalını hazırlama"), instructions.index(dry_run))
+        self.assertTrue((NAMING / "docs-rename.patch").is_file())
         for key in ("head", "copy", "commit", "copies"):
             self.assertIn(f"`{key}`", instructions)
 

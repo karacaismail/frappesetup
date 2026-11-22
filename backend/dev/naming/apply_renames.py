@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
+import errno
 import io
 import json
 import os
@@ -31,6 +32,7 @@ COPY_KEYS = r"label|description|summary|help_text|message|placeholder|title"
 TECHNICAL = re.compile(r"[\w./:%@{}$?&=\\+*-]+")
 QUOTED = r"""(?:"(?:\\.|[^"\\\r\n])*"|'(?:\\.|[^'\\\r\n])*')"""
 JS_REGEX = r"(?<=[(=,:;!])\s*/(?![/*])(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\n])+/[a-z]*"
+SCOPED_MODULE_REFERENCE = re.compile(r"`[\w./-]+`|[A-Za-z_]\w*(?:\\?\.[A-Za-z_]\w*)+")
 
 
 @dataclass(frozen=True)
@@ -164,14 +166,13 @@ def rewrite_source(source: str, rules: tuple[Rule, ...], path: str) -> str:
     bare_modules = {rule.old for rule in rules if bare_module(rule)} - identifier_names
     exact_fstrings = {rule.old for rule in rules if rule.paths and ('f"' in rule.old or "f'" in rule.old)}
     suffix = PurePosixPath(path).suffix
-    inline_module_paths = {
+    scoped_module_references = {
         rule.old
         for rule in rules
         if rule.type == "module"
         and rule.paths
-        and ("/" in rule.old or "." in rule.old)
-        and re.fullmatch(r"`[\w./-]+`", rule.old)
-        and re.fullmatch(r"`[\w./-]+`", rule.new)
+        and SCOPED_MODULE_REFERENCE.fullmatch(rule.old)
+        and SCOPED_MODULE_REFERENCE.fullmatch(rule.new)
     }
     spans = []
     if suffix == ".py":
@@ -227,13 +228,17 @@ def rewrite_source(source: str, rules: tuple[Rule, ...], path: str) -> str:
         for start, end, value, protected in spans:
             if match.start() >= end or match.end() <= start:
                 continue
+            if (
+                suffix in {".py", ".yaml", ".yml"}
+                and old in scoped_module_references
+                and start <= match.start() <= match.end() <= end
+            ):
+                return new
             if protected:
                 if old in exact_fstrings and match.start() <= start and match.end() >= end:
                     continue
                 return old
             if match.start() >= start and match.end() <= end:
-                if suffix == ".py" and old in inline_module_paths:
-                    return new
                 if old == value:
                     matched_literal = True
                 if match.span() == (start, end) or (
@@ -646,12 +651,35 @@ def stage_addition(root: Path, path: str, content: bytes) -> None:
 
 
 def report_untracked(root: Path, rules: tuple[Rule, ...]) -> None:
-    paths = git(root, "ls-files", "-z", "--others", "--directory", "--", "backend/").split(b"\0")
+    paths = git(
+        root, "ls-files", "-z", "--others", "--directory", "--no-empty-directory", "--", "backend/"
+    ).split(b"\0")
     old_paths = tuple(rule.old for rule in rules if rule.type == "path")
     for path in filter(None, paths):
         relative_path = os.fsdecode(path).rstrip("/")
         if any(under(relative_path, old) for old in old_paths):
             print(f"left untracked {relative_path}")
+
+
+def remove_empty_old_directories(root: Path, changes: list[Change], rules: tuple[Rule, ...]) -> None:
+    old_paths = {rule.old for rule in rules if rule.type == "path"}
+    parents = {
+        parent
+        for change in changes
+        if change.source != change.target
+        for parent in PurePosixPath(change.source).parents
+        if any(under(parent.as_posix(), old) for old in old_paths)
+    }
+    for parent in sorted(parents, key=lambda path: (len(path.parts), str(path)), reverse=True):
+        check_ancestors(root, parent.as_posix())
+        path = root / parent
+        if path.is_symlink() or not path.is_dir():
+            continue
+        try:
+            path.rmdir()
+        except OSError as error:
+            if error.errno not in {errno.ENOTEMPTY, errno.EEXIST, errno.ENOENT}:
+                raise
 
 
 def run(root: Path, changes: list[Change], additions: dict[str, bytes], dry_run: bool) -> None:
@@ -729,6 +757,8 @@ def main() -> int:
         if args.dry_run:
             report_untracked(root, rules)
         run(root, changes, additions, args.dry_run)
+        if not args.dry_run:
+            remove_empty_old_directories(root, changes, rules)
     except (OSError, ValueError, SyntaxError, tokenize.TokenError, csv.Error) as error:
         print(f"Naming update stopped: {error}", file=sys.stderr)
         return 1
