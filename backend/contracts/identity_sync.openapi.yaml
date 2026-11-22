@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.3.0
+  version: 0.4.0
   summary: Kullanıcı eşitleme servisinin uçları
   description: |
     Bu servis Keycloak'taki kullanıcı değişikliklerini Press'e ve kiracı sitelerine taşır (G-81).
@@ -276,30 +276,67 @@ paths:
   /v1/reconcile:
     post:
       operationId: runReconcile
-      summary: Keycloak, Press ve kiracı kullanıcılarını karşılaştırır.
+      summary: Keycloak, Press ve kiracı kullanıcılarını karşılaştırır ve farkı düzeltir.
       description: |
         Bu uç mutabakat komutunun HTTP karşılığıdır. Komut `reconcile` adını taşır.
-        Uç yalnız okur ve farkı raporlar. Hiçbir kaydı değiştirmez.
-        Keycloak doğruluk kaynağıdır.
-        Yanıt e-posta taşımaz. Kullanıcıyı `sub` kimliğiyle anar.
         Uç zamanlanmaz. Yalnız çağrılınca çalışır.
-        Önizleme listesindeki ve yürütme listesindeki istemciler bu ucu çağırabilir.
+        Keycloak doğruluk kaynağıdır.
+
+        Önizleme isteği `dry_run: true` taşır. Servis yalnız okur.
+        Yanıt farkları, düzeltme işlerinin önizlemesini ve `preview_digest` değerini taşır.
+        Yanıt e-posta taşımaz. Kullanıcıyı `sub` kimliğiyle anar.
+        Önizleme listesindeki ve yürütme listesindeki istemciler önizleme isteyebilir.
+
+        Düzeltme isteği `dry_run: false` taşır. Düzeltmeyi yalnız onay katmanı başlatır.
+        İstek `preview_digest` ve `approval_id` alanlarını taşımalıdır.
+        Servis planı iş kilidi altında yeniden hesaplar.
+        Plan onaylanan planla birebir aynı değilse servis 409 döner ve hiçbir şey yazmaz.
+        Bu uç yıkıcı iş yapabilir. Örneğin Keycloak'ta kapalı kullanıcıyı kiracıda kapatır.
+
+        Servis her işi dener ve her işin sonucunu ayrı bildirir.
+        Sonuç `done`, `failed` ya da `unknown` olur. Belirsiz sonuç yeniden denenmez.
+        Kalan fark bir sonraki önizlemede yine görünür.
+
+        Bazı farkların güvenli bir düzeltmesi yoktur. Servis bunları yalnız raporlar.
+        Örnekler şunlardır: Press'te kapalı kullanıcı, Press'teki farklı e-posta,
+        doğrulanmamış e-posta ve başka kimlik sunucusunun kaydı.
+
+        Servis karşılaştırma için Press'ten ve kiracıdan kullanıcı listesi ister.
+        Bu uçların adı `press_tr.api.identity.list_identities` ve
+        `platform_core.api.identity.list_identities` olur. Yanıt `TargetIdentityList` şemasındadır.
+        Bu iki uç Press'in ve kiracının sözleşmelerinde henüz yoktur.
       x-durum: uygulandi
-      x-yikici: false
-      x-yurutme: yalniz-okur
+      x-yikici: true
+      x-yurutme: yalniz-onay-katmani
       security:
         - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconcileRequest"
       responses:
         "200":
-          description: Fark raporu.
+          description: |
+            Önizlemede fark raporu ve düzeltme önizlemesi döner.
+            Düzeltmede farklar ve her işin sonucu döner.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReconcileReport"
+        "400":
+          description: Gövde hatalı. Örneğin `dry_run` yok ya da düzeltmede onay alanları eksik.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/PreviewChanged"
         "502":
           $ref: "#/components/responses/UpstreamFailed"
   /v1/dead-letters:
@@ -894,16 +931,74 @@ components:
             $ref: "#/components/schemas/Preview"
         preview_digest:
           $ref: "#/components/schemas/PreviewDigest"
+    ReconcileRequest:
+      description: Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.
+      oneOf:
+        - $ref: "#/components/schemas/ReconcilePreviewRequest"
+        - $ref: "#/components/schemas/ReconcileExecuteRequest"
+    ReconcilePreviewRequest:
+      type: object
+      description: Önizleme isteği. Servis hiçbir kaydı değiştirmez.
+      required: [dry_run]
+      properties:
+        dry_run:
+          type: boolean
+          const: true
+    ReconcileExecuteRequest:
+      type: object
+      description: Düzeltme isteği. Yalnız onay katmanı gönderebilir.
+      required: [dry_run, preview_digest, approval_id]
+      properties:
+        dry_run:
+          type: boolean
+          const: false
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+        approval_id:
+          $ref: "#/components/schemas/ApprovalId"
     ReconcileReport:
       type: object
       required: [count, differences]
       properties:
         count:
           type: integer
+          description: Fark sayısı.
         differences:
           type: array
           items:
             $ref: "#/components/schemas/Difference"
+        previews:
+          type: array
+          description: Yalnız önizlemede döner. Farkları giderecek işlerin önizlemesidir.
+          items:
+            $ref: "#/components/schemas/Preview"
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+        results:
+          type: array
+          description: Yalnız düzeltmede döner. Her işin sonucudur.
+          items:
+            $ref: "#/components/schemas/RepairResult"
+    RepairResult:
+      type: object
+      required: [operation, target, status]
+      properties:
+        operation:
+          type: string
+          description: İşin adı. Örneğin `tenant.set_enabled`.
+        target:
+          type: string
+          description: İşin hedefi. Değer `press` ya da kiracının adıdır.
+        status:
+          type: string
+          enum: [done, failed, unknown]
+          description: |
+            `done` değeri hedefin kesin başarı yanıtı verdiğini gösterir.
+            `failed` değeri hedefin işi reddettiğini ya da ulaşılamadığını gösterir.
+            `unknown` değeri işin bitip bitmediğinin bilinmediğini gösterir.
+        error:
+          type: string
+          description: Başarısız adım ve durum kodu. Yanıt gövdesi taşımaz.
     Difference:
       type: object
       required: [target, subject, kind]
@@ -916,12 +1011,55 @@ components:
           description: Kullanıcının Keycloak kimliği (`sub`).
         kind:
           type: string
-          enum: [missing, unexpected, email_mismatch, disabled]
+          enum:
+            - missing
+            - disabled
+            - email_mismatch
+            - closed_in_keycloak
+            - unexpected
+            - unverified_in_keycloak
+            - missing_team_membership
+            - unexpected_team_membership
+            - foreign_issuer
           description: |
-            `missing` değeri kullanıcının hedefte olmadığını gösterir.
-            `unexpected` değeri hedefte açık ama Keycloak'a göre beklenmeyen kaydı gösterir.
-            `email_mismatch` değeri e-postanın farklı olduğunu gösterir.
+            `missing` değeri kullanıcının kiracıda bağı olmadığını gösterir.
             `disabled` değeri beklenen kullanıcının hedefte kapalı olduğunu gösterir.
+            `email_mismatch` değeri hedefteki e-postanın farklı olduğunu gösterir.
+            `closed_in_keycloak` değeri şunu gösterir: kullanıcı Keycloak'ta kapalı ya da silinmiş, hedefte açık.
+            `unexpected` değeri kullanıcının kiracıda açık olduğunu ama kiracının kuruluşuna üye olmadığını gösterir.
+            `unverified_in_keycloak` değeri kullanıcının kiracıda açık ama Keycloak'taki e-postasının doğrulanmamış olduğunu gösterir.
+            `missing_team_membership` değeri Press'te eksik takım üyeliğini gösterir.
+            `unexpected_team_membership` değeri Press'te fazla takım üyeliğini gösterir.
+            `foreign_issuer` değeri kaydın başka bir kimlik sunucusuna ait olduğunu gösterir.
+        organization_id:
+          type: string
+          description: Yalnız takım üyeliği farklarında döner. Keycloak'taki kuruluşun kimliğidir.
+    TargetIdentityList:
+      type: object
+      description: |
+        `list_identities` uçlarından beklenen yanıt. Bu şema bu servisin ucu değildir.
+        Bu uçlar Press'in ve kiracının sözleşmelerinde henüz yoktur. Bu şema bir öneridir.
+      required: [message]
+      properties:
+        message:
+          type: array
+          items:
+            type: object
+            required: [issuer, subject, email, enabled]
+            properties:
+              issuer:
+                type: string
+              subject:
+                type: string
+              email:
+                type: string
+              enabled:
+                type: boolean
+              organization_ids:
+                type: array
+                description: Yalnız Press gönderir. Kullanıcının üye olduğu takımların kuruluş kimlikleridir.
+                items:
+                  type: string
     TargetEnsureTeamResult:
       type: object
       description: |

@@ -170,6 +170,27 @@ class FakeKeycloak(FakeServer):
             (404, {"error": "User not found"}),
         )
 
+    def serve_directory(self) -> None:
+        """Serve the user list, the organization list and the member lists from the fake's state."""
+
+        def page(rows: list, req: Recorded) -> Reply:
+            first, size = int(req.query.get("first", ["0"])[0]), int(req.query.get("max", ["100"])[0])
+            return 200, rows[first : first + size]
+
+        organizations: dict[str, dict[str, object]] = {}
+        for memberships in self.memberships.values():
+            for org in memberships:
+                organizations[str(org["id"])] = org
+        self.on("GET", f"{self.admin}/users", lambda req: page(list(self.users.values()), req))
+        self.on("GET", f"{self.admin}/organizations", lambda req: page(list(organizations.values()), req))
+        for org_id in organizations:
+            members = [
+                self.users[subject]
+                for subject, memberships in self.memberships.items()
+                if any(org["id"] == org_id for org in memberships)
+            ]
+            self.on("GET", f"{self.admin}/organizations/{org_id}/members", lambda req, members=members: page(members, req))
+
     def add_organization(self, org_id: str, alias: str) -> dict[str, object]:
         org = {"id": org_id, "name": alias, "alias": alias}
         self.organizations[org_id] = org
@@ -238,6 +259,14 @@ class FakeTenant(FakeSite):
         self.default("POST", TENANT_PROVISION, self._provision)
         self.default("POST", TENANT_SET_ENABLED, self._set_enabled)
         self.default("POST", TENANT_CHANGE_EMAIL, self._change_email)
+        self.default("GET", TENANT_LIST, self._list)
+
+    def _list(self, _req: Recorded) -> Reply:
+        rows = [
+            {"issuer": issuer, "subject": subject, "email": email, "enabled": self.users[email]["enabled"]}
+            for (issuer, subject), email in self.links.items()
+        ]
+        return 200, {"message": rows}
 
     def seed_user(self, issuer: str, subject: str, email: str, *, enabled: bool = True) -> None:
         self.links[(issuer, subject)] = email
@@ -314,6 +343,20 @@ class FakePress(FakeSite):
         self.teams: dict[str, dict[str, object]] = {}
         self.default("POST", PRESS_ENSURE_TEAM, self._ensure_team)
         self.default("POST", PRESS_REMOVE_MEMBER, self._remove_team_member)
+        self.default("GET", PRESS_LIST, self._list)
+
+    def _list(self, _req: Recorded) -> Reply:
+        rows = [
+            {
+                "issuer": issuer,
+                "subject": subject,
+                "email": email,
+                "enabled": self.users[email]["enabled"],
+                "organization_ids": self.teams_of(issuer, subject),
+            }
+            for (issuer, subject), email in self.links.items()
+        ]
+        return 200, {"message": rows}
 
     def seed_member(self, issuer: str, subject: str, email: str, organization_id: str, *, api_keys: int = 0) -> None:
         self.links[(issuer, subject)] = email

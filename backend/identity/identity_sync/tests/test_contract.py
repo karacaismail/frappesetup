@@ -301,21 +301,52 @@ class SchemaTest(ServerCase):
         self.assert_response(self.post_json(path, request), "POST", path, 502)
 
     def test_reconcile(self) -> None:
-        kc = self.stack.keycloak
-        org = {"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}
-        kc.on("GET", f"{kc.admin}/organizations", lambda r: (200, [org] if r.query["first"] == ["0"] else []))
-        kc.on(
-            "GET",
-            f"{kc.admin}/organizations/{ORG_ID}/members",
-            lambda r: (200, [keycloak_user()] if r.query["first"] == ["0"] else []),
-        )
-        self.stack.press.on("GET", fakes.PRESS_LIST, (200, {"message": []}))
-        self.stack.tenant.on("GET", fakes.TENANT_LIST, (200, {"message": []}))
+        path = "/v1/reconcile"
+        kc, issuer = self.stack.keycloak, self.stack.issuer
+        kc.add_user(keycloak_user(subject="closed-1", email="closed@example.test", enabled=False), [])
+        kc.serve_directory()
+        self.stack.tenant.seed_user(issuer, "closed-1", "closed@example.test")
+        # The member from the base setup is in sync.
+        self.stack.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID)
+        self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
 
-        body = self.assert_response(
-            self.call("POST", "/v1/reconcile", b"{}", self.bearer(PREVIEW_TOKEN)), "POST", "/v1/reconcile", 200
-        )
-        self.assertEqual(body["count"], 2)
+        preview_request = {"dry_run": True}
+        self.assert_request(preview_request, "POST", path)
+        preview = self.assert_response(self.post_json(path, preview_request, PREVIEW_TOKEN), "POST", path, 200)
+        self.assertEqual([d["kind"] for d in preview["differences"]], ["closed_in_keycloak"])
+        execute = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-m1"}
+        self.assert_request(execute, "POST", path)
+        self.assert_response(self.post_json(path, execute, PREVIEW_TOKEN), "POST", path, 403)
+        stale = {**execute, "preview_digest": "0" * 64, "approval_id": "onay-m0"}
+        self.assert_response(self.post_json(path, stale), "POST", path, 409)
+        done = self.assert_response(self.post_json(path, execute), "POST", path, 200)
+        self.assertEqual([r["status"] for r in done["results"]], ["done"])
+        self.assert_response(self.post_json(path, execute), "POST", path, 409)
+        for rejected in ({}, {"dry_run": False}, {"dry_run": "true"}):
+            with self.subTest(rejected=rejected):
+                self.assertNotEqual(schema_errors(rejected, request_schema("POST", path), CONTRACT), [])
+                self.assert_response(self.post_json(path, rejected), "POST", path, 400)
+        self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
+
+    def test_every_difference_kind_is_in_the_contract(self) -> None:
+        import inspect
+
+        from identity_sync import reconcile
+
+        documented = set(CONTRACT["components"]["schemas"]["Difference"]["properties"]["kind"]["enum"])
+        used = set(re.findall(r'"([a-z_]+)"', inspect.getsource(reconcile))) & {
+            "missing",
+            "disabled",
+            "email_mismatch",
+            "closed_in_keycloak",
+            "unexpected",
+            "unverified_in_keycloak",
+            "missing_team_membership",
+            "unexpected_team_membership",
+            "foreign_issuer",
+        }
+        self.assertEqual(len(used), 9)
+        self.assertEqual(documented, used)
 
     def test_common_errors_use_the_error_schema(self) -> None:
         error = CONTRACT["components"]["schemas"]["Error"]

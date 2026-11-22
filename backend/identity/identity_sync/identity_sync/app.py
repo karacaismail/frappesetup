@@ -8,12 +8,35 @@ from dataclasses import dataclass
 
 from identity_sync.config import Settings
 from identity_sync.keycloak_admin import KeycloakAdmin, snapshot_from_user
-from identity_sync.mapping import Organization
-from identity_sync.pipeline import Processor
-from identity_sync.reconcile import Difference, compare, expected_identities
+from identity_sync.mapping import Action, Organization, digest_of
+from identity_sync.pipeline import PreviewChanged, Processor, plan_digest
+from identity_sync.reconcile import Difference, find_differences, plan_repairs
 from identity_sync.sites import PressClient, TenantClient
 from identity_sync.store import Store
 from identity_sync.tokens import TokenProvider
+
+
+@dataclass(frozen=True)
+class ReconcilePlan:
+    """What reconcile found and what it would do about it. Building a plan only reads."""
+
+    differences: tuple[Difference, ...]
+    actions: tuple[Action, ...]
+
+    @property
+    def digest(self) -> str:
+        """Digest of the differences and of everything the repair would write."""
+        differences = [difference.to_dict() for difference in self.differences]
+        return digest_of({"differences": differences, "plan": plan_digest(self.actions)})
+
+    def report(self) -> dict[str, object]:
+        """The report for a human. It carries no e-mail: users are named by `sub`."""
+        return {
+            "count": len(self.differences),
+            "differences": [difference.to_dict() for difference in self.differences],
+            "previews": [action.preview().to_dict() for action in self.actions],
+            "preview_digest": self.digest,
+        }
 
 
 @dataclass
@@ -25,24 +48,40 @@ class App:
     tenant_client: TenantClient
     processor: Processor
 
-    def reconcile(self) -> list[Difference]:
-        """Keycloak, Press ve kiracı kullanıcılarını karşılaştırır. Yalnız okur."""
-        users: dict[str, dict[str, object]] = {}
+    def reconcile_plan(self) -> ReconcilePlan:
+        """Compare Keycloak with Press and the tenants. Reads only. Started by hand, never scheduled."""
         memberships: dict[str, list[Organization]] = {}
         for organization in self.keycloak.list_organizations():
             for member in self.keycloak.list_organization_members(organization.id):
-                subject = str(member.get("id", ""))
-                users[subject] = dict(member)
-                memberships.setdefault(subject, []).append(organization)
-        snapshots = [snapshot_from_user(user, memberships[subject]) for subject, user in users.items()]
-        press_expected, tenant_expected = expected_identities(
-            snapshots, issuer=self.settings.issuer, tenants=self.settings.tenants
+                memberships.setdefault(str(member.get("id", "")), []).append(organization)
+        users = [
+            snapshot_from_user(user, memberships.get(str(user.get("id", "")), ()))
+            for user in self.keycloak.list_users()
+        ]
+        tenants = self.settings.tenants
+        tenant_records = {tenant.name: self.tenant_client.list_identities(tenant.name) for tenant in tenants}
+        differences = find_differences(
+            users, self.press.list_identities(), tenant_records, issuer=self.settings.issuer, tenants=tenants
         )
-        differences = compare(press_expected, self.press.list_identities(), target="press")
-        for tenant in self.settings.tenants:
-            actual = self.tenant_client.list_identities(tenant.name)
-            differences += compare(tenant_expected[tenant.name], actual, target=tenant.name)
-        return differences
+        actions = plan_repairs(differences, users, issuer=self.settings.issuer, tenants=tenants)
+        return ReconcilePlan(tuple(differences), actions)
+
+    def reconcile_execute(self, expected_digest: str) -> dict[str, object]:
+        """Run the approved repair.
+
+        The plan is built again under the work lock. If it is not exactly the approved one,
+        `PreviewChanged` is raised and nothing is written. Otherwise that same plan runs.
+        """
+        with self.store.work_lock():
+            plan = self.reconcile_plan()
+            if plan.digest != expected_digest:
+                raise PreviewChanged
+            results = self.processor.run_actions(plan.actions)
+        return {
+            "count": len(plan.differences),
+            "differences": [difference.to_dict() for difference in plan.differences],
+            "results": results,
+        }
 
     def close(self) -> None:
         self.store.close()

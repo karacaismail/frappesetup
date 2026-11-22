@@ -189,33 +189,75 @@ class CliTest(unittest.TestCase):
 
         self.assertEqual(code, 1)
 
-    def test_reconcile_reports_and_only_reads(self) -> None:
-        kc = self.keycloak
-        kc.on("GET", f"{kc.admin}/organizations", lambda r: (200, [self.org] if r.query["first"] == ["0"] else []))
-        kc.on(
-            "GET",
-            f"{kc.admin}/organizations/{ORG_ID}/members",
-            lambda r: (200, [keycloak_user()] if r.query["first"] == ["0"] else []),
-        )
-        issuer = f"{kc.url}/realms/platform"
-        row = {"issuer": issuer, "subject": SUBJECT, "email": "ayse@example.test", "enabled": True}
-        self.press.on("GET", fakes.PRESS_LIST, (200, {"message": [row]}))
-        self.tenant.on("GET", fakes.TENANT_LIST, (200, {"message": []}))
+    def drift(self) -> None:
+        # The tenant lost the user's link. Press still has the membership.
+        self.keycloak.serve_directory()
+        issuer = f"{self.keycloak.url}/realms/platform"
+        self.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID)
+
+    def writes(self) -> list[fakes.Recorded]:
+        keycloak_writes = [r for r in self.keycloak.requests if r.method != "GET" and "/admin/" in r.path]
+        return self.press.writes() + self.tenant.writes() + keycloak_writes
+
+    def test_reconcile_is_a_dry_run_by_default(self) -> None:
+        self.drift()
+
+        for arguments in (("reconcile",), ("reconcile", "--dry-run")):
+            with self.subTest(arguments=arguments):
+                code, body = self.run_cli(*arguments)
+                self.assertEqual(code, 1)
+                self.assertEqual(body["differences"], [{"target": "kiraci1", "subject": SUBJECT, "kind": "missing"}])
+                self.assertEqual(
+                    [p["operation"] for p in body["previews"]], ["tenant.change_email", "tenant.provision"]
+                )
+        self.assertEqual(self.writes(), [])
+
+    def test_reconcile_without_difference_exits_zero(self) -> None:
+        self.keycloak.remove_user(SUBJECT)
+        self.keycloak.users.clear()
+        self.keycloak.serve_directory()
 
         code, body = self.run_cli("reconcile")
 
-        self.assertEqual(code, 1)
-        self.assertEqual(body, {"count": 1, "differences": [{"target": "kiraci1", "subject": SUBJECT, "kind": "missing"}]})
-        self.assertEqual(self.press.writes() + self.tenant.writes(), [])
-        self.assertEqual([r for r in kc.requests if r.method != "GET" and "/admin/" in r.path], [])
+        self.assertEqual((code, body["count"], body["differences"]), (0, 0, []))
 
-    def test_reconcile_without_difference_exits_zero(self) -> None:
-        kc = self.keycloak
-        kc.on("GET", f"{kc.admin}/organizations", (200, []))
-        self.press.on("GET", fakes.PRESS_LIST, (200, {"message": []}))
-        self.tenant.on("GET", fakes.TENANT_LIST, (200, {"message": []}))
+    def test_reconcile_execute_needs_digest_and_approval(self) -> None:
+        self.drift()
+        err = io.StringIO()
+        for arguments in (("--execute",), ("--execute", "--preview-digest", "a" * 64), ("--execute", "--approval-id", "x")):
+            with self.subTest(arguments=arguments), contextlib.redirect_stderr(err):
+                with self.assertRaises(SystemExit) as caught:
+                    cli.main(["reconcile", *arguments], env=self.env)
+                self.assertEqual(caught.exception.code, 2)
+        self.assertEqual(self.writes(), [])
 
-        self.assertEqual(self.run_cli("reconcile"), (0, {"count": 0, "differences": []}))
+    def test_reconcile_execute_runs_the_previewed_repair_once(self) -> None:
+        self.drift()
+        _code, preview = self.run_cli("reconcile")
+        arguments = ("reconcile", "--execute", "--preview-digest", preview["preview_digest"], "--approval-id", "onay-k1")
+
+        code, body = self.run_cli(*arguments)
+
+        self.assertEqual(code, 0)
+        self.assertEqual([r["status"] for r in body["results"]], ["done", "done"])
+        self.assertEqual(self.run_cli("reconcile")[0], 0)
+        # The approval is spent.
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(cli.main(list(arguments), env=self.env), 2)
+        self.assertIn("approval", err.getvalue())
+
+    def test_reconcile_execute_refuses_a_stale_digest(self) -> None:
+        self.drift()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = cli.main(
+                ["reconcile", "--execute", "--preview-digest", "0" * 64, "--approval-id", "onay-k2"], env=self.env
+            )
+
+        self.assertEqual(code, 2)
+        self.assertIn("preview", err.getvalue())
+        self.assertEqual(self.writes(), [])
 
     def test_missing_settings_exit_with_two(self) -> None:
         err = io.StringIO()

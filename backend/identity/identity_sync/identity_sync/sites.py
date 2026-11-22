@@ -107,6 +107,15 @@ def _is_removed(message: object) -> bool:
     return isinstance(message, Mapping) and message.get("member") is False and "team" in message
 
 
+def _organization_ids(value: object) -> tuple[str, ...]:
+    """Team memberships of a Press identity, one Keycloak organization id each. Tenants send none."""
+    if value is None:
+        return ()
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise TransportError("identity row has invalid organization_ids")
+    return tuple(value)
+
+
 def _identities(message: object) -> list[Identity]:
     if not isinstance(message, list):
         raise TransportError("identity list is not a list")
@@ -120,6 +129,7 @@ def _identities(message: object) -> list[Identity]:
                 subject=str(row.get("subject", "")),
                 email=str(row.get("email") or ""),
                 enabled=row.get("enabled") is True,
+                organization_ids=_organization_ids(row.get("organization_ids")),
             )
         )
     return rows

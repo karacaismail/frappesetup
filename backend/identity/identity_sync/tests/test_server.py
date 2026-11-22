@@ -395,7 +395,7 @@ class RawSocketTest(ServerCase):
 
 class ServiceTokenTest(ServerCase):
     PROTECTED = (
-        ("POST", "/v1/reconcile", b"{}"),
+        ("POST", "/v1/reconcile", b'{"dry_run": true}'),
         ("GET", "/v1/dead-letters", None),
         ("POST", "/v1/dead-letters/replay", b'{"dry_run": true}'),
         ("POST", "/v1/invitations", b'{"email": "a@example.test", "organization_id": "o", "dry_run": true}'),
@@ -682,33 +682,114 @@ class DeadLetterEndpointTest(ServerCase):
 
 
 class ReconcileEndpointTest(ServerCase):
-    def test_reports_differences_without_writing(self) -> None:
-        kc = self.stack.keycloak
-        org = {"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}
-        kc.on("GET", f"{kc.admin}/organizations", lambda r: (200, [org] if r.query["first"] == ["0"] else []))
-        kc.on(
-            "GET",
-            f"{kc.admin}/organizations/{ORG_ID}/members",
-            lambda r: (200, [keycloak_user()] if r.query["first"] == ["0"] else []),
-        )
-        self.stack.press.on("GET", fakes.PRESS_LIST, (200, {"message": []}))
-        row = {"issuer": self.stack.issuer, "subject": SUBJECT, "email": "eski@example.test", "enabled": True}
-        self.stack.tenant.on("GET", fakes.TENANT_LIST, (200, {"message": [row]}))
+    """POST /v1/reconcile: the HTTP side of the `reconcile` command (D-9)."""
 
-        status, body = self.call("POST", "/v1/reconcile", b"{}", self.bearer(PREVIEW_TOKEN))
+    PATH = "/v1/reconcile"
+    CLOSED = "closed-1"
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Drift: CLOSED is disabled in Keycloak but still enabled on Press and on the tenant.
+        keycloak, issuer = self.stack.keycloak, self.stack.issuer
+        org = {"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}
+        keycloak.add_user(keycloak_user(subject=self.CLOSED, email="closed@example.test", enabled=False), [org])
+        keycloak.serve_directory()
+        self.stack.press.seed_member(issuer, self.CLOSED, "closed@example.test", ORG_ID, api_keys=1)
+        self.stack.tenant.seed_user(issuer, self.CLOSED, "closed@example.test")
+        # The user from the base setup is in sync.
+        self.stack.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID)
+        self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
+
+    def preview(self, token: str = PREVIEW_TOKEN) -> dict[str, object]:
+        status, body = self.post_json(self.PATH, {"dry_run": True}, token)
+        self.assertEqual(status, 200)
+        return body
+
+    def execute(self, digest: object, token: str = EXECUTE_TOKEN, approval_id: str = "onay-m1"):
+        return self.post_json(self.PATH, {"dry_run": False, "preview_digest": digest, "approval_id": approval_id}, token)
+
+    def test_agent_gets_the_report_and_nothing_is_written(self) -> None:
+        body = self.preview()
+
+        self.assertEqual(body["count"], 2)
+        self.assertEqual(
+            body["differences"],
+            [
+                {"target": "press", "subject": self.CLOSED, "kind": "closed_in_keycloak"},
+                {"target": "kiraci1", "subject": self.CLOSED, "kind": "closed_in_keycloak"},
+            ],
+        )
+        self.assertEqual([p["operation"] for p in body["previews"]], ["press.remove_team_member", "tenant.set_enabled"])
+        self.assertTrue(all(p["destructive"] for p in body["previews"]))
+        self.assertRegex(body["preview_digest"], r"^[0-9a-f]{64}$")
+        self.assertNotIn("example.test", json.dumps(body))
+        self.assertEqual(self.downstream_writes(), [])
+
+    def test_request_must_state_dry_run(self) -> None:
+        for payload in ({}, {"dry_run": "true"}, {"dry_run": False}):
+            with self.subTest(payload=payload):
+                self.assertEqual(self.post_json(self.PATH, payload), (400, {"error": "bad_request"}))
+        self.assertEqual(self.downstream_writes(), [])
+
+    def test_agent_cannot_repair(self) -> None:
+        digest = self.preview()["preview_digest"]
+
+        self.assertEqual(self.execute(digest, token=PREVIEW_TOKEN), (403, {"error": "forbidden"}))
+        self.assertEqual(self.downstream_writes(), [])
+
+    def test_approval_layer_repairs_the_drift(self) -> None:
+        issuer = self.stack.issuer
+        digest = self.preview()["preview_digest"]
+
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            status, body = self.execute(digest)
 
         self.assertEqual(status, 200)
         self.assertEqual(
-            body,
-            {
-                "count": 2,
-                "differences": [
-                    {"target": "press", "subject": SUBJECT, "kind": "missing"},
-                    {"target": "kiraci1", "subject": SUBJECT, "kind": "email_mismatch"},
-                ],
-            },
+            [(r["operation"], r["target"], r["status"]) for r in body["results"]],
+            [("press.remove_team_member", "press", "done"), ("tenant.set_enabled", "kiraci1", "done")],
         )
+        closed_on_press = self.stack.press.user_of(issuer, self.CLOSED)
+        self.assertEqual((closed_on_press["enabled"], closed_on_press["api_keys"]), (False, []))
+        self.assertFalse(self.stack.tenant.user_of(issuer, self.CLOSED)["enabled"])
+        self.assertTrue(self.stack.tenant.user_of(issuer, SUBJECT)["enabled"])
+        audit = "\n".join(logs.output)
+        self.assertIn("operation=reconcile", audit)
+        self.assertIn("onay-m1", audit)
+        self.assertIn("outcome=executed", audit)
+        self.assertEqual(self.preview()["count"], 0)
+
+    def test_repair_is_refused_when_the_drift_changed(self) -> None:
+        digest = self.preview()["preview_digest"]
+        self.stack.keycloak.add_user(keycloak_user(enabled=False), [])
+        self.stack.keycloak.serve_directory()
+
+        self.assertEqual(self.execute(digest), (409, {"error": "preview_changed"}))
         self.assertEqual(self.downstream_writes(), [])
+
+    def test_approval_works_once(self) -> None:
+        digest = self.preview()["preview_digest"]
+        self.assertEqual(self.execute(digest)[0], 200)
+        writes = len(self.downstream_writes())
+
+        self.assertEqual(self.execute(self.preview()["preview_digest"]), (409, {"error": "approval_used"}))
+        self.assertEqual(len(self.downstream_writes()), writes)
+
+    def test_failed_repair_is_reported_not_hidden(self) -> None:
+        digest = self.preview()["preview_digest"]
+        self.stack.tenant.on("POST", fakes.TENANT_SET_ENABLED, (403, None))
+
+        status, body = self.execute(digest)
+
+        self.assertEqual(status, 200)
+        failed = [r for r in body["results"] if r["status"] == "failed"]
+        self.assertEqual([(r["operation"], r["error"]) for r in failed], [("tenant.set_enabled", "tenant.set_enabled kiraci1: HTTP 403")])
+
+    def test_unreachable_keycloak_is_an_upstream_failure(self) -> None:
+        kc = self.stack.keycloak
+        kc.on("GET", f"{kc.admin}/organizations", (500, None))
+
+        self.assertEqual(self.post_json(self.PATH, {"dry_run": True}), (502, {"error": "upstream_failed"}))
 
 
 if __name__ == "__main__":

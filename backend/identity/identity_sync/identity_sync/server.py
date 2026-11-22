@@ -148,9 +148,19 @@ class _Api:
 
     # --- okuma uçları ---
 
-    def post_reconcile(self, _body: bytes, _azp: str) -> Reply:
-        differences = [difference.to_dict() for difference in self._app.reconcile()]
-        return 200, {"count": len(differences), "differences": differences}
+    def post_reconcile(self, body: bytes, azp: str) -> Reply:
+        """Reconcile: the report is open to preview clients, the repair only to the approval layer."""
+        payload = _json_object(body)
+        if _flag(payload, "dry_run"):
+            return 200, self._app.reconcile_plan().report()
+        digest = self._approval("reconcile", payload, azp)
+        try:
+            result = self._app.reconcile_execute(digest)
+        except PreviewChanged:
+            self._audit("reconcile", payload, azp, "preview_changed")
+            return 409, {"error": "preview_changed"}
+        self._audit("reconcile", payload, azp, "executed")
+        return 200, result
 
     def get_dead_letters(self, _body: bytes, _azp: str) -> Reply:
         return 200, {"dead_letters": [letter.to_dict() for letter in self._app.store.dead_letters()]}

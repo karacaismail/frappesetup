@@ -209,6 +209,25 @@ class Processor:
         order = {letter.event.id: index for index, letter in enumerate(self._store.dead_letters())}
         return sorted(results, key=lambda item: order.get(item[0], len(order)))
 
+    def run_actions(self, actions: Sequence[Action]) -> list[dict[str, str]]:
+        """Run a list of actions and report each outcome. Used by the reconcile repair.
+
+        Every action is attempted. `status` is `done`, `failed` or `unknown`.
+        An unknown outcome is not retried. The caller holds the work lock.
+        """
+        results: list[dict[str, str]] = []
+        for action in actions:
+            preview = action.preview()
+            result = {"operation": preview.operation, "target": preview.target, "status": "done"}
+            try:
+                self._retry(f"{preview.operation} {preview.target}", lambda action=action: self._execute(action))
+            except _Failed as failure:
+                result.update(status="failed", error=str(failure))
+            except UnknownOutcome:
+                result.update(status="unknown", error=f"{preview.operation} {preview.target}: unknown outcome")
+            results.append(result)
+        return results
+
     def _plan(self, event: Event) -> tuple[Action, ...]:
         subject = event.user_id or ""
         snapshot = self._retry("keycloak.read", lambda: self._keycloak.get_user_snapshot(subject))
