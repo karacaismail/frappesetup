@@ -302,10 +302,11 @@ wait_http "http://127.0.0.1:$sync_port/healthz"
 wait_http "http://127.0.0.1:$provider_port/attempts"
 
 # Frappe caches site settings on requests, including the readiness ping.
-docker_default cp "$suite_dir/preview/preview_site_config.py" "$tenant:/tmp/preview_site_config.py"
-python3 "$suite_dir/preview/fixtures.py" prepare
+E2E_TENANT_MODULE_DIR="$(docker_default exec "$tenant" env/bin/python -c 'import tempfile; print(tempfile.mkdtemp(prefix="e2e-tenant-"))')"
+docker_default cp "$suite_dir/preview/preview_site_config.py" "$tenant:$E2E_TENANT_MODULE_DIR/preview_site_config.py"
+E2E_TENANT_MODULE_DIR="$E2E_TENANT_MODULE_DIR" python3 "$suite_dir/preview/fixtures.py" prepare
 docker_default exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c "exec bench serve --port \"\$PTR_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
-docker_default exec -d -e PYTHONPATH=/tmp -e E2E_KEYCLOAK_SERVICE_CLIENT_SECRET "$tenant" bash -c "exec bench serve --port \"\$FS_TENANT_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
+docker_default exec -d -e PYTHONPATH="$E2E_TENANT_MODULE_DIR" -e E2E_KEYCLOAK_SERVICE_CLIENT_SECRET "$tenant" bash -c "exec bench serve --port \"\$FS_TENANT_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
 wait_http "$ATONOTA_SITE_TENANT1_URL/api/method/ping"
 wait_http "$ATONOTA_PRESS_URL/api/method/ping"
 node "$suite_dir/preview/run-tests.mjs" "$worktree"

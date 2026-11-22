@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.11.3
+  version: 0.13.0
   summary: Endpoints of the user sync service
   description: |
     This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
@@ -30,7 +30,8 @@ info:
 
     AI cannot execute the write endpoints of this service directly.
     The AI agent only reads and asks for a preview. A preview changes no record.
-    Real execution comes only from the approval layer inside `platform_core`.
+    Tenant execution comes from its approval layer inside `platform_core`.
+    Platform reconciliation and replay instead require a separate operator approval client (O-38).
     The approval layer calls with its own service token after a human approves.
 
     The flow is as follows.
@@ -58,17 +59,19 @@ info:
     The service writes no event in that request.
     The service computes the plan once more at execution time. If the plan is not exactly the same, the operation does not run.
 
-    The service keeps four client lists.
-    A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
-    A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute. This list holds the service clients of the tenant sites.
-    The human gives the approval in the AI layer of the tenant site. So the tenant site calls the execution.
-    A client in the `IDENTITY_SYNC_SESSION_AZP` list can end a session. This list holds the same tenant site clients.
-    The two lists must be equal. Every client in them must be the service client of a tenant in the tenant list.
-    If not, the service does not start. A client that is bound to no tenant gets 403 when it asks for execution.
-    A client in the preview list or in the deletion list cannot be in another list.
-    A tenant site client can invite a user only into the organization of its own tenant.
-    The service finds the tenant from the `azp` value of the token. The body cannot choose the tenant.
-    The reconcile, replay and operation endpoints work on the whole platform. They are not bound to one tenant.
+    The service keeps five client lists (O-38).
+    `IDENTITY_SYNC_EXECUTE_AZP` and `IDENTITY_SYNC_SESSION_AZP` hold the same configured tenant service clients.
+    A tenant client executes approved invitations and resolves operations only for its own organization.
+    It can also revoke sessions of its own members. Another organization's invitation or operation returns 403.
+    `_require_own_organization` checks the organization against the tenant selected by the verified `azp`.
+    For operation resolution, the organization comes from the stored operation, never from the request body.
+    Only `IDENTITY_SYNC_OPERATOR_AZP` clients can use POST /v1/reconcile, POST /v1/dead-letters/replay,
+    GET /v1/dead-letters and GET /v1/operations, including their preview modes. Tenant clients get 403.
+    Operator execution still requires the human approval id and the matching preview digest.
+    `IDENTITY_SYNC_PREVIEW_AZP` clients may preview invitations but cannot execute or access platform queues.
+    Operator, preview and deletion lists must be disjoint from each other and from the tenant lists.
+    These three lists cannot contain a client starting with `site-`, including an unregistered site.
+    Invalid settings prevent startup. An empty operator list disables platform endpoints.
     This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
     A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
     Only a trusted service client goes into the execute list.
@@ -359,7 +362,7 @@ paths:
         A preview request carries `dry_run: true`. The service only reads.
         The response carries the differences, the preview of the repair operations and the `preview_digest` value.
         The response carries no email. It refers to the user by the `sub` id.
-        Clients in the preview list and in the execute list can ask for a preview.
+        Only clients in IDENTITY_SYNC_OPERATOR_AZP can preview or execute this platform operation.
 
         A repair request carries `dry_run: false`. Only the approval layer starts the repair.
         The request must carry the `preview_digest` and `approval_id` fields.
@@ -420,7 +423,7 @@ paths:
       description: |
         This endpoint is the HTTP counterpart of the `dead-letters` command.
         The endpoint only reads. The records carry no email.
-        Clients in the preview list and in the execute list can call this endpoint.
+        Only clients in IDENTITY_SYNC_OPERATOR_AZP can call this endpoint. Tenant and preview clients get 403.
         The list is cut at the `limit` value. If more records exist, the response carries `next_offset`.
       x-durum: uygulandi
       x-yikici: false
@@ -449,7 +452,7 @@ paths:
         This endpoint is the HTTP counterpart of the `replay-dead-letters` command.
         This endpoint can do destructive work. A waiting event can disable a user.
 
-        The preview is open to both lists. A client in either list can send the `dry_run: true` request.
+        Only IDENTITY_SYNC_OPERATOR_AZP clients may preview or execute this queue operation.
         Only the approval layer starts the real execution.
         The execute request must carry the `preview_digest` and `approval_id` fields.
         If the plan changed after the preview, the service returns 409 and processes no event.
@@ -505,7 +508,7 @@ paths:
         The service records every step before it writes it. When the step is done, it updates the record.
         If the process stops midway, the record shows which step stayed uncertain.
         Finished operations do not appear in the list. The record carries no email.
-        Clients in the preview list and in the execute list can call this endpoint.
+        Only clients in IDENTITY_SYNC_OPERATOR_AZP can call this endpoint. Tenant and preview clients get 403.
         The list is cut at the `limit` value. If more records exist, the response carries `next_offset`.
       x-durum: uygulandi
       x-yikici: false
@@ -536,7 +539,9 @@ paths:
         Then the human closes the operation with the `completed` or the `abandoned` resolution.
         `completed` means the operation was completed at the target. `abandoned` means the operation was given up.
         This endpoint changes only the service's own record. It does not write to the target.
-        Only the approval layer can call this endpoint. The service writes the caller and the result to the log.
+        Only a tenant execute client can resolve an operation recorded for its own organization.
+        The stored organization is checked before any update. Another organization returns 403.
+        The service writes the caller and the result to the log.
       x-durum: uygulandi
       x-yikici: false
       x-yurutme: yalniz-onay-katmani
@@ -787,12 +792,14 @@ components:
         The token that goes to the tenant and to Press does not carry these roles.
         The service verifies the token with the shared `oidc_verify` library.
         The `aud` value of the token must be only `identity-sync`.
-        The `azp` value of the token must be in one of two lists.
-        The `IDENTITY_SYNC_PREVIEW_AZP` list gives permission to read and to preview.
-        The `IDENTITY_SYNC_EXECUTE_AZP` list also gives permission to execute.
+        The `azp` value of the token must be in one of five lists.
+        The `IDENTITY_SYNC_PREVIEW_AZP` list gives permission to preview invitations.
+        The `IDENTITY_SYNC_EXECUTE_AZP` list gives permission to execute within the caller tenant organization.
         The `IDENTITY_SYNC_SESSION_AZP` list opens only the `/v1/sessions/revoke` endpoint.
-        A client can be in only one of these lists.
-        If both lists are empty, the service rejects every request.
+        The OPERATOR list alone opens platform reconciliation, replay and queue lists.
+        The DELETION list opens only global account deletion for Press.
+        EXECUTE and SESSION contain the same tenant clients. All other lists are disjoint.
+        If all lists are empty, the service rejects every token request.
         If the library is not installed, the service also rejects every request.
         If the request also carries a cookie, the service rejects the request.
   responses:

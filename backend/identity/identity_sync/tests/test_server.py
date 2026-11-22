@@ -26,6 +26,7 @@ NOW = 1_795_000_000
 PREVIEW_TOKEN = "preview-token"  # yapay zekâ aracısının belirteci: yalnız okur ve önizler
 # The service token of tenant kiraci1. The human approves on the tenant site, so this client
 # executes approved work. The same client ends sessions. The two names keep the tests readable.
+OPERATOR_TOKEN = "operator-token"
 EXECUTE_TOKEN = "execute-token"
 SESSION_TOKEN = "session-token"
 OTHER_SITE_TOKEN = "other-site-token"  # the service token of tenant kiraci2
@@ -36,6 +37,7 @@ ALL_ACTIONS = ["press.ensure_team", "tenant.change_email", "tenant.provision"]
 
 def fake_verifier(token: str) -> dict[str, object]:
     azp = {
+        OPERATOR_TOKEN: "identity-sync-operator",
         PREVIEW_TOKEN: "ai-agent",
         EXECUTE_TOKEN: "site-tenant1-service",
         SESSION_TOKEN: "site-tenant1-service",
@@ -116,10 +118,12 @@ class ServerCase(unittest.TestCase):
         headers = {"X-Identity-Sync-Timestamp": str(timestamp), "X-Identity-Sync-Signature": sign(body, timestamp)}
         return self.call("POST", "/v1/events", body, headers)
 
-    def bearer(self, token: str = EXECUTE_TOKEN) -> dict[str, str]:
+    def bearer(self, token: str = OPERATOR_TOKEN) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
-    def post_json(self, path: str, payload: object, token: str = EXECUTE_TOKEN) -> tuple[int, object]:
+    def post_json(self, path: str, payload: object, token: str | None = None) -> tuple[int, object]:
+        if token is None:
+            token = OPERATOR_TOKEN if path in {"/v1/reconcile", "/v1/dead-letters/replay"} else EXECUTE_TOKEN
         return self.call("POST", path, json.dumps(payload).encode(), self.bearer(token))
 
     def downstream_writes(self) -> list[fakes.Recorded]:
@@ -518,19 +522,19 @@ class ApprovalLayerTest(ServerCase):
         self.post_event({**EVENT, "id": "e-2"})
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, DONE)
 
-    def preview_replay(self, token: str = PREVIEW_TOKEN) -> dict[str, object]:
+    def preview_replay(self, token: str = OPERATOR_TOKEN) -> dict[str, object]:
         status, body = self.post_json("/v1/dead-letters/replay", {"dry_run": True}, token)
         self.assertEqual(status, 200)
         return body
 
-    def execute_replay(self, digest: object, token: str = EXECUTE_TOKEN, approval_id: object = "onay-1"):
+    def execute_replay(self, digest: object, token: str = OPERATOR_TOKEN, approval_id: object = "onay-1"):
         payload = {"dry_run": False, "preview_digest": digest, "approval_id": approval_id}
         return self.post_json("/v1/dead-letters/replay", payload, token)
 
-    def test_agent_can_read_and_preview(self) -> None:
+    def test_operator_can_read_and_preview(self) -> None:
         self.fail_once()
 
-        self.assertEqual(self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN))[0], 200)
+        self.assertEqual(self.call("GET", "/v1/dead-letters", None, self.bearer(OPERATOR_TOKEN))[0], 200)
         preview = self.preview_replay()
 
         self.assertEqual(preview["results"][0]["status"], "preview")
@@ -560,7 +564,7 @@ class ApprovalLayerTest(ServerCase):
         # İşlem günlüğü çağıranı, onay kimliğini, önizleme özetini ve sonucu taşır.
         audit = "\n".join(logs.output)
         self.assertIn("replay_dead_letters", audit)
-        self.assertIn("site-tenant1-service", audit)
+        self.assertIn("identity-sync-operator", audit)
         self.assertIn("onay-1", audit)
         self.assertIn(digest, audit)
         self.assertIn("outcome=executed", audit)
@@ -974,7 +978,7 @@ class AccountDeletionEndpointTest(ServerCase):
 
         self.assertEqual((status, body["status"]), (200, "dead_lettered"))
         self.assertIn(SUBJECT, self.stack.keycloak.users)
-        _status, listing = self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN))
+        _status, listing = self.call("GET", "/v1/dead-letters", None, self.bearer(OPERATOR_TOKEN))
         (letter,) = listing["dead_letters"]
         self.assertEqual((letter["event"]["kind"], letter["event"]["type"]), ("request", "ACCOUNT_DELETION"))
         self.assertEqual(letter["event"]["id"], body["request_id"])
@@ -992,10 +996,10 @@ class AccountDeletionEndpointTest(ServerCase):
         # A preview client can list the queue and preview the retry. It must not learn who it is.
         self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
         _status, body = self.request()
-        bearer = self.bearer(PREVIEW_TOKEN)
+        bearer = self.bearer(OPERATOR_TOKEN)
 
         _s, listing = self.call("GET", "/v1/dead-letters", None, bearer)
-        _s, preview = self.post_json("/v1/dead-letters/replay", {"dry_run": True}, PREVIEW_TOKEN)
+        _s, preview = self.post_json("/v1/dead-letters/replay", {"dry_run": True}, OPERATOR_TOKEN)
 
         for reply in (listing, preview):
             self.assertNotIn(SUBJECT, json.dumps(reply))
@@ -1025,7 +1029,7 @@ class AccountDeletionEndpointTest(ServerCase):
         for failures in (3, 1, 0):
             with self.subTest(failures=failures):
                 left[0] = failures
-                status, preview = self.post_json("/v1/dead-letters/replay", {"dry_run": True}, PREVIEW_TOKEN)
+                status, preview = self.post_json("/v1/dead-letters/replay", {"dry_run": True}, OPERATOR_TOKEN)
                 self.assertEqual(status, 200)
                 self.assertNotIn(SUBJECT, json.dumps(preview))
         self.assertEqual(self.downstream_writes(), [])
@@ -1088,7 +1092,7 @@ class OperationJournalTest(ServerCase):
         execute = {**self.INVITATION, "dry_run": False, "preview_digest": preview["preview_digest"]}
         return self.post_json("/v1/invitations", {**execute, "approval_id": approval_id})
 
-    def operations(self, token: str = PREVIEW_TOKEN) -> list[dict[str, object]]:
+    def operations(self, token: str = OPERATOR_TOKEN) -> list[dict[str, object]]:
         status, body = self.call("GET", "/v1/operations", None, self.bearer(token))
         self.assertEqual(status, 200)
         return body["operations"]
@@ -1199,7 +1203,7 @@ class DeadLetterEndpointTest(ServerCase):
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
         self.post_event()
 
-        status, body = self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN))
+        status, body = self.call("GET", "/v1/dead-letters", None, self.bearer(OPERATOR_TOKEN))
 
         self.assertEqual(status, 200)
         (letter,) = body["dead_letters"]
@@ -1227,15 +1231,15 @@ class ReconcileEndpointTest(ServerCase):
         self.stack.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID)
         self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
 
-    def preview(self, token: str = PREVIEW_TOKEN) -> dict[str, object]:
+    def preview(self, token: str = OPERATOR_TOKEN) -> dict[str, object]:
         status, body = self.post_json(self.PATH, {"dry_run": True}, token)
         self.assertEqual(status, 200)
         return body
 
-    def execute(self, digest: object, token: str = EXECUTE_TOKEN, approval_id: str = "onay-m1"):
+    def execute(self, digest: object, token: str = OPERATOR_TOKEN, approval_id: str = "onay-m1"):
         return self.post_json(self.PATH, {"dry_run": False, "preview_digest": digest, "approval_id": approval_id}, token)
 
-    def test_agent_gets_the_report_and_nothing_is_written(self) -> None:
+    def test_operator_gets_the_report_and_nothing_is_written(self) -> None:
         body = self.preview()
 
         self.assertEqual(body["count"], 2)
@@ -1340,7 +1344,7 @@ class ListLimitTest(ServerCase):
             store.add_dead_letter(failed, "tenant.provision tenant1: HTTP 503")
 
     def ids(self, query: str = "") -> tuple[list[str], object]:
-        status, body = self.call("GET", "/v1/dead-letters" + query, None, self.bearer(PREVIEW_TOKEN))
+        status, body = self.call("GET", "/v1/dead-letters" + query, None, self.bearer(OPERATOR_TOKEN))
         self.assertEqual(status, 200)
         return [letter["event"]["id"] for letter in body["dead_letters"]], body.get("next_offset")
 
@@ -1366,7 +1370,7 @@ class ListLimitTest(ServerCase):
     def test_bad_paging_values_are_refused(self) -> None:
         for query in ("?limit=0", "?limit=501", "?limit=abc", "?offset=-1", "?limit=1&limit=2", "?offset=1.5"):
             with self.subTest(query=query):
-                status, body = self.call("GET", "/v1/dead-letters" + query, None, self.bearer(PREVIEW_TOKEN))
+                status, body = self.call("GET", "/v1/dead-letters" + query, None, self.bearer(OPERATOR_TOKEN))
                 self.assertEqual((status, body), (400, {"error": "bad_request"}))
 
     def test_operation_list_has_the_same_limit(self) -> None:
@@ -1374,11 +1378,11 @@ class ListLimitTest(ServerCase):
         for number in range(5):
             store.operation_begin(f"o-{number}", "invite_user", ORG_ID, ["s1"])
 
-        status, body = self.call("GET", "/v1/operations?limit=2", None, self.bearer(PREVIEW_TOKEN))
+        status, body = self.call("GET", "/v1/operations?limit=2", None, self.bearer(OPERATOR_TOKEN))
 
         self.assertEqual(status, 200)
         self.assertEqual(([o["operation_id"] for o in body["operations"]], body["next_offset"]), (["o-0", "o-1"], 2))
-        status, body = self.call("GET", "/v1/operations?limit=2&offset=4", None, self.bearer(PREVIEW_TOKEN))
+        status, body = self.call("GET", "/v1/operations?limit=2&offset=4", None, self.bearer(OPERATOR_TOKEN))
         self.assertEqual(([o["operation_id"] for o in body["operations"]], body.get("next_offset")), (["o-4"], None))
 
 
@@ -1450,7 +1454,7 @@ class RequestLogTest(ServerCase):
                 self.assertIn("unknown 404", log)
 
     def test_query_values_are_not_logged(self) -> None:
-        status, log = self.logged("GET", f"/v1/dead-letters?email={self.PERSONAL}", None, self.bearer(PREVIEW_TOKEN))
+        status, log = self.logged("GET", f"/v1/dead-letters?email={self.PERSONAL}", None, self.bearer(OPERATOR_TOKEN))
 
         self.assertEqual(status, 400)
         self.assertNotIn(self.PERSONAL, log)
@@ -1458,7 +1462,7 @@ class RequestLogTest(ServerCase):
         self.assertIn("/v1/dead-letters 400", log)
 
     def test_id_in_a_known_path_is_logged_as_the_route_template(self) -> None:
-        status, log = self.logged("POST", "/v1/operations/onay-gizli-17/resolve", b'{"resolution": "abandoned"}', self.bearer())
+        status, log = self.logged("POST", "/v1/operations/onay-gizli-17/resolve", b'{"resolution": "abandoned"}', self.bearer(EXECUTE_TOKEN))
 
         self.assertEqual(status, 404)
         self.assertNotIn("onay-gizli-17", log)
@@ -1502,7 +1506,7 @@ class RequestLogTest(ServerCase):
 
     def test_known_routes_are_logged_by_name_and_status(self) -> None:
         self.assertIn("/healthz 200", self.logged("GET", "/healthz")[1])
-        self.assertIn("/v1/dead-letters 200", self.logged("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN))[1])
+        self.assertIn("/v1/dead-letters 200", self.logged("GET", "/v1/dead-letters", None, self.bearer(OPERATOR_TOKEN))[1])
 
     def test_failure_logs_name_the_route_too(self) -> None:
         keycloak = self.stack.keycloak
@@ -1549,7 +1553,7 @@ class TargetErrorValueTest(ServerCase):
 
     def everything(self, logs) -> str:
         store = "\n".join(self.stack.app.store._db.iterdump())
-        _status, queue = self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN))
+        _status, queue = self.call("GET", "/v1/dead-letters", None, self.bearer(OPERATOR_TOKEN))
         return "\n".join(logs.output) + store + json.dumps(queue)
 
     def test_unknown_error_name_from_keycloak_is_dropped(self) -> None:
