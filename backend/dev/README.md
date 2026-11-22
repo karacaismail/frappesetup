@@ -12,6 +12,11 @@ Python 3.14 ve Docker Compose kurulu olmalıdır.
 Pane terminali `PANE_PORT` değerini verir. Bu değeri değiştirmeyin.
 İlk kurulum imajları ve uygulama paketlerini indirir.
 
+Kiracı, Keycloak ve Press için ayrı ortamlar da vardır.
+Bu ortamlar aynı Pane'de ortak ortamla aynı portları kullanır.
+Bu portlardan birini kendi ortamınız kullanıyorsa önce ilgili ortamı kapatın.
+Kiracı ortamınızı kapatmak için `backend/dev/bin/stop` komutunu çalıştırın.
+
 1. Colima profilini seçin.
 
    ```sh
@@ -39,8 +44,27 @@ Pane terminali `PANE_PORT` değerini verir. Bu değeri değiştirmeyin.
    Başlatma için en az 10 GiB disk ve 3 GiB bellek gerekir.
    Betik mevcut imajları yeniden kullanır. Eksik imajları derler.
    Kiracıya ERPNext ve `platform_core` kurulur. Press sitesine `press_tr` kurulur.
+   `up`, `press_tr` kaynak kodunu kopyalar.
+   Press kurulum işareti varsa `up`, `bench migrate` komutuyla Press veritabanını günceller.
    Betik servislerin yanıtlarını ve bellek kullanımını gösterir.
    Kurulum yarıda kalırsa aynı komutu yeniden çalıştırabilirsiniz.
+
+## Press imajını yeniden derleyin
+
+Press Dockerfile dosyası veya imajın bağımlılıkları değişirse önce `build` komutunu çalıştırın.
+
+```sh
+backend/e2e/stack build
+```
+
+Bu komut yalnız Press'in `web` imajını yeniden derler.
+Derleme tamamlanınca ortamı açın.
+
+```sh
+backend/e2e/stack up
+```
+
+Kiracı ve Keycloak imajlarını kendi mevcut betikleriyle derleyin.
 
 ## Adresler
 
