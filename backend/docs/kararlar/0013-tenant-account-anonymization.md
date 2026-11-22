@@ -6,42 +6,51 @@ Tarih: 22 Kasım 2026 Pazar. Sahibi: platform-core-kimlik işi. Orkestratör bir
 
 Müşteri kendi hesabını silebilir (Proje kaydı O-27). Hesap silme akışını identity-sync yürütür. Akışın 4. adımı kiracı sitesindeki kullanıcıyı kapatır. Aynı adım kişiyi gösteren alanları anonim yapar. İş kayıtları silinmez.
 
-Uç `platform_core.api.identity.anonymize_user` olur. Yalnız `azp=identity-sync` servis belirteci çağırabilir.
+Uç `platform_core.api.identity.anonymize_user` olur. Yalnız `azp=identity-sync` servis belirteci çağırabilir. Kurallar `docs/sozlesmeler.md` 7. bölümdeki anonim yapma kurallarıdır.
 
-## Frappe 16'nın hazır yolu
+## Frappe 16'nın hazır yolu neden kullanılmıyor
 
-Frappe 16'da “Personal Data Deletion Request” adlı bir DocType var. Kaynak dosya `frappe/website/doctype/personal_data_deletion_request/personal_data_deletion_request.py` yolundadır. Dosyada iki parça vardır.
+Frappe 16'da “Personal Data Deletion Request” adlı bir DocType var. Kaynak dosya `frappe/website/doctype/personal_data_deletion_request/personal_data_deletion_request.py` yolundadır.
 
-1. **Anonimleştirme motoru.** `_anonymize_data` yöntemi (satır 260) `user_data_fields` kancasını okur. Her kurulu uygulama bu kancaya kendi kişi alanlarını yazar. Frappe ve ERPNext bu kancayı doldurur. Motor alanları değiştirir, kayıtları silmez. Sonunda kullanıcının adını `deleted-user-<sıra>@<site>` yapar.
-2. **İstek yaşam döngüsü.** Kayıt açılınca kullanıcıya onay e-postası gider (satır 67). Sonra bir “System Manager” onay verir (satır 118). İş uzun kuyruğa gönderilir (satır 132). İş bitince eski adrese yine e-posta gider (satır 142). Otomatik işleme `scheduler_events` kancasıyla çalışır (`frappe/hooks.py:282`).
+- Kayıt açılınca kullanıcıya onay e-postası gider (satır 67).
+- Bir “System Manager” onay verir (satır 118).
+- İş uzun kuyruğa gönderilir (satır 132).
+- Otomatik işleme `scheduler_events` kancasıyla çalışır (`frappe/hooks.py:282`). Proje zamanlanmış iş kurmaz.
+- Motor bazı tablolarda tam adı bütün satırlarda arar ve değiştirir (satır 317). Aynı adı taşıyan başka bir kişinin yorumu da değişebilir. Bağımsız inceleme bunu engelleyici buldu.
+
+Bu yüzden ne kaydın yaşam döngüsü ne de motor kullanılır. Kapsam yine Frappe'nin `user_data_fields` kancasından türer. Böylece her uygulama kendi kişi alanlarını kendisi bildirir.
 
 ## Seçim
 
-Motor ve kanca kullanılır. Yaşam döngüsü kullanılmaz.
+### Silme kaydı
 
-| Parça | Kullanılır mı | Neden |
-| --- | --- | --- |
-| `user_data_fields` kancası | Evet | Her uygulama kendi kişi alanlarını kendisi bildirir. HRMS TR da aynı kancaya yazar. |
-| `_anonymize_data` motoru | Evet | Frappe'nin kendi kuralıyla alanları değiştirir ve kullanıcının adını çevirir. |
-| Kaydın kendisi | Evet | İşin izini tutar. Durumu “Deleted” olur. |
-| Onay e-postası | Hayır | Onayı identity-sync aldı. E-posta adresi yeniden “Email Queue” içine girerdi. |
-| Yönetici onayı | Hayır | Servis çağrısı insan onayı bekleyemez. |
-| Kuyruk | Hayır | identity-sync adımın bittiğini yanıttan bilmelidir. İş istek içinde çalışır. |
-| Zamanlanmış işleme | Hayır | Proje zamanlanmış iş kurmaz. |
+Yeni DocType “Platform Identity Deletion” silme kaydını tutar. Kayıt ham kimliği tutmaz. Kaydın adı `(iss, sub)` çiftinin HMAC-SHA256 özetidir. Anahtar `kimlik_deletion_hmac_key` site ayarıdır. Anahtar yoksa kimlik değiştiren uçlar 503 döner.
 
-Uygulama şöyledir:
+`provision`, `set_enabled` ve `change_email` önce bu kaydı denetler. Silinmiş kimlik 410 alır. Giriş de aynı kaydı denetler ve 403 döner.
 
-1. Uç bağ `(issuer, subject)` ile kullanıcıyı bulur. `Administrator` ve `Guest` 409 alır.
-2. Uç kullanıcıyı kapatır. Frappe bütün oturumları kapatır (`frappe/core/doctype/user/user.py:362`).
-3. Uç kaydı `db_insert` ile yazar. Böylece `after_insert` çalışmaz ve e-posta gitmez.
-4. Uç `_anonymize_data` yöntemini aynı istekte çağırır.
-5. Motor kayıtta özgün e-postayı bırakır. Uç bu alanı anonim adla değiştirir.
-6. Kimlik bağı kalır ve anonim kullanıcıyı gösterir. Aynı istek ikinci kez gelince uç aynı gövdeyi döner.
+### İki adım
+
+1. Birinci adım kimlik bağını ve silme kaydını kilitler. Hesabı kapatır. API anahtarını, API gizlisini ve parolayı siler. Kaydı “Disabled” durumunda yazar ve commit eder. Sonra oturumları 100'lük sayfalarla kapatır.
+2. İkinci adım aynı satırları yeniden kilitler. Kişisel veriyi anonim yapar. Kullanıcının adını `deleted-user-<16 onaltılık karakter>@deleted.invalid` yapar. Kimlik bağını siler, böylece ham `sub` gider. Kaydı “Anonymized” yapar.
+
+İki adım da tekrar güvenlidir. İkinci adım yarıda keserse değişiklikleri geri alınır. Kayıt “Disabled” kalır ve yeni istek işi bitirir.
+
+### Kilit sırası
+
+Her yerde önce kimlik bağı, sonra silme kaydı kilitlenir. Giriş de aynı kilidi alır. Frappe oturum kaydını ekleyince commit eder (`frappe/sessions.py:301`). Bu yüzden giriş kilidi bundan sonra yeniden alır ve denetimi yineler. Silme araya girdiyse giriş kendi oturumunu kapatır.
+
+### Kapsam
+
+- Kapsam `user_data_fields` kancasından ve sözleşmedeki ek kayıtlardan türer. Kod `kimlik/anonymization_scope.py` dosyasındadır.
+- Yalnız kullanıcıya bağlı satırlar değişir. Tam ad yalnız kullanıcının kendi satırlarında değişir.
+- Bir “Contact” kaydı, bütün e-posta satırları kişinin adresiyse kişinindir. Başka bir adres de varsa kayıt ortaktır. Ortak kayıttan yalnız kişinin e-posta satırı silinir.
+- Bir “Address” kaydı, bütün bağları kişinin kendi “Contact” kayıtlarına gidiyorsa kişinindir. Ortak adreste yalnız kişinin e-postası boşalır.
+- Yalnız kişisel dosya silinir. Kişisel dosya, “User” kaydına ya da kişinin kendi “Contact” kaydına bağlı dosyadır. İş kaydına bağlı dosya kalır.
+- E-posta alanlarında yalnız tam adres değişir. Adres listeleri tek tek ayrıştırılır.
 
 ## Bilinen sınırlar ve geri dönüş
 
-- `_anonymize_data` alt çizgili bir yöntemdir. Frappe bu yöntemi değiştirebilir. Testler bu durumda başarısız olur. O zaman uç motoru kendi koduyla yazar.
-- Motor her eşleşen “Contact” kaydını aynı anonim ada çevirir. Aynı e-postayla iki kişi kaydı varsa iş 417 ile durur. Fazla kayıt elle birleştirilir, sonra istek yinelenir.
-- Telefon kurulumları bu uçla kapanmaz. Onları `platform_core.api.mobile.revoke_user_installations` ucu kapatır.
 - Kişi alanı taşıyan her yeni DocType `user_data_fields` kancasına girmelidir. Girmezse alan anonim olmaz.
-- Geri dönüş: Uç kaldırılır. Silme adımı elle “Personal Data Deletion Request” ekranından yürütülür.
+- Telefon kurulumları bu uçla kapanmaz. Onları `platform_core.api.mobile.revoke_user_installations` ucu kapatır.
+- `kimlik_deletion_hmac_key` değeri sonradan değişirse eski kayıtlar okunamaz.
+- Geri dönüş: Uç kaldırılır. Silme adımı elle yürütülür.
