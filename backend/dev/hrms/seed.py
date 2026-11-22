@@ -182,9 +182,12 @@ def seed(password):
         "File",
         file_name="hrms-tr-synthetic-leave-report.txt",
         is_private=1,
-        attached_to_doctype="Prepared Report",
-        attached_to_name=prepared.name,
         content="Synthetic result from an old leave report.",
+    )
+
+    # Recreate an attachment saved before the report was disabled.
+    attachment.db_set(
+        {"attached_to_doctype": "Prepared Report", "attached_to_name": prepared.name}
     )
 
     return {

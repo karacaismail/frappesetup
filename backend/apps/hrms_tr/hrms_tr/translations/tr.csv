@@ -58,3 +58,5 @@ Preserve operations access to leave applications on this site.,Bu sitede işleti
 Use the tenant portal to access HRMS TR.,HRMS TR için kiracı panelini kullanın.
 Use this order for stable paging when modification timestamps match.,Bu sırayı kullanırsanız değişiklik saati eşit kayıtlar sayfalar arasında yer değiştirmez.
 The authenticated user exceeded the approval request limit.,Kullanıcının onay isteği sayısı sınırı aştı.
+Read the leave application version before approving.,Onaylamadan önce izin talebinin güncel kaydını açın.
+The leave application could not be approved.,İzin talebi onaylanamadı.

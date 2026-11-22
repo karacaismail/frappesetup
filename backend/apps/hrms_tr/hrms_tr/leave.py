@@ -57,20 +57,23 @@ def validate_approval(doc, method=None):
 	check_not_own_leave(doc)
 
 
-def pending_leave(name: str, *, expected_version: str, lock: bool = False):
+def pending_leave(name: str, *, expected_version: str | None = None, lock: bool = False):
 	check_approver_role()
 	doc = frappe.get_doc(DOCTYPE, name, for_update=lock)
 	for operation in ("read", "write", "submit"):
 		doc.check_permission(operation)
 	check_not_own_leave(doc)
+	if expected_version is not None and str(doc.modified) != expected_version:
+		frappe.throw(
+			_("The leave application changed. Open it again before approving."),
+			frappe.TimestampMismatchError,
+		)
 	if doc.docstatus != DocStatus.draft() or doc.status != "Open":
 		frappe.throw(_("Only open draft leave applications can be approved."))
-	if str(doc.modified) != expected_version:
-		frappe.throw(_("The leave application changed. Open it again before approving."))
 	return doc
 
 
-def approve(name: str, *, expected_version: str) -> dict[str, str]:
+def approve(name: str, *, expected_version: str | None = None) -> dict[str, str]:
 	doc = pending_leave(name, lock=True, expected_version=expected_version)
 	doc.status = "Approved"
 	doc.submit()

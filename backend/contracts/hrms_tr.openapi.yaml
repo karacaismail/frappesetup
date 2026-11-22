@@ -33,25 +33,37 @@ paths:
         - name: filters
           in: query
           description: |
-            URL-encoded JSON object. Frappe applies all equality conditions in the object together.
+            URL-encoded JSON. Use an object for equality conditions or an array of name membership filters.
+            Frappe applies all conditions together.
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: false
-                properties:
-                  name: {type: string}
-                  employee: {type: string}
-                  leave_type: {type: string}
-                  status: {type: string, enum: [Open, Approved, Rejected, Cancelled]}
-                  docstatus: {type: integer, enum: [0, 1, 2]}
+                oneOf:
+                  - type: object
+                    additionalProperties: false
+                    properties:
+                      name: {type: string}
+                      employee: {type: string}
+                      leave_type: {type: string}
+                      status: {type: string, enum: [Open, Approved, Rejected, Cancelled]}
+                      docstatus: {type: integer, enum: [0, 1, 2]}
+                  - type: array
+                    items:
+                      type: array
+                      minItems: 3
+                      prefixItems:
+                        - {const: name}
+                        - {const: in}
+                        - type: array
+                          items: {type: string}
+                      items: false
               example: {status: Open, docstatus: 0}
         - name: order_by
           in: query
-          description: Use this order for stable paging when modification timestamps match.
+          description: Supply an explicit order for stable paging. Use the name to break ties between matching modification timestamps.
           schema:
             type: string
-            enum: ["modified desc, name asc"]
+            enum: ["modified desc, name asc", "name asc"]
         - name: limit_start
           in: query
           description: Number of records to skip. The first record is at offset 0.
@@ -61,10 +73,13 @@ paths:
             default: 0
         - name: limit_page_length
           in: query
-          description: Maximum number of records requested per page.
+          description: |
+            Clients that follow this contract request up to 100 records per page.
+            The standard Frappe endpoint treats 0 as unlimited, which is outside this contract.
           schema:
             type: integer
             minimum: 1
+            maximum: 100
             default: 20
       responses:
         "200":
@@ -77,6 +92,12 @@ paths:
           $ref: "#/components/responses/AuthenticationFailed"
         "403":
           $ref: "#/components/responses/PermissionDenied"
+        "417":
+          description: Frappe could not validate the requested fields, filters, or ordering.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrappeError"
   /resource/Leave%20Application/{name}:
     parameters:
       - in: path
@@ -142,11 +163,14 @@ paths:
                 $ref: "#/components/schemas/FrappeError"
         "417":
           description: |
-            The application version changed, the application is not an open draft, or HRMS validation failed.
+            The application version changed, input validation failed, the application is not an open draft,
+            or HRMS validation failed. A version conflict returns TimestampMismatchError.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/FrappeError"
+              example:
+                exc_type: TimestampMismatchError
   /method/hrms_tr.hrms_endpoints.deny_legacy_leave_query:
     get:
       operationId: denyLegacyLeaveQueryGet
@@ -162,34 +186,107 @@ paths:
       responses:
         "403":
           $ref: "#/components/responses/PermissionDenied"
-  /{rpcNamespace}/{legacyLeaveMethod}:
-    description: HRMS TR routes these upstream method aliases to its denial handler.
-    parameters:
-      - in: path
-        name: rpcNamespace
-        required: true
-        schema: {type: string, const: method}
-      - in: path
-        name: legacyLeaveMethod
-        required: true
-        schema:
-          type: string
-          enum:
-            - hrms.www.hrms.get_context_for_dev
-            - hrms.hr.doctype.leave_application.leave_application.get_leave_details
-            - hrms.hr.doctype.leave_application.leave_application.get_leave_balance_on
-            - hrms.api.get_leave_balance_map
-            - hrms.api.get_leave_types
-            - hrms.payroll.doctype.salary_slip.salary_slip.make_salary_slip_from_timesheet
-            - hrms.payroll.doctype.salary_structure.salary_structure.make_salary_slip
-            - hrms.hr.doctype.leave_application.leave_application.get_events
+  /method/hrms.www.hrms.get_context_for_dev:
     get:
-      description: Denies the request without reading leave data.
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
       responses:
         "403":
           $ref: "#/components/responses/PermissionDenied"
     post:
-      description: Denies the request without reading leave data.
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /method/hrms.hr.doctype.leave_application.leave_application.get_leave_details:
+    get:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /method/hrms.hr.doctype.leave_application.leave_application.get_leave_balance_on:
+    get:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /method/hrms.api.get_leave_balance_map:
+    get:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /method/hrms.api.get_leave_types:
+    get:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /method/hrms.payroll.doctype.salary_slip.salary_slip.make_salary_slip_from_timesheet:
+    get:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /method/hrms.payroll.doctype.salary_structure.salary_structure.make_salary_slip:
+    get:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /method/hrms.hr.doctype.leave_application.leave_application.get_events:
+    get:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      summary: Deny access to an unsupported legacy HRMS endpoint.
+      description: Rejects the legacy method before it can read or write HRMS records.
       responses:
         "403":
           $ref: "#/components/responses/PermissionDenied"
@@ -212,15 +309,31 @@ paths:
           $ref: "#/components/responses/PermissionDenied"
 x-ai-tool:
   name: hrms_tr_approve_leave
+  kind: write
   destructive: true
+  roles: [HRMS TR Manager, HRMS TR Admin]
+  versioned: true
   arguments:
     type: object
     additionalProperties: false
-    required: [name, version]
+    required: [name]
     properties:
-      name: {type: string, minLength: 1, maxLength: 140, description: "Leave application record name."}
-      version: {type: string, minLength: 1, maxLength: 40, description: "The modified value of the open draft."}
-  description: The tool creates a proposal. The leave application changes only after human approval.
+      name: {type: string, minLength: 1, maxLength: 140, description: "Document name of the leave application."}
+  description: The tool creates a proposal and records the current modified value. The approval flow checks that value before submitting the application.
+  preview:
+    type: object
+    properties:
+      changes:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          required: [fieldname, label, old, new]
+          properties:
+            fieldname: {type: string}
+            label: {type: string}
+            old: {type: [string, integer]}
+            new: {type: [string, integer]}
 components:
   securitySchemes:
     frappeSession:

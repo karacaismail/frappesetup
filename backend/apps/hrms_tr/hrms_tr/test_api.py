@@ -45,8 +45,9 @@ class ApprovalEndpointTest(TestCase):
 			fake.session.user = "manager@example.test"
 			fake.db.get_value.return_value = "employee@example.test"
 			fake.get_doc.return_value = doc
-			fake.throw.side_effect = lambda message: raise_permission_error(message, frappe.ValidationError)
-			with self.assertRaises(frappe.ValidationError) as error:
+			fake.TimestampMismatchError = frappe.TimestampMismatchError
+			fake.throw.side_effect = raise_permission_error
+			with self.assertRaises(frappe.TimestampMismatchError) as error:
 				approve_leave("LEAVE-STALE-0001", "2026-11-22 12:00:00")
 		self.assertEqual(error.exception.http_status_code, 417)
 		fake.get_doc.assert_called_once_with("Leave Application", "LEAVE-STALE-0001", for_update=True)
@@ -71,4 +72,17 @@ class ApprovalEndpointTest(TestCase):
 			with self.assertRaises(frappe.RateLimitExceededError):
 				approve_leave("HR-LAP-TEST", "2026-11-22 12:00:00")
 		cache.make_key.assert_called_once_with("rl:hrms_tr.api.approve_leave:manager@example.test")
+		approve.assert_not_called()
+
+	def test_missing_version_raises_native_validation_error(self):
+		from hrms_tr import api
+
+		with (
+			patch.object(frappe, "_", side_effect=lambda message: message),
+			patch.object(api, "_", create=True, side_effect=lambda message: message),
+			patch.object(frappe, "throw", side_effect=raise_permission_error),
+			patch.object(leave, "approve") as approve,
+		):
+			with self.assertRaises(frappe.ValidationError):
+				approve_leave("LEAVE-MISSING")
 		approve.assert_not_called()

@@ -102,14 +102,21 @@ Rapor uçları ve rapora bağlı özel dosya indirme yolu bu denetimi uygular.
 Liste ve belge okuma, Frappe'nin genel `/api/resource/Leave%20Application` yolunu kullanır.
 Liste alanları, süzgeç ve sayfalama seçenekleri OpenAPI sözleşmesinde yer alır.
 Frappe kayıt ve alan izinlerini bu yolda uygular.
+Sözleşme, sayfa başına 1 ile 100 kayıt aralığını destekler.
+Frappe, sıfırı sayfa sınırı olmadan okuma isteği olarak yorumlar.
 
 İnsan onay isteği, okunan kaydın `modified` değerini `version` olarak taşır.
-Sunucu kaydı kilitler. Sürüm değişmişse sunucu 417 döndürür.
+Sunucu kaydı kilitler.
+Sürüm değişmişse Frappe, 417 koduyla `TimestampMismatchError` döndürür.
 Bu durumda talebin durumu değişmez.
 
-Yapay zekâ önizlemesi, alan farklarını `fieldname`, `old` ve `new` ile gösterir.
+Yapay zekâ aracı yalnız talebin kayıt adını alır.
+Önizleme, kaydın güncel sürümünü `target_version` alanına yazar.
+Platform, insan onayında ve çalıştırmadan önce kilit altında sürümü denetler.
+Önizleme, alan farklarını `fieldname`, `label`, `old` ve `new` ile gösterir.
 Öneri ayrıntısında yalnız talebin kayıt adı bulunur.
-Çalışan adı, izin tarihleri ve gün sayısı öneri ayrıntısına yazılmaz.
+Önizleme çalışan adı, izin tarihleri ve gün sayısını içermez.
+HRMS izin onayını reddederse araç, kişi bilgisi içermeyen bir hata verir.
 
 ## Öz denetim kararları
 

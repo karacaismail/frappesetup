@@ -39,7 +39,8 @@ class Client:
 
     def csrf_token(self):
         status, body = self.page("/panel")
-        match = re.search(
+        match = re.search(rb'<meta name="csrf-token" content="([^"]+)"', body)
+        match = match or re.search(
             rb'(?:frappe\.csrf_token\s*=|["]csrf_token["]\s*:)\s*"([^"]+)"', body
         )
         if status != 200 or match is None or match[1] in (b"None", b"null"):
@@ -48,8 +49,12 @@ class Client:
             )
         return match[1].decode()
 
-    def send(self, path, data=None, csrf_token=None, *, method=None):
+    def send(
+        self, path, data=None, csrf_token=None, *, method=None, authorization=None
+    ):
         headers = {"Accept": "application/json", "X-Frappe-Site-Name": self.site}
+        if authorization:
+            headers["Authorization"] = authorization
         if data is not None:
             headers["Content-Type"] = "application/json"
         if csrf_token:
@@ -78,6 +83,8 @@ class LeaveHttpTest(unittest.TestCase):
     def document(self, client, key, status=200):
         code, result = client.send(self.leave_path(key))
         self.assertEqual(code, status, result.get("exc_type"))
+        if status == 200:
+            self.contract_validators["detail"].validate(result)
         return result.get("data")
 
     def listed(self, client):
@@ -86,7 +93,22 @@ class LeaveHttpTest(unittest.TestCase):
         )
         code, result = client.send(f"{LEAVE_PATH}?{query}")
         self.assertEqual(code, 200, result.get("exc_type"))
+        self.contract_validators["list"].validate(result)
         return {row["name"]: row["employee"] for row in result["data"]}
+
+    def leave_ledger_entries(self, client, name):
+        query = urlencode(
+            {
+                "filters": json.dumps(
+                    {"transaction_type": "Leave Application", "transaction_name": name}
+                ),
+                "fields": json.dumps(["name"]),
+                "limit_page_length": 1,
+            }
+        )
+        code, result = client.send(f"/api/resource/Leave%20Ledger%20Entry?{query}")
+        self.assertEqual(code, 200, result.get("exc_type"))
+        return result["data"]
 
     def assert_list_scope(self, client, *actors):
         records = self.listed(client)
@@ -110,6 +132,7 @@ class LeaveHttpTest(unittest.TestCase):
         )
         code, result = client.send(f"{LEAVE_PATH}?{query}")
         self.assertEqual(code, 200, result.get("exception"))
+        self.contract_validators["list"].validate(result)
         self.assertEqual(result["data"], [{"name": names[0]}])
 
         query = urlencode(
@@ -123,6 +146,7 @@ class LeaveHttpTest(unittest.TestCase):
         )
         code, result = client.send(f"{LEAVE_PATH}?{query}")
         self.assertEqual(code, 200, result.get("exception"))
+        self.contract_validators["list"].validate(result)
         self.assertEqual(
             result["data"],
             [{"name": names[1], "employee": self.data["employees"]["employee"]}],
@@ -133,9 +157,10 @@ class LeaveHttpTest(unittest.TestCase):
         )
         code, result = client.send(f"{LEAVE_PATH}?{query}")
         self.assertEqual(code, 200, result.get("exception"))
+        self.contract_validators["list"].validate(result)
         self.assertEqual(result["data"], [])
         code, _ = Client(self, None).send(LEAVE_PATH)
-        self.assertIn(code, (401, 403))
+        self.assertEqual(code, 403)
 
     def test_hrms_tr_roles_do_not_grant_desk_access(self):
         for actor in ("employee", "manager", "hr"):
@@ -230,7 +255,12 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertNotEqual(changed["modified"], before["modified"])
         code, result = client.send(endpoint, self.approval_payload(before))
         self.assertEqual(code, 417, result.get("exception"))
-        self.assertEqual(self.document(client, "manager_approve"), changed)
+        self.assertEqual(result.get("exc_type"), "TimestampMismatchError")
+        admin = Client(self, "Administrator", password=os.environ["ADMIN_PASSWORD"])
+        persisted = self.document(admin, "manager_approve")
+        for field in ("modified", "status", "docstatus"):
+            self.assertEqual(persisted[field], changed[field], field)
+        self.assertEqual(self.leave_ledger_entries(admin, persisted["name"]), [])
 
         code, result = client.send(endpoint, self.approval_payload(changed))
         self.assertEqual(code, 200, result.get("exc_type"))
@@ -481,15 +511,22 @@ class LeaveHttpTest(unittest.TestCase):
         code, _ = guest.send(
             "/api/method/hrms_tr.api.approve_leave", self.approval_payload(outsider)
         )
-        self.assertIn(code, (401, 403))
+        self.assertEqual(code, 403)
         code, _ = guest.send(
             "/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
         )
-        self.assertIn(code, (401, 403))
+        self.assertEqual(code, 403)
         code, _ = self.login("manager").send(
             "/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
         )
         self.assertEqual(code, 403)
+
+    def test_invalid_api_token_is_unauthorized(self):
+        guest = Client(self, None)
+        code, result = guest.send(
+            LEAVE_PATH, authorization="token missing-test-key:missing-test-secret"
+        )
+        self.assertEqual(code, 401, result.get("exc_type"))
 
     def test_approval_rejects_invalid_verb_version_and_client_role(self):
         manager = self.login("manager")
@@ -499,10 +536,15 @@ class LeaveHttpTest(unittest.TestCase):
         body = self.approval_payload(before)
         status, _ = manager.page(f"{endpoint}?{urlencode(body)}")
         self.assertIn(status, (403, 405))
-        for invalid in ("", ["not a version"]):
-            with self.subTest(version=invalid):
-                status, _ = manager.send(endpoint, {**body, "version": invalid})
-                self.assertIn(status, (400, 417))
+        for invalid_body in (
+            {"name": before["name"]},
+            {**body, "version": ""},
+            {**body, "version": "x" * 41},
+            {**body, "version": ["not a version"]},
+        ):
+            with self.subTest(body=invalid_body):
+                status, result = manager.send(endpoint, invalid_body)
+                self.assertEqual(status, 417, result.get("exc_type"))
         status, _ = employee.send(endpoint, {**body, "role": "HRMS TR Admin"})
         self.assertIn(status, (403, 417))
         self.assertEqual(self.document(manager, "employee"), before)
@@ -589,7 +631,7 @@ class LeaveHttpTest(unittest.TestCase):
         status, _ = admin.page(self.data["prepared_report_file"])
         self.assertEqual(status, 403)
 
-    def ai_call(self, client, name, version):
+    def ai_call(self, client, name):
         return client.send(
             f"{AI_PATH}.mcp",
             {
@@ -598,23 +640,28 @@ class LeaveHttpTest(unittest.TestCase):
                 "method": "tools/call",
                 "params": {
                     "name": "hrms_tr_approve_leave",
-                    "arguments": {"name": name, "version": version},
+                    "arguments": {"name": name},
                 },
             },
         )
 
     def ai_propose(self, client, document):
-        code, response = self.ai_call(client, document["name"], document["modified"])
+        code, response = self.ai_call(client, document["name"])
         self.assertEqual(code, 200, response)
         proposal = response["result"]["structuredContent"]
         self.assertEqual(proposal["status"], "approval_required")
         self.assertEqual(proposal["preview"]["details"], {"name": document["name"]})
+        changes = proposal["preview"]["changes"]
+        self.assertEqual(len(changes), 2)
+        for change in changes:
+            self.assertEqual(set(change), {"fieldname", "label", "old", "new"})
+            self.assertIsInstance(change["label"], str)
+            self.assertTrue(change["label"])
+        transitions = {
+            change["fieldname"]: (change["old"], change["new"]) for change in changes
+        }
         self.assertEqual(
-            proposal["preview"]["changes"],
-            [
-                {"fieldname": "status", "old": "Open", "new": "Approved"},
-                {"fieldname": "docstatus", "old": 0, "new": 1},
-            ],
+            transitions, {"status": ("Open", "Approved"), "docstatus": (0, 1)}
         )
         return proposal
 
@@ -638,9 +685,7 @@ class LeaveHttpTest(unittest.TestCase):
         ):
             with self.subTest(actor=actor, key=key):
                 before = self.document(hr, key)
-                code, response = self.ai_call(
-                    self.login(actor), before["name"], before["modified"]
-                )
+                code, response = self.ai_call(self.login(actor), before["name"])
                 if code == 200:
                     result = response.get("result", {})
                     self.assertTrue(
@@ -689,7 +734,8 @@ class LeaveHttpTest(unittest.TestCase):
         approval = self.ai_approval(client, proposal)
         endpoint = f"{AI_PATH}.approve_proposal"
         csrf = client.csrf_token()
-        self.assertEqual(client.send(endpoint, approval)[0], 403)
+        code, response = client.send(endpoint, approval)
+        self.assertEqual((code, response.get("exc_type")), (400, "CSRFTokenError"))
         self.assertEqual(self.document(client, "ai")["modified"], before["modified"])
 
         code, response = client.send(endpoint, approval, csrf_token=csrf)
@@ -701,12 +747,40 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertEqual((doc["status"], doc["docstatus"]), ("Approved", 1))
 
 
+def load_contract_validators(path):
+    import yaml
+    from jsonschema import Draft202012Validator
+
+    contract = yaml.safe_load(path.read_text())
+    return {
+        response: Draft202012Validator(
+            {
+                **contract,
+                **contract["paths"][path]["get"]["responses"]["200"]["content"][
+                    "application/json"
+                ]["schema"],
+            }
+        )
+        for response, path in (
+            ("list", "/resource/Leave%20Application"),
+            ("detail", "/resource/Leave%20Application/{name}"),
+        )
+    }
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", required=True)
     parser.add_argument("--site", required=True)
     parser.add_argument("--manifest", type=Path, required=True)
+    contract_path = Path(__file__).resolve().with_name("hrms_tr.openapi.yaml")
+    if not contract_path.is_file():
+        contract_path = (
+            Path(__file__).resolve().parents[2] / "contracts/hrms_tr.openapi.yaml"
+        )
+    parser.add_argument("--contract", type=Path, default=contract_path)
     parser.add_argument("--with-ai", action="store_true")
+    parser.add_argument("tests", nargs="*")
     args = parser.parse_args()
     parsed_url = urlsplit(args.url)
     if parsed_url.scheme != "http" or parsed_url.hostname not in {
@@ -719,4 +793,5 @@ if __name__ == "__main__":
     LeaveHttpTest.data = json.loads(args.manifest.read_text())
     LeaveHttpTest.password = os.environ["HRMS_TR_TEST_PASSWORD"]
     LeaveHttpTest.with_ai = args.with_ai
-    unittest.main(argv=[__file__], verbosity=2)
+    LeaveHttpTest.contract_validators = load_contract_validators(args.contract)
+    unittest.main(argv=[__file__, *args.tests], verbosity=2)
