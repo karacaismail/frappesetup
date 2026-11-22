@@ -474,11 +474,13 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 #### Kullanım günlüğü temizliğinin modül arayüzü
 
-- “AI Usage Log” kaydının sahibi model geçididir. Temizlik işlevi `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False)` olur.
+- “AI Usage Log” kaydının sahibi model geçididir. Temizlik işlevi `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False, names=None)` olur.
 - İşlev yetkiyi kendisi denetler. Yalnız “System Manager” çağırabilir. Öteki kullanıcı `frappe.PermissionError` alır.
 - Süre 365 gündür. Ayar bu süreyi değiştiremez. Kayıtlar O-32'ye göre kalıcı silinir.
-- İşlev `{"eligible": <sayı>, "deleted": <sayı>}` döner. `dry_run=True` iken hiçbir kayıt silinmez ve `deleted` 0 olur.
-- İşlev önizleme belirteci istemez. İnsan onayını çağıran taraf yönetir. Örneğin `platform_core.api.ai.purge_logs` kendi önizleme ve onay yolunu kullanır. Geçidin kendi HTTP ucu da kendi önizleme belirtecini kullanabilir.
+- `dry_run=True` iken işlev hiçbir kaydı silmez. `{"eligible": <sayı>, "deleted": 0, "names": [...]}` döner. `names` bu çalıştırmada silinecek kayıtların adlarıdır, en çok 500 tanedir.
+- `dry_run=False` iken çağıran taraf önizlemedeki `names` listesini verir. İşlev yalnız bu kayıtları siler. Kayıtları kilit altında yeniden doğrular. Bir kayıt artık uygun değilse ya da listede olmayan bir kayıt seçilirse işlev hiçbir şey silmez ve `frappe.ValidationError` verir. Çağıran taraf yeni önizleme ister.
+- Silme tek bir veritabanı işlemi ve geri dönüş noktası içinde yapılır. Bir kayıt silinemezse hiçbir kayıt silinmez ve hata çağırana iletilir. Başarılı yanıt `{"eligible": <sayı>, "deleted": <sayı>, "names": [...]}` olur.
+- İşlev önizleme belirteci istemez. İnsan onayını çağıran taraf yönetir. Örneğin `platform_core.api.ai.purge_logs` kendi önizleme ve onay yolunu kullanır ve onaya `names` listesini bağlar. Geçidin kendi HTTP ucu da kendi önizleme belirtecini kullanabilir.
 
 
 ### Genel araçlar
