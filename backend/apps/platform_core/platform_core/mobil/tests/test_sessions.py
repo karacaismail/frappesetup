@@ -147,8 +147,10 @@ class MobileSessionTest(IntegrationTestCase):
 		with (
 			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
 			patch.object(frappe.db, "commit"),
-			patch.object(identity_sync_client, "_configured_url", return_value="https://sync.example.test"),
-			patch.object(identity_sync_client, "_service_bearer", return_value="fixture-bearer"),
+			patch.object(
+				identity_sync_client, "_identity_sync_origin", return_value="https://sync.example.test"
+			),
+			patch.object(identity_sync_client, "identity_sync_bearer", return_value="fixture-bearer"),
 			patch.object(
 				identity_sync_client._OPENER, "open", side_effect=HTTPError("", 403, "Forbidden", None, None)
 			),

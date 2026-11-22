@@ -86,7 +86,11 @@ def _list_installations(identity, body):
 	_keys(body, set(), {"after"})
 	_require_enabled_user(identity.account)
 	after = uuid4_id(body["after"]) if "after" in body else None
-	return MobileStore().list_owned_installations(identity, after)
+	store = MobileStore()
+	if identity.scope == "mobile":
+		row = store.require_installation(identity, identity.installation)
+		_require_recent_activity(identity, row)
+	return store.list_owned_installations(identity, after)
 
 
 def _revoke_installation(identity, body):
