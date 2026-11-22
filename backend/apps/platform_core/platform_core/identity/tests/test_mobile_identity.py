@@ -1,4 +1,4 @@
-"""Mobile token verification exposed by `platform_core.kimlik.api` for platform-core-mobil (AU-3, AU-4, AU-5).
+"""Mobile token verification exposed by `platform_core.identity.api` for platform-core-mobil (AU-3, AU-4, AU-5).
 
 The real mobile endpoints are not in this branch; a stub under the tests package stands in for them and
 `MOBILE_PATH_PREFIX` is pointed at it for the duration of the tests.
@@ -110,7 +110,7 @@ class TestMobileIdentity(FrappeAPITestCase):
 		self.assertEqual(with_cookie.json.get("exc_type"), "ServiceTokenRejected")
 
 	def test_mobile_identity_matches_the_contract(self):
-		# docs/sozlesmeler.md section 3, "Telefon kimliği": account, scope, site, installation and sid are text.
+		# docs/sozlesmeler.md section 3, mobile identity: account, scope, site, installation and sid are text.
 		# scope is always the text "mobile". site is the site of the request.
 		token = self.key.sign(mobile_payload())
 		response = self.call(token, headers={"X-Platform-Installation": "inst-0001_ab"})
@@ -127,7 +127,7 @@ class TestMobileIdentity(FrappeAPITestCase):
 		self.assertIsInstance(identity["iat"], int)
 
 	def test_mobile_identity_carries_auth_time(self):
-		# docs/sozlesmeler.md section 3, "Telefon kimliği": auth_time is the token claim, an integer (Unix seconds).
+		# docs/sozlesmeler.md section 3, mobile identity: auth_time is the token claim, an integer (Unix seconds).
 		response = self.call(self.key.sign(mobile_payload()))
 		self.assertEqual(response.status_code, 200, response.data[:300])
 		value = response.json["message"]["identity"]["auth_time"]

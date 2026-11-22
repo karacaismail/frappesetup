@@ -138,7 +138,7 @@ class TestKeycloakOnly(FrappeAPITestCase):
 			self.assertEqual(via_cmd_login.status_code, 401, via_cmd_login.data[:200])
 
 	def test_every_gated_function_answers_403_for_guest_and_signed_in_user(self):
-		# Contract `x-yerel-giris-kapisi`: each of the 16 wrappers (LDAP included, review Ö3) refuses with 403 `PermissionError` while the
+		# Contract `x-yerel-giris-kapisi`: each of the 16 wrappers (LDAP included, minor finding 3) refuses with 403 `PermissionError` while the
 		# gate is on, both under Frappe's path (override) and under the wrapper's own path, with or without a session.
 		self.assertEqual(len(login_policy.GATED_FUNCTIONS), 16)
 		with h.SiteSettings({"identity_keycloak_only": 1}):
