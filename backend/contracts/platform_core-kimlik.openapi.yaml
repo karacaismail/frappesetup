@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: platform_core kimlik uçları
-  version: 0.2.0
+  version: 0.3.0
   summary: Keycloak ile giriş, dönüş, çıkış ve kullanıcı eşitleme uçları.
   description: |
     Bu sözleşme `platform_core.kimlik` modülünün uçlarını tarif eder.
@@ -20,27 +20,39 @@ info:
 
     Üç kimlik türü vardır.
 
-    - Misafir uçlar kimlik istemez. `get_login_url`, `keycloak_callback` ve `keycloak_backchannel_logout` böyledir.
-      Bu üç uç istek sınırlıdır. Sınır aşılınca 429 döner.
+    - Misafir uçlar kimlik istemez. `get_login_url`, `start_login`, `keycloak_callback` ve `keycloak_backchannel_logout` böyledir.
+      Bu dört uç istek sınırlıdır. Sınır aşılınca 429 döner.
     - Oturum uçları `sid` çerezini ve `X-Frappe-CSRF-Token` başlığını birlikte ister.
       `logout` ve `setup_keycloak_login` böyledir.
     - Servis uçları `Authorization: Bearer <JWT>` başlığını ister. `identity.*` uçları böyledir.
       Belirteç kuralları `serviceToken` şemasının açıklamasındadır.
 
     Yol `/api/method/<python yolu>` biçimindedir. Bu Frappe'nin RPC yoludur.
-    `keycloak_callback` GET ister. Öteki uçlar POST ister.
+    `start_login` ve `keycloak_callback` GET ister. Öteki uçlar POST ister.
 
     Giriş akışı şöyledir.
 
-    1. Panel `get_login_url` ucunu çağırır. Sunucu `state`, PKCE doğrulayıcısı ve `nonce` üretir.
+    1. Giriş iki yoldan başlar. Giriş sayfasındaki düğme `start_login` ucuna gider.
+       Panel ise `get_login_url` ucunu çağırır ve dönen adrese gider.
+       İki uç aynı işi yapar. Sunucu `state`, PKCE doğrulayıcısı ve `nonce` üretir.
        Sunucu bir tarayıcı değeri de üretir. Değer `kimlik_login` çerezine yazılır.
        Sunucu `state` kaydında bu değerin SHA-256 özetini, PKCE doğrulayıcısını, `nonce` değerini ve dönüş yolunu saklar. Kayıt 600 saniye yaşar.
-    2. Tarayıcı `login_url` adresine gider. Kullanıcı Keycloak'ta oturum açar.
+    2. Tarayıcı Keycloak yetki adresine gider. Kullanıcı Keycloak'ta oturum açar.
     3. Keycloak tarayıcıyı `keycloak_callback` ucuna döndürür. Sunucu `state` kaydını tek bölünmez işlemle okur ve siler.
        Sunucu çerezi ve kimlik belirtecini doğrular. Sunucu Frappe oturumu açar ve tarayıcıyı dönüş yoluna yönlendirir.
 
+    Giriş sayfası şöyledir.
+
+    `platform_core` kiracının `/login` sayfasını kendi `www/login` sayfasıyla geçersiz kılar.
+    Sayfada marka düğmesi vardır. Düğme metni `kimlik_marka_adi` ayarından gelir: “{marka} ile oturum aç”.
+    Düğme `start_login` ucuna gider.
+    `kimlik_yalniz_keycloak` ayarı açıkken sayfada yalnız bu düğme vardır. Parola formu yoktur.
+    Ayar kapalıyken sayfada ayrıca yalın bir parola formu vardır. Form Frappe'nin `/api/method/login` ucunu kullanır.
+    Sayfa `redirect-to` sorgu alanını alır. Değer güvenliyse sayfa onu `start_login` ucuna `redirect_to` olarak geçirir.
+
     Başarı gövdesi Frappe sarmalıdır: `{"message": <sonuç>}`.
-    `keycloak_callback` ucu bunun dışındadır. O uç tarayıcı akışıdır. Yanıtı HTML sayfa ya da yönlendirmedir.
+    `start_login` ve `keycloak_callback` uçları bunun dışındadır. Bu iki uç tarayıcı akışıdır.
+    Yanıtları HTML sayfa ya da yönlendirmedir.
 
     Hata gövdesi Frappe'nin olağan biçimidir. Şeması `FrappeError` altındadır.
     İstemci hatayı `exc_type` alanından tanır. Her hata yanıtında beklenen `exc_type` değerleri yazılıdır.
@@ -122,7 +134,8 @@ x-yerel-giris-kapisi:
     `kimlik_yalniz_keycloak` ayarı 1 iken Frappe'nin yerel giriş işlevleri kapanır.
     Kapatma adrese değil, çağrılan işleve uygulanır. Bunun için `override_whitelisted_methods` kancası kullanılır.
     `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi kapsamdadır.
-    `keycloak_callback` ucu ve bu dosyadaki öteki uçlar etkilenmez.
+    `start_login`, `keycloak_callback` ve bu dosyadaki öteki uçlar etkilenmez.
+    Kapı açıkken `/login` sayfasında yalnız marka düğmesi vardır. Düğme `start_login` ucuna gider. Parola formu yoktur.
     Yönetici kurtarma yolu yalnız site ayarıyla açılır. Ayarı sunucuya erişen yönetici yazar.
   parola_girisi:
     description: Parola girişi 401 ve `AuthenticationError` döner.
@@ -245,6 +258,86 @@ paths:
                     exc_type: KeycloakLoginNotConfigured
                     exception: "platform_core.kimlik.hatalar.KeycloakLoginNotConfigured: keycloak_client_id"
                     _server_messages: '["{\"message\": \"Keycloak girişi bu sitede kurulu değil: keycloak_client_id\"}"]'
+
+  /platform_core.api.auth.start_login:
+    get:
+      tags: [giris]
+      operationId: startLogin
+      summary: Giriş akışını başlatır ve tarayıcıyı Keycloak'a yönlendirir.
+      description: |
+        Giriş sayfasındaki “{marka} ile oturum aç” düğmesi bu uca gider. Kullanıcı henüz oturum açmamıştır.
+        Bu uç tarayıcı akışıdır. Yanıt yönlendirme ya da HTML sayfadır.
+        Hata yanıtları JSON değildir. Bu yüzden `exc_type` yoktur. Sayfa bir başlık ve kısa bir açıklama gösterir.
+
+        Uç `get_login_url` ile aynı işi yapar. Sunucu `state`, PKCE doğrulayıcısı ve `nonce` üretir.
+        Sunucu tarayıcı değerini `kimlik_login` çerezine yazar. Çerez kuralları `get_login_url` ucundaki gibidir.
+        Sunucu `state` kaydını 600 saniye saklar.
+        Sonra uç tarayıcıyı Keycloak yetki adresine 302 ile yönlendirir. Adres `get_login_url` ucunun döndürdüğü adresle aynı biçimdedir.
+
+        `redirect_to` isteğe bağlıdır. Kuralı `get_login_url` ucundaki ile aynıdır.
+        Yalnız `/` ile başlayan göreli yol kabul edilir. `//` ile başlayan yol reddedilir.
+        Ters eğik çizgi hiçbir yerde kabul edilmez. Uygun olmayan yol 400 döner.
+        `redirect_to` yoksa dönüş adresi `platform_panel_url` ayarıdır.
+
+        Zorunlu site ayarlarından biri eksikse uç 503 döner.
+        Aynı IP adresinden dakikada en çok 20 istek kabul edilir. Fazlası 429 alır.
+        Uç kalıcı kayıt değiştirmez. Uç oturum açmaz. Oturumu `keycloak_callback` ucu açar.
+      x-yikici: false
+      security: []
+      parameters:
+        - name: redirect_to
+          in: query
+          required: false
+          description: |
+            Giriş bitince dönülecek göreli yol. `/` ile başlar. `//` ile başlayamaz.
+            Ters eğik çizgi hiçbir yerde olamaz. Boşluk ve denetim karakteri içeremez.
+            En çok 2048 karakter olur. Verilmezse dönüş adresi `platform_panel_url` olur.
+          schema:
+            type: string
+            maxLength: 2048
+            pattern: '^/(?!/)[^\\\s\x00-\x1f\x7f]*$'
+          examples:
+            panel:
+              value: /panel
+      responses:
+        "302":
+          description: Akış başlatıldı. Tarayıcı Keycloak yetki adresine gider.
+          headers:
+            Location:
+              description: |
+                Keycloak yetki adresi. Adres `state`, `nonce`, `code_challenge`, `code_challenge_method=S256` ve `redirect_uri` taşır.
+                `redirect_uri` değeri bu sitenin `keycloak_callback` ucudur.
+              schema: {type: string, format: uri}
+              examples:
+                atonota:
+                  value: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?client_id=site-kiraci1&response_type=code&scope=openid+profile+email&redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fapi%2Fmethod%2Fplatform_core.api.auth.keycloak_callback&state=a1b2c3d4e5f6a7b8&nonce=c9d8e7f6a5b4c3d2&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
+            Set-Cookie:
+              description: |
+                Giriş akışını tarayıcıya bağlayan çerez. Adı geliştirmede `kimlik_login`, HTTPS'te `__Host-kimlik_login` olur.
+                Öznitelikleri `HttpOnly`, `SameSite=Lax`, `Path=/` ve `Max-Age=600` olur. HTTPS'te `Secure` de olur.
+              schema: {type: string}
+              examples:
+                gelistirme:
+                  value: "kimlik_login=9f3b2c1d8e7a6b5c4d3e2f1a0b9c8d7e; Path=/; Max-Age=600; HttpOnly; SameSite=Lax"
+        "400":
+          description: |
+            `redirect_to` güvenli değil. Sayfa başlığı “Dönüş yolu güvenli değil” olur.
+            Sayfa kullanıcıya giriş sayfasına dönmesini söyler.
+          content:
+            text/html:
+              schema: {$ref: "#/components/schemas/HtmlSayfa"}
+        "429":
+          description: İstek sınırı aşıldı. Sınır IP adresine göre sayılır. Yanıt HTML sayfadır.
+          content:
+            text/html:
+              schema: {$ref: "#/components/schemas/HtmlSayfa"}
+        "503":
+          description: |
+            Keycloak girişi bu sitede kurulu değil. Zorunlu site ayarlarından biri eksik.
+            Sayfa başlığı “Giriş bu sitede kurulu değil” olur. Sayfa eksik anahtarın adını göstermez.
+          content:
+            text/html:
+              schema: {$ref: "#/components/schemas/HtmlSayfa"}
 
   /platform_core.api.auth.keycloak_callback:
     get:
@@ -1149,7 +1242,7 @@ components:
         `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput` ve `KeycloakKeysUnavailable`.
         Frappe'nin genel değerleri `PermissionError`, `AuthenticationError`, `CSRFTokenError`,
         `DataError` ve `RateLimitExceededError` olabilir.
-        `keycloak_callback` ucu bu gövdeyi dönmez. O uç HTML sayfa döner.
+        `start_login` ve `keycloak_callback` uçları bu gövdeyi dönmez. Bu iki uç HTML sayfa döner.
       required: [exc_type]
       properties:
         exc_type:
