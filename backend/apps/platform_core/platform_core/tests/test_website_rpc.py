@@ -10,6 +10,7 @@ from platform_core.kabuk.metadata import visible_schema
 from platform_core.kabuk.metadata_policy import MetadataPolicy
 from platform_core.kabuk.native_metadata import (
 	guard_native_metadata,
+	resolve_method,
 	resolve_request_target,
 	website_method_allowed,
 )
@@ -75,6 +76,25 @@ class TestWebsiteRPC(IntegrationTestCase):
 		for path, command in (("/api/method/xyz", None), ("/", "xyz")):
 			with self.subTest(path=path), self.assertRaises(frappe.ValidationError):
 				resolve_request_target(Request.from_values(path=path), command)
+
+	def test_unresolved_rpc_message_has_turkish_translation(self):
+		request = Request.from_values(path="/api/method/xyz")
+		with patch.object(frappe.local, "lang", "tr", create=True):
+			with self.assertRaises(frappe.ValidationError) as unresolved:
+				resolve_request_target(request, None)
+		self.assertEqual(str(unresolved.exception), "\u0130stenen yöntem bulunamad\u0131.")
+
+	def test_unexpected_rpc_lookup_failure_is_not_a_validation_error(self):
+		for target, doctype in (
+			("platform_core.kabuk.native_metadata.load_doctype_module", "ToDo"),
+			("frappe.get_attr", None),
+		):
+			with (
+				self.subTest(target=target),
+				patch(target, side_effect=RuntimeError("Unexpected lookup failure")),
+				self.assertRaisesRegex(RuntimeError, "Unexpected lookup failure"),
+			):
+				resolve_method("frappe.auth.get_logged_user", doctype=doctype)
 
 	def test_installed_allowlist_compares_callables(self):
 		self.assertTrue(website_method_allowed(get_logged_user))

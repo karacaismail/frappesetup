@@ -108,6 +108,13 @@ case "${1:-}" in
             "${compose[@]}" down
         fi
         "$dev_dir/bin/tunel" kapat
+        if [[ "$context" == colima ]]; then
+            owned_image="$("${engine[@]}" image ls --filter "reference=$tenant_image" \
+                --filter "label=com.docker.compose.project=$project" --format '{{.ID}}')"
+            if [[ -n "$owned_image" ]]; then
+                "${engine[@]}" image rm --no-prune "$tenant_image"
+            fi
+        fi
         ;;
     provider)
         "${engine[@]}" run --pull never --detach --rm --name "$project-provider" \

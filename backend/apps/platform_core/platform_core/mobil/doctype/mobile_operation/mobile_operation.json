@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "field:operation_key",
+ "creation": "2026-11-22 10:42:15.000000",
  "description": "Stores the original operation result for retries.",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -36,9 +37,13 @@
   }
  ],
  "links": [],
+ "modified": "2026-11-22 10:42:15.000000",
+ "modified_by": "Administrator",
  "module": "Mobil",
  "name": "Mobile Operation",
+ "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": []

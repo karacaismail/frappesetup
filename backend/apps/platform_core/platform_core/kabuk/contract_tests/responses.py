@@ -1,7 +1,6 @@
 """Validate actual Frappe responses against the shell OpenAPI document."""
 
 import http.client
-import json
 import os
 import unittest
 from http.cookies import SimpleCookie
@@ -10,24 +9,18 @@ from urllib.parse import urlencode, urlsplit
 
 from jsonschema import Draft202012Validator
 
+if __package__:
+	from .contract_json import parse_json
+else:
+	from contract_json import parse_json
+
 CONTRACT = Path("backend/contracts/platform_core-kabuk.openapi.yaml")
 SNAPSHOT = Path(__file__).resolve().parents[2] / "tests" / "shell_contract_components.json"
 BOOTSTRAP = "/api/method/platform_core.api.shell.get_bootstrap"
 METADATA = "/api/method/platform_core.api.meta.get_doctype"
+POLICY_CHECK = "/api/method/platform_core.api.meta.validate_mobile_policy"
 PROBE = "/api/method/frappe.auth.get_logged_user"
 DOCTYPE = "Kabuk Test Record"
-
-
-def parse_json(source: str | bytes):
-	def unique_object(pairs):
-		result = {}
-		for key, value in pairs:
-			if key in result:
-				raise ValueError(f"Duplicate JSON key: {key}")
-			result[key] = value
-		return result
-
-	return json.loads(source, object_pairs_hook=unique_object)
 
 
 class TestShellResponses(unittest.TestCase):
@@ -128,6 +121,10 @@ class TestShellResponses(unittest.TestCase):
 			self.assertEqual(result[0], 200)
 		self.fail("The shell bootstrap rate limit did not respond with HTTP 429.")
 
+	def test_policy_check_rejects_unsupported_query_parameters(self):
+		result = self.request(POLICY_CHECK + "?unexpected=sample", sid=self.sid)
+		self.validate(POLICY_CHECK, 417, result)
+
 	def test_official_projection_snapshot_matches_openapi(self):
 		snapshot = parse_json(SNAPSHOT.read_text(encoding="utf-8"))
 		schemas = self.contract["components"]["schemas"]
@@ -137,7 +134,12 @@ class TestShellResponses(unittest.TestCase):
 class TestContractParsing(unittest.TestCase):
 	def test_duplicate_keys_are_rejected(self):
 		with self.assertRaisesRegex(ValueError, "Duplicate JSON key"):
-			parse_json('{"field": 1, "field": 2}')
+			parse_json('{"nested": {"field": 1, "field": 2}}')
+
+	def test_nonfinite_numbers_are_rejected(self):
+		for constant in ("NaN", "Infinity", "-Infinity", "1e309", "-1e309"):
+			with self.subTest(constant=constant), self.assertRaisesRegex(ValueError, "Nonfinite JSON number"):
+				parse_json(f'{{"field": {constant}}}')
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ SUITE = Path(__file__).resolve().parents[1]
 COMMAND = SUITE / "bin" / "merge-preview"
 ORDER = (SUITE / "preview" / "branches.txt").read_text().split()
 HOOKS = Path("backend/apps/platform_core/platform_core/hooks.py")
+TRANSLATIONS = HOOKS.parent / "translations/tr.csv"
 
 
 class MergePreviewTest(unittest.TestCase):
@@ -78,6 +79,15 @@ class MergePreviewTest(unittest.TestCase):
         self.assertIn("'on_trash': ['first', 'second']", hooks)
         self.assertLess(report.index(f"| {ORDER[0]} |"), report.index(f"| {ORDER[1]} |"))
 
+    def test_allows_a_change_to_app_metadata(self):
+        self.commit_file(HOOKS, 'auth_hooks = ["base"]\napp_title = "Old name"\n')
+        self.git("switch", ORDER[0])
+        self.git("merge", "--ff-only", "backend")
+        self.commit_file(HOOKS, 'auth_hooks = ["base"]\napp_title = "New name"\n')
+        self.git("switch", "backend")
+        result, _ = self.preview()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_blocks_an_unknown_conflict_and_still_cleans_up(self):
         for name in ORDER[:2]:
             self.git("switch", name)
@@ -114,6 +124,48 @@ class MergePreviewTest(unittest.TestCase):
         self.assertIn(f"| `{HOOKS}` | `auth_hooks` | 3, 9, 15 |", report)
         self.assertNotIn("Birleştirildi |", report)
         self.assertIn("Geçici worktree ve dal kaldırıldı.", report)
+
+    def test_rejects_duplicate_nested_hook_keys_after_a_clean_merge(self):
+        base = [f'    "Anchor{i}": "keep",\n' for i in range(16)]
+        prefix = 'auth_hooks = ["base"]\ndoc_events = {\n'
+        self.commit_file(HOOKS, prefix + "".join(base) + "}\n")
+        for index, event, name in zip((2, 12), ("on_update", "validate"), ORDER):
+            self.git("switch", name)
+            self.git("merge", "--ff-only", "backend")
+            added = f'    "User": {{"{event}": "app.{event}"}},\n'
+            self.commit_file(HOOKS, prefix + "".join(base[:index] + [added] + base[index:]) + "}\n")
+        self.git("switch", "backend")
+        result, report = self.preview()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Duplicate hook dictionary key: User", report)
+        self.assertNotIn("Birleştirildi |", report)
+
+    def test_rejects_lost_string_hook(self):
+        prefix = 'auth_hooks = ["base"]\n'
+        self.commit_file(HOOKS, prefix + 'doc_events = {"User": {"validate": "app.validate"}}\n')
+        self.git("switch", ORDER[0])
+        self.git("merge", "--ff-only", "backend")
+        self.commit_file(HOOKS, prefix + 'doc_events = {"User": {"validate": "app.other_validate"}}\n')
+        self.git("switch", "backend")
+        result, report = self.preview()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Hook string lost: hooks.doc_events.User.validate", report)
+
+    def test_rejects_conflicting_translations_in_the_final_tree(self):
+        self.git("switch", ORDER[0])
+        self.commit_file(TRANSLATIONS, "Open,Aç\nOpen,Başlat\n")
+        self.git("switch", "backend")
+        result, report = self.preview()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("A translation source and context have different values", report)
+
+    def test_rejects_scheduler_registration_in_the_final_tree(self):
+        self.git("switch", ORDER[0])
+        self.commit_file(HOOKS, 'auth_hooks = ["base"]\nscheduler_events = {"daily": ["app.run"]}\n')
+        self.git("switch", "backend")
+        result, report = self.preview()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("scheduler_events is not allowed", report)
 
     def test_refuses_git_index_overrides_before_creating_artifacts(self):
         before = self.refs()
