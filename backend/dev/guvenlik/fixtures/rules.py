@@ -27,11 +27,22 @@ def public_limited():
     frappe.get_doc("Note", "fixture").check_permission("read")
     return "fixture"
 
+# ruleid: frappe-guest-without-limit
+@frappe.whitelist(True, methods=["GET"])
+def public_positional():
+    frappe.get_doc("Note", "fixture").check_permission("read")
+    return "fixture"
+
 # ruleid: frappe-missing-methods
 @frappe.whitelist()
 def unbounded_method():
     frappe.get_doc("Note", "fixture").check_permission("read")
     return "fixture"
+
+# ruleid: frappe-missing-methods
+@frappe.whitelist(methods=None)
+def default_methods():
+    frappe.get_doc("Note", "fixture").check_permission("read")
 
 # ok: frappe-missing-methods
 @frappe.whitelist(methods=["GET"])
@@ -78,6 +89,8 @@ def execution(value):
 def http():
     # ruleid: http-missing-timeout
     requests.get("https://example.invalid")
+    # ruleid: http-missing-timeout
+    requests.get("https://example.invalid", timeout=None)
     # ok: http-missing-timeout
     requests.get("https://example.invalid", timeout=5)
 

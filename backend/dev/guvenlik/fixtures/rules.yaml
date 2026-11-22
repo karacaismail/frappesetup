@@ -42,31 +42,36 @@ rules:
     severity: ERROR
     message: "Misafir isteklerine sayı sınırı koyun."
     patterns:
-      - pattern: |
-          @frappe.whitelist(..., allow_guest=True, ...)
-          def $FUNC(...):
-              ...
+      - pattern-either:
+          - pattern: |
+              @frappe.whitelist(..., allow_guest=True, ...)
+              def $FUNC(...):
+                  ...
+          - pattern: |
+              @frappe.whitelist(True, ...)
+              def $FUNC(...):
+                  ...
       - pattern-not: |
-          @frappe.whitelist(..., allow_guest=True, ...)
+          @frappe.whitelist(...)
           @rate_limit(...)
-          def $FUNC(...):
-              ...
-      - pattern-not: |
-          @rate_limit(...)
-          @frappe.whitelist(..., allow_guest=True, ...)
           def $FUNC(...):
               ...
   - id: frappe-missing-methods
     languages: [python]
     severity: ERROR
     message: "Ucun HTTP yöntemlerini methods seçeneğinde yazın."
-    patterns:
+    pattern-either:
+      - patterns:
+          - pattern: |
+              @frappe.whitelist(...)
+              def $FUNC(...):
+                  ...
+          - pattern-not: |
+              @frappe.whitelist(..., methods=$METHODS, ...)
+              def $FUNC(...):
+                  ...
       - pattern: |
-          @frappe.whitelist(...)
-          def $FUNC(...):
-              ...
-      - pattern-not: |
-          @frappe.whitelist(..., methods=$METHODS, ...)
+          @frappe.whitelist(..., methods=None, ...)
           def $FUNC(...):
               ...
   - id: frappe-request-commit
@@ -103,7 +108,11 @@ rules:
                   metavariable: $METHOD
                   regex: ^(request|get|post|put|patch|delete|head|options|stream)$
           - pattern: urllib.request.urlopen(...)
-      - pattern-not: $CALL(..., timeout=$TIMEOUT, ...)
+      - pattern-either:
+          - pattern: $CALL(..., timeout=None, ...)
+          - patterns:
+              - pattern: $CALL(...)
+              - pattern-not: $CALL(..., timeout=$TIMEOUT, ...)
   - id: ai-provider-sdk
     languages: [python]
     severity: ERROR
