@@ -6,6 +6,10 @@ from frappe.tests import IntegrationTestCase
 from platform_core.kimlik.tests import helpers as h
 
 
+# setUpClass creates the two users explicitly. No generated User records are needed.
+IGNORE_TEST_RECORD_DEPENDENCIES = ["User"]
+
+
 class TestPlatformIdentityLink(IntegrationTestCase):
 	@classmethod
 	def setUpClass(cls):
