@@ -1,0 +1,13 @@
+name: fs-pd-py314
+services:
+  probe:
+    image: fs-pd-press-py314:probe
+    network_mode: none
+    environment:
+      PANE_PORT: ${PANE_PORT:?Set PANE_PORT to the assigned port base}
+    volumes:
+      - probe-sites:/home/frappe/frappe-bench/sites
+      - probe-logs:/home/frappe/frappe-bench/logs
+volumes:
+  probe-sites:
+  probe-logs:

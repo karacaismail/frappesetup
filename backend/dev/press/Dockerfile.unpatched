@@ -1,0 +1,15 @@
+# Diagnostic image only. A successful build does not establish Press compatibility.
+FROM frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84 AS unpatched-probe
+USER root
+RUN mkdir -p /opt/press-probe && chown frappe /opt/press-probe
+USER frappe
+WORKDIR /home/frappe/frappe-bench
+RUN git clone --depth 1 --branch v0.154.1 https://github.com/frappe/press apps/press \
+    && test "$(git -C apps/press rev-parse HEAD)" = 7a4384d5eec9f0f0dce4124e9dd48b106e51222f
+COPY --chown=frappe backend/dev/press/probe-requirements.txt /opt/press-probe/
+RUN uv pip install --python env/bin/python -r /opt/press-probe/probe-requirements.txt \
+    && uv pip install --python env/bin/python --no-deps -e apps/press
+COPY --chown=frappe backend/dev/press/test_unpatched_runtime.py backend/dev/press/provisioning_probe.yml /opt/press-probe/
+ENV PRESS_TEST_UNPATCHED_BENCH=/home/frappe/frappe-bench
+ENTRYPOINT []
+CMD ["env/bin/python", "-B", "/opt/press-probe/test_unpatched_runtime.py"]
