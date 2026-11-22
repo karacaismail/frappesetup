@@ -726,7 +726,7 @@
           },
           "meta_hash": {
             "type": "string",
-            "description": "SHA-256 of the parent schema and included child schemas."
+            "description": "SHA-256 of the permission-filtered parent and child schemas in this response."
           },
           "perm_version": {
             "type": "string",

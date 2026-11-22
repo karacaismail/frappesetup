@@ -3,6 +3,7 @@ import json
 import frappe
 
 from platform_core.kabuk.metadata import get_doctype
+from platform_core.kabuk.serialization import digest
 from platform_core.tests.shell_http_fixture import (
 	CHILD_DOCTYPE,
 	DOCTYPE,
@@ -39,6 +40,17 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertIn("private_note", [f["fieldname"] for f in high["schema"]["fields"]])
 		self.assertIn("private_section", [f["fieldname"] for f in high["schema"]["fields"]])
 		self.assertNotEqual(low_headers["ETag"], high_headers["ETag"])
+		for payload in (low, high):
+			self.assertEqual(
+				payload["meta_hash"],
+				digest(
+					{
+						"schema": payload["schema"],
+						"child_tables": payload["child_tables"],
+					}
+				),
+			)
+		self.assertNotEqual(low["meta_hash"], high["meta_hash"])
 		self.assertEqual(low_headers["Cache-Control"], "private, no-store")
 
 	def test_conditional_get_has_empty_304_body(self):
@@ -85,23 +97,37 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		from frappe.custom.doctype.custom_field.custom_field import create_custom_field
 		from frappe.custom.doctype.property_setter.property_setter import make_property_setter
 
-		custom = create_custom_field(
-			DOCTYPE,
-			{
-				"fieldname": "review_note",
-				"fieldtype": "Data",
-				"label": "Review note",
-				"description": "A site-specific note.",
-			},
+		fieldname = "review_note"
+		existing_field = frappe.db.exists("Custom Field", {"dt": DOCTYPE, "fieldname": fieldname})
+		custom = (
+			frappe.get_doc("Custom Field", existing_field)
+			if existing_field
+			else create_custom_field(
+				DOCTYPE,
+				{
+					"fieldname": fieldname,
+					"fieldtype": "Data",
+					"label": "Review note",
+					"description": "A site-specific note.",
+				},
+			)
 		)
 		self.addCleanup(self.delete_fixture, custom)
-		setter = make_property_setter(DOCTYPE, "review_note", "label", "Site note", "Data")
+		existing_setter = frappe.db.exists(
+			"Property Setter", {"doc_type": DOCTYPE, "field_name": fieldname, "property": "label"}
+		)
+		if existing_setter:
+			setter = frappe.get_doc("Property Setter", existing_setter)
+			setter.value = "Site note"
+			setter.save()
+		else:
+			setter = make_property_setter(DOCTYPE, fieldname, "label", "Site note", "Data")
 		self.addCleanup(self.delete_fixture, setter)
 		frappe.db.commit()
 		status, _, body = self.metadata(self.reader_sid)
 		self.assertEqual(status, 200)
 		fields = {field["fieldname"]: field for field in json.loads(body)["message"]["schema"]["fields"]}
-		self.assertEqual(fields["review_note"]["label"], "Site note")
+		self.assertEqual(fields[fieldname]["label"], "Site note")
 
 	def delete_fixture(self, doc):
 		frappe.delete_doc(doc.doctype, doc.name)
@@ -123,11 +149,20 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertEqual({field["fieldname"] for field in child["fields"]}, {"entry"})
 
 	def test_protected_and_missing_doctypes_are_indistinguishable(self):
+		bodies = []
 		for doctype in (PROTECTED_DOCTYPE, "Nonexistent Shell Test DocType", CHILD_DOCTYPE):
 			with self.subTest(doctype=doctype):
 				status, _, body = self.metadata(self.reader_sid, doctype=doctype)
 				self.assertEqual(status, 403)
 				self.assertEqual(json.loads(body)["exc_type"], "PermissionError")
+				bodies.append(json.loads(body))
+		self.assertEqual(bodies[0], bodies[1])
+		self.assertEqual(bodies[0], bodies[2])
+
+	def test_doctype_returns_the_canonical_name(self):
+		status, _, body = self.metadata(self.reader_sid, doctype=DOCTYPE.lower())
+		self.assertEqual(status, 200)
+		self.assertEqual(json.loads(body)["message"]["schema"]["name"], DOCTYPE)
 
 	def test_invalid_doctype_names(self):
 		for doctype in ("", "x" * 141):

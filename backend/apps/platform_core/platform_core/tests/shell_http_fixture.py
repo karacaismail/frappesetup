@@ -1,6 +1,6 @@
 """HTTP acceptance tests on a dedicated test-kabuk.localhost site only.
 
-Run the local bench web process first. Fixtures use synthetic accounts.
+Set KABUK_TEST_SITE=test-kabuk.localhost explicitly and run the local bench web process first. Fixtures use synthetic accounts.
 The tests commit fixtures because real HTTP requests use separate transactions.
 """
 
@@ -25,11 +25,20 @@ PRIVILEGED = "kabuk-privileged@example.test"
 class ShellHTTPFixture(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):
-		cls.site = os.environ.get("KABUK_TEST_SITE", SITE)
+		cls.site = os.environ.get("KABUK_TEST_SITE")
+		if not cls.site:
+			raise unittest.SkipTest("Set KABUK_TEST_SITE explicitly to run shell HTTP tests.")
 		if cls.site != SITE:
 			raise RuntimeError("Use the isolated test-kabuk.localhost site.")
+		if getattr(frappe.local, "site", None):
+			raise RuntimeError("Start shell HTTP tests in a separate process with no active Frappe site.")
 		frappe.init(site=cls.site, sites_path=os.getcwd())
+		if frappe.local.site != SITE:
+			raise RuntimeError("Frappe did not initialize the isolated site.")
+		cls.addClassCleanup(frappe.destroy)
 		frappe.connect()
+		if frappe.local.site != SITE:
+			raise RuntimeError("Frappe did not connect to the isolated site.")
 		if not frappe.conf.allow_tests:
 			raise RuntimeError("Tests are disabled on this site.")
 		frappe.set_user("Administrator")
@@ -227,10 +236,6 @@ class ShellHTTPFixture(unittest.TestCase):
 		frappe.db.commit()
 		cls.reader_sid = cls.login(READER)
 		cls.privileged_sid = cls.login(PRIVILEGED)
-
-	@classmethod
-	def tearDownClass(cls):
-		frappe.destroy()
 
 	@classmethod
 	def request(cls, path, sid=None, method="GET", data=None, headers=None):

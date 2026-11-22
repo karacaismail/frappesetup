@@ -74,6 +74,12 @@ def project_meta(
 		for key in DEPENDENCY_PROPERTIES:
 			if field.get(key) and not has_readable_dependencies(field[key], readable, parent_readable):
 				del field[key]
+		fetch_from = field.get("fetch_from")
+		if fetch_from and fetch_from.partition(".")[0] not in readable:
+			field.pop("fetch_from")
+			field.pop("fetch_if_empty", None)
+		if field["fieldtype"] == "Dynamic Link" and field.get("options") not in readable:
+			field.pop("options", None)
 		field["read_only"] = bool(source.get("read_only")) or name not in writable
 		# A configured password default must never become client bootstrap data.
 		if field.get("fieldtype") == "Password":

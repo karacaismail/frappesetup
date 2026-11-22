@@ -17,17 +17,17 @@ def get_doctype(doctype: str, user: str) -> dict:
 	if not isinstance(doctype, str) or not doctype.strip() or len(doctype) > 140:
 		frappe.throw(frappe._("A valid DocType name is required."), frappe.ValidationError)
 
-	if not frappe.db.exists("DocType", doctype, cache=True):
-		frappe.throw(frappe._("You cannot read this DocType."), frappe.PermissionError)
-	meta = frappe.get_meta(doctype)
-	if meta.istable or not has_permission(meta.name, "read", user=user, print_logs=False):
-		frappe.throw(frappe._("You cannot read this DocType."), frappe.PermissionError)
+	canonical_name = frappe.db.exists("DocType", doctype, cache=True)
+	meta = frappe.get_meta(canonical_name) if canonical_name else None
+	if meta is None or meta.istable or not has_permission(meta.name, "read", user=user, print_logs=False):
+		message = frappe._("You cannot read this DocType.")
+		frappe.msgprint(message, indicator="red")
+		raise frappe.PermissionError(message)
 
 	raw = meta.as_dict()
 	schema = visible_schema(meta, raw, user)
 	parent_readable = {field["fieldname"] for field in schema["fields"]}
 	child_tables = {}
-	sources = {meta.name: raw}
 	for field in schema["fields"]:
 		child_name = field.get("options")
 		if field["fieldtype"] not in TABLE_FIELD_TYPES or not child_name or child_name in child_tables:
@@ -35,15 +35,14 @@ def get_doctype(doctype: str, user: str) -> dict:
 		child = frappe.get_meta(child_name)
 		if child.istable:
 			child_raw = child.as_dict()
-			sources[child.name] = child_raw
 			child_tables[child.name] = visible_schema(
 				child, child_raw, user, parenttype=meta.name, parent_readable=parent_readable
 			)
 
+	projection = {"schema": schema, "child_tables": child_tables}
 	return {
-		"schema": schema,
-		"child_tables": child_tables,
-		"meta_hash": digest(sources),
+		**projection,
+		"meta_hash": digest(projection),
 		"perm_version": digest([permission_version(), sorted(frappe.get_roles(user))]),
 	}
 

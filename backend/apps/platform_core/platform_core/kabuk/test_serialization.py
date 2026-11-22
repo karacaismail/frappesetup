@@ -121,7 +121,7 @@ class TestMetadataProjection(unittest.TestCase):
 			collapsible_depends_on="eval:doc.title",
 		)
 
-		result = project_meta(schema, {"title"}, {"title"})
+		result = project_meta(schema, {"title", "source"}, {"title"})
 
 		self.assertEqual(result["fields"][0], custom)
 
@@ -145,6 +145,24 @@ class TestMetadataProjection(unittest.TestCase):
 		self.assertNotIn("depends_on", field)
 		allowed = project_meta(schema, {"title"}, {"title"}, parent_readable={"private_note"})
 		self.assertEqual(allowed["fields"][0]["depends_on"], "eval:parent.private_note")
+
+	def test_fetch_from_and_dynamic_links_cannot_reference_hidden_fields(self):
+		schema = sample_schema()
+		schema["fields"][0]["fetch_from"] = "private_note.title"
+		schema["fields"].append(
+			{
+				"fieldname": "target",
+				"fieldtype": "Dynamic Link",
+				"options": "private_note",
+			}
+		)
+		readable = {"title", "target"}
+		fields = project_meta(schema, readable, set())["fields"]
+		self.assertNotIn("fetch_from", fields[0])
+		self.assertNotIn("options", fields[1])
+		visible_source = project_meta(schema, readable | {"private_note"}, set())["fields"]
+		self.assertEqual(visible_source[0]["fetch_from"], "private_note.title")
+		self.assertEqual(visible_source[-1]["options"], "private_note")
 
 	def test_display_hidden_setting_is_not_a_permission_grant(self):
 		schema = sample_schema()

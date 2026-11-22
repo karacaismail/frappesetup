@@ -1,7 +1,5 @@
-import csv
 import json
 from html.parser import HTMLParser
-from pathlib import Path
 
 import frappe
 
@@ -26,6 +24,8 @@ class TestPanelHTTP(ShellHTTPFixture):
 		self.assertEqual(status, 302)
 		self.assertEqual(headers["Location"], "/login?redirect-to=/panel")
 		self.assertIn("no-store", headers["Cache-Control"])
+		self.assertEqual(headers["Content-Security-Policy"], "default-src 'self'; frame-ancestors 'none'")
+		self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
 		self.assertIsNone(PanelMetadata(body).token)
 
 	def test_token_is_stable_within_session_and_distinct_across_sessions(self):
@@ -57,16 +57,14 @@ class TestPanelHTTP(ShellHTTPFixture):
 				headers=headers,
 			)
 			self.assertEqual(status, expected)
-			if status == 200:
+			if expected == 400:
+				self.assertEqual(json.loads(body)["exc_type"], "CSRFTokenError")
+			else:
 				frappe.delete_doc(DOCTYPE, json.loads(body)["message"]["name"])
 				frappe.db.commit()
 
 	def test_panel_uses_the_requested_language(self):
-		source = "Admin panel"
-		catalog = Path(__file__).resolve().parents[1] / "translations" / "tr.csv"
-		with catalog.open(encoding="utf-8", newline="") as stream:
-			translation = dict(csv.reader(stream))[source]
-		for language, title in (("en", source), ("tr", translation)):
+		for language, title in (("en", "Admin panel"), ("tr", "Yönetim paneli")):
 			with self.subTest(language=language):
 				status, _, body = self.request(f"/panel?_lang={language}", self.reader_sid)
 				self.assertEqual(status, 200)
