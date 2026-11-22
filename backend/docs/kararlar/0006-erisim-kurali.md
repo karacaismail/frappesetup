@@ -874,13 +874,25 @@ bench --site <site> execute platform_core.erisim.tests.performance.measure
 ```
 
 - Komut 200 çalışan ve 2.000 kayıt kurar. Sonra her ucu 50 kez çağırır. Sonunda örnek veriyi siler.
-- Komut oluşturduğu çalışan ve kural adlarını saklar ve yalnız onları siler. Ölçüm yarıda kalsa da sitedeki eski kurallar, kayıtlar, çalışanlar ve izinler yerinde kalır. Beş test bunu sınar.
 - Komut yalnız `allow_tests` ayarı açık sitede çalışır. Örnek veri yazdığı için HTTP ucu yoktur.
 - İstekler Frappe'nin WSGI uygulamasından geçer. Süre isteğin tamamıdır. Ağ süresi sayılmaz.
-- Komut kendi kayıt türünde çalışır. Türün adı “AR Measurement Request” olur. Komut türü ilk çalışmada kurar ve türü yalnız ölçüm kullanır. Başka hiçbir türün kaydına, kuralına ve izin satırına dokunmaz.
-- Komut yarıda kalırsa oluşturduğu bütün kayıtları yine siler. İstekle açılan kayıt da buna dahildir, çünkü her kayıt çalışmanın işaretini başlığında taşır.
-- Uydurma test rolleri, kullanıcıları ve şirketi sitede yoksa komut onları kurar ve bırakır.
 - HRMS TR'nin izin kaydı türü başka işin klasöründedir. Bu yüzden ölçüm o türle yapılmadı.
+
+Komut yalnız kendi geçici verisiyle çalışır. Her çalışma şunları kurar ve sonunda siler:
+
+- bir kayıt türü,
+- üç rol,
+- dört kullanıcı,
+- bir şirket,
+- çalışanlar, kayıtlar ve kurallar.
+
+Bunların adları çalışmanın işaretini taşır. Temizlik işarete göre siler. Bu yüzden ölçüm yarıda kalsa da temizlik hepsini bulur. İstekle açılan kayıt da buna dahildir.
+
+Komut sitede önceden var olan hiçbir şeye dokunmaz. Kullanıcı, rol, izin satırı, kullanıcı izni (“User Permission”), kural ve kayıt aynı kalır. Komut testlerin ortak hazırlığını çağırmaz. O hazırlık kullanıcı izinlerini siler ve test türlerine izin satırı ekler.
+
+Yedi test bunu sınar. Testler ölçümden önce ve sonra 21 tabloyu karşılaştırır. Tablolar izinleri, kişileri, kuralları, kayıt türlerini ve Frappe'nin iz kayıtlarını tutar. Testler önce sitede eski bir kural, bir düzey izni, bir kullanıcı izni ve portal izni olmayan eski bir tür bırakır.
+
+Temizlik Frappe'nin yazdığı iz kayıtlarını da siler. Yalnız çalışmanın başından sonra yazılanları siler. Çalışan numarası gibi adlar silmeden sonra yeniden verilir. Eski bir iz kaydı aynı adı taşıyabilir.
 
 Ölçüm 22 Kasım 2026 Pazar günü geliştirme sitesinde yapıldı.
 

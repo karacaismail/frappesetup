@@ -99,9 +99,8 @@ def ensure_roles() -> None:
 REQUEST_ROLES = (ROLE_EMPLOYEE, ROLE_MANAGER, ROLE_HR, ROLE_NO_RULE, ROLE_PORTAL, "System Manager")
 
 
-def request_doctype(name: str) -> dict:
+def request_doctype(name: str, roles=REQUEST_ROLES, level_1_roles=(ROLE_HR, "System Manager")) -> dict:
 	"""The definition of a made-up request type: an employee link and one field at level 1."""
-	roles = REQUEST_ROLES
 	return {
 		"doctype": "DocType",
 		"name": name,
@@ -148,10 +147,7 @@ def request_doctype(name: str) -> dict:
 			},
 		],
 		"permissions": [{"role": role, **LEVEL_0} for role in roles]
-		+ [
-			{"role": ROLE_HR, "permlevel": 1, "read": 1, "write": 1},
-			{"role": "System Manager", "permlevel": 1, "read": 1, "write": 1},
-		],
+		+ [{"role": role, "permlevel": 1, "read": 1, "write": 1} for role in level_1_roles],
 	}
 
 

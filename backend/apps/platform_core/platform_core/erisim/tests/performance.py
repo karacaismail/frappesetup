@@ -7,15 +7,14 @@ write endpoint. Sample data: 200 employees and 2,000 records. Every endpoint is 
 Start it by hand on a development or test site with `bench --site <site> execute`, followed by
 the dotted path of this module and `.measure`. `COMMAND` below holds the full line.
 
-It refuses to run unless the site has `allow_tests` set, because it writes made-up employees,
-records and rules. There is no HTTP endpoint for it for the same reason.
+It refuses to run unless the site has `allow_tests` set, because it writes sample data. There
+is no HTTP endpoint for it for the same reason.
 
-It works on a document type of its own (`MEASURE_DOCTYPE`), made the first time it runs.
-Records, rules and permission rows of every other type stay as they were. It keeps the names
-of the employees and rules it creates and deletes only those, also when it stops half way.
-Every record of the run carries the run's mark in its title, also a record made by a request,
-so a run that stops early still finds them. The made-up roles, users and company of the test
-fixtures are created when missing and stay on the site.
+Everything it works on is its own and lives for one run only: a document type, three roles,
+four users, a company, the employees, the records and the rules. Their names carry the mark of
+the run, so the clean-up finds them also when the run stops half way. Nothing that was on the
+site before is read as sample data, changed or deleted: no user, no role, no permission row, no
+user permission, no rule and no record. It does not call the shared set-up of the tests.
 
 The requests go through the WSGI application of Frappe, like the tests do (D-6). The time is the
 whole request in this process: session, permission hooks, query and response. Network time is
@@ -27,9 +26,9 @@ import statistics
 import time
 
 import frappe
-from frappe.permissions import reset_perms
 from frappe.tests.test_api import make_request
 from frappe.utils import get_test_client, now
+from frappe.utils.password import update_password
 
 from platform_core.erisim import rules
 from platform_core.erisim.tests import base
@@ -40,13 +39,11 @@ READ_LIMIT_MS = 500
 WRITE_LIMIT_MS = 1000
 EMPLOYEES = 200
 RECORDS = 2000
-MARK = "ER Perf"
+MARK = "AR Measure"
 LIST_FIELDS = ["name", "title", "employee", "status"]
 METHOD = "/api/method/"
-# The type the measurement writes to. Nothing else uses it, so its records and its permission
-# rows belong to the measurement alone.
-MEASURE_DOCTYPE = "AR Measurement Request"
-RESOURCE = base.REST + MEASURE_DOCTYPE
+PASSWORD = "Made-Up-Measure-6150!"
+PEOPLE = ("employee", "manager", "hr", "admin")
 
 
 def p95(samples: list[float]) -> float:
@@ -66,43 +63,91 @@ def send(client, method: str, path: str, *, body=None, query=None):
 
 def login(user: str):
 	client = get_test_client(use_cookies=True)
-	response = send(client, "POST", METHOD + "login", body={"usr": user, "pwd": base.PASSWORD})
+	response = send(client, "POST", METHOD + "login", body={"usr": user, "pwd": PASSWORD})
 	if response.status_code != 200:
 		raise RuntimeError(f"Login failed for {user}: {response.status_code}")
 	return client
 
 
 def new_sample() -> dict:
-	"""The names of everything this run creates. `clean` deletes these and nothing else."""
-	return {"employees": [], "rules": [], "run": frappe.generate_hash(length=6)}
+	"""The names of everything this run will create. They all carry the mark of the run."""
+	run = frappe.generate_hash(length=6).lower()
+	prefix = f"{MARK} {run}"
+	return {
+		"run": run,
+		"started": now(),
+		"prefix": prefix,
+		"doctype": f"{prefix} Request",
+		"company": f"{prefix} Company",
+		"gender": f"{prefix} Gender",
+		"roles": {kind: f"{prefix} {kind.title()}" for kind in ("employee", "manager", "hr")},
+		"users": {kind: f"ar.measure.{run}.{kind}@example.test" for kind in PEOPLE},
+		"rules": [],
+	}
 
 
-def seed(sample: dict, employees: int, records: int) -> None:
-	"""Create the sample: employees in a tree, records spread over them, and the rules."""
-	base.ensure_fixtures()
-	if not frappe.db.exists("DocType", MEASURE_DOCTYPE):
-		frappe.get_doc(base.request_doctype(MEASURE_DOCTYPE)).insert()
-	people = {email: base.employee_of(email) for email in base.RECORD_OWNERS}
-	managers = [people[base.MANAGER_1], people[base.MANAGER_2]]
-	run = sample["run"]
-	for index in range(max(employees - len(people), 0)):
-		# The first seven have no manager and lead a team each. The others are spread over all nine.
-		reports_to = None if index < 7 else managers[index % len(managers)]
+def make_type_and_people(sample: dict) -> None:
+	"""The run's own roles, document type, company and four users."""
+	for role in sample["roles"].values():
+		frappe.get_doc(doctype="Role", role_name=role, desk_access=1).insert()
+	roles = (*sample["roles"].values(), "System Manager")
+	level_1 = (sample["roles"]["hr"], "System Manager")
+	frappe.get_doc(base.request_doctype(sample["doctype"], roles, level_1)).insert()
+	frappe.get_doc(doctype="Gender", gender=sample["gender"]).insert()
+	# The company row is written directly. ERPNext's company setup creates accounts and warehouses.
+	company = frappe.get_doc(
+		doctype="Company",
+		company_name=sample["company"],
+		abbr=sample["run"].upper(),
+		default_currency="TRY",
+		country=frappe.db.get_value("Country", {}, "name"),
+	)
+	company.name = sample["company"]
+	company.db_insert()
+	user_roles = {
+		"employee": [sample["roles"]["employee"]],
+		"manager": [sample["roles"]["employee"], sample["roles"]["manager"]],
+		"hr": [sample["roles"]["hr"]],
+		"admin": ["System Manager"],
+	}
+	for kind, email in sample["users"].items():
+		frappe.get_doc(
+			doctype="User",
+			email=email,
+			first_name=f"{sample['prefix']} {kind}",
+			send_welcome_email=0,
+			roles=[{"role": role} for role in user_roles[kind]],
+		).insert()
+		update_password(email, PASSWORD)
+
+
+def make_employees(sample: dict, employees: int) -> list[str]:
+	"""A tree: the manager user leads a team, seven more leads have teams, the rest are members."""
+	names, leads = [], []
+	for index in range(employees):
+		user = {0: sample["users"]["manager"], 1: sample["users"]["employee"]}.get(index)
+		# Number 0 and numbers 2 to 8 lead a team. Everyone else reports to one of the leads.
+		reports_to = None if index == 0 or 2 <= index <= 8 else leads[index % len(leads)]
 		doc = frappe.get_doc(
 			doctype="Employee",
-			first_name=f"{MARK} {run} {index:03d}",
-			company=base.COMPANY,
+			first_name=f"{sample['prefix']} {index:03d}",
+			company=sample["company"],
 			status="Active",
-			gender=base.GENDER,
+			gender=sample["gender"],
 			date_of_birth="1990-01-01",
 			date_of_joining="2020-01-01",
+			user_id=user,
+			# ERPNext would create a User Permission for the user. The measurement times the engine alone.
 			create_user_permission=0,
 			reports_to=reports_to,
 		).insert()
-		sample["employees"].append(doc.name)
-		if index < 7:
-			managers.append(doc.name)
-	owners = [*people.values(), *sample["employees"]]
+		names.append(doc.name)
+		if reports_to is None:
+			leads.append(doc.name)
+	return names
+
+
+def make_records(sample: dict, owners: list[str], records: int) -> list[tuple]:
 	stamp = now()
 	fields = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx"]
 	fields += ["title", "employee", "company", "status", "salary_amount"]
@@ -115,48 +160,130 @@ def seed(sample: dict, employees: int, records: int) -> None:
 			"Administrator",
 			0,
 			0,
-			f"{MARK} {run} {number:04d}",
+			f"{sample['prefix']} {number:04d}",
 			owners[number % len(owners)],
-			base.COMPANY,
+			sample["company"],
 			"Open",
 			1234,
 		)
 		for number in range(records)
 	]
-	sample["records"] = len(rows)
-	frappe.db.bulk_insert(MEASURE_DOCTYPE, fields, rows)
-	for rule in base.ErisimTestCase.RULES:
+	frappe.db.bulk_insert(sample["doctype"], fields, rows)
+	return rows
+
+
+def make_rules(sample: dict) -> None:
+	"""The P1 scenario of the roadmap: own records, the team, and everything for HR."""
+	definitions = (
+		{"role": "employee", "scope": "own", "match_field": "employee", "allow_write": 1, "allow_create": 1},
+		{"role": "manager", "scope": "team", "match_field": "employee"},
+		{"role": "hr", "scope": "all", "allow_write": 1, "allow_create": 1, "allow_delete": 1},
+	)
+	for definition in definitions:
 		doc = frappe.get_doc(
-			{"doctype": base.RULE_DOCTYPE, "document_type": MEASURE_DOCTYPE, "is_active": 1, **rule}
+			{
+				"doctype": base.RULE_DOCTYPE,
+				"title": f"{sample['prefix']} {definition['role']}",
+				"document_type": sample["doctype"],
+				"is_active": 1,
+				"allow_read": 1,
+				**definition,
+				"role": sample["roles"][definition["role"]],
+			}
 		)
 		sample["rules"].append(doc.insert().name)
+
+
+def seed(sample: dict, employees: int, records: int) -> None:
+	"""Create the sample. Every name comes from `new_sample`, so `clean` can find all of it."""
+	make_type_and_people(sample)
+	owners = make_employees(sample, employees)
+	rows = make_records(sample, owners, records)
+	make_rules(sample)
 	# Committed on purpose: the requests use another connection.
 	frappe.db.commit()  # nosemgrep: frappe-request-commit
-	sample["total_employees"] = len(owners)
-	sample["own"] = {
-		email: next(row[0] for row in rows if row[8] == employee) for email, employee in people.items()
-	}
+	sample["employees"] = len(owners)
+	sample["records"] = len(rows)
+	# Employee number 1 belongs to the employee user; its first record is the "own" record.
+	sample["own"] = next(row[0] for row in rows if row[8] == owners[1])
+	sample["employee_name"] = owners[1]
+
+
+def clean_traces(sample: dict, employees: list[str]) -> None:
+	"""Remove the log rows Frappe wrote about the run's own documents and users.
+
+	Only rows written since the run started are removed. A name such as an employee number is
+	given out again after a delete, so an older log row can carry the same name.
+	"""
+	doctype, users = sample["doctype"], list(sample["users"].values())
+	names = [*sample["rules"], *sample["roles"].values(), *users, *employees]
+	names += [doctype, sample["company"], sample["gender"]]
+	recent = {"creation": (">=", sample["started"])}
+	frappe.db.delete("Deleted Document", {**recent, "owner": ("in", users)})
+	frappe.db.delete("Deleted Document", {**recent, "deleted_doctype": doctype})
+	frappe.db.delete("Deleted Document", {**recent, "deleted_name": ("in", names)})
+	for table, type_field, name_field in (
+		("Version", "ref_doctype", "docname"),
+		("Comment", "reference_doctype", "reference_name"),
+		("Activity Log", "reference_doctype", "reference_name"),
+	):
+		frappe.db.delete(table, {**recent, type_field: doctype})
+		frappe.db.delete(table, {**recent, name_field: ("in", names)})
+	for table in (
+		"Version",
+		"Comment",
+		"Activity Log",
+		"Access Log",
+		"Route History",
+		"Notification Settings",
+	):
+		frappe.db.delete(table, {**recent, "owner": ("in", users)})
+	frappe.db.delete("Activity Log", {**recent, "user": ("in", users)})
+	# Frappe notes every deletion in a comment whose subject is the type and the name.
+	subjects = [f"{base.RULE_DOCTYPE} {name}" for name in sample["rules"]]
+	subjects += [f"Employee {name}" for name in employees]
+	deleted = {**recent, "comment_type": "Deleted"}
+	frappe.db.delete("Comment", {**deleted, "subject": ("in", subjects)})
+	frappe.db.delete("Comment", {**deleted, "subject": ("like", f"%{sample['prefix']}%")})
+	frappe.db.delete("Comment", {**deleted, "subject": ("like", f"%ar.measure.{sample['run']}.%")})
 
 
 def clean(sample: dict) -> None:
-	"""Delete what this run created. Nothing of any other type or run is touched."""
+	"""Delete everything that carries the mark of this run. Nothing else is touched."""
 	frappe.set_user("Administrator")
 	frappe.db.rollback()
-	if frappe.db.exists("DocType", MEASURE_DOCTYPE):
-		# By the run's mark, so a record that a request created is removed as well.
-		frappe.db.delete(MEASURE_DOCTYPE, {"title": ("like", f"{MARK} {sample['run']}%")})
-		# The level access case writes permission rows of this type. The type is the measurement's own.
-		reset_perms(MEASURE_DOCTYPE)
-		frappe.clear_cache(doctype=MEASURE_DOCTYPE)
-	for name in sample["rules"]:
-		if frappe.db.exists(base.RULE_DOCTYPE, name):
-			frappe.delete_doc(base.RULE_DOCTYPE, name, force=True)
-	# Team members were created after their managers, so the reverse order deletes them first.
-	for name in reversed(sample["employees"]):
-		if frappe.db.exists("Employee", name):
-			frappe.delete_doc("Employee", name, force=True)
+	doctype = sample["doctype"]
+	# The reads below are the clean-up's own search for what this run made, by the run's names.
+	for name in frappe.get_all(base.RULE_DOCTYPE, filters={"document_type": doctype}, pluck="name", limit=0):
+		frappe.delete_doc(base.RULE_DOCTYPE, name, force=True, delete_permanently=True)
+	members = frappe.get_all(
+		"Employee", filters={"company": sample["company"]}, pluck="name", order_by="lft desc", limit=0
+	)
+	for name in members:
+		frappe.delete_doc("Employee", name, force=True, delete_permanently=True)
+	for email in sample["users"].values():
+		# Frappe makes a contact for every new user and keeps it when the user is deleted.
+		for contact in frappe.get_all("Contact", filters={"user": email}, pluck="name", limit=0):
+			frappe.delete_doc("Contact", contact, force=True, delete_permanently=True)
+		if frappe.db.exists("User", email):
+			frappe.delete_doc("User", email, force=True, delete_permanently=True)
+	if frappe.db.exists("DocType", doctype):
+		frappe.db.delete("Custom DocPerm", {"parent": doctype})
+		frappe.db.delete("Property Setter", {"doc_type": doctype})
+		frappe.db.delete("DocShare", {"share_doctype": doctype})
+		frappe.delete_doc("DocType", doctype, force=True, delete_permanently=True)
+	for role in sample["roles"].values():
+		if frappe.db.exists("Role", role):
+			frappe.delete_doc("Role", role, force=True, delete_permanently=True)
+	clean_traces(sample, members)
+	frappe.db.delete("Company", {"name": sample["company"]})
+	frappe.db.delete("Gender", {"name": sample["gender"]})
 	# Committed on purpose: the sample must be gone for every connection.
 	frappe.db.commit()  # nosemgrep: frappe-request-commit
+	# Deleting a document type leaves its table. The name is built above from the run's mark and
+	# holds no input from outside, and a table name cannot be passed as a query parameter.
+	frappe.db.sql_ddl(f"DROP TABLE IF EXISTS `tab{doctype}`")
+	frappe.clear_cache()
 
 
 def timed(calls: int, request) -> tuple[list[float], set[int]]:
@@ -170,45 +297,39 @@ def timed(calls: int, request) -> tuple[list[float], set[int]]:
 
 
 def endpoint_cases(sample: dict) -> list[tuple]:
-	"""Each case: kind, label, user and a function that sends request number `n`."""
-	employee, manager, hr, admin = (
-		login(user) for user in (base.EMPLOYEE_1, base.MANAGER_1, base.HR, base.ADMIN)
-	)
-	own = sample["own"][base.EMPLOYEE_1]
+	"""Each case: kind, label and a function that sends request number `n`."""
+	employee, manager, hr, admin = (login(sample["users"][kind]) for kind in PEOPLE)
+	doctype, own, prefix = sample["doctype"], sample["own"], sample["prefix"]
+	resource = base.REST + doctype
 	listing = {"fields": json.dumps(LIST_FIELDS), "limit": 20}
-	view = {"doctype": MEASURE_DOCTYPE, "fields": json.dumps(LIST_FIELDS), "page_length": 20, "start": 0}
-	search = {"doctype": MEASURE_DOCTYPE, "txt": MARK, "page_length": 10}
+	view = {"doctype": doctype, "fields": json.dumps(LIST_FIELDS), "page_length": 20, "start": 0}
+	search = {"doctype": doctype, "txt": MARK, "page_length": 10}
 	access = METHOD + "platform_core.api.access."
 	created: list[str] = []
 
 	def create(_number):
-		body = {"title": f"{MARK} {sample['run']} created", "employee": employee_name}
-		response = send(employee, "POST", RESOURCE, body=body)
+		body = {"title": f"{prefix} created", "employee": sample["employee_name"]}
+		response = send(employee, "POST", resource, body=body)
 		if response.status_code == 200:
 			created.append(response.json["data"]["name"])
 		return response
 
 	def delete(_number):
 		# The create case ran first and left one record for the warm-up and one for each call.
-		return send(hr, "DELETE", f"{RESOURCE}/{created.pop()}")
+		return send(hr, "DELETE", f"{resource}/{created.pop()}")
 
-	employee_name = base.employee_of(base.EMPLOYEE_1)
-	rule = sample["rules"][0]
-	rule_path = f"{base.REST}{base.RULE_DOCTYPE}/{rule}"
-	level = {"doctype": MEASURE_DOCTYPE, "role": base.ROLE_MANAGER, "permlevel": 1, "write": False}
+	rule_path = f"{base.REST}{base.RULE_DOCTYPE}/{sample['rules'][0]}"
+	level = {"doctype": doctype, "role": sample["roles"]["manager"], "permlevel": 1, "write": False}
 	return [
-		("read", "List, own scope", lambda n: send(employee, "GET", RESOURCE, query=listing)),
-		("read", "List, team scope", lambda n: send(manager, "GET", RESOURCE, query=listing)),
-		("read", "List, all scope", lambda n: send(hr, "GET", RESOURCE, query=listing)),
-		("read", "Single record", lambda n: send(employee, "GET", f"{RESOURCE}/{own}")),
+		("read", "List, own scope", lambda n: send(employee, "GET", resource, query=listing)),
+		("read", "List, team scope", lambda n: send(manager, "GET", resource, query=listing)),
+		("read", "List, all scope", lambda n: send(hr, "GET", resource, query=listing)),
+		("read", "Single record", lambda n: send(employee, "GET", f"{resource}/{own}")),
 		(
 			"read",
 			"Count, team scope",
 			lambda n: send(
-				manager,
-				"POST",
-				METHOD + "frappe.desk.reportview.get_count",
-				body={"doctype": MEASURE_DOCTYPE},
+				manager, "POST", METHOD + "frappe.desk.reportview.get_count", body={"doctype": doctype}
 			),
 		),
 		(
@@ -228,31 +349,26 @@ def endpoint_cases(sample: dict) -> list[tuple]:
 				employee,
 				"POST",
 				METHOD + "frappe.client.validate_link_and_fetch",
-				body={"doctype": MEASURE_DOCTYPE, "docname": own},
+				body={"doctype": doctype, "docname": own},
 			),
 		),
 		(
 			"read",
 			"Explain permission",
 			lambda n: send(
-				employee,
-				"GET",
-				access + "explain_permission",
-				query={"doctype": MEASURE_DOCTYPE, "name": own},
+				employee, "GET", access + "explain_permission", query={"doctype": doctype, "name": own}
 			),
 		),
 		(
 			"read",
 			"Access summary",
-			lambda n: send(manager, "GET", access + "get_access_summary", query={"doctype": MEASURE_DOCTYPE}),
+			lambda n: send(manager, "GET", access + "get_access_summary", query={"doctype": doctype}),
 		),
 		("write", "Create record", create),
 		(
 			"write",
 			"Update record",
-			lambda n: send(
-				employee, "PUT", f"{RESOURCE}/{own}", body={"title": f"{MARK} {sample['run']} edit {n}"}
-			),
+			lambda n: send(employee, "PUT", f"{resource}/{own}", body={"title": f"{prefix} edit {n}"}),
 		),
 		("write", "Delete record", delete),
 		(
@@ -293,14 +409,14 @@ def measure_endpoints(sample: dict, calls: int) -> list[dict]:
 	return results
 
 
-def list_times(user: str, calls: int, page: int) -> list[float]:
+def list_times(doctype: str, user: str, calls: int, page: int) -> list[float]:
 	frappe.set_user(user)
 	samples = []
 	for _number in range(calls + 1):
 		# A new request starts with no rules read. Without this the first loop would pay for all.
 		frappe.local.request_cache.clear()
 		started = time.perf_counter()
-		frappe.get_list(MEASURE_DOCTYPE, fields=LIST_FIELDS, limit=page)
+		frappe.get_list(doctype, fields=LIST_FIELDS, limit=page)
 		samples.append((time.perf_counter() - started) * 1000)
 	frappe.set_user("Administrator")
 	return samples[1:]
@@ -316,21 +432,18 @@ def set_rules_active(names: list[str], active: int) -> None:
 
 
 def measure_rule_cost(sample: dict, calls: int) -> list[dict]:
-	"""Time the same list read with the rules active and with the rules switched off.
-
-	Only the rules of this run are switched. A site that has other active rules on the test
-	type keeps them, and the "without rules" column then still includes their cost.
-	"""
+	"""Time the same list read with the rules active and with the rules switched off."""
 	results = []
 	# The requests above changed a rule on another connection. Start from a fresh snapshot.
 	frappe.db.rollback()
-	scopes = (("own", base.EMPLOYEE_1), ("team", base.MANAGER_1), ("all", base.HR))
+	users = sample["users"]
+	scopes = (("own", users["employee"]), ("team", users["manager"]), ("all", users["hr"]))
 	for page in (20, 500):
 		for scope, user in scopes:
 			set_rules_active(sample["rules"], 1)
-			with_rules = list_times(user, calls, page)
+			with_rules = list_times(sample["doctype"], user, calls, page)
 			set_rules_active(sample["rules"], 0)
-			without_rules = list_times(user, calls, page)
+			without_rules = list_times(sample["doctype"], user, calls, page)
 			results.append(
 				{
 					"scope": scope,
@@ -385,7 +498,7 @@ def measure(calls: int = 50, keep: int = 0, employees: int = EMPLOYEES, records:
 	try:
 		seed(sample, int(employees), int(records))
 		report = {
-			"employees": sample["total_employees"],
+			"employees": sample["employees"],
 			"records": sample["records"],
 			"calls": calls,
 			"endpoints": measure_endpoints(sample, calls),
