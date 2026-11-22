@@ -14,9 +14,7 @@ from urllib.error import HTTPError
 from urllib.request import Request
 from uuid import uuid4
 
-import erpnext
 import frappe
-import hrms
 from frappe.app import application
 from platform_core.api import mobile
 from platform_core.mobil.protocol import PAGE_SIZE
@@ -41,7 +39,7 @@ def timed_application(environ, start_response):
 
 
 @contextmanager
-def benchmark_server(phones):
+def benchmark_server(phones, *, threaded=True):
     auth = {f"Bearer {phone.token}": phone.account for phone in phones}
     original_override = frappe.override_whitelisted_method
 
@@ -58,7 +56,7 @@ def benchmark_server(phones):
         patch.object(mobile, "PROJECTIONS", {"fixture": fixture.projection}),
         patch.object(mobile, "INVENTORIES", {"fixture": fixture.scan_inventory}),
     ):
-        server = make_server("127.0.0.1", 0, timed_application)
+        server = make_server("127.0.0.1", 0, timed_application, threaded=threaded)
         worker = Thread(target=server.serve_forever, daemon=True)
         worker.start()
         try:
@@ -69,8 +67,8 @@ def benchmark_server(phones):
             server.server_close()
 
 
-def call(url, phone, endpoint, payload=None):
-    request = Request(
+def mobile_request(url, phone, endpoint, payload=None):
+    return Request(
         f"{url}/api/method/platform_core.api.mobile.{endpoint}",
         data=json.dumps({"installation_id": phone.installation, **(payload or {})}).encode(),
         headers={
@@ -83,6 +81,10 @@ def call(url, phone, endpoint, payload=None):
         },
         method="POST",
     )
+
+
+def call(url, phone, endpoint, payload=None):
+    request = mobile_request(url, phone, endpoint, payload)
     started = perf_counter_ns()
     try:
         with open_loopback(request, timeout=15) as response:
@@ -158,6 +160,9 @@ def p95(values):
 
 
 def report(samples, catchups, label):
+    import erpnext
+    import hrms
+
     rows = [
         f"### O-31 mobil ölçümü ({label})",
         "",
@@ -196,7 +201,7 @@ def main():
     destination = args.status_file.resolve()
     os.chdir("sites")
     phones = seed_site(SAMPLES)
-    with benchmark_server(phones) as url:
+    with benchmark_server(phones, threaded=False) as url:
         samples = measure_base(url, phones[:SAMPLES])
         samples["v1_pull (1000)"], catchups = measure_backlog(url, phones[-1], SAMPLES)
     summary, passed = report(samples, catchups, args.label)

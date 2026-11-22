@@ -32,3 +32,17 @@ Depo kökünden çalıştırın.
 uv run --no-project --with-requirements backend/dev/requirements-contract-tests.txt \
   python -m unittest discover -s backend/dev/mobile_test_app/tests
 ```
+
+## Eşzamanlı telefon yükü
+
+Aynı boş site koşullarını kullanın. MariaDB, bu test sitesine ayrılmış olmalı.
+
+```bash
+env/bin/python -m mobile_test_app.measure_concurrent --status-file /yol/durum.md
+```
+
+50 telefon birlikte 50 gönderme ve 50 çekme isteği açar.
+Komut, her uç için p95 süresini ve hata oranını yazar.
+MariaDB'deki satır kilidi bekleme sayısını ve toplam süreyi de yazar.
+Kilit sayaçları iki işin ortak sonucudur.
+Komut, hata veya sınır aşımı varsa 1 döndürür.

@@ -324,6 +324,47 @@ class MobileHTTPTest(unittest.TestCase):
 		replayed, _unused = self.pull_all(body, cursor)
 		self.assertEqual([change for change in replayed if change["record_id"] in ids], changes)
 
+	@unittest.skipUnless(FIXTURE, "Synthetic business commands are required")
+	def test_parallel_writes_from_one_installation_do_not_drop_or_duplicate_records(self):
+		body = self.register()
+		initial, cursor = self.pull_all(body)
+		self.assertIsInstance(initial, list)
+		records = [str(uuid4()) for _unused in range(3)]
+		operations = [
+			self.fixture_operation(
+				body,
+				"create",
+				record_id,
+				fields={"title": "Delayed fixture" if index < 2 else "Concurrent fixture"},
+			)
+			for index, record_id in enumerate(records)
+		]
+
+		for first, second in ((operations[0], operations[0]), (operations[1], operations[2])):
+			held_record = first["operations"][0]["record_id"]
+			with ThreadPoolExecutor(max_workers=2) as pool:
+				delayed = pool.submit(self.post, "v1_push", first)
+				try:
+					self.wait_for_writer(held_record, "pending")
+					parallel = pool.submit(
+						self.post, "v1_push", second, extra_headers={"X-Mobile-Test-Writer": held_record}
+					)
+					self.wait_for_writer(held_record, "entered")
+					self.assertFalse(delayed.done(), "Both requests must overlap at the server")
+				finally:
+					self.commit_probe(held_record, release=True)
+				for future, request in ((delayed, first), (parallel, second)):
+					status, response, _unused = future.result()
+					self.assertEqual(status, 200, response)
+					self.assertEqual(
+						response["message"]["operations"],
+						[{"operation_id": request["operations"][0]["operation_id"], "status": "applied"}],
+					)
+
+		changes, _unused = self.pull_all(body, cursor)
+		delivered = [change["record_id"] for change in changes if change["record_id"] in records]
+		self.assertCountEqual(delivered, records)
+
 	@unittest.skipUnless(
 		os.environ.get("MOBILE_TEST_FIXTURE") == "1", "Synthetic business commands are required"
 	)
