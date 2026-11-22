@@ -61,7 +61,9 @@ class EndpointInventoryTest(unittest.TestCase):
         status, output, errors = self.check()
         self.assertEqual(status, 0, errors)
         self.assertIn("/api/method/demo.api.begin", output)
-        self.assertIn("POST", output)
+        self.assertIn("All endpoints (1)", output)
+        self.assertIn("Guest endpoints (1)", output)
+        self.assertIn("[POST] [guest]", output)
         self.assertEqual(output.count("/api/method/demo.api.begin"), 2)
 
     def test_reviewed_logout_still_requires_exact_route_and_line(self):
@@ -133,7 +135,7 @@ class EndpointInventoryTest(unittest.TestCase):
         )
         status, _, errors = self.check()
         self.assertEqual(status, 1)
-        self.assertIn("allow_guest", errors)
+        self.assertIn("allow_guest is unclear.", errors)
 
     def test_document_methods_have_scoped_test_names(self):
         self.write(
@@ -184,7 +186,7 @@ class EndpointInventoryTest(unittest.TestCase):
         )
         status, _, errors = self.check()
         self.assertEqual(status, 1)
-        self.assertIn("methods", errors)
+        self.assertIn("methods must be explicit and nonempty.", errors)
 
     def test_missing_apps_reports_failure(self):
         self.backend = self.backend / "missing"

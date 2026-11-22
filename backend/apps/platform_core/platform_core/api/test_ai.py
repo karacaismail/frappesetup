@@ -5,9 +5,15 @@
 Requests go through Frappe's WSGI application, so authentication runs on the real path.
 """
 
+from unittest.mock import patch
+
 import frappe
 
 from platform_core.ai.tests.base import DOCTYPE, USER_A, USER_B, AiTestCase
+
+MCP_METADATA_METHOD = "mcp_resource_metadata"
+MCP_RESOURCE = "https://tenant.example.test/api/method/platform_core.api.ai.mcp"
+MCP_ISSUER = "https://identity.example.test/realms/platform"
 
 
 class TestAiEndpoints(AiTestCase):
@@ -40,6 +46,39 @@ class TestAiEndpoints(AiTestCase):
 
 		self.assert_denied(result, "permission")
 		self.assertNotIn("Private to A", result["content"][0]["text"])
+
+	# --- mcp_resource_metadata ---
+
+	def test_mcp_resource_metadata_guest_denied(self):
+		with patch("platform_core.identity.api.mcp_oauth_config", return_value=None):
+			response = self.human(self.anonymous(), "GET", MCP_METADATA_METHOD)
+		self.assertEqual(response.status_code, 404)
+		self.assertEqual(response.get_data(), b"")
+
+	def test_mcp_resource_metadata_foreign_data_denied(self):
+		name = self.make_record(USER_A, title="Private to A")
+		client = self.login(USER_B)
+		query = {
+			"name": name,
+			"account": USER_A,
+			"resource": "https://other.example.test/mcp",
+			"issuer": "https://other.example.test/realms/platform",
+		}
+		with patch(
+			"platform_core.identity.api.mcp_oauth_config",
+			return_value={"resource": MCP_RESOURCE, "issuer": MCP_ISSUER},
+		):
+			response = self.human(client, "GET", MCP_METADATA_METHOD, query=query)
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(
+			response.json,
+			{
+				"resource": MCP_RESOURCE,
+				"authorization_servers": [MCP_ISSUER],
+				"scopes_supported": ["mcp"],
+				"bearer_methods_supported": ["header"],
+			},
+		)
 
 	# --- issue_agent_token ---
 
@@ -126,7 +165,9 @@ class TestAiEndpoints(AiTestCase):
 
 	def unknown_proposal_of_a(self) -> str:
 		_name, proposal_id, _digest = self.proposal_of_a()
-		frappe.db.set_value("PLT AI Action Proposal", proposal_id, {"status": "consumed", "result": "unknown"})
+		frappe.db.set_value(
+			"PLT AI Action Proposal", proposal_id, {"status": "consumed", "result": "unknown"}
+		)
 		return proposal_id
 
 	def test_resolve_proposal_guest_denied(self):

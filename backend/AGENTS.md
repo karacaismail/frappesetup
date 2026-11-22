@@ -136,7 +136,7 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
    - `colima-factory` profilinde yeniden imaj derleyebilir ve site açabilirsiniz. Önce boş yeri ölçün. Boş yer 10 GB'ın altına inerse yeni ortamı `colima` profilinde açın.
    - Port başına ayrı imaj etiketi biriktirmeyin. Örneğin `fs-kiraci-dev:3820` gibi etiketler birikiyordu. İşiniz bitince kendi etiketinizi silin.
    - `colima` (default) profilinde 57 GB boş disk ve yaklaşık 5 GB boş bellek var. `frappe/erpnext:v16.55.0` imajı orada da var.
-   - Profili `FS_COLIMA_PROFILE=default` değişkeni seçer. `dev/bin/compose` ve `dev/bin/tunel` bu değişkeni okur. Kendi betiğinizde `docker --context colima` kullanın.
+   - Profili `FS_COLIMA_PROFILE=default` değişkeni seçer. `dev/bin/compose` ve `dev/bin/tunnel` bu değişkeni okur. Kendi betiğinizde `docker --context colima` kullanın.
    - `colima` profilinde başlatmadan önce `colima ssh -- free -g` ile en az 2 GB boş bellek ölçün. Bellek yoksa bekleyin ve başka bölümü yapın.
    - Bir deneme bitince kendi geçici sitesini ve birimlerini silin. Bir işin en çok bir sitesi açık kalır.
    - Her `up` imajı yeniden derlemesin. İmaj varsa yeniden kullanın.

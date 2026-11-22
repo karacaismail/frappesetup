@@ -41,6 +41,27 @@ class RealmFileTest(unittest.TestCase):
     def test_clients_exist(self):
         self.assertTrue(CLIENTS <= set(self.clients), set(self.clients))
 
+    def test_mobile_app_can_request_tenant_audience_and_mobile_scope(self):
+        mobile = self.clients["mobile-app"]
+        self.assertEqual(set(mobile["optionalClientScopes"]), {"aud-site-tenant1", "mobile"})
+        self.assertNotIn("aud-site-tenant1", mobile["defaultClientScopes"])
+        scope = self.scopes["mobile"]
+        self.assertEqual(scope["protocol"], "openid-connect")
+        self.assertEqual(scope["attributes"]["include.in.token.scope"], "true")
+        self.assertFalse(scope.get("protocolMappers"))
+        for name, client in self.clients.items():
+            if name != "mobile-app":
+                self.assertNotIn("mobile", client.get("defaultClientScopes", []))
+                self.assertNotIn("mobile", client.get("optionalClientScopes", []))
+
+    def test_browser_headers_deny_framing_and_restrict_document_actions(self):
+        headers = self.realm["browserSecurityHeaders"]
+        self.assertEqual(headers["xFrameOptions"], "DENY")
+        directives = {part.strip() for part in headers["contentSecurityPolicy"].split(";")}
+        self.assertTrue({
+            "frame-ancestors 'none'", "object-src 'none'", "base-uri 'self'",
+        } <= directives)
+
     def test_audience_scopes_add_one_audience(self):
         for name, audience in AUDIENCE_SCOPES.items():
             scope = self.scopes[name]

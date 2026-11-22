@@ -1,5 +1,5 @@
 x-tenant: &tenant
-  image: fs-tenant-dev:${PANE_PORT:?Use dev/bin/compose}
+  image: fs-tenant-dev:${FS_STACK_IMAGE_TAG:-${PANE_PORT:?Use dev/bin/compose}}
   build:
     context: ..
     dockerfile: dev/Dockerfile.tenant

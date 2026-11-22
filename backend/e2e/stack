@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -14,8 +15,14 @@ import tempfile
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
-PROJECT = "fs-e2e-ortam"
-REDIS = "redis:7.4-alpine"
+REDIS = "redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
+
+
+def project_name(environment):
+    """Give each canonical worktree and port base a stable resource namespace."""
+    port = environment["PANE_PORT"]
+    digest = hashlib.sha256(f"{BACKEND.resolve()}\n{port}".encode()).hexdigest()[:20]
+    return f"fs-e2e-{port}-{digest}"
 
 
 def run(command, environment, **kwargs):
@@ -81,6 +88,8 @@ def setup():
             "FS_TENANT_SOCKET_PORT": str(port + 2),
             "PTR_WEB_PORT": str(port + 3),
             "PTR_SOCKET_PORT": str(port + 4),
+            "IDENTITY_SYNC_PORT": str(port + 5),
+            "IDENTITY_SYNC_EVENTS_URL": "http://identity-sync.localhost:6115/v1/events",
             "KC_PORT": str(port),
             "KC_PUBLIC_URL": f"http://identity.localhost:{port}",
             "MAILPIT_UI_PORT": str(port + 6),
@@ -88,12 +97,19 @@ def setup():
             "ATONOTA_PRESS_URL": f"http://press.localhost:{port + 3}",
         }
     )
+    environment["FS_STACK_IMAGE_TAG"] = project_name(environment)
+    # Domain separation keeps preview digests distinct from event signatures.
+    environment["IDENTITY_SYNC_DIGEST_KEY"] = hmac.new(
+        environment["IDENTITY_SYNC_WEBHOOK_SECRET"].encode(),
+        b"frappesetup-e2e-preview-digest-v1",
+        hashlib.sha256,
+    ).hexdigest()
     engine = ["docker", "--context", context]
     compose = [
         *engine,
         "compose",
         "--project-name",
-        PROJECT,
+        project_name(environment),
         "--env-file",
         str(path),
         "--file",
@@ -103,15 +119,16 @@ def setup():
 
 
 def assert_owner(engine, compose, environment, create=False):
-    """Keep the fixed project name from crossing worktrees or port ranges."""
+    """Reject foreign resources even inside the worktree's own namespace."""
+    project = project_name(environment)
     env_path = str(Path(compose[compose.index("--env-file") + 1]).resolve())
     owner = hashlib.sha256(
         f"{BACKEND.resolve()}\n{environment['PANE_PORT']}\n{env_path}".encode()
     ).hexdigest()
-    marker = PROJECT + "-owner"
+    marker = project + "-owner"
     label = "io.frappesetup.stack-owner"
     ids = run(
-        [*engine, "ps", "-aq", "--filter", f"label=com.docker.compose.project={PROJECT}"],
+        [*engine, "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"],
         environment,
         capture_output=True,
         text=True,
@@ -124,7 +141,8 @@ def assert_owner(engine, compose, environment, create=False):
             labels = container["Config"].get("Labels", {})
             if labels.get("com.docker.compose.project.working_dir") != str(BACKEND / "dev"):
                 raise ValueError("This Compose project belongs to another worktree.")
-            if labels.get("com.docker.compose.project.environment_file") != env_path:
+            recorded_env = labels.get("com.docker.compose.project.environment_file")
+            if not recorded_env or str(Path(recorded_env).resolve()) != env_path:
                 raise ValueError("This Compose project uses another environment file.")
             for item in container["Config"].get("Env", []):
                 key, _, value = item.partition("=")
@@ -135,7 +153,7 @@ def assert_owner(engine, compose, environment, create=False):
     volumes = run(
         [*engine, "volume", "ls", "--format", "{{.Name}}"], environment, capture_output=True, text=True
     ).stdout.splitlines()
-    if marker not in volumes and not ids and any(name.startswith(PROJECT + "_") for name in volumes):
+    if marker not in volumes and any(name.startswith(project + "_") for name in volumes):
         raise ValueError("Unclaimed stack volumes exist. Their ownership must be checked before reuse.")
     if create and marker not in volumes:
         run(
@@ -189,15 +207,16 @@ def resources(engine, environment):
 
 
 def ensure_images(engine, compose, environment, model):
-    for service in ("tenant-web", "keycloak", "event-sink", "web"):
-        image = model["services"][service].get("image", f"{PROJECT}-{service}")
+    for service in ("tenant-web", "keycloak", "event-sink", "web", "identity-sync"):
+        image = model["services"][service].get("image") or f"{project_name(environment)}-{service}"
         found = subprocess.run(
             [*engine, "image", "inspect", image],
             env=environment,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        if found.returncode:
+        # Refresh both halves of the event contract, including the dev HTTP allowlist.
+        if found.returncode or service in ("keycloak", "identity-sync"):
             run([*compose, "build", service], environment)
 
 
@@ -243,6 +262,11 @@ def check(compose, environment):
             "'/api/method/ping', timeout=10); assert json.load(r)['message']=='pong'\"",
         ],
         "redis": ["redis-cli", "ping"],
+        "identity-sync": [
+            "python",
+            "-c",
+            "import urllib.request; urllib.request.urlopen('http://127.0.0.1:6115/healthz', timeout=5)",
+        ],
         "event-sink": ["bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080"],
         "mailpit": ["wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8025/livez"],
     }
@@ -282,10 +306,14 @@ def check(compose, environment):
     run([*compose, "ps"], environment)
 
 
-def up(engine, compose, environment):
+def check_resources(engine, environment):
     disk, memory = resources(engine, environment)
     if disk < 10 * 1024 * 1024 or memory < 3 * 1024:
         raise ValueError("Startup requires 10 GiB free disk and 3 GiB available memory.")
+
+
+def up(engine, compose, environment):
+    check_resources(engine, environment)
     model = config(compose, environment)
     ensure_images(engine, compose, environment, model)
     run(
@@ -306,6 +334,28 @@ def up(engine, compose, environment):
         ],
         environment,
     )
+    realm_id = run(
+        [
+            *compose,
+            "exec",
+            "-T",
+            "keycloak-db",
+            "psql",
+            "-U",
+            "keycloak",
+            "-d",
+            "keycloak",
+            "-Atc",
+            "SELECT id FROM realm WHERE name = 'platform'",
+        ],
+        environment,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", realm_id):
+        raise ValueError("The platform realm must have one valid internal ID.")
+    environment["IDENTITY_SYNC_REALM_ID"] = realm_id
+    run([*compose, "up", "-d", "--no-build", "--wait", "identity-sync"], environment)
     run(
         [
             *compose,
@@ -381,6 +431,19 @@ def up(engine, compose, environment):
             ],
             environment,
         )
+    else:
+        run(
+            [
+                *compose,
+                "exec",
+                "-T",
+                "web",
+                "bash",
+                "-lc",
+                "cd /home/frappe/benches/frappe-bench && bench --site press.localhost migrate",
+            ],
+            environment,
+        )
     run(
         [
             *compose,
@@ -420,7 +483,7 @@ def up(engine, compose, environment):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("config", "up", "down", "check", "resources"))
+    parser.add_argument("action", choices=("config", "build", "up", "down", "check", "resources"))
     args = parser.parse_args()
     try:
         environment, engine, compose = setup()
@@ -441,6 +504,10 @@ def main():
                     indent=2,
                 )
             )
+        elif args.action == "build":
+            assert_owner(engine, compose, environment)
+            check_resources(engine, environment)
+            run([*compose, "build", "web"], environment)
         elif args.action == "up":
             assert_owner(engine, compose, environment, create=True)
             up(engine, compose, environment)

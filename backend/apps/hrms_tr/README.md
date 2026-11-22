@@ -33,7 +33,6 @@ Başka bir “Leave Application” kaydı, düzeltme bağlantısıyla silmeyi du
 Bu durumda komut hata verir. Geri dönüş için veritabanı yedeği kullanılır.
 Hata çıkarsa ekrandaki ilk hata metnini okuyun.
 
-
 Komut yalnız izin kayıtlarını siler. Çalışan kaydı kalır.
 “Leave Allocation”, “Leave Ledger Entry”, “Attendance”, “Salary Slip” ve “Shift Assignment” kayıtları kalır.
 Kullanıcı hesapları, denetim kayıtları ve yedekler bu işlemin kapsamı dışındadır.

@@ -1,4 +1,4 @@
-"""Servisin parçalarını birbirine bağlar."""
+"""Wire the service components together."""
 
 from __future__ import annotations
 

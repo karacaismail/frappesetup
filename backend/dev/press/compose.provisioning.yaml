@@ -1,0 +1,8 @@
+services:
+  target:
+    build:
+      context: ./press
+      dockerfile: Dockerfile.provisioning-target
+    container_name: fs-pd-press-provision-target
+    cap_add:
+      - NET_ADMIN

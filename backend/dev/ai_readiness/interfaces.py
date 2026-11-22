@@ -74,13 +74,13 @@ def folder_owner(path, owners):
         or fnmatchcase(path, pattern)
     )
     match = max(paths, key=len, default="")
-    return owners.get(match, "Belirtilmemiş")
+    return owners.get(match, "Unspecified")
 
 
 def hook_values(node, bindings, key, seen=frozenset()):
     value = resolve(node, bindings)
     if value in seen:
-        yield key, "Çözülemedi", node.lineno
+        yield key, "Unresolved", node.lineno
         return
     if isinstance(value, (ast.List, ast.Tuple, ast.Set)):
         for entry in value.elts:
@@ -89,7 +89,7 @@ def hook_values(node, bindings, key, seen=frozenset()):
                 try:
                     text = json.dumps(ast.literal_eval(resolved), ensure_ascii=False)
                 except (TypeError, ValueError):
-                    text = "Çözülemedi"
+                    text = "Unresolved"
                 yield key, text, entry.lineno
             else:
                 yield from hook_values(entry, bindings, key, seen | {value})
@@ -99,7 +99,7 @@ def hook_values(node, bindings, key, seen=frozenset()):
     else:
         text = string(value, bindings)
         if text is None:
-            text = str(value.value) if isinstance(value, ast.Constant) else "Çözülemedi"
+            text = str(value.value) if isinstance(value, ast.Constant) else "Unresolved"
         yield key, text, node.lineno
 
 
@@ -198,7 +198,7 @@ def list_interfaces(root, source_files, whitelist_checks):
                 with tokenize.open(path) as stream:
                     tree = ast.parse(stream.read(), filename=relative)
             except (OSError, UnicodeError, SyntaxError, ValueError) as error:
-                warn(path, getattr(error, "lineno", None) or 1, "input", "Python dosyası okunamadı.")
+                warn(path, getattr(error, "lineno", None) or 1, "input", "Could not read the Python file.")
                 continue
             bindings = dict(pair for item in tree.body for pair in assignments(item))
             group = module_for(name, relative, policy)
@@ -206,7 +206,7 @@ def list_interfaces(root, source_files, whitelist_checks):
             local, exposed = whitelist_checks(tree, bindings, name, path, warn)
             functions.update((f"{name}.{method}", name) for method in local if "." not in method)
             for method, (_, line) in exposed.items():
-                rows[group].add(("Dışarıya açık yöntem", method, f"{relative}:{line}"))
+                rows[group].add(("Whitelisted method", method, f"{relative}:{line}"))
 
     add_function_exports(sources, functions)
     apps = {path.split("/")[1] for path, *_ in sources.values() if path.startswith("apps/")}
@@ -225,7 +225,7 @@ def list_interfaces(root, source_files, whitelist_checks):
                 for key, text, line in hook_values(value, bindings, hook):
                     target = functions.get(text, text if text in sources else "")
                     target_group = sources[target][1] if target else group
-                    kind = "Kayıt olayı" if hook == "doc_events" else "Kanca"
+                    kind = "Document event" if hook == "doc_events" else "Hook"
                     rows[target_group].add((kind, f"{key} = {text}", f"{relative}:{line}"))
         for method, line in function_imports(tree, package, functions, sources):
             target = functions[method]
@@ -233,26 +233,28 @@ def list_interfaces(root, source_files, whitelist_checks):
             if target_group == group:
                 continue
             location = f"{relative}:{line}"
-            rows[target_group].add(("İçe aktarılan işlev", method, location))
+            rows[target_group].add(("Imported function", method, location))
             if target not in public_paths.get(target_group, []) or method.rsplit(".", 1)[-1].startswith("_"):
                 internal_imports.add((group, target_group, method, location))
 
-    lines = ["# Modül arayüzleri", ""]
+    lines = ["# Module interfaces", ""]
     for group in sorted(module_paths):
-        labels = {folder_owner(path, owners) for path in module_paths[group]} - {"Belirtilmemiş"}
-        label = ", ".join(sorted(labels)) or "Belirtilmemiş"
+        labels = {folder_owner(path, owners) for path in module_paths[group]} - {"Unspecified"}
+        label = ", ".join(sorted(labels)) or "Unspecified"
         lines.extend((f"## `{table_cell(group)}`", ""))
-        entries = rows[group] or {("Kayıt yok", "", "")}
-        lines.extend(show_table(("Tür", "Arayüz", "Kaynak", "Sahip"), ((*row, label) for row in entries)))
+        entries = rows[group] or {("No entries", "", "")}
+        lines.extend(show_table(("Type", "Interface", "Source", "Owner"), ((*row, label) for row in entries)))
         lines.append("")
-    lines.extend(("## İç işlev içe aktarma uyarıları", ""))
+    lines.extend(("## Internal function import warnings", ""))
     if internal_imports:
-        lines.append("Bu uyarılar komutun çıkış kodunu değiştirmez.")
+        lines.append("These warnings do not affect the exit code.")
         lines.append("")
-        lines.extend(show_table(("Çağıran modül", "Hedef modül", "İşlev", "Kaynak"), internal_imports))
+        lines.extend(
+            show_table(("Importing module", "Target module", "Function", "Source"), internal_imports)
+        )
     else:
-        lines.append("İç işlev içe aktarma uyarısı yok.")
+        lines.append("No internal function import warnings.")
     if warnings:
-        lines.extend(("", "## Okuma uyarıları", ""))
-        lines.extend(show_table(("Kaynak", "Uyarı"), warnings))
+        lines.extend(("", "## Read warnings", ""))
+        lines.extend(show_table(("Source", "Warning"), warnings))
     return "\n".join(lines)

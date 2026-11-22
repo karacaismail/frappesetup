@@ -44,7 +44,7 @@
    "fieldname": "principal",
    "fieldtype": "Select",
    "label": "Principal",
-   "options": "human_session\nagent_token\nother\nguest",
+   "options": "human_session\nagent_token\noauth\nother\nguest",
    "read_only": 1
   },
   {
