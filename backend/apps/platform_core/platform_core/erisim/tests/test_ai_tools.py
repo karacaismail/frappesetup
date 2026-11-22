@@ -418,3 +418,28 @@ class TestProposeRuleChange(AiToolsTestCase):
 			name="AR-NO-SUCH",
 			priority=1,
 		)
+
+
+class TestGenericWriteToolsAreClosed(AiToolsTestCase):
+	"""O-28: the generic AI write tools may not change Access Rules. Only the engine's own tools may.
+
+	The AI layer reads `ai_write_closed_doctypes` as a plain list of document type names
+	(`contracts/platform_core-yapay-zeka.openapi.yaml`).
+	"""
+
+	def test_access_rule_is_closed_to_generic_write_tools(self):
+		self.assertIn(RULE_DOCTYPE, frappe.get_hooks("ai_write_closed_doctypes") or [])
+
+	def test_every_closed_document_type_of_the_engine_exists(self):
+		from platform_core.erisim import ai_tools
+
+		self.assertTrue(ai_tools.WRITE_CLOSED_DOCTYPES)
+		for doctype in ai_tools.WRITE_CLOSED_DOCTYPES:
+			self.assertTrue(frappe.db.exists("DocType", doctype), doctype)
+			self.assertIn(doctype, frappe.get_hooks("ai_write_closed_doctypes") or [])
+
+	def test_the_engine_still_offers_its_own_write_tools_for_the_closed_type(self):
+		"""Closing the generic tools must not leave Access Rules unmanageable by AI (D-9)."""
+		declarations = self.declarations()
+
+		self.assertEqual({"propose_access_rule", "propose_access_rule_change"} - set(declarations), set())

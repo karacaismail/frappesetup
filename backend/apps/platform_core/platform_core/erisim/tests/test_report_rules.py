@@ -9,6 +9,7 @@ C. A script report runs only when an app declared what it reads and its code rea
 E. Auto Email Report follows the same rules for the user it runs as.
 """
 
+import inspect
 import json
 from unittest.mock import patch
 
@@ -155,6 +156,13 @@ class TestQueryReportRule(ReportRulesTestCase):
 		frappe.set_user("Administrator")
 		self.assertRaises(frappe.PermissionError, api.report_guard, NAME_REPORT, HR)
 		self.assertIsNone(api.report_guard(NAME_REPORT, ADMIN))
+
+	def test_guard_signatures_other_modules_rely_on_are_stable(self):
+		"""The AI layer calls the guard as `guard(report_name)` and may pass a user."""
+		for function in (api.report_guard, reports.guard):
+			parameters = list(inspect.signature(function).parameters.values())
+			self.assertEqual([parameter.name for parameter in parameters], ["report_name", "user"])
+			self.assertIsNone(parameters[1].default)
 
 
 class TestReportsWithoutRules(ReportRulesTestCase):

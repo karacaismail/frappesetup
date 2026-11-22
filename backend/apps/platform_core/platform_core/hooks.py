@@ -32,3 +32,5 @@ doc_events = {
 }
 # AI tools of the access rule engine (D-9). Format: contracts/platform_core-yapay-zeka.openapi.yaml
 ai_tools = ["platform_core.erisim.ai_tools.declare"]
+# Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
+ai_write_closed_doctypes = ["Access Rule"]

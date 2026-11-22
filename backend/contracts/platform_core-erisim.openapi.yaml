@@ -363,6 +363,13 @@ x-hooks:
         Kurallı kayıt türünde çalışabilecek özel arama işlevlerini sayar.
         İşlevin modülü yalnız izinli okuma yolu kullanmalıdır. Motor bunu her aramada denetler.
 
+    - name: ai_write_closed_doctypes
+      shape: '["Access Rule"]'
+      description: |
+        Bu kancayı yapay zekâ katmanı okur. Motor “Access Rule” kayıt türünü bu listeye yazar (O-28).
+        Genel yazma araçları bu türü değiştiremez. Örneğin `create_document` ve `update_document` reddedilir.
+        Kural yalnız motorun kendi araçlarıyla değişir: `propose_access_rule` ve `propose_access_rule_change`.
+
 x-report-rules:
   description: |
     Rapor uçları Frappe'nin kendi uçlarıdır. Motor rapor kaydını genişletir.
