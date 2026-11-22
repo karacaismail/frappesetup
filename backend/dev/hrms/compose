@@ -7,9 +7,14 @@ if [[ ! "${PANE_PORT:-}" =~ ^[1-9][0-9]{3,4}$ ]] || (( PANE_PORT > 65526 )); the
     exit 2
 fi
 
+case "${FS_COLIMA_PROFILE:-factory}" in
+    factory) docker_context=colima-factory ;;
+    default) docker_context=colima ;;
+    *) printf '%s\n' 'FS_COLIMA_PROFILE must be factory or default.' >&2; exit 2 ;;
+esac
 export KIRACI_WEB_PORT="$((PANE_PORT + 1))"
 export KIRACI_SOCKET_PORT="$((PANE_PORT + 2))"
-exec docker --context colima-factory compose \
+exec docker --context "$docker_context" compose \
     --project-name fs-ilk-dikey-dilim \
     --env-file "${HRMS_TR_ENV_FILE:-$dev_dir/.env}" \
     --file "$dev_dir/compose.yaml" "$@"

@@ -4,17 +4,30 @@ Bu komutlar depoda, ayrı bir test sitesi kurar.
 Platform Core, “Access Rule” kayıt türünü sağlamalıdır.
 Yapay zekâ testi için Platform Core yapay zekâ uçlarını da sağlamalıdır.
 
-1. Colima diskinde boş yeri ölçün.
+Factory profilinde yalnız mevcut imajı ve test sitesini kullanın.
+Factory profilinde imaj derlemeyin veya yeni site açmayın.
+Yeni ortam gerekiyorsa aşağıdaki adımları izleyin.
+
+1. Varsayılan Colima profilinde boş belleği ölçün.
 
    ```sh
-   colima ssh -p factory -- df -h /var/lib/docker
+   colima ssh -- free -g
    ```
 
-2. Depo kökünden iki imajı derleyin.
+   `available` sütununda en az 2 GB bellek varsa devam edin.
+   Yeni ortam için profili seçin.
 
    ```sh
-   docker --context colima-factory build -t fs-kiraci-dev:v16.55.0 -f backend/dev/Dockerfile.kiraci backend
-   docker --context colima-factory build -t fs-ilk-dikey-dilim:hrms_tr -f backend/dev/hrms/Dockerfile backend
+   export FS_COLIMA_PROFILE=default
+   ```
+
+2. Depo kökünden mevcut imajları kullanın. Eksik imajı varsayılan profilde derleyin.
+
+   ```sh
+   docker --context colima image inspect fs-kiraci-dev:v16.55.0 >/dev/null 2>&1 ||
+     docker --context colima build -t fs-kiraci-dev:v16.55.0 -f backend/dev/Dockerfile.kiraci backend
+   docker --context colima image inspect fs-ilk-dikey-dilim:hrms_tr >/dev/null 2>&1 ||
+     docker --context colima build -t fs-ilk-dikey-dilim:hrms_tr -f backend/dev/hrms/Dockerfile backend
    ```
 
 3. `.env.example` dosyasını aynı klasöre `.env` adıyla kopyalayın.
@@ -22,10 +35,10 @@ Yapay zekâ testi için Platform Core yapay zekâ uçlarını da sağlamalıdır
 4. Veritabanını ve Redis hizmetini başlatın. Ardından test sitesini kurun.
 
    ```sh
-   backend/dev/hrms/compose up -d kiraci-db kiraci-redis
+   backend/dev/hrms/compose up -d --no-build kiraci-db kiraci-redis
    backend/dev/hrms/compose run --rm web env/bin/python /workspace/dev/bootstrap.py \
      test-hrms-tr.localhost --app hrms --app platform_core --app hrms_tr
-   backend/dev/hrms/compose up -d web
+   backend/dev/hrms/compose up -d --no-build web
    ```
 
 5. Uydurma kayıtları ekleyin. Testleri web konteynerinde çalıştırın.
@@ -41,8 +54,9 @@ Yapay zekâ testi için Platform Core yapay zekâ uçlarını da sağlamalıdır
    Yapay zekâ katmanı eksikse `--with-ai` seçeneğini çıkarın.
    Test, taslak durumunu değiştirir. Her tam koşu için boş test sitesi kullanın.
 
-6. Test ortamını kapatın. Compose veritabanı birimini saklar.
+6. Deneme bitince yalnız bu işin geçici sitesini ve veri birimlerini silin.
+   Komut bu Compose projesinin test verisini siler. Aynı anda bir test sitesi açık tutun.
 
    ```sh
-   backend/dev/hrms/compose down
+   backend/dev/hrms/compose down --volumes
    ```
