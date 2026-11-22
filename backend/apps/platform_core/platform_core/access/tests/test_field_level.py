@@ -9,13 +9,13 @@ from platform_core.access.tests.base import (
 	HR,
 	MANAGER_1,
 	ROLE_MANAGER,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 SALARY = 1234
 
 
-class TestFieldLevel(ErisimTestCase):
+class TestFieldLevel(AccessRuleTestCase):
 	def test_restricted_field_is_not_returned_on_document(self):
 		client = self.login(EMPLOYEE_1)
 
@@ -65,7 +65,7 @@ class TestFieldLevel(ErisimTestCase):
 		self.assertEqual(response.json["data"]["salary_amount"], SALARY)
 
 
-class TestFieldLevelEndpoints(ErisimTestCase):
+class TestFieldLevelEndpoints(AccessRuleTestCase):
 	"""The `set_field_level` and `set_level_access` endpoints (contract)."""
 
 	def reset(self):

@@ -223,7 +223,7 @@ def iter_named_rows(doctype: str, filters: dict, fields: tuple[str, ...] = ()):
 def replace_mailbox(value: str, email: str, placeholder: str) -> str | None:
 	addresses = getaddresses([value])
 	email = email.lower()
-	if not any(address.lower() == email for _, address in addresses):
+	if not any(address.lower() == email for _field, address in addresses):
 		return None
 	return ", ".join(
 		placeholder if address.lower() == email else formataddr((name, address))
@@ -409,7 +409,7 @@ def redact_record_ownership(user: str, placeholder: str) -> None:
 	)
 	for table_name, rows in groupby(ownership_columns, key=itemgetter(0)):
 		table = frappe.qb.Table(table_name)
-		fields = [table[field] for _, field in rows]
+		fields = [table[field] for _table, field in rows]
 		matches = fields[0] == user
 		for field in fields[1:]:
 			matches |= field == user

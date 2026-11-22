@@ -229,7 +229,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
         for thread in threads:
             thread.join(5.0)
         self.assertEqual(results, ["identity-sync"] * 2)
-        self.assertEqual(inner.cagri, 1)
+        self.assertEqual(inner.call_count, 1)
         self.assertFalse(cache._refresh_lock.locked())
 
     def test_unknown_kid_caller_gives_up_at_wait_timeout(self):
@@ -241,7 +241,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
 
         def fetcher():
             data = inner()
-            if inner.cagri > 1:
+            if inner.call_count > 1:
                 in_fetch.set()
                 self.assertTrue(release.wait(10.0))
             return data
@@ -273,7 +273,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
         self.assertLess(elapsed, 2.0, f"the waiting caller waited {elapsed:.3f}s, bound is 0.5s")
         # The first refresh completed once released, and the lock is free again.
         self.assertEqual(first, ["identity-sync"])
-        self.assertEqual(inner.cagri, 2)
+        self.assertEqual(inner.call_count, 2)
         self.assertFalse(cache._refresh_lock.locked())
         self.assertEqual(self.access(token, cache)["azp"], "identity-sync")
 
@@ -286,7 +286,7 @@ class BoundedWaitTest(_ServerMixin, unittest.TestCase):
 
         def fetcher():
             data = inner()
-            if inner.cagri > 1:
+            if inner.call_count > 1:
                 in_fetch.set()
                 self.assertTrue(release.wait(10.0))
             return data

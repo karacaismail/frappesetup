@@ -46,7 +46,7 @@ class PressHttpClient:
 			connection.close()
 
 	def request(self, method, path):
-		status, headers, _ = self.exchange(method, path)
+		status, headers, _body = self.exchange(method, path)
 		return status, headers.get("Location")
 
 
@@ -71,7 +71,7 @@ class AuthHttpTest(PressHttpClient, unittest.TestCase):
 		self.assertTrue(browser["httponly"])
 		self.assertEqual(browser["samesite"], "Lax")
 		self.assertEqual(browser["max-age"], "600")
-		status, _ = self.request(
+		status, _payload = self.request(
 			"GET", f"/api/method/press_tr.api.auth.keycloak_callback?state={query['state'][0]}&code=unused"
 		)
 		self.assertEqual(status, 403)
@@ -85,7 +85,7 @@ class AuthHttpTest(PressHttpClient, unittest.TestCase):
 	def test_disabled_endpoints(self):
 		for command in CLOSED_METHODS:
 			with self.subTest(command=command):
-				status, _ = self.request("POST", f"/api/method/{command}")
+				status, _payload = self.request("POST", f"/api/method/{command}")
 				self.assertEqual(status, 403)
 
 	def test_canonical_rpc_versions_block_legacy_identity(self):
@@ -103,12 +103,12 @@ class AuthHttpTest(PressHttpClient, unittest.TestCase):
 				"press.api.oauth.google_login",
 			):
 				with self.subTest(prefix=prefix, command=command):
-					status, _ = self.request("POST", prefix + command)
+					status, _payload = self.request("POST", prefix + command)
 					self.assertEqual(status, 403)
 
 	def test_login_url_rate_limit(self):
 		path = "/api/method/press_tr.api.auth.get_login_url"
-		for _ in range(10):
+		for _iteration in range(10):
 			self.assertEqual(self.request("POST", path)[0], 200)
 		self.assertEqual(self.request("POST", path.replace("/api/method/", "/api/v2/method/"))[0], 429)
 

@@ -196,7 +196,7 @@ class TestBoundedQueries(AiTestCase):
 		from platform_core.ai import retention
 
 		manager = self.login(MANAGER)
-		for _ in range(4):
+		for _iteration in range(4):
 			self.call_tool(manager, "plt_search_doctypes", {})
 		frappe.db.rollback()
 		table = "PLT AI Action Log"
@@ -218,7 +218,7 @@ class TestBoundedQueries(AiTestCase):
 		self.assertEqual(old, waiting - 3)
 
 	def test_pages_with_equal_sort_values_neither_repeat_nor_skip(self):
-		names = sorted(self.make_record(USER_A, title="Same") for _ in range(5))
+		names = sorted(self.make_record(USER_A, title="Same") for _iteration in range(5))
 		client = self.login(USER_A)
 		base = {"doctype": DOCTYPE, "filters": {"name": ["in", names]}, "limit": 2}
 

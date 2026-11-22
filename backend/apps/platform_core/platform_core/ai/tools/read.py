@@ -185,7 +185,7 @@ def run_report(report: str, filters: dict[str, Any] | None = None, limit: int = 
 def _report_guard():
 	"""Return the access engine's report gate, or None while it is not installed.
 
-	The gate is `platform_core.erisim.api.report_guard`, the public path of that module.
+	The gate is `platform_core.access.api.report_guard`, the public path of that module.
 	The report tool stays closed without it. That is the safe default.
 	"""
 	try:

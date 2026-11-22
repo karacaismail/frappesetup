@@ -123,7 +123,7 @@ class MeasurementSession:
         self.headers = {"X-Frappe-Site-Name": site, "Accept": "application/json"}
         self.call("POST", "/api/method/login", body={"usr": username, "pwd": password})
         if portal:
-            page, _ = self.call("GET", "/panel")
+            page, _elapsed = self.call("GET", "/panel")
             token = re.search(rb'<meta name="csrf-token" content="([^"]+)"', page.data)
             if token is None or token[1] in (b"None", b"null"):
                 raise SystemExit("The HR portal did not provide a CSRF token.")
@@ -156,7 +156,7 @@ class MeasurementSession:
 
 
 def record_version(session, name):
-    response, _ = session.call("GET", f"{RESOURCE}/{quote(name, safe='')}")
+    response, _elapsed = session.call("GET", f"{RESOURCE}/{quote(name, safe='')}")
     return {"name": name, "version": response.json["data"]["modified"]}
 
 
@@ -188,11 +188,11 @@ def measure(site, draft_names, employees, attendance, password):
         response, elapsed = hr.call("GET", read_name)
         operations["GET", f"{RESOURCE}/{{name}}", READ_LIMIT_MS].append(elapsed)
         version = {"name": name, "version": response.json["data"]["modified"]}
-        _, elapsed = hr.call("GET", f"{METHOD}get_leave_approver", query={"employee": employees[ordinal]})
+        _response, elapsed = hr.call("GET", f"{METHOD}get_leave_approver", query={"employee": employees[ordinal]})
         operations["GET", f"{METHOD}get_leave_approver", READ_LIMIT_MS].append(elapsed)
-        _, elapsed = hr.call("POST", f"{METHOD}approve_leave", body=version)
+        _response, elapsed = hr.call("POST", f"{METHOD}approve_leave", body=version)
         operations["POST", f"{METHOD}approve_leave", WRITE_LIMIT_MS].append(elapsed)
-        _, elapsed = hr.call("POST", f"{METHOD}cancel_leave", body=record_version(hr, name))
+        _response, elapsed = hr.call("POST", f"{METHOD}cancel_leave", body=record_version(hr, name))
         operations["POST", f"{METHOD}cancel_leave", WRITE_LIMIT_MS].append(elapsed)
     attendance_path = "/api/v2/document/Attendance%20Request/{name}/method/get_attendance_warnings/"
     for method in ("GET", "POST"):
@@ -201,7 +201,7 @@ def measure(site, draft_names, employees, attendance, password):
             (attendance_path, attendance_path.format(name=quote(attendance, safe=""))),
         ):
             operations[method, route, READ_LIMIT_MS] = [
-                admin.call(method, path, expected=403)[1] for _ in range(SAMPLES)
+                admin.call(method, path, expected=403)[1] for _iteration in range(SAMPLES)
             ]
     return operations
 

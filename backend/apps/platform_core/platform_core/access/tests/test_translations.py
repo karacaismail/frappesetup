@@ -16,7 +16,7 @@ import frappe
 
 import platform_core
 from platform_core.access import ai_tools
-from platform_core.access.tests.base import DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, RULE_DOCTYPE, ErisimTestCase
+from platform_core.access.tests.base import DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, RULE_DOCTYPE, AccessRuleTestCase
 
 ROOT = Path(platform_core.__file__).parent
 CSV_PATH = ROOT / "translations" / "tr.csv"
@@ -78,7 +78,7 @@ def csv_rows() -> dict[tuple[str, str], str]:
 	return rows
 
 
-class TestTranslations(ErisimTestCase):
+class TestTranslations(AccessRuleTestCase):
 	def all_visible(self) -> set[str]:
 		visible = message_strings() | tool_strings()
 		for labels, descriptions in doctype_strings().values():

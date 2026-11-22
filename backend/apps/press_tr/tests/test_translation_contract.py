@@ -17,7 +17,7 @@ class TranslationContractTest(unittest.TestCase):
 
 	def test_translations_have_unique_contextual_keys(self):
 		self.assertTrue(all(len(row) == 3 and all(row) for row in self.rows))
-		keys = [(source, context) for source, _, context in self.rows]
+		keys = [(source, context) for source, _translation, context in self.rows]
 		self.assertEqual(len(keys), len(set(keys)))
 
 	def test_missing_anonymization_key_error_is_translated(self):

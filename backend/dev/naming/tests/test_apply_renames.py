@@ -436,6 +436,48 @@ class RenameTests(unittest.TestCase):
         self.assertEqual(rerun.returncode, 0, rerun.stderr)
         self.assertEqual((self.git("status", "--porcelain"), self.git("diff")), before_repeat)
 
+    def test_cp2_tree_is_unchanged_on_repeat(self):
+        ai = "backend/apps/platform_core/platform_core/ai"
+        samples = {
+            f"{ai}/tests/base.py": 'response = self.human(client, "GET", "get_proposal")\n',
+            f"{ai}/tests/test_approval.py": (
+                'tool = self.call_tool(client, "plt_get_proposal", {})\n'
+                'response = self.human(client, "GET", "get_proposal")\n'
+            ),
+            "backend/identity/keycloak/tests/test_standards_audit.py": (
+                'words = ("sihirli", "yontem", "duzey", "baglanti")\n'
+            ),
+        }
+        for path, content in samples.items():
+            self.write(path, content)
+        self.git("add", ".")
+        before = self.git("status", "--porcelain")
+
+        for options in (("--dry-run",), ()):
+            with self.subTest(options=options):
+                result = self.rename(None, *options)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertRegex(result.stdout, r"(?m)^0 tracked file\(s\) (?:would change|changed)\.$")
+                self.assertEqual(self.git("status", "--porcelain"), before)
+                self.assertEqual(self.git("diff"), "")
+
+    def test_proposal_tool_rename_preserves_http_endpoint(self):
+        path = self.write(
+            "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_approval.py",
+            'tool = self.call_tool(client, "get_proposal", {})\n'
+            'response = self.human(client, "GET", "get_proposal")\n',
+        )
+        self.git("add", ".")
+
+        result = self.rename(None)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        moved = path.parents[2] / "ai/tests/test_approval.py"
+        self.assertEqual(
+            moved.read_text(),
+            'tool = self.call_tool(client, "plt_get_proposal", {})\n'
+            'response = self.human(client, "GET", "get_proposal")\n',
+        )
+
     def test_only_matching_tracked_backend_references_change(self):
         tracked = self.write(
             "backend/app/hooks.py",

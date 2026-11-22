@@ -5,10 +5,12 @@ import { join, resolve } from 'node:path';
 
 const worktree = resolve(process.argv[2]);
 const previewDir = process.env.PREVIEW_DIR;
+const containerRuntime = process.env.E2E_BROWSER_RUNTIME === 'container';
 const require = createRequire(join(worktree, 'package.json'));
-const { request } = require('@playwright/test');
+const { chromium, request, webkit } = require('@playwright/test');
 const fixture = readFixture(join(previewDir, 'fixtures.json'));
 const tenant = 'http://tenant1.localhost:' + (Number(process.env.PANE_PORT) + 1);
+const credentialName = /(?:^|_)(?:AUTHORIZATION|COOKIE|CSRF|PASSWORD|SECRET|SEED|TOKEN)(?:_|$)/;
 
 const env = {
   ...process.env,
@@ -18,6 +20,7 @@ const env = {
 for (const name of [
   'E2E_ADMIN_PASSWORD', 'E2E_KEYCLOAK_ADMIN_PASSWORD', 'E2E_KEYCLOAK_CLIENT_SECRET',
   'ATONOTA_SITE_TENANT1_SERVICE_SECRET', 'E2E_KEYCLOAK_SERVICE_CLIENT_SECRET', 'E2E_PREVIEW_READER_PASSWORD', 'E2E_PRESS_ADMIN_PASSWORD', 'E2E_PRESS_CLIENT_SECRET',
+  'E2E_CHROMIUM_UNAVAILABLE',
 ]) delete env[name];
 
 function readFixture(path) {
@@ -58,7 +61,6 @@ async function openTenantSession(role, username, password) {
 }
 
 function sanitize(raw) {
-  const credentialName = /(?:^|_)(?:AUTHORIZATION|COOKIE|CSRF|PASSWORD|SECRET|SEED|TOKEN)(?:_|$)/;
   const credentials = new Set();
   for (const settings of [process.env, fixture, env]) {
     for (const [name, value] of Object.entries(settings)) {
@@ -75,6 +77,21 @@ function sanitize(raw) {
     .replace(/([?&](?:code|state|session_state)=)[^&\s"']+/gi, '$1[redacted]')
     .replace(/(authorization:\s*(?:Bearer|Basic|token)\s+)[^\s"']+/gi, '$1[redacted]')
     .replace(/(\bsid=|x-frappe-csrf-token:\s*)[^;\s"']+/gi, '$1[redacted]');
+}
+
+async function browserAvailable(engine, browserType) {
+  let browser;
+  const browserEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => !credentialName.test(name)));
+  try {
+    browser = await browserType.launch({ timeout: 10000, env: browserEnv });
+  } catch (error) {
+    const output = sanitize(String(error));
+    writeFileSync(join(previewDir, engine + '-launch.log'), output + '\n', { mode: 0o600 });
+    process.stdout.write(`not_run ${engine} (browser launch failed)\n`);
+    return false;
+  }
+  await browser.close();
+  return true;
 }
 
 async function runPlaywright(label, args, reporter = 'list') {
@@ -94,7 +111,7 @@ async function runPlaywright(label, args, reporter = 'list') {
   const safe = sanitize(raw);
   const safeErrors = sanitize(errors.join(''));
   writeFileSync(join(previewDir, label + '.log'), safe + safeErrors, { mode: 0o600 });
-  if (reporter === 'json' && status === 0) {
+  if (reporter === 'json' && (status === 0 || raw.trim())) {
     let pending;
     try {
       pending = [...JSON.parse(raw).suites];
@@ -106,8 +123,15 @@ async function runPlaywright(label, args, reporter = 'list') {
       pending.push(...(suite.suites ?? []));
       for (const spec of suite.specs ?? []) {
         for (const test of spec.tests) {
+          const result = test.results?.at(-1);
           const skipped = test.annotations?.find(({ type }) => type === 'skip');
-          const line = skipped ? `not_run ${spec.title} (${skipped.description})` : `pass ${spec.title}`;
+          const outcome = {
+            passed: 'pass', failed: 'fail', timedOut: 'fail', interrupted: 'fail', skipped: 'not_run',
+          }[result?.status] ?? 'not_run';
+          const detail = skipped?.description ?? result?.error?.message?.split('\n')[0];
+          const project = test.projectName ? `[${test.projectName}] ` : '';
+          const file = spec.file ? `${spec.file} · ` : '';
+          const line = `${outcome} ${project}${file}${spec.title}${detail ? ` (${detail})` : ''}`;
           process.stdout.write(sanitize(line) + '\n');
         }
       }
@@ -121,21 +145,36 @@ async function runPlaywright(label, args, reporter = 'list') {
 
 try {
   const results = [];
-  results.push(await runPlaywright('browser', ['--project=chromium', '--project=webkit', 'browser.spec.ts']));
+  const projects = [];
+  if (await browserAvailable('chromium', chromium)) projects.push('--project=chromium');
+  else env.E2E_CHROMIUM_UNAVAILABLE = '1';
+  if (await browserAvailable('webkit', webkit)) projects.push('--project=webkit');
+  if (projects.length) {
+    results.push(await runPlaywright('browser', [
+      ...projects, 'browser.spec.ts', 'magic-link.spec.ts', 'mobile-pkce.spec.ts',
+    ], containerRuntime ? 'json' : 'list'));
+  }
   try {
-    await openTenantSession('OPERATOR', 'Administrator', process.env.E2E_ADMIN_PASSWORD);
-    env.E2E_DELETE_TENANT_READER_COOKIE ||= env.E2E_OPERATOR_COOKIE;
-    env.E2E_REVOKE_ADMIN_COOKIE ||= env.E2E_OPERATOR_COOKIE;
-    env.E2E_REVOKE_ADMIN_CSRF ||= env.E2E_OPERATOR_CSRF;
-    await openTenantSession('READER', fixture.E2E_PREVIEW_READER_EMAIL, fixture.E2E_PREVIEW_READER_PASSWORD);
-    results.push(await runPlaywright('api', ['--project=api', 'integration.spec.ts']));
+    if (!containerRuntime || env.E2E_ACCOUNT_DELETION === '1' || env.E2E_MOBILE_SESSION_REVOKE === '1') {
+      await openTenantSession('OPERATOR', 'Administrator', process.env.E2E_ADMIN_PASSWORD);
+      env.E2E_DELETE_TENANT_READER_COOKIE ||= env.E2E_OPERATOR_COOKIE;
+      env.E2E_REVOKE_ADMIN_COOKIE ||= env.E2E_OPERATOR_COOKIE;
+      env.E2E_REVOKE_ADMIN_CSRF ||= env.E2E_OPERATOR_CSRF;
+    }
+    if (!containerRuntime) {
+      await openTenantSession('READER', fixture.E2E_PREVIEW_READER_EMAIL, fixture.E2E_PREVIEW_READER_PASSWORD);
+      results.push(await runPlaywright('api', ['--project=api', 'integration.spec.ts']));
+    }
   } catch (error) {
     const message = 'API fixture failed: ' + sanitize(String(error)) + '\n';
     process.stderr.write(message);
     writeFileSync(join(previewDir, 'api.log'), message, { mode: 0o600 });
     results.push(1);
   }
-  results.push(await runPlaywright('lifecycle', ['--project=chromium', 'lifecycle.spec.ts'], 'json'));
+  const lifecycleProjects = containerRuntime ? projects : ['--project=chromium'];
+  if (lifecycleProjects.length) {
+    results.push(await runPlaywright('lifecycle', [...lifecycleProjects, 'lifecycle.spec.ts'], 'json'));
+  }
   process.exitCode = results.find((code) => code !== 0) ?? 0;
 } catch (error) {
   process.stderr.write(sanitize(String(error)) + '\n');

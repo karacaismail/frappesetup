@@ -17,10 +17,10 @@ Werkzeug için onaylı çözüm `Werkzeug~=3.1.9` yazmaktır. Frappe 16.56.0, We
 Birleşen `hooks.py` dosyasında aynı üst düzey ad yeniden atanırsa komut durur.
 Rapor, Git çakışması olmasa bile adı ve satırları gösterir.
 
-Canlı koşu, `PANE_PORT`, kurulu Playwright ve varsayılan Colima'yı ister.
+Canlı koşu `PANE_PORT`, kurulu Playwright ve çalışan bir Colima profili ister.
 Ağır ortam için en az 3 GiB kullanılabilir bellek gerekir.
-Komut belleği varsayılan Colima’nın Docker bağlamında ölçer.
-Komut varsayılan Colima'da örnek ortamı açar ve senaryoları koşar.
+Komut belleği seçilen Colima profilinde ölçer.
+Komut o profilde örnek ortamı açar ve senaryoları çalıştırır.
 Model sağlayıcısı yalnız kendi sabit yerel adres listesiyle kaydedilir.
 Testten sonra geçici birimler, imajlar, derleme alanı ve worktree kaldırılır.
 Rapor ve günlükler komutun yazdığı yerel klasörde kalır.
@@ -72,6 +72,19 @@ Pane, `PANE_PORT` değişkeniyle bu çalışma alanına port ayırır.
 
 Mevcut kiracı imajı, son derlemede alınan kodu taşır.
 Kiracı kodu değişirse imajı güncelleyin ve sonra testleri çalıştırın.
+
+### Tarayıcıları Colima içinde çalıştırma
+
+```sh
+E2E_BROWSER_RUNTIME=container FS_COLIMA_PROFILE=default backend/e2e/bin/merge-preview
+```
+
+Komut mevcut Playwright imajını kullanır. İmaj ve kurulu paket aynı ana ve alt sürümde olmalıdır.
+Chromium ve WebKit, geçici ortamın Docker ağında çalışır.
+Yerel ağ bağlantısı, tarayıcıdaki site adreslerini ve HTTP başlıklarını korur.
+Komut dört tarayıcı dosyasını seçer. Örnek verisi eksik testler `not_run` olarak görünür.
+Bu seçenekte ayrı API test grubu çalışmaz.
+Varsayılan profilde bellek yetmezse `FS_COLIMA_PROFILE=factory` ile deneyin.
 
 ### Press gerektirmeyen testler
 

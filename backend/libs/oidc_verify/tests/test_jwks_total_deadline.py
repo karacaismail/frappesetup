@@ -273,7 +273,7 @@ class ConcurrentStartTest(unittest.TestCase):
 
         def fetcher():
             data = inner()
-            if inner.cagri > 1:
+            if inner.call_count > 1:
                 in_fetch.set()
                 release.wait(10.0)
             return data
