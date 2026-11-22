@@ -413,7 +413,10 @@ Kimlik türleri şunlardır: API anahtarı, taşıyıcı belirteç, OAuth istemc
 2. Kapalı, yeteneği eksik, bütçesi dolmuş ve devresi açık adayları çıkarın.
 3. Adayları yolun seçme biçimine göre sıralayın. Seçme biçimleri öncelik, ağırlık ve en düşük maliyettir.
 4. İlk adayı çağırın.
-5. 429, 5xx ya da zaman aşımı gelirse adayı bir süre dinlendirin ve sıradakine geçin.
+5. 429 ya da 5xx gelirse adayı bir süre dinlendirin ve sıradakine geçin.
+   - Zaman aşımında sağlayıcı işi bitirip ücret almış olabilir. Bu yüzden bütçeli hesapta sıradakine geçilmez. Kayıt “unknown” kalır ve kullanıcı 503 alır.
+   - Bütçesiz hesapta zaman aşımı sıradakine geçebilir.
+   - Modelin çıktı hızı kayıtta durur (`output_tokens_per_second`). Yol süresine sığmayan `limit` değeri, bütçe ayrılmadan önce 400 ile reddedilir.
 6. Kimlik hatası gelirse API'yi kapalı sayın ve yönetici kaydına yazın.
 7. Her denemeyi “AI Usage Log” kaydına yazın.
 
@@ -429,7 +432,7 @@ Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinde
 - Mesaj içeriği varsayılan olarak günlüğe yazılmaz.
 - Yol kaydının veri kısıtı, model çağrısından önce veri seçimini ve maskelemeyi ister (G-90).
 - Dış sağlayıcıya giden içerik her zaman maskelenir. Yolun veri kısıtını “AI Manager” rolü seçer. Kısıt `masked` ise maskelenmiş içerik dış sağlayıcıya gidebilir. Ayrıca içerik bazında ön onay istenmez.
-- Aracı belirteci model ucunda geçmez. Aracı modele `yapay_zeka` katmanı üzerinden ulaşır. Bu katman `model_gecidi` modülünün açık işlevini çağırır. Böylece belirtecin biçimi tek yerde, `yapay_zeka` modülünde kalır.
+- Aracı belirteci model ucunda geçmez. Aracı modele `yapay_zeka` katmanı üzerinden ulaşır. Bu katman `platform_core.model_gecidi.api.complete` işlevini çağırır. Böylece belirtecin biçimi tek yerde, `yapay_zeka` modülünde kalır.
 - `model_gecidi` modülünün açık çağrı işlevi arka plan işinde de çalışır. İşlev o anki kullanıcının yetkisini denetler. Misafir kullanıcı çağıramaz.
 
 ### Uç
