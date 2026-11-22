@@ -22,7 +22,8 @@ class ImageContractTest(unittest.TestCase):
         image = re.search(r"`fs-press-tr-base:py(?P<version>\d+\.\d+\.\d+)`", decision)
         self.assertIsNotNone(image)
         readme = (PRESS_DEV / "README.md").read_text()
-        self.assertIn(f"Python sürümü {image['version']}.", readme)
+        versions = re.findall(r"(?m)^.*\bPython\b.* (\d+\.\d+\.\d+)\.$", readme)
+        self.assertEqual(versions, [image["version"]])
 
     def test_site_setup_refreshes_hooks_after_press_install(self):
         commands = (PRESS_DEV / "install.sh").read_text().splitlines()
