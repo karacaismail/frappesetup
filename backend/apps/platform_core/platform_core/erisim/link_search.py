@@ -5,7 +5,7 @@ function returns (`frappe/desk/search.py:133`). Such a function may ignore recor
 field levels, and it may pick records by a field the user cannot read.
 
 Rule: on a governed document type only Frappe's standard search runs. Every custom search
-function is refused, for every user. There is no allow-list. An allow-list with a static code
+function is refused, for every user, the Administrator user included. There is no allow-list. An allow-list with a static code
 check was tried and removed: the check could be bypassed and can never be complete.
 
 `hooks.py` puts `search_link` and `search_widget` in place of Frappe's two search endpoints.
@@ -29,9 +29,13 @@ def custom_query(doctype: str, query: str | None) -> str | None:
 
 
 def guard(doctype: str, query: str | None = None) -> None:
-	"""Refuse every custom search function on a governed document type."""
+	"""Refuse every custom search function on a governed document type.
+
+	There is no exception, not for a System Manager and not for the Administrator user: Frappe's
+	own search would run the function for them as for anyone else.
+	"""
 	used = custom_query(doctype, query)
-	if not used or frappe.session.user == "Administrator" or not rules.is_governed(doctype):
+	if not used or not rules.is_governed(doctype):
 		return
 	frappe.throw(
 		_("Search function {0} is not allowed on {1}, which is governed by Access Rules.").format(

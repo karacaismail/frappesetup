@@ -11,7 +11,8 @@ Rules while any document type is governed:
   reads cannot be verified. A static check of script code was tried and removed: an aliased
   import or a `user` argument got around it, and such a check can never be complete.
 - Prepared Report is closed for a report that touches governed data.
-- Auto Email Report follows the same rules for the user it runs as, and runs as that user.
+- Auto Email Report on governed data is for System Managers only, and the report rules also
+  hold for the user named on the record. The engine never switches the session user.
 
 Every way to get report data ends in `Report.execute_query_report` or
 `Report.execute_script_report` (`frappe/desk/query_report.py:93`). `GuardedReport` extends the
@@ -115,14 +116,32 @@ def refuse_prepared_report(report_name: str | None) -> None:
 # Every method calls `super()` so the next class in that chain still runs.
 
 
+PREPARED_REPORT_JOB = "prepared_report.generate_report"
+
+
+def refuse_inside_prepared_report_job(report_name: str) -> None:
+	"""Refuse when a worker is building a Prepared Report for a report that touches governed data.
+
+	The job calls neither `before_insert` nor `get_prepared_data`
+	(`frappe/core/doctype/prepared_report/prepared_report.py:107`). A record queued before the
+	rule existed would still run. The worker names the running method in `frappe.local.job`
+	(`frappe/utils/background_jobs.py:260`).
+	"""
+	job = getattr(frappe.local, "job", None)
+	if job and str(job.get("method") or "").endswith(PREPARED_REPORT_JOB):
+		refuse_prepared_report(report_name)
+
+
 class GuardedReport:
 	"""Extension of Report: no data is read before the gate agrees."""
 
 	def execute_query_report(self, filters):
+		refuse_inside_prepared_report_job(self.name)
 		guard(self.name)
 		return super().execute_query_report(filters)
 
 	def execute_script_report(self, filters):
+		refuse_inside_prepared_report_job(self.name)
 		guard(self.name)
 		return super().execute_script_report(filters)
 
@@ -143,27 +162,48 @@ class GuardedPreparedReport:
 		return super().get_prepared_data(with_file_name=with_file_name)
 
 
-class GuardedAutoEmailReport:
-	"""Extension of Auto Email Report: the report rules apply to the user the record runs as.
+def is_system_manager(user: str) -> bool:
+	return user == "Administrator" or ADMIN_ROLE in frappe.get_roles(user)
 
-	Frappe hands `self.user` to the report as an argument but keeps the session of whoever
-	downloads or sends the record (`frappe/email/doctype/auto_email_report/auto_email_report.py:152`).
-	Record rules and field levels follow the session user. So the report is run as `self.user`,
-	and the previous user is put back even when the report fails.
+
+class GuardedAutoEmailReport:
+	"""Extension of Auto Email Report: on governed data it is for System Managers only.
+
+	The record runs a report later, for a user who is not present. The project runs no
+	scheduled jobs (D-6), so the rule is as narrow as it can be. Two checks, each on every
+	save and every run:
+
+	- the user who saves, downloads or sends the record must be a System Manager;
+	- the report rules must allow the report for the user named on the record.
+
+	Frappe lets a Report Manager save such a record and choose any user for it
+	(`frappe/email/doctype/auto_email_report/auto_email_report.json`). Checking only the chosen
+	user would let that role borrow a more powerful account. The engine does not switch the
+	session user: `frappe.set_user` resets the session data and the request input
+	(`frappe/__init__.py:381`).
 	"""
 
-	def validate(self):
+	def refuse_on_governed_data(self) -> None:
+		if touches_governed(self.report) and not is_system_manager(frappe.session.user):
+			frappe.throw(
+				_(
+					"Only a System Manager may use Auto Email Report for {0}: it reads data governed by Access Rules."
+				).format(frappe.bold(self.report)),
+				frappe.PermissionError,
+			)
 		guard(self.report, self.user)
+
+	def validate(self):
+		self.refuse_on_governed_data()
 		return super().validate()
 
 	def get_report_content(self):
-		guard(self.report, self.user)
-		previous_user = frappe.session.user
-		frappe.set_user(self.user)
-		try:
-			return super().get_report_content()
-		finally:
-			frappe.set_user(previous_user)
+		self.refuse_on_governed_data()
+		return super().get_report_content()
+
+	def send(self):
+		self.refuse_on_governed_data()
+		return super().send()
 
 
 class GuardedFile:

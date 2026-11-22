@@ -377,7 +377,19 @@ Aşağıdaki kurallar sitede en az bir kurallı kayıt türü varken geçerlidir
 
 Sitede hiç kurallı tür yoksa kapı tek şeye bakar. Öznenin raporun ana türündeki bütün izin seviyelerinde okuma izni olmalıdır.
 
-“Administrator” kullanıcısı kapıdan muaftır.
+#### Kimler muaftır?
+
+| Kural | “System Manager” rolü | “Administrator” kullanıcısı |
+| --- | --- | --- |
+| Kayıt kuralı | Muaf değil | Muaf |
+| Sorgu ve betik raporu | Muaf | Muaf |
+| Hazır rapor kapatması | Muaf değil | Muaf değil |
+| Zamanlanmış e-posta raporu | İşi yapabilir. Kayıttaki kullanıcı kuralı yine geçerli. | İşi yapabilir. Kayıttaki kullanıcı kuralı yine geçerli. |
+| Özel bağlantı araması | Muaf değil | Muaf değil |
+
+- “System Manager” rolü sorgu ve betik raporu kuralından bilerek muaftır. Sitede bu raporları çalıştırabilen biri gerekir. Bu rol kuralları zaten yönetir.
+- “Administrator” kayıt kuralından muaftır. Frappe bu kullanıcı için izin kancasını hiç çağırmaz (`permissions.py:108`).
+- Özel aramada muafiyet yoktur. Frappe özel arama işlevini “Administrator” için de çalıştırırdı. Beşinci inceleme bu erken dönüşü buldu ve dönüş kaldırıldı.
 
 #### Sorgu ve betik raporu neden kapalı?
 
@@ -419,6 +431,8 @@ Bu yüzden karar özelliği kapatmaktır. Kurallı veriye dokunan raporda hazır
 
 Var olan saklı sonuçlar ve dosyaları silinmez. Yalnız okunamaz. Dosyanın sahibi ve dosyanın paylaşıldığı kişi de okuyamaz. Frappe bu ikisine bağlı kayda bakmadan izin verir (`core/doctype/file/file.py:1097`). Motorun denetimi bu karardan önce çalışır.
 
+Sırada bekleyen hazır rapor da kapalıdır. Bir kayıt kural yazılmadan önce sıraya alınmış olabilir. Arka plan işi çalışırken kayıt oluşturma denetiminden geçmez (`core/doctype/prepared_report/prepared_report.py:107`). Bu yüzden rapor kapısı işin adına da bakar. İş hazır rapor işiyse ve rapor kurallı veriye dokunuyorsa kapı reddeder. İş hatayla biter. Rapor çalışmaz ve dosya yazılmaz.
+
 Bir rapor ne zaman kurallı veriye dokunur?
 
 - Liste raporu, ana türü kurallıysa dokunur.
@@ -426,19 +440,27 @@ Bir rapor ne zaman kurallı veriye dokunur?
 
 #### Zamanlanmış e-posta raporu
 
-“Auto Email Report” raporu sonradan, kayıttaki kullanıcı adına çalıştırır. Kayıt aynı rapor kurallarına uyar. Kapı kayıttaki kullanıcı için sorulur.
+“Auto Email Report” raporu sonradan, kayıttaki kullanıcı adına çalıştırır. Bu, zamanlanmış bir özelliktir. Proje zamanlanmış iş kurmaz (D-6). Bu yüzden kural en dar olandır.
 
-- Kayıt kaydedilirken kapı çalışır. Kural reddediyorsa kayıt açılamaz.
-- Kayıt her çalıştığında kapı yeniden çalışır. İndirme, elle gönderme ve zamanlanmış gönderme aynı yoldan geçer.
-- Kullanıcının yetkisi sonradan düşerse sonraki çalıştırma reddedilir.
+Kurallı veriye dokunan “Auto Email Report” kaydını yalnız “System Manager” rolü kullanabilir. Şu işlerin hepsi öteki kullanıcılara reddedilir:
 
-Bir örnek verelim. Sorgu raporu için kayıttaki kullanıcı “System Manager” olmalıdır.
+- kaydı oluşturma,
+- kaydı değiştirme,
+- raporu indirme,
+- raporu gönderme.
 
-Kapıdan geçmek yetmez. Rapor da kayıttaki kullanıcının kimliğiyle çalışmalıdır. Frappe kullanıcıyı rapora yalnız bir girdi olarak verir (`email/doctype/auto_email_report/auto_email_report.py:152`). Oturum ise raporu indiren ya da gönderen kişide kalır. Kayıt kuralı ve alan seviyesi oturuma bakar. Yönetici bir çalışanın raporunu indirse rapor yöneticinin gördüğünü üretirdi.
+Önceden kaydedilmiş kayıt da aynı ret yolundan geçer. Denetim her kaydetmede ve her çalıştırmada yinelenir.
 
-Bu yüzden motor raporu çalıştırmadan önce oturumu kayıttaki kullanıcıya çevirir. Rapor bitince eski kullanıcıyı geri yükler. Rapor hata verse de geri yükler. Bir test raporun içeriğini sınar: İçerikte yalnız o kullanıcının kayıtları vardır ve kapalı alan yoktur.
+İki denetim birlikte yapılır:
 
-Proje zamanlanmış iş kurmaz (D-6). Zamanlayıcı kapalıdır. Bu kural zamanlayıcı açılırsa da geçerli kalır.
+1. İşi yapan kullanıcı “System Manager” olmalıdır.
+2. Rapor kuralları kayıttaki kullanıcı için de sağlanmalıdır. Örneğin sorgu raporu için kayıttaki kullanıcı da “System Manager” olmalıdır.
+
+İki denetimin nedeni şudur. Frappe “Report Manager” rolüne bu kaydı oluşturma izni verir. O rol kayıttaki kullanıcıyı da seçebilir. Yalnız kayıttaki kullanıcıya bakılsaydı bu rol daha yetkili bir hesabı seçerdi. Beşinci inceleme bu açığı buldu.
+
+Motor oturumdaki kullanıcıyı değiştirmez. Bir ara rapor kayıttaki kullanıcının oturumuyla çalıştırılıyordu. Frappe'nin `set_user` işlevi oturum verisini ve istek girdilerini siler (`frappe/__init__.py:381`). Eski kullanıcı geri yüklense de bu veriler geri gelmez. O kod tümüyle kaldırıldı. Bir test motorun `set_user` çağırmadığını sınar.
+
+Liste raporunda Frappe kullanıcıyı kendisi uygular. Bir test içeriği sınar: Yönetici bir çalışan adına liste raporu indirir. İçerikte yalnız o çalışanın kayıtları vardır.
 
 #### Sınıf genişletme ve `super()`
 
@@ -454,7 +476,7 @@ Bir bağlantı alanı ya da uygulama kendi arama işlevini verebilir. Frappe o i
 
 Bu yüzden kural şudur. Kurallı kayıt türünde yalnız Frappe'nin standart araması çalışır.
 
-Bütün özel arama işlevleri kurallı türde reddedilir. Ret bütün kullanıcılar içindir. Kullanıcının bütün kayıtları görmesi sonucu değiştirmez. Kuralsız türde özel arama Frappe'nin olağan davranışıyla çalışır.
+Bütün özel arama işlevleri kurallı türde reddedilir. Ret bütün kullanıcılar içindir. “Administrator” için de geçerlidir. Kullanıcının bütün kayıtları görmesi sonucu değiştirmez. Kuralsız türde özel arama Frappe'nin olağan davranışıyla çalışır.
 
 İzin listesi yoktur. Bir ara `access_rule_allowed_queries` kancası vardı. Listedeki işlevin kodu durağan olarak denetleniyordu. Bu denetim rapor kodundaki denetimle aynıydı ve aynı nedenle kaldırıldı.
 
@@ -688,12 +710,23 @@ Dördüncü incelemenin düzeltmeleri de incelendi. İnceleme üç engelleyici v
 
 | Bulgu | Düzeltme | Test |
 | --- | --- | --- |
-| E-posta raporu kayıttaki kullanıcının kimliğiyle çalışmıyor. | Motor oturumu kayıttaki kullanıcıya çeviriyor ve sonra geri yüklüyor. | `tests/test_report_rules.py` |
+| E-posta raporu kayıttaki kullanıcının kimliğiyle çalışmıyor. | Motor oturumu kayıttaki kullanıcıya çeviriyordu. Bu çözüm sonraki incelemede kaldırıldı. | `tests/test_report_rules.py` |
 | Takma ad kullanan kod kod denetimini atlıyor. | Kod denetimi ve bildirim kaldırıldı. Betik raporu yalnız “System Manager” rolüne çalışıyor. | `tests/test_report_rules.py` |
 | `user` girdisi alan sorgu başka kullanıcı adına okuyor. | Aynı düzeltme. Arama izin listesi de kaldırıldı. | `tests/test_report_rules.py`, `test_link_search.py` |
 | Kısmi geri alma istek içindeki kural listesini temizlemiyor. | Kural değişen istekte liste saklanmıyor. | `tests/test_rule_cache.py` |
 
 İkinci ve üçüncü bulgunun kökü aynıdır. Gerekçe 9. bölümdedir.
+
+### Altıncı inceleme
+
+Beşinci incelemenin düzeltmeleri de incelendi. İnceleme bir engelleyici ve üç önemli bulgu verdi.
+
+| Bulgu | Düzeltme | Test |
+| --- | --- | --- |
+| E-posta raporunda yetki seçilen hesaba göre açılıyor. | Kurallı veride kaydı yalnız “System Manager” kullanabilir. | `tests/test_report_rules.py` |
+| E-posta raporu oturum bilgilerini siliyor. | Kullanıcı değiştirme kodu tümüyle kaldırıldı. | `tests/test_report_rules.py` |
+| Özel arama yasağı “Administrator” için uygulanmıyor. | Erken dönüş kaldırıldı. Muafiyetler bu notta ve sözleşmede tablo olarak yazıldı. | `test_link_search.py` |
+| Önceden sıraya alınan hazır rapor çalışabiliyor. | Kapı arka plan işinin adına bakıyor ve işi reddediyor. | `tests/test_report_rules.py` |
 
 ### Özne alanlarını koruyun
 

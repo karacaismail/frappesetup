@@ -119,6 +119,38 @@ class TestLinkSearch(ErisimTestCase):
 
 		self.assert_refused(response)
 
+	def test_administrator_is_refused_too(self):
+		"""Review O2: the rule has no exception. Frappe's own search would run the function."""
+		frappe.set_user("Administrator")
+
+		for function in (link_search.search_link, link_search.search_widget):
+			with self.subTest(function=function.__name__):
+				self.assertRaises(frappe.PermissionError, function, DOCTYPE, "", UNSAFE_QUERY)
+		self.assertRaises(frappe.PermissionError, api.link_search_guard, DOCTYPE, UNSAFE_QUERY)
+
+	def test_administrator_is_refused_for_a_standard_query_hook_too(self):
+		original = frappe.get_hooks
+
+		def with_standard_query(hook=None, *args, **kwargs):
+			hooks = original(hook, *args, **kwargs)
+			if hook is None:
+				hooks = frappe._dict(hooks)
+				hooks["standard_queries"] = {**(hooks.get("standard_queries") or {}), DOCTYPE: [UNSAFE_QUERY]}
+			return hooks
+
+		frappe.set_user("Administrator")
+		with patch.object(frappe, "get_hooks", with_standard_query):
+			for function in (link_search.search_link, link_search.search_widget):
+				with self.subTest(function=function.__name__):
+					self.assertRaises(frappe.PermissionError, function, DOCTYPE, "")
+
+	def test_administrator_keeps_the_standard_search(self):
+		frappe.set_user("Administrator")
+
+		values = {row["value"] for row in link_search.search_link(DOCTYPE, "", page_length=500)}
+
+		self.assertEqual(values, set(self.records.values()))
+
 	def test_function_that_looks_permission_aware_is_refused_too(self):
 		for user in (EMPLOYEE_1, HR):
 			with self.subTest(user=user):

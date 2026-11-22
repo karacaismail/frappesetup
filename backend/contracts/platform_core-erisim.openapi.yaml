@@ -340,7 +340,7 @@ paths:
 
         The standard search is unchanged. Its result passes the record rules and field levels.
         On a governed document type every custom search function is refused with 403,
-        for every user except “Administrator”. There is no allow list. A custom search function can come from the `query`
+        for every user, “Administrator” included. There is no allow list. A custom search function can come from the `query`
         input or from the `standard_queries` hook. Both follow the same rule.
         On a document type that is not governed a custom search runs as Frappe runs it.
       security:
@@ -534,7 +534,7 @@ x-replaced-endpoints:
     - On a governed document type only Frappe's standard search runs. Every custom search function returns 403.
     - A custom search function comes through the `query` input or through the `standard_queries` hook. Both follow the same rule.
     - There is no allow list. Whether a search function reads with permissions cannot be verified from its code.
-    - This denial is for all users. The only exception is the “Administrator” user.
+    - This denial is for all users. There is no exception, not for the “System Manager” role and not for the “Administrator” user.
     - On a document type that is not governed, a custom search runs with Frappe's usual behaviour.
     - An unknown input name is rejected. The wrappers accept Frappe's documented inputs.
 
@@ -571,8 +571,14 @@ x-report-rules:
     - A script report (“Script Report”) runs only for the “System Manager” role. Everyone else gets 403.
     - What the SQL of a query report or the code of a script report reads cannot be verified. No declaration opens such a report.
     - For a report that touches governed data the prepared report (“Prepared Report”) is closed. Creating one, reading a stored result, downloading its file alone or in a ZIP, and converting it to CSV are refused.
-    - A scheduled email report (“Auto Email Report”) follows the same rules for the user on the record. The report runs as that user, so its content holds only what that user may see.
+    - A scheduled email report (“Auto Email Report”) that touches governed data is for the “System Manager” role only. Creating, changing, downloading and sending the record return 403 for everyone else. A record saved earlier follows the same rule.
+    - The report rules also apply to the user named on the “Auto Email Report” record. A query report or script report record needs a “System Manager” as that user.
+    - The engine does not switch the session user to run a report.
+    - A prepared report queued before a rule existed is refused when its job runs. The job ends in error, runs no report and writes no file.
     - When the site has no governed document type, the gate checks only the field levels of the report's own document type.
+  exemptions:
+    - The “System Manager” role is exempt from the query report and script report rule by design. A site needs someone who can run these reports, and this role already manages the rules. The role is not exempt from the prepared report closure, from the link search rule or from record rules.
+    - The “Administrator” user is exempt from record rules and from the report gate. Frappe never asks permission hooks for this user. The user is not exempt from the prepared report closure or from the link search rule.
 
 x-ai-tools:
   description: |

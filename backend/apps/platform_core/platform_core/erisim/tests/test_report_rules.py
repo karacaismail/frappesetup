@@ -20,6 +20,7 @@ from frappe.core.doctype.prepared_report import prepared_report
 from frappe.core.doctype.report.report import Report
 from frappe.desk import query_report
 from frappe.email.doctype.auto_email_report import auto_email_report
+from frappe.utils.background_jobs import execute_job
 
 from platform_core.erisim import api, reports
 from platform_core.erisim.tests.base import (
@@ -368,7 +369,20 @@ class TestPreparedReportClosed(ReportRulesTestCase):
 
 
 class TestAutoEmailReportRules(ReportRulesTestCase):
-	"""Decision E."""
+	"""Decision E: on governed data Auto Email Report is for System Managers only.
+
+	It is a scheduled feature, and the project runs no scheduled jobs (D-6). Only a System
+	Manager may create, change, download or send such a record, and the report rules still hold
+	for the user named on the record. The engine never switches the session user.
+	"""
+
+	REPORT_MANAGER = "Report Manager"
+
+	def setUp(self):
+		super().setUp()
+		# Frappe lets this role create and change Auto Email Reports. It is not a System Manager.
+		frappe.get_doc("User", HR).add_roles(self.REPORT_MANAGER)
+		self.addCleanup(lambda: frappe.get_doc("User", HR).remove_roles(self.REPORT_MANAGER))
 
 	def auto_report(self, report: str, user: str, report_type: str = "Query Report", **values):
 		return frappe.get_doc(
@@ -383,40 +397,82 @@ class TestAutoEmailReportRules(ReportRulesTestCase):
 			**values,
 		)
 
-	def gate_refuses(self, doc) -> bool:
+	def gate_refuses(self, doc, caller: str) -> bool:
 		"""Only the gate's refusal counts. Frappe's own validation of the record is not under test."""
+		frappe.set_user(caller)
 		try:
 			doc.validate()
 		except frappe.PermissionError:
 			return True
 		except frappe.ValidationError:
 			return False
+		finally:
+			frappe.set_user("Administrator")
 		return False
 
-	def test_query_and_script_reports_need_a_system_manager_as_the_record_user(self):
-		for report, report_type in ((NAME_REPORT, "Query Report"), (SCRIPT_REPORT, "Script Report")):
-			for user in (EMPLOYEE_1, MANAGER_1, HR):
-				with self.subTest(report=report, user=user):
-					self.assertTrue(self.gate_refuses(self.auto_report(report, user, report_type)))
-			self.assertFalse(self.gate_refuses(self.auto_report(report, ADMIN, report_type)))
-
-	def test_saved_record_cannot_be_inserted_for_a_refused_user(self):
-		self.assertRaises(frappe.PermissionError, self.auto_report(NAME_REPORT, HR).insert)
-		self.assertFalse(frappe.db.count("Auto Email Report"))
-
-	def test_existing_record_is_refused_when_it_runs(self):
-		"""The record was saved earlier. The rule is applied again each time it runs."""
-		doc = self.auto_report(NAME_REPORT, HR)
-		doc.name = NAME_REPORT
+	def existing(self, report: str, user: str, report_type: str = "Query Report") -> str:
+		"""Stand-in for a record saved before the rule existed."""
+		doc = self.auto_report(report, user, report_type)
+		doc.name = f"{report} {user}"
 		doc.db_insert()
 		self.addCleanup(frappe.db.delete, "Auto Email Report", {"name": doc.name})
+		return doc.name
 
-		self.assertRaises(frappe.PermissionError, auto_email_report.download, doc.name)
-		self.assertRaises(frappe.PermissionError, auto_email_report.send_now, doc.name)
-		self.assertRaises(frappe.PermissionError, frappe.get_doc("Auto Email Report", doc.name).send)
+	def test_report_manager_cannot_save_one_that_runs_as_a_system_manager(self):
+		"""Review E1: picking a more powerful account must not open the report."""
+		for report, report_type in (
+			(NAME_REPORT, "Query Report"),
+			(SCRIPT_REPORT, "Script Report"),
+			(BUILDER_REPORT, "Report Builder"),
+		):
+			with self.subTest(report=report):
+				self.assertTrue(self.gate_refuses(self.auto_report(report, ADMIN, report_type), HR))
+		frappe.set_user(HR)
+		self.assertRaises(frappe.PermissionError, self.auto_report(NAME_REPORT, ADMIN).insert)
+		frappe.set_user("Administrator")
+		self.assertFalse(frappe.db.count("Auto Email Report"))
 
-	def test_report_content_holds_only_what_the_record_user_may_see(self):
-		"""An administrator downloads a report made for an employee. Only the employee's record is in it."""
+	def test_system_manager_may_save_one(self):
+		for report, report_type in ((NAME_REPORT, "Query Report"), (BUILDER_REPORT, "Report Builder")):
+			with self.subTest(report=report):
+				self.assertFalse(self.gate_refuses(self.auto_report(report, ADMIN, report_type), ADMIN))
+
+	def test_record_user_must_pass_the_report_rule_too(self):
+		"""A System Manager cannot schedule a query report to run for a narrowed user."""
+		for user in (EMPLOYEE_1, MANAGER_1, HR):
+			with self.subTest(user=user):
+				self.assertTrue(self.gate_refuses(self.auto_report(NAME_REPORT, user), ADMIN))
+				self.assertTrue(
+					self.gate_refuses(self.auto_report(SCRIPT_REPORT, user, "Script Report"), ADMIN)
+				)
+
+	def test_existing_record_cannot_be_changed_downloaded_or_sent_by_a_report_manager(self):
+		name = self.existing(NAME_REPORT, ADMIN)
+		builder = self.existing(BUILDER_REPORT, ADMIN, "Report Builder")
+		frappe.set_user(HR)
+
+		for record in (name, builder):
+			with self.subTest(record=record):
+				doc = frappe.get_doc("Auto Email Report", record)
+				self.assertRaises(frappe.PermissionError, doc.save)
+				self.assertRaises(frappe.PermissionError, auto_email_report.download, record)
+				self.assertRaises(frappe.PermissionError, auto_email_report.send_now, record)
+				self.assertRaises(frappe.PermissionError, doc.send)
+				self.assertRaises(frappe.PermissionError, doc.get_report_content)
+
+	def test_existing_record_for_a_narrowed_user_does_not_run_for_anyone(self):
+		"""Saved earlier for a user who may not run the report. Even a scheduler run is refused."""
+		name = self.existing(NAME_REPORT, HR)
+
+		for caller in (ADMIN, "Administrator"):
+			with self.subTest(caller=caller):
+				frappe.set_user(caller)
+				self.assertRaises(frappe.PermissionError, auto_email_report.download, name)
+				self.assertRaises(frappe.PermissionError, frappe.get_doc("Auto Email Report", name).send)
+				frappe.set_user("Administrator")
+
+	def test_system_manager_gets_content_limited_to_the_record_user(self):
+		"""Frappe reads a list report as the record's user. The content holds only that user's records."""
 		frappe.db.set_value(DOCTYPE, self.records[EMPLOYEE_1], "salary_amount", SALARY)
 		doc = self.auto_report(BUILDER_REPORT, EMPLOYEE_1, "Report Builder", no_of_rows=500)
 		frappe.set_user(ADMIN)
@@ -430,30 +486,100 @@ class TestAutoEmailReportRules(ReportRulesTestCase):
 				self.assertNotIn(name, text)
 		self.assertNotIn(str(SALARY), text)
 
-	def test_report_runs_as_the_record_user_and_the_session_user_comes_back(self):
-		seen = []
-
-		def record_user(*args, **kwargs):
-			seen.append(frappe.session.user)
-			return [], []
-
+	def test_engine_never_switches_the_session_user(self):
+		"""Review O1: `frappe.set_user` resets the session. The engine must not call it."""
 		doc = self.auto_report(BUILDER_REPORT, EMPLOYEE_1, "Report Builder")
 		frappe.set_user(ADMIN)
+		frappe.session.data["marker"] = "kept"
+		session_id = frappe.session.sid
 
-		with patch.object(Report, "get_data", record_user):
+		with patch.object(frappe, "set_user") as set_user:
 			doc.get_report_content()
 
-		self.assertEqual(seen, [EMPLOYEE_1])
-		self.assertEqual(frappe.session.user, ADMIN)
+		set_user.assert_not_called()
+		self.assertEqual((frappe.session.user, frappe.session.sid), (ADMIN, session_id))
+		self.assertEqual(frappe.session.data.get("marker"), "kept")
 
-	def test_session_user_comes_back_when_the_report_fails(self):
-		def fail(*args, **kwargs):
-			raise RuntimeError("report failed")
 
-		doc = self.auto_report(BUILDER_REPORT, EMPLOYEE_1, "Report Builder")
+class TestAutoEmailReportWithoutRules(ReportRulesTestCase):
+	"""Without governed data the engine leaves Auto Email Report to Frappe."""
+
+	RULES = ()
+
+	def test_report_manager_is_not_refused_by_the_gate(self):
+		doc = frappe.get_doc(
+			doctype="Auto Email Report",
+			report=BUILDER_REPORT,
+			report_type="Report Builder",
+			user=HR,
+			enabled=1,
+			email_to="ar.reader@example.test",
+			format="CSV",
+			frequency="Daily",
+		)
+		frappe.set_user(HR)
+
+		try:
+			doc.validate()
+		except frappe.PermissionError:
+			self.fail("the gate refused although no document type is governed")
+		except frappe.ValidationError:
+			pass
+
+
+class TestQueuedPreparedReport(ReportRulesTestCase):
+	"""Review O3: a Prepared Report queued before the rule existed is refused when its job runs."""
+
+	JOB = "frappe.core.doctype.prepared_report.prepared_report.generate_report"
+
+	def setUp(self):
+		super().setUp()
+		self.addCleanup(self.cleanup)
+		doc = frappe.get_doc(doctype="Prepared Report", report_name=NAME_REPORT, status="Queued")
+		doc.name = frappe.generate_hash(length=10)
+		doc.owner = ADMIN
+		doc.db_insert()
+		self.prepared = doc.name
+		frappe.db.commit()  # nosemgrep: the job reads committed data
+
+	def cleanup(self) -> None:
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+		if hasattr(frappe.local, "job"):
+			del frappe.local.job
+		frappe.db.delete("File", {"attached_to_doctype": "Prepared Report"})
+		frappe.db.delete("Prepared Report", {"report_name": NAME_REPORT})
+		frappe.db.commit()  # nosemgrep
+
+	def run_job(self) -> None:
+		"""Run the queued job the way a worker does, as the System Manager who queued it."""
+		execute_job(
+			frappe.local.site,
+			self.JOB,
+			None,
+			"ar-test-prepared-report",
+			{"prepared_report": self.prepared},
+			user=ADMIN,
+			is_async=False,
+		)
+
+	def test_job_ends_without_running_the_report_or_writing_a_file(self):
+		with patch.object(Report, "execute_query_report") as execute:
+			self.run_job()
+
+		execute.assert_not_called()
+		frappe.set_user("Administrator")
+		self.assertEqual(frappe.db.get_value("Prepared Report", self.prepared, "status"), "Error")
+		self.assertFalse(
+			frappe.db.exists(
+				"File", {"attached_to_doctype": "Prepared Report", "attached_to_name": self.prepared}
+			)
+		)
+
+	def test_live_run_by_the_same_system_manager_still_works(self):
+		"""Only the prepared path is closed. The System Manager can still run the report directly."""
 		frappe.set_user(ADMIN)
 
-		with patch.object(Report, "get_data", fail):
-			self.assertRaises(RuntimeError, doc.get_report_content)
+		result = query_report.run(NAME_REPORT, {}, ignore_prepared_report=True)
 
-		self.assertEqual(frappe.session.user, ADMIN)
+		self.assertTrue(result["result"])
