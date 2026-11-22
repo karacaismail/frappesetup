@@ -204,7 +204,7 @@ case "$komut" in
       echo "Production Keycloak did not become ready." >&2
       exit 1
     fi
-    (cd "$KLASOR/tests" && PROD_KC_URL="http://127.0.0.1:$prod_port" PROD_HTTP_REFUSED="$PROD_HTTP_REFUSED" \
+    (cd "$KLASOR/tests" && PROD_KC_URL="http://127.0.0.1:$prod_port" PROD_KC_PORT="$prod_port" PROD_HTTP_REFUSED="$PROD_HTTP_REFUSED" \
       python3 -I -m unittest discover -s . -p 'test_production_image.py' -v "$@")
     ;;
   realm-reload)
