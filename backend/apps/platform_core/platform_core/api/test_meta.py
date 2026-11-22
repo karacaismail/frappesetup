@@ -1,4 +1,5 @@
 import json
+from urllib.parse import quote
 
 import frappe
 
@@ -188,3 +189,11 @@ class TestMetadataHTTP(ShellHTTPFixture):
 				get_doctype(DOCTYPE, PRIVILEGED)
 		finally:
 			frappe.set_user("Administrator")
+
+	def test_website_user_cannot_read_native_doctype_metadata(self):
+		path = f"/api/v2/doctype/{quote(DOCTYPE)}/meta"
+		status, _, body = self.request(path, self.reader_sid)
+		self.assertEqual(status, 403)
+		self.assertNotIn("data", json.loads(body))
+		status, _, _ = self.metadata(self.reader_sid)
+		self.assertEqual(status, 200)

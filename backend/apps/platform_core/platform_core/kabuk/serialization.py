@@ -1,9 +1,10 @@
 """Pure projections: never mutate Frappe's shared metadata objects."""
 
 import json
-import re
 from copy import deepcopy
 from hashlib import sha256
+
+from platform_core.kabuk.conditions import project_condition
 
 FIELD_PROPERTIES = (
 	"fieldname",
@@ -39,20 +40,6 @@ DEPENDENCY_PROPERTIES = (
 	"read_only_depends_on",
 	"collapsible_depends_on",
 )
-DOCUMENT_REFERENCE = re.compile(
-	r"""\b(doc|parent)\s*(?:\.\s*([A-Za-z_]\w*)|\[\s*['"]([A-Za-z_]\w*)['"]\s*\])"""
-)
-
-
-def has_readable_dependencies(condition: str, readable: set[str], parent_readable: set[str] | None) -> bool:
-	if not condition.startswith("eval:"):
-		return condition in readable
-	references = DOCUMENT_REFERENCE.findall(condition)
-	# Reject dynamic access and references to the whole document.
-	if re.search(r"\b(?:doc|parent)\b", DOCUMENT_REFERENCE.sub("", condition)):
-		return False
-	scopes = {"doc": readable, "parent": parent_readable or set()}
-	return all((dot_name or bracket_name) in scopes[scope] for scope, dot_name, bracket_name in references)
 
 
 def digest(value: object) -> str:
@@ -71,9 +58,18 @@ def project_meta(
 		if name not in readable:
 			continue
 		field = {key: deepcopy(source[key]) for key in FIELD_PROPERTIES if key in source}
+		unsupported = []
 		for key in DEPENDENCY_PROPERTIES:
-			if field.get(key) and not has_readable_dependencies(field[key], readable, parent_readable):
-				del field[key]
+			source_condition = field.pop(key, None)
+			if not source_condition:
+				continue
+			condition = project_condition(source_condition, readable, parent_readable)
+			if condition is None:
+				unsupported.append(key)
+			else:
+				field[key] = condition
+		if unsupported:
+			field["unsupported_conditions"] = unsupported
 		fetch_from = field.get("fetch_from")
 		if fetch_from and fetch_from.partition(".")[0] not in readable:
 			field.pop("fetch_from")

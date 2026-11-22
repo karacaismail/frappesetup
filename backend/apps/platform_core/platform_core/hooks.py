@@ -45,3 +45,6 @@ doc_events = {
 		"on_trash": "platform_core.kabuk.cache.invalidate_permissions",
 	},
 }
+
+# Frappe resolves cookie and token authentication before calling this hook.
+auth_hooks = ["platform_core.kabuk.native_metadata.guard_native_metadata"]

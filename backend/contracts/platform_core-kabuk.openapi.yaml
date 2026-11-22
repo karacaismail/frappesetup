@@ -285,6 +285,32 @@
           }
         }
       }
+    },
+    "/api/v2/doctype/{doctype}/meta": {
+      "get": {
+        "operationId": "getNativeDoctypeMetadata",
+        "summary": "Read native metadata as a system user",
+        "description": "Platform Core rejects Website Users on the native Frappe endpoint. Website Users must use the permission-filtered shell metadata endpoint.",
+        "parameters": [
+          {
+            "name": "doctype",
+            "in": "path",
+            "required": true,
+            "description": "DocType name.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Frappe metadata for a System User."
+          },
+          "403": {
+            "description": "Native metadata is unavailable to this user."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -533,31 +559,13 @@
             ]
           },
           "depends_on": {
-            "description": "Native visibility expression. Omitted when it references an unreadable field. Consumers must not execute it as code.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
+            "$ref": "#/components/schemas/FieldCondition"
           },
           "mandatory_depends_on": {
-            "description": "Native conditional required expression. Omitted when it references an unreadable field.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
+            "$ref": "#/components/schemas/FieldCondition"
           },
           "read_only_depends_on": {
-            "description": "Native conditional read-only expression. Omitted when it references an unreadable field.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
+            "$ref": "#/components/schemas/FieldCondition"
           },
           "fetch_from": {
             "description": "Native source field path. Omitted when the local source link field is unreadable.",
@@ -650,13 +658,21 @@
             ]
           },
           "collapsible_depends_on": {
-            "description": "Native collapse expression. Omitted when it references an unreadable field.",
-            "type": [
-              "string",
-              "number",
-              "boolean",
-              "null"
-            ]
+            "$ref": "#/components/schemas/FieldCondition"
+          },
+          "unsupported_conditions": {
+            "type": "array",
+            "uniqueItems": true,
+            "description": "Condition properties omitted because they are unsupported or refer to unreadable fields. Source expressions are never returned.",
+            "items": {
+              "type": "string",
+              "enum": [
+                "depends_on",
+                "mandatory_depends_on",
+                "read_only_depends_on",
+                "collapsible_depends_on"
+              ]
+            }
           }
         }
       },
@@ -996,6 +1012,53 @@
           }
         },
         "additionalProperties": true
+      },
+      "FieldCondition": {
+        "type": "object",
+        "description": "Declarative rule for an approved renderer. Never contains executable source.",
+        "required": [
+          "scope",
+          "field",
+          "op"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "scope": {
+            "type": "string",
+            "enum": [
+              "doc",
+              "parent"
+            ],
+            "description": "Document that owns the field."
+          },
+          "field": {
+            "type": "string",
+            "description": "Readable field name."
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "truthy",
+              "falsy",
+              "eq",
+              "ne",
+              "gt",
+              "gte",
+              "lt",
+              "lte"
+            ],
+            "description": "Approved operator."
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ],
+            "description": "Scalar comparison value. Omitted for truth tests."
+          }
+        }
       }
     }
   }

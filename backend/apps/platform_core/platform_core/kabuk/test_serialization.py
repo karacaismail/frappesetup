@@ -123,6 +123,8 @@ class TestMetadataProjection(unittest.TestCase):
 
 		result = project_meta(schema, {"title", "source"}, {"title"})
 
+		for key in ("depends_on", "mandatory_depends_on", "read_only_depends_on", "collapsible_depends_on"):
+			custom[key] = {"scope": "doc", "field": "title", "op": "truthy"}
 		self.assertEqual(result["fields"][0], custom)
 
 	def test_dependencies_on_unreadable_fields_are_removed(self):
@@ -136,7 +138,10 @@ class TestMetadataProjection(unittest.TestCase):
 		field = project_meta(schema, {"title"}, {"title"})["fields"][0]
 		for key in ("depends_on", "mandatory_depends_on", "read_only_depends_on"):
 			self.assertNotIn(key, field)
-		self.assertEqual(field["collapsible_depends_on"], "eval:doc.title")
+		self.assertEqual(field["collapsible_depends_on"], {"scope": "doc", "field": "title", "op": "truthy"})
+		self.assertEqual(
+			field["unsupported_conditions"], ["depends_on", "mandatory_depends_on", "read_only_depends_on"]
+		)
 
 	def test_dependencies_require_a_readable_parent_field(self):
 		schema = sample_schema()
@@ -144,7 +149,22 @@ class TestMetadataProjection(unittest.TestCase):
 		field = project_meta(schema, {"title"}, {"title"})["fields"][0]
 		self.assertNotIn("depends_on", field)
 		allowed = project_meta(schema, {"title"}, {"title"}, parent_readable={"private_note"})
-		self.assertEqual(allowed["fields"][0]["depends_on"], "eval:parent.private_note")
+		self.assertEqual(
+			allowed["fields"][0]["depends_on"], {"scope": "parent", "field": "private_note", "op": "truthy"}
+		)
+
+	def test_comparison_is_declarative_and_function_calls_are_omitted(self):
+		schema = sample_schema()
+		schema["fields"][0].update(
+			depends_on="eval:doc.title === 'Sample'",
+			read_only_depends_on="eval:customFunction(doc.title)",
+		)
+		field = project_meta(schema, {"title"}, {"title"})["fields"][0]
+		self.assertEqual(
+			field["depends_on"], {"scope": "doc", "field": "title", "op": "eq", "value": "Sample"}
+		)
+		self.assertNotIn("read_only_depends_on", field)
+		self.assertEqual(field["unsupported_conditions"], ["read_only_depends_on"])
 
 	def test_fetch_from_and_dynamic_links_cannot_reference_hidden_fields(self):
 		schema = sample_schema()
