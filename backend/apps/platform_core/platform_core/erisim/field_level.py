@@ -2,9 +2,13 @@
 
 import frappe
 from frappe import _
+from frappe.core.doctype.custom_docperm.custom_docperm import update_custom_docperm
+from frappe.core.doctype.doctype.doctype import validate_permissions_for_doctype
 from frappe.custom.doctype.property_setter.property_setter import delete_property_setter, make_property_setter
-from frappe.permissions import add_permission, setup_custom_perms, update_permission_property
+from frappe.permissions import add_permission, setup_custom_perms
 from frappe.utils import cint
+
+from platform_core.erisim.rules import PROTECTED_DOCTYPES
 
 MAX_LEVEL = 9
 
@@ -13,6 +17,9 @@ def _require_admin(doctype: str) -> None:
 	frappe.only_for("System Manager")
 	if not frappe.db.exists("DocType", doctype, cache=True):
 		frappe.throw(_("Document type {0} not found.").format(doctype), frappe.DoesNotExistError)
+	if doctype in PROTECTED_DOCTYPES:
+		# Bu türlerde alan kapatmak izin yönetimini kilitleyebilir.
+		frappe.throw(_("Field levels of {0} cannot be changed here.").format(frappe.bold(doctype)))
 
 
 def set_field_level(doctype: str, fieldname: str, permlevel: int) -> dict:
@@ -56,9 +63,10 @@ def set_level_access(doctype: str, role: str, permlevel: int, read: bool, write:
 			frappe.delete_doc("Custom DocPerm", existing)
 	else:
 		if not existing:
-			add_permission(doctype, role, permlevel, "read")
-		update_permission_property(doctype, role, permlevel, "read", 1, validate=False)
-		update_permission_property(doctype, role, permlevel, "write", cint(write))
+			existing = add_permission(doctype, role, permlevel, "read")
+		# Satır adla güncellenir. Rol ve seviyeyle arama `if_owner` satırını da bulabilir.
+		update_custom_docperm(existing, {"read": 1, "write": cint(write)})
+		validate_permissions_for_doctype(doctype)
 	frappe.clear_cache(doctype=doctype)
 	return {
 		"doctype": doctype,

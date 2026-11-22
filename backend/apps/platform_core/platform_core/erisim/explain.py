@@ -13,6 +13,9 @@ SHAREABLE = ("read", "write", "submit")
 def _require_doctype(doctype: str) -> None:
 	if not frappe.db.exists("DocType", doctype, cache=True):
 		frappe.throw(_("Document type {0} not found.").format(doctype), frappe.DoesNotExistError)
+	meta = frappe.get_meta(doctype)
+	if meta.istable or meta.issingle or meta.is_virtual:
+		frappe.throw(_("Child tables, single and virtual document types are not supported."))
 
 
 def explain(doctype: str, name: str, ptype: str = "read", user: str | None = None) -> dict:
@@ -51,8 +54,6 @@ def explain(doctype: str, name: str, ptype: str = "read", user: str | None = Non
 	role = bool(get_role_permissions(frappe.get_meta(doctype), user=target, is_owner=is_owner).get(ptype))
 	result["layers"]["role"] = role
 	if not exists:
-		if not role:
-			result["reason"] = "no_role_permission"
 		return result
 
 	allowed = has_permission(doctype, ptype, doc=name, user=target, print_logs=False)
@@ -68,10 +69,11 @@ def explain(doctype: str, name: str, ptype: str = "read", user: str | None = Non
 	if allowed:
 		result["reason"] = "allowed" if without_share else "allowed_by_share"
 		result["layers"].update(access_rule=by_rule, share=shared)
-	elif not role:
-		result["reason"] = "no_role_permission"
 	elif is_admin:
-		result["reason"] = "user_permission" if by_rule else "no_matching_rule"
+		# Ret nedeninin ayrıntısı yalnız yöneticiye döner. Olağan kullanıcı tek neden görür.
+		result["reason"] = (
+			"no_role_permission" if not role else "user_permission" if by_rule else "no_matching_rule"
+		)
 		result["layers"].update(access_rule=by_rule, share=shared)
 	if is_admin:
 		result["rules"] = rule_report

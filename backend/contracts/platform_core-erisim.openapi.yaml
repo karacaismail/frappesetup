@@ -112,7 +112,9 @@ paths:
         "404":
           description: Kayıt yok. Yalnız “System Manager” rolüne döner.
         "417":
-          description: Girdi geçersiz. Örneğin `ptype` izinli değerlerden biri değil.
+          description: |
+            Girdi geçersiz. Örneğin `ptype` izinli değerlerden biri değil.
+            Alt tablo, tek kayıtlı tür ve sanal tür de bu yanıtı alır.
 
   /platform_core.api.access.get_access_summary:
     get:
@@ -237,7 +239,9 @@ paths:
         "404":
           description: Kayıt türü yok.
         "417":
-          description: Alan yok, alan standart ya da seviye 0 ile 9 arasında değil.
+          description: |
+            Alan yok, alan standart ya da seviye 0 ile 9 arasında değil.
+            İzin sistemini tutan kayıt türü de bu yanıtı alır. Örneğin “Access Rule”.
 
   /platform_core.api.access.set_level_access:
     post:
@@ -317,7 +321,9 @@ paths:
         "404":
           description: Kayıt türü ya da rol yok.
         "417":
-          description: Seviye 1 ile 9 arasında değil ya da yazma okumasız istendi.
+          description: |
+            Seviye 1 ile 9 arasında değil ya da yazma okumasız istendi.
+            İzin sistemini tutan kayıt türü de bu yanıtı alır.
 
 components:
   securitySchemes:
@@ -361,9 +367,9 @@ components:
           description: |
             `allowed`: Rol izni var ve kural kaydı seçiyor.
             `allowed_by_share`: Kayıt kullanıcıyla paylaşılmış. Paylaşım kuralı aşar.
-            `no_role_permission`: Rolün bu işlem için izni yok.
-            `no_matching_rule`: Kayıt türü kurallı ve hiçbir kural kaydı seçmiyor.
-            `user_permission`: Frappe'nin kullanıcı izni kaydı engelliyor.
+            `no_role_permission`: Rolün bu işlem için izni yok. Yalnız “System Manager” görür.
+            `no_matching_rule`: Kayıt türü kurallı ve hiçbir kural kaydı seçmiyor. Yalnız “System Manager” görür.
+            `user_permission`: Frappe'nin kullanıcı izni kaydı engelliyor. Yalnız “System Manager” görür.
             `not_permitted_or_missing`: Olağan kullanıcıya dönen tek ret nedeni.
         governed:
           type: boolean

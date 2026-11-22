@@ -4,12 +4,14 @@ Karar notu: `docs/kararlar/0006-erisim-kurali.md`, 3. ve 12. bölüm.
 """
 
 import json
+import math
 
 import frappe
 from frappe import _
 
 RULE_DOCTYPE = "Access Rule"
 CACHE_KEY = "platform_core:erisim:rules"
+CACHE_SECONDS = 60
 
 SCOPES = ("own", "team", "department", "company", "all")
 OPERATIONS = ("read", "write", "create", "delete", "submit", "cancel")
@@ -81,7 +83,12 @@ def active_rules() -> dict[str, list[dict]]:
 	if frappe.flags.in_install or frappe.flags.in_migrate:
 		# Kurulumda tablo henüz olmayabilir. Kurulum yönetici kimliğiyle çalışır.
 		return {}
-	return frappe.cache.get_value(CACHE_KEY, generator=_load)
+	grouped = frappe.cache.get_value(CACHE_KEY)
+	if grouped is None:
+		grouped = _load()
+		# Süre bir güvenlik ağıdır. Eşzamanlı bir istek eski kuralı önbelleğe yazabilir.
+		frappe.cache.set_value(CACHE_KEY, grouped, expires_in_sec=CACHE_SECONDS)
+	return grouped
 
 
 def _load() -> dict[str, list[dict]]:
@@ -183,6 +190,8 @@ def _validate_filter_value(operator: str, value) -> None:
 	for item in values:
 		if isinstance(item, bool) or not isinstance(item, str | int | float):
 			frappe.throw(_("Filter values must be text or numbers."))
+		if isinstance(item, float) and not math.isfinite(item):
+			frappe.throw(_("Filter values must be finite numbers."))
 		if isinstance(item, str) and item.startswith("$") and item not in VARIABLES:
 			frappe.throw(_("Unknown variable {0}. Allowed: {1}").format(item, ", ".join(VARIABLES)))
 		if isinstance(item, str) and item.startswith("$") and operator in ("in", "not in"):

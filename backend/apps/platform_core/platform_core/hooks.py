@@ -21,4 +21,6 @@ doc_events = {
 		"after_rename": "platform_core.erisim.rules.clear_cache",
 		"on_trash": "platform_core.erisim.rules.clear_cache",
 	},
+	"Prepared Report": {"before_insert": "platform_core.erisim.reports.guard_prepared_report"},
+	"Auto Email Report": {"validate": "platform_core.erisim.reports.guard_auto_email_report"},
 }

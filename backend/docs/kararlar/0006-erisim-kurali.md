@@ -221,7 +221,13 @@ Motor saklı kaydı tek sorguyla sınar. Sorgu şunu sorar: “Bu adda ve kurala
 
 Yeni değerler de veritabanında sınanır. Motor aynı koşulda sütun adlarının yerine yeni değerleri koyar.
 
+Yeni değer istemciden gelir. Motor sayıyı metne çevirir. Nedeni şudur: MariaDB `0 = 'HR-EMP-1'` karşılaştırmasını doğru sayar. Liste ve sözlük değeri boş sayılır. Boş değer hiçbir koşulu sağlamaz.
+
 Karar sitesi tek kayıt için Python yüklemi önerir. Bu not o yolu seçmedi. Nedeni şudur: MariaDB metni büyük küçük harf ayırmadan karşılaştırır. Python ayırır. Boş değer de iki yerde farklı davranır. İki ayrı değerlendirici zamanla farklı sonuç verir. Tek değerlendirici bu farkı baştan kapatır (G-121).
+
+### Onay ve iptal
+
+Frappe onaydan ve iptalden önce `write` iznini de arar (`model/document.py:822`, `:1403`, `:1417`). Bu yüzden onay için kuralda `allow_write` ve `allow_submit` birlikte açık olmalıdır. İptal için `allow_write` ve `allow_cancel` birlikte açık olmalıdır.
 
 ### Kayıt olmayan denetimler
 
@@ -316,7 +322,7 @@ Alan seviyesini yönetmek için iki ince uç yazılır. Uçlar Frappe'nin hazır
 - `set_field_level` bir alanın seviyesini değiştirir. Değişiklik “Property Setter” kaydıyla tutulur.
 - `set_level_access` bir role bir seviye için okuma ve yazma izni verir. Değişiklik “Custom DocPerm” kaydıyla tutulur.
 
-İki uç da yalnız “System Manager” rolüne açıktır. İkinci uç seviye 0'a dokunmaz. Böylece yönetici temel erişimi bu uçla bozamaz.
+İki uç da yalnız “System Manager” rolüne açıktır. İki uç da izin sistemini tutan türleri reddeder. Örneğin “Access Rule” türünde alan kapatılamaz. İkinci uç seviye 0'a dokunmaz. Böylece yönetici temel erişimi bu uçla bozamaz.
 
 ## 9. Liste, kayıt, rapor ve dışa aktarma aynı sonucu nasıl verir?
 
@@ -347,6 +353,8 @@ Karar şudur: Motor bu raporlara bir kapı koyar. Kapı güvenli tarafta kalır.
 4. Bir uygulama raporunu kurala uyumlu yazabilir. Örneğin rapor veriyi `frappe.get_list` ile okur. Uygulama bu raporu `access_rule_aware_reports` kancasıyla bildirir. Kapı bildirilen raporu geçirir.
 
 Kapı Frappe'nin `override_whitelisted_methods` kancasıyla bağlanır. Bu kanca bir ucun yerine başka işlev koyar (`__init__.py:1577`). Kapı `frappe.desk.query_report.run` ve `frappe.desk.query_report.export_query` uçlarını sarar. Frappe'nin kodu değişmez (M-4).
+
+Hazır rapor (“Prepared Report”) arka planda üretilir ve uçtaki kapıdan geçmez. Bu yüzden kapı “Prepared Report” kaydı açılırken de çalışır. Zamanlanmış e-posta raporu (“Auto Email Report”) kaydı doğrulanırken de çalışır. İkisi `doc_events` kancasıyla bağlanır.
 
 Kapının iki sınırı vardır:
 
@@ -429,6 +437,7 @@ Bu yüzden etkin kurallar önbellekte tutulur. Önbellek, sık istenen sonucu ge
 - Anahtar bütün etkin kuralları kayıt türüne göre taşır. Kullanıcıya özel veri taşımaz.
 - “Access Rule” kaydı eklenince, değişince ve silinince önbellek silinir. Silme, kayıt kesinleşince bir kez daha yapılır.
 - “Role” ve “DocType” adı değişince ya da silinince de önbellek silinir.
+- Önbellek 60 saniye sonra kendiliğinden silinir. Bu süre bir güvenlik ağıdır. Eşzamanlı bir istek eski kuralı önbelleğe yazabilir. Süre bu durumu 60 saniyeyle sınırlar.
 - Özne değerleri önbelleğe girmez. Yalnız istek boyunca saklanır. Böylece `reports_to` değişikliği hemen etki eder.
 
 Kural değişince sonuç sonraki istekte değişir. Bu davranış testle sınanır.
@@ -453,7 +462,7 @@ Kural ekleme, değiştirme ve silme için ayrı uç yazılmadı. Frappe'nin haz�
 Açıklama ucu kayıt varlığını ele verebilir. Bu yüzden yanıt çağırana göre değişir.
 
 - Çağıranın kayıt türünde okuma izni olmalıdır. İzin yoksa uç 403 döner. Kayıt türü yoksa da 403 döner.
-- Olağan kullanıcı yalnız kendi iznini sorabilir. Ret nedeni tek değerdir: `not_permitted_or_missing`. Kayıt yoksa da aynı değer döner.
+- Olağan kullanıcı yalnız kendi iznini sorabilir. Ret nedeni tek değerdir: `not_permitted_or_missing`. Kayıt yoksa da aynı değer döner. Rolün izni yoksa da aynı değer döner.
 - “System Manager” başka kullanıcıyı da sorabilir. Yanıt kuralları tek tek sayar.
 
 ## 14. Testler
@@ -472,6 +481,7 @@ Beklenen sonuçlar bu nottan, sözleşmeden ve karar sitesinden gelir (D-1).
 | `test_kural_degisimi.py` | Kural değişince sonuç sonraki istekte değişir. | Görev belgesi |
 | `test_uclar.py` | Dört ucun izni, girdisi ve çıktısı. | Sözleşme |
 | `test_sorgu_sayisi.py` | Liste sorgu sayısı kayıt sayısıyla artmaz. | P-1 |
+| `test_inceleme.py` | Bağımsız incelemenin bulguları, bölüm ve şirket kapsamları, işleçler. | R-9 |
 
 Güvenlik kapısı uç testlerini modülün yanında ister. Bu yüzden iki dosya daha vardır:
 
@@ -480,7 +490,35 @@ Güvenlik kapısı uç testlerini modülün yanında ister. Bu yüzden iki dosya
 
 Testler önce kancalar kapalıyken çalıştırıldı. 83 testten 80'i beklenen nedenle başarısız oldu (D-2). Örneğin çalışan bütün kayıtları gördü ve başkasının kaydı 200 döndü. Kancalar açılınca testler geçti.
 
-## 15. Bağımlılık ve sınırlar
+## 15. Bağımsız inceleme
+
+Motor yetki kodudur. Bu yüzden kod bağımsız bir incelemeden geçti (R-9). İnceleyen yalnız okudu. Her bulgu için önce test yazıldı.
+
+| Bulgu | Sonuç |
+| --- | --- |
+| İstemci kaydın adını değiştirerek başkasının kaydına ulaşabilir. | Doğrulanmadı. Üç test bu yolu gerçek istekle sınar ve yol kapalıdır. Testler kalıcıdır. |
+| Hazır rapor yolu kapıyı atlar. | Doğrulandı ve kapatıldı. |
+| Eski kural önbellekte süresiz kalabilir. | Önbelleğe 60 saniye süre verildi. |
+| Sayı değeri kuralı geçer. Liste değeri sunucu hatası verir. | Doğrulandı ve kapatıldı. |
+| Sonsuz sayı süzgeç değeri olarak kabul edilir. | Doğrulandı ve kapatıldı. |
+| Açıklama ucu olağan kullanıcıya iki ret nedeni döner. | Kapatıldı. Tek neden döner. |
+| Alan düzeyi uçları korumalı türleri ayırmaz. | Doğrulandı ve kapatıldı. |
+| Çalışan kendi bölüm ya da şirket alanını değiştirip kapsamını genişletebilir. | Aşağıdaki koşul yazıldı. |
+
+### Özne alanlarını koruyun
+
+Motor özneyi “Employee” kaydından okur. Bu kayıttaki `user_id`, `reports_to`, `department` ve `company` alanları kapsamı belirler. Çalışan bu alanları değiştirebilirse kendi kapsamını genişletir.
+
+Bu yüzden şu koşul zorunludur: Çalışana kendi “Employee” kaydında yazma izni veren uygulama bu dört alanı izin seviyesiyle kapatır. Bu koşul kural şablonları turunda testle denetlenir (G-104).
+
+### Frappe'nin bilinen iki davranışı
+
+- Kanban panosu sütun sayısını izin uygulamadan sayar (`desk/doctype/kanban_board/kanban_board.py:531`). Kural dışı kayıtların sayısı görünebilir. Son kullanıcı yönetim ekranını görmez (D-5).
+- `frappe.client.get` ucu süzgeçle çağrılınca iki ayrı hata döner. Kural dışı kayıt izin hatası verir. Olmayan kayıt bulunamadı hatası verir. Bu fark bir alanın değerini sınamaya yarayabilir.
+
+İki davranış da inceleyenin kod okumasına dayanır. Bu tur ikisini de sınamadı.
+
+## 16. Bağımlılık ve sınırlar
 
 - `erisim` modülü öteki `platform_core` modüllerini içe aktarmaz. Öteki modüller de `erisim` modülünü içe aktarmaz. Bu yön proje kaydındadır.
 - Motor “Employee”, “Department” ve “Company” kayıt türlerini adla kullanır. Bu türler ERPNext'ten gelir. Kiracı sitesi ERPNext taşır (proje kaydı, sürümler tablosu).
@@ -488,7 +526,7 @@ Testler önce kancalar kapalıyken çalıştırıldı. 83 testten 80'i beklenen 
 - Motor Frappe'nin ve ERPNext'in kodunu değiştirmez (M-4).
 - Motor zamanlanmış iş kurmaz (D-6).
 
-## 16. Ertelenen işler
+## 17. Ertelenen işler
 
 | İş | Neden ertelendi | Nerede |
 | --- | --- | --- |
@@ -499,6 +537,6 @@ Testler önce kancalar kapalıyken çalıştırıldı. 83 testten 80'i beklenen 
 | Kiracı yöneticisi rolü (“Tenant Admin”) | Rol henüz tanımlı değil. Uçlar şimdilik “System Manager” ister. | G-62 |
 | Dosya, arka plan işi ve anlık bildirim yüzeyleri | Bu tur liste, kayıt, rapor ve dışa aktarmayı kapsar. | G-121 |
 
-## 17. Geri dönüş
+## 18. Geri dönüş
 
 Motor iki kanca satırıyla bağlanır. Satırlar silinirse Frappe'nin olağan izinleri geçerli olur. “Access Rule” kayıtları veritabanında kalır ama etkisizdir. Veri geçişi gerekmez.

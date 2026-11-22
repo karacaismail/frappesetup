@@ -52,6 +52,16 @@ def guard(report_name: str | None, user: str | None = None) -> None:
 	)
 
 
+def guard_prepared_report(doc, method=None) -> None:
+	"""“Prepared Report” kaydı açılmadan önce çalışır. Hazır rapor arka planda kapısız üretilir."""
+	guard(doc.report_name)
+
+
+def guard_auto_email_report(doc, method=None) -> None:
+	"""“Auto Email Report” kaydı raporu `user` alanındaki kullanıcı adına çalıştırır."""
+	guard(doc.report, doc.user)
+
+
 @frappe.whitelist(methods=["GET", "POST"])
 @frappe.read_only()
 def run(

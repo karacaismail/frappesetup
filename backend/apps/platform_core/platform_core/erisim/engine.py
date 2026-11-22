@@ -5,6 +5,8 @@ aynı koşulda sütunların yerine değerler konur. Karar notu 5., 6. ve 7. böl
 """
 
 from collections.abc import Callable
+from datetime import date, timedelta
+from decimal import Decimal
 
 import frappe
 from pypika import Case
@@ -30,7 +32,21 @@ def table_column(doctype: str) -> Column:
 
 
 def value_column(doc) -> Column:
-	return lambda fieldname: ValueWrapper(doc.get(fieldname))
+	"""Sütun yerine kaydın yeni değerini koyar.
+
+	Değer istemciden gelir. Sayı metne çevrilir: MariaDB `0 = 'HR-EMP-1'` karşılaştırmasını
+	doğru sayar. Liste ve sözlük boş değer olur. Boş değer hiçbir koşulu sağlamaz.
+	"""
+
+	def column(fieldname: str) -> Term:
+		value = doc.get(fieldname)
+		if value is None or isinstance(value, str):
+			return ValueWrapper(value)
+		if isinstance(value, bool | int | float | Decimal | date | timedelta):
+			return ValueWrapper(str(value))
+		return ValueWrapper(None)
+
+	return column
 
 
 def _employees(where: Criterion, kind: str):
