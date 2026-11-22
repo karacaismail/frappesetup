@@ -11,6 +11,7 @@ from pypika.functions import Cast
 MILLION = Decimal("1000000")
 UNSETTLED = ("pending", "unknown", "upstream", "timeout", "invalid_response", "rejected")
 POTENTIALLY_BILLED = (*UNSETTLED, "success", "resolved")
+USAGE_PAGE_SIZE = 500
 
 
 def price(model, input_tokens, output_tokens):
@@ -28,22 +29,27 @@ def money_as_text(table, field):
 
 def _usage(filters):
 	log = frappe.qb.DocType("AI Usage Log")
-	return frappe.qb.get_query(
-		"AI Usage Log",
-		filters=filters,
-		fields=[
-			"input_tokens",
-			"output_tokens",
-			"usage_known",
-			money_as_text(log, "cost"),
-			"currency",
-			"result",
-			"cost_known",
-			money_as_text(log, "reserved_cost"),
-			"reservation_known",
-			"reserved_tokens",
-		],
-	).run(as_dict=True)
+	fields = [
+		"name",
+		"input_tokens",
+		"output_tokens",
+		"usage_known",
+		money_as_text(log, "cost"),
+		"currency",
+		"result",
+		"cost_known",
+		money_as_text(log, "reserved_cost"),
+		"reservation_known",
+		"reserved_tokens",
+	]
+	while True:
+		page = frappe.qb.get_query(
+			"AI Usage Log", filters=filters, fields=fields, order_by="name asc", limit=USAGE_PAGE_SIZE
+		).run(as_dict=True)
+		yield from page
+		if len(page) < USAGE_PAGE_SIZE:
+			return
+		filters = {**filters, "name": [">", page[-1].name]}
 
 
 def remaining(account):
@@ -81,18 +87,19 @@ def site_quota(user):
 def api_quota(api, conservative_tokens):
 	if not (api.requests_per_minute or api.tokens_per_minute):
 		return True
-	records = _usage({"api": api.name, "attempted_at": [">=", now_datetime() - timedelta(minutes=1)]})
-	if api.requests_per_minute and len(records) >= api.requests_per_minute:
+	filters = {"api": api.name, "attempted_at": [">=", now_datetime() - timedelta(minutes=1)]}
+	tokens = conservative_tokens
+	if api.tokens_per_minute and tokens > api.tokens_per_minute:
 		return False
-	if api.tokens_per_minute:
-		billable = [item for item in records if item.result in POTENTIALLY_BILLED]
-		if any(not item.usage_known and not item.reserved_tokens for item in billable):
+	for count, item in enumerate(_usage(filters), 1):
+		if api.requests_per_minute and count >= api.requests_per_minute:
 			return False
-		tokens = sum(
-			item.input_tokens + item.output_tokens if item.usage_known else item.reserved_tokens
-			for item in billable
-		)
-		return tokens + conservative_tokens <= api.tokens_per_minute
+		if api.tokens_per_minute and item.result in POTENTIALLY_BILLED:
+			if not item.usage_known and not item.reserved_tokens:
+				return False
+			tokens += item.input_tokens + item.output_tokens if item.usage_known else item.reserved_tokens
+			if tokens > api.tokens_per_minute:
+				return False
 	return True
 
 

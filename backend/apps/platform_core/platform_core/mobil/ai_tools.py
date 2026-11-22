@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .lifecycle import ACCOUNT_STATE, lock_revocation_scope, record_revocation
 from .protocol import UUID_PATTERN, MobileError, content_digest
 from .retention import cleanup
-from .sessions import is_session_closure_pending
+from .sessions import is_session_closure_pending, pending_session_closures
 from .store import MobileStore, _select
 
 ADMIN_ROLE = "System Manager"
@@ -108,14 +108,16 @@ def list_installations(account, after=None, limit=20):
 	rows = _select(
 		INSTALLATION, ["name", "revoked", "session_id"], filters, limit=args.limit + 1, order_by="name asc"
 	)
+	page = rows[: args.limit]
+	pending_sessions = pending_session_closures(row.session_id for row in page)
 	return {
 		"installations": [
 			{
 				"installation_id": row.name,
 				"revoked": bool(row.revoked),
-				"closure_pending": is_session_closure_pending(row.session_id),
+				"closure_pending": row.session_id in pending_sessions,
 			}
-			for row in rows[: args.limit]
+			for row in page
 		],
 		"next_after": rows[args.limit - 1].name if len(rows) > args.limit else None,
 	}
@@ -134,7 +136,7 @@ def _plan_revocation(account, installation_id=None):
 		for row in rows
 		if not row.revoked or is_session_closure_pending(row.session_id)
 	]
-	installation_ids = tuple(name for name, _ in targets)
+	installation_ids = tuple(name for name, _unused in targets)
 	if installation_id is not None and not installation_ids:
 		raise frappe.ValidationError(_("The mobile installation is unavailable."))
 	return RevocationPlan(

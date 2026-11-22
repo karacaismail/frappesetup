@@ -13,8 +13,8 @@ Zamanlanmış tarama kurulmaz (D-6). Asıl dosya bazı taramaları her gece ya d
 | Projeye özel Semgrep kuralları | security-tooling | Var olan güvenlik kapısındadır. |
 | Bandit ile Python taraması | security-tooling | `security-full` komutu |
 | CodeQL ile derin kod taraması | DevOps sorumlusu | GitHub'da çalışır. Devir notu `docs/handoff/ci-security.md` dosyasındadır. |
-| ZAP ya da Nuclei ile çalışan siteye dışarıdan deneme | security-tooling | `dast-scan` yerel sitenin ilk yanıtını ZAP ile pasif olarak inceler. |
-| Schemathesis ile API'ye rastgele girdi | security-tooling | Canlı tarama adımı `not_run` durumundadır. |
+| ZAP ya da Nuclei ile çalışan siteye dışarıdan deneme | security-tooling | `dast-scan` yerel sitenin ilk yanıtını ZAP ile pasif olarak inceler. Yalnız yerel adres hedeflenir. |
+| Schemathesis ile API'ye rastgele girdi | security-tooling | Sözleşme dosyaları kullanılır. Varsayılan kapsam GET işlemleridir. Yerel hedef yoksa adım `not_run` döner. Erişim izni ayrı rol testiyle doğrulanır: aynı uçta yetkili sahte hesap 200, yetkisiz sahte hesap 403 alır. |
 | Bütün araçlardan JSON çıktı | security-tooling | `release-report` bu çıktıları toplar. |
 | Kodda ve Git geçmişinde gizli bilgi taraması | security-tooling | Gitleaks bütün geçmişi tarar. |
 

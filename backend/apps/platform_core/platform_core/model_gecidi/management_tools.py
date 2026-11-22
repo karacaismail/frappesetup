@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 from pydantic import BaseModel, ConfigDict, Field
 
-from platform_core.model_gecidi import gateway
+from platform_core.model_gecidi import gateway, maintenance
 from platform_core.model_gecidi.doctype.ai_api.ai_api import clear_api_credential
 from platform_core.model_gecidi.doctype.validation import validate_url
 from platform_core.model_gecidi.policy import MANAGERS
@@ -68,6 +68,10 @@ class CreateAccount(AccountSettings):
 class UpdateAccount(AccountSettings):
 	name: Identifier
 	account_name: Identifier | None = None
+
+
+class ReconcilePending(Arguments):
+	name: Identifier
 
 
 def _require_manager():
@@ -207,6 +211,23 @@ def update_account(**arguments):
 	return _save_account(doc, values)
 
 
+def preview_reconcile_pending(**arguments):
+	name = _validated(ReconcilePending, arguments)["name"]
+	log = maintenance.preview_pending_recovery(name)
+	return {
+		"action": "update",
+		"summary": _("Reconcile the selected expired model gateway reservation.", context="AI Usage Log"),
+		"target_doctype": "AI Usage Log",
+		"target_name": log.name,
+		"target_version": str(log.modified),
+		"changes": [{"fieldname": "result", "old": "pending", "new": "unknown"}],
+	}
+
+
+def reconcile_pending(**arguments):
+	return maintenance.reconcile_stale_pending(**_validated(ReconcilePending, arguments))
+
+
 def declare():
 	"""Register registry writes with human approval in the AI layer."""
 	roles = sorted(MANAGERS)
@@ -252,6 +273,17 @@ def declare():
 			"arguments": MODULE_PATH + "UpdateAccount",
 			"handler": MODULE_PATH + "update_account",
 			"preview": MODULE_PATH + "preview_update_account",
+			"versioned": True,
+			"destructive": False,
+		},
+		{
+			"name": "reconcile_stale_pending",
+			"description": "Reconcile one expired reservation without releasing its reserved cost.",
+			"kind": "write",
+			"roles": roles,
+			"arguments": MODULE_PATH + "ReconcilePending",
+			"handler": MODULE_PATH + "reconcile_pending",
+			"preview": MODULE_PATH + "preview_reconcile_pending",
 			"versioned": True,
 			"destructive": False,
 		},
