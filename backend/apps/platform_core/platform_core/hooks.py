@@ -26,7 +26,10 @@ doc_events = {
 	},
 	"Role": {
 		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions", "platform_core.erisim.rules.clear_cache"],
+		"on_trash": [
+			"platform_core.kabuk.cache.invalidate_permissions",
+			"platform_core.erisim.rules.clear_cache",
+		],
 		# The access rule engine forgets the rules it read in this request.
 		"after_rename": ["platform_core.erisim.rules.clear_cache"],
 	},
@@ -44,7 +47,10 @@ doc_events = {
 	},
 	"DocType": {
 		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions", "platform_core.erisim.rules.clear_cache"],
+		"on_trash": [
+			"platform_core.kabuk.cache.invalidate_permissions",
+			"platform_core.erisim.rules.clear_cache",
+		],
 		"after_rename": ["platform_core.erisim.rules.clear_cache"],
 	},
 	"Custom Field": {
