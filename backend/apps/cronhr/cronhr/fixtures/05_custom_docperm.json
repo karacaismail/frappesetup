@@ -1,0 +1,61 @@
+[
+  {
+    "doctype": "Custom DocPerm",
+    "name": "cronhr-leave-1",
+    "parent": "Leave Application",
+    "parenttype": "DocType",
+    "parentfield": "permissions",
+    "role": "CronHR Employee",
+    "permlevel": 0,
+    "read": 1,
+    "write": 1,
+    "create": 1,
+    "submit": 0
+  },
+  {
+    "doctype": "Custom DocPerm",
+    "name": "cronhr-leave-2",
+    "parent": "Leave Application",
+    "parenttype": "DocType",
+    "parentfield": "permissions",
+    "role": "CronHR Manager",
+    "permlevel": 0,
+    "read": 1,
+    "write": 1,
+    "create": 0,
+    "submit": 1
+  },
+  {
+    "doctype": "Custom DocPerm",
+    "name": "cronhr-leave-3",
+    "parent": "Leave Application",
+    "parenttype": "DocType",
+    "parentfield": "permissions",
+    "role": "CronHR HR",
+    "permlevel": 0,
+    "read": 1,
+    "write": 1,
+    "create": 1,
+    "submit": 1
+  },
+  {
+    "doctype": "Custom DocPerm",
+    "name": "cronhr-leave-4",
+    "parent": "Leave Application",
+    "parenttype": "DocType",
+    "parentfield": "permissions",
+    "role": "CronHR Manager",
+    "permlevel": 1,
+    "read": 1
+  },
+  {
+    "doctype": "Custom DocPerm",
+    "name": "cronhr-leave-5",
+    "parent": "Leave Application",
+    "parenttype": "DocType",
+    "parentfield": "permissions",
+    "role": "CronHR HR",
+    "permlevel": 1,
+    "read": 1
+  }
+]

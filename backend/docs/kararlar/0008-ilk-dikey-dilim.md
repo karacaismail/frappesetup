@@ -18,7 +18,7 @@ Yönetici ve İK rolleri bu seviyede okuma hakkı alır.
 Kabuk, kurulu HRMS uygulamasının “Workspace Sidebar” kaydından menü öğelerini alır.
 CronHR, panel yolu veya ayrı bir menü tanımlamaz.
 
-`cronhr_approve_leave` aracı kayıt adını alır ve öneri oluşturur.
+`cronhr_approve_leave` aracı kayıt adı ve sürümüyle öneri oluşturur.
 Önizleme kayıt sürümünü ve durum değişikliğini gösterir.
 İnsan oturumu öneriyi onaylayınca yapay zekâ katmanı izni yeniden denetler.
 CronHR, kaydı Frappe üzerinden onaylar ve gönderir.

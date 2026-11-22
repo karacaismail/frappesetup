@@ -1,0 +1,32 @@
+[
+  {
+    "doctype": "Role Profile",
+    "name": "CronHR Employee",
+    "role_profile": "CronHR Employee",
+    "roles": [
+      {
+        "role": "CronHR Employee"
+      }
+    ]
+  },
+  {
+    "doctype": "Role Profile",
+    "name": "CronHR Manager",
+    "role_profile": "CronHR Manager",
+    "roles": [
+      {
+        "role": "CronHR Manager"
+      }
+    ]
+  },
+  {
+    "doctype": "Role Profile",
+    "name": "CronHR HR",
+    "role_profile": "CronHR HR",
+    "roles": [
+      {
+        "role": "CronHR HR"
+      }
+    ]
+  }
+]

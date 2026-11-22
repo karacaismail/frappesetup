@@ -1,0 +1,46 @@
+[
+  {
+    "doctype": "Access Rule",
+    "name": "CronHR Employee Leave Application",
+    "title": "CronHR Employee Leave Application",
+    "document_type": "Leave Application",
+    "role": "CronHR Employee",
+    "scope": "own",
+    "is_active": 1,
+    "match_field": "employee",
+    "allow_read": 1,
+    "allow_create": 1,
+    "allow_write": 1,
+    "allow_submit": 0,
+    "description": "Read and edit own leave drafts."
+  },
+  {
+    "doctype": "Access Rule",
+    "name": "CronHR Manager Leave Application",
+    "title": "CronHR Manager Leave Application",
+    "document_type": "Leave Application",
+    "role": "CronHR Manager",
+    "scope": "team",
+    "is_active": 1,
+    "match_field": "employee",
+    "allow_read": 1,
+    "allow_create": 0,
+    "allow_write": 1,
+    "allow_submit": 1,
+    "description": "Read and approve leave for the reporting team."
+  },
+  {
+    "doctype": "Access Rule",
+    "name": "CronHR HR Leave Application",
+    "title": "CronHR HR Leave Application",
+    "document_type": "Leave Application",
+    "role": "CronHR HR",
+    "scope": "all",
+    "is_active": 1,
+    "allow_read": 1,
+    "allow_create": 1,
+    "allow_write": 1,
+    "allow_submit": 1,
+    "description": "Manage leave applications in this site."
+  }
+]
