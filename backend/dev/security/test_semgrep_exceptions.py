@@ -35,7 +35,8 @@ class SemgrepExceptionsTests(unittest.TestCase):
             expected = source_digest(root, scope)
             self.assertIsNotNone(expected)
             result = self.run_cli(root, "--snapshot")
-            self.assertEqual((result.returncode, result.stdout, result.stderr), (0, expected + "\n", ""))
+            self.assertEqual((result.returncode, result.stderr), (0, ""))
+            self.assertEqual(json.loads(result.stdout)[scope], expected)
 
     def test_cli_rejects_malformed_json(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -77,6 +78,41 @@ class SemgrepExceptionsTests(unittest.TestCase):
                 "Semgrep did not complete cleanly: exit=2, errors=1, findings=1.\n",
             )
 
+    def test_reviews_keep_independent_scopes_and_require_both_snapshots(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            rules = root / RULES
+            rules.parent.mkdir(parents=True)
+            rules.write_text("rules: []")
+            self.git(root, "init", "-q")
+            reviews = []
+            findings = []
+            for scope in ("press", "access"):
+                path = f"{scope}/api.py"
+                (root / scope).mkdir()
+                (root / path).write_text("pass\n")
+                reviews.append({
+                    "scope": scope, "sha256": source_digest(root, scope),
+                    "findings": [{"rule": "frappe-missing-permission", "path": path,
+                                  "line": 1, "reason": "Reviewed permission check."}],
+                })
+                findings.append({"check_id": "rules.frappe-missing-permission", "path": path,
+                                 "start": {"line": 1}})
+            config = root / "exceptions.json"
+            config.write_text(json.dumps({**reviews[0], "additionalReviews": reviews[1:]}))
+            before = {entry["scope"]: entry["sha256"] for entry in reviews}
+            self.assertEqual(reviewed_findings(root, config, findings, before), [])
+            self.assertEqual(reviewed_findings(root, config, findings, {"press": before["press"]}),
+                             [findings[1]])
+            (root / "access/api.py").write_text("changed = True\n")
+            self.assertEqual(reviewed_findings(root, config, findings, before), [findings[1]])
+
+    def test_missing_rule_file_cannot_produce_a_digest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "press").mkdir()
+            self.assertIsNone(source_digest(root, "press"))
+
     def test_digest_ignores_cache_and_preserves_clean_digest(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -109,11 +145,11 @@ class SemgrepExceptionsTests(unittest.TestCase):
             rule_file.parent.mkdir(parents=True)
             rule_file.write_text("rules: []")
             self.git(root, "init", "-q")
-            before = source_digest(root, "press")
+            before = {"press": source_digest(root, "press")}
             config = root / "exceptions.json"
             config.write_text(json.dumps({
                 "scope": "press",
-                "sha256": before,
+                "sha256": before["press"],
                 "findings": [{"rule": "frappe-missing-permission", "path": "press/api.py",
                               "line": 1, "reason": "Reviewed permission check."}],
             }))
@@ -121,7 +157,7 @@ class SemgrepExceptionsTests(unittest.TestCase):
                        "start": {"line": 1}}
             other = {**finding, "start": {"line": 2}}
             self.assertEqual(reviewed_findings(root, config, [finding, other], before), [other])
-            self.assertEqual(reviewed_findings(root, config, [finding], "different"), [finding])
+            self.assertEqual(reviewed_findings(root, config, [finding], {"press": "different"}), [finding])
             self.assertEqual(reviewed_findings(root, config, [finding], None), [finding])
             rule_file.write_text("rules: changed")
             self.assertEqual(reviewed_findings(root, config, [finding], before), [finding])

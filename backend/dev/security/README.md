@@ -68,8 +68,9 @@ Press kodu veya kural değişirse istisnaları yeniden inceleyin.
 python3 -B backend/dev/security/semgrep_exceptions.py --snapshot
 ```
 
-Komut boş çıktı verirse şimdiki özeti koruyun.
-Komut bir özet verirse değeri `semgrep-exceptions.json` dosyasındaki `sha256` alanına yazın.
+Komut her kapsam için bir özet yazdırır.
+Özet `null` ise kapsama ait onayları yenilemeyin.
+Onayları inceleyince yeni özeti aynı kapsamın `sha256` alanına yazın.
 Ardından `backend/dev/bin/security-audit` komutunu çalıştırın.
 
 Uç listesi `backend/apps/<uygulama>/<paket>/` altındaki Python kaynaklarını okur.

@@ -19,7 +19,11 @@ def source_digest(root, scope):
     directory = root / scope
     if not directory.is_dir() or directory.is_symlink() or not directory.resolve().is_relative_to(root):
         return None
-    digest = hashlib.sha256(hashlib.sha256((root / RULES).read_bytes()).digest())
+    try:
+        rule_content = (root / RULES).read_bytes()
+    except FileNotFoundError:
+        return None
+    digest = hashlib.sha256(hashlib.sha256(rule_content).digest())
     git = shutil.which("git")
     if not git or not Path(git).is_absolute():
         return None
@@ -41,19 +45,28 @@ def source_digest(root, scope):
     return digest.hexdigest()
 
 
-def approved_keys(root, config, before=None):
+def review_scopes(config):
     review = json.loads(config.read_text())
-    scope = review["scope"]
-    current = source_digest(root, scope)
-    if current is None or current != review["sha256"] or (before is not None and current != before):
-        return set()
-    return {
-        (entry["rule"], entry["path"], entry["line"])
-        for entry in review["findings"]
-        if (entry["rule"] in REVIEWABLE or (entry["rule"], entry["path"]) == (GUEST_LIMIT, PRESS_LOGOUT))
-        and entry["reason"].strip()
-        and Path(entry["path"]).is_relative_to(Path(scope))
-    }
+    return [review, *review.get("additionalReviews", [])]
+
+
+def approved_keys(root, config, before=None):
+    allowed = set()
+    for review in review_scopes(config):
+        scope = review["scope"]
+        current = source_digest(root, scope)
+        if current is None or current != review["sha256"]:
+            continue
+        if before is not None and current != before.get(scope):
+            continue
+        allowed.update(
+            (entry["rule"], entry["path"], entry["line"])
+            for entry in review["findings"]
+            if (entry["rule"] in REVIEWABLE or (entry["rule"], entry["path"]) == (GUEST_LIMIT, PRESS_LOGOUT))
+            and entry["reason"].strip()
+            and Path(entry["path"]).is_relative_to(Path(scope))
+        )
+    return allowed
 
 
 def reviewed_findings(root, config, findings, before):
@@ -75,8 +88,8 @@ def reviewed_findings(root, config, findings, before):
 def main():
     root = Path.cwd()
     if sys.argv[1:] == ["--snapshot"]:
-        review = json.loads(CONFIG.read_text())
-        print(source_digest(root, review["scope"]) or "")
+        print(json.dumps({review["scope"]: source_digest(root, review["scope"])
+                          for review in review_scopes(CONFIG)}))
         return 0
     if len(sys.argv) != 4:
         raise ValueError("Expected report path, scan status and pre-scan signature.")
@@ -93,7 +106,10 @@ def main():
             file=sys.stderr,
         )
         return 1
-    remaining = reviewed_findings(root, CONFIG, findings, sys.argv[3])
+    before = json.loads(sys.argv[3])
+    if not isinstance(before, dict):
+        raise TypeError("Expected Semgrep snapshots by scope.")
+    remaining = reviewed_findings(root, CONFIG, findings, before)
     for finding in remaining:
         print(f"{finding['path']}:{finding['start']['line']} [{finding['check_id']}]")
     return int(bool(remaining))

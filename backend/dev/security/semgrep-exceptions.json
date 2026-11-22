@@ -116,5 +116,43 @@
       "line": 37,
       "reason": "Matches the current account and exact logout session ID before deleting the internal mapping."
     }
+  ],
+  "additionalReviews": [
+    {
+      "scope": "backend/apps/platform_core/platform_core",
+      "sha256": "625d35b9011c36bda9e4bda9b5cacd9605adf359b91a7040a53ddb623c41a4f4",
+      "findings": [
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/access/link_search.py",
+          "line": 56,
+          "reason": "Checks DocType select permission and rejects custom queries on governed types before search."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/access/link_search.py",
+          "line": 90,
+          "reason": "Checks DocType select permission and rejects custom queries on governed types before search."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/access/link_search.py",
+          "line": 137,
+          "reason": "Checks DocType select permission and rejects custom queries on governed types before link validation."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 12,
+          "reason": "Checks DocType read permission before explaining access and restricts other-user requests to managers."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 20,
+          "reason": "Checks DocType read permission before returning the session user’s access summary."
+        }
+      ]
+    }
   ]
 }
