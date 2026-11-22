@@ -53,7 +53,7 @@ class TestPanelHTTP(ShellHTTPFixture):
 		self.assertNotEqual(first, other)
 		for token, expected in ((None, 400), (other, 400), (first, 200)):
 			headers = {"X-Frappe-CSRF-Token": token} if token else {}
-			status, _, body = self.request(
+			status, _unused_headers, body = self.request(
 				f"/api/resource/{quote(DOCTYPE)}",
 				self.reader_sid,
 				method="POST",
@@ -70,7 +70,7 @@ class TestPanelHTTP(ShellHTTPFixture):
 	def test_panel_uses_the_requested_language(self):
 		for language, title in (("en", "Admin panel"), ("tr", "Yönetim paneli")):
 			with self.subTest(language=language):
-				status, _, body = self.request(f"/panel?_lang={language}", self.reader_sid)
+				status, _unused_headers, body = self.request(f"/panel?_lang={language}", self.reader_sid)
 				self.assertEqual(status, 200)
 				self.assertEqual(PanelMetadata(body).language, language)
 				self.assertIn(f"<title>{title}</title>", body.decode("utf-8"))

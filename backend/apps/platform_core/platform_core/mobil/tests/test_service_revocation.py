@@ -89,7 +89,7 @@ class ServiceRevocationTest(IntegrationTestCase):
 			patch("platform_core.mobil.sessions.send_session_revocations") as send,
 			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
 		):
-			for _ in range(2):
+			for _unused in range(2):
 				self.assertEqual(revoke_user_installations(), {"revoked": 1})
 			self.assertTrue(is_session_revoked(sid))
 			self.assertFalse(is_session_closure_pending(sid))
@@ -101,7 +101,7 @@ class ServiceRevocationTest(IntegrationTestCase):
 	def test_account_revocation_reads_installations_in_bounded_batches(self):
 		identity = SimpleNamespace(account=self.account, scope="mobile", principal="fixture", sid=None)
 		repository = MobileStore()
-		installations = sorted(str(uuid4()) for _ in range(3))
+		installations = sorted(str(uuid4()) for _unused in range(3))
 		for installation in installations:
 			identity.sid = str(uuid4())
 			repository.install(identity, installation)
