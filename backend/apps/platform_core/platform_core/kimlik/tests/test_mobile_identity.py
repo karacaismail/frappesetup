@@ -17,9 +17,16 @@ STUB = "/api/method/platform_core.kimlik.tests.mobile_stub.v1_whoami"
 STUB_PREFIX = "/api/method/platform_core.kimlik.tests.mobile_stub.v1_"
 
 
+AUTH_TIME = 1795300000
+
+
 def mobile_payload(**overrides) -> dict:
 	payload = h.access_payload(
-		sub="sub-ayse", azp="mobile", scope="openid mobile", sid="11111111-1111-4111-8111-111111111111"
+		sub="sub-ayse",
+		azp="mobile",
+		scope="openid mobile",
+		sid="11111111-1111-4111-8111-111111111111",
+		auth_time=AUTH_TIME,
 	)
 	payload.update(overrides)
 	return {k: v for k, v in payload.items() if v is not None}
@@ -88,6 +95,21 @@ class TestMobileIdentity(FrappeAPITestCase):
 		self.assertNotIn("user", identity)
 		# Fields that the mobile module reads in addition (mobil/request.py): issuer, subject and iat.
 		self.assertIsInstance(identity["iat"], int)
+
+	def test_mobile_identity_carries_auth_time(self):
+		# docs/sozlesmeler.md section 3, "Telefon kimliği": auth_time is the token claim, an integer (Unix seconds).
+		response = self.call(self.key.sign(mobile_payload()))
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		value = response.json["message"]["identity"]["auth_time"]
+		self.assertIs(type(value), int)
+		self.assertEqual(value, AUTH_TIME)
+
+	def test_token_without_integer_auth_time_is_not_a_phone_request(self):
+		# "If the value is missing or malformed, the request is not a phone request."
+		for bad in (None, "1795300000", 1795300000.5, True):
+			response = self.call(self.key.sign(mobile_payload(auth_time=bad)))
+			self.assertEqual(response.status_code, 401, f"{bad!r}: {response.data[:200]}")
+			self.assertEqual(response.json.get("exc_type"), "ServiceTokenRejected", repr(bad))
 
 	def test_bad_installation_header_gives_an_empty_installation(self):
 		for value in ("", "a" * 129, "bad value", "<x>"):

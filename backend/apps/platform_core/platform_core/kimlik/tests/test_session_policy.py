@@ -160,7 +160,11 @@ class TestSessionPolicy(FrappeAPITestCase):
 
 	def test_forced_attempt_refuses_an_authentication_from_before_the_attempt(self):
 		_started, query = h.start_login(self.client)
-		first = h.finish_login(self.client, query, h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE)))
+		first = h.finish_login(
+			self.client,
+			query,
+			h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE), auth_time=int(time.time()) - 3700),
+		)
 		again = _query(first.headers["Location"])
 		earlier = int(time.time()) - 300
 		second = h.finish_login(
@@ -171,15 +175,28 @@ class TestSessionPolicy(FrappeAPITestCase):
 
 	def test_forced_attempt_without_auth_time_is_refused(self):
 		_started, query = h.start_login(self.client)
-		first = h.finish_login(self.client, query, h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE)))
+		first = h.finish_login(
+			self.client,
+			query,
+			h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE), auth_time=int(time.time()) - 3700),
+		)
 		again = _query(first.headers["Location"])
 		second = h.finish_login(
 			self.client, again, h.id_token(again, h.userinfo("sub-calisan", EMPLOYEE), auth_time=None)
 		)
 		self.assertEqual(second.status_code, 403, second.data[:300])
 
-	def test_customer_with_old_authentication_signs_in(self):
-		# Customers keep the Keycloak 7 day idle window (O-25 table). Only the Frappe cookie is 1 hour.
+	def test_idle_customer_is_also_sent_back_to_keycloak(self):
+		# docs/sozlesmeler.md section 3: on the tenant site every user gets the employee durations.
+		_started, query = h.start_login(self.client)
+		token = h.id_token(query, h.userinfo("sub-ayse", h.AYSE), auth_time=int(time.time()) - 7200)
+		response = h.finish_login(self.client, query, token)
+		self.assertEqual(response.status_code, 302, response.data[:300])
+		self.assertEqual(_query(response.headers["Location"]).get("prompt"), "login")
+		self.assertEqual(h.logged_user(self.client), "Guest")
+
+	def test_active_customer_continues(self):
+		session_policy.mark_activity(None, h.AYSE)
 		_started, query = h.start_login(self.client)
 		token = h.id_token(query, h.userinfo("sub-ayse", h.AYSE), auth_time=int(time.time()) - 7200)
 		response = h.finish_login(self.client, query, token)

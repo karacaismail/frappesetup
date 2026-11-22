@@ -7,9 +7,10 @@
 - Idle time is measured from real user activity (review finding Ö2). Frappe renews a session on every
   request, background polling included. `before_request` keeps its own activity key per session and per
   user in Redis. Background requests do not renew it. A session without a live key ends with 401.
-- An employee (System User) who was idle for the limit authenticates again at Keycloak. The open
-  Keycloak cookie must not skip this step: the login restarts with `prompt=login`, and the forced attempt
-  accepts only an `auth_time` from that attempt. Customers keep the Keycloak idle window of 7 days.
+- A user who was idle for the limit authenticates again at Keycloak. On the tenant site this holds for
+  every user, employee or customer (docs/sozlesmeler.md section 3). The open Keycloak cookie must not skip
+  this step: the login restarts with `prompt=login`, and the forced attempt accepts only an `auth_time`
+  from that attempt. Customer durations apply only to Press.
 """
 
 import time
@@ -18,7 +19,6 @@ import frappe
 
 IDLE_TIMEOUT = "01:00:00"
 IDLE_SECONDS = 3600
-EMPLOYEE_USER_TYPE = "System User"
 ACTIVITY_PREFIX = "kimlik_activity"
 AUTH_TIME_LEEWAY = 30
 BACKGROUND_HEADER = "X-Platform-Background"
@@ -100,20 +100,25 @@ def before_request() -> None:
 
 
 def check_fresh_authentication(user: str, claims: dict, record: dict) -> str:
-	"""Decides how an employee's sign-in continues (O-25, review finding Ö2).
+	"""Decides how a sign-in continues (O-25, review finding Ö2, contract section 3).
 
-	Returns "ok", "force" (restart with `prompt=login`) or "refuse". An employee who had real activity in
+	Every user of the tenant site gets the employee durations. Returns "ok", "force" (restart with
+	`prompt=login`) or "refuse". A user who had real activity in
 	the last hour continues. Otherwise Keycloak must confirm a sign-in made during this very attempt:
 	`auth_time` must not be older than the start of the forced attempt.
 	"""
-	if frappe.db.get_value("User", user, "user_type") != EMPLOYEE_USER_TYPE:
-		return "ok"
+	# docs/sozlesmeler.md section 3: on the tenant site every user gets the employee durations.
 	if recently_active(user):
 		return "ok"
-	if not record.get("force_login"):
-		return "force"
+	# Keycloak confirmed a sign-in made during this attempt: that is a fresh authentication.
+	if _fresh_for_attempt(claims, record):
+		return "ok"
+	return "refuse" if record.get("force_login") else "force"
+
+
+def _fresh_for_attempt(claims: dict, record: dict) -> bool:
 	auth_time = claims.get("auth_time")
 	started = record.get("started_at")
-	if isinstance(auth_time, bool) or not isinstance(auth_time, int | float) or not isinstance(started, int):
-		return "refuse"
-	return "ok" if auth_time >= started - AUTH_TIME_LEEWAY else "refuse"
+	if type(auth_time) not in (int, float) or type(started) is not int:
+		return False
+	return auth_time >= started - AUTH_TIME_LEEWAY

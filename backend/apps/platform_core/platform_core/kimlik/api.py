@@ -74,8 +74,13 @@ def verify_mobile_token(token: str) -> dict:
 	if not frappe.db.get_value("User", user, "enabled"):
 		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("user_disabled"))
 	sid = claims.get("sid") if helpers.is_session_id(claims.get("sid")) else ""
+	auth_time = claims.get("auth_time")
+	# Contract section 3: without an integer auth_time the request is not a phone request.
+	if type(auth_time) is not int:
+		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("missing_auth_time"))
 	issued_at = claims.get("iat")
-	# docs/sozlesmeler.md section 3, "Telefon kimliği": account, scope, site, installation and sid are text.
+	# docs/sozlesmeler.md section 3, phone identity: account, scope, site, installation and sid are text,
+	# auth_time is the integer token claim.
 	# issuer, subject and iat are read in addition by the mobile module (mobil/request.py).
 	return {
 		"account": user,
@@ -86,6 +91,7 @@ def verify_mobile_token(token: str) -> dict:
 		"issuer": settings.issuer,
 		"subject": subject.strip(),
 		"iat": issued_at if type(issued_at) is int else 0,
+		"auth_time": auth_time,
 		"azp": claims.get("azp"),
 		"expires_at": claims.get("exp"),
 	}
