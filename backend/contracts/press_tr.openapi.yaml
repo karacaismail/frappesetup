@@ -1,0 +1,74 @@
+openapi: 3.1.0
+info:
+  title: Press TR
+  version: 0.1.0
+paths:
+  /api/method/press_tr.api.auth.get_login_url:
+    post:
+      operationId: getLoginUrl
+      summary: Get a single-use Keycloak login URL.
+      description: Starts a rate-limited browser login and binds it to that browser.
+      responses:
+        "200":
+          description: The URL contains state, nonce and a PKCE S256 challenge.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [url]
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+        "429":
+          description: Login URL request limit reached.
+  /api/method/press_tr.api.auth.keycloak_callback:
+    get:
+      operationId: completeLogin
+      summary: Exchange the authorization code and open a Press session.
+      description: Validates browser state and Keycloak identity before opening a session. May create a local user and a team. Does not start billing.
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Signed in and redirected to the Press dashboard.
+          headers:
+            Location:
+              schema:
+                type: string
+                const: /dashboard
+        "403":
+          description: State, token or identity binding was rejected.
+  /api/method/press_tr.api.keycloak_backchannel_logout:
+    post:
+      operationId: closeSessions
+      summary: Close sessions associated with a verified Keycloak logout token.
+      description: Revokes matching Press sessions and deletes their session mappings. This is destructive and does not incur charges.
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [logout_token]
+              properties:
+                logout_token:
+                  type: string
+      responses:
+        "200":
+          description: Logout processed, including a repeated logout.
+        "403":
+          description: Logout token was rejected.

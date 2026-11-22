@@ -1,0 +1,33 @@
+import frappe
+from frappe.sessions import delete_session
+
+from press_tr.kimlik.identity import find_identity
+from press_tr.kimlik.oidc import claim, reject, verify
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def keycloak_backchannel_logout(logout_token: str | None = None) -> None:
+	if not isinstance(logout_token, str) or not logout_token:
+		reject()
+
+	from oidc_verify import verify_logout_token
+
+	claims = verify(verify_logout_token, logout_token, client_id="press")
+	filters = {}
+	if "sid" in claims:
+		filters["keycloak_sid"] = claim(claims, "sid")
+	if "sub" in claims:
+		link = find_identity(claim(claims, "iss"), claim(claims, "sub"))
+		if not link:
+			return
+		filters["identity_link"] = link.name
+	if not filters:
+		reject()
+
+	for name in frappe.get_all("Press Keycloak Session", filters=filters, pluck="name"):
+		record = frappe.get_doc("Press Keycloak Session", name)
+		sid = record.get_password("press_sid")
+		user = frappe.db.get_value("Sessions", {"sid": sid}, "user", order_by=None)
+		if user:
+			delete_session(sid=sid, user=user, reason="Keycloak logout")
+		record.delete(ignore_permissions=True)

@@ -1,0 +1,12 @@
+Issuer,Kimlik sunucusu
+Issuer URL from the verified Keycloak token.,Bu adres doğrulanmış Keycloak kimlik bilgisinden gelir.
+Subject,Kalıcı kullanıcı kimliği
+Permanent user identifier assigned by the issuer.,Kimlik sunucusu bu kalıcı değeri kullanıcıya verir.
+User,Kullanıcı
+Press user associated with this Keycloak identity.,Bu Keycloak kimliği bu Press kullanıcısına bağlıdır.
+Identity Link,Kimlik bağı
+Verified identity associated with the session.,Bu oturum doğrulanmış kimlik bağına aittir.
+Keycloak Session ID,Keycloak oturum kimliği
+Keycloak session identifier used to match logout requests.,Press çıkış isteğini bu Keycloak oturumuyla eşler.
+Press Session ID,Press oturum kimliği
+Secret Press session identifier used only to revoke the session.,Press bu gizli değeri yalnızca oturumu kapatmak için kullanır.

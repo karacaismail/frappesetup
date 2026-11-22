@@ -1,0 +1,40 @@
+{
+  "doctype": "DocType",
+  "name": "Press Identity Link",
+  "module": "Kimlik",
+  "autoname": "hash",
+  "engine": "InnoDB",
+  "field_order": [
+    "issuer",
+    "subject",
+    "user"
+  ],
+  "fields": [
+    {
+      "fieldname": "issuer",
+      "label": "Issuer",
+      "fieldtype": "Data",
+      "description": "Issuer URL from the verified Keycloak token.",
+      "reqd": 1,
+      "length": 255
+    },
+    {
+      "fieldname": "subject",
+      "label": "Subject",
+      "fieldtype": "Data",
+      "description": "Permanent user identifier assigned by the issuer.",
+      "reqd": 1,
+      "length": 255
+    },
+    {
+      "fieldname": "user",
+      "label": "User",
+      "fieldtype": "Link",
+      "description": "Press user associated with this Keycloak identity.",
+      "reqd": 1,
+      "options": "User",
+      "unique": 1
+    }
+  ],
+  "permissions": []
+}

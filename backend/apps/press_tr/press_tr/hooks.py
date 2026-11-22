@@ -264,3 +264,4 @@ required_apps = ["press"]
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+before_request = ["press_tr.kimlik.request_policy.before_request"]

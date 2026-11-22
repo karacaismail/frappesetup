@@ -1,33 +1,23 @@
-### Press TR
+# Press TR
 
-Keycloak identity integration for Press
+Keycloak sign-in and identity synchronization for Press on Frappe 16.
 
-### Installation
+## Installation
 
-You can install this app using the [bench](https://github.com/frappe/bench) CLI:
+Use the isolated environment in [Press development setup](../../dev/press/README.md).
+Install the shared `oidc_verify` package from `backend/libs/oidc_verify` into the bench Python environment. The login callback, logout notification and service routes require it.
 
-```bash
-cd $PATH_TO_YOUR_BENCH
-bench get-app $URL_OF_THIS_REPO --branch develop
-bench install-app press_tr
-```
+Configure these site settings before starting the web process:
 
-### Contributing
+- `host_name` is the exact Press origin registered for the Keycloak callback.
+- `keycloak_public_url` and `keycloak_realm` identify the issuer. Use
+  `keycloak_internal_url` when the bench reaches Keycloak through a different address.
+- `keycloak_client_secret` is the secret for the `press` client. Keep it in site configuration.
+- `platform_panel_url` is where legacy Press login and signup pages redirect.
 
-This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
+Register the exact callback and logout notification addresses in the
+[OpenAPI contract](../../contracts/press_tr.openapi.yaml).
 
-```bash
-cd apps/press_tr
-pre-commit install
-```
+## License
 
-Pre-commit is configured to use the following tools for checking and formatting your code:
-
-- ruff
-- eslint
-- prettier
-- pyupgrade
-
-### License
-
-mit
+AGPL-3.0. See [license.txt](license.txt).

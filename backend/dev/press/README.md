@@ -26,10 +26,15 @@ press_compose exec -T --user root web install -d -o frappe -g frappe /home/frapp
 press_compose cp backend/dev/press/patch-py314.sh web:/opt/press-local/scripts/patch-py314.sh
 press_compose cp backend/apps/press_tr web:/home/frappe/benches/source/
 press_compose exec -T web bash -s < backend/dev/press/install.sh
+press_compose cp backend/libs/oidc_verify web:/home/frappe/benches/source/
+press_compose exec -T --workdir /home/frappe/benches/frappe-bench web \
+  env/bin/python -m pip install ../source/oidc_verify
 press_compose exec -d web bash -lc 'cd /home/frappe/benches/frappe-bench && exec bench start > logs/bench-start.log 2>&1'
 ```
 
-Duman testi, sitenin yanıtını ve iş için gereken uygulamaları denetler.
+Site ayarları [Press TR kurulumunda](../../apps/press_tr/README.md) yer alır.
+
+Duman testi, sitenin yanıtını ve kurulu uygulamaları denetler.
 
 ```sh
 sh backend/apps/press_tr/tests/smoke.sh
