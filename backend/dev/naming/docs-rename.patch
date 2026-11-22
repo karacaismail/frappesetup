@@ -133,8 +133,7 @@ index 9ef87a7ded874aec85ef7d29b1832f12ba94ea30..404ef9f67e1ff0eb7234652295f5c219
  7. **Yasaklı ad yok (D-13).** Bu denetim `backend/` ile sınırlı değildir. Depodaki bütün izlenen dosyaları tarar (`git ls-files`). Dosya ve klasör adlarını da tarar.
     - Adın kendisi kapıya yazılmaz. Kapı yalnız şu SHA-256 özetini taşır: `17618b2344e07d3418e161912308ad63a118158bf4e3f1307329b5543b5fd743`.
     - Kapı metni küçük harfe çevirir. Sonra harf ve rakam dışındaki işaretleri siler. Böylece boşluk, alt çizgi, tire ve nokta ile yazılan biçimler de yakalanır.
-@@ -50,7 +50,7 @@ Her denetim ihlali dosya ve satırla yazar. Çıkış kodu ihlal varsa 1, yoksa
- 1. Kapıyı öteki işlerin dallarında salt okunur olarak çalıştırın. Dallar `/Users/w6x/Documents/frappesetup/worktrees/` altındadır.
+@@ -51,6 +51,6 @@ Her denetim ihlali dosya ve satırla yazar. Çıkış kodu ihlal varsa 1, yoksa
  2. Başka dalda dosya değiştirmeyin ve commit atmayın.
  3. Her dal için ihlal sayısını ve ilk beş ihlali durum dosyasına yazın.
 -4. `guvenlik-denetimi` komutuna yeni kapıyı çağıran satırı ekleyin.
@@ -382,9 +381,7 @@ diff --git a/backend/docs/isler/naming-history-fix.md b/backend/docs/isler/namin
 index 178e437c706e8bbc25f7921856dc378737fdba44..fc438821325d51b3701ac5ac7dc87b0e4144fc61 100644
 --- a/backend/docs/isler/naming-history-fix.md
 +++ b/backend/docs/isler/naming-history-fix.md
-@@ -6,8 +6,8 @@ Bu iş var olan adları adlandırma kurallarına göre düzeltir. Kurallar ayrı
-
- 1. `/Users/w6x/Documents/rules ai/naming_rules_report.md`. Dosyanın son hâlini okuyun. Rapor sonradan güncellenebilir.
+@@ -8,6 +8,6 @@ Bu iş var olan adları adlandırma kurallarına göre düzeltir. Kurallar ayrı
  2. `backend/AGENTS.md`, özellikle “Ad dili” bölümü
 -3. `backend/PROJE-KAYDI.md`, özellikle D-12
 -4. `backend/docs/sozlesmeler.md`

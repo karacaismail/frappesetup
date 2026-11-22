@@ -10,7 +10,7 @@ Bu bölüm, önceki bölümlerde ray ray gerekçelendirilen tüm gereksinimleri 
 
 - **Öncelik:** MUST = sabit kararların veya mevzuatın doğrudan sonucu; SHOULD = bağlamsal öneri; MAY = isteğe bağlı.
 - **Kaynak:** native = Press/Frappe/Keycloak yerleşik mekanizma; configure = yalnızca ayar/kayıt; develop = özel kod (yaşadığı uygulama metinde adlandırılır: press\_tr, `press_tr_finance`, `press_ops_bridge`, platform\_core, tr\_localization, agent servisi, panel monorepo); integrate = dış servis bağlanır.
-- **Sahip:** Altyapı işleri Hüseyin Cengiz, GoDaddy/DNS işleri Asistan Hüseyin; "Platform ekibi" yazan kalemler platform geliştirme ekibi ve ürün sahibindedir.
+- **Sahip:** Altyapı işleri DevOps sorumlusu, GoDaddy/DNS işleri alan adı sorumlusu; "Platform ekibi" yazan kalemler platform geliştirme ekibi ve ürün sahibindedir.
 - **Güven:** "(doğrulandı)" = Press/Frappe/Keycloak kaynak kodunda, resmi dokümanda veya sürüm notunda teyit edildi ve [kaynak defterinde](/frappesetup/izlenebilirlik/#kaynak-defteri) sürüm/commit ile kayıtlıdır (G-128); "(doğrulanacak)" = olası veya hukuk/mali müşavir/kurulum teyidi bekleyen iddia.
 - **Faz:** gereksinimin kabulünün ilk kanıtlanması gereken fazdır; sonraki fazdaki genişleme ayrıntıda yazılır. Faz hedefleri ve çıkış ölçütleri [yol haritasındadır](/frappesetup/yol-haritasi/).
 

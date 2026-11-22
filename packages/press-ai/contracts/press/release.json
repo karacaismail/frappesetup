@@ -705,10 +705,10 @@
       ],
       "owner_handoff": {
         "role": "infrastructure_owner",
-        "person": "Hüseyin Cengiz",
+        "person": "DevOps sorumlusu",
         "steps": [
           "Ayrı app sunucusunu Press'te hazırla (kapasite, agent erişimi, roller, güvenli ağ).",
-          "DNS gerekirse kayıt türü/adı/değerini hazırla; Asistan Hüseyin GoDaddy'de uygular.",
+          "DNS gerekirse kayıt türü/adı/değerini hazırla; alan adı sorumlusu GoDaddy'de uygular.",
           "Sunucu Active olduktan sonra Desk'te Actions → Add Server ile gruba ekle; mevcut servisleri yeniden başlatma."
         ],
         "acceptance": "Server kaydı Active; Ping Agent yanıtı alınır; grup Servers tablosunda tek satır; build/deploy sonucu ayrıca doğrulanır."
