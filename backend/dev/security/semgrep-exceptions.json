@@ -9,6 +9,7 @@
     "backend/apps/press_tr/press_tr/hooks.py",
     "backend/apps/press_tr/press_tr/press_identity/accounts.py",
     "backend/apps/press_tr/press_tr/press_identity/anonymization.py",
+    "backend/apps/press_tr/press_tr/press_identity/custom/team.json",
     "backend/apps/press_tr/press_tr/press_identity/deletion.py",
     "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/ptr_identity_link.json",
     "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/ptr_identity_link.py",
@@ -27,7 +28,7 @@
     "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
     "backend/libs/oidc_verify/src/oidc_verify/verification.py"
   ],
-  "sha256": "65ff8e2a4ac49f0cff24641a1777100f67a929f3221e5b305ce3afd3a5575f99",
+  "sha256": "cd51da475e5f2f2bf29a23412a663cefeabed51afa13528e7ce00a7a18a34ccc",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",

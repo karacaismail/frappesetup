@@ -20,6 +20,8 @@ Gitleaks Git'in izlediği ve dışlamadığı yeni backend dosyalarını tarar.
 Tarama, Git geçmişini kapsamaz.
 Gitleaks sonucu gösterirken gizli değerleri örter.
 Bandit önce bilinen hatalı örneği sınar. Ardından örnek klasörlerini kapsam dışında tutar.
+Bandit, Python ile başlayan uzantısız betikleri de tarar.
+`# nosec` yorumu tarama sonucunu değiştirmez.
 Kullanılmayan Bandit istisnası ya da açık bulgu kapıyı durdurur.
 
 ## Her uç için iki test
@@ -88,7 +90,9 @@ Liste şu dosyaları kapsar.
 - Press kancaları, Press paket bildirimi ve `backend/libs/oidc_verify/` doğrulama kitaplığının kaynakları.
 - OIDC kitaplığının paket bildirimi.
 
+Takım alanının tekilliğini tanımlayan `press_identity/custom/team.json` da özete girer.
 Press belgeleri ve test çalıştırma betikleri bu özete girmez.
+Ansible köprüsü yalnız yükleyiciyi ayarlar. Yetki kararı vermediği için özete girmez.
 
 Erişim onayları yalnız listelenen dosyalara bağlıdır.
 Aşağıdaki yollar `backend/apps/platform_core/platform_core/` klasörüne göredir.

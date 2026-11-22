@@ -263,7 +263,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 
 - **O-42. Erişim Semgrep onayları dosya listesine bağlıdır.**
   - Özet, beş onayın geçtiği iki dosyayı ve yetki yardımcılarını kapsar.
-  - Dosya listesi `backend/dev/security/README.md` içindedir.
+  - Dosya listesi `backend/dev/security/semgrep-exceptions.json` içindedir.
   - Kapsamdaki bir dosya değişirse kapı bu onayları yeniden ister.
   - Onay kapsamları çakışırsa kapı hata verir.
 

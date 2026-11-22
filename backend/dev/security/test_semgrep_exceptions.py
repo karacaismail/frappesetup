@@ -165,9 +165,12 @@ class SemgrepExceptionsTests(unittest.TestCase):
                 "backend/apps/press_tr/press_tr/press_identity/request_policy.py",
                 "backend/libs/oidc_verify/src/oidc_verify/verification.py",
             )
+            bridge = "backend/apps/press_tr/press_tr/ansible_bridge/__init__.py"
+            team = "backend/apps/press_tr/press_tr/press_identity/custom/team.json"
             self.assertNotIn(press_test, files)
-            self.assertTrue(set(helpers).issubset(files))
-            for filename in [*files, press_test, RULES]:
+            self.assertNotIn(bridge, files)
+            self.assertTrue({*helpers, team}.issubset(files))
+            for filename in [*files, press_test, bridge, RULES]:
                 source = root / filename
                 source.parent.mkdir(parents=True, exist_ok=True)
                 source.write_text("fixture\n")
@@ -183,7 +186,9 @@ class SemgrepExceptionsTests(unittest.TestCase):
             ]
             (root / press_test).write_text("changed\n")
             self.assertEqual(reviewed_findings(root, config, findings, {scope: before}), [])
-            for filename in helpers:
+            (root / bridge).write_text("changed\n")
+            self.assertEqual(reviewed_findings(root, config, findings, {scope: before}), [])
+            for filename in (*helpers, team):
                 with self.subTest(filename=filename):
                     helper = root / filename
                     helper.write_text("changed\n")
