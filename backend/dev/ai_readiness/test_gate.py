@@ -42,7 +42,7 @@ class GateTests(unittest.TestCase):
         self.assertEqual(result.returncode, int(bool(rules)), result.stderr)
         self.assertTrue(result.stdout, result.stderr)
         violations = json.loads(result.stdout)["findings"]
-        self.assertCountEqual([item["rule"] for item in violations], rules)
+        self.assertCountEqual([item["rule"] for item in violations], rules, violations)
         for item in violations:
             self.assertTrue(item["message"])
             self.assertFalse(Path(item["path"]).is_absolute())
@@ -205,6 +205,190 @@ class GateTests(unittest.TestCase):
                 finally:
                     (self.root / path).unlink()
                     (self.root / "dev" / policy).unlink()
+
+    def test_duplicate_decision_number_reports_later_note(self):
+        self.write("docs/kararlar/0010-one.md", "# One")
+        self.write("docs/kararlar/0010-two.md", "# Two")
+        self.write("docs/kararlar/00101-three.md", "# Three")
+        self.write("docs/kararlar/0011-four.md", "# Four")
+        self.write("docs/elsewhere/0010-other.md", "# Elsewhere")
+        (finding,) = self.scan("decision-number")
+        self.assertEqual(finding["path"], "docs/kararlar/0010-two.md")
+        self.assertIn("0010-one.md", finding["message"])
+
+    def test_website_user_methods_require_real_same_app_whitelisted_functions(self):
+        self.write(
+            f"{APP}/api.py",
+            "import frappe\n@frappe.whitelist()\ndef run(): pass\ndef private(): pass",
+        )
+        self.write_contract()
+        allowed = [
+            "sample_app.api.run",
+            "frappe.auth.get_logged_user",
+            "logout",
+            "frappe.desk.search.search_link",
+        ]
+        self.write(f"{APP}/hooks.py", f"website_user_allowed_methods = {allowed!r}")
+        self.scan()
+        for method in (
+            "sample_app.api.missing",
+            "sample_app.api.private",
+            "frappe.auth.login",
+            "other_app.api.run",
+        ):
+            with self.subTest(method=method):
+                self.write(f"{APP}/hooks.py", f"website_user_allowed_methods = [{method!r}]")
+                (finding,) = self.scan("website-user")
+                self.assertIn(method, finding["message"])
+
+    def test_website_user_accepts_non_manager_role_alternative(self):
+        self.write(f"{APP}/hooks.py", 'website_user_allowed_methods = ["sample_app.api.run"]')
+        self.write(
+            f"{APP}/api.py",
+            'import frappe\n@frappe.whitelist()\ndef run(): frappe.only_for(["Customer", "System Manager"])',
+        )
+        self.write_contract()
+        self.scan()
+
+    def test_website_user_rejects_privileged_endpoints(self):
+        methods = (
+            ("platform_core.api.mobile", "v1_cleanup", "pass"),
+            ("platform_core.api.mobile", "revoke_user_installations", "pass"),
+            ("press_tr.api.identity", "ensure_team", "pass"),
+            ("press_tr.api.identity", "remove_team_member", "pass"),
+            ("sample_app.api", "manage", 'frappe.only_for("System Manager")'),
+            ("sample_app.api", "manage", 'frappe.only_for(roles="System Manager")'),
+        )
+        for module, method, body in methods:
+            with self.subTest(method=method):
+                app = module.split(".")[0]
+                package = f"apps/{app}/{app}"
+                source_path = f"{package}/{module.partition('.')[2].replace('.', '/')}.py"
+                self.write(source_path, f"import frappe\n@frappe.whitelist()\ndef {method}(): {body}")
+                self.write(f"{package}/hooks.py", f"website_user_allowed_methods = ['{module}.{method}']")
+                self.write_contract(function=method)
+                contract = self.root / CONTRACT
+                contract.write_text(
+                    contract.read_text().replace(f"sample_app.api.{method}", f"{module}.{method}")
+                )
+                if app == "platform_core":
+                    self.write(
+                        "dev/module-boundaries.json",
+                        '{"path_owners": {"platform_core.api.ai": "platform_core.ai"}}',
+                    )
+                    self.write(f"{package}/ai/__init__.py", "")
+                try:
+                    (finding,) = self.scan("website-user")
+                    self.assertIn(f"{module}.{method}", finding["message"])
+                finally:
+                    for path in (contract, self.root / f"{package}/hooks.py", self.root / source_path):
+                        path.unlink()
+
+    def test_website_user_rejects_rebound_whitelisted_name(self):
+        self.write(f"{APP}/hooks.py", 'website_user_allowed_methods = ["sample_app.api.run"]')
+        self.write_contract()
+        for rebind in ("run = None", "def run(): pass", "if enabled: run = None"):
+            with self.subTest(rebind=rebind):
+                self.write(
+                    f"{APP}/api.py",
+                    "import frappe\n@frappe.whitelist()\ndef run(): pass\n" + rebind,
+                )
+                rules = ("website-user", "endpoint") if rebind.startswith("def") else ("website-user",)
+                findings = self.scan(*rules)
+                finding = next(item for item in findings if item["rule"] == "website-user")
+                self.assertIn("sample_app.api.run", finding["message"])
+
+    def test_website_user_rejects_rebound_package_export(self):
+        self.write(f"{APP}/hooks.py", 'website_user_allowed_methods = ["sample_app.run"]')
+        self.write(f"{APP}/api.py", "import frappe\n@frappe.whitelist()\ndef run(): pass")
+        self.write_contract()
+        self.write(f"{APP}/__init__.py", "from .api import run\nrun = None")
+        (finding,) = self.scan("website-user")
+        self.assertIn("sample_app.run", finding["message"])
+
+    def test_website_user_rejects_dynamic_hook_construction(self):
+        self.write(
+            f"{APP}/hooks.py", 'website_user_allowed_methods = []\nwebsite_user_allowed_methods += ["logout"]'
+        )
+        (finding,) = self.scan("website-user")
+        self.assertEqual(finding["line"], 2)
+
+    def test_website_user_rejects_mutable_alias_for_list(self):
+        self.write(
+            f"{APP}/hooks.py",
+            'METHODS = []\nwebsite_user_allowed_methods = METHODS\nMETHODS.append("frappe.auth.login")',
+        )
+        (finding,) = self.scan("website-user")
+        self.assertEqual(finding["line"], 2)
+
+    def test_website_user_rejects_privileged_override_of_core_method(self):
+        self.write(
+            f"{APP}/hooks.py",
+            """
+            website_user_allowed_methods = ["frappe.desk.search.search_link"]
+            override_whitelisted_methods = {"frappe.desk.search.search_link": "sample_app.api.run"}
+            """,
+        )
+        self.write(
+            f"{APP}/api.py",
+            'import frappe\n@frappe.whitelist()\ndef run(): frappe.only_for("System Manager")',
+        )
+        self.write_contract()
+        contract = self.root / CONTRACT
+        contract.write_text(
+            contract.read_text().replace(
+                "responses:",
+                "x-frappe-original: frappe.desk.search.search_link\n      responses:",
+            )
+        )
+        (finding,) = self.scan("website-user")
+        self.assertIn("sample_app.api.run", finding["message"])
+
+    def test_website_user_checks_all_override_candidates(self):
+        self.write(
+            f"{APP}/hooks.py",
+            """
+            website_user_allowed_methods = ["frappe.desk.search.search_link"]
+            override_whitelisted_methods = {
+                "frappe.desk.search.search_link": ["sample_app.api.manage", "sample_app.api.run"],
+            }
+            """,
+        )
+        self.write(
+            f"{APP}/api.py",
+            """
+            import frappe
+
+            @frappe.whitelist()
+            def manage():
+                frappe.only_for("System Manager")
+
+            @frappe.whitelist()
+            def run():
+                pass
+            """,
+        )
+        self.write(
+            CONTRACT,
+            json.dumps(
+                {
+                    "paths": {
+                        "/api/method/sample_app.api.manage": {
+                            "post": {"summary": "Manage", "description": "Manage."}
+                        },
+                        "/api/method/sample_app.api.run": {
+                            "post": {
+                                "summary": "Read",
+                                "description": "Read.",
+                                "x-frappe-original": "frappe.desk.search.search_link",
+                            }
+                        },
+                    }
+                }
+            ),
+        )
+        (finding,) = self.scan("website-user")
+        self.assertIn("sample_app.api.manage", finding["message"])
 
     def test_missing_naming_checker_reports_not_run(self):
         result = subprocess.run(

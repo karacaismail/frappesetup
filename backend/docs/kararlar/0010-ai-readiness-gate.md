@@ -20,6 +20,17 @@ Kapı sürüm hatası verirse güvenlik komutu 1 döndürür.
 
 ## Kapsam
 
+- Kapı karar notlarının dosya adındaki dört haneli sayıyı denetler.
+  Aynı sayı iki notta varsa kapı ikinci dosyayı gösterir.
+  Numaraları `backend/docs/gap-backlog.md` içindeki “Orkestratör” bölümü verir.
+- Kapı `website_user_allowed_methods` kancasında doğrudan yazılan yöntem adlarını denetler.
+  Uygulama yalnız kendi dışa açık yöntemlerini listeye yazar.
+  Hazır Frappe yöntemleri için sözleşmenin 5. bölümündeki liste geçerlidir.
+  Kapı bilinen yönetici ve servis uçlarını reddeder.
+  Kapı doğrudan yazılan yönetici rolü denetimini de tanır.
+  Bir yöntem başka bir hedefe yönleniyorsa kapı o hedefi de denetler.
+  Kapı çalışma anında belirlenen yetkiyi çözmez. Yetkiyi uygulamanın uç testleri doğrular.
+
 - Kapı DocType tanımlarını okur. DocType, bir kayıt türünün tanımıdır.
 - Kapı kayıt türünün ve alanlarının açıklamalarını arar.
   `Section Break`, `Column Break` ve `Tab Break` alanları açıklama istemez.

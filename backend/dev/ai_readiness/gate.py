@@ -13,7 +13,7 @@ from pathlib import Path
 
 from contracts import METHOD_PATH, operations
 from forbidden_name import find_path_code, match_lines, redact_path, tracked_findings
-from hook_validation import invalid_hook_uses
+from hook_validation import HOOK_RULES, invalid_hook_uses, node_names
 from source import (
     FUNCTIONS,
     assignments,
@@ -358,8 +358,7 @@ def naming_findings(root: Path) -> list[Finding]:
 
 def hook_checks(path, tree, bindings, emit):
     for name, line in invalid_hook_uses(tree):
-        rule = "sql" if name == "ai_tools" else "endpoint"
-        emit(path, line, rule, f"{name} must use one direct top-level assignment.")
+        emit(path, line, HOOK_RULES[name], f"{name} must use one direct top-level assignment.")
 
     if "scheduler_events" in bindings or any(
         isinstance(item, ast.Name)
@@ -391,7 +390,7 @@ def hook_checks(path, tree, bindings, emit):
             for target in entries:
                 name = string(target, bindings)
                 if name and METHOD_PATH.fullmatch(name) and METHOD_PATH.fullmatch(public):
-                    overrides[public] = name, path, target.lineno
+                    overrides.setdefault(public, []).append((name, path, target.lineno))
                 else:
                     emit(path, target.lineno, "endpoint", "Cannot resolve whitelist override target.")
     return registrations, overrides
@@ -420,7 +419,7 @@ def provider_checks(path, tree, package, aliases, bindings, providers, emit):
                 emit(path, item.lineno, "provider", f"Provider import is forbidden: {name}.")
 
 
-def resolve_tool_function(name, functions, reexports):
+def resolve_app_export(name, functions, reexports):
     app = name.partition(".")[0]
     visited = set()
     while name not in functions and name in reexports and name not in visited:
@@ -447,7 +446,7 @@ def tool_helper_names(body, module, package, inherited_aliases):
 def tool_sql_checks(targets, functions, sources, reexports, emit):
     pending = []
     for target, (hook, line) in targets.items():
-        function = resolve_tool_function(target, functions, reexports)
+        function = resolve_app_export(target, functions, reexports)
         if function is None:
             emit(hook, line, "sql", f"Cannot inspect registered AI tool {target}.")
         else:
@@ -476,10 +475,153 @@ def tool_sql_checks(targets, functions, sources, reexports, emit):
         app = module.partition(".")[0]
         for name in tool_helper_names(fn.body, module, package, module_aliases):
             if name.partition(".")[0] == app:
-                function = resolve_tool_function(name, functions, reexports)
+                function = resolve_app_export(name, functions, reexports)
                 if function is not None and function not in visited:
                     pending.append(function)
     return referenced
+
+
+DECISION_NUMBER = re.compile(r"^([0-9]{4})(?![0-9])")
+WEBSITE_HOOK = "website_user_allowed_methods"
+# Built-in methods permitted by section 5 of backend/docs/sozlesmeler.md.
+WEBSITE_CORE_METHODS = {"frappe.auth.get_logged_user", "logout", "frappe.desk.search.search_link"}
+# These repository methods require a manager or a service identity.
+WEBSITE_PRIVILEGED_METHODS = {
+    "platform_core.api.identity.anonymize_user",
+    "platform_core.api.identity.change_email",
+    "platform_core.api.identity.provision",
+    "platform_core.api.identity.set_enabled",
+    "platform_core.api.meta.validate_mobile_policy",
+    "platform_core.api.mobile.revoke_user_installations",
+    "platform_core.api.mobile.v1_cleanup",
+    "platform_core.api.model.clear_api_credential",
+    "platform_core.api.model.purge_usage",
+    "platform_core.api.model.resolve_usage",
+    "platform_core.api.model.test_api",
+    "press_tr.api.identity.anonymize_user",
+    "press_tr.api.identity.ensure_team",
+    "press_tr.api.identity.remove_team_member",
+}
+
+
+def decision_number_checks(directory, emit):
+    if not (directory.exists() or directory.is_symlink()):
+        return
+    first_notes = {}
+    for path in sorted(source_files(directory, emit)):
+        match = DECISION_NUMBER.match(path.name)
+        if path.suffix != ".md" or not match:
+            continue
+        number = match[1]
+        first = first_notes.setdefault(number, path)
+        if path != first:
+            emit(path, 1, "decision-number", f"Decision number {number} is also used by {first.name}.")
+
+
+def website_methods(path, bindings, emit):
+    value = bindings.get(WEBSITE_HOOK)
+    if value is None:
+        return
+    if not isinstance(value, (ast.List, ast.Tuple)):
+        emit(path, value.lineno, "website-user", "Website User methods must use a literal list or tuple.")
+        return
+    for entry in value.elts:
+        if not isinstance(entry, ast.Constant) or not has_text(entry.value):
+            emit(path, entry.lineno, "website-user", "Cannot resolve Website User method.")
+        else:
+            yield entry.value, entry.lineno
+
+
+def privileged_website_method(target, functions, sources):
+    if target in WEBSITE_PRIVILEGED_METHODS:
+        return True
+    if target not in functions:
+        return False
+    module, fn = functions[target]
+    _, _, tree, _, _, package = sources[module]
+    nodes = list(scope_nodes(fn.body))
+    aliases = imported_aliases(tree.body, package) | imported_aliases(nodes, package)
+    for item in nodes:
+        if not isinstance(item, ast.Call):
+            continue
+        called = qualified(item.func, aliases)
+        if called == "platform_core.mobil.request.identity_sync_response":
+            return True
+        if called == "frappe.only_for":
+            role = (
+                item.args[0]
+                if item.args
+                else next((arg.value for arg in item.keywords if arg.arg == "roles"), None)
+            )
+            roles = role.elts if isinstance(role, (ast.List, ast.Tuple, ast.Set)) else [role]
+            if roles and all(
+                isinstance(value, ast.Constant)
+                and value.value in ("Administrator", "System Manager", "AI Manager")
+                for value in roles
+            ):
+                return True
+    return False
+
+
+def binding_changes(nodes, name):
+    return any(
+        (not isinstance(node, ast.Name) or not isinstance(node.ctx, ast.Load)) and name in node_names(node)
+        for node in scope_nodes(nodes)
+    )
+
+
+def stable_website_reexports(sources):
+    return {
+        f"{module}.{alias}": target
+        for module, (path, _, tree, _, _, package) in sources.items()
+        if path.stem == "__init__"
+        for index, stmt in enumerate(tree.body)
+        for alias, target in imported_aliases([stmt], package).items()
+        if not binding_changes(tree.body[index + 1 :], alias)
+    }
+
+
+def current_website_endpoint(endpoint, endpoints, sources):
+    module, _, name = endpoint.rpartition(".")
+    if module not in sources:
+        return False
+    _, _, tree, _, _, _ = sources[module]
+    _, line = endpoints[endpoint]
+    for index, stmt in enumerate(tree.body):
+        defined = isinstance(stmt, FUNCTIONS) and stmt.name == name and stmt.lineno == line
+        assigned = any(target == name and value.lineno == line for target, value in assignments(stmt))
+        if defined or assigned:
+            return not binding_changes(tree.body[index + 1 :], name)
+    return False
+
+
+def website_method_checks(entries, endpoints, functions, sources, reexports, overrides, emit):
+    for name, module, path, line in entries:
+        if name not in WEBSITE_CORE_METHODS and (
+            not METHOD_PATH.fullmatch(name) or name.partition(".")[0] != module.partition(".")[0]
+        ):
+            emit(
+                path,
+                line,
+                "website-user",
+                f"Website User method is outside the app or core allowlist: {name}.",
+            )
+            continue
+        targets = [name] if name not in WEBSITE_CORE_METHODS else []
+        targets.extend(target for target, _, _ in overrides.get(name, ()))
+        for target in dict.fromkeys(targets):
+            endpoint = resolve_app_export(target, endpoints, reexports)
+            if privileged_website_method(endpoint or target, functions, sources):
+                emit(
+                    path,
+                    line,
+                    "website-user",
+                    f"Website User method is restricted to managers or services: {target}.",
+                )
+                break
+            if endpoint is None or not current_website_endpoint(endpoint, endpoints, sources):
+                emit(path, line, "website-user", f"No whitelisted Website User method for {target}.")
+                break
 
 
 def scan(root, commit_base=None):
@@ -489,12 +631,15 @@ def scan(root, commit_base=None):
     sources = {}
     registered = {}
     overrides = {}
+    override_candidates = {}
+    website_entries = []
     referenced = set()
     providers = PROVIDERS
 
     def emit(path, line, rule, message):
         findings.add(Finding(path.relative_to(root).as_posix(), line, rule, message))
 
+    decision_number_checks(root / "docs/kararlar", emit)
     try:
         policy, ai_paths, additional = boundary_policy(root)
         providers = providers | additional
@@ -533,7 +678,12 @@ def scan(root, commit_base=None):
         if path.name == "hooks.py":
             hook_tools, hook_overrides = hook_checks(path, tree, bindings, emit)
             registered.update(hook_tools)
-            overrides.update(hook_overrides)
+            for public, candidates in hook_overrides.items():
+                overrides[public] = candidates[-1]
+                override_candidates.setdefault(public, []).extend(candidates)
+            website_entries.extend(
+                (name, module, path, line) for name, line in website_methods(path, bindings, emit)
+            )
             referenced.update(
                 item.value
                 for item in ast.walk(tree)
@@ -550,9 +700,18 @@ def scan(root, commit_base=None):
         if path.stem == "__init__"
         for alias, name in imported_aliases(tree.body, package).items()
     }
+    website_method_checks(
+        website_entries,
+        endpoints,
+        functions,
+        sources,
+        stable_website_reexports(sources),
+        override_candidates,
+        emit,
+    )
     targets = dict(registered)
     for name, (hook, line) in registered.items():
-        function = resolve_tool_function(name, functions, reexports)
+        function = resolve_app_export(name, functions, reexports)
         if function is None:
             continue
         module, fn = functions[function]
