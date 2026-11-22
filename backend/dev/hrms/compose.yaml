@@ -1,21 +1,28 @@
 services:
-  kiraci-db:
+  tenant-db:
     image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     environment:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Create .env}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
     volumes:
       - db:/var/lib/mysql
 
-  kiraci-redis:
+  tenant-redis:
     image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
 
   web:
     image: fs-ilk-dikey-dilim:cronhr
-    command: ["bench", "serve", "--port", "${KIRACI_WEB_PORT:?Use ./compose}", "--noreload"]
+    command: ["bench", "serve", "--port", "${TENANT_WEB_PORT:?Use ./compose}", "--noreload"]
     environment:
-      KIRACI_WEB_PORT: ${KIRACI_WEB_PORT:?Use ./compose}
-      KIRACI_SOCKET_PORT: ${KIRACI_SOCKET_PORT:?Use ./compose}
+      TENANT_WEB_PORT: ${TENANT_WEB_PORT:?Use ./compose}
+      # The shared bootstrap currently reads these two environment variable names.
+      KIRACI_WEB_PORT: ${TENANT_WEB_PORT:?Use ./compose}
+      KIRACI_SOCKET_PORT: ${TENANT_SOCKET_PORT:?Use ./compose}
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Create .env}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Create .env}
       CRONHR_TEST_PASSWORD: ${CRONHR_TEST_PASSWORD:?Create .env}

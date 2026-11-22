@@ -7,8 +7,8 @@ if [[ ! "${PANE_PORT:-}" =~ ^[1-9][0-9]{3,4}$ ]] || (( PANE_PORT > 65526 )); the
     exit 2
 fi
 
-export KIRACI_WEB_PORT="$((PANE_PORT + 1))"
-export KIRACI_SOCKET_PORT="$((PANE_PORT + 2))"
+export TENANT_WEB_PORT="$((PANE_PORT + 1))"
+export TENANT_SOCKET_PORT="$((PANE_PORT + 2))"
 exec docker --context colima-factory compose \
     --project-name fs-ilk-dikey-dilim \
     --env-file "${CRONHR_ENV_FILE:-$dev_dir/.env}" \

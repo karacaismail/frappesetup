@@ -1,5 +1,6 @@
 """Register a proposal-only operation with the platform AI layer."""
 
+from frappe import _
 from pydantic import BaseModel, ConfigDict, Field
 
 from cronhr import leave
@@ -30,7 +31,7 @@ def declarations() -> list[dict]:
 def preview_approval(name: str, version: str) -> dict:
 	doc = leave.pending_leave(name, expected_version=version)
 	return {
-		"summary": f"Approve and submit leave application {doc.name}.",
+		"summary": _("Approve and submit leave application {0}.").format(doc.name),
 		"target_doctype": doc.doctype,
 		"target_name": doc.name,
 		"target_version": str(doc.modified),
