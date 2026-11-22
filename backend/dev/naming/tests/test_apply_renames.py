@@ -165,3 +165,48 @@ class RenameTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(link.is_symlink())
         self.assertEqual(outside.read_text(), "old_name\n")
+
+        move = self.rename([{"old": "backend/link.txt", "new": "backend/moved.txt", "type": "path"}])
+        self.assertNotEqual(move.returncode, 0, move.stdout)
+        self.assertIn("backend/link.txt", move.stderr)
+        self.assertTrue(link.is_symlink())
+
+    def test_planned_file_cannot_be_a_destination_directory(self):
+        first = self.write("backend/first.py", "")
+        second = self.write("backend/second.py", "")
+        self.git("add", ".")
+        result = self.rename(
+            [
+                {"old": "backend/first.py", "new": "backend/group", "type": "path"},
+                {"old": "backend/second.py", "new": "backend/group/second.py", "type": "path"},
+            ]
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("backend/group", result.stderr)
+        self.assertTrue(first.is_file())
+        self.assertTrue(second.is_file())
+
+    def test_old_path_scope_still_protects_new_names_after_move(self):
+        self.write("backend/legacy/entry.py", '"Provider"\n')
+        self.git("add", ".")
+        entries = [
+            {"old": "backend/legacy", "new": "backend/current", "type": "path"},
+            {
+                "old": "Provider",
+                "new": "Provider Record",
+                "type": "doctype",
+                "paths": ["backend/legacy/*"],
+            },
+            {
+                "old": "Record",
+                "new": "Entry",
+                "type": "identifier",
+                "paths": ["backend/current/*"],
+            },
+        ]
+        result = self.rename(entries)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.root / "backend/current/entry.py").read_text(), '"Provider Record"\n')
+        rerun = self.rename(entries, "--dry-run")
+        self.assertEqual(rerun.returncode, 0, rerun.stderr)
+        self.assertIn("0 tracked file(s)", rerun.stdout)

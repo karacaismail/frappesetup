@@ -31,6 +31,7 @@ class Rule:
 class Change:
     source: str
     target: str
+    original: bytes
     content: bytes | None
 
 
@@ -110,17 +111,18 @@ def rewrite(data: bytes, rules: tuple[Rule, ...]) -> bytes:
     return pattern.sub(lambda match: replacements.get(match[0], match[0]), source).encode("utf-8")
 
 
-def tracked_paths(root: Path) -> list[str]:
+def tracked_paths(root: Path) -> list[tuple[str, bool]]:
     records = git(root, "ls-files", "-z", "--stage", "--", "backend/").split(b"\0")
     paths = []
     for record in filter(None, records):
         metadata, name = record.split(b"\t", 1)
         mode, _, stage = metadata.split()
         path = os.fsdecode(name)
-        if stage != b"0" and included(path):
+        if not included(path):
+            continue
+        if stage != b"0":
             raise ValueError(f"Unmerged tracked file: {path}")
-        if mode.startswith(b"100") and included(path):
-            paths.append(path)
+        paths.append((path, mode.startswith(b"100")))
     return paths
 
 
@@ -158,12 +160,13 @@ def build_plan(root: Path, rules: tuple[Rule, ...]) -> list[Change]:
     )
     changes = []
     destinations = {}
-    paths = tracked_paths(root)
-    for source in paths:
+    for source, regular in tracked_paths(root):
         target = destination(source, path_rules)
         if not included(target) or destination(target, path_rules) != target:
             raise ValueError(f"Invalid final path: {source} -> {target}")
         if source != target:
+            if not regular:
+                raise ValueError(f"Path rule matches a symbolic link or submodule: {source}")
             check_ancestors(root, target)
             if os.path.lexists(root / target):
                 raise ValueError(f"Destination already exists: {target}")
@@ -172,6 +175,8 @@ def build_plan(root: Path, rules: tuple[Rule, ...]) -> list[Change]:
         if other != source and (source != target or destination(other, path_rules) != other):
             raise ValueError(f"Conflicting destinations: {other} and {source} -> {target}")
 
+        if not regular:
+            continue
         check_ancestors(root, source)
         file_path = root / source
         if file_path.is_symlink():
@@ -194,7 +199,7 @@ def build_plan(root: Path, rules: tuple[Rule, ...]) -> list[Change]:
         if data != updated and rewrite(updated, scoped_rules) != updated:
             raise ValueError(f"Text rules would change {target} again on the next run.")
         if source != target or updated != data:
-            changes.append(Change(source, target, updated if updated != data else None))
+            changes.append(Change(source, target, data, updated if updated != data else None))
     for change in changes:
         for parent in PurePosixPath(change.target).parents:
             if parent.as_posix().casefold() in destinations:
@@ -215,16 +220,28 @@ def replace_content(path: Path, data: bytes) -> None:
             temporary.unlink(missing_ok=True)
 
 
+def check_unchanged(root: Path, path: str, original: bytes) -> None:
+    check_ancestors(root, path)
+    file_path = root / path
+    if file_path.is_symlink() or not file_path.is_file() or file_path.read_bytes() != original:
+        raise ValueError(f"File changed after planning: {path}")
+
+
 def run(root: Path, changes: list[Change], dry_run: bool) -> None:
     for change in changes:
         if change.source != change.target:
             print(f"move {change.source} -> {change.target}")
             if not dry_run:
+                check_unchanged(root, change.source, change.original)
+                check_ancestors(root, change.target)
+                if os.path.lexists(root / change.target):
+                    raise ValueError(f"Destination appeared after planning: {change.target}")
                 (root / change.target).parent.mkdir(parents=True, exist_ok=True)
                 git(root, "mv", "--", change.source, change.target)
         if change.content is not None:
             print(f"edit {change.target}")
             if not dry_run:
+                check_unchanged(root, change.target, change.original)
                 replace_content(root / change.target, change.content)
     print(f"{len(changes)} tracked file(s) {'would change' if dry_run else 'changed'}.")
 
