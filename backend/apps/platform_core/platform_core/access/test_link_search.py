@@ -24,7 +24,7 @@ from platform_core.access.tests.base import (
 	FREE_DOCTYPE,
 	HR,
 	NO_RULE,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 SEARCH_LINK = "/api/method/frappe.desk.search.search_link"
@@ -63,7 +63,7 @@ def register_for_test(test, *paths: str) -> None:
 		test.addCleanup(frappe.allowed_http_methods_for_whitelisted_func.pop, function, None)
 
 
-class TestLinkSearch(ErisimTestCase):
+class TestLinkSearch(AccessRuleTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()

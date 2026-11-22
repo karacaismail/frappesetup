@@ -17,7 +17,7 @@ WebKit bağlantıya Tab ile değil, Alt+Tab ile gider. Safari'nin varsayılanı 
 npx playwright test -c backend/apps/platform_core/platform_core/kimlik/tests/e2e/playwright.config.ts
 ```
 
-Başka adres için `KIMLIK_E2E_BASE_URL` değişkenini verin.
+Başka adres için `IDENTITY_E2E_BASE_URL` değişkenini verin.
 
 Parola formu testi `login-password.spec.ts` yalnız kapı kapalıyken çalışır. Kapı açıksa test atlanır. Bu testi `kimlik_yalniz_keycloak=0` ayarıyla ayrıca çalıştırın.
 

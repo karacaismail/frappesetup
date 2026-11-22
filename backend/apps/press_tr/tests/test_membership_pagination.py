@@ -35,7 +35,7 @@ class MembershipPaginationTest(TestCase):
 		framework = Mock()
 		framework.get_all.side_effect = read_memberships
 		framework.db.get_values.side_effect = lock_teams
-		framework.get_doc.side_effect = lambda _, name, **options: SimpleNamespace(name=name)
+		framework.get_doc.side_effect = lambda _doctype, name, **options: SimpleNamespace(name=name)
 		with (
 			patch.object(identity, "frappe", framework),
 			patch.object(anonymization, "frappe", framework),

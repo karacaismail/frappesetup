@@ -13,7 +13,7 @@ import unittest
 import urllib.parse
 import uuid
 
-from test_extensions import _open, _cookie_opener, _form_hedefi
+from test_extensions import _open, _cookie_opener, _form_action
 from test_second_factor import TOTP_PASSWORD, TOTP_USER, fresh_totp_code
 from helpers import (admin, live_available, request, get_environment_value, read_realm, tenant_authorize_url, tenant_authorize_with_pkce,
                       tenant_callback_url, admin_token, safe_detail)
@@ -73,13 +73,13 @@ def _login(authorize_url: str):
     opener = _cookie_opener()
     _, _, html = _open(opener, authorize_url)
     form = urllib.parse.urlencode({"username": TOTP_USER, "password": TOTP_PASSWORD, "credentialId": ""}).encode()
-    _, _, html = _open(opener, _form_hedefi(html), form)
+    _, _, html = _open(opener, _form_action(html), form)
     _pause()
-    status, headers, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+    status, headers, html = _open(opener, _form_action(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
     if status == 200 and 'name="otp"' in html:
         # Keycloak refused a code that an earlier run had already used. Wait for the next period once.
         time.sleep(30 - time.time() % 30 + 1)
-        status, headers, html = _open(opener, _form_hedefi(html),
+        status, headers, html = _open(opener, _form_action(html),
                                     urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
     return opener, status, headers, html
 
@@ -166,7 +166,7 @@ class AccountBacklogLiveTest(unittest.TestCase):
         _, _, html = _open(opener, tenant_authorize_url() + "&kc_action=delete_account")
         form = urllib.parse.urlencode({"username": f"{username}@example.test", "password": password,
                                        "credentialId": ""}).encode()
-        status, headers, html = _open(opener, _form_hedefi(html), form)
+        status, headers, html = _open(opener, _form_action(html), form)
         location = headers.get("Location", "")
         if status in (302, 303) and location.startswith(self.kc):
             status, headers, html = _open(opener, location)

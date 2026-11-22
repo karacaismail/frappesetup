@@ -20,7 +20,7 @@ from platform_core.access.tests.base import (
 	ROLE_EMPLOYEE,
 	ROLE_NO_RULE,
 	RULE_DOCTYPE,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 HOOK = "platform_core.access.ai_tools.declare"
@@ -45,7 +45,7 @@ WRITE_TOOLS = {"propose_access_rule", "propose_access_rule_change"}
 OWN_RULE = "Calisan kendi kaydi"
 
 
-class AiToolsTestCase(ErisimTestCase):
+class AiToolsTestCase(AccessRuleTestCase):
 	def declarations(self) -> dict[str, dict]:
 		self.assertIn(HOOK, frappe.get_hooks("ai_tools") or [], "the ai_tools hook is not registered")
 		return {declaration["name"]: declaration for declaration in frappe.get_attr(HOOK)()}

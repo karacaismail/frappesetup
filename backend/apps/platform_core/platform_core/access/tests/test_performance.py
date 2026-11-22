@@ -38,7 +38,7 @@ from platform_core.access.tests.base import (
 	ROLE_MANAGER,
 	ROLE_PORTAL,
 	RULE_DOCTYPE,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 SMALL = {"calls": 50, "employees": 12, "records": 40}
@@ -371,7 +371,7 @@ class TestMeasurementLogic(unittest.TestCase):
 					self.assertEqual(filters[name_field], ("in", expected_names))
 
 
-class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
+class TestMeasurementLeavesTheSiteAsItWas(AccessRuleTestCase):
 	"""Runs the command for real. Only on a measuring site (O-35); skipped everywhere else."""
 
 	RUN_WAITING_JOBS = False
@@ -589,7 +589,7 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 				self.assertTrue(frappe.db.exists(table, name))
 
 
-class TestTheSetUpPutsBackWhatItChanged(ErisimTestCase):
+class TestTheSetUpPutsBackWhatItChanged(AccessRuleTestCase):
 	"""Review finding: the set-up above must not lose a permission that was there before it."""
 
 	RUN_WAITING_JOBS = False

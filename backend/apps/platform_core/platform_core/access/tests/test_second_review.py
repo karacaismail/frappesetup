@@ -15,11 +15,11 @@ from platform_core.access.tests.base import (
 	REST,
 	ROLE_EMPLOYEE,
 	RULE_DOCTYPE,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 
-class TestStaleReader(ErisimTestCase):
+class TestStaleReader(AccessRuleTestCase):
 	"""Finding 3: a request that read the old rules must not hand them to later requests."""
 
 	OWN_RULE = "Calisan kendi kaydi"

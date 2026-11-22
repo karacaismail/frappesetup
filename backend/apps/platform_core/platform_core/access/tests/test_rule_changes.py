@@ -11,13 +11,13 @@ from platform_core.access.tests.base import (
 	REST,
 	ROLE_NO_RULE,
 	RULE_DOCTYPE,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 OWN_RULE = "Calisan kendi kaydi"
 
 
-class TestRuleChange(ErisimTestCase):
+class TestRuleChange(AccessRuleTestCase):
 	def rule_path(self, title: str) -> str:
 		return f"{REST}{RULE_DOCTYPE}/{self.rules[title]}"
 

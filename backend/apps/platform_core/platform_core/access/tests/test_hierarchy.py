@@ -9,12 +9,12 @@ from platform_core.access.tests.base import (
 	EMPLOYEE_4,
 	MANAGER_1,
 	MANAGER_2,
-	ErisimTestCase,
+	AccessRuleTestCase,
 	employee_of,
 )
 
 
-class TestHierarchy(ErisimTestCase):
+class TestHierarchy(AccessRuleTestCase):
 	def test_manager_lists_own_and_team_records(self):
 		client = self.login(MANAGER_1)
 
