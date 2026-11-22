@@ -32,20 +32,24 @@ function tokenClaims(token: string) {
   return JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
 }
 
-async function signIn(page: Page, email: string, password: string, deleteAccount = false) {
-  const { tenant, identity } = sites();
+async function signIn(page: Page, email: string, password: string, site: 'tenant' | 'press' = 'tenant') {
+  const origins = sites();
+  const origin = origins[site];
+  const { identity } = origins;
   await page.route('**/*', async (route) => {
-    const { origin } = new URL(route.request().url());
-    if (origin === tenant || origin === identity) await route.continue();
+    const requestOrigin = new URL(route.request().url()).origin;
+    if (requestOrigin === origin || requestOrigin === identity) await route.continue();
     else await route.abort();
   });
-  const response = await page.request.post(tenant + LOGIN_METHOD, {
-    data: { redirect_to: '/panel' }, maxRedirects: 0,
+  const pressLogin = site === 'press';
+  const method = pressLogin ? '/api/method/press_tr.api.auth.get_login_url' : LOGIN_METHOD;
+  const response = await page.request.post(origin + method, {
+    data: pressLogin ? {} : { redirect_to: '/panel' }, maxRedirects: 0,
   });
   expect(response.status()).toBe(200);
-  const login = new URL((await response.json()).message.login_url);
+  const { message } = await response.json();
+  const login = new URL(pressLogin ? message.url : message.login_url);
   expect(login.origin).toBe(identity);
-  if (deleteAccount) login.searchParams.set('kc_action', 'delete_account');
   await page.goto(login.href);
   await enterCredentials(page, email, password);
 }
@@ -86,56 +90,82 @@ async function resource(request: APIRequestContext, origin: string, cookie: stri
   return (await response.json()).data;
 }
 
-test('customer self-deletion closes Press, tenant and mobile access', async ({ page, request }) => {
-  test.skip(process.env.E2E_ACCOUNT_DELETION !== '1',
-    'Requires the Keycloak self-deletion action, signed event listener, account deletion workflow and downstream cleanup.');
-  test.setTimeout(120_000);
-  const { identity, tenant, press } = sites();
-  const email = fixtureEmail('E2E_DELETE_EMAIL', 'delete');
-  const subject = required('E2E_DELETE_SUBJECT');
-  const tenantReader = required('E2E_DELETE_TENANT_READER_COOKIE');
-  const pressReader = required('E2E_DELETE_PRESS_READER_COOKIE');
-  const pressKey = required('E2E_DELETE_PRESS_AUTHORIZATION');
-  const mobileToken = required('E2E_DELETE_MOBILE_TOKEN');
-  expect(tokenClaims(mobileToken).sub === subject).toBe(true);
-  const installation = required('E2E_DELETE_INSTALLATION');
-  const readUser = (origin: string, cookie: string) => resource(request, origin, cookie, 'User', email);
-  const pressAccess = () => request.get(press + LOGGED_USER, {
-    headers: { Authorization: pressKey }, maxRedirects: 0,
+test.describe('Press account deletion', () => {
+  test.skip(() => process.env.E2E_ACCOUNT_DELETION !== '1',
+    'Requires the Press deletion page, identity-sync deletion workflow and dedicated synthetic fixtures.');
+
+  test('customer self-deletion closes Press, tenant and mobile access', async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const { tenant, press } = sites();
+    const email = fixtureEmail('E2E_DELETE_EMAIL', 'delete');
+    const subject = required('E2E_DELETE_SUBJECT');
+    const tenantReader = required('E2E_DELETE_TENANT_READER_COOKIE');
+    const pressReader = required('E2E_DELETE_PRESS_READER_COOKIE');
+    const pressKey = required('E2E_DELETE_PRESS_AUTHORIZATION');
+    const mobileToken = required('E2E_DELETE_MOBILE_TOKEN');
+    expect(tokenClaims(mobileToken).sub === subject).toBe(true);
+    const installation = required('E2E_DELETE_INSTALLATION');
+    const readUser = (origin: string, cookie: string) => resource(request, origin, cookie, 'User', email);
+    const pressAccess = () => request.get(press + LOGGED_USER, {
+      headers: { Authorization: pressKey }, maxRedirects: 0,
+    });
+    const business = {
+      doctype: required('E2E_DELETE_RECORD_DOCTYPE'),
+      name: required('E2E_DELETE_RECORD_NAME'),
+      field: required('E2E_DELETE_RECORD_PERSON_FIELD'),
+      anonymous: required('E2E_DELETE_RECORD_ANONYMOUS_VALUE'),
+    };
+    const readBusinessValue = async () =>
+      (await resource(request, tenant, tenantReader, business.doctype, business.name))[business.field];
+
+    const account = await keycloakUser(request, subject);
+    expect(account.status()).toBe(200);
+    const user = await account.json();
+    expect(user.email === email && user.enabled === true).toBe(true);
+    expect((await readUser(tenant, tenantReader)).enabled).toBe(1);
+    expect((await readUser(press, pressReader)).enabled).toBe(1);
+    const pressSession = await pressAccess();
+    expect(pressSession.status()).toBe(200);
+    expect((await pressSession.json()).message === email).toBe(true);
+    expect((await mobilePull(request, mobileToken, installation)).status()).toBe(200);
+    const before = await readBusinessValue();
+    const anonymous = JSON.parse(business.anonymous);
+    expect(before).not.toEqual(anonymous);
+
+    const password = required('E2E_DELETE_PASSWORD');
+    await signIn(page, email, password, 'press');
+    await expect.poll(() => new URL(page.url()).origin).toBe(press);
+    const deletionPage = press + '/account-deletion';
+    await page.goto(deletionPage);
+    const form = page.locator('#account-deletion');
+    await expect(form).toHaveAttribute('data-confirm', 'false');
+
+    const reauthentication = page.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return url.origin === sites().identity && url.pathname.endsWith('/protocol/openid-connect/auth');
+    });
+    await form.locator('button[type=submit]').click();
+    const login = new URL((await reauthentication).url());
+    expect(login.searchParams.get('prompt')).toBe('login');
+    expect(login.searchParams.get('max_age')).toBe('0');
+    await enterCredentials(page, email, password);
+    await expect(form).toHaveAttribute('data-confirm', 'true');
+    expect(new URL(page.url()).origin).toBe(press);
+    const submission = page.waitForResponse((response) =>
+      response.url() === press + '/api/method/press_tr.api.account.request_deletion'
+      && response.request().method() === 'POST');
+    await form.locator('button[type=submit]').click();
+    const submitted = await submission;
+    expect(submitted.status()).toBe(200);
+    expect((await submitted.json()).message).toMatchObject({ submitted: true });
+
+    await expect.poll(async () => (await keycloakUser(request, subject)).status(), { timeout: 60_000 }).toBe(404);
+    expect((await readUser(press, pressReader)).enabled).toBe(0);
+    expect((await readUser(tenant, tenantReader)).enabled).toBe(0);
+    expect([401, 403]).toContain((await pressAccess()).status());
+    expect([401, 403]).toContain((await mobilePull(request, mobileToken, installation)).status());
+    expect(await readBusinessValue()).toEqual(anonymous);
   });
-  const business = {
-    doctype: required('E2E_DELETE_RECORD_DOCTYPE'),
-    name: required('E2E_DELETE_RECORD_NAME'),
-    field: required('E2E_DELETE_RECORD_PERSON_FIELD'),
-    anonymous: required('E2E_DELETE_RECORD_ANONYMOUS_VALUE'),
-  };
-  const readBusinessValue = async () =>
-    (await resource(request, tenant, tenantReader, business.doctype, business.name))[business.field];
-
-  const account = await keycloakUser(request, subject);
-  expect(account.status()).toBe(200);
-  const user = await account.json();
-  expect(user.email === email && user.enabled === true).toBe(true);
-  expect((await readUser(tenant, tenantReader)).enabled).toBe(1);
-  expect((await readUser(press, pressReader)).enabled).toBe(1);
-  const pressSession = await pressAccess();
-  expect(pressSession.status()).toBe(200);
-  expect((await pressSession.json()).message === email).toBe(true);
-  expect((await mobilePull(request, mobileToken, installation)).status()).toBe(200);
-  const before = await readBusinessValue();
-  const anonymous = JSON.parse(business.anonymous);
-  expect(before).not.toEqual(anonymous);
-
-  await signIn(page, email, required('E2E_DELETE_PASSWORD'), true);
-  expect(new URL(page.url()).origin).toBe(identity);
-  await page.getByRole('button', { name: /^(confirm|delete|delete account|onayla|sil|hesabı sil)$/i }).click();
-
-  await expect.poll(async () => (await keycloakUser(request, subject)).status(), { timeout: 60_000 }).toBe(404);
-  expect((await readUser(press, pressReader)).enabled).toBe(0);
-  expect((await readUser(tenant, tenantReader)).enabled).toBe(0);
-  expect([401, 403]).toContain((await pressAccess()).status());
-  expect([401, 403]).toContain((await mobilePull(request, mobileToken, installation)).status());
-  expect(await readBusinessValue()).toEqual(anonymous);
 });
 
 test('administrator revocation also terminates the Keycloak mobile session', async ({ request }) => {

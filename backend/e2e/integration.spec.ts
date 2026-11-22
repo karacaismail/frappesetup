@@ -143,6 +143,15 @@ test('an update takes effect only after one valid human approval', async ({ requ
   const { proposal_id } = result.structuredContent;
   expect(await readValue()).toBe(before);
 
+  const listing = await request.get(aiMethod('list_proposals'), {
+    headers, params: { limit: 1 }, maxRedirects: 0,
+  });
+  expect(listing.status()).toBe(200);
+  const { proposals, has_next_page: hasNextPage } = (await listing.json()).message;
+  expect(proposals).toHaveLength(1);
+  expect(proposals[0]).toMatchObject({ proposal_id, status: 'pending' });
+  expect(typeof hasNextPage).toBe('boolean');
+
   const preview = await request.get(aiMethod('get_proposal'), { headers, params: { proposal_id }, maxRedirects: 0 });
   expect(preview.status()).toBe(200);
   const { digest } = (await preview.json()).message;
