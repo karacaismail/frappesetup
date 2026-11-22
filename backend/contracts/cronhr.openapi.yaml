@@ -1,31 +1,31 @@
 openapi: 3.1.0
 info:
-  title: CronHR Leave Application
+  title: CronHR izin talebi
   version: 0.1.0
 servers:
   - url: /api
 paths:
   /resource/Leave%20Application:
     get:
-      summary: List the leave applications the caller can read.
+      summary: Kullanıcının görebildiği izin taleplerini listeler.
       responses:
-        "200": {description: Own applications, the reporting team's applications, or all applications on the site.}
+        "200": {description: Kendi talepleri, bağlı ekip veya tüm site kayıtları.}
   /resource/Leave%20Application/{name}:
     parameters:
       - in: path
         name: name
         required: true
         schema: {type: string}
-        description: Leave application document name.
+        description: İzin talebinin kayıt adı.
     get:
-      summary: Read a leave application.
+      summary: İzin talebini açar.
       responses:
-        "200": {description: Leave application. The leave_balance field is omitted without level 2 read permission.}
-        "403": {description: The caller does not have read permission.}
+        "200": {description: Talep. İzin seviyesi 2 yoksa leave_balance alanı kapalıdır.}
+        "403": {description: Kullanıcının okuma izni yok.}
   /method/cronhr.api.approve_leave:
     post:
-      summary: Approve and submit an open leave application.
-      description: Managers can approve their reporting team's applications. HR can approve applications across the site. Self-approval is denied.
+      summary: Açık izin talebini onaylar ve gönderir.
+      description: Yönetici bağlı ekipteki talebi onaylar. İK sitedeki talepleri onaylar.
       requestBody:
         required: true
         content:
@@ -33,7 +33,7 @@ paths:
             schema: {$ref: "#/components/schemas/LeaveName"}
       responses:
         "200":
-          description: Name of the approved application.
+          description: Onaylanan kaydın adı.
           content:
             application/json:
               schema:
@@ -41,9 +41,9 @@ paths:
                 required: [message]
                 properties:
                   message: {$ref: "#/components/schemas/LeaveName"}
-        "403": {description: The caller has insufficient role or document permissions.}
-        "404": {description: Leave application not found.}
-        "417": {description: The application is not an open draft or failed HRMS validation.}
+        "403": {description: Kullanıcının rolü veya kayıt izni yetersiz.}
+        "404": {description: Talep bulunamadı.}
+        "417": {description: Talep açık bir taslak değil veya HRMS doğrulaması başarısız.}
 x-ai-tool:
   name: cronhr_approve_leave
   arguments:
@@ -51,9 +51,9 @@ x-ai-tool:
     additionalProperties: false
     required: [name, version]
     properties:
-      name: {type: string, minLength: 1, maxLength: 140, description: Leave application document name.}
-      version: {type: string, minLength: 1, maxLength: 40, description: The open draft's modified value.}
-  description: The tool creates a proposal. Human approval is required before the application changes.
+      name: {type: string, minLength: 1, maxLength: 140, description: İzin talebinin kayıt adı.}
+      version: {type: string, minLength: 1, maxLength: 40, description: Açık taslağın modified değeri.}
+  description: Araç öneri oluşturur. İnsan onayından önce izin talebi değişmez.
 components:
   schemas:
     LeaveName:
@@ -61,4 +61,4 @@ components:
       additionalProperties: false
       required: [name]
       properties:
-        name: {type: string, minLength: 1, maxLength: 140, description: Leave application document name.}
+        name: {type: string, minLength: 1, maxLength: 140, description: İzin talebinin kayıt adı.}
