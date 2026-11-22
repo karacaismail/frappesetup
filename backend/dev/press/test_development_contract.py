@@ -6,6 +6,7 @@ import re
 import runpy
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from types import ModuleType
@@ -187,39 +188,93 @@ class ImageContractTest(unittest.TestCase):
 
 
 class ComposeContractTest(unittest.TestCase):
-    def compose_config(self, port):
-        env = {
-            **os.environ,
-            "PANE_PORT": str(port),
-            "PRESS_ENV_FILE": str(PRESS_DEV / ".env.example"),
-            "PRESS_WEB_PORT": "1",
-            "PRESS_SOCKET_PORT": "2",
-        }
-        result = subprocess.run(
-            ["bash", str(PRESS_DEV / "compose.sh"), "config", "--format", "json"],
-            env=env,
-            capture_output=True,
-            check=True,
-            text=True,
+    @staticmethod
+    def service_definition(service):
+        manifest = (PRESS_DEV.parent / "compose.press.yaml").read_text()
+        match = re.search(rf"^  {service}:\n((?:^ {{4,}}.*\n)+)", manifest, re.MULTILINE)
+        if match is None:
+            raise AssertionError(f"Missing Compose service: {service}")
+        return match.group(1)
+
+    def test_config_contract_runs_with_an_empty_docker_configuration(self):
+        with (
+            tempfile.TemporaryDirectory(dir=os.environ.get("PANE_SCRATCH_DIR")) as home,
+            patch.dict(os.environ, {"HOME": home, "DOCKER_CONFIG": home}),
+        ):
+            self.assertEqual(self.compose_invocation(4250)["PRESS_WEB_PORT"], "4253")
+
+    def compose_invocation(self, port):
+        env_file = PRESS_DEV / ".env.example"
+        with tempfile.TemporaryDirectory(dir=os.environ.get("PANE_SCRATCH_DIR")) as bin_dir:
+            # Capture the wrapper's real arguments without a host Docker profile or plugin.
+            docker = Path(bin_dir) / "docker"
+            docker.write_text(
+                '#!/bin/sh\nexec "$PRESS_TEST_PYTHON" -c \''
+                "import json, os, sys; "
+                'print(json.dumps(dict(args=sys.argv[1:], PRESS_WEB_PORT=os.environ["PRESS_WEB_PORT"], '
+                'PRESS_SOCKET_PORT=os.environ["PRESS_SOCKET_PORT"])))'
+                '\' "$@"\n'
+            )
+            docker.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": bin_dir + os.pathsep + os.environ.get("PATH", os.defpath),
+                "PRESS_TEST_PYTHON": sys.executable,
+                "FS_COLIMA_PROFILE": "factory",
+                "PANE_PORT": str(port),
+                "PRESS_ENV_FILE": str(env_file),
+                "PRESS_WEB_PORT": "1",
+                "PRESS_SOCKET_PORT": "2",
+            }
+            result = subprocess.run(
+                ["bash", str(PRESS_DEV / "compose.sh"), "config", "--format", "json"],
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        invocation = json.loads(result.stdout)
+        self.assertEqual(
+            invocation["args"],
+            [
+                "--context",
+                "colima-factory",
+                "compose",
+                "--env-file",
+                str(env_file),
+                "--file",
+                str(PRESS_DEV / "../compose.press.yaml"),
+                "config",
+                "--format",
+                "json",
+            ],
         )
-        return json.loads(result.stdout)["services"]
+        return invocation
 
     def test_ports_are_derived_from_the_pane_port(self):
+        web = self.service_definition("web")
+        ports = re.search(r"^    ports:\n((?:^      - .+\n)+)", web, re.MULTILINE)
+        self.assertIsNotNone(ports)
+        self.assertCountEqual(
+            ports.group(1).splitlines(),
+            [
+                '      - "127.0.0.1:${PRESS_WEB_PORT}:${PRESS_WEB_PORT}"',
+                '      - "127.0.0.1:${PRESS_SOCKET_PORT}:${PRESS_SOCKET_PORT}"',
+            ],
+        )
+        for variable in ("PRESS_WEB_PORT", "PRESS_SOCKET_PORT"):
+            self.assertRegex(web, rf"(?m)^      {variable}: \$\{{{variable}:\?[^}}]+\}}$")
         for port in (4250, 4310):
             with self.subTest(port=port):
-                web = self.compose_config(port)["web"]
-                self.assertEqual(web["environment"]["PRESS_WEB_PORT"], str(port + 3))
-                self.assertEqual(web["environment"]["PRESS_SOCKET_PORT"], str(port + 4))
-                self.assertEqual(
-                    {int(binding["published"]) for binding in web["ports"]},
-                    {port + 3, port + 4},
-                )
-                self.assertTrue(all(binding["host_ip"] == "127.0.0.1" for binding in web["ports"]))
+                invocation = self.compose_invocation(port)
+                self.assertEqual(invocation["PRESS_WEB_PORT"], str(port + 3))
+                self.assertEqual(invocation["PRESS_SOCKET_PORT"], str(port + 4))
 
     def test_external_images_are_pinned_and_web_uses_the_development_target(self):
-        services = self.compose_config(4250)
         for service in ("mariadb", "redis"):
-            self.assertRegex(services[service]["image"], r"@sha256:[0-9a-f]{64}$")
-        self.assertEqual(services["web"]["build"]["target"], "development")
+            self.assertRegex(self.service_definition(service), r"(?m)^    image: \S+@sha256:[0-9a-f]{64}$")
+        self.assertRegex(
+            self.service_definition("web"), r"(?m)^    build:\n(?:^      .+\n)*^      target: development$"
+        )
         dockerfile = (PRESS_DEV / "Dockerfile").read_text()
         self.assertRegex(dockerfile, re.compile(r"^FROM \S+@sha256:[0-9a-f]{64} AS \w+$", re.MULTILINE))
