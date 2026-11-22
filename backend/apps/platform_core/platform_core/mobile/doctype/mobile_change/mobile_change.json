@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "hash",
- "description": "Telefon eşitlemesi için bir değişiklik kaydeder.",
+ "description": "Records a change for mobile sync.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -13,45 +13,45 @@
  ],
  "fields": [
   {
-   "description": "Sunucu değişiklikleri bu numaraya göre sıraya koyar.",
+   "description": "The server uses this number to order changes.",
    "fieldname": "sequence",
    "fieldtype": "Int",
-   "label": "Sıra numarası",
+   "label": "Sequence number",
    "reqd": 1,
    "unique": 1
   },
   {
-   "description": "Bu kod değişen kaydın türünü belirtir.",
+   "description": "The type of record that changed.",
    "fieldname": "record_type",
    "fieldtype": "Data",
-   "label": "Kayıt türü",
+   "label": "Record type",
    "reqd": 1
   },
   {
-   "description": "Bu değer değişen kaydı belirtir.",
+   "description": "The identifier of the record that changed.",
    "fieldname": "record_id",
    "fieldtype": "Data",
-   "label": "Kayıt kimliği",
+   "label": "Record ID",
    "reqd": 1
   },
   {
-   "description": "Tür, kaydın yenilendiğini veya kaldırıldığını belirtir.",
+   "description": "Whether the record was updated or removed.",
    "fieldname": "kind",
    "fieldtype": "Select",
-   "label": "Değişiklik türü",
+   "label": "Change kind",
    "options": "upsert\nremove",
    "reqd": 1
   },
   {
-   "description": "Bu alan doluysa değişikliği yalnız bu kurulum alır.",
+   "description": "When set, only this installation receives the change.",
    "fieldname": "target_installation",
    "fieldtype": "Link",
-   "label": "Hedef kurulum",
+   "label": "Target installation",
    "options": "Mobile Installation"
   }
  ],
  "links": [],
- "module": "Mobil",
+ "module": "Mobile",
  "name": "Mobile Change",
  "permissions": [],
  "sort_field": "sequence",

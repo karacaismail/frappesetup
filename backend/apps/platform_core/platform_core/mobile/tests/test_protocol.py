@@ -1,6 +1,6 @@
 import unittest
 
-from platform_core.mobil import protocol
+from platform_core.mobile import protocol
 
 INSTALLATION = "9d8109a3-32fd-48e3-b921-252cb01ade71"
 OPERATION = "12d67d64-a312-43d2-9afb-2eb7412561de"

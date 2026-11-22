@@ -1,7 +1,7 @@
 import unittest
 
-from platform_core.mobil.protocol import Command, MobileError
-from platform_core.mobil.service import push
+from platform_core.mobile.protocol import Command, MobileError
+from platform_core.mobile.service import push
 
 OPERATION = "12d67d64-a312-43d2-9afb-2eb7412561de"
 RECORD = "5cc4515b-c67f-4ca9-8706-7768158f4df2"

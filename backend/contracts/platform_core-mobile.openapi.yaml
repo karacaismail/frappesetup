@@ -1,12 +1,12 @@
 openapi: 3.1.0
 info:
-  title: Telefon eşitlemesi
+  title: Mobile sync
   version: 1.0.0
   description: |
-    Telefon, bağlantı gelince bekleyen işleri gönderir ve değişiklikleri alır.
-    İstek gövdesi en çok 256 KiB olabilir. Aşımda 413 döner.
-    Sunucu her hesaba dakikada en çok 60 istek işler. Aşımda 429 döner.
-    Bu sürümde izin listesi boş başlar. Sunucu dosya kabul etmez.
+    The phone sends queued operations and receives changes when connectivity returns.
+    Request bodies may be up to 256 KiB. Larger requests return 413.
+    The server processes up to 60 requests per account per minute. Excess requests return 429.
+    The allowlist starts empty. The server rejects files.
 servers:
   - url: /api/method
 security:
@@ -18,7 +18,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: Hesaba bir telefon kurulumu bağlar. İptal edilen kimlik yeniden açılamaz.
+      description: Links a mobile installation to the account. A revoked ID cannot be reactivated.
       requestBody:
         required: true
         content:
@@ -35,7 +35,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: Hesabın bir kurulumunu veya bütün kurulumlarını iptal eder.
+      description: Revokes one installation or all installations for the account.
       requestBody:
         required: true
         content:
@@ -60,8 +60,8 @@ paths:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
-        En çok 20 işi sırayla işler. Bir iş başarısız olursa bütün grubu geri alır.
-        Sunucu aynı kimlik ve içerikle gelen işe ilk kesinleşen sonucu verir.
+        Processes up to 20 operations in order. A failed operation rolls back the entire batch.
+        The server returns the first committed result for the same operation ID and content.
       requestBody:
         required: true
         content:
@@ -79,7 +79,7 @@ paths:
                   items: { $ref: '#/components/schemas/Operation' }
       responses:
         '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
-        '409': { $ref: '#/components/responses/Error', description: İşlem içeriği değişti veya kayıt sürümü eski. }
+        '409': { $ref: '#/components/responses/Error', description: The operation content changed or the record version is stale. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         default: { $ref: '#/components/responses/Error' }
@@ -89,7 +89,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: İmleç yoksa ilk kopyayı başlatır. Sonraki çağrılar sunucunun verdiği imleci kullanır.
+      description: Starts a full sync when no cursor is given. Subsequent calls use the returned cursor.
       requestBody:
         required: true
         content:
@@ -104,7 +104,7 @@ paths:
                 limit: { type: integer, minimum: 1, maximum: 100, default: 100 }
       responses:
         '200': { $ref: '#/components/responses/Page' }
-        '410': { $ref: '#/components/responses/Error', description: İmleç geçersiz veya süresi doldu. Tam kopya alın. }
+        '410': { $ref: '#/components/responses/Error', description: The cursor is invalid or expired. Start a full sync. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         default: { $ref: '#/components/responses/Error' }
@@ -114,7 +114,7 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: Site yöneticisi, süresi dolmuş kaldırma işaretlerini elle temizler.
+      description: Lets a site manager remove expired removal markers manually.
       requestBody:
         required: true
         content:
@@ -158,8 +158,8 @@ components:
         operation_id: { $ref: '#/components/schemas/UUID' }
         command: { type: string, minLength: 1, maxLength: 80 }
         record_id: { $ref: '#/components/schemas/UUID' }
-        version: { type: string, minLength: 1, maxLength: 128, description: Güncelleme ve silmede zorunlu kayıt sürümü. }
-        fields: { type: object, description: Komutun izin verdiği alanlar. }
+        version: { type: string, minLength: 1, maxLength: 128, description: Record version required for updates and deletions. }
+        fields: { type: object, description: Fields allowed by the command. }
     Change:
       type: object
       additionalProperties: false
@@ -200,12 +200,12 @@ components:
         - required: [code]
         - required: [exc_type]
       properties:
-        code: { type: string, description: Mobil ucun verdiği hata kodu. }
-        exc_type: { type: string, description: Frappe isteği uca ulaşmadan reddederse gelen hata türü. }
-        current: { $ref: '#/components/schemas/Change', description: Kullanıcının görebildiği güncel kayıt. }
+        code: { type: string, description: Error code returned by the mobile endpoint. }
+        exc_type: { type: string, description: Error type returned when Frappe rejects a request before dispatch. }
+        current: { $ref: '#/components/schemas/Change', description: The current record visible to the user. }
   responses:
     DeviceSuccess:
-      description: İstek tamamlandı.
+      description: Request completed.
       content:
         application/json:
           schema:
@@ -214,7 +214,7 @@ components:
             properties:
               message: { $ref: '#/components/schemas/Device' }
     RevokedSuccess:
-      description: İstek tamamlandı.
+      description: Request completed.
       content:
         application/json:
           schema:
@@ -223,7 +223,7 @@ components:
             properties:
               message: { $ref: '#/components/schemas/Revoked' }
     AppliedOperationsSuccess:
-      description: İstek tamamlandı.
+      description: Request completed.
       content:
         application/json:
           schema:
@@ -232,7 +232,7 @@ components:
             properties:
               message: { $ref: '#/components/schemas/AppliedOperations' }
     CleanupResultSuccess:
-      description: İstek tamamlandı.
+      description: Request completed.
       content:
         application/json:
           schema:
@@ -241,7 +241,7 @@ components:
             properties:
               message: { $ref: '#/components/schemas/CleanupResult' }
     Page:
-      description: Kayıt sayfası ve sonraki çağrı için imleç.
+      description: Page of records and a cursor for the next call.
       content:
         application/json:
           schema:
@@ -256,7 +256,7 @@ components:
                   cursor: { type: string, maxLength: 2048 }
                   has_more: { type: boolean }
     Error:
-      description: İstek reddedildi.
+      description: Request rejected.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -264,7 +264,7 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
-      description: İstek sıklığı sınırı aşıldı.
+      description: Request rate limit exceeded.
       headers:
         Retry-After:
           schema: { type: integer, minimum: 1 }

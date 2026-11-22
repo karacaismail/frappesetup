@@ -1,0 +1,50 @@
+Account,Hesap
+Change kind,Değişiklik türü
+Content digest,İçerik özeti
+Counter key,Sayaç anahtarı
+Delivery key,Teslim anahtarı
+Earliest valid sequence,En eski geçerli sıra
+First result,İlk sonuç
+Installation ID,Kurulum kimliği
+Latest sequence number,Son sıra numarası
+Links a mobile installation to its account.,Telefon kurulumunu hesabına bağlar.
+Mobile,Mobil
+Mobile Change,Mobil Değişiklik
+Mobile Delivery,Mobil Teslim
+Mobile Installation,Mobil Kurulum
+Mobile Operation,Mobil İşlem
+Mobile Sequence,Mobil Sıra
+Operation key,İşlem anahtarı
+Record ID,Kayıt kimliği
+Record type,Kayıt türü
+Records a change for mobile sync.,Telefon eşitlemesi için bir değişiklik kaydeder.
+Revoked,İptal edildi
+Scope,Kapsam
+Sequence number,Sıra numarası
+Stable account key,Sabit hesap anahtarı
+Stores the first result of an operation for retries.,İlk iş sonucunu yeniden gönderim için saklar.
+Target installation,Hedef kurulum
+The account that owns the mobile installation.,Bu hesap telefon kurulumunun sahibidir.
+The identifier of the installation that received the record.,Bu kimlik kaydı alan telefon kurulumunu belirtir.
+The identifier of the mobile installation.,Bu değer telefon kurulumunu belirtir.
+The identifier of the record sent to the phone.,Bu değer telefona gönderilen kaydı belirtir.
+The identifier of the record that changed.,Bu değer değişen kaydı belirtir.
+The key of the single sequence record for the site.,Site için tek sayaç kaydı bu anahtarı taşır.
+The last read permission reported by the server.,Sunucunun bildirdiği son okuma iznini gösterir.
+The result of the first request.,Sunucu ilk isteğin sonucunu bu alanda saklar.
+The server assigns each new change a sequence number above this value.,Sunucu her yeni değişikliğe bu sayıdan büyük bir sıra numarası verir.
+"The server derives the key from the installation ID, record type, and record ID.","Sunucu anahtarı kurulum kimliği, kayıt türü ve kayıt kimliğinden üretir."
+"The server derives the key from the site, account, and operation ID.","Sunucu anahtarı site, hesap ve işlem kimliğinden üretir."
+The server derives this value from the stable identity link.,Sistem bu değeri sabit kimlik bağına göre üretir.
+The server rejects cursors with sequence numbers below this value.,Sunucu daha eski sıra numarası olan imleçle gelen isteği reddeder.
+The server uses this digest to compare the content of repeated requests.,Sunucu bu özeti kullanarak yinelenen isteğin içeriğini karşılaştırır.
+The server uses this number to order changes.,Sunucu değişiklikleri bu numaraya göre sıraya koyar.
+The sync scope assigned to the installation.,"Kapsam, bu kurulumun eşitleme alanını belirtir."
+The type of record sent to the phone.,Bu kod telefona gönderilen kaydın türünü belirtir.
+The type of record that changed.,Bu kod değişen kaydın türünü belirtir.
+Tracks records delivered to a mobile installation.,Bir telefon kurulumuna gönderilen kayıtları izler.
+Tracks the sync sequence for the site.,Sitenin eşitleme sırasını tutar.
+Visible,Görünür
+"When set, only this installation receives the change.",Bu alan doluysa değişikliği yalnız bu kurulum alır.
+"When set, the server rejects sync requests from this installation.",Bu işaret açıkken sunucu kurulumun eşitleme isteğini reddeder.
+Whether the record was updated or removed.,"Tür, kaydın yenilendiğini veya kaldırıldığını belirtir."

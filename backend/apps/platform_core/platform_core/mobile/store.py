@@ -28,9 +28,9 @@ def _insert(doctype, *, ignore_duplicate=False, **fields):
 	previous = doc.flags.ignore_permissions
 	try:
 		# The approved operation creates server-owned metadata, never a business record.
-		return doc.insert(
+		return doc.insert(  # nosemgrep: frappe-ignore-permissions
 			ignore_permissions=True, ignore_if_duplicate=ignore_duplicate
-		)  # nosemgrep: frappe-ignore-permissions
+		)
 	finally:
 		doc.flags.ignore_permissions = previous
 

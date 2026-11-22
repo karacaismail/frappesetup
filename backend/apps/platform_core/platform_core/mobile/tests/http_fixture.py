@@ -4,7 +4,7 @@ import time
 
 import frappe
 
-from platform_core.mobil.protocol import Command, MobileError
+from platform_core.mobile.protocol import Command, MobileError
 
 SITE = "test-mobile.localhost"
 FIRST = "mobile-first@example.test"
@@ -36,7 +36,7 @@ def setup():
 			{
 				"doctype": "DocType",
 				"name": RECORD,
-				"module": "Mobil",
+				"module": "Mobile",
 				"custom": 1,
 				"autoname": "field:record_id",
 				"fields": [

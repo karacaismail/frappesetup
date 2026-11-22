@@ -1,7 +1,7 @@
 import unittest
 from dataclasses import dataclass
 
-from platform_core.mobil.service import pull
+from platform_core.mobile.service import pull
 
 SCOPE = ("site", "account", "installation", "mobile")
 SECRET = b"a" * 32
@@ -30,7 +30,7 @@ class Store:
 		return len(self.events)
 
 	def reconcile_deliveries(self, projections, installation, account, after):
-		from platform_core.mobil.protocol import content_digest
+		from platform_core.mobile.protocol import content_digest
 
 		rows = sorted((content_digest(key), key) for key in self.deliveries)
 		remaining = [row for row in rows if after is None or row[0] > after]

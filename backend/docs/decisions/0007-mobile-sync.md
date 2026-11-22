@@ -4,7 +4,7 @@ Bu not tasarım kararını anlatır. Canlı uç testi ikinci kontrol noktasında
 
 ## Kapsam ve sahiplik
 
-`mobil` modülü telefonun kurulumunu ve eşitleme kayıtlarını yönetir.
+`mobile` modülü telefonun kurulumunu ve eşitleme kayıtlarını yönetir.
 Telefon yalnız açıkça tanımlanmış eşitleme uçlarını çağırır.
 Uçların tam adresleri sürümlü OpenAPI dosyasında yer alır.
 İlk sürüm `/api/method/platform_core.api.mobile.v1_*` adlarını kullanır (AU-1).
@@ -37,7 +37,7 @@ Sistem kayıt iznini Frappe üzerinden denetler.
 Canlı uçlar için uygulama iskeleti ve kimlik kancası gerekir.
 Erişim kuralı motoru bağlanınca motorun ret yolu da HTTP üzerinden sınanır.
 Erişim kuralı motoru mevcut Frappe izin kancalarından çalışır.
-Mobil modülü bu motoru doğrudan çağırmaz.
+`Mobile` modülü bu motoru doğrudan çağırmaz.
 Modül sınırı denetimi başka modüllere doğrudan yazmayı yakalar.
 Mobil uçlar genel kayıt uçlarını veya telefonun seçtiği kayıt türlerini açmaz.
 
@@ -182,7 +182,7 @@ Bir yanıt kaybolursa telefon aynı imleçle kaldırma işaretini yeniden alabil
 Temizlik, geçerli imlecin ihtiyaç duyduğu değişikliği silmez.
 Eski imlece dayanan güvenli bir değişiklik listesi kalmazsa ilk kopya istenir.
 Yetkili görevli temizliği elle başlatır.
-Görevli komut satırında `bench --site <site> execute platform_core.mobil.store.cleanup` komutunu çalıştırır.
+Görevli komut satırında `bench --site <site> execute platform_core.mobile.store.cleanup` komutunu çalıştırır.
 Görevli HTTP üzerinden `v1_cleanup` ucunu çağırır.
 HTTP ucu Frappe içindeki `System Manager` rolünü arar.
 Komut ve HTTP ucu aynı temizlik işlevini kullanır.
