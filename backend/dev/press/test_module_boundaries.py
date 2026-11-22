@@ -1,4 +1,4 @@
-"""Use the shared checker for the Press identity module and its entry points."""
+"""Check module boundaries for the Press identity and Ansible packages."""
 
 import importlib.util
 import json
@@ -26,7 +26,7 @@ def press_policy():
 
 
 class PressModuleBoundaryTest(unittest.TestCase):
-    def test_entry_points_cannot_write_foreign_doctypes(self):
+    def test_press_paths_reject_foreign_dependencies_and_writes(self):
         scratch = Path(os.environ.get("PANE_SCRATCH_DIR", BACKEND.parent / ".pane/scratch"))
         scratch.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=scratch) as temp:
@@ -40,7 +40,21 @@ class PressModuleBoundaryTest(unittest.TestCase):
                 target.parent.mkdir(parents=True)
                 target.write_text('import frappe\nfrappe.db.set_value("Foreign Rule", "rule", "state", 1)\n')
 
+            bridge = root / "apps/press_tr/press_tr/ansible_bridge/callback_plugins/example.py"
+            bridge.parent.mkdir(parents=True)
+            bridge.write_text(
+                "import platform_core.access.api\n"
+                "import frappe\n"
+                'frappe.db.set_value("Foreign Rule", "rule", "state", 1)\n'
+            )
+
             errors = CHECKER.check(root, press_policy())
+            bridge_source = bridge.relative_to(root)
+            for line, code in ((1, "IMPORT"), (3, "WRITE")):
+                source = f"{bridge_source}:{line} {code} "
+                with self.subTest(source=source):
+                    self.assertTrue(any(error.startswith(source) for error in errors), errors)
+
             for entry in ("api", "www"):
                 with self.subTest(entry=entry):
                     source = f"apps/press_tr/press_tr/{entry}/example.py:2 WRITE "
@@ -51,6 +65,6 @@ class PressModuleBoundaryTest(unittest.TestCase):
         press_errors = [
             error
             for error in errors
-            if error.startswith("apps/press_tr/") or ("CYCLE" in error and "press_tr.press_identity" in error)
+            if error.startswith("apps/press_tr/") or ("CYCLE" in error and "press_tr." in error)
         ]
         self.assertEqual(press_errors, [])
