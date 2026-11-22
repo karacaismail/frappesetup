@@ -281,9 +281,15 @@ Kaynak `contracts/press_tr.openapi.yaml` dosyasıdır.
 True if the team was created in this request.,Takım bu istekte açıldıysa doğrudur.,identity_sync.openapi.yaml: components.schemas.TargetEnsureTeamResult.properties.message.properties.created.description
 The name of the team in Press.,Press'teki takımın adı.,identity_sync.openapi.yaml: components.schemas.TargetEnsureTeamResult.properties.message.properties.team.description
 "The response expected from the `list_identities` endpoints. This schema is not an endpoint of this service.
-These endpoints do not exist yet in the contracts of Press and of the tenant. This schema is a proposal.
-","`list_identities` uçlarından beklenen yanıt. Bu şema bu servisin ucu değildir.
-Bu uçlar Press'in ve kiracının sözleşmelerinde henüz yoktur. Bu şema bir öneridir.
+The shared contract (`docs/sozlesmeler.md`, section 7) names the endpoints and the fields.
+Every row carries the `issuer` and `subject` fields and whether the account is enabled.
+The `email` and `organization_ids` fields are optional. Without them the service does not compare the email or the teams.
+The shared contract says the response is paged. It does not name the paging fields yet. The service reads one response.
+","`list_identities` uçlarından beklenen yanıt. Bu şema bu servisin bir ucu değildir.
+Ortak sözleşmenin 7. bölümü uçları ve alanları adlandırır.
+Her satır `issuer` ve `subject` alanlarını ve hesabın açık olup olmadığını taşır.
+`email` ve `organization_ids` alanları isteğe bağlıdır. Bu alanlar yoksa servis e-postayı ve takımları karşılaştırmaz.
+Ortak sözleşme yanıtın sayfalı olduğunu söyler. Sayfalama alanlarını henüz adlandırmaz. Servis tek yanıt okur.
 ",identity_sync.openapi.yaml: components.schemas.TargetIdentityList.description
 Only Press sends it. These are the organization ids of the teams the user is a member of.,Yalnız Press gönderir. Kullanıcının üye olduğu takımların kuruluş kimlikleridir.,identity_sync.openapi.yaml: components.schemas.TargetIdentityList.properties.message.items.properties.organization_ids.description
 "The definite success response expected from the `platform_core.api.identity.provision` endpoint.
@@ -391,9 +397,8 @@ It chooses the actions from this current state. So the result does not change ev
 
 ## Endpoint markers
 
-The status extension key tells whether the endpoint exists in code. It is the `x-` key that takes the two values below.
-`uygulandi` means the endpoint is implemented in code.
-`planlandi` means the endpoint is not written yet.
+The status extension key tells whether the endpoint exists in code. It is the `x-` key that takes the value below.
+`uygulandi` means the endpoint is implemented in code. Every endpoint in this file is implemented.
 
 `x-yikici` tells whether the endpoint can do destructive work.
 Destructive work is work that disables a user or removes a membership.
@@ -439,10 +444,13 @@ One request can cover more than one event. If the plan of any event changed, the
 The service writes no event in that request.
 The service computes the plan once more at execution time. If the plan is not exactly the same, the operation does not run.
 
-The service keeps four client lists. A client can be in only one list.
+The service keeps four client lists.
 A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
-A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute.
-A client in the `IDENTITY_SYNC_SESSION_AZP` list can only end a session. It is the client of a tenant site.
+A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute. This list holds the service clients of the tenant sites.
+The human gives the approval in the AI layer of the tenant site. So the tenant site calls the execution.
+A client in the `IDENTITY_SYNC_SESSION_AZP` list can end a session. This list holds the same tenant site clients.
+A client in the preview list or in the deletion list cannot be in another list.
+This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
 A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
 Only a trusted service client goes into the execute list.
 The agent token and the model identity do not go into this list.
@@ -568,8 +576,7 @@ Eylemleri bu güncel duruma göre seçer. Bu yüzden aynı olay iki kez gelse de
 ## Uçların işaretleri
 
 `x-durum` alanı ucun kodda olup olmadığını söyler.
-`uygulandi` değeri ucun kodda olduğunu gösterir.
-`planlandi` değeri ucun henüz yazılmadığını gösterir.
+`uygulandi` değeri ucun kodda olduğunu gösterir. Bu dosyadaki bütün uçlar koddadır.
 
 `x-yikici` alanı ucun yıkıcı iş yapıp yapamadığını söyler.
 Yıkıcı iş, kullanıcıyı kapatan ya da üyeliği kaldıran iştir.
@@ -615,10 +622,13 @@ Bir istek birden çok olay kapsayabilir. Herhangi bir olayın planı değiştiys
 Servis o istekte hiçbir olayı yazmaz.
 Servis yürütme anında planı bir kez daha hesaplar. Plan birebir aynı değilse iş yürümez.
 
-Servis dört istemci listesi tutar. Bir istemci yalnız bir listede olabilir.
+Servis dört istemci listesi tutar.
 `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
-`IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir.
-`IDENTITY_SYNC_SESSION_AZP` listesindeki istemci yalnız oturum kapatabilir. Bu istemci bir kiracı sitesinin istemcisidir.
+`IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır.
+İnsan onayı kiracı sitesindeki yapay zekâ katmanında verir. Bu yüzden yürütmeyi kiracı sitesi çağırır.
+`IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
+Önizleme listesindeki ya da silme listesindeki istemci başka bir listede olamaz.
+Bu servis Keycloak'ta istemci açmaz. Yeni kiracının istemcisini kimlik-realm işi açar. O komutu insan başlatır.
 `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
 Yürütme listesine yalnız güvenilir servis istemcisi girer.
 Aracı belirteci ve model kimliği bu listeye girmez.
@@ -1107,17 +1117,4 @@ Kullanıcı çağıran kiracının kuruluşuna üye değilse de yanıt aynıdır
 Hata kodu `forbidden` olur.
 ",identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.responses.403.description
 Ends one Keycloak session.,Bir Keycloak oturumunu kapatır.,identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.summary
-"Press calls this endpoint when it creates a new site (G-39, G-112).
-The core of the work exists in code. The HTTP endpoint does not exist yet.
-The endpoint returns a secret. Section 10 of the shared contract (`docs/sozlesmeler.md`) forbids returning a secret field.
-So the endpoint is not offered as an AI tool. How the secret reaches Press is an open decision.
-","Press bu ucu yeni site açarken çağırır (G-39, G-112).
-İşin çekirdeği kodda vardır. HTTP ucu henüz yoktur.
-Uç sır döner. Ortak sözleşmenin 10. bölümü gizli alanın dönmesini yasaklar.
-Bu yüzden uç yapay zekâ aracı olarak sunulmaz. Sırrın Press'e nasıl gideceği açık karardır.
-",identity_sync.openapi.yaml: paths./v1/tenants/{tenant}/client.post.description
-The full address of the tenant site.,Kiracı sitesinin tam adresi.,identity_sync.openapi.yaml: paths./v1/tenants/{tenant}/client.post.requestBody.content.application/json.schema.properties.base_url.description
-Returned only in this response. It is not written to the log.,Yalnız bu yanıtta döner. Günlüğe yazılmaz.,identity_sync.openapi.yaml: paths./v1/tenants/{tenant}/client.post.responses.200.content.application/json.schema.properties.client_secret.description
-The client is ready.,İstemci hazır.,identity_sync.openapi.yaml: paths./v1/tenants/{tenant}/client.post.responses.200.description
-Prepares the `site-<tenant>` client of the tenant and its secret.,Kiracının `site-<kiracı>` istemcisini ve sırrını hazırlar.,identity_sync.openapi.yaml: paths./v1/tenants/{tenant}/client.post.summary
 Development environment. The port is the `PANE_PORT` value plus 5.,"Geliştirme ortamı. Port, `PANE_PORT` değerinin 5 fazlasıdır.",identity_sync.openapi.yaml: servers[0].description

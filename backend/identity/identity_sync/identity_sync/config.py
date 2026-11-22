@@ -56,7 +56,7 @@ class Settings:
     execute_azp: frozenset[str] = frozenset()
     # Yalnız okuyabilen ve önizleyebilen istemciler. Yapay zekâ aracısı bu listeye girer.
     preview_azp: frozenset[str] = frozenset()
-    # Service clients of platform_core sites. They may only call /v1/sessions/revoke.
+    # Service clients of platform_core sites that may call /v1/sessions/revoke.
     session_azp: frozenset[str] = frozenset()
     # Clients that may request an account deletion. Only Press does (docs/sozlesmeler.md, section 7).
     deletion_azp: frozenset[str] = frozenset()
@@ -147,12 +147,14 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     execute_azp, preview_azp = _names(get("EXECUTE_AZP")), _names(get("PREVIEW_AZP"))
     session_azp = _names(get("SESSION_AZP"))
     deletion_azp = _names(get("DELETION_AZP", DEFAULT_DELETION_AZP))
-    lists = (execute_azp, preview_azp, session_azp, deletion_azp)
-    if sum(len(names) for names in lists) != len(frozenset().union(*lists)):
-        # Each list grants a different right. A client in two lists would blur that line.
+    # Each list grants a different right. One overlap is intended: a tenant site client both
+    # executes approved work and ends sessions (docs/sozlesmeler.md, section 7). A preview
+    # client must never execute, and the Press client only requests deletions.
+    tenant_clients = execute_azp | session_azp
+    if preview_azp & tenant_clients or deletion_azp & (preview_azp | tenant_clients):
         raise ConfigError(
-            f"a client can be in only one of {PREFIX}EXECUTE_AZP, {PREFIX}PREVIEW_AZP, "
-            f"{PREFIX}SESSION_AZP and {PREFIX}DELETION_AZP"
+            f"a client in {PREFIX}PREVIEW_AZP or {PREFIX}DELETION_AZP cannot be in another list; "
+            f"only {PREFIX}EXECUTE_AZP and {PREFIX}SESSION_AZP may share clients"
         )
     if len(get("WEBHOOK_SECRET")) < MIN_WEBHOOK_SECRET_LENGTH:
         raise ConfigError(f"{PREFIX}WEBHOOK_SECRET must be at least {MIN_WEBHOOK_SECRET_LENGTH} characters long")

@@ -118,10 +118,18 @@ python3 -m identity_sync resolve-operation <kimlik> --resolution completed
 
 `serve` komutu günlüğü standart hata akışına yazar. İşlem günlüğü satırı `execute operation=` ile başlar.
 
-Servis iki istemci listesi tutar:
+Servis dört istemci listesi tutar:
 
 - `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
-- `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir.
+- `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır. Örnek: `site-kiraci1`.
+- `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
+- `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
+
+İnsan onayı kiracı sitesindeki yapay zekâ katmanında verir. Bu yüzden yürütmeyi kiracı sitesi çağırır.
+
+- Bir istemci hem yürütme hem oturum listesinde olabilir.
+- Önizleme ya da silme listesindeki istemci başka bir listede olamaz.
+- Bu servis Keycloak'ta istemci açmaz. Yeni kiracının istemcisini kimlik-realm işi açar. O komutu insan başlatır.
 
 Aracı belirteci yürütme listesine girmez. Önizleme listesindeki istemci yürütme isterse 403 alır.
 
@@ -354,8 +362,6 @@ Bu komutta hiçbir test atlanmamalıdır. Testler RSA anahtarını kendisi üret
 Bu maddeler bilerek bırakılan eksiklerdir. Her biri bir teknik borçtur. `BORC(mvp)` işareti, eksiğin MVP seviyesini tamamlamayı engellediğini gösterir.
 
 - `BORC(mvp)`: Servis canlı Keycloak, Press ve kiracı ile denenmedi. Olay eklentisinin yalnız imza kodu denendi. Etki: Sahte hedeflerin kaçırdığı bir uyumsuzluk üretimde ortaya çıkabilir. Sorumlu: integration-e2e işi. Kapanma koşulu: Uçtan uca test gerçek servislerle geçer.
-- `BORC(mvp)`: Mutabakat, Press'te ve kiracıda `list_identities` ucunu ister. Bu uçlar hedeflerin sözleşmesinde yok. Etki: Mutabakat komutu gerçek hedeflerde çalışmaz. Sorumlu: press-tr ve platform-core-kimlik işleri. Kapanma koşulu: İki uç sözleşmeye girer ve sayfalı yanıt verir.
-- `BORC(mvp)`: `ensure_site_client` işlevi Keycloak'ta `manage-clients` rolünü ister. Ortak sözleşme servis hesabına bu rolü vermez. HTTP ucu da yazılmadı. Etki: Yeni kiracının istemcisi bu servisle açılamaz. Sorumlu: orkestratör ve kimlik-realm işi. Kapanma koşulu: Rol kararı verilir ve sırrın Press'e nasıl ulaşacağı sözleşmeye yazılır.
-- `BORC(mvp)`: Onay katmanının istemci adı ortak sözleşmede yok. Etki: `IDENTITY_SYNC_EXECUTE_AZP` ayarı üretimde doldurulamaz. Sorumlu: orkestratör ve platform-core-yz işi. Kapanma koşulu: İstemci adı sözleşmenin 2. bölümüne yazılır.
+- `BORC(mvp)`: Ortak sözleşme `list_identities` yanıtının sayfalı olduğunu söyler. Sayfalama alanlarını adlandırmaz. Bu servis tek yanıt okur. Etki: Uzun kullanıcı listesinde mutabakat eksik kalır. Sorumlu: press-tr, platform-core-kimlik ve identity-sync işleri. Kapanma koşulu: Alan adları sözleşmeye girer ve bir test iki sayfa okur.
 - `BORC(mvp)`: Servisin container dosyası yok. Etki: Servis ortak geliştirme ortamında başlatılamaz. Sorumlu: identity-sync ve dev-ortam işleri. Kapanma koşulu: Container dosyası yazılır ve servis `oidc_verify` kitaplığıyla açılır.
 - `BORC(mvp)`: Bu servisin testleri ve biçim denetimi CI'da koşmaz. Etki: Bozulma yalnız elle çalıştırılan testte görülür. Sorumlu: DevOps sorumlusu. Kapanma koşulu: CI bu klasörün testlerini her değişiklikte koşar.

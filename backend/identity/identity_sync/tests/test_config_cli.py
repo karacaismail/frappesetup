@@ -88,9 +88,30 @@ class ConfigTest(unittest.TestCase):
         settings = load_settings(self.ENV)
         self.assertEqual(settings.session_azp, frozenset({"site-kiraci1"}))
         self.assertIn("site-kiraci1", settings.known_azp)
-        for other in ("EXECUTE", "PREVIEW"):
-            with self.subTest(other=other), self.assertRaises(ConfigError):
-                load_settings({**self.ENV, f"IDENTITY_SYNC_{other}_AZP": "site-kiraci1"})
+        with self.assertRaises(ConfigError):
+            load_settings({**self.ENV, "IDENTITY_SYNC_PREVIEW_AZP": "site-kiraci1"})
+
+    def test_tenant_site_client_may_execute_and_revoke_sessions(self) -> None:
+        # docs/sozlesmeler.md, section 7: the approval is given on the tenant site, so the execute
+        # list holds the tenant service clients. It carries the same clients as the session list.
+        both = {**self.ENV, "IDENTITY_SYNC_EXECUTE_AZP": "site-kiraci1", "IDENTITY_SYNC_SESSION_AZP": "site-kiraci1"}
+
+        settings = load_settings(both)
+
+        self.assertEqual((settings.execute_azp, settings.session_azp), (frozenset({"site-kiraci1"}),) * 2)
+
+    def test_every_other_pair_of_lists_stays_separate(self) -> None:
+        pairs = (
+            ("EXECUTE", "PREVIEW"),
+            ("SESSION", "PREVIEW"),
+            ("DELETION", "PREVIEW"),
+            ("DELETION", "EXECUTE"),
+            ("DELETION", "SESSION"),
+        )
+        for first, second in pairs:
+            with self.subTest(pair=(first, second)), self.assertRaises(ConfigError):
+                env = {key: value for key, value in self.ENV.items() if not key.endswith("_AZP")}
+                load_settings({**env, f"IDENTITY_SYNC_{first}_AZP": "same", f"IDENTITY_SYNC_{second}_AZP": "same"})
 
     def test_client_lists_default_to_empty(self) -> None:
         env = {k: v for k, v in self.ENV.items() if not k.endswith("_AZP")}

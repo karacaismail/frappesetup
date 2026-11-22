@@ -223,11 +223,19 @@ class RolesTest(AdminCase):
                     admin.get_user(SUBJECT)
                 self.assertEqual(caught.exception.status, 403)
 
-    def test_client_administration_is_not_among_the_roles(self) -> None:
-        # ensure_site_client needs manage-clients. The contract does not grant it.
-        with self.assertRaises(HttpError) as caught:
-            self.admin.ensure_site_client("kiraci2", TENANT_URL)
-        self.assertEqual(caught.exception.status, 403)
+    def test_service_does_not_administer_keycloak_clients(self) -> None:
+        # docs/sozlesmeler.md, section 7: identity-sync opens no client in Keycloak and its
+        # service account has no `manage-clients` role. The kimlik-realm job opens tenant clients.
+        import inspect
+
+        from identity_sync import keycloak_admin
+
+        for name in ("ensure_site_client", "create_site_client", "find_client", "get_client_secret"):
+            self.assertFalse(hasattr(KeycloakAdmin, name), name)
+        self.assertFalse(hasattr(keycloak_admin, "SiteClient"))
+        source = inspect.getsource(keycloak_admin)
+        self.assertNotIn('"/clients', source)
+        self.assertNotIn("client-secret", source)
 
 
 class InviteTest(AdminCase):
@@ -322,101 +330,3 @@ class InviteTest(AdminCase):
         self.assertEqual(len(result.previews), 3)
         self.assertEqual(self.writes(), [])
         self.assertNotIn("davetli@example.test", " ".join(p.summary for p in result.previews))
-
-
-class SiteClientTest(AdminCase):
-    """These tests grant manage-clients to the fake. The real service account does not have it yet."""
-
-    def setUp(self) -> None:
-        super().setUp()
-        self.kc.extra_role_paths = ("/clients",)
-
-    def test_creates_confidential_client_with_exact_urls(self) -> None:
-        found: list[object] = []
-        self.kc.on("GET", f"{self.base}/clients", lambda _r: (200, list(found)))
-
-        def create(req: fakes.Recorded) -> fakes.Reply:
-            found.append({"id": CLIENT_UUID, "clientId": "site-kiraci2"})
-            return 201, None, {"Location": f"{self.kc.url}{self.base}/clients/{CLIENT_UUID}"}
-
-        self.kc.on("POST", f"{self.base}/clients", create)
-        self.kc.on("GET", f"{self.base}/clients/{CLIENT_UUID}/client-secret", (200, {"type": "secret", "value": "s3"}))
-
-        site = self.admin.ensure_site_client("kiraci2", TENANT_URL)
-
-        self.assertEqual(site.client_id, "site-kiraci2")
-        self.assertEqual(site.client_secret, "s3")
-        body = self.kc.calls("POST", f"{self.base}/clients")[0].json()
-        self.assertEqual(body["clientId"], "site-kiraci2")
-        self.assertEqual(body["protocol"], "openid-connect")
-        self.assertFalse(body["publicClient"])
-        self.assertTrue(body["standardFlowEnabled"])
-        self.assertFalse(body["implicitFlowEnabled"])
-        self.assertFalse(body["directAccessGrantsEnabled"])
-        self.assertFalse(body["serviceAccountsEnabled"])
-        # Dönüş adresi tam adrestir. Joker karakter yoktur.
-        self.assertEqual(
-            body["redirectUris"],
-            [f"{TENANT_URL}/api/method/frappe.integrations.oauth2_logins.login_via_keycloak"],
-        )
-        self.assertEqual(
-            body["attributes"],
-            {
-                "backchannel.logout.url": f"{TENANT_URL}/api/method/platform_core.api.keycloak_backchannel_logout",
-                "backchannel.logout.session.required": "true",
-            },
-        )
-
-    def test_existing_client_is_not_created_again(self) -> None:
-        self.kc.on("GET", f"{self.base}/clients", (200, [{"id": CLIENT_UUID, "clientId": "site-kiraci2"}]))
-        self.kc.on("GET", f"{self.base}/clients/{CLIENT_UUID}/client-secret", (200, {"type": "secret", "value": "s3"}))
-
-        site = self.admin.ensure_site_client("kiraci2", TENANT_URL)
-
-        self.assertEqual(site.client_secret, "s3")
-        self.assertEqual(self.writes(), [])
-        self.assertEqual(self.kc.calls("GET", f"{self.base}/clients")[0].query["clientId"], ["site-kiraci2"])
-
-    def test_secret_is_not_shown_in_repr(self) -> None:
-        self.kc.on("GET", f"{self.base}/clients", (200, [{"id": CLIENT_UUID, "clientId": "site-kiraci2"}]))
-        self.kc.on("GET", f"{self.base}/clients/{CLIENT_UUID}/client-secret", (200, {"value": "cok-gizli"}))
-
-        site = self.admin.ensure_site_client("kiraci2", TENANT_URL)
-
-        self.assertNotIn("cok-gizli", repr(site))
-
-    def test_rejects_bad_tenant_name(self) -> None:
-        for bad in ("", "Kiraci", "a/b", "a b", "-a", "x" * 41):
-            with self.subTest(bad=bad), self.assertRaises(ValueError):
-                self.admin.ensure_site_client(bad, TENANT_URL)
-        self.assertEqual(self.kc.requests, [])
-
-    def test_invite_reports_each_step_before_and_after_the_write(self) -> None:
-        self.kc.on("GET", f"{self.base}/users", (200, []))
-        self.kc.on("POST", f"{self.base}/users", (201, None, {"Location": f"{self.kc.url}{self.base}/users/{SUBJECT}"}))
-        self.kc.on("POST", f"{self.base}/organizations/{ORG_ID}/members", (201, None))
-        steps: list[tuple[str, str, int]] = []
-
-        def on_step(step: str, status: str) -> None:
-            steps.append((step, status, len(self.writes())))
-
-        self.kc.on("PUT", f"{self.base}/users/{SUBJECT}/execute-actions-email", (500, None))
-        with self.assertRaises(HttpError):
-            self.admin.invite_user("davetli@example.test", "Deniz", "Örnek", ORG_ID, on_step=on_step)
-
-        # "writing" is recorded before the request leaves; "done" after the answer.
-        self.assertEqual(
-            steps,
-            [
-                ("keycloak.create_user", "writing", 0),
-                ("keycloak.create_user", "done", 1),
-                ("keycloak.add_organization_member", "writing", 1),
-                ("keycloak.add_organization_member", "done", 2),
-                ("keycloak.send_execute_actions_email", "writing", 2),
-                ("keycloak.send_execute_actions_email", "failed", 3),
-            ],
-        )
-
-
-if __name__ == "__main__":
-    unittest.main()

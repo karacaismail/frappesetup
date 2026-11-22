@@ -35,13 +35,18 @@ _DISABLE_KINDS = frozenset({"closed_in_keycloak", "unexpected"})
 
 @dataclass(frozen=True)
 class Identity:
-    """A user record on a target. `organization_ids` is filled by Press: one id per team membership."""
+    """A user record on a target.
+
+    `organization_ids` is filled by Press: one id per team membership. `None` means the target
+    did not say, and then team memberships are not compared. An empty `email` means the same
+    for the e-mail. The shared contract lets a list row carry only issuer, subject and state.
+    """
 
     issuer: str
     subject: str
     email: str
     enabled: bool
-    organization_ids: tuple[str, ...] = ()
+    organization_ids: tuple[str, ...] | None = ()
 
 
 @dataclass(frozen=True)
@@ -106,7 +111,7 @@ def _tenant_differences(
                 kind = "missing"
             elif not record.enabled:
                 kind = "disabled"
-            elif record.email.lower() != user.email.lower():
+            elif record.email and record.email.lower() != user.email.lower():
                 kind = "email_mismatch"
             else:
                 continue
@@ -144,12 +149,14 @@ def _press_differences(users: Mapping[str, UserSnapshot], actual: Iterable[Ident
         if not user.email_verified:
             continue  # no first link without a verified e-mail (AU-4); nothing is expected yet
         wanted = {org.id for org in user.organizations}
-        present = set(record.organization_ids) if record is not None else set()
         if record is not None and wanted:
             if not record.enabled:
                 differences.append(Difference(PRESS, subject, "disabled"))
-            elif record.email.lower() != user.email.lower():
+            elif record.email and record.email.lower() != user.email.lower():
                 differences.append(Difference(PRESS, subject, "email_mismatch"))
+        if record is not None and record.organization_ids is None:
+            continue  # the target did not list team memberships, so none can be compared
+        present = set(record.organization_ids or ()) if record is not None else set()
         differences += [Difference(PRESS, subject, "missing_team_membership", org) for org in sorted(wanted - present)]
         differences += [
             Difference(PRESS, subject, "unexpected_team_membership", org) for org in sorted(present - wanted)

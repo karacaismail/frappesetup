@@ -134,6 +134,19 @@ class PressDifferenceTest(unittest.TestCase):
             with self.subTest(enabled=record.enabled):
                 self.assertEqual(differences([], [record], []), [Difference("press", "a", "deleted_in_keycloak")])
 
+    def test_rows_without_email_and_teams_report_no_false_difference(self) -> None:
+        # docs/sozlesmeler.md, section 7: a `list_identities` row carries only issuer, subject and
+        # the enabled state. Then e-mail and team differences cannot be seen, and none is invented.
+        users, _press, _tenant = in_sync()
+        bare = Identity(issuer=ISSUER, subject="a", email="", enabled=True, organization_ids=None)
+
+        self.assertEqual(differences(users, [bare], [bare]), [])
+        closed = Identity(issuer=ISSUER, subject="a", email="", enabled=False, organization_ids=None)
+        self.assertEqual(
+            differences(users, [closed], [closed]),
+            [Difference("press", "a", "disabled"), Difference("kiraci1", "a", "disabled")],
+        )
+
     def test_deleted_subjects_are_listed_once(self) -> None:
         found = differences([], [identity("a"), identity("b")], [identity("a")])
         self.assertEqual(deleted_subjects(found), ("a", "b"))

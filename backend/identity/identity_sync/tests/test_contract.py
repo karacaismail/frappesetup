@@ -45,7 +45,7 @@ def request_schema(method: str, path: str) -> dict:
 
 class DocumentationTest(unittest.TestCase):
     def test_contract_lists_operations(self) -> None:
-        self.assertEqual(len(operations()), 11)
+        self.assertEqual(len(operations()), 10)
 
     def test_every_operation_is_documented(self) -> None:
         # Her uç özet, açıklama ve yıkıcılık bilgisi taşır (`docs/sozlesmeler.md`, 10. bölüm).

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.9.1
+  version: 0.10.0
   summary: Endpoints of the user sync service
   description: |
     This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
@@ -11,9 +11,8 @@ info:
 
     ## Endpoint markers
 
-    The status extension key tells whether the endpoint exists in code. It is the `x-` key that takes the two values below.
-    `uygulandi` means the endpoint is implemented in code.
-    `planlandi` means the endpoint is not written yet.
+    The status extension key tells whether the endpoint exists in code. It is the `x-` key that takes the value below.
+    `uygulandi` means the endpoint is implemented in code. Every endpoint in this file is implemented.
 
     `x-yikici` tells whether the endpoint can do destructive work.
     Destructive work is work that disables a user or removes a membership.
@@ -59,10 +58,13 @@ info:
     The service writes no event in that request.
     The service computes the plan once more at execution time. If the plan is not exactly the same, the operation does not run.
 
-    The service keeps four client lists. A client can be in only one list.
+    The service keeps four client lists.
     A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
-    A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute.
-    A client in the `IDENTITY_SYNC_SESSION_AZP` list can only end a session. It is the client of a tenant site.
+    A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute. This list holds the service clients of the tenant sites.
+    The human gives the approval in the AI layer of the tenant site. So the tenant site calls the execution.
+    A client in the `IDENTITY_SYNC_SESSION_AZP` list can end a session. This list holds the same tenant site clients.
+    A client in the preview list or in the deletion list cannot be in another list.
+    This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
     A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
     Only a trusted service client goes into the execute list.
     The agent token and the model identity do not go into this list.
@@ -687,52 +689,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  /v1/tenants/{tenant}/client:
-    post:
-      operationId: ensureTenantClient
-      summary: Prepares the `site-<tenant>` client of the tenant and its secret.
-      description: |
-        Press calls this endpoint when it creates a new site (G-39, G-112).
-        The core of the work exists in code. The HTTP endpoint does not exist yet.
-        The endpoint returns a secret. Section 10 of the shared contract (`docs/sozlesmeler.md`) forbids returning a secret field.
-        So the endpoint is not offered as an AI tool. How the secret reaches Press is an open decision.
-      x-durum: planlandi
-      x-yikici: false
-      x-yurutme: yalniz-onay-katmani
-      security:
-        - serviceToken: []
-      parameters:
-        - name: tenant
-          in: path
-          required: true
-          schema:
-            type: string
-            pattern: "^[a-z0-9][a-z0-9-]{0,39}$"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [base_url]
-              properties:
-                base_url:
-                  type: string
-                  description: The full address of the tenant site.
-      responses:
-        "200":
-          description: The client is ready.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [client_id, client_secret]
-                properties:
-                  client_id:
-                    type: string
-                  client_secret:
-                    type: string
-                    description: Returned only in this response. It is not written to the log.
   /v1/invitations:
     post:
       operationId: inviteUser
@@ -1505,14 +1461,17 @@ components:
       type: object
       description: |
         The response expected from the `list_identities` endpoints. This schema is not an endpoint of this service.
-        These endpoints do not exist yet in the contracts of Press and of the tenant. This schema is a proposal.
+        The shared contract (`docs/sozlesmeler.md`, section 7) names the endpoints and the fields.
+        Every row carries the `issuer` and `subject` fields and whether the account is enabled.
+        The `email` and `organization_ids` fields are optional. Without them the service does not compare the email or the teams.
+        The shared contract says the response is paged. It does not name the paging fields yet. The service reads one response.
       required: [message]
       properties:
         message:
           type: array
           items:
             type: object
-            required: [issuer, subject, email, enabled]
+            required: [issuer, subject, enabled]
             properties:
               issuer:
                 type: string

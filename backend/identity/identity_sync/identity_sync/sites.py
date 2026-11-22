@@ -3,8 +3,10 @@
 Uç adlarının kaynağı `docs/sozlesmeler.md` dosyasının 5. ve 6. bölümüdür.
 Her hedefe yalnız o hedefin `aud` değerini taşıyan belirteç gider.
 
-`list_identities` uçları ortak sözleşmede henüz yoktur. Mutabakat bu uçları ister.
-BORC(mvp): Uçlar sözleşmeye girince adları buradan doğrulanır. Sorumlu: identity-sync işi.
+The `list_identities` endpoints are named in the shared contract (docs/sozlesmeler.md, section 7).
+BORC(mvp): the contract says the reply is paged but not yet how. This client reads one reply.
+Effect: a long list is cut by the target. Owner: the press-tr and platform-core-kimlik jobs name
+the paging fields, then the identity-sync job reads every page. Closes when a contract test reads two pages.
 """
 
 from __future__ import annotations
@@ -163,7 +165,8 @@ def _identities(message: object) -> list[Identity]:
                 subject=str(row.get("subject", "")),
                 email=str(row.get("email") or ""),
                 enabled=row.get("enabled") is True,
-                organization_ids=_organization_ids(row.get("organization_ids")),
+                # A row without the key says nothing about teams (docs/sozlesmeler.md, section 7).
+                organization_ids=_organization_ids(row["organization_ids"]) if "organization_ids" in row else None,
             )
         )
     return rows

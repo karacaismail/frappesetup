@@ -143,3 +143,31 @@ class DependencyTest(unittest.TestCase):
         declared_names = {re.split(r"[<>=!~ \[@;]", item, maxsplit=1)[0].replace("-", "_") for item in declared}
         self.assertEqual(third_party, {"oidc_verify"})
         self.assertLessEqual(third_party, declared_names)
+
+
+class ReachabilityTest(unittest.TestCase):
+    def test_every_keycloak_admin_method_is_used_by_the_service(self) -> None:
+        # frappe-python-standartlari.md, A-5: no code is kept "for later".
+        import inspect
+
+        from identity_sync.keycloak_admin import KeycloakAdmin
+
+        others = "\n".join(
+            path.read_text(encoding="utf-8") for path in sorted((PACKAGE / "identity_sync").glob("*.py"))
+        )
+        public = [name for name, _member in inspect.getmembers(KeycloakAdmin, inspect.isfunction) if not name.startswith("_")]
+        self.assertGreater(len(public), 5)
+        for name in public:
+            with self.subTest(method=name):
+                self.assertGreaterEqual(len(re.findall(rf"\.{name}\(", others)), 1)
+
+    def test_contract_has_no_planned_endpoint(self) -> None:
+        # The contract describes what the service does. An endpoint that is not written is not in it.
+        states = {
+            operation["x-durum"]
+            for item in CONTRACT["paths"].values()
+            for method, operation in item.items()
+            if method in HTTP_METHODS
+        }
+        self.assertEqual(states, {"uygulandi"})
+        self.assertNotIn("/v1/tenants/{tenant}/client", CONTRACT["paths"])

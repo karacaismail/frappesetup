@@ -1,7 +1,7 @@
 """Keycloak Admin API istemcisi.
 
-Her işlev tek bir iş yapar ve açık bir ad taşır. Bu işlevler ileride araç olarak
-sunulacak. Yazan her işlev `dry_run=True` ile yalnız önizleme üretir.
+Her işlev tek bir iş yapar ve açık bir ad taşır. Yazan her işlev `dry_run=True` ile
+yalnız önizleme üretir. Servis Keycloak'ta istemci açmaz (`docs/sozlesmeler.md`, 7. bölüm).
 
 Yolların kaynağı Keycloak 26.8.2 Admin REST API belgesidir.
 Admin API belirteci ayrı kapsamla istenir. Bu belirteç sitelere gitmez.
@@ -21,7 +21,6 @@ from identity_sync.tokens import TokenProvider
 PAGE_SIZE = 100
 INVITE_ACTIONS = ("UPDATE_PASSWORD", "CONFIGURE_TOTP")
 TENANT_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
-SITE_REDIRECT_PATH = "/api/method/frappe.integrations.oauth2_logins.login_via_keycloak"
 SITE_BACKCHANNEL_LOGOUT_PATH = "/api/method/platform_core.api.keycloak_backchannel_logout"
 
 
@@ -32,12 +31,6 @@ class Outcome:
     preview: Preview
     executed: bool
     value: object = None
-
-
-@dataclass(frozen=True)
-class SiteClient:
-    client_id: str
-    client_secret: str = field(repr=False)
 
 
 @dataclass(frozen=True)
@@ -207,19 +200,6 @@ class KeycloakAdmin:
     def list_organization_members(self, organization_id: str) -> Iterator[Mapping[str, object]]:
         return self._pages(f"/organizations/{_quote(organization_id)}/members")
 
-    def find_client(self, client_id: str) -> Mapping[str, object] | None:
-        for row in self._list("/clients", query={"clientId": client_id}):
-            if row.get("clientId") == client_id:
-                return row
-        return None
-
-    def get_client_secret(self, client_uuid: str) -> str:
-        """İstemcinin sırrını döner. Çağıran sırrı günlüğe yazmamalıdır."""
-        body = self._call("GET", f"/clients/{_quote(client_uuid)}/client-secret").body
-        if not isinstance(body, Mapping) or not isinstance(body.get("value"), str):
-            raise TransportError("unexpected Keycloak response")
-        return body["value"]
-
     # --- yazma: her işlev tek iş yapar ---
 
     def create_organization(self, alias: str, name: str, *, dry_run: bool = False) -> Outcome:
@@ -301,39 +281,6 @@ class KeycloakAdmin:
         _expect(response, 200, 204)
         return Outcome(preview, executed=True)
 
-    def create_site_client(self, tenant: str, base_url: str, *, dry_run: bool = False) -> Outcome:
-        """Kiracının `site-<kiracı>` istemcisini açar. Sonuç değeri istemcinin iç kimliğidir.
-
-        Ayarların kaynağı `docs/sozlesmeler.md` dosyasının 2. bölümüdür.
-        """
-        client_id = site_client_id(tenant)
-        base = base_url.rstrip("/")
-        preview = Preview(
-            operation="keycloak.create_site_client",
-            target=client_id,
-            summary=f"Create confidential Keycloak client {client_id} for {base}.",
-            destructive=False,
-        )
-        if dry_run:
-            return Outcome(preview, executed=False)
-        body = {
-            "clientId": client_id,
-            "protocol": "openid-connect",
-            "enabled": True,
-            "publicClient": False,
-            "standardFlowEnabled": True,
-            "implicitFlowEnabled": False,
-            "directAccessGrantsEnabled": False,
-            "serviceAccountsEnabled": False,
-            "redirectUris": [f"{base}{SITE_REDIRECT_PATH}"],
-            "attributes": {
-                "backchannel.logout.url": f"{base}{SITE_BACKCHANNEL_LOGOUT_PATH}",
-                "backchannel.logout.session.required": "true",
-            },
-        }
-        response = _expect(self._call("POST", "/clients", json_body=body), 201)
-        return Outcome(preview, executed=True, value=_id_from_location(response))
-
     def disable_user(self, subject: str) -> None:
         """Disable the user and end the user's sessions. Repeatable. A missing user counts as done.
 
@@ -392,17 +339,6 @@ class KeycloakAdmin:
             organization_id = str(self.create_organization(alias, name).value)
         self.add_organization_member(organization_id, subject)
         return organization_id
-
-    # BORC(mvp): no entry point calls this yet, and it needs the `manage-clients` role that the
-    # shared contract does not grant. Effect: a new tenant's client cannot be opened by this service.
-    # Owner: the orchestrator and the kimlik-realm job. Closes when the role is decided and the
-    # contract says how the secret reaches Press.
-    def ensure_site_client(self, tenant: str, base_url: str) -> SiteClient:
-        """`site-<kiracı>` istemcisi yoksa açar. İstemciyi ve sırrını döner."""
-        client_id = site_client_id(tenant)
-        existing = self.find_client(client_id)
-        client_uuid = str(existing["id"]) if existing else str(self.create_site_client(tenant, base_url).value)
-        return SiteClient(client_id=client_id, client_secret=self.get_client_secret(client_uuid))
 
     def invite_user(
         self,
