@@ -60,3 +60,16 @@ Yeni ortam gerekiyorsa aşağıdaki adımları izleyin.
    ```sh
    backend/dev/hrms/compose down --volumes
    ```
+
+## Yerel yükseltme denemesi
+
+Yalnız bu işe ait test sitesini yükseltin.
+Siteyi yükselttikten sonra Frappe'nin rol kuyruğunu boşaltın.
+Yerel ortamda bu kuyruğu sürekli işleyen bir hizmet yoktur.
+
+```sh
+backend/dev/hrms/compose exec -T web bench --site test-hrms-tr.localhost migrate --skip-search-index
+backend/dev/hrms/compose exec -T web bench worker --queue long --burst
+```
+
+İkinci yükseltme denemesinden önce ilk kuyruğun bitmesini bekleyin.

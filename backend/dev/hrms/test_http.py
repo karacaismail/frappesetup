@@ -529,6 +529,7 @@ class LeaveHttpTest(unittest.TestCase):
                 )
         for invalid_args in (
             {"name": name},
+            {"version": args["version"]},
             {**args, "version": ""},
             {**args, "version": "x" * 41},
         ):
@@ -728,6 +729,7 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertIn(status, (403, 405))
         for invalid_body in (
             {"name": before["name"]},
+            {"version": body["version"]},
             {**body, "version": ""},
             {**body, "version": "x" * 41},
             {**body, "version": ["not a version"]},

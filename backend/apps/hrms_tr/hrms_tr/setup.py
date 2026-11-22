@@ -21,7 +21,6 @@ def fixture_rows(filename):
 
 
 def require_access_engine():
-	# BORC(mvp): Verify fresh install and upgrade after the access engine is available.
 	if not engine_available() or not frappe.db.exists("DocType", RULE_DOCTYPE):
 		frappe.throw(_("Install Platform Core with Access Rule before syncing HRMS TR."))
 
