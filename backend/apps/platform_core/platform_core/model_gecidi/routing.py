@@ -63,6 +63,6 @@ def candidates(entries, *, now, mode="priority", required=frozenset(), seed=0):
 def on_failure(candidate, code, *, now, cooldown_seconds):
 	if code == "authentication":
 		return Decision(replace(candidate, enabled=False), True)
-	if code in {"rate_limit", "upstream", "timeout"}:
+	if code in {"rate_limit", "upstream", "timeout", "connect_failed"}:
 		return Decision(replace(candidate, cooldown_until=now + cooldown_seconds), True)
-	return Decision(candidate, False)
+	return Decision(candidate, code == "forbidden")

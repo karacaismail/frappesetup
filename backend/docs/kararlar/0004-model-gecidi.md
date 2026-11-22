@@ -64,9 +64,17 @@ Maliyeti hesaplanamayan çağrı bütçeli hesaba gitmez.
 Geçit, her sağlayıcı denemesinden önce kullanım kaydı açar.
 Kayıt, çağrının sonucunu ve ölçülen kullanımı tutar.
 Geçit mesaj metnini, anahtarı ve araç girdisini kayda yazmaz.
-Maliyeti bilinmeyen ücretli deneme, sınırlı hesabı tekrar kullanıma kapatır.
-Sınır takvim ayı değişince yeni ay için hesaplanır.
-Geçit, aynı sitede aynı anda bir ücretli çağrı başlatır.
+Geçit aynı hesapta süren denemeler için hesap başına kilit alır.
+Farklı hesaplar aynı anda çağrı yapabilir.
+Geçit çağrıdan önce tahmini üst tutarı bütçeden ayırır.
+Çağrı hiç çıkmadıysa geçit ayrılan tutarı geri bırakır.
+Sonuç bilinmiyorsa tahmini tutar, yönetici gerçek tutarı girene kadar ayrılır.
+Eski kayıtta tahmin yoksa geçit yönetici çözümünü bekler.
+Geçit bütçeyi her takvim ayı için ayrı hesaplar.
+Geçit, bütçeli hesapta sonucu bilinmeyen süre aşımından sonra yedeğe geçmez.
+Geçit bağlantı için 5 saniye ayırır. Okuma süresi çıktı sınırına göre artar.
+Geçit bir yol için en çok 105 saniye ayırır.
+Deneme ortamı `bench serve` kullanır. Temel imaj Gunicorn için 120 saniye ayırır.
 
 Yönetici, `model_gateway_endpoints` ayarına tam bağlantı adresini ekler.
 Adresin değeri yerel ağ için `local`, dış hizmet için `external` olur.
@@ -75,22 +83,28 @@ Dış hizmet bağlantısı HTTPS ister.
 `local_only` yolu yalnız yerel ağa çağrı yapar.
 
 `masked` yolu, yaygın kimlik ve ödeme bilgilerini kalıpla örter.
-Geçit, dış çağrıdan önce örtülmüş isteğin parmak izini hesaplar.
-Parmak izi, içeriği temsil eden sabit uzunlukta bir özettir.
-Yönetici onaylı özetleri `model_gateway_external_payloads` ayarına ekler.
-Ayar, yol kimliğini onaylı özet listesine bağlar.
-Özet mesajı, araç listesini, çıktı şemasını ve çıktı sınırını kapsar.
-Geçit onaysız içeriği dış hizmete göndermez.
-Bağlantı denemesi yalnız sunucudaki sabit ve açık metni gönderir.
+Geçit dış hizmete her gönderimde mesajı örter.
+Geçit araç ve şema metnindeki hassas değerleri de örter.
+Geçit hassas bir alan adı bulursa isteği durdurur.
+“AI Manager” dış gönderime izin veren yolu seçebilir.
+Bağlantı denemesi sunucudaki sabit ve açık metni gönderir.
 
-İki HTTP ucu izin denetimini ortak geçit işlevlerine bırakır.
-Statik tarama bu işlevleri izleyemediği için iki uçta dar istisna vardır.
+HTTP uçları izin denetimini ortak işlevlere bırakır.
+Statik tarama bu işlevleri izleyemediği için uçlarda dar istisna vardır.
 HTTP testleri hem misafir hem yetkisiz kullanıcı erişimini sınar.
 Kullanım günlüğüne yazan iç işlev yalnız sunucunun seçtiği alanları alır.
 İşlev, sağlayıcı çağrısından önce deneme kaydını veritabanına yazar.
 Bu kayıt, istek yarıda kalırsa bütçe denetiminde korunur.
 
-Model çağrısı, yapay zekâ erişim katmanının süreli belirtecini de kabul eder.
-Geçit belirteci yalnız model çağrısı yolunda tanır.
-Geçit oturum sahibini ve kalan çağrı sayısını denetler.
-Yapay zekâ katmanı ile birleştirmede ortak kanca listesi iki girişi korumalıdır.
+Model çağrısı insan oturumunu ve Frappe kullanıcı anahtarını kabul eder.
+Aracı, çağrıyı yapay zekâ katmanından başlatır.
+Geçidin ortak işlevi arka plan işinde de kullanıcının yetkisini denetler.
+Arka plan işi, model çağrısından önce kendi veritabanı yazısını bitirir.
+
+Yönetici, sonucu bilinmeyen denemenin gerçek ücretini kayda yazabilir.
+Yönetici, kapalı bağlantının anahtarını ayrı bir uçla silebilir.
+Boş anahtar alanıyla form kaydetmek mevcut anahtarı korur.
+Kullanım günlükleri varsayılan olarak 365 gün tutulur.
+Site yöneticisi süreyi `model_gateway_usage_retention_days` ayarında belirler.
+Yönetici temizliği önizleyebilir veya elle başlatabilir.
+Temizlik yalnız kapanmış kayıtları siler. Her çağrı en çok 500 kayıt siler.

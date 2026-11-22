@@ -56,7 +56,7 @@
    "reqd": 1
   },
   {
-   "default": "masked",
+   "default": "local_only",
    "description": "Controls whether the route sends masked data or uses only local models.",
    "fieldname": "data_policy",
    "fieldtype": "Select",

@@ -1,6 +1,7 @@
-"""Validate the JSON arrays supported by gateway registry records."""
+"""Validate gateway registry field formats."""
 
 import json
+from urllib.parse import urlsplit
 
 import frappe
 from frappe import _
@@ -27,3 +28,29 @@ def encode_identifiers(value, label):
 	if len(set(items)) != len(items):
 		frappe.throw(_("{0} contains duplicate identifiers.").format(_(label)))
 	return json.dumps(items, separators=(",", ":"))
+
+
+def validate_url(value, label, *, https_only=False):
+	if not value:
+		return
+	schemes = {"https"} if https_only else {"http", "https"}
+	if isinstance(value, str) and not any(
+		character.isspace() or ord(character) < 32 or character in "?#\\" for character in value
+	):
+		try:
+			url = urlsplit(value)
+			port = url.port
+		except ValueError:
+			pass
+		else:
+			if url.scheme in schemes and url.hostname and url.username is None and port != 0:
+				return
+	if https_only:
+		frappe.throw(
+			_("{0} must be an HTTPS address without credentials, a query, or a fragment.").format(_(label))
+		)
+	frappe.throw(
+		_("{0} must be an HTTP or HTTPS address without credentials, a query, or a fragment.").format(
+			_(label)
+		)
+	)

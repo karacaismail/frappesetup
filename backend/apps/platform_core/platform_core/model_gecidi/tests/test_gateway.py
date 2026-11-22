@@ -3,6 +3,10 @@ import threading
 import unittest
 from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from time import monotonic, sleep
+from unittest.mock import patch
+
+import requests
 
 from platform_core.model_gecidi.adapters import Endpoint, GatewayError, complete
 from platform_core.model_gecidi.routing import Candidate, candidates, on_failure
@@ -18,6 +22,7 @@ class Handler(BaseHTTPRequestHandler):
 		pass
 
 	def do_POST(self):
+		self.server.paths.append(self.path)
 		self.server.path = self.path
 		self.server.headers = self.headers
 		raw = self.rfile.read(int(self.headers["Content-Length"]))
@@ -28,16 +33,35 @@ class Handler(BaseHTTPRequestHandler):
 			self.wfile.write(b'{"access_token":"fixture-token"}')
 			return
 		self.server.body = json.loads(raw)
+		sleep(self.server.header_delay)
 		self.send_response(self.status)
 		self.send_header("Content-Type", "application/json")
+		if self.server.location:
+			self.send_header("Location", self.server.location)
+		if self.server.content_encoding:
+			self.send_header("Content-Encoding", self.server.content_encoding)
 		self.end_headers()
-		self.wfile.write(json.dumps(self.response).encode())
+		try:
+			if self.server.chunks:
+				for chunk in self.server.chunks:
+					sleep(0.025)
+					self.wfile.write(chunk)
+					self.wfile.flush()
+			else:
+				self.wfile.write(json.dumps(self.response).encode())
+		except (BrokenPipeError, ConnectionResetError):
+			pass
 
 
 class AdapterTests(unittest.TestCase):
 	def setUp(self):
 		server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-		thread = threading.Thread(target=server.serve_forever)
+		server.paths = []
+		server.location = None
+		server.content_encoding = None
+		server.chunks = []
+		server.header_delay = 0
+		thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.02})
 		thread.start()
 		self.addCleanup(server.server_close)
 		self.addCleanup(thread.join)
@@ -212,6 +236,130 @@ class AdapterTests(unittest.TestCase):
 				self.assertEqual(failure.exception.code, code)
 				self.assertTrue(on_failure(first, code, now=100, cooldown_seconds=30).try_next)
 
+	def test_connect_timeout_is_nonbillable_and_separate_from_read_timeout(self):
+		with (
+			patch.object(requests.Session, "post", side_effect=requests.ConnectTimeout) as post,
+			self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(
+				Endpoint("first", "ollama", self.url), "fake", [], 4096, timeout=45, deadline=monotonic() + 60
+			)
+		self.assertEqual(post.call_args.kwargs["timeout"], (5, 45))
+		self.assertEqual(failure.exception.code, "connect_failed")
+		self.assertFalse(failure.exception.may_be_billed)
+
+	def test_timeout_before_response_headers_is_ambiguous(self):
+		Handler.status = 200
+		self.server.header_delay = 0.075
+		with (
+			self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(Endpoint("first", "ollama", self.url), "fake", [], 20, timeout=0.025)
+		self.assertEqual(failure.exception.code, "timeout")
+		self.assertTrue(failure.exception.may_be_billed)
+		self.assertEqual(self.server.paths, ["/api/chat"])
+
+	def test_redirects_are_not_followed_and_http_rejections_are_nonbillable(self):
+		endpoint = Endpoint("first", "ollama", self.url)
+		self.server.location = self.url + "/redirected"
+		for status, expected in ((307, "rejected"), (400, "rejected"), (403, "forbidden"), (404, "rejected")):
+			with (
+				self.subTest(status=status),
+				self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
+				self.assertRaises(GatewayError) as failure,
+			):
+				Handler.status = status
+				complete(endpoint, "fake", [], 20)
+			self.assertEqual(failure.exception.code, expected)
+			self.assertFalse(failure.exception.may_be_billed)
+		self.assertEqual(self.server.paths, ["/api/chat"] * 4)
+
+	def test_accepted_and_request_timeout_statuses_may_have_incurred_cost(self):
+		endpoint = Endpoint("first", "ollama", self.url)
+		for status, expected in ((202, "invalid_response"), (408, "timeout")):
+			with (
+				self.subTest(status=status),
+				self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
+				self.assertRaises(GatewayError) as failure,
+			):
+				Handler.status = status
+				complete(endpoint, "fake", [], 20)
+			self.assertEqual(failure.exception.code, expected)
+			self.assertTrue(failure.exception.may_be_billed)
+
+	def test_redirect_is_rejected_without_reading_its_body(self):
+		Handler.status = 307
+		self.server.location = self.url + "/redirected"
+		self.server.chunks = [b" "] * 40
+		started = monotonic()
+		with (
+			self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(Endpoint("first", "ollama", self.url), "fake", [], 20, deadline=started + 0.4)
+		self.assertEqual(failure.exception.code, "rejected")
+		self.assertLess(monotonic() - started, 0.7)
+		self.assertEqual(self.server.paths, ["/api/chat"])
+
+	def test_body_requires_identity_encoding(self):
+		Handler.status = 200
+		self.server.content_encoding = "gzip"
+		# Compressed reads can consume multiple network chunks before returning.
+		# The provider must honor the requested identity encoding.
+		with (
+			self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(Endpoint("first", "ollama", self.url), "fake", [], 20)
+		self.assertEqual(self.server.headers["Accept-Encoding"], "identity")
+		self.assertEqual(failure.exception.code, "invalid_response")
+
+	def test_body_cannot_exceed_byte_or_elapsed_time_limits(self):
+		endpoint = Endpoint("first", "ollama", self.url)
+		Handler.status = 200
+		Handler.response = {"message": {"content": "x" * (2 * 1024 * 1024)}}
+		with (
+			self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(endpoint, "fake", [], 20)
+		self.assertEqual(failure.exception.code, "invalid_response")
+		self.assertTrue(failure.exception.may_be_billed)
+		self.server.chunks = [b" "] * 40
+		started = monotonic()
+		with (
+			self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(endpoint, "fake", [], 20, deadline=started + 0.25)
+		self.assertEqual(failure.exception.code, "timeout")
+		self.assertLess(monotonic() - started, 0.75)
+
+	def test_tool_calls_must_use_an_offered_name_and_unique_safe_identifier(self):
+		Handler.status = 200
+		endpoint = Endpoint("first", "openai", self.url)
+		valid = {"id": "call-1", "function": {"name": "lookup", "arguments": "{}"}}
+		bad_id = {**valid, "id": "invalid id"}
+		bad_name = {**valid, "function": {**valid["function"], "name": "unlisted"}}
+		for calls in ([bad_id], [bad_name], [valid, valid]):
+			with (
+				self.subTest(calls=calls),
+				self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
+				self.assertRaises(GatewayError) as failure,
+			):
+				Handler.response = {"choices": [{"message": {"tool_calls": calls}}]}
+				complete(
+					endpoint,
+					"fake",
+					[],
+					20,
+					allow_test_http=True,
+					tools=[{"name": "lookup", "parameters": {"type": "object"}}],
+				)
+			self.assertEqual(failure.exception.code, "invalid_response")
+
 	def test_error_does_not_expose_secret(self):
 		Handler.status = 401
 		Handler.response = {"error": SECRET}
@@ -229,7 +377,7 @@ class RoutingTests(unittest.TestCase):
 		first = Candidate("first", "fake", priority=1)
 		second = Candidate("second", "fake", priority=2)
 		exhausted = Candidate("exhausted", "fake", priority=0, remaining_budget=0)
-		for error in ("rate_limit", "upstream", "timeout"):
+		for error in ("rate_limit", "upstream", "timeout", "connect_failed"):
 			with self.subTest(error=error):
 				decision = on_failure(first, error, now=100, cooldown_seconds=30)
 				self.assertTrue(decision.try_next)
@@ -240,6 +388,9 @@ class RoutingTests(unittest.TestCase):
 		decision = on_failure(first, "authentication", now=100, cooldown_seconds=30)
 		self.assertTrue(decision.try_next)
 		self.assertEqual(candidates([decision.candidate, second], now=500), [second])
+		decision = on_failure(first, "forbidden", now=100, cooldown_seconds=30)
+		self.assertTrue(decision.try_next)
+		self.assertIs(decision.candidate, first)
 
 	def test_capped_account_requires_a_bounded_cost(self):
 		budget = Decimal("1")

@@ -8,7 +8,8 @@ import frappe
 from frappe.utils import now_datetime
 
 MILLION = Decimal("1000000")
-POTENTIALLY_BILLED = ("pending", "success", "upstream", "timeout", "invalid_response", "rejected")
+UNSETTLED = ("pending", "unknown", "upstream", "timeout", "invalid_response", "rejected")
+POTENTIALLY_BILLED = (*UNSETTLED, "success", "resolved")
 
 
 def price(model, input_tokens, output_tokens):
@@ -23,7 +24,18 @@ def _usage(filters):
 	return frappe.get_all(
 		"AI Usage Log",
 		filters=filters,
-		fields=["input_tokens", "output_tokens", "usage_known", "cost", "currency", "result", "cost_known"],
+		fields=[
+			"input_tokens",
+			"output_tokens",
+			"usage_known",
+			"cost",
+			"currency",
+			"result",
+			"cost_known",
+			"reserved_cost",
+			"reservation_known",
+			"reserved_tokens",
+		],
 	)
 
 
@@ -38,9 +50,17 @@ def remaining(account):
 			"result": ["in", POTENTIALLY_BILLED],
 		}
 	)
-	if any(not item.cost_known or item.currency != account.currency for item in records):
-		return Decimal(0)
-	return Decimal(str(account.monthly_budget)) - sum(Decimal(str(item.cost)) for item in records)
+	spent = Decimal(0)
+	for item in records:
+		if item.currency != account.currency:
+			return Decimal(0)
+		if item.result not in UNSETTLED and item.cost_known:
+			spent += Decimal(str(item.cost))
+		elif item.reservation_known:
+			spent += Decimal(str(item.reserved_cost))
+		else:
+			return Decimal(0)
+	return Decimal(str(account.monthly_budget)) - spent
 
 
 def site_quota(user):
@@ -59,14 +79,17 @@ def api_quota(api, conservative_tokens):
 		return False
 	if api.tokens_per_minute:
 		billable = [item for item in records if item.result in POTENTIALLY_BILLED]
-		if any(not item.usage_known for item in billable):
+		if any(not item.usage_known and not item.reserved_tokens for item in billable):
 			return False
-		tokens = sum(item.input_tokens + item.output_tokens for item in billable)
+		tokens = sum(
+			item.input_tokens + item.output_tokens if item.usage_known else item.reserved_tokens
+			for item in billable
+		)
 		return tokens + conservative_tokens <= api.tokens_per_minute
 	return True
 
 
-def begin(route, api, account, provider, model):
+def begin(route, api, account, provider, model, *, cost, tokens):
 	# This internal audit writer only inserts fields assembled from authorized records.
 	# No caller can supply values directly or grant creation rights to their REST identity.
 	log = frappe.get_doc(
@@ -83,6 +106,9 @@ def begin(route, api, account, provider, model):
 			"currency": model.cost_currency,
 			"result": "pending",
 			"usage_known": 0,
+			"reserved_cost": cost if cost is not None else 0,
+			"reservation_known": int(cost is not None),
+			"reserved_tokens": tokens,
 		}
 	)
 	log.db_insert()
@@ -91,16 +117,17 @@ def begin(route, api, account, provider, model):
 	return log.name
 
 
-def finish(name, model, result, duration_ms, usage=None):
+def finish(name, model, result, duration_ms, usage=None, *, failure_code=None):
 	usage = usage or {}
 	tokens_in, tokens_out = usage.get("input"), usage.get("output")
 	cost = price(model, tokens_in, tokens_out)
 	frappe.db.set_value(
 		"AI Usage Log",
-		name,
+		{"name": name, "result": "pending"},
 		{
 			"result": result,
 			"duration_ms": duration_ms,
+			"failure_code": failure_code,
 			"input_tokens": tokens_in or 0,
 			"output_tokens": tokens_out or 0,
 			"cost": cost or 0,

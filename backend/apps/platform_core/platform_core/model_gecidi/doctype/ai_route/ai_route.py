@@ -9,6 +9,8 @@ from platform_core.model_gecidi.doctype.validation import encode_identifiers, pa
 
 class AIRoute(Document):
 	def validate(self):
+		if self.data_policy == "masked" and self.has_value_changed("data_policy"):
+			frappe.only_for("AI Manager", message=True)
 		self.required_capabilities = encode_identifiers(self.required_capabilities, "Required Capabilities")
 		targets = parse_records(self.targets, "Targets", required=True)
 		seen = set()

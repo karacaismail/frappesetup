@@ -25,11 +25,13 @@ class ProviderHandler(BaseHTTPRequestHandler):
 		pass
 
 	def do_POST(self):
-		self.rfile.read(int(self.headers["Content-Length"]))
+		payload = self.rfile.read(int(self.headers["Content-Length"]))
 		self.server.attempts.append(self.path)
-		if self.path == "/first/api/chat":
-			status, response = 429, {"error": "fixture rate limit"}
-		elif self.path == "/second/api/chat":
+		self.server.provider_payloads.append(payload)
+		status = self.server.provider_status.get(self.path)
+		if status is not None and status != 200:
+			response = {"error": "fixture provider failure"}
+		elif self.path in {"/first/api/chat", "/second/api/chat"}:
 			status, response = (
 				200,
 				{
@@ -52,22 +54,25 @@ def _insert(doctype, **fields):
 	return frappe.get_doc({"doctype": doctype, **fields}).insert().name
 
 
-def _identities(suffix, password, cleanup):
+def _identities(suffix, password, role, auth, cleanup):
 	users = {}
-	for actor in ("manager", "regular"):
+	roles = {"manager": "AI Manager", "system_manager": "System Manager", "authorized": role}
+	for actor in ("manager", "regular", "authorized", "system_manager"):
+		credentials = {"api_key": auth[0], "api_secret": auth[1]} if actor == "authorized" else {}
 		users[actor] = _insert(
 			"User",
 			email=f"gateway-{actor}-{suffix}@example.test",
 			first_name=f"Gateway fixture {actor}",
 			send_welcome_email=0,
 			new_password=password,
-			roles=[{"role": "AI Manager"}] if actor == "manager" else [],
+			roles=[{"role": roles[actor]}] if actor in roles else [],
+			**credentials,
 		)
 		cleanup.callback(frappe.delete_doc, "User", users[actor])
 	return users
 
 
-def _seed(suffix, credential, cleanup):
+def _seed(suffix, credential, role, cleanup):
 	def insert(doctype, **fields):
 		name = _insert(doctype, **fields)
 		cleanup.callback(frappe.delete_doc, doctype, name)
@@ -99,16 +104,31 @@ def _seed(suffix, credential, cleanup):
 		targets=json.dumps([{"model": model, "api": api} for api in apis]),
 		data_policy="local_only",
 	)
+	role_route = insert(
+		"AI Route",
+		route_name=f"Role route {suffix}",
+		selection_mode="priority",
+		targets=json.dumps([{"model": model, "api": apis[1]}]),
+		data_policy="local_only",
+		required_role=role,
+	)
 	locked_provider = insert("AI Provider", provider_name=f"Credential {suffix}", adapter="openai")
 	locked_account = insert("AI Account", provider=locked_provider, account_name=f"Private account {suffix}")
-	credential_api = insert(
-		"AI API",
-		account=locked_account,
-		api_name=f"Credential API {suffix}",
-		base_url="https://fixture.example.test",
-		auth_type="api_key",
-		api_key=credential,
-	)
+
+	def credential_api(display):
+		return insert(
+			"AI API",
+			account=locked_account,
+			api_name=f"{display} API {suffix}",
+			base_url="https://fixture.example.test",
+			auth_type="api_key",
+			api_key=credential,
+		)
+
+	credential_read_api = credential_api("Private")
+	editable_api = credential_api("Editable")
+	clearable_api = credential_api("Clearable")
+
 	for api in apis:
 		cleanup.callback(_remove_usage, api)
 	return {
@@ -118,7 +138,10 @@ def _seed(suffix, credential, cleanup):
 		"first_api": apis[0],
 		"second_api": apis[1],
 		"route": route,
-		"credential_api": credential_api,
+		"role_route": role_route,
+		"credential_api": credential_read_api,
+		"editable_api": editable_api,
+		"clearable_api": clearable_api,
 		"credential": credential,
 	}
 
@@ -183,24 +206,33 @@ def run():
 	suffix = uuid4().hex[:12]
 	password = f"Fixture#{uuid4().hex}"
 	credential = f"test-only-{uuid4().hex}"
+	auth = (uuid4().hex, uuid4().hex)
 	frappe.set_user("Administrator")
 	try:
 		with ExitStack() as cleanup:
-			users = _identities(suffix, password, cleanup)
-			fixture = _seed(suffix, credential, cleanup)
+			role = _insert("Role", role_name=f"Gateway fixture caller {suffix}", desk_access=0)
+			cleanup.callback(frappe.delete_doc, "Role", role)
+			users = _identities(suffix, password, role, auth, cleanup)
+			fixture = _seed(suffix, credential, role, cleanup)
 			frappe.db.commit()
 			with ExitStack() as connections:
 				server = connections.enter_context(
 					ThreadingHTTPServer(("127.0.0.1", FIXTURE_PORT), ProviderHandler)
 				)
 				server.attempts = []
+				server.provider_status = {}
+				server.provider_payloads = []
 				thread = Thread(target=server.serve_forever, daemon=True)
 				thread.start()
 				connections.callback(thread.join)
 				connections.callback(server.shutdown)
 				fixture.update(
 					base=base,
+					users=users,
 					attempts=server.attempts,
+					provider_status=server.provider_status,
+					provider_payloads=server.provider_payloads,
+					provider_url=SECOND_URL,
 					sessions={"guest": connections.enter_context(_session(base))},
 				)
 				for actor, user in users.items():
@@ -208,6 +240,8 @@ def run():
 				fixture["sessions"]["agent"] = connections.enter_context(
 					_agent_session(base, fixture["sessions"]["manager"], users["manager"], cleanup)
 				)
+				fixture["sessions"]["api_key"] = connections.enter_context(_session(base))
+				fixture["sessions"]["api_key"].headers["Authorization"] = f"token {auth[0]}:{auth[1]}"
 				TestModelHTTP.fixture = fixture
 				try:
 					suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestModelHTTP)

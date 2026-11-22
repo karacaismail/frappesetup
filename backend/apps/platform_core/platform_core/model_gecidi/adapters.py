@@ -2,14 +2,17 @@
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from time import monotonic
 from urllib.parse import quote, quote_plus, urlsplit
 
 import requests
-from urllib3.exceptions import HTTPError, ReadTimeoutError
+from urllib3.exceptions import HTTPError, MaxRetryError, NewConnectionError, ReadTimeoutError
 
 LOGGER = logging.getLogger(__name__)
+CALL_ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
+POTENTIALLY_BILLED = {"timeout", "upstream", "invalid_response"}
 PATHS = {
 	"openai": "/v1/chat/completions",
 	"anthropic": "/v1/messages",
@@ -30,9 +33,16 @@ class Endpoint:
 
 
 class GatewayError(Exception):
-	def __init__(self, code):
+	def __init__(self, code, *, may_be_billed=None):
 		super().__init__(code)
 		self.code = code
+		self.may_be_billed = code in POTENTIALLY_BILLED if may_be_billed is None else may_be_billed
+
+
+class _ProviderSession(requests.Session):
+	def get_redirect_target(self, response):
+		# Requests otherwise drains redirect bodies even with allow_redirects=False.
+		return None
 
 
 def _url(value, *, secure):
@@ -48,24 +58,65 @@ def _url(value, *, secure):
 	return value
 
 
-def _post_json(session, url, *, timeout, max_bytes, before_post, **kwargs):
+def _read_body(response, deadline, max_bytes):
+	# urllib3's read1 returns after one socket read. Apply the remaining wall time
+	# to the underlying CPython socket as well, so a final quiet read cannot
+	# spend the original read timeout again. A fully read response has no socket.
+	if response.headers.get("Content-Encoding", "identity").strip().lower() != "identity":
+		raise GatewayError("invalid_response")
+	raw = response.raw
+	buffered = getattr(getattr(raw, "_fp", None), "fp", None)
+	socket = getattr(getattr(buffered, "raw", None), "_sock", None)
+	body = bytearray()
+	while True:
+		remaining = deadline - monotonic()
+		if remaining <= 0:
+			raise GatewayError("timeout")
+		if socket is not None and socket.fileno() >= 0:
+			socket.settimeout(remaining)
+		chunk = raw.read1(8192, decode_content=False)
+		if not chunk:
+			break
+		body.extend(chunk)
+		if len(body) > max_bytes:
+			raise GatewayError("invalid_response")
+	if monotonic() >= deadline:
+		raise GatewayError("timeout")
+	try:
+		return json.loads(body)
+	except (ValueError, RecursionError):
+		raise GatewayError("invalid_response") from None
+
+
+def _post_json(session, url, *, timeout, connect_timeout, deadline, max_bytes, before_post, **kwargs):
 	if before_post is not None and not before_post():
 		raise GatewayError("reservation_lost")
-	deadline = monotonic() + timeout
-	with session.post(url, timeout=timeout, allow_redirects=False, stream=True, **kwargs) as response:
-		if response.status_code != 200:
-			return response.status_code, None
-		body = bytearray()
-		while chunk := response.raw.read1(8192, decode_content=True):
-			if monotonic() > deadline:
-				raise GatewayError("timeout")
-			body.extend(chunk)
-			if len(body) > max_bytes:
-				raise GatewayError("invalid_response")
-		try:
-			return response.status_code, json.loads(body)
-		except (ValueError, RecursionError):
-			raise GatewayError("invalid_response") from None
+	remaining = deadline - monotonic()
+	if remaining <= 0:
+		raise GatewayError("not_sent")
+	# Keep both socket timeouts inside the shared route budget.
+	connect = min(connect_timeout, remaining / 2)
+	read = min(timeout, remaining - connect)
+	try:
+		with session.post(
+			url, timeout=(connect, read), allow_redirects=False, stream=True, **kwargs
+		) as response:
+			if response.status_code != 200:
+				return response.status_code, None
+			return response.status_code, _read_body(response, min(deadline, monotonic() + read), max_bytes)
+	except requests.ConnectTimeout:
+		raise GatewayError("connect_failed") from None
+	except (requests.Timeout, ReadTimeoutError, TimeoutError):
+		raise GatewayError("timeout") from None
+	except requests.ConnectionError as failure:
+		reason = failure.args[0] if failure.args else None
+		if isinstance(reason, MaxRetryError) and isinstance(reason.reason, NewConnectionError):
+			raise GatewayError("connect_failed") from None
+		raise GatewayError("upstream") from None
+	except (requests.exceptions.InvalidURL, requests.exceptions.InvalidHeader):
+		raise GatewayError("configuration") from None
+	except (requests.RequestException, HTTPError):
+		raise GatewayError("upstream") from None
 
 
 def _contains_secret(value, secrets):
@@ -78,7 +129,7 @@ def _contains_secret(value, secrets):
 	return False
 
 
-def _headers(endpoint, session, timeout, *, allow_test_http, before_post):
+def _headers(endpoint, session, timeout, connect_timeout, deadline, *, allow_test_http, before_post):
 	headers = {}
 	if endpoint.adapter == "anthropic":
 		headers["anthropic-version"] = "2023-06-01"
@@ -100,12 +151,13 @@ def _headers(endpoint, session, timeout, *, allow_test_http, before_post):
 			data={"grant_type": "client_credentials"},
 			auth=(quote_plus(endpoint.client_id), quote_plus(endpoint.secret)),
 			timeout=timeout,
+			connect_timeout=connect_timeout,
+			deadline=deadline,
 			max_bytes=65536,
 			before_post=before_post,
 		)
 		if status != 200:
-			code = _status_code(status)
-			raise GatewayError("authentication" if code == "rejected" else code)
+			raise GatewayError(_status_code(status), may_be_billed=False)
 		token = token_body.get("access_token") if isinstance(token_body, dict) else None
 		if not isinstance(token, str) or not token:
 			raise GatewayError("invalid_response")
@@ -180,18 +232,28 @@ def _payload(adapter, model, messages, limit, tools, schema):
 def _call(name, arguments, identifier):
 	if isinstance(arguments, str):
 		arguments = json.loads(arguments)
-	if not isinstance(arguments, dict) or not isinstance(name, str):
+	if (
+		not isinstance(arguments, dict)
+		or not isinstance(name, str)
+		or not isinstance(identifier, str)
+		or not CALL_ID.fullmatch(identifier)
+	):
 		raise ValueError("Invalid function call")
 	return {"id": identifier, "name": name, "arguments": arguments}
+
+
+def _call_id(call, index):
+	identifier = call.get("id")
+	return f"call-{index}" if identifier is None else identifier
 
 
 def _normalize(adapter, body):
 	if adapter in {"openai", "ollama"}:
 		message = body["choices"][0]["message"] if adapter == "openai" else body["message"]
 		if message.get("refusal"):
-			raise GatewayError("rejected")
+			raise GatewayError("rejected", may_be_billed=True)
 		calls = [
-			_call(call["function"]["name"], call["function"]["arguments"], call.get("id") or f"call-{index}")
+			_call(call["function"]["name"], call["function"]["arguments"], _call_id(call, index))
 			for index, call in enumerate(message.get("tool_calls", []))
 		]
 		if adapter == "openai":
@@ -205,7 +267,7 @@ def _normalize(adapter, body):
 		return message.get("content") or "", calls, body.get("prompt_eval_count"), body.get("eval_count")
 	if adapter == "anthropic":
 		if body.get("stop_reason") == "refusal":
-			raise GatewayError("rejected")
+			raise GatewayError("rejected", may_be_billed=True)
 		parts = body["content"]
 		text = "".join(part["text"] for part in parts if part["type"] == "text")
 		calls = [
@@ -216,11 +278,11 @@ def _normalize(adapter, body):
 
 	candidate = body["candidates"][0]
 	if candidate.get("finishReason") not in {None, "STOP", "MAX_TOKENS"}:
-		raise GatewayError("rejected")
+		raise GatewayError("rejected", may_be_billed=True)
 	parts = candidate["content"]["parts"]
 	text = "".join(part.get("text", "") for part in parts if not part.get("thought"))
 	calls = [
-		_call(call["name"], call.get("args", {}), call.get("id") or f"call-{index}")
+		_call(call["name"], call.get("args", {}), _call_id(call, index))
 		for index, call in enumerate(part["functionCall"] for part in parts if "functionCall" in part)
 	]
 	usage = body.get("usageMetadata") or {}
@@ -232,8 +294,14 @@ def _normalize(adapter, body):
 
 
 def _status_code(status):
-	if status in {401, 403}:
+	if 200 <= status < 300:
+		return "invalid_response"
+	if status == 401:
 		return "authentication"
+	if status == 403:
+		return "forbidden"
+	if status == 408:
+		return "timeout"
 	if status == 429:
 		return "rate_limit"
 	if 500 <= status < 600:
@@ -250,45 +318,67 @@ def complete(
 	tools=(),
 	schema=None,
 	timeout=30,
+	connect_timeout=5,
+	deadline=None,
 	allow_test_http=False,
 	before_post=None,
 ):
 	"""Make one synchronous attempt. Exceptions and logs carry only fixed codes."""
-	error = "configuration"
+	error = GatewayError("configuration")
+	if deadline is None:
+		deadline = monotonic() + connect_timeout + timeout
 	try:
 		base = _url(
 			endpoint.base_url,
 			secure=not (allow_test_http or (endpoint.adapter == "ollama" and endpoint.auth == "none")),
 		)
 		if endpoint.auth in {"api_key", "bearer"} and not endpoint.secret:
-			raise GatewayError(error)
+			raise error
 		path = PATHS[endpoint.adapter].format(model=quote(model, safe=""))
 		payload = _payload(endpoint.adapter, model, messages, limit, tools, schema)
-		with requests.Session() as session:
+		with _ProviderSession() as session:
 			session.trust_env = False
-			headers = _headers(
-				endpoint, session, timeout, allow_test_http=allow_test_http, before_post=before_post
-			)
+			session.headers["Accept-Encoding"] = "identity"
+			try:
+				headers = _headers(
+					endpoint,
+					session,
+					timeout,
+					connect_timeout,
+					deadline,
+					allow_test_http=allow_test_http,
+					before_post=before_post,
+				)
+			except GatewayError as failure:
+				# Token issuance cannot have sent a model request.
+				raise GatewayError(failure.code, may_be_billed=False) from None
 			status, body = _post_json(
 				session,
 				base.rstrip("/") + path,
 				headers=headers,
 				json=payload,
 				timeout=timeout,
+				connect_timeout=connect_timeout,
+				deadline=deadline,
 				max_bytes=2 * 1024 * 1024,
 				before_post=before_post,
 			)
 		if status != 200:
 			raise GatewayError(_status_code(status))
-		error = "invalid_response"
+		error = GatewayError("invalid_response")
 		if body.get("error") or body.get("promptFeedback", {}).get("blockReason"):
-			raise GatewayError("rejected")
+			raise GatewayError("rejected", may_be_billed=True)
 		text, calls, input_tokens, output_tokens = _normalize(endpoint.adapter, body)
 		if not isinstance(text, str) or any(
 			count is not None and (type(count) is not int or count < 0)
 			for count in (input_tokens, output_tokens)
 		):
-			raise GatewayError(error)
+			raise error
+		allowed_names = {tool["name"] for tool in tools}
+		if any(call["name"] not in allowed_names for call in calls) or len(
+			{call["id"] for call in calls}
+		) != len(calls):
+			raise error
 		bearer = headers.get("Authorization", "").removeprefix("Bearer ")
 		if _contains_secret([text, calls], (endpoint.secret, bearer)):
 			raise GatewayError("invalid_response")
@@ -299,15 +389,9 @@ def complete(
 			"tool_calls": calls,
 			"usage": {"input": input_tokens, "output": output_tokens},
 		}
-	except (requests.Timeout, ReadTimeoutError):
-		error = "timeout"
-	except (requests.ConnectionError, HTTPError):
-		error = "upstream"
-	except requests.RequestException:
-		error = "rejected"
 	except GatewayError as failure:
-		error = failure.code
+		error = failure
 	except (KeyError, IndexError, ValueError, TypeError, AttributeError, RecursionError):
 		pass
-	LOGGER.warning("Model gateway attempt failed: %s", error)
-	raise GatewayError(error)
+	LOGGER.warning("Model gateway attempt failed: %s", error.code)
+	raise GatewayError(error.code, may_be_billed=error.may_be_billed)

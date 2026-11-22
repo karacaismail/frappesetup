@@ -31,7 +31,6 @@ Context Size,Bağlam Boyutu
 Controls whether the route sends masked data or uses only local models.,Geçit maskeli veri gönderir veya yalnız yerel model kullanır.
 Cost Currency,Maliyetin Para Birimi
 Currency of both model prices.,Girdi ve çıktı fiyatları bu para birimindedir.
-Currency of the calculated cost. Blank when the cost is unknown.,Geçit maliyeti biliyorsa para birimini burada gösterir.
 Currency of the monthly cap.,Geçit aylık bütçeyi bu para birimiyle hesaplar.
 Data Policy,Veri Kuralı
 Default Base URL,Varsayılan Bağlantı Adresi
@@ -121,3 +120,23 @@ Cost Known,Maliyet Biliniyor
 Whether the recorded cost is known.,Geçit denemenin maliyetini hesapladı.
 Enter the API credential as text.,Gizli bağlantı bilgisini metin olarak yazın.
 Enter a credential without using the password mask.,Gizli bağlantı bilgisini yalnız yıldız işaretiyle yazmayın.
+API credentials cannot be read through document methods.,Kayıt üzerinden gizli bağlantı bilgisi okunamaz.
+Disable the API connection before clearing its credential.,Gizli bağlantı bilgisini silmeden önce API bağlantısını kapatın.
+"{0} must be an HTTPS address without credentials, a query, or a fragment.","{0} alanına geçerli bir HTTPS adresi yazın. Adres kullanıcı bilgisi, sorgu veya bölüm içermesin."
+"{0} must be an HTTP or HTTPS address without credentials, a query, or a fragment.","{0} alanına geçerli bir HTTP veya HTTPS adresi yazın. Adres kullanıcı bilgisi, sorgu veya bölüm içermesin."
+Context size must be at least 1 token.,Bağlam boyutu en az 1 token olmalıdır.
+Reservation Known,Ayrılan Tutar Biliniyor
+Whether the attempt has a bounded reserved cost.,Geçit bu deneme için üst tutarı hesapladı.
+Reserved Cost,Ayrılan Tutar
+Maximum estimated charge reserved before dispatch.,Geçit çağrıdan önce bu tahmini tutarı ayırır.
+Reserved Tokens,Ayrılan Tokenlar
+Maximum estimated tokens reserved before dispatch.,Geçit çağrıdan önce bu tahmini token sayısını ayırır.
+Resolved By,Sonucu Belirleyen Yönetici
+Manager who resolved the uncertain provider charge.,Bu yönetici sağlayıcı ücretinin sonucunu belirledi.
+Resolved At,Sonuç Belirleme Zamanı
+Time when the manager resolved the uncertain provider charge.,Yönetici sağlayıcı ücretinin sonucunu bu zamanda belirledi.
+Resolution Note,Sonuç Notu
+Manager note explaining how the uncertain charge was reconciled.,Yönetici sağlayıcı ücretinin sonucunu nasıl belirlediğini yazar.
+Model currency used to reserve and calculate the attempt cost.,Geçit deneme tutarını modelin para birimiyle ayırır ve hesaplar.
+Failure Code,Hata Kodu
+Fixed provider failure code recorded when an attempt outcome is uncertain.,Geçit denemenin sonucu bilinmiyorsa bu hata kodunu yazar.

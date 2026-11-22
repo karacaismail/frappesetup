@@ -8,13 +8,12 @@ paths:
       summary: Generate a model response
       description: >
         Selects an eligible API for the active tenant and route. Checks permissions, quota,
-        and the route data policy before dispatch. External dispatch requires an approved
-        masked payload. Attempts may incur provider charges.
+        and the route data policy before dispatch. External dispatch masks content when the route permits it. Attempts may incur provider charges.
         Tool calls are returned as data for the caller to authorize and execute.
       operationId: complete
       security:
         - session: []
-        - agent: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -25,15 +24,17 @@ paths:
         '200':
           $ref: '#/components/responses/Result'
         '400':
-          description: Invalid request
+          $ref: '#/components/responses/Error'
         '401':
-          description: Authentication required
+          $ref: '#/components/responses/Error'
         '403':
-          description: Route, operation, or outbound data policy denied
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
         '429':
-          description: Request quota exceeded or site gateway busy
+          $ref: '#/components/responses/Error'
         '503':
-          description: No eligible API or provider available
+          $ref: '#/components/responses/Error'
   /api/method/platform_core.api.model.test_api:
     post:
       summary: Test one configured API
@@ -64,15 +65,119 @@ paths:
         '200':
           $ref: '#/components/responses/Result'
         '400':
-          description: Invalid API or model combination
+          $ref: '#/components/responses/Error'
         '401':
-          description: Authentication required
+          $ref: '#/components/responses/Error'
         '403':
-          description: Manager role required
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
         '429':
-          description: Request quota exceeded or site gateway busy
+          $ref: '#/components/responses/Error'
         '503':
-          description: Test connection unavailable
+          $ref: '#/components/responses/Error'
+  /api/method/platform_core.api.model.resolve_usage:
+    post:
+      summary: Resolve an unsettled attempt
+      description: A manager records the verified charge in the attempt currency. This changes the usage log and budget.
+      operationId: resolve_usage
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [log, cost]
+              properties:
+                log: {type: string, minLength: 1, maxLength: 140}
+                cost: {type: number, minimum: 0, exclusiveMaximum: 1000000000000, multipleOf: 0.000000001}
+      responses:
+        '200':
+          description: Reconciled usage record
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '417':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/method/platform_core.api.model.purge_usage:
+    post:
+      summary: Preview or purge old usage records
+      description: This destructive manager operation defaults to preview. Execution deletes up to 500 closed records past the retention window.
+      operationId: purge_usage
+      security:
+        - session: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                dry_run: {type: boolean, default: true}
+      responses:
+        '200':
+          description: Eligible and deleted counts
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '417':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/method/platform_core.api.model.clear_api_credential:
+    post:
+      summary: Clear a disabled API credential
+      description: This destructive manager operation removes the stored credential from a disabled API.
+      operationId: clear_api_credential
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [api]
+              properties:
+                api: {type: string, minLength: 1, maxLength: 140}
+      responses:
+        '200':
+          description: Credential cleared
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '417':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     session:
@@ -80,11 +185,36 @@ components:
       in: cookie
       name: sid
       description: Frappe session with the required CSRF header
-    agent:
-      type: http
-      scheme: bearer
-      description: Tenant-bound, short-lived agent token
+    apiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Native Frappe User API credentials in token or Basic form.
   responses:
+    Error:
+      description: Gateway error or Frappe request rejection
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [error]
+                    properties:
+                      error:
+                        type: string
+                        enum: [invalid_request, invalid_route, invalid_target, invalid_cost,
+                          authentication_required, permission_denied, data_policy_denied,
+                          transaction_active, attempt_in_progress, attempt_already_settled,
+                          quota_exceeded, gateway_busy, endpoint_unavailable, gateway_unavailable,
+                          provider_unavailable, invalid_retention]
+              - type: object
+                required: [exc_type]
+                properties:
+                  exc_type: {type: string}
     Result:
       description: Normalized Frappe RPC response
       content:
@@ -100,6 +230,7 @@ components:
       type: object
       additionalProperties: false
       required: [route, messages]
+      description: Messages, tools, and schema together may occupy at most 256 KiB when encoded as UTF-8 JSON.
       properties:
         route:
           type: string
@@ -108,6 +239,7 @@ components:
         messages:
           type: array
           minItems: 1
+          maxItems: 128
           items:
             type: object
             additionalProperties: false
@@ -128,6 +260,8 @@ components:
               name:
                 type: string
                 minLength: 1
+                maxLength: 64
+                pattern: '^[A-Za-z_][A-Za-z0-9_-]{0,63}$'
               description:
                 type: string
               parameters:

@@ -2,18 +2,21 @@
 
 import json
 import secrets
+from contextlib import contextmanager
 from dataclasses import dataclass
 from time import monotonic, time
 
 import frappe
+from frappe.utils.password import get_decrypted_password
 from redis.exceptions import LockError, RedisError
 
-from platform_core.model_gecidi import adapters, agent_access, ledger, policy, routing
+from platform_core.model_gecidi import adapters, ledger, policy, routing
 from platform_core.model_gecidi.policy import Denied
 
 COOLDOWN = 60
-MAX_ROUTE_SECONDS = 120
-MAX_ATTEMPT_TIMEOUT = 10
+MAX_ROUTE_SECONDS = 105
+LOCK_SECONDS = 135
+CONNECT_SECONDS = 5
 MAX_TARGETS = 12
 
 
@@ -38,7 +41,9 @@ class Target:
 
 	def endpoint(self):
 		secret = (
-			self.api.get_password("api_key", raise_exception=False) if self.api.auth_type != "none" else ""
+			get_decrypted_password("AI API", self.api.name, "api_key", raise_exception=False)
+			if self.api.auth_type != "none"
+			else ""
 		)
 		return adapters.Endpoint(
 			self.api.name,
@@ -114,15 +119,36 @@ def _choose(targets, route, request):
 	return [(choice, available[(choice.api, choice.model)]) for choice in sorted_choices]
 
 
-def _attempt(route, candidate, target, request, timeout, lock):
-	endpoint = target.endpoint()
+def read_timeout(limit):
+	return min(95, 8 + limit / 128)
+
+
+def retry_allowed(code, *, potentially_billed, capped):
+	return code != "timeout" or not potentially_billed or not capped
+
+
+def _set_health(api, status):
+	frappe.db.set_value("AI API", api, "health_status", status, update_modified=False)
+
+
+def _attempt(candidate, target, request, timeout, deadline, lock, log):
 	started = monotonic()
-	log = ledger.begin(
-		route.name if route else None, target.api, target.account, target.provider, target.model
-	)
-	if not lock.owned():
-		raise Denied(503, "gateway_unavailable")
+	outcome = "not_sent"
+	usage = None
+	failure_code = None
+
+	def owns_reservation():
+		try:
+			return lock.owned()
+		except RedisError:
+			return False
+
 	try:
+		if not owns_reservation():
+			raise Denied(503, "gateway_unavailable")
+		endpoint = target.endpoint()
+		# Beyond this point an unexpected interruption can leave delivery uncertain.
+		outcome = "unknown"
 		result = adapters.complete(
 			endpoint,
 			target.model.model_id,
@@ -131,110 +157,157 @@ def _attempt(route, candidate, target, request, timeout, lock):
 			tools=request.tools,
 			schema=request.schema,
 			timeout=timeout,
-			before_post=lock.owned,
+			connect_timeout=CONNECT_SECONDS,
+			deadline=deadline,
+			before_post=owns_reservation,
 		)
+		outcome, usage = "success", result["usage"]
+		if target.api.health_status != "healthy":
+			_set_health(target.api.name, "healthy")
+		return result, False
 	except adapters.GatewayError as failure:
-		if failure.code == "reservation_lost":
+		code = failure_code = failure.code
+		if code == "reservation_lost":
+			outcome = "not_sent"
 			raise Denied(503, "gateway_unavailable") from None
-		decision = routing.on_failure(candidate, failure.code, now=time(), cooldown_seconds=COOLDOWN)
+		if failure.may_be_billed:
+			outcome = "unknown"
+		elif code in ledger.UNSETTLED:
+			outcome = "not_billed"
+		else:
+			outcome = code
+		decision = routing.on_failure(candidate, code, now=time(), cooldown_seconds=COOLDOWN)
 		if not decision.candidate.enabled:
-			frappe.db.set_value("AI API", target.api.name, "health_status", "auth_failed")
+			_set_health(target.api.name, "auth_failed")
 		elif decision.candidate.cooldown_until:
-			frappe.db.set_value("AI API", target.api.name, "health_status", "unhealthy")
+			_set_health(target.api.name, "unhealthy")
 			frappe.cache.set(_cache_key(target.api.name), decision.candidate.cooldown_until, ex=COOLDOWN)
-		ledger.finish(log, target.model, failure.code, int((monotonic() - started) * 1000))
-		return None, decision.try_next
-	if target.api.health_status != "healthy":
-		frappe.db.set_value("AI API", target.api.name, "health_status", "healthy")
-	ledger.finish(log, target.model, "success", int((monotonic() - started) * 1000), result["usage"])
-	return result, False
+		retry = retry_allowed(
+			code,
+			potentially_billed=failure.may_be_billed,
+			capped=target.account.has_monthly_budget,
+		)
+		return None, retry and decision.try_next
+	finally:
+		ledger.finish(
+			log,
+			target.model,
+			outcome,
+			int((monotonic() - started) * 1000),
+			usage,
+			failure_code=failure_code,
+		)
 
 
-def _dispatch(route, targets, request, lock, deadline):
-	failed_apis = set()
-	quota_limited = False
-	policy_denied = False
-	for candidate, target in _choose(targets, route, request):
-		if target.api.name in failed_apis:
-			continue
-		if not ledger.site_quota(frappe.session.user):
-			raise Denied(429, "quota_exceeded")
-		# A prior failed attempt can consume the same account's budget. Read anew
-		# after recording it, before sending another request against that account.
-		budget = ledger.remaining(target.account)
-		if budget is not None and (budget <= 0 or candidate.cost is None or candidate.cost > budget):
-			continue
-		if not ledger.api_quota(target.api, target.model.context_size + request.limit):
-			quota_limited = True
-			continue
-		try:
-			outbound = policy.outbound(target.base_url, target.oauth_url, route, request)
-		except Denied as failure:
-			if route is None:
-				raise
-			policy_denied |= failure.status == 403
-			continue
-		timeout = min(MAX_ATTEMPT_TIMEOUT, (deadline - monotonic()) / 2)
-		if timeout <= 0:
-			break
-		result, retry = _attempt(route, candidate, target, outbound, timeout, lock)
-		if result is not None:
-			return result
-		if not retry:
-			break
-		failed_apis.add(target.api.name)
-	if quota_limited:
-		raise Denied(429, "quota_exceeded")
-	if policy_denied:
-		raise Denied(403, "data_policy_denied")
-	raise Denied(503, "provider_unavailable")
-
-
-def _under_lock(call, *args):
-	# A tenant-scoped, nonblocking lock serializes the reservation and settlement.
-	# Refresh the site's DB snapshot before checking quotas.
-	lock = frappe.cache.lock(frappe.cache.make_key("model_gateway:dispatch"), timeout=150, blocking=False)
+@contextmanager
+def scoped_lock(scope, identity, *, timeout=LOCK_SECONDS):
+	key = frappe.cache.make_key(f"model_gateway:{scope}:{identity}")
+	lock = frappe.cache.lock(key, timeout=timeout, blocking=False)
 	try:
 		if not lock.acquire():
 			raise Denied(429, "gateway_busy")
 		try:
-			frappe.db.commit()  # nosemgrep
-			return call(*args, lock=lock, deadline=monotonic() + MAX_ROUTE_SECONDS)
+			yield lock
 		finally:
 			try:
 				lock.release()
-			except LockError:
-				# A durable attempt was already recorded. Releasing an expired
-				# lease must not change its response or release a new owner's lock.
+			except (LockError, RedisError):
 				pass
 	except RedisError:
 		raise Denied(503, "gateway_unavailable") from None
 
 
-def _complete(route_id, request, *, lock, deadline):
-	route = _document("AI Route", route_id)
+def _reserve(route, target, candidate, tokens):
+	budget = ledger.remaining(target.account)
+	if budget is not None and (budget <= 0 or candidate.cost is None or candidate.cost > budget):
+		raise Denied(503, "provider_unavailable")
+	if not ledger.api_quota(target.api, tokens):
+		raise Denied(429, "quota_exceeded")
+	user = frappe.session.user
+	with scoped_lock("user", user, timeout=10):
+		# This is a gateway-owned transaction. Refresh the snapshot under the lock.
+		frappe.db.commit()  # nosemgrep
+		if not ledger.site_quota(user):
+			raise Denied(429, "quota_exceeded")
+		return ledger.begin(
+			route.name if route else None,
+			target.api,
+			target.account,
+			target.provider,
+			target.model,
+			cost=candidate.cost,
+			tokens=tokens,
+		)
+
+
+def _dispatch(route, targets, request, deadline):
+	failed_apis = set()
+	last_denial = None
+	for candidate, target in _choose(targets, route, request):
+		if target.api.name in failed_apis:
+			continue
+		timeout = min(read_timeout(request.limit), deadline - monotonic() - CONNECT_SECONDS)
+		if timeout <= 0:
+			break
+		try:
+			with scoped_lock("account", target.account.name) as lock:
+				# The candidate list is advisory. Re-read after acquiring the account lock.
+				frappe.db.commit()  # nosemgrep
+				current = _target(target.api.name, target.model.name)
+				if current.account.name != target.account.name:
+					continue
+				choices = _choose([current], route, request)
+				if not choices:
+					continue
+				candidate, current = choices[0]
+				outbound = policy.outbound(current.base_url, current.oauth_url, route, request)
+				log = _reserve(route, current, candidate, current.model.context_size + request.limit)
+				result, retry = _attempt(candidate, current, outbound, timeout, deadline, lock, log)
+		except Denied as failure:
+			if failure.code == "gateway_unavailable":
+				raise
+			last_denial = failure
+			continue
+		if result is not None:
+			return result
+		if not retry:
+			raise Denied(503, "provider_unavailable")
+		failed_apis.add(target.api.name)
+	if last_denial:
+		raise last_denial
+	raise Denied(503, "provider_unavailable")
+
+
+def _require_clean_transaction():
+	# Durable reservations must never commit writes belonging to a background caller.
+	if frappe.db.transaction_writes:
+		raise Denied(409, "transaction_active")
+
+
+def complete(route, messages, tools=None, schema=None, limit=1024):
+	policy.require_user()
+	_require_clean_transaction()
+	deadline = monotonic() + MAX_ROUTE_SECONDS
+	request = policy.parse(messages, tools, schema, limit)
+	route = _document("AI Route", route)
 	policy.require_route(route)
 	pairs = _json(route.targets)
 	if len(pairs) > MAX_TARGETS:
 		raise Denied(400, "invalid_route")
 	targets = [_target(item["api"], item["model"]) for item in pairs]
-	return _dispatch(route, targets, request, lock, deadline)
-
-
-def complete(route, messages, tools, schema, limit):
-	policy.require_session()
-	if agent_access.is_agent() and not agent_access.spend_call():
-		raise Denied(429, "agent_quota_exceeded")
-	request = policy.parse(messages, tools, schema, limit)
-	return _under_lock(_complete, route, request)
-
-
-def _test_api(api, model, *, lock, deadline):
-	target = _target(api, model)
-	request = policy.Request([{"role": "user", "content": "Reply with OK."}], [], None, 8)
-	return _dispatch(None, [target], request, lock, deadline)
+	try:
+		return _dispatch(route, targets, request, deadline)
+	except RedisError:
+		raise Denied(503, "gateway_unavailable") from None
 
 
 def test_api(api, model):
-	policy.require_session(managers_only=True)
-	return _under_lock(_test_api, api, model)
+	policy.require_user(managers_only=True)
+	_require_clean_transaction()
+	deadline = monotonic() + MAX_ROUTE_SECONDS
+	target = _target(api, model)
+	request = policy.Request([{"role": "user", "content": "Reply with OK."}], [], None, 8)
+	try:
+		return _dispatch(None, [target], request, deadline)
+	except RedisError:
+		raise Denied(503, "gateway_unavailable") from None

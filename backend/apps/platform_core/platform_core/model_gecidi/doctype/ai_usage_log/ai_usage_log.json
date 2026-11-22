@@ -18,7 +18,14 @@
   "cost",
   "currency",
   "duration_ms",
-  "result"
+  "result",
+  "failure_code",
+  "reservation_known",
+  "reserved_cost",
+  "reserved_tokens",
+  "resolved_by",
+  "resolved_at",
+  "resolution_note"
  ],
  "fields": [
   {
@@ -130,7 +137,7 @@
    "read_only": 1
   },
   {
-   "description": "Currency of the calculated cost. Blank when the cost is unknown.",
+   "description": "Model currency used to reserve and calculate the attempt cost.",
    "fieldname": "currency",
    "fieldtype": "Link",
    "label": "Cost Currency",
@@ -153,9 +160,64 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Result",
-   "options": "pending\nsuccess\nupstream\ntimeout\ninvalid_response\nrejected\nrate_limit\nauthentication\nconfiguration",
+   "options": "pending\nsuccess\nupstream\ntimeout\ninvalid_response\nrejected\nrate_limit\nauthentication\nconfiguration\nnot_sent\nnot_billed\nconnect_failed\nforbidden\nunknown\nresolved",
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "description": "Fixed provider failure code recorded when an attempt outcome is uncertain.",
+   "fieldname": "failure_code",
+   "fieldtype": "Data",
+   "label": "Failure Code",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Whether the attempt has a bounded reserved cost.",
+   "fieldname": "reservation_known",
+   "fieldtype": "Check",
+   "label": "Reservation Known",
+   "read_only": 1
+  },
+  {
+   "description": "Maximum estimated charge reserved before dispatch.",
+   "fieldname": "reserved_cost",
+   "fieldtype": "Currency",
+   "label": "Reserved Cost",
+   "non_negative": 1,
+   "options": "currency",
+   "precision": "9",
+   "read_only": 1
+  },
+  {
+   "description": "Maximum estimated tokens reserved before dispatch.",
+   "fieldname": "reserved_tokens",
+   "fieldtype": "Int",
+   "label": "Reserved Tokens",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "description": "Manager who resolved the uncertain provider charge.",
+   "fieldname": "resolved_by",
+   "fieldtype": "Link",
+   "label": "Resolved By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "description": "Time when the manager resolved the uncertain provider charge.",
+   "fieldname": "resolved_at",
+   "fieldtype": "Datetime",
+   "label": "Resolved At",
+   "read_only": 1
+  },
+  {
+   "description": "Manager note explaining how the uncertain charge was reconciled.",
+   "fieldname": "resolution_note",
+   "fieldtype": "Small Text",
+   "label": "Resolution Note",
+   "read_only": 1
   }
  ],
  "links": [],

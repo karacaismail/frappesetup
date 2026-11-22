@@ -3,12 +3,9 @@
 import json
 import re
 from dataclasses import dataclass
-from hashlib import sha256
 from urllib.parse import urlsplit
 
 import frappe
-
-from platform_core.model_gecidi import agent_access
 
 MAX_BYTES = 256 * 1024
 MAX_OUTPUT = 16_384
@@ -16,10 +13,39 @@ MANAGERS = {"AI Manager", "System Manager"}
 ROLES = {"user", "assistant", "system"}
 TOOL_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_-]{0,63}\Z")
 SENSITIVE = re.compile(
-	r"(?i)\b(?:TR(?:[ -]?\d){24}|\d(?:[ -]?\d){12,18}|\d{10,11})\b"
+	r"(?i)(?<![\w])(?:TR(?:[ -]?[0-9]){24}|"
+	r"(?:\+90[ .-]?|0[ .-]?)?\(?[2-5][0-9]{2}\)?(?:[ .-]?[0-9]){7}|"
+	r"[0-9](?:[ -]?[0-9]){9,10})(?![\w]|[ -][0-9])"
 	r"|[\w.+-]+@[\w.-]+\.[a-z]{2,}"
-	r"|(?<!\w)\+?90(?:[ .-]?\d){10}(?!\w)"
 )
+CARD = re.compile(r"(?<![\w])(?:[0-9][ -]?){12,18}[0-9](?![\w]|[ -][0-9])")
+
+
+def _mask_card(match):
+	digits = [int(char) for char in match.group() if char.isdigit()]
+	checksum = sum(
+		(value * 2 - 9 if value > 4 else value * 2) if index % 2 else value
+		for index, value in enumerate(reversed(digits))
+	)
+	return "[REDACTED]" if checksum % 10 == 0 else match.group()
+
+
+def _mask(text):
+	return SENSITIVE.sub("[REDACTED]", CARD.sub(_mask_card, text))
+
+
+def _mask_metadata(value):
+	if isinstance(value, dict):
+		if any(not isinstance(key, str) or _mask(key) != key for key in value):
+			raise Denied(403, "data_policy_denied")
+		return {key: _mask_metadata(item) for key, item in value.items()}
+	if isinstance(value, list):
+		return [_mask_metadata(item) for item in value]
+	if isinstance(value, str):
+		return _mask(value)
+	if type(value) is int and _mask(str(value)) != str(value):
+		raise Denied(403, "data_policy_denied")
+	return value
 
 
 class Denied(Exception):
@@ -38,9 +64,9 @@ class Request:
 
 	def masked(self):
 		return Request(
-			[{**item, "content": SENSITIVE.sub("[REDACTED]", item["content"])} for item in self.messages],
-			self.tools,
-			self.schema,
+			[{**item, "content": _mask(item["content"])} for item in self.messages],
+			_mask_metadata(self.tools),
+			_mask_metadata(self.schema),
 			self.limit,
 		)
 
@@ -85,16 +111,31 @@ def parse(messages, tools, schema, limit):
 	return Request(messages, tools, schema, limit)
 
 
-def require_session(*, managers_only=False):
-	"""Allow human sessions and, for completion, the shared gateway-scoped agent identity."""
-	if frappe.session.user in ("", "Guest"):
+def require_user(*, managers_only=False):
+	user = frappe.session.user
+	if user in (None, "", "Guest") or not frappe.db.get_value("User", user, "enabled"):
 		raise Denied(401, "authentication_required")
-	if managers_only and (agent_access.is_agent() or MANAGERS.isdisjoint(frappe.get_roles())):
+	if managers_only and MANAGERS.isdisjoint(frappe.get_roles()):
 		raise Denied(403, "permission_denied")
-	if not agent_access.is_agent():
-		sid = frappe.request.cookies.get("sid")
-		if not sid or sid != frappe.session.sid or frappe.get_request_header("Authorization"):
-			raise Denied(401, "authentication_required")
+
+
+def require_session(*, allow_api_key=False):
+	"""Require a real cookie session at the HTTP boundary."""
+	require_user()
+	request = getattr(frappe.local, "request", None)
+	sid = request.cookies.get("sid") if request is not None else None
+	auth = frappe.get_request_header("Authorization") or ""
+	if sid and sid != "Guest" and sid == frappe.session.sid and not auth:
+		return
+	if (
+		allow_api_key
+		and sid in (None, "", "Guest")
+		and auth.partition(" ")[0].lower() in {"token", "basic"}
+		and frappe.session.sid == frappe.session.user
+		and not frappe.get_request_header("Frappe-Authorization-Source")
+	):
+		return
+	raise Denied(401, "authentication_required")
 
 
 def require_route(route):
@@ -103,19 +144,8 @@ def require_route(route):
 		raise Denied(403, "permission_denied")
 
 
-def payload_digest(request):
-	"""Hash the complete canonical payload that would leave the site."""
-	body = json.dumps(
-		[request.messages, request.tools, request.schema, request.limit],
-		sort_keys=True,
-		separators=(",", ":"),
-		ensure_ascii=False,
-	)
-	return sha256(body.encode()).hexdigest()
-
-
 def outbound(base, oauth_url, route, request):
-	"""Use deployment-approved destinations and payloads for network dispatch."""
+	"""Use deployment-approved destinations and mask all external requests."""
 	endpoints = frappe.conf.get("model_gateway_endpoints") or {}
 	kind = endpoints.get(base)
 	if kind not in {"local", "external"} or (oauth_url and endpoints.get(oauth_url) != kind):
@@ -124,17 +154,6 @@ def outbound(base, oauth_url, route, request):
 		return request
 	if urlsplit(base).scheme != "https" or (oauth_url and urlsplit(oauth_url).scheme != "https"):
 		raise Denied(503, "endpoint_unavailable")
-	if route is None:
-		# The connection check sends only the server's fixed public probe.
-		return request
-	if route.data_policy != "masked":
+	if route is not None and route.data_policy != "masked":
 		raise Denied(403, "data_policy_denied")
-	# Changing tool or schema identifiers can change the contract. Refuse
-	# matching sensitive metadata instead of silently rewriting it.
-	if SENSITIVE.search(json.dumps([request.tools, request.schema], ensure_ascii=False)):
-		raise Denied(403, "data_policy_denied")
-	masked = request.masked()
-	approved = (frappe.conf.get("model_gateway_external_payloads") or {}).get(route.name, [])
-	if not isinstance(approved, list) or payload_digest(masked) not in approved:
-		raise Denied(403, "data_policy_denied")
-	return masked
+	return request.masked()
