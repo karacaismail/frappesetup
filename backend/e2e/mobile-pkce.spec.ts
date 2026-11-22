@@ -1,7 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { expect, request as apiRequest, test } from '@playwright/test';
 import { localUrl, required } from './local';
-import { authorizeMobile, mobileHeaders, previewMobileToken } from './mobile-fixture';
+import { authorizeMobile, previewMobileToken } from './mobile-fixture';
+import { postMobile } from './mobile-request';
 
 const fullPreview = process.env.E2E_FULL_BROWSER_FIXTURES === '1';
 
@@ -52,20 +53,13 @@ test('public PKCE client gets a token restricted to mobile endpoints', async ({ 
     expect([payload.aud].flat().includes(audience)).toBe(true);
 
     const installation = randomUUID();
-    const postMobile = (method: string, accessToken?: string, cookie?: string, extra = {}) => context.post(
-      methods + 'platform_core.api.mobile.v1_' + method,
-      { maxRedirects: 0,
-        headers: { ...mobileHeaders(accessToken, installation), Cookie: cookie ?? 'sid=Guest' },
-        data: { installation_id: randomUUID(), ...extra },
-      },
-    );
     const device = { installation_id: installation };
-    const registered = await postMobile('register', token, 'sid=Guest', device);
-    expect(registered.status()).toBe(200);
-    expect((await registered.json()).message).toMatchObject(device);
-    const pulled = await postMobile('pull', token, undefined, device);
-    expect(pulled.status()).toBe(200);
-    const page = (await pulled.json()).message;
+    const registered = await postMobile(methods, 'register', token, installation);
+    expect(registered.status).toBe(200);
+    expect(registered.json().message).toMatchObject(device);
+    const pulled = await postMobile(methods, 'pull', token, installation);
+    expect(pulled.status).toBe(200);
+    const page = pulled.json().message;
     expect(Array.isArray(page.changes) && typeof page.cursor === 'string' && typeof page.has_more === 'boolean').toBe(true);
 
     const expiredClaims = claims(expired);
@@ -81,19 +75,14 @@ test('public PKCE client gets a token restricted to mobile endpoints', async ({ 
       && wrongClaims.exp > Math.floor(Date.now() / 1000)).toBe(true);
 
     for (const invalid of [undefined, expired, wrong, 'eyJhbGciOiJub25lIn0.e30.']) {
-      expect([401, 403]).toContain((await postMobile('pull', invalid, undefined, device)).status());
+      expect([401, 403]).toContain((await postMobile(methods, 'pull', invalid, installation)).status);
     }
     expect([400, 401, 403]).toContain(
-      (await postMobile('pull', token, required('E2E_MOBILE_SESSION_COOKIE'), device)).status(),
+      (await postMobile(methods, 'pull', token, installation, {}, required('E2E_MOBILE_SESSION_COOKIE'))).status,
     );
     expect([400, 401, 403]).toContain(
-      (await postMobile('pull', token, undefined, { ...device, cmd: 'ping' })).status(),
+      (await postMobile(methods, 'pull', token, installation, { cmd: 'ping' })).status,
     );
-    const outside = await context.get(methods + 'frappe.auth.get_logged_user', {
-      headers: { Authorization: 'Bearer ' + token, Cookie: 'sid=Guest' }, maxRedirects: 0,
-    });
-    expect([401, 403]).toContain(outside.status());
-
     const preflight = await context.fetch(methods + 'platform_core.api.mobile.v1_pull', {
       method: 'OPTIONS',
       headers: { Origin: required('E2E_MOBILE_ORIGIN'), 'Access-Control-Request-Method': 'POST',
@@ -101,7 +90,12 @@ test('public PKCE client gets a token restricted to mobile endpoints', async ({ 
       maxRedirects: 0,
     });
     expect(preflight.ok()).toBe(true);
-    expect((await postMobile('revoke', token, undefined, device)).status()).toBe(200);
+    const outside = await context.get(methods + 'frappe.auth.get_logged_user', {
+      headers: { Authorization: 'Bearer ' + token }, maxRedirects: 0,
+    });
+    expect([401, 403]).toContain(outside.status());
+
+    expect((await postMobile(methods, 'revoke', token, installation)).status).toBe(200);
   } finally {
     await context.dispose();
   }

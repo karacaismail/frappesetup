@@ -1,7 +1,8 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 import { localUrl, required } from './local';
-import { mobileHeaders, previewMobileToken } from './mobile-fixture';
+import { previewMobileToken } from './mobile-fixture';
+import { mobileHeaders } from './mobile-request';
 
 const fullPreview = process.env.E2E_FULL_BROWSER_FIXTURES === '1';
 

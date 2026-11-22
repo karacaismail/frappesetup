@@ -64,12 +64,3 @@ export async function previewMobileToken(browser: Browser, request: APIRequestCo
   if (!result.access_token || !result.refresh_token) throw new Error('Preview mobile tokens are missing.');
   return { access: String(result.access_token), refresh: String(result.refresh_token) };
 }
-
-export function mobileHeaders(token: string | undefined, installation: string) {
-  return {
-    ...(token ? { Authorization: 'Bearer ' + token } : {}),
-    'X-Platform-Installation': installation,
-    'X-Mobile-App-Version': '1.0.0',
-    'X-Mobile-Contract-Version': '1',
-  };
-}
