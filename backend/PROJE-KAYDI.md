@@ -229,6 +229,7 @@ Bu turda gerçek kişisel veri yoktur. Saklama süresi ve silme yolu MVP yayın�
 | “AI Usage Log” | Kullanıcı adı | 365 gün. Bütçe ve fatura denetimi bu süreyi ister | Aynı silme komutu elle çalışır |
 | “AI Action Proposal” | Kullanıcı adı ve önizlemedeki kişi bilgisi. Örneğin çalışan adı ve izin tarihleri | Karar ya da süre dolumundan sonra 30 gün | Aynı silme komutu elle çalışır. Önizleme yalnız gerekli bilgiyi tutar |
 | Hesap silme isteği (O-27) | E-posta ve Keycloak kimliği | İş bitene kadar | İş bitince kayıt anonim yapılır |
+| identity-sync kayıt dosyası | Keycloak kullanıcı kimliği. E-posta ve ad tutulmaz | İş bitene kadar | İş bitince kimlik HMAC izine çevrilir (O-27) |
 | HRMS TR çalışan ve izin kayıtları | Ad, izin tarihleri, onaylayan kişi | İş ilişkisi sürdükçe. Yasal saklama süresini hukuk sorumlusu belirler. Bu madde teknik borçtur | Hesap silme kişinin alanlarını anonim yapar. İş kayıtları kalır (O-27) |
 
 Mesaj içeriği ve araç girdisi günlüğe yazılmaz. Günlük yalnız girdinin özetini tutar.
@@ -239,6 +240,11 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
+| `BORC(mvp)`: identity-sync canlı Keycloak, Press ve kiracı ile denenmedi | Sahte hedeflerin kaçırdığı uyumsuzluk üretimde çıkabilir | integration-e2e | Uçtan uca test gerçek servislerle geçer |
+| `BORC(mvp)`: `list_identities` uçları yok | Mutabakat gerçek hedeflerde çalışmaz | press-tr ve platform-core-kimlik | İki uç sözleşmeye uygun yazılır ve sayfalı yanıt verir |
+| `BORC(mvp)`: Yeni kiracının Keycloak istemcisini açan komut yok | Yeni kiracı istemcisi elle açılır | kimlik-realm | Elle başlatılan, insan onaylı komut yazılır |
+| `BORC(mvp)`: identity-sync container dosyası yok | Servis ortak geliştirme ortamında başlamaz | identity-sync | Container dosyası yazılır ve servis `oidc_verify` ile açılır |
+| `BORC(mvp)`: identity-sync testleri CI'da koşmaz | Bozulma yalnız elle çalışan testte görülür | DevOps sorumlusu | CI bu klasörün testlerini her değişiklikte koşar |
 | `BORC(mvp)`: Tema derleme adımının iki kopyası var | Bir kopya değişince öteki eski kalabilir | kimlik-tema | Derleme adımı tek yerde durur ve test bunu denetler |
 | `BORC(mvp)`: Bazı tema ekranları sınanmadı | Görünüm hatası fark edilmeyebilir | kimlik-tema | Sınanmamış ekranların listesi boşalır |
 | `BORC(mvp)`: Geçiş anahtarı testleri yük altında zaman aşımına uğruyor | Test sonucu güvenilmez olur | kimlik-tema | Testler yük altında da kararlı geçer |

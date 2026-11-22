@@ -337,6 +337,9 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
 6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
 7. Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
 - `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır.
+- Onaylı işlem yürütme ucunu da kiracı sitesinin servis istemcisi çağırır. Onay kiracı sitesindeki yapay zekâ katmanında verilir. Bu yüzden `IDENTITY_SYNC_EXECUTE_AZP` ayarı kiracı servis istemcilerinin listesidir. Liste `IDENTITY_SYNC_SESSION_AZP` ile aynı istemcileri taşır.
+- Mutabakat için Press ve kiracı sitesi `list_identities` ucunu sunar. Uç yalnız identity-sync servis belirtecini kabul eder. Yanıt sayfalıdır ve her satırda yalnız `issuer`, `subject` ve hesabın açık ya da kapalı durumu bulunur. E-posta ve ad dönmez. Uç adları `press_tr.api.identity.list_identities` ve `platform_core.api.identity.list_identities` olur.
+- identity-sync, Keycloak'ta istemci açmaz. Servis hesabı `manage-clients` rolünü almaz. Yeni kiracının Keycloak istemcisini kimlik-realm işinin elle başlatılan komutu açar. Komut insan onayıyla çalışır.
 - Hesap silme akışının 3. ve 4. adımı şu uçları çağırır: `platform_core.api.mobile.revoke_user_installations`, `platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user`.
 
 ## 8. Site ayarları
