@@ -474,12 +474,12 @@ test.describe('AI nav group', () => {
     await expect(links.first()).toBeHidden();
     await wrapper.focus();
     await page.keyboard.press('Enter');
-    await expect(links).toHaveCount(6);
+    await expect(links).toHaveCount(7);
     await expect(links.first()).toBeVisible();
 
     await page.goto('ai-mcp/');
     await waitForHydration(page);
-    await expect(links).toHaveCount(6);
+    await expect(links).toHaveCount(7);
     await expect(page.locator('#site-nav a[aria-current="page"]')).toHaveText(/MCP sunucuları/);
   });
 });
