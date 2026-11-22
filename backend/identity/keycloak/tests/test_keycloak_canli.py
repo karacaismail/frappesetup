@@ -8,7 +8,7 @@ import hmac
 import unittest
 import urllib.parse
 
-from yardimci import admin, canli_var_mi, get_without_redirect, istek, istemci_belirteci, jwt_govdesi, ortam, yonetici_belirteci, safe_detail
+from yardimci import admin, assert_refused_without_pkce, canli_var_mi, get_without_redirect, istek, istemci_belirteci, jwt_govdesi, ortam, yonetici_belirteci, safe_detail
 
 LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout"
 
@@ -220,13 +220,7 @@ class RealmAyarlariTesti(unittest.TestCase):
             "redirect_uri": f"{ortam('ATONOTA_SITE_KIRACI1_URL')}/api/method/platform_core.api.auth.keycloak_callback",
         })
         yanit = get_without_redirect(f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{sorgu}")
-        konum = yanit.basliklar.get("Location", "")
-        self.assertFalse(b'name="username"' in yanit.govde, safe_detail(yanit))
-        self.assertFalse("code=" in konum, safe_detail(yanit))
-        if yanit.durum in (302, 303):
-            self.assertTrue("error=invalid_request" in konum, safe_detail(yanit))
-        else:
-            self.assertEqual(yanit.durum, 400)
+        assert_refused_without_pkce(self, yanit)
 
     def test_eposta_mailpit_uzerinden(self):
         self.assertEqual(self.realm["smtpServer"]["host"], ortam("ATONOTA_SMTP_HOST"))

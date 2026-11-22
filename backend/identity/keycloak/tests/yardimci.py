@@ -69,6 +69,17 @@ def safe_detail(response: "HttpYanit") -> str:
     return detail
 
 
+def assert_refused_without_pkce(test, response: HttpYanit) -> None:
+    detail = safe_detail(response)
+    location = response.basliklar.get("Location", "")
+    test.assertFalse(b'name="username"' in response.govde, detail)
+    test.assertFalse("code=" in location, detail)
+    if response.durum in (302, 303):
+        test.assertTrue("error=invalid_request" in location, detail)
+    else:
+        test.assertEqual(response.durum, 400, detail)
+
+
 def istek(yontem: str, adres: str, *, form: dict | None = None, govde: dict | None = None,
           belirtec: str | None = None, basliklar: dict | None = None) -> HttpYanit:
     veri = None

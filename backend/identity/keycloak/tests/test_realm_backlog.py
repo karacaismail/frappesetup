@@ -10,7 +10,7 @@ import re
 import unittest
 import urllib.parse
 
-from yardimci import (KLASOR, ORNEK_ENV, admin, canli_var_mi, get_without_redirect, istemci_belirteci, istek,
+from yardimci import (KLASOR, ORNEK_ENV, admin, assert_refused_without_pkce, canli_var_mi, get_without_redirect, istemci_belirteci, istek,
                       jwt_govdesi, ortam, pkce_pair, realm_oku, yonetici_belirteci, safe_detail)
 
 PLACEHOLDER = re.compile(r"^\$\{[A-Z0-9_]+\}$")
@@ -129,16 +129,6 @@ def _authorize(client_id: str, redirect_uri: str, **extra) -> object:
     return get_without_redirect(f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{query}")
 
 
-def _assert_refused_without_pkce(test: unittest.TestCase, response) -> None:
-    location = response.basliklar.get("Location", "")
-    test.assertFalse(b'name="username"' in response.govde, safe_detail(response))
-    test.assertNotIn("code=", location)
-    if response.durum in (302, 303):
-        test.assertIn("error=invalid_request", location)
-    else:
-        test.assertEqual(response.durum, 400)
-
-
 def _audiences(claims: dict) -> list:
     aud = claims.get("aud", [])
     return [aud] if isinstance(aud, str) else list(aud)
@@ -161,7 +151,7 @@ class RealmBacklogLiveTest(unittest.TestCase):
         self.assertNotIn("${", str(smtp))
 
     def test_mobile_client_refuses_login_without_pkce(self):
-        _assert_refused_without_pkce(self, _authorize("mobile-app", ortam("ATONOTA_MOBILE_REDIRECT_URI")))
+        assert_refused_without_pkce(self, _authorize("mobile-app", ortam("ATONOTA_MOBILE_REDIRECT_URI")))
 
     def test_mobile_client_opens_login_with_pkce(self):
         _, challenge = pkce_pair()
@@ -173,7 +163,7 @@ class RealmBacklogLiveTest(unittest.TestCase):
     def test_mobile_client_refuses_a_plain_challenge(self):
         response = _authorize("mobile-app", ortam("ATONOTA_MOBILE_REDIRECT_URI"),
                               code_challenge="a" * 43, code_challenge_method="plain")
-        _assert_refused_without_pkce(self, response)
+        assert_refused_without_pkce(self, response)
 
     def test_mobile_client_has_no_password_or_client_credentials_grant(self):
         token_url = f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/token"
@@ -186,7 +176,7 @@ class RealmBacklogLiveTest(unittest.TestCase):
 
     def test_press_client_refuses_login_without_pkce(self):
         redirect = f"{ortam('ATONOTA_PRESS_URL')}/api/method/press_tr.api.auth.keycloak_callback"
-        _assert_refused_without_pkce(self, _authorize("press", redirect))
+        assert_refused_without_pkce(self, _authorize("press", redirect))
 
     def test_tenant_service_client_gets_identity_sync_audience(self):
         response = istemci_belirteci("site-kiraci1", ortam("ATONOTA_SITE_KIRACI1_SECRET"), "aud-identity-sync")

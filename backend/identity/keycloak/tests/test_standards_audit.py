@@ -192,6 +192,13 @@ class NoRawResponseInMessagesTest(unittest.TestCase):
             # A slice of a response object's raw body; a local dict of decoded claims is fine.
             self.assertIsNone(re.search(r"\.govde\[", text), path.name)
 
+    def test_unexpected_redirect_reports_only_status(self):
+        from yardimci import HttpYanit, assert_refused_without_pkce
+
+        response = HttpYanit(302, b"", {"Location": "https://example.test/?code=dummy-code"})
+        with self.assertRaisesRegex(AssertionError, r"^True is not false : HTTP 302$"):
+            assert_refused_without_pkce(self, response)
+
     def test_unreadable_json_reports_only_status(self):
         from yardimci import HttpYanit
 
