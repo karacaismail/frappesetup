@@ -35,14 +35,8 @@ CONFIRMATION_KEY = "yz_purge_confirmation:"
 MAX_TOKEN_CHARS = 128
 
 
-def purge(older_than_days: int = MIN_DAYS, dry_run: bool = True) -> dict:
-	"""Delete records past their retention period. If `dry_run` is true, only count (V-10).
-
-	`older_than_days` is the period of the action log. The period of proposals is fixed.
-	The usage log belongs to the model gateway, which applies its own 365 day rule.
-	The counts are taken in the same transaction as the delete.
-	"""
-	frappe.only_for("System Manager")
+def _days(older_than_days: object) -> int:
+	"""The retention period of the action log as a number within its bounds."""
 	if isinstance(older_than_days, bool) or not isinstance(older_than_days, int | str):
 		older_than_days = -1
 	try:
@@ -56,15 +50,58 @@ def purge(older_than_days: int = MIN_DAYS, dry_run: bool = True) -> dict:
 			),
 			frappe.ValidationError,
 		)
-	counts = store.purge_older_than(days, PROPOSAL_DAYS, BATCH_SIZE, delete=not dry_run)
+	return days
+
+
+def purge(older_than_days: int = MIN_DAYS, dry_run: bool = True, selection: dict | None = None) -> dict:
+	"""Delete records past their retention period. If `dry_run` is true, only count (V-10).
+
+	`older_than_days` is the period of the action log. The period of proposals is fixed.
+	The usage log belongs to the model gateway, which applies its own 365 day rule.
+	With `selection` exactly those records are deleted. Without it the records are chosen once,
+	here, and those are deleted. A record is never chosen a second time between count and delete.
+	"""
+	frappe.only_for("System Manager")
+	days = _days(older_than_days)
+	chosen = selection or store.select_expired(days, PROPOSAL_DAYS, BATCH_SIZE)
+	if not dry_run:
+		# Exactly the chosen records go. Nothing is chosen a second time.
+		store.delete_selected(chosen["logs"], chosen["proposals"])
 	return {
 		"dry_run": bool(dry_run),
 		"older_than_days": days,
 		"proposal_days": PROPOSAL_DAYS,
 		"batch_size": BATCH_SIZE,
-		**counts,
+		"logs": len(chosen["logs"]),
+		"logs_waiting": chosen["logs_waiting"],
+		"proposals": len(chosen["proposals"]),
+		"proposals_waiting": chosen["proposals_waiting"],
 		"usage_logs": _purge_usage_logs(bool(dry_run)),
 	}
+
+
+def select(older_than_days: int = MIN_DAYS) -> tuple[dict, dict, str]:
+	"""Preview a delete: the counts a human reads, the records chosen and a digest of both.
+
+	The digest covers the chosen names and every number of the preview. A confirmation or an
+	approval is bound to it, so it is valid only for exactly that preview.
+	"""
+	frappe.only_for("System Manager")
+	days = _days(older_than_days)
+	chosen = store.select_expired(days, PROPOSAL_DAYS, BATCH_SIZE)
+	counted = purge(days, dry_run=True, selection=chosen)
+	usage = counted["usage_logs"]
+	bound = [
+		days,
+		chosen["logs"],
+		chosen["proposals"],
+		chosen["logs_waiting"],
+		chosen["proposals_waiting"],
+		usage.get("status"),
+		usage.get("eligible"),
+		usage.get("to_delete"),
+	]
+	return counted, chosen, hashlib.sha256(json.dumps(bound).encode()).hexdigest()
 
 
 def purge_from_web(
@@ -77,38 +114,40 @@ def purge_from_web(
 	period and the previewed numbers, and it is claimed in one step, so it works once.
 	A preview whose numbers have changed since is refused: the human confirmed other numbers.
 	"""
+	# The role comes first. A caller without it learns nothing about tokens.
+	frappe.only_for("System Manager")
 	if dry_run:
-		result = purge(older_than_days, dry_run=True)
+		counted, chosen, digest = select(older_than_days)
 		token = secrets.token_urlsafe(32)
-		frappe.cache.set_value(_confirmation_key(token, result), 1, expires_in_sec=CONFIRMATION_SECONDS)
-		return {**result, "confirmation_token": token}
-	current = purge(older_than_days, dry_run=True)
-	valid = isinstance(confirmation_token, str) and 0 < len(confirmation_token) <= MAX_TOKEN_CHARS
-	if (
-		not valid
-		or frappe.cache.getdel(frappe.cache.make_key(_confirmation_key(confirmation_token, current))) is None
-	):
-		raise access.PreviewRequired(
-			_(
-				"Ask for a preview first, then send its confirmation token. Nothing was deleted.",
-				context=CONTEXT,
-			)
-		)
-	return purge(older_than_days, dry_run=False)
+		kept = {"user": frappe.session.user, "digest": digest, "selection": chosen}
+		frappe.cache.set_value(_confirmation_key(token, "data"), kept, expires_in_sec=CONFIRMATION_SECONDS)
+		frappe.cache.set_value(_confirmation_key(token, "claim"), 1, expires_in_sec=CONFIRMATION_SECONDS)
+		return {**counted, "confirmation_token": token}
+	refusal = access.PreviewRequired(
+		_("Ask for a preview first, then send its confirmation token. Nothing was deleted.", context=CONTEXT)
+	)
+	if not isinstance(confirmation_token, str) or not 0 < len(confirmation_token) <= MAX_TOKEN_CHARS:
+		raise refusal
+	kept = frappe.cache.get_value(_confirmation_key(confirmation_token, "data"))
+	# The claim is one atomic step, so a token works once even if two requests race.
+	claimed = frappe.cache.getdel(frappe.cache.make_key(_confirmation_key(confirmation_token, "claim")))
+	frappe.cache.delete_value(_confirmation_key(confirmation_token, "data"))
+	if kept is None or claimed is None or kept["user"] != frappe.session.user:
+		raise refusal
+	# Every number of the preview must still hold: the chosen records and all that wait.
+	_counted, _chosen, digest = select(older_than_days)
+	if digest != kept["digest"]:
+		raise refusal
+	try:
+		return purge(older_than_days, dry_run=False, selection=kept["selection"])
+	except store.SelectionChanged:
+		frappe.db.rollback()
+		raise refusal from None
 
 
-def _confirmation_key(token: str, counted: dict) -> str:
+def _confirmation_key(token: str, part: str) -> str:
 	"""Cache key of a confirmation. It holds a digest, never the token itself."""
-	usage = counted["usage_logs"]
-	bound = [
-		token,
-		frappe.session.user,
-		counted["older_than_days"],
-		counted["logs"],
-		counted["proposals"],
-		usage.get("to_delete"),
-	]
-	return CONFIRMATION_KEY + hashlib.sha256(json.dumps(bound).encode()).hexdigest()
+	return f"{CONFIRMATION_KEY}{part}:{hashlib.sha256(token.encode()).hexdigest()}"
 
 
 def _purge_usage_logs(dry_run: bool) -> dict:

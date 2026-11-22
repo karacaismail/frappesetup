@@ -200,7 +200,8 @@ class TestStaticRules(YzTestCase):
 			and path not in (APP_ROOT / "api" / "ai.py", APP_ROOT / "api" / "test_ai.py")
 			and re.search(r"platform_core\.yapay_zeka|from platform_core import yapay_zeka", path.read_text())
 			# The hooks file and the shell's test of it name this layer's hook paths as text.
-			and path.name not in ("hooks.py", "test_shell_hooks.py")
+			# So does the app-level test of the retention delete, which joins this layer and the gateway.
+			and path.name not in ("hooks.py", "test_shell_hooks.py", "test_ai_retention_entries.py")
 		]
 
 		self.assertEqual(outward, set())

@@ -601,7 +601,12 @@ Altıncı birleştirme incelemesi web ucunun silmeyi onaysız başlattığını 
 - **Sayım çağrısı önizlemedir.** `purge_logs` ucu `dry_run` açıkken sayıları ve bir onay belirteci döner.
 - **Silme çağrısı belirteci ister.** Belirteç yoksa ya da geçersizse hiçbir kayıt silinmez. Yanıt 417 olur ve ret nedeni `preview_required` olur.
 - **Belirteç tek kullanımlıktır.** Belirteç 10 dakika yaşar. Katman belirteci tek adımda alır ve siler.
-- **Belirteç önizlemeye bağlıdır.** Kullanıcı, süre ve önizlemedeki sayılar belirtece girer. Sayılar önizlemeden sonra değiştiyse silme reddedilir.
+- **Belirteç önizlemeye bağlıdır.** Katman önizlemede silinecek kayıtları seçer ve belirteçle birlikte saklar. Kullanıcı, süre, seçilen kayıtlar ve bütün sayılar belirtece bağlanır. Bekleyen toplam da bu sayılardandır.
+- **Silme yalnız seçilen kayıtları siler.** Katman silme adımında kayıtları yeniden seçmez. Örneğin saklama süresi önizlemeden sonra dolan kayıt silinmez.
+- **Sayı değişirse eski onay reddedilir.** Örneğin bekleyen kayıt 501 iken 502 olursa silme 417 döner ve hiçbir kayıt silinmez.
+- **Yapay zekâ aracı aynı kuralı uygular.** `purge_action_log` önizlemesinin sürümü, seçilen kayıtların ve sayıların özetidir. Onayda özet değiştiyse sonuç `document_changed` olur.
+- **Kullanım günlüğünde bağ sayıyladır.** Geçit kendi kayıtlarını kendisi seçer. Katman geçidin seçtiği kayıt adlarını göremez. Katman yalnız bekleyen toplamı ve silinecek sayıyı bağlar.
+- **Ortak test üç girişi gerçek kayıtlarla sınar.** Test `platform_core/tests/test_ai_retention_entries.py` dosyasındadır. Dosya iki modülün ortak alanındadır, çünkü modül sınırı bir modülün ötekinin kaydına yazmasını yasaklar.
 - **Terminal komutu belirteç istemez.** Komutu terminalde bir insan başlatır. Komut `dry_run` verilmezse yalnız sayar.
 - **Yapay zekâ aracı öneri yolunu kullanır.** `purge_action_log` aracı önizleme ve insan onayı ister.
 - **Kullanım günlüğü üç sayı taşır.** `eligible` bekleyen toplamdır. `to_delete` bu çalıştırmanın sileceği sayıdır ve en çok 500 olur. `deleted` gerçekten silinen sayıdır.

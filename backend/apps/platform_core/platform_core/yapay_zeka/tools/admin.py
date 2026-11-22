@@ -502,7 +502,7 @@ def write_remove_role(prepared: tuple) -> dict:
 
 
 def preview_purge(older_than_days: int = retention.MIN_DAYS) -> dict:
-	counts = retention.purge(older_than_days, dry_run=True)
+	counted, _chosen, digest = retention.select(older_than_days)
 	return {
 		"action": "admin",
 		"summary": (
@@ -512,16 +512,28 @@ def preview_purge(older_than_days: int = retention.MIN_DAYS) -> dict:
 			"kind, oldest first. Cannot be undone."
 		),
 		# `logs` and `proposals` are what one run deletes. The `_waiting` numbers are all records
-		# past their period. The gateway deletes the usage log in batches of its own.
-		"details": counts,
+		# past their period. For the usage log `to_delete` is what the gateway takes in one run.
+		"details": counted,
+		"target_doctype": "AI Action Log",
+		# The version is the digest of the chosen records and of every number above. The approval
+		# is valid only while a fresh selection gives the same digest.
+		"target_version": digest,
 	}
 
 
-def prepare_purge(older_than_days: int = retention.MIN_DAYS) -> int:
-	"""Pre-check: the admin role and the retention period. Counts only."""
-	retention.purge(older_than_days, dry_run=True)
-	return older_than_days
+def prepare_purge(older_than_days: int = retention.MIN_DAYS, expected_version=_UNCHECKED) -> tuple:
+	"""Pre-check: the admin role, the period and the selection the human approved."""
+	_counted, chosen, digest = retention.select(older_than_days)
+	_verify({"target_version": digest}, expected_version)
+	return older_than_days, chosen
 
 
-def write_purge(older_than_days: int) -> dict:
-	return retention.purge(older_than_days, dry_run=False)
+def write_purge(prepared: tuple) -> dict:
+	"""Delete exactly the records chosen in the pre-check."""
+	older_than_days, chosen = prepared
+	try:
+		return retention.purge(older_than_days, dry_run=False, selection=chosen)
+	except store.SelectionChanged:
+		raise ToolDenied(
+			"document_changed", _("The target changed after the preview.", context=CONTEXT)
+		) from None

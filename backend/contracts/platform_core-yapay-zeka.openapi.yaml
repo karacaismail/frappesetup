@@ -328,8 +328,11 @@ paths:
         If `dry_run` is true, nothing is deleted. The response returns the number of records that would be deleted and a
         `confirmation_token`. This is the default, and it is the preview a human reads.
         A delete (`dry_run` false) must carry that `confirmation_token`. The token lives 10 minutes and works once. It is bound
-        to the user, the period and the previewed numbers. Without a valid token nothing is deleted and the answer is 417
-        with the deny reason `preview_required`. If the numbers changed after the preview, ask for a new preview.
+        to the user, the period, the records the preview chose and every number of the preview, the waiting totals included.
+        The delete removes exactly the records the preview chose. It never chooses records again.
+        Without a valid token nothing is deleted and the answer is 417 with the deny reason `preview_required`.
+        The same answer comes if any number changed after the preview, for example if one more record waits. Ask for a new preview then.
+        The AI tool `purge_action_log` follows the same rule: its approval is bound to the chosen records and the numbers.
         Retention periods:
         - "AI Action Log" records go after `older_than_days`, at least 365 days.
         - An "AI Action Proposal" goes 30 days after its decision or its expiry, whichever comes first. That period is fixed.

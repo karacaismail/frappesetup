@@ -136,3 +136,60 @@ class TestPurgeConfirmation(YzTestCase):
 			preview = self.post(manager).json["message"]
 
 		self.assertEqual(preview["usage_logs"]["to_delete"], 7)
+
+	def test_delete_takes_only_the_records_the_preview_selected(self):
+		"""A record whose period ends after the confirmation was checked is not deleted with the rest.
+
+		The clock moves on two days right after the token is claimed. A proposal decided 29 days
+		ago is then past its 30 days. The human did not see it in the preview, so it stays.
+		"""
+		from platform_core.yapay_zeka import retention, store
+
+		manager = self.login(MANAGER)
+		seen = self.old_proposal(manager)
+		almost = self.old_proposal(manager)
+		frappe.db.set_value("AI Action Proposal", almost, "decided_at", ago(29), update_modified=False)
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
+		token = self.post(manager).json["message"]["confirmation_token"]
+		later = patch.object(store, "now_datetime", lambda: add_days(now_datetime(), 2))
+		original = retention.purge
+		started = []
+
+		def time_passes_then_delete(*args, **kwargs):
+			# The preview was verified a moment ago. Now the clock moves on, then the delete starts.
+			if kwargs.get("dry_run") is False and not started:
+				later.start()
+				started.append(True)
+			return original(*args, **kwargs)
+
+		try:
+			with patch.object(retention, "purge", time_passes_then_delete):
+				done = self.post(manager, dry_run=False, confirmation_token=token)
+		finally:
+			if started:
+				later.stop()
+
+		self.assertEqual(done.status_code, 200, done.get_data(as_text=True))
+		self.assertEqual(started, [True])
+		self.assertFalse(self.exists(seen))
+		self.assertTrue(self.exists(almost))
+
+	def test_old_confirmation_is_refused_when_the_waiting_total_changes(self):
+		"""Over the batch limit the number to delete stays the same, but more records wait than the human saw."""
+		from platform_core.yapay_zeka import retention
+
+		manager = self.login(MANAGER)
+		first, second = self.old_proposal(manager), self.old_proposal(manager)
+
+		with patch.object(retention, "BATCH_SIZE", 1):
+			preview = self.post(manager).json["message"]
+			third = self.old_proposal(manager)
+			late = self.post(manager, dry_run=False, confirmation_token=preview["confirmation_token"])
+
+		# Other tests may have left old proposals on the site. At least the two of this test wait.
+		self.assertEqual(preview["proposals"], 1)
+		self.assertGreaterEqual(preview["proposals_waiting"], 2)
+		self.assertEqual(late.status_code, 417)
+		for name in (first, second, third):
+			self.assertTrue(self.exists(name))
+		self.assertEqual(self.last_log(tool="purge_logs", decision="denied").deny_reason, "preview_required")

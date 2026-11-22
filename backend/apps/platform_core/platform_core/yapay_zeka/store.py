@@ -189,25 +189,27 @@ def _delete_for_good(doctype: str, name: str) -> None:
 		doc.delete(force=True, delete_permanently=True)
 
 
-def purge_older_than(days: int, proposal_days: int, batch: int, *, delete: bool) -> dict:
-	"""Count the records past their retention period and delete them if asked.
+class SelectionChanged(frappe.ValidationError):
+	"""A record chosen for deletion is no longer there. The human saw another set of records."""
 
-	A log row goes `days` after it was written. A proposal goes `proposal_days` after its decision
-	or its expiry, whichever comes first. Every proposal has an expiry, so none stays forever.
 
-	One run takes at most `batch` records of each kind, oldest first. `logs` and `proposals` are
-	what this run takes. `logs_waiting` and `proposals_waiting` are all records past their period
-	when the run started.
+def select_expired(days: int, proposal_days: int, batch: int) -> dict:
+	"""Choose the records one delete run takes, and count all records past their period.
 
-	Only `retention.purge` calls this path. That function checks the admin role.
+	A log row is past its period `days` after it was written. A proposal is past it
+	`proposal_days` after its decision or its expiry, whichever comes first. Every proposal has
+	an expiry, so none stays forever. One run takes at most `batch` records of each kind, oldest
+	first.
+
+	`logs` and `proposals` are the names chosen. `logs_waiting` and `proposals_waiting` are all
+	records past their period now. Nothing is deleted here.
 	"""
 	now = now_datetime()
 	cutoff = add_days(now, -proposal_days)
 	old_logs = {"creation": ("<", add_days(now, -days))}
 	# A filter on an empty `decided_at` alone would match every undecided proposal, because the
-	# database layer reads an empty date as a very old one. So the two groups are asked for apart.
-	# The period starts at the decision or the expiry, whichever comes first. The three groups
-	# below do not overlap, so their counts add up.
+	# database layer reads an empty date as a very old one. The three groups below do not
+	# overlap, so their counts add up.
 	groups = (
 		[["decided_at", "is", "set"], ["decided_at", "<", cutoff]],
 		[["decided_at", "is", "not set"], ["expires_at", "<", cutoff]],
@@ -215,22 +217,29 @@ def purge_older_than(days: int, proposal_days: int, batch: int, *, delete: bool)
 		[["decided_at", "is", "set"], ["decided_at", ">=", cutoff], ["expires_at", "<", cutoff]],
 	)
 	oldest_first = "creation asc, name asc"
-
-	logs = frappe.get_all(LOG, filters=old_logs, pluck="name", order_by=oldest_first, limit=batch)
 	proposals = []
 	for filters in groups:
 		if len(proposals) < batch:
 			proposals += frappe.get_all(
 				PROPOSAL, filters=filters, pluck="name", order_by=oldest_first, limit=batch - len(proposals)
 			)
-	counts = {
-		"logs": len(logs),
+	return {
+		"logs": frappe.get_all(LOG, filters=old_logs, pluck="name", order_by=oldest_first, limit=batch),
 		"logs_waiting": frappe.db.count(LOG, old_logs),
-		"proposals": len(proposals),
+		"proposals": proposals,
 		"proposals_waiting": sum(frappe.db.count(PROPOSAL, filters) for filters in groups),
 	}
-	if delete:
-		for doctype, names in ((LOG, logs), (PROPOSAL, proposals)):
-			for name in names:
-				_delete_for_good(doctype, name)
-	return counts
+
+
+def delete_selected(logs: list[str], proposals: list[str]) -> None:
+	"""Delete exactly the chosen records for good. No record is chosen again here.
+
+	Each record is locked first. If one is gone, the set the human saw has changed and nothing
+	more is deleted: the caller rolls back and asks for a new preview.
+	Only `retention.purge` calls this path. That function checks the admin role.
+	"""
+	for doctype, names in ((LOG, logs), (PROPOSAL, proposals)):
+		for name in names:
+			if not frappe.db.get_value(doctype, name, "name", for_update=True):
+				raise SelectionChanged
+			_delete_for_good(doctype, name)
