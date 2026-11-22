@@ -339,7 +339,7 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 				def fail_second_lock(*args, **kwargs):
 					nonlocal attempts, opened_sid
 					attempts += 1
-					if attempts == 2:
+					if attempts >= 2:
 						opened_sid = frappe.session.sid
 						raise error_type("Test lock failure after the session commit")
 					return lock_identity(*args, **kwargs)
@@ -351,9 +351,10 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 				with patch.object(anonymization, "lock_identity", side_effect=fail_second_lock):
 					response = h.login_with_keycloak(client, h.userinfo("sub-ayse", h.AYSE))
 
-				self.assertEqual(attempts, 2)
+				self.assertEqual(attempts, 4 if error_type is frappe.QueryDeadlockError else 2)
 				self.assertEqual(response.status_code, 500)
 				self.assertEqual(response.json.get("exc_type"), "IdentityInternalError")
+				self.assertFalse({"message", "home_page", "full_name"} & response.json.keys())
 				h.refresh()
 				self.assertEqual(h.session_count(h.AYSE), 0)
 				for name in ("sid", "user_id", "full_name", "system_user", "user_image", "user_lang"):

@@ -246,7 +246,7 @@ def _lock_identity_for_sign_in(issuer: str, claims: dict, user: str) -> None:
 	from platform_core.identity import anonymization
 
 	frappe.db.commit()
-	link, record = anonymization.lock_identity(issuer, claims["sub"].strip(), require_key=False)
+	link, record = anonymization._lock_identity_with_retry(issuer, claims["sub"].strip(), require_key=False)
 	refused = record or not link or link.user != user
 	if not refused and not frappe.db.get_value("User", user, "enabled", for_update=True):
 		refused = True
@@ -259,6 +259,9 @@ def _close_new_session() -> None:
 	from frappe.sessions import delete_session
 
 	sid = frappe.session.sid
+	# Frappe stages these fields before the final identity check.
+	for field in ("message", "home_page", "full_name"):
+		frappe.local.response.pop(field, None)
 	frappe.local.cookie_manager.cookies.clear()
 	clear_cookies()
 	frappe.local.cookie_manager.delete_cookie(_cookie_name())

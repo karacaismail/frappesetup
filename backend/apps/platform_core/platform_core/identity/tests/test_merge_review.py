@@ -135,6 +135,26 @@ class TestMergeReview(FrappeAPITestCase):
 		self.assertEqual(h.session_count(FAKE_EMAIL) + h.session_count(anon), 0)
 		self.assertEqual(h.logged_user(client), "Guest")
 
+	def test_deletion_retries_when_a_query_after_the_lock_deadlocks(self):
+		from platform_core.identity import anonymization_scope
+
+		anonymize = anonymization_scope.anonymize
+		attempts = 0
+
+		def fail_once(*args, **kwargs):
+			nonlocal attempts
+			attempts += 1
+			if attempts == 1:
+				raise frappe.QueryDeadlockError("Test deadlock after the identity lock")
+			return anonymize(*args, **kwargs)
+
+		with patch.object(anonymization_scope, "anonymize", side_effect=fail_once):
+			response, _token = self.service("anonymize_user", {"issuer": h.ISSUER, "subject": FAKE_SUBJECT})
+		self.assertEqual(response.status_code, 200, response.data[:200])
+		self.assertEqual(attempts, 2)
+		h.refresh()
+		self.assertFalse(frappe.db.exists(LINK, self.link.name))
+
 	def test_sign_in_after_step_one_is_refused_under_the_lock(self):
 		anonymization.disable_step(h.ISSUER, FAKE_SUBJECT)
 		frappe.db.commit()

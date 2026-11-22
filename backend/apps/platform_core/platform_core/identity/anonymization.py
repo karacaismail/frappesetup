@@ -106,20 +106,32 @@ def is_deleted(issuer: str, subject: str) -> bool:
 def anonymize_user(data: dict) -> dict:
 	issuer = provisioning._issuer(data)
 	subject = provisioning._text(data, "subject", provisioning.MAX_SUBJECT)
-	record = disable_step(issuer, subject)
+	record = _with_retry(disable_step, issuer, subject)
 	if record.state == ANONYMIZED:
 		return _result(record.user)
 	close_sessions(record.user)
-	return anonymize_step(issuer, subject)
+	return _with_retry(anonymize_step, issuer, subject)
+
+
+def _with_retry(step, issuer: str, subject: str):
+	"""Run each repeatable deletion step in a fresh transaction."""
+	for attempt in range(3):
+		frappe.db.commit()
+		try:
+			return step(issuer, subject)
+		except frappe.QueryDeadlockError:
+			frappe.db.rollback()
+			if attempt == 2:
+				raise
 
 
 def _lock_identity_with_retry(
-	issuer: str, subject: str, *, candidate_user: str | None = None
+	issuer: str, subject: str, *, candidate_user: str | None = None, require_key: bool = True
 ) -> tuple[frappe._dict | None, frappe._dict | None]:
 	"""Retry a changed snapshot before any write or irreversible side effect."""
 	for attempt in range(3):
 		try:
-			return lock_identity(issuer, subject, candidate_user=candidate_user)
+			return lock_identity(issuer, subject, candidate_user=candidate_user, require_key=require_key)
 		except frappe.QueryDeadlockError:
 			frappe.db.rollback()
 			if attempt == 2:
@@ -128,7 +140,7 @@ def _lock_identity_with_retry(
 
 def disable_step(issuer: str, subject: str) -> frappe._dict:
 	"""Step 1. Records the deletion and closes the account. Commits before any session is closed."""
-	link, record = _lock_identity_with_retry(issuer, subject)
+	link, record = lock_identity(issuer, subject)
 	if record:
 		frappe.db.commit()
 		return record
@@ -177,7 +189,7 @@ def close_sessions(user: str) -> None:
 
 def anonymize_step(issuer: str, subject: str) -> dict:
 	"""Step 2. Removes personal data, renames the user and deletes the identity link (raw `sub`)."""
-	link, record = _lock_identity_with_retry(issuer, subject)
+	link, record = lock_identity(issuer, subject)
 	if not record:
 		frappe.throw(
 			_("No user is linked to this identity.", context="platform_core.identity"), IdentityNotFound
