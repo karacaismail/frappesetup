@@ -12,7 +12,7 @@ from frappe.utils import now_datetime
 from platform_core.model_gecidi import gateway, ledger, policy
 from platform_core.model_gecidi.doctype.ai_api.ai_api import clear_api_credential as clear_credential
 
-DEFAULT_RETENTION_DAYS = 365
+RETENTION_DAYS = 365
 DELETE_BATCH_SIZE = 500
 PREVIEW_TTL_SECONDS = 300
 USAGE_LOG = "AI Usage Log"
@@ -128,72 +128,100 @@ def _purge_preview_key(token):
 	return f"model_gateway:purge_preview:{token}"
 
 
-def purge_usage(dry_run=True, preview_token=None):
-	policy.require_user(managers_only=True)
-	if type(dry_run) is not bool or (dry_run and preview_token is not None):
-		raise policy.Denied(400, "invalid_request")
-	if not dry_run:
-		if preview_token is None:
-			raise policy.Denied(400, "preview_required")
-		if not isinstance(preview_token, str) or not re.fullmatch(r"[0-9a-f]{64}", preview_token):
-			raise policy.Denied(409, "preview_invalid")
-		key = _purge_preview_key(preview_token)
-		preview = frappe.cache.get_value(key, expires=True, use_local_cache=False)
-		if not preview or preview["user"] != frappe.session.user:
-			raise policy.Denied(409, "preview_invalid")
-	days = frappe.conf.get("model_gateway_usage_retention_days", DEFAULT_RETENTION_DAYS)
-	if type(days) is not int or not 32 <= days <= 36500:
-		raise policy.Denied(503, "invalid_retention")
-	now = now_datetime()
-	cutoff = now - timedelta(days=days) if dry_run else preview["cutoff"]
-	filters = {
+def _require_retention_manager():
+	policy.require_user()
+	if "System Manager" not in frappe.get_roles():
+		raise frappe.PermissionError
+
+
+def _retention_filters(cutoff):
+	return {
 		"attempted_at": ["<", cutoff],
 		"result": ["not in", ledger.UNSETTLED],
 	}
-	rows = _purge_batch(filters, for_update=not dry_run)
-	batch = [(row.name, row.modified) for row in rows]
-	targets = [name for name, _ in batch]
-	eligible = frappe.db.count(USAGE_LOG, filters)
-	deleted = 0
+
+
+def _load_purge_preview(token):
+	if token is None:
+		raise policy.Denied(400, "preview_required")
+	if not isinstance(token, str) or not re.fullmatch(r"[0-9a-f]{64}", token):
+		raise policy.Denied(409, "preview_invalid")
+	preview = frappe.cache.get_value(_purge_preview_key(token), expires=True, use_local_cache=False)
+	if not preview or preview["user"] != frappe.session.user or preview["days"] != RETENTION_DAYS:
+		raise policy.Denied(409, "preview_invalid")
+	return preview
+
+
+def purge_usage_logs(*, dry_run: bool = False) -> dict[str, int]:
+	"""Count or permanently delete expired, settled logs as a System Manager."""
+	_require_retention_manager()
+	if type(dry_run) is not bool:
+		raise policy.Denied(400, "invalid_request")
+	now = now_datetime()
+	filters = _retention_filters(now - timedelta(days=RETENTION_DAYS))
 	if dry_run:
+		return {"eligible": frappe.db.count(USAGE_LOG, filters), "deleted": 0}
+	batch = [(row.name, row.modified) for row in _purge_batch(filters, for_update=True)]
+	deleted = _delete_usage_batch(batch, now)
+	return {"eligible": deleted + frappe.db.count(USAGE_LOG, filters), "deleted": deleted}
+
+
+def _delete_usage_batch(batch, now):
+	for name, _modified in batch:
+		# The System Manager check and locking query restrict this O-32 deletion.
+		frappe.delete_doc(  # nosemgrep: frappe-ignore-permissions
+			USAGE_LOG, name, ignore_permissions=True, ignore_missing=False, delete_permanently=True
+		)
+	deleted = len(batch)
+	frappe.get_doc(
+		{
+			"doctype": "Activity Log",
+			"name": uuid4().hex,
+			"reference_doctype": USAGE_LOG,
+			"subject": "Model gateway usage logs purged",
+			"content": f"Deleted usage records: {deleted}",
+			"status": "Success",
+			"user": frappe.session.user,
+			"communication_date": now,
+		}
+	).db_insert()
+	return deleted
+
+
+def purge_usage(dry_run=True, preview_token=None):
+	_require_retention_manager()
+	if type(dry_run) is not bool or (dry_run and preview_token is not None):
+		raise policy.Denied(400, "invalid_request")
+	if dry_run:
+		cutoff = now_datetime() - timedelta(days=RETENTION_DAYS)
+		filters = _retention_filters(cutoff)
+		batch = [(row.name, row.modified) for row in _purge_batch(filters)]
+		eligible = frappe.db.count(USAGE_LOG, filters)
+		deleted = 0
 		preview_token = token_hex(32)
 		frappe.cache.set_value(
 			_purge_preview_key(preview_token),
-			{"user": frappe.session.user, "days": days, "cutoff": cutoff, "batch": batch},
+			{"user": frappe.session.user, "days": RETENTION_DAYS, "cutoff": cutoff, "batch": batch},
 			expires_in_sec=PREVIEW_TTL_SECONDS,
 		)
 	else:
-		if preview["days"] != days or preview["batch"] != batch:
+		preview = _load_purge_preview(preview_token)
+		filters = _retention_filters(preview["cutoff"])
+		batch = [(row.name, row.modified) for row in _purge_batch(filters, for_update=True)]
+		if preview["batch"] != batch:
 			raise policy.Denied(409, "preview_invalid")
 		# Claim at most once, including empty batches with no database rows to lock.
+		key = _purge_preview_key(preview_token)
 		if frappe.cache.getdel(frappe.cache.make_key(key)) is None:
 			raise policy.Denied(409, "preview_invalid")
-		for name in targets:
-			# The gateway operation checks manager permissions before taking the row locks.
-			# O-32: retention never leaves a Deleted Document copy.
-			frappe.delete_doc(  # nosemgrep: frappe-ignore-permissions
-				USAGE_LOG, name, ignore_permissions=True, ignore_missing=False, delete_permanently=True
-			)
-		deleted = len(targets)
-		# The management operation writes a fixed audit record in the same transaction.
-		frappe.get_doc(
-			{
-				"doctype": "Activity Log",
-				"name": uuid4().hex,
-				"reference_doctype": USAGE_LOG,
-				"subject": "Model gateway usage logs purged",
-				"content": f"Deleted usage records: {deleted}",
-				"status": "Success",
-				"user": frappe.session.user,
-				"communication_date": now,
-			}
-		).db_insert()
+		deleted = _delete_usage_batch(batch, now_datetime())
+		eligible = deleted + frappe.db.count(USAGE_LOG, filters)
 		preview_token = None
 	return {
 		"eligible": eligible,
 		"deleted": deleted,
 		"dry_run": dry_run,
-		"targets": targets,
+		"targets": [name for name, _modified in batch],
 		"preview_token": preview_token,
 	}
 

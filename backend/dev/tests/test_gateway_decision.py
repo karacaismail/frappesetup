@@ -60,6 +60,18 @@ class GatewayDecisionTests(unittest.TestCase):
                 for decorator in node.decorator_list
             ):
                 self.assertIn(f"`platform_core.api.model.{node.name}`", interface)
+        tools_row = next(line for line in interface.splitlines() if "| `ai_tools` |" in line)
+        self.assertEqual(
+            set(re.findall(r"`([a-z_]+)`", tools_row)),
+            {
+                "ai_tools",
+                "create_ai_api",
+                "update_ai_api",
+                "create_ai_account",
+                "update_ai_account",
+                "reconcile_stale_pending",
+            },
+        )
         for item in (
             "create_ai_api",
             "update_ai_api",
