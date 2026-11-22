@@ -277,6 +277,8 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   .btn > svg {
     flex: none;
   }
+  /* Kök yazı %200 iken 320 ve 360 px ekranda iç alan 8rem altına iner.
+     Bu genişlikte ok, etiketle aynı satır akışına girer. */
   @container (max-width: 8rem) {
     .btn-primary {
       display: block;
@@ -361,7 +363,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   .rail-detail {
     color: var(--fs-quiet);
     font-size: var(--fs-font-body);
-    line-height: 1.35;
+    line-height: var(--fs-leading-body);
   }
 
   /* Sayılar */
@@ -470,7 +472,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .decision h3 {
     margin: 0 0 0.25rem;
-    font-size: var(--mantine-font-size-lg);
+    font-size: var(--fs-font-card-title);
     letter-spacing: -0.01em;
   }
   .decision p {
@@ -512,7 +514,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     margin: 0;
     color: var(--fs-quiet);
     font-size: var(--fs-font-body);
-    line-height: 1.5;
+    line-height: var(--fs-leading-body);
     text-wrap: pretty;
   }
 
@@ -587,7 +589,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   .section-title {
     color: var(--fs-quiet);
     font-size: var(--fs-font-body);
-    line-height: 1.45;
+    line-height: var(--fs-leading-body);
     text-wrap: pretty;
   }
   /* Büyük kök yazıda dar kapsayıcı: numara/ikon üstte, metin tam genişlikte; kırılamayan uzun dizgi

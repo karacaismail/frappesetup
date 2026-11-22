@@ -25,6 +25,7 @@
   --fs-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --fs-dur: 160ms;
   --fs-font-body: var(--mantine-font-size-md);
+  --fs-font-brand-name: var(--mantine-font-size-lg);
   --fs-leading-body: var(--mantine-line-height-md);
   --fs-font-page-title: clamp(var(--mantine-h2-font-size), 1.2rem + 1.8vw, var(--mantine-h1-font-size));
   --fs-leading-page-title: var(--mantine-h1-line-height);
@@ -196,12 +197,12 @@ body {
   background: var(--fs-accent);
   color: var(--fs-on-accent);
   font-weight: 800;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   box-shadow: var(--fs-shadow-1);
 }
 .brand-name {
   font-weight: 700;
-  font-size: 1.125rem;
+  font-size: var(--fs-font-brand-name);
   letter-spacing: -0.015em;
   min-width: 0;
   overflow: hidden;
@@ -215,7 +216,7 @@ body {
 .nav-group {
   margin: 0 0 0.35rem;
   padding: 0 0.75rem;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -231,7 +232,7 @@ body {
   border-radius: var(--mantine-radius-sm);
   color: var(--mantine-color-text);
   text-decoration: none;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   line-height: 1.6;
   transition:
     background-color var(--fs-dur) var(--fs-ease),
@@ -324,8 +325,8 @@ body {
   border-radius: var(--mantine-radius-sm);
   color: var(--fs-quiet);
   text-decoration: none;
-  font-size: 1rem;
-  line-height: 1.4;
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
   box-shadow: inset 2px 0 0 var(--fs-grid);
   transition:
     color var(--fs-dur) var(--fs-ease),
@@ -477,7 +478,7 @@ body {
 }
 .prose code {
   font-family: var(--mantine-font-family-monospace);
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   background: var(--fs-tint);
   padding: 0.1em 0.35em;
   border-radius: 4px;
@@ -509,14 +510,14 @@ body {
   padding: 1rem 1.1rem;
   border-radius: var(--mantine-radius-md);
   overflow-x: auto;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   line-height: 1.55;
   background: var(--fs-surface-2);
 }
 .prose pre code {
   background: none;
   padding: 0;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
 }
 /* Shiki çift tema: koyu şemada --shiki-dark değişkenleri uygulanır */
 [data-mantine-color-scheme='dark'] .astro-code,
@@ -565,7 +566,7 @@ body {
   border-collapse: separate;
   border-spacing: 0;
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   line-height: 1.5;
 }
 .prose thead th {
@@ -631,7 +632,7 @@ body {
 }
 .mermaid-details {
   margin: -0.75rem 0 1.5rem;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
 }
 .mermaid-details summary {
   cursor: pointer;
@@ -670,7 +671,7 @@ body {
 }
 .diagram-note {
   color: var(--fs-quiet);
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   margin: 0.75rem 0.25rem 0;
   max-width: var(--fs-content-max);
 }
@@ -711,7 +712,7 @@ body {
 }
 .req-explorer .mantine-Button-label {
   white-space: normal;
-  line-height: 1.25;
+  line-height: var(--fs-leading-body);
   text-align: center;
 }
 /* Öncelik rozeti hiçbir genişlikte kısalmaz: Mantine Badge taşmayı gizlediği için içerik katkısı ~0'dır ve sütun ya da
@@ -747,7 +748,7 @@ body {
   gap: 0.35rem;
 }
 .req-toggle-label {
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   color: var(--fs-quiet);
 }
 .req-bar {
@@ -761,7 +762,7 @@ body {
 .req-id,
 .req-code {
   font-family: var(--mantine-font-family-monospace);
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
 }
 .req-id {
   font-weight: 600;
@@ -840,19 +841,13 @@ body {
   justify-content: space-between;
   gap: 0.5rem;
 }
-.req-card-title {
-  line-height: 1.4;
-}
-.req-card-detail {
-  line-height: 1.5;
-}
 .req-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem 0.5rem;
   color: var(--fs-quiet);
-  font-size: 1rem;
-  line-height: 1.4;
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
 }
 /* Uzun sahip adı gibi öğe satırdan genişse satır genişliğine iner ve sözcük aralarından sarılır (kart taşmaz). */
 .req-meta > * {

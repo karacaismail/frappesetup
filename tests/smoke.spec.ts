@@ -290,6 +290,19 @@ test.describe('text scaling', () => {
     }
   });
 
+  test('card headings share a size and supporting copy uses body leading', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('');
+    const phaseTitle = page.locator('.phase h3').first();
+    const cardTitleSize = await phaseTitle.evaluate((title) => getComputedStyle(title).fontSize);
+    await expect.soft(page.locator('.decision h3').first()).toHaveCSS('font-size', cardTitleSize, { timeout: 1000 });
+    for (const selector of ['.rail-detail', '.section-title']) {
+      await expect.soft(page.locator(selector).first()).toHaveCSS('line-height', '24px', { timeout: 1000 });
+    }
+    await page.goto('gereksinimler/');
+    await expect.soft(page.locator('.req-meta').first()).toHaveCSS('line-height', '24px', { timeout: 1000 });
+  });
+
   for (const width of [320, 360]) {
     test(`@touch home action labels fit at ${width}px with 200% root font`, async ({ page }) => {
       await page.setViewportSize({ width, height: 640 });

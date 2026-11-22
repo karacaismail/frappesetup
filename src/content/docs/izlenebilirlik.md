@@ -127,12 +127,12 @@ Durumlar: pass, fail, not\_run. Her satır kontrolün koşulduğu commit'i yazar
 | Görsel regresyon | 7 görüntü × 3 motor, ubuntu-24.04'te üretilen referanslarla karşılaştırma | Referanslar bağımsız onaylı (17'si 3bcc006 run 37792505431, 4'ü 837f2e4 run 37797285107); karşılaştırma bu commit'in Actions koşusunda, bu sayfada not\_run |
 | Gerçek macOS/iOS Safari, Android | — | not\_run |
 
-## Kapatılan işler
+## Onay bekleyen işler
 
 | İş | Durum | Sonuç |
 | --- | --- | --- |
-| Yazı boyutları | Kapatıldı | Gövde 1rem. Satır yüksekliği yazı boyutunun 1,5 katı. Sayfa başlığı 1,5 ile 2rem arasında. |
-| Dar ekranda büyük yazı | Kapatıldı | Ana sayfa düğmelerinin metni 320 ve 360 pikselde tam görünür. Kök yazı %200 iken sayfa yatay taşmaz. |
+| Yazı boyutları | Sürüyor: görsel referans onayı bekliyor | Gövde 1rem. Satır yüksekliği yazı boyutunun 1,5 katı. Sayfa başlığı 1,5 ile 2rem arasında. |
+| Dar ekranda büyük yazı | Sürüyor: görsel referans onayı bekliyor | Ana sayfa düğmelerinin metni 320 ve 360 pikselde tam görünür. Kök yazı %200 iken sayfa yatay taşmaz. |
 
 ## Açık işler
 
