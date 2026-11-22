@@ -7,7 +7,7 @@
     "field_name": "leave_balance",
     "property": "permlevel",
     "property_type": "Int",
-    "value": "1"
+    "value": "2"
   },
   {
     "doctype": "Property Setter",

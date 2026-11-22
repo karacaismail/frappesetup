@@ -7,7 +7,8 @@ from frappe import _
 from frappe.model.docstatus import DocStatus
 from pydantic import StringConstraints
 
-DOCTYPE = "Leave Application"
+from cronhr.access import DOCTYPE
+
 APPROVER_ROLES = ("CronHR Manager", "CronHR HR")
 
 LeaveName = Annotated[str, StringConstraints(min_length=1, max_length=140)]
@@ -25,6 +26,10 @@ def check_not_own_leave(doc):
 
 def validate_approval(doc, method=None):
 	"""Apply the approval role even when a draft is changed through a native Frappe route."""
+	if doc.leave_approver and not frappe.has_permission(
+		DOCTYPE, "submit", doc, user=doc.leave_approver, ignore_share_permissions=True
+	):
+		frappe.throw(_("The selected approver cannot submit this leave application."), frappe.PermissionError)
 	if doc.status != "Approved" or frappe.session.user == "Administrator":
 		return
 	check_approver_role()

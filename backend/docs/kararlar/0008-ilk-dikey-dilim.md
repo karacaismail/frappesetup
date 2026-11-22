@@ -12,7 +12,7 @@ Proje bu lisans için hukuk görüşü almadı. Bordro hesabı kapsam dışında
 
 Erişim kuralı, kullanıcıyı `Employee.user_id` alanıyla çalışan kaydına bağlar.
 Yönetici zincirini `Employee.reports_to` alanı kurar.
-`leave_balance` alanını Frappe izin seviyesi 1 ile korur.
+`leave_balance` alanını Frappe izin seviyesi 2 ile korur.
 Yönetici ve İK rolleri bu seviyede okuma hakkı alır.
 
 Kabuk, kurulu HRMS uygulamasının “Workspace Sidebar” kaydından menü öğelerini alır.
@@ -23,3 +23,11 @@ CronHR, panel yolu veya ayrı bir menü tanımlamaz.
 İnsan oturumu öneriyi onaylayınca yapay zekâ katmanı izni yeniden denetler.
 CronHR, kaydı Frappe üzerinden onaylar ve gönderir.
 Yapay zekâ katmanı işlemi “AI Action Log” kaydına yazar.
+
+CronHR, izin taleplerinde doğrudan belge paylaşımını kapatır.
+Frappe, paylaşılan kayıtları normal erişim kuralının dışında açabilir.
+Daha önce paylaşım veya özel seviye 2 izni varsa kurulum durur.
+Tüm erişim kuralları kapanırsa CronHR listeyi ve belgeyi kapatır.
+Yönetici ve İK, kendi taleplerini onaylayamaz.
+Standart HRMS rolü, CronHR rolünün yerini tutmaz.
+Bu karar izin talebindeki alanı kapsar. Ayrı HRMS bakiye uçları değişmez.

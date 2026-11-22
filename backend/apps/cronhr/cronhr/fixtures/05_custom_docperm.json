@@ -46,7 +46,8 @@
     "parentfield": "permissions",
     "role": "CronHR Manager",
     "permlevel": 1,
-    "read": 1
+    "read": 1,
+    "write": 1
   },
   {
     "doctype": "Custom DocPerm",
@@ -56,6 +57,27 @@
     "parentfield": "permissions",
     "role": "CronHR HR",
     "permlevel": 1,
+    "read": 1,
+    "write": 1
+  },
+  {
+    "doctype": "Custom DocPerm",
+    "name": "cronhr-leave-6",
+    "parent": "Leave Application",
+    "parenttype": "DocType",
+    "parentfield": "permissions",
+    "role": "CronHR Manager",
+    "permlevel": 2,
+    "read": 1
+  },
+  {
+    "doctype": "Custom DocPerm",
+    "name": "cronhr-leave-7",
+    "parent": "Leave Application",
+    "parenttype": "DocType",
+    "parentfield": "permissions",
+    "role": "CronHR HR",
+    "permlevel": 2,
     "read": 1
   }
 ]

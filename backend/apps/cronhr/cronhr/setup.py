@@ -13,3 +13,11 @@ def require_access_engine():
 		or not frappe.db.exists("DocType", "Access Rule")
 	):
 		frappe.throw(_("Install Platform Core with Access Rule before syncing CronHR."))
+
+
+def check_install():
+	require_access_engine()
+	if frappe.db.exists("DocShare", {"share_doctype": "Leave Application"}):
+		frappe.throw(_("Resolve existing Leave Application shares before installing CronHR."))
+	if frappe.db.exists("Custom DocPerm", {"parent": "Leave Application", "permlevel": 2}):
+		frappe.throw(_("Resolve existing level 2 Leave Application permissions before installing CronHR."))

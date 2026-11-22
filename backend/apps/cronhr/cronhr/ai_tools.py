@@ -34,10 +34,11 @@ def preview_approval(name: str, version: str) -> dict:
 		"target_doctype": doc.doctype,
 		"target_name": doc.name,
 		"target_version": str(doc.modified),
-		"changes": {
-			"status": {"before": "Open", "after": "Approved"},
-			"docstatus": {"before": 0, "after": 1},
-		},
+		"changes": [
+			{"field": "status", "before": "Open", "after": "Approved"},
+			{"field": "docstatus", "before": 0, "after": 1},
+		],
+		"details": {"name": doc.name},
 	}
 
 

@@ -20,7 +20,7 @@ paths:
     get:
       summary: İzin talebini açar.
       responses:
-        "200": {description: Talep. İzin seviyesi 1 yoksa leave_balance alanı kapalıdır.}
+        "200": {description: Talep. İzin seviyesi 2 yoksa leave_balance alanı kapalıdır.}
         "403": {description: Kullanıcının okuma izni yok.}
   /method/cronhr.api.approve_leave:
     post:

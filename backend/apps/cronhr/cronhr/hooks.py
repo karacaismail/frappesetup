@@ -7,8 +7,14 @@ app_license = "gpl-3.0"
 
 required_apps = ["hrms", "platform_core"]
 
-before_install = "cronhr.setup.require_access_engine"
+before_install = "cronhr.setup.check_install"
 before_migrate = "cronhr.setup.require_access_engine"
 
 ai_tools = ["cronhr.ai_tools.declarations"]
-doc_events = {"Leave Application": {"validate": "cronhr.leave.validate_approval"}}
+permission_query_conditions = {"Leave Application": "cronhr.access.query_condition"}
+has_permission = {"Leave Application": "cronhr.access.has_permission"}
+doc_events = {
+	"Leave Application": {"validate": "cronhr.leave.validate_approval"},
+	"DocShare": {"validate": "cronhr.access.deny_sharing"},
+}
+extend_doctype_class = {"Leave Application": "cronhr.leave_application.LeaveApplication"}
