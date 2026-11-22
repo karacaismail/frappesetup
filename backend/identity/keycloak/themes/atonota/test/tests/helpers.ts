@@ -324,6 +324,77 @@ export const screens: Screen[] = [
       }).toPass({ timeout: 30_000 });
     },
   },
+  // Screens added for the technical debt "some theme screens are not tested".
+  {
+    name: 'update-profile',
+    open: async (page) => {
+      const email = await createUser({ requiredActions: ['UPDATE_PROFILE'] });
+      await openLogin(page);
+      await submitPassword(page, email);
+      await expect(page.locator('#kc-update-profile-form')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'recovery-codes-setup',
+    open: async (page) => {
+      const email = await createUser({ requiredActions: ['CONFIGURE_RECOVERY_AUTHN_CODES'] });
+      await openLogin(page);
+      await submitPassword(page, email);
+      await expect(page.locator('#kc-recovery-codes-settings-form')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'delete-credential',
+    open: async (page) => {
+      // The account console sends the user here to remove a sign-in method. The user must prove the identity first.
+      const email = await createUser({ totp: true });
+      const [user] = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`)).json()) as { id: string }[];
+      const credentials = (await (await admin(`/users/${user.id}/credentials`)).json()) as { id: string; type: string }[];
+      const otp = credentials.find((credential) => credential.type === 'otp')!;
+      await page.goto(`${loginUrl()}&kc_action=${encodeURIComponent(`delete_credential:${otp.id}`)}`);
+      await submitPassword(page, email);
+      await expect(page.locator('#otp')).toBeVisible({ timeout: 20_000 });
+      await page.locator('#otp').fill(totp());
+      await page.locator('#kc-login').click();
+      await expect(page.locator('#kc-accept')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'sign-out-confirm',
+    open: async (page) => {
+      await page.goto(`${KC}/realms/${REALM}/protocol/openid-connect/logout`);
+      await expect(page.locator('#kc-logout')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'signed-out',
+    open: async (page) => {
+      await page.goto(`${KC}/realms/${REALM}/protocol/openid-connect/logout`);
+      await page.locator('#kc-logout').click();
+      await expect(page.locator('#kc-info-message')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'error',
+    open: async (page) => {
+      // An application that Keycloak does not know. This is what a broken sign-in link looks like.
+      await page.goto(`${KC}/realms/${REALM}/protocol/openid-connect/auth?client_id=unknown-application&response_type=code`);
+      await expect(page.locator('#kc-error-message')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'page-expired',
+    open: async (page) => {
+      const email = await createUser({ totp: true });
+      await openLogin(page);
+      const firstStep = (await page.locator('#kc-form-login').getAttribute('action'))!;
+      await submitPassword(page, email);
+      await expect(page.locator('#otp')).toBeVisible({ timeout: 20_000 });
+      // The address of the first step is now out of date. A restored tab or an old link opens it like this.
+      await page.goto(firstStep);
+      await expect(page.locator('#loginRestartLink')).toBeVisible({ timeout: 20_000 });
+    },
+  },
 ];
 
 export const screen = (name: string): Screen => {

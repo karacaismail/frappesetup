@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { base32Decode, createUser, KC, openLogin, PASSWORD, REALM, screen, submitPassword, totp } from './helpers';
+import { admin, base32Decode, createUser, KC, loginUrl, openLogin, PASSWORD, REALM, screen, submitPassword, totp } from './helpers';
 
 /**
  * Signs in the way a user does: the fields and the button are found by their visible label and role (TE-4).
@@ -150,3 +150,94 @@ test('TOTP setup: a wrong code is announced with the field it belongs to', async
   // A field without an error points at nothing.
   await expect(page.locator('#userLabel')).not.toHaveAttribute('aria-describedby', /.+/);
 });
+
+test('recovery codes: the setup finishes only after the user confirms that the codes are saved', async ({ page }) => {
+  await screen('recovery-codes-setup').open(page);
+  await page.waitForLoadState('load');
+  const codes = page.locator('#kc-recovery-codes-list li');
+  expect(await codes.count()).toBeGreaterThanOrEqual(8);
+  const firstCode = (await codes.first().innerText()).trim();
+  await page.evaluate(() => {
+    const output = document.createElement('output');
+    output.id = 'test-recovery-actions';
+    output.hidden = true;
+    document.body.append(output);
+
+    document.execCommand = (command) => {
+      if (command !== 'copy' || !(document.activeElement instanceof HTMLTextAreaElement)) return false;
+      output.dataset.copied = document.activeElement.value;
+      return true;
+    };
+
+    const printDocument = document.implementation.createHTMLDocument();
+    window.open = () => ({
+      document: printDocument,
+      print: () => {
+        output.dataset.printed = printDocument.body.textContent ?? '';
+      },
+      close: () => {},
+    }) as unknown as Window;
+  });
+  const recoveryActions = page.locator('#test-recovery-actions');
+  await page.getByRole('button', { name: 'Kopyalayın', exact: true }).click();
+  await expect(recoveryActions).toHaveAttribute('data-copied', new RegExp(firstCode));
+  await page.getByRole('button', { name: 'Yazdırın', exact: true }).click();
+  await expect(recoveryActions).toHaveAttribute('data-printed', new RegExp(firstCode));
+
+  const finish = page.locator('#saveRecoveryAuthnCodesBtn');
+  await expect(finish).toBeDisabled();
+  // The download holds the same codes and plain Turkish text. The date is written in the language of the page.
+  const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'İndirin', exact: true }).click()]);
+  const stream = await download.createReadStream();
+  let file = '';
+  for await (const chunk of stream) file += chunk.toString();
+  expect(file).toContain('Bu kurtarma kodlarını güvenli bir yerde saklayın.');
+  expect(file).toContain(firstCode);
+  expect(file).toContain('Kodların üretildiği tarih:');
+  expect(/(?<!\p{L})(?:January|February|March|April|May|June|July|August|September|October|November|December)(?!\p{L})/u.test(file), 'English month name in the file').toBe(false);
+  await page.getByLabel('Kodları güvenli bir yere kaydettim').check();
+  await expect(finish).toBeEnabled();
+  await page.getByLabel('Kodları güvenli bir yere kaydettim').uncheck();
+  await expect(finish).toBeDisabled();
+  await page.getByLabel('Kodları güvenli bir yere kaydettim').check();
+  await finish.click();
+  await expect(page).toHaveURL(accountUrl, { timeout: 20_000 });
+});
+
+test('sign-out: the confirmation signs the user out', async ({ page }) => {
+  const email = await createUser();
+  await openLogin(page);
+  await submitPassword(page, email);
+  await expect(page).toHaveURL(accountUrl, { timeout: 20_000 });
+  await expect(page.locator('#save-btn')).toBeVisible({ timeout: 20_000 });
+  await screen('sign-out-confirm').open(page);
+  await page.getByRole('button', { name: 'Oturumu kapatın', exact: true }).click();
+  await expect(page.locator('#kc-page-title')).toHaveText('Oturumu kapattınız');
+  await page.goto(`${KC}/realms/${REALM}/account/`);
+  await expect(page.locator('#kc-form-login')).toBeVisible({ timeout: 20_000 });
+});
+
+for (const choice of ['decline', 'confirm'] as const) {
+  test(`removing a sign-in method: the user can ${choice}`, async ({ page }) => {
+    const email = await createUser({ totp: true });
+    const [user] = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`)).json()) as { id: string }[];
+    const otpCredentials = async () => ((await (await admin(`/users/${user.id}/credentials`)).json()) as { id: string; type: string }[]).filter((credential) => credential.type === 'otp');
+    const [credential] = await otpCredentials();
+    // The account console starts this action. The user proves the identity before the question appears.
+    await page.goto(`${loginUrl()}&kc_action=${encodeURIComponent(`delete_credential:${credential.id}`)}`);
+    await submitPassword(page, email);
+    await expect(page.locator('#otp')).toBeVisible({ timeout: 20_000 });
+    await page.locator('#otp').fill(totp());
+    await page.locator('#kc-login').click();
+    await expect(page.locator('#kc-page-title')).toHaveText('Telefon silinsin mi?', { timeout: 20_000 });
+    if (choice === 'decline') {
+      await page.getByRole('button', { name: 'Vazgeçin', exact: true }).click();
+      await expect(page).toHaveURL(accountUrl, { timeout: 20_000 });
+      expect((await otpCredentials()).length, 'declining keeps the sign-in method').toBe(1);
+    } else {
+      await page.getByRole('button', { name: 'Silmeyi onaylayın', exact: true }).click();
+      await expect(page).toHaveURL(accountUrl, { timeout: 20_000 });
+      expect((await otpCredentials()).length, 'confirming removes the sign-in method').toBe(0);
+    }
+  });
+}
