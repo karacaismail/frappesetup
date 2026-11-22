@@ -82,7 +82,7 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/JsonRpcResponse"}
         "202": {description: Bildirim kabul edildi. Gövde yoktur.}
-        "400": {description: Geçersiz JSON-RPC gövdesi, başlık uyuşmazlığı ya da desteklenmeyen sürüm.}
+        "400": {description: "Geçersiz JSON-RPC gövdesi, başlık uyuşmazlığı ya da desteklenmeyen sürüm. Kimliği bilinen kullanıcının erken reddi günlüğe `protocol_error` ya da `origin_not_allowed` koduyla yazılır."}
         "401": {description: "Belirteç bilinmiyor, süresi dolmuş, bağlı oturumu bitmiş ya da çağrı hakkı tükenmiş."}
         "403": {description: "İstek kimlik taşımıyor, köken izinli değil, kimlik türü kabul edilmiyor ya da çerezle belirteç birlikte geldi. Uç misafire açık değildir. Frappe kimliksiz isteği 403 ile reddeder."}
         "404": {description: Bilinmeyen yöntem ya da bilinmeyen araç.}
@@ -183,9 +183,10 @@ paths:
         Denetim başarısızsa iş yürümez ve yanıt `executed: false` ile ret nedenini taşır.
 
         Sunucu yürütmeden önce sonucu `unknown` olarak kaydeder. Süreç yarıda kesilirse sonuç `unknown` kalır.
-        Yürütme hata verirse sonuç yalnız şu durumda `failed` olur: hata katmanın kendi ön denetiminde,
-        Frappe'nin kayıt yöntemi çağrılmadan önce oluşmuştur. Kayıt yöntemi çağrıldıktan sonraki her hata
-        `unknown` olur. Kayıt yöntemleri `insert`, `save`, `submit`, `cancel`, silme ve bunların kancalarıdır.
+        Yürütme hata verirse sonuç yalnız şu durumda `failed` olur: hata katmanın kendi denetiminde oluşmuştur.
+        Katmanın denetimi bittikten sonraki her hata `unknown` olur. Bu bölümde Frappe'nin kayıt yöntemleri
+        (`insert`, `save`, `submit`, `cancel`, silme), kancaları ve uygulama aracının bütün işlevleri çalışır.
+        Uygulama aracının kendi `prepare` işlevi de bu bölümdedir.
         Araç, hedefi yazmadan hemen önce kilitler ve sürümünü önizlemedekiyle karşılaştırır.
         Uygulama aracı hata verirse sonuç yine `unknown` kalır. Araç dış sisteme dokunmuş olabilir.
         Aynı hedefe kör tekrar yapılmaz. İnsan durumu `resolve_proposal` ile kapatır.
@@ -411,6 +412,9 @@ components:
         - session_ended
         - cookie_with_token
         - report_gate_unavailable
+        - invalid_preview
+        - origin_not_allowed
+        - protocol_error
         - token_call_limit
         - unknown_tool
         - not_owner
@@ -929,16 +933,17 @@ x-ai-tools-hook:
       prepare:
         type: string
         description: |
-          İsteğe bağlı. Yazma aracının ön denetim işlevinin yolu. İşlev Frappe'nin kayıt yöntemini çağırmaz.
-          Değer dönerse `handler` yalnız o değeri alır. Ön denetimdeki hata `failed` sonucunu verir.
-          `prepare` yoksa aracın her hatası `unknown` sonucunu verir.
+          İsteğe bağlı. Yazma aracının kendi ön denetim işlevinin yolu. `handler` yalnız bu işlevin döndürdüğü değeri alır.
+          Bu işlev uygulamanın kodudur, katmanın kendi denetimi değildir. İşlev başladıktan sonraki her hata
+          `unknown` sonucunu verir. İşlev dış sisteme dokunmuş olabilir.
       versioned:
         type: boolean
         default: false
         description: |
           İsteğe bağlı. Doğruysa katman yürütmeden hemen önce hedef satırı kilitler ve önizlemeyi yeniden çalıştırır.
           `target_version` değiştiyse iş yürümez. Sonuç `failed`, hata `document_changed` olur.
-          Önizleme `target_doctype`, `target_name` ve `target_version` dönmelidir.
+          Önizleme `target_doctype`, `target_name` ve `target_version` dönmelidir. Biri eksikse araç `invalid_preview` döner.
+          Bu denetim öneri açılmadan önce, onay anında ve yürütmeden hemen önce yapılır.
       preview:
         type: string
         description: |

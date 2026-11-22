@@ -26,10 +26,39 @@ LIST_TTL_MS = 60000
 
 
 def handle() -> Response:
-	"""Hatalar `frappe.app` içine çıkar. Orası işlemi geri alır ve MCP zarfıyla yanıtlar."""
+	"""Answer one MCP request. A refusal of a known identity is logged before the error leaves.
+
+	Errors propagate to `frappe.app`, which rolls the request back and answers in the MCP
+	envelope. The log row is therefore committed here, before the error is raised again.
+	At that point the request has written nothing else.
+	"""
+	frappe.local.mcp_request = transport.RequestContext()
+	try:
+		return _handle()
+	except McpError as error:
+		if not getattr(error, "logged", False) and access.principal() != access.GUEST:
+			reason = getattr(error, "deny_reason", "protocol_error")
+			stage = "auth" if reason == "origin_not_allowed" else "call"
+			frappe.db.rollback()
+			access.record(stage, decision="denied", deny_reason=reason)
+			frappe.db.commit()  # nosemgrep
+		raise
+
+
+def _logged(error: McpError) -> McpError:
+	"""Mark an error whose denial is already in the log, so that it is not logged twice."""
+	error.logged = True
+	return error
+
+
+def _handle() -> Response:
 	request = frappe.request
-	context = frappe.local.mcp_request = transport.RequestContext()
-	transport.check_origin(request)
+	context = frappe.local.mcp_request
+	try:
+		transport.check_origin(request)
+	except McpError as error:
+		error.deny_reason = "origin_not_allowed"
+		raise
 	_check_principal()
 	if not request.is_json:
 		raise McpError(protocol.INVALID_REQUEST, "Content-Type must be application/json", status=415)
@@ -66,8 +95,12 @@ def _check_principal() -> None:
 		# back, so the log row is committed first. Nothing else has been written yet.
 		access.record("auth", decision="denied", deny_reason="credential_not_accepted")
 		frappe.db.commit()  # nosemgrep
-		raise McpError(
-			protocol.INVALID_REQUEST, "Use a session cookie or an agent token on this endpoint", status=403
+		raise _logged(
+			McpError(
+				protocol.INVALID_REQUEST,
+				"Use a session cookie or an agent token on this endpoint",
+				status=403,
+			)
 		)
 
 
@@ -133,7 +166,7 @@ def call_tool(params: dict) -> dict:
 		)
 		# 401 yanıtı işlemi geri alır. Ret kaydı için burada kesinleştirilir.
 		frappe.db.commit()  # nosemgrep
-		raise McpError(protocol.INVALID_REQUEST, "The agent token has no calls left", status=401)
+		raise _logged(McpError(protocol.INVALID_REQUEST, "The agent token has no calls left", status=401))
 	tool = registry.find(name) if isinstance(name, str) else None
 	if tool is None:
 		access.record(
@@ -141,7 +174,7 @@ def call_tool(params: dict) -> dict:
 		)
 		# 404 yanıtı işlemi geri alır. Ret kaydı için burada kesinleştirilir.
 		frappe.db.commit()  # nosemgrep
-		raise McpError(METHOD_NOT_FOUND, f"Unknown MCP tool: {name}", status=404)
+		raise _logged(McpError(METHOD_NOT_FOUND, f"Unknown MCP tool: {name}", status=404))
 
 	raw = params.get("arguments", {})
 	context = {"tool": tool.name, "tool_class": tool.tool_class, "started": started}

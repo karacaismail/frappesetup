@@ -66,6 +66,15 @@ def _run_preview(tool: registry.AiTool, arguments: dict) -> dict:
 	if not isinstance(spec, dict) or not isinstance(spec.get("summary"), str):
 		raise ToolDenied("internal_error", _("The preview of tool {0} is not valid.").format(tool.name))
 	spec.setdefault("action", "app_tool")
+	if tool.tool_class == "app" and tool.versioned:
+		# The tool asked the layer to guard the target's version. Without all three values the
+		# layer could neither lock the row nor compare versions, so the action stops here.
+		missing = [key for key in ("target_doctype", "target_name", "target_version") if not spec.get(key)]
+		if missing:
+			raise ToolDenied(
+				"invalid_preview",
+				_("The preview of versioned tool {0} must return {1}.").format(tool.name, ", ".join(missing)),
+			)
 	spec["target_version"] = versioning.token(spec.get("target_version"))
 	return spec
 
@@ -279,8 +288,9 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 	committed = []
 	frappe.db.after_commit.add(lambda: committed.append(True))
 
-	# Step 1: the layer's own pre-check. It calls no Frappe document method, so nothing outside
-	# this transaction can have happened. Only an error here may be recorded as `failed`.
+	# Step 1: the layer's own check. It runs only code of this layer and calls no Frappe document
+	# method, so nothing outside this transaction can have happened. Only an error here may be
+	# recorded as `failed`.
 	try:
 		prepared = _pre_check(doc, tool, arguments)
 	except Exception as error:
@@ -289,13 +299,16 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 
 	# ---------------------------------------------------------------------------------------
 	# WRITE BOUNDARY. This is the only place that decides between `failed` and `unknown`.
-	# From here on Frappe document methods (insert, save, submit, cancel, delete) and their
-	# hooks run. A hook may reach another system or commit. Every error below this line is
-	# `unknown`, whatever its type, `ToolDenied` included. A human resolves it.
-	# A tool without a pre-check (an app tool) is past the boundary from its first line.
+	# From here on code outside the layer's control runs: Frappe document methods (insert,
+	# save, submit, cancel, delete) with their hooks, and every function of an app tool,
+	# its own `prepare` included. Such code may reach another system or commit. Every error
+	# below this line is `unknown`, whatever its type, `ToolDenied` included. A human resolves it.
 	# ---------------------------------------------------------------------------------------
 	try:
-		result = tool.handler(prepared) if tool.prepare is not None else tool.handler(**arguments)
+		if tool.tool_class == "app":
+			result = tool.handler(tool.prepare(**arguments)) if tool.prepare else tool.handler(**arguments)
+		else:
+			result = tool.handler(prepared)
 	except Exception as error:
 		return _execution_error(doc, tool, error, result="unknown")
 
@@ -314,21 +327,22 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 
 
 def _pre_check(doc, tool: registry.AiTool, arguments: dict) -> Any:
-	"""Run the checks that come before the write boundary and return what the write step needs.
+	"""Run the layer's own check before the write boundary. Return what a built-in write step needs.
 
 	A built-in tool checks the previewed version itself, under a row lock. For an app tool that
 	declares `versioned`, the layer locks the target row, runs the preview again and compares
-	the version. An app tool may also declare its own `prepare` step.
+	the version. An app tool's own `prepare` is not part of this check. It runs after the boundary.
 	"""
 	if tool.tool_class != "app":
 		extra = {"expected_version": doc.target_modified} if tool.versioned else {}
 		return tool.prepare(**arguments, **extra)
 	if tool.versioned:
-		if doc.target_doctype and doc.target_name:
-			store.lock_row(doc.target_doctype, doc.target_name)
-		if _run_preview(tool, arguments).get("target_version") != doc.target_modified:
+		spec = _run_preview(tool, arguments)
+		store.lock_row(spec["target_doctype"], spec["target_name"])
+		# Read again under the lock, then compare with the version the human approved.
+		if _run_preview(tool, arguments)["target_version"] != doc.target_modified:
 			raise ToolDenied("document_changed", _("The target changed after the preview."))
-	return tool.prepare(**arguments) if tool.prepare is not None else None
+	return None
 
 
 def _execution_error(doc, tool: registry.AiTool, error: Exception, *, result: str) -> dict:

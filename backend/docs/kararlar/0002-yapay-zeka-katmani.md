@@ -276,8 +276,9 @@ Başka kullanıcının onayı 403 alır. Yanıt öneriyi taşımaz. Önizleme o 
 2. Sunucu öneriyi `consumed` yapar ve sonucu `unknown` yazar. Bu yazıyı hemen kesinleştirir.
 3. Sunucu işi yürütür.
 4. İş başarılıysa sonuç `succeeded` olur. İş hata verirse yazılar geri alınır.
-   - Yerleşik araç yalnız veritabanına yazar. Geri alma kesindir ve sonuç `failed` olur.
-   - Uygulama aracı dış sisteme dokunmuş olabilir. Onun sonucu `unknown` kalır.
+   - Hata katmanın kendi denetiminde oluştuysa sonuç `failed` olur. Bu denetim yalnız katmanın kodudur ve kayıt yöntemi çağırmaz.
+   - Katmanın denetimi bittikten sonraki her hata `unknown` olur. Bu bölümde Frappe'nin kayıt yöntemleri ve kancaları çalışır. Uygulama aracının bütün işlevleri de bu bölümdedir.
+   - Sınır kodda tek yerdedir: `proposals.py` içindeki `_execute` işlevi.
 5. Süreç arada ölürse sonuç `unknown` kalır.
 
 İkinci adımdaki erken kesinleştirme bilinçli bir istisnadır (V-2). Bu yazı olmadan ölen iş iz bırakmaz. Tek kullanım kuralı da bu yazıya dayanır.
@@ -469,7 +470,7 @@ Aynı turda kendi başlattığım ikinci inceleme de şu ek düzeltmeleri getird
 
 Codex'in ikinci incelemesi B1, B2, B4 ve B5 bulgularını kapalı buldu. B3 ve B6 kısmen açık kaldı. Orkestratör iki bulgu için karar verdi. Kararlar şöyle uygulandı:
 
-- **B3.** Sonuç yalnız bir durumda `failed` olur. Hata katmanın kendi ön denetiminde, Frappe'nin kayıt yöntemi çağrılmadan önce oluşmuştur. Kayıt yöntemi çağrıldıktan sonraki her hata `unknown` olur. `ToolDenied` türü de buna dahildir.
+- **B3.** Sonuç yalnız bir durumda `failed` olur. Hata katmanın kendi denetiminde oluşmuştur. Katmanın denetimi bittikten sonraki her hata `unknown` olur. `ToolDenied` türü de buna dahildir.
 - Her yerleşik yazma aracı iki işleve ayrıldı. `prepare_*` işlevi ön denetimi yapar ve kayıt yöntemi çağırmaz. `write_*` işlevi kayıt yöntemini çağırır.
 - Sınır kodda tek yerdedir. Yer `proposals.py` içindeki `_execute` işlevinde “WRITE BOUNDARY” yorumuyla işaretlidir.
 - **B6.** Kimliği bilinen üç ret daha günlüğe düşer. Birincisi API anahtarıyla gelen MCP isteğidir. İkincisi süresi dolmuş oturuma bağlı belirteçtir. Üçüncüsü çerezle birlikte gelen belirteçtir. Kayıt hata yanıtından önce kesinleştirilir. Bilinmeyen belirteç ve misafir istisna kalır.
@@ -478,9 +479,21 @@ HRMS TR incelemesi iki konu getirdi:
 
 - Uygulama aracının önizlemesi `frappe.ValidationError` verirse araç `invalid_arguments` döner ve ret günlüğe düşer. Onay anında verirse öneri `rejected` olur. Önceden öneri `pending` kalıyor ve yanıt 417 oluyordu.
 - Uygulama aracı `prepare` ve `versioned` bildirebilir. `versioned` bildirirse katman hedef satırı kilitler, önizlemeyi yeniden çalıştırır ve sürümü karşılaştırır.
+- Uygulama aracının `prepare` işlevi katmanın denetimi sayılmaz. O işlev başladıktan sonraki her hata `unknown` olur. Bunu Codex'in üçüncü incelemesi buldu.
 - Rapor aracı raporu çalıştırmadan önce erişim motorunun rapor kapısını çağırır. Kapı `platform_core.erisim.reports.guard` işlevidir. Kapı kurulu değilse rapor aracı kapalı kalır.
 
 Aynı turda araçların sonuç şeması sözleşmeye yazıldı (D-1). Şema `x-mcp-results` bölümündedir. Araç listesi aynı şemayı `outputSchema` olarak yayımlar. Bir test kodu sözleşmeye bağlar.
+
+### Dördüncü tur: Codex'in üçüncü incelemesi
+
+Üçüncü inceleme engelleyici bulmadı. Dört konu açık kaldı ve kapatıldı:
+
+- **B3.** `failed` sonucu yalnız katmanın kendi denetimi içindir. Uygulama aracının `prepare` işlevi sınırın öte yanına alındı.
+- **B6.** Kimliği bilinen kullanıcının erken MCP reddi de günlüğe düşer. Örneğin yasak `Origin` başlığı böyledir. Kayıt hata yanıtından önce kesinleştirilir.
+- **Y1.** `versioned` bildiren araç önizlemede üç değeri vermek zorundadır: `target_doctype`, `target_name` ve `target_version`. Biri eksikse araç `invalid_preview` döner. Denetim öneri açılmadan önce, onay anında ve yürütmeden hemen önce yapılır.
+- **Y2.** Bu notun 7. bölümündeki eski sonuç kuralı yeni kuralla aynı yapıldı.
+
+Proje sahibi yalnız Frappe 16'yı hedefledi (D-15). Bu katman baştan beri yalnız Frappe 16 ile yazıldı. Katman Frappe 16'nın hazır MCP protokol modüllerini ve izin yöneticisi işlevlerini kullanır.
 
 ## 13. Karar sitesiyle çelişkiler
 

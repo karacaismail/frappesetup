@@ -201,3 +201,60 @@ def declare_more() -> list[dict]:
 			"handler": PATH + "set_title",
 		},
 	]
+
+
+def prepare_with_external_effect(name: str, title: str) -> tuple:
+	"""Pre-check of an app tool that reaches another system and then fails. It writes nothing."""
+	frappe.cache.set_value(EXTERNAL_MARKER, name)
+	frappe.throw("The other system answered with an error.")
+
+
+def preview_without_version(name: str, title: str) -> dict:
+	"""Preview of a tool that claims `versioned` but leaves out the target version."""
+	doc = frappe.get_doc(DOCTYPE, name)
+	doc.check_permission("write")
+	return {"summary": f"Set the title of {name}", "target_doctype": DOCTYPE, "target_name": name}
+
+
+def preview_version_sometimes(name: str, title: str) -> dict:
+	"""Preview that stops reporting the target once the record is frozen."""
+	doc = frappe.get_doc(DOCTYPE, name)
+	doc.check_permission("write")
+	if doc.amount == 99:
+		return {"summary": f"Set the title of {name}"}
+	return {
+		"summary": f"Set the title of {name}",
+		"target_doctype": DOCTYPE,
+		"target_name": name,
+		"target_version": str(doc.modified),
+	}
+
+
+def declare_strict() -> list[dict]:
+	"""Tools for the rules of the third independent review."""
+	base = {"arguments": PATH + "TitleArguments", "kind": "write", "handler": PATH + "set_title"}
+	return [
+		{
+			"name": "effect_in_prepare",
+			"description": "Its pre-check leaves an effect outside the database.",
+			"arguments": PATH + "TitleArguments",
+			"kind": "write",
+			"preview": PATH + "preview_checked",
+			"prepare": PATH + "prepare_with_external_effect",
+			"handler": PATH + "write_prepared_title",
+		},
+		{
+			**base,
+			"name": "versioned_without_version",
+			"description": "Claims versioned but previews no version.",
+			"versioned": True,
+			"preview": PATH + "preview_without_version",
+		},
+		{
+			**base,
+			"name": "versioned_sometimes",
+			"description": "Claims versioned and later previews no target.",
+			"versioned": True,
+			"preview": PATH + "preview_version_sometimes",
+		},
+	]

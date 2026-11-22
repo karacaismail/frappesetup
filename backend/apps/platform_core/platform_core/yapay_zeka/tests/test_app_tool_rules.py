@@ -69,7 +69,7 @@ class TestAppToolValidation(YzTestCase):
 		log = self.last_log(proposal=proposal_id, stage="approve")
 		self.assertEqual((log.decision, log.deny_reason), ("denied", "invalid_arguments"))
 
-	def test_validation_error_in_a_declared_pre_check_is_failed(self):
+	def test_validation_error_in_an_app_tools_own_pre_check_stays_unknown(self):
 		name = self.make_record(USER_A, title="Old")
 		client = self.login(USER_A)
 		arguments = {"name": name, "title": "refused in pre-check"}
@@ -78,8 +78,9 @@ class TestAppToolValidation(YzTestCase):
 			proposal = self.call_tool(client, "platform_core_prepared_title", arguments)["structuredContent"]
 			outcome = self.approve(client, proposal["proposal_id"]).json["message"]
 
+		# An app tool's `prepare` is app code, not the layer's own check. Its errors stay unknown.
 		self.assertFalse(outcome["executed"])
-		self.assertEqual(outcome["proposal"]["result"], "failed")
+		self.assertEqual(outcome["proposal"]["result"], "unknown")
 		self.assertIn("refused", outcome["proposal"]["error"])
 		self.assertEqual(frappe.db.get_value(DOCTYPE, name, "title"), "Old")
 
