@@ -1,5 +1,6 @@
 import json
 from io import BytesIO
+from logging import Logger
 from unittest import TestCase
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError, URLError
@@ -96,6 +97,32 @@ class IdentitySyncClientTest(TestCase):
 		self.assertTrue(error.fp.closed)
 		for value in (*forbidden, "fixture-bearer", "fixture-secret", "private response body"):
 			self.assertNotIn(value, str(self.logger.mock_calls))
+
+	def test_forbidden_closure_log_has_only_fixed_text(self):
+		session = ("fixture-private-sid", "person@example.test")
+		refusal = HTTPError(
+			"https://sync.example.test/v1/sessions/revoke",
+			403,
+			"person@example.test fixture-private-sid fixture-private-bearer",
+			{"X-Fixture-Secret": "fixture-private-header"},
+			BytesIO(b"fixture-private-body"),
+		)
+		self.open.side_effect = [self.response(b'{"access_token":"fixture-private-bearer"}'), refusal]
+		logger = Logger("mobile_sessions")
+		with (
+			patch.object(client.frappe, "logger", return_value=logger),
+			self.assertLogs(logger, "ERROR") as log,
+		):
+			self.assertEqual(client.send_session_revocations([session]), ())
+
+		self.assertEqual(
+			log.output,
+			[
+				"ERROR:mobile_sessions:Identity-sync refused mobile session closure (HTTP 403). "
+				"Local revocation remains in effect."
+			],
+		)
+		self.assertIsNone(log.records[0].exc_info)
 
 	def test_reuses_service_bearer_until_expiry(self):
 		self.open.side_effect = [
