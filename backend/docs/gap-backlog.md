@@ -25,7 +25,7 @@ Kurallar şunlardır:
 
 ## platform-core-kimlik
 
-1. Telefon belirteci için `auth_hooks` kancası.
+1. Kapandı. `auth_hooks` telefon belirtecini doğrular. `test_mobile_identity.py` geçerli ve geçersiz belirteçleri sınar.
 2. Frappe'nin `/login` sayfası Atonota girişine gitsin. Giriş başlatan GET ucu sözleşmeye yazılsın.
 3. Frappe oturum süresi 1 saat boşta kalma olsun (O-25).
 4. Kimlik bağı DocType'ı `ai_write_closed_doctypes` kancasına girsin (O-28).
