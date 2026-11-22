@@ -88,7 +88,7 @@ def purge_usage(dry_run=True):
 		names = frappe.get_all(
 			"AI Usage Log",
 			filters=filters,
-			order_by="attempted_at asc",
+			order_by="attempted_at asc, name asc",
 			limit=DELETE_BATCH_SIZE,
 			pluck="name",
 		)

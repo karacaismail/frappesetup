@@ -250,7 +250,8 @@ def run():
 	frappe.set_user("Administrator")
 	try:
 		with ExitStack() as cleanup:
-			role = _insert("Role", role_name=f"Gateway fixture caller {suffix}", desk_access=0)
+			# Direct gateway RPC is exercised with a non-manager Desk user.
+			role = _insert("Role", role_name=f"Gateway fixture caller {suffix}", desk_access=1)
 			cleanup.callback(frappe.delete_doc, "Role", role)
 			users = _identities(suffix, password, role, auth, cleanup)
 			fixture = _seed(suffix, credential, role, cleanup)

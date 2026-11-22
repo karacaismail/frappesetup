@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from math import ceil
 from time import monotonic, time
+from uuid import UUID
 
 import frappe
 from frappe.utils.password import get_decrypted_password
@@ -67,8 +68,12 @@ def _json(value):
 	return json.loads(value) if isinstance(value, str) else value or []
 
 
+def _valid_name(name):
+	return isinstance(name, str) and 0 < len(name) <= 140
+
+
 def _document(doctype, name):
-	if not isinstance(name, str) or not 0 < len(name) <= 140:
+	if not _valid_name(name):
 		raise Denied(400, "invalid_request")
 	try:
 		return frappe.get_doc(doctype, name)
@@ -81,10 +86,81 @@ def _target(api_id, model_id):
 	model = _document("AI Model", model_id)
 	account = _document("AI Account", api.account)
 	provider = _document("AI Provider", account.provider)
+	return _checked_target(api, account, provider, model)
+
+
+def _checked_target(api, account, provider, model):
 	models = _json(api.allowed_models)
 	if model.provider != provider.name or (models and model.model_id not in models):
 		raise Denied(400, "invalid_target")
 	return Target(api, account, provider, model)
+
+
+def _record_key(name):
+	# The database can return the canonical spelling of a UUID link.
+	try:
+		return str(UUID(str(name)))
+	except ValueError:
+		return name
+
+
+def _selection_rows(doctype, names, fields):
+	names = list(dict.fromkeys(name for name in names if _valid_name(name)))
+	if not names:
+		return {}
+	return {
+		_record_key(row.name): row
+		for row in frappe.get_all(doctype, filters={"name": ["in", names]}, fields=["name", *fields])
+	}
+
+
+def _selection_row(rows, name):
+	if not _valid_name(name):
+		raise Denied(400, "invalid_request")
+	row = rows.get(_record_key(name))
+	if row is None:
+		raise Denied(403, "permission_denied")
+	return row
+
+
+def _route_targets(items):
+	# The route is authorized before this internal read. Selection needs no credentials.
+	apis = _selection_rows(
+		"AI API",
+		(item.api for item in items),
+		("account", "allowed_models", "enabled", "health_status", "priority", "weight"),
+	)
+	models = _selection_rows(
+		"AI Model",
+		(item.model for item in items),
+		(
+			"provider",
+			"model_id",
+			"enabled",
+			"context_size",
+			"prices_known",
+			"input_price",
+			"output_price",
+			"cost_currency",
+			"capabilities",
+		),
+	)
+	accounts = _selection_rows(
+		"AI Account",
+		(api.account for api in apis.values()),
+		("provider", "enabled", "has_monthly_budget", "currency"),
+	)
+	providers = _selection_rows(
+		"AI Provider", (account.provider for account in accounts.values()), ("enabled",)
+	)
+	targets = []
+	for item in items:
+		api = _selection_row(apis, item.api)
+		model = _selection_row(models, item.model)
+		account = _selection_row(accounts, api.account)
+		provider = _selection_row(providers, account.provider)
+		targets.append(_checked_target(api, account, provider, model))
+	return targets
 
 
 def _cache_key(api):
@@ -337,7 +413,7 @@ def complete(route, messages, tools=None, schema=None, limit=1024):
 	policy.require_route(route)
 	if len(route.targets) > MAX_TARGETS:
 		raise Denied(400, "invalid_route")
-	targets = [_target(item.api, item.model) for item in route.targets]
+	targets = _route_targets(route.targets)
 	try:
 		return _dispatch(route, targets, request, deadline)
 	except RedisError:
