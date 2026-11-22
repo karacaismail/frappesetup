@@ -105,6 +105,20 @@ Keycloak çıkışta `logout_token` gönderir. Doğrulamada şunları denetleyin
 - `sid` ya da `sub` değerinin varlığı,
 - `nonce` alanının yokluğu.
 
+### Telefon kimliği
+
+Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_identity` değerini yazar. Değer şu alanları taşıyan bir sözlüktür:
+
+| Alan | Tür | Not |
+| --- | --- | --- |
+| `account` | metin | Frappe kullanıcısının adı |
+| `scope` | metin | Her zaman `mobile` |
+| `site` | metin | İsteğin geldiği site |
+| `installation` | metin | Telefon kurulumunun kimliği |
+| `sid` | metin | Keycloak oturum kimliği |
+
+Kabuk ve mobil modülü bu değeri okur. Değer yoksa ya da biçimi tutmazsa istek telefon isteği sayılmaz.
+
 ### Kitaplığın arayüzü
 
 `press_tr` ve `platform_core` kitaplığı aynı anda kullanacak. Bu yüzden arayüz önceden belirlendi. Kitaplık Python 3.11 ve sonrasında çalışır. Frappe 16 Python 3.14 kullanır. Kitaplık Frappe'ye bağlı değildir.
@@ -170,6 +184,15 @@ Adres biçimi `/api/method/<yol>` olur.
 - `kimlik_yalniz_keycloak` ayarı açıkken Frappe'nin yerel giriş işlevleri kapanır. Kapatma adrese değil, çağrılan işleve uygulanır. `override_whitelisted_methods` kancası kullanılır. Kapsam şudur: parola girişi, parola sıfırlama ve güncelleme, e-posta bağlantısıyla giriş ve hazır sosyal giriş uçları. `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi 403 alır.
 - Yönetici kurtarma yolu yalnız site ayarıyla açılır. Ayarı sunucuya erişen yönetici yazar. Yol README'de anlatılır.
 - `/panel` sayfası `platform_core/www/` altında durur. Sayfa CSRF belirtecini taşır (G-45). Sahibi platform-core-kabuk işidir.
+
+### Website User için yöntem izin listesi
+
+- Website User yalnız izin listesindeki yöntemleri çağırabilir. Öteki her yöntem 403 döner. Kural `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsine uygulanır.
+- Denetim adrese değil, Frappe'nin çözdüğü işleve uygulanır. Böylece takma yol da aynı kurala takılır.
+- Liste `website_user_allowed_methods` kancasından gelir. Her uygulama yalnız kendi yöntemlerini ekler. Örneğin `platform_core.api.shell.get_bootstrap` ve `platform_core.api.meta.get_doctype` bu listededir.
+- Frappe'nin yöntemlerinden yalnız şunlar listededir: `frappe.auth.get_logged_user`, `logout` ve kurallı aramayı saran `frappe.desk.search.search_link`. Yeni bir Frappe yöntemi listeye ancak testle girer.
+- REST kayıt uçları (`/api/resource`, `/api/v2/document`) bu kuralın dışındadır. Bu uçlar Frappe'nin kayıt izinleriyle ve erişim kuralı motoruyla denetlenir.
+- Sahibi platform-core-kabuk işidir. Masaüstü kullanıcısı bu kuraldan etkilenmez.
 - `api/__init__.py`, `api/auth.py` ve `api/identity.py` dosyaları platform-core-kimlik işinindir.
 - `api/shell.py` ve `api/meta.py` dosyaları platform-core-kabuk işinindir.
 - Uç dosyası ince kalır. İş kuralı modül klasöründe durur.
@@ -260,10 +283,6 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Kurulum iptal edilince `platform_core` bu ucu çağırır. Aynı `sid` ile gelen belirteç de reddedilir (Proje kaydı O-25).
 - `POST /v1/account-deletions` ucu hesap silme isteğini kaydeder (Proje kaydı O-27). Ucu yalnız Press çağırır. Belirteç `azp=press-service` ve `aud=identity-sync` taşır. Gövde `issuer`, `subject` ve `reauthenticated_at` alanlarını taşır.
 - Müşteri silme isteğini Press'te verir. Press önce kullanıcıyı Keycloak'ta yeniden doğrular (`prompt=login`, `max_age=0`). `reauthenticated_at` bu doğrulamanın zamanıdır. identity-sync 300 saniyeden eski doğrulamayı reddeder.
-- Press, `/account-deletion` sayfasında işlemin geri alınamaz olduğunu açıklar. Sayfa insan oturumu ister.
-- Sayfa `press_tr.api.account.request_deletion` ucunu çağırır. Uç POST ve istek koruma belirteci ister. `confirm: false` yeniden doğrulamayı başlatır. `confirm: true` isteği gönderir.
-- Press, doğrulanan zamanı aynı tarayıcı oturumuna yazar. Başka oturum veya başka hesap bu doğrulamayı kullanamaz. Press 300 saniyeden eski doğrulamayı reddeder.
-- Press, `reauthenticated_at` değerini Unix saniyesi olarak gönderir.
 - Keycloak'ın kendi `delete_account` eylemi kapalıdır. Bu eylem kullanıcıyı ilk adımda siler. Hesap ekranındaki silme bağlantısı Press'teki silme sayfasına gider.
 - Yönetici kullanıcıyı Keycloak yönetim ekranından silerse olay dinleyici olayı gönderir. identity-sync 2., 3. ve 4. adımları yine çalıştırır. Olay kaybolursa elle başlatılan mutabakat komutu silinmiş kullanıcıyı bulur.
 - Akış sırası şudur:
