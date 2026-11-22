@@ -1,7 +1,7 @@
-"""Canlı Keycloak ile bütünleşme testi.
+"""Integration test against a live Keycloak instance.
 
-Keycloak'ın verdiği gerçek belirteç kitaplıkla doğrulanır. Ortam değişkenleri yoksa test atlanır.
-Çalıştırma: backend/identity/keycloak/bin/kc-dev.sh ortamını yükleyin ve bu klasörde testi koşun.
+Verify a token issued by Keycloak. Skip the test if the environment variables are missing.
+Load the environment from backend/identity/keycloak/bin/kc-dev.sh, then run the test from this directory.
 """
 
 import http.client
@@ -148,7 +148,7 @@ class TenantScopeSelectionTest(unittest.TestCase):
         )
 
 
-@unittest.skipUnless(KC and SECRET, "KC_PUBLIC_URL ve ATONOTA_IDENTITY_SYNC_SECRET yok, canlı test atlandı")
+@unittest.skipUnless(KC and SECRET, "Live test requires KC_PUBLIC_URL and ATONOTA_IDENTITY_SYNC_SECRET")
 class LiveKeycloakTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
