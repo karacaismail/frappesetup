@@ -23,7 +23,7 @@ Sayıları kontrol ettikten sonra silme komutunu çalıştırın.
 bench --site <site> execute hrms_tr.retention.purge --kwargs '{"dry_run": False}'
 ```
 
-Komut gönderilmiş izin kayıtlarını korur.
+Komut gönderilmiş izin kayıtlarını korur. Bu yüzden iptal e-postası göndermez.
 HRMS, iptal sırasında “Leave Ledger Entry” ve “Attendance” kayıtlarını değiştirebilir.
 Başka bir “Leave Application” kaydı, düzeltme bağlantısıyla silmeyi durdurabilir.
 Özel bağlantılar da Frappe'nin silme denetimine girer.

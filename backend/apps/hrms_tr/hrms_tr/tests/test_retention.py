@@ -52,18 +52,21 @@ class TestRetention(TestCase):
 		):
 			framework.conf = {"hrms_tr_retention_days": 30}
 			framework.get_all.return_value = ["EMP-ACTIVE", "EMP-LEFT"]
-			framework.qb.get_query.return_value.run.return_value = [{"name": "LEAVE-1"}]
+			framework.qb.get_query.return_value.run.return_value = [{"name": "LEAVE-1"}, {"name": "LEAVE-2"}]
 			leave = Mock(employee="EMP-LEFT", to_date="2026-10-02", docstatus=0)
 			leave.name = "LEAVE-1"
+			submitted = Mock(employee="EMP-LEFT", to_date="2026-10-02", docstatus=1)
 			framework.get_doc.side_effect = [
 				SimpleNamespace(status="Active", relieving_date="2026-10-01"),
 				SimpleNamespace(status="Left", relieving_date="2026-10-01"),
 				leave,
+				submitted,
 			]
 			result = retention.purge(dry_run=False)
 			self.assertEqual((result["employees"], result["leaves"]), (1, 1))
 			framework.only_for.assert_called_once_with("System Manager")
 			leave.cancel.assert_not_called()
+			submitted.cancel.assert_not_called()
 			self.assertEqual(
 				framework.delete_doc.call_args_list,
 				[
