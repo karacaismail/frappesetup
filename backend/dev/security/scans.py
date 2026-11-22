@@ -188,10 +188,15 @@ def scan_bandit():
         today = datetime.now(timezone.utc).date()
         if any(not valid_exception(item, today) for item in entries):
             raise ValueError("Invalid or expired Bandit exception.")
-        keys = {(item["rule"], item["file"], item["code"], item["statementSha256"]) for item in entries}
+        signatures = {
+            (item["rule"], item["file"], item["code"], item["statementSha256"]): item.get("occurrences", 1)
+            for item in entries
+        }
+        keys = signatures.keys()
         if len(keys) != len(entries) or any(
             not code or not re.fullmatch(r"[a-f0-9]{64}", digest)
-            for _, _, code, digest in keys
+            or type(count) is not int or count < 1
+            for (_, _, code, digest), count in signatures.items()
         ):
             raise ValueError("Invalid or duplicate Bandit exception signature.")
         files = [path for path in git("ls-files", "-z", "--", "backend").split("\0")
@@ -212,7 +217,10 @@ def scan_bandit():
             line = item["line_number"]
             key = (item["test_id"], filename, *bandit_source_signature(*sources[filename], line))
             grouped.setdefault(key, []).append(line)
-        matched = {key for key, lines in grouped.items() if key in keys and len(lines) == 1}
+        matched = {
+            key for key, lines in grouped.items()
+            if len(lines) == signatures.get(key)
+        }
         unreviewed = tuple(
             f"{rule} · {filename}:{line}"
             for rule, filename, code, digest in sorted(grouped.keys() - matched)

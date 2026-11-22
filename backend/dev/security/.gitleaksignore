@@ -42,3 +42,6 @@ b063f69c05a53250d1e46ccc8aa604d0830562ea:backend/apps/platform_core/platform_cor
 
 # Owner kimlik-realm. Synthetic webhook signing key used only by the sender test fixture.
 9060112adaf46b6889bf64390b179df51c2a7e48:backend/identity/keycloak/event-listener/src/test/java/au/com/ais/keycloak/webhook/WebhookSenderTest.java:generic-api-key:26
+
+# Owner Orkestratör (ProPR). OAuth client identifier; the distinct client secret is read interactively.
+55c14ec1dcfda4dadd5265ae36d9e7323c1a7172:Propr_setup/set-oauth-secret.sh:generic-api-key:21

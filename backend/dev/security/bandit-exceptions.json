@@ -1483,5 +1483,962 @@
     "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
     "owner": "platform-core-kimlik",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B101",
+    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_backlog.py",
+    "code": "assert parsed.tzinfo is not None, f\"{value!r} carries no UTC offset\"",
+    "statementSha256": "6e8d970dbbcecc16cf0bc52662b1741dcff9aa2d218dee18135981d0214a79f8",
+    "reason": "Test helper checks the UTC offset of a fixture timestamp.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B101",
+    "file": "backend/identity/identity_sync/identity_sync/reconcile.py",
+    "code": "assert user is not None",
+    "statementSha256": "e0ce73291ff3ff89230d636048f0573a26ec7940b83d1bb29021d63072a41e9e",
+    "reason": "The immediately preceding _is_open predicate already rejects None. This assertion only narrows the type.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22",
+    "occurrences": 2
+  },
+  {
+    "rule": "B101",
+    "file": "backend/identity/identity_sync/identity_sync/reconcile.py",
+    "code": "assert user is not None",
+    "statementSha256": "ef894e3a8f8753ac045a667e7be90493a1ce21fa88abab1f9b7c7e507fcd38c5",
+    "reason": "A preceding guard skips None before processing the user. This assertion only narrows the type.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B101",
+    "file": "backend/identity/identity_sync/tests/contract_tools.py",
+    "code": "assert line is not None",
+    "statementSha256": "b664801887803fff604f39525ff9be9573ae67be5f849939d89e5f444bf71414",
+    "reason": "A test helper verifies that the expected line exists in a fixture contract.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B101",
+    "file": "backend/identity/identity_sync/tests/test_mobile_client.py",
+    "code": "assert urlsplit(token_url).hostname == urlsplit(service_url).hostname == \"127.0.0.1\"",
+    "statementSha256": "b6e074b04142c345d7087b0d8a02fa0f8248694162768779062f118553615039",
+    "reason": "A test fixture checks that both generated destinations use loopback.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B101",
+    "file": "backend/identity/keycloak/tests/test_keycloak_canli.py",
+    "code": "assert yanit.durum == 200, safe_detail(yanit)",
+    "statementSha256": "a1d7d93aef76b0b2da6bfbed4c04d2b798e4401d32a032ebf6621e4fda9672c3",
+    "reason": "A live test helper checks a fixture response status; this is not a production authorization check.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/base.py",
+    "code": "PASSWORD = \"Sahte-Parola-6150-er!\"",
+    "statementSha256": "07a0f291f4b579bc4d1c199407bd29c5c745ca7ecf6742ddcfdb15351ef8cbc9",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/performance.py",
+    "code": "PASSWORD = \"Made-Up-Measure-6150!\"",
+    "statementSha256": "48956959a14bcba563e7addf2c488558e5db7e6267d385944a5a3d93f79dbbfe",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/tests/test_ai_retention_entries.py",
+    "code": "forced = self.human(desk, \"POST\", \"purge_logs\", body={\"dry_run\": False, \"confirmation_token\": \"x\"})",
+    "statementSha256": "55d8aff0ca99944666b752d3666cdd62395b85eb7b8d4f329b99886333c256ba",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/base.py",
+    "code": "PASSWORD = \"Sahte-Parola-7391-yz!\"",
+    "statementSha256": "7c15a0b4a5419b810b2786763f2712a0197b0bdb6f67e293c468dec4c5d7872e",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_approval.py",
+    "code": "client.csrf_token = \"yanlis\"",
+    "statementSha256": "5c953d0fc8808627a2304dd395052341372fd50f1a5f7568e27dc650fd65c56e",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_codex.py",
+    "code": "client.csrf_token = \"yanlis\"",
+    "statementSha256": "40beaa5a99e9313312496584e3ec7d260aff375a28ba8861c678c32d09f2df93",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_read.py",
+    "code": "manager, \"list_documents\", {\"doctype\": DOCTYPE, \"filters\": {\"access_token\": \"gizli-belirtec\"}}",
+    "statementSha256": "f8161291bb55606bf2108a27da1ddcccc06257ddcf7acd42ccb407c179a34c73",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/press_tr/tests/deletion_fixture.py",
+    "code": "\"press_service_client_secret\": \"press-test-fixture\",",
+    "statementSha256": "04b95d1d4c0121c4eefd8f138b32665db086ec5da3697d97f1f384e7945e42c2",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/press_tr/tests/test_account_deletion_template.py",
+    "code": "for context in ({}, {\"deletion_csrf_token\": \"\", \"reauthenticated\": True}):",
+    "statementSha256": "c0f01426ecaa11a10f4d9c423f21d4b367fe0754e60cf788c39ec59159ce775b",
+    "reason": "The template test supplies an empty placeholder CSRF token.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/press_tr/tests/test_machine_routes.py",
+    "code": "facade.request.args = {\"webhook_token\": \"invalid\"}",
+    "statementSha256": "48957f84f8203f12fe057de7f86f59bc8ed73d1dbd9b68ae1b0165969a53f162",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/press_tr/tests/test_machine_routes.py",
+    "code": "json.dumps({\"token\": \"unknown-test-token:invalid\"}),",
+    "statementSha256": "1a1ae96e03e14448f30fb8fc8dad474f341fbfae69d15d3fe741ae32a4d1154b",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/press_tr/tests/test_request_guards.py",
+    "code": "form = {\"logout_token\": \"fixture\"}",
+    "statementSha256": "4b096d69848acaf2858286433d49744f72a921a9675d8afec9c5c7742e685111",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "os.environ, {\"PRESS_DB_PASSWORD\": \"db-fixture\", \"PRESS_ADMIN_PASSWORD\": \"admin-fixture\"}",
+    "statementSha256": "5cbddb3a719365af494daae6367646d9d8faa820227421a5c20376f0dde025a9",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22",
+    "occurrences": 2
+  },
+  {
+    "rule": "B105",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "os.environ, {\"PRESS_DB_PASSWORD\": \"db-fixture\", \"PRESS_ADMIN_PASSWORD\": \"admin-fixture\"}",
+    "statementSha256": "ddb18b2e2a9af2c7b279b78f60db826bd622f4bd7296e9e343500c682908b7a9",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22",
+    "occurrences": 2
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_preview_fixtures.py",
+    "code": "\"E2E_KEYCLOAK_ADMIN_PASSWORD\": \"synthetic\",",
+    "statementSha256": "41df86edda87ee55493a59b5dbe63062f81b2d1544b6d0046bc34814716de0b1",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_preview_fixtures.py",
+    "code": "\"E2E_KEYCLOAK_CLIENT_SECRET\": \"browser-secret\",",
+    "statementSha256": "a1c793a71b4d08849761a10d171ee17e6ca8f9248bb3395f7b04fd40cb4ee8fc",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_preview_fixtures.py",
+    "code": "\"E2E_KEYCLOAK_CLIENT_SECRET\": \"browser-secret\",",
+    "statementSha256": "ed0a40a7a5a8cd5100527f7f86e1e4b4e681c3bfc0f03d929db4e0efc8f4e052",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_preview_fixtures.py",
+    "code": "\"E2E_KEYCLOAK_SERVICE_CLIENT_SECRET\": \"service-secret\",",
+    "statementSha256": "a1c793a71b4d08849761a10d171ee17e6ca8f9248bb3395f7b04fd40cb4ee8fc",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_preview_fixtures.py",
+    "code": "\"E2E_KEYCLOAK_SERVICE_CLIENT_SECRET\": \"service-secret\",",
+    "statementSha256": "ed0a40a7a5a8cd5100527f7f86e1e4b4e681c3bfc0f03d929db4e0efc8f4e052",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_preview_fixtures.py",
+    "code": "fixtures, \"keycloak_request\", return_value={\"access_token\": \"unexpected\"},",
+    "statementSha256": "2e0c38f3f0a1845c8fb1262e197e02d895adc4d27e4134bcee12601200329510",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/e2e/tests/test_preview_fixtures.py",
+    "code": "return {\"access_token\": \"synthetic\"}",
+    "statementSha256": "755327e98b72aa8178053bf5fb21b075e37ab3e541a9d407b18349f61aa981f8",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "integration-e2e",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/fakes.py",
+    "code": "WEBHOOK_SECRET = \"test-webhook-secret\"",
+    "statementSha256": "8af64cb0b0c47d91dad731948c92cf4f0ca43d12624940c46fa3197c327b3d02",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/fakes.py",
+    "code": "return 200, {\"access_token\": f\"token-for:{scope}\", \"expires_in\": 300, \"token_type\": \"Bearer\"}",
+    "statementSha256": "cfb49a799b11020597427b9129082bf1469592c064f9c17e0db3f9664f58f492",
+    "reason": "The fake HTTP handler generates an in-process test token for each scope.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_config_cli.py",
+    "code": "\"IDENTITY_SYNC_CLIENT_SECRET\": \"test-client-secret\",",
+    "statementSha256": "9422ba166b1ff9eae08228253b5c827e3cfacc552e799d4c14bc7c340ec0e1bc",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_config_cli.py",
+    "code": "\"IDENTITY_SYNC_WEBHOOK_SECRET\": \"test-webhook-secret\",",
+    "statementSha256": "9422ba166b1ff9eae08228253b5c827e3cfacc552e799d4c14bc7c340ec0e1bc",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_config_cli.py",
+    "code": "load_settings({**self.ENV, \"IDENTITY_SYNC_WEBHOOK_SECRET\": \"kisa-anahtar\"})",
+    "statementSha256": "cd7c4754cc440a4308ad35b688638d18a46246a5211e7d7b2e612d34733dc6f0",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_mobile_client.py",
+    "code": "\"keycloak_service_client_secret\": \"made-up-site-value\",",
+    "statementSha256": "24fe3320313f81b72944b454681e14b05959583d9784218020ff50625679ba6b",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_mobile_client.py",
+    "code": "return 200, {\"access_token\": SESSION_TOKEN, \"expires_in\": 300, \"token_type\": \"Bearer\"}",
+    "statementSha256": "e232daf35e54d8a76f8e5b185c34a925af811a1d87683d2038b9281b3bc312d5",
+    "reason": "The fake HTTP handler returns a test session token from a fixture constant.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "EXECUTE_TOKEN = \"execute-token\"",
+    "statementSha256": "6d596229995c2bffebc7981123566ba894457e78d7e12bd91fda6cfcf5a11ecb",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "OTHER_SITE_TOKEN = \"other-site-token\"  # the service token of tenant kiraci2",
+    "statementSha256": "2a09f9e481b05ac5e83c581d106efe1aa6cb1cfef017d8d013bb45507a41cfd7",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "PRESS_TOKEN = \"press-token\"  # the Press service token: may only request an account deletion",
+    "statementSha256": "77bece1a86eadd668fa5780ce4c28d5c4ce800bbed197115cb3cc3a7b4619269",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "PREVIEW_TOKEN = \"preview-token\"  # yapay zekâ aracısının belirteci: yalnız okur ve önizler",
+    "statementSha256": "f713a9561df32d0e74160f3ee651cc597b66733395f1380f8fab9662fac58a7e",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "SESSION_TOKEN = \"session-token\"",
+    "statementSha256": "ac541226af7ed19277b6d263a7ef76145d0d3df37e3080703b92c9c05ca9b6b6",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/keycloak/tests/test_create_tenant_client.py",
+    "code": "self.clients[client_id] = {**body, \"id\": client_id, \"secret\": \"preserved-test-secret\"}",
+    "statementSha256": "e742a2aad28012da3a6ab1d5533d8c4eb1b499ce93dd59b643be2616145fa8e0",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "FAKE_SECRET = \"fake-webhook-secret-for-the-argv-test-7f3a\"  # gitleaks:allow (synthetic test value)",
+    "statementSha256": "7f70cb471c60d2c5d71384ba74072021a199e23f2a8568cf28208bab4a02c238",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/keycloak/tests/test_realm_backlog.py",
+    "code": "\"username\": \"nobody@example.test\", \"password\": \"x\"})",
+    "statementSha256": "c23015f459e9dc72f7b0f41f85151b7725f2c77da6bd40d10c1ec2b7a7110e89",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/keycloak/tests/test_second_factor.py",
+    "code": "TOTP_PASSWORD = \"Ornek-Parola-Totp-2026\"  # gitleaks:allow (synthetic test value, development realm only)",
+    "statementSha256": "fa2e6eeb3a8ed5d0e8a36ca0feb069b18669f1ca2a78d8f41e2c637a848f1aef",
+    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_backlog.py",
+    "code": "self.make_record(USER_A, title=f\"{index:02d} {big}\"[:140], access_token=\"\") for index in range(6)",
+    "statementSha256": "492cab7c95a8f3b3d03cca5fbbe9569ff387b25e237f7f0bc3f42ddd05d4c41c",
+    "reason": "The test supplies a synthetic credential or token through a fixture argument.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_identity.py",
+    "code": "response = self.rpc(self.anonymous(), \"tools/list\", token=\"fsat_bilinmeyen\")",
+    "statementSha256": "71980568f8684eda2a37d5c11a434e98ee41aada802906a76ac27e7938ac1c86",
+    "reason": "The test supplies a synthetic credential or token through a fixture argument.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_purge_confirmation.py",
+    "code": "made_up = self.post(manager, dry_run=False, confirmation_token=\"made-up-token\")",
+    "statementSha256": "bebecbca1f55d85d959247677ad374f4bd7d18021a55a56c0a64361577f5b948",
+    "reason": "The test supplies a synthetic credential or token through a fixture argument.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_read.py",
+    "code": "name = self.make_record(USER_A, vault_code=\"cok-gizli-deger\", access_token=\"gizli-belirtec\")",
+    "statementSha256": "155c87a88ce5edef14ae1e83a322b992df08a15cebc2f60a2cba763ebe870bb2",
+    "reason": "The test supplies a synthetic credential or token through a fixture argument.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_result_boundary.py",
+    "code": "self.rpc(self.anonymous(), \"tools/list\", token=\"fsat_unknown\")",
+    "statementSha256": "2f0f81ad9f674178c1ded4498e6a9ee5f552a1c7ccf96f49dc69c7681b317980",
+    "reason": "The test supplies a synthetic credential or token through a fixture argument.",
+    "owner": "platform-core-yz",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/apps/press_tr/tests/test_account_deletion_template.py",
+    "code": "output = self.render(translate, reauthenticated=True, deletion_csrf_token='token\"><input>')",
+    "statementSha256": "d4e72800e4db26d3edef8de809745feb937a0df4cfdc42603e250fc402734620",
+    "reason": "The test supplies a synthetic credential or token through a fixture argument.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "_, arguments, _ = frappe.database.get_command(user=\"fixture\", password=\"generated-fixture\")",
+    "statementSha256": "dc832f1cd7d0f84b1f9115483dc34c5289da477774056860b4cc5e128b5e1f7a",
+    "reason": "The test supplies a synthetic credential or token through a fixture argument.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/identity/identity_sync/tests/fakes.py",
+    "code": "client_secret=\"test-client-secret\",",
+    "statementSha256": "f287ff2a8d758737399a3daee808c87b53e4d131d2677e717c2b862361f8f691",
+    "reason": "The test supplies a synthetic credential or token through a fixture argument.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "self.assert_rejected(self.send(body, NOW, sign(body, NOW, secret=\"baska-anahtar\")))",
+    "statementSha256": "c9980e808b7ac500baade59b261a75907a581cdde44d6edcfd3e3f87487ca41a",
+    "reason": "The test supplies a synthetic credential or token through a fixture argument.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B108",
+    "file": "backend/dev/press/create_site.py",
+    "code": "with NamedTemporaryFile(mode=\"w\", encoding=\"utf-8\", prefix=\"press-db-\", dir=\"/dev/shm\") as options:",
+    "statementSha256": "563a1a27e6c74ac6b418787b28c8ba20fe7d7f07d301218ec9540d4893bec5fd",
+    "reason": "NamedTemporaryFile atomically creates a private file for development database options and removes it on context exit.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B108",
+    "file": "backend/identity/identity_sync/tests/test_config_cli.py",
+    "code": "ENV = environment(\"http://kimlik.localhost:6110/\", \"http://press.localhost:6113\", \"http://kiraci1.localhost:6111\", \"/tmp/x.sqlite3\")",
+    "statementSha256": "68c34b9c5a3bc8402d0ab5291751f725e1f8c1cfa58c490e3b74a0c8f2c2f0bb",
+    "reason": "The configuration test uses this path as a fixture string; the flagged statement opens no file.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B110",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "except Exception:  # the dropped connection reaches the client as an error",
+    "statementSha256": "717c42f8ad8c6bf5205ffe215d7dfd93cf37145e5e50546d583154a77f226517",
+    "reason": "The crash simulation expects a dropped test connection and then verifies the saved dead letter.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B110",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "except Exception:  # the dropped connection reaches the client as an error",
+    "statementSha256": "7bb6722e447ca5e4d80a4c368a23c53781337407d8c5571366db2744cb86e6d6",
+    "reason": "The crash simulation expects a dropped test connection and then verifies the saved operation state.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B310",
+    "file": "backend/identity/identity_sync/tests/measure.py",
+    "code": "with urllib.request.urlopen(request, timeout=30) as response:",
+    "statementSha256": "3ca4148022b2e697ecf79d7c5f0354cad30b26a31f87b0ca710776ac5032d406",
+    "reason": "The test constructs an HTTP request to its own local fake server with a timeout.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B310",
+    "file": "backend/identity/identity_sync/tests/measure.py",
+    "code": "with urllib.request.urlopen(request, timeout=30) as response:",
+    "statementSha256": "9dec3af337ce3fad49a97aae1487a603fe2c213a17047a1badf8dd23d7542b53",
+    "reason": "The test constructs an HTTP request to its own local fake server with a timeout.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B310",
+    "file": "backend/identity/identity_sync/tests/measure.py",
+    "code": "with urllib.request.urlopen(request, timeout=30) as response:",
+    "statementSha256": "e5b8f91a5ff49affea3c1e29ea7f4e8cf2e493465e5454d045b24a3bc15b8752",
+    "reason": "The test constructs an HTTP request to its own local fake server with a timeout.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B310",
+    "file": "backend/identity/identity_sync/tests/test_access_matrix.py",
+    "code": "with urllib.request.urlopen(request, timeout=10) as response:",
+    "statementSha256": "e253f05b32741ef9355f81c95dd7b3c93c998c3ef70d31e49f6e73275e018c3f",
+    "reason": "The test constructs an HTTP request to its own local fake server with a timeout.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B310",
+    "file": "backend/identity/identity_sync/tests/test_auth.py",
+    "code": "urllib.request.urlopen(request, timeout=10)",
+    "statementSha256": "40a951b0304fc7b9613289b779641765b4f925b1986d7d16ea04c90dd6ab0a74",
+    "reason": "The test constructs an HTTP request to its own local fake server with a timeout.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B310",
+    "file": "backend/identity/identity_sync/tests/test_auth.py",
+    "code": "with urllib.request.urlopen(request, timeout=10) as response:",
+    "statementSha256": "ebff1773b786464786d7c8916c4893562fdab8fa230faa086f790519c2b51df5",
+    "reason": "The test constructs an HTTP request to its own local fake server with a timeout.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B310",
+    "file": "backend/identity/identity_sync/tests/test_contract.py",
+    "code": "with urllib.request.urlopen(request, timeout=10) as response:",
+    "statementSha256": "aab77c95c1bb7ff157941827884ebdfe438ba85e13f128e366e5d6e322a7cd7d",
+    "reason": "The test constructs an HTTP request to its own local fake server with a timeout.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B310",
+    "file": "backend/identity/identity_sync/tests/test_contract.py",
+    "code": "with urllib.request.urlopen(request, timeout=10) as response:",
+    "statementSha256": "c48c276b9725e6af8c679e7984297b21137fc3b194083149a674b2b86d45b739",
+    "reason": "The test constructs an HTTP request to its own local fake server with a timeout.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B310",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "with urllib.request.urlopen(request, timeout=10) as response:",
+    "statementSha256": "a5fd3dca63609645f357c6be4829937cec4cf77a7bb3378c3a5d559c720892cf",
+    "reason": "The test constructs an HTTP request to its own local fake server with a timeout.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/base.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/apps/press_tr/tests/test_machine_routes.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/hrms/test_compose.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "ilk-dikey-dilim",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/identity/identity_sync/tests/test_store.py",
+    "code": "import subprocess",
+    "statementSha256": "a5eecd4fe6e4c5b54123e2d73e6450d878a0b47fff9ae9f16ff0285cdb1e3a28",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/identity/keycloak/tests/test_event_listener.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/base.py",
+    "code": "subprocess.run(",
+    "statementSha256": "70c887d9a95e15d92699fdb2315df107db68d518ebcfd40b6df38a109c3ef350",
+    "reason": "A test starts a bench worker with fixed argument tokens and a controlled fixture working directory.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/apps/press_tr/tests/test_machine_routes.py",
+    "code": "tag = subprocess.check_output(",
+    "statementSha256": "a8cab5a2fa33ed2ddf3342fdff16f622f0a87d7af840df338ed2e559c0f198db",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/hrms/test_compose.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "d5e570bcd7575e3de2257bd4f4dc12393134762479486a1bb3f112c7f88b5868",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "ilk-dikey-dilim",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "1ae5e7638aee15bf0dabfe389b616ca7605d6ace59703c1a1ff2d1843f87ecbe",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "1d5fcfbba7cf12cede1779bed3769f15571145f1fd0009cc406b97549c7fe476",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "2f781333cf0901755273efc6e5fddac28348d83eb10d6494e21ca0132b19980f",
+    "reason": "The test passes the repository patch script to Bash stdin inside the selected fixture image; the host invokes no shell.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "85e3a4c7bb25504c4a5b5d1aefbabb12678abe1d09d48db45b07d5192128a526",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "subprocess.run(",
+    "statementSha256": "71cc2c5a41b26bab76e3c4eb3877ecbd3c82265ea03a2d9ce91cb6690cc7f945",
+    "reason": "The test starts a fixture container through the Docker CLI with separate argument tokens.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/identity_sync/tests/test_store.py",
+    "code": "return subprocess.run([sys.executable, \"-c\", child, self.path], cwd=package_root, timeout=30).returncode",
+    "statementSha256": "86db33da5e1c70856964a7969eb980b2ac5729c50bb0fb4bdb9cadcd9493a552",
+    "reason": "The lock test starts the current Python interpreter with test-owned child code and a fixture path.",
+    "owner": "identity-sync",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "2274c9e4f8355d143f59e7eedcf59eafaaae64138efa8c03a3fa51ba2b159f46",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "6cc335476eb278d61c35fdfe18d2e0ed7893afa0b7266be592192f0225a10285",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "e151932b3eed9e54ac80619cb31cbef89e5836ce4051ce77030cdd4af0abd7df",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "f4c60f326264dcc0f0ebccbb87fc534461c2a087a07d0c2f12241941727e5b80",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "subprocess.run([\"bash\", str(self.script), \"prod-check\"], env=self.env, capture_output=True,",
+    "statementSha256": "eea4ba92960975ad0735da5d53f00560ae5fe413028abc9128e0b616b3321235",
+    "reason": "The test invokes a fixture command with separate argument tokens and without a host shell.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/identity/keycloak/tests/test_event_listener.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "e5b34f916e5aab9fd6fad8fa0421cd92f1483fba89e40f2fea0f250d4bfa4f42",
+    "reason": "The test reads its event fixture from an isolated container using a constant shell command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/base.py",
+    "code": "subprocess.run(",
+    "statementSha256": "70c887d9a95e15d92699fdb2315df107db68d518ebcfd40b6df38a109c3ef350",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/apps/press_tr/tests/test_machine_routes.py",
+    "code": "tag = subprocess.check_output(",
+    "statementSha256": "a8cab5a2fa33ed2ddf3342fdff16f622f0a87d7af840df338ed2e559c0f198db",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "1ae5e7638aee15bf0dabfe389b616ca7605d6ace59703c1a1ff2d1843f87ecbe",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "1d5fcfbba7cf12cede1779bed3769f15571145f1fd0009cc406b97549c7fe476",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "85e3a4c7bb25504c4a5b5d1aefbabb12678abe1d09d48db45b07d5192128a526",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "2274c9e4f8355d143f59e7eedcf59eafaaae64138efa8c03a3fa51ba2b159f46",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "6cc335476eb278d61c35fdfe18d2e0ed7893afa0b7266be592192f0225a10285",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "e151932b3eed9e54ac80619cb31cbef89e5836ce4051ce77030cdd4af0abd7df",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "f4c60f326264dcc0f0ebccbb87fc534461c2a087a07d0c2f12241941727e5b80",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
+    "code": "subprocess.run([\"bash\", str(self.script), \"prod-check\"], env=self.env, capture_output=True,",
+    "statementSha256": "eea4ba92960975ad0735da5d53f00560ae5fe413028abc9128e0b616b3321235",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/identity/keycloak/tests/test_event_listener.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "e5b34f916e5aab9fd6fad8fa0421cd92f1483fba89e40f2fea0f250d4bfa4f42",
+    "reason": "The developer test runner supplies the executable PATH for this fixture command.",
+    "owner": "kimlik-realm",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B608",
+    "file": "backend/apps/platform_core/platform_core/erisim/test_reports.py",
+    "code": "query=f\"select name as `Name:Data:200`, title as `Title:Data:200` from `tab{DOCTYPE}`\",",
+    "statementSha256": "3ba5bbc1c851f99d3f7b5753911bf3eca210a92c21c7fa0850498e7c903be61b",
+    "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B608",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_inceleme.py",
+    "code": "query=f\"select name as `Name:Data:200`, title as `Title:Data:200` from `tab{DOCTYPE}`\",",
+    "statementSha256": "25abe3d07b911275db7455ae301149c19534a2e2cc84ca069a7c8f894c43970f",
+    "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B608",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_report_rules.py",
+    "code": "ensure_report(CROSS_REPORT, FREE_DOCTYPE, query=f\"select {columns} from `tab{DOCTYPE}`\")",
+    "statementSha256": "806595dc46401c480c16d1731a05ffc8f9fe34c0b3e7d5ba6fed0b8933fcbedc",
+    "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B608",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_report_rules.py",
+    "code": "ensure_report(FREE_REPORT, FREE_DOCTYPE, query=f\"select {columns} from `tab{FREE_DOCTYPE}`\")",
+    "statementSha256": "6b86a496ed1b7b1b27c43333276b93498415e56c083e4ab6eee16f131105642c",
+    "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B608",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_report_rules.py",
+    "code": "ensure_report(NAME_REPORT, DOCTYPE, query=f\"select {columns} from `tab{DOCTYPE}`\")",
+    "statementSha256": "db07109397d3168be482bbcef5992790639a70bff344948d534852152e5c88eb",
+    "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B608",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_report_rules.py",
+    "code": "query = f\"select name as `Name:Data:200`, title as `Title:Data:200` from `tab{DOCTYPE}`\"",
+    "statementSha256": "7f5e8111eb8f69b4ac7751619b2ce1ac82dc530c1af8c51722ef4719f22a5a2f",
+    "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B608",
+    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_report_rules.py",
+    "code": "query=f\"select name as `Name:Data:200`, salary_amount as `Salary:Currency:120` from `tab{DOCTYPE}`\",",
+    "statementSha256": "7d0013ee9d5fc4d6be99581924ce80815e7f11ef105a921f1bff56149e6d569f",
+    "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
+    "owner": "erisim-kurali",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B701",
+    "file": "backend/apps/press_tr/tests/test_account_deletion_template.py",
+    "code": "environment = Environment(",
+    "statementSha256": "674f518bc529a43a32e440292d1f75ceba2abceccfdf57b72e3c8f05186ed063",
+    "reason": "The isolated template test deliberately disables default escaping to verify the application template escapes its values explicitly.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
   }
 ]
