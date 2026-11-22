@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: HRMS TR izin talebi
+  title: HRMS TR Leave Applications
   version: 0.1.0
 servers:
   - url: /api
@@ -11,16 +11,16 @@ paths:
   /resource/Leave%20Application:
     get:
       operationId: listLeaveApplications
-      summary: Kullanıcının okuyabildiği izin taleplerini listeler.
+      summary: List leave applications the user can read.
       description: |
-        Frappe'nin genel kayıt ucunu kullanır. Frappe, kayıt ve alan izinlerini uygular.
-        Bu sözleşme, uygulamanın kullandığı alan ve süzgeç biçimini tanımlar.
+        Uses Frappe's standard resource endpoint. Frappe enforces document and field permissions.
+        This contract defines the fields and filter format the application uses.
       parameters:
         - name: fields
           in: query
           description: |
-            URL kodlu JSON dizisi. Alanı vermezseniz Frappe yalnız name döndürür.
-            Frappe, yalnız kullanıcının okuma izni olan alanları döndürür.
+            URL-encoded JSON array. If omitted, Frappe returns only name.
+            Frappe returns only the fields the user can read.
           content:
             application/json:
               schema:
@@ -33,7 +33,7 @@ paths:
         - name: filters
           in: query
           description: |
-            URL kodlu JSON nesnesi. Frappe, nesnedeki eşitlik koşullarını birlikte uygular.
+            URL-encoded JSON object. Frappe applies all equality conditions in the object together.
           content:
             application/json:
               schema:
@@ -48,21 +48,21 @@ paths:
               example: {status: Open, docstatus: 0}
         - name: limit_start
           in: query
-          description: Atlanacak kayıt sayısı. İlk kayıt 0 değerinden başlar.
+          description: Number of records to skip. The first record is at offset 0.
           schema:
             type: integer
             minimum: 0
             default: 0
         - name: limit_page_length
           in: query
-          description: Bir sayfada istenen en çok kayıt sayısı.
+          description: Maximum number of records requested per page.
           schema:
             type: integer
             minimum: 1
             default: 20
       responses:
         "200":
-          description: "Kendi talepleri, bağlı ekip veya tüm site kayıtları."
+          description: "The user's own applications, their team's applications, or all applications on the site."
           content:
             application/json:
               schema:
@@ -78,13 +78,13 @@ paths:
         required: true
         schema:
           type: string
-        description: İzin talebinin kayıt adı.
+        description: Leave application record name.
     get:
       operationId: getLeaveApplication
-      summary: İzin talebini açar.
+      summary: Read a leave application.
       responses:
         "200":
-          description: Kullanıcıya açık alanları döndürür. Bakiye alanı okuma izni gerektirir.
+          description: Returns the fields the user can read. The balance field requires its own read permission.
           content:
             application/json:
               schema:
@@ -98,15 +98,15 @@ paths:
   /method/hrms_tr.api.approve_leave:
     post:
       operationId: approveLeaveApplication
-      summary: Açık izin talebini onaylar ve gönderir.
+      summary: Approve and submit an open leave application.
       description: |
-        Yönetici bağlı ekipteki talebi onaylar. İK sitedeki talepleri onaylar.
-        Yetkili işletim rolleri sitedeki talepleri onaylar.
-        Talebi okurken gelen modified değerini version alanında gönderin.
+        Managers approve applications from their team. HR can approve applications across the site.
+        Authorized operations roles can approve applications across the site.
+        Send the modified value from the application response in the version field.
       parameters:
         - in: header
           name: X-Frappe-CSRF-Token
-          description: Frappe, oturuma bağlı CSRF belirteci varsa yazma isteğinde bu başlığı ister.
+          description: Frappe requires this header for a write request if the session has a CSRF token.
           schema:
             type: string
       requestBody:
@@ -117,7 +117,7 @@ paths:
               $ref: "#/components/schemas/ApproveLeaveRequest"
       responses:
         "200":
-          description: Onaylanan kaydın adı.
+          description: Name of the approved record.
           content:
             application/json:
               schema:
@@ -130,7 +130,7 @@ paths:
           $ref: "#/components/responses/LeaveNotFound"
         "417":
           description: |
-            Talebin sürümü değişti, talep açık bir taslak değil veya HRMS doğrulaması başarısız.
+            The application version changed, the application is not an open draft, or HRMS validation failed.
           content:
             application/json:
               schema:
@@ -143,24 +143,24 @@ x-ai-tool:
     additionalProperties: false
     required: [name, version]
     properties:
-      name: {type: string, minLength: 1, maxLength: 140, description: "İzin talebinin kayıt adı."}
-      version: {type: string, minLength: 1, maxLength: 40, description: "Açık taslağın modified değeri."}
-  description: Araç öneri oluşturur. İnsan onayından önce izin talebi değişmez.
+      name: {type: string, minLength: 1, maxLength: 140, description: "Leave application record name."}
+      version: {type: string, minLength: 1, maxLength: 40, description: "The modified value of the open draft."}
+  description: The tool creates a proposal. The leave application changes only after human approval.
 components:
   securitySchemes:
     frappeSession:
       type: apiKey
       in: cookie
       name: sid
-      description: Frappe oturum çerezi.
+      description: Frappe session cookie.
     frappeApiToken:
       type: apiKey
       in: header
       name: Authorization
-      description: "Frappe API anahtarı ve sırrı. Başlık değeri: token <api_key>:<api_secret>"
+      description: "Frappe API key and secret. Header value: token <api_key>:<api_secret>"
   responses:
     AuthenticationFailed:
-      description: Frappe, verilen kimlik bilgisini kabul etmedi.
+      description: Frappe rejected the supplied credentials.
       content:
         application/json:
           schema:
@@ -168,7 +168,7 @@ components:
           example:
             exc_type: AuthenticationError
     PermissionDenied:
-      description: Erişim reddedildi. Oturum veya gerekli izin eksik olabilir.
+      description: Access denied. The session or a required permission may be missing.
       content:
         application/json:
           schema:
@@ -176,7 +176,7 @@ components:
           example:
             exc_type: PermissionError
     LeaveNotFound:
-      description: İzin talebi bulunamadı.
+      description: Leave application not found.
       content:
         application/json:
           schema:
@@ -187,18 +187,18 @@ components:
       additionalProperties: false
       required: [name]
       properties:
-        name: {type: string, minLength: 1, maxLength: 140, description: "İzin talebinin kayıt adı."}
+        name: {type: string, minLength: 1, maxLength: 140, description: "Leave application record name."}
     ApproveLeaveRequest:
       type: object
       additionalProperties: false
       required: [name, version]
       properties:
-        name: {type: string, minLength: 1, maxLength: 140, description: "İzin talebinin kayıt adı."}
+        name: {type: string, minLength: 1, maxLength: 140, description: "Leave application record name."}
         version:
           type: string
           minLength: 1
           maxLength: 40
-          description: İzin talebini okurken gelen modified değeri.
+          description: The modified value returned when reading the leave application.
           example: "2026-11-22 09:00:00.000001"
     LeaveApplication:
       type: object
@@ -213,11 +213,11 @@ components:
         docstatus: {type: integer, enum: [0, 1, 2]}
         modified:
           type: string
-          description: Onay isteğinde version olarak gönderilen kayıt sürümü.
+          description: Record version sent as version in the approval request.
         total_leave_days: {type: [number, "null"]}
         leave_balance:
           type: [number, "null"]
-          description: Frappe bu alanı yalnız okuma izni varsa döndürür.
+          description: Frappe returns this field only when the user has read permission.
     LeaveApplicationListResponse:
       type: object
       required: [data]

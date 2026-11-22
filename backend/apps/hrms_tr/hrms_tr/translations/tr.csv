@@ -19,3 +19,39 @@ Document name of the leave application.,İzin talebinin kayıt adı.
 Modified value of the reviewed draft.,İncelenen taslağın son değişiklik değeri.
 Leave balance before the application.,Talep öncesindeki izin bakiyesi.
 You do not have permission to cancel leave.,İzin talebini iptal etme yetkiniz yok.
+HRMS TR Leave Applications,HRMS TR izin talebi
+List leave applications the user can read.,Kullanıcının okuyabildiği izin taleplerini listeler.
+Uses Frappe's standard resource endpoint. Frappe enforces document and field permissions.\nThis contract defines the fields and filter format the application uses.,"Frappe'nin genel kayıt ucunu kullanır. Frappe, kayıt ve alan izinlerini uygular.\nBu sözleşme, uygulamanın kullandığı alan ve süzgeç biçimini tanımlar."
+"URL-encoded JSON array. If omitted, Frappe returns only name.\nFrappe returns only the fields the user can read.","URL kodlu JSON dizisi. Alanı vermezseniz Frappe yalnız name döndürür.\nFrappe, yalnız kullanıcının okuma izni olan alanları döndürür."
+URL-encoded JSON object. Frappe applies all equality conditions in the object together.,"URL kodlu JSON nesnesi. Frappe, nesnedeki eşitlik koşullarını birlikte uygular."
+Number of records to skip. The first record is at offset 0.,Atlanacak kayıt sayısı. İlk kayıt 0 değerinden başlar.
+Maximum number of records requested per page.,Bir sayfada istenen en çok kayıt sayısı.
+"The user's own applications, their team's applications, or all applications on the site.","Kendi talepleri, bağlı ekip veya tüm site kayıtları."
+Leave application record name.,İzin talebinin kayıt adı.
+Read a leave application.,İzin talebini açar.
+Returns the fields the user can read. The balance field requires its own read permission.,Kullanıcıya açık alanları döndürür. Bakiye alanı okuma izni gerektirir.
+Approve and submit an open leave application.,Açık izin talebini onaylar ve gönderir.
+Managers approve applications from their team. HR can approve applications across the site.\nAuthorized operations roles can approve applications across the site.\nSend the modified value from the application response in the version field.,Yönetici bağlı ekipteki talebi onaylar. İK sitedeki talepleri onaylar.\nYetkili işletim rolleri sitedeki talepleri onaylar.\nTalebi okurken gelen modified değerini version alanında gönderin.
+Frappe requires this header for a write request if the session has a CSRF token.,"Frappe, oturuma bağlı CSRF belirteci varsa yazma isteğinde bu başlığı ister."
+Name of the approved record.,Onaylanan kaydın adı.
+"The application version changed, the application is not an open draft, or HRMS validation failed.","Talebin sürümü değişti, talep açık bir taslak değil veya HRMS doğrulaması başarısız."
+The modified value of the open draft.,Açık taslağın modified değeri.
+The tool creates a proposal. The leave application changes only after human approval.,Araç öneri oluşturur. İnsan onayından önce izin talebi değişmez.
+Frappe session cookie.,Frappe oturum çerezi.
+Frappe API key and secret. Header value: token <api_key>:<api_secret>,Frappe API anahtarı ve sırrı. Başlık değeri: token <api_key>:<api_secret>
+Frappe rejected the supplied credentials.,"Frappe, verilen kimlik bilgisini kabul etmedi."
+Access denied. The session or a required permission may be missing.,Erişim reddedildi. Oturum veya gerekli izin eksik olabilir.
+Leave application not found.,İzin talebi bulunamadı.
+The modified value returned when reading the leave application.,İzin talebini okurken gelen modified değeri.
+Record version sent as version in the approval request.,Onay isteğinde version olarak gönderilen kayıt sürümü.
+Frappe returns this field only when the user has read permission.,Frappe bu alanı yalnız okuma izni varsa döndürür.
+Leave Balance Before Application,Talep Öncesi İzin Bakiyesi
+HRMS TR Employee Leave Application,HRMS TR çalışanının izin talebi
+HRMS TR Manager Leave Application,HRMS TR yöneticisinin ekip izin talepleri
+HRMS TR Admin Leave Application,HRMS TR insan kaynaklarının izin talepleri
+HRMS TR System Manager Leave Application,HRMS TR sistem yöneticisinin izin talepleri
+HRMS TR HR Manager Leave Application,HRMS TR insan kaynakları yöneticisinin izin talepleri
+Read and edit own leave drafts.,Kendi izin taslaklarınızı okuyun ve düzenleyin.
+Read and approve leave for the reporting team.,Ekibinizin izin taleplerini okuyun ve onaylayın.
+Manage leave applications in this site.,Bu sitedeki izin taleplerini yönetin.
+Preserve operations access to leave applications on this site.,Bu sitede işletim rollerinin izin taleplerine erişimini korur.
