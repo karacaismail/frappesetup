@@ -3,6 +3,11 @@ import { expect, test, type Page } from "@playwright/test";
 const START = "/api/method/platform_core.api.auth.start_login";
 const LABEL = "Atonota ile oturum aç";
 
+// Safari and WebKit move focus to links only with Option+Tab by default. Chromium uses Tab.
+function tabKey(browserName: string) {
+	return browserName === "webkit" ? "Alt+Tab" : "Tab";
+}
+
 async function fontSizes(page: Page) {
 	return page.evaluate(() => {
 		const out: { tag: string; size: number; text: string }[] = [];
@@ -38,7 +43,7 @@ test.describe("tenant /login with the Keycloak-only gate on", () => {
 
 		await page.evaluate(() => (document as any).fonts.ready);
 		const family = await button.evaluate((el) => getComputedStyle(el).fontFamily);
-		expect(family.toLowerCase().startsWith('"outfit"') || family.toLowerCase().startsWith("outfit")).toBeTruthy();
+		expect(family.toLowerCase(), "Outfit is the first font").toMatch(/^"?outfit/);
 		const loaded = await page.evaluate(() => (document as any).fonts.check('16px "Outfit Variable"'));
 		expect(loaded, "self-hosted Outfit loaded").toBeTruthy();
 
@@ -48,7 +53,7 @@ test.describe("tenant /login with the Keycloak-only gate on", () => {
 		expect(radius, "no coloured accent edge on a rounded box").toBe("0px");
 	});
 
-	test("keyboard focus is visible without a surrounding ring and only after Tab", async ({ page }) => {
+	test("keyboard focus is visible without a surrounding ring and only after Tab", async ({ page, browserName }) => {
 		await page.goto("/login");
 		const button = page.getByRole("link", { name: LABEL });
 		await button.click({ trial: true });
@@ -56,27 +61,28 @@ test.describe("tenant /login with the Keycloak-only gate on", () => {
 		await button.focus();
 		const afterMouse = await button.evaluate((el) => {
 			const s = getComputedStyle(el);
-			return { outline: s.outlineWidth, shadow: s.boxShadow, kbd: document.documentElement.hasAttribute("data-kbd") };
+			return { outline: s.outlineStyle, shadow: s.boxShadow, kbd: document.documentElement.hasAttribute("data-kbd") };
 		});
+		expect(afterMouse.outline).toBe("none");
 		expect(afterMouse.kbd).toBeFalsy();
 		expect(afterMouse.shadow).toBe("none");
 
 		await page.mouse.click(5, 5);
-		await page.keyboard.press("Tab");
+		await page.keyboard.press(tabKey(browserName));
 		await expect(button).toBeFocused();
 		const afterTab = await button.evaluate((el) => {
 			const s = getComputedStyle(el);
-			return { outline: s.outlineWidth, shadow: s.boxShadow, kbd: document.documentElement.hasAttribute("data-kbd") };
+			return { outline: s.outlineStyle, shadow: s.boxShadow, kbd: document.documentElement.hasAttribute("data-kbd") };
 		});
 		expect(afterTab.kbd).toBeTruthy();
-		expect(afterTab.outline, "no outline ring").toBe("0px");
+		expect(afterTab.outline, "no outline ring").toBe("none");
 		expect(afterTab.shadow, "a visible non-surrounding indicator").not.toBe("none");
 	});
 
-	test("forced colours use the single allowed outline", async ({ page }) => {
+	test("forced colours use the single allowed outline", async ({ page, browserName }) => {
 		await page.emulateMedia({ forcedColors: "active" });
 		await page.goto("/login");
-		await page.keyboard.press("Tab");
+		await page.keyboard.press(tabKey(browserName));
 		const button = page.getByRole("link", { name: LABEL });
 		await expect(button).toBeFocused();
 		const outline = await button.evaluate((el) => getComputedStyle(el).outlineWidth);
@@ -92,14 +98,22 @@ test.describe("tenant /login with the Keycloak-only gate on", () => {
 	});
 
 	test("the button starts the Keycloak flow with PKCE and a browser cookie", async ({ page, context }) => {
+		// Chromium does not route the target of a redirect. So the start_login answer itself is caught:
+		// the real 302 is fetched, its Location is kept, and the browser gets the real Set-Cookie header.
 		let authorize = "";
-		await page.route("**/realms/platform/protocol/openid-connect/auth**", async (route) => {
-			authorize = route.request().url();
-			await route.fulfill({ status: 200, contentType: "text/html", body: "<title>keycloak stub</title>" });
+		await page.route(/\/api\/method\/platform_core\.api\.auth\.start_login/, async (route) => {
+			const response = await route.fetch({ maxRedirects: 0 });
+			expect(response.status()).toBe(302);
+			const headers = response.headers();
+			authorize = headers["location"] ?? "";
+			delete headers["location"];
+			headers["content-type"] = "text/html";
+			await route.fulfill({ status: 200, headers, body: "<title>keycloak stub</title>" });
 		});
 		await page.goto("/login?redirect-to=/panel");
 		await page.getByRole("link", { name: LABEL }).click();
-		await page.waitForURL(/realms\/platform/);
+		await page.waitForURL(/start_login/);
+		expect(authorize).toMatch(/\/realms\/platform\/protocol\/openid-connect\/auth\?/);
 		const url = new URL(authorize);
 		expect(url.searchParams.get("code_challenge_method")).toBe("S256");
 		expect(url.searchParams.get("state")?.length ?? 0).toBeGreaterThanOrEqual(32);

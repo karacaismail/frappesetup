@@ -15,7 +15,9 @@ Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis be
 | `provisioning.py` | identity-sync için kullanıcı açma, kapatma ve e-posta değiştirme. |
 | `login_policy.py` | Yerel girişi kapatan kapı ve portal sayfalarının kapatılması. |
 | `jwks.py` | Anahtar listesi önbelleği. |
-| `hooks_fragment.py` | `hooks.py` dosyasına eklenecek satırlar. |
+| `session_policy.py` | Oturum 1 saat işlem olmazsa kapanır. Eski girişli çalışan yeniden kimlik doğrular (O-25). |
+| `anonymization.py` | Hesap silme: kullanıcıyı kapatır ve kişi alanlarını anonim yapar (O-27, karar notu 0009). |
+| `api.py` | Telefon belirtecini doğrulayan açık işlevler. |
 | `doctype/platform_identity_link/` | Kimlik bağı kaydı. `issuer` ve `subject` çifti tekildir. |
 
 ## Giriş akışı
@@ -91,5 +93,5 @@ Ayar kapanınca yerel giriş hemen açılır. Yeniden başlatma gerekmez.
 
 - Çıkış adresinde `id_token_hint` yoktur. Kimlik belirteci girişten sonra saklanmaz. Keycloak çıkış onay ekranı gösterebilir.
 - Arka kanal çıkışında `sid` eşleşmezse `sub` yedeği devreye girer. Yedek yalnız belirteçten önce açılmış oturumları kapatır.
-- Servis belirteci yalnız üç identity ucunda kabul edilir. Başka uçta Bearer başlığı 401 alır.
-- `kimlik_yalniz_keycloak` açıkken Frappe'nin `/login` sayfası parola formunu yine gösterir. Form gönderimi 401 alır.
+- Servis belirteci yalnız dört identity ucunda kabul edilir. Başka uçta Bearer başlığı 401 alır.
+- `kimlik_yalniz_keycloak` açıkken `/login` sayfasında yalnız marka düğmesi vardır. Parola girişi yine de doğrudan çağrılırsa 401 alır.
