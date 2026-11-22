@@ -23,6 +23,7 @@ test('Türkçe ve İngilizce ileti dosyaları aynı anahtarları taşır', () =>
 
 test('giriş seçeneği e-posta bağlantısını açıkça adlandırır', () => {
   expect(read('tr').get('magiclink-display-name')).toBe('E-posta bağlantısı');
+  expect(read('en').get('magiclink-display-name')).toBe('Email link');
 });
 
 test('Türkçe ve İngilizce iletiler aynı yer tutucuları taşır', () => {
