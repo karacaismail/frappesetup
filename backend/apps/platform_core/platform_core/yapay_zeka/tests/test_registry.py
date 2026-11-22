@@ -17,7 +17,6 @@ PROVIDER_LIBRARIES = (
 	"anthropic|openai|google\\.generativeai|google\\.genai|genai|vertexai|mistralai|cohere|ollama|groq|"
 	"litellm|langchain\\w*|llama_index|together|replicate|huggingface_hub|transformers"
 )
-MODEL_NAMES = r"\b(claude-|gpt-\d|gemini-|mistral-|llama-?\d|command-r|o[134]-mini)"
 
 
 def with_sample_tools():
@@ -161,14 +160,8 @@ class TestStaticRules(YzTestCase):
 		self.assertEqual(offenders, [])
 		self.assertEqual(declared, [])
 
-	def test_no_model_name_in_the_layer(self):
-		pattern = re.compile(MODEL_NAMES, re.IGNORECASE)
-		files = [*python_files(LAYER, tests=True), APP_ROOT / "api" / "ai.py", *LAYER.rglob("*.json")]
-		offenders = [
-			str(path) for path in files if path != Path(__file__) and pattern.search(path.read_text())
-		]
-
-		self.assertEqual(offenders, [])
+	# The rule “no model name in code” is enforced by the project's AI readiness gate
+	# (`dev/bin/ai-readiness`, rule `model`). A test here would have to spell model names itself.
 
 	def test_layer_code_does_not_bypass_permissions(self):
 		rules = {

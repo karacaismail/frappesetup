@@ -232,6 +232,22 @@ class YzTestCase(IntegrationTestCase):
 	def human(self, client, method: str, endpoint: str, body=None, query=None):
 		return self.send(client, method, API + endpoint, body=body, query=query)
 
+	def age_session(self, sid: str, last_update) -> None:
+		"""Make a session look unused since `last_update`, in the cache and in the session table.
+
+		Frappe keeps sessions in a table that is not a DocType, so the query builder is used.
+		"""
+		session = frappe.cache.hget("session", sid)
+		session["data"]["last_updated"] = str(last_update)
+		frappe.cache.hset("session", sid, session)
+		sessions = frappe.qb.DocType("Sessions")
+		frappe.qb.update(sessions).set(sessions.lastupdate, last_update).where(sessions.sid == sid).run()
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
+
+	def session_row_exists(self, sid: str) -> bool:
+		sessions = frappe.qb.DocType("Sessions")
+		return bool(frappe.qb.from_(sessions).select(sessions.sid).where(sessions.sid == sid).run())
+
 	def open_report_gate(self) -> None:
 		"""Install a report gate that allows every report, for tests about other report rules.
 

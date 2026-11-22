@@ -452,16 +452,12 @@ class TestSessionBoundToken(YzTestCase):
 		token = self.issue_token(client)
 		sid = client.get_cookie("sid").value
 		long_ago = add_to_date(now_datetime(), days=-400)
-		session = frappe.cache.hget("session", sid)
-		session["data"]["last_updated"] = str(long_ago)
-		frappe.cache.hset("session", sid, session)
-		frappe.db.sql("update `tabSessions` set lastupdate=%s where sid=%s", (long_ago, sid))
-		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
+		self.age_session(sid, long_ago)
 
-		still_there = frappe.db.sql("select count(*) from `tabSessions` where sid=%s", sid)[0][0]
+		still_there = self.session_row_exists(sid)
 		response = self.rpc(self.anonymous(), "tools/list", token=token)
 
-		self.assertEqual(still_there, 1)
+		self.assertTrue(still_there)
 		self.assertEqual(response.status_code, 401)
 
 	def test_token_of_a_session_past_its_end_is_rejected(self):

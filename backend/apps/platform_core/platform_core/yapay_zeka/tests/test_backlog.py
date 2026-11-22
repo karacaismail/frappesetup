@@ -86,11 +86,7 @@ class TestSessionStatus(YzTestCase):
 	def test_expired_session_gets_401_and_no_session_gets_403(self):
 		client = self.login(USER_A)
 		sid = client.get_cookie("sid").value
-		session = frappe.cache.hget("session", sid)
-		session["data"]["last_updated"] = "2020-01-01 00:00:00"
-		frappe.cache.hset("session", sid, session)
-		frappe.db.sql("update `tabSessions` set lastupdate=%s where sid=%s", ("2020-01-01 00:00:00", sid))
-		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
+		self.age_session(sid, "2020-01-01 00:00:00")
 
 		expired = self.human(client, "GET", "list_proposals")
 		expired_post = self.human(client, "POST", "issue_agent_token", body={})
