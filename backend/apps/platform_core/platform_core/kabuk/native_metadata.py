@@ -52,6 +52,6 @@ def resolve_request_target(request, command):
 
 def resolve_legacy_target(method: str):
 	# Frappe handles login in HTTPRequest before the legacy handler.
-	if method == "login":
+	if not isinstance(method, str) or method == "login":
 		return None
 	return get_legacy_attr(frappe.override_whitelisted_method(method))

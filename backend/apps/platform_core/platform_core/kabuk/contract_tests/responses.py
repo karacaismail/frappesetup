@@ -11,6 +11,7 @@ from urllib.parse import urlencode, urlsplit
 from jsonschema import Draft202012Validator
 
 CONTRACT = Path("backend/contracts/platform_core-kabuk.openapi.yaml")
+SNAPSHOT = Path(__file__).resolve().parents[2] / "tests" / "shell_contract_components.json"
 BOOTSTRAP = "/api/method/platform_core.api.shell.get_bootstrap"
 METADATA = "/api/method/platform_core.api.meta.get_doctype"
 PROBE = "/api/method/frappe.auth.get_logged_user"
@@ -94,14 +95,43 @@ class TestShellResponses(unittest.TestCase):
 				route = path + "?" + urlencode({"doctype": DOCTYPE}) if path == METADATA else path
 				ok = self.request(route, sid=self.sid)
 				self.validate(path, 200, ok)
+				payload = parse_json(ok[2])["message"]
+				if path == METADATA:
+					choice = next(
+						field
+						for field in payload["schema"]["fields"]
+						if field["fieldname"] == "contract_choice"
+					)
+					self.assertEqual(choice["depends_on"]["op"], "eq")
+					self.assertTrue(choice["choices"])
+					self.assertIn("read_only_depends_on", choice["unsupported_conditions"])
+				else:
+					self.assertTrue(any(sidebar["data"]["items"] for sidebar in payload["sidebars"]))
 				conditional = self.request(route, sid=self.sid, headers={"If-None-Match": ok[1]["ETag"]})
 				self.validate(path, 304, conditional)
 				self.assertEqual(conditional[1]["ETag"], ok[1]["ETag"])
 				self.validate(path, 401, self.request(route, sid="missing-shell-contract-session"))
 				self.validate(path, 403, self.request(route))
+				separator = "&" if "?" in route else "?"
+				self.validate(path, 417, self.request(route + separator + "unknown=sample", sid=self.sid))
 		self.validate(PROBE, 200, self.request(PROBE, sid=self.sid))
 		self.validate(PROBE, 401, self.request(PROBE, sid="missing-shell-contract-session"))
 		self.validate(PROBE, 403, self.request(PROBE))
+
+	def test_rate_limit_response_matches_the_contract(self):
+		# The synthetic account starts with its own bucket on the isolated site.
+		for _ in range(121):
+			result = self.request(BOOTSTRAP, sid=self.sid)
+			if result[0] == 429:
+				self.validate(BOOTSTRAP, 429, result)
+				return
+			self.assertEqual(result[0], 200)
+		self.fail("The shell bootstrap rate limit did not respond with HTTP 429.")
+
+	def test_official_projection_snapshot_matches_openapi(self):
+		snapshot = parse_json(SNAPSHOT.read_text(encoding="utf-8"))
+		schemas = self.contract["components"]["schemas"]
+		self.assertEqual(snapshot, {key: schemas[key] for key in snapshot})
 
 
 class TestContractParsing(unittest.TestCase):

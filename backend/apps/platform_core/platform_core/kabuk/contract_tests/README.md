@@ -13,16 +13,23 @@ This uses the existing OpenAPI validation tool's JSON Schema dependency.
 The suite validates live JSON, contract examples, declared headers and empty
 304 responses. Frappe does not need this dependency at runtime.
 
-Cookie-based clients can request the mobile projection with `surface=mobile`.
-The metadata service also forces this projection when the verified identity
-hook has established `mobile_identity`, regardless of the requested surface.
-Mobile bearer tokens remain limited to the mobile API. That API must call the
-metadata service through its verified route when it adds metadata delivery.
+Mobile metadata is available only when the identity hook has verified the
+mobile account and the request is on a mobile API route. Browser clients do
+not gain mobile access by selecting `surface=mobile`. Website Users never
+receive restricted fields through the shell metadata endpoint.
 
-Set
-`shell_mobile_doctypes` in the site's configuration to an array of permitted
-DocType names. An absent list admits no mobile DocTypes. Mark whole DocTypes
-as restricted using `shell_restricted_doctypes`. Fields with elevated
-permission levels and Password fields are also restricted on mobile.
+Set `shell_mobile_doctypes` to the site's allowed DocType names. An absent
+list admits no mobile DocTypes. Use `shell_restricted_doctypes` for restricted
+types and `shell_restricted_fields` for a mapping from DocType names to
+restricted field names. Masked fields, Password fields and elevated
+permission levels are also restricted. Validate configuration locally with
+`bench --site <site> execute platform_core.kabuk.metadata_policy.validate_mobile_policy`.
+Unknown names cause the mobile metadata service to fail closed.
+
+The official Frappe runner checks projection components using
+`tests/shell_contract_components.json`. The live suite enforces parity with
+the authoritative OpenAPI schemas. Regenerate the snapshot whenever a
+covered component changes.
+
 For absolute navigation URLs, configure `shell_navigation_hosts` as an array
 of exact hostnames. Relative same-origin links require no host entry.

@@ -210,7 +210,7 @@
           {
             "name": "surface",
             "in": "query",
-            "description": "Mobile requests use a site allowlist and never include restricted fields.",
+            "description": "Public shell requests use web. Mobile metadata is only available inside the verified mobile API route; a request parameter cannot widen scope.",
             "schema": {
               "type": "string",
               "enum": [
@@ -289,9 +289,10 @@
                       "sort_field": null
                     },
                     "child_tables": {},
-                    "catalog_version": 1,
+                    "catalog_version": 2,
                     "meta_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-                    "perm_version": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+                    "perm_version": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                    "mobile_cache_allowed": false
                   }
                 }
               }
@@ -321,7 +322,7 @@
             }
           },
           "403": {
-            "description": "Guest, unknown or unreadable DocType, a child without parent context, or an unsupported HTTP method. Authorization is rechecked before conditional handling.",
+            "description": "Guest, unknown or unreadable DocType, a child without parent context, or an unsupported HTTP method. Authorization is rechecked before conditional handling. Mobile metadata requested outside the verified mobile route is denied.",
             "content": {
               "application/json": {
                 "schema": {
@@ -825,7 +826,7 @@
           "unsupported_conditions": {
             "type": "array",
             "uniqueItems": true,
-            "description": "Condition properties omitted because they are unsupported or refer to unreadable fields. Source expressions are never returned.",
+            "description": "Condition properties omitted because they are unsupported or refer to unreadable fields. Source expressions are never returned. If read_only_depends_on is unsupported, read_only is true and clients must not enable editing. For other unsupported conditions, keep the ordinary field state and rely on server validation.",
             "items": {
               "type": "string",
               "enum": [
@@ -912,13 +913,14 @@
       },
       "Meta": {
         "type": "object",
-        "description": "User-specific effective schema. Never persist this permission-filtered payload in IndexedDB.",
+        "description": "Effective metadata. Keep permission tokens in memory. A verified mobile response may permit offline storage of its non-sensitive definitions.",
         "required": [
           "schema",
           "meta_hash",
           "perm_version",
           "child_tables",
-          "catalog_version"
+          "catalog_version",
+          "mobile_cache_allowed"
         ],
         "properties": {
           "schema": {
@@ -943,6 +945,10 @@
             "type": "integer",
             "minimum": 1,
             "description": "Version of the approved component catalog."
+          },
+          "mobile_cache_allowed": {
+            "type": "boolean",
+            "description": "Only a verified mobile response can be true. The approved non-sensitive schema and child definitions may be stored in authorized mobile offline storage. Never persist permission tokens or restricted definitions. Purge on scope change, logout or revocation."
           }
         },
         "additionalProperties": false
@@ -971,7 +977,10 @@
             "description": "Sidebar identity."
           },
           "module": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Module that owns the sidebar."
           },
           "label": {
@@ -1111,7 +1120,7 @@
               "string",
               "null"
             ],
-            "description": "Same-origin path or URL whose hostname is in the site allowlist. HTTP is allowed only in developer mode."
+            "description": "Same-origin path or URL whose hostname is in the site allowlist. HTTP is allowed only in developer mode. Unsafe values are removed from all row kinds."
           },
           "show_arrow": {
             "type": [

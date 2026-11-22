@@ -95,7 +95,11 @@ def project_meta(
 		for key in field.keys() & STRING_PROPERTIES:
 			if field[key] is not None and not isinstance(field[key], str):
 				field[key] = str(field[key])
-		field["read_only"] = source.get("read_only") in (True, 1, "1") or name not in writable
+		field["read_only"] = (
+			source.get("read_only") in (True, 1, "1")
+			or name not in writable
+			or "read_only_depends_on" in unsupported
+		)
 		# A configured password default must never become client bootstrap data.
 		if field.get("fieldtype") == "Password":
 			field.pop("default", None)

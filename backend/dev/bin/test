@@ -8,6 +8,13 @@ if [[ ! "$APP" =~ ^[a-z][a-z0-9_]*$ ]]; then
 fi
 shift || true
 SITE="test-${APP//_/-}.localhost"
+test_options=()
+if [[ "$APP" == platform_core ]]; then
+    test_options=(
+        -v "$DEV_DIR/../contracts/platform_core-kabuk.openapi.yaml:/workspace/shell.openapi.yaml:ro"
+        -e SHELL_TEST_OPENAPI=/workspace/shell.openapi.yaml
+    )
+fi
 python3 "$DEV_DIR/init_env.py"
 "$DEV_DIR/bin/compose" config --quiet
 "$DEV_DIR/bin/compose" build kiraci-web
@@ -16,5 +23,5 @@ python3 "$DEV_DIR/init_env.py"
     env/bin/python /workspace/dev/bootstrap.py "$SITE" --app "$APP"
 "$DEV_DIR/bin/compose" run --rm --no-deps kiraci-web \
     bench --site "$SITE" migrate --skip-search-index
-"$DEV_DIR/bin/compose" run --rm --no-deps kiraci-web \
+"$DEV_DIR/bin/compose" run --rm --no-deps "${test_options[@]}" kiraci-web \
     bench --site "$SITE" run-tests --app "$APP" "$@"

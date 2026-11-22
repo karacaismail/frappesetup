@@ -40,9 +40,14 @@ doc_events = {
 		"on_update": "platform_core.kabuk.cache.invalidate_permissions",
 		"on_trash": "platform_core.kabuk.cache.invalidate_permissions",
 	},
+	# This DocType is installed with the access-rule module. Keep shell validators fresh after rule changes.
+	"Access Rule": {
+		"on_update": "platform_core.kabuk.cache.invalidate_permissions",
+		"on_trash": "platform_core.kabuk.cache.invalidate_permissions",
+	},
 }
 
-# Frappe resolves cookie and token authentication before calling this hook.
+# Keep a single list assignment. Credential hooks must precede the metadata guard when merged.
 auth_hooks = ["platform_core.kabuk.native_metadata.guard_native_metadata"]
 
 after_build = ["platform_core.kabuk.assets.remove_panel_source_maps"]

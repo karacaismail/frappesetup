@@ -20,6 +20,7 @@ CHILD_DOCTYPE = "Shell Test Child"
 PROTECTED_DOCTYPE = "Shell Test Protected"
 READER = "kabuk-reader@example.test"
 PRIVILEGED = "kabuk-privileged@example.test"
+DESK = "shell-desk@example.test"
 
 
 class ShellHTTPFixture(unittest.TestCase):
@@ -43,9 +44,11 @@ class ShellHTTPFixture(unittest.TestCase):
 			raise RuntimeError("Tests are disabled on this site.")
 		frappe.set_user("Administrator")
 		cls.password = secrets.token_urlsafe(30)
-		for name in ("Kabuk Test Reader", "Kabuk Test Privileged"):
+		for name in ("Kabuk Test Reader", "Kabuk Test Privileged", "Shell Test Desk"):
 			if not frappe.db.exists("Role", name):
-				frappe.get_doc({"doctype": "Role", "role_name": name, "desk_access": 0}).insert()
+				frappe.get_doc(
+					{"doctype": "Role", "role_name": name, "desk_access": int(name == "Shell Test Desk")}
+				).insert()
 		if not frappe.db.exists("DocType", DOCTYPE):
 			frappe.get_doc(
 				{
@@ -119,6 +122,18 @@ class ShellHTTPFixture(unittest.TestCase):
 				"description": "Entries for the test record.",
 			},
 		)
+		create_custom_field(
+			DOCTYPE,
+			{
+				"fieldname": "contract_choice",
+				"fieldtype": "Select",
+				"label": "Contract choice",
+				"options": "Draft\nApproved",
+				"depends_on": "eval:doc.title === 'Sample'",
+				"read_only_depends_on": "eval:doc.title && doc.private_note",
+				"description": "A choice for contract tests.",
+			},
+		)
 		if not frappe.db.exists("DocType", PROTECTED_DOCTYPE):
 			frappe.get_doc(
 				{
@@ -147,6 +162,7 @@ class ShellHTTPFixture(unittest.TestCase):
 		for email, roles in (
 			(READER, ["Kabuk Test Reader"]),
 			(PRIVILEGED, ["Kabuk Test Reader", "Kabuk Test Privileged"]),
+			(DESK, ["Shell Test Desk", "Kabuk Test Reader", "Kabuk Test Privileged"]),
 		):
 			if not frappe.db.exists("User", email):
 				doc = frappe.get_doc(
@@ -236,6 +252,7 @@ class ShellHTTPFixture(unittest.TestCase):
 		frappe.db.commit()
 		cls.reader_sid = cls.login(READER)
 		cls.privileged_sid = cls.login(PRIVILEGED)
+		cls.desk_sid = cls.login(DESK)
 
 	@classmethod
 	def request(cls, path, sid=None, method="GET", data=None, headers=None):

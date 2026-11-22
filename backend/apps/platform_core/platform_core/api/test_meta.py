@@ -1,19 +1,23 @@
 import json
+from contextlib import contextmanager
 from unittest.mock import patch
 from urllib.parse import quote, urlencode
 
 import frappe
+from werkzeug.wrappers import Request
 
 from platform_core.kabuk.metadata import get_doctype
 from platform_core.kabuk.serialization import digest
 from platform_core.tests.shell_http_fixture import (
 	CHILD_DOCTYPE,
+	DESK,
 	DOCTYPE,
 	PRIVILEGED,
 	PROTECTED_DOCTYPE,
 	READER,
 	ShellHTTPFixture,
 )
+from platform_core.tests.test_shell_contract import SCHEMA_FILE, matches
 
 
 class TestMetadataHTTP(ShellHTTPFixture):
@@ -31,9 +35,9 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		fields = json.loads(body)["message"]["schema"]["fields"]
 		self.assertNotIn("private_note", {field["fieldname"] for field in fields})
 
-	def test_two_website_users_get_different_fields_and_etags(self):
+	def test_website_and_desk_users_get_different_fields_and_etags(self):
 		low_status, low_headers, low_body = self.metadata(self.reader_sid)
-		high_status, high_headers, high_body = self.metadata(self.privileged_sid)
+		high_status, high_headers, high_body = self.metadata(self.desk_sid)
 		self.assertEqual((low_status, high_status), (200, 200))
 		low = json.loads(low_body)["message"]
 		high = json.loads(high_body)["message"]
@@ -74,23 +78,30 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertEqual(status, 403)
 
 	def test_role_revocation_invalidates_cached_schema(self):
-		status, headers, _ = self.metadata(self.privileged_sid)
+		status, headers, _ = self.metadata(self.desk_sid)
 		self.assertEqual(status, 200)
 		frappe.set_user("Administrator")
-		doc = frappe.get_doc("User", PRIVILEGED)
-		doc.set("roles", [{"role": "Kabuk Test Reader"}])
+		doc = frappe.get_doc("User", DESK)
+		doc.set("roles", [{"role": "Shell Test Desk"}, {"role": "Kabuk Test Reader"}])
 		doc.save()
 		frappe.db.commit()
 		try:
-			status, new_headers, body = self.metadata(self.privileged_sid, {"If-None-Match": headers["ETag"]})
+			status, new_headers, body = self.metadata(self.desk_sid, {"If-None-Match": headers["ETag"]})
 			self.assertEqual(status, 200)
 			self.assertNotEqual(new_headers["ETag"], headers["ETag"])
 			self.assertNotIn(
 				"private_note", [f["fieldname"] for f in json.loads(body)["message"]["schema"]["fields"]]
 			)
 		finally:
-			doc = frappe.get_doc("User", PRIVILEGED)
-			doc.set("roles", [{"role": "Kabuk Test Reader"}, {"role": "Kabuk Test Privileged"}])
+			doc = frappe.get_doc("User", DESK)
+			doc.set(
+				"roles",
+				[
+					{"role": "Shell Test Desk"},
+					{"role": "Kabuk Test Reader"},
+					{"role": "Kabuk Test Privileged"},
+				],
+			)
 			doc.save()
 			frappe.db.commit()
 
@@ -177,7 +188,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 				self.assertEqual(status, 417)
 
 	def test_child_fields_inherit_parent_permission_levels(self):
-		for sid, can_read_private in ((self.reader_sid, False), (self.privileged_sid, True)):
+		for sid, can_read_private in ((self.reader_sid, False), (self.desk_sid, True)):
 			status, _, body = self.metadata(sid)
 			self.assertEqual(status, 200)
 			child = json.loads(body)["message"]["child_tables"][CHILD_DOCTYPE]
@@ -240,23 +251,41 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		status, _, body = self.metadata(self.reader_sid)
 		self.assertEqual(status, 200)
 		payload = json.loads(body)["message"]
-		self.assertEqual(payload["catalog_version"], 1)
+		self.assertEqual(payload["catalog_version"], 2)
 		fields = {field["fieldname"]: field for field in payload["schema"]["fields"]}
 		self.assertEqual(fields["title"]["component"], "input")
 		self.assertEqual(fields["test_entries"]["component"], "table")
 		self.assertIsNone(fields["unsupported_html"]["component"])
 		self.assertNotIn("options", fields["unsupported_html"])
 
-	def test_mobile_surface_denies_by_default_and_omits_restricted_fields(self):
+	@contextmanager
+	def mobile_context(self):
+		identity = {"account": PRIVILEGED, "scope": "mobile", "site": frappe.local.site}
+		request = Request.from_values(path="/api/method/platform_core.api.mobile.get_metadata")
+		with (
+			patch.object(frappe.local, "mobile_identity", identity, create=True),
+			patch.object(frappe.local, "request", request, create=True),
+		):
+			yield
+
+	def test_mobile_surface_requires_verified_route_and_omits_restricted_fields(self):
 		path = "/api/method/platform_core.api.meta.get_doctype?" + urlencode(
 			{"doctype": DOCTYPE, "surface": "mobile"}
 		)
-		status, _, _ = self.request(path, self.reader_sid)
-		self.assertEqual(status, 403)
+		self.assertEqual(self.request(path, self.privileged_sid)[0], 403)
 		frappe.set_user(PRIVILEGED)
 		try:
+			web = get_doctype(DOCTYPE, PRIVILEGED)
+			self.assertFalse(web["mobile_cache_allowed"])
+			self.assertNotIn("private_note", {field["fieldname"] for field in web["schema"]["fields"]})
 			with patch.dict(frappe.conf, {"shell_mobile_doctypes": [DOCTYPE, CHILD_DOCTYPE]}):
-				payload = get_doctype(DOCTYPE, PRIVILEGED, surface="mobile")
+				with self.assertRaises(frappe.PermissionError):
+					get_doctype(DOCTYPE, PRIVILEGED, surface="mobile")
+				with self.mobile_context():
+					payload = get_doctype(DOCTYPE, PRIVILEGED, surface="web")
+				self.assertTrue(payload["mobile_cache_allowed"])
+				components = json.loads(SCHEMA_FILE.read_text(encoding="utf-8"))
+				self.assertTrue(matches(payload, components["Meta"], components))
 				self.assertEqual(payload["schema"]["sensitivity"], "standard")
 				self.assertNotIn(
 					"private_note", {field["fieldname"] for field in payload["schema"]["fields"]}
@@ -265,11 +294,49 @@ class TestMetadataHTTP(ShellHTTPFixture):
 					{field["fieldname"] for field in payload["child_tables"][CHILD_DOCTYPE]["fields"]},
 					{"entry"},
 				)
-			web = get_doctype(DOCTYPE, PRIVILEGED)
-			private = next(field for field in web["schema"]["fields"] if field["fieldname"] == "private_note")
-			self.assertEqual(private["sensitivity"], "restricted")
 		finally:
 			frappe.set_user("Administrator")
+
+	def test_trusted_mobile_denies_unknown_doctypes_in_either_list(self):
+		frappe.set_user(PRIVILEGED)
+		try:
+			for key in ("shell_mobile_doctypes", "shell_restricted_doctypes"):
+				config = {"shell_mobile_doctypes": [DOCTYPE], "shell_restricted_doctypes": []}
+				config[key].append("Missing Shell Policy DocType")
+				with self.subTest(key=key), patch.dict(frappe.conf, config), self.mobile_context():
+					with self.assertRaises(frappe.PermissionError):
+						get_doctype(DOCTYPE, PRIVILEGED, surface="mobile")
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_masked_and_configured_fields_obey_surface_policy(self):
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_field
+
+		field = create_custom_field(
+			DOCTYPE, {"fieldname": "mask_test", "fieldtype": "Data", "label": "Masked test field", "mask": 1}
+		)
+		self.addCleanup(self.delete_fixture, field)
+		frappe.db.commit()
+		with patch.dict(frappe.conf, {"shell_restricted_fields": {DOCTYPE: ["title"]}}):
+			frappe.set_user(DESK)
+			try:
+				fields = {
+					entry["fieldname"]: entry for entry in get_doctype(DOCTYPE, DESK)["schema"]["fields"]
+				}
+				self.assertEqual(fields["mask_test"]["sensitivity"], "restricted")
+				self.assertTrue(fields["mask_test"]["read_only"])
+				self.assertEqual(fields["title"]["sensitivity"], "restricted")
+			finally:
+				frappe.set_user("Administrator")
+			frappe.set_user(PRIVILEGED)
+			try:
+				fields = {
+					entry["fieldname"] for entry in get_doctype(DOCTYPE, PRIVILEGED)["schema"]["fields"]
+				}
+				self.assertNotIn("mask_test", fields)
+				self.assertNotIn("title", fields)
+			finally:
+				frappe.set_user("Administrator")
 
 	def test_http_metadata_translates_display_text_and_preserves_select_values(self):
 		from frappe.custom.doctype.custom_field.custom_field import create_custom_field
@@ -300,8 +367,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 	def test_verified_mobile_identity_cannot_select_web_metadata(self):
 		frappe.set_user(PRIVILEGED)
 		try:
-			identity = {"account": PRIVILEGED, "scope": "mobile", "site": frappe.local.site}
-			with patch.object(frappe.local, "mobile_identity", identity, create=True):
+			with self.mobile_context():
 				with self.assertRaises(frappe.PermissionError):
 					get_doctype(DOCTYPE, PRIVILEGED, surface="web")
 		finally:

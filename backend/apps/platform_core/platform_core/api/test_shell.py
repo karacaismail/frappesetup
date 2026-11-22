@@ -89,13 +89,21 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 			frappe.db.commit()
 
 	def test_safe_url_rejects_disallowed_links(self):
-		for url in ("javascript:void(0)", "//example.test/path", "/\\example.test"):
+		for url in (
+			"javascript:void(0)",
+			"JAVASCRIPT:void(0)",
+			"data:text/plain,example",
+			"//example.test/path",
+			"/\\example.test",
+			"https:example.test",
+		):
 			with self.subTest(url=url):
 				self.assertFalse(safe_url(url))
 		self.assertTrue(safe_url("/panel"))
 		self.assertFalse(safe_url("https://example.test/panel"))
 		with patch.dict(frappe.conf, {"shell_navigation_hosts": ["example.test"], "developer_mode": False}):
 			self.assertTrue(safe_url("https://example.test/panel"))
+			self.assertTrue(safe_url("HTTPS://example.test/panel"))
 			self.assertFalse(safe_url("http://example.test/panel"))
 			self.assertFalse(safe_url("https://sub.example.test/panel"))
 			self.assertFalse(safe_url("https://example.test@external.test/panel"))
@@ -123,6 +131,7 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 						"link_type": "DocType",
 						"link_to": DOCTYPE,
 						"new_key": "ignore",
+						"url": "javascript:void(0)",
 						"report": {"report_type": "Script Report", "private": "ignore"},
 					}
 				],
@@ -130,6 +139,7 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 		)
 		self.assertNotIn("internal", data)
 		self.assertNotIn("new_key", data["items"][0])
+		self.assertNotIn("url", data["items"][0])
 		self.assertEqual(data["items"][0]["report"], {"report_type": "Script Report"})
 
 	def test_session_probe_and_shell_distinguish_guest_and_expired_sessions(self):

@@ -77,6 +77,8 @@ def project_sidebar(source: dict) -> dict:
 		if row.get("link_type") in {"URL", "Help"} and not safe_url(row.get("url")):
 			continue
 		item = {key: row[key] for key in ITEM_FIELDS if key in row}
+		if item.get("url") and not safe_url(item["url"]):
+			del item["url"]
 		if isinstance(report := row.get("report"), dict):
 			item["report"] = {key: report[key] for key in ("report_type", "ref_doctype") if key in report}
 		items.append(item)
@@ -136,7 +138,7 @@ def get_bootstrap(user: str) -> dict:
 		"workspaces": [
 			{
 				"name": page["name"],
-				"title": page.get("title") or page["name"],
+				"title": page.get("label") or frappe._(page.get("title") or page["name"]),
 				"module": page.get("module"),
 				"app": page.get("app"),
 				"parent_page": page.get("parent_page") if page.get("parent_page") in allowed_names else None,

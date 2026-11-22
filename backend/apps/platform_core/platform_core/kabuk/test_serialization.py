@@ -166,6 +166,13 @@ class TestMetadataProjection(unittest.TestCase):
 		self.assertNotIn("read_only_depends_on", field)
 		self.assertEqual(field["unsupported_conditions"], ["read_only_depends_on"])
 
+	def test_unknown_read_only_condition_fails_closed(self):
+		schema = sample_schema()
+		schema["fields"][0]["read_only_depends_on"] = "eval:unknownFunction(doc.title)"
+		field = project_meta(schema, {"title"}, {"title"})["fields"][0]
+		self.assertTrue(field["read_only"])
+		self.assertEqual(field["unsupported_conditions"], ["read_only_depends_on"])
+
 	def test_loose_javascript_equality_is_omitted(self):
 		schema = sample_schema()
 		schema["fields"][0]["depends_on"] = "eval:doc.title == 1"

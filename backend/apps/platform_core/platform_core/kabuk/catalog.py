@@ -1,9 +1,13 @@
 """Approved field renderers for the shell contract."""
 
-CATALOG_VERSION = 1
+CATALOG_VERSION = 2
 
 FIELD_COMPONENTS = {
 	"Data": "input",
+	"Phone": "input",
+	"Autocomplete": "input",
+	"Barcode": "input",
+	"Icon": "icon-picker",
 	"Read Only": "text",
 	"Password": "password",
 	"Small Text": "text-area",
@@ -15,6 +19,7 @@ FIELD_COMPONENTS = {
 	"Code": "code-editor",
 	"JSON": "code-editor",
 	"Int": "number",
+	"Long Int": "number",
 	"Float": "number",
 	"Currency": "number",
 	"Percent": "number",
