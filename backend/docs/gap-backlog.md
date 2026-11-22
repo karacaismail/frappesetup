@@ -34,6 +34,9 @@ Kurallar şunlardır:
 
 7. O-41 için hesap silme kancası ekleyin. Kanca, kullanıcı bağı yenilenmeden önce kullanıcı ve anonim kimlik değerlerini versin. İzin, devam ve bordro kayıtlarındaki `employee_name` kopyalarını HRMS TR bu kancayla temizlesin. İş kayıtları kalsın. Eğitim ve önceki iş alt tablolarının temizliği de açık borçtur.
 
+8. Hesap silmede çalışan kartına yüklenen fotoğraf dosyasını temizleyin (O-41).
+9. Hesap silmede çalışan kartının değişiklik geçmişindeki kişisel değerleri temizleyin (O-41).
+
 ## identity-sync
 
 1. Olay alıcısı kimlik-realm'in çatal eklentisiyle canlı denensin. Bozuk imza ve eski zaman damgası reddedilsin.

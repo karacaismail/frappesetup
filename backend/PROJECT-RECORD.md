@@ -194,7 +194,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Çalışan kendi hesabını açamaz. Çalışan yalnız davetle gelir.
   - Müşteri silme isteğini Press'te verir. Press kullanıcıyı önce Keycloak'ta yeniden doğrular. Keycloak'ın kendi hesap silme eylemi kapalıdır, çünkü bu eylem kullanıcıyı ilk adımda siler. Hesap ekranındaki bağlantı Press'teki silme sayfasına gider.
   - identity-sync isteği kaydeder. Sonra Keycloak kullanıcısını kapatır ve siler. Press kullanıcısını kapatır ve API anahtarlarını geçersiz kılar. Kiracı sitelerindeki kullanıcıyı kapatır. Telefon kurulumlarını ve bildirim bağlarını siler (CK-7).
-  - İş kayıtları silinmez. Çalışan kartındaki kişisel alanlar O-41 kapsamına göre anonim yapılır. İzin, devam ve bordro kayıtlarındaki ad kopyaları kalır.
+  - İş kayıtları silinmez. Çalışan kartındaki kişisel alanlar O-41 kapsamına göre anonim yapılır. İzin, devam ve bordro kayıtlarındaki ad kopyaları şimdilik kalır. Ad kopyalarının silinmesi hedeftir. Bu iş O-41 borcudur. Proje sahibi bu varsayılanı değiştirebilir.
   - Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır.
   - Silinen kimliğin ham değeri saklanmaz. Yeniden açmayı engellemek için yalnız kimliğin HMAC özeti tutulur.
   - Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
@@ -250,8 +250,12 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Üretimde ters vekil başlığı ekleyebilir. Uygulamanın taban politikası da yürürlükte kalır.
 
 - **O-41. Hesap silme, çalışan kartındaki kişisel alanları anonim yapar.** Sistem, çalışan kartını kullanıcı bağıyla bulur.
-  - Sistem adları, iletişim ve acil durum bilgilerini, adresleri ve fotoğraf alanını anonim yapar.
-  - Sistem pasaport, banka, sağlık, sigorta, aile ve devam cihazı bilgilerini de anonim yapar. Kan grubu ve medeni durum alanları boşalır.
+  - Sistem adları, iletişim ve acil durum bilgilerini ve adresleri anonim yapar.
+  - Sistem pasaport numarasını, pasaportun düzenlendiği yeri, banka, sağlık, sigorta ve aile bilgilerini anonim yapar.
+  - Doğum tarihi, pasaport tarihleri, devam cihazı kimliği, kan grubu ve medeni durum alanları boşalır.
+  - Fotoğraf alanı boşalır. Karta yüklenen fotoğraf dosyası şimdilik kalır.
+  - Çalışan kartının değişiklik geçmişi eski değerleri şimdilik tutar.
+  - Orkestratör, kiracıda `clear_fields` seçeneğini kabul etti. Seçenek, `redact_fields` içindeki zorunlu olmayan alanları boşaltır. `platform-core-kimlik` bu seçenek için kendi testini ekleyecek.
   - Eğitim ve önceki iş alt tabloları bu kancayla temizlenmez. Bu tablolar açık teknik borçtur.
   - İzin, devam ve bordro kayıtlarındaki çalışan adı kopyaları kalır. Bu kopyalar için `platform_core` tarafında ayrı bir kanca gerekir.
 
@@ -308,6 +312,8 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Performans ölçümü yalnız elle yapılır (O-31) | Canlı darboğaz görülmez | DevOps sorumlusu | P1'de Grafana ve gerçek kullanıcı ölçümü kurulur (G-149) |
 | `BORC(mvp)`: İzinlerin ve bağlı HR kayıtlarının yasal saklama süresi yok (O-39) | Silme zamanı belli değil | Hukuk sorumlusu | Hukuk sorumlusu süreleri proje kaydına yazar. İzin komutu yalnız taslak ve iptal edilmiş izinlerde site ayarındaki süreyi uygular. Bağlı HR kayıtları için silme yolu ayrıca belirlenir. |
 | `BORC(mvp)`: Çalışan kartının alt tabloları ve iş kayıtlarındaki ad kopyaları kalıyor (O-41) | Hesap silme bu alanları temizlemez | platform-core-kimlik ve ilk-dikey-dilim | `platform_core` hesap silme kancası alt tablolara ve kullanıcıya bağlı iş kayıtlarına güvenli erişim sağlar |
+| `BORC(mvp)`: Çalışan fotoğrafı dosyası kalıyor (O-41) | Fotoğraf alanı boşalır. Karta yüklenen fotoğraf dosyası şimdilik kalır. | platform-core-kimlik | Hesap silme, çalışan fotoğrafı dosyasını temizler. |
+| `BORC(mvp)`: Çalışan kartı geçmişi kalıyor (O-41) | Çalışan kartının değişiklik geçmişi eski değerleri şimdilik tutar. | platform-core-kimlik | Hesap silme, kart geçmişindeki kişisel değerleri temizler. |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
 | `BORC(mvp)`: Press geliştirme imajı `patch-py314.sh` ile Press kodunu değiştiriyor (O-18) | M-4 kuralına aykırı. Press yükseltmesinde yama bozulabilir | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da yama Press'e gönderilip kabul edilir |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
