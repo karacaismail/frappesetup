@@ -74,6 +74,12 @@ class AuthHttpTest(PressHttpClient, unittest.TestCase):
 		)
 		self.assertEqual(status, 403)
 
+	def test_guest_contract_allows_ping_and_rejects_other_rpc(self):
+		for prefix in ("/api/method/", "/api/v1/method/", "/api/v2/method/"):
+			with self.subTest(prefix=prefix):
+				self.assertEqual(self.request("GET", prefix + "ping")[0], 200)
+				self.assertEqual(self.request("GET", prefix + "frappe.utils.get_url")[0], 403)
+
 	def test_disabled_endpoints(self):
 		for command in CLOSED_METHODS:
 			with self.subTest(command=command):

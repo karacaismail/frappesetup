@@ -1,22 +1,32 @@
+from contextlib import suppress
 from typing import Any
 
 import frappe
 from frappe import _
+from redis.exceptions import LockNotOwnedError
+from werkzeug.exceptions import Conflict
 
+from press_tr.kimlik.accounts import disable_user as disable_linked_user
 from press_tr.kimlik.identity import as_press_user, bind_identity, create_team, find_identity
 from press_tr.kimlik.oidc import claim, reject
 from press_tr.kimlik.service import require_service
 
 
+def reset_read_snapshot() -> None:
+	if frappe.db.transaction_writes:
+		raise RuntimeError("Cannot reset a transaction after writes.")
+	frappe.db.rollback()
+
+
 def lock_team(organization_id: str):
 	# Authentication opens a read snapshot before the Team lock.
-	frappe.db.rollback()
+	reset_read_snapshot()
 	name = frappe.db.get_value("Team", {"keycloak_org_id": organization_id}, "name")
 	if not name:
 		return None
 	# The name lookup uses a snapshot too. Start the write transaction with
 	# the parent row lock, before controller code can read a consistent snapshot.
-	frappe.db.rollback()
+	reset_read_snapshot()
 	if not frappe.db.get_value("Team", name, "name", for_update=True):
 		return None
 	doc = frappe.get_doc("Team", name, for_update=True)
@@ -39,15 +49,26 @@ def ensure_team(
 	title = organization_name if organization_name is not None else organization_id
 	title = claim({"organization_name": title}, "organization_name")
 	email = claim({"email": email}, "email")
+	lock = frappe.cache.lock(
+		frappe.cache.make_key(f"press_tr:provision:{organization_id}"), timeout=60, blocking_timeout=5
+	)
+	if not lock.acquire():
+		raise Conflict(_("Another request is updating this organization. Try again."))
+
+	def release_lock():
+		with suppress(LockNotOwnedError):
+			lock.release()
+
 	try:
-		return provision_team(issuer, subject, email, email_verified, organization_id, title)
-	except frappe.DuplicateEntryError, frappe.UniqueValidationError, frappe.QueryDeadlockError:
-		# A competing first request may have created the identity and team.
-		frappe.db.rollback()
-		try:
-			return provision_team(issuer, subject, email, email_verified, organization_id, title)
-		except frappe.DuplicateEntryError, frappe.UniqueValidationError:
-			reject()
+		result = provision_team(issuer, subject, email, email_verified, organization_id, title)
+	except Exception:
+		release_lock()
+		raise
+
+	# Hold the lock until the request commits so the next request sees its writes.
+	frappe.db.after_commit.add(release_lock)
+	frappe.db.after_rollback.add(release_lock)
+	return result
 
 
 def provision_team(
@@ -92,6 +113,7 @@ def remove_team_member(
 	if has_all_organizations:
 		if link:
 			remove_organization_memberships(link.user)
+			disable_linked_user(link.user)
 		return {"team": None, "member": False}
 
 	doc = lock_team(organization_id)
@@ -102,14 +124,14 @@ def remove_team_member(
 
 def remove_organization_memberships(user: str) -> None:
 	# This authenticated system operation must find all candidate memberships.
-	frappe.db.rollback()
+	reset_read_snapshot()
 	names = frappe.get_all("Team Member", filters={"user": user, "parenttype": "Team"}, pluck="parent")
 	if not names:
 		return
 
 	# Keep every lock and write in one transaction. Refresh the snapshot before
 	# locking, since the membership lookup above used a consistent read.
-	frappe.db.rollback()
+	reset_read_snapshot()
 	names = frappe.db.get_values(
 		"Team",
 		{"name": ["in", names], "keycloak_org_id": ["is", "set"]},
@@ -119,15 +141,17 @@ def remove_organization_memberships(user: str) -> None:
 		pluck=True,
 	)
 	teams = [frappe.get_doc("Team", name, for_update=True) for name in names]
-	remove_memberships(teams, user)
+	remove_memberships(teams, user, allow_owner=True)
 
 
-def remove_memberships(teams, user: str) -> None:
+def remove_memberships(teams, user: str, *, allow_owner: bool = False) -> None:
 	# Check owners before the first write so a rejected request has no partial result.
-	if any(team.user == user for team in teams):
+	if not allow_owner and any(team.user == user for team in teams):
 		frappe.throw(_("Change team ownership before removing the owner."), frappe.PermissionError)
 	for team in teams:
 		if any(member.user == user for member in team.team_members):
 			# Use the team owner so the Press save retains a valid team context.
-			with as_press_user(team.user):
+			# A deactivated owner may still be the recorded owner of the team.
+			# This authorized service operation does not open a user session.
+			with as_press_user(team.user, allow_disabled=True):
 				team.remove_team_member(user)

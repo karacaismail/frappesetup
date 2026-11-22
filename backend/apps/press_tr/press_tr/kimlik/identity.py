@@ -58,17 +58,21 @@ def bind_identity(claims):
 	return frappe._dict(name=link.name, user=user)
 
 
-def validate_local_user(user):
+def validate_local_user(user, *, allow_disabled: bool = False):
 	if user in {"Administrator", "Guest"}:
 		reject()
 	enabled, user_type = frappe.db.get_value("User", user, ["enabled", "user_type"]) or (False, None)
-	if not enabled or user_type != "Website User" or "Press User" not in frappe.get_roles(user):
+	if (
+		(not enabled and not allow_disabled)
+		or user_type != "Website User"
+		or "Press User" not in frappe.get_roles(user)
+	):
 		reject()
 
 
 @contextmanager
-def as_press_user(user):
-	validate_local_user(user)
+def as_press_user(user, *, allow_disabled: bool = False):
+	validate_local_user(user, allow_disabled=allow_disabled)
 	previous_session = frappe.session.copy()
 	previous_form = frappe.form_dict.copy()
 	frappe.set_user(user)

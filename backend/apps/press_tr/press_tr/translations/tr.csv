@@ -14,3 +14,11 @@ Keycloak Organization ID,Keycloak kuruluş kimliği
 Unique identifier of the Keycloak organization mapped to this Press team.,Bu Press takımı bu Keycloak kuruluş kimliğine bağlıdır.
 Send exactly one valid organization selector.,Bir kuruluş kimliği ya da bütün kuruluşları seçen değeri gönderin.
 Change team ownership before removing the owner.,Takım sahibini çıkarmadan önce takımın sahipliğini devredin.
+Keycloak identity was rejected.,Press bu Keycloak kimliğini kabul etmedi.
+Set the Keycloak client ID for this site.,Bu site için Keycloak istemci kimliğini ayarlayın.
+Set the Keycloak URL and realm for this site.,Bu site için Keycloak adresini ve giriş alanını ayarlayın.
+Set the Press site address before enabling Keycloak.,Keycloak girişini açmadan önce Press site adresini ayarlayın.
+Keycloak keys are temporarily unavailable.,Press şu anda Keycloak anahtarlarını alamıyor.
+Concurrent account update. Start sign-in again.,Hesap şu anda güncelleniyor. Giriş işlemini yeniden başlatın.
+Guest access is denied.,Misafirler bu işlemi yapamaz.
+Another request is updating this organization. Try again.,Bu kuruluş şu anda güncelleniyor. Yeniden deneyin.

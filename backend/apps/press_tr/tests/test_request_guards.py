@@ -5,40 +5,41 @@ from unittest.mock import Mock, call, patch
 from oidc_verify import JwksUnavailable
 from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
-from press_tr import api, hooks
-from press_tr.api import auth, identity
+from press_tr import api
+from press_tr.api import auth, identity, maintenance
 from press_tr.kimlik import oidc, request_policy, service, sessions
 
 
 class RequestGuardsTest(unittest.TestCase):
-	def test_legacy_rpc_overrides_are_deny_handlers(self):
-		closed = request_policy.CLOSED_METHODS | request_policy.SOCIAL_METHODS
-		self.assertEqual(set(hooks.override_whitelisted_methods), closed)
-		for handler in hooks.override_whitelisted_methods.values():
-			self.assertEqual(handler, "press_tr.kimlik.request_policy.deny_legacy_method")
-		with self.assertRaises(Forbidden):
-			request_policy.deny_legacy_method()
-
-	def test_rpc_method_is_extracted_from_each_prefix(self):
-		for prefix in request_policy.API_PREFIXES:
-			self.assertEqual(request_policy.rpc_method(prefix + "fixture.echo/metadata"), "fixture.echo")
-
-	def test_native_recovery_is_off_unless_enabled_for_administrator(self):
+	def test_guest_allowlist_matches_the_contract(self):
+		targets = {
+			"press_tr.api.auth.get_login_url": Mock(),
+			"press_tr.api.auth.keycloak_callback": Mock(),
+			"press_tr.api.keycloak_backchannel_logout": Mock(),
+		}
 		with patch.object(request_policy, "frappe") as facade:
-			facade.request.path = "/api/method/login"
-			facade.form_dict.get.return_value = "Administrator"
-			for value in (False, None, "false", "0"):
-				facade.conf.press_tr_allow_admin_password_login = value
-				with self.assertRaises(Forbidden):
-					request_policy.block_native_login()
-			facade.conf.press_tr_allow_admin_password_login = True
-			request_policy.block_native_login()
-			facade.form_dict.get.return_value = "desk-user@example.test"
+			facade.get_attr.side_effect = targets.__getitem__
+			facade.session.user = "Guest"
+			self.assertEqual(request_policy.allowed_guest_targets(), {facade.ping, *targets.values()})
+			facade.local.press_request_target = (Mock(), {})
+			facade.throw.side_effect = Forbidden
 			with self.assertRaises(Forbidden):
-				request_policy.block_native_login()
+				request_policy.enforce_guest_allowlist()
+
+	def test_native_password_recovery_cannot_be_enabled(self):
+		with self.assertRaises(Forbidden):
+			request_policy.block_native_login()
+
+	def test_snapshot_reset_rejects_pending_writes(self):
+		with patch.object(identity, "frappe") as facade:
+			facade.db.transaction_writes = 1
+			with self.assertRaises(RuntimeError):
+				identity.reset_read_snapshot()
+			facade.db.rollback.assert_not_called()
 
 	def test_team_lock_refreshes_snapshot_before_lookup_and_lock(self):
 		with patch.object(identity, "frappe") as facade:
+			facade.db.transaction_writes = 0
 			facade.db.get_value.return_value = "team"
 			facade.get_doc.return_value.keycloak_org_id = "organization"
 			self.assertIs(identity.lock_team("organization"), facade.get_doc.return_value)
@@ -87,7 +88,7 @@ class RequestGuardsTest(unittest.TestCase):
 			old.delete.assert_not_called()
 			current.delete.assert_called_once_with(ignore_permissions=True)
 
-	def test_logout_redacts_token_before_calling_rate_limited_helper(self):
+	def test_logout_redacts_token_before_verification(self):
 		form = {"logout_token": "fixture"}
 		with (
 			patch.object(api, "frappe", SimpleNamespace(form_dict=form)),
@@ -115,3 +116,53 @@ class RequestGuardsTest(unittest.TestCase):
 			with self.assertRaises(Forbidden):
 				service.authorize_identity_sync()
 			reject.assert_called_once()
+
+	def test_proxy_overwrites_forwarded_client_address(self):
+		from pathlib import Path
+
+		config = Path(__file__).with_name("forwarded-client.conf")
+		directives = [line.strip() for line in config.read_text().splitlines() if not line.startswith("#")]
+		self.assertEqual(directives, ["proxy_set_header X-Forwarded-For $remote_addr;"])
+
+	def test_team_invitation_dispatch_is_denied_by_callable(self):
+		from press.api.account import accept_team_invite
+		from press.api.client import run_doc_method
+
+		with patch.object(
+			request_policy,
+			"frappe",
+			SimpleNamespace(form_dict={"dt": "Team", "method": "invite_team_member"}),
+		):
+			for target in (accept_team_invite, run_doc_method):
+				with self.assertRaises(Forbidden):
+					request_policy.block_team_invitation(target, {})
+
+	def test_server_script_cannot_replace_an_allowed_python_target(self):
+		with (
+			patch.object(request_policy, "frappe") as facade,
+			patch.object(request_policy, "get_server_script_map", return_value={"_api": {"ping": "fixture"}}),
+			patch.object(request_policy, "get_attr") as resolve,
+		):
+			facade.override_whitelisted_method.side_effect = lambda name: name
+			self.assertIsNone(request_policy.resolve_method("ping"))
+			resolve.assert_not_called()
+
+	def test_maintenance_skips_missing_and_active_mappings(self):
+		with (
+			patch.object(maintenance, "frappe") as facade,
+			patch.object(maintenance, "get_expired_threshold", return_value="2026-11-22 00:00:00"),
+		):
+
+			class Disappeared(Exception):
+				pass
+
+			facade.DoesNotExistError = Disappeared
+			active, expired, orphan = Mock(), Mock(), Mock()
+			facade.get_all.return_value = ["gone", "active", "expired", "orphan"]
+			facade.get_doc.side_effect = [Disappeared, active, expired, orphan]
+			facade.db.get_value.side_effect = ["2026-11-22 01:00:00", "2026-11-21 23:00:00", None]
+			self.assertEqual(maintenance.cleanup_expired_sessions(), {"removed": 2})
+			facade.only_for.assert_called_once_with("System Manager")
+			active.delete.assert_not_called()
+			expired.delete.assert_called_once_with(ignore_permissions=True)
+			orphan.delete.assert_called_once_with(ignore_permissions=True)

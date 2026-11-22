@@ -79,7 +79,7 @@ paths:
         "403":
           description: Logout token was rejected.
         "429":
-          description: Logout request limit reached.
+          description: Rejected logout token limit reached. Valid logout notifications do not count.
         "503":
           description: Keycloak configuration or verification keys are unavailable.
   /api/method/press_tr.api.identity.ensure_team:
@@ -135,13 +135,15 @@ paths:
                         type: boolean
         "403":
           description: Service identity or user binding was rejected.
+        "409":
+          description: Another request is updating this organization.
         "503":
           description: Keycloak configuration or verification keys are unavailable.
   /api/method/press_tr.api.identity.remove_team_member:
     post:
       operationId: removeTeamMember
       summary: Revoke memberships in one or all Keycloak organizations.
-      description: Removes the member and their team role assignments. Bulk removal affects only teams mapped to Keycloak. This destructive operation preserves the user and teams. If any affected team is owned by the member, transfer ownership before retrying.
+      description: Removes the member and their team role assignments. Bulk removal affects only mapped teams and disables the linked user and API credentials. This destructive operation preserves the user and teams. Bulk removal preserves the recorded team owner while removing their membership and access. A single-team request requires ownership transfer before removing the owner.
       security:
         - identitySync: []
       requestBody:
@@ -194,8 +196,25 @@ paths:
           description: Service identity or owner removal was rejected.
         "503":
           description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.maintenance.cleanup_expired_sessions:
+    post:
+      operationId: cleanupExpiredPressSessions
+      summary: Remove expired Keycloak session mappings.
+      description: A System Manager starts this maintenance operation. It deletes expired or orphaned session mappings and leaves active mappings in place.
+      security:
+        - deskSession: []
+      responses:
+        "200":
+          description: Number of removed session mappings in the message object.
+        "403":
+          description: The caller cannot run System Manager maintenance.
 components:
   securitySchemes:
+    deskSession:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: An authenticated System Manager session with standard Frappe CSRF protection.
     identitySync:
       type: http
       scheme: bearer

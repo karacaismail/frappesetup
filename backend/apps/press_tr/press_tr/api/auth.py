@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 import frappe
 import requests
+from frappe import _
 from frappe.rate_limiter import rate_limit
 from werkzeug.exceptions import Conflict
 
@@ -133,8 +134,8 @@ def keycloak_callback(state: str | None = None, code: str | None = None) -> None
 	try:
 		link = bind_identity(claims)
 		ensure_personal_team(link.user)
-	except frappe.QueryDeadlockError:
-		raise Conflict("Concurrent account update. Start sign-in again.")
+	except frappe.QueryDeadlockError, frappe.QueryTimeoutError:
+		raise Conflict(_("Concurrent account update. Start sign-in again."))
 	except frappe.DuplicateEntryError, frappe.UniqueValidationError:
 		reject()
 

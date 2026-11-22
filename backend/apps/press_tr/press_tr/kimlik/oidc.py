@@ -35,7 +35,7 @@ def server_endpoint(endpoint):
 def callback_url():
 	origin = frappe.conf.host_name
 	if not origin or urlsplit(origin).scheme not in {"https", "http"}:
-		frappe.throw(_("Set the Press site address before enabling Keycloak."))
+		raise ServiceUnavailable(_("Set the Press site address before enabling Keycloak."))
 	return origin.rstrip("/") + "/api/method/press_tr.api.auth.keycloak_callback"
 
 

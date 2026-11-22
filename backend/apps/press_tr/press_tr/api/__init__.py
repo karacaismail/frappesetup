@@ -13,13 +13,33 @@ def keycloak_backchannel_logout(logout_token: str | None = None) -> None:
 
 
 @rate_limit(limit=120, seconds=60)
-def _revoke_keycloak_sessions(logout_token: str | None) -> None:
-	if not isinstance(logout_token, str) or not logout_token:
-		reject()
+def _count_rejected_logout() -> None:
+	pass
 
+
+def count_rejected_logout() -> None:
+	# Frappe derives the cache namespace from cmd, which v2 does not populate.
+	command = frappe.form_dict.get("cmd")
+	frappe.form_dict.cmd = "press_tr.rejected_logout"
+	try:
+		_count_rejected_logout()
+	finally:
+		if command is None:
+			frappe.form_dict.pop("cmd", None)
+		else:
+			frappe.form_dict.cmd = command
+
+
+def _revoke_keycloak_sessions(logout_token: str | None) -> None:
 	from oidc_verify import verify_logout_token
 
-	claims = verify(verify_logout_token, logout_token, client_id=client_id())
+	try:
+		if not isinstance(logout_token, str) or not logout_token:
+			reject()
+		claims = verify(verify_logout_token, logout_token, client_id=client_id())
+	except frappe.PermissionError:
+		count_rejected_logout()
+		raise
 	filters = {}
 	if "sid" in claims:
 		filters["keycloak_sid"] = claim(claims, "sid")

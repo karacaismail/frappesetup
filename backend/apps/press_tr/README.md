@@ -27,19 +27,22 @@ as `0`, the value Frappe 16 accepts for a Check field.
 
 Identity Sync must only send verified Keycloak email addresses to `ensure_team`.
 Press creates a team at sign-in only if the user has no team membership.
-Press assigns the first member as the owner of a new team. An existing owner must
-transfer ownership before Identity Sync can remove that member.
+Press assigns the first member as the owner of a new team. Single-team removal
+requires an ownership transfer before removing an owner. Bulk deactivation removes
+memberships and credentials while preserving the recorded team owner. A System Manager
+can transfer ownership. Re-enable a disabled Press account separately if needed.
 
 ## Operations
 
-Password login is off by default. To recover Administrator access, temporarily run
-`bench --site <site> set-config -p press_tr_allow_admin_password_login true`.
-Use the standard Frappe password login API from the private network as Administrator.
-After recovery, set the same option to the JSON boolean `false`.
-Other users can only sign in through Keycloak.
+For Administrator recovery, run `bench --site <site> browse --user Administrator`
+on the Press host. This opens an Administrator session without enabling password login.
 
-Keep direct backend access private. The trusted proxy must overwrite
-`X-Forwarded-For` so the request limits use the actual client address.
+Keep direct backend access private. Include
+[`forwarded-client.conf`](../../dev/press/forwarded-client.conf) in the public proxy
+location so request limits use the address seen by that proxy.
+
+A System Manager can run `press_tr.api.maintenance.cleanup_expired_sessions` with
+an authenticated POST to remove expired Press session mappings.
 
 Review on MariaDB 11.8 uses the default repeatable-read transaction isolation.
 Membership updates reset the read snapshot before acquiring a locking Team document.

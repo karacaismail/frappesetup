@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlencode, urlsplit
 from uuid import uuid4
 
+import frappe
 import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 from test_auth_http import PressHttpClient
@@ -267,19 +268,64 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			self.assertEqual(status, 200, result)
 			self.assertEqual(result["message"], {"team": None, "member": False})
 
-		session = self.sign_in(member, email, uuid4().hex)
-		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, session)
-		self.assertEqual(status, 200)
-		account = json.loads(payload)["message"]
-		self.assertEqual([row["name"] for row in account["teams"]], [account["team"]["name"]])
-		self.assertNotIn(account["team"]["name"], organization_teams)
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			self.assertFalse(frappe.db.get_value("User", email, "enabled"))
+			teams = frappe.get_all(
+				"Team Member", filters={"user": email, "parenttype": "Team"}, pluck="parent"
+			)
+			self.assertEqual(len(teams), 1)
+			self.assertNotIn(teams[0], organization_teams)
+			self.assertFalse(frappe.db.get_value("Team", teams[0], "keycloak_org_id"))
+		finally:
+			frappe.destroy()
 
-	def test_bulk_remove_owner_conflict_leaves_other_membership_intact(self):
+	def test_disabling_linked_user_revokes_api_key(self):
+		from frappe.utils.password import set_encrypted_password
+
+		subject = uuid4().hex
+		email = f"{subject}@example.test"
+		self.sign_in(subject, email, uuid4().hex)
+		key, secret = uuid4().hex, uuid4().hex
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			frappe.db.set_value("User", email, "api_key", key)
+			set_encrypted_password("User", email, secret, "api_secret")
+			frappe.db.commit()
+		finally:
+			frappe.destroy()
+
+		headers = {"Authorization": f"token {key}:{secret}"}
+		self.assertEqual(self.exchange("GET", ACCOUNT_ROUTE, headers)[0], 200)
+		body = {"issuer": ISSUER, "subject": subject}
+		for _ in range(2):
+			status, result = self.call("remove_team_member", body | {"all_organizations": True}, self.token())
+			self.assertEqual(status, 200, result)
+			self.assertEqual(result["message"], {"team": None, "member": False})
+		self.assertIn(self.exchange("GET", ACCOUNT_ROUTE, headers)[0], {401, 403})
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			self.assertFalse(frappe.db.get_value("User", email, "api_key"))
+			self.assertFalse(
+				frappe.db.exists("__Auth", {"doctype": "User", "name": email, "fieldname": "api_secret"})
+			)
+		finally:
+			frappe.destroy()
+
+	def test_bulk_remove_disables_owner_and_preserves_team_ownership(self):
 		owner, other_owner = uuid4().hex, uuid4().hex
 		first_org, second_org = uuid4().hex, uuid4().hex
 		token = self.token()
 		teams = []
-		for subject, organization in ((owner, first_org), (other_owner, second_org), (owner, second_org)):
+		for subject, organization in (
+			(owner, first_org),
+			(other_owner, second_org),
+			(owner, second_org),
+			(other_owner, first_org),
+		):
 			status, result = self.call(
 				"ensure_team",
 				{
@@ -295,11 +341,27 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			teams.append(result["message"]["team"])
 
 		body = {"issuer": ISSUER, "subject": owner, "all_organizations": True}
-		self.assertEqual(self.call("remove_team_member", body, token)[0], 403)
-		session = self.sign_in(owner, f"{owner}@example.test", uuid4().hex)
-		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, session)
-		self.assertEqual(status, 200)
-		self.assertEqual({row["name"] for row in json.loads(payload)["message"]["teams"]}, set(teams))
+		self.assertEqual(self.call("remove_team_member", body, token)[0], 200)
+		self.assertEqual(self.call("remove_team_member", body | {"subject": other_owner}, token)[0], 200)
+		email = f"{owner}@example.test"
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			self.assertFalse(frappe.db.get_value("User", email, "enabled"))
+			self.assertFalse(frappe.db.get_value("User", f"{other_owner}@example.test", "enabled"))
+			self.assertEqual(frappe.db.get_value("Team", teams[0], "user"), email)
+			self.assertFalse(
+				frappe.db.exists(
+					"Team Member",
+					{
+						"parent": ["in", teams],
+						"parenttype": "Team",
+						"user": email,
+					},
+				)
+			)
+		finally:
+			frappe.destroy()
 
 	def start_login(self):
 		status, headers, payload = self.exchange("POST", "/api/method/press_tr.api.auth.get_login_url")
@@ -362,10 +424,10 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			subject = uuid4().hex
 			self.sign_in(subject, f"{subject}@example.test", uuid4().hex, 403, **claims)
 
-	def post_logout(self, token):
+	def post_logout(self, token, prefix="/api/method/"):
 		return self.exchange(
 			"POST",
-			"/api/method/press_tr.api.keycloak_backchannel_logout",
+			prefix + "press_tr.api.keycloak_backchannel_logout",
 			{"Content-Type": "application/x-www-form-urlencoded"},
 			urlencode({"logout_token": token}),
 		)[0]
@@ -386,16 +448,18 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			self.assertEqual(self.post_logout(token), 200)
 			self.assertIn(self.exchange("GET", ACCOUNT_ROUTE, session)[0], {401, 403})
 
-	def test_logout_rate_limit(self):
-		token = self.token(
+	def test_only_rejected_logout_tokens_reach_rate_limit(self):
+		valid = self.token(
 			authorized_party="press",
 			sub=None,
 			sid=uuid4().hex,
 			events={"http://schemas.openid.net/event/backchannel-logout": {}},
 		)
 		for _ in range(120):
-			self.assertEqual(self.post_logout(token), 200)
-		self.assertEqual(self.post_logout(token), 429)
+			self.assertEqual(self.post_logout("invalid-fixture"), 403)
+		self.assertEqual(self.post_logout("invalid-fixture", "/api/v2/method/"), 429)
+		self.assertEqual(self.post_logout(valid, "/api/v2/method/"), 200)
+		self.assertEqual(self.request("POST", "/api/v2/method/press_tr.api.auth.get_login_url")[0], 200)
 
 	def test_callback_and_backchannel_logout(self):
 		subject = uuid4().hex

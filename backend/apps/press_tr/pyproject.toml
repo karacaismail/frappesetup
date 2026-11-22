@@ -1,4 +1,5 @@
 [project]
+license = "AGPL-3.0-only"
 name = "press_tr"
 authors = [
     { name = "Platform", email = "noreply@example.test"}
@@ -11,7 +12,7 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["flit_core >=3.4,<4"]
+requires = ["flit_core >=3.11,<4"]
 build-backend = "flit_core.buildapi"
 
 # These dependencies are only installed when developer mode is enabled
