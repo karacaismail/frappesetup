@@ -384,3 +384,10 @@ export async function userExists(email: string, realm = REALM): Promise<boolean>
   const users = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`, {}, realm)).json()) as unknown[];
   return users.length > 0;
 }
+
+/** Ends every session of the user on the server, as an expired or revoked session would. The browser keeps its cookies. */
+export async function endSessions(email: string, realm = REALM): Promise<void> {
+  const [user] = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`, {}, realm)).json()) as { id: string }[];
+  const res = await admin(`/users/${user.id}/logout`, { method: 'POST' }, realm);
+  if (!res.ok) throw new Error(`Could not end the sessions: ${res.status}`);
+}
