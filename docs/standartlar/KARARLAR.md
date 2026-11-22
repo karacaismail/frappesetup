@@ -67,7 +67,8 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 20. Her şey yapay zekâyla yönetilebilir olur. Katman model sağlayıcısından bağımsızdır.
 21. Proje sahibi kararları Claude'a bıraktı. Claude açık kararları kapatır ve kayda yazar.
 22. Sisteme n tane yapay zekâ sağlayıcısı, hesabı ve API'si eklenebilir.
-23. Yeni kod İngilizce adlarla yazılır. Var olan adlar değişmez.
+23. Bütün kod adları İngilizce ve ASCII olur. Eski adlar da kurallara göre güncellenir (Karar 40).
+24. Kural dosyasının sınırı varsayılan olarak 36.000 bayttır. Özel durumda en çok 39.000 bayttır (Karar 41).
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -830,6 +831,48 @@ Sonuç şudur:
 - Yeni yazılan koddaki yorumlar ve hata iletileri İngilizce olur.
 - Kullanıcıya görünen yeni metnin kaynağı İngilizcedir. Türkçesi çeviri dosyasında durur.
 - İşçilere önce ad değiştirme, sonra iptal mesajı gitti. Bir işçi dosya taşıdıysa eski adlara geri döner.
+
+Karar 40, bu kararın eski adlarla ilgili sonucunu değiştirdi.
+
+### Karar 40. Bütün kod adları İngilizce olacak, eski adlar da güncellenecek
+
+Proje sahibi ad verme kuralları için bir rapor istedi. Rapor Claude, Codex ve Gemini ile ortak yazılacaktı. Rapor yazılırken proje sahibi şunu yazdı:
+
+> ama tanımlama ingilizce olacak. default dil, ingilizce olacak. karakterler ingilizce sınırında olacak. […] class id variable const vb tanımlamalar ingilizce olacak.
+>
+> string değerlerin çevirisi için zaten frappe çözüm üretir. codes, kodlar, coding, ingilizce olacak.
+
+Claude raporun dilini sordu. Proje sahibi “Türkçe, örnekler İngilizce” seçeneğini seçti.
+
+Rapor bitince proje sahibi şunu yazdı:
+
+> ve geçmiş isimlendirmeleri bu kura dosyasındaki kurallara göre güncellesin paralel agents ile, multi agents ile.
+
+Sonuç şudur:
+
+- Bütün kod adları İngilizce olur. Class, id, değişken, sabit, modül, DocType, alan ve dosya adı bu kapsamdadır.
+- Kod adında yalnız ASCII karakter kullanılır. Türkçe harf kullanılmaz.
+- Kaynak dil İngilizcedir. Türkçe ekran metni Frappe çevirisinden gelir.
+- Eski adlar da kurallara göre güncellenir. Bu sonuç Karar 39'daki “Var olan adlar yerinde kaldı” sonucunun yerini alır.
+- Ad kuralları `naming_rules_report.md` dosyasındadır. Raporda 73 kural var. Kural kodları `AV` ile başlar.
+- Raporun açıklamaları Türkçedir. Kod örnekleri İngilizcedir.
+- frappesetup deposunun eski adlarını “Frappe setup” oturumu düzeltir. İş Pane'de `naming-history-fix` adıyla yürür.
+- Kural dosyaları bu karara göre güncellenir. Python dosyasında M-8, Python dışı dosyada H-10 ve F-4, ayrı arayüz dosyasında TS-9 değişir.
+
+### Karar 41. Kural dosyasının sınırı 36.000 ile 39.000 bayt arasında olacak
+
+Python kural dosyası 38.000 baytlık sınırdaydı. İngilizce kuralı dosyaya 39 bayt ekliyordu. Claude sınır artışını sordu. Proje sahibi şöyle cevap verdi:
+
+> sınır, default olarak 36000, max (özel durumlarda) 39000 (~36000~39000 arasında) olmalı. bu esneklik özel durumlarda sağlanabilir.
+
+Sonuç şudur:
+
+- Kural dosyasının varsayılan sınırı 36.000 bayttır.
+- Özel durumda sınır en çok 39.000 bayta çıkabilir.
+- Python dosyası özel durumdur. Sınırı 39.000 bayt oldu.
+- Python dışı ve ayrı arayüz dosyalarının sınırı 36.000 bayt oldu. Bu iki sınır önce 32.768 bayttı.
+- Mobil dosyanın sınırı 36.000 bayt olarak kalır.
+- Bir kural dosyası `AGENTS.md` olarak kullanılırsa 32.768 bayt sınırı ayrıca geçerlidir. Codex bu dosyanın fazlasını okumaz.
 
 ## Modellerin kararları
 
