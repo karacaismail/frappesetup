@@ -773,16 +773,16 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 	def test_logout_token_requires_events_and_accepts_both_selectors(self):
 		event = {"http://schemas.openid.net/event/backchannel-logout": {}}
 		subject, keycloak_sid = uuid4().hex, uuid4().hex
-		common = {"sub": subject, "sid": keycloak_sid, "events": event}
-		self.assertEqual(
-			self.post_logout(self.token(authorized_party="press", **common, nonce="unexpected")), 403
+		common = {"sub": subject, "sid": keycloak_sid}
+		with_nonce = self.token(
+			authorized_party="press", **common, events=event, nonce="unexpected", jti=uuid4().hex
 		)
-		self.assertEqual(
-			self.post_logout(self.token(authorized_party="press", sub=subject, sid=keycloak_sid)), 403
-		)
+		without_events = self.token(authorized_party="press", **common, jti=uuid4().hex)
+		self.assertEqual(self.post_logout(with_nonce), 403)
+		self.assertEqual(self.post_logout(without_events), 403)
 		for claims in ({"sid": keycloak_sid, "sub": None}, {"sub": subject}):
 			session = self.sign_in(subject, f"{subject}@example.test", keycloak_sid)
-			token = self.token(authorized_party="press", **claims, events=event)
+			token = self.token(authorized_party="press", **claims, events=event, jti=uuid4().hex)
 			self.assertEqual(self.post_logout(token), 200)
 			self.assertIn(self.exchange("GET", ACCOUNT_ROUTE, session)[0], {401, 403})
 
@@ -791,6 +791,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			authorized_party="press",
 			sub=None,
 			sid=uuid4().hex,
+			jti=uuid4().hex,
 			events={"http://schemas.openid.net/event/backchannel-logout": {}},
 		)
 		for _ in range(120):
