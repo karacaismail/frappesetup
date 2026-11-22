@@ -119,3 +119,28 @@ Realm dosyası sır taşımaz. Sır alanları `${ATONOTA_...}` yer tutucusudur. 
 
 - `model/storage-services/src/main/java/org/keycloak/exportimport/AbstractFileBasedImportProvider.java` 33 ve 42. satırlar: yer tutucu `System.getenv` ile çözülür.
 - `services/src/main/java/org/keycloak/exportimport/ExportImportManager.java` 79 ve 81. satırlar: açılıştaki içe alım yer tutucu değişimini açar.
+
+## Yeni kiracı için istemci açma
+
+Keycloak, her kiracı sitesini ayrı bir istemci kaydıyla tanır. İstemciyi bir Keycloak yöneticisi açar.
+
+1. Keycloak ve kiracı sitesinin HTTPS adreslerini belirleyin.
+2. Komutu önce `--preview` ile çalıştırın. Komut Keycloak'a istek göndermez.
+
+   ```bash
+   bin/create-tenant-client.py acme https://tenant.example.test https://identity.example.test --preview
+   ```
+
+3. Önizlemede Keycloak adresini ve kiracının dönüş adreslerini kontrol edin.
+4. Ayarlar doğruysa aynı komutu `--preview` olmadan çalıştırın.
+5. Komut sorunca `CREATE site-acme` yazın.
+6. Keycloak yönetim yetkisi olan kısa ömürlü erişim belirtecini girin. Komut girişi gizler.
+7. Keycloak 201 dönerse “Clients” ekranında `site-acme` kaydını açın.
+8. Keycloak'ın ürettiği istemci sırrını kiracı sitesinin gizli ayarına ekleyin.
+
+Komut, sözleşmenin 7. bölümündeki yönetim işini Keycloak'ın mevcut
+`POST /admin/realms/platform/clients` ucuyla yapar. Bu uç yönetim yetkisini denetler.
+`identity-sync` hesabına istemci açma yetkisi verilmez.
+
+Keycloak 409 dönerse istemci adı zaten kayıtlıdır. Komut mevcut kaydı değiştirmez.
+Bağlantı kesilirse komutu yinelemeden önce “Clients” ekranını kontrol edin.
