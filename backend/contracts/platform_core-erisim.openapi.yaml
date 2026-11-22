@@ -516,6 +516,198 @@ paths:
         "417":
           description: Invalid input.
 
+  # The two Frappe addresses the engine answers. Clients call these addresses.
+  # Each one repeats the operation of the engine function that replaces it.
+  /frappe.desk.search.search_link:
+    get:
+      tags: [arama]
+      operationId: frappeSearchLink
+      summary: Link search behind the link search rule.
+      description: |
+        The engine puts this function in place of `frappe.desk.search.search_link`.
+        Clients keep calling `/api/method/frappe.desk.search.search_link`. The address and the
+        inputs do not change. POST is accepted too, with the same inputs in the body.
+
+        The endpoint does not change any record.
+
+        The standard search is unchanged. Its result passes the record rules and field levels.
+        On a governed document type every custom search function is refused with 403,
+        for every user, “Administrator” included. There is no allow list. A custom search function can come from the `query`
+        input or from the `standard_queries` hook. Both follow the same rule.
+        On a document type that is not governed a custom search runs as Frappe runs it.
+      security:
+        - oturum: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Document type to search in.
+          schema: {type: string, maxLength: 140}
+        - name: txt
+          in: query
+          required: true
+          description: Search text. It may be empty.
+          schema: {type: string}
+        - name: query
+          in: query
+          required: false
+          description: |
+            Dotted path of a custom search function. On a governed document type it is always refused.
+          schema: {type: string}
+        - name: filters
+          in: query
+          required: false
+          description: Filters as JSON, passed on to the search.
+          schema: {type: string}
+        - name: page_length
+          in: query
+          required: false
+          description: Maximum number of results.
+          schema: {type: integer, default: 10}
+        - name: searchfield
+          in: query
+          required: false
+          description: Field to search in. Defaults to the name.
+          schema: {type: string}
+        - name: reference_doctype
+          in: query
+          required: false
+          description: Document type of the form that holds the link field.
+          schema: {type: string}
+        - name: link_fieldname
+          in: query
+          required: false
+          description: Name of the link field in the reference document type.
+          schema: {type: string}
+        - name: ignore_user_permissions
+          in: query
+          required: false
+          description: Frappe honours it only when the link field itself allows it.
+          schema: {type: boolean, default: false}
+      responses:
+        "200":
+          description: Matching records.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: array
+                    items:
+                      type: object
+                      required: [value]
+                      properties:
+                        value: {type: string, description: Name of the record.}
+                        label: {type: string, description: Title shown for the record.}
+                        description: {type: string, description: Extra text shown under the title.}
+        "403":
+          description: |
+            Guest request, no `select` or `read` permission on the document type, or a custom
+            search function that is not allowed on a governed document type.
+        "417":
+          description: Invalid input.
+
+  /frappe.desk.search.search_widget:
+    get:
+      tags: [arama]
+      operationId: frappeSearchWidget
+      summary: Raw link search behind the link search rule.
+      description: |
+        The engine puts this function in place of `frappe.desk.search.search_widget`.
+        Clients keep calling `/api/method/frappe.desk.search.search_widget`. The address and the
+        inputs do not change. POST is accepted too, with the same inputs in the body.
+
+        The endpoint does not change any record. It follows the same rule as `search_link`
+        and returns the rows of the search without formatting them for a link field.
+      security:
+        - oturum: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Document type to search in.
+          schema: {type: string, maxLength: 140}
+        - name: txt
+          in: query
+          required: true
+          description: Search text. It may be empty.
+          schema: {type: string}
+        - name: query
+          in: query
+          required: false
+          description: |
+            Dotted path of a custom search function. On a governed document type it is always refused.
+          schema: {type: string}
+        - name: filters
+          in: query
+          required: false
+          description: Filters as JSON, passed on to the search.
+          schema: {type: string}
+        - name: page_length
+          in: query
+          required: false
+          description: Maximum number of results.
+          schema: {type: integer, default: 10}
+        - name: searchfield
+          in: query
+          required: false
+          description: Field to search in. Defaults to the name.
+          schema: {type: string}
+        - name: reference_doctype
+          in: query
+          required: false
+          description: Document type of the form that holds the link field.
+          schema: {type: string}
+        - name: link_fieldname
+          in: query
+          required: false
+          description: Name of the link field in the reference document type.
+          schema: {type: string}
+        - name: ignore_user_permissions
+          in: query
+          required: false
+          description: Frappe honours it only when the link field itself allows it.
+          schema: {type: boolean, default: false}
+        - name: start
+          in: query
+          required: false
+          description: Number of results to skip.
+          schema: {type: integer, default: 0}
+        - name: filter_fields
+          in: query
+          required: false
+          description: Extra fields to return, as JSON.
+          schema: {type: string}
+        - name: as_dict
+          in: query
+          required: false
+          description: Return each row as an object instead of a list.
+          schema: {type: boolean, default: false}
+      responses:
+        "200":
+          description: Matching rows. Each row starts with the record name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: array
+                    items:
+                      oneOf:
+                        - type: array
+                          items: {}
+                        - type: object
+        "403":
+          description: |
+            Guest request, no `select` or `read` permission on the document type, or a custom
+            search function that is not allowed on a governed document type.
+        "417":
+          description: Invalid input.
+
 x-replaced-endpoints:
   description: |
     The engine puts its own function in place of two Frappe search endpoints.
