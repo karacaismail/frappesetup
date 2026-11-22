@@ -1,11 +1,11 @@
-"""Sözleşme testlerinin araçları: küçük bir YAML okuyucu ve küçük bir şema denetleyici.
+"""Contract test tools: a small YAML reader and schema validator.
 
-Python'un kendi kitaplığında YAML okuyucu ve JSON Schema denetleyici yoktur.
-Servis yeni paket eklemez. Bu yüzden testler sözleşme dosyasının kullandığı kadarını okur.
+The Python standard library has no YAML reader or JSON Schema validator.
+The service adds no dependencies, so the tests read only the subset used by the contract.
 
-Okuyucu şunları tanır: iç içe eşleme, liste, `|` ile başlayan çok satırlı metin,
-`[a, b]` biçimli kısa liste, tırnaklı metin, sayı, `true`, `false` ve `null`.
-Dosyaya başka bir YAML yapısı girerse okuyucu `ValueError` verir ve testler kırılır.
+The reader supports nested mappings, lists, multiline text introduced by `|`,
+inline lists such as `[a, b]`, quoted text, numbers, `true`, `false` and `null`.
+Other YAML constructs raise `ValueError` and fail the tests.
 """
 
 from __future__ import annotations
@@ -89,12 +89,12 @@ class _Parser:
         return self._sequence(indent) if line[1].startswith("- ") or line[1] == "-" else self._mapping(indent)
 
     def _value(self, text: str | None, indent: int) -> object:
-        """Anahtardan sonraki değeri okur. `indent`, anahtarın girintisidir."""
+        """Read the value after a key. `indent` is the indentation of the key."""
         if text is None or text == "":
             following = self._peek()
             if following is None or following[0] < indent or (following[0] == indent and not following[1].startswith("- ")):
                 return None
-            if following[0] == indent:  # anahtarla aynı girintide liste
+            if following[0] == indent:  # a list at the same indentation as the key
                 return self._sequence(indent)
             return self._block(following[0])
         if text == "|":
@@ -180,9 +180,9 @@ def _is_type(value: object, name: str) -> bool:
 
 
 def schema_errors(value: object, schema: dict, root: dict, path: str = "$") -> list[str]:
-    """Değeri şemaya göre denetler. Hataların listesini döner. Boş liste uygunluk demektir.
+    """Validate a value against the schema. Return errors, or an empty list on success.
 
-    Desteklenen anahtarlar sözleşme dosyasının kullandıklarıdır.
+    Supported keywords are those used by the contract.
     """
     known = {
         "$ref", "type", "required", "properties", "additionalProperties", "enum", "const", "pattern",

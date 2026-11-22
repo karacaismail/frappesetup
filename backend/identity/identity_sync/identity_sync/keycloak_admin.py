@@ -1,10 +1,10 @@
-"""Keycloak Admin API istemcisi.
+"""Keycloak Admin API client.
 
-Her işlev tek bir iş yapar ve açık bir ad taşır. Yazan her işlev `dry_run=True` ile
-yalnız önizleme üretir. Servis Keycloak'ta istemci açmaz (`docs/sozlesmeler.md`, 7. bölüm).
+Each function performs one operation and has an explicit name. Every write function produces
+only a preview with `dry_run=True`. The service does not create Keycloak clients (`docs/sozlesmeler.md`, section 7).
 
-Yolların kaynağı Keycloak 26.8.2 Admin REST API belgesidir.
-Admin API belirteci ayrı kapsamla istenir. Bu belirteç sitelere gitmez.
+Paths come from the Keycloak 26.8.2 Admin REST API documentation.
+Request the Admin API token with a separate scope. Never send it to sites.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ SITE_BACKCHANNEL_LOGOUT_PATH = "/api/method/platform_core.api.keycloak_backchann
 
 @dataclass(frozen=True)
 class Outcome:
-    """Bir yazma işinin sonucu. `executed` yanlışsa yalnız önizleme üretildi."""
+    """The result of a write operation. If `executed` is false, only a preview was produced."""
 
     preview: Preview
     executed: bool
@@ -33,14 +33,14 @@ class Outcome:
 
 @dataclass(frozen=True)
 class InviteResult:
-    """`subject`, davet edilen kullanıcının kimliğidir. Önizlemede boş kalabilir."""
+    """`subject` is the invited user ID. It may be empty in a preview."""
 
     subject: str | None
     previews: tuple[Preview, ...]
 
 
 def _quote(value: str) -> str:
-    """Değeri adres yoluna güvenle koyar. Yolu değiştirebilen değeri reddeder."""
+    """Safely encode a value in a URL path. Reject values that could change the path."""
     if value in ("", ".", ".."):
         raise ValueError("invalid path segment")
     return urllib.parse.quote(value, safe="")
@@ -55,11 +55,11 @@ def _id_from_location(response: Response) -> str:
 
 
 class PlanChanged(Exception):
-    """Güncel plan onaylanan plandan farklı. Hiçbir şey yazılmadı."""
+    """The current plan differs from the approved plan. Nothing was written."""
 
 
 def _expect(response: Response, *statuses: int) -> Response:
-    """Keycloak'ın yazma yanıtını denetler. Beklenmeyen durum kodu başarı sayılmaz."""
+    """Check a Keycloak write response. Unexpected status codes do not count as success."""
     if response.status not in statuses:
         raise TransportError("unexpected Keycloak response")
     return response
@@ -74,7 +74,7 @@ class KeycloakAdmin:
         self._admin_scope = admin_scope
         self._timeout = timeout
 
-    # --- ortak yardımcılar ---
+    # --- shared helpers ---
 
     def _call(
         self,
@@ -99,11 +99,11 @@ class KeycloakAdmin:
         )
 
     def _get_object_or_none(self, path: str) -> Mapping[str, object] | None:
-        """Kaydı okur. Kayıt yoksa `None` döner.
+        """Read the record, returning `None` if it does not exist.
 
-        404 yanıtı tek başına "kayıt yok" kanıtı değildir. Yanlış realm adı ya da aradaki
-        bir vekil sunucu da 404 döner. Bu yüzden işlev realm'in yanıt verdiğini ayrıca doğrular.
-        Belirsiz yanıt hata sayılır. Çünkü "kullanıcı yok" sonucu kullanıcıyı her yerde kapatır.
+        A 404 response alone does not prove absence. An incorrect realm name or an intermediate
+        proxy can also return 404. Therefore verify separately that the realm responds.
+        Ambiguous responses are errors because an absent user result disables the user everywhere.
         """
         try:
             body = self._call("GET", path).body
@@ -139,7 +139,7 @@ class KeycloakAdmin:
     # --- okuma ---
 
     def get_user(self, subject: str) -> Mapping[str, object] | None:
-        """Kullanıcının Keycloak gösterimini döner. Kullanıcı yoksa `None` döner."""
+        """Return the Keycloak user representation, or `None` if the user does not exist."""
         user = self._get_object_or_none(f"/users/{_quote(subject)}")
         if user is None:
             return None
@@ -154,15 +154,15 @@ class KeycloakAdmin:
         return None
 
     def list_users(self) -> Iterator[Mapping[str, object]]:
-        """Realm'deki bütün kullanıcıları sayfa sayfa okur."""
+        """Read every user in the realm page by page."""
         return self._pages("/users")
 
     def list_user_organizations(self, subject: str) -> tuple[Organization, ...]:
-        """Kullanıcının üyeliklerini döner. Okunamayan üyelik "üyelik yok" sayılmaz, hata olur."""
+        """Return user memberships. An unreadable membership is an error, not an absent membership."""
         return tuple(_organization(row) for row in self._list(f"/organizations/members/{_quote(subject)}/organizations"))
 
     def get_user_snapshot(self, subject: str) -> UserSnapshot | None:
-        """Kullanıcının güncel durumunu ve üyeliklerini birlikte döner."""
+        """Return the current user state together with memberships."""
         user = self.get_user(subject)
         if user is None:
             return None
@@ -177,9 +177,9 @@ class KeycloakAdmin:
         return _organization(body) if body is not None else None
 
     def find_organization(self, name: str, alias: str) -> Organization | None:
-        """Organization'ı adıyla arar. Yalnız takma adı da tutan kaydı döner.
+        """Find an Organization by name. Return only a record whose alias also matches.
 
-        Keycloak arama ucu ada ve alan adına bakar. Takma ada bakmaz.
+        The Keycloak search endpoint matches names and domains, not aliases.
         """
         for row in self._list("/organizations", query={"search": name, "exact": "true"}):
             if row.get("alias") == alias:
@@ -192,10 +192,10 @@ class KeycloakAdmin:
     def list_organization_members(self, organization_id: str) -> Iterator[Mapping[str, object]]:
         return self._pages(f"/organizations/{_quote(organization_id)}/members")
 
-    # --- yazma: her işlev tek iş yapar ---
+    # --- writes: each function performs one operation ---
 
     def create_organization(self, alias: str, name: str, *, dry_run: bool = False) -> Outcome:
-        """Yeni bir Organization açar. Sonuç değeri yeni kimliktir."""
+        """Create an Organization. The result value is its new ID."""
         preview = Preview(
             operation="keycloak.create_organization",
             target=alias,
@@ -208,7 +208,7 @@ class KeycloakAdmin:
         return Outcome(preview, executed=True, value=_id_from_location(_expect(response, 201)))
 
     def add_organization_member(self, organization_id: str, subject: str, *, dry_run: bool = False) -> Outcome:
-        """Kullanıcıyı Organization'a üye yapar. Kullanıcı zaten üyeyse iş yapmaz."""
+        """Add the user to the Organization. Do nothing if the user is already a member."""
         preview = Preview(
             operation="keycloak.add_organization_member",
             target=organization_id,
@@ -220,12 +220,12 @@ class KeycloakAdmin:
         try:
             _expect(self._call("POST", f"/organizations/{_quote(organization_id)}/members", json_body=subject), 201, 204)
         except HttpError as error:
-            if error.status != 409:  # 409: kullanıcı zaten üye
+            if error.status != 409:  # 409: the user is already a member
                 raise
         return Outcome(preview, executed=True)
 
     def create_user(self, email: str, first_name: str, last_name: str, *, dry_run: bool = False) -> Outcome:
-        """Parolasız ve e-postası doğrulanmamış bir kullanıcı açar. Sonuç değeri `sub` kimliğidir."""
+        """Create a user without a password and with unverified email. The result value is the `sub` ID."""
         preview = Preview(
             operation="keycloak.create_user",
             target="keycloak",
@@ -255,7 +255,7 @@ class KeycloakAdmin:
         lifespan: int | None = None,
         dry_run: bool = False,
     ) -> Outcome:
-        """Kullanıcıya `execute-actions-email` e-postası gönderir. Bu e-posta geri alınamaz."""
+        """Send an `execute-actions-email` message to the user. This email cannot be recalled."""
         preview = Preview(
             operation="keycloak.send_execute_actions_email",
             target=subject,
@@ -314,7 +314,7 @@ class KeycloakAdmin:
                 raise
             self._confirm_realm_answers()
 
-    # --- birleşik işler: tekrar edilebilir ---
+    # --- composite operations: repeatable ---
 
     def ensure_organization_member(
         self, alias: str, name: str, subject: str, organization_id: str | None
