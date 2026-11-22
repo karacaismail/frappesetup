@@ -20,7 +20,7 @@ from pathlib import Path, PurePosixPath
 from tempfile import NamedTemporaryFile
 
 RULE_TYPES = {"path", "module", "identifier", "setting", "doctype", "reference"}
-EXCLUDED = ("backend/dev/naming",)
+EXCLUDED = ("backend/dev/naming", "backend/docs/standartlar")
 REDIRECTS = {"backend/PROJE-KAYDI.md", "backend/docs/sozlesmeler.md"}
 GLOSSARY_APPS = {
     "press_tr": "backend/apps/press_tr",
