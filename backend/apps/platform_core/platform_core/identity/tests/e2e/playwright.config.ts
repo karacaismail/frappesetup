@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 // Tenant /login page of platform_core. The site must run with kimlik_yalniz_keycloak=1
 // (see kimlik/tests/e2e/README.md). Firefox is excluded by project policy.
-const baseURL = process.env.KIMLIK_E2E_BASE_URL ?? "http://tenant1.localhost:8661";
+const baseURL = process.env.IDENTITY_E2E_BASE_URL ?? "http://tenant1.localhost:8661";
 
 const viewports = [320, 360, 375, 390, 1280];
 

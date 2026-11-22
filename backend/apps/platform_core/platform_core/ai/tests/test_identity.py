@@ -97,7 +97,7 @@ class TestIdentity(AiTestCase):
 		token = self.issue_token(client)
 		anonymous = self.anonymous()
 
-		for _ in range(20):
+		for _iteration in range(20):
 			self.call_tool(anonymous, "plt_search_doctypes", {"query": "YZ"}, token=token)
 		response = self.rpc(
 			anonymous, "tools/call", {"name": "plt_search_doctypes", "arguments": {}}, token=token

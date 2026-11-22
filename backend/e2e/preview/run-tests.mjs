@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 
 const worktree = resolve(process.argv[2]);
 const previewDir = process.env.PREVIEW_DIR;
+const containerRuntime = process.env.E2E_BROWSER_RUNTIME === 'container';
 const require = createRequire(join(worktree, 'package.json'));
 const { chromium, request, webkit } = require('@playwright/test');
 const fixture = readFixture(join(previewDir, 'fixtures.json'));
@@ -110,7 +111,7 @@ async function runPlaywright(label, args, reporter = 'list') {
   const safe = sanitize(raw);
   const safeErrors = sanitize(errors.join(''));
   writeFileSync(join(previewDir, label + '.log'), safe + safeErrors, { mode: 0o600 });
-  if (reporter === 'json' && status === 0) {
+  if (reporter === 'json' && (status === 0 || raw.trim())) {
     let pending;
     try {
       pending = [...JSON.parse(raw).suites];
@@ -122,8 +123,15 @@ async function runPlaywright(label, args, reporter = 'list') {
       pending.push(...(suite.suites ?? []));
       for (const spec of suite.specs ?? []) {
         for (const test of spec.tests) {
+          const result = test.results?.at(-1);
           const skipped = test.annotations?.find(({ type }) => type === 'skip');
-          const line = skipped ? `not_run ${spec.title} (${skipped.description})` : `pass ${spec.title}`;
+          const outcome = {
+            passed: 'pass', failed: 'fail', timedOut: 'fail', interrupted: 'fail', skipped: 'not_run',
+          }[result?.status] ?? 'not_run';
+          const detail = skipped?.description ?? result?.error?.message?.split('\n')[0];
+          const project = test.projectName ? `[${test.projectName}] ` : '';
+          const file = spec.file ? `${spec.file} · ` : '';
+          const line = `${outcome} ${project}${file}${spec.title}${detail ? ` (${detail})` : ''}`;
           process.stdout.write(sanitize(line) + '\n');
         }
       }
@@ -144,22 +152,29 @@ try {
   if (projects.length) {
     results.push(await runPlaywright('browser', [
       ...projects, 'browser.spec.ts', 'magic-link.spec.ts', 'mobile-pkce.spec.ts',
-    ]));
+    ], containerRuntime ? 'json' : 'list'));
   }
   try {
-    await openTenantSession('OPERATOR', 'Administrator', process.env.E2E_ADMIN_PASSWORD);
-    env.E2E_DELETE_TENANT_READER_COOKIE ||= env.E2E_OPERATOR_COOKIE;
-    env.E2E_REVOKE_ADMIN_COOKIE ||= env.E2E_OPERATOR_COOKIE;
-    env.E2E_REVOKE_ADMIN_CSRF ||= env.E2E_OPERATOR_CSRF;
-    await openTenantSession('READER', fixture.E2E_PREVIEW_READER_EMAIL, fixture.E2E_PREVIEW_READER_PASSWORD);
-    results.push(await runPlaywright('api', ['--project=api', 'integration.spec.ts']));
+    if (!containerRuntime || env.E2E_ACCOUNT_DELETION === '1' || env.E2E_MOBILE_SESSION_REVOKE === '1') {
+      await openTenantSession('OPERATOR', 'Administrator', process.env.E2E_ADMIN_PASSWORD);
+      env.E2E_DELETE_TENANT_READER_COOKIE ||= env.E2E_OPERATOR_COOKIE;
+      env.E2E_REVOKE_ADMIN_COOKIE ||= env.E2E_OPERATOR_COOKIE;
+      env.E2E_REVOKE_ADMIN_CSRF ||= env.E2E_OPERATOR_CSRF;
+    }
+    if (!containerRuntime) {
+      await openTenantSession('READER', fixture.E2E_PREVIEW_READER_EMAIL, fixture.E2E_PREVIEW_READER_PASSWORD);
+      results.push(await runPlaywright('api', ['--project=api', 'integration.spec.ts']));
+    }
   } catch (error) {
     const message = 'API fixture failed: ' + sanitize(String(error)) + '\n';
     process.stderr.write(message);
     writeFileSync(join(previewDir, 'api.log'), message, { mode: 0o600 });
     results.push(1);
   }
-  results.push(await runPlaywright('lifecycle', ['--project=chromium', 'lifecycle.spec.ts'], 'json'));
+  const lifecycleProjects = containerRuntime ? projects : ['--project=chromium'];
+  if (lifecycleProjects.length) {
+    results.push(await runPlaywright('lifecycle', [...lifecycleProjects, 'lifecycle.spec.ts'], 'json'));
+  }
   process.exitCode = results.find((code) => code !== 0) ?? 0;
 } catch (error) {
   process.stderr.write(sanitize(String(error)) + '\n');

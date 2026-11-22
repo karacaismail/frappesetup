@@ -267,7 +267,7 @@ class AiTestCase(IntegrationTestCase):
 	def open_report_gate(self) -> None:
 		"""Install a report gate that allows every report, for tests about other report rules.
 
-		The real gate is `platform_core.erisim.api.report_guard`. Without it the report tool is closed.
+		The real gate is `platform_core.access.api.report_guard`. Without it the report tool is closed.
 		"""
 		import sys
 		from types import ModuleType
@@ -337,7 +337,9 @@ class AiTestCase(IntegrationTestCase):
 		return rows[0]
 
 	def propose_update(self, client, name: str, **data) -> dict:
-		result = self.call_tool(client, "plt_update_document", {"doctype": DOCTYPE, "name": name, "data": data})
+		result = self.call_tool(
+			client, "plt_update_document", {"doctype": DOCTYPE, "name": name, "data": data}
+		)
 		self.assertFalse(result["isError"], result)
 		return result["structuredContent"]
 

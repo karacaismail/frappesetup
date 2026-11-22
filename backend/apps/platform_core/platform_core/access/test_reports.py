@@ -2,14 +2,14 @@
 
 import frappe
 
-from platform_core.access.tests.base import ADMIN, DOCTYPE, EMPLOYEE_1, HR, MANAGER_1, NO_RULE, ErisimTestCase
+from platform_core.access.tests.base import ADMIN, DOCTYPE, EMPLOYEE_1, HR, MANAGER_1, NO_RULE, AccessRuleTestCase
 
 QUERY_REPORT = "ER Test Sorgu Raporu"
 RUN = "/api/method/frappe.desk.query_report.run"
 EXPORT = "/api/method/frappe.desk.query_report.export_query"
 
 
-class TestQueryReportGate(ErisimTestCase):
+class TestQueryReportGate(AccessRuleTestCase):
 	"""A query report reads with its own SQL. The gate denies a narrowed user (decision note, section 9)."""
 
 	@classmethod

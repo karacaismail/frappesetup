@@ -231,7 +231,7 @@ class TestReadLimits(AiTestCase):
 		manager = self.login(MANAGER)
 		fake = {
 			"columns": [{"fieldname": "title", "fieldtype": "Data"}],
-			"result": [{"title": "y" * 200} for _ in range(50)],
+			"result": [{"title": "y" * 200} for _iteration in range(50)],
 		}
 
 		with (

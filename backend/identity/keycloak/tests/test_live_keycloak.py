@@ -85,9 +85,9 @@ class ServiceTokenTest(unittest.TestCase):
         kuruluslar = admin("/organizations?search=deneme-kurulus&exact=true", admin_token).json()
         for k in kuruluslar:
             admin(f"/organizations/{k['id']}", admin_token, method="DELETE")
-        kurulus = admin("/organizations", token, method="POST",
+        organization_response = admin("/organizations", token, method="POST",
                         body={"name": "deneme-kurulus", "alias": "deneme-kurulus", "domains": [{"name": "deneme-kurulus.example.test"}]})
-        self.assertEqual(kurulus.status, 201, safe_detail(kurulus))
+        self.assertEqual(organization_response.status, 201, safe_detail(organization_response))
         # Realm-wide writes stay forbidden for this account.
         self.assertEqual(admin("/clients", token, method="POST", body={"clientId": "yetki-denemesi"}).status, 403)
         # Cleanup with the master admin.

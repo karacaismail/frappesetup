@@ -184,7 +184,7 @@ class TestLiveKeycloak(IntegrationTestCase):
 		self.assertEqual(logout.status_code, 204, logout.text[:300])
 
 		last = None
-		for _ in range(10):
+		for _iteration in range(10):
 			last = self.logged_user(browser)
 			if last == "Guest":
 				break

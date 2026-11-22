@@ -10,12 +10,12 @@ from platform_core.access.tests.base import (
 	HR,
 	NO_RULE,
 	RULE_DOCTYPE,
-	ErisimTestCase,
+	AccessRuleTestCase,
 	employee_of,
 )
 
 
-class TestRecordRule(ErisimTestCase):
+class TestRecordRule(AccessRuleTestCase):
 	def test_employee_lists_only_own_record(self):
 		client = self.login(EMPLOYEE_1)
 
@@ -118,7 +118,7 @@ class TestRecordRule(ErisimTestCase):
 		self.assertEqual(self.listed_names(client), set(self.records.values()))
 
 
-class TestRuleFilters(ErisimTestCase):
+class TestRuleFilters(AccessRuleTestCase):
 	"""The `filters` field narrows the scope. All the conditions must be met together."""
 
 	RULES = (
@@ -155,7 +155,7 @@ class TestRuleFilters(ErisimTestCase):
 		self.assertEqual(self.listed_names(client), set())
 
 
-class TestRuleValidation(ErisimTestCase):
+class TestRuleValidation(AccessRuleTestCase):
 	"""An invalid rule is not saved (decision note, section 3)."""
 
 	def insert(self, **values):

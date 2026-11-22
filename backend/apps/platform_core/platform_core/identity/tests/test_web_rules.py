@@ -23,7 +23,7 @@ from platform_core.identity import provider_setup
 from platform_core.identity.tests import helpers as h
 
 APP = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-KIMLIK = os.path.join(APP, "identity")
+IDENTITY_DIRECTORY = os.path.join(APP, "identity")
 CONTRACT = os.path.join(APP, "..", "..", "..", "contracts", "platform_core-identity.openapi.yaml")
 PORTAL_USER = "portal.kural.ornek@example.test"
 
@@ -107,7 +107,7 @@ class TestWebRules(FrappeAPITestCase):
 
 	def test_every_site_setting_is_documented(self):
 		keys = set()
-		for folder, _dirs, files in os.walk(KIMLIK):
+		for folder, _dirs, files in os.walk(IDENTITY_DIRECTORY):
 			if f"{os.sep}tests" in folder:
 				continue
 			for name in files:
@@ -121,7 +121,7 @@ class TestWebRules(FrappeAPITestCase):
 							if isinstance(target, ast.Name) and target.id == "KEY_SETTING":
 								keys.add(node.value.value)
 		keys.discard("get")
-		with open(os.path.join(KIMLIK, "README.md"), encoding="utf-8") as handle:
+		with open(os.path.join(IDENTITY_DIRECTORY, "README.md"), encoding="utf-8") as handle:
 			readme = handle.read()
 		documented = {entry["key"] for entry in _contract()["x-site-settings"]["settings"]}
 		self.assertEqual(sorted(k for k in keys if f"`{k}`" not in readme), [])

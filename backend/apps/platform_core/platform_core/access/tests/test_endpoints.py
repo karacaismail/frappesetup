@@ -13,13 +13,13 @@ from platform_core.access.tests.base import (
 	HR,
 	MANAGER_1,
 	NO_RULE,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 OPERATIONS = ("read", "write", "create", "delete", "submit", "cancel")
 
 
-class TestExplainPermission(ErisimTestCase):
+class TestExplainPermission(AccessRuleTestCase):
 	def explain(self, client, name: str, **query):
 		return self.api(
 			client, "GET", "explain_permission", query={"doctype": DOCTYPE, "name": name, **query}
@@ -136,7 +136,7 @@ class TestExplainPermission(ErisimTestCase):
 		self.assertEqual(response.status_code, 403)
 
 
-class TestAccessSummary(ErisimTestCase):
+class TestAccessSummary(AccessRuleTestCase):
 	def summary(self, client, doctype: str = DOCTYPE):
 		return self.api(client, "GET", "get_access_summary", query={"doctype": doctype})
 
@@ -205,7 +205,7 @@ class TestAccessSummary(ErisimTestCase):
 		self.assertEqual(response.status_code, 403)
 
 
-class TestWebsiteUser(ErisimTestCase):
+class TestWebsiteUser(AccessRuleTestCase):
 	"""A Website User reaches only the methods the shell allows (`website_user_allowed_methods`).
 
 	The summary shows the user's own scopes and is open to them. The explanation shows rule
@@ -213,7 +213,7 @@ class TestWebsiteUser(ErisimTestCase):
 	"""
 
 	RULES = (
-		*ErisimTestCase.RULES,
+		*AccessRuleTestCase.RULES,
 		{
 			"title": "Portal own records",
 			"role": base.ROLE_PORTAL,
@@ -264,7 +264,7 @@ class TestWebsiteUser(ErisimTestCase):
 		self.assertNotIn("platform_core.api.access.explain_permission", allowed)
 
 
-class TestQueuedJobs(ErisimTestCase):
+class TestQueuedJobs(AccessRuleTestCase):
 	def test_waiting_jobs_are_run_before_the_queue_is_full(self):
 		"""A site without a worker must not fail a test because old jobs fill the queue."""
 		for _number in range(5):
