@@ -15,18 +15,26 @@ from time import perf_counter_ns
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request
-from uuid import uuid4
 
 import frappe
 from frappe.app import application
 from frappe.database.database import Database
 from platform_core.api import mobile
-from platform_core.mobil.protocol import PAGE_SIZE
-from platform_core.mobil.tests.loopback_http import open_loopback
+from platform_core.identity import service_token
+from platform_core.mobile.protocol import PAGE_SIZE
+from platform_core.mobile.tests.loopback_http import open_loopback
 from werkzeug.serving import make_server
 
 from . import fixture
-from .performance_data import BACKLOG, EMPLOYEES, LEAVE_PER_EMPLOYEE, seed_backlog, seed_site, verify_counts
+from .performance_data import (
+    BACKLOG,
+    EMPLOYEES,
+    LEAVE_PER_EMPLOYEE,
+    performance_fixture,
+    require_performance_site,
+    seed_backlog,
+    verify_counts,
+)
 
 LIMITS_MS = {"v1_register": 1000, "v1_push": 1000, "v1_pull": 500, "v1_activity": 1000, "v1_pull (1000)": 500}
 TIMING_HEADER = "X-Mobile-Test-Server-Ns"
@@ -44,11 +52,11 @@ def capture_db_failures(sql):
                 original = error.__cause__ or error.__context__ or error
                 code = original.args[0] if original.args and isinstance(original.args[0], int) else 0
                 tables = (
-                    "Mobile Sequence",
-                    "Mobile Operation",
-                    "Mobile Delivery",
-                    "Mobile Change",
-                    "Mobile Installation",
+                    "PLT Mobile Sequence",
+                    "PLT Mobile Operation",
+                    "PLT Mobile Delivery",
+                    "PLT Mobile Change",
+                    "PLT Mobile Installation",
                     "User",
                 )
                 table = next((name for name in tables if f"tab{name}`" in str(query)), "other")
@@ -109,18 +117,40 @@ def timed_application(environ, start_response):
 
 
 @contextmanager
-def benchmark_server(phones, *, threaded=True, workers=0):
+def benchmark_server(phones, *, site=None, threaded=True, workers=0):
     auth = {f"Bearer {phone.token}": phone.account for phone in phones}
     original_override = frappe.override_whitelisted_method
+    original_identity = service_token.validate
 
     def resolve(method):
         if method.startswith("platform_core.api.mobile."):
             return method
         return original_override(method)
 
-    # Use the real Website User gate and original routes. Only the business adapter is synthetic.
+    if site is not None:
+        require_performance_site(site)
+
+    def is_fixture_request():
+        return (
+            site is not None
+            and frappe.local.site == site
+            and frappe.local.request.headers.get("Authorization") in auth
+        )
+
+    def authenticate():
+        if is_fixture_request():
+            fixture._authenticate()
+
+    def validate_identity():
+        # The fixture has already authenticated this request with a run-owned identity.
+        if not (is_fixture_request() and getattr(frappe.local, "mobile_identity", None)):
+            original_identity()
+
+    # Use the real Website User gate and routes with the isolated benchmark identity and data.
     with (
-        patch.dict(fixture.TOKENS, auth),
+        patch.object(fixture, "TOKENS", auth),
+        patch.object(fixture, "authenticate", authenticate),
+        patch.object(service_token, "validate", validate_identity),
         patch.object(Database, "sql", capture_db_failures(Database.sql)),
         patch.object(frappe, "override_whitelisted_method", resolve),
         patch.object(mobile, "COMMANDS", {"fixture.update": fixture.FixtureCommand("update")}),
@@ -149,7 +179,7 @@ def mobile_request(url, phone, endpoint, payload=None):
         headers={
             "Authorization": f"Bearer {phone.token}",
             "Content-Type": "application/json",
-            "X-Frappe-Site-Name": fixture.SITE,
+            "X-Frappe-Site-Name": phone.site,
             "X-Mobile-App-Version": "1.0.0",
             "X-Mobile-Contract-Version": "1",
             "X-Mobile-Test-Sid": phone.sid,
@@ -180,9 +210,9 @@ def measure_base(url, phones):
             raise RuntimeError("Registration did not bind the expected installation.")
         samples["v1_register"].append(timing)
 
-    verify_counts()
+    verify_counts(phones[0].site)
     for phone in phones:
-        operation_id = str(uuid4())
+        operation_id = phone.operation_id
         operation = {
             "operation_id": operation_id,
             "command": "fixture.update",
@@ -205,11 +235,11 @@ def measure_base(url, phones):
     return samples
 
 
-def measure_backlog(url, phone, sample_count):
+def measure_backlog(url, phone, sample_count, created):
     baseline, _unused = call(url, phone, "v1_pull")
     if baseline["has_more"] or len(baseline["changes"]) != LEAVE_PER_EMPLOYEE:
         raise RuntimeError("The backlog phone needs a completed initial pull.")
-    seed_backlog(phone)
+    seed_backlog(phone, created)
     measured = []
     catchups = []
     while len(measured) < sample_count:
@@ -270,15 +300,16 @@ def report(samples, catchups, label):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--site", required=True)
     parser.add_argument("--status-file", type=Path, required=True)
     parser.add_argument("--label", default="Frappe geliştirme sitesi")
     args = parser.parse_args()
     destination = args.status_file.resolve()
     os.chdir("sites")
-    phones = seed_site(SAMPLES)
-    with benchmark_server(phones, threaded=False) as url:
-        samples = measure_base(url, phones[:SAMPLES])
-        samples["v1_pull (1000)"], catchups = measure_backlog(url, phones[-1], SAMPLES)
+    with performance_fixture(args.site, SAMPLES) as (phones, created):
+        with benchmark_server(phones, site=args.site, threaded=False) as url:
+            samples = measure_base(url, phones[:SAMPLES])
+            samples["v1_pull (1000)"], catchups = measure_backlog(url, phones[-1], SAMPLES, created)
     summary, passed = report(samples, catchups, args.label)
     with destination.open("a", encoding="utf-8") as output:
         output.write(f"\n\n{summary}\n")

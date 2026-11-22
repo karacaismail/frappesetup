@@ -10,6 +10,7 @@ import io
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -19,6 +20,9 @@ from fnmatch import fnmatchcase
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from tempfile import NamedTemporaryFile
+
+GIT_PATH = shutil.which("git")
+GIT = str(Path(GIT_PATH).absolute()) if GIT_PATH else None
 
 RULE_TYPES = {"path", "module", "identifier", "setting", "doctype", "reference"}
 EXCLUDED = ("backend/dev/naming", "backend/docs/standartlar")
@@ -56,7 +60,7 @@ def bare_module(rule: Rule) -> bool:
 
 
 def git(root: Path, *args: str) -> bytes:
-    result = subprocess.run(["git", "-C", str(root), *args], capture_output=True, check=False)
+    result = subprocess.run([GIT, "-C", str(root), *args], capture_output=True, check=False)
     if result.returncode:
         raise ValueError(result.stderr.decode(errors="replace").strip())
     return result.stdout
@@ -737,6 +741,8 @@ def main() -> int:
         help="Only report old keys in the given environment or site config files.",
     )
     args = parser.parse_args()
+    if GIT is None:
+        parser.exit(2, "Git executable not found on PATH.\n")
     try:
         root = Path(os.fsdecode(git(args.repo, "rev-parse", "--show-toplevel").rstrip(b"\n")))
         rules = load_rules(args.map)

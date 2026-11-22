@@ -8,7 +8,7 @@
 dea386a1f62fea46da6928e8d385e120bd45b528:backend/identity/keycloak/tests/test_second_factor.py:generic-api-key:22
 
 # Owner platform-core-kimlik. Example token in the API contract.
-2ec928f16cf6174585ec3ba382c3e69bbbca97d0:backend/contracts/platform_core-kimlik.openapi.yaml:jwt:331
+2ec928f16cf6174585ec3ba382c3e69bbbca97d0:backend/contracts/platform_core-identity.openapi.yaml:jwt:331
 
 # Owner kimlik-tema. Synthetic theme test value.
 6fede6542a96431a9dbe99146da15976d6f5c719:backend/identity/keycloak/themes/atonota/test/tests/helpers.ts:generic-api-key:19
@@ -27,3 +27,21 @@ b85303a73c5f16c0660df2d841ca243d69cd063c:backend/identity/keycloak/.env.example:
 
 # Owner press-ai. Synthetic client unit test value.
 6d599fdca55013d29599f0f461796c22975d3700:packages/press-ai/tests/test_press.py:generic-api-key:75
+
+# Owner kimlik-realm. Synthetic token in a unit test that checks diagnostic redaction.
+292a20937f1c7fe8f4a1f90f9dae5fb5f0973488:backend/identity/keycloak/tests/test_standards_audit.py:generic-api-key:198
+
+# Owner platform-core-yz. Made-up credential-shaped text declared as FAKE_TOKEN for a test.
+becf3d0bf59755e423b7576d534104b3cc6460ac:backend/apps/platform_core/platform_core/ai/tests/test_client_text.py:generic-api-key:16
+
+# Owner platform-core-kimlik. Synthetic token injected into a mocked logout error to verify safe logging.
+b063f69c05a53250d1e46ccc8aa604d0830562ea:backend/apps/platform_core/platform_core/identity/tests/test_merge_review.py:generic-api-key:301
+
+# Owner kimlik-realm. Public synthetic test key used to verify an HMAC test vector.
+9060112adaf46b6889bf64390b179df51c2a7e48:backend/identity/keycloak/event-listener/src/test/java/au/com/ais/keycloak/webhook/WebhookSignerTest.java:generic-api-key:17
+
+# Owner kimlik-realm. Synthetic webhook signing key used only by the sender test fixture.
+9060112adaf46b6889bf64390b179df51c2a7e48:backend/identity/keycloak/event-listener/src/test/java/au/com/ais/keycloak/webhook/WebhookSenderTest.java:generic-api-key:26
+
+# Owner Orkestratör (ProPR). OAuth client identifier; the distinct client secret is read interactively.
+55c14ec1dcfda4dadd5265ae36d9e7323c1a7172:Propr_setup/set-oauth-secret.sh:generic-api-key:21

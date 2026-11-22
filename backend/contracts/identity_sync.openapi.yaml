@@ -1,0 +1,1673 @@
+openapi: 3.1.0
+info:
+  title: identity_sync
+  version: 0.11.3
+  summary: Endpoints of the user sync service
+  description: |
+    This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
+
+    The service receives the event. Then it reads the current state of the user from Keycloak.
+    It chooses the actions from this current state. So the result does not change even if the same event arrives twice.
+
+    ## Endpoint markers
+
+    The status extension key tells whether the endpoint exists in code. It is the `x-` key that takes the value below.
+    `uygulandi` means the endpoint is implemented in code. Every endpoint in this file is implemented.
+
+    `x-yikici` tells whether the endpoint can do destructive work.
+    Destructive work is work that disables a user or removes a membership.
+    No endpoint does paid work.
+
+    `x-yurutme` tells who can execute the endpoint. It takes four values.
+    The value that names the approval layer means this. Only the approval layer starts the real execution.
+    `otomatik` means the endpoint needs no human approval. For example, the event endpoint is like this.
+    `yalniz-okur` means the endpoint changes no record.
+    `press-only` means only the Press service client starts the work. The account deletion endpoint is like this.
+
+    ## AI and human approval
+
+    The rules are in section 10 of `docs/sozlesmeler.md`.
+
+    AI cannot execute the write endpoints of this service directly.
+    The AI agent only reads and asks for a preview. A preview changes no record.
+    Real execution comes only from the approval layer inside `platform_core`.
+    The approval layer calls with its own service token after a human approves.
+
+    The flow is as follows.
+
+    1. The agent or the approval layer calls the endpoint with `dry_run: true`.
+    2. The service returns the operations that would run and a `preview_digest` value.
+    3. The approval layer shows the operations to the human. The approval is bound to this digest.
+    4. The human approves. The approval layer calls the endpoint with `dry_run: false`.
+    5. The request carries the `preview_digest` and `approval_id` fields.
+    6. The service records the approval id as single-use. This record is written before the first external write.
+       If the same `approval_id` arrives a second time, the service returns 409 and `approval_used`.
+    7. The service computes the plan again. If the digest does not match, it returns 409 and `preview_changed`.
+    8. The service writes the caller, the approval id, the digest and the result to the log.
+
+    The digest covers everything that will be written. It covers the name, the target and all field values of every operation.
+    For example, if the email or the name changes after the preview, the digest does not match.
+    The digest is a keyed hash value, HMAC-SHA256. The key is in the `IDENTITY_SYNC_DIGEST_KEY` environment secret.
+    Only the service knows the key. So someone who sees the digest cannot compare an email guess with the digest.
+    The digest in the log is the same keyed value. The preview text carries no email and no name.
+    For an operation that creates an organization or adds a member to an organization, the digest also covers the real Keycloak id of the organization.
+    The service looks up the organization during planning. It does not look it up again during execution.
+    If the organization was created after the preview, or a different organization was found, the digest does not match.
+
+    One request can cover more than one event. If the plan of any event changed, the whole request returns 409.
+    The service writes no event in that request.
+    The service computes the plan once more at execution time. If the plan is not exactly the same, the operation does not run.
+
+    The service keeps four client lists.
+    A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
+    A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute. This list holds the service clients of the tenant sites.
+    The human gives the approval in the AI layer of the tenant site. So the tenant site calls the execution.
+    A client in the `IDENTITY_SYNC_SESSION_AZP` list can end a session. This list holds the same tenant site clients.
+    The two lists must be equal. Every client in them must be the service client of a tenant in the tenant list.
+    If not, the service does not start. A client that is bound to no tenant gets 403 when it asks for execution.
+    A client in the preview list or in the deletion list cannot be in another list.
+    A tenant site client can invite a user only into the organization of its own tenant.
+    The service finds the tenant from the `azp` value of the token. The body cannot choose the tenant.
+    The reconcile, replay and operation endpoints work on the whole platform. They are not bound to one tenant.
+    This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
+    A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
+    Only a trusted service client goes into the execute list.
+    The agent token and the model identity do not go into this list.
+    The trust boundary is this. Only the client of the approval layer can call execution.
+    This service does not give approval. The approval layer checks the lifetime of the approval.
+    The approval id is bound to the digest it was first used with and cannot be used again.
+    A request rejected because the plan changed also consumes the approval. A new plan needs a new approval.
+
+    ## Account deletion and disabled accounts
+
+    The source of the account deletion flow is the shared contract (`docs/sozlesmeler.md`), section 7, and project record O-27.
+    The flow has five steps and the order is fixed.
+
+    1. The service disables the Keycloak user. It does not delete the user in this step.
+    2. The service sends an `all_organizations: true` request to Press. Press disables the user and invalidates the API keys.
+    3. The service disables the user in every tenant. Then it has the phone installations and the notification links deleted.
+    4. The service has the fields that identify the person anonymized in Press and in every tenant. Business records are not deleted.
+    5. The service deletes the Keycloak user.
+
+    Only Press starts this flow, with the `POST /v1/account-deletions` endpoint.
+    The customer asks for the deletion on Press. Press authenticates the customer again in Keycloak before it calls the service.
+    The `delete_account` action of Keycloak itself is switched off. That action deletes the user in the first step.
+
+    Every step can be repeated. The steps depend on each other.
+    If a step fails, the service executes no later step and the request goes into the dead-letter queue.
+    The service stores how many steps are finished. A replay continues from the first step that is not finished.
+    A human replays the request with the `POST /v1/dead-letters/replay` endpoint. Press can also send the same request again.
+    The id of the request is a keyed digest of the account. So one account is always one request.
+    When the work is done, only this id stays in the service record. The record carries no email and no user id.
+    The service processes the user by the `sub` id. It never stores the email.
+
+    An administrator can delete a user on the Keycloak admin screen. The event listener then sends the `USER_DELETE` event.
+    The service confirms that Keycloak no longer has the user. Then it executes steps 2, 3 and 4 in the same order.
+
+    The Press request and the Keycloak delete event are one job for one account. The id of the job is the keyed digest of the account.
+    Step 5 deletes the Keycloak user, so the event listener reports that delete too. That event finds the finished job and starts nothing.
+    If the Press request stopped at a step, the delete event continues the same job. The service does not call a finished step again.
+    A preview and the dead-letter list show the id of the job. They do not show the id of the account.
+    The same holds for a Keycloak delete event that waits in the queue, whatever Keycloak answers about the user.
+    When the job is done, the service records the end and removes the id of the account from its records in one storage transaction.
+    If that write fails, the job is not done. A retry writes to no target and only completes the record.
+    After the job is done, the service knows the account only by the keyed digest of the job.
+    A later event of that account returns `duplicate`. The service does not execute it and does not record it.
+    A replay asks the storage before every event whether the record is still in the queue.
+
+    If the delete event is lost, the reconcile command finds the deleted user. Its difference kind is `deleted_in_keycloak`.
+    The reconcile preview shows the steps of the job that are left. After the human approves, these steps are executed in order.
+    This also works when the local account is already disabled.
+
+    For a user disabled in Keycloak, the service also has the phone installations revoked.
+    This operation is part of the disable plan.
+
+    Steps 3 and 4 call three endpoints in the tenant and in Press. The names are in the shared contract (`docs/sozlesmeler.md`), sections 5, 6 and 7.
+    The endpoints are named `platform_core.api.mobile.revoke_user_installations`,
+    `platform_core.api.identity.anonymize_user` and `press_tr.api.identity.anonymize_user`.
+    The shared contract defines the response of the two anonymize endpoints: 200 with the `anonymized` and `found` fields.
+    These endpoints return 409 for a lock conflict or a timeout. The service then tries the request again.
+    The responses the service expects are in the `Target` schemas at the end of this file.
+
+    ## Common errors of all endpoints
+
+    These errors are not written separately on every endpoint.
+    An unknown path returns 404 and `not_found`.
+    A wrong method returns 405 and `method_not_allowed`.
+    A body larger than 65,536 bytes returns 413 and `too_large`.
+    One client address can send a limited number of requests in one minute. The default is 600.
+    Over the limit the service returns 429 and `rate_limited` and does not read the body. The caller waits one minute.
+    The limit also covers the endpoints that need no token. These are the health check and the event endpoint.
+    An invalid `Content-Length` header also returns 413. The service does not support a chunked body.
+    A storage file error returns 500 and `storage_failed`.
+    If another process is handling an event, the service waits at most 10 seconds.
+    If the time runs out, the service returns 503 and `busy`. The caller must send the request again.
+    On the event endpoint, a resend needs a new timestamp and a new signature.
+    The connection of a request that does not complete its headers and body within 10 seconds is closed.
+
+    ## Definite success response of the target endpoints
+
+    The service calls the write endpoints of Press and of the tenant.
+    These endpoints are named `press_tr.api.identity.*` and `platform_core.api.identity.*`.
+    The contracts of these endpoints are the Press contract `contracts/press_tr.openapi.yaml` (0.1.0) and
+    the `platform_core` identity contract in the same `contracts/` folder (0.2.0).
+    The service counts only this response as success. It is HTTP 200 with a body that fits the result schema of that endpoint.
+    The schemas are at the end of this file and start with `Target`.
+    The service also compares the final state in the response with the state it asked for.
+    For example, if it disabled the user, `enabled` must be false in the response.
+    The target must have finished the work before it responds.
+    A 202, an empty body or a body that does not fit the schema is not success.
+
+    For a user with no tenant link, the tenant returns 404 and `IdentityNotFound`.
+    The service counts this response as success in two operations. They are disabling the user and changing the email.
+    The reason is that without a link there is no record to disable or to rename.
+    If the `exc_type` field is not `IdentityNotFound`, a 404 is an error. A wrong address also returns 404.
+
+    In the tenant the service calls `change_email` first and `provision` after it.
+    The reason is that the tenant rejects the `provision` request with `EmailMismatch` while the link shows the old email.
+    The service writes such an event to the dead-letter queue with the `unknown` state.
+    The service does not count this event as processed and does not retry it by itself.
+    If the same event arrives again, the service does not repeat the write and returns `unknown` again.
+    A human checks the target. Then the human replays the event with the `include_unknown` option.
+    If the request reached the target but the response could not be read, the result is also `unknown`.
+    The 502 and 504 responses also count as `unknown`. The reason is that the server in between may have forwarded the request.
+    If the connection could not be made at all, the result is not `unknown`. In this case the service retries.
+
+    ## Interrupted work
+
+    The service writes an accepted event to the dead-letter queue before it starts the work.
+    This record is in the `failed` state and its attempt count is 0.
+    The service sets the record to `unknown` just before the first external write.
+    If the process stops midway, the record stays in the queue.
+    If no write started, the event is replayed by hand.
+    If a write started, the result is not known. A human checks the target and replays with `include_unknown`.
+    When the event finishes with success, the record leaves the queue.
+
+    ## Disabled and deleted accounts
+
+    A user disabled or deleted in Keycloak is disabled everywhere.
+    This plan does not depend on the membership list or on the Organization record.
+    The service sends the disable requests even if those reads fail.
+    The service sends a single `all_organizations: true` request to Press.
+    Press then disables the user and invalidates the API keys.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://127.0.0.1:{port}
+    description: Development environment. The port is the `PANE_PORT` value plus 5.
+    variables:
+      port:
+        default: "6115"
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Tells that the service is up.
+      description: This endpoint only reads. It needs no authentication. It returns no personal data.
+      x-durum: uygulandi
+      x-yikici: false
+      x-yurutme: yalniz-okur
+      security: []
+      responses:
+        "200":
+          description: The service is up.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /v1/events:
+    post:
+      operationId: postEvent
+      summary: Receives and processes one Keycloak event.
+      description: |
+        The event source is the event listener plugin installed in Keycloak (`docs/sozlesmeler.md`, section 7).
+        The Keycloak realm job installs the plugin. The plugin sends user events and admin events to this endpoint, signed.
+        Our own operations can also call this endpoint.
+        An event can get lost. The backup path is the reconcile that is started by hand. That endpoint is `/v1/reconcile`.
+
+        The service processes the event in the same request. If an action fails, the event goes into the dead-letter queue.
+        In this case the response is still 202. The reason is that the service now keeps the event.
+
+        This endpoint can do destructive work. For example, if the user was disabled in Keycloak,
+        the service disables the user in all tenants and removes the Press membership.
+        This endpoint needs no human approval. The reason is that the event carries a change that already happened in Keycloak.
+
+        The service does not choose the action from the content of the event. It chooses from the current state of the user in Keycloak.
+
+        The body can be one of two formats.
+        The first format is the service envelope. Its schema is named `Event`.
+        The second format is the native Keycloak event format.
+        Its schemas are named `KeycloakUserEvent` and `KeycloakAdminEvent`.
+
+        Keycloak writes the internal id of the realm to the `realmId` field. It does not write the realm name.
+        The service compares this id with the `IDENTITY_SYNC_REALM_ID` setting.
+        If the id does not match, the service ignores the event. If the setting is empty, the service rejects the Keycloak format with 400.
+
+        There is one exception. Keycloak 26.8.2 does not give the id of the user in the member-add event.
+        The service cannot process this event in the Keycloak format and returns `ignored`.
+        To report a member add, send the envelope with the `user_id` field.
+      x-durum: uygulandi
+      x-yikici: true
+      x-yurutme: otomatik
+      security:
+        - webhookSignature: []
+      parameters:
+        - name: dry_run
+          in: query
+          required: false
+          description: |
+            If the value is `true`, the service changes no record.
+            The service only returns the preview of the operations that would run. The response code is 200.
+            If the parameter is missing, the value counts as `false`.
+            Any other value or a repeated parameter returns 400. The service does not execute that request.
+            The signature covers this choice. A preview signature is not accepted for execution.
+          schema:
+            type: string
+            enum: ["true", "false"]
+        - name: X-Identity-Sync-Timestamp
+          in: header
+          required: true
+          description: The moment the signature was produced. The unit is seconds (Unix time).
+          schema:
+            type: string
+            pattern: "^[0-9]{1,12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              anyOf:
+                - $ref: "#/components/schemas/Event"
+                - $ref: "#/components/schemas/KeycloakUserEvent"
+                - $ref: "#/components/schemas/KeycloakAdminEvent"
+            examples:
+              epostaDogrulandi:
+                summary: The user verified the email.
+                value:
+                  id: 5f0c1f6e-0000-4000-8000-000000000001
+                  kind: user
+                  type: VERIFY_EMAIL
+                  realm: platform
+                  time: 1795000000000
+                  user_id: 11111111-1111-4111-8111-111111111111
+              uyelikSilindi:
+                summary: An admin removed the user from the Organization membership.
+                value:
+                  id: 5f0c1f6e-0000-4000-8000-000000000002
+                  kind: admin
+                  type: ORGANIZATION_MEMBERSHIP_DELETE
+                  realm: platform
+                  time: 1795000000500
+                  user_id: 11111111-1111-4111-8111-111111111111
+                  organization_id: 22222222-2222-4222-8222-222222222222
+              keycloakKullaniciOlayi:
+                summary: A user event in the native Keycloak format.
+                value:
+                  id: 5f0c1f6e-0000-4000-8000-000000000003
+                  time: 1795000000900
+                  type: UPDATE_EMAIL
+                  realmId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  userId: 11111111-1111-4111-8111-111111111111
+              keycloakYoneticiOlayi:
+                summary: An admin event in the native Keycloak format.
+                value:
+                  id: 5f0c1f6e-0000-4000-8000-000000000004
+                  time: 1795000001000
+                  realmId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  operationType: UPDATE
+                  resourceType: USER
+                  resourcePath: users/11111111-1111-4111-8111-111111111111
+      responses:
+        "200":
+          description: |
+            The response of a preview request. The service changed no record.
+            The status is `preview`, `ignored` or `failed`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResult"
+        "202":
+          description: The service received the event.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResult"
+        "400":
+          description: The body is not JSON, a required field is missing or the `dry_run` value is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: |
+            The signature is missing, wrong, expired or already used.
+            The error code is `bad_signature`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/reconcile:
+    post:
+      operationId: runReconcile
+      summary: Compares Keycloak, Press and tenant users and repairs the difference.
+      description: |
+        This endpoint is the HTTP counterpart of the reconcile command. The command is named `reconcile`.
+        The endpoint is not scheduled. It runs only when it is called.
+        Keycloak is the source of truth.
+
+        A preview request carries `dry_run: true`. The service only reads.
+        The response carries the differences, the preview of the repair operations and the `preview_digest` value.
+        The response carries no email. It refers to the user by the `sub` id.
+        Clients in the preview list and in the execute list can ask for a preview.
+
+        A repair request carries `dry_run: false`. Only the approval layer starts the repair.
+        The request must carry the `preview_digest` and `approval_id` fields.
+        The service computes the plan again under the work lock.
+        If the plan is not exactly the same as the approved plan, the service returns 409 and writes nothing.
+        This endpoint can do destructive work. For example, it disables in the tenant a user who is disabled in Keycloak.
+
+        The service tries every operation and reports the result of each operation separately.
+        The result is `done`, `failed` or `unknown`. An uncertain result is not retried.
+        A remaining difference shows up again in the next preview.
+
+        Some differences have no safe repair. The service only reports them.
+        The examples are a disabled user in Press, a different email in Press,
+        an unverified email and a record of another identity server.
+
+        For the comparison the service asks Press and the tenant for a user list.
+        These endpoints are named `press_tr.api.identity.list_identities` and
+        `platform_core.api.identity.list_identities`. The response is in the `TargetIdentityList` schema.
+        These two endpoints do not exist yet in the contracts of Press and of the tenant.
+      x-durum: uygulandi
+      x-yikici: true
+      x-yurutme: yalniz-onay-katmani
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReconcileRequest"
+      responses:
+        "200":
+          description: |
+            In a preview it returns the difference report and the repair preview.
+            In a repair it returns the differences and the result of every operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReconcileReport"
+        "400":
+          description: The body is invalid. For example, `dry_run` is missing or the approval fields are missing in a repair.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/PreviewChanged"
+        "502":
+          $ref: "#/components/responses/UpstreamFailed"
+  /v1/dead-letters:
+    get:
+      operationId: listDeadLetters
+      summary: Lists the events in the dead-letter queue.
+      description: |
+        This endpoint is the HTTP counterpart of the `dead-letters` command.
+        The endpoint only reads. The records carry no email.
+        Clients in the preview list and in the execute list can call this endpoint.
+        The list is cut at the `limit` value. If more records exist, the response carries `next_offset`.
+      x-durum: uygulandi
+      x-yikici: false
+      x-yurutme: yalniz-okur
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: The waiting events. The oldest event comes first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeadLetterList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/dead-letters/replay:
+    post:
+      operationId: replayDeadLetters
+      summary: Replays the events in the dead-letter queue once.
+      description: |
+        This endpoint is the HTTP counterpart of the `replay-dead-letters` command.
+        This endpoint can do destructive work. A waiting event can disable a user.
+
+        The preview is open to both lists. A client in either list can send the `dry_run: true` request.
+        Only the approval layer starts the real execution.
+        The execute request must carry the `preview_digest` and `approval_id` fields.
+        If the plan changed after the preview, the service returns 409 and processes no event.
+
+        The service executes the whole request under the work lock.
+        The service first computes the plan of all events and checks the digest.
+        If the plan of any event differs from the approved plan, the service returns 409. No event is written.
+        If the digest matches, the service writes exactly those plans. It does not read again between the check and the write.
+        An event whose preview cannot be produced is not executed. The result of this event is `failed`.
+        If an event created an Organization, the following operations need a new preview and a new approval.
+        That event stays in the queue.
+
+        A successful event leaves the queue. An event that fails again stays in the queue.
+        The service skips an event in the `unknown` state. The reason is that no blind repeat is made against the same target.
+        `include_unknown: true` replays these events too. Check the target first.
+      x-durum: uygulandi
+      x-yikici: true
+      x-yurutme: yalniz-onay-katmani
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplayRequest"
+      responses:
+        "200":
+          description: The result of every event. In a preview it also returns `preview_digest`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReplayReport"
+        "400":
+          description: The body is invalid. For example, `dry_run` is missing or the approval fields are missing in an execution.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/PreviewChanged"
+  /v1/operations:
+    get:
+      operationId: listOperations
+      summary: Lists the multi-step operations that were interrupted.
+      description: |
+        This endpoint is the HTTP counterpart of the `operations` command. The endpoint only reads.
+        An invitation writes to Keycloak in three steps. It creates the user, makes the user a member and sends an email.
+        The service records every step before it writes it. When the step is done, it updates the record.
+        If the process stops midway, the record shows which step stayed uncertain.
+        Finished operations do not appear in the list. The record carries no email.
+        Clients in the preview list and in the execute list can call this endpoint.
+        The list is cut at the `limit` value. If more records exist, the response carries `next_offset`.
+      x-durum: uygulandi
+      x-yikici: false
+      x-yurutme: yalniz-okur
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: The interrupted operations. The oldest operation comes first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /v1/operations/{operation_id}/resolve:
+    post:
+      operationId: resolveOperation
+      summary: Closes one interrupted operation.
+      description: |
+        This endpoint is the HTTP counterpart of the `resolve-operation` command.
+        A human checks the target first. For example, the human looks whether the user was created in Keycloak.
+        Then the human closes the operation with the `completed` or the `abandoned` resolution.
+        `completed` means the operation was completed at the target. `abandoned` means the operation was given up.
+        This endpoint changes only the service's own record. It does not write to the target.
+        Only the approval layer can call this endpoint. The service writes the caller and the result to the log.
+      x-durum: uygulandi
+      x-yikici: false
+      x-yurutme: yalniz-onay-katmani
+      security:
+        - serviceToken: []
+      parameters:
+        - name: operation_id
+          in: path
+          required: true
+          description: The id of the operation. This value is the `approval_id` value of the approval that started the operation.
+          schema:
+            $ref: "#/components/schemas/ApprovalId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResolveRequest"
+      responses:
+        "200":
+          description: The operation is closed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResolveResult"
+        "400":
+          description: The body is invalid. For example, the `resolution` value is invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: There is no interrupted operation with this id. The error code is `not_found`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/sessions/revoke:
+    post:
+      operationId: revokeSession
+      summary: Ends one Keycloak session.
+      description: |
+        The source is the shared contract (`docs/sozlesmeler.md`), section 7.
+        When a user revokes a phone installation, `platform_core` calls this endpoint.
+        The phone installation stores the `sid` value of the token at registration time. The body carries this value and the id of the user.
+
+        The service limits the caller to its own tenant. It finds the tenant from the `azp` value of the token and the tenant list.
+        The body cannot choose the tenant. The service reads two facts from the Keycloak Admin API before it deletes anything.
+        First, the user must be a member of the organization of the calling tenant. If not, the service returns 403.
+        Second, the session must be in the session list of that user. The service deletes only such a session.
+        When the session is deleted, the refresh token also becomes invalid.
+
+        The endpoint can be repeated. If the session is already ended, the service still returns 200.
+        If the session is not in the list of the user, the service deletes nothing and returns 200.
+
+        Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint.
+        This list carries the service clients of the `platform_core` sites. An example is `site-tenant1-service`.
+        A tenant has two clients. The `site-<tenant>` client is only for browser login and has no service account.
+        The service refuses a token whose `azp` value is the browser client.
+        The site requests the token with the `aud-identity-sync` scope (the shared contract, `docs/sozlesmeler.md`, section 2).
+        Clients in the other lists cannot call this endpoint.
+        This endpoint needs no human approval. The reason is that the user's own revoke action starts the work.
+        This endpoint is destructive. An ended session cannot be opened again. The user logs in again.
+      x-durum: uygulandi
+      x-yikici: true
+      x-yurutme: otomatik
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionRevokeRequest"
+      responses:
+        "200":
+          description: The session is ended. If the session was ended before this request, the response is still this one.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRevokeResult"
+        "400":
+          description: The body is invalid. For example, `sid` or `subject` is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: |
+            The client is not in the session list, or no tenant in the tenant list belongs to the client.
+            The response is the same when the user is not a member of the organization of the calling tenant.
+            The error code is `forbidden`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "502":
+          $ref: "#/components/responses/UpstreamFailed"
+  /v1/account-deletions:
+    post:
+      operationId: requestAccountDeletion
+      summary: Requests the deletion of one account and executes the flow.
+      description: |
+        The source is the shared contract (`docs/sozlesmeler.md`), section 7, and project record O-27.
+        A customer asks for the deletion of the customer's own account on Press. Press then calls this endpoint.
+        The service records the request and executes the five steps in order.
+        The steps are in the "Account deletion and disabled accounts" section at the top of this file.
+
+        This endpoint is destructive and cannot be undone. The user is disabled everywhere and deleted from Keycloak.
+        The fields that identify the person are anonymized. Business records are not deleted.
+
+        Only Press can call the endpoint. The token carries `azp=press-service` and `aud=identity-sync`.
+        The allowed clients are in the `IDENTITY_SYNC_DELETION_AZP` setting. Clients in the other lists get 403.
+        This endpoint has no preview and no approval id. The consent is the fresh login of the account owner.
+        Press authenticates the customer again in Keycloak and sends the time of that login in `reauthenticated_at`.
+        The service refuses a login that is older than 300 seconds. It also refuses a time that is in the future.
+
+        The service records the request before it starts the work. The id of the request is a keyed digest of the account.
+        If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`. No later step is executed.
+        The request is then in the dead-letter queue. A human replays the request with `POST /v1/dead-letters/replay`.
+        Press can also send the same request again. The service continues from the first step that is not finished.
+      x-durum: uygulandi
+      x-yikici: true
+      x-yurutme: press-only
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountDeletionRequest"
+      responses:
+        "200":
+          description: The result of the request. The status is `processed`, `dead_lettered`, `unknown` or `duplicate`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionResult"
+        "400":
+          description: The body is invalid. For example, a field is missing, the body carries another field or `issuer` is not the issuer of the realm.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: |
+            The client is not in the deletion list. The error code is `forbidden`.
+            Or the login in `reauthenticated_at` is older than 300 seconds. The error code is `reauthentication_required`.
+            Press then authenticates the customer again and sends a new request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/invitations:
+    post:
+      operationId: inviteUser
+      summary: Invites a user.
+      description: |
+        Press calls this endpoint from inside `press_tr.api.team.invite` (G-16, G-79).
+        If the user does not exist, the service creates the user in Keycloak. Then it adds the user to the Organization.
+        Then it sends the invitation email with `execute-actions-email`.
+        The actions in the email are UPDATE_PASSWORD and CONFIGURE_TOTP.
+        This endpoint deletes no record and disables no user. But a sent email cannot be taken back.
+
+        The preview is open to both lists. A client in either list can send the `dry_run: true` request.
+        The preview only reads.
+        Only the approval layer starts the real execution.
+        The execute request must carry the `preview_digest` and `approval_id` fields.
+        The digest also covers the fields of the request. The approval of one invitation is not accepted for another invitation.
+
+        The service executes only the approved plan. If the plan changed in between, the service returns 409.
+        For example, if the user was created after the preview, the plan has changed.
+        A second invitation does not create a second user. But it needs a new preview and a new approval.
+        A second invitation sends the email again.
+        If an invitation is cut off midway, a new preview shows the remaining operations.
+      x-durum: uygulandi
+      x-yikici: false
+      x-yurutme: yalniz-onay-katmani
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationRequest"
+      responses:
+        "200":
+          description: The invitation was sent or the preview was produced.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvitationResult"
+        "400":
+          description: The body is invalid. For example, `dry_run` is missing or the approval fields are missing in an execution.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/PreviewChanged"
+        "502":
+          $ref: "#/components/responses/UpstreamFailed"
+components:
+  securitySchemes:
+    webhookSignature:
+      type: apiKey
+      in: header
+      name: X-Identity-Sync-Signature
+      description: |
+        The value has the form `sha256=<hex digest>`.
+        The digest is produced with HMAC-SHA256. The key is in the `IDENTITY_SYNC_WEBHOOK_SECRET` environment variable.
+
+        The signed content has three parts, `<timestamp>.<mode>.<raw body>`.
+        The timestamp is the value in the `X-Identity-Sync-Timestamp` header.
+        The mode is `execute` or `preview`. The mode of a `dry_run=true` request is `preview`.
+
+        The service makes these three checks.
+        The timestamp can differ from the clock of the service by at most 300 seconds.
+        The same signature is accepted only once. A second use gets 401.
+        A preview signature is not accepted for execution. An execution signature is not accepted for a preview either.
+
+        If the sender will send the same event again, it signs again with a new timestamp.
+    serviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        The Keycloak service token. The rules are in the shared contract (`docs/sozlesmeler.md`), section 3.
+        This token is the token of the requests that come to the service.
+        The token the service uses when it goes to the Keycloak Admin API is a separate one.
+        That token is requested with `scope=admin-api kc-admin-api` (the shared contract, `docs/sozlesmeler.md`, section 2).
+        The Keycloak roles of the service account go only into that token.
+        The roles are `view-users`, `query-users`, `manage-users` and the minimum role needed for organizations.
+        The token that goes to the tenant and to Press does not carry these roles.
+        The service verifies the token with the shared `oidc_verify` library.
+        The `aud` value of the token must be only `identity-sync`.
+        The `azp` value of the token must be in one of two lists.
+        The `IDENTITY_SYNC_PREVIEW_AZP` list gives permission to read and to preview.
+        The `IDENTITY_SYNC_EXECUTE_AZP` list also gives permission to execute.
+        The `IDENTITY_SYNC_SESSION_AZP` list opens only the `/v1/sessions/revoke` endpoint.
+        A client can be in only one of these lists.
+        If both lists are empty, the service rejects every request.
+        If the library is not installed, the service also rejects every request.
+        If the request also carries a cookie, the service rejects the request.
+  responses:
+    Unauthorized:
+      description: The service token is missing or invalid. The error code is `unauthorized`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: |
+        The token is valid but the client has no permission for this operation. The error code is `forbidden`.
+        For example, a client in the preview list asked for execution.
+        A tenant site client also gets this response when it asks for work in the organization of another tenant.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PreviewChanged:
+      description: |
+        The service executed no operation. A new preview and a new approval are needed. There can be two reasons.
+        If the error code is `preview_changed`, the plan changed after the preview.
+        If the error code is `approval_used`, this `approval_id` was used before.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    UpstreamFailed:
+      description: Keycloak, Press or the tenant site did not respond or rejected the request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: The largest number of records in the response. The default is 100. A value outside 1 to 500 returns 400.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+    Offset:
+      name: offset
+      in: query
+      required: false
+      description: The number of records to skip. The default is 0. The order is stable, so pages do not overlap.
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 1000000
+        default: 0
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok
+    ResourceId:
+      type: string
+      pattern: "^[A-Za-z0-9_-]{1,128}$"
+      description: An id that goes into the address path. It carries only letters, digits, hyphens and underscores.
+    Event:
+      type: object
+      description: The service envelope. It carries no personal data.
+      required: [id, kind, type, realm, time]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: The unique id of the event. The service does not process the same id a second time.
+        kind:
+          type: string
+          enum: [user, admin]
+          description: |
+            `user` shows work that the user did personally.
+            `admin` shows work that an admin or the Admin API did.
+        type:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: |
+            The service processes the following types.
+            For `user` they are REGISTER, VERIFY_EMAIL, UPDATE_EMAIL and DELETE_ACCOUNT.
+            For `admin` they are USER_CREATE, USER_UPDATE, USER_DELETE,
+            ORGANIZATION_MEMBERSHIP_CREATE and ORGANIZATION_MEMBERSHIP_DELETE.
+            The service ignores any other type and returns `ignored`.
+        realm:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: The realm name. If it is not the same as the realm name in the settings, the service ignores the event.
+        time:
+          type: integer
+          description: The time of the event. The unit is milliseconds.
+        user_id:
+          $ref: "#/components/schemas/ResourceId"
+        organization_id:
+          $ref: "#/components/schemas/ResourceId"
+      additionalProperties: true
+    QueuedEvent:
+      type: object
+      description: |
+        One record in the dead-letter queue. The record can be a Keycloak event or the service's own request.
+        If the `kind` value is `request`, the record is the deletion job of one account.
+        Then the `type` value is `ACCOUNT_DELETION`, or `ACCOUNT_REMOVAL` when Keycloak no longer has the user.
+        The id of such a record is the id of the job. The record does not show the `user_id` field.
+        A Keycloak delete event (`USER_DELETE` or `DELETE_ACCOUNT`) does not show the `user_id` field either.
+        The `request` kind cannot come from the event endpoint. The service itself produces it.
+      required: [id, kind, type, realm, time]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [user, admin, request]
+        type:
+          type: string
+        realm:
+          type: string
+        time:
+          type: integer
+        user_id:
+          $ref: "#/components/schemas/ResourceId"
+        organization_id:
+          $ref: "#/components/schemas/ResourceId"
+    KeycloakUserEvent:
+      type: object
+      description: |
+        The Keycloak user event representation (Keycloak 26.8.2, EventRepresentation).
+        The service uses only the fields below. It drops the other fields.
+      required: [id, time, type, realmId]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        time:
+          type: integer
+        type:
+          type: string
+          minLength: 1
+          maxLength: 255
+        realmId:
+          type: string
+          description: The internal id of the realm. It is not the realm name.
+        userId:
+          $ref: "#/components/schemas/ResourceId"
+      additionalProperties: true
+    KeycloakAdminEvent:
+      type: object
+      description: |
+        The Keycloak admin event representation (Keycloak 26.8.2, AdminEventRepresentation).
+        The service reads the id of the user and of the Organization from the `resourcePath` field.
+        If the `id` field is missing, the service derives a stable id from the event.
+      required: [time, realmId, operationType, resourceType, resourcePath]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        time:
+          type: integer
+        realmId:
+          type: string
+          description: The internal id of the realm. It is not the realm name.
+        operationType:
+          type: string
+          minLength: 1
+        resourceType:
+          type: string
+          minLength: 1
+        resourcePath:
+          type: string
+          description: For example, `users/<user>` or `organizations/<organization>/members/<user>`.
+      additionalProperties: true
+    EventResult:
+      type: object
+      required: [status, actions]
+      properties:
+        status:
+          type: string
+          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed]
+          description: |
+            `processed` shows that all actions finished with definite success.
+            `duplicate` shows that the event was processed before.
+            `ignored` shows that the service does not process this event type or this realm.
+            `dead_lettered` shows that the event went into the dead-letter queue.
+            Going into the queue is not success. The service still tries all steps.
+            For example, the user is disabled in the tenants even if Press does not respond.
+            `unknown` shows that a target did not give a definite success response.
+            The event waits in the queue in the `unknown` state. The service does not count the event as processed.
+            In a replay response, `unknown` shows that the event was skipped.
+            `preview` shows that only a preview was produced.
+            `failed` shows that the preview could not be produced. For example, Keycloak did not respond.
+        actions:
+          type: array
+          description: The names of the actions that finished with definite success.
+          items:
+            type: string
+        previews:
+          type: array
+          description: Returned only in the `preview` status.
+          items:
+            $ref: "#/components/schemas/Preview"
+        plan_digest:
+          $ref: "#/components/schemas/PlanDigest"
+    PlanDigest:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+      description: |
+        Returned only in the `preview` status. It is the keyed digest of the plan of this event (HMAC-SHA256).
+        The digest covers the name, the target and all field values of every operation.
+        The value is a hash. The email and the name cannot be read from this value.
+    Preview:
+      type: object
+      description: The preview of one write operation. It carries no email and no secret.
+      required: [operation, target, summary, destructive]
+      properties:
+        operation:
+          type: string
+          description: The name of the operation.
+          enum:
+            - keycloak.ensure_organization
+            - keycloak.create_organization
+            - keycloak.add_organization_member
+            - keycloak.create_user
+            - keycloak.send_execute_actions_email
+            - keycloak.create_site_client
+            - keycloak.disable_user
+            - keycloak.delete_user
+            - press.anonymize_user
+            - tenant.revoke_user_installations
+            - tenant.anonymize_user
+            - press.ensure_team
+            - press.remove_team_member
+            - tenant.provision
+            - tenant.set_enabled
+            - tenant.change_email
+        target:
+          type: string
+          description: The target of the operation. For example, the name of the tenant.
+        summary:
+          type: string
+          description: An English sentence that describes the operation. It refers to the user by the `sub` id.
+        destructive:
+          type: boolean
+          description: |
+            True if the operation is destructive.
+            `press.remove_team_member` is always destructive.
+            For a deleted or disabled user this operation covers all teams.
+            Press then also disables the user and invalidates the API keys.
+            `tenant.set_enabled` is destructive if it disables the user.
+    PreviewDigest:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+      description: |
+        The keyed digest of the preview (HMAC-SHA256). The approval is bound to this digest.
+        The execute request must carry the same digest.
+    ApprovalId:
+      type: string
+      pattern: "^[A-Za-z0-9_-]{1,128}$"
+      description: |
+        The id of the approval record in the approval layer.
+        The service writes this value to the operation log. The approval layer checks the validity of the value.
+    DeadLetter:
+      type: object
+      required: [event, error, state, attempts, first_failed_at, last_failed_at]
+      properties:
+        event:
+          $ref: "#/components/schemas/QueuedEvent"
+        error:
+          type: string
+          description: |
+            The failed steps and their status codes. The steps are separated by semicolons.
+            The response body is not stored. An example is `tenant.provision kiraci1: HTTP 503`.
+        state:
+          type: string
+          enum: [failed, unknown]
+          description: |
+            `failed` shows that the target rejected the operation or could not be reached.
+            If the attempt count is 0, the service accepted the event but stopped before it could start the work.
+            `unknown` shows that it is not known whether the operation finished.
+            If the process stopped after a write, the state is also `unknown`.
+        attempts:
+          type: integer
+          description: How many times the event failed.
+        first_failed_at:
+          type: number
+          description: The time of the first failure. The unit is seconds since 1970-01-01 00.00 UTC (Unix time).
+        last_failed_at:
+          type: number
+          description: The time of the last failure. The unit is seconds since 1970-01-01 00.00 UTC (Unix time).
+    NextOffset:
+      type: integer
+      minimum: 1
+      description: Returned only when more records exist. Send this value as `offset` to read the next page.
+    DeadLetterList:
+      type: object
+      required: [dead_letters]
+      properties:
+        dead_letters:
+          type: array
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/DeadLetter"
+        next_offset:
+          $ref: "#/components/schemas/NextOffset"
+    ReplayRequest:
+      description: The caller must write the `dry_run` field explicitly. One of two forms is valid.
+      oneOf:
+        - $ref: "#/components/schemas/ReplayPreviewRequest"
+        - $ref: "#/components/schemas/ReplayExecuteRequest"
+    ReplayPreviewRequest:
+      type: object
+      description: A preview request. The service changes no record.
+      required: [dry_run]
+      properties:
+        dry_run:
+          type: boolean
+          const: true
+        include_unknown:
+          type: boolean
+          description: |
+            If true, the service also adds the events in the `unknown` state to the plan.
+            The default value is false.
+    ReplayExecuteRequest:
+      type: object
+      description: An execute request. Only the approval layer can send it.
+      required: [dry_run, preview_digest, approval_id]
+      properties:
+        dry_run:
+          type: boolean
+          const: false
+        include_unknown:
+          type: boolean
+          description: It must be the same as the value in the preview. Otherwise the digest does not match.
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+        approval_id:
+          $ref: "#/components/schemas/ApprovalId"
+    ReplayReport:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReplayResult"
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+    ReplayResult:
+      type: object
+      required: [event_id, status, actions]
+      properties:
+        event_id:
+          type: string
+        status:
+          type: string
+          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed]
+        actions:
+          type: array
+          items:
+            type: string
+        previews:
+          type: array
+          items:
+            $ref: "#/components/schemas/Preview"
+        plan_digest:
+          $ref: "#/components/schemas/PlanDigest"
+    InvitationRequest:
+      description: The caller must write the `dry_run` field explicitly. One of two forms is valid.
+      oneOf:
+        - $ref: "#/components/schemas/InvitationPreviewRequest"
+        - $ref: "#/components/schemas/InvitationExecuteRequest"
+    InvitationPreviewRequest:
+      type: object
+      description: A preview request. The service only reads.
+      required: [email, organization_id, dry_run]
+      properties:
+        email:
+          $ref: "#/components/schemas/Email"
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        organization_id:
+          $ref: "#/components/schemas/ResourceId"
+        dry_run:
+          type: boolean
+          const: true
+    InvitationExecuteRequest:
+      type: object
+      description: |
+        An execute request. Only the approval layer can send it.
+        The invitation fields must be the same as the fields in the preview. Otherwise the digest does not match.
+      required: [email, organization_id, dry_run, preview_digest, approval_id]
+      properties:
+        email:
+          $ref: "#/components/schemas/Email"
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        organization_id:
+          $ref: "#/components/schemas/ResourceId"
+        dry_run:
+          type: boolean
+          const: false
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+        approval_id:
+          $ref: "#/components/schemas/ApprovalId"
+    Email:
+      type: string
+      maxLength: 254
+      pattern: "^[^@\\s]{1,64}@[^@\\s]{1,189}$"
+    InvitationResult:
+      type: object
+      required: [subject, previews]
+      properties:
+        subject:
+          type: [string, "null"]
+          description: |
+            The Keycloak id of the user (`sub`).
+            In a preview the value is null if the user does not exist yet.
+        previews:
+          type: array
+          items:
+            $ref: "#/components/schemas/Preview"
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+    OperationList:
+      type: object
+      required: [operations]
+      properties:
+        operations:
+          type: array
+          maxItems: 500
+          items:
+            $ref: "#/components/schemas/Operation"
+        next_offset:
+          $ref: "#/components/schemas/NextOffset"
+    Operation:
+      type: object
+      description: One interrupted multi-step operation. It carries no email.
+      required: [operation_id, operation, organization_id, subject, state, steps]
+      properties:
+        operation_id:
+          $ref: "#/components/schemas/ApprovalId"
+        operation:
+          type: string
+          enum: [invite_user]
+        organization_id:
+          type: string
+        subject:
+          type: [string, "null"]
+          description: The Keycloak id of the user. It is null if the user is not created yet.
+        state:
+          type: string
+          enum: [failed, unknown]
+          description: |
+            `failed` shows that a step failed for certain.
+            `unknown` shows that the result of a step is not known. For example, the process stopped during a write.
+        steps:
+          type: array
+          items:
+            type: object
+            required: [step, status]
+            properties:
+              step:
+                type: string
+                description: The name of the step. For example, `keycloak.send_execute_actions_email`.
+              status:
+                type: string
+                enum: [pending, done, failed, unknown]
+                description: |
+                  `pending` shows that the step never started.
+                  `done` shows that the step finished.
+                  `failed` shows that Keycloak rejected the step.
+                  `unknown` shows that the step started but its result is not known.
+    ResolveRequest:
+      type: object
+      required: [resolution]
+      properties:
+        resolution:
+          type: string
+          enum: [completed, abandoned]
+    ResolveResult:
+      type: object
+      required: [operation_id, state, resolution]
+      properties:
+        operation_id:
+          $ref: "#/components/schemas/ApprovalId"
+        state:
+          type: string
+          const: resolved
+        resolution:
+          type: string
+          enum: [completed, abandoned]
+    SessionRevokeRequest:
+      type: object
+      required: [sid, subject]
+      properties:
+        sid:
+          $ref: "#/components/schemas/ResourceId"
+        subject:
+          $ref: "#/components/schemas/ResourceId"
+      additionalProperties: false
+    SessionRevokeResult:
+      type: object
+      required: [sid, revoked]
+      properties:
+        sid:
+          type: string
+          description: The id of the ended session.
+        revoked:
+          type: boolean
+          const: true
+          description: The session no longer exists.
+    AccountDeletionRequest:
+      type: object
+      required: [issuer, subject, reauthenticated_at]
+      properties:
+        issuer:
+          type: string
+          maxLength: 512
+          description: The issuer of the realm. It must be equal to the issuer in the service settings.
+        subject:
+          $ref: "#/components/schemas/ResourceId"
+        reauthenticated_at:
+          type: integer
+          description: The time when Press authenticated the customer again in Keycloak. The unit is seconds since 1970-01-01 00.00 UTC (Unix time). It is the `auth_time` value of the token.
+      additionalProperties: false
+    AccountDeletionResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [processed, dead_lettered, unknown, duplicate]
+          description: |
+            `processed` shows that every step that was left finished.
+            `dead_lettered` shows that a step failed and the request waits in the queue.
+            `unknown` shows that the result of a step is not known.
+            `duplicate` shows that the request for this account finished before.
+        request_id:
+          type: string
+          pattern: "^del-[0-9a-f]{40}$"
+          description: The id of the request. It is a keyed digest of the account, so it does not show the user.
+        actions:
+          type: array
+          description: The names of the steps that finished with definite success in this call.
+          items:
+            type: string
+      additionalProperties: false
+    ReconcileRequest:
+      description: The caller must write the `dry_run` field explicitly. One of two forms is valid.
+      oneOf:
+        - $ref: "#/components/schemas/ReconcilePreviewRequest"
+        - $ref: "#/components/schemas/ReconcileExecuteRequest"
+    ReconcilePreviewRequest:
+      type: object
+      description: A preview request. The service changes no record.
+      required: [dry_run]
+      properties:
+        dry_run:
+          type: boolean
+          const: true
+    ReconcileExecuteRequest:
+      type: object
+      description: A repair request. Only the approval layer can send it.
+      required: [dry_run, preview_digest, approval_id]
+      properties:
+        dry_run:
+          type: boolean
+          const: false
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+        approval_id:
+          $ref: "#/components/schemas/ApprovalId"
+    ReconcileReport:
+      type: object
+      required: [count, differences]
+      properties:
+        count:
+          type: integer
+          description: The number of differences.
+        differences:
+          type: array
+          items:
+            $ref: "#/components/schemas/Difference"
+        previews:
+          type: array
+          description: Returned only in a preview. It is the preview of the operations that will remove the differences.
+          items:
+            $ref: "#/components/schemas/Preview"
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+        results:
+          type: array
+          description: Returned only in a repair. It is the result of every operation.
+          items:
+            $ref: "#/components/schemas/RepairResult"
+    RepairResult:
+      type: object
+      required: [operation, target, status]
+      properties:
+        operation:
+          type: string
+          description: |
+            The name of the operation. For example, `tenant.set_enabled`.
+            The value `account_deletion` is the deletion job of one account that Keycloak no longer has.
+        target:
+          type: string
+          description: |
+            The target of the operation. The value is `press` or the name of the tenant.
+            For the `account_deletion` operation it is the id of the job.
+        status:
+          type: string
+          enum: [done, failed, unknown]
+          description: |
+            `done` shows that the target gave a definite success response.
+            `failed` shows that the target rejected the operation or could not be reached.
+            `unknown` shows that it is not known whether the operation finished.
+        error:
+          type: string
+          description: The failed step and its status code. It carries no response body.
+    Difference:
+      type: object
+      description: |
+        One difference between Keycloak and a target.
+        A difference of the `deleted_in_keycloak` kind carries `job_id` and no `subject`.
+        Every other kind carries `subject` and no `job_id`.
+      required: [target, kind]
+      properties:
+        target:
+          type: string
+          description: The place where the difference was seen. The value is `press` or the name of the tenant.
+        subject:
+          type: string
+          description: The Keycloak id of the user (`sub`). It is not returned for an account that is deleted in Keycloak.
+        job_id:
+          type: string
+          pattern: "^del-[0-9a-f]{40}$"
+          description: |
+            Returned only for an account that is deleted in Keycloak. It is the id of the deletion job of that account.
+            The id is a keyed digest. The raw id of a deleted account does not leave the service.
+        kind:
+          type: string
+          enum:
+            - missing
+            - disabled
+            - email_mismatch
+            - closed_in_keycloak
+            - deleted_in_keycloak
+            - unexpected
+            - unverified_in_keycloak
+            - missing_team_membership
+            - unexpected_team_membership
+            - foreign_issuer
+          description: |
+            `missing` shows that the user has no link in the tenant.
+            `disabled` shows that the expected user is disabled at the target.
+            `email_mismatch` shows that the email at the target is different.
+            `closed_in_keycloak` shows this. The user is disabled in Keycloak and enabled at the target.
+            `deleted_in_keycloak` shows this. Keycloak no longer has the user but the target still has the record.
+            The record can be enabled or disabled. The repair is the deletion job of the account.
+            `unexpected` shows that the user is enabled in the tenant but is not a member of the tenant's organization.
+            `unverified_in_keycloak` shows that the user is enabled in the tenant but the email in Keycloak is not verified.
+            `missing_team_membership` shows a team membership that is missing in Press.
+            `unexpected_team_membership` shows an extra team membership in Press.
+            `foreign_issuer` shows that the record belongs to another identity server.
+        organization_id:
+          type: string
+          description: Returned only in team membership differences. It is the id of the organization in Keycloak.
+    TargetIdentityList:
+      type: object
+      description: |
+        The response expected from the `list_identities` endpoints. This schema is not an endpoint of this service.
+        The shared contract (`docs/sozlesmeler.md`, section 7) names the endpoints and the fields.
+        Every row carries the `issuer` and `subject` fields and whether the account is enabled.
+        The row carries no email and no name. So the service does not compare the email or the teams of an existing record.
+        The request takes `start` and `page_length`. The `page_length` value is at most 500. The order is `subject`, ascending.
+        The service reads every page. It computes the differences only after the last page.
+        If the response has another shape or the paging does not end, the service reports an error and concludes nothing.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [identities, has_next_page]
+          properties:
+            identities:
+              type: array
+              maxItems: 500
+              items:
+                type: object
+                required: [issuer, subject, enabled]
+                properties:
+                  issuer:
+                    type: string
+                  subject:
+                    type: string
+                  enabled:
+                    type: boolean
+            has_next_page:
+              type: boolean
+              description: True when more records exist after this page.
+    TargetEnsureTeamResult:
+      type: object
+      description: |
+        The definite success response expected from the `press_tr.api.identity.ensure_team` endpoint.
+        This schema is not an endpoint of this service. It is the response the service expects from Press.
+        The source is the `contracts/press_tr.openapi.yaml` file.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [team, created]
+          properties:
+            team:
+              type: string
+              minLength: 1
+              description: The name of the team in Press.
+            created:
+              type: boolean
+              description: True if the team was created in this request.
+          additionalProperties: true
+    TargetRemoveTeamMemberResult:
+      type: object
+      description: |
+        The definite success response expected from the `press_tr.api.identity.remove_team_member` endpoint.
+        The source is the `contracts/press_tr.openapi.yaml` file.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [team, member]
+          properties:
+            team:
+              type: [string, "null"]
+              description: The name of the team. It is null in a request for all teams or if there is no team.
+            member:
+              type: boolean
+              const: false
+              description: The user is no longer a member.
+          additionalProperties: true
+    TargetProvisionResult:
+      type: object
+      description: |
+        The definite success response expected from the `platform_core.api.identity.provision` endpoint.
+        The source is the `platform_core` identity contract in the `contracts/` folder.
+        The service also compares the `enabled` value with the value it asked for.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [user, enabled, linked]
+          properties:
+            user:
+              type: string
+              minLength: 1
+              description: The name of the user in the tenant. This name is the email.
+            enabled:
+              type: boolean
+            linked:
+              type: boolean
+              const: true
+          additionalProperties: true
+    TargetSetEnabledResult:
+      type: object
+      description: |
+        The definite success response expected from the `platform_core.api.identity.set_enabled` endpoint.
+        The source is the `platform_core` identity contract in the `contracts/` folder.
+        The service also compares the `enabled` value with the value it asked for.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [user, enabled]
+          properties:
+            user:
+              type: string
+              minLength: 1
+            enabled:
+              type: boolean
+          additionalProperties: true
+    TargetRevokeUserInstallationsResult:
+      type: object
+      description: |
+        The response expected from the `platform_core.api.mobile.revoke_user_installations` endpoint.
+        The name of the endpoint is in the shared contract (`docs/sozlesmeler.md`), section 5. Its owner is the platform-core-mobil job.
+        The shared contract does not define the response body. This schema follows the code of the platform-core-mobil job.
+        The endpoint deletes all phone installations and notification links of the user.
+        The request carries the `issuer` and `subject` fields. The endpoint must be safe to repeat.
+        If there is no link, the endpoint returns 404 and `IdentityNotFound`. The service counts this response as success.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [revoked]
+          properties:
+            revoked:
+              type: integer
+              description: The number of installations deleted in this request. It is 0 if no installation is left.
+          additionalProperties: true
+    TargetAnonymizeUserResult:
+      type: object
+      description: |
+        The response expected from the `platform_core.api.identity.anonymize_user` and `press_tr.api.identity.anonymize_user` endpoints.
+        The names of the endpoints are in the shared contract (`docs/sozlesmeler.md`), sections 5 and 6.
+        The shared contract defines the response: 200 with the `anonymized` and `found` fields.
+        The endpoint disables the user and anonymizes the fields that identify the person. It does not delete business records.
+        The endpoint in Press also invalidates the API keys.
+        The request carries the `issuer` and `subject` fields. A repeated call gets the same response.
+        If the endpoint does not know the identity, `found` is false. The service counts this response as success.
+        The tenant can also return 404 and `IdentityNotFound` for an unknown identity. The service counts this response as success too.
+        The endpoint returns 409 for a lock conflict or a timeout. The service then tries the request again.
+        If a field is missing, the service does not know the result and does not continue with the next step.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [anonymized, found]
+          properties:
+            anonymized:
+              type: boolean
+              description: True when the personal fields are anonymized or there was nothing to anonymize.
+            found:
+              type: boolean
+              description: False when the endpoint does not know the identity.
+          additionalProperties: true
+    TargetChangeEmailResult:
+      type: object
+      description: |
+        The definite success response expected from the `platform_core.api.identity.change_email` endpoint.
+        The source is the `platform_core` identity contract in the `contracts/` folder.
+        The service also compares the `user` value with the new email it sent.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [user]
+          properties:
+            user:
+              type: string
+              minLength: 1
+          additionalProperties: true
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum:
+            - bad_request
+            - reauthentication_required
+            - bad_signature
+            - unauthorized
+            - forbidden
+            - preview_changed
+            - approval_used
+            - too_large
+            - rate_limited
+            - busy
+            - not_found
+            - method_not_allowed
+            - storage_failed
+            - upstream_failed

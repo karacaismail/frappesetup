@@ -10,13 +10,12 @@ from pathlib import Path
 from threading import Barrier
 from time import perf_counter_ns
 from urllib.error import HTTPError, URLError
-from uuid import uuid4
 
 import frappe
-from platform_core.mobil.tests.loopback_http import open_loopback
+from platform_core.mobile.tests.loopback_http import open_loopback
 
 from .measure_performance import LIMITS_MS, TIMING_HEADER, benchmark_server, call, mobile_request, p95
-from .performance_data import EMPLOYEES, LEAVE_PER_EMPLOYEE, seed_site, test_database, verify_counts
+from .performance_data import EMPLOYEES, LEAVE_PER_EMPLOYEE, performance_fixture, test_database, verify_counts
 
 PHONES = 50
 ENDPOINTS = ("v1_push", "v1_pull")
@@ -33,8 +32,8 @@ class Sample:
     db_failures: tuple[str, ...] = ()
 
 
-def lock_counters():
-    with test_database():
+def lock_counters(site):
+    with test_database(site):
         # These fixed MariaDB status counters describe real InnoDB row-lock waits.
         rows = frappe.db.sql(
             "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_row_lock_waits', 'Innodb_row_lock_time')"
@@ -78,7 +77,7 @@ def measure(url, phones):
     requests = []
     for phone in phones:
         operation = {
-            "operation_id": str(uuid4()),
+            "operation_id": phone.operation_id,
             "command": "fixture.update",
             "record_id": phone.record,
             "version": phone.version,
@@ -100,11 +99,11 @@ def measure(url, phones):
         return endpoint, exchange(request, expected)
 
     samples = {method: [] for method in ENDPOINTS}
-    before = lock_counters()
+    before = lock_counters(phones[0].site)
     with ThreadPoolExecutor(max_workers=len(requests)) as pool:
         for endpoint, sample in pool.map(send, requests):
             samples[endpoint].append(sample)
-    after = lock_counters()
+    after = lock_counters(phones[0].site)
     return samples, (after[0] - before[0], after[1] - before[1])
 
 
@@ -158,24 +157,86 @@ def render(samples, locks):
     return "\n".join(rows), passed
 
 
+def run_trial(site, workers):
+    with performance_fixture(site, PHONES) as (phones, _created):
+        phones = phones[:PHONES]
+        with benchmark_server(phones, site=site, workers=workers) as url:
+            for phone in phones:
+                message, _unused = call(url, phone, "v1_register")
+                if message != {"installation_id": phone.installation}:
+                    raise RuntimeError("Registration did not bind the expected installation.")
+            verify_counts(site)
+            return measure(url, phones)
+
+
+def recommend_worker_count(trials, client_limit_ms):
+    for workers, measurements in sorted(trials.items()):
+        if measurements and all(passed and elapsed <= client_limit_ms for passed, elapsed in measurements):
+            return workers
+    return None
+
+
+def measure_capacity(site, candidates, repeats, client_limit_ms):
+    rows = [
+        "### Mobil Gunicorn işçi sayısı ölçümü",
+        "",
+        f"Her koşuda {PHONES} telefon aynı anda bir yazma ve bir okuma isteği gönderdi.",
+        f"İşçi önerisi için istemci p95 üst sınırı {client_limit_ms:g} ms.",
+        "O-31 sunucu sınırları ve sıfır hata koşulu da geçerli.",
+        "",
+        "| İşçi | Koşu | Uç | Sunucu p95 (ms) | İstemci p95 (ms) | Hata | Kilit bekleme (sayı ve ms) |",
+        "| ---: | ---: | --- | ---: | ---: | ---: | --- |",
+    ]
+    trials = {}
+    for workers in sorted(set(candidates)):
+        trials[workers] = []
+        for iteration in range(1, repeats + 1):
+            samples, locks = run_trial(site, workers)
+            _unused, passed = render(samples, locks)
+            client_times = []
+            for endpoint, values in samples.items():
+                server_times = [sample.server_ms for sample in values if sample.server_ms is not None]
+                server = f"{p95(server_times):.1f}" if server_times else "ölçülmedi"
+                client = p95([sample.client_ms for sample in values])
+                client_times.append(client)
+                errors = sum(not sample.ok for sample in values)
+                rows.append(
+                    f"| {workers} | {iteration} | {endpoint} | {server} | {client:.1f} "
+                    f"| {errors}/{len(values)} | {locks[0]} / {locks[1]} |"
+                )
+            trials[workers].append((passed, max(client_times)))
+    recommended = recommend_worker_count(trials, client_limit_ms)
+    rows.extend(("", "Kilit bekleme değerleri her koşunun iki ucu için ortaktır."))
+    if recommended is None:
+        rows.append("İşçi önerisi yok. Ölçülen sayıların hiçbiri bütün koşulları karşılamadı.")
+    else:
+        rows.append(f"Bu ortam için başlangıç önerisi {recommended} Gunicorn işçisi.")
+    return "\n".join(rows), recommended is not None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--site", required=True)
     parser.add_argument("--status-file", type=Path, required=True)
-    parser.add_argument("--workers", type=int, default=4)
+    worker_mode = parser.add_mutually_exclusive_group()
+    worker_mode.add_argument("--workers", type=int, default=4)
+    worker_mode.add_argument("--worker-candidates", type=int, nargs="+")
+    parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--client-p95-limit-ms", type=int, default=1000)
     args = parser.parse_args()
-    if args.workers < 0:
-        parser.error("--workers must be zero or greater")
+    if args.workers < 0 or any(workers < 1 for workers in (args.worker_candidates or [])):
+        parser.error("Worker candidates must be positive. A single worker count may be zero.")
+    if args.repeats < 1 or args.client_p95_limit_ms < 1:
+        parser.error("Repeats and the client limit must be positive.")
     destination = args.status_file.resolve()
     os.chdir("sites")
-    phones = seed_site(PHONES)
-    with benchmark_server(phones[:PHONES], workers=args.workers) as url:
-        for phone in phones[:PHONES]:
-            message, _unused = call(url, phone, "v1_register")
-            if message != {"installation_id": phone.installation}:
-                raise RuntimeError("Registration did not bind the expected installation.")
-        verify_counts()
-        samples, locks = measure(url, phones[:PHONES])
-    report, passed = render(samples, locks)
+    if args.worker_candidates:
+        report, passed = measure_capacity(
+            args.site, args.worker_candidates, args.repeats, args.client_p95_limit_ms
+        )
+    else:
+        samples, locks = run_trial(args.site, args.workers)
+        report, passed = render(samples, locks)
     with destination.open("a", encoding="utf-8") as output:
         output.write(f"\n\n{report}\n")
     print(report)

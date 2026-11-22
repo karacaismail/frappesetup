@@ -11,7 +11,7 @@ from frappe.tests.test_api import make_request
 from frappe.utils import get_datetime, get_test_client, now_datetime
 from frappe.utils.password import update_password
 
-from platform_core.mobil.tests.http_diagnostics import http_diagnostic, safe_http_error_code
+from platform_core.mobile.tests.http_diagnostics import http_diagnostic, safe_http_error_code
 
 
 class MobilePwaTest(IntegrationTestCase):
@@ -20,7 +20,7 @@ class MobilePwaTest(IntegrationTestCase):
 		self.identity_links = {}
 		self.enterContext(
 			patch(
-				"platform_core.mobil.request._identity_link",
+				"platform_core.mobile.request._identity_link",
 				side_effect=self.identity_links.get,
 			)
 		)
@@ -109,7 +109,7 @@ class MobilePwaTest(IntegrationTestCase):
 				self.assertEqual(response.status_code, 403)
 
 	def test_user_rename_preserves_installation_and_operation_replay(self):
-		from platform_core.mobil.tests.test_service import RECORD, SampleCommand
+		from platform_core.mobile.tests.test_service import RECORD, SampleCommand
 
 		client, sid, headers = self.login()
 		account = frappe.cache.hget("session", sid)["user"]

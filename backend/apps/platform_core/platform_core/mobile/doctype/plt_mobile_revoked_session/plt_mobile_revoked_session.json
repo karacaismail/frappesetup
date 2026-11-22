@@ -1,0 +1,49 @@
+{
+ "actions": [],
+ "autoname": "field:session_key",
+ "creation": "2026-11-22 14:34:54.775269",
+ "description": "Prevents a revoked Keycloak session from accessing mobile sync.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "session_key",
+  "delivery_pending",
+  "last_delivery_attempt_at"
+ ],
+ "fields": [
+  {
+   "description": "A digest of the revoked Keycloak session identifier.",
+   "fieldname": "session_key",
+   "fieldtype": "Data",
+   "label": "Session key",
+   "length": 64,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "1",
+   "description": "Identity-sync has not confirmed closure of this Keycloak session.",
+   "fieldname": "delivery_pending",
+   "fieldtype": "Check",
+   "label": "Closure pending"
+  },
+  {
+   "description": "Unix time when the server last scheduled remote session closure.",
+   "fieldname": "last_delivery_attempt_at",
+   "fieldtype": "Data",
+   "label": "Last closure attempt time",
+   "length": 16
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-22 14:34:54.821920",
+ "modified_by": "Administrator",
+ "module": "Mobile",
+ "name": "PLT Mobile Revoked Session",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

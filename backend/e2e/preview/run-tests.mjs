@@ -8,7 +8,7 @@ const previewDir = process.env.PREVIEW_DIR;
 const require = createRequire(join(worktree, 'package.json'));
 const { request } = require('@playwright/test');
 const fixture = readFixture(join(previewDir, 'fixtures.json'));
-const tenant = 'http://kiraci1.localhost:' + (Number(process.env.PANE_PORT) + 1);
+const tenant = 'http://tenant1.localhost:' + (Number(process.env.PANE_PORT) + 1);
 
 const env = {
   ...process.env,
@@ -17,7 +17,7 @@ const env = {
 };
 for (const name of [
   'E2E_ADMIN_PASSWORD', 'E2E_KEYCLOAK_ADMIN_PASSWORD', 'E2E_KEYCLOAK_CLIENT_SECRET',
-  'E2E_PREVIEW_READER_PASSWORD', 'E2E_PRESS_ADMIN_PASSWORD', 'E2E_PRESS_CLIENT_SECRET',
+  'ATONOTA_SITE_TENANT1_SERVICE_SECRET', 'E2E_KEYCLOAK_SERVICE_CLIENT_SECRET', 'E2E_PREVIEW_READER_PASSWORD', 'E2E_PRESS_ADMIN_PASSWORD', 'E2E_PRESS_CLIENT_SECRET',
 ]) delete env[name];
 
 function readFixture(path) {
@@ -124,6 +124,9 @@ try {
   results.push(await runPlaywright('browser', ['--project=chromium', '--project=webkit', 'browser.spec.ts']));
   try {
     await openTenantSession('OPERATOR', 'Administrator', process.env.E2E_ADMIN_PASSWORD);
+    env.E2E_DELETE_TENANT_READER_COOKIE ||= env.E2E_OPERATOR_COOKIE;
+    env.E2E_REVOKE_ADMIN_COOKIE ||= env.E2E_OPERATOR_COOKIE;
+    env.E2E_REVOKE_ADMIN_CSRF ||= env.E2E_OPERATOR_CSRF;
     await openTenantSession('READER', fixture.E2E_PREVIEW_READER_EMAIL, fixture.E2E_PREVIEW_READER_PASSWORD);
     results.push(await runPlaywright('api', ['--project=api', 'integration.spec.ts']));
   } catch (error) {

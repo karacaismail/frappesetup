@@ -10,7 +10,7 @@ from pathlib import Path
 
 ENVIRONMENT = Path(__file__).resolve().parents[1] / "environment.sh"
 PROJECT = "fs-integration-e2e-43820"
-IMAGE = "fs-kiraci-dev:43820"
+IMAGE = "fs-tenant-dev:43820"
 
 
 class EnvironmentCleanupTest(unittest.TestCase):
@@ -31,7 +31,7 @@ class EnvironmentCleanupTest(unittest.TestCase):
             "PATH": f"{root / 'dev/bin'}:{os.environ['PATH']}",
             "CALLS": str(self.log),
         }
-        tunnel = root / "dev/bin/tunel"
+        tunnel = root / "dev/bin/tunnel"
         tunnel.write_text('#!/bin/bash\nprintf "tunnel %s\\n" "$*" >> "$CALLS"\n')
         tunnel.chmod(0o700)
         docker = root / "dev/bin/docker"

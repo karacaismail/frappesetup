@@ -1,0 +1,76 @@
+[project]
+license = "AGPL-3.0-only"
+name = "press_tr"
+authors = [
+    { name = "Platform", email = "noreply@example.test"}
+]
+description = "Keycloak identity integration for Press"
+requires-python = ">=3.14"
+readme = "README.md"
+dynamic = ["version"]
+dependencies = [
+    "oidc_verify==0.1.0",
+    "packaging>=24",
+    "redis~=7.1.0",
+    "requests~=2.33.0",
+    "Werkzeug~=3.1.9",
+]
+
+[project.optional-dependencies]
+test = [
+    "cryptography~=50.0.0",
+    "Jinja2~=3.1.6",
+    "PyJWT~=2.13.0",
+    "PyYAML~=6.0.3",
+]
+
+[build-system]
+requires = ["flit_core >=3.11,<4"]
+build-backend = "flit_core.buildapi"
+
+# These dependencies are only installed when developer mode is enabled
+[tool.bench.dev-dependencies]
+# package_name = "~=1.1.0"
+
+# These apt dependencies will be installed from Ubuntu repositories when you host your app on Frappe Cloud
+[deploy.dependencies.apt]
+packages = []
+
+[tool.ruff]
+line-length = 110
+target-version = "py314"
+
+[tool.ruff.lint]
+select = [
+    "F",
+    "E",
+    "W",
+    "I",
+    "UP",
+    "B",
+    "RUF",
+]
+ignore = [
+    "B017", # assertRaises(Exception) - should be more specific
+    "B018", # useless expression, not assigned to anything
+    "B023", # function doesn't bind loop variable - will have last iteration's value
+    "B904", # raise inside except without from
+    "E101", # indentation contains mixed spaces and tabs
+    "E402", # module level import not at top of file
+    "E501", # line too long
+    "E741", # ambiguous variable name
+    "F401", # "unused" imports
+    "F403", # can't detect undefined names from * import
+    "F405", # can't detect undefined names from * import
+    "F722", # syntax error in forward type annotation
+    "W191", # indentation contains tabs
+]
+typing-modules = ["frappe.types.DF"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "tab"
+docstring-code-format = true
+
+[tool.bench.frappe-dependencies]
+frappe = ">=16.0.0,<17.0.0"

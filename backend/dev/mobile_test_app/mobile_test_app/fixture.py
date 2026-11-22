@@ -7,7 +7,7 @@ from functools import partial
 import frappe
 from frappe.core.doctype.installed_applications.installed_applications import update_installed_apps_order
 from platform_core.api.mobile import _pull, _push
-from platform_core.mobil.protocol import (
+from platform_core.mobile.protocol import (
 	UUID_PATTERN,
 	Command,
 	content_digest,
@@ -15,7 +15,7 @@ from platform_core.mobil.protocol import (
 	unavailable_record,
 	uuid4_id,
 )
-from platform_core.mobil.request import endpoint_response
+from platform_core.mobile.request import endpoint_response
 
 from .load_accounts import LOAD_ACCOUNTS
 
@@ -60,7 +60,13 @@ def _require_test_site():
 
 
 def setup():
-	_require_test_site()
+	performance_site = frappe.local.site != SITE
+	if performance_site:
+		from .performance_data import require_performance_site
+
+		require_performance_site(frappe.local.site, frappe.local.sites_path)
+	else:
+		_require_test_site()
 	apps = list(frappe.get_installed_apps())
 	if "mobile_test_app" in apps and apps.index("mobile_test_app") > apps.index("platform_core"):
 		apps.remove("mobile_test_app")
@@ -68,6 +74,9 @@ def setup():
 		update_installed_apps_order(apps)
 		frappe.clear_cache()
 
+	_setup_record_type()
+	if performance_site:
+		return
 	if not frappe.db.exists("User", WEBSITE):
 		frappe.get_doc(
 			doctype="User",
@@ -98,6 +107,9 @@ def setup():
 		elif frappe.db.get_value("User", user, "user_type") != "System User":
 			# Drive the legacy override tests with their intended Desk accounts.
 			frappe.get_doc("User", user).add_roles("Desk User")
+
+
+def _setup_record_type():
 	if not frappe.db.exists("DocType", RECORD):
 		frappe.get_doc(
 			{
@@ -142,6 +154,10 @@ def _hold_commit(record_id):
 
 def authenticate():
 	_require_test_site()
+	_authenticate()
+
+
+def _authenticate():
 	request = frappe.local.request
 	if frappe.session.user != "Guest" or any(request.args.getlist("cmd")) or frappe.form_dict.get("cmd"):
 		return
@@ -161,7 +177,7 @@ def authenticate():
 		if request.headers.get("X-Mobile-Test-Identity-Mismatch") == "site":
 			raise frappe.AuthenticationError
 		frappe.set_user("Administrator")
-		frappe.local.kimlik_service_claims = {
+		frappe.local.identity_service_claims = {
 			"iss": "fixture",
 			"azp": "identity-sync" if header == "Bearer fixture-service" else "different-service",
 		}
@@ -187,7 +203,7 @@ def authenticate():
 	issued_at = int(request.headers.get("X-Mobile-Test-Iat", time.time()))
 	frappe.set_user(account)
 	frappe.local.mobile_identity = {
-		"site": SITE,
+		"site": frappe.local.site,
 		"account": account,
 		"scope": "mobile",
 		"installation": installation,

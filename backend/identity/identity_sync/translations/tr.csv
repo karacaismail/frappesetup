@@ -1,0 +1,1158 @@
+The largest number of records in the response. The default is 100. A value outside 1 to 500 returns 400.,Yanıttaki en çok kayıt sayısı. Varsayılan değer 100'dür. 1 ile 500 arasında olmayan değer 400 döner.,identity_sync.openapi.yaml: components.parameters.Limit.description
+"The number of records to skip. The default is 0. The order is stable, so pages do not overlap.","Atlanacak kayıt sayısı. Varsayılan değer 0'dır. Sıra kararlıdır, bu yüzden sayfalar çakışmaz.",identity_sync.openapi.yaml: components.parameters.Offset.description
+"The token is valid but the client has no permission for this operation. The error code is `forbidden`.
+For example, a client in the preview list asked for execution.
+A tenant site client also gets this response when it asks for work in the organization of another tenant.
+","Belirteç geçerli ama istemcinin bu işe izni yok. Hata kodu `forbidden` olur.
+Örneğin önizleme listesindeki istemci yürütme istedi.
+Kiracı sitesinin istemcisi başka kiracının kuruluşunda iş isterse de bu yanıtı alır.
+",identity_sync.openapi.yaml: components.responses.Forbidden.description
+"The service executed no operation. A new preview and a new approval are needed. There can be two reasons.
+If the error code is `preview_changed`, the plan changed after the preview.
+If the error code is `approval_used`, this `approval_id` was used before.
+","Servis hiçbir işi yürütmedi. Yeni önizleme ve yeni onay gerekir. İki neden olabilir.
+Hata kodu `preview_changed` ise plan önizlemeden sonra değişti.
+Hata kodu `approval_used` ise bu `approval_id` daha önce kullanıldı.
+",identity_sync.openapi.yaml: components.responses.PreviewChanged.description
+The service token is missing or invalid. The error code is `unauthorized`.,Servis belirteci yok ya da geçersiz. Hata kodu `unauthorized` olur.,identity_sync.openapi.yaml: components.responses.Unauthorized.description
+"Keycloak, Press or the tenant site did not respond or rejected the request.","Keycloak, Press ya da kiracı sitesi yanıt vermedi ya da isteği reddetti.",identity_sync.openapi.yaml: components.responses.UpstreamFailed.description
+The issuer of the realm. It must be equal to the issuer in the service settings.,Realm'in yayıncı adresi. Servis ayarındaki yayıncı adresine eşit olmalıdır.,identity_sync.openapi.yaml: components.schemas.AccountDeletionRequest.properties.issuer.description
+The time when Press authenticated the customer again in Keycloak. The unit is seconds since 1970-01-01 00.00 UTC (Unix time). It is the `auth_time` value of the token.,Press'in müşteriyi Keycloak'ta yeniden doğruladığı zaman. Birim 1970-01-01 00.00 UTC anından beri geçen saniyedir (Unix zamanı). Değer belirteçteki `auth_time` değeridir.,identity_sync.openapi.yaml: components.schemas.AccountDeletionRequest.properties.reauthenticated_at.description
+The names of the steps that finished with definite success in this call.,Bu çağrıda kesin başarıyla biten adımların adları.,identity_sync.openapi.yaml: components.schemas.AccountDeletionResult.properties.actions.description
+"The id of the request. It is a keyed digest of the account, so it does not show the user.","İsteğin kimliği. Hesabın anahtarlı özetidir, bu yüzden kullanıcıyı göstermez.",identity_sync.openapi.yaml: components.schemas.AccountDeletionResult.properties.request_id.description
+"`processed` shows that every step that was left finished.
+`dead_lettered` shows that a step failed and the request waits in the queue.
+`unknown` shows that the result of a step is not known.
+`duplicate` shows that the request for this account finished before.
+","`processed` değeri kalan bütün adımların bittiğini gösterir.
+`dead_lettered` değeri bir adımın başarısız olduğunu ve isteğin kuyrukta beklediğini gösterir.
+`unknown` değeri bir adımın sonucunun bilinmediğini gösterir.
+`duplicate` değeri bu hesabın isteğinin daha önce bittiğini gösterir.
+",identity_sync.openapi.yaml: components.schemas.AccountDeletionResult.properties.status.description
+"The id of the approval record in the approval layer.
+The service writes this value to the operation log. The approval layer checks the validity of the value.
+","Onay katmanındaki onay kaydının kimliği.
+Servis bu değeri işlem günlüğüne yazar. Değerin geçerliliğini onay katmanı denetler.
+",identity_sync.openapi.yaml: components.schemas.ApprovalId.description
+How many times the event failed.,Olayın kaç kez başarısız olduğu.,identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.attempts.description
+"The failed steps and their status codes. The steps are separated by semicolons.
+The response body is not stored. An example is `tenant.provision kiraci1: HTTP 503`.
+","Başarısız adımlar ve durum kodları. Adımlar noktalı virgülle ayrılır.
+Yanıt gövdesi saklanmaz. Örnek: `tenant.provision kiraci1: HTTP 503`.
+",identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.error.description
+The time of the first failure. The unit is seconds since 1970-01-01 00.00 UTC (Unix time).,İlk hatanın zamanı. Birim 1970-01-01 00.00 UTC anından beri geçen saniyedir (Unix zamanı).,identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.first_failed_at.description
+The time of the last failure. The unit is seconds since 1970-01-01 00.00 UTC (Unix time).,Son hatanın zamanı. Birim 1970-01-01 00.00 UTC anından beri geçen saniyedir (Unix zamanı).,identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.last_failed_at.description
+"`failed` shows that the target rejected the operation or could not be reached.
+If the attempt count is 0, the service accepted the event but stopped before it could start the work.
+`unknown` shows that it is not known whether the operation finished.
+If the process stopped after a write, the state is also `unknown`.
+","`failed` değeri hedefin işi reddettiğini ya da ulaşılamadığını gösterir.
+Deneme sayısı 0 ise servis olayı kabul etti ama işe başlayamadan durdu.
+`unknown` değeri işin bitip bitmediğinin bilinmediğini gösterir.
+Süreç bir yazmadan sonra durduysa durum yine `unknown` olur.
+",identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.state.description
+"One difference between Keycloak and a target.
+A difference of the `deleted_in_keycloak` kind carries `job_id` and no `subject`.
+Every other kind carries `subject` and no `job_id`.
+","Keycloak ile bir hedef arasındaki bir fark.
+`deleted_in_keycloak` türündeki fark `job_id` taşır, `subject` taşımaz.
+Öteki bütün türler `subject` taşır, `job_id` taşımaz.
+",identity_sync.openapi.yaml: components.schemas.Difference.description
+"Returned only for an account that is deleted in Keycloak. It is the id of the deletion job of that account.
+The id is a keyed digest. The raw id of a deleted account does not leave the service.
+","Yalnız Keycloak'ta silinen hesap için döner. O hesabın silme işinin kimliğidir.
+Kimlik anahtarlı bir özettir. Silinen hesabın ham kimliği servisten çıkmaz.
+",identity_sync.openapi.yaml: components.schemas.Difference.properties.job_id.description
+"`missing` shows that the user has no link in the tenant.
+`disabled` shows that the expected user is disabled at the target.
+`email_mismatch` shows that the email at the target is different.
+`closed_in_keycloak` shows this. The user is disabled in Keycloak and enabled at the target.
+`deleted_in_keycloak` shows this. Keycloak no longer has the user but the target still has the record.
+The record can be enabled or disabled. The repair is the deletion job of the account.
+`unexpected` shows that the user is enabled in the tenant but is not a member of the tenant's organization.
+`unverified_in_keycloak` shows that the user is enabled in the tenant but the email in Keycloak is not verified.
+`missing_team_membership` shows a team membership that is missing in Press.
+`unexpected_team_membership` shows an extra team membership in Press.
+`foreign_issuer` shows that the record belongs to another identity server.
+","`missing` değeri kullanıcının kiracıda bağı olmadığını gösterir.
+`disabled` değeri beklenen kullanıcının hedefte kapalı olduğunu gösterir.
+`email_mismatch` değeri hedefteki e-postanın farklı olduğunu gösterir.
+`closed_in_keycloak` değeri şunu gösterir: kullanıcı Keycloak'ta kapalı, hedefte açık.
+`deleted_in_keycloak` değeri şunu gösterir: kullanıcı Keycloak'ta artık yok ama hedefte kaydı duruyor.
+Kayıt açık ya da kapalı olabilir. Onarım, hesabın silme işidir.
+`unexpected` değeri kullanıcının kiracıda açık olduğunu ama kiracının kuruluşuna üye olmadığını gösterir.
+`unverified_in_keycloak` değeri kullanıcının kiracıda açık ama Keycloak'taki e-postasının doğrulanmamış olduğunu gösterir.
+`missing_team_membership` değeri Press'te eksik takım üyeliğini gösterir.
+`unexpected_team_membership` değeri Press'te fazla takım üyeliğini gösterir.
+`foreign_issuer` değeri kaydın başka bir kimlik sunucusuna ait olduğunu gösterir.
+",identity_sync.openapi.yaml: components.schemas.Difference.properties.kind.description
+Returned only in team membership differences. It is the id of the organization in Keycloak.,Yalnız takım üyeliği farklarında döner. Keycloak'taki kuruluşun kimliğidir.,identity_sync.openapi.yaml: components.schemas.Difference.properties.organization_id.description
+The Keycloak id of the user (`sub`). It is not returned for an account that is deleted in Keycloak.,Kullanıcının Keycloak kimliği (`sub`). Keycloak'ta silinen hesap için dönmez.,identity_sync.openapi.yaml: components.schemas.Difference.properties.subject.description
+The place where the difference was seen. The value is `press` or the name of the tenant.,Farkın görüldüğü yer. Değer `press` ya da kiracının adıdır.,identity_sync.openapi.yaml: components.schemas.Difference.properties.target.description
+The service envelope. It carries no personal data.,Servis zarfı. Kişisel veri taşımaz.,identity_sync.openapi.yaml: components.schemas.Event.description
+The unique id of the event. The service does not process the same id a second time.,Olayın tekil kimliği. Servis aynı kimliği ikinci kez işlemez.,identity_sync.openapi.yaml: components.schemas.Event.properties.id.description
+"`user` shows work that the user did personally.
+`admin` shows work that an admin or the Admin API did.
+","`user` değeri kullanıcının kendi yaptığı işi gösterir.
+`admin` değeri yöneticinin ya da Admin API'nin yaptığı işi gösterir.
+",identity_sync.openapi.yaml: components.schemas.Event.properties.kind.description
+"The realm name. If it is not the same as the realm name in the settings, the service ignores the event.",Realm adı. Ayardaki realm adıyla aynı değilse servis olayı yok sayar.,identity_sync.openapi.yaml: components.schemas.Event.properties.realm.description
+The time of the event. The unit is milliseconds.,Olayın zamanı. Birim milisaniyedir.,identity_sync.openapi.yaml: components.schemas.Event.properties.time.description
+"The service processes the following types.
+For `user` they are REGISTER, VERIFY_EMAIL, UPDATE_EMAIL and DELETE_ACCOUNT.
+For `admin` they are USER_CREATE, USER_UPDATE, USER_DELETE,
+ORGANIZATION_MEMBERSHIP_CREATE and ORGANIZATION_MEMBERSHIP_DELETE.
+The service ignores any other type and returns `ignored`.
+","Servisin işlediği türler şunlardır.
+`user` için REGISTER, VERIFY_EMAIL, UPDATE_EMAIL ve DELETE_ACCOUNT.
+`admin` için USER_CREATE, USER_UPDATE, USER_DELETE,
+ORGANIZATION_MEMBERSHIP_CREATE ve ORGANIZATION_MEMBERSHIP_DELETE.
+Servis başka türü yok sayar ve `ignored` döner.
+",identity_sync.openapi.yaml: components.schemas.Event.properties.type.description
+The names of the actions that finished with definite success.,Kesin başarıyla biten eylemlerin adları.,identity_sync.openapi.yaml: components.schemas.EventResult.properties.actions.description
+Returned only in the `preview` status.,Yalnız `preview` durumunda döner.,identity_sync.openapi.yaml: components.schemas.EventResult.properties.previews.description
+"`processed` shows that all actions finished with definite success.
+`duplicate` shows that the event was processed before.
+`ignored` shows that the service does not process this event type or this realm.
+`dead_lettered` shows that the event went into the dead-letter queue.
+Going into the queue is not success. The service still tries all steps.
+For example, the user is disabled in the tenants even if Press does not respond.
+`unknown` shows that a target did not give a definite success response.
+The event waits in the queue in the `unknown` state. The service does not count the event as processed.
+In a replay response, `unknown` shows that the event was skipped.
+`preview` shows that only a preview was produced.
+`failed` shows that the preview could not be produced. For example, Keycloak did not respond.
+","`processed` değeri bütün eylemlerin kesin başarıyla bittiğini gösterir.
+`duplicate` değeri olayın daha önce işlendiğini gösterir.
+`ignored` değeri servisin bu olay türünü ya da realm'i işlemediğini gösterir.
+`dead_lettered` değeri olayın bekleme kuyruğuna girdiğini gösterir.
+Kuyruğa girmek başarı değildir. Servis yine de bütün adımları dener.
+Örneğin Press yanıt vermese de kullanıcı kiracılarda kapanır.
+`unknown` değeri bir hedefin kesin başarı yanıtı vermediğini gösterir.
+Olay kuyrukta `unknown` durumuyla bekler. Servis olayı işlenmiş saymaz.
+Yeniden işleme yanıtında `unknown` değeri olayın atlandığını gösterir.
+`preview` değeri yalnız önizleme üretildiğini gösterir.
+`failed` değeri önizlemenin üretilemediğini gösterir. Örneğin Keycloak yanıt vermedi.
+",identity_sync.openapi.yaml: components.schemas.EventResult.properties.status.description
+"An execute request. Only the approval layer can send it.
+The invitation fields must be the same as the fields in the preview. Otherwise the digest does not match.
+","Yürütme isteği. Yalnız onay katmanı gönderebilir.
+Davet alanları önizlemedeki alanlarla aynı olmalıdır. Yoksa özet tutmaz.
+",identity_sync.openapi.yaml: components.schemas.InvitationExecuteRequest.description
+A preview request. The service only reads.,Önizleme isteği. Servis yalnız okur.,identity_sync.openapi.yaml: components.schemas.InvitationPreviewRequest.description
+The caller must write the `dry_run` field explicitly. One of two forms is valid.,Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.,identity_sync.openapi.yaml: components.schemas.InvitationRequest.description
+"The Keycloak id of the user (`sub`).
+In a preview the value is null if the user does not exist yet.
+","Kullanıcının Keycloak kimliği (`sub`).
+Önizlemede kullanıcı henüz yoksa değer boştur.
+",identity_sync.openapi.yaml: components.schemas.InvitationResult.properties.subject.description
+"The Keycloak admin event representation (Keycloak 26.8.2, AdminEventRepresentation).
+The service reads the id of the user and of the Organization from the `resourcePath` field.
+If the `id` field is missing, the service derives a stable id from the event.
+","Keycloak'ın yönetici olayı gösterimi (Keycloak 26.8.2, AdminEventRepresentation).
+Servis kullanıcının ve Organization'ın kimliğini `resourcePath` alanından okur.
+`id` alanı yoksa servis olaydan kararlı bir kimlik türetir.
+",identity_sync.openapi.yaml: components.schemas.KeycloakAdminEvent.description
+The internal id of the realm. It is not the realm name.,Realm'in iç kimliği. Realm adı değildir.,identity_sync.openapi.yaml: components.schemas.KeycloakAdminEvent.properties.realmId.description
+"For example, `users/<user>` or `organizations/<organization>/members/<user>`.",Örneğin `users/<kullanıcı>` ya da `organizations/<kuruluş>/members/<kullanıcı>`.,identity_sync.openapi.yaml: components.schemas.KeycloakAdminEvent.properties.resourcePath.description
+"The Keycloak user event representation (Keycloak 26.8.2, EventRepresentation).
+The service uses only the fields below. It drops the other fields.
+","Keycloak'ın kullanıcı olayı gösterimi (Keycloak 26.8.2, EventRepresentation).
+Servis yalnız aşağıdaki alanları kullanır. Öteki alanları atar.
+",identity_sync.openapi.yaml: components.schemas.KeycloakUserEvent.description
+The internal id of the realm. It is not the realm name.,Realm'in iç kimliği. Realm adı değildir.,identity_sync.openapi.yaml: components.schemas.KeycloakUserEvent.properties.realmId.description
+Returned only when more records exist. Send this value as `offset` to read the next page.,Yalnız başka kayıt varsa döner. Sonraki sayfayı okumak için bu değeri `offset` olarak gönderin.,identity_sync.openapi.yaml: components.schemas.NextOffset.description
+One interrupted multi-step operation. It carries no email.,Yarıda kalan çok adımlı bir iş. E-posta taşımaz.,identity_sync.openapi.yaml: components.schemas.Operation.description
+"`failed` shows that a step failed for certain.
+`unknown` shows that the result of a step is not known. For example, the process stopped during a write.
+","`failed` değeri bir adımın kesin olarak başarısız olduğunu gösterir.
+`unknown` değeri bir adımın sonucunun bilinmediğini gösterir. Örneğin süreç yazma sırasında durdu.
+",identity_sync.openapi.yaml: components.schemas.Operation.properties.state.description
+"`pending` shows that the step never started.
+`done` shows that the step finished.
+`failed` shows that Keycloak rejected the step.
+`unknown` shows that the step started but its result is not known.
+","`pending` değeri adımın hiç başlamadığını gösterir.
+`done` değeri adımın bittiğini gösterir.
+`failed` değeri Keycloak'ın adımı reddettiğini gösterir.
+`unknown` değeri adımın başladığını ama sonucunun bilinmediğini gösterir.
+",identity_sync.openapi.yaml: components.schemas.Operation.properties.steps.items.properties.status.description
+"The name of the step. For example, `keycloak.send_execute_actions_email`.",Adımın adı. Örneğin `keycloak.send_execute_actions_email`.,identity_sync.openapi.yaml: components.schemas.Operation.properties.steps.items.properties.step.description
+The Keycloak id of the user. It is null if the user is not created yet.,Kullanıcının Keycloak kimliği. Kullanıcı henüz açılmadıysa boştur.,identity_sync.openapi.yaml: components.schemas.Operation.properties.subject.description
+"Returned only in the `preview` status. It is the keyed digest of the plan of this event (HMAC-SHA256).
+The digest covers the name, the target and all field values of every operation.
+The value is a hash. The email and the name cannot be read from this value.
+","Yalnız `preview` durumunda döner. Bu olayın planının anahtarlı özetidir (HMAC-SHA256).
+Özet her işin adını, hedefini ve bütün alan değerlerini kapsar.
+Değer bir karmadır. E-posta ve ad bu değerden okunamaz.
+",identity_sync.openapi.yaml: components.schemas.PlanDigest.description
+The preview of one write operation. It carries no email and no secret.,Bir yazma işinin önizlemesi. E-posta ve sır taşımaz.,identity_sync.openapi.yaml: components.schemas.Preview.description
+"True if the operation is destructive.
+`press.remove_team_member` is always destructive.
+For a deleted or disabled user this operation covers all teams.
+Press then also disables the user and invalidates the API keys.
+`tenant.set_enabled` is destructive if it disables the user.
+","İş yıkıcıysa doğrudur.
+`press.remove_team_member` her zaman yıkıcıdır.
+Silinen ya da kapatılan kullanıcı için bu iş bütün takımları kapsar.
+Press o zaman kullanıcıyı da kapatır ve API anahtarlarını geçersiz yapar.
+`tenant.set_enabled` kullanıcıyı kapatıyorsa yıkıcıdır.
+",identity_sync.openapi.yaml: components.schemas.Preview.properties.destructive.description
+The name of the operation.,İşin adı.,identity_sync.openapi.yaml: components.schemas.Preview.properties.operation.description
+An English sentence that describes the operation. It refers to the user by the `sub` id.,İşi anlatan İngilizce cümle. Kullanıcıyı `sub` kimliğiyle anar.,identity_sync.openapi.yaml: components.schemas.Preview.properties.summary.description
+"The target of the operation. For example, the name of the tenant.",İşin hedefi. Örneğin kiracının adı.,identity_sync.openapi.yaml: components.schemas.Preview.properties.target.description
+"The keyed digest of the preview (HMAC-SHA256). The approval is bound to this digest.
+The execute request must carry the same digest.
+","Önizlemenin anahtarlı özeti (HMAC-SHA256). Onay bu özete bağlanır.
+Yürütme isteği aynı özeti taşımalıdır.
+",identity_sync.openapi.yaml: components.schemas.PreviewDigest.description
+"One record in the dead-letter queue. The record can be a Keycloak event or the service's own request.
+If the `kind` value is `request`, the record is the deletion job of one account.
+Then the `type` value is `ACCOUNT_DELETION`, or `ACCOUNT_REMOVAL` when Keycloak no longer has the user.
+The id of such a record is the id of the job. The record does not show the `user_id` field.
+A Keycloak delete event (`USER_DELETE` or `DELETE_ACCOUNT`) does not show the `user_id` field either.
+The `request` kind cannot come from the event endpoint. The service itself produces it.
+","Bekleme kuyruğundaki bir kayıt. Kayıt bir Keycloak olayı ya da servisin kendi isteği olabilir.
+`kind` değeri `request` ise kayıt bir hesabın silme işidir.
+O zaman `type` değeri `ACCOUNT_DELETION` olur. Kullanıcı Keycloak'ta artık yoksa `ACCOUNT_REMOVAL` olur.
+Böyle bir kaydın kimliği işin kimliğidir. Kayıt `user_id` alanını göstermez.
+Keycloak silme olayı da (`USER_DELETE` ya da `DELETE_ACCOUNT`) `user_id` alanını göstermez.
+`request` türü olay ucundan gelemez. Onu servis kendisi üretir.
+",identity_sync.openapi.yaml: components.schemas.QueuedEvent.description
+A repair request. Only the approval layer can send it.,Düzeltme isteği. Yalnız onay katmanı gönderebilir.,identity_sync.openapi.yaml: components.schemas.ReconcileExecuteRequest.description
+A preview request. The service changes no record.,Önizleme isteği. Servis hiçbir kaydı değiştirmez.,identity_sync.openapi.yaml: components.schemas.ReconcilePreviewRequest.description
+The number of differences.,Fark sayısı.,identity_sync.openapi.yaml: components.schemas.ReconcileReport.properties.count.description
+Returned only in a preview. It is the preview of the operations that will remove the differences.,Yalnız önizlemede döner. Farkları giderecek işlerin önizlemesidir.,identity_sync.openapi.yaml: components.schemas.ReconcileReport.properties.previews.description
+Returned only in a repair. It is the result of every operation.,Yalnız düzeltmede döner. Her işin sonucudur.,identity_sync.openapi.yaml: components.schemas.ReconcileReport.properties.results.description
+The caller must write the `dry_run` field explicitly. One of two forms is valid.,Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.,identity_sync.openapi.yaml: components.schemas.ReconcileRequest.description
+The failed step and its status code. It carries no response body.,Başarısız adım ve durum kodu. Yanıt gövdesi taşımaz.,identity_sync.openapi.yaml: components.schemas.RepairResult.properties.error.description
+"The name of the operation. For example, `tenant.set_enabled`.
+The value `account_deletion` is the deletion job of one account that Keycloak no longer has.
+","İşin adı. Örneğin `tenant.set_enabled`.
+`account_deletion` değeri, Keycloak'ta artık olmayan bir hesabın silme işidir.
+",identity_sync.openapi.yaml: components.schemas.RepairResult.properties.operation.description
+"`done` shows that the target gave a definite success response.
+`failed` shows that the target rejected the operation or could not be reached.
+`unknown` shows that it is not known whether the operation finished.
+","`done` değeri hedefin kesin başarı yanıtı verdiğini gösterir.
+`failed` değeri hedefin işi reddettiğini ya da ulaşılamadığını gösterir.
+`unknown` değeri işin bitip bitmediğinin bilinmediğini gösterir.
+",identity_sync.openapi.yaml: components.schemas.RepairResult.properties.status.description
+"The target of the operation. The value is `press` or the name of the tenant.
+For the `account_deletion` operation it is the id of the job.
+","İşin hedefi. Değer `press` ya da kiracının adıdır.
+`account_deletion` işinde değer işin kimliğidir.
+",identity_sync.openapi.yaml: components.schemas.RepairResult.properties.target.description
+An execute request. Only the approval layer can send it.,Yürütme isteği. Yalnız onay katmanı gönderebilir.,identity_sync.openapi.yaml: components.schemas.ReplayExecuteRequest.description
+It must be the same as the value in the preview. Otherwise the digest does not match.,Önizlemedeki değerle aynı olmalıdır. Yoksa özet tutmaz.,identity_sync.openapi.yaml: components.schemas.ReplayExecuteRequest.properties.include_unknown.description
+A preview request. The service changes no record.,Önizleme isteği. Servis hiçbir kaydı değiştirmez.,identity_sync.openapi.yaml: components.schemas.ReplayPreviewRequest.description
+"If true, the service also adds the events in the `unknown` state to the plan.
+The default value is false.
+","Doğruysa servis `unknown` durumundaki olayları da plana katar.
+Varsayılan değer yanlıştır.
+",identity_sync.openapi.yaml: components.schemas.ReplayPreviewRequest.properties.include_unknown.description
+The caller must write the `dry_run` field explicitly. One of two forms is valid.,Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.,identity_sync.openapi.yaml: components.schemas.ReplayRequest.description
+"An id that goes into the address path. It carries only letters, digits, hyphens and underscores.","Adres yoluna giren kimlik. Yalnız harf, rakam, tire ve alt çizgi taşır.",identity_sync.openapi.yaml: components.schemas.ResourceId.description
+The session no longer exists.,Oturum artık yok.,identity_sync.openapi.yaml: components.schemas.SessionRevokeResult.properties.revoked.description
+The id of the ended session.,Kapanan oturumun kimliği.,identity_sync.openapi.yaml: components.schemas.SessionRevokeResult.properties.sid.description
+"The response expected from the `platform_core.api.identity.anonymize_user` and `press_tr.api.identity.anonymize_user` endpoints.
+The names of the endpoints are in the shared contract (`docs/sozlesmeler.md`), sections 5 and 6.
+The shared contract defines the response: 200 with the `anonymized` and `found` fields.
+The endpoint disables the user and anonymizes the fields that identify the person. It does not delete business records.
+The endpoint in Press also invalidates the API keys.
+The request carries the `issuer` and `subject` fields. A repeated call gets the same response.
+If the endpoint does not know the identity, `found` is false. The service counts this response as success.
+The tenant can also return 404 and `IdentityNotFound` for an unknown identity. The service counts this response as success too.
+The endpoint returns 409 for a lock conflict or a timeout. The service then tries the request again.
+If a field is missing, the service does not know the result and does not continue with the next step.
+","`platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user` uçlarından beklenen yanıt.
+Uçların adı ortak sözleşmenin 5. ve 6. bölümündedir.
+Ortak sözleşme yanıtı tanımlar: 200 ile `anonymized` ve `found` alanları.
+Uç kullanıcıyı kapatır ve kişiyi gösteren alanları anonim yapar. İş kayıtlarını silmez.
+Press'teki uç API anahtarlarını da geçersiz yapar.
+İstek `issuer` ve `subject` alanlarını taşır. Tekrar çağrı aynı yanıtı alır.
+Uç kimliği tanımıyorsa `found` yanlış olur. Servis bu yanıtı başarı sayar.
+Kiracı, bilinmeyen kimlik için 404 ve `IdentityNotFound` da dönebilir. Servis bu yanıtı da başarı sayar.
+Uç kilit çakışmasında ya da zaman aşımında 409 döner. Servis o zaman isteği yeniden dener.
+Bir alan eksikse servis sonucu bilmez ve sonraki adıma geçmez.
+",identity_sync.openapi.yaml: components.schemas.TargetAnonymizeUserResult.description
+True when the personal fields are anonymized or there was nothing to anonymize.,Kişisel alanlar anonim yapıldıysa ya da anonim yapılacak bir şey yoksa doğrudur.,identity_sync.openapi.yaml: components.schemas.TargetAnonymizeUserResult.properties.message.properties.anonymized.description
+False when the endpoint does not know the identity.,Uç kimliği tanımıyorsa yanlıştır.,identity_sync.openapi.yaml: components.schemas.TargetAnonymizeUserResult.properties.message.properties.found.description
+"The definite success response expected from the `platform_core.api.identity.change_email` endpoint.
+The source is the `platform_core` identity contract in the `contracts/` folder.
+The service also compares the `user` value with the new email it sent.
+","`platform_core.api.identity.change_email` ucundan beklenen kesin başarı yanıtı.
+Kaynak `contracts/platform_core-kimlik.openapi.yaml` dosyasıdır.
+Servis `user` değerini gönderdiği yeni e-postayla da karşılaştırır.
+",identity_sync.openapi.yaml: components.schemas.TargetChangeEmailResult.description
+"The definite success response expected from the `press_tr.api.identity.ensure_team` endpoint.
+This schema is not an endpoint of this service. It is the response the service expects from Press.
+The source is the `contracts/press_tr.openapi.yaml` file.
+","`press_tr.api.identity.ensure_team` ucundan beklenen kesin başarı yanıtı.
+Bu şema bu servisin ucu değildir. Servisin Press'ten beklediği yanıttır.
+Kaynak `contracts/press_tr.openapi.yaml` dosyasıdır.
+",identity_sync.openapi.yaml: components.schemas.TargetEnsureTeamResult.description
+True if the team was created in this request.,Takım bu istekte açıldıysa doğrudur.,identity_sync.openapi.yaml: components.schemas.TargetEnsureTeamResult.properties.message.properties.created.description
+The name of the team in Press.,Press'teki takımın adı.,identity_sync.openapi.yaml: components.schemas.TargetEnsureTeamResult.properties.message.properties.team.description
+"The response expected from the `list_identities` endpoints. This schema is not an endpoint of this service.
+The shared contract (`docs/sozlesmeler.md`, section 7) names the endpoints and the fields.
+Every row carries the `issuer` and `subject` fields and whether the account is enabled.
+The row carries no email and no name. So the service does not compare the email or the teams of an existing record.
+The request takes `start` and `page_length`. The `page_length` value is at most 500. The order is `subject`, ascending.
+The service reads every page. It computes the differences only after the last page.
+If the response has another shape or the paging does not end, the service reports an error and concludes nothing.
+","`list_identities` uçlarından beklenen yanıt. Bu şema bu servisin bir ucu değildir.
+Ortak sözleşmenin 7. bölümü uçları ve alanları adlandırır.
+Her satır `issuer` ve `subject` alanlarını ve hesabın açık olup olmadığını taşır.
+Satır e-posta ve ad taşımaz. Bu yüzden servis var olan kaydın e-postasını ve takımlarını karşılaştırmaz.
+İstek `start` ve `page_length` alır. `page_length` en çok 500 olur. Sıra `subject` değerine göre artandır.
+Servis bütün sayfaları okur. Farkları ancak son sayfadan sonra hesaplar.
+Yanıt başka biçimdeyse ya da sayfalama bitmiyorsa servis hata bildirir ve hiçbir sonuç çıkarmaz.
+",identity_sync.openapi.yaml: components.schemas.TargetIdentityList.description
+True when more records exist after this page.,Bu sayfadan sonra başka kayıt varsa doğrudur.,identity_sync.openapi.yaml: components.schemas.TargetIdentityList.properties.message.properties.has_next_page.description
+"The definite success response expected from the `platform_core.api.identity.provision` endpoint.
+The source is the `platform_core` identity contract in the `contracts/` folder.
+The service also compares the `enabled` value with the value it asked for.
+","`platform_core.api.identity.provision` ucundan beklenen kesin başarı yanıtı.
+Kaynak `contracts/platform_core-kimlik.openapi.yaml` dosyasıdır.
+Servis `enabled` değerini istediği değerle de karşılaştırır.
+",identity_sync.openapi.yaml: components.schemas.TargetProvisionResult.description
+The name of the user in the tenant. This name is the email.,Kullanıcının kiracıdaki adı. Bu ad e-postadır.,identity_sync.openapi.yaml: components.schemas.TargetProvisionResult.properties.message.properties.user.description
+"The definite success response expected from the `press_tr.api.identity.remove_team_member` endpoint.
+The source is the `contracts/press_tr.openapi.yaml` file.
+","`press_tr.api.identity.remove_team_member` ucundan beklenen kesin başarı yanıtı.
+Kaynak `contracts/press_tr.openapi.yaml` dosyasıdır.
+",identity_sync.openapi.yaml: components.schemas.TargetRemoveTeamMemberResult.description
+The user is no longer a member.,Kullanıcı artık üye değil.,identity_sync.openapi.yaml: components.schemas.TargetRemoveTeamMemberResult.properties.message.properties.member.description
+The name of the team. It is null in a request for all teams or if there is no team.,Takımın adı. Bütün takımlar için istekte ya da takım yoksa boştur.,identity_sync.openapi.yaml: components.schemas.TargetRemoveTeamMemberResult.properties.message.properties.team.description
+"The response expected from the `platform_core.api.mobile.revoke_user_installations` endpoint.
+The name of the endpoint is in the shared contract (`docs/sozlesmeler.md`), section 5. Its owner is the platform-core-mobil job.
+The shared contract does not define the response body. This schema follows the code of the platform-core-mobil job.
+The endpoint deletes all phone installations and notification links of the user.
+The request carries the `issuer` and `subject` fields. The endpoint must be safe to repeat.
+If there is no link, the endpoint returns 404 and `IdentityNotFound`. The service counts this response as success.
+","`platform_core.api.mobile.revoke_user_installations` ucundan beklenen yanıt.
+Ucun adı ortak sözleşmenin 5. bölümündedir. Sahibi platform-core-mobil işidir.
+Ortak sözleşme yanıt gövdesini tanımlamaz. Bu şema platform-core-mobil işinin kodunu izler.
+Uç kullanıcının bütün telefon kurulumlarını ve bildirim bağlarını siler.
+İstek `issuer` ve `subject` alanlarını taşır. Uç tekrar edilebilir olmalıdır.
+Bağ yoksa uç 404 ve `IdentityNotFound` döner. Servis bu yanıtı başarı sayar.
+",identity_sync.openapi.yaml: components.schemas.TargetRevokeUserInstallationsResult.description
+The number of installations deleted in this request. It is 0 if no installation is left.,Bu istekte silinen kurulum sayısı. Kurulum kalmadıysa 0 olur.,identity_sync.openapi.yaml: components.schemas.TargetRevokeUserInstallationsResult.properties.message.properties.revoked.description
+"The definite success response expected from the `platform_core.api.identity.set_enabled` endpoint.
+The source is the `platform_core` identity contract in the `contracts/` folder.
+The service also compares the `enabled` value with the value it asked for.
+","`platform_core.api.identity.set_enabled` ucundan beklenen kesin başarı yanıtı.
+Kaynak `contracts/platform_core-kimlik.openapi.yaml` dosyasıdır.
+Servis `enabled` değerini istediği değerle de karşılaştırır.
+",identity_sync.openapi.yaml: components.schemas.TargetSetEnabledResult.description
+"The Keycloak service token. The rules are in the shared contract (`docs/sozlesmeler.md`), section 3.
+This token is the token of the requests that come to the service.
+The token the service uses when it goes to the Keycloak Admin API is a separate one.
+That token is requested with `scope=admin-api kc-admin-api` (the shared contract, `docs/sozlesmeler.md`, section 2).
+The Keycloak roles of the service account go only into that token.
+The roles are `view-users`, `query-users`, `manage-users` and the minimum role needed for organizations.
+The token that goes to the tenant and to Press does not carry these roles.
+The service verifies the token with the shared `oidc_verify` library.
+The `aud` value of the token must be only `identity-sync`.
+The `azp` value of the token must be in one of two lists.
+The `IDENTITY_SYNC_PREVIEW_AZP` list gives permission to read and to preview.
+The `IDENTITY_SYNC_EXECUTE_AZP` list also gives permission to execute.
+The `IDENTITY_SYNC_SESSION_AZP` list opens only the `/v1/sessions/revoke` endpoint.
+A client can be in only one of these lists.
+If both lists are empty, the service rejects every request.
+If the library is not installed, the service also rejects every request.
+If the request also carries a cookie, the service rejects the request.
+","Keycloak servis belirteci. Kurallar ortak sözleşmenin 3. bölümündedir.
+Bu belirteç servise gelen isteklerin belirtecidir.
+Servisin Keycloak Admin API'ye giderken kullandığı belirteç ayrıdır.
+O belirteç `scope=admin-api kc-admin-api` ile istenir (ortak sözleşme, 2. bölüm).
+Servis hesabının Keycloak rolleri yalnız o belirtece girer.
+Roller `view-users`, `query-users`, `manage-users` ve kuruluş için gereken en az roldür.
+Kiracıya ve Press'e giden belirteç bu rolleri taşımaz.
+Servis belirteci ortak `oidc_verify` kitaplığıyla doğrular.
+Belirtecin `aud` değeri yalnız `identity-sync` olmalıdır.
+Belirtecin `azp` değeri iki listeden birinde olmalıdır.
+`IDENTITY_SYNC_PREVIEW_AZP` listesi okuma ve önizleme izni verir.
+`IDENTITY_SYNC_EXECUTE_AZP` listesi ayrıca yürütme izni verir.
+`IDENTITY_SYNC_SESSION_AZP` listesi yalnız `/v1/sessions/revoke` ucunu açar.
+Bir istemci bu listelerden yalnız birinde durabilir.
+İki liste de boşsa servis her isteği reddeder.
+Kitaplık kurulu değilse servis yine her isteği reddeder.
+İstek çerez de taşıyorsa servis isteği reddeder.
+",identity_sync.openapi.yaml: components.securitySchemes.serviceToken.description
+"The value has the form `sha256=<hex digest>`.
+The digest is produced with HMAC-SHA256. The key is in the `IDENTITY_SYNC_WEBHOOK_SECRET` environment variable.
+
+The signed content has three parts, `<timestamp>.<mode>.<raw body>`.
+The timestamp is the value in the `X-Identity-Sync-Timestamp` header.
+The mode is `execute` or `preview`. The mode of a `dry_run=true` request is `preview`.
+
+The service makes these three checks.
+The timestamp can differ from the clock of the service by at most 300 seconds.
+The same signature is accepted only once. A second use gets 401.
+A preview signature is not accepted for execution. An execution signature is not accepted for a preview either.
+
+If the sender will send the same event again, it signs again with a new timestamp.
+","Değer `sha256=<onaltılık özet>` biçimindedir.
+Özet HMAC-SHA256 ile üretilir. Anahtar `IDENTITY_SYNC_WEBHOOK_SECRET` ortam değişkenindedir.
+
+İmzalanan içerik üç parçadır: `<zaman damgası>.<kip>.<ham gövde>`.
+Zaman damgası `X-Identity-Sync-Timestamp` başlığındaki değerdir.
+Kip `execute` ya da `preview` olur. `dry_run=true` isteğinin kipi `preview` olur.
+
+Servis şu üç denetimi yapar.
+Zaman damgası servisin saatinden en çok 300 saniye farklı olabilir.
+Aynı imza yalnız bir kez geçer. İkinci kullanım 401 alır.
+Önizleme imzası yürütmede geçmez. Yürütme imzası da önizlemede geçmez.
+
+Gönderen aynı olayı yeniden gönderecekse yeni zaman damgasıyla yeniden imzalar.
+",identity_sync.openapi.yaml: components.securitySchemes.webhookSignature.description
+"This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
+
+The service receives the event. Then it reads the current state of the user from Keycloak.
+It chooses the actions from this current state. So the result does not change even if the same event arrives twice.
+
+## Endpoint markers
+
+The status extension key tells whether the endpoint exists in code. It is the `x-` key that takes the value below.
+`uygulandi` means the endpoint is implemented in code. Every endpoint in this file is implemented.
+
+`x-yikici` tells whether the endpoint can do destructive work.
+Destructive work is work that disables a user or removes a membership.
+No endpoint does paid work.
+
+`x-yurutme` tells who can execute the endpoint. It takes four values.
+The value that names the approval layer means this. Only the approval layer starts the real execution.
+`otomatik` means the endpoint needs no human approval. For example, the event endpoint is like this.
+`yalniz-okur` means the endpoint changes no record.
+`press-only` means only the Press service client starts the work. The account deletion endpoint is like this.
+
+## AI and human approval
+
+The rules are in section 10 of `docs/sozlesmeler.md`.
+
+AI cannot execute the write endpoints of this service directly.
+The AI agent only reads and asks for a preview. A preview changes no record.
+Real execution comes only from the approval layer inside `platform_core`.
+The approval layer calls with its own service token after a human approves.
+
+The flow is as follows.
+
+1. The agent or the approval layer calls the endpoint with `dry_run: true`.
+2. The service returns the operations that would run and a `preview_digest` value.
+3. The approval layer shows the operations to the human. The approval is bound to this digest.
+4. The human approves. The approval layer calls the endpoint with `dry_run: false`.
+5. The request carries the `preview_digest` and `approval_id` fields.
+6. The service records the approval id as single-use. This record is written before the first external write.
+   If the same `approval_id` arrives a second time, the service returns 409 and `approval_used`.
+7. The service computes the plan again. If the digest does not match, it returns 409 and `preview_changed`.
+8. The service writes the caller, the approval id, the digest and the result to the log.
+
+The digest covers everything that will be written. It covers the name, the target and all field values of every operation.
+For example, if the email or the name changes after the preview, the digest does not match.
+The digest is a keyed hash value, HMAC-SHA256. The key is in the `IDENTITY_SYNC_DIGEST_KEY` environment secret.
+Only the service knows the key. So someone who sees the digest cannot compare an email guess with the digest.
+The digest in the log is the same keyed value. The preview text carries no email and no name.
+For an operation that creates an organization or adds a member to an organization, the digest also covers the real Keycloak id of the organization.
+The service looks up the organization during planning. It does not look it up again during execution.
+If the organization was created after the preview, or a different organization was found, the digest does not match.
+
+One request can cover more than one event. If the plan of any event changed, the whole request returns 409.
+The service writes no event in that request.
+The service computes the plan once more at execution time. If the plan is not exactly the same, the operation does not run.
+
+The service keeps four client lists.
+A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
+A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute. This list holds the service clients of the tenant sites.
+The human gives the approval in the AI layer of the tenant site. So the tenant site calls the execution.
+A client in the `IDENTITY_SYNC_SESSION_AZP` list can end a session. This list holds the same tenant site clients.
+The two lists must be equal. Every client in them must be the service client of a tenant in the tenant list.
+If not, the service does not start. A client that is bound to no tenant gets 403 when it asks for execution.
+A client in the preview list or in the deletion list cannot be in another list.
+A tenant site client can invite a user only into the organization of its own tenant.
+The service finds the tenant from the `azp` value of the token. The body cannot choose the tenant.
+The reconcile, replay and operation endpoints work on the whole platform. They are not bound to one tenant.
+This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
+A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
+Only a trusted service client goes into the execute list.
+The agent token and the model identity do not go into this list.
+The trust boundary is this. Only the client of the approval layer can call execution.
+This service does not give approval. The approval layer checks the lifetime of the approval.
+The approval id is bound to the digest it was first used with and cannot be used again.
+A request rejected because the plan changed also consumes the approval. A new plan needs a new approval.
+
+## Account deletion and disabled accounts
+
+The source of the account deletion flow is the shared contract (`docs/sozlesmeler.md`), section 7, and project record O-27.
+The flow has five steps and the order is fixed.
+
+1. The service disables the Keycloak user. It does not delete the user in this step.
+2. The service sends an `all_organizations: true` request to Press. Press disables the user and invalidates the API keys.
+3. The service disables the user in every tenant. Then it has the phone installations and the notification links deleted.
+4. The service has the fields that identify the person anonymized in Press and in every tenant. Business records are not deleted.
+5. The service deletes the Keycloak user.
+
+Only Press starts this flow, with the `POST /v1/account-deletions` endpoint.
+The customer asks for the deletion on Press. Press authenticates the customer again in Keycloak before it calls the service.
+The `delete_account` action of Keycloak itself is switched off. That action deletes the user in the first step.
+
+Every step can be repeated. The steps depend on each other.
+If a step fails, the service executes no later step and the request goes into the dead-letter queue.
+The service stores how many steps are finished. A replay continues from the first step that is not finished.
+A human replays the request with the `POST /v1/dead-letters/replay` endpoint. Press can also send the same request again.
+The id of the request is a keyed digest of the account. So one account is always one request.
+When the work is done, only this id stays in the service record. The record carries no email and no user id.
+The service processes the user by the `sub` id. It never stores the email.
+
+An administrator can delete a user on the Keycloak admin screen. The event listener then sends the `USER_DELETE` event.
+The service confirms that Keycloak no longer has the user. Then it executes steps 2, 3 and 4 in the same order.
+
+The Press request and the Keycloak delete event are one job for one account. The id of the job is the keyed digest of the account.
+Step 5 deletes the Keycloak user, so the event listener reports that delete too. That event finds the finished job and starts nothing.
+If the Press request stopped at a step, the delete event continues the same job. The service does not call a finished step again.
+A preview and the dead-letter list show the id of the job. They do not show the id of the account.
+The same holds for a Keycloak delete event that waits in the queue, whatever Keycloak answers about the user.
+When the job is done, the service records the end and removes the id of the account from its records in one storage transaction.
+If that write fails, the job is not done. A retry writes to no target and only completes the record.
+After the job is done, the service knows the account only by the keyed digest of the job.
+A later event of that account returns `duplicate`. The service does not execute it and does not record it.
+A replay asks the storage before every event whether the record is still in the queue.
+
+If the delete event is lost, the reconcile command finds the deleted user. Its difference kind is `deleted_in_keycloak`.
+The reconcile preview shows the steps of the job that are left. After the human approves, these steps are executed in order.
+This also works when the local account is already disabled.
+
+For a user disabled in Keycloak, the service also has the phone installations revoked.
+This operation is part of the disable plan.
+
+Steps 3 and 4 call three endpoints in the tenant and in Press. The names are in the shared contract (`docs/sozlesmeler.md`), sections 5, 6 and 7.
+The endpoints are named `platform_core.api.mobile.revoke_user_installations`,
+`platform_core.api.identity.anonymize_user` and `press_tr.api.identity.anonymize_user`.
+The shared contract defines the response of the two anonymize endpoints: 200 with the `anonymized` and `found` fields.
+These endpoints return 409 for a lock conflict or a timeout. The service then tries the request again.
+The responses the service expects are in the `Target` schemas at the end of this file.
+
+## Common errors of all endpoints
+
+These errors are not written separately on every endpoint.
+An unknown path returns 404 and `not_found`.
+A wrong method returns 405 and `method_not_allowed`.
+A body larger than 65,536 bytes returns 413 and `too_large`.
+One client address can send a limited number of requests in one minute. The default is 600.
+Over the limit the service returns 429 and `rate_limited` and does not read the body. The caller waits one minute.
+The limit also covers the endpoints that need no token. These are the health check and the event endpoint.
+An invalid `Content-Length` header also returns 413. The service does not support a chunked body.
+A storage file error returns 500 and `storage_failed`.
+If another process is handling an event, the service waits at most 10 seconds.
+If the time runs out, the service returns 503 and `busy`. The caller must send the request again.
+On the event endpoint, a resend needs a new timestamp and a new signature.
+The connection of a request that does not complete its headers and body within 10 seconds is closed.
+
+## Definite success response of the target endpoints
+
+The service calls the write endpoints of Press and of the tenant.
+These endpoints are named `press_tr.api.identity.*` and `platform_core.api.identity.*`.
+The contracts of these endpoints are the Press contract `contracts/press_tr.openapi.yaml` (0.1.0) and
+the `platform_core` identity contract in the same `contracts/` folder (0.2.0).
+The service counts only this response as success. It is HTTP 200 with a body that fits the result schema of that endpoint.
+The schemas are at the end of this file and start with `Target`.
+The service also compares the final state in the response with the state it asked for.
+For example, if it disabled the user, `enabled` must be false in the response.
+The target must have finished the work before it responds.
+A 202, an empty body or a body that does not fit the schema is not success.
+
+For a user with no tenant link, the tenant returns 404 and `IdentityNotFound`.
+The service counts this response as success in two operations. They are disabling the user and changing the email.
+The reason is that without a link there is no record to disable or to rename.
+If the `exc_type` field is not `IdentityNotFound`, a 404 is an error. A wrong address also returns 404.
+
+In the tenant the service calls `change_email` first and `provision` after it.
+The reason is that the tenant rejects the `provision` request with `EmailMismatch` while the link shows the old email.
+The service writes such an event to the dead-letter queue with the `unknown` state.
+The service does not count this event as processed and does not retry it by itself.
+If the same event arrives again, the service does not repeat the write and returns `unknown` again.
+A human checks the target. Then the human replays the event with the `include_unknown` option.
+If the request reached the target but the response could not be read, the result is also `unknown`.
+The 502 and 504 responses also count as `unknown`. The reason is that the server in between may have forwarded the request.
+If the connection could not be made at all, the result is not `unknown`. In this case the service retries.
+
+## Interrupted work
+
+The service writes an accepted event to the dead-letter queue before it starts the work.
+This record is in the `failed` state and its attempt count is 0.
+The service sets the record to `unknown` just before the first external write.
+If the process stops midway, the record stays in the queue.
+If no write started, the event is replayed by hand.
+If a write started, the result is not known. A human checks the target and replays with `include_unknown`.
+When the event finishes with success, the record leaves the queue.
+
+## Disabled and deleted accounts
+
+A user disabled or deleted in Keycloak is disabled everywhere.
+This plan does not depend on the membership list or on the Organization record.
+The service sends the disable requests even if those reads fail.
+The service sends a single `all_organizations: true` request to Press.
+Press then disables the user and invalidates the API keys.
+","Bu servis Keycloak'taki kullanıcı değişikliklerini Press'e ve kiracı sitelerine taşır (G-81).
+
+Servis olayı alır. Sonra kullanıcının güncel durumunu Keycloak'tan okur.
+Eylemleri bu güncel duruma göre seçer. Bu yüzden aynı olay iki kez gelse de sonuç değişmez.
+
+## Uçların işaretleri
+
+`x-durum` alanı ucun kodda olup olmadığını söyler.
+`uygulandi` değeri ucun kodda olduğunu gösterir. Bu dosyadaki bütün uçlar koddadır.
+
+`x-yikici` alanı ucun yıkıcı iş yapıp yapamadığını söyler.
+Yıkıcı iş, kullanıcıyı kapatan ya da üyeliği kaldıran iştir.
+Hiçbir uç ücretli iş yapmaz.
+
+`x-yurutme` alanı ucu kimin yürütebildiğini söyler. Alan dört değer alır.
+`yalniz-onay-katmani` değeri şunu söyler: gerçek yürütmeyi yalnız onay katmanı başlatır.
+`otomatik` değeri ucun insan onayı istemediğini söyler. Örneğin olay ucu böyledir.
+`yalniz-okur` değeri ucun hiçbir kaydı değiştirmediğini söyler.
+`press-only` değeri işi yalnız Press servis istemcisinin başlattığını söyler. Hesap silme ucu böyledir.
+
+## Yapay zekâ ve insan onayı
+
+Kurallar `docs/sozlesmeler.md` dosyasının 10. bölümündedir.
+
+Yapay zekâ bu servisin yazma uçlarını doğrudan yürütemez.
+Yapay zekâ aracısı yalnız okur ve önizleme ister. Önizleme hiçbir kaydı değiştirmez.
+Gerçek yürütme yalnız `platform_core` içindeki onay katmanından gelir.
+Onay katmanı insan onayladıktan sonra kendi servis belirteciyle çağırır.
+
+Akış şudur:
+
+1. Aracı ya da onay katmanı ucu `dry_run: true` ile çağırır.
+2. Servis çalışacak işleri ve bir `preview_digest` değeri döner.
+3. Onay katmanı işleri insana gösterir. Onay bu özete bağlanır.
+4. İnsan onaylar. Onay katmanı ucu `dry_run: false` ile çağırır.
+5. İstek `preview_digest` ve `approval_id` alanlarını taşır.
+6. Servis onay kimliğini tek kullanımlık olarak kaydeder. Bu kayıt ilk dış yazmadan önce yazılır.
+   Aynı `approval_id` ikinci kez gelirse servis 409 ve `approval_used` döner.
+7. Servis planı yeniden hesaplar. Özet tutmazsa 409 ve `preview_changed` döner.
+8. Servis çağıranı, onay kimliğini, özeti ve sonucu günlüğe yazar.
+
+Özet yazılacak her şeyi kapsar: her işin adını, hedefini ve bütün alan değerlerini.
+Örneğin e-posta ya da ad önizlemeden sonra değişirse özet tutmaz.
+Özet anahtarlı bir karma değerdir: HMAC-SHA256. Anahtar `IDENTITY_SYNC_DIGEST_KEY` ortam sırrındadır.
+Anahtarı yalnız servis bilir. Bu yüzden özeti gören biri bir e-posta tahminini özetle karşılaştıramaz.
+Günlükteki özet de aynı anahtarlı değerdir. Önizleme metni e-posta ve ad taşımaz.
+Özet, kuruluş açan ya da kuruluşa üye ekleyen işte kuruluşun gerçek Keycloak kimliğini de kapsar.
+Servis kuruluşu plan sırasında arar. Yürütmede yeniden aramaz.
+Kuruluş önizlemeden sonra oluştuysa ya da başka bir kuruluş bulunduysa özet tutmaz.
+
+Bir istek birden çok olay kapsayabilir. Herhangi bir olayın planı değiştiyse bütün istek 409 döner.
+Servis o istekte hiçbir olayı yazmaz.
+Servis yürütme anında planı bir kez daha hesaplar. Plan birebir aynı değilse iş yürümez.
+
+Servis dört istemci listesi tutar.
+`IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
+`IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır.
+İnsan onayı kiracı sitesindeki yapay zekâ katmanında verir. Bu yüzden yürütmeyi kiracı sitesi çağırır.
+`IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
+İki liste eşit olmalıdır. Listelerdeki her istemci, kiracı listesindeki bir kiracının servis istemcisi olmalıdır.
+Değilse servis açılmaz. Hiçbir kiracıya bağlı olmayan istemci yürütme isterse 403 alır.
+Önizleme listesindeki ya da silme listesindeki istemci başka bir listede olamaz.
+Kiracı sitesinin istemcisi yalnız kendi kiracısının kuruluşuna kullanıcı davet edebilir.
+Servis kiracıyı belirtecin `azp` değerinden bulur. Gövde kiracıyı seçemez.
+Mutabakat, yeniden işletme ve işlem uçları bütün platformda çalışır. Bu uçlar tek kiracıya bağlı değildir.
+Bu servis Keycloak'ta istemci açmaz. Yeni kiracının istemcisini kimlik-realm işi açar. O komutu insan başlatır.
+`IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
+Yürütme listesine yalnız güvenilir servis istemcisi girer.
+Aracı belirteci ve model kimliği bu listeye girmez.
+Güven sınırı şudur: yürütmeyi yalnız onay katmanının istemcisi çağırabilir.
+Bu servis onay vermez. Onayın süresini onay katmanı denetler.
+Onay kimliği ilk kullanıldığı özete bağlıdır ve bir daha kullanılamaz.
+Plan değiştiği için reddedilen istek de onayı tüketir. Yeni plan yeni onay ister.
+
+## Hesap silme ve kapalı hesap
+
+Hesap silme akışının kaynağı ortak sözleşmenin 7. bölümü ve proje kaydının O-27 kararıdır.
+Akış beş adımdır ve sırası sabittir.
+
+1. Servis Keycloak kullanıcısını kapatır. Bu adımda kullanıcıyı silmez.
+2. Servis Press'e `all_organizations: true` isteği gönderir. Press kullanıcıyı kapatır ve API anahtarlarını geçersiz yapar.
+3. Servis kullanıcıyı her kiracıda kapatır. Sonra telefon kurulumlarını ve bildirim bağlarını sildirir.
+4. Servis kişiyi gösteren alanları Press'te ve her kiracıda anonim yaptırır. İş kayıtları silinmez.
+5. Servis Keycloak kullanıcısını siler.
+
+Bu akışı yalnız Press başlatır. Press `POST /v1/account-deletions` ucunu çağırır.
+Müşteri silme isteğini Press'te verir. Press servisi çağırmadan önce müşteriyi Keycloak'ta yeniden doğrular.
+Keycloak'ın kendi `delete_account` eylemi kapalıdır. O eylem kullanıcıyı ilk adımda siler.
+
+Her adım tekrar edilebilir. Adımlar birbirine bağlıdır.
+Bir adım başarısız olursa servis sonraki adımları yürütmez ve istek bekleme kuyruğuna girer.
+Servis kaç adımın bittiğini saklar. Yeniden işletme, bitmemiş ilk adımdan sürer.
+İnsan isteği `POST /v1/dead-letters/replay` ucuyla yeniden işletir. Press de aynı isteği yeniden gönderebilir.
+İsteğin kimliği hesabın anahtarlı özetidir. Bu yüzden bir hesap her zaman tek istektir.
+İş bitince servisin kaydında yalnız bu kimlik kalır. Kayıt e-posta ve kullanıcı kimliği taşımaz.
+Servis kullanıcıyı `sub` kimliğiyle işler. E-postayı hiç saklamaz.
+
+Yönetici bir kullanıcıyı Keycloak yönetim ekranından silebilir. Olay dinleyici o zaman `USER_DELETE` olayını gönderir.
+Servis kullanıcının Keycloak'ta artık olmadığını doğrular. Sonra 2., 3. ve 4. adımı aynı sırayla yürütür.
+
+Press isteği ve Keycloak silme olayı bir hesap için tek iştir. İşin kimliği hesabın anahtarlı özetidir.
+5. adım Keycloak kullanıcısını siler. Olay dinleyici bu silmeyi de bildirir. O olay bitmiş işi bulur ve hiçbir iş başlatmaz.
+Press isteği bir adımda durduysa silme olayı aynı işi sürdürür. Servis bitmiş adımı yeniden çağırmaz.
+Önizleme ve bekleme kuyruğu listesi işin kimliğini gösterir. Hesabın kimliğini göstermez.
+Kuyrukta bekleyen Keycloak silme olayı için de böyledir. Keycloak kullanıcı hakkında ne yanıt verirse versin sonuç değişmez.
+İş bitince servis bitişi kaydeder ve hesabın kimliğini kayıtlarından siler. İkisi tek kayıt işlemidir.
+Bu yazma başarısız olursa iş bitmiş sayılmaz. Yeniden deneme hiçbir hedefe yazmaz, yalnız kaydı tamamlar.
+İş bitince servis hesabı yalnız işin anahtarlı özetinden bilir.
+O hesabın sonradan gelen olayı `duplicate` döner. Servis o olayı yürütmez ve kaydetmez.
+Yeniden işletme her olaydan önce kaydın hâlâ kuyrukta olduğunu kayıttan sorar.
+
+Silme olayı kaybolursa mutabakat komutu silinen kullanıcıyı bulur. Bu farkın türü `deleted_in_keycloak` olur.
+Mutabakat önizlemesi işin kalan adımlarını gösterir. İnsan onay verince bu adımlar sırayla yürür.
+Yerel hesap önceden kapalı olsa da bu yol çalışır.
+
+Keycloak'ta kapatılan kullanıcı için servis telefon kurulumlarını da iptal ettirir.
+Bu iş kapatma planının parçasıdır.
+
+3. ve 4. adım kiracıda ve Press'te üç ucu çağırır. Adlar ortak sözleşmenin 5., 6. ve 7. bölümündedir.
+Uçlar `platform_core.api.mobile.revoke_user_installations`,
+`platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user` adını taşır.
+Ortak sözleşme iki anonim yapma ucunun yanıtını tanımlar: 200 ile `anonymized` ve `found` alanları.
+Bu uçlar kilit çakışmasında ya da zaman aşımında 409 döner. Servis o zaman isteği yeniden dener.
+Servisin beklediği yanıtlar bu dosyanın sonundaki `Target` şemalarındadır.
+
+## Bütün uçların ortak hataları
+
+Bu hatalar her uçta ayrıca yazılmadı.
+Bilinmeyen yol 404 ve `not_found` döner.
+Yanlış yöntem 405 ve `method_not_allowed` döner.
+65.536 bayttan büyük gövde 413 ve `too_large` döner.
+Bir istemci adresi bir dakikada sınırlı sayıda istek gönderebilir. Varsayılan sınır 600'dür.
+Sınır aşılınca servis 429 ve `rate_limited` döner ve gövdeyi okumaz. Çağıran bir dakika bekler.
+Sınır belirteç istemeyen uçları da kapsar. Bunlar sağlık denetimi ve olay ucudur.
+Geçersiz `Content-Length` başlığı da 413 döner. Servis parçalı gövdeyi desteklemez.
+Kayıt dosyası hatası 500 ve `storage_failed` döner.
+Başka bir süreç bir olayı işliyorsa servis en çok 10 saniye bekler.
+Süre dolarsa servis 503 ve `busy` döner. Çağıran isteği yeniden göndermelidir.
+Olay ucunda yeniden gönderim yeni zaman damgası ve yeni imza ister.
+Başlığını ve gövdesini 10 saniyede tamamlamayan isteğin bağlantısı kapanır.
+
+## Hedef uçların kesin başarı yanıtı
+
+Servis Press'in ve kiracının yazma uçlarını çağırır.
+Bu uçlar `press_tr.api.identity.*` ve `platform_core.api.identity.*` adlarını taşır.
+Bu uçların sözleşmeleri `contracts/press_tr.openapi.yaml` (0.1.0) ve
+`contracts/platform_core-kimlik.openapi.yaml` (0.2.0) dosyalarındadır.
+Servis yalnız şu yanıtı başarı sayar: HTTP 200 ve o ucun sonuç şemasına uyan gövde.
+Şemalar bu dosyanın sonundadır ve `Target` ile başlar.
+Servis yanıttaki son durumu istediği durumla da karşılaştırır.
+Örneğin kullanıcıyı kapattıysa yanıtta `enabled` yanlış olmalıdır.
+Hedef işi yanıt vermeden önce bitirmiş olmalıdır.
+202, boş gövde ya da şemaya uymayan gövde başarı değildir.
+
+Kiracı bağı olmayan kullanıcı için 404 ve `IdentityNotFound` döner.
+Servis bu yanıtı iki işte başarı sayar: kullanıcıyı kapatma ve e-postayı değiştirme.
+Çünkü bağ yoksa kapatılacak ya da adı değişecek kayıt yoktur.
+`exc_type` alanı `IdentityNotFound` değilse 404 bir hatadır. Yanlış adres de 404 döner.
+
+Servis kiracıda önce `change_email`, sonra `provision` çağırır.
+Çünkü kiracı, bağ eski e-postayı gösterirken `provision` isteğini `EmailMismatch` ile reddeder.
+Servis böyle bir olayı `unknown` durumuyla bekleme kuyruğuna yazar.
+Servis bu olayı işlenmiş saymaz ve kendiliğinden yeniden denemez.
+Aynı olay yeniden gelirse servis yazmayı tekrarlamaz ve yine `unknown` döner.
+İnsan hedefi denetler. Sonra olayı `include_unknown` seçeneğiyle yeniden işletir.
+İstek hedefe gitti ama yanıt okunamadıysa sonuç yine `unknown` olur.
+502 ve 504 yanıtları da `unknown` sayılır. Çünkü aradaki sunucu isteği iletmiş olabilir.
+Bağlantı hiç kurulamadıysa sonuç `unknown` değildir. Servis bu durumda yeniden dener.
+
+## Yarıda kalan iş
+
+Servis kabul ettiği olayı işe başlamadan önce bekleme kuyruğuna yazar.
+Bu kayıt `failed` durumundadır ve deneme sayısı 0 olur.
+Servis ilk dış yazmadan hemen önce kaydı `unknown` yapar.
+Süreç yarıda durursa kayıt kuyrukta kalır.
+Yazma başlamadıysa olay elle yeniden işlenir.
+Yazma başladıysa sonuç bilinmez. İnsan hedefi denetler ve `include_unknown` ile yeniden işletir.
+Olay başarıyla bitince kayıt kuyruktan çıkar.
+
+## Kapalı ve silinen hesap
+
+Keycloak'ta kapatılan ya da silinen kullanıcı her yerde kapanır.
+Bu plan üyelik listesine ve Organization kaydına bağlı değildir.
+O okumalar başarısız olsa da servis kapatma isteklerini gönderir.
+Servis Press'e tek bir `all_organizations: true` isteği gönderir.
+Press o zaman kullanıcıyı kapatır ve API anahtarlarını geçersiz yapar.
+",identity_sync.openapi.yaml: info.description
+Endpoints of the user sync service,Kullanıcı eşitleme servisinin uçları,identity_sync.openapi.yaml: info.summary
+This endpoint only reads. It needs no authentication. It returns no personal data.,Bu uç yalnız okur. Kimlik istemez. Kişisel veri dönmez.,identity_sync.openapi.yaml: paths./healthz.get.description
+The service is up.,Servis ayakta.,identity_sync.openapi.yaml: paths./healthz.get.responses.200.description
+Tells that the service is up.,Servisin ayakta olduğunu söyler.,identity_sync.openapi.yaml: paths./healthz.get.summary
+"The source is the shared contract (`docs/sozlesmeler.md`), section 7, and project record O-27.
+A customer asks for the deletion of the customer's own account on Press. Press then calls this endpoint.
+The service records the request and executes the five steps in order.
+The steps are in the ""Account deletion and disabled accounts"" section at the top of this file.
+
+This endpoint is destructive and cannot be undone. The user is disabled everywhere and deleted from Keycloak.
+The fields that identify the person are anonymized. Business records are not deleted.
+
+Only Press can call the endpoint. The token carries `azp=press-service` and `aud=identity-sync`.
+The allowed clients are in the `IDENTITY_SYNC_DELETION_AZP` setting. Clients in the other lists get 403.
+This endpoint has no preview and no approval id. The consent is the fresh login of the account owner.
+Press authenticates the customer again in Keycloak and sends the time of that login in `reauthenticated_at`.
+The service refuses a login that is older than 300 seconds. It also refuses a time that is in the future.
+
+The service records the request before it starts the work. The id of the request is a keyed digest of the account.
+If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`. No later step is executed.
+The request is then in the dead-letter queue. A human replays the request with `POST /v1/dead-letters/replay`.
+Press can also send the same request again. The service continues from the first step that is not finished.
+","Kaynak ortak sözleşmenin 7. bölümü ve proje kaydının O-27 kararıdır.
+Müşteri kendi hesabının silinmesini Press'te ister. Press o zaman bu ucu çağırır.
+Servis isteği kaydeder ve beş adımı sırayla yürütür.
+Adımlar bu dosyanın başındaki “Hesap silme ve kapalı hesap” bölümündedir.
+
+Bu uç yıkıcıdır ve geri alınamaz. Kullanıcı her yerde kapanır ve Keycloak'tan silinir.
+Kişiyi gösteren alanlar anonim yapılır. İş kayıtları silinmez.
+
+Ucu yalnız Press çağırabilir. Belirteç `azp=press-service` ve `aud=identity-sync` taşır.
+İzinli istemciler `IDENTITY_SYNC_DELETION_AZP` ayarındadır. Öteki listelerdeki istemciler 403 alır.
+Bu uçta önizleme ve onay kimliği yoktur. Onay, hesap sahibinin yeni girişidir.
+Press müşteriyi Keycloak'ta yeniden doğrular ve bu girişin zamanını `reauthenticated_at` alanında gönderir.
+Servis 300 saniyeden eski girişi reddeder. Gelecekteki bir zamanı da reddeder.
+
+Servis isteği işe başlamadan önce kaydeder. İsteğin kimliği hesabın anahtarlı özetidir.
+Bir adım başarısız olursa yanıt yine 200 olur ve durum `dead_lettered` ya da `unknown` olur. Sonraki adımlar yürümez.
+İstek o zaman bekleme kuyruğundadır. İnsan isteği `POST /v1/dead-letters/replay` ile yeniden işletir.
+Press de aynı isteği yeniden gönderebilir. Servis bitmemiş ilk adımdan sürdürür.
+",identity_sync.openapi.yaml: paths./v1/account-deletions.post.description
+"The result of the request. The status is `processed`, `dead_lettered`, `unknown` or `duplicate`.","İsteğin sonucu. Durum `processed`, `dead_lettered`, `unknown` ya da `duplicate` olur.",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.200.description
+"The body is invalid. For example, a field is missing, the body carries another field or `issuer` is not the issuer of the realm.","Gövde geçersiz. Örneğin bir alan eksiktir, gövde başka bir alan taşır ya da `issuer` realm'in yayıncı adresi değildir.",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.400.description
+"The client is not in the deletion list. The error code is `forbidden`.
+Or the login in `reauthenticated_at` is older than 300 seconds. The error code is `reauthentication_required`.
+Press then authenticates the customer again and sends a new request.
+","İstemci silme listesinde değildir. Hata kodu `forbidden` olur.
+Ya da `reauthenticated_at` alanındaki giriş 300 saniyeden eskidir. Hata kodu `reauthentication_required` olur.
+Press o zaman müşteriyi yeniden doğrular ve yeni istek gönderir.
+",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.403.description
+Requests the deletion of one account and executes the flow.,Bir hesabın silinmesini ister ve akışı yürütür.,identity_sync.openapi.yaml: paths./v1/account-deletions.post.summary
+"This endpoint is the HTTP counterpart of the `dead-letters` command.
+The endpoint only reads. The records carry no email.
+Clients in the preview list and in the execute list can call this endpoint.
+The list is cut at the `limit` value. If more records exist, the response carries `next_offset`.
+","Bu uç `dead-letters` komutunun HTTP karşılığıdır.
+Uç yalnız okur. Kayıtlar e-posta taşımaz.
+Önizleme listesindeki ve yürütme listesindeki istemciler bu ucu çağırabilir.
+Liste `limit` değerinde kesilir. Başka kayıt varsa yanıt `next_offset` taşır.
+",identity_sync.openapi.yaml: paths./v1/dead-letters.get.description
+The waiting events. The oldest event comes first.,Bekleyen olaylar. En eski olay ilk sıradadır.,identity_sync.openapi.yaml: paths./v1/dead-letters.get.responses.200.description
+Lists the events in the dead-letter queue.,Bekleme kuyruğundaki olayları listeler.,identity_sync.openapi.yaml: paths./v1/dead-letters.get.summary
+"This endpoint is the HTTP counterpart of the `replay-dead-letters` command.
+This endpoint can do destructive work. A waiting event can disable a user.
+
+The preview is open to both lists. A client in either list can send the `dry_run: true` request.
+Only the approval layer starts the real execution.
+The execute request must carry the `preview_digest` and `approval_id` fields.
+If the plan changed after the preview, the service returns 409 and processes no event.
+
+The service executes the whole request under the work lock.
+The service first computes the plan of all events and checks the digest.
+If the plan of any event differs from the approved plan, the service returns 409. No event is written.
+If the digest matches, the service writes exactly those plans. It does not read again between the check and the write.
+An event whose preview cannot be produced is not executed. The result of this event is `failed`.
+If an event created an Organization, the following operations need a new preview and a new approval.
+That event stays in the queue.
+
+A successful event leaves the queue. An event that fails again stays in the queue.
+The service skips an event in the `unknown` state. The reason is that no blind repeat is made against the same target.
+`include_unknown: true` replays these events too. Check the target first.
+","Bu uç `replay-dead-letters` komutunun HTTP karşılığıdır.
+Bu uç yıkıcı iş yapabilir. Bekleyen olay bir kullanıcıyı kapatabilir.
+
+Önizleme herkese açıktır: `dry_run: true` isteğini iki listedeki istemci de gönderebilir.
+Gerçek yürütmeyi yalnız onay katmanı başlatır.
+Yürütme isteği `preview_digest` ve `approval_id` alanlarını taşımalıdır.
+Plan önizlemeden sonra değiştiyse servis 409 döner ve hiçbir olayı işlemez.
+
+Servis bütün isteği iş kilidi altında yürütür.
+Servis önce bütün olayların planını hesaplar ve özeti denetler.
+Herhangi bir olayın planı onaylanan plandan farklıysa servis 409 döner. Hiçbir olay yazılmaz.
+Özet tutarsa servis tam o planları yazar. Denetim ile yazma arasında yeniden okuma yapmaz.
+Önizlemesi üretilemeyen olay yürütülmez. Bu olayın sonucu `failed` olur.
+Bir olay Organization açtıysa sonraki işler yeni bir önizleme ve yeni bir onay ister.
+O olay kuyrukta kalır.
+
+Başarılı olay kuyruktan çıkar. Yine başarısız olan olay kuyrukta kalır.
+Servis `unknown` durumundaki olayı atlar. Çünkü aynı hedefe kör tekrar yapılmaz.
+`include_unknown: true` bu olayları da işletir. Önce hedefi denetleyin.
+",identity_sync.openapi.yaml: paths./v1/dead-letters/replay.post.description
+The result of every event. In a preview it also returns `preview_digest`.,Her olayın sonucu. Önizlemede `preview_digest` de döner.,identity_sync.openapi.yaml: paths./v1/dead-letters/replay.post.responses.200.description
+"The body is invalid. For example, `dry_run` is missing or the approval fields are missing in an execution.",Gövde hatalı. Örneğin `dry_run` yok ya da yürütmede onay alanları eksik.,identity_sync.openapi.yaml: paths./v1/dead-letters/replay.post.responses.400.description
+Replays the events in the dead-letter queue once.,Bekleme kuyruğundaki olayları bir kez yeniden işler.,identity_sync.openapi.yaml: paths./v1/dead-letters/replay.post.summary
+"The event source is the event listener plugin installed in Keycloak (`docs/sozlesmeler.md`, section 7).
+The Keycloak realm job installs the plugin. The plugin sends user events and admin events to this endpoint, signed.
+Our own operations can also call this endpoint.
+An event can get lost. The backup path is the reconcile that is started by hand. That endpoint is `/v1/reconcile`.
+
+The service processes the event in the same request. If an action fails, the event goes into the dead-letter queue.
+In this case the response is still 202. The reason is that the service now keeps the event.
+
+This endpoint can do destructive work. For example, if the user was disabled in Keycloak,
+the service disables the user in all tenants and removes the Press membership.
+This endpoint needs no human approval. The reason is that the event carries a change that already happened in Keycloak.
+
+The service does not choose the action from the content of the event. It chooses from the current state of the user in Keycloak.
+
+The body can be one of two formats.
+The first format is the service envelope. Its schema is named `Event`.
+The second format is the native Keycloak event format.
+Its schemas are named `KeycloakUserEvent` and `KeycloakAdminEvent`.
+
+Keycloak writes the internal id of the realm to the `realmId` field. It does not write the realm name.
+The service compares this id with the `IDENTITY_SYNC_REALM_ID` setting.
+If the id does not match, the service ignores the event. If the setting is empty, the service rejects the Keycloak format with 400.
+
+There is one exception. Keycloak 26.8.2 does not give the id of the user in the member-add event.
+The service cannot process this event in the Keycloak format and returns `ignored`.
+To report a member add, send the envelope with the `user_id` field.
+","Olay kaynağı Keycloak'a kurulan olay dinleyici eklentisidir (`docs/sozlesmeler.md`, 7. bölüm).
+Eklentiyi kimlik-realm işi kurar. Eklenti kullanıcı ve yönetim olaylarını imzalı olarak bu uca gönderir.
+Bizim işlemlerimiz de bu ucu çağırabilir.
+Olay kaybolabilir. Yedek yol elle başlatılan mutabakattır. O uç `/v1/reconcile` adresidir.
+
+Servis olayı aynı istekte işler. Eylem başarısız olursa olay bekleme kuyruğuna girer.
+Bu durumda yanıt yine 202 olur. Çünkü olayı artık servis saklar.
+
+Bu uç yıkıcı iş yapabilir. Örneğin kullanıcı Keycloak'ta kapatıldıysa
+servis kullanıcıyı bütün kiracılarda kapatır ve Press üyeliğini kaldırır.
+Bu uç insan onayı istemez. Çünkü olay Keycloak'ta zaten olmuş bir değişikliği taşır.
+
+Servis eylemi olayın içeriğinden seçmez. Kullanıcının Keycloak'taki güncel durumundan seçer.
+
+Gövde iki biçimden biri olabilir.
+Birinci biçim servis zarfıdır. Şeması `Event` adını taşır.
+İkinci biçim Keycloak'ın kendi olay biçimidir.
+Şemaları `KeycloakUserEvent` ve `KeycloakAdminEvent` adını taşır.
+
+Keycloak `realmId` alanına realm'in iç kimliğini yazar. Realm adını yazmaz.
+Servis bu kimliği `IDENTITY_SYNC_REALM_ID` ayarıyla karşılaştırır.
+Kimlik tutmazsa servis olayı yok sayar. Ayar boşsa servis Keycloak biçimini 400 ile reddeder.
+
+Bir istisna vardır. Keycloak 26.8.2 üye ekleme olayında kullanıcının kimliğini vermez.
+Servis Keycloak biçimindeki bu olayı işleyemez ve `ignored` döner.
+Üye eklemeyi bildirmek için zarfı `user_id` alanıyla gönderin.
+",identity_sync.openapi.yaml: paths./v1/events.post.description
+"If the value is `true`, the service changes no record.
+The service only returns the preview of the operations that would run. The response code is 200.
+If the parameter is missing, the value counts as `false`.
+Any other value or a repeated parameter returns 400. The service does not execute that request.
+The signature covers this choice. A preview signature is not accepted for execution.
+","Değer `true` ise servis hiçbir kaydı değiştirmez.
+Servis yalnız çalışacak işlerin önizlemesini döner. Yanıt kodu 200 olur.
+Parametre yoksa değer `false` sayılır.
+Başka değer ya da yinelenen parametre 400 döner. Servis o isteği yürütmez.
+İmza bu seçimi kapsar. Önizleme imzası yürütmede geçmez.
+",identity_sync.openapi.yaml: paths./v1/events.post.parameters[0].description
+The moment the signature was produced. The unit is seconds (Unix time).,İmzanın üretildiği an. Birim saniyedir (Unix zamanı).,identity_sync.openapi.yaml: paths./v1/events.post.parameters[1].description
+The user verified the email.,Kullanıcı e-postasını doğruladı.,identity_sync.openapi.yaml: paths./v1/events.post.requestBody.content.application/json.examples.epostaDogrulandi.summary
+A user event in the native Keycloak format.,Keycloak'ın kendi biçiminde bir kullanıcı olayı.,identity_sync.openapi.yaml: paths./v1/events.post.requestBody.content.application/json.examples.keycloakKullaniciOlayi.summary
+An admin event in the native Keycloak format.,Keycloak'ın kendi biçiminde bir yönetici olayı.,identity_sync.openapi.yaml: paths./v1/events.post.requestBody.content.application/json.examples.keycloakYoneticiOlayi.summary
+An admin removed the user from the Organization membership.,Yönetici kullanıcıyı Organization üyeliğinden çıkardı.,identity_sync.openapi.yaml: paths./v1/events.post.requestBody.content.application/json.examples.uyelikSilindi.summary
+"The response of a preview request. The service changed no record.
+The status is `preview`, `ignored` or `failed`.
+","Önizleme isteğinin yanıtı. Servis hiçbir kaydı değiştirmedi.
+Durum `preview`, `ignored` ya da `failed` olur.
+",identity_sync.openapi.yaml: paths./v1/events.post.responses.200.description
+The service received the event.,Servis olayı aldı.,identity_sync.openapi.yaml: paths./v1/events.post.responses.202.description
+"The body is not JSON, a required field is missing or the `dry_run` value is invalid.","Gövde JSON değil, zorunlu alan eksik ya da `dry_run` değeri geçersiz.",identity_sync.openapi.yaml: paths./v1/events.post.responses.400.description
+"The signature is missing, wrong, expired or already used.
+The error code is `bad_signature`.
+","İmza yok, yanlış, süresi geçmiş ya da daha önce kullanılmış.
+Hata kodu `bad_signature` olur.
+",identity_sync.openapi.yaml: paths./v1/events.post.responses.401.description
+Receives and processes one Keycloak event.,Bir Keycloak olayını alır ve işler.,identity_sync.openapi.yaml: paths./v1/events.post.summary
+"Press calls this endpoint from inside `press_tr.api.team.invite` (G-16, G-79).
+If the user does not exist, the service creates the user in Keycloak. Then it adds the user to the Organization.
+Then it sends the invitation email with `execute-actions-email`.
+The actions in the email are UPDATE_PASSWORD and CONFIGURE_TOTP.
+This endpoint deletes no record and disables no user. But a sent email cannot be taken back.
+
+The preview is open to both lists. A client in either list can send the `dry_run: true` request.
+The preview only reads.
+Only the approval layer starts the real execution.
+The execute request must carry the `preview_digest` and `approval_id` fields.
+The digest also covers the fields of the request. The approval of one invitation is not accepted for another invitation.
+
+The service executes only the approved plan. If the plan changed in between, the service returns 409.
+For example, if the user was created after the preview, the plan has changed.
+A second invitation does not create a second user. But it needs a new preview and a new approval.
+A second invitation sends the email again.
+If an invitation is cut off midway, a new preview shows the remaining operations.
+","Press bu ucu `press_tr.api.team.invite` içinden çağırır (G-16, G-79).
+Servis kullanıcı yoksa kullanıcıyı Keycloak'ta açar. Sonra kullanıcıyı Organization'a ekler.
+Sonra `execute-actions-email` ile davet e-postasını gönderir.
+E-postadaki işler UPDATE_PASSWORD ve CONFIGURE_TOTP olur.
+Bu uç kayıt silmez ve kullanıcı kapatmaz. Ama gönderilen e-posta geri alınamaz.
+
+Önizleme herkese açıktır: `dry_run: true` isteğini iki listedeki istemci de gönderebilir.
+Önizleme yalnız okur.
+Gerçek yürütmeyi yalnız onay katmanı başlatır.
+Yürütme isteği `preview_digest` ve `approval_id` alanlarını taşımalıdır.
+Özet isteğin alanlarını da kapsar. Bir davetin onayı başka davette geçmez.
+
+Servis yalnız onaylanan planı yürütür. Plan arada değiştiyse servis 409 döner.
+Örneğin kullanıcı önizlemeden sonra açıldıysa plan değişmiştir.
+İkinci davet ikinci kullanıcı açmaz. Ama yeni önizleme ve yeni onay ister.
+İkinci davet e-postayı yeniden gönderir.
+Davet yarıda kesilirse yeni önizleme kalan işleri gösterir.
+",identity_sync.openapi.yaml: paths./v1/invitations.post.description
+The invitation was sent or the preview was produced.,Davet gönderildi ya da önizleme üretildi.,identity_sync.openapi.yaml: paths./v1/invitations.post.responses.200.description
+"The body is invalid. For example, `dry_run` is missing or the approval fields are missing in an execution.",Gövde hatalı. Örneğin `dry_run` yok ya da yürütmede onay alanları eksik.,identity_sync.openapi.yaml: paths./v1/invitations.post.responses.400.description
+Invites a user.,Kullanıcıyı davet eder.,identity_sync.openapi.yaml: paths./v1/invitations.post.summary
+"This endpoint is the HTTP counterpart of the `operations` command. The endpoint only reads.
+An invitation writes to Keycloak in three steps. It creates the user, makes the user a member and sends an email.
+The service records every step before it writes it. When the step is done, it updates the record.
+If the process stops midway, the record shows which step stayed uncertain.
+Finished operations do not appear in the list. The record carries no email.
+Clients in the preview list and in the execute list can call this endpoint.
+The list is cut at the `limit` value. If more records exist, the response carries `next_offset`.
+","Bu uç `operations` komutunun HTTP karşılığıdır. Uç yalnız okur.
+Davet Keycloak'a üç adımda yazar: kullanıcıyı açar, üye yapar ve e-posta gönderir.
+Servis her adımı yazmadan önce kaydeder. Adım bitince kaydı günceller.
+Süreç yarıda durursa kayıt hangi adımın belirsiz kaldığını gösterir.
+Biten işler listede görünmez. Kayıt e-posta taşımaz.
+Önizleme listesindeki ve yürütme listesindeki istemciler bu ucu çağırabilir.
+Liste `limit` değerinde kesilir. Başka kayıt varsa yanıt `next_offset` taşır.
+",identity_sync.openapi.yaml: paths./v1/operations.get.description
+The interrupted operations. The oldest operation comes first.,Yarıda kalan işler. En eski iş ilk sıradadır.,identity_sync.openapi.yaml: paths./v1/operations.get.responses.200.description
+Lists the multi-step operations that were interrupted.,Yarıda kalan çok adımlı işleri listeler.,identity_sync.openapi.yaml: paths./v1/operations.get.summary
+"This endpoint is the HTTP counterpart of the `resolve-operation` command.
+A human checks the target first. For example, the human looks whether the user was created in Keycloak.
+Then the human closes the operation with the `completed` or the `abandoned` resolution.
+`completed` means the operation was completed at the target. `abandoned` means the operation was given up.
+This endpoint changes only the service's own record. It does not write to the target.
+Only the approval layer can call this endpoint. The service writes the caller and the result to the log.
+","Bu uç `resolve-operation` komutunun HTTP karşılığıdır.
+İnsan önce hedefi denetler. Örneğin Keycloak'ta kullanıcının açılıp açılmadığına bakar.
+Sonra işi `completed` ya da `abandoned` sonucuyla kapatır.
+`completed` değeri işin hedefte tamamlandığını söyler. `abandoned` değeri işten vazgeçildiğini söyler.
+Bu uç yalnız servisin kendi kaydını değiştirir. Hedefe yazmaz.
+Bu ucu yalnız onay katmanı çağırabilir. Servis çağıranı ve sonucu günlüğe yazar.
+",identity_sync.openapi.yaml: paths./v1/operations/{operation_id}/resolve.post.description
+The id of the operation. This value is the `approval_id` value of the approval that started the operation.,İşin kimliği. Bu değer işi başlatan onayın `approval_id` değeridir.,identity_sync.openapi.yaml: paths./v1/operations/{operation_id}/resolve.post.parameters[0].description
+The operation is closed.,İş kapandı.,identity_sync.openapi.yaml: paths./v1/operations/{operation_id}/resolve.post.responses.200.description
+"The body is invalid. For example, the `resolution` value is invalid.",Gövde hatalı. Örneğin `resolution` değeri geçersiz.,identity_sync.openapi.yaml: paths./v1/operations/{operation_id}/resolve.post.responses.400.description
+There is no interrupted operation with this id. The error code is `not_found`.,Bu kimlikle yarıda kalan bir iş yok. Hata kodu `not_found` olur.,identity_sync.openapi.yaml: paths./v1/operations/{operation_id}/resolve.post.responses.404.description
+Closes one interrupted operation.,Yarıda kalan bir işi kapatır.,identity_sync.openapi.yaml: paths./v1/operations/{operation_id}/resolve.post.summary
+"This endpoint is the HTTP counterpart of the reconcile command. The command is named `reconcile`.
+The endpoint is not scheduled. It runs only when it is called.
+Keycloak is the source of truth.
+
+A preview request carries `dry_run: true`. The service only reads.
+The response carries the differences, the preview of the repair operations and the `preview_digest` value.
+The response carries no email. It refers to the user by the `sub` id.
+Clients in the preview list and in the execute list can ask for a preview.
+
+A repair request carries `dry_run: false`. Only the approval layer starts the repair.
+The request must carry the `preview_digest` and `approval_id` fields.
+The service computes the plan again under the work lock.
+If the plan is not exactly the same as the approved plan, the service returns 409 and writes nothing.
+This endpoint can do destructive work. For example, it disables in the tenant a user who is disabled in Keycloak.
+
+The service tries every operation and reports the result of each operation separately.
+The result is `done`, `failed` or `unknown`. An uncertain result is not retried.
+A remaining difference shows up again in the next preview.
+
+Some differences have no safe repair. The service only reports them.
+The examples are a disabled user in Press, a different email in Press,
+an unverified email and a record of another identity server.
+
+For the comparison the service asks Press and the tenant for a user list.
+These endpoints are named `press_tr.api.identity.list_identities` and
+`platform_core.api.identity.list_identities`. The response is in the `TargetIdentityList` schema.
+These two endpoints do not exist yet in the contracts of Press and of the tenant.
+","Bu uç mutabakat komutunun HTTP karşılığıdır. Komut `reconcile` adını taşır.
+Uç zamanlanmaz. Yalnız çağrılınca çalışır.
+Keycloak doğruluk kaynağıdır.
+
+Önizleme isteği `dry_run: true` taşır. Servis yalnız okur.
+Yanıt farkları, düzeltme işlerinin önizlemesini ve `preview_digest` değerini taşır.
+Yanıt e-posta taşımaz. Kullanıcıyı `sub` kimliğiyle anar.
+Önizleme listesindeki ve yürütme listesindeki istemciler önizleme isteyebilir.
+
+Düzeltme isteği `dry_run: false` taşır. Düzeltmeyi yalnız onay katmanı başlatır.
+İstek `preview_digest` ve `approval_id` alanlarını taşımalıdır.
+Servis planı iş kilidi altında yeniden hesaplar.
+Plan onaylanan planla birebir aynı değilse servis 409 döner ve hiçbir şey yazmaz.
+Bu uç yıkıcı iş yapabilir. Örneğin Keycloak'ta kapalı kullanıcıyı kiracıda kapatır.
+
+Servis her işi dener ve her işin sonucunu ayrı bildirir.
+Sonuç `done`, `failed` ya da `unknown` olur. Belirsiz sonuç yeniden denenmez.
+Kalan fark bir sonraki önizlemede yine görünür.
+
+Bazı farkların güvenli bir düzeltmesi yoktur. Servis bunları yalnız raporlar.
+Örnekler şunlardır: Press'te kapalı kullanıcı, Press'teki farklı e-posta,
+doğrulanmamış e-posta ve başka kimlik sunucusunun kaydı.
+
+Servis karşılaştırma için Press'ten ve kiracıdan kullanıcı listesi ister.
+Bu uçların adı `press_tr.api.identity.list_identities` ve
+`platform_core.api.identity.list_identities` olur. Yanıt `TargetIdentityList` şemasındadır.
+Bu iki uç Press'in ve kiracının sözleşmelerinde henüz yoktur.
+",identity_sync.openapi.yaml: paths./v1/reconcile.post.description
+"In a preview it returns the difference report and the repair preview.
+In a repair it returns the differences and the result of every operation.
+","Önizlemede fark raporu ve düzeltme önizlemesi döner.
+Düzeltmede farklar ve her işin sonucu döner.
+",identity_sync.openapi.yaml: paths./v1/reconcile.post.responses.200.description
+"The body is invalid. For example, `dry_run` is missing or the approval fields are missing in a repair.",Gövde hatalı. Örneğin `dry_run` yok ya da düzeltmede onay alanları eksik.,identity_sync.openapi.yaml: paths./v1/reconcile.post.responses.400.description
+"Compares Keycloak, Press and tenant users and repairs the difference.","Keycloak, Press ve kiracı kullanıcılarını karşılaştırır ve farkı düzeltir.",identity_sync.openapi.yaml: paths./v1/reconcile.post.summary
+"The source is the shared contract (`docs/sozlesmeler.md`), section 7.
+When a user revokes a phone installation, `platform_core` calls this endpoint.
+The phone installation stores the `sid` value of the token at registration time. The body carries this value and the id of the user.
+
+The service limits the caller to its own tenant. It finds the tenant from the `azp` value of the token and the tenant list.
+The body cannot choose the tenant. The service reads two facts from the Keycloak Admin API before it deletes anything.
+First, the user must be a member of the organization of the calling tenant. If not, the service returns 403.
+Second, the session must be in the session list of that user. The service deletes only such a session.
+When the session is deleted, the refresh token also becomes invalid.
+
+The endpoint can be repeated. If the session is already ended, the service still returns 200.
+If the session is not in the list of the user, the service deletes nothing and returns 200.
+
+Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint.
+This list carries the service clients of the `platform_core` sites. An example is `site-tenant1-service`.
+A tenant has two clients. The `site-<tenant>` client is only for browser login and has no service account.
+The service refuses a token whose `azp` value is the browser client.
+The site requests the token with the `aud-identity-sync` scope (the shared contract, `docs/sozlesmeler.md`, section 2).
+Clients in the other lists cannot call this endpoint.
+This endpoint needs no human approval. The reason is that the user's own revoke action starts the work.
+This endpoint is destructive. An ended session cannot be opened again. The user logs in again.
+","Kaynak ortak sözleşmenin 7. bölümüdür.
+Kullanıcı bir telefon kurulumunu iptal edince `platform_core` bu ucu çağırır.
+Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Gövde bu değeri ve kullanıcının kimliğini taşır.
+
+Servis çağıranı kendi kiracısıyla sınırlar. Kiracıyı belirtecin `azp` değerinden ve kiracı listesinden bulur.
+Gövde kiracıyı seçemez. Servis bir şey silmeden önce Keycloak Admin API'den iki bilgiyi okur.
+Birincisi: kullanıcı, çağıran kiracının kuruluşuna üye olmalıdır. Değilse servis 403 döner.
+İkincisi: oturum o kullanıcının oturum listesinde olmalıdır. Servis yalnız böyle bir oturumu siler.
+Oturum silinince yenileme belirteci de geçersiz olur.
+
+Uç tekrar edilebilir. Oturum zaten kapalıysa servis yine 200 döner.
+Oturum kullanıcının listesinde yoksa servis hiçbir şey silmez ve 200 döner.
+
+Ucu yalnız `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci çağırabilir.
+Bu liste `platform_core` sitelerinin servis istemcilerini taşır. Örnek: `site-tenant1-service`.
+Bir kiracının iki istemcisi vardır. `site-<kiracı>` istemcisi yalnız tarayıcı girişi içindir ve servis hesabı yoktur.
+Servis, `azp` değeri tarayıcı istemcisi olan belirteci reddeder.
+Site belirteci `aud-identity-sync` kapsamıyla ister (ortak sözleşme, 2. bölüm).
+Öteki listelerdeki istemciler bu ucu çağıramaz.
+Bu uç insan onayı istemez. Çünkü işi kullanıcının kendi iptal işlemi başlatır.
+Bu uç yıkıcıdır: kapanan oturum geri açılamaz. Kullanıcı yeniden giriş yapar.
+",identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.description
+"The session is ended. If the session was ended before this request, the response is still this one.",Oturum kapalı. Oturum bu istekten önce kapalıysa yanıt yine budur.,identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.responses.200.description
+"The body is invalid. For example, `sid` or `subject` is missing or invalid.",Gövde geçersiz. Örneğin `sid` ya da `subject` eksik ya da geçersizdir.,identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.responses.400.description
+"The client is not in the session list, or no tenant in the tenant list belongs to the client.
+The response is the same when the user is not a member of the organization of the calling tenant.
+The error code is `forbidden`.
+","İstemci oturum listesinde değildir ya da kiracı listesindeki hiçbir kiracı bu istemciye ait değildir.
+Kullanıcı çağıran kiracının kuruluşuna üye değilse de yanıt aynıdır.
+Hata kodu `forbidden` olur.
+",identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.responses.403.description
+Ends one Keycloak session.,Bir Keycloak oturumunu kapatır.,identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.summary
+Development environment. The port is the `PANE_PORT` value plus 5.,"Geliştirme ortamı. Port, `PANE_PORT` değerinin 5 fazlasıdır.",identity_sync.openapi.yaml: servers[0].description

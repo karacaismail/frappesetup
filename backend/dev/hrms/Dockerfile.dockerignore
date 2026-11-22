@@ -1,0 +1,12 @@
+**
+!apps/
+!apps/hrms_tr/
+!apps/hrms_tr/**
+!contracts/
+!contracts/hrms_tr.openapi.yaml
+!dev/
+!dev/hrms/
+!dev/hrms/seed.py
+!dev/hrms/test_http.py
+!dev/hrms/measure.py
+**/__pycache__

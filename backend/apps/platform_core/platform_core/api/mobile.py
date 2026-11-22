@@ -7,19 +7,19 @@ from zoneinfo import ZoneInfo
 import frappe
 from frappe.utils import get_system_timezone
 
-from platform_core.mobil.lifecycle import (
+from platform_core.mobile.lifecycle import (
 	_require_enabled_user,
 	check_new_installation,
 	lock_account,
 	lock_revocation_scope,
 	record_revocation,
 )
-from platform_core.mobil.protocol import PAGE_SIZE, MobileError, uuid4_id
-from platform_core.mobil.request import endpoint_response, identity_sync_response
-from platform_core.mobil.retention import cleanup
-from platform_core.mobil.service import COMMANDS, pull, push
-from platform_core.mobil.sessions import require_active_session
-from platform_core.mobil.store import MobileStore
+from platform_core.mobile.protocol import PAGE_SIZE, MobileError, uuid4_id
+from platform_core.mobile.request import endpoint_response, identity_sync_response
+from platform_core.mobile.retention import cleanup
+from platform_core.mobile.service import COMMANDS, pull, push
+from platform_core.mobile.sessions import require_active_session
+from platform_core.mobile.store import MobileStore
 
 # The shared request guard and each action check the installation, record or
 # administrator permission. The static rule cannot follow endpoint_response.
@@ -86,7 +86,11 @@ def _list_installations(identity, body):
 	_keys(body, set(), {"after"})
 	_require_enabled_user(identity.account)
 	after = uuid4_id(body["after"]) if "after" in body else None
-	return MobileStore().list_owned_installations(identity, after)
+	store = MobileStore()
+	if identity.scope == "mobile":
+		row = store.require_installation(identity, identity.installation)
+		_require_recent_activity(identity, row)
+	return store.list_owned_installations(identity, after)
 
 
 def _revoke_installation(identity, body):
@@ -105,7 +109,7 @@ def _activity(identity, body):
 	row = MobileStore().require_installation(identity, installation, for_update=True)
 	_require_recent_activity(identity, row)
 	activity_at = int(time.time())
-	frappe.db.set_value("Mobile Installation", installation, "last_user_activity_at", str(activity_at))
+	frappe.db.set_value("PLT Mobile Installation", installation, "last_user_activity_at", str(activity_at))
 	return {"last_user_activity_at": activity_at}
 
 
@@ -163,9 +167,9 @@ def _cleanup(identity, body):
 
 
 def _linked_account(issuer, subject):
-	if not frappe.db.exists("DocType", "Platform Identity Link"):
+	if not frappe.db.exists("DocType", "PLT Identity Link"):
 		raise MobileError("mobile_schema_unavailable", 503)
-	return frappe.db.get_value("Platform Identity Link", {"issuer": issuer, "subject": subject}, "user")
+	return frappe.db.get_value("PLT Identity Link", {"issuer": issuer, "subject": subject}, "user")
 
 
 def _revoke_user_installations(body):

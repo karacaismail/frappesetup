@@ -1,0 +1,16 @@
+- term_tr: HRMS TR
+  code: hrms_tr
+  scope: Frappe app
+  definition_tr: Adın tr bölümü Türkiye'nin ülke kodudur.
+- term_tr: Çalışan
+  code: HRT Employee
+  scope: hrms_tr role
+  definition_tr: Bu rol çalışanın kendi izin işlerini yapmasını sağlar.
+- term_tr: Yönetici
+  code: HRT Manager
+  scope: hrms_tr role
+  definition_tr: Bu rol yöneticinin ekibinin izin işlerini incelemesini sağlar.
+- term_tr: İK yöneticisi
+  code: HRT Admin
+  scope: hrms_tr role
+  definition_tr: Bu rol insan kaynakları yöneticisinin izin işlerini denetlemesini sağlar.

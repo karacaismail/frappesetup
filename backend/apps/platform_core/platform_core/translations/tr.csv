@@ -1,10 +1,10 @@
-AI API,Yapay Zekâ API Bağlantısı,
-AI Account,Yapay Zekâ Hesabı,
-AI Manager,Yapay Zekâ Yöneticisi,
-AI Model,Yapay Zekâ Modeli,
-AI Provider,Yapay Zekâ Sağlayıcısı,
-AI Route,Yapay Zekâ Yolu,
-AI Usage Log,Yapay Zekâ Kullanım Kaydı,
+PLT AI API,Yapay Zekâ API Bağlantısı,
+PLT AI Account,Yapay Zekâ Hesabı,
+PLT AI Manager,Yapay Zekâ Yöneticisi,
+PLT AI Model,Yapay Zekâ Modeli,
+PLT AI Provider,Yapay Zekâ Sağlayıcısı,
+PLT AI Route,Yapay Zekâ Yolu,
+PLT AI Usage Log,Yapay Zekâ Kullanım Kaydı,
 API Connection,API Bağlantısı,
 API Credential,Gizli Bağlantı Bilgisi,
 API Name,API Bağlantı Adı,
@@ -19,7 +19,7 @@ Apply the monthly spending cap to the account.,Geçit hesabın aylık harcaması
 Attempt Cost,Deneme Maliyeti,
 Attempt Time,Deneme Zamanı,
 Authentication Type,Bağlantı Kimlik Türü,
-Base URL,Bağlantı Adresi,AI API
+Base URL,Bağlantı Adresi,PLT AI API
 Base URL inherited by APIs without an override.,API bağlantısının ayrı adresi yoksa geçit bu adresi kullanır.,
 "Calculated cost of the attempt, when known.",Geçit hesaplayabildiği deneme maliyetini burada tutar.,
 Calling User,Çağrıyı Yapan Kullanıcı,
@@ -40,11 +40,11 @@ Display name of the provider.,Sağlayıcının ekranda görünen adıdır.,
 Display name of the task route.,Yolun ekranda görünen adıdır.,
 Duration in Milliseconds,Süre (Milisaniye),
 Elapsed time of the attempt in milliseconds.,Denemenin milisaniye cinsinden süresidir.,
-Enabled,Açık,AI API
-Enabled,Açık,AI Account
-Enabled,Açık,AI Model
-Enabled,Açık,AI Provider
-Enabled,Açık,AI Route
+Enabled,Açık,PLT AI API
+Enabled,Açık,PLT AI Account
+Enabled,Açık,PLT AI Model
+Enabled,Açık,PLT AI Provider
+Enabled,Açık,PLT AI Route
 Exact model identifier used by the provider API.,Geçit sağlayıcının API bağlantısına bu model kimliğini gönderir.,
 Fixed outcome code without provider error text.,Geçit yalnız sabit sonuç kodunu kaydeder.,
 HTTP protocol used to talk to the provider.,Geçit bu biçimle sağlayıcıya istek gönderir.,
@@ -90,7 +90,7 @@ Provider that serves this model.,Modeli bu sağlayıcı sunar.,
 Requests Per Minute,Dakikadaki İstek Sınırı,
 Required Capabilities,Gerekli Yetenekler,
 Required Role,Gerekli Rol,
-Route,Yol,AI Usage Log
+Route,Yol,PLT AI Usage Log
 Route Name,Yol Adı,
 "Route used for completion, if applicable.",Tamamlama çağrısı bu yolu kullandı. Bağlantı testinde alan boş kalır.,
 Selection Mode,Seçim Yöntemi,
@@ -155,7 +155,7 @@ Links one model to one API connection in the route's target order.,Yolun hedef s
 Gateway registry management requires a manager role.,Geçit kayıtlarını yalnız yöneticiler değiştirebilir.,
 Review the gateway registry update.,Geçit kaydındaki değişikliği inceleyin.,
 Review the new gateway registry record.,Yeni geçit kaydını inceleyin.,
-Reconcile the selected expired model gateway reservation.,Seçilen takılı kullanım kaydını kapatın.,AI Usage Log
+Reconcile the selected expired model gateway reservation.,Seçilen takılı kullanım kaydını kapatın.,PLT AI Usage Log
 Model gateway API credential cleared.,Model geçidi API anahtarı silindi.,
 Create a disabled model provider connection.,Kapalı bir model bağlantısı oluşturun.,
 Update a provider connection and clear its stored credential if its destination changes.,Sağlayıcı bağlantısını güncelleyin. Adres değişirse kayıtlı anahtar silinir.,
@@ -177,15 +177,15 @@ shell_restricted_fields contains an unknown DocType: {0},shell_restricted_fields
 shell_restricted_fields entry for {0} must be an array of field names.,shell_restricted_fields ayarında {0} için alan adlarını listeleyin.,shell.metadata
 shell_restricted_fields contains an unknown field: {0}.{1},shell_restricted_fields ayarı tanınmayan {0}.{1} alanını içeriyor.,shell.metadata
 The request has invalid parameters.,İstekte geçersiz alanlar var.,shell.request
-Mobile Account State,Mobil Hesap Durumu,
-Stores the token cutoff for mobile installation registration.,Yeni telefon kurulumunda geçerli belirteç zamanını tutar.,Mobile Account State
-The account that owns this revocation state.,Bu hesap iptal kaydının sahibidir.,Mobile Account State
-Revoked through,İptal zamanı,Mobile Account State
-Registration rejects tokens issued at or before this Unix timestamp.,"Kurulum, bu zamana kadar verilen belirteçleri reddeder.",Mobile Account State
-Account,Hesap,Mobile Account State
-Account,Hesap,Mobile Installation
-Last Audit At,Son denetim zamanı,Mobile Installation
-The UTC time when the installation last completed its delivery audit.,Kurulumun son teslim denetimini bitirdiği UTC zamanıdır.,Mobile Installation
+PLT Mobile Account State,Mobil Hesap Durumu,
+Stores the token cutoff for mobile installation registration.,Yeni telefon kurulumunda geçerli belirteç zamanını tutar.,PLT Mobile Account State
+The account that owns this revocation state.,Bu hesap iptal kaydının sahibidir.,PLT Mobile Account State
+Revoked through,İptal zamanı,PLT Mobile Account State
+Registration rejects tokens issued at or before this Unix timestamp.,"Kurulum, bu zamana kadar verilen belirteçleri reddeder.",PLT Mobile Account State
+Account,Hesap,PLT Mobile Account State
+Account,Hesap,PLT Mobile Installation
+Last Audit At,Son denetim zamanı,PLT Mobile Installation
+The UTC time when the installation last completed its delivery audit.,Kurulumun son teslim denetimini bitirdiği UTC zamanıdır.,PLT Mobile Installation
 List mobile installations for a user.,Kullanıcının telefon kurulumlarını listele.,
 Propose revoking one mobile installation.,Bir telefon kurulumunu iptal etmeyi öner.,
 Propose revoking all mobile installations for a user.,Kullanıcının bütün telefon kurulumlarını iptal etmeyi öner.,
@@ -198,56 +198,56 @@ Revoke all installations and request Keycloak session closure.,Bütün kurulumla
 A prepared mobile revocation is required.,Önce telefon kurulumu için iptal önerisi hazırlayın.,
 Count expired mobile records without deleting them.,Süresi dolan mobil kayıtları say.,
 A prepared mobile cleanup preview is required.,Önce mobil temizlik önerisi hazırlayın.,
-Mobile Revoked Session,İptal Edilen Mobil Oturum,
-Prevents a revoked Keycloak session from accessing mobile sync.,İptal edilen Keycloak oturumunun eşitlemeye erişimini engeller.,Mobile Revoked Session
-Session key,Oturum anahtarı,Mobile Revoked Session
-A digest of the revoked Keycloak session identifier.,İptal edilen Keycloak oturum kimliğinin özeti.,Mobile Revoked Session
-Keycloak session ID,Keycloak oturum kimliği,Mobile Installation
-The verified Keycloak session that registered this installation.,Kurulumu açan doğrulanmış Keycloak oturumu.,Mobile Installation
-Closure pending,Kapatma bekliyor,Mobile Revoked Session
-Last closure attempt time,Son kapatma denemesinin zamanı,Mobile Revoked Session
-Identity-sync has not confirmed closure of this Keycloak session.,Kimlik servisi bu Keycloak oturumunun kapandığını henüz doğrulamadı.,Mobile Revoked Session
-Notification token,Bildirim belirteci,Mobile Installation
-The private notification binding for this installation.,Bu kuruluma ait özel bildirim bağı.,Mobile Installation
-Sequence number,Sıra numarası,Mobile Change
-Record type,Kayıt türü,Mobile Change
-Record type,Kayıt türü,Mobile Delivery
-Record ID,Kayıt kimliği,Mobile Change
-Record ID,Kayıt kimliği,Mobile Delivery
-Change type,Değişiklik türü,Mobile Change
-Target installation,Hedef kurulum,Mobile Change
-Delivery key,Teslim anahtarı,Mobile Delivery
-Installation ID,Kurulum kimliği,Mobile Delivery
-Installation ID,Kurulum kimliği,Mobile Installation
-Visible,Görünür,Mobile Delivery
-Stable account key,Sabit hesap anahtarı,Mobile Installation
-Scope,Kapsam,Mobile Installation
-Revoked,İptal edildi,Mobile Installation
-Operation key,İşlem anahtarı,Mobile Operation
-Content digest,İçerik özeti,Mobile Operation
-Original result,İlk sonuç,Mobile Operation
-Counter key,Sayaç anahtarı,Mobile Sequence
-Latest sequence number,Son sıra numarası,Mobile Sequence
-Oldest valid sequence,En eski geçerli sıra,Mobile Sequence
-Records a change for mobile sync.,Telefon eşitlemesi için bir değişiklik kaydeder.,Mobile Change
-The server orders changes by this number.,Sunucu değişiklikleri bu numaraya göre sıraya koyar.,Mobile Change
-The type code for the changed record.,Bu kod değişen kaydın türünü belirtir.,Mobile Change
-The identifier of the changed record.,Bu değer değişen kaydı belirtir.,Mobile Change
-Indicates whether the record was updated or removed.,"Tür, kaydın yenilendiğini veya kaldırıldığını belirtir.",Mobile Change
-"When set, only this installation receives the change.",Bu alan doluysa değişikliği yalnız bu kurulum alır.,Mobile Change
-Tracks records delivered to a mobile installation.,Bir telefon kurulumuna gönderilen kayıtları izler.,Mobile Delivery
-"The server derives the key from the installation ID, record type, and record ID.","Sunucu anahtarı kurulum kimliği, kayıt türü ve kayıt kimliğinden üretir.",Mobile Delivery
-Identifies the installation that received the record.,Bu kimlik kaydı alan telefon kurulumunu belirtir.,Mobile Delivery
-The type code for the delivered record.,Bu kod telefona gönderilen kaydın türünü belirtir.,Mobile Delivery
-The identifier of the delivered record.,Bu değer telefona gönderilen kaydı belirtir.,Mobile Delivery
-Shows the last read permission delivered by the server.,Sunucunun bildirdiği son okuma iznini gösterir.,Mobile Delivery
-Links a mobile installation to its account.,Telefon kurulumunu hesabına bağlar.,Mobile Installation
-Identifies the mobile installation.,Bu değer telefon kurulumunu belirtir.,Mobile Installation
-The account that owns the installation.,Bu hesap telefon kurulumunun sahibidir.,Mobile Installation
-The server derives this value from the stable identity link.,Sistem bu değeri sabit kimlik bağına göre üretir.,Mobile Installation
-Identifies the sync scope for this installation.,"Kapsam, bu kurulumun eşitleme alanını belirtir.",Mobile Installation
-The server rejects sync for a revoked installation.,Bu işaret açıkken sunucu kurulumun eşitleme isteğini reddeder.,Mobile Installation
-Last user activity time,Son kullanıcı işleminin zamanı,Mobile Installation
+PLT Mobile Revoked Session,İptal Edilen Mobil Oturum,
+Prevents a revoked Keycloak session from accessing mobile sync.,İptal edilen Keycloak oturumunun eşitlemeye erişimini engeller.,PLT Mobile Revoked Session
+Session key,Oturum anahtarı,PLT Mobile Revoked Session
+A digest of the revoked Keycloak session identifier.,İptal edilen Keycloak oturum kimliğinin özeti.,PLT Mobile Revoked Session
+Keycloak session ID,Keycloak oturum kimliği,PLT Mobile Installation
+The verified Keycloak session that registered this installation.,Kurulumu açan doğrulanmış Keycloak oturumu.,PLT Mobile Installation
+Closure pending,Kapatma bekliyor,PLT Mobile Revoked Session
+Last closure attempt time,Son kapatma denemesinin zamanı,PLT Mobile Revoked Session
+Identity-sync has not confirmed closure of this Keycloak session.,Kimlik servisi bu Keycloak oturumunun kapandığını henüz doğrulamadı.,PLT Mobile Revoked Session
+Notification token,Bildirim belirteci,PLT Mobile Installation
+The private notification binding for this installation.,Bu kuruluma ait özel bildirim bağı.,PLT Mobile Installation
+Sequence number,Sıra numarası,PLT Mobile Change
+Record type,Kayıt türü,PLT Mobile Change
+Record type,Kayıt türü,PLT Mobile Delivery
+Record ID,Kayıt kimliği,PLT Mobile Change
+Record ID,Kayıt kimliği,PLT Mobile Delivery
+Change type,Değişiklik türü,PLT Mobile Change
+Target installation,Hedef kurulum,PLT Mobile Change
+Delivery key,Teslim anahtarı,PLT Mobile Delivery
+Installation ID,Kurulum kimliği,PLT Mobile Delivery
+Installation ID,Kurulum kimliği,PLT Mobile Installation
+Visible,Görünür,PLT Mobile Delivery
+Stable account key,Sabit hesap anahtarı,PLT Mobile Installation
+Scope,Kapsam,PLT Mobile Installation
+Revoked,İptal edildi,PLT Mobile Installation
+Operation key,İşlem anahtarı,PLT Mobile Operation
+Content digest,İçerik özeti,PLT Mobile Operation
+Original result,İlk sonuç,PLT Mobile Operation
+Counter key,Sayaç anahtarı,PLT Mobile Sequence
+Latest sequence number,Son sıra numarası,PLT Mobile Sequence
+Oldest valid sequence,En eski geçerli sıra,PLT Mobile Sequence
+Records a change for mobile sync.,Telefon eşitlemesi için bir değişiklik kaydeder.,PLT Mobile Change
+The server orders changes by this number.,Sunucu değişiklikleri bu numaraya göre sıraya koyar.,PLT Mobile Change
+The type code for the changed record.,Bu kod değişen kaydın türünü belirtir.,PLT Mobile Change
+The identifier of the changed record.,Bu değer değişen kaydı belirtir.,PLT Mobile Change
+Indicates whether the record was updated or removed.,"Tür, kaydın yenilendiğini veya kaldırıldığını belirtir.",PLT Mobile Change
+"When set, only this installation receives the change.",Bu alan doluysa değişikliği yalnız bu kurulum alır.,PLT Mobile Change
+Tracks records delivered to a mobile installation.,Bir telefon kurulumuna gönderilen kayıtları izler.,PLT Mobile Delivery
+"The server derives the key from the installation ID, record type, and record ID.","Sunucu anahtarı kurulum kimliği, kayıt türü ve kayıt kimliğinden üretir.",PLT Mobile Delivery
+Identifies the installation that received the record.,Bu kimlik kaydı alan telefon kurulumunu belirtir.,PLT Mobile Delivery
+The type code for the delivered record.,Bu kod telefona gönderilen kaydın türünü belirtir.,PLT Mobile Delivery
+The identifier of the delivered record.,Bu değer telefona gönderilen kaydı belirtir.,PLT Mobile Delivery
+Shows the last read permission delivered by the server.,Sunucunun bildirdiği son okuma iznini gösterir.,PLT Mobile Delivery
+Links a mobile installation to its account.,Telefon kurulumunu hesabına bağlar.,PLT Mobile Installation
+Identifies the mobile installation.,Bu değer telefon kurulumunu belirtir.,PLT Mobile Installation
+The account that owns the installation.,Bu hesap telefon kurulumunun sahibidir.,PLT Mobile Installation
+The server derives this value from the stable identity link.,Sistem bu değeri sabit kimlik bağına göre üretir.,PLT Mobile Installation
+Identifies the sync scope for this installation.,"Kapsam, bu kurulumun eşitleme alanını belirtir.",PLT Mobile Installation
+The server rejects sync for a revoked installation.,Bu işaret açıkken sunucu kurulumun eşitleme isteğini reddeder.,PLT Mobile Installation
+Last user activity time,Son kullanıcı işleminin zamanı,PLT Mobile Installation
 Mobile sync,Telefon eşitlemesi,OpenAPI mobile.info.title
 "The phone sends pending operations and receives changes when connectivity returns.
 Request bodies may be at most 256 KiB. Larger requests return 413.
@@ -375,21 +375,21 @@ The request was rejected.,İstek reddedildi.,OpenAPI mobile.components.responses
 The request rate limit was exceeded.,İstek sıklığı sınırı aşıldı.,OpenAPI mobile.components.responses.Throttled.description
 The server could not complete the operation.,Sunucu şu anda işlemi tamamlayamadı.,OpenAPI mobile.components.responses.Unavailable.description
 Seconds to wait before trying again.,Yeni denemeden önce beklenecek saniye.,OpenAPI mobile.components.responses.Unavailable.headers.Retry-After.description
-Stores the original operation result for retries.,İlk iş sonucunu yeniden gönderim için saklar.,Mobile Operation
-"The server derives the key from the site, account, and operation ID.","Sunucu anahtarı site, hesap ve işlem kimliğinden üretir.",Mobile Operation
-The server uses this digest to compare the contents of a repeated request.,Sunucu bu özeti kullanarak yinelenen isteğin içeriğini karşılaştırır.,Mobile Operation
-The server stores the original request result in this field.,Sunucu ilk isteğin sonucunu bu alanda saklar.,Mobile Operation
-Tracks the sync sequence for the site.,Sitenin eşitleme sırasını tutar.,Mobile Sequence
-The site's only counter record uses this key.,Site için tek sayaç kaydı bu anahtarı taşır.,Mobile Sequence
-The server assigns each new change a sequence number higher than this value.,Sunucu her yeni değişikliğe bu sayıdan büyük bir sıra numarası verir.,Mobile Sequence
-The server rejects requests with a cursor below this sequence number.,Sunucu daha eski sıra numarası olan imleçle gelen isteği reddeder.,Mobile Sequence
-Session binding time,Oturum bağlama zamanı,Mobile Installation
+Stores the original operation result for retries.,İlk iş sonucunu yeniden gönderim için saklar.,PLT Mobile Operation
+"The server derives the key from the site, account, and operation ID.","Sunucu anahtarı site, hesap ve işlem kimliğinden üretir.",PLT Mobile Operation
+The server uses this digest to compare the contents of a repeated request.,Sunucu bu özeti kullanarak yinelenen isteğin içeriğini karşılaştırır.,PLT Mobile Operation
+The server stores the original request result in this field.,Sunucu ilk isteğin sonucunu bu alanda saklar.,PLT Mobile Operation
+Tracks the sync sequence for the site.,Sitenin eşitleme sırasını tutar.,PLT Mobile Sequence
+The site's only counter record uses this key.,Site için tek sayaç kaydı bu anahtarı taşır.,PLT Mobile Sequence
+The server assigns each new change a sequence number higher than this value.,Sunucu her yeni değişikliğe bu sayıdan büyük bir sıra numarası verir.,PLT Mobile Sequence
+The server rejects requests with a cursor below this sequence number.,Sunucu daha eski sıra numarası olan imleçle gelen isteği reddeder.,PLT Mobile Sequence
+Session binding time,Oturum bağlama zamanı,PLT Mobile Installation
 List your mobile installations,Telefon kurulumlarınızı listeleyin,Mobile sync API
 Revoke one of your mobile installations,Bir telefon kurulumunuzu iptal edin,Mobile sync API
 A page of installations for the authenticated account.,Oturum açan hesabın kurulum sayfası.,Mobile sync API
-Unix time of the last reported interactive action for this installation.,Bu kurulumda bildirilen son kullanıcı işleminin Unix zamanı.,Mobile Installation
-Unix time when the server last scheduled remote session closure.,Sunucunun son kapatma isteğini sıraya aldığı Unix zamanı.,Mobile Revoked Session
-Unix time used as the idle baseline for the current authenticated session.,Geçerli oturumun boşta kalma hesabında kullanılan Unix zamanı.,Mobile Installation
+Unix time of the last reported interactive action for this installation.,Bu kurulumda bildirilen son kullanıcı işleminin Unix zamanı.,PLT Mobile Installation
+Unix time when the server last scheduled remote session closure.,Sunucunun son kapatma isteğini sıraya aldığı Unix zamanı.,PLT Mobile Revoked Session
+Unix time used as the idle baseline for the current authenticated session.,Geçerli oturumun boşta kalma hesabında kullanılan Unix zamanı.,PLT Mobile Installation
 "Lists installations for the verified account, ordered by installation ID.",Doğrulanmış hesabın kurulumlarını kimliğe göre sıralar.,Mobile sync API
 "Lists installations for the signed-in account, ordered by installation ID.",Oturum açan hesabın kurulumlarını kimliğe göre sıralar.,Mobile sync API
 Revokes one owned installation and requests closure of its Keycloak session when present.,Hesabın kurulumunu iptal eder. Keycloak oturumu varsa kapatılmasını ister.,Mobile sync API
@@ -398,14 +398,392 @@ A browser with a valid session can register a replacement installation.
 ","Hesabın bir kurulumunu iptal eder. Frappe tarayıcı oturumu açık kalır.
 Oturumu geçerli olan tarayıcı yeni kurulum kaydedebilir.
 ",Mobile sync API
-Keycloak user ID,Keycloak kullanıcı kimliği,Mobile Installation
-The Keycloak user identifier bound to this session.,Bu oturuma bağlı Keycloak kullanıcı kimliği.,Mobile Installation
-Mobile Change,Mobil Değişiklik,Mobile Change
-Mobile Delivery,Mobil Teslim,Mobile Delivery
-Mobile Installation,Mobil Kurulum,Mobile Installation
-Mobile Operation,Mobil İşlem,Mobile Operation
-Mobile Sequence,Mobil Sıra,Mobile Sequence
-upsert,Ekle veya güncelle,Mobile Change
-remove,Kaldır,Mobile Change
+Keycloak user ID,Keycloak kullanıcı kimliği,PLT Mobile Installation
+The Keycloak user identifier bound to this session.,Bu oturuma bağlı Keycloak kullanıcı kimliği.,PLT Mobile Installation
+PLT Mobile Change,Mobil Değişiklik,PLT Mobile Change
+PLT Mobile Delivery,Mobil Teslim,PLT Mobile Delivery
+PLT Mobile Installation,Mobil Kurulum,PLT Mobile Installation
+PLT Mobile Operation,Mobil İşlem,PLT Mobile Operation
+PLT Mobile Sequence,Mobil Sıra,PLT Mobile Sequence
+upsert,Ekle veya güncelle,PLT Mobile Change
+remove,Kaldır,PLT Mobile Change
 You are not permitted to call this method.,Bu yöntemi çağırma izniniz yok.,shell.request
+Sign in with {0},{0} ile oturum aç,platform_core.identity
+Redirect target must be a relative path on this site.,Yönlendirme hedefi bu sitede göreli bir yol olmalıdır.,platform_core.identity
+Keycloak settings are missing: {0},Keycloak ayarları eksik: {0},platform_core.identity
+The identity provider did not send a subject.,Kimlik sunucusu kullanıcı kimliğini göndermedi.,platform_core.identity
+This identity is linked to a different user.,Bu kimlik başka bir kullanıcıya bağlı.,platform_core.identity
+This user is already linked to a different identity.,Bu kullanıcı zaten başka bir kimliğe bağlı.,platform_core.identity
+The e-mail address is not verified by the identity provider.,E-posta adresi kimlik sunucusunda doğrulanmadı.,platform_core.identity
+Back-channel logout must not carry a session cookie.,Arka kanal çıkış isteği oturum çerezi taşıyamaz.,platform_core.identity
+Logout token is missing.,Çıkış belirteci eksik.,platform_core.identity
+Logout token rejected: {0},Çıkış belirteci reddedildi: {0},platform_core.identity
+Identity provider keys are not available.,Kimlik sunucusunun anahtarları alınamadı.,platform_core.identity
+Issuer and subject are required.,Veren ve kullanıcı kimliği zorunludur.,platform_core.identity
+Service requests must not carry a cmd field.,Servis isteği cmd alanı taşıyamaz.,platform_core.identity
+Service requests must not carry a session cookie.,Servis isteği oturum çerezi taşıyamaz.,platform_core.identity
+Service token rejected: {0},Servis belirteci reddedildi: {0},platform_core.identity
+This endpoint accepts only the {0} service token.,Bu uç yalnız {0} servis belirtecini kabul eder.,platform_core.identity
+E-mail differs from the linked user. Use change_email.,E-posta bağlı kullanıcıdan farklı. change_email ucunu kullanın.,platform_core.identity
+The first link requires a verified e-mail address.,İlk bağ için doğrulanmış e-posta gerekir.,platform_core.identity
+This e-mail is already linked to a different identity.,Bu e-posta zaten başka bir kimliğe bağlı.,platform_core.identity
+No user is linked to this identity.,Bu kimliğe bağlı kullanıcı yok.,platform_core.identity
+The new e-mail address belongs to another user.,Yeni e-posta adresi başka bir kullanıcıya ait.,platform_core.identity
+Issuer is not the configured identity provider.,Veren ayarlı kimlik sunucusu değil.,platform_core.identity
+Field {0} is required.,{0} alanı zorunludur.,platform_core.identity
+E-mail address is not valid.,E-posta adresi geçerli değil.,platform_core.identity
+Field {0} must be true or false.,{0} alanı doğru ya da yanlış olmalıdır.,platform_core.identity
+Field {0} must be a list of role profile names.,{0} alanı rol profili adlarının listesi olmalıdır.,platform_core.identity
+Role profile {0} does not exist.,{0} rol profili yok.,platform_core.identity
+Role profile grants desk access: {0},Rol profili masaüstü erişimi veriyor: {0},platform_core.identity
+Password sign-in is disabled. Sign in with the identity provider.,Parola ile giriş kapalı. Kimlik sunucusu ile oturum açın.,platform_core.identity
+This page is not available. Use the application.,Bu sayfa kullanılamaz. Uygulamayı kullanın.,platform_core.identity
+Sign in with the identity provider is not configured.,Kimlik sunucusu ile oturum açma kurulu değil.,platform_core.identity
+The identity provider refused or cancelled the sign-in.,Kimlik sunucusu girişi reddetti ya da iptal etti.,platform_core.identity
+The sign-in response is incomplete.,Giriş yanıtı eksik.,platform_core.identity
+"This sign-in attempt is unknown, expired or already used. Please try again.","Bu giriş denemesi bilinmiyor, süresi dolmuş ya da kullanılmış. Yeniden deneyin.",platform_core.identity
+The sign-in cookie is missing. Please start again in this browser.,Giriş çerezi yok. Bu tarayıcıda yeniden başlayın.,platform_core.identity
+This sign-in was started in a different browser.,Bu giriş başka bir tarayıcıda başlatıldı.,platform_core.identity
+The identity provider could not be reached.,Kimlik sunucusuna ulaşılamadı.,platform_core.identity
+The identity provider did not return an identity token.,Kimlik sunucusu kimlik belirteci göndermedi.,platform_core.identity
+The identity token is not valid ({0}).,Kimlik belirteci geçerli değil ({0}).,platform_core.identity
+The identity provider keys are not available.,Kimlik sunucusunun anahtarları alınamadı.,platform_core.identity
+There is no account for this e-mail address. Sign-up is closed.,Bu e-posta için hesap yok. Kayıt kapalı.,platform_core.identity
+This user is disabled.,Bu kullanıcı kapalı.,platform_core.identity
+Sign-in failed,Giriş başarısız,platform_core.identity
+Local sign-in is disabled. Sign in with the identity provider.,Yerel giriş kapalı. Kimlik sunucusu ile oturum açın.,platform_core.identity
+This e-mail belongs to a desk user and cannot be provisioned.,Bu e-posta bir yönetim kullanıcısına ait. Eşitleme ile açılamaz.,platform_core.identity
+Field {0} is longer than {1} characters.,{0} alanı {1} karakterden uzun.,platform_core.identity
+Field {0} must be text.,{0} alanı metin olmalıdır.,platform_core.identity
+This account cannot be anonymized.,Bu hesap anonim yapılamaz.,platform_core.identity
+Mobile token rejected: {0},Telefon belirteci reddedildi: {0},platform_core.identity
+Request body is too large.,İstek gövdesi çok büyük.,platform_core.identity
+The identity provider did not confirm a fresh sign-in.,Kimlik sunucusu yeni bir giriş doğrulamadı.,platform_core.identity
+Sign in,Oturum aç,platform_core.identity
+Use your {0} account to continue.,Devam etmek için {0} hesabınızı kullanın.,platform_core.identity
+Sign in with password,Parola ile oturum aç,platform_core.identity
+E-mail,E-posta,platform_core.identity
+Password,Parola,platform_core.identity
+Sign-in failed. Check your e-mail and password.,Giriş başarısız. E-postanızı ve parolanızı denetleyin.,platform_core.identity
+The server could not be reached. Try again.,Sunucuya ulaşılamadı. Yeniden deneyin.,platform_core.identity
+PLT Identity Link,Kimlik Bağı,
+Issuer,Veren,PLT Identity Link
+Subject,Kullanıcı kimliği,PLT Identity Link
+User,Kullanıcı,PLT Identity Link
+Links one identity at the identity provider (issuer and subject) to one Frappe user. The pair is the permanent key of the user. The e-mail address is only contact data and may change.,Kimlik sunucusundaki bir kimliği (veren ve kullanıcı kimliği) bir Frappe kullanıcısına bağlar. Bu çift kullanıcının kalıcı anahtarıdır. E-posta adresi yalnız iletişim bilgisidir ve değişebilir.,PLT Identity Link
+"Identity provider address as written in the token's iss claim, for example https://idp.example.test/realms/platform. Together with Subject it is unique.",Belirtecin iss alanındaki kimlik sunucusu adresi. Örnek: https://idp.example.test/realms/platform. Kullanıcı kimliğiyle birlikte tekildir.,PLT Identity Link
+Stable user identifier at the identity provider (the sub claim). Together with Issuer it is unique. It never changes when the e-mail changes.,Kimlik sunucusundaki değişmeyen kullanıcı kimliği (sub alanı). Verenle birlikte tekildir. E-posta değişince bu değer değişmez.,PLT Identity Link
+The Frappe user this identity signs in as. One user has at most one link.,Bu kimliğin oturum açtığı Frappe kullanıcısı. Bir kullanıcının en çok bir bağı olur.,PLT Identity Link
+The deletion key is not configured: {0},Silme anahtarı kurulu değil: {0},platform_core.identity
+This identity was deleted and cannot be used again.,Bu kimlik silindi ve yeniden kullanılamaz.,platform_core.identity
+Platform Identity Deletion,Kimlik Silme Kaydı,
+Identity Hash,Kimlik özeti,Platform Identity Deletion
+State,Durum,Platform Identity Deletion
+User,Kullanıcı,Platform Identity Deletion
+Deleted At,Silinme zamanı,Platform Identity Deletion
+Disabled,Kapatıldı,Platform Identity Deletion
+Anonymized,Anonim yapıldı,Platform Identity Deletion
+"Records that an identity was deleted (project record O-27). It keeps no raw identity: only the HMAC-SHA256 digest of the issuer and subject pair. Provisioning, enabling and e-mail changes check this record first, so a deleted identity cannot come back.","Bir kimliğin silindiğini kaydeder (Proje kaydı O-27). Ham kimliği tutmaz. Yalnız veren ve kullanıcı kimliği çiftinin HMAC-SHA256 özetini tutar. Hesap açma, açıp kapama ve e-posta değiştirme önce bu kaydı denetler. Böylece silinen kimlik geri gelemez.",Platform Identity Deletion
+"HMAC-SHA256 digest of the issuer and subject pair, as 64 hexadecimal characters. The key is the site setting kimlik_deletion_hmac_key. The raw pair is not stored.","Veren ve kullanıcı kimliği çiftinin HMAC-SHA256 özeti, 64 onaltılık karakter. Anahtar kimlik_deletion_hmac_key site ayarıdır. Ham çift saklanmaz.",Platform Identity Deletion
+"Disabled: step 1 closed the account, its sessions and API keys. Anonymized: step 2 removed the personal data.","Kapatıldı durumunda 1. adım hesabı, oturumları ve API anahtarlarını kapattı. Anonim yapıldı durumunda 2. adım kişisel veriyi kaldırdı.",Platform Identity Deletion
+Current name of the Frappe user. It is the anonymous name after step 2.,Frappe kullanıcısının şimdiki adı. 2. adımdan sonra anonim addır.,Platform Identity Deletion
+When step 1 recorded the deletion.,1. adımın silmeyi kaydettiği zaman.,Platform Identity Deletion
+Unknown field: {0},Bilinmeyen alan: {0},platform_core.identity
+The identity endpoint failed.,Kimlik ucu başarısız oldu.,platform_core.identity
 The requested method could not be resolved.,İstenen yöntem bulunamadı.,shell.request
+PLT Access Rule,Erişim Kuralı,PLT Access Rule
+A rule that narrows which records of a document type a role may read or change. Role permissions grant access; Access Rules only narrow it.,Bir rolün bir kayıt türünde okuyabildiği ya da değiştirebildiği kayıtları daraltan kural. İzni rol izni verir. Erişim kuralı yalnız daraltır.,PLT Access Rule
+Title,Başlık,PLT Access Rule
+Is Active,Etkin,PLT Access Rule
+Document Type,Kayıt Türü,PLT Access Rule
+Role,Rol,PLT Access Rule
+Scope,Kapsam,PLT Access Rule
+Match Field,Eşleşme Alanı,PLT Access Rule
+Priority,Öncelik,PLT Access Rule
+Operations,İşlemler,PLT Access Rule
+Allow Read,Okumaya İzin Ver,PLT Access Rule
+Allow Write,Yazmaya İzin Ver,PLT Access Rule
+Allow Create,Oluşturmaya İzin Ver,PLT Access Rule
+Allow Delete,Silmeye İzin Ver,PLT Access Rule
+Allow Submit,Onaya Göndermeye İzin Ver,PLT Access Rule
+Allow Cancel,İptale İzin Ver,PLT Access Rule
+Conditions,Koşullar,PLT Access Rule
+Filters,Süzgeçler,PLT Access Rule
+Description,Açıklama,PLT Access Rule
+Short name of the rule. Shown when a permission is explained.,Kuralın kısa adı. İzin açıklanırken gösterilir.,PLT Access Rule
+Only active rules are applied. An inactive rule does not govern its document type.,Yalnız etkin kurallar uygulanır. Etkin olmayan kural kayıt türünü kurallı yapmaz.,PLT Access Rule
+"Document type whose records this rule narrows. Child tables, single and virtual document types and the document types of the permission system are not accepted.","Bu kuralın kayıtlarını daralttığı kayıt türü. Alt tablolar, tek kayıtlı ve sanal kayıt türleri ile izin sisteminin kayıt türleri kabul edilmez.",PLT Access Rule
+Role the rule applies to. A user is covered when they hold this role.,"Kuralın uygulandığı rol. Kural, bu rolü taşıyan kullanıcıyı kapsar.",PLT Access Rule
+"Which records the rule selects relative to the user: own (the user's records), team (the user and everyone reporting to them through Employee.reports_to), department (the user's department and its sub-departments), company (the user's company) or all (every record).","Kural, kayıtları kullanıcıya göre seçer. Seçenekler şunlardır: own kullanıcının kendi kayıtlarını seçer. team kullanıcıyı ve Employee.reports_to alanıyla ona bağlı herkesi seçer. department kullanıcının bölümünü ve alt bölümlerini seçer. company kullanıcının şirketini seçer. all bütün kayıtları seçer.",PLT Access Rule
+"Field of the document type that ties a record to a user, employee, department or company, for example employee or owner. Required unless the scope is all. Use name when the record itself is the employee, department or company.","Kaydı bir kullanıcıya, çalışana, bölüme ya da şirkete bağlayan alan. Örneğin employee ya da owner. Kapsam all değilse zorunludur. Kaydın kendisi çalışan, bölüm ya da şirketse name yazın.",PLT Access Rule
+Order in which rules are listed when a permission is explained. Lower numbers come first. It never changes the decision.,İzin açıklanırken kuralların sırası. Küçük sayı önce gelir. Kararı hiç değiştirmez.,PLT Access Rule
+"The rule covers reading, listing, printing, emailing, exporting, reporting and sharing.","Kural okumayı, listelemeyi, yazdırmayı, e-postayla göndermeyi, dışa aktarmayı, raporlamayı ve paylaşmayı kapsar.",PLT Access Rule
+The rule covers changing a saved record.,Kural kayıtlı bir kaydı değiştirmeyi kapsar.,PLT Access Rule
+The rule covers creating and amending a record. The new values must satisfy the rule.,Kural kayıt oluşturmayı ve düzeltme kaydı açmayı kapsar. Yeni değerler kurala uymalıdır.,PLT Access Rule
+The rule covers deleting a record.,Kural kayıt silmeyi kapsar.,PLT Access Rule
+The rule covers submitting a record.,Kural kaydı onaya göndermeyi kapsar.,PLT Access Rule
+The rule covers cancelling a submitted record.,Kural onaylanmış kaydı iptal etmeyi kapsar.,PLT Access Rule
+"Extra conditions as a JSON list of [field, operator, value] rows. All rows must hold. Operators: =, !=, in, not in. A value may be a constant or one of $user, $user.employee, $user.department, $user.company.","Ek koşullar. [alan, işleç, değer] satırlarından oluşan bir JSON listesidir. Bütün satırlar sağlanmalıdır. İşleçler: =, !=, in, not in. Değer sabit olabilir ya da şunlardan biri olabilir: $user, $user.employee, $user.department, $user.company.",PLT Access Rule
+Why this rule exists. Free text for administrators and assistants.,Bu kuralın neden var olduğu. Yöneticiler ve asistanlar için serbest metin.,PLT Access Rule
+PLT Access Rule,Erişim Kuralı,
+"Access Rules cannot govern child tables, single or virtual document types.","Erişim kuralı alt tabloya, tek kayıtlı ya da sanal kayıt türüne yazılamaz.",
+Access Rules cannot govern {0}.,{0} kayıt türüne erişim kuralı yazılamaz.,
+"Child tables, single and virtual document types are not supported.","Alt tablolar, tek kayıtlı ve sanal kayıt türleri desteklenmez.",
+Document type {0} not found.,{0} kayıt türü bulunamadı.,
+"Each filter must be a [field, operator, value] row.","Her süzgeç [alan, işleç, değer] biçiminde bir satır olmalıdır.",
+Field levels of {0} cannot be changed here.,{0} kayıt türünün alan seviyeleri buradan değiştirilemez.,
+Filter field {0} is not a column of {1}.,{0} süzgeç alanı {1} kayıt türünün bir sütunu değil.,
+Filter operator must be one of: {0},Süzgeç işleci şunlardan biri olmalıdır: {0},
+Filter values must be finite numbers.,Süzgeç değeri sonlu bir sayı olmalıdır.,
+Filter values must be text or numbers.,Süzgeç değeri metin ya da sayı olmalıdır.,
+"Filters must be a list of [field, operator, value] rows.","Süzgeçler [alan, işleç, değer] satırlarından oluşan bir liste olmalıdır.",
+Filters must be valid JSON.,Süzgeçler geçerli bir JSON olmalıdır.,
+Match Field is required unless the scope is all.,Kapsam all değilse Eşleşme Alanı zorunludur.,
+Match Field {0} must point to one of: {1},{0} eşleşme alanı şunlardan birini göstermelidir: {1},
+No permission to change field levels.,Alan seviyelerini değiştirme izniniz yok.,
+No permission to change role permissions.,Rol izinlerini değiştirme izniniz yok.,
+No permission to create Access Rules.,Erişim kuralı oluşturma izniniz yok.,
+No permission to read Access Rules.,Erişim kurallarını okuma izniniz yok.,
+No permission to read {0}.,{0} kayıt türünü okuma izniniz yok.,
+No permission to search {0}.,{0} kayıt türünde arama izniniz yok.,
+Only a System Manager can explain another user's permission.,Başka kullanıcının iznini yalnız System Manager açıklayabilir.,
+Operator {0} needs a non-empty list of values.,{0} işleci boş olmayan bir değer listesi ister.,
+Permission level must be between 0 and {0}.,İzin seviyesi 0 ile {0} arasında olmalıdır.,
+Permission level must be between 1 and {0}.,İzin seviyesi 1 ile {0} arasında olmalıdır.,
+Prepared Report is switched off for {0}: the report reads data governed by Access Rules.,{0} için hazır rapor kapalıdır. Rapor erişim kuralı olan veriyi okuyor.,
+Report {0} cannot apply the field levels of {1}.,{0} raporu {1} kayıt türünün alan seviyelerini uygulayamıyor.,
+Role {0} not found.,{0} rolü bulunamadı.,
+Roles without an active Access Rule have no access to {0}: {1},Etkin erişim kuralı olmayan roller {0} kayıt türüne erişemez: {1},
+Scope must be one of: {0},Kapsam şunlardan biri olmalıdır: {0},
+"Search function {0} is not allowed on {1}, which is governed by Access Rules.",{0} arama işlevi {1} kayıt türünde kullanılamaz. Bu türün erişim kuralı var.,
+Select at least one operation for the rule.,Kural için en az bir işlem seçin.,
+The proposal does not change the rule.,Öneri kuralı değiştirmiyor.,
+This file belongs to a prepared report that is switched off.,Bu dosya kapatılmış bir hazır rapora ait.,
+Unknown variable {0}. Allowed: {1},{0} değişkeni bilinmiyor. İzinli değişkenler: {1},
+User {0} not found.,{0} kullanıcısı bulunamadı.,
+Variables can only be used with = and !=.,Değişkenler yalnız = ve != işleçleriyle kullanılabilir.,
+Write access needs read access.,Yazma izni okuma izni olmadan verilemez.,
+ptype must be one of: {0},ptype şunlardan biri olmalıdır: {0},
+{0} is not a field of {1}.,"{0}, {1} kayıt türünün bir alanı değil.",
+{0} {1} not found.,{0} {1} bulunamadı.,
+List the Access Rules that narrow which records each role may use.,Her rolün kullanabileceği kayıtları daraltan erişim kurallarını listeler.,
+Explain why a user may or may not read or change one record. Details about rules are returned to administrators only.,"Bir kullanıcının bir kaydı neden okuyabildiğini, değiştirebildiğini ya da bunu neden yapamadığını açıklar. Kural ayrıntıları yalnız yöneticilere döner.",
+Propose a new Access Rule from structured fields. The first rule on a document type removes access for every role without a rule. This only opens a proposal. A human must approve it before anything changes.,"Yapılandırılmış alanlardan yeni bir erişim kuralı önerir. Bir kayıt türüne yazılan ilk kural, kuralı olmayan bütün rollerin erişimini kaldırır. Bu araç yalnız bir öneri açar. Bir insan onaylamadan hiçbir şey değişmez.",
+"Propose a change to a saved Access Rule, including switching it off. Narrowing a rule removes access. This only opens a proposal. A human must approve it before anything changes.",Kayıtlı bir erişim kuralında değişiklik önerir. Kuralı kapatmak da buna dahildir. Kuralı daraltmak erişimi kaldırır. Bu araç yalnız bir öneri açar. Bir insan onaylamadan hiçbir şey değişmez.,
+Report {0} reads data with its own code. Only a System Manager may run it while Access Rules exist.,{0} raporu veriyi kendi koduyla okuyor. Erişim kuralı varken bu raporu yalnız System Manager çalıştırabilir.,
+Auto Email Report is switched off for {0}: the report reads data governed by Access Rules.,{0} için zamanlanmış e-posta raporu kapalıdır. Rapor erişim kuralı olan veriyi okuyor.,
+Report {0} refers to a report that cannot be found.,{0} raporu bulunamayan bir rapora başvuruyor.,
+"Create an Access Rule on {0} for role {1}: scope {2}, operations {3}.","{0} türünde {1} rolü için Access Rule oluştur. Kapsam {2}, işlemler {3}.",
+Roles listed in roles_without_access can no longer read this document type once the rule is active.,Kural etkin olunca roles_without_access listesindeki roller bu kayıt türünü okuyamaz.,
+Change Access Rule {0} ({1}) on {2}: {3}.,{2} türündeki {0} ({1}) adlı Access Rule kaydını değiştir. Değişen alanlar: {3}.,
+Roles listed in roles_without_access can no longer read this document type once the change is saved.,Değişiklik kaydedilince roles_without_access listesindeki roller bu kayıt türünü okuyamaz.,
+"The phone sends pending operations and receives changes when connectivity returns.
+Request bodies may be at most 256 KiB. Larger requests return 413.
+The server accepts up to 60 requests per account per minute. Further requests return 429.
+This version starts with an empty allowlist. The server does not accept files.
+","Telefon, bağlantı gelince bekleyen işleri gönderir ve değişiklikleri alır.
+İstek gövdesi en çok 256 KiB olabilir. Aşımda 413 döner.
+Sunucu her hesaba dakikada en çok 60 istek işler. Aşımda 429 döner.
+Bu sürümde izin listesi boş başlar. Sunucu dosya kabul etmez.
+",OpenAPI mobile.info.description
+"Binds the installation to a verified Keycloak session.
+A revoked installation cannot be reactivated. A new session requires a new installation ID.
+","Telefon kurulumunu doğrulanmış Keycloak oturumuna bağlar.
+İptal edilen kurulum yeniden açılamaz. Yeni oturum yeni kurulum kimliği ister.
+",OpenAPI mobile.paths./platform_core.api.mobile.v1_register.post.description
+"Revokes one installation or all active installations for the account.
+The returned count reflects local revocations. The server then requests session closure.
+A single-installation revocation can be retried from another valid session.
+","Hesabın bir kurulumunu veya bütün etkin kurulumlarını iptal eder.
+Yanıttaki sayı yerel iptali gösterir. Sunucu daha sonra oturum kapatma isteği gönderir.
+Başka bir geçerli oturumla tekli iptal yinelenebilir.
+",OpenAPI mobile.paths./platform_core.api.mobile.v1_revoke.post.description
+"Processes up to 20 operations in order. If any operation fails, the server rolls back the entire batch.
+For an operation with the same ID and content, the server returns the original committed result.
+","En çok 20 işi sırayla işler. Bir iş başarısız olursa bütün grubu geri alır.
+Sunucu aynı kimlik ve içerikle gelen işe ilk kesinleşen sonucu verir.
+",OpenAPI mobile.paths./platform_core.api.mobile.v1_push.post.description
+Starts the initial copy when no cursor is provided. Later calls use the cursor returned by the server.,İmleç yoksa ilk kopyayı başlatır. Sonraki çağrılar sunucunun verdiği imleci kullanır.,OpenAPI mobile.paths./platform_core.api.mobile.v1_pull.post.description
+"Registers the mobile installation using a same-origin Frappe session.
+A revoked installation cannot be reactivated. A new session requires a new installation ID.
+","Telefon kurulumunu aynı kökendeki Frappe oturumuyla kaydeder.
+İptal edilen kurulum yeniden açılamaz. Yeni oturum yeni kurulum kimliği ister.
+",OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_register.post.description
+"Revokes one installation or all active installations for the account.
+The returned count reflects local revocations. The server then requests session closure.
+A single-installation revocation can be retried from another valid session.
+","Hesabın bir kurulumunu veya bütün etkin kurulumlarını iptal eder.
+Yanıttaki sayı yerel iptali gösterir. Sunucu daha sonra oturum kapatma isteği gönderir.
+Başka bir geçerli oturumla tekli iptal yinelenebilir.
+",OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_revoke.post.description
+Stores the original operation result for retries.,İlk iş sonucunu yeniden gönderim için saklar.,Mobile Operation.description
+"The server derives the key from the site, account, and operation ID.","Sunucu anahtarı site, hesap ve işlem kimliğinden üretir.",Mobile Operation.fields.operation_key.description
+The server uses this digest to compare the contents of a repeated request.,Sunucu bu özeti kullanarak yinelenen isteğin içeriğini karşılaştırır.,Mobile Operation.fields.content_digest.description
+The server stores the original request result in this field.,Sunucu ilk isteğin sonucunu bu alanda saklar.,Mobile Operation.fields.result.description
+Tracks the sync sequence for the site.,Sitenin eşitleme sırasını tutar.,Mobile Sequence.description
+The site's only counter record uses this key.,Site için tek sayaç kaydı bu anahtarı taşır.,Mobile Sequence.fields.sequence_key.description
+The server assigns each new change a sequence number higher than this value.,Sunucu her yeni değişikliğe bu sayıdan büyük bir sıra numarası verir.,Mobile Sequence.fields.sequence.description
+The server rejects requests with a cursor below this sequence number.,Sunucu daha eski sıra numarası olan imleçle gelen isteği reddeder.,Mobile Sequence.fields.retention_floor.description
+Revokes one owned installation without signing out the current browser.,Hesabın bir kurulumunu iptal eder. Tarayıcı oturumu açık kalır.,Mobile sync API
+This action needs a human session.,Bu işlem için insan oturumu gerekir.,platform_core.ai
+This action cannot run inside a transaction with pending writes.,"Bu işlem, bekleyen yazı taşıyan bir işlemin içinde çalışamaz.",platform_core.ai
+"Send either a session cookie or an agent token, not both.",Oturum çerezini ya da aracı belirtecini gönderin. İkisini birlikte göndermeyin.,platform_core.ai
+AI Action Log entries cannot be deleted.,Yapay zekâ işlem günlüğü kayıtları silinemez.,platform_core.ai
+AI Action Log is append-only.,Yapay zekâ işlem günlüğüne yalnız yeni kayıt eklenir.,platform_core.ai
+Unknown field: {0},Bilinmeyen alan: {0},platform_core.ai
+Field {0} is secret.,{0} alanı gizlidir.,platform_core.ai
+You may not read field {0}.,{0} alanını okuma izniniz yok.,platform_core.ai
+DocType {0} does not exist.,{0} adlı kayıt türü yok.,platform_core.ai
+Your roles do not allow tool {0}.,Rolleriniz {0} aracını kullanmaya izin vermiyor.,platform_core.ai
+An earlier action on this target has an unknown result. A human must resolve it first.,Bu hedefteki önceki işlemin sonucu bilinmiyor. Önce bir insan o işlemi kapatmalı.,platform_core.ai
+Proposal not found.,Öneri bulunamadı.,platform_core.ai
+This proposal belongs to another user.,Bu öneri başka bir kullanıcıya ait.,platform_core.ai
+Unknown status.,Bilinmeyen durum.,platform_core.ai
+start must be between 0 and {0}.,start değeri 0 ile {0} arasında olmalı.,platform_core.ai
+The target changed after the preview.,"Hedef, önizlemeden sonra değişti.",platform_core.ai
+Only a pending proposal can be rejected.,Yalnız bekleyen öneri reddedilebilir.,platform_core.ai
+outcome must be succeeded or failed.,outcome değeri succeeded ya da failed olmalı.,platform_core.ai
+Only a proposal with an unknown result can be resolved.,Yalnız sonucu bilinmeyen öneri kapatılabilir.,platform_core.ai
+The preview of tool {0} must be an object.,{0} aracının önizlemesi bir nesne olmalı.,platform_core.ai
+The preview of tool {0} is not valid: {1},{0} aracının önizlemesi geçersiz: {1},platform_core.ai
+The preview of versioned tool {0} must return {1}.,Sürüm denetimi isteyen {0} aracının önizlemesi şunları döndürmeli: {1}.,platform_core.ai
+The retention period is between {0} and {1} days.,Saklama süresi {0} ile {1} gün arasında olmalı.,platform_core.ai
+You may not create custom fields.,Özel alan oluşturma izniniz yok.,platform_core.ai
+Select and Link fields need options.,Select ve Link türündeki alanlar seçenek ister.,platform_core.ai
+insert_after names a field that does not exist.,insert_after değeri var olmayan bir alanı gösteriyor.,platform_core.ai
+You may not change field properties.,Alan ayarlarını değiştirme izniniz yok.,platform_core.ai
+options can change only on a Select field.,Seçenekler yalnız Select türündeki alanda değişebilir.,platform_core.ai
+This role has more than one rule at this level. Change it in the permission manager.,Bu rolün bu seviyede birden çok kuralı var. Değişikliği izin yöneticisinde yapın.,platform_core.ai
+permissions takes known permission types.,permissions yalnız bilinen izin türlerini alır.,platform_core.ai
+The user already has this role.,Kullanıcı bu role zaten sahip.,platform_core.ai
+The user does not have this role.,Kullanıcı bu role sahip değil.,platform_core.ai
+DocType {0} is closed to AI tools.,{0} kayıt türü yapay zekâ araçlarına kapalıdır.,platform_core.ai
+Field {0} already exists.,{0} alanı zaten var.,platform_core.ai
+{0} takes text.,{0} metin alır.,platform_core.ai
+Permissions of DocType {0} do not change through AI.,{0} kayıt türünün izinleri yapay zekâ yoluyla değişmez.,platform_core.ai
+Permissions of role {0} do not change through AI.,{0} rolünün izinleri yapay zekâ yoluyla değişmez.,platform_core.ai
+Unknown role: {0},Bilinmeyen rol: {0},platform_core.ai
+Role {0} does not change through AI.,{0} rolü yapay zekâ yoluyla verilmez ve alınmaz.,platform_core.ai
+Role {0} gives desk access. An end user cannot have it.,{0} rolü yönetim ekranını açar. Son kullanıcı bu rolü alamaz.,platform_core.ai
+{0} takes true or false.,{0} doğru ya da yanlış alır.,platform_core.ai
+{0} takes a number from 0 to 9.,{0} 0 ile 9 arasında bir sayı alır.,platform_core.ai
+You have no permission on DocType {0}.,{0} kayıt türünde izniniz yok.,platform_core.ai
+Read child rows through their parent document.,Alt tablo satırlarını ana kayıt üzerinden okuyun.,platform_core.ai
+This report reads a DocType that is closed to AI tools.,"Bu rapor, yapay zekâ araçlarına kapalı bir kayıt türünü okuyor.",platform_core.ai
+Reports are closed until the access engine's report gate is installed.,Erişim motorunun rapor kapısı kurulana kadar raporlar kapalıdır.,platform_core.ai
+"A filter is a value or an [operator, value] pair.","Süzgeç bir değerdir ya da [işleç, değer] çiftidir.",platform_core.ai
+order_by takes a field name and asc or desc.,order_by bir alan adı ile asc ya da desc alır.,platform_core.ai
+You may not read DocType {0}.,{0} kayıt türünü okuma izniniz yok.,platform_core.ai
+You may not run report {0}.,{0} raporunu çalıştırma izniniz yok.,platform_core.ai
+Report {0} is prepared in the background.,{0} raporu arka planda hazırlanır.,platform_core.ai
+Change child rows through their parent document.,Alt tablo satırlarını ana kayıt üzerinden değiştirin.,platform_core.ai
+data must name at least one field.,data en az bir alan içermeli.,platform_core.ai
+The document changed after the preview.,"Kayıt, önizlemeden sonra değişti.",platform_core.ai
+Only a draft of a submittable DocType can be submitted.,Yalnız onaya gönderilebilen bir kayıt türünün taslağı onaya gönderilebilir.,platform_core.ai
+Only a submitted document can be cancelled.,Yalnız onaylanmış kayıt iptal edilebilir.,platform_core.ai
+Cancel a submitted document before deleting it.,Onaylanmış kaydı silmeden önce iptal edin.,platform_core.ai
+DocType {0} is closed to AI write tools.,{0} kayıt türü yapay zekâ yazma araçlarına kapalıdır.,platform_core.ai
+DocType {0} changes only through admin tools.,{0} kayıt türü yalnız yönetim araçlarıyla değişir.,platform_core.ai
+Framework DocType {0} is closed to AI write tools.,Çatıya ait {0} kayıt türü yapay zekâ yazma araçlarına kapalıdır.,platform_core.ai
+Field {0} takes a list of rows.,{0} alanı satır listesi alır.,platform_core.ai
+Rows cannot carry their own tables.,Satırlar kendi alt tablolarını taşıyamaz.,platform_core.ai
+You may not create {0}.,{0} oluşturma izniniz yok.,platform_core.ai
+Field {0} cannot be set.,{0} alanına değer verilemez.,platform_core.ai
+Field {0} is secret. A human enters it.,{0} alanı gizlidir. Bu değeri bir insan girer.,platform_core.ai
+You may not write field {0}.,{0} alanına yazma izniniz yok.,platform_core.ai
+A row name must be an existing row of this document. New rows carry no name.,Satır adı bu kaydın var olan bir satırı olmalı. Yeni satır ad taşımaz.,platform_core.ai
+Row field {0} cannot be set.,Satırdaki {0} alanına değer verilemez.,platform_core.ai
+You may not write row field {0}.,Satırdaki {0} alanına yazma izniniz yok.,platform_core.ai
+PLT AI Action Log,Yapay Zekâ İşlem Günlüğü,
+PLT AI Action Proposal,Yapay Zekâ İşlem Önerisi,
+"Append-only log of every call an AI makes through the AI access layer, and of every denial. One row per step: call, preview, approval, rejection, execution. It stores a hash of the arguments, never the arguments themselves.","Yapay zekânın erişim katmanından yaptığı her çağrının ve her reddin günlüğüdür. Günlüğe yalnız kayıt eklenir. Her adım bir satırdır: çağrı, önizleme, onay, ret ve yürütme. Günlük girdinin kendisini değil, özetini tutar.",PLT AI Action Log
+User,Kullanıcı,PLT AI Action Log
+User on whose behalf the action ran.,İşlemin adına yapıldığı kullanıcı.,PLT AI Action Log
+Principal,Kimlik türü,PLT AI Action Log
+How the caller proved its identity: a human session or an agent token.,Çağıranın kimliğini nasıl kanıtladığı: insan oturumu ya da aracı belirteci.,PLT AI Action Log
+Session ID,Konuşma kimliği,PLT AI Action Log
+SHA-256 of the conversation id the client sent. The id itself is not stored. Rows of one conversation share this value.,İstemcinin gönderdiği konuşma kimliğinin SHA-256 özeti. Kimliğin kendisi saklanmaz. Aynı konuşmanın satırları bu değeri paylaşır.,PLT AI Action Log
+Client Info,İstemci bilgisi,PLT AI Action Log
+"Fixed name of the MCP client if the layer knows it, otherwise ""other"". The client's own text is not stored.","Katman istemciyi tanıyorsa istemcinin sabit adı, tanımıyorsa ""other"". İstemcinin kendi metni saklanmaz.",PLT AI Action Log
+Stage,Adım,PLT AI Action Log
+Step of the flow this row records.,Bu satırın kaydettiği akış adımı.,PLT AI Action Log
+Tool,Araç,PLT AI Action Log
+Name of the tool that was called.,Çağrılan aracın adı.,PLT AI Action Log
+Tool Class,Araç türü,PLT AI Action Log
+Kind of the tool.,Aracın türü.,PLT AI Action Log
+Target DocType,Hedef kayıt türü,PLT AI Action Log
+DocType or report the call was aimed at.,Çağrının hedeflediği kayıt türü ya da rapor.,PLT AI Action Log
+Target Name,Hedef kaydın adı,PLT AI Action Log
+Name of the document the call was aimed at.,Çağrının hedeflediği kaydın adı.,PLT AI Action Log
+Arguments Hash,Girdi özeti,PLT AI Action Log
+SHA-256 of the call arguments. The arguments themselves are not stored.,Çağrı girdisinin SHA-256 özeti. Girdinin kendisi saklanmaz.,PLT AI Action Log
+Decision,Karar,PLT AI Action Log
+"Whether the layer allowed the step, denied it, or it failed unexpectedly.","Katmanın adıma izin verdiğini, adımı reddettiğini ya da adımın beklenmedik biçimde hata verdiğini gösterir.",PLT AI Action Log
+Deny Reason,Ret nedeni,PLT AI Action Log
+"Code that says why the step was denied, for example permission or expired.",Adımın neden reddedildiğini söyleyen kod. Örneğin permission ya da expired.,PLT AI Action Log
+Proposal,Öneri,PLT AI Action Log
+Write proposal this step belongs to.,Bu adımın bağlı olduğu yazma önerisi.,PLT AI Action Log
+Approval State,Onay durumu,PLT AI Action Log
+Status of the proposal when this row was written.,Bu satır yazıldığında önerinin durumu.,PLT AI Action Log
+Result,Sonuç,PLT AI Action Log
+Outcome of an executed write. Unknown means the outcome could not be confirmed.,"Yürütülen yazmanın sonucu. unknown, sonucun doğrulanamadığını gösterir.",PLT AI Action Log
+Version,Sürüm kaydı,PLT AI Action Log
+"Name of the Version document the write produced, if any.",Yazmanın ürettiği sürüm kaydının adı. Kayıt yoksa boş kalır.,PLT AI Action Log
+IP Address,IP adresi,PLT AI Action Log
+Network address the request came from.,İsteğin geldiği ağ adresi.,PLT AI Action Log
+Duration (ms),Süre (ms),PLT AI Action Log
+How long the step took in milliseconds.,Adımın milisaniye cinsinden süresi.,PLT AI Action Log
+"A write that an AI asked for and that waits for a human. It holds the preview the human sees, the digest that binds the approval to that preview, and the outcome. Nothing is written to the target until the owner approves the proposal.","Yapay zekânın istediği ve insan kararını bekleyen yazma işidir. İnsanın gördüğü önizlemeyi, onayı o önizlemeye bağlayan özeti ve sonucu tutar. Sahibi öneriyi onaylayana kadar hedefe hiçbir şey yazılmaz.",PLT AI Action Proposal
+User,Kullanıcı,PLT AI Action Proposal
+User who asked for the write and who alone may approve it.,Yazmayı isteyen kullanıcı. Öneriyi yalnız bu kullanıcı onaylayabilir.,PLT AI Action Proposal
+Principal,Kimlik türü,PLT AI Action Proposal
+Identity type that opened the proposal.,Öneriyi açan kimlik türü.,PLT AI Action Proposal
+Session ID,Konuşma kimliği,PLT AI Action Proposal
+SHA-256 of the conversation id the client sent. The id itself is not stored.,İstemcinin gönderdiği konuşma kimliğinin SHA-256 özeti. Kimliğin kendisi saklanmaz.,PLT AI Action Proposal
+Tool,Araç,PLT AI Action Proposal
+Name of the write tool that will run after approval.,Onaydan sonra çalışacak yazma aracının adı.,PLT AI Action Proposal
+Tool Class,Araç türü,PLT AI Action Proposal
+"Kind of the tool: write, admin or app.","Aracın türü: write, admin ya da app.",PLT AI Action Proposal
+Target DocType,Hedef kayıt türü,PLT AI Action Proposal
+DocType the write is aimed at.,Yazmanın hedeflediği kayıt türü.,PLT AI Action Proposal
+Target Name,Hedef kaydın adı,PLT AI Action Proposal
+Document the write is aimed at. Empty for a new document.,Yazmanın hedeflediği kayıt. Yeni kayıtta boş kalır.,PLT AI Action Proposal
+Target Key,Hedef anahtarı,PLT AI Action Proposal
+Hash of the target. Blocks a blind retry on the same target.,Hedefin özeti. Aynı hedefte kör tekrarı engeller.,PLT AI Action Proposal
+Target Version,Hedef sürümü,PLT AI Action Proposal
+Version marker of the target when the preview was made.,Önizleme üretildiğinde hedefin sürüm işareti.,PLT AI Action Proposal
+Arguments,Girdi,PLT AI Action Proposal
+Validated tool arguments as JSON. Never holds a secret field.,"Doğrulanmış araç girdisi, JSON biçiminde. Gizli alan taşımaz.",PLT AI Action Proposal
+Preview,Önizleme,PLT AI Action Proposal
+"What the human sees before approving, as JSON.","İnsanın onaydan önce gördüğü içerik, JSON biçiminde.",PLT AI Action Proposal
+Digest,Özet,PLT AI Action Proposal
+SHA-256 that binds an approval to this exact preview.,Onayı tam olarak bu önizlemeye bağlayan SHA-256 özeti.,PLT AI Action Proposal
+Destructive,Yıkıcı,PLT AI Action Proposal
+Set when the tool may destroy or overwrite data.,Araç veriyi silebiliyor ya da üstüne yazabiliyorsa işaretlenir.,PLT AI Action Proposal
+Billable,Ücretli,PLT AI Action Proposal
+Set when the tool may cost money.,Araç ücret doğurabiliyorsa işaretlenir.,PLT AI Action Proposal
+Expires At,Son geçerlilik zamanı,PLT AI Action Proposal
+Moment after which the proposal can no longer be approved.,Bu andan sonra öneri onaylanamaz.,PLT AI Action Proposal
+Status,Durum,PLT AI Action Proposal
+Where the proposal stands. Consumed means execution has started.,"Önerinin durumu. consumed, yürütmenin başladığını gösterir.",PLT AI Action Proposal
+Result,Sonuç,PLT AI Action Proposal
+Outcome of the execution. Unknown blocks new proposals on the same target.,"Yürütmenin sonucu. unknown, aynı hedefte yeni öneriyi engeller.",PLT AI Action Proposal
+Result Document,Sonuç kaydı,PLT AI Action Proposal
+Name of the document the execution touched.,Yürütmenin dokunduğu kaydın adı.,PLT AI Action Proposal
+Error,Hata,PLT AI Action Proposal
+Why the proposal was rejected or the execution failed.,Önerinin neden reddedildiği ya da yürütmenin neden hata verdiği.,PLT AI Action Proposal
+Decided At,Karar zamanı,PLT AI Action Proposal
+"When a human approved, rejected or resolved the proposal.","İnsanın öneriyi onayladığı, reddettiği ya da kapattığı zaman.",PLT AI Action Proposal
+Preview Digest,Önizleme özeti,PLT AI Action Proposal
+SHA-256 of the whole preview and its target. The server previews again at approval and compares.,Önizlemenin tamamının ve hedefinin SHA-256 özeti. Sunucu onayda önizlemeyi yeniden üretir ve karşılaştırır.,PLT AI Action Proposal
+You do not have permission for this action.,Bu işlem için izniniz yok.,platform_core.ai
+The record was not found.,Kayıt bulunamadı.,platform_core.ai
+The tool refused the input.,Araç girdiyi kabul etmedi.,platform_core.ai
+The digest is not valid.,Özet geçerli değil.,platform_core.ai
+A proposal cannot change after it is opened or decided.,Öneri açıldıktan ya da karar verildikten sonra değişemez.,platform_core.ai
+The tool failed. The error was recorded.,Araç hata verdi. Hata kaydedildi.,platform_core.ai
+"Ask for a preview first, then send its confirmation token. Nothing was deleted.","Önce önizleme isteyin, sonra onay belirtecini gönderin. Hiçbir kayıt silinmedi.",platform_core.ai
+The delete failed and was rolled back. Nothing was deleted.,Silme hata verdi ve geri alındı. Hiçbir kayıt silinmedi.,platform_core.ai
+Field {0} must be an integer from {1} to {2}.,{0} alanına {1} ile {2} arasında bir tam sayı yazın.,platform_core.identity
+The identity link changed. Try again.,Kimlik bağı değişti. Yeniden deneyin.,platform_core.identity
+You do not have permission to read identity links.,Kimlik bağlarını okuma izniniz yok.,platform_core.identity

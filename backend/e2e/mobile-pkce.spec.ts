@@ -5,7 +5,7 @@ import { localUrl, required } from './local';
 test.skip(process.env.E2E_MOBILE_PKCE !== '1', 'A public PKCE client and mobile token fixtures are required.');
 
 async function authorize(browser: Browser, clientId: string, redirect: URL) {
-  const identity = localUrl('kimlik.localhost', 0);
+  const identity = localUrl('identity.localhost', 0);
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
   const state = randomUUID();
@@ -53,8 +53,8 @@ function claims(token: string) {
 }
 
 test('public PKCE client gets a token restricted to mobile endpoints', async ({ browser }) => {
-  const identity = localUrl('kimlik.localhost', 0);
-  const site = localUrl('kiraci1.localhost', 1);
+  const identity = localUrl('identity.localhost', 0);
+  const site = localUrl('tenant1.localhost', 1);
   const methods = site + '/api/method/';
   const clientId = required('E2E_MOBILE_CLIENT_ID');
   const redirect = new URL(required('E2E_MOBILE_REDIRECT_URI'));
