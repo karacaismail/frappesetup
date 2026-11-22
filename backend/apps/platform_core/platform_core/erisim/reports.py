@@ -11,8 +11,9 @@ Rules while any document type is governed:
   reads cannot be verified. A static check of script code was tried and removed: an aliased
   import or a `user` argument got around it, and such a check can never be complete.
 - Prepared Report is closed for a report that touches governed data.
-- Auto Email Report on governed data is for System Managers only, and the report rules also
-  hold for the user named on the record. The engine never switches the session user.
+- Auto Email Report on governed data is for System Managers only, the report rules also hold
+  for the user named on the record, and a record runs only while a System Manager's approval
+  of its current settings is on file. The engine never switches the session user.
 
 Every way to get report data ends in `Report.execute_query_report` or
 `Report.execute_script_report` (`frappe/desk/query_report.py:93`). `GuardedReport` extends the
@@ -21,13 +22,18 @@ and code that calls Frappe directly all meet the same check.
 Decision note: `docs/kararlar/0006-erisim-kurali.md`, section 9.
 """
 
+import hashlib
+
 import frappe
 from frappe import _
+from frappe.utils import cstr, now_datetime
 
 from platform_core.erisim import rules
 
 ADMIN_ROLE = "System Manager"
 PREPARED_REPORT = "Prepared Report"
+AUTO_EMAIL_REPORT = "Auto Email Report"
+APPROVAL = "Auto Email Report Approval"
 REPORT_FIELDS = ["name", "ref_doctype", "report_type", "reference_report"]
 
 
@@ -43,13 +49,18 @@ def report_record(report_name: str):
 	return record
 
 
-def touches_governed(report_name: str) -> bool:
-	"""Does the report read a governed document type, or may it for all we know?"""
-	record = report_record(report_name)
-	if not record or not any_governed():
+def touches_governed(report_name: str | None, governed: set[str] | None = None) -> bool:
+	"""Does the report read a governed document type, or may it for all we know?
+
+	`governed` replaces the engine's own list of governed types. Migration passes it, because
+	the engine does not read rules on its own while a site is being migrated.
+	"""
+	governed = set(rules.active_rules()) if governed is None else governed
+	record = report_record(report_name) if report_name else None
+	if not record or not governed:
 		return False
 	if record.report_type == "Report Builder":
-		return rules.is_governed(record.ref_doctype)
+		return record.ref_doctype in governed
 	# A query or script report may read any table. Its own document type proves nothing.
 	return True
 
@@ -166,43 +177,135 @@ def is_system_manager(user: str) -> bool:
 	return user == "Administrator" or ADMIN_ROLE in frappe.get_roles(user)
 
 
+def value_fields() -> list[str]:
+	"""Fields of Auto Email Report that hold its settings."""
+	meta = frappe.get_meta(AUTO_EMAIL_REPORT)
+	return sorted(set(meta.get_valid_columns()) - set(frappe.model.default_fields))
+
+
+def settings_digest(name: str | None) -> str | None:
+	"""Fingerprint of the saved settings of an Auto Email Report. None when it is not saved.
+
+	It is taken from the database row, so it describes the record that will run, not a copy in
+	memory. Every settings field counts: report, user, recipients, filters, format and the rest.
+	"""
+	if not name:
+		return None
+	fieldnames = value_fields()
+	# The engine's own read of one row it was asked about (exception to G-3).
+	row = frappe.db.get_value(AUTO_EMAIL_REPORT, name, fieldnames, as_dict=True)
+	if not row:
+		return None
+	text = "\x1f".join(f"{fieldname}={cstr(row.get(fieldname))}" for fieldname in fieldnames)
+	return hashlib.sha256(text.encode()).hexdigest()
+
+
+def approval_is_valid(name: str | None) -> bool:
+	"""Did a System Manager approve exactly the settings the record has now?"""
+	if not name:
+		return False
+	approval = frappe.db.get_value(APPROVAL, name, ["approved_by", "settings_digest"], as_dict=True)
+	if not approval or not is_system_manager(approval.approved_by):
+		return False
+	return approval.settings_digest == settings_digest(name)
+
+
+def record_approval(name: str) -> None:
+	"""Keep who approved the record and when. Called when a System Manager saves it by hand."""
+	approval = (
+		frappe.get_doc(APPROVAL, name) if frappe.db.exists(APPROVAL, name) else frappe.new_doc(APPROVAL)
+	)
+	approval.update(
+		{
+			"auto_email_report": name,
+			"approved_by": frappe.session.user,
+			"approved_on": now_datetime(),
+			"settings_digest": settings_digest(name),
+		}
+	)
+	approval.save()
+
+
+def switch_off_unapproved_auto_email_reports() -> None:
+	"""Switch off every Auto Email Report on governed data that has no valid approval.
+
+	Runs after install and after migrate. A record saved before the rule existed may have been
+	set up by someone who is no System Manager. It comes back only when a System Manager saves
+	it by hand, which records the approval.
+	"""
+	if not frappe.db.table_exists(rules.RULE_DOCTYPE) or not frappe.db.table_exists(APPROVAL):
+		return
+	governed = set(rules.load_now())
+	if not governed:
+		return
+	# System maintenance over every record, not a read for a user (exception to G-3).
+	for row in frappe.get_all(AUTO_EMAIL_REPORT, filters={"enabled": 1}, fields=["name", "report"]):
+		if touches_governed(row.report, governed) and not approval_is_valid(row.name):
+			frappe.db.set_value(AUTO_EMAIL_REPORT, row.name, "enabled", 0)
+
+
 class GuardedAutoEmailReport:
 	"""Extension of Auto Email Report: on governed data it is for System Managers only.
 
-	The record runs a report later, for a user who is not present. The project runs no
-	scheduled jobs (D-6), so the rule is as narrow as it can be. Two checks, each on every
-	save and every run:
+	The record runs a report later, for a user who is not present, and mails the result. The
+	project runs no scheduled jobs (D-6), so the rule is as narrow as it can be.
 
-	- the user who saves, downloads or sends the record must be a System Manager;
-	- the report rules must allow the report for the user named on the record.
+	Saving. The user who saves must be a System Manager when the record's report, or the
+	report it had before, touches governed data. The report rules must also allow the report
+	for the user named on the record. Frappe lets a Report Manager save such a record and
+	choose any user for it (`frappe/email/doctype/auto_email_report/auto_email_report.json`).
 
-	Frappe lets a Report Manager save such a record and choose any user for it
-	(`frappe/email/doctype/auto_email_report/auto_email_report.json`). Checking only the chosen
-	user would let that role borrow a more powerful account. The engine does not switch the
-	session user: `frappe.set_user` resets the session data and the request input
-	(`frappe/__init__.py:381`).
+	Running. Download, send now and the scheduler all need the same, and also a valid
+	approval. The scheduler works as Administrator (`frappe/utils/scheduler.py:117`), so the
+	session user proves nothing there. A System Manager saving the record by hand is the
+	approval. A record changed afterwards, or saved before the rule existed, does not run.
+
+	The engine never switches the session user: `frappe.set_user` resets the session data and
+	the request input (`frappe/__init__.py:381`). Frappe passes the record's user to a list
+	report as the user to read for; a query or script report reads as the session user.
 	"""
 
-	def refuse_on_governed_data(self) -> None:
-		if touches_governed(self.report) and not is_system_manager(frappe.session.user):
+	def refuse_on_governed_data(self, previous_report: str | None = None) -> None:
+		governed = touches_governed(self.report) or touches_governed(previous_report)
+		if governed and not is_system_manager(frappe.session.user):
 			frappe.throw(
 				_(
 					"Only a System Manager may use Auto Email Report for {0}: it reads data governed by Access Rules."
-				).format(frappe.bold(self.report)),
+				).format(frappe.bold(previous_report or self.report)),
 				frappe.PermissionError,
 			)
 		guard(self.report, self.user)
 
+	def refuse_without_approval(self) -> None:
+		if touches_governed(self.report) and not approval_is_valid(self.name):
+			frappe.throw(
+				_(
+					"Auto Email Report {0} is not approved. A System Manager must save it before it can run."
+				).format(frappe.bold(self.name or self.report)),
+				frappe.PermissionError,
+			)
+
 	def validate(self):
-		self.refuse_on_governed_data()
+		previous = None if self.is_new() else frappe.db.get_value(AUTO_EMAIL_REPORT, self.name, "report")
+		self.refuse_on_governed_data(previous)
 		return super().validate()
+
+	def on_update(self):
+		in_job = bool(getattr(frappe.local, "job", None))
+		if touches_governed(self.report) and is_system_manager(frappe.session.user) and not in_job:
+			record_approval(self.name)
+		# The Frappe class has no `on_update` today. Another extension in the chain may.
+		parent = getattr(super(), "on_update", None)
+		return parent() if parent else None
 
 	def get_report_content(self):
 		self.refuse_on_governed_data()
+		self.refuse_without_approval()
 		return super().get_report_content()
 
 	def send(self):
 		self.refuse_on_governed_data()
+		self.refuse_without_approval()
 		return super().send()
 
 

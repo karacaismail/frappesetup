@@ -57,6 +57,7 @@ PROTECTED_DOCTYPES = frozenset(
 		"Property Setter",
 		"DocShare",
 		"Module Def",
+		"Auto Email Report Approval",
 	}
 )
 
@@ -114,6 +115,11 @@ def _load() -> dict[str, list[dict]]:
 _request_rules = request_cache(_load)
 # Key in `frappe.local.request_cache`. It lives and dies with the request.
 _CHANGED_IN_REQUEST = "platform_core.erisim.rules_changed"
+
+
+def load_now() -> dict[str, list[dict]]:
+	"""Read the active rules from the database now, also during install and migrate."""
+	return _load()
 
 
 def clear_cache(*_args, **_kwargs) -> None:

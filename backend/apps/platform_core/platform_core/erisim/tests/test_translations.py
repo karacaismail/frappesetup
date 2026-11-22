@@ -20,21 +20,23 @@ from platform_core.erisim.tests.base import DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, RUL
 
 ROOT = Path(platform_core.__file__).parent
 CSV_PATH = ROOT / "translations" / "tr.csv"
-DOCTYPE_JSON = ROOT / "erisim" / "doctype" / "access_rule" / "access_rule.json"
 TURKISH_LETTERS = set("çğıöşüÇĞİÖŞÜ")
 
 
-def doctype_strings() -> tuple[set[str], set[str]]:
-	"""Labels and descriptions of the Access Rule document type."""
-	definition = json.loads(DOCTYPE_JSON.read_text())
-	labels = {definition["name"]}
-	descriptions = {definition["description"]}
-	for field in definition["fields"]:
-		if field.get("label"):
-			labels.add(field["label"])
-		if field.get("description"):
-			descriptions.add(field["description"])
-	return labels, descriptions
+def doctype_strings() -> dict[str, tuple[set[str], set[str]]]:
+	"""Labels and descriptions of every document type of the engine, keyed by document type name."""
+	found = {}
+	for path in sorted((ROOT / "erisim" / "doctype").glob("*/*.json")):
+		definition = json.loads(path.read_text())
+		labels = {definition["name"]}
+		descriptions = {definition["description"]}
+		for field in definition["fields"]:
+			if field.get("label"):
+				labels.add(field["label"])
+			if field.get("description"):
+				descriptions.add(field["description"])
+		found[definition["name"]] = (labels, descriptions)
+	return found
 
 
 def message_strings() -> set[str]:
@@ -78,8 +80,10 @@ def csv_rows() -> dict[tuple[str, str], str]:
 
 class TestTranslations(ErisimTestCase):
 	def all_visible(self) -> set[str]:
-		labels, descriptions = doctype_strings()
-		return labels | descriptions | message_strings() | tool_strings()
+		visible = message_strings() | tool_strings()
+		for labels, descriptions in doctype_strings().values():
+			visible |= labels | descriptions
+		return visible
 
 	def test_source_text_is_english(self):
 		for text in sorted(self.all_visible()):
@@ -89,9 +93,9 @@ class TestTranslations(ErisimTestCase):
 
 	def test_every_visible_text_has_a_turkish_row(self):
 		rows = csv_rows()
-		labels, descriptions = doctype_strings()
-		expected = {(text, RULE_DOCTYPE) for text in labels | descriptions}
-		expected |= {(text, "") for text in message_strings() | tool_strings()}
+		expected = {(text, "") for text in message_strings() | tool_strings()}
+		for doctype, (labels, descriptions) in doctype_strings().items():
+			expected |= {(text, doctype) for text in labels | descriptions}
 		for source, context in sorted(expected):
 			with self.subTest(source=source[:60]):
 				translation = rows.get((source, context), "")
