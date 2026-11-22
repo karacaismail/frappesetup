@@ -52,7 +52,10 @@ Mevcut `guvenlik-denetimi` komutu tek başına çalışır.
 Bandit, Git'in izlediği `backend` altındaki Python dosyalarını tarar.
 Bilinen hatalı deneme dosyaları kaynak taramasına girmez.
 `packages/press-ai` Python taramasının kapsamı dışındadır.
-Bandit istisnası kural, dosya, satır, sahip, gerekçe ve bitiş tarihi taşır.
+Bandit istisnası kural, dosya, kod, kod özeti, sahip, gerekçe ve bitiş tarihi taşır.
+Kod özeti, komutun tamamını ve bulunduğu işlevi tanımlar.
+Satır numarası değişse de aynı kod eşleşir.
+Komut değişirse ya da birden çok bulgu aynı kayda uyarsa kapı hata verir.
 Süresi geçen veya eşleşmeyen istisna denetimi durdurur.
 Gitleaks yalnız kural, dosya, satır, commit ve parmak izi gösterir.
 

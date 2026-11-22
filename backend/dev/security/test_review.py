@@ -59,7 +59,7 @@ class ReviewTests(unittest.TestCase):
             git.assert_not_called()
 
     def test_unused_bandit_exception_fails(self):
-        entry = '{"rule":"B603","file":"backend/a.py","line":1,"owner":"dev","reason":"Fixed argv","ignoreUntil":"2100-01-01"}'
+        entry = '{"rule":"B603","file":"backend/a.py","code":"run()","statementSha256":"1111111111111111111111111111111111111111111111111111111111111111","owner":"dev","reason":"Fixed argv","ignoreUntil":"2100-01-01"}'
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config = root / scans.SECURITY / "bandit-exceptions.json"

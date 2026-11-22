@@ -1,6 +1,7 @@
 """Manually invoked defensive checks and local release records."""
 
 import argparse
+import ast
 import base64
 import hashlib
 import http.client
@@ -186,25 +187,63 @@ def scan_bandit():
         today = datetime.now(timezone.utc).date()
         if any(not valid_exception(item, today) for item in entries):
             raise ValueError("Invalid or expired Bandit exception.")
-        keys = {(item["rule"], item["file"], item["line"]) for item in entries}
+        keys = {(item["rule"], item["file"], item["code"], item["statementSha256"]) for item in entries}
+        if len(keys) != len(entries) or any(
+            not code or not re.fullmatch(r"[a-f0-9]{64}", digest)
+            for _, _, code, digest in keys
+        ):
+            raise ValueError("Invalid or duplicate Bandit exception signature.")
         files = [path for path in git("ls-files", "-z", "--", "backend").split("\0")
                  if path.endswith(".py") and not path.startswith(
                      ("backend/dev/guvenlik/fixtures/", f"{FIXTURES}/"))
                  and (ROOT / path).is_file() and not (ROOT / path).is_symlink()]
         if not files:
             raise ValueError("No tracked Python files to scan.")
-        findings = {(item["test_id"], Path(item["filename"]).as_posix(), item["line_number"])
-                    for item in bandit_findings(command, files)}
-        unreviewed = tuple(f"{rule} · {filename}:{line}" for rule, filename, line in sorted(findings - keys))
-        unused = tuple(f"Unused exception · {rule} · {filename}:{line}"
-                       for rule, filename, line in sorted(keys - findings))
+        sources = {}
+        grouped = {}
+        for item in bandit_findings(command, files):
+            filename = Path(item["filename"]).as_posix()
+            if filename not in files:
+                raise ValueError("Bandit reported a file outside the tracked scan.")
+            if filename not in sources:
+                source = (ROOT / filename).read_text()
+                sources[filename] = source, ast.parse(source, filename=filename)
+            line = item["line_number"]
+            key = (item["test_id"], filename, *bandit_source_signature(*sources[filename], line))
+            grouped.setdefault(key, []).append(line)
+        matched = {key for key, lines in grouped.items() if key in keys and len(lines) == 1}
+        unreviewed = tuple(
+            f"{rule} · {filename}:{line}"
+            for rule, filename, code, digest in sorted(grouped.keys() - matched)
+            for line in sorted(grouped[(rule, filename, code, digest)])
+        )
+        unused = tuple(
+            f"Unused exception · {rule} · {filename} · {code} · {digest}"
+            for rule, filename, code, digest in sorted(keys - matched)
+        )
         for finding in (*unreviewed, *unused):
             print(f"Bandit: {finding}")
         return replace(result, status="fail" if unreviewed or unused else "pass",
                        findings=(*unreviewed, *unused))
-    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+    except (OSError, SyntaxError, TypeError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         print(f"Bandit check failed: {error}")
         return result
+
+
+def bandit_source_signature(source, tree, line):
+    statements = [node for node in ast.walk(tree) if isinstance(node, ast.stmt)
+                  and node.lineno <= line <= node.end_lineno]
+    if not statements:
+        raise ValueError("Bandit finding has no matching Python statement.")
+    statement = max(statements, key=lambda node: (node.lineno, node.col_offset, -node.end_lineno))
+    parents = sorted(
+        (node for node in statements if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))),
+        key=lambda node: (node.lineno, node.col_offset),
+    )
+    scope = ".".join(node.name for node in parents)
+    code = source.splitlines()[line - 1].strip()
+    content = ast.get_source_segment(source, statement)
+    return code, hashlib.sha256(f"{scope}\n{content}".encode()).hexdigest()
 
 
 def dependency_locks(files):
