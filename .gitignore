@@ -33,3 +33,6 @@ __pycache__/
 
 # press-ai indirmeleri (scripts/press-ai-downloads.mjs derlemede üretir)
 /public/downloads/
+
+# Local Pane state and temporary test data
+/.pane/

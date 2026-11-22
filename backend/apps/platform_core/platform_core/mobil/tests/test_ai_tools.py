@@ -86,6 +86,34 @@ class MobileAiToolsTest(IntegrationTestCase):
 		)
 		self.assertIsNone(result["next_after"])
 
+	def test_lists_session_closure_states_with_a_bounded_query_count(self):
+		from platform_core.mobil.ai_tools import list_installations
+		from platform_core.mobil.sessions import _session_key
+
+		pending_sid = str(uuid4())
+		closed_sid = str(uuid4())
+		expected = {}
+		for sid, pending in ((pending_sid, True), (closed_sid, False)):
+			frappe.get_doc(
+				doctype="Mobile Revoked Session", session_key=_session_key(sid), delivery_pending=int(pending)
+			).insert()
+			installation = self.install(self.account)
+			frappe.db.set_value("Mobile Installation", installation, "session_id", sid)
+			expected[installation] = pending
+
+		shared_installation = self.install(self.account)
+		frappe.db.set_value("Mobile Installation", shared_installation, "session_id", pending_sid)
+		expected[shared_installation] = True
+		expected[self.installation] = False
+
+		frappe.get_roles()
+		with self.assertQueryCount(2):
+			result = list_installations(self.account)
+		self.assertEqual(
+			{row["installation_id"]: row["closure_pending"] for row in result["installations"]},
+			expected,
+		)
+
 	def test_single_preview_does_not_mutate_and_execution_sets_cutoff(self):
 		from platform_core.mobil import ai_tools
 

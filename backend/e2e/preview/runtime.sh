@@ -36,6 +36,7 @@ tenant_image=frappe/erpnext:v16.55.0
 tenant="$PREVIEW_PROJECT-kiraci-web-1"
 press="$PREVIEW_PROJECT-web-1"
 sync="$PREVIEW_PROJECT-identity"
+sync_host=identity-sync.localhost
 provider="$PREVIEW_PROJECT-provider"
 network="${PREVIEW_PROJECT}_default"
 builder="$PREVIEW_PROJECT-builder"
@@ -51,7 +52,7 @@ export KC_PORT="$PANE_PORT"
 export KC_PUBLIC_URL="http://kimlik.localhost:$KC_PORT"
 export ATONOTA_SITE_KIRACI1_URL="http://kiraci1.localhost:$KIRACI_WEB_PORT"
 export ATONOTA_PRESS_URL="http://press.localhost:$PRESS_WEB_PORT"
-export IDENTITY_SYNC_EVENTS_URL="http://identity-sync:$sync_port/v1/events"
+export IDENTITY_SYNC_EVENTS_URL="http://$sync_host:$sync_port/v1/events"
 export DEV_ENV_FILE="$PREVIEW_DIR/tenant.env"
 keycloak_env="$PREVIEW_DIR/keycloak.env"
 press_env="$PREVIEW_DIR/press.env"
@@ -239,7 +240,7 @@ printf '%s\n' "Preparing a disposable stack. See $PREVIEW_DIR/runtime.log."
         printf '%s\n' 'IDENTITY_SYNC_HOST=0.0.0.0' 'IDENTITY_SYNC_REALM=platform' 'IDENTITY_SYNC_CLIENT_ID=identity-sync' \
             'IDENTITY_SYNC_ADMIN_SCOPE=admin-api kc-admin-api' 'IDENTITY_SYNC_DB=/tmp/e2e-sync.sqlite' 'IDENTITY_SYNC_SESSION_AZP=site-kiraci1'
     } > "$sync_env"
-    docker_default create --label "$sidecar_label=$PREVIEW_PROJECT" --name "$sync" --network "$network" --network-alias identity-sync --memory 128m \
+    docker_default create --label "$sidecar_label=$PREVIEW_PROJECT" --name "$sync" --network "$network" --network-alias "$sync_host" --memory 128m \
         --env-file "$sync_env" -e PYTHONPATH=/tmp --publish "127.0.0.1:$sync_port:$sync_port" \
         --entrypoint /home/frappe/frappe-bench/env/bin/python "$tenant_image" -m identity_sync serve
     docker_default cp "$identity_dir/identity_sync/identity_sync" "$sync:/tmp/identity_sync"

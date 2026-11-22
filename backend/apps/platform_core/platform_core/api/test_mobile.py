@@ -289,7 +289,10 @@ class MobileHTTPTest(unittest.TestCase):
 			operation = self.fixture_operation(body, "create", record_id, fields={"title": "Example"})
 			status, result, _ = self.post("v1_push", operation)
 			self.assertEqual(status, 200, result)
-			self.assertEqual(self.post("v1_push", operation)[:2], (status, result))
+			retry_status, retry_result, _ = self.post("v1_push", operation)
+			self.assertEqual(retry_status, status, retry_result)
+			self.assertEqual(retry_result["message"], result["message"])
+			self.assertIsInstance(retry_result["server_time"], int)
 			operation["operations"][0]["fields"]["title"] = "Different"
 			status, result, _ = self.post("v1_push", operation)
 			self.assertEqual((status, result.get("code")), (409, "operation_conflict"), result)
