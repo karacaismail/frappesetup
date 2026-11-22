@@ -39,7 +39,7 @@ for role in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
         fail "Git author and committer must use the configured personal identity."
 done
 
-python_bin="${PYTHON:-python3}"
+python_bin="${PYTHON:-python3.14}"
 "$python_bin" -B "$naming_dir/apply_renames.py"
 git add -A -- backend/
 planned_tree="$(git write-tree)"

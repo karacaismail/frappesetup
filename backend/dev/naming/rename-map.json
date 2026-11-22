@@ -12,13 +12,7 @@
   {
     "old": "Kimlik",
     "new": "Identity",
-    "type": "module",
-    "paths": [
-      "backend/apps/platform_core/platform_core/modules.txt",
-      "backend/apps/platform_core/platform_core/kimlik/*.json",
-      "backend/apps/platform_core/platform_core/kimlik/*.py",
-      "backend/apps/platform_core/platform_core/tests/test_installation.py"
-    ]
+    "type": "module"
   },
   {
     "old": "platform_core.kabuk",
@@ -33,14 +27,7 @@
   {
     "old": "Kabuk",
     "new": "Shell",
-    "type": "module",
-    "paths": [
-      "backend/apps/platform_core/platform_core/modules.txt",
-      "backend/apps/platform_core/platform_core/kabuk/*.json",
-      "backend/apps/platform_core/platform_core/kabuk/*.py",
-      "backend/apps/platform_core/platform_core/tests/test_installation.py",
-      "backend/apps/platform_core/platform_core/tests/shell_http_fixture.py"
-    ]
+    "type": "module"
   },
   {
     "old": "platform_core.erisim",
@@ -55,13 +42,7 @@
   {
     "old": "Erisim",
     "new": "Access",
-    "type": "module",
-    "paths": [
-      "backend/apps/platform_core/platform_core/modules.txt",
-      "backend/apps/platform_core/platform_core/erisim/*.json",
-      "backend/apps/platform_core/platform_core/erisim/*.py",
-      "backend/apps/platform_core/platform_core/tests/test_installation.py"
-    ]
+    "type": "module"
   },
   {
     "old": "platform_core.mobil",
@@ -76,13 +57,7 @@
   {
     "old": "Mobil",
     "new": "Mobile",
-    "type": "module",
-    "paths": [
-      "backend/apps/platform_core/platform_core/modules.txt",
-      "backend/apps/platform_core/platform_core/mobil/*.json",
-      "backend/apps/platform_core/platform_core/mobil/*.py",
-      "backend/apps/platform_core/platform_core/tests/test_installation.py"
-    ]
+    "type": "module"
   },
   {
     "old": "platform_core.model_gecidi",
@@ -139,12 +114,7 @@
   {
     "old": "Kimlik",
     "new": "Press Identity",
-    "type": "module",
-    "paths": [
-      "backend/apps/press_tr/press_tr/modules.txt",
-      "backend/apps/press_tr/press_tr/kimlik/*.json",
-      "backend/apps/press_tr/press_tr/kimlik/*.py"
-    ]
+    "type": "module"
   },
   {
     "old": "platform_core.erisim.doctype.access_rule.access_rule",
@@ -3667,7 +3637,7 @@
   },
   {
     "old": "deger",
-    "new": "value",
+    "new": "environment_value",
     "type": "identifier",
     "paths": [
       "backend/identity/keycloak/tests/*"
@@ -3904,48 +3874,22 @@
   {
     "old": "kimlik",
     "new": "identity",
-    "type": "module",
-    "paths": [
-      "backend/dev/tests/test_boundaries.py",
-      "backend/apps/platform_core/platform_core/kimlik/jwks.py"
-    ]
+    "type": "module"
   },
   {
     "old": "kabuk",
     "new": "shell",
-    "type": "module",
-    "paths": [
-      "backend/dev/tests/test_boundaries.py",
-      "backend/apps/platform_core/platform_core/kabuk/test_boundaries.py"
-    ]
+    "type": "module"
   },
   {
     "old": "yapay_zeka",
     "new": "ai",
-    "type": "module",
-    "paths": [
-      "backend/dev/tests/test_boundaries.py",
-      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py",
-      "backend/dev/ai_readiness/gate.py",
-      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_gap_analysis.py"
-    ]
+    "type": "module"
   },
   {
     "old": "model_gecidi",
     "new": "model_gateway",
-    "type": "module",
-    "paths": [
-      "backend/dev/tests/test_boundaries.py",
-      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py"
-    ]
-  },
-  {
-    "old": "Kimlik",
-    "new": "Identity",
-    "type": "module",
-    "paths": [
-      "backend/dev/tests/test_boundaries.py"
-    ]
+    "type": "module"
   },
   {
     "old": "kimlik.localhost",
@@ -4028,7 +3972,7 @@
   },
   {
     "old": "veri",
-    "new": "data",
+    "new": "request_body",
     "type": "identifier",
     "paths": [
       "backend/identity/keycloak/tests/*"
@@ -4624,19 +4568,12 @@
   {
     "old": "erisim",
     "new": "access",
-    "type": "module",
-    "paths": [
-      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py",
-      "backend/apps/platform_core/platform_core/erisim/test_link_search.py"
-    ]
+    "type": "module"
   },
   {
     "old": "kimlik",
     "new": "press_identity",
-    "type": "module",
-    "paths": [
-      "backend/apps/press_tr/tests/test_module_boundaries.py"
-    ]
+    "type": "module"
   },
   {
     "old": "platform_core\\.yapay_zeka",
@@ -4673,10 +4610,7 @@
   {
     "old": "guvenlik",
     "new": "security",
-    "type": "module",
-    "paths": [
-      "backend/dev/ai_readiness/gate.py"
-    ]
+    "type": "module"
   },
   {
     "old": "\"guvenlik\"",
@@ -5701,5 +5635,50 @@
     "old": "/assets/platform_core/kimlik",
     "new": "/assets/platform_core/identity",
     "type": "reference"
+  },
+  {
+    "old": "mobil",
+    "new": "mobile",
+    "type": "module"
+  },
+  {
+    "old": "'Eklentili Keycloak adresi (SIHIRLI_KC_URL) verilmedi. Tema deneme ortamında eklenti yok.'",
+    "new": "'Eklentili Keycloak adresi (KC_MAGIC_LINK_URL) verilmedi. Tema deneme ortamında eklenti yok.'",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "'SIHIRLI_ADMIN_TOKEN gerekli'",
+    "new": "'KC_MAGIC_LINK_ADMIN_TOKEN gerekli'",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "f\"/api/method/platform_core.kimlik.login_policy.{name}\"",
+    "new": "f\"/api/method/platform_core.identity.login_policy.{name}\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/kimlik/tests/test_login_policy.py"
+    ]
+  },
+  {
+    "old": "for path in (APP / \"kimlik\").rglob(\"*.py\"):",
+    "new": "identity_layer = APP / \"press_identity\"\n\t\tself.assertTrue(identity_layer.is_dir())\n\t\tfor path in identity_layer.rglob(\"*.py\"):",
+    "type": "reference",
+    "paths": [
+      "backend/apps/press_tr/tests/test_module_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"environment: PRESS_DB_PASSWORD\"",
+    "new": "\"environment: PTR_DB_PASSWORD\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/press/test_development_contract.py"
+    ]
   }
 ]

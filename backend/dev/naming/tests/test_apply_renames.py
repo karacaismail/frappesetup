@@ -72,6 +72,75 @@ class RenameTests(unittest.TestCase):
             self.assertEqual((self.root / path).read_text(), expected)
         self.assertEqual(self.rename(None, "--check-modules").returncode, 0)
 
+    def test_real_map_preserves_fstring_copy_and_renames_expressions(self):
+        errors = "backend/libs/oidc_verify/src/oidc_verify"
+        keycloak = "backend/identity/keycloak/tests"
+        self.write(
+            f"{errors}/hatalar.py",
+            'def reject(code):\n    raise ValueError(f"Bilinmeyen hata kodu: {code}")\n',
+        )
+        self.write(
+            f"{keycloak}/yardimci.py",
+            'def ortam(ad):\n    raise KeyError(f"{ad} ortam değişkeni boş. '
+            'Testi bin/kc-dev.sh test ile çalıştırın.")\n'
+            'def request(belirtec):\n    return f"Bearer {belirtec}"\n',
+        )
+        self.git("add", ".")
+        outcome = self.rename(None)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+        self.assertIn('f"Bilinmeyen hata kodu: {code}"', (self.root / errors / "errors.py").read_text())
+        rewritten = (self.root / keycloak / "helpers.py").read_text()
+        self.assertIn('f"{name} ortam değişkeni boş. Testi bin/kc-dev.sh test ile çalıştırın."', rewritten)
+        self.assertIn('f"Bearer {token}"', rewritten)
+
+    def test_real_map_finds_unscoped_module_literals_and_raw_embedded_imports(self):
+        ref = self.write(
+            "backend/apps/platform_core/platform_core/erisim/tests/test_translations.py",
+            'layer = ROOT / "erisim"\nasset = "/assets/platform_core/kimlik/logo.svg"\n',
+        )
+        self.write("backend/dev/unlisted.py", 'snippet = "from platform_core.kimlik.api import x"\n')
+        self.git("add", ".")
+        outcome = self.rename(None, "--check-modules")
+        self.assertEqual(outcome.returncode, 1, outcome.stdout)
+        self.assertIn("backend/dev/unlisted.py:1", outcome.stdout)
+        outcome = self.rename(None)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+        self.assertFalse(ref.exists())
+        target = self.root / "backend/apps/platform_core/platform_core/access/tests/test_translations.py"
+        self.assertIn('ROOT / "access"', target.read_text())
+
+    def test_redirect_is_restored_if_interrupted_after_git_mv(self):
+        self.write("backend/PROJE-KAYDI.md", "Record\n")
+        self.git("add", ".")
+        self.git("mv", "backend/PROJE-KAYDI.md", "backend/PROJECT-RECORD.md")
+        rules = [{"old": "backend/PROJE-KAYDI.md", "new": "backend/PROJECT-RECORD.md", "type": "path"}]
+        outcome = self.rename(rules)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+        self.assertIn("PROJECT-RECORD.md", (self.root / "backend/PROJE-KAYDI.md").read_text())
+
+    def test_module_allowlist_accepts_only_exact_file_and_line(self):
+        note = '# Keep the legacy example "platform_core.kimlik".\n'
+        source = self.write("backend/example.py", note)
+        self.git("add", ".")
+        allowlist = self.workspace / "allowed.json"
+        allowlist.write_text(json.dumps([{"path": "backend/example.py", "line_text": note.strip()}]))
+        flags = ("--check-modules", "--module-allowlist", str(allowlist))
+        self.assertEqual(self.rename(None, *flags).returncode, 0)
+        source.write_text(note + 'example = "platform_core.kimlik"\n')
+        report = self.rename(None, *flags)
+        self.assertEqual(report.returncode, 1)
+        self.assertIn("backend/example.py:2", report.stdout)
+
+    def test_reports_markdown_code_and_links_without_mutating_content(self):
+        content = "Kimlik hakkında. `platform_core.kimlik`. [Görev](docs/isler/kimlik-realm.md).\n"
+        source = self.write("backend/README.md", content)
+        self.git("add", ".")
+        report = self.rename(None, "--report-docs")
+        self.assertEqual(report.returncode, 0, report.stderr)
+        self.assertIn("backend/README.md:1: platform_core.kimlik", report.stdout)
+        self.assertIn("kimlik-realm.md", report.stdout)
+        self.assertEqual(source.read_text(), content)
+
     def test_real_map_distinguishes_email_properties_slugs_and_copy(self):
         directory = "backend/identity/keycloak/themes/atonota/test/tests"
         pattern = "const pattern = /https?:\\/\\/[^\\s\"'<>]+/g;\n"
@@ -101,7 +170,9 @@ class RenameTests(unittest.TestCase):
         )
         document = self.write("backend/PROJE-KAYDI.md", "AI Provider adı bu kayıtta kalır.\n")
         metadata = self.write("backend/app/record.json", '{"name":"AI Provider","label":"AI Provider"}\n')
-        csv_path = self.write("backend/app/translations/tr.csv", 'AI Provider,"AI Provider, sağlayıcı"\n')
+        csv_path = self.write(
+            "backend/app/translations/tr.csv", 'AI Provider,"AI Provider, sağlayıcı",AI Provider\n'
+        )
         po_path = self.write(
             "backend/app/locale/tr.po", 'msgid ""\n"AI "\n"Provider"\nmsgstr "AI Provider sağlayıcı"\n'
         )
@@ -122,7 +193,7 @@ class RenameTests(unittest.TestCase):
         )
         self.assertEqual(document.read_text(), "[Yeni dosyayı açın.](PROJECT-RECORD.md)\n")
         self.assertEqual(metadata.read_text(), '{"name":"PLT AI Provider","label":"AI Provider"}\n')
-        self.assertEqual(csv_path.read_text(), 'PLT AI Provider,"AI Provider, sağlayıcı"\n')
+        self.assertEqual(csv_path.read_text(), 'PLT AI Provider,"AI Provider, sağlayıcı",PLT AI Provider\n')
         self.assertEqual(po_path.read_text(), 'msgid "PLT AI Provider"\nmsgstr "AI Provider sağlayıcı"\n')
         self.assertIn("0 tracked file(s)", self.rename(entries, "--dry-run").stdout)
 
@@ -144,6 +215,32 @@ class RenameTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn("LEGACY_KEY", result.stdout)
         self.assertNotIn("never-print-this", result.stdout)
+
+    def test_preserves_template_copy_html_yaml_and_properties(self):
+        template = self.write("backend/view.ts", "const label = `Durum: ${durum}`;\n")
+        markup = self.write("backend/view.ftl", '<div class="durum">Son durum</div>\n')
+        contract = self.write("backend/contracts/example.yaml", "summary: >-\n  Son durum\n")
+        properties = self.write("backend/view.properties", "caption=Son durum\n")
+        non_utf8 = self.write("backend/legacy.txt", "")
+        non_utf8.write_bytes(b"\xe9")
+        self.git("add", ".")
+        entries = [{"old": "durum", "new": "status", "type": "identifier"}]
+        result = self.rename(entries)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Skipped non-UTF-8 file: backend/legacy.txt", result.stderr)
+        self.assertEqual(template.read_text(), "const label = `Durum: ${status}`;\n")
+        self.assertEqual(markup.read_text(), '<div class="status">Son durum</div>\n')
+        self.assertEqual(contract.read_text(), "summary: >-\n  Son durum\n")
+        self.assertEqual(properties.read_text(), "caption=Son durum\n")
+        self.assertEqual(non_utf8.read_bytes(), b"\xe9")
+
+    def test_rejects_a_module_binding_collision(self):
+        source = self.write("backend/collision.py", "name = 1\nad = 2\n")
+        self.git("add", ".")
+        result = self.rename([{"old": "ad", "new": "name", "type": "identifier"}])
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("Name collision", result.stderr)
+        self.assertIn("ad = 2", source.read_text())
 
     def test_prefixed_doctype_and_path_moves_are_repeatable(self):
         original = "backend/app/legacy/ai_provider.json"

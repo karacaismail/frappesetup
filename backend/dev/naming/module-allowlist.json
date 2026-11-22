@@ -1,0 +1,118 @@
+[
+  {
+    "path": "backend/apps/platform_core/platform_core/access/link_search.py",
+    "line_text": "Python code must use `platform_core.erisim.api`: Frappe's own functions cannot be intercepted"
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/access/tests/test_report_rules.py",
+    "line_text": "\"\"\"Other modules call the gate through `platform_core.erisim.api`.\"\"\""
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/ai/retention.py",
+    "line_text": "- `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs \"{'older_than_days': 365}\"`"
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/ai/tests/base.py",
+    "line_text": "The real gate is `platform_core.erisim.api.report_guard`. Without it the report tool is closed."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/ai/tests/base.py",
+    "line_text": "The real gate is `platform_core.erisim.reports.guard`. Without it the report tool is closed."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/ai/tools/read.py",
+    "line_text": "\"\"\"Return `platform_core.erisim.reports.guard`, or None while that module is not installed."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/ai/tools/read.py",
+    "line_text": "The gate is `platform_core.erisim.api.report_guard`, the public path of that module."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/api/access.py",
+    "line_text": "\"\"\"Access rule endpoints. The business rule is in the `platform_core.erisim` module."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/api/access.py",
+    "line_text": "\"\"\"Erişim kuralı uçları. İş kuralı `platform_core.erisim` modülündedir."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/api/ai.py",
+    "line_text": "\"\"\"Yapay zekâ erişim katmanının uçları. İş kuralı `platform_core.yapay_zeka` modülündedir."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/api/auth.py",
+    "line_text": "\"\"\"Sign-in and sign-out endpoints. Business rules live in `platform_core.kimlik`; this file stays thin.\"\"\""
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/api/test_access.py",
+    "line_text": "Ayrıntılı davranış testleri `platform_core/erisim/tests/` klasöründedir."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/api/test_access.py",
+    "line_text": "The detailed behavior tests are in the `platform_core/erisim/tests/` folder."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/identity/api.py",
+    "line_text": "\"\"\"Public functions of the `kimlik` module for other modules (module boundary: `platform_core.kimlik.api`)."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/identity/provider_setup.py",
+    "line_text": "Manual run: `bench --site <site> execute platform_core.kimlik.provider_setup.ensure_social_login_key`"
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/identity/tests/helpers.py",
+    "line_text": "\"\"\"Patch that feeds `platform_core.kimlik.jwks.jwks_cache` with the local key.\"\"\""
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/identity/tests/mobile_stub.py",
+    "line_text": "\"\"\"Stand-in mobile endpoint for the tests of `platform_core.kimlik.api` (the real ones belong to platform-core-mobil)."
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/identity/tests/mobile_stub.py",
+    "line_text": "\"\"\"Stand-in mobile endpoint for the tests of `platform_core.kimlik.api` (the real ones belong to platform-core-mobil).\"\"\""
+  },
+  {
+    "path": "backend/apps/platform_core/platform_core/identity/tests/test_mobile_identity.py",
+    "line_text": "\"\"\"Mobile token verification exposed by `platform_core.kimlik.api` for platform-core-mobil (AU-3, AU-4, AU-5)."
+  },
+  {
+    "path": "backend/contracts/platform_core-access.openapi.yaml",
+    "line_text": "Bildirim işlevi `platform_core.erisim.ai_tools.declare` olur."
+  },
+  {
+    "path": "backend/contracts/platform_core-access.openapi.yaml",
+    "line_text": "Bu sözleşme `platform_core.erisim` modülünün uçlarını tarif eder."
+  },
+  {
+    "path": "backend/contracts/platform_core-access.openapi.yaml",
+    "line_text": "The declaration function is `platform_core.erisim.ai_tools.declare`."
+  },
+  {
+    "path": "backend/contracts/platform_core-access.openapi.yaml",
+    "line_text": "This contract describes the endpoints of the `platform_core.erisim` module."
+  },
+  {
+    "path": "backend/contracts/platform_core-ai.openapi.yaml",
+    "line_text": "Bu sözleşme `platform_core.yapay_zeka` modülünün uçlarını tarif eder."
+  },
+  {
+    "path": "backend/contracts/platform_core-ai.openapi.yaml",
+    "line_text": "`bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs \"{'older_than_days': 365}\"`."
+  },
+  {
+    "path": "backend/contracts/platform_core-identity.openapi.yaml",
+    "line_text": "Bu sözleşme `platform_core.kimlik` modülünün uçlarını tarif eder."
+  },
+  {
+    "path": "backend/contracts/platform_core-identity.openapi.yaml",
+    "line_text": "The Turkish text comes from `translations/tr.csv` with the context `platform_core.kimlik`."
+  },
+  {
+    "path": "backend/contracts/platform_core-identity.openapi.yaml",
+    "line_text": "This contract describes the endpoints of the `platform_core.kimlik` module."
+  },
+  {
+    "path": "backend/identity/identity_sync/tests/fakes.py",
+    "line_text": "Source of the behaviour: that contract and `platform_core/kimlik/provisioning.py`."
+  }
+]
