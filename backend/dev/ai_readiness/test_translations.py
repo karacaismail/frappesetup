@@ -67,7 +67,7 @@ class TranslationChecksTests(unittest.TestCase):
         self.write(f"{CORE}/translations/tr.csv", "Open,Çekirdek\n")
         self.write(
             f"{CORE}/locale/tr.po",
-            'msgid ""\nmsgstr ""\n\nmsgctxt "action"\nmsgid ""\n"Save\\n"\n"now"\nmsgstr "Kaydet"\n'
+            'msgid ""\nmsgstr ""\n\nmsgid ""\n"Save\\n"\n"now"\nmsgstr "Sakla"\n'
             '#~ msgid "Old"\n#~ msgstr "Eski"\n',
         )
         self.write(f"{CORE}/locale/es.po", 'msgid "Spanish"\nmsgstr "Español"\n')
@@ -109,7 +109,7 @@ class TranslationChecksTests(unittest.TestCase):
 
     def test_explicit_core_checkout_supports_parent_locale(self):
         locale = TR.replace("tr.csv", "tr-TR.csv")
-        self.write(locale, "Open,Aç,\n")
+        self.write(locale, "Open,Açınız,\n")
         self.write("separate/frappe/locale/tr.po", 'msgid "Open"\nmsgstr "Aç"\n')
         result = self.scan("--frappe-root", str(self.root / "separate"))
         self.assertEqual(result.returncode, 1, result.stderr)
@@ -117,3 +117,16 @@ class TranslationChecksTests(unittest.TestCase):
         self.assertEqual(payload["checks"]["translation_core"], "fail")
         [(path, rule)] = [(row["path"], row["rule"]) for row in payload["findings"]]
         self.assertEqual((path, rule), (locale, "translation-core"))
+
+    def test_identical_and_context_only_core_translations_are_allowed(self):
+        self.write(TR, "Open,Aç,\nAmending,Değiştir,\nClose,Kapat,\n")
+        self.write(f"{CORE}/translations/tr.csv", "Close,Kapat\n")
+        self.write(
+            f"{CORE}/locale/tr.po",
+            'msgid "Open"\nmsgstr "Aç"\nmsgctxt "amendment"\nmsgid "Amending"\nmsgstr "Düzenle"\n',
+        )
+        result = self.scan()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["findings"], [])
+        self.assertEqual(payload["checks"]["translation_core"], "pass")

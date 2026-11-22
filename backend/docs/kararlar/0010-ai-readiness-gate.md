@@ -39,7 +39,8 @@ Kip dosyası yoksa kapı `advisory` kullanır ve bunu çıktıda belirtir.
 JSON çıktısı kipi `checks.naming_mode` alanında gösterir.
 `checks.naming_mode_source` kipi dosyadan mı aldığını belirtir.
 Kip dosyası geçersizse veya ad betiği çalışmazsa kapı hata verir.
-Ad betiği yoksa kapı `not_run` yazar.
+Ad betiği yoksa kapı `advisory` kipinde `not_run` yazar.
+Kapı `enforce` kipinde ad betiği yoksa hata verir.
 
 ## Çeviri denetimi
 
@@ -47,7 +48,8 @@ Kapı uygulama çeviri dosyalarında her kayıtta üç sütun arar.
 Sütunlar kaynak metin, çeviri ve bağlamdır.
 Aynı dosyada kaynak metin ile bağlam çifti yalnız bir kez yazılır.
 Bağlam boşsa kapı kaynak metni Frappe çekirdek çevirisiyle karşılaştırır.
-Kaynak iki yerde de varsa kapı bulgu yazar.
+Kapı aynı kaynak için yalnız çeviriler farklıysa bulgu yazar.
+Kapı çekirdekte yalnız bağlamla verilen çevirileri bu denetime almaz.
 
 Kapı çekirdek katalog için `backend/apps/frappe/frappe` yoluna bakar.
 Başka bir Frappe çalışma kopyası için `FRAPPE_SOURCE` değişkenine yol yazın.
@@ -61,7 +63,7 @@ Bu durumda da sütun ve tekrar denetimleri çalışır.
 
 Kapı her uygulamanın `pyproject.toml` dosyasını okur.
 Olağan ve isteğe bağlı Python bağımlılıklarını denetler.
-Farklı uygulamalar aynı paket için farklı sürüm veya paket adresi yazarsa kapı bulgu verir.
+Farklı uygulamalar aynı paket için farklı sürüm kuralı yazarsa kapı bulgu verir.
 Paket adının büyük harf ve ayırıcı farkı ayrı paket sayılmaz.
 
 Kapı uygulama kurallarını Frappe 16.56.0'ın kesin sürüm sabitleriyle karşılaştırır.
@@ -72,8 +74,10 @@ Kapı Frappe'nin sürüm aralıklarını veya dolaylı bağımlılıkları çöz
 Kapı bağımlılık denetimi için de aynı Frappe yolunu kullanır.
 İstenen sürümün kaynağı yoksa `dependency_core` sonucu `not_run` olur.
 Uygulamalar arası karşılaştırma bu durumda da çalışır.
-Kapı Python sürüm kurallarını okumak için `packaging` kullanır.
-Bu paket yoksa kapı, mevcut `pip` içindeki kopyayı kullanır.
+Kapı sürüm kurallarını yalnız Python standart kitaplığıyla okur.
+Sayısal sürümlerde `==`, `!=`, `~=`, `>=`, `<=`, `<` ve `>` işlemlerini tanır.
+Git adresi, sürüm eki veya işletim sistemi koşulu varsa kapı o kuralı atlar.
+Atlanan karşılaştırma için sonuç `not_run` olur. Kapı hata bulgusu yazmaz.
 
 ## Kapsam
 
@@ -84,7 +88,8 @@ Bu paket yoksa kapı, mevcut `pip` içindeki kopyayı kullanır.
   Uygulama yalnız kendi dışa açık yöntemlerini listeye yazar.
   Hazır Frappe yöntemleri için sözleşmenin 5. bölümündeki liste geçerlidir.
   Kapı bilinen yönetici ve servis uçlarını reddeder.
-  Kapı doğrudan yazılan yönetici rolü denetimini de tanır.
+  Kapı doğrudan verilen rolleri ve sabit rol listelerini tanır.
+  Kapı aynı uygulamadaki bir yardımcı işlevin rol denetimini de okur.
   Bir yöntem başka bir hedefe yönleniyorsa kapı o hedefi de denetler.
   Kapı çalışma anında belirlenen yetkiyi çözmez. Yetkiyi uygulamanın uç testleri doğrular.
 
@@ -143,7 +148,9 @@ Kapı girintisiz YAML listelerini de kabul eder.
 Kapı işlem tanımında desteklenmeyen bir biçim görürse bulgu yazar.
 Kapı çalışma anında hesaplanan adreslerin tümünü çözemez.
 Kapı aynı uygulamada `__init__.py` üzerinden dışa açılan işlevleri izler.
-Kapı, kayıtlı araçtan çıkan `Class().method()` ve `self.method()` çağrılarını izlemez.
+Kapı iç sınıf ve kısa işlev gövdelerindeki yardımcı başvurularını da izler.
+Kapı varsayılan değerlerde ve işlev süsleyicilerinde de yardımcı arar.
+Kapı, `Class().method()` ve `self.method()` çağrılarının hedefini çözmez.
 Kapı çalışma anında seçilen yardımcı işlevleri de SQL için çözemez.
 
 ## Yasaklı ad

@@ -64,7 +64,7 @@ class InterfaceInventoryTests(unittest.TestCase):
             """
             clear_cache = ["sample_app.cards.events.clear"]
             doc_events = {"Contact": {"on_update": "sample_app.cards.events.update"}}
-            fixtures = [{"dt": "Role"}]
+            fixtures = [{"dt": "Role", "filters": [["name", "=", "AI Manager"]]}]
             """,
         )
         first = self.inventory()
@@ -79,6 +79,7 @@ class InterfaceInventoryTests(unittest.TestCase):
         self.assertIn("clear_cache", first)
         self.assertIn("Contact", first)
         self.assertIn("on_update", first)
+        self.assertIn('fixtures[filters] = ["name", "=", "AI Manager"]', first)
         self.assertTrue(any("fixtures" in row and "shared-owner" in row for row in first.splitlines()))
 
     def test_internal_cross_module_imports_warn_without_failing(self):

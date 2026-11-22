@@ -2,6 +2,7 @@
 
 import ast
 import csv
+import re
 
 
 class TranslationCSVError(ValueError):
@@ -37,28 +38,47 @@ def po_text(value):
     return result
 
 
-def po_sources(path):
-    fragments = []
+def po_entry(fields, fuzzy):
+    if not fuzzy and "msgctxt" not in fields and "msgid_plural" not in fields:
+        source = "".join(fields.get("msgid", ()))
+        translated = "".join(fields.get("msgstr", ()))
+        if source and translated:
+            return source, translated
+    return None
+
+
+def po_translations(path):
+    fields = {}
+    field = ""
+    fuzzy = False
     with path.open(encoding="utf-8-sig") as stream:
-        for line in stream:
-            field, _, value = line.strip().partition(" ")
-            if field in {"msgid", "msgid_plural"}:
-                if fragments:
-                    yield "".join(fragments)
-                fragments = [po_text(value.strip())]
-            elif fragments and field.startswith('"'):
-                fragments.append(po_text(line.strip()))
-            elif fragments:
-                yield "".join(fragments)
-                fragments = []
-    if fragments:
-        yield "".join(fragments)
+        for raw in stream:
+            line = raw.strip()
+            words = line.split(maxsplit=1)
+            token = words[0] if words else ""
+            if token in {"msgctxt", "msgid"} and "msgid" in fields or token.startswith("#") or not token:
+                if entry := po_entry(fields, fuzzy):
+                    yield entry
+                if fields or not token:
+                    fuzzy = False
+                fields, field = {}, ""
+            if token == "#,":
+                fuzzy = "fuzzy" in re.split(r"[,\s]+", line[2:])
+            elif token in {"msgctxt", "msgid", "msgid_plural", "msgstr"}:
+                field = token
+                fields[field] = [po_text(words[1] if len(words) > 1 else "")]
+            elif token.startswith('"') and field:
+                fields[field].append(po_text(line))
+            elif token:
+                field = ""
+    if entry := po_entry(fields, fuzzy):
+        yield entry
 
 
-def core_sources(package, language):
+def core_translations(package, language):
     parent = language.replace("_", "-").partition("-")[0]
-    variants = dict.fromkeys((language, language.replace("-", "_"), language.replace("_", "-"), parent))
-    result = set()
+    variants = dict.fromkeys((parent, language.replace("-", "_"), language.replace("_", "-"), language))
+    result = {}
     found = False
     for variant in variants:
         csv_path = package / "translations" / f"{variant}.csv"
@@ -69,12 +89,12 @@ def core_sources(package, language):
                     continue
                 if len(row) not in {2, 3}:
                     raise ValueError("Invalid Frappe translation record.")
-                result.add(csv_source(row[0]))
+                if row[0] and (len(row) == 2 or not row[2]):
+                    result[csv_source(row[0])] = csv_source(row[1]).strip()
         po_path = package / "locale" / f"{variant}.po"
         if po_path.is_file():
             found = True
-            result.update(po_sources(po_path))
-    result.discard("")
+            result.update(po_translations(po_path))
     return result if found else None
 
 
@@ -86,7 +106,7 @@ def check_csv(path, core, emit):
             if len(row) != 3:
                 emit(path, line, "translation-columns", f"Expected 3 translation columns. Found {len(row)}.")
                 continue
-            source, _, context = row
+            source, translated, context = row
             source = csv_source(source)
             first = keys.setdefault((source, context), line)
             if first != line:
@@ -96,12 +116,17 @@ def check_csv(path, core, emit):
                     "translation-duplicate",
                     f"Source and context are already used on line {first}.",
                 )
-            if not context and core is not None and source in core:
+            if (
+                not context
+                and core is not None
+                and source in core
+                and csv_source(translated).strip() != core[source]
+            ):
                 emit(
                     path,
                     line,
                     "translation-core",
-                    "Translation source also exists in Frappe core. Add context.",
+                    "Translation differs from Frappe core for the same source. Add context.",
                 )
                 conflict = True
     except TranslationCSVError as error:
@@ -118,7 +143,7 @@ def translation_checks(paths, frappe_package, emit):
         language = path.stem
         if language not in catalogs:
             try:
-                catalogs[language] = core_sources(frappe_package, language)
+                catalogs[language] = core_translations(frappe_package, language)
             except (OSError, SyntaxError, ValueError):
                 catalogs[language] = None
                 emit(path, 1, "translation-core", "Could not read the Frappe core translation catalog.")

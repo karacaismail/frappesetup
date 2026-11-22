@@ -36,9 +36,18 @@ class DependencyChecksTests(unittest.TestCase):
         self.manifest(directory, "frappe", ["Werkzeug==3.1.9", "Other>=2,<3"])
         self.write(f"{directory}/frappe/__init__.py", f'__version__ = "{version}"\n')
 
-    def scan(self, *args, structured=True, frappe_source=""):
+    def scan(self, *args, structured=True, frappe_source="", no_site=False):
         return subprocess.run(
-            [sys.executable, "-B", GATE, "--root", self.root, *(["--json"] if structured else []), *args],
+            [
+                sys.executable,
+                *(["-S"] if no_site else []),
+                "-B",
+                GATE,
+                "--root",
+                self.root,
+                *(["--json"] if structured else []),
+                *args,
+            ],
             capture_output=True,
             text=True,
             env=dict(os.environ, FRAPPE_SOURCE=frappe_source),
@@ -46,7 +55,7 @@ class DependencyChecksTests(unittest.TestCase):
 
     def test_accepts_app_rules_that_include_frappe_pin(self):
         self.frappe()
-        for rule in ("Werkzeug~=3.1.9", "Werkzeug>=3.1,<4", "Werkzeug==3.1.*"):
+        for rule in ("Werkzeug~=3.1.9", "Werkzeug>=3.1,<4", "Werkzeug==3.1.*", "Werkzeug>3.1.8,<=3.1.9"):
             with self.subTest(rule=rule):
                 self.manifest("apps/sample_app", "sample_app", [rule])
                 result = self.scan()
@@ -57,7 +66,7 @@ class DependencyChecksTests(unittest.TestCase):
 
     def test_rejects_rules_excluding_exact_frappe_pin(self):
         self.frappe()
-        for rule in ("Werkzeug>=4", "Werkzeug!=3.1.9", "Werkzeug @ https://example.test/werkzeug.whl"):
+        for rule in ("Werkzeug>=4", "Werkzeug!=3.1.9"):
             with self.subTest(rule=rule):
                 self.manifest("apps/sample_app", "sample_app", [rule])
                 result = self.scan()
@@ -123,3 +132,40 @@ class DependencyChecksTests(unittest.TestCase):
         checks = json.loads(result.stdout)["checks"]
         self.assertEqual(checks["dependency_core"], "not_run")
         self.assertEqual(checks["translation_core"], "not_run")
+
+    def test_pip_free_python_and_unsupported_requirements(self):
+        self.frappe()
+        self.manifest("apps/sample_app", "sample_app", ["Werkzeug~=3.1.9"])
+        result = self.scan(no_site=True)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(json.loads(result.stdout)["checks"]["dependency_core"], "pass")
+        self.manifest("apps/sample_app", "sample_app", ["Werkzeug @ git+https://example.test/package"])
+        result = self.scan(no_site=True)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["findings"], [])
+        self.assertEqual(payload["checks"]["dependency_core"], "not_run")
+        self.assertEqual(payload["checks"]["dependency_apps"], "not_run")
+
+    def test_markers_are_skipped_in_both_manifests(self):
+        self.frappe()
+        for core, app in (
+            ("Werkzeug==3.1.9; sys_platform == 'win32'", "Werkzeug>=4"),
+            ("Werkzeug==3.1.9", "Werkzeug>=4; sys_platform == 'win32'"),
+        ):
+            with self.subTest(core=core, app=app):
+                self.manifest("apps/frappe", "frappe", [core])
+                self.manifest("apps/sample_app", "sample_app", [app])
+                result = self.scan()
+                self.assertEqual(result.returncode, 0, result.stdout)
+                self.assertEqual(json.loads(result.stdout)["checks"]["dependency_core"], "not_run")
+
+    def test_external_frappe_checkout_under_apps_is_excluded(self):
+        self.frappe(directory="apps/frappe-16")
+        self.write("apps/frappe-16/frappe/api.py", "import frappe\n@frappe.whitelist()\ndef core(): pass")
+        self.manifest("apps/sample_app", "sample_app", ["Werkzeug~=3.1.9"])
+        for path in ("apps/frappe-16", "apps/frappe-16/frappe"):
+            with self.subTest(path=path):
+                result = self.scan("--frappe-root", str(self.root / path))
+                self.assertEqual(result.returncode, 0, result.stdout)
+                self.assertEqual(json.loads(result.stdout)["checks"]["dependency_core"], "pass")

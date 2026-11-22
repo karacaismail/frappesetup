@@ -84,7 +84,15 @@ def hook_values(node, bindings, key, seen=frozenset()):
         return
     if isinstance(value, (ast.List, ast.Tuple, ast.Set)):
         for entry in value.elts:
-            yield from hook_values(entry, bindings, key, seen | {value})
+            resolved = resolve(entry, bindings)
+            if isinstance(resolved, (ast.List, ast.Tuple)):
+                try:
+                    text = json.dumps(ast.literal_eval(resolved), ensure_ascii=False)
+                except (TypeError, ValueError):
+                    text = "Çözülemedi"
+                yield key, text, entry.lineno
+            else:
+                yield from hook_values(entry, bindings, key, seen | {value})
     elif isinstance(value, ast.Dict) and (entries := mapping(value, bindings)) is not None:
         for label, entry in entries.items():
             yield from hook_values(entry, bindings, f"{key}[{label}]", seen | {value})
