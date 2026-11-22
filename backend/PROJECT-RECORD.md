@@ -285,8 +285,6 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Dış MCP istemcileri OAuth 2.1 ile giremez | Dış yapay zekâ istemcisi yalnız oturum ya da API anahtarıyla bağlanır | platform-core-yz | MCP ucu OAuth 2.1 yetkilendirmesini Keycloak üzerinden destekler |
 | `BORC(mvp)`: Üretim işçi sayısı ölçülmedi | 50 eşzamanlı telefonda 4 Gunicorn işçisiyle istemci p95 1 saniyeyi aştı. Sunucu süresi sınırın altında kaldı | DevOps sorumlusu | Üretim kapasite ölçümü yapılır ve işçi sayısı ölçümle seçilir |
 | `BORC(mvp)`: identity-sync canlı Keycloak, Press ve kiracı ile denenmedi | Sahte hedeflerin kaçırdığı uyumsuzluk üretimde çıkabilir | integration-e2e | Uçtan uca test gerçek servislerle geçer |
-| `BORC(mvp)`: Yeni kiracının Keycloak istemcisini açan komut yok | Yeni kiracı istemcisi elle açılır | kimlik-realm | Elle başlatılan, insan onaylı komut yazılır |
-| `BORC(mvp)`: identity-sync container dosyası yok | Servis ortak geliştirme ortamında başlamaz | identity-sync | Container dosyası yazılır ve servis `oidc_verify` ile açılır |
 | `BORC(mvp)`: identity-sync testleri CI'da koşmaz | Bozulma yalnız elle çalışan testte görülür | DevOps sorumlusu | CI bu klasörün testlerini her değişiklikte koşar |
 | `BORC(mvp)`: Tema derleme adımının iki kopyası var | Bir kopya değişince öteki eski kalabilir | kimlik-tema | Derleme adımı tek yerde durur ve test bunu denetler |
 | `BORC(mvp)`: Bazı tema ekranları sınanmadı | Görünüm hatası fark edilmeyebilir | kimlik-tema | Sınanmamış ekranların listesi boşalır |
@@ -304,3 +302,8 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 - `list_identities` uçları tamamlandı. Kiracı ve Press uçları aynı sayfalama sözleşmesini kullanır.
 - Kiracı HTTP testleri ikinci sayfayı ve yetkisiz istek reddini doğruladı.
 - Press ucu ve sayfalama testleri `f4cb09f` birleşme kaydında yer alır.
+
+- **Yeni kiracı için Keycloak istemcisi.** `a51ef9a` kaydı `create-tenant-client.py` komutunu ekledi.
+  `test_confirmed_creation_posts_restricted_client_to_admin_api` testi, onay sonrası isteği doğrular.
+- **Kimlik eşitleme servisinin container dosyası.** `6aaa981` kaydı `Dockerfile` dosyasını ekledi.
+  İmaj `oidc_verify` kitaplığıyla açıldı. `/healthz` isteği HTTP 200 döndü.
