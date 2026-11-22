@@ -279,6 +279,7 @@ def main():
                 for field in ("email", "password", "subject"):
                     fixture[prefix + scenario.upper() + "_" + field.upper()] = account[field]
             fixture[prefix + "MAGIC_EMAIL"] = lifecycle[f"{engine}_magic"]["email"]
+            fixture[prefix + "MAGIC_EXPIRY_EMAIL"] = lifecycle[f"{engine}_magic-expiry"]["email"]
             otp = lifecycle[f"{engine}_magic-otp"]
             fixture[prefix + "MAGIC_OTP_EMAIL"] = otp["email"]
             fixture[prefix + "MAGIC_OTP_SEED"] = otp["otp_seed"]

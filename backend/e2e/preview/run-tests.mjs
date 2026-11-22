@@ -1,3 +1,4 @@
+import { listenOAuthCallback } from './container-network.mjs';
 import { spawn } from 'node:child_process';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -76,7 +77,7 @@ function sanitize(raw) {
     raw = raw.replaceAll(value, '[redacted]');
   }
   return raw
-    .replace(/([?&](?:code|state|session_state)=)[^&\s"']+/gi, '$1[redacted]')
+    .replace(/([?&](?:code|state|session_state|magickey)=)[^&\s"']+/gi, '$1[redacted]')
     .replace(/(authorization:\s*(?:Bearer|Basic|token)\s+)[^\s"']+/gi, '$1[redacted]')
     .replace(/(\bsid=|x-frappe-csrf-token:\s*)[^;\s"']+/gi, '$1[redacted]');
 }
@@ -99,7 +100,7 @@ async function browserAvailable(engine, browserType) {
 async function runPlaywright(label, args, reporter = 'list', settings = env) {
   const child = spawn(join(worktree, 'node_modules', '.bin', 'playwright'), [
     'test', '-c', 'backend/e2e/playwright.config.ts', '--reporter=' + reporter,
-    '--output=' + join(previewDir, label), ...args,
+    '--output=' + join(previewDir, 'playwright-output', label), ...args,
   ], { cwd: worktree, env: settings });
   const output = [];
   const errors = [];
@@ -151,7 +152,7 @@ async function runFullPreview(projects) {
     const identity = 'http://identity.localhost:' + Number(process.env.PANE_PORT);
     const response = await ref.post(identity + '/realms/platform/protocol/openid-connect/token', {
       maxRedirects: 0,
-      form: { grant_type: 'client_credentials', client_id: fixture.E2E_LIFECYCLE_READER_CLIENT,
+      form: { grant_type: 'client_credentials', scope: 'kc-admin-api', client_id: fixture.E2E_LIFECYCLE_READER_CLIENT,
         client_secret: fixture.E2E_LIFECYCLE_READER_SECRET },
     });
     if (!response.ok()) throw new Error('Keycloak preview reader HTTP ' + response.status());
@@ -192,7 +193,13 @@ try {
   else if (!fullPreview) env.E2E_CHROMIUM_UNAVAILABLE = '1';
   if (await browserAvailable('webkit', webkit)) projects.push('--project=webkit');
   if (fullPreview) {
-    results.push(...await runFullPreview(projects));
+    // A redirect can bypass Playwright routing. Accept it on loopback in either runtime.
+    const callback = await listenOAuthCallback(Number(process.env.PANE_PORT) + 8);
+    try {
+      results.push(...await runFullPreview(projects));
+    } finally {
+      callback.close();
+    }
     if (projects.length !== 2) results.push(1);
   } else {
     if (projects.length) {

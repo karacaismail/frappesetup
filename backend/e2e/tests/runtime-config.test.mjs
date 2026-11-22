@@ -131,3 +131,10 @@ test('the HTTPS-enabled tenant uses the preview trust store for Python requests'
   assert.match(script, /tenant_web_options\+=\(-e REQUESTS_CA_BUNDLE=\/etc\/ssl\/certs\/ca-certificates\.crt\)/);
   assert.ok(script.includes('"${tenant_web_options[@]}" "$tenant" bash -c'));
 });
+
+
+test('preview exit removes the shared directory for raw Playwright artifacts', () => {
+  assert.ok(readFileSync(runtime, 'utf8').includes('"$PREVIEW_DIR/playwright-output"'));
+  const runner = readFileSync(new URL('../preview/run-tests.mjs', import.meta.url), 'utf8');
+  assert.ok(runner.includes("join(previewDir, 'playwright-output', label)"));
+});

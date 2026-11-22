@@ -132,11 +132,13 @@ test('expired magic link is rejected and a new send works', async ({ browser, pa
   const lifetime = Number(required('E2E_MAGIC_TTL_SECONDS'));
   expect(Number.isInteger(lifetime) && lifetime > 0 && lifetime <= 300).toBe(true);
   test.setTimeout((lifetime + 70) * 1000);
-  const email = required('E2E_MAGIC_EMAIL');
+  const email = process.env.E2E_FULL_BROWSER_FIXTURES === '1'
+    ? required('E2E_MAGIC_EXPIRY_EMAIL') : required('E2E_MAGIC_EMAIL');
   const expired = await requestLink(page, request, email);
   await new Promise((resolve) => setTimeout(resolve, (lifetime + 2) * 1000));
   await page.goto(expired.url.toString());
   expect(expired.issuedCode()).toBe(false);
+  await new Promise((resolve) => setTimeout(resolve, 1200));
 
   const retry = await browser.newContext();
   try {
@@ -159,10 +161,17 @@ test('magic link still requires the enrolled second factor', async ({ page, requ
   await expect(otp).toBeVisible();
   const code = totp(required('E2E_MAGIC_OTP_SEED'));
   await otp.fill(code === '000000' ? '111111' : '000000');
+  const rejection = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return response.request().method() === 'POST' && url.origin === identityOrigin()
+      && url.pathname === '/realms/platform/login-actions/authenticate';
+  });
   await otp.evaluate((input: HTMLInputElement) => input.form!.requestSubmit());
+  await rejection;
+  await expect(otp).toBeVisible();
   expect(attempt.issuedCode()).toBe(false);
-  // Keycloak rejects reuse of a time-based code across browser projects.
-  await new Promise((resolve) => setTimeout(resolve, 30_000 - (Date.now() % 30_000) + 500));
+  // Leave the quick-login lockout window before submitting the valid code.
+  await new Promise((resolve) => setTimeout(resolve, 1200));
   await otp.fill(totp(required('E2E_MAGIC_OTP_SEED')));
   await otp.evaluate((input: HTMLInputElement) => input.form!.requestSubmit());
   await expect.poll(attempt.authorized).toBe(true);

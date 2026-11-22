@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -22,7 +22,11 @@ function runPreview(fixture, settings = {}) {
       } };
       exports.webkit = { launch: async () => ({ close: async () => {} }) };
       exports.request = { newContext: async () => ({
-        post: async () => ({ ok: () => true }),
+        post: async (url, options) => {
+          if (!url.endsWith('/protocol/openid-connect/token')) return { ok: () => true };
+          if (options.form.scope !== 'kc-admin-api') throw new Error('Missing admin API scope');
+          return { ok: () => true, json: async () => ({ access_token: 'synthetic-reader-token' }) };
+        },
         get: async () => ({ ok: () => true, text: async () => '<meta name="csrf-token" content="test-csrf">' }),
         storageState: async () => ({ cookies: [{ name: 'sid', value: 'test-session' }] }),
         dispose: async () => {},
@@ -38,6 +42,14 @@ function runPreview(fixture, settings = {}) {
         }
       }
       if (process.argv.includes('lifecycle.spec.ts')) {
+        if (process.env.E2E_FULL_BROWSER_FIXTURES === '1') {
+          if (process.env.E2E_LIFECYCLE_READER_SECRET) process.exit(22);
+          console.log(JSON.stringify({ suites: [{ specs: [{ title: process.env.E2E_MAGIC_OTP_SEED,
+            tests: [{ projectName: 'webkit', results: [{ status: 'passed' }] }] }] }],
+            readerToken: process.env.E2E_LIFECYCLE_KEYCLOAK_READER_TOKEN }));
+          console.error('http://identity.localhost?magickey=synthetic-mail-link');
+          process.exit(0);
+        }
         if (process.env.E2E_BROWSER_RUNTIME === 'container') console.error('ran ' + process.argv.slice(2).join(' '));
         console.log(JSON.stringify({ suites: [{ specs: [{ title: process.env.E2E_DELETE_PASSWORD,
           tests: [{ projectName: 'chromium', annotations: [], results: [{ status: 'passed' }] }] }] }], submitted: process.env.E2E_REVOKE_MOBILE_REFRESH_TOKEN }));
@@ -49,8 +61,8 @@ function runPreview(fixture, settings = {}) {
       env: { ...process.env, ...settings, PANE_PORT: '4500', PREVIEW_DIR: root },
       encoding: 'utf8',
     });
-    let log = '';
-    if (result.status === 0) log = readFileSync(join(root, 'lifecycle.log'), 'utf8');
+    const log = readdirSync(root).filter((file) => file.endsWith('.log'))
+      .map((file) => readFileSync(join(root, file), 'utf8')).join('\n');
     return { ...result, log };
   } finally {
     rmSync(root, { recursive: true });
@@ -99,4 +111,21 @@ test('container preview runs all requested files in both engines', () => {
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stderr, /ran .*--project=chromium.*--project=webkit.*browser\.spec\.ts/);
   assert.match(result.stderr, /ran .*--project=chromium.*--project=webkit.*lifecycle\.spec\.ts/);
+});
+
+test('full preview requests the admin scope and redacts its credentials and magic links', () => {
+  const fixture = {
+    E2E_LIFECYCLE_READER_CLIENT: 'synthetic-reader',
+    E2E_LIFECYCLE_READER_SECRET: 'synthetic-reader-secret',
+    E2E_CHROMIUM_MAGIC_OTP_SEED: 'synthetic-otp-chromium',
+    E2E_WEBKIT_MAGIC_OTP_SEED: 'synthetic-otp-webkit',
+  };
+  const result = runPreview(fixture, { E2E_FULL_BROWSER_FIXTURES: '1', TEST_CHROMIUM_UNAVAILABLE: '1' });
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /not_run chromium/);
+  assert.match(result.stdout, /pass \[webkit\]/);
+  assert.match(result.stderr, /magickey=\[redacted\]/);
+  for (const sensitive of [...Object.values(fixture).slice(1), 'synthetic-reader-token', 'synthetic-mail-link']) {
+    assert.equal((result.log + result.stdout + result.stderr).includes(sensitive), false);
+  }
 });

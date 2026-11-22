@@ -130,7 +130,7 @@ PYTHON
         PANE_SCRATCH_DIR="$tunnel_state" "$dev_dir/bin/tunnel" close >> "$PREVIEW_DIR/cleanup.log" 2>&1 || cleanup_failed=1
     fi
     rm -f -- "$DEV_ENV_FILE" "$keycloak_env" "$press_env" "$sync_env" "$PREVIEW_DIR/fixtures.json"
-    rm -rf -- "$PREVIEW_DIR/browser" "$PREVIEW_DIR/api" "$PREVIEW_DIR/lifecycle" "$tunnel_state" "$docker_config" "$PREVIEW_DIR/session-tls"
+    rm -rf -- "$PREVIEW_DIR/playwright-output" "$tunnel_state" "$docker_config" "$PREVIEW_DIR/session-tls"
     if [[ "${cleanup_failed:-}" ]]; then
         printf '%s\n' "Preview cleanup failed. See $PREVIEW_DIR/cleanup.log." >&2
         if (( result == 0 )); then result=1; fi

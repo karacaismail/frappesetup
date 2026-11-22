@@ -3,8 +3,12 @@
 import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
+import sys
 import unittest
+from pathlib import Path
 
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 class SessionRelayTest(unittest.TestCase):
     def test_only_session_revocation_is_forwarded(self):

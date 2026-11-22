@@ -9,7 +9,7 @@ MOBILE_CLIENT = "mobile-app"
 EXPIRED_CLIENT = "e2e-expired-mobile"
 SSO_PROBE_CLIENT = "e2e-sso-probe"
 MOBILE_SCOPE = "openid mobile aud-site-tenant1"
-SCENARIOS = ("delete", "revoke", "employee", "mobile", "magic", "magic-otp")
+SCENARIOS = ("delete", "revoke", "employee", "mobile", "magic", "magic-expiry", "magic-otp")
 MAGIC_TTL = 45
 
 
@@ -22,7 +22,7 @@ def browser_accounts():
                 "password": "Aa9!" + secrets.token_urlsafe(24),
             }
             if scenario == "magic-otp":
-                account["otp_seed"] = base64.b32encode(secrets.token_urlsafe(20).encode()).decode()
+                account["otp_seed"] = base64.b32encode(secrets.token_hex(10).encode("ascii")).decode("ascii")
             accounts[f"{engine}_{scenario}"] = account
     return accounts
 
@@ -90,7 +90,8 @@ def configure_browser_clients(call, redirect):
         "defaultClientScopes": ["roles"],
     })
     reader, = call(f"/clients?clientId={reader_id}")
-    call(f"/clients/{reader['id']}/default-client-scopes/{scopes['kc-admin-api']['id']}", method="PUT", data={})
+    for scope in ("basic", "service_account", "kc-admin-api"):
+        call(f"/clients/{reader['id']}/default-client-scopes/{scopes[scope]['id']}", method="PUT", data={})
     management, = call("/clients?clientId=realm-management")
     service_user = call(f"/clients/{reader['id']}/service-account-user")
     role = call(f"/clients/{management['id']}/roles/view-users")

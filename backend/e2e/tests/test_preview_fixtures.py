@@ -5,8 +5,12 @@ import importlib.util
 import json
 import os
 import subprocess
+import sys
 import unittest
+from pathlib import Path
 from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from backend.e2e.preview import fixtures
 
@@ -145,9 +149,11 @@ class PreviewFixturesTest(unittest.TestCase):
 
     def test_full_browser_accounts_are_distinct_and_only_otp_accounts_enroll(self):
         accounts = fixtures.browser_keycloak.browser_accounts()
-        self.assertEqual(len(accounts), 12)
-        self.assertEqual(len({account["email"] for account in accounts.values()}), 12)
-        self.assertEqual(len({account["password"] for account in accounts.values()}), 12)
+        for engine in ("chromium", "webkit"):
+            self.assertNotEqual(accounts[f"{engine}_magic"]["email"], accounts[f"{engine}_magic-expiry"]["email"])
+        self.assertEqual(len(accounts), 14)
+        self.assertEqual(len({account["email"] for account in accounts.values()}), 14)
+        self.assertEqual(len({account["password"] for account in accounts.values()}), 14)
         enrolled = {key for key, account in accounts.items() if "otp_seed" in account}
         self.assertEqual(enrolled, {"chromium_magic-otp", "webkit_magic-otp"})
         seeds = [accounts[key]["otp_seed"] for key in enrolled]
@@ -160,6 +166,8 @@ class PreviewFixturesTest(unittest.TestCase):
         responses = {
             "/client-scopes": [
                 {"name": "mobile", "id": "mobile-scope"},
+                {"name": "basic", "id": "basic-scope"},
+                {"name": "service_account", "id": "service-scope"},
                 {"name": "kc-admin-api", "id": "admin-api-scope"},
                 {"name": "aud-site-tenant1", "id": "tenant-scope"},
             ],
@@ -194,7 +202,10 @@ class PreviewFixturesTest(unittest.TestCase):
         self.assertTrue(secret)
         self.assertIn(("/clients/mobile/default-client-scopes/roles-scope", {"method": "DELETE"}), calls)
         self.assertIn(("/clients/mobile/optional-client-scopes/tenant-scope", {"method": "PUT", "data": {}}), calls)
-        self.assertIn(("/clients/reader/default-client-scopes/admin-api-scope", {"method": "PUT", "data": {}}), calls)
+        reader_scopes = {path.rsplit("/", 1)[1] for path, values in calls
+                         if path.startswith("/clients/reader/default-client-scopes/")
+                         and values == {"method": "PUT", "data": {}}}
+        self.assertEqual(reader_scopes, {"admin-api-scope", "basic-scope", "service-scope"})
         role = {"id": "view", "name": "view-users"}
         grants = [(path, values["data"]) for path, values in calls if "/clients/management" in path and "data" in values]
         self.assertEqual(grants, [
