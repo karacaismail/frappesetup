@@ -1,0 +1,225 @@
+# Bileşenler arası sözleşmeler
+
+Bu dosya backend bileşenlerinin ortak adlarını tutar. İşler paralel yürür. Bu yüzden herkes aynı adları kullanmalıdır. Bir adı değiştirmek gerekirse raporda isteyin. Orkestratör bu dosyayı günceller.
+
+Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyalarındadır. OpenAPI, uçları tarif eden belge biçimidir. Her uç sahibi kendi dosyasını yazar:
+
+| Dosya | Sahip iş |
+| --- | --- |
+| `contracts/platform_core-kimlik.openapi.yaml` | platform-core-kimlik |
+| `contracts/platform_core-kabuk.openapi.yaml` | platform-core-kabuk |
+| `contracts/press_tr.openapi.yaml` | press-tr |
+| `contracts/identity_sync.openapi.yaml` | identity-sync |
+
+## 1. Marka
+
+- Kimlik markasının adı “Atonota”dır.
+- Düğme metni “Atonota ile oturum aç” olur.
+- Üretimdeki alan adı atonota.net olur. Tam sunucu adı açık karardır (Proje kaydı A-1).
+- Kod marka adını ve alan adını ayardan okur. Kodda sabit yazmayın.
+
+## 2. Keycloak
+
+### Realm ve adresler
+
+- Realm adı `platform` olur.
+- Tarayıcının gördüğü adres `keycloak_public_url` ayarıdır.
+- Belirteçteki `iss` değeri `<keycloak_public_url>/realms/platform` olur.
+- Sunucu Keycloak'a başka adresten ulaşacaksa `keycloak_internal_url` ayarını kullanın. Bu ayar boşsa genel adres kullanılır.
+- Realm'in görünen adı “Atonota” olur. Giriş ve e-posta teması `atonota` adını taşır.
+- Varsayılan dil Türkçedir. İkinci dil İngilizcedir.
+
+### İstemciler
+
+İstemci, Keycloak'a bağlanan uygulamadır. Bu turdaki istemciler şunlardır:
+
+| İstemci | Tür | Akış | Dönüş adresi | Çıkış bildirimi |
+| --- | --- | --- | --- | --- |
+| `site-kiraci1` | Gizli sırlı | Yetkilendirme kodu | `<kiracı adresi>/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
+| `press` | Gizli sırlı | Yetkilendirme kodu | `<Press adresi>/api/method/press_tr.api.auth.keycloak_callback` | `<Press adresi>/api/method/press_tr.api.keycloak_backchannel_logout` |
+| `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
+| `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
+
+- Dönüş adresini tam adresle kaydedin. Joker karakter kullanmayın.
+- Çıkış bildiriminde “oturum gerekli” ayarını açın.
+- Yeni kiracı için aynı biçimi kullanın. Örneğin `site-kiraci2` yazın.
+- `agent-service`, `ops-bff` ve `site-ops` bu turda yoktur.
+
+### Hedef kapsamları
+
+Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamdır. `aud`, belirtecin hangi uygulama için olduğunu söyler.
+
+| Kapsam | Eklediği `aud` | Kullanan |
+| --- | --- | --- |
+| `aud-site-kiraci1` | `site-kiraci1` | `identity-sync`, `press-service` |
+| `aud-press` | `press` | `identity-sync` |
+
+- Bu kapsamlar varsayılan değildir. İstekte `scope` ile istenir.
+- Servis belirteci yalnız bir `aud` değeri taşır.
+- Admin API yetkileri kiracıya giden belirtece girmez.
+
+### Politikalar
+
+Realm politikaları G-78 ve G-144'ü uygular. Örneğin şu ayarlar vardır:
+
+- e-postayla giriş ve zorunlu e-posta doğrulaması,
+- 300 saniyede 5 hatalı denemeden sonra kilit,
+- en az 12 karakterli parola, parola geçmişi ve yaygın parola listesi,
+- TOTP ve passkey,
+- 30 dakika boşta kalma ve 12 saat toplam oturum süresi,
+- 5 dakikalık erişim belirteci,
+- her kullanımda değişen yenileme belirteci,
+- kapalı “Beni hatırla” seçeneği.
+
+## 3. Belirteç doğrulama
+
+Bu kuralları `libs/oidc_dogrulama` kitaplığı uygular. `platform_core` ve `press_tr` bu kitaplığı kullanır.
+
+### Servis belirteci
+
+- Yalnız RS256 imzasını kabul edin.
+- `iss` değerini tam eşleştirin.
+- `aud` tek değer olmalı. Değer, çağrılan sitenin istemcisi olmalı.
+- `azp` değeri ucun izin listesinde olmalı. `azp`, belirteci alan istemcidir.
+- `exp` zorunludur. Saat payı 30 saniyedir.
+- Anahtar listesini 10 dakika saklayın. Bilinmeyen `kid` gelirse listeyi bir kez yenileyin.
+- İstekte `cmd` alanı varsa isteği reddedin.
+- İstek hem oturum çerezi hem belirteç taşıyorsa isteği reddedin.
+
+### Çıkış belirteci
+
+Keycloak çıkışta `logout_token` gönderir. Doğrulamada şunları denetleyin:
+
+- imza, `iss` ve `aud`,
+- `iat` değeri,
+- `events` içindeki `http://schemas.openid.net/event/backchannel-logout` anahtarı,
+- `sid` ya da `sub` değerinin varlığı,
+- `nonce` alanının yokluğu.
+
+## 4. Kimlik bağı
+
+Kullanıcının kalıcı anahtarı `(iss, sub)` çiftidir (G-120). E-posta yalnız iletişim bilgisidir.
+
+| Uygulama | DocType | Alanlar |
+| --- | --- | --- |
+| `platform_core` | `Platform Identity Link` | `issuer`, `subject`, `user` |
+| `press_tr` | `Press Identity Link` | `issuer`, `subject`, `user` |
+
+- `issuer` ve `subject` zorunludur. İkisi birlikte veritabanında tekildir.
+- `user` alanı bir kullanıcıya bağlanır ve tekildir.
+- İlk bağı yalnız doğrulanmış e-postayla kurun (AU-4).
+- Bağ farklıysa oturum açmadan reddedin.
+- Keycloak oturum kimliğini (`sid`) Frappe oturumuyla eşleştirin. Çıkış belirteci bu eşleşmeyle oturumu kapatır.
+
+## 5. `platform_core` uçları
+
+Adres biçimi `/api/method/<yol>` olur.
+
+| Yol | Yöntem | Kimlik | İşi |
+| --- | --- | --- | --- |
+| `platform_core.api.auth.get_login_url` | POST | Misafir, istek sınırlı | Keycloak giriş adresini üretir. `state` sunucuda üretilir. `redirect_to` yalnız aynı kökende göreli yol olabilir. |
+| `platform_core.api.auth.logout` | POST | Oturum | Frappe oturumunu kapatır. Keycloak çıkış adresini döner. |
+| `platform_core.api.keycloak_backchannel_logout` | POST | Misafir, çıkış belirteci | Eşleşen Frappe oturumlarını kapatır. |
+| `platform_core.api.identity.provision` | POST | Servis belirteci, `azp=identity-sync` | Kullanıcıyı açar ya da günceller. Aynı istek iki kez gelirse aynı sonucu döner. |
+| `platform_core.api.identity.set_enabled` | POST | Servis belirteci, `azp=identity-sync` | Kullanıcıyı açar ya da kapatır. |
+| `platform_core.api.identity.change_email` | POST | Servis belirteci, `azp=identity-sync` | E-postayı `rename_doc` ile değiştirir. |
+| `platform_core.api.shell.get_bootstrap` | GET | Oturum | Kullanıcıyı, rolleri, kurulu uygulamaları ve kenar çubuğunu döner. |
+| `platform_core.api.meta.get_doctype` | GET | Oturum | Kullanıcının görebildiği DocType tanımını döner. `ETag` başlığı taşır. |
+
+- `/panel` sayfası `platform_core/www/` altında durur. Sayfa CSRF belirtecini taşır (G-45). Sahibi platform-core-kabuk işidir.
+- `api/__init__.py`, `api/auth.py` ve `api/identity.py` dosyaları platform-core-kimlik işinindir.
+- `api/shell.py` ve `api/meta.py` dosyaları platform-core-kabuk işinindir.
+- Uç dosyası ince kalır. İş kuralı modül klasöründe durur.
+
+`provision` isteğinin alanları şunlardır:
+
+| Alan | Tür | Not |
+| --- | --- | --- |
+| `issuer` | metin | Zorunlu |
+| `subject` | metin | Zorunlu |
+| `email` | metin | Zorunlu |
+| `email_verified` | doğru ya da yanlış | Yanlışsa ilk bağ kurulmaz. |
+| `first_name`, `last_name` | metin | İsteğe bağlı |
+| `enabled` | doğru ya da yanlış | Zorunlu |
+| `role_profiles` | metin listesi | İsteğe bağlı |
+
+Açılan kullanıcının türü “Website User” olur (Proje kaydı D-5).
+
+## 6. `press_tr` uçları
+
+| Yol | Yöntem | Kimlik | İşi |
+| --- | --- | --- | --- |
+| `press_tr.api.auth.get_login_url` | POST | Misafir, istek sınırlı | Keycloak giriş adresini üretir. |
+| `press_tr.api.auth.keycloak_callback` | GET | Misafir, `state` ve kod | Kodu belirteçle değiştirir. Kullanıcıyı `(iss, sub)` ile bulur. Takım yoksa açar (G-12). |
+| `press_tr.api.keycloak_backchannel_logout` | POST | Misafir, çıkış belirteci | Eşleşen Press oturumlarını kapatır. |
+| `press_tr.api.identity.ensure_team` | POST | Servis belirteci, `azp=identity-sync` | Takımı ve üyeliği hazırlar. Aynı istek iki kez gelirse aynı sonucu döner. |
+| `press_tr.api.identity.remove_team_member` | POST | Servis belirteci, `azp=identity-sync` | Üyeliği kaldırır. |
+
+- Press, Frappe 15 üzerinde çalışır. Frappe 15'te `on_social_login` kancası yoktur. Bu yüzden Press kendi dönüş ucunu kullanır (AU-4). press-tr işi bunu kaynak kodda doğrular.
+- G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
+
+## 7. `identity_sync`
+
+- Keycloak olaylarını alır. Olay kaynağı T-2 kararıyla seçilir (Proje kaydı A-10).
+- Belirteci Keycloak'tan istemci kimlik bilgisiyle alır.
+- `press_tr.api.identity.*` ve `platform_core.api.identity.*` uçlarını çağırır.
+- Kiracı listesini ayardan okur. Geliştirmede tek kiracı `kiraci1` vardır.
+- Her işlem tekrar edilebilir olmalıdır. Aynı olay iki kez gelirse sonuç değişmez.
+- Başarısız olay ayrı kuyrukta bekler.
+- Mutabakat elle başlatılan bir komuttur. Komut farkları raporlar.
+
+## 8. Site ayarları
+
+Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
+
+| Anahtar | Örnek | Not |
+| --- | --- | --- |
+| `keycloak_public_url` | `http://kimlik.localhost:<port>` | Tarayıcının gördüğü adres |
+| `keycloak_internal_url` | Boş | Sunucunun ulaştığı adres |
+| `keycloak_realm` | `platform` | |
+| `keycloak_client_id` | `site-kiraci1` ya da `press` | |
+| `keycloak_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
+| `kimlik_marka_adi` | `Atonota` | Düğme metni bundan üretilir |
+| `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
+
+## 9. Geliştirme ortamı
+
+### Adlar
+
+| Ad | Değer |
+| --- | --- |
+| Kiracı sitesi | `kiraci1.localhost` |
+| Press sitesi | `press.localhost` |
+| Keycloak sunucusu | `kimlik.localhost` |
+| Compose proje adı | `fs-<iş adı>` |
+| Ana compose dosyası | `dev/compose.yaml` |
+| Kiracı compose dosyası | `dev/compose.kiraci.yaml` |
+| Keycloak compose dosyası | `dev/compose.keycloak.yaml` |
+| Press compose dosyası | `dev/compose.press.yaml` |
+| Örnek kullanıcıların alan adı | `example.test` |
+
+### Portlar
+
+Port tabanı `PANE_PORT` değişkenidir. Kısaca `P` diyelim.
+
+| Port | Servis |
+| --- | --- |
+| `P` | Keycloak |
+| `P+1` | Kiracı sitesinin web sunucusu |
+| `P+2` | Kiracı sitesinin anlık bağlantı sunucusu |
+| `P+3` | Press'in web sunucusu |
+| `P+4` | Press'in anlık bağlantı sunucusu |
+| `P+5` | `identity_sync` |
+| `P+6` | Test e-posta kutusunun ekranı |
+
+### Önerilen adres yolu
+
+Tarayıcı ve container aynı adresi kullanmalıdır. Yoksa `iss` değeri tutmaz. Önerilen yol şudur:
+
+1. Keycloak container içinde de `P` portunu dinler.
+2. Compose, `P` portunu `127.0.0.1:P` adresine açar.
+3. Keycloak servisi ağda `kimlik.localhost` takma adını taşır.
+4. Tarayıcı `http://kimlik.localhost:P` adresine gider.
+5. Container'lar aynı adresle Keycloak'a ulaşır.
+
+Kiracı ve Press sunucuları için de aynı yol geçerlidir. Keycloak çıkış bildirimini bu adreslere gönderir. Bu yolu ilk deneyen iş sonucu raporlar.
