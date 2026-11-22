@@ -7,6 +7,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
 from pathlib import Path
 from urllib.parse import quote, urlencode
@@ -15,6 +16,7 @@ LOGIN_EMAIL = "e2e-user@example.test"
 SYNC_EMAIL = "e2e-sync@example.test"
 BENCH = "/home/frappe/frappe-bench"
 PRESS_BENCH = "/home/frappe/benches/frappe-bench"
+DOCKER_PATH = shutil.which("docker")
 
 
 def keycloak_request(port, path, *, token=None, data=None, form=False, expect_denial=False):
@@ -49,6 +51,12 @@ def docker_context():
     return {"default": "colima", "factory": "colima-factory"}[profile]
 
 
+def docker_executable():
+    if not DOCKER_PATH or not Path(DOCKER_PATH).is_absolute():
+        raise RuntimeError("An absolute Docker executable path is required. Check PATH.")
+    return DOCKER_PATH
+
+
 def container_keycloak_request(port, method, path, body, headers):
     project = os.environ["PREVIEW_PROJECT"]
     script = """
@@ -66,7 +74,7 @@ finally:
     connection.close()
 """
     result = subprocess.run(
-        ["docker", "--context", docker_context(), "exec", "-i", f"{project}-tenant-web-1",
+        [docker_executable(), "--context", docker_context(), "exec", "-i", f"{project}-tenant-web-1",
          "env/bin/python", "-c", script],
         input=json.dumps(dict(port=port, method=method, path=path, body=body, headers=headers)),
         text=True, stdout=subprocess.PIPE, check=True, timeout=20,
@@ -168,7 +176,7 @@ def seed_keycloak(port, password):
 
 def seed_site(project, service, bench, environment):
     source = Path(__file__).with_name("site-seed.py")
-    command = ["docker", "--context", docker_context(), "exec", "-i", "--workdir", bench]
+    command = [docker_executable(), "--context", docker_context(), "exec", "-i", "--workdir", bench]
     for name in environment:
         command.extend(("--env", name))
     command.extend((f"{project}-{service}-1", "env/bin/python", "-", service))
@@ -196,6 +204,7 @@ def main():
     ):
         raise SystemExit("The fake provider must use a private address on the preview network.")
 
+    docker_executable()
     check_tenant_clients(port)
     print("Tenant browser and service client checks passed.", flush=True)
     password = "Aa9!" + secrets.token_urlsafe(24)

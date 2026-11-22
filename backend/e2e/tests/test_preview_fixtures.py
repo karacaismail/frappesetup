@@ -1,6 +1,7 @@
 """Check fixture failures without starting Keycloak, Docker, or Frappe."""
 
 import base64
+import importlib.util
 import json
 import os
 import subprocess
@@ -10,17 +11,48 @@ from unittest.mock import patch
 from backend.e2e.preview import fixtures
 
 
+def load_fixtures():
+    spec = importlib.util.spec_from_file_location("backend.e2e.preview.fixtures_probe", fixtures.__file__)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class PreviewFixturesTest(unittest.TestCase):
+    def test_resolves_docker_once_for_both_fixture_commands(self):
+        with patch("shutil.which", return_value="/tools/docker") as which:
+            preview = load_fixtures()
+        replies = [
+            subprocess.CompletedProcess([], 0, '[200, null, "{}"]'),
+            subprocess.CompletedProcess([], 0, "{}"),
+        ]
+        with patch.dict(os.environ, {"PREVIEW_PROJECT": "fs-e2e-preview-test"}), patch(
+            "subprocess.run", side_effect=replies,
+        ) as run:
+            preview.container_keycloak_request(43820, "GET", "/health", None, {})
+            preview.seed_site("fs-e2e-preview-test", "tenant-web", "/bench", {})
+        which.assert_called_once_with("docker")
+        self.assertEqual([call.args[0][0] for call in run.call_args_list], ["/tools/docker", "/tools/docker"])
+
+    def test_rejects_missing_and_relative_docker_before_running_a_command(self):
+        for path in (None, "bin/docker"):
+            with self.subTest(path=path), patch("shutil.which", return_value=path):
+                preview = load_fixtures()
+                with patch("subprocess.run") as run:
+                    with self.assertRaisesRegex(RuntimeError, "absolute.*Docker"):
+                        preview.seed_site("fs-e2e-preview-test", "tenant-web", "/bench", {})
+                    run.assert_not_called()
+
     def test_container_fixture_reaches_keycloak_without_a_host_tunnel(self):
         project = "fs-e2e-preview-browser-test"
         settings = {"E2E_BROWSER_RUNTIME": "container", "FS_COLIMA_PROFILE": "factory", "PREVIEW_PROJECT": project}
         response = subprocess.CompletedProcess([], 0, json.dumps([200, None, json.dumps({"ready": True})]))
-        with patch.dict(os.environ, settings), patch.object(
+        with patch.dict(os.environ, settings), patch.object(fixtures, "DOCKER_PATH", "/tools/docker"), patch.object(
             fixtures.subprocess, "run", return_value=response,
         ) as run:
             self.assertEqual(fixtures.keycloak_request(43820, "/health", token="test-only-token"), {"ready": True})
         args, kwargs = run.call_args
-        self.assertEqual(args[0][:6], ["docker", "--context", "colima-factory", "exec", "-i", project + "-tenant-web-1"])
+        self.assertEqual(args[0][:6], ["/tools/docker", "--context", "colima-factory", "exec", "-i", project + "-tenant-web-1"])
         self.assertNotIn("test-only-token", str(args))
         self.assertEqual(json.loads(kwargs["input"])["headers"]["Authorization"], "Bearer test-only-token")
 
