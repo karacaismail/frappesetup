@@ -928,7 +928,7 @@ test.describe('requirements explorer', () => {
 /* ------------------------------------------------------------------ */
 // Uzun satır içi kod bölünmez; satırdan uzunsa kendi kutusunda kayar (global.css). Yalnız gerçekten taşan kutu Tab
 // sırasındadır (sayfa betiği; WebKit taşan kutuyu kendiliğinden odaklamaz), ok tuşuyla kayar, sığınca sıradan çıkar.
-const INLINE_CODE = '.prose :not(pre, a) > code, .req-code';
+const INLINE_CODE = '.prose :not(pre, a) > code, :is(.req-card-detail, .req-detail) > code';
 async function codeBoxes(page: Page) {
   return page.evaluate((sel) =>
     Array.from(document.querySelectorAll<HTMLElement>(sel))
@@ -959,6 +959,23 @@ async function codeOutsideLine(page: Page) {
 }
 
 test.describe('long inline code', () => {
+  test('keeps long requirement settings and paths in their own scrollable code boxes @touch', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    const examples = [
+      { id: 'SA-2', text: 'skip_team_filter_for_system_user_and_support_agent' },
+      { id: 'G-134', text: 'frappe/utils/telemetry/pulse/client.py' },
+    ];
+    for (const { id, text } of examples) {
+      const code = page.locator(`#req-${id} code`).filter({ hasText: text });
+      await expect(code).toHaveText(text);
+      await expect(code).toHaveAttribute('data-scroll', '');
+      await expect(code).toHaveAttribute('tabindex', '0');
+      expect(await code.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    }
+    await noHorizontalOverflow(page);
+  });
+
   test('scrolls in its own box, is keyboard reachable while it overflows and leaves the tab order when it fits', async ({
     page,
     browserName,

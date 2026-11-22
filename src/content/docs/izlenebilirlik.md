@@ -139,7 +139,8 @@ Durumlar: pass, fail, not\_run. Her satır kontrolün koşulduğu commit'i yazar
 | İş | Gerekçe | Kabul | Sahip |
 | --- | --- | --- | --- |
 | Gereksinimler sayfası HTML payı | 198,8 KB / 200 KB: kart ve tablo görünümü ikisi de sunucuda üretilir, veri ada özelliklerinde üçüncü kez taşınır; satır işaretlemesi sadeleştirildi (−3,6 KB) | SSR'da tek görünüm (diğeri istemcide) ya da verinin tek kopyası; ölçüm ≤ 180 KB | Depo sahibi |
-| Düz metindeki uzun tanımlayıcılar | Gereksinim ayrıntılarında ters tırnaksız yazılmış uzun tanımlayıcılar satırdan uzunsa satır sonunda kırılır (320 px'te ≈ 50 kart dizgisi); kod biçimindekiler bölünmez, kendi kutusunda kayar | İlgili dizgiler kod biçiminde; 320 px'te güvenlik ağı kırılımı yok | Depo sahibi |
+| Düz metindeki uzun tanımlayıcılar | Kapatıldı. Gereksinimlerdeki uzun dosya yolları, uç adları ve ayar anahtarları kod biçiminde. | Uzun kod kendi kutusunda kayar. | Depo sahibi |
+| Dar ekranda büyük yazı | Kapatıldı. Ana sayfadaki düğme etiketleri gerektiğinde birden çok satıra yayılır. | Yazı %200 iken test, 320 ve 360 px genişlikte etiketleri ve yatay taşmayı denetler. | Depo sahibi |
 | Gerçek cihaz doğrulaması | WebKit ve iPhone 13 emülasyondur | Gerçek macOS/iOS Safari ve Android'de odak, dokunma, kaydırma ve tema senaryoları `pass/fail` kaydıyla | Depo sahibi |
 | Görsel referans kapsamı | Referanslar yedi görünüm içindir; mobil gezinme çekmecesi ve Teslim grubu gezinmesi görüntüde yok (davranış testleri var) | Gerekirse ek referans, bağımsız onayla | Depo sahibi |
 | Action güncellemeleri | Action'lar commit SHA'sına sabittir; otomatik güncelleme işi kurulmadı (zamanlanmış iş kurma kararı kullanıcıdadır) | Güncellemede etiket → SHA eşleşmesi doğrulanır, CI geçer | Hüseyin Cengiz |

@@ -25,6 +25,16 @@ export interface Requirement {
   owner?: string;
 }
 
+type RequirementRow = [
+  id: string, title: string, detail: string, rail: string,
+  priority: string, phase: string, source: string, owner?: string,
+];
+
+// Ada verisinde her gereksinim için alan adlarını yinelemeyin.
+export function toRequirementRow({ id, title, detail, rail, priority, phase, source, owner }: Requirement): RequirementRow {
+  return [id, title, detail, rail, priority, phase, source, owner];
+}
+
 interface Props {
   items: Requirement[];
 }
@@ -69,7 +79,7 @@ function byId(a: Requirement, b: Requirement) {
 function inlineCode(text: string): ReactNode[] {
   return text.split('`').map((part, i) =>
     i % 2 === 1 ? (
-      <code key={i} className="req-code">
+      <code key={i}>
         {part}
       </code>
     ) : (
@@ -151,7 +161,7 @@ function Explorer({ items }: Props) {
       if (rail && r.rail !== rail) return false;
       if (source && r.source !== source) return false;
       if (!needle) return true;
-      const hay = `${r.id} ${r.title} ${r.detail} ${r.owner ?? ''}`.toLocaleLowerCase('tr');
+      const hay = `${r.id} ${r.title} ${r.detail.replaceAll('`', '')} ${r.owner ?? ''}`.toLocaleLowerCase('tr');
       return hay.includes(needle);
     });
   }, [sorted, q, priority, phase, rail, source]);
@@ -369,7 +379,10 @@ function useDocumentColorScheme(): MantineColorScheme | undefined {
   return scheme;
 }
 
-export default function RequirementsExplorer(props: Props) {
+export default function RequirementsExplorer({ rows }: { rows: RequirementRow[] }) {
+  const items = useMemo(() => rows.map(([id, title, detail, rail, priority, phase, source, owner]) => ({
+    id, title, detail, rail, priority, phase, source, owner,
+  })), [rows]);
   const scheme = useDocumentColorScheme();
   return (
     <MantineProvider
@@ -379,7 +392,7 @@ export default function RequirementsExplorer(props: Props) {
       withCssVariables={false}
       withGlobalClasses={false}
     >
-      <Explorer {...props} />
+      <Explorer items={items} />
     </MantineProvider>
   );
 }

@@ -5,7 +5,7 @@ import Site from '../layouts/Site.astro';
 import Mermaid from '../components/Mermaid.tsx';
 import PhaseTable from '../components/PhaseTable.astro';
 import PressAiDownloads from '../components/PressAiDownloads.astro';
-import RequirementsExplorer from '../components/RequirementsExplorer.tsx';
+import RequirementsExplorer, { toRequirementRow } from '../components/RequirementsExplorer.tsx';
 import Rails from '../components/Rails.astro';
 import RequirementSummary from '../components/RequirementSummary.astro';
 import Timeline from '../components/Timeline.astro';
@@ -99,7 +99,7 @@ const embeds = EMBEDS[entry.id] ?? [];
     {
       entry.id === 'gereksinimler' && (
         <div class="explorer">
-          <RequirementsExplorer client:visible items={requirements} />
+          <RequirementsExplorer client:visible rows={requirements.map(toRequirementRow)} />
         </div>
       )
     }
@@ -181,7 +181,7 @@ const embeds = EMBEDS[entry.id] ?? [];
   //    break-word ağı kapalı: kodun satırı taşıyor mu?), böylece durum salınmaz. Yalnız gerçekten taşan kaydırma kutusu
   //    Tab sırasına girer. Sayfanın boyutu (genişlik, kök yazı, yazı tipi), yazı tipi yüklemesi ve gezginin yeniden
   //    çizimi durumu yeniler; kutunun kaydırma konumu korunur.
-  const CODE = '.prose :not(pre, a) > code, .req-code';
+  const CODE = '.prose :not(pre, a) > code, :is(.req-card-detail, .req-detail) > code';
   const lineBox = (code: HTMLElement) => {
     let box = code.parentElement!;
     while (box.parentElement && getComputedStyle(box).display === 'inline') box = box.parentElement;

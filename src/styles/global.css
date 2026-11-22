@@ -490,13 +490,16 @@ body {
    ağı uzun kodu satır sonunda kırar, sayfa taşmaz. Tablo hücresindeki kod sarılmaz (sütun genişler, tablo kendi
    kapsayıcısında kayar); bağlantı içindeki kod satır içi kalır. */
 [data-code-measured] .prose code,
-[data-code-measured] .req-code {
+[data-code-measured] :is(.req-card-detail, .req-detail) > code {
   /* Betik ölçtükten sonra ağ satır içi kodda kapanır: Gecko ağ açıkken kodun bitiş dolgusunu sığma hesabına katıp
      satırına sığan kodu da bölüyor. Satırdan uzun dizileri kod kutuları çözer. */
   overflow-wrap: normal;
 }
+[data-code-measured] :is(.req-card-detail, .req-detail) > code {
+  white-space: nowrap;
+}
 .prose :not(pre, a) > code[data-scroll],
-.req-code[data-scroll] {
+:is(.req-card-detail, .req-detail) > code[data-scroll] {
   display: inline-block;
   max-width: 100%;
   overflow: auto hidden;
@@ -760,7 +763,7 @@ body {
   margin-bottom: 0.75rem;
 }
 .req-id,
-.req-code {
+:is(.req-card-detail, .req-detail) > code {
   font-family: var(--mantine-font-family-monospace);
   font-size: var(--fs-font-body);
 }
@@ -772,7 +775,7 @@ body {
   border-radius: 4px;
   white-space: nowrap;
 }
-.req-code {
+:is(.req-card-detail, .req-detail) > code {
   background: var(--fs-tint);
   padding: 0.05em 0.3em;
   border-radius: 4px;
