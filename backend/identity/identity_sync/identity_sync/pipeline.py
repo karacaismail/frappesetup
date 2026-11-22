@@ -225,14 +225,21 @@ class Processor:
         finished = self._store.progress(event.id)
         return tuple(action for action in actions if self._step_key(action) not in finished)
 
-    @staticmethod
-    def _describe(event: Event, action: Action) -> Preview:
-        """The preview of one step. An account job is named by its id, not by the account."""
+    def _describe(self, event: Event, action: Action) -> Preview:
+        """The preview of one step.
+
+        A step of an account deletion never names the account. It names the deletion job, whose
+        id is a keyed digest. This holds for the account job and for a Keycloak delete event,
+        whatever Keycloak answered: gone, closed or open. Only the text changes. The plan stays
+        with its own record and the digest is computed from the real steps.
+        """
         preview = action.preview()
-        if event.kind != REQUEST_KIND or not event.user_id:
+        subject = event.user_id
+        if not subject or not (event.kind == REQUEST_KIND or event.type in USER_REMOVED_TYPES):
             return preview
-        summary = preview.summary.replace(f"user {event.user_id}", f"the user of deletion job {event.id}")
-        return replace(preview, summary=summary.replace(event.user_id, event.id))
+        job_id = self.account_job(subject, time=0).id
+        summary = preview.summary.replace(f"user {subject}", f"the user of deletion job {job_id}")
+        return replace(preview, summary=summary.replace(subject, job_id))
 
     def _preview(self, event: Event) -> tuple[EventResult, _Planned | None]:
         """Plan the event and describe the plan. Reads only. The second value is None when planning failed.
@@ -310,7 +317,10 @@ class Processor:
             return EventResult("duplicate")
         if not allow_unknown and self._store.dead_letter_state(event.id) == "unknown":
             # The event came again but its earlier outcome is unknown. No blind repeat.
-            return EventResult("unknown")
+            # One case is certain: every step of an account job is recorded as finished and only
+            # the final record is missing. Nothing will be written to a target, so it may finish.
+            if event.type not in JOB_TYPES or self._pending(event, self._plan(event)):
+                return EventResult("unknown")
         # Keep the accepted event on record before any work. A crash must not lose it.
         self._store.begin(event)
         try:
@@ -320,10 +330,10 @@ class Processor:
             state = "unknown" if failure.unknown else "failed"
             self._store.add_dead_letter(event, str(failure), state=state)
             return EventResult("unknown" if failure.unknown else "dead_lettered")
-        self._store.mark_processed(event.id, "processed")
-        if event.type in JOB_TYPES and event.user_id:
-            # The account is gone. No record keeps its id (the job's own id is a keyed digest).
-            self._store.forget_subject(event.user_id)
+        # A finished account job and the cleanup of the account's id are one transaction.
+        # The job's own id is a keyed digest, so the finished record does not name the user.
+        forget = event.user_id if event.type in JOB_TYPES else None
+        self._store.mark_processed(event.id, "processed", forget_subject=forget)
         return EventResult("processed", actions=tuple(names))
 
     def replay_dead_letters(

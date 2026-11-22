@@ -32,7 +32,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from identity_sync.events import REQUEST_KIND, Event
+from identity_sync.events import REQUEST_KIND, USER_REMOVED_TYPES, Event
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS processed_events (
@@ -98,8 +98,9 @@ class DeadLetter:
 
     def to_dict(self) -> dict[str, object]:
         event = self.event.to_dict()
-        if self.event.kind == REQUEST_KIND:
-            # An account job is named by its id, a keyed digest. The listing does not show whose it is.
+        if self.event.kind == REQUEST_KIND or self.event.type in USER_REMOVED_TYPES:
+            # An account job is named by its id, a keyed digest. The listing does not show whose
+            # it is. The same holds for a Keycloak delete event: its account is, or is being, deleted.
             event.pop("user_id", None)
         return {
             "event": event,
@@ -377,14 +378,27 @@ class Store:
             )
             return cursor.rowcount == 1
 
-    def mark_processed(self, event_id: str, status: str) -> None:
-        """Olayı işlenmiş sayar ve bekleme kuyruğundan çıkarır. İki yazı tek işlemdedir."""
+    def mark_processed(self, event_id: str, status: str, *, forget_subject: str | None = None) -> None:
+        """Count the event as processed and take it out of the queue. One transaction.
+
+        `forget_subject`: the account of this user is deleted. In the same transaction every
+        record that still names the user drops the id: the operation journal and any other
+        queued event of that user. Either the job is finished and no record names the user, or
+        neither happened and a retry does both. A finished job can never leave the id behind.
+        """
         with self._transaction():
             self._db.execute(
                 "INSERT OR IGNORE INTO processed_events (event_id, status, processed_at) VALUES (?, ?, ?)",
                 (event_id, status, self._clock()),
             )
             self._db.execute("DELETE FROM dead_letters WHERE event_id = ?", (event_id,))
+            if forget_subject:
+                self._db.execute("UPDATE operations SET subject = '' WHERE subject = ?", (forget_subject,))
+                queued = self._db.execute("SELECT event_id, event FROM dead_letters").fetchall()
+                for queued_id, raw in queued:
+                    if json.loads(raw).get("user_id") == forget_subject:
+                        # Work for an account that no longer exists. It must not keep the id.
+                        self._db.execute("DELETE FROM dead_letters WHERE event_id = ?", (queued_id,))
 
     def add_dead_letter(self, event: Event, error: str, *, state: str = "failed") -> None:
         """Olayı bekleme kuyruğuna yazar. Olay zaten kuyruktaysa deneme sayısını artırır."""

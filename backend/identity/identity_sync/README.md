@@ -234,6 +234,47 @@ Silme olayı kaybolabilir. O zaman `reconcile` komutu silinen kullanıcıyı bul
 
 Keycloak'ta kapatılan kullanıcının telefon kurulumları da iptal edilir. Bu iş kapatma planının parçasıdır.
 
+## Hesap silme yolları
+
+Bu tablo silme akışının bütün yollarını gösterir. Her satırı `tests/test_deletion_paths.py` dosyasındaki bir test sınar. Testin adı `test_row_` ile ve satır numarasıyla başlar. Her test gerçek HTTP girişini kullanır.
+
+Hiçbir satırda yanıt hesabın ham Keycloak kimliğini göstermez. Yanıt yalnız iş kimliğini gösterir. Her test bunu da denetler.
+
+| Satır | Giriş | Keycloak okuması | Yazma isteği | Kayıt durumu |
+| --- | --- | --- | --- | --- |
+| 1 | Press isteği | Okuma yok | Beş adım | İş bitti |
+| 2 | Press isteği, 4. adım hata verir | Okuma yok | 1., 2. ve 3. adım | İş kuyrukta |
+| 3 | İkinci Press isteği | Okuma yok | Yok | İş bitti |
+| 4 | Silme olayı, iş bitmiş | Kullanıcı yok | Yok | İş bitti |
+| 5 | Silme olayı, iş yok | Kullanıcı yok | 2., 3. ve 4. adım | İş bitti |
+| 6 | Silme olayı, iş yarım | Kullanıcı yok | Yalnız kalan adım | İş bitti |
+| 7 | Silme olayı | Okuma hatası | Yok | Olay kuyrukta |
+| 8 | Silme olayı | Kullanıcı var | Yalnız kapatma | Olay bitti, iş açılmadı |
+| 9 | Kuyruktaki olayın önizlemesi | Kullanıcı yok | Yok | Olay kuyrukta |
+| 10 | Kuyruktaki olayın önizlemesi | Kullanıcı kapalı | Yok | Olay kuyrukta |
+| 11 | Kuyruktaki olayın önizlemesi | Okuma hatası | Yok | Olay kuyrukta |
+| 12 | Kuyruk listesi | Okuma yok | Yok | Olay kuyrukta |
+| 13 | Onaylı yeniden deneme | Önce kapalı, yürütmeden sonra yok | Yalnız kapatma | Olay bitti, iş açık |
+| 14 | Onaylı yeniden deneme | Önce yok, yürütmeden sonra var | 2., 3. ve 4. adım | İş bitti |
+| 15 | Onaylı yeniden deneme | Onaydan sonra değişti | Yok, yanıt 409 | Olay kuyrukta |
+| 16 | Onaylı yeniden deneme, iş bitmiş | Kullanıcı yok | Yok | İş bitti, kuyruk boş |
+| 17 | Mutabakat, olay hiç gelmedi | Kullanıcı listede yok | 2., 3. ve 4. adım | İş bitti |
+| 18 | İş biter, eski kayıtlar var | Okuma yok | Beş adım | Hiçbir kayıt kimliği tutmaz |
+| 19 | İş biter, kayıt yazması hata verir | Okuma yok | Yeniden denemede yok | İş bitti, hiçbir kayıt kimliği tutmaz |
+
+Adımlar şunlardır:
+
+1. Keycloak kullanıcısını kapatma.
+2. Press kullanıcısını kapatma.
+3. Kiracıda kapatma ve telefon kurulumlarını iptal.
+4. Press'te ve kiracıda anonim yapma.
+5. Keycloak kullanıcısını silme.
+
+- 8. satırda servis hiçbir şeyi anonim yapmaz. Çünkü Keycloak kullanıcının durduğunu söyler.
+- 13. ve 14. satırda plan, onaylandığı kaydın altında kalır. Yürütme Keycloak'ı yeniden okumaz.
+- 17. satırda fark listesi kullanıcıyı Keycloak kimliğiyle anar. Sözleşme bu alanı mutabakat okuru için tanımlar. Önizleme ve sonuç iş kimliğini gösterir.
+- 19. satırda bitiş kaydı ve kimlik temizliği tek kayıt işlemidir. Yazma başarısız olursa iş bitmiş sayılmaz.
+
 ## Olay dinleyici eklentisi
 
 Keycloak olayları kimlik-realm işinin kurduğu eklentiden gelir. Eklenti olayı imzalar ve `POST /v1/events` ucuna gönderir.
