@@ -227,6 +227,14 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Aynı `remove_team_member` isteği iki kez gelirse ikinci istek de 200 döner ve bir şey değiştirmez.
 - Takım adı istekte gelmez. Takım adını Press üretir.
 
+### Press kullanıcısını anonim yapma
+
+- `anonymize_user` isteği `issuer` ve `subject` alanlarını taşır. İki alan da zorunludur.
+- İş geri alınamaz. Uç bunu açıklamasında yazar.
+- Yanıt 200 döner ve `anonymized` ile `found` alanlarını taşır. Kimlik bulunamazsa `found: false` olur. Tekrar çağrı aynı yanıtı alır.
+- Kilit çakışması ya da zaman aşımı 409 döner. identity-sync isteği yeniden dener.
+- Anonim yapma kuralları 7. bölümdeki ortak kurallardır.
+
 - Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
 - G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
 - Press'te misafir için izin listesi uygulanır. Misafir yalnız listedeki yöntemleri çağırabilir. Liste şudur: `ping`, `press_tr.api.auth.get_login_url`, `press_tr.api.auth.keycloak_callback`, `press_tr.api.keycloak_backchannel_logout`. Öteki bütün yöntemler misafire 403 döner.
@@ -257,6 +265,25 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
   4. Kişiyi gösteren alanlar anonim yapılır. İş kayıtları silinmez.
   5. Keycloak kullanıcısı silinir. İstek kaydı anonim yapılır.
 - Her adım tekrar edilebilir. Bir adım başarısız olursa istek hata kuyruğuna girer ve elle yeniden denenir.
+
+### Anonim yapma kuralları
+
+Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve Press'te (`press_tr.api.identity.anonymize_user`) aynıdır. Kararın kaynağı proje kaydındaki O-27'dir.
+
+1. Silme iki adımdır. Birinci adım hesabı kapatır, oturumları sayfalayarak kapatır, API anahtarlarını iptal eder ve silme durumunu kaydeder. İkinci adım kişisel veriyi anonim yapar. İki adım da tekrar güvenlidir.
+2. Silme kaydı ham kimliği tutmaz. Kayıt `(iss, sub)` çiftinin HMAC-SHA256 özetini tutar. Anahtar site ayarındaki gizli değerdir. Kimlik bağındaki ham `sub` silinir.
+3. Hesap açma, durum değiştirme ve e-posta değiştirme uçları önce silme kaydını denetler. Silinmiş kimlik yeniden açılamaz. Bu uçlar aynı satır kilidini kullanır.
+4. Kapsam Frappe'nin `user_data_fields` kancasından türer. Ek olarak şunlar temizlenir ya da anonim yapılır:
+   - kullanıcıya bağlı “Contact” ve adres kayıtları,
+   - “Activity Log” kayıtlarındaki ad ve IP adresi,
+   - “Version” kayıtlarındaki eski kişisel değerler,
+   - profil fotoğrafı ve kullanıcının yüklediği kişisel dosyalar,
+   - “Communication” ve e-posta kuyruğundaki adresler,
+   - iki adımlı doğrulama anahtarları, varsayılan değer satırları, sosyal giriş ve ek e-posta satırları,
+   - Press'te takımın fatura adı ve telefonu, SSH anahtarları ve sertifikaları.
+5. Frappe'nin tam adı bütün satırlarda arayan değiştirmesi kullanılmaz. Yalnız kullanıcıya bağlı alanlar değişir. Böylece aynı adı taşıyan başka bir kişinin verisi değişmez.
+6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
+7. Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
 - `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır.
 - Hesap silme akışının 3. ve 4. adımı şu uçları çağırır: `platform_core.api.mobile.revoke_user_installations`, `platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user`.
 
@@ -381,6 +408,11 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
 | `platform_core.api.ai.purge_logs` | POST | “System Manager” rolü | Saklama süresi dolan günlükleri elle siler. Yıkıcıdır. |
 
+- `list_proposals` yanıtı bir nesnedir: `proposals` ve `has_next_page`. İstek `start` alır. Süzme ve sayfalama veritabanında yapılır.
+- Öneri `created_at` ve `expires_at` taşır. Zaman sitenin saat dilimiyle ve farkıyla ISO 8601 biçiminde döner.
+- Okuma araçlarının sonucu `as_of`, `site` ve `source` taşır. Sonuç sınırı aşarsa `truncated: true` döner. Alt tablo en çok 200 satır, sonuç verisi en çok 262.144 bayttır.
+- Oturumsuz istek 403, süresi dolmuş oturum 401 alır.
+
 ### Genel araçlar
 
 `search_doctypes`, `get_doctype_schema`, `list_documents`, `get_document`, `run_report`, `create_document`, `update_document`, `submit_document`, `cancel_document`, `delete_document` ve `get_proposal`.
@@ -446,10 +478,14 @@ Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinde
 
 ### Güvenlik
 
+- Dış bağlantı (`external`) özel ağ adresine gidemez. Denetim bağlantı anında çözülen adrese yapılır.
+- Yerel bağlantı (`local`) yalnız site ayarındaki sabit adres listesine gider. Örnek: `{"kind": "local", "addresses": ["10.0.5.7"]}`. Bağlantı yerel adresler (`169.254.0.0/16`, `fe80::/10`), `0.0.0.0/8` ve çoklu yayın adresleri her zaman reddedilir.
+- Şifresiz HTTP yalnız listedeki yerel adrese izinlidir. Açık internetteki adrese şifresiz istek gönderilmez.
 - Gizli anahtar “Password” alanında şifreli durur. Hiçbir uç ve hiçbir yapay zekâ aracı anahtarı dönmez.
 - Kayıt, günlük ve hata metni anahtarı içermez.
 - Kaydı yalnız “AI Manager” rolü ve “System Manager” rolü yönetir.
-- Yapay zekâ kaydı yönetim araçlarıyla değiştirebilir. Her değişiklik önizleme ve insan onayı ister.
+- Genel yazma araçları AI API ve AI Account kayıtlarına yazamaz (Proje kaydı O-28). Yapay zekâ bu kayıtları yalnız model geçidinin kendi yönetim araçlarıyla değiştirir. Her değişiklik önizleme ve insan onayı ister.
+- Yönetim aracı bağlantı adresini değiştirirse kayıtlı anahtar silinir ve bağlantı kapanır. Yeni anahtarı insan Desk ekranında girer. Böylece kayıtlı anahtar yeni adrese gitmez.
 - Bağlantı denetimi ücretli bir çağrıdır. Bu yüzden ücretli işaretini taşır.
 - Mesaj içeriği varsayılan olarak günlüğe yazılmaz.
 - Yol kaydının veri kısıtı, model çağrısından önce veri seçimini ve maskelemeyi ister (G-90).
