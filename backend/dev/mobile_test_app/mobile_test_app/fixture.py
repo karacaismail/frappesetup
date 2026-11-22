@@ -5,6 +5,7 @@ import time
 from functools import partial
 
 import frappe
+from frappe.core.doctype.installed_applications.installed_applications import update_installed_apps_order
 from platform_core.api.mobile import _pull, _push
 from platform_core.mobil.protocol import (
 	UUID_PATTERN,
@@ -19,6 +20,7 @@ from platform_core.mobil.request import endpoint_response
 from .load_accounts import LOAD_ACCOUNTS
 
 SITE = "test-mobile.localhost"
+WEBSITE = "mobile-website@example.test"
 FIRST = "mobile-first@example.test"
 SECOND = "mobile-second@example.test"
 RATE = "mobile-rate@example.test"
@@ -41,6 +43,7 @@ MOBILE_PATHS = frozenset(
 PROBE_PATH = "/api/method/mobile_test_app.fixture.commit_probe"
 TOKENS = {
 	**LOAD_ACCOUNTS,
+	"Bearer fixture-website": WEBSITE,
 	"Bearer fixture-first": FIRST,
 	"Bearer fixture-second": SECOND,
 	"Bearer fixture-rate": RATE,
@@ -57,6 +60,21 @@ def _require_test_site():
 
 def setup():
 	_require_test_site()
+	apps = list(frappe.get_installed_apps())
+	if "mobile_test_app" in apps and apps.index("mobile_test_app") > apps.index("platform_core"):
+		apps.remove("mobile_test_app")
+		apps.insert(apps.index("platform_core"), "mobile_test_app")
+		update_installed_apps_order(apps)
+		frappe.clear_cache()
+
+	if not frappe.db.exists("User", WEBSITE):
+		frappe.get_doc(
+			doctype="User",
+			email=WEBSITE,
+			first_name="Mobile Website Test",
+			user_type="Website User",
+			send_welcome_email=0,
+		).insert()
 	for user, name in (
 		(FIRST, "First Test"),
 		(SECOND, "Second Test"),
@@ -71,10 +89,13 @@ def setup():
 					"doctype": "User",
 					"email": user,
 					"first_name": name,
-					"user_type": "System User",
+					"roles": [{"role": "Desk User"}],
 					"send_welcome_email": 0,
 				}
 			).insert()
+		elif frappe.db.get_value("User", user, "user_type") != "System User":
+			# Drive the legacy override tests with their intended Desk accounts.
+			frappe.get_doc("User", user).add_roles("Desk User")
 	if not frappe.db.exists("DocType", RECORD):
 		frappe.get_doc(
 			{
