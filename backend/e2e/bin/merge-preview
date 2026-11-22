@@ -99,9 +99,27 @@ def merge_inputs(worktree, inputs, branch, report, base):
     report.write("\nKanca listeleri korundu.\n")
 
 
-def run_live(worktree, environment):
+def trusted_scratch(repo, value):
+    """Keep preview artifacts inside the repository's ignored Pane directory."""
+    # The fixed in-repository location is the trust anchor. Never follow a link here.
+    trusted = repo.resolve() / ".pane"
+    if trusted.is_symlink() or (trusted.exists() and not trusted.is_dir()):
+        raise MergeError(f"{trusted} must be a real directory, not a symbolic link.")
+    if "\0" in value or "\n" in value:
+        raise MergeError("PANE_SCRATCH_DIR contains a control character.")
+    scratch = Path(value).resolve()
+    if scratch == trusted or not scratch.is_relative_to(trusted):
+        raise MergeError(f"PANE_SCRATCH_DIR must be inside {trusted}.")
+    return scratch
+
+
+def run_live(worktree, environment, root):
     if not BASH_PATH or not Path(BASH_PATH).is_absolute():
         raise MergeError("An absolute Bash executable path is required. Check PATH.")
+    # Bash receives this path, so re-check it where the process starts.
+    worktree = worktree.resolve()
+    if not worktree.is_relative_to(root):
+        raise MergeError("The preview worktree must stay inside the trusted scratch directory.")
     workspace = worktree / "backend" / "e2e"
     workspace.mkdir(parents=True, exist_ok=True)
     for filename in (*SUITE.glob("*.ts"), SUITE / "fake-provider.mjs"):
@@ -133,7 +151,10 @@ def main():
     except MergeError as error:
         parser.error(str(error))
     order = (SUITE / "preview" / "branches.txt").read_text().split()
-    scratch = Path(os.environ.get("PANE_SCRATCH_DIR", repo / ".pane" / "scratch")).resolve()
+    try:
+        scratch = trusted_scratch(repo, os.environ.get("PANE_SCRATCH_DIR", str(repo / ".pane" / "scratch")))
+    except MergeError as error:
+        parser.error(str(error))
     scratch.mkdir(parents=True, exist_ok=True)
     artifacts = Path(tempfile.mkdtemp(prefix="merge-preview-", dir=scratch))
     worktree = artifacts / "worktree"
@@ -180,7 +201,7 @@ def main():
                         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     except BlockingIOError as error:
                         raise MergeError("A live merge preview already uses this Pane port.") from error
-                    result = run_live(worktree, environment)
+                    result = run_live(worktree, environment, scratch)
                 report.write(f"\nCanlı koşu çıkış kodu `{result}`.\n")
         except (MergeError, subprocess.CalledProcessError, OSError, KeyboardInterrupt) as error:
             if isinstance(error, subprocess.CalledProcessError):

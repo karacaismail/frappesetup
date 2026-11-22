@@ -16,6 +16,8 @@ pnpm-debug.log*
 # environment variables
 .env
 .env.production
+# Staging files for generated e2e credentials (backend/e2e/stack)
+/backend/e2e/.fs-stack-env.[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f].tmp
 
 # macOS-specific files
 .DS_Store

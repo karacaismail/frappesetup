@@ -7,17 +7,24 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
 from pathlib import Path
 from urllib.parse import quote, urlencode
+
+if __package__:
+    from . import browser_keycloak
+else:
+    import browser_keycloak
 
 LOGIN_EMAIL = "e2e-user@example.test"
 SYNC_EMAIL = "e2e-sync@example.test"
 BENCH = "/home/frappe/frappe-bench"
 PRESS_BENCH = "/home/frappe/benches/frappe-bench"
+DOCKER_PATH = shutil.which("docker")
 
 
-def keycloak_request(port, path, *, token=None, data=None, form=False, expect_denial=False):
+def keycloak_request(port, path, *, token=None, data=None, form=False, expect_denial=False, method=None):
     headers = {"Host": f"identity.localhost:{port}"}
     body = None
     if token:
@@ -25,7 +32,7 @@ def keycloak_request(port, path, *, token=None, data=None, form=False, expect_de
     if data is not None:
         headers["Content-Type"] = "application/x-www-form-urlencoded" if form else "application/json"
         body = urlencode(data) if form else json.dumps(data)
-    method = "POST" if data is not None else "GET"
+    method = method or ("POST" if data is not None else "GET")
     if os.environ.get("E2E_BROWSER_RUNTIME") == "container":
         status, location, raw = container_keycloak_request(port, method, path, body, headers)
     else:
@@ -49,6 +56,12 @@ def docker_context():
     return {"default": "colima", "factory": "colima-factory"}[profile]
 
 
+def docker_executable():
+    if not DOCKER_PATH or not Path(DOCKER_PATH).is_absolute():
+        raise RuntimeError("An absolute Docker executable path is required. Check PATH.")
+    return DOCKER_PATH
+
+
 def container_keycloak_request(port, method, path, body, headers):
     project = os.environ["PREVIEW_PROJECT"]
     script = """
@@ -66,7 +79,7 @@ finally:
     connection.close()
 """
     result = subprocess.run(
-        ["docker", "--context", docker_context(), "exec", "-i", f"{project}-tenant-web-1",
+        [docker_executable(), "--context", docker_context(), "exec", "-i", f"{project}-tenant-web-1",
          "env/bin/python", "-c", script],
         input=json.dumps(dict(port=port, method=method, path=path, body=body, headers=headers)),
         text=True, stdout=subprocess.PIPE, check=True, timeout=20,
@@ -116,7 +129,7 @@ def created_identifier(location, fixture_kind):
     return identifier
 
 
-def seed_keycloak(port, password):
+def seed_keycloak(port, password, *, browser_fixtures=None):
     token = keycloak_request(
         port,
         "/realms/master/protocol/openid-connect/token",
@@ -136,16 +149,38 @@ def seed_keycloak(port, password):
         }
         for scenario in ("delete", "revoke", "employee")
     }
+    if browser_fixtures is not None:
+        lifecycle = browser_keycloak.browser_accounts()
+        def call(path, **kwargs):
+            return keycloak_request(port, realm + path, token=token, **kwargs)
+
+        redirect = f"http://127.0.0.1:{port + 8}/callback"
+        reader, secret = browser_keycloak.configure_browser_clients(call, redirect)
+        browser_fixtures.update(
+            E2E_MOBILE_REDIRECT_URI=redirect,
+            E2E_MOBILE_AUDIENCE="site-tenant1",
+            E2E_MOBILE_SCOPE=browser_keycloak.MOBILE_SCOPE,
+            E2E_MOBILE_EXPIRED_CLIENT_ID=browser_keycloak.EXPIRED_CLIENT,
+            E2E_SSO_PROBE_CLIENT=browser_keycloak.SSO_PROBE_CLIENT,
+            E2E_MOBILE_ORIGIN=f"http://127.0.0.1:{port + 8}",
+            E2E_MAGIC_TTL_SECONDS=str(browser_keycloak.MAGIC_TTL),
+            E2E_LIFECYCLE_READER_CLIENT=reader,
+            E2E_LIFECYCLE_READER_SECRET=secret,
+        )
+    otp_seeds = {item["email"]: item["otp_seed"] for item in lifecycle.values() if "otp_seed" in item}
     accounts = {email: password for email in (LOGIN_EMAIL, SYNC_EMAIL)}
     accounts.update({item["email"]: item["password"] for item in lifecycle.values()})
     subjects = {}
     for email, credential in accounts.items():
+        credentials = [{"type": "password", "value": credential, "temporary": False}]
+        if email in otp_seeds:
+            credentials.append(browser_keycloak.otp_credential(otp_seeds[email]))
         location = keycloak_request(
             port, realm + "/users", token=token,
             data={
                 "username": email, "email": email, "emailVerified": True, "enabled": True,
                 "firstName": "Preview", "lastName": "Fixture",
-                "credentials": [{"type": "password", "value": credential, "temporary": False}],
+                "credentials": credentials,
             },
         )
         if email != LOGIN_EMAIL:
@@ -158,7 +193,8 @@ def seed_keycloak(port, password):
         data={"name": "Preview Integration Tenant", "alias": "tenant1", "enabled": True},
     )
     organization = created_identifier(location, "organization")
-    for member in (subject, lifecycle["delete"]["subject"], lifecycle["revoke"]["subject"]):
+    members = (item["subject"] for key, item in lifecycle.items() if key.split("_")[-1] in {"delete", "revoke"})
+    for member in (subject, *members):
         keycloak_request(
             port, realm + "/organizations/" + quote(organization, safe="") + "/members",
             token=token, data=member,
@@ -168,7 +204,7 @@ def seed_keycloak(port, password):
 
 def seed_site(project, service, bench, environment):
     source = Path(__file__).with_name("site-seed.py")
-    command = ["docker", "--context", docker_context(), "exec", "-i", "--workdir", bench]
+    command = [docker_executable(), "--context", docker_context(), "exec", "-i", "--workdir", bench]
     for name in environment:
         command.extend(("--env", name))
     command.extend((f"{project}-{service}-1", "env/bin/python", "-", service))
@@ -196,13 +232,16 @@ def main():
     ):
         raise SystemExit("The fake provider must use a private address on the preview network.")
 
+    docker_executable()
     check_tenant_clients(port)
     print("Tenant browser and service client checks passed.", flush=True)
     password = "Aa9!" + secrets.token_urlsafe(24)
-    subject, lifecycle = seed_keycloak(port, password)
+    browser_fixtures = {} if os.environ.get("E2E_FULL_BROWSER_FIXTURES") == "1" else None
+    subject, lifecycle = seed_keycloak(port, password, browser_fixtures=browser_fixtures)
     common = {
         "E2E_PREVIEW_SYNC_ORIGIN": os.environ["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],
         "PANE_PORT": str(port), "E2E_PREVIEW_LOGIN_EMAIL": LOGIN_EMAIL,
+        "E2E_FULL_BROWSER_FIXTURES": "1" if browser_fixtures is not None else "0",
         "E2E_LIFECYCLE_IDENTITIES": json.dumps({
             key: {field: item[field] for field in ("email", "subject")}
             for key, item in lifecycle.items()
@@ -227,16 +266,25 @@ def main():
         "E2E_KEYCLOAK_SERVICE_CLIENT_SECRET": os.environ["E2E_KEYCLOAK_SERVICE_CLIENT_SECRET"],
     })
     fixture.update(press_fixture)
+    if browser_fixtures is None:
+        for scenario in ("delete", "revoke", "employee"):
+            for field in ("email", "password", "subject"):
+                fixture[f"E2E_{scenario.upper()}_{field.upper()}"] = lifecycle[scenario][field]
+    else:
+        fixture.update(browser_fixtures)
+        for engine in browser_keycloak.ENGINES:
+            prefix = f"E2E_{engine.upper()}_"
+            for scenario in ("delete", "revoke", "employee", "mobile"):
+                account = lifecycle[f"{engine}_{scenario}"]
+                for field in ("email", "password", "subject"):
+                    fixture[prefix + scenario.upper() + "_" + field.upper()] = account[field]
+            fixture[prefix + "MAGIC_EMAIL"] = lifecycle[f"{engine}_magic"]["email"]
+            fixture[prefix + "MAGIC_EXPIRY_EMAIL"] = lifecycle[f"{engine}_magic-expiry"]["email"]
+            otp = lifecycle[f"{engine}_magic-otp"]
+            fixture[prefix + "MAGIC_OTP_EMAIL"] = otp["email"]
+            fixture[prefix + "MAGIC_OTP_SEED"] = otp["otp_seed"]
     fixture.update(
-        E2E_DELETE_EMAIL=lifecycle["delete"]["email"],
-        E2E_DELETE_PASSWORD=lifecycle["delete"]["password"],
-        E2E_DELETE_SUBJECT=lifecycle["delete"]["subject"],
-        E2E_REVOKE_SUBJECT=lifecycle["revoke"]["subject"],
-        E2E_REVOKE_EMAIL=lifecycle["revoke"]["email"],
-        E2E_REVOKE_PASSWORD=lifecycle["revoke"]["password"],
-        E2E_MOBILE_CLIENT_ID="mobile-app",
-        E2E_EMPLOYEE_EMAIL=lifecycle["employee"]["email"],
-        E2E_EMPLOYEE_PASSWORD=lifecycle["employee"]["password"],
+        E2E_MOBILE_CLIENT_ID=browser_keycloak.MOBILE_CLIENT,
         E2E_KEYCLOAK_PASSWORD=password,
         E2E_SYNC_EMAIL=SYNC_EMAIL,
         E2E_SYNC_SUBJECT=subject,

@@ -45,7 +45,7 @@ identity_dir="$worktree/backend/identity"
 tenant="$PREVIEW_PROJECT-tenant-web-1"
 press="$PREVIEW_PROJECT-web-1"
 sync="$PREVIEW_PROJECT-identity"
-sync_host=event-sink.localhost
+sync_host=identity-sync.localhost
 provider="$PREVIEW_PROJECT-provider"
 network="${PREVIEW_PROJECT}_default"
 builder="$PREVIEW_PROJECT-builder"
@@ -130,7 +130,7 @@ PYTHON
         PANE_SCRATCH_DIR="$tunnel_state" "$dev_dir/bin/tunnel" close >> "$PREVIEW_DIR/cleanup.log" 2>&1 || cleanup_failed=1
     fi
     rm -f -- "$DEV_ENV_FILE" "$keycloak_env" "$press_env" "$sync_env" "$PREVIEW_DIR/fixtures.json"
-    rm -rf -- "$PREVIEW_DIR/browser" "$PREVIEW_DIR/api" "$PREVIEW_DIR/lifecycle" "$tunnel_state" "$docker_config"
+    rm -rf -- "$PREVIEW_DIR/playwright-output" "$tunnel_state" "$docker_config" "$PREVIEW_DIR/session-tls"
     if [[ "${cleanup_failed:-}" ]]; then
         printf '%s\n' "Preview cleanup failed. See $PREVIEW_DIR/cleanup.log." >&2
         if (( result == 0 )); then result=1; fi
@@ -323,12 +323,20 @@ wait_http "$KC_PUBLIC_URL/realms/platform/.well-known/openid-configuration" keyc
 wait_http "http://$sync_host:$sync_port/healthz" identity-sync
 wait_http "http://$E2E_PROVIDER_HOST:$provider_port/attempts" "$E2E_PROVIDER_HOST"
 
+if [[ "${E2E_FULL_BROWSER_FIXTURES:-0}" == 1 ]]; then
+    bash "$suite_dir/preview/session-tls.sh" "$docker_context" "$sync" "$tenant" "$sync_port" "$KC_PORT" "$PREVIEW_DIR/session-tls"
+fi
+
 # Frappe caches site settings on requests, including the readiness ping.
 E2E_TENANT_MODULE_DIR="$(docker_preview exec "$tenant" env/bin/python -c 'import tempfile; print(tempfile.mkdtemp(prefix="e2e-tenant-"))')"
 docker_preview cp "$suite_dir/preview/preview_site_config.py" "$tenant:$E2E_TENANT_MODULE_DIR/preview_site_config.py"
 E2E_TENANT_MODULE_DIR="$E2E_TENANT_MODULE_DIR" python3 "$suite_dir/preview/fixtures.py" prepare
 docker_preview exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c "exec bench serve --port \"\$PTR_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
-docker_preview exec -d -e PYTHONPATH="$E2E_TENANT_MODULE_DIR" -e E2E_KEYCLOAK_SERVICE_CLIENT_SECRET "$tenant" bash -c "exec bench serve --port \"\$FS_TENANT_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
+tenant_web_options=(-e PYTHONPATH="$E2E_TENANT_MODULE_DIR" -e E2E_KEYCLOAK_SERVICE_CLIENT_SECRET)
+if [[ "${E2E_FULL_BROWSER_FIXTURES:-0}" == 1 ]]; then
+    tenant_web_options+=(-e REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt)
+fi
+docker_preview exec -d "${tenant_web_options[@]}" "$tenant" bash -c "exec bench serve --port \"\$FS_TENANT_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
 wait_http "$ATONOTA_SITE_TENANT1_URL/api/method/ping" tenant-web
 wait_http "$ATONOTA_PRESS_URL/api/method/ping" web
 if [[ "${E2E_BROWSER_RUNTIME:-host}" == container ]]; then
