@@ -1,0 +1,45 @@
+{
+ "actions": [],
+ "autoname": "field:operation_key",
+ "description": "Stores the original operation result for retries.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "operation_key",
+  "content_digest",
+  "result"
+ ],
+ "fields": [
+  {
+   "description": "The server derives the key from the site, account, and operation ID.",
+   "fieldname": "operation_key",
+   "fieldtype": "Data",
+   "label": "Operation key",
+   "length": 64,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "The server uses this digest to compare the contents of a repeated request.",
+   "fieldname": "content_digest",
+   "fieldtype": "Data",
+   "label": "Content digest",
+   "length": 64,
+   "reqd": 1
+  },
+  {
+   "description": "The server stores the original request result in this field.",
+   "fieldname": "result",
+   "fieldtype": "JSON",
+   "label": "Original result",
+   "reqd": 1
+  }
+ ],
+ "links": [],
+ "module": "Mobil",
+ "name": "Mobile Operation",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -5,13 +5,32 @@ app_description = "Platform backend modules"
 app_email = "noreply@example.test"
 app_license = "mit"
 
+# Mobile sync tables must exist before the sequence row is created.
+# The access rule engine switches off Auto Email Reports on governed data in the same two hooks.
+after_install = [
+	"platform_core.mobil.store.seed_sequence",
+	"platform_core.erisim.reports.switch_off_governed_auto_email_reports",
+]
+after_migrate = [
+	"platform_core.mobil.store.seed_sequence",
+	"platform_core.erisim.reports.switch_off_governed_auto_email_reports",
+]
+
 fixtures = [{"dt": "Role", "filters": [["name", "=", "AI Manager"]]}]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
-ai_write_closed_doctypes = ["AI API", "AI Account", "Access Rule"]
+ai_write_closed_doctypes = [
+	"AI API",
+	"AI Account",
+	"Mobile Revoked Session",
+	"Mobile Installation",
+	"Mobile Account State",
+	"Access Rule",
+]
 
 ai_tools = [
 	"platform_core.model_gecidi.management_tools.declare",
+	"platform_core.mobil.ai_tools.declarations",
 	# AI tools of the access rule engine (D-9).
 	"platform_core.erisim.ai_tools.declare",
 ]
@@ -22,7 +41,10 @@ clear_cache = ["platform_core.kabuk.cache.clear_cache"]
 doc_events = {
 	"User": {
 		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": [
+			"platform_core.kabuk.cache.invalidate_permissions",
+			"platform_core.mobil.store.delete_user_state",
+		],
 	},
 	"Role": {
 		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
@@ -79,6 +101,13 @@ website_user_allowed_methods = [
 	"frappe.auth.get_logged_user",
 	"logout",
 	"frappe.desk.search.search_link",
+	"platform_core.api.mobile_pwa.v1_activity",
+	"platform_core.api.mobile_pwa.v1_list_installations",
+	"platform_core.api.mobile_pwa.v1_pull",
+	"platform_core.api.mobile_pwa.v1_push",
+	"platform_core.api.mobile_pwa.v1_register",
+	"platform_core.api.mobile_pwa.v1_revoke",
+	"platform_core.api.mobile_pwa.v1_revoke_installation",
 ]
 
 after_build = ["platform_core.kabuk.assets.remove_panel_source_maps"]
@@ -100,8 +129,5 @@ extend_doctype_class = {
 	"Auto Email Report": ["platform_core.erisim.reports.GuardedAutoEmailReport"],
 	"File": ["platform_core.erisim.reports.GuardedFile"],
 }
-# Auto Email Reports on governed data are switched off; existing ones are disabled here.
-after_install = "platform_core.erisim.reports.switch_off_governed_auto_email_reports"
-after_migrate = ["platform_core.erisim.reports.switch_off_governed_auto_email_reports"]
 # A Prepared Report queued before a rule existed is refused when its job starts.
 before_job = ["platform_core.erisim.reports.refuse_prepared_report_job"]
