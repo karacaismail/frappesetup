@@ -1,4 +1,4 @@
-"""App tool rules found in the CronHR review, and the report gate of the access engine."""
+"""App tool rules found in the HRMS TR review, and the report gate of the access engine."""
 
 import sys
 from types import ModuleType

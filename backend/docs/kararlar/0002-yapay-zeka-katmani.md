@@ -465,7 +465,7 @@ Aynı turda kendi başlattığım ikinci inceleme de şu ek düzeltmeleri getird
 - CSRF başlığı her yazan insan isteğinde katmanın kendisi tarafından karşılaştırılır.
 - Aracı belirtecinin çağrı hakkı bilinmeyen araç adında da düşer.
 
-### Üçüncü tur: Codex'in ikinci incelemesi ve CronHR incelemesi
+### Üçüncü tur: Codex'in ikinci incelemesi ve HRMS TR incelemesi
 
 Codex'in ikinci incelemesi B1, B2, B4 ve B5 bulgularını kapalı buldu. B3 ve B6 kısmen açık kaldı. Orkestratör iki bulgu için karar verdi. Kararlar şöyle uygulandı:
 
@@ -474,7 +474,7 @@ Codex'in ikinci incelemesi B1, B2, B4 ve B5 bulgularını kapalı buldu. B3 ve B
 - Sınır kodda tek yerdedir. Yer `proposals.py` içindeki `_execute` işlevinde “WRITE BOUNDARY” yorumuyla işaretlidir.
 - **B6.** Kimliği bilinen üç ret daha günlüğe düşer. Birincisi API anahtarıyla gelen MCP isteğidir. İkincisi süresi dolmuş oturuma bağlı belirteçtir. Üçüncüsü çerezle birlikte gelen belirteçtir. Kayıt hata yanıtından önce kesinleştirilir. Bilinmeyen belirteç ve misafir istisna kalır.
 
-CronHR incelemesi iki konu getirdi:
+HRMS TR incelemesi iki konu getirdi:
 
 - Uygulama aracının önizlemesi `frappe.ValidationError` verirse araç `invalid_arguments` döner ve ret günlüğe düşer. Onay anında verirse öneri `rejected` olur. Önceden öneri `pending` kalıyor ve yanıt 417 oluyordu.
 - Uygulama aracı `prepare` ve `versioned` bildirebilir. `versioned` bildirirse katman hedef satırı kilitler, önizlemeyi yeniden çalıştırır ve sürümü karşılaştırır.

@@ -918,7 +918,7 @@ x-ai-tools-hook:
       name:
         type: string
         pattern: "^[a-z][a-z0-9_]{2,63}$"
-        description: Araç adı. Katman başına uygulama adını ekler. Örnek sonuç `cronhr_approve_leave` olur.
+        description: Araç adı. Katman başına uygulama adını ekler. Örnek sonuç `hrms_tr_approve_leave` olur.
       description: {type: string, description: İngilizce açıklama. Türkçesi çeviri dosyasındadır.}
       arguments: {type: string, description: "Girdi modelinin yolu. Model bir `pydantic.BaseModel` sınıfıdır ve `extra=\"forbid\"` ayarını taşır. `confirm`, `approved` ve `force` gibi alan adları reddedilir."}
       kind: {type: string, enum: [read, write]}

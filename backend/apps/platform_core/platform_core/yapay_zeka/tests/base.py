@@ -149,7 +149,8 @@ class YzTestCase(IntegrationTestCase):
 		super().setUp()
 		frappe.set_user("Administrator")
 		# Log rows written by earlier tests or runs must not satisfy an assertion of this test.
-		self.log_mark = frappe.db.sql("select max(creation) from `tabAI Action Log`")[0][0]
+		# Rows are told apart by name, not by time: the clock of the container host can step back.
+		self.known_logs = set(frappe.get_all("AI Action Log", pluck="name"))
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -282,16 +283,21 @@ class YzTestCase(IntegrationTestCase):
 
 	def last_log(self, **filters) -> dict | None:
 		"""Return the newest log row this test wrote that matches the filters."""
-		if self.log_mark:
-			filters["creation"] = (">", self.log_mark)
+		names = [
+			name
+			for name in frappe.get_all("AI Action Log", filters=filters, pluck="name")
+			if name not in self.known_logs
+		]
+		if not names:
+			return None
 		rows = frappe.get_all(
 			"AI Action Log",
-			filters=filters,
+			filters={"name": ("in", names)},
 			fields=["*"],
 			order_by="creation desc, name desc",
 			limit=1,
 		)
-		return rows[0] if rows else None
+		return rows[0]
 
 	def propose_update(self, client, name: str, **data) -> dict:
 		result = self.call_tool(client, "update_document", {"doctype": DOCTYPE, "name": name, "data": data})
