@@ -1,0 +1,11 @@
+**
+!apps/
+!apps/platform_core/
+!apps/platform_core/**
+!dev/
+!dev/**
+**/.git
+**/.env*
+**/__pycache__
+**/*.pyc
+**/.ruff_cache

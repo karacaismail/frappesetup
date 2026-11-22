@@ -184,6 +184,25 @@ Açılan kullanıcının türü “Website User” olur (Proje kaydı D-5).
 | `press_tr.api.identity.ensure_team` | POST | Servis belirteci, `azp=identity-sync` | Takımı ve üyeliği hazırlar. Aynı istek iki kez gelirse aynı sonucu döner. |
 | `press_tr.api.identity.remove_team_member` | POST | Servis belirteci, `azp=identity-sync` | Üyeliği kaldırır. |
 
+### Kuruluş ile takım eşlemesi
+
+Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşılık gelir (Rail 4). Bağ Press tarafında “Team” kaydının `keycloak_org_id` alanında durur. Bu alanı `press_tr` ekler.
+
+`ensure_team` isteğinin alanları şunlardır:
+
+| Alan | Tür | Not |
+| --- | --- | --- |
+| `issuer` | metin | Zorunlu |
+| `subject` | metin | Zorunlu |
+| `email` | metin | Zorunlu. İlk bağ yalnız doğrulanmış e-postayla kurulur. |
+| `organization_id` | metin | Zorunlu. Keycloak'taki kuruluşun kimliğidir. |
+| `organization_name` | metin | İsteğe bağlı. Yeni takımın görünen adı olur. |
+
+- Press takımı `keycloak_org_id` alanıyla arar. Takım yoksa açar ve alana kimliği yazar.
+- Yanıt `team` ve `created` alanlarını taşır. `team`, Press'teki takımın adıdır.
+- `remove_team_member` isteği `issuer`, `subject` ve `organization_id` alanlarını taşır.
+- Takım adı istekte gelmez. Takım adını Press üretir.
+
 - Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
 - G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
 
