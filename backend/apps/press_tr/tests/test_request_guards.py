@@ -1,6 +1,7 @@
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
+from uuid import uuid4
 
 import frappe
 from oidc_verify import JwksUnavailable
@@ -41,6 +42,30 @@ class RequestGuardsTest(unittest.TestCase):
 	def test_native_password_recovery_cannot_be_enabled(self):
 		with self.assertRaises(Forbidden):
 			request_policy.block_native_login()
+
+	def test_anonymization_selects_only_the_accounts_files(self):
+		from press_tr.kimlik.anonymization import get_personal_files
+
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			account = f"{uuid4().hex}@example.test"
+			owned_name, unrelated_name = uuid4().hex, uuid4().hex
+			for name, user in ((owned_name, account), (unrelated_name, "Administrator")):
+				frappe.get_doc(
+					{
+						"doctype": "File",
+						"name": name,
+						"file_name": f"{name}.txt",
+						"is_private": 1,
+						"attached_to_doctype": "User",
+						"attached_to_name": user,
+					}
+				).db_insert()
+			self.assertEqual(get_personal_files(account, None), {owned_name})
+		finally:
+			frappe.db.rollback()
+			frappe.destroy()
 
 	def test_anonymization_suspends_only_the_sole_members_sites(self):
 		from press_tr.kimlik import anonymization

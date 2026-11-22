@@ -152,22 +152,27 @@ def redact_profile(profile, placeholder: str) -> None:
 	)
 	frappe.db.delete("Version", {"ref_doctype": "User", "docname": user})
 
-	# Delete only profile attachments and private files owned by this account.
-	for name in frappe.get_all(
-		"File",
-		filters={"is_folder": 0},
-		or_filters=[
-			{"attached_to_doctype": "User", "attached_to_name": user},
-			{"owner": user, "is_private": 1, "attached_to_doctype": ["is", "not set"]},
-			*([{"owner": user, "file_url": profile.user_image}] if profile.user_image else []),
-		],
-		pluck="name",
-	):
+	for name in get_personal_files(user, profile.user_image):
 		frappe.delete_doc("File", name, ignore_permissions=True)
 
 	clean_press_ownership(user)
 	rename_linked_record("User", user, placeholder)
 	frappe.db.after_commit.add(lambda: clear_session_cache(user, ()))
+
+
+def get_personal_files(user: str, image: str | None) -> set[str]:
+	queries = [
+		{"attached_to_doctype": "User", "attached_to_name": user},
+		{"owner": user, "is_private": 1, "attached_to_doctype": ["is", "not set"]},
+	]
+	if image:
+		queries.append({"owner": user, "file_url": image, "attached_to_doctype": ["is", "not set"]})
+	# Frappe flattens or_filters into individual OR terms. Each scope needs AND.
+	return {
+		name
+		for filters in queries
+		for name in frappe.get_all("File", {"is_folder": 0, **filters}, pluck="name")
+	}
 
 
 def redact_address_lists(doctype: str, field: str, email: str, placeholder: str) -> None:
