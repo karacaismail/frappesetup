@@ -44,3 +44,22 @@ def invalid_hook_uses(tree):
         if name in HOOK_RULES
     }
     return sorted(findings, key=lambda finding: (finding[1], finding[0]))
+
+
+def opaque_hook_lines(tree):
+    return {
+        node.lineno
+        for node in ast.walk(tree)
+        if (isinstance(node, ast.ImportFrom) and any(alias.name == "*" for alias in node.names))
+        or (
+            isinstance(node, ast.Call)
+            and (
+                isinstance(node.func, ast.Name)
+                and node.func.id in {"globals", "vars", "locals", "setattr"}
+                or isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "builtins"
+                and node.func.attr in {"globals", "vars", "locals", "setattr"}
+            )
+        )
+    }

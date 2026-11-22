@@ -9,6 +9,8 @@ Komut önce `python3.14` adını arar. Bu ad yoksa `python3` kullanır.
 Komut her bulguda dosyayı ve satırı gösterir.
 Bir hata bulgusu varsa komut 1 döndürür. Hata yoksa 0 döndürür.
 Python sürümü yetersizse komut 2 döndürür.
+Kapı Git aracını başta bir kez arar. Yol kök klasörden başlamalıdır.
+Kapı Git'i bulamazsa veya yol göreliyse hata yazar ve 2 döndürür.
 
 Başka bir arka uç klasörünü taramak için `--root` kullanın.
 Programın okuyacağı çıktı için `--json` ekleyin.
@@ -37,7 +39,45 @@ Kip dosyası yoksa kapı `advisory` kullanır ve bunu çıktıda belirtir.
 JSON çıktısı kipi `checks.naming_mode` alanında gösterir.
 `checks.naming_mode_source` kipi dosyadan mı aldığını belirtir.
 Kip dosyası geçersizse veya ad betiği çalışmazsa kapı hata verir.
-Ad betiği yoksa kapı `not_run` yazar.
+Ad betiği yoksa kapı `advisory` kipinde `not_run` yazar.
+Kapı `enforce` kipinde ad betiği yoksa hata verir.
+
+## Çeviri denetimi
+
+Kapı uygulama çeviri dosyalarında her kayıtta üç sütun arar.
+Sütunlar kaynak metin, çeviri ve bağlamdır.
+Aynı dosyada kaynak metin ile bağlam çifti yalnız bir kez yazılır.
+Bağlam boşsa kapı kaynak metni Frappe çekirdek çevirisiyle karşılaştırır.
+Kapı aynı kaynak için yalnız çeviriler farklıysa bulgu yazar.
+Kapı çekirdekte yalnız bağlamla verilen çevirileri bu denetime almaz.
+
+Kapı çekirdek katalog için `backend/apps/frappe/frappe` yoluna bakar.
+Başka bir Frappe çalışma kopyası için `FRAPPE_SOURCE` değişkenine yol yazın.
+Komutta `--frappe-root <yol>` verirseniz kapı o yolu kullanır.
+Kapı aynı dilin CSV ve PO dosyalarını okur.
+Örneğin `tr-TR` dosyası için `tr` dosyasına da bakar.
+Bir dilin çekirdek kataloğu yoksa `translation_core` sonucu `not_run` olur.
+Bu durumda da sütun ve tekrar denetimleri çalışır.
+
+## Bağımlılık sürümü denetimi
+
+Kapı her uygulamanın `pyproject.toml` dosyasını okur.
+Olağan ve isteğe bağlı Python bağımlılıklarını denetler.
+Farklı uygulamalar aynı paket için farklı sürüm kuralı yazarsa kapı bulgu verir.
+Paket adının büyük harf ve ayırıcı farkı ayrı paket sayılmaz.
+
+Kapı uygulama kurallarını Frappe 16.56.0'ın kesin sürüm sabitleriyle karşılaştırır.
+Örneğin Frappe `Werkzeug==3.1.9` ister. Uygulama `Werkzeug~=3.1.9` yazabilir.
+`Werkzeug>=4` bu sürümü dışarıda bıraktığı için kapı bulgu verir.
+Kapı Frappe'nin sürüm aralıklarını veya dolaylı bağımlılıkları çözmez.
+
+Kapı bağımlılık denetimi için de aynı Frappe yolunu kullanır.
+İstenen sürümün kaynağı yoksa `dependency_core` sonucu `not_run` olur.
+Uygulamalar arası karşılaştırma bu durumda da çalışır.
+Kapı sürüm kurallarını yalnız Python standart kitaplığıyla okur.
+Sayısal sürümlerde `==`, `!=`, `~=`, `>=`, `<=`, `<` ve `>` işlemlerini tanır.
+Git adresi, sürüm eki veya işletim sistemi koşulu varsa kapı o kuralı atlar.
+Atlanan karşılaştırma için sonuç `not_run` olur. Kapı hata bulgusu yazmaz.
 
 ## Kapsam
 
@@ -48,7 +88,8 @@ Ad betiği yoksa kapı `not_run` yazar.
   Uygulama yalnız kendi dışa açık yöntemlerini listeye yazar.
   Hazır Frappe yöntemleri için sözleşmenin 5. bölümündeki liste geçerlidir.
   Kapı bilinen yönetici ve servis uçlarını reddeder.
-  Kapı doğrudan yazılan yönetici rolü denetimini de tanır.
+  Kapı doğrudan verilen rolleri ve sabit rol listelerini tanır.
+  Kapı aynı uygulamadaki bir yardımcı işlevin rol denetimini de okur.
   Bir yöntem başka bir hedefe yönleniyorsa kapı o hedefi de denetler.
   Kapı çalışma anında belirlenen yetkiyi çözmez. Yetkiyi uygulamanın uç testleri doğrular.
 
@@ -107,7 +148,9 @@ Kapı girintisiz YAML listelerini de kabul eder.
 Kapı işlem tanımında desteklenmeyen bir biçim görürse bulgu yazar.
 Kapı çalışma anında hesaplanan adreslerin tümünü çözemez.
 Kapı aynı uygulamada `__init__.py` üzerinden dışa açılan işlevleri izler.
-Kapı, kayıtlı araçtan çıkan `Class().method()` ve `self.method()` çağrılarını izlemez.
+Kapı iç sınıf ve kısa işlev gövdelerindeki yardımcı başvurularını da izler.
+Kapı varsayılan değerlerde ve işlev süsleyicilerinde de yardımcı arar.
+Kapı, `Class().method()` ve `self.method()` çağrılarının hedefini çözmez.
 Kapı çalışma anında seçilen yardımcı işlevleri de SQL için çözemez.
 
 ## Yasaklı ad
