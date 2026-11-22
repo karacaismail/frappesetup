@@ -410,6 +410,21 @@ class GateTests(unittest.TestCase):
         )
         self.scan()
 
+    def test_frappe_test_base_exports_exempt_test_class(self):
+        for module, base in (
+            ("frappe.tests.test_api", "FrappeAPITestCase"),
+            ("frappe.tests.classes", "IntegrationTestCase"),
+            ("frappe.tests.classes", "UnitTestCase"),
+        ):
+            with self.subTest(module=module, base=base):
+                self.write(
+                    f"{APP}/tests/test_api.py",
+                    f"from {module} import {base} as Base\n"
+                    "class Check(Base):\n    def test_model(self):\n"
+                    "        model = 'gpt-4o'\n",
+                )
+                self.scan()
+
     def test_local_import_does_not_turn_non_test_base_into_test_case(self):
         self.write(
             "dev/module-boundaries.json", json.dumps({"path_owners": {"sample_app.api.ai": "sample_app.ai"}})
@@ -509,6 +524,24 @@ class GateTests(unittest.TestCase):
         """,
         )
         self.scan("sql")
+
+    def test_tool_sql_follows_nested_calls_and_function_references(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/queries.py",
+            "import frappe\ndef read(): frappe.db.sql('SELECT 1')",
+        )
+        for body in (
+            "    def inner():\n        from .queries import read\n        read()\n    inner()",
+            "    from .queries import read\n    apply(read)",
+        ):
+            with self.subTest(body=body):
+                self.write(
+                    f"{APP}/tools.py",
+                    'def declare(): return [{"handler": "sample_app.tools.run"}]\ndef run():\n' + body,
+                )
+                (finding,) = self.scan("sql")
+                self.assertEqual(finding["path"], f"{APP}/queries.py")
 
     def test_tool_sql_ignores_uncalled_and_other_app_functions(self):
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.declarations.declare"]')

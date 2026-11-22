@@ -139,8 +139,15 @@ def sql_calls(nodes, aliases):
             name = qualified(item.args[0], aliases) + "." + (string(item.args[1], {}) or "")
         else:
             continue
-        owner, _, method = name.rpartition(".")
-        if owner in {"frappe.db", "frappe.local.db"} and method in {"sql", "sql_list", "multisql", "sql_ddl"}:
+        owner, _, member = name.rpartition(".")
+        if owner in {"frappe.db", "frappe.local.db"} and member in {
+            "sql",
+            "sql_list",
+            "multisql",
+            "sql_ddl",
+            "_cursor",
+            "_conn",
+        }:
             yield item.lineno
 
 
