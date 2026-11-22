@@ -922,6 +922,16 @@ Gerçek çalıştırma testleri veritabanını değiştirir. Bu yüzden komutla 
 
 Mantık testleri şunları sınar: site adı ve ayarı, yanlış sitede durma, dolu kuyrukta durma, yarıda kalınca temizliğin çalışması, her ucun en az 50 kez çağrılması, sonucun `pass` ya da `fail` olması ve iz satırlarının tür ve ad çiftiyle seçilmesi.
 
+Süre sınırı testi beklenen değeri ölçüm kodundan almaz. Değerler testte ayrıca yazılıdır ve proje kaydının O-31 kuralından gelir: okuma 500 milisaniye, yazma 1.000 milisaniye. Ölçüm kodundaki sınır değişirse test başarısız olur.
+
+#### `perf-` sitesinde geri yükleme yoktur
+
+Dokuzuncu inceleme gerçek çalıştırma testlerinde iki şey buldu. Testlerin dış hazırlığı `perf-` sitesindeki eski bir yazma iznini geri yüklemiyor. Ortak test sınıfının temizliği de `perf-` sitesindeki başka kuralları siliyor.
+
+Karar: Bu iki bulgu için kod değişmez. Gerekçe O-35 kuralıdır. `perf-` sitesi yalnız ölçüm için kurulan atılabilir bir sitedir. Ölçüm bitince site silinebilir ve geri yükleme gerekmez. Bu sitede korunacak izin ya da kural yoktur. Karar orkestratörün kararıdır ve 22 Kasım 2026 Pazar günü verildi.
+
+Sonucu şudur: Gerçek çalıştırma testleri yalnız bu iş için kurulan bir `perf-` sitesinde çalıştırılır. Başka amaçla kullanılan bir site `perf-` adıyla açılmaz.
+
 Temizlik Frappe'nin yazdığı iz kayıtlarını da siler. İz kaydını tür ve ad çiftiyle seçer. Yalnız çalışmanın başından sonra yazılanları siler. Çalışan numarası gibi adlar silmeden sonra yeniden verilir. Eski bir iz kaydı aynı adı taşıyabilir.
 
 Ölçüm 22 Kasım 2026 Pazar günü `perf-access.localhost` adlı ayrı deneme sitesinde yapıldı. Site ölçümden sonra silindi.

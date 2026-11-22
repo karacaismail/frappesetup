@@ -43,6 +43,11 @@ from platform_core.erisim.tests.base import (
 
 SMALL = {"calls": 50, "employees": 12, "records": 40}
 PERF_SITE = "perf-access.localhost"
+# The limits of rule O-31 in the project record (`backend/PROJE-KAYDI.md`): p95 of a read
+# endpoint at most 500 ms, p95 of a write endpoint at most 1 second. They are written here on
+# purpose and not taken from the measurement code, so a changed limit in that code shows.
+O31_READ_LIMIT_MS = 500
+O31_WRITE_LIMIT_MS = 1000
 # Every table a measurement could leave a trace in: permissions, people, rules, types and logs.
 WATCHED = (
 	"User Permission",
@@ -260,14 +265,16 @@ class TestMeasurementLogic(unittest.TestCase):
 		self.cases.return_value = [
 			("read", "fast read", ok),
 			("read", "slow read", ok),
+			("write", "fast write", ok),
 			("write", "slow write", ok),
 			("write", "delete", deleted),
 			("read", "error", error),
 		]
 		times = {
-			"fast read": performance.READ_LIMIT_MS,
-			"slow read": performance.READ_LIMIT_MS + 1,
-			"slow write": performance.WRITE_LIMIT_MS + 1,
+			"fast read": O31_READ_LIMIT_MS,
+			"slow read": O31_READ_LIMIT_MS + 1,
+			"fast write": O31_WRITE_LIMIT_MS,
+			"slow write": O31_WRITE_LIMIT_MS + 1,
 			"delete": 5,
 			"error": 5,
 		}
@@ -285,11 +292,19 @@ class TestMeasurementLogic(unittest.TestCase):
 			{
 				"fast read": "pass",
 				"slow read": "fail",
+				"fast write": "pass",
 				"slow write": "fail",
 				"delete": "pass",
 				"error": "fail",
 			},
 		)
+		# The report states the limit it judged by. It must be the limit of rule O-31.
+		limits = {row["kind"]: row["limit_ms"] for row in report["endpoints"]}
+		self.assertEqual(limits, {"read": O31_READ_LIMIT_MS, "write": O31_WRITE_LIMIT_MS})
+
+	def test_the_limits_are_those_of_rule_o31(self):
+		self.assertEqual(performance.READ_LIMIT_MS, O31_READ_LIMIT_MS)
+		self.assertEqual(performance.WRITE_LIMIT_MS, O31_WRITE_LIMIT_MS)
 
 	def test_every_name_of_a_run_carries_its_mark(self):
 		first, second = performance.new_sample(), performance.new_sample()
