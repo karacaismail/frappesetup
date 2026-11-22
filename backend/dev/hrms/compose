@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+dev_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [[ ! "${PANE_PORT:-}" =~ ^[1-9][0-9]{3,4}$ ]] || (( PANE_PORT > 65526 )); then
+    printf '%s\n' 'PANE_PORT must be an integer from 1000 to 65526.' >&2
+    exit 2
+fi
+
+export KIRACI_WEB_PORT="$((PANE_PORT + 1))"
+export KIRACI_SOCKET_PORT="$((PANE_PORT + 2))"
+exec docker --context colima-factory compose \
+    --project-name fs-ilk-dikey-dilim \
+    --env-file "${CRONHR_ENV_FILE:-$dev_dir/.env}" \
+    --file "$dev_dir/compose.yaml" "$@"

@@ -1,0 +1,147 @@
+"""Seed one isolated CronHR test site with synthetic employees and requests."""
+
+import argparse
+import json
+import os
+import re
+from pathlib import Path
+
+import frappe
+from frappe.utils import add_days, today
+
+COMPANY = "CronHR Synthetic"
+LEAVE_TYPE = "CronHR Synthetic Unpaid"
+USERS = {
+    actor: f"cronhr-{actor}@example.test"
+    for actor in ("employee", "manager", "outsider", "hr")
+}
+ROLES = {
+    "employee": "Employee",
+    "manager": "Manager",
+    "outsider": "Employee",
+    "hr": "HR",
+}
+
+
+def insert(doctype, **fields):
+    return frappe.get_doc({"doctype": doctype, **fields}).insert()
+
+
+def seed(password):
+    if frappe.db.exists("Company", COMPANY):
+        raise SystemExit("Start with a fresh test site before seeding.")
+    frappe.db.set_single_value("System Settings", "enable_telemetry", 0)
+    if not frappe.db.exists("Warehouse Type", "Transit"):
+        insert("Warehouse Type", name="Transit")
+    holiday_list = insert(
+        "Holiday List",
+        holiday_list_name=COMPANY,
+        from_date=add_days(today(), -30),
+        to_date=add_days(today(), 90),
+    )
+    company = insert(
+        "Company",
+        company_name=COMPANY,
+        abbr="CHRT",
+        default_currency="TRY",
+        country="Türkiye",
+    )
+    insert(
+        "Holiday List Assignment",
+        naming_series="HR-HLA-.YYYY.-",
+        applicable_for="Company",
+        assigned_to=company.name,
+        holiday_list=holiday_list.name,
+        from_date=holiday_list.from_date,
+    ).submit()
+    leave_type = insert(
+        "Leave Type", leave_type_name=LEAVE_TYPE, is_lwp=1, include_holiday=1
+    )
+    frappe.db.set_single_value(
+        "HR Settings",
+        {
+            "send_leave_notification": 0,
+            "leave_approver_mandatory_in_leave_application": 0,
+        },
+    )
+
+    if not frappe.db.exists("Gender", "Other"):
+        insert("Gender", gender="Other")
+
+    employees = {}
+    for actor in ("manager", "employee", "outsider", "hr"):
+        username = USERS[actor]
+        insert(
+            "User",
+            email=username,
+            first_name=f"CronHR {actor}",
+            send_welcome_email=0,
+            new_password=password,
+            user_type="System User",
+            roles=[{"role": f"CronHR {ROLES[actor]}"}],
+        )
+        employees[actor] = insert(
+            "Employee",
+            first_name=f"CronHR {actor}",
+            company=company.name,
+            status="Active",
+            gender="Other",
+            date_of_birth="1990-01-01",
+            date_of_joining=add_days(today(), -30),
+            user_id=username,
+            create_user_permission=0,
+            reports_to=employees.get("manager") if actor == "employee" else None,
+        ).name
+
+    leaves = {}
+    for offset, (key, actor) in enumerate(
+        (
+            ("employee", "employee"),
+            ("manager", "manager"),
+            ("outsider", "outsider"),
+            ("ai", "employee"),
+        ),
+        start=2,
+    ):
+        date = add_days(today(), offset)
+        leave = insert(
+            "Leave Application",
+            employee=employees[actor],
+            company=company.name,
+            leave_type=leave_type.name,
+            from_date=date,
+            to_date=date,
+            posting_date=today(),
+            status="Open",
+        )
+        leave.db_set("leave_balance", 7, update_modified=False)
+        leaves[key] = leave.name
+
+    return {"users": USERS, "leaves": leaves}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--site", required=True)
+    parser.add_argument("--manifest", type=Path, required=True)
+    args = parser.parse_args()
+    if not re.fullmatch(r"test-[a-z0-9-]+\.localhost", args.site):
+        parser.error("Use a dedicated test-*.localhost site.")
+    password = os.environ["CRONHR_TEST_PASSWORD"]
+    manifest = args.manifest.resolve()
+    os.chdir("sites")
+    frappe.init(site=args.site, sites_path=".")
+    try:
+        frappe.connect()
+        if not frappe.conf.allow_tests:
+            raise SystemExit("The site must have allow_tests enabled.")
+        frappe.set_user("Administrator")
+        data = seed(password)
+        frappe.db.commit()
+        manifest.write_text(json.dumps(data, indent=2) + "\n")
+    finally:
+        frappe.destroy()
+
+
+if __name__ == "__main__":
+    main()

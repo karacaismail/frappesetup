@@ -1,0 +1,9 @@
+**
+!apps/
+!apps/cronhr/
+!apps/cronhr/**
+!dev/
+!dev/hrms/
+!dev/hrms/seed.py
+!dev/hrms/test_http.py
+**/__pycache__
