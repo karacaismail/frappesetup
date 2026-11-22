@@ -25,8 +25,6 @@ Another request is updating this organization. Try again.,Bu kuruluş şu anda g
 Press team invitations are disabled.,Press üzerinden takım daveti gönderilemez.,press_tr
 Links a verified Keycloak issuer and subject to a Press user account.,Doğrulanan Keycloak kimliğini Press hesabına bağlar.,Press Identity Link
 Maps a Keycloak session to a Press session so that Press can revoke it on logout.,Keycloak oturumunu Press oturumuna bağlar. Press çıkışta kendi oturumunu kapatır.,Press Keycloak Session
-Account profile anonymized.,Hesap profilindeki kişi bilgileri anonim yapıldı.,press_tr
-Anonymize Press account profiles while preserving linked business documents.,Press hesap bilgilerini anonim yapar. Bağlı iş kayıtlarını korur.,press_tr.docstring
 Get a single-use Keycloak login URL.,Tek kullanımlık Keycloak giriş adresini alın.,press_tr.openapi
 Starts a rate-limited browser login. A separate random value in an HttpOnly SameSite=Lax cookie binds the state record to the initiating browser for 600 seconds. HTTPS uses a Secure cookie with the __Host- prefix.,"Tarayıcıdan girişi başlatır ve istek sayısını sınırlar. HttpOnly ve SameSite=Lax çerezindeki rastgele değer, giriş kaydını tarayıcıya 600 saniye bağlar. HTTPS, __Host- önekli Secure çerez kullanır.",press_tr.openapi
 "The URL contains state, nonce and a PKCE S256 challenge.","Adres, state ve nonce değerlerini ve PKCE S256 özetini taşır.",press_tr.openapi
@@ -60,7 +58,6 @@ Remove memberships in all teams mapped to Keycloak.,Üyelikleri Keycloak ile eş
 The request must contain exactly one valid organization selector.,İstek kuruluş seçen geçerli tek bir alan taşımalıdır.,press_tr.openapi
 Service identity or owner removal was rejected.,Press servis kimliğini veya takım sahibini çıkarma isteğini kabul etmedi.,press_tr.openapi
 Anonymize a linked Press user and revoke access.,Bağlı Press hesabını anonim yapın ve erişimi kapatın.,press_tr.openapi
-"Disables the linked user, invalidates API credentials, and replaces personal account fields. Linked business records are retained. An unknown identity and repeated requests succeed with the same response.",Press bağlı hesabı kapatır ve API anahtarlarını iptal eder. Kişiyi gösteren alanları değiştirir. İş kayıtları korunur. Tekrar gelen veya kimliği bulunamayan istek aynı yanıtı alır.,press_tr.openapi
 The operation completed.,Press işlemi tamamladı.,press_tr.openapi
 Service identity or issuer was rejected.,Press servis kimliğini veya kimlik sunucusunu kabul etmedi.,press_tr.openapi
 Remove expired Keycloak session mappings.,Süresi dolan Keycloak oturum bağlarını kaldırın.,press_tr.openapi
@@ -78,3 +75,7 @@ Snapshot request key must match the named backup.,Yedek isteğinin anahtarı ad�
 Compares the supplied access token against its stored credential and returns a boolean.,Press gönderilen erişim belirtecini kayıtlı bilgiyle karşılaştırır. Sonuç doğru veya yanlış olur.,press_tr.openapi
 Press SaaS wrapper validates a site secret or site access token before dispatch.,"Press SaaS, isteği işlemeden önce site sırrını veya erişim belirtecini doğrular.",press_tr.openapi
 Login callback request limit reached.,Giriş dönüşü istek sınırına ulaşıldı.,press_tr.openapi
+Irreversibly anonymizes a linked account after revoking access. Invoices remain unchanged. An unknown identity returns found false. A repeat of a completed request returns the same result.,Press erişimi kapatır ve hesabı geri alınamaz biçimde anonim yapar. Faturalar değişmez. Kimlik yoksa found false olur. Tamamlanan istek tekrar gelirse sonuç değişmez.,press_tr.openapi
+An account update is in progress or a database lock timed out. Retry the request.,Hesap güncelleniyor veya kilit bekleme süresi doldu. İsteği yeniden gönderin.,press_tr.openapi
+"This account is being updated. Try again.",Hesap güncelleniyor. Yeniden deneyin.,press_tr
+Anonymize account data without changing invoices or unrelated accounts.,Hesap verilerini anonim yapar. Faturalar ve ilgisiz hesaplar korunur.,press_tr.docstring

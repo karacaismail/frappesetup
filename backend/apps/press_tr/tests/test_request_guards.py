@@ -14,6 +14,14 @@ from press_tr.kimlik import oidc, request_policy, service, sessions
 class RequestGuardsTest(unittest.TestCase):
 	def test_identity_link_is_closed_to_generic_ai_writes(self):
 		self.assertIn("Press Identity Link", getattr(hooks, "ai_write_closed_doctypes", []))
+		self.assertIn("Press Keycloak Session", getattr(hooks, "ai_write_closed_doctypes", []))
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			for doctype in hooks.ai_write_closed_doctypes:
+				self.assertTrue(frappe.db.exists("DocType", doctype))
+		finally:
+			frappe.destroy()
 
 	def test_guest_allowlist_matches_the_contract(self):
 		targets = {
@@ -33,6 +41,45 @@ class RequestGuardsTest(unittest.TestCase):
 	def test_native_password_recovery_cannot_be_enabled(self):
 		with self.assertRaises(Forbidden):
 			request_policy.block_native_login()
+
+	def test_anonymization_suspends_only_the_sole_members_sites(self):
+		from press_tr.kimlik import anonymization
+
+		user = "old@example.test"
+		with patch.object(anonymization, "frappe") as framework:
+			framework.db.exists.return_value = False
+			framework.db.get_value.return_value = user
+			framework.get_all.side_effect = [
+				["single", "shared"],
+				["owned-without-members"],
+				[],
+				[],
+				["owned-site"],
+				[user, "another@example.test"],
+				[],
+				[user],
+				[],
+				["sole-site"],
+			]
+			owned_site, sole_site = Mock(), Mock()
+			framework.get_doc.side_effect = [owned_site, sole_site]
+			anonymization.clean_press_ownership(user)
+			for site in (owned_site, sole_site):
+				site.suspend.assert_called_once_with(reason="Account anonymized")
+				site.save.assert_called_once_with(ignore_permissions=True)
+				site.delete.assert_not_called()
+
+	def test_anonymization_lock_contention_returns_conflict(self):
+		from werkzeug.exceptions import Conflict
+
+		for error in (frappe.QueryDeadlockError, frappe.QueryTimeoutError):
+			with (
+				patch.object(identity, "require_service"),
+				patch.object(identity, "reset_read_snapshot"),
+				patch.object(identity, "anonymize_linked_user", side_effect=error),
+				self.assertRaises(Conflict),
+			):
+				identity.anonymize_user("issuer", "subject")
 
 	def test_snapshot_reset_rejects_pending_writes(self):
 		with patch.object(identity, "frappe") as facade:

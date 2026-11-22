@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import hmac
 import json
 import threading
 import time
@@ -91,7 +92,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		status, _, response = self.exchange(
 			"POST", f"/api/method/press_tr.api.identity.{method}", headers, json.dumps(body)
 		)
-		return status, json.loads(response)
+		return status, json.loads(response) if response.startswith(b"{") else response.decode()
 
 	def test_service_rejects_wrong_credentials(self):
 		for method in ("ensure_team", "remove_team_member"):
@@ -331,7 +332,19 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			invoice_name = f"anonymization-fixture-{subject}"
 			# Persist a representative invoice without running Press billing hooks.
 			frappe.get_doc({"doctype": "Invoice", "name": invoice_name, "team": team}).db_insert()
-			frappe.db.set_value("Invoice", invoice_name, "owner", email)
+			frappe.db.set_value("Invoice", invoice_name, {"owner": email, "customer_email": email})
+			frappe.db.set_value("Team", team, {"billing_name": "Private", "phone_number": "5550100"})
+			activity = frappe.get_doc(
+				{
+					"doctype": "Activity Log",
+					"name": f"privacy-{subject}",
+					"user": email,
+					"full_name": "Private",
+					"subject": "Private logged in",
+					"ip_address": "198.18.0.1",
+				}
+			)
+			activity.db_insert()
 			self.assertEqual(frappe.db.get_value("Invoice", invoice_name, "owner"), email)
 			frappe.db.set_value("User", email, {"api_key": key, "phone": "5550100", "first_name": "Private"})
 			set_encrypted_password("User", email, secret, "api_secret")
@@ -344,24 +357,97 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 					"phone_nos": [{"phone": "5550100", "is_primary_phone": 1}],
 				}
 			).insert(ignore_permissions=True)
+			secondary = frappe.get_doc(
+				{
+					"doctype": "Contact",
+					"first_name": f"Secondary {subject}",
+					"email_ids": [
+						{"email_id": f"secondary-{subject}@example.test", "is_primary": 1},
+						{"email_id": email},
+					],
+				}
+			).insert(ignore_permissions=True)
+			address = frappe.get_doc(
+				{
+					"doctype": "Address",
+					"address_title": f"Private {subject}",
+					"address_type": "Billing",
+					"address_line1": "Private street",
+					"city": "Fixture city",
+					"country": frappe.db.get_value("Country", {}, "name"),
+					"links": [{"link_doctype": "Contact", "link_name": contact.name}],
+				}
+			).insert(ignore_permissions=True)
+			for _ in range(125):
+				frappe.get_doc({"doctype": "Activity Log", "user": email, "full_name": "Private"}).db_insert()
+			from frappe.utils.file_manager import save_file
+
+			profile_file = save_file(
+				f"privacy-{subject}.txt", b"private fixture", "User", email, is_private=1
+			)
+			version = frappe.get_doc(
+				{
+					"doctype": "Version",
+					"ref_doctype": "User",
+					"docname": email,
+					"data": json.dumps({"changed": [["first_name", "Private", "Other"]]}),
+				}
+			)
+			version.db_insert()
+			communication = frappe.get_doc(
+				{
+					"doctype": "Communication",
+					"sender": "sender@example.test",
+					"recipients": f"Private <{email}>, other@example.test",
+				}
+			)
+			communication.db_insert()
 			frappe.db.commit()
 		finally:
 			frappe.destroy()
 
+		self.assertEqual(self.call("anonymize_user", body, self.token(), session)[0], 403)
 		for _ in range(2):
+			started = time.monotonic()
 			status, result = self.call("anonymize_user", body, self.token())
+			print(
+				f"Account anonymization HTTP execution with 126 activity records: {time.monotonic() - started:.3f}s"
+			)
 			self.assertEqual(status, 200, result)
-			self.assertEqual(result["message"], {"anonymized": True})
+			self.assertEqual(result["message"], {"anonymized": True, "found": True})
 
 		self.assertEqual(self.exchange("GET", ACCOUNT_ROUTE, session)[0], 403)
+		self.assertIn(
+			self.exchange("GET", ACCOUNT_ROUTE, {"Authorization": f"token {key}:{secret}"})[0], {401, 403}
+		)
+		self.sign_in(subject, email, uuid4().hex, expected_status=403)
 		frappe.init("press.localhost")
 		frappe.connect()
 		try:
-			user = frappe.db.get_value("Press Identity Link", body, "user")
+			self.assertFalse(frappe.db.exists("Press Identity Link", body))
+			self.assertFalse(frappe.db.get_value("Team", team, "enabled"))
+			self.assertEqual(
+				frappe.db.get_value("Team", team, ["billing_name", "phone_number"]), (None, None)
+			)
+			self.assertEqual(
+				frappe.db.get_value("Activity Log", activity.name, ["full_name", "subject", "ip_address"]),
+				("Deleted", "Account activity", None),
+			)
+			user = frappe.db.get_value("Team", team, "user")
 			self.assertNotEqual(user, email)
 			self.assertTrue(user.endswith("@invalid.example"))
+			secret_key = frappe.conf.press_anonymization_hmac_key or frappe.conf.encryption_key
+			expected_digest = hmac.new(
+				secret_key.encode(), json.dumps([ISSUER, subject], separators=(",", ":")).encode(), "sha256"
+			).hexdigest()
+			self.assertEqual(
+				frappe.db.get_value("Press Identity Link", {"user": user}, "subject"), expected_digest
+			)
 			self.assertEqual(frappe.db.get_value("Team", team, "user"), user)
-			self.assertEqual(frappe.db.get_value("Invoice", invoice_name, ["team", "owner"]), (team, user))
+			self.assertEqual(
+				frappe.db.get_value("Invoice", invoice_name, ["team", "owner", "customer_email"]),
+				(team, email, email),
+			)
 			self.assertFalse(
 				any(
 					email in (content or "")
@@ -378,6 +464,14 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			self.assertFalse(doc.enabled)
 			self.assertFalse(doc.api_key)
 			self.assertFalse(frappe.db.exists("Contact", contact.name))
+			self.assertFalse(frappe.db.exists("Contact", secondary.name))
+			self.assertFalse(frappe.db.exists("Address", address.name))
+			self.assertFalse(frappe.db.exists("File", profile_file.name))
+			self.assertFalse(frappe.db.exists("Version", version.name))
+			self.assertEqual(
+				frappe.db.get_value("Communication", communication.name, "recipients"),
+				f"{user}, other@example.test",
+			)
 			contacts = frappe.get_all("Contact", filters={"user": user}, pluck="name")
 			self.assertTrue(contacts)
 			for name in contacts:
@@ -397,7 +491,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		body = {"issuer": ISSUER, "subject": uuid4().hex}
 		self.assertEqual(
 			self.call("anonymize_user", body, self.token()),
-			(200, {"message": {"anonymized": True}}),
+			(200, {"message": {"anonymized": True, "found": False}}),
 		)
 
 	def test_anonymize_requires_identity_sync_token(self):
@@ -406,9 +500,14 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			None,
 			self.token(authorized_party="press-service"),
 			self.token(audience="site-kiraci1"),
+			self.token(exp=int(time.time()) - 300),
 		):
 			with self.subTest(token_present=token is not None):
 				self.assertEqual(self.call("anonymize_user", body, token)[0], 403)
+
+	def test_anonymize_rejects_extra_fields(self):
+		body = {"issuer": ISSUER, "subject": uuid4().hex, "extra": True}
+		self.assertEqual(self.call("anonymize_user", body, self.token())[0], 403)
 
 	def test_bulk_remove_disables_owner_and_preserves_team_ownership(self):
 		owner, other_owner = uuid4().hex, uuid4().hex

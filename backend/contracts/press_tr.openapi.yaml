@@ -205,7 +205,7 @@ paths:
     post:
       operationId: anonymizeUser
       summary: Anonymize a linked Press user and revoke access.
-      description: Disables the linked user, invalidates API credentials, and replaces personal account fields. Linked business records are retained. An unknown identity and repeated requests succeed with the same response.
+      description: Irreversibly anonymizes a linked account after revoking access. Invoices remain unchanged. An unknown identity returns found false. A repeat of a completed request returns the same result.
       security:
         - identitySync: []
       requestBody:
@@ -235,12 +235,16 @@ paths:
                 properties:
                   message:
                     type: object
-                    required: [anonymized]
+                    required: [anonymized, found]
                     properties:
                       anonymized:
                         const: true
+                      found:
+                        type: boolean
         "403":
           description: Service identity or issuer was rejected.
+        "409":
+          description: An account update is in progress or a database lock timed out. Retry the request.
         "503":
           description: Keycloak configuration or verification keys are unavailable.
   /api/method/press_tr.api.maintenance.cleanup_expired_sessions:

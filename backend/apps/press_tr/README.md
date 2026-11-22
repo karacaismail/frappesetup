@@ -79,3 +79,11 @@ PRESS_TEST_PANEL_URL=http://kiraci1.localhost:3201/panel sh backend/apps/press_t
 ## License
 
 AGPL-3.0. See [license.txt](license.txt).
+
+### Hesabı anonim yapma
+
+Identity Sync, silme uç noktasını servis belirteciyle çağırır.
+Silme kaydı, Keycloak kimliği yerine gizli anahtarla üretilen bir özet tutar.
+`press_anonymization_hmac_key` için sabit bir site sırrı kullanın.
+Bu ayar yoksa Press, Frappe'nin `encryption_key` değerini kullanır.
+Silme kayıtları durduğu sürece kullanılan anahtarı değiştirmeyin.

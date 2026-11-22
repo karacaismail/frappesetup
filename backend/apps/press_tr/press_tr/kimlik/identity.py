@@ -1,13 +1,27 @@
+import hmac
+import json
 from contextlib import contextmanager
 from email.errors import HeaderParseError
 from email.headerregistry import Address
 
 import frappe
 from press.press.doctype.team.team import Team
+from werkzeug.exceptions import ServiceUnavailable
 
 from press_tr.kimlik.oidc import claim, reject
 
 IDENTITY_LINK = "Press Identity Link"
+
+
+DELETED_IDENTITY_ISSUER = "urn:press-tr:deleted-identity"
+
+
+def deleted_identity_subject(issuer: str, subject: str) -> str:
+	key = frappe.conf.press_anonymization_hmac_key or frappe.conf.encryption_key
+	if not key:
+		raise ServiceUnavailable("Configure a stable site key for Press anonymization.")
+	message = json.dumps([issuer, subject], separators=(",", ":"), ensure_ascii=False).encode()
+	return hmac.digest(key.encode(), message, "sha256").hex()
 
 
 def find_identity(issuer, subject, *, for_update=False):
@@ -26,7 +40,9 @@ def find_identity(issuer, subject, *, for_update=False):
 def bind_identity(claims):
 	issuer = claim(claims, "iss")
 	subject = claim(claims, "sub")
-	link = find_identity(issuer, subject)
+	link = find_identity(issuer, subject, for_update=True)
+	if find_identity(DELETED_IDENTITY_ISSUER, deleted_identity_subject(issuer, subject), for_update=True):
+		reject()
 	if link:
 		validate_local_user(link.user)
 		return link

@@ -175,5 +175,8 @@ def anonymize_user(issuer: str, subject: str) -> dict[str, bool]:
 	require_service(issuer)
 	subject = claim({"subject": subject}, "subject")
 	reset_read_snapshot()
-	anonymize_linked_user(issuer, subject)
-	return {"anonymized": True}
+	try:
+		found = anonymize_linked_user(issuer, subject)
+	except frappe.QueryDeadlockError, frappe.QueryTimeoutError:
+		raise Conflict(_("This account is being updated. Try again.", context="press_tr"))
+	return {"anonymized": True, "found": found}
