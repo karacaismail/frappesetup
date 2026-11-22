@@ -12,7 +12,7 @@ chmod 700 "$STATE_DIR"
 cd "$STATE_DIR"
 SOCKET="$PANE_PORT.sock"
 CONFIG="$HOME/.colima/_lima/colima-factory/ssh.config"
-ACTION="${1:-open}"
+ACTION="${1:-ac}"
 shift || true
 if [[ ! -f "$CONFIG" ]]; then
     printf '%s\n' 'Colima factory SSH configuration is missing.' >&2
@@ -20,7 +20,7 @@ if [[ ! -f "$CONFIG" ]]; then
 fi
 SSH=(ssh -F "$CONFIG" -o ControlPath="$SOCKET" -o ControlPersist=no)
 case "$ACTION" in
-    open)
+    ac)
         if "${SSH[@]}" -O check lima-colima-factory 2>/dev/null; then
             exit 0
         fi
@@ -37,11 +37,11 @@ case "$ACTION" in
         done
         "${SSH[@]}" -M -f -N -o ExitOnForwardFailure=yes "${FORWARDS[@]}" lima-colima-factory
         ;;
-    close)
+    kapat)
         if [[ -S "$SOCKET" ]]; then
             "${SSH[@]}" -O exit lima-colima-factory
         fi
         ;;
-    status) "${SSH[@]}" -O check lima-colima-factory ;;
-    *) printf '%s\n' 'Usage: tunnel <open|close|status> [ports]' >&2; exit 2 ;;
+    durum) "${SSH[@]}" -O check lima-colima-factory ;;
+    *) printf '%s\n' 'Usage: tunel <ac|kapat|durum> [ports]' >&2; exit 2 ;;
 esac

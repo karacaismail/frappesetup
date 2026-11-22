@@ -2,7 +2,7 @@ rules:
   - id: frappe-missing-permission
     languages: [python]
     severity: ERROR
-    message: "Check record permission in the whitelisted endpoint."
+    message: "Uçta kayıt iznini denetleyin."
     patterns:
       - pattern: |
           @frappe.whitelist(...)
@@ -24,7 +24,7 @@ rules:
   - id: frappe-ignore-permissions
     languages: [python]
     severity: ERROR
-    message: "Remove the option that bypasses permission checks."
+    message: "İzin denetimini atlayan seçeneği kaldırın."
     pattern-either:
       - pattern: $CALL(..., ignore_permissions=True, ...)
       - pattern: $DOC.flags.ignore_permissions = True
@@ -32,7 +32,7 @@ rules:
   - id: frappe-built-sql
     languages: [python]
     severity: ERROR
-    message: "Pass query values as separate parameters."
+    message: "Sorgu değerlerini ayrı parametrelerle verin."
     pattern-either:
       - pattern: frappe.db.sql(f"...", ...)
       - pattern: frappe.db.sql($FORMAT.format(...), ...)
@@ -40,7 +40,7 @@ rules:
   - id: frappe-guest-without-limit
     languages: [python]
     severity: ERROR
-    message: "Add a rate limit to guest endpoints."
+    message: "Misafir isteklerine sayı sınırı koyun."
     patterns:
       - pattern-either:
           - pattern: |
@@ -59,7 +59,7 @@ rules:
   - id: frappe-missing-methods
     languages: [python]
     severity: ERROR
-    message: "Declare the HTTP methods of the endpoint with methods=."
+    message: "Ucun HTTP yöntemlerini methods seçeneğinde yazın."
     pattern-either:
       - patterns:
           - pattern: |
@@ -77,7 +77,7 @@ rules:
   - id: frappe-request-commit
     languages: [python]
     severity: ERROR
-    message: "Do not commit inside a request."
+    message: "İstek içinde yazıları erken kesinleştirmeyin."
     patterns:
       - pattern-inside: |
           @frappe.whitelist(...)
@@ -89,7 +89,7 @@ rules:
   - id: python-dynamic-execution
     languages: [python]
     severity: ERROR
-    message: "Remove dynamic code execution and shell calls."
+    message: "Dinamik kod ve kabuk çalıştırmayı kaldırın."
     pattern-either:
       - pattern: eval(...)
       - pattern: exec(...)
@@ -97,7 +97,7 @@ rules:
   - id: http-missing-timeout
     languages: [python]
     severity: ERROR
-    message: "Set an explicit timeout on outbound requests."
+    message: "Dış isteğe açık bir süre sınırı verin."
     patterns:
       - pattern-either:
           - patterns:
@@ -116,5 +116,5 @@ rules:
   - id: ai-provider-sdk
     languages: [python]
     severity: ERROR
-    message: "Call model providers only through the shared model gateway."
+    message: "Model sağlayıcısına ortak geçit üzerinden bağlanın."
     pattern-regex: '^\s*(?:from|import)\s+(?:openai|anthropic|google\.generativeai|google\.genai|mistralai|cohere|groq|ollama|litellm)\b'

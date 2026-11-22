@@ -5,16 +5,16 @@ Bu iş kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis belir
 Önce şu dosyaları okuyun:
 
 1. `backend/AGENTS.md`
-2. `backend/PROJECT-RECORD.md`
-3. `backend/docs/contracts.md`, özellikle 2, 3, 4, 5 ve 8. bölümler
+2. `backend/PROJE-KAYDI.md`
+3. `backend/docs/sozlesmeler.md`, özellikle 2, 3, 4, 5 ve 8. bölümler
 4. Karar sitesinde `src/content/docs/rail-4-keycloak.md`
 5. `docs/standartlar/mobile.md` içindeki AU-3, AU-4, AU-5 ve AU-19 kuralları
 
 ## Sahip olduğunuz yerler
 
-- `backend/apps/platform_core/platform_core/identity/`
+- `backend/apps/platform_core/platform_core/kimlik/`
 - `backend/apps/platform_core/platform_core/api/__init__.py`, `api/auth.py`, `api/identity.py`
-- `backend/contracts/platform_core-identity.openapi.yaml`
+- `backend/contracts/platform_core-kimlik.openapi.yaml`
 - `hooks.py` içinde yalnız bu işin satırları
 
 ## Önkoşullar
@@ -30,7 +30,7 @@ Bu iş kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis belir
 3. Keycloak için “Social Login Key” kaydını site ayarından kuran bir kurulum adımı yazın. Adım iki kez çalışınca zarar vermesin (V-7).
    - `user_id_property` değeri `sub` olsun.
    - `sign_ups` değeri `Deny` olsun.
-   - Görünen ad `identity_brand_name` ayarından gelsin.
+   - Görünen ad `kimlik_marka_adi` ayarından gelsin.
 4. Girişte kullanıcıyı `(iss, sub)` çiftiyle bulun. Frappe 16'daki `on_social_login` kancasını kaynakta doğrulayın ve kullanın (AU-4).
    - İlk bağı yalnız doğrulanmış e-postayla kurun.
    - Bağ farklıysa oturum açmadan reddedin.

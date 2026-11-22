@@ -4,7 +4,7 @@ Bu not 22 Kasım 2026 Pazar günü yazıldı. Notu platform-core-yz işi yazdı.
 
 ## 1. Kısa karar
 
-Katmanı `platform_core` içinde, `ai` modülünde kendimiz yazıyoruz. Yeni paket eklemiyoruz.
+Katmanı `platform_core` içinde, `yapay_zeka` modülünde kendimiz yazıyoruz. Yeni paket eklemiyoruz.
 
 Katman MCP ile konuşur. MCP, modellerin araç kullandığı açık protokoldür. Protokol kodunu yeniden yazmıyoruz. Frappe 16'nın içindeki `frappe.mcp` modülünün protokol parçalarını kullanıyoruz.
 
@@ -319,7 +319,7 @@ Her araç çağrısı bir kayıt açar. Ret de kayıt açar. Onay, ret ve yürü
 G-64 `model`, token ve maliyet alanlarını da sayar. Bu alanlar bu kayıtta yoktur.
 
 - Bu katman model çağırmaz. Hangi modelin konuştuğunu bilemez.
-- Token ve maliyet “AI Usage Log” kaydındadır. O kaydın sahibi `model_gateway` modülüdür.
+- Token ve maliyet “AI Usage Log” kaydındadır. O kaydın sahibi `model_gecidi` modülüdür.
 - İki kayıt `session_id` değeriyle eşleşir.
 
 Bu konu `BORC(mvp)` etiketli bir teknik borçtur. Günlüğün saklama süresi 365 gündür (Rail 5). Eski kaydı silen elle başlatılan komut henüz yoktur. Sorumlu platform-core-yz işidir. Komut ve HTTP ucu yazılınca bu borç kapanır.
@@ -355,7 +355,7 @@ Model geçidinin “AI API” kaydı bu kurala örnektir. Yapay zekâ kaydın ad
 
 ## 10. Uçlar
 
-Bütün uçlar `platform_core/api/ai.py` dosyasındadır. Dosya ince kalır. İş kuralı `ai` modülündedir.
+Bütün uçlar `platform_core/api/ai.py` dosyasındadır. Dosya ince kalır. İş kuralı `yapay_zeka` modülündedir.
 
 | Yol | Yöntem | Kimlik | İşi |
 | --- | --- | --- | --- |
@@ -367,7 +367,7 @@ Bütün uçlar `platform_core/api/ai.py` dosyasındadır. Dosya ince kalır. İ�
 | `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
 | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
 
-Ayrıntılı biçim `contracts/platform_core-ai.openapi.yaml` dosyasına yazılır. Bu dosya ikinci kontrol noktasında, koddan önce yazılır.
+Ayrıntılı biçim `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasına yazılır. Bu dosya ikinci kontrol noktasında, koddan önce yazılır.
 
 ## 11. Karar sitesiyle çelişkiler
 

@@ -5,16 +5,16 @@ Bu iş ayrı arayüzün sunucudan aldığı verileri hazırlar. Açılış veris
 Önce şu dosyaları okuyun:
 
 1. `backend/AGENTS.md`
-2. `backend/PROJECT-RECORD.md`
-3. `backend/docs/contracts.md`, özellikle 5 ve 10. bölümler
+2. `backend/PROJE-KAYDI.md`
+3. `backend/docs/sozlesmeler.md`, özellikle 5 ve 10. bölümler
 4. Karar sitesinde `rail-2-gelistirme.md`, `rail-3-frontend.md` ve `admin-shell.md` sayfaları. G-45, G-63 ve G-94 kurallarını bulun.
 
 ## Sahip olduğunuz yerler
 
-- `backend/apps/platform_core/platform_core/shell/`
+- `backend/apps/platform_core/platform_core/kabuk/`
 - `backend/apps/platform_core/platform_core/api/shell.py`, `api/meta.py`
 - `backend/apps/platform_core/platform_core/www/panel.*`
-- `backend/contracts/platform_core-shell.openapi.yaml`
+- `backend/contracts/platform_core-kabuk.openapi.yaml`
 - `hooks.py` içinde yalnız bu işin satırları
 
 ## Önkoşul

@@ -2,13 +2,13 @@
 
 Bu iş kullanıcı eşitleme servisinin teknoloji kararını hazırlar. Servisin çekirdek mantığını da yazar. Servis Keycloak'taki kullanıcı değişikliklerini Press'e ve kiracı sitelerine taşır (G-81).
 
-Önce `backend/AGENTS.md`, `backend/PROJECT-RECORD.md` ve `backend/docs/contracts.md` dosyalarını okuyun. Sonra karar sitesinin `rail-4-keycloak.md` sayfasının 4. bölümünü okuyun.
+Önce `backend/AGENTS.md`, `backend/PROJE-KAYDI.md` ve `backend/docs/sozlesmeler.md` dosyalarını okuyun. Sonra karar sitesinin `rail-4-keycloak.md` sayfasının 4. bölümünü okuyun.
 
 ## Sahip olduğunuz yerler
 
 - `backend/identity/identity_sync/`
 - `backend/contracts/identity_sync.openapi.yaml`
-- `backend/docs/decisions/0001-identity-sync.md`
+- `backend/docs/kararlar/0001-identity-sync.md`
 
 ## Önemli kısıt
 
@@ -16,7 +16,7 @@ Zamanlanmış iş yasaktır (Proje kaydı D-6). Karar sitesi saatlik yoklama ve 
 
 ## Kontrol noktası 1: teknoloji kararı
 
-1. T-2 karar notunu `backend/docs/decisions/0001-identity-sync.md` dosyasına yazın.
+1. T-2 karar notunu `backend/docs/kararlar/0001-identity-sync.md` dosyasına yazın.
 2. Notta şu soruları cevaplayın:
    - Servis hangi dilde ve sürümde yazılır? Python 3.11 ve sonrası önerilir. Ekip ikinci dil eklemesin (T-1).
    - HTTP sunucusu için yeni paket gerekir mi? Python'un kendi kitaplığı yeter mi?

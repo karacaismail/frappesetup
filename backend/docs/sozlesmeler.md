@@ -6,12 +6,12 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 
 | Dosya | Sahip iş |
 | --- | --- |
-| `contracts/platform_core-identity.openapi.yaml` | platform-core-kimlik |
-| `contracts/platform_core-shell.openapi.yaml` | platform-core-kabuk |
+| `contracts/platform_core-kimlik.openapi.yaml` | platform-core-kimlik |
+| `contracts/platform_core-kabuk.openapi.yaml` | platform-core-kabuk |
 | `contracts/press_tr.openapi.yaml` | press-tr |
 | `contracts/identity_sync.openapi.yaml` | identity-sync |
-| `contracts/platform_core-model-gateway.openapi.yaml` | platform-core-gecit |
-| `contracts/platform_core-ai.openapi.yaml` | platform-core-yz |
+| `contracts/platform_core-model-gecidi.openapi.yaml` | platform-core-gecit |
+| `contracts/platform_core-yapay-zeka.openapi.yaml` | platform-core-yz |
 
 ## 1. Marka
 
@@ -38,14 +38,14 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 
 | İstemci | Tür | Akış | Dönüş adresi | Çıkış bildirimi |
 | --- | --- | --- | --- | --- |
-| `site-tenant1` | Gizli sırlı | Yetkilendirme kodu | `<kiracı adresi>/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
+| `site-kiraci1` | Gizli sırlı | Yetkilendirme kodu | `<kiracı adresi>/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
 | `press` | Gizli sırlı | Yetkilendirme kodu | `<Press adresi>/api/method/press_tr.api.auth.keycloak_callback` | `<Press adresi>/api/method/press_tr.api.keycloak_backchannel_logout` |
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 
 - Dönüş adresini tam adresle kaydedin. Joker karakter kullanmayın.
 - Çıkış bildiriminde “oturum gerekli” ayarını açın.
-- Yeni kiracı için aynı biçimi kullanın. Örneğin `site-tenant2` yazın.
+- Yeni kiracı için aynı biçimi kullanın. Örneğin `site-kiraci2` yazın.
 - `agent-service`, `ops-bff` ve `site-ops` bu turda yoktur.
 
 ### Hedef kapsamları
@@ -54,7 +54,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 
 | Kapsam | Eklediği `aud` | Kullanan |
 | --- | --- | --- |
-| `aud-site-tenant1` | `site-tenant1` | `identity-sync`, `press-service` |
+| `aud-site-kiraci1` | `site-kiraci1` | `identity-sync`, `press-service` |
 | `aud-press` | `press` | `identity-sync` |
 
 - Bu kapsamlar varsayılan değildir. İstekte `scope` ile istenir.
@@ -115,7 +115,7 @@ from oidc_verify import (
 )
 
 cache = JwksCache(jwks_url, ttl_seconds=600)
-claims = verify_access_token(token, cache=cache, issuer=iss, audience="site-tenant1", allowed_azp={"identity-sync"}, leeway=30)
+claims = verify_access_token(token, cache=cache, issuer=iss, audience="site-kiraci1", allowed_azp={"identity-sync"}, leeway=30)
 claims = verify_id_token(token, cache=cache, issuer=iss, client_id="press", nonce=nonce, leeway=30)
 claims = verify_logout_token(token, cache=cache, issuer=iss, client_id="press", leeway=30)
 ```
@@ -215,7 +215,7 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Keycloak olaylarını alır. Olay kaynağı T-2 kararıyla seçilir (Proje kaydı A-10).
 - Belirteci Keycloak'tan istemci kimlik bilgisiyle alır.
 - `press_tr.api.identity.*` ve `platform_core.api.identity.*` uçlarını çağırır.
-- Kiracı listesini ayardan okur. Geliştirmede tek kiracı `tenant1` vardır.
+- Kiracı listesini ayardan okur. Geliştirmede tek kiracı `kiraci1` vardır.
 - Her işlem tekrar edilebilir olmalıdır. Aynı olay iki kez gelirse sonuç değişmez.
 - Başarısız olay ayrı kuyrukta bekler.
 - Mutabakat elle başlatılan bir komuttur. Komut farkları raporlar.
@@ -226,13 +226,13 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 
 | Anahtar | Örnek | Not |
 | --- | --- | --- |
-| `keycloak_public_url` | `http://id.localhost:<port>` | Tarayıcının gördüğü adres |
+| `keycloak_public_url` | `http://kimlik.localhost:<port>` | Tarayıcının gördüğü adres |
 | `keycloak_internal_url` | Boş | Sunucunun ulaştığı adres |
 | `keycloak_realm` | `platform` | |
-| `keycloak_client_id` | `site-tenant1` ya da `press` | |
+| `keycloak_client_id` | `site-kiraci1` ya da `press` | |
 | `keycloak_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
-| `identity_brand_name` | `Atonota` | Düğme metni bundan üretilir |
-| `platform_panel_url` | `http://tenant1.localhost:<port>/panel` | Çıkıştan sonraki adres |
+| `kimlik_marka_adi` | `Atonota` | Düğme metni bundan üretilir |
+| `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 
 ## 9. Geliştirme ortamı
 
@@ -240,12 +240,12 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 
 | Ad | Değer |
 | --- | --- |
-| Kiracı sitesi | `tenant1.localhost` |
+| Kiracı sitesi | `kiraci1.localhost` |
 | Press sitesi | `press.localhost` |
-| Keycloak sunucusu | `id.localhost` |
+| Keycloak sunucusu | `kimlik.localhost` |
 | Compose proje adı | `fs-<iş adı>` |
 | Ana compose dosyası | `dev/compose.yaml` |
-| Kiracı compose dosyası | `dev/compose.tenant.yaml` |
+| Kiracı compose dosyası | `dev/compose.kiraci.yaml` |
 | Keycloak compose dosyası | `dev/compose.keycloak.yaml` |
 | Press compose dosyası | `dev/compose.press.yaml` |
 | Örnek kullanıcıların alan adı | `example.test` |
@@ -270,8 +270,8 @@ Tarayıcı ve container aynı adresi kullanmalıdır. Yoksa `iss` değeri tutmaz
 
 1. Keycloak container içinde de `P` portunu dinler.
 2. Compose, `P` portunu `127.0.0.1:P` adresine açar.
-3. Keycloak servisi ağda `id.localhost` takma adını taşır.
-4. Tarayıcı `http://id.localhost:P` adresine gider.
+3. Keycloak servisi ağda `kimlik.localhost` takma adını taşır.
+4. Tarayıcı `http://kimlik.localhost:P` adresine gider.
 5. Container'lar aynı adresle Keycloak'a ulaşır.
 
 Kiracı ve Press sunucuları için de aynı yol geçerlidir. Keycloak çıkış bildirimini bu adreslere gönderir. Bu yolu ilk deneyen iş sonucu raporlar.
@@ -323,9 +323,9 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 ### Sahiplik
 
-- `platform_core` içinde katmanı platform-core-yz işi kurar. Modül klasörü `ai` olur.
+- `platform_core` içinde katmanı platform-core-yz işi kurar. Modül klasörü `yapay_zeka` olur.
 - Önce Frappe'nin hazır MCP yolunu inceleyin (T-1). Karar sitesi bunu `frappe_mcp` olarak anar (G-84).
-- Ayrıntılı tasarım `docs/decisions/0002-ai-layer.md` dosyasındadır.
+- Ayrıntılı tasarım `docs/kararlar/0002-yapay-zeka-katmani.md` dosyasındadır.
 - Frappe 16'nın hazır MCP ucu (`/api/v2/mcp`) kiracı sitesinde kapatılır. Bu uç önizleme, onay ve günlük taşımaz.
 
 ### Uçlar
@@ -353,7 +353,7 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 ### Öteki modüllerin araç bildirimi
 
-Her modül elle başlatılan komutlarını ve yazma işlerini `ai_tools` kancasıyla araç olarak bildirir. Bildirim biçimi `contracts/platform_core-ai.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir. Yazma araçları önizleme işlevi taşır. Bu bölüm platform-core-yz dalı birleşince geçerli olur.
+Her modül elle başlatılan komutlarını ve yazma işlerini `ai_tools` kancasıyla araç olarak bildirir. Bildirim biçimi `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir. Yazma araçları önizleme işlevi taşır. Bu bölüm platform-core-yz dalı birleşince geçerli olur.
 
 ## 11. Model geçidi ve sağlayıcı kaydı
 
@@ -361,7 +361,7 @@ Altyapı yapay zekâ tabanlıdır. Sisteme n tane sağlayıcı, her sağlayıcı
 
 ### DocType'lar
 
-Bütün DocType'lar `model_gateway` modülündedir. Her alan açıklama taşır (D-9).
+Bütün DocType'lar `model_gecidi` modülündedir. Her alan açıklama taşır (D-9).
 
 | DocType | Görevi | Önemli alanlar |
 | --- | --- | --- |
@@ -387,7 +387,7 @@ Kimlik türleri şunlardır: API anahtarı, taşıyıcı belirteç, OAuth istemc
 
 ### Ortak çağrı
 
-`model_gateway` dışarıya tek bir işlev açar. İşlev bir yol adı ve mesajları alır. Araç tanımı ve yanıt biçimi isteğe bağlıdır. Yanıt sağlayıcıdan bağımsız tek biçimdedir: metin, araç çağrıları, kullanım ve hangi model ile API'nin kullanıldığı.
+`model_gecidi` dışarıya tek bir işlev açar. İşlev bir yol adı ve mesajları alır. Araç tanımı ve yanıt biçimi isteğe bağlıdır. Yanıt sağlayıcıdan bağımsız tek biçimdedir: metin, araç çağrıları, kullanım ve hangi model ile API'nin kullanıldığı.
 
 ### Yönlendirme
 

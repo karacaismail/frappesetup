@@ -5,17 +5,17 @@ Bu iş `platform_core` içinde yapay zekâ erişim katmanını kurar. Proje sahi
 Önce şu dosyaları okuyun:
 
 1. `backend/AGENTS.md`
-2. `backend/PROJECT-RECORD.md`
-3. `backend/docs/contracts.md`, özellikle 10. bölüm
+2. `backend/PROJE-KAYDI.md`
+3. `backend/docs/sozlesmeler.md`, özellikle 10. bölüm
 4. Karar sitesinde `src/content/docs/rail-5-ai.md` ve `ai-*.md` sayfaları
 5. Depodaki `packages/press-ai/INTERFACE.md` dosyası. Onay ve “unknown” kuralları orada uygulanmıştır.
 
 ## Sahip olduğunuz yerler
 
-- `backend/apps/platform_core/platform_core/ai/`
+- `backend/apps/platform_core/platform_core/yapay_zeka/`
 - `backend/apps/platform_core/platform_core/api/ai.py`
-- `backend/contracts/platform_core-ai.openapi.yaml`
-- `backend/docs/decisions/0002-ai-layer.md`
+- `backend/contracts/platform_core-yapay-zeka.openapi.yaml`
+- `backend/docs/kararlar/0002-yapay-zeka-katmani.md`
 - `hooks.py` içinde yalnız bu işin satırları
 
 ## Kontrol noktası 1: karar notu
@@ -25,7 +25,7 @@ Bu iş `platform_core` içinde yapay zekâ erişim katmanını kurar. Proje sahi
    - `frappe/mcp` deposu ne sunuyor? Lisansı ne? Son sürümü ve bakımı nasıl?
    - Bu depo Frappe 16 ile çalışıyor mu?
 2. MCP'nin güncel sürümünü ve HTTP taşıma biçimini resmî kaynaktan doğrulayın.
-3. Karar notunu `backend/docs/decisions/0002-ai-layer.md` dosyasına yazın. Notta şu tasarımlar olsun:
+3. Karar notunu `backend/docs/kararlar/0002-yapay-zeka-katmani.md` dosyasına yazın. Notta şu tasarımlar olsun:
    - Araçlar DocType tanımından nasıl üretilir?
    - Kimlik nasıl taşınır? İnsan oturumu ve aracı belirteci ayrı ele alınır (G-148).
    - Yetki eşitliği nasıl sağlanır (G-85)?
@@ -63,10 +63,10 @@ Bu bölüm `platform_core` iskeletini ister. Orkestratör iskeleti `backend` dal
 
 ## Model geçidiyle ilişki
 
-- Sağlayıcı, hesap ve API kaydını platform-core-gecit işi kurar. Kayıt `model_gateway` modülündedir.
+- Sağlayıcı, hesap ve API kaydını platform-core-gecit işi kurar. Kayıt `model_gecidi` modülündedir.
 - Bu kayıt da DocType olduğu için genel araçlardan görünür. Gizli anahtar hiçbir araçtan dönmez.
 - Yapay zekâ kaydı yönetim araçlarıyla değiştirebilir. Her değişiklik önizleme ve insan onayı ister.
-- Bu katman model çağırmaz. Model çağrısı gerekirse `model_gateway` modülünün açık işlevini kullanın.
+- Bu katman model çağırmaz. Model çağrısı gerekirse `model_gecidi` modülünün açık işlevini kullanın.
 
 ## Kapsam dışı
 
