@@ -188,7 +188,8 @@ def measure(site, data, draft_names, employees, attendance, password):
 
 
 def report(revision, operations):
-    print(f"\n## HRMS TR O-31 ölçümü · `{revision}`\n")
+    print("\n## HRMS TR O-31 ölçümü\n")
+    print(f"Git kaydı `{revision}`.")
     print(f"Test verisi {EMPLOYEES} çalışan ve {LEAVES} izin kaydı içerir.")
     print(
         "Ölçüm, Frappe sunucusunun isteği işlemesi ve yanıtı üretmesi için geçen süreyi kapsar."
