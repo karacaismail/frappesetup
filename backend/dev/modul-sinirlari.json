@@ -27,6 +27,7 @@
   "public_paths": {
     "platform_core.kimlik": [
       "platform_core.kimlik.api",
+      "platform_core.kimlik.service_client",
       "platform_core.api.auth",
       "platform_core.api.identity"
     ],
