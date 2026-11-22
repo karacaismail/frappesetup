@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
  */
 class WebhookSenderTest {
 
-    private static final String SECRET = "test-secret-0123456789abcdef";
+    private static final String SECRET = "test-secret-0123456789abcdef"; // gitleaks:allow (synthetic test value)
     private static final byte[] BODY = "{\"id\":\"e1\",\"realmId\":\"r1\"}".getBytes(StandardCharsets.UTF_8);
 
     record Received(String path, String timestamp, String signature, String contentType, String body) {}

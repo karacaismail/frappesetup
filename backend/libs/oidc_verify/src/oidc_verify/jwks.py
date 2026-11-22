@@ -14,9 +14,9 @@ Locking: `_state_lock` guards the key dict and timestamps and is held only brief
 serialises network fetches so at most one runs at a time. A reader whose `kid` is cached never waits
 for an in-flight fetch; readers with an unknown `kid` wait for the running fetch and then look again.
 
-Bounds: the HTTP fetcher gives up once the whole download has taken `total_timeout` seconds, however
-slowly the server trickles bytes. A timer shuts the socket down at the deadline, so the status line, the
-headers and the body are all covered (the per-operation socket `timeout` alone does not bound that).
+Bounds: one deadline of `total_timeout` seconds covers the whole download, from name resolution to the
+end of the body. The download runs in a worker thread and the caller stops waiting when the time is
+over; the connection is then cut (the per-operation socket `timeout` alone does not bound that).
 A caller whose `kid` is cached and still inside the stale window never waits for the refresh lock: it
 tries the refresh without blocking and serves the cached key when another thread holds the lock. A
 caller without a usable key waits at most `wait_timeout` seconds and then raises `JwksUnavailable`.
@@ -60,8 +60,8 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 class _Deadline:
     """Cuts the open connection when the total download time is over.
 
-    A timer calls `cut`. Shutting the socket down wakes a read that is blocked in any stage: connect has
-    its own socket timeout, the status line and headers and the body all read from this socket.
+    The waiting caller calls `cut` when the deadline is over. Shutting the socket down wakes the worker's
+    read in any stage that has a socket: the TLS handshake, the status line, the headers and the body.
     """
 
     def __init__(self) -> None:
@@ -146,58 +146,71 @@ def _http_fetcher(
 ) -> Fetcher:
     """Builds the default fetcher.
 
-    `timeout` bounds each socket operation (connect, header read, one body read). `total_timeout` bounds
-    the whole body download: a server that sends a few bytes before every socket timeout cannot keep the
-    fetch alive. The worst case is `total_timeout + timeout`. The body is capped at `max_bytes`.
+    One deadline covers the whole download, from the first network step to the end of the body: name
+    resolution, connect, the TLS handshake, the status line, the headers and the body. The download runs
+    in a worker thread. The caller waits at most `total_timeout` seconds. When the time is over the
+    caller gets `TimeoutError` at once, the connection is cut if one is open, and the worker's late
+    result is thrown away. The worker itself ends within one socket `timeout` after the cut; name
+    resolution cannot be cut and ends when the resolver gives up. The refresh throttle
+    (`min_refresh_seconds`) keeps such abandoned workers rare. The body is capped at `max_bytes`.
     """
 
-    def getir() -> dict:
-        # The URL was checked in JwksCache.__init__ (_check_url). The opener refuses redirects.
-        istek = urllib.request.Request(jwks_url, headers={"Accept": "application/json"})  # noqa: S310
-        deadline = time.monotonic() + total_timeout
-        cutter = _Deadline()
-        opener = urllib.request.build_opener(
-            _NoRedirect(), _DeadlineHTTPHandler(cutter), _DeadlineHTTPSHandler(cutter)
-        )
-        timer = threading.Timer(total_timeout, cutter.cut)
-        timer.daemon = True
-        timer.start()
-        try:
-            return _read(opener, istek, deadline, cutter)
-        except OSError as hata:
-            if cutter.expired:
-                raise TimeoutError("JWKS download exceeded total_timeout") from hata
-            raise
-        finally:
-            timer.cancel()
-
-    def _read(opener, istek, deadline: float, cutter: _Deadline) -> dict:
-        with opener.open(istek, timeout=timeout) as yanit:
-            if yanit.status != 200:
-                raise OSError(f"JWKS yanıtı {yanit.status}")
-            parcalar: list[bytes] = []
-            uzunluk = 0
+    def download(opener, request, deadline: _Deadline) -> dict:
+        with opener.open(request, timeout=timeout) as response:
+            if response.status != 200:
+                raise OSError(f"JWKS response status {response.status}")
+            chunks: list[bytes] = []
+            size = 0
             while True:
-                if time.monotonic() >= deadline:
+                if deadline.expired:
                     # Leaving the `with` block closes the response and the connection.
                     raise TimeoutError("JWKS download exceeded total_timeout")
-                # read1 returns after one socket read, so a trickling server cannot block this call
-                # for longer than `timeout`. Read one byte past the cap to detect an oversized body
-                # without buffering all of it.
-                parca = yanit.read1(min(_READ_CHUNK, max_bytes + 1 - uzunluk))
-                if not parca:
+                # read1 returns after one socket read. Read one byte past the cap to detect an oversized
+                # body without buffering all of it.
+                chunk = response.read1(min(_READ_CHUNK, max_bytes + 1 - size))
+                if not chunk:
                     break
-                parcalar.append(parca)
-                uzunluk += len(parca)
-                if uzunluk > max_bytes:
+                chunks.append(chunk)
+                size += len(chunk)
+                if size > max_bytes:
                     raise ValueError("JWKS response exceeds the size limit")
-            if cutter.expired:
+            if deadline.expired:
                 # A cut socket can end the body read with an empty chunk instead of an error.
                 raise TimeoutError("JWKS download exceeded total_timeout")
-            govde = b"".join(parcalar)
-        return json.loads(govde.decode("utf-8"))
+            body = b"".join(chunks)
+        return json.loads(body.decode("utf-8"))
 
-    return getir
+    def fetch() -> dict:
+        # The URL was checked in JwksCache.__init__ (_check_url). The opener refuses redirects.
+        request = urllib.request.Request(jwks_url, headers={"Accept": "application/json"})  # noqa: S310
+        deadline = _Deadline()
+        opener = urllib.request.build_opener(
+            _NoRedirect(), _DeadlineHTTPHandler(deadline), _DeadlineHTTPSHandler(deadline)
+        )
+        outcome: dict[str, object] = {}
+        finished = threading.Event()
+
+        def work() -> None:
+            try:
+                outcome["value"] = download(opener, request, deadline)
+            except BaseException as error:  # noqa: BLE001 - handed back to the caller below
+                outcome["error"] = error
+            finally:
+                finished.set()
+
+        worker = threading.Thread(target=work, name="oidc-verify-jwks-download", daemon=True)
+        worker.start()
+        if not finished.wait(total_timeout):
+            deadline.cut()
+            raise TimeoutError("JWKS download exceeded total_timeout")
+        if "error" in outcome:
+            error = outcome["error"]
+            if deadline.expired and isinstance(error, OSError):
+                raise TimeoutError("JWKS download exceeded total_timeout") from error
+            raise error  # type: ignore[misc]
+        return outcome["value"]  # type: ignore[return-value]
+
+    return fetch
 
 
 def _anahtarlari_ayikla(veri: object) -> dict[str, object]:
@@ -344,33 +357,33 @@ class JwksCache:
             raise JwksUnavailable("Anahtar listesi alınamadı")
 
     def get_signing_key(self, kid: str):
-        """`kid` için açık anahtarı döner. Bilinmiyorsa listeyi bir kez yeniler."""
-        anahtar, expired, generation = self._lookup(kid)
-        if anahtar is not None and not expired:
-            return anahtar
+        """Returns the public key for `kid`. Refreshes the list once when the `kid` is unknown."""
+        key, expired, generation = self._lookup(kid)
+        if key is not None and not expired:
+            return key
         attempted: bool | None = False
         if expired:
-            if anahtar is not None and self._usable():
+            if key is not None and self._usable():
                 # A valid cached key never waits for the refresh lock. Try the refresh without blocking:
                 # when another thread already runs it, serve the cached key at once (merge review O4).
                 attempted = self._attempt_refresh(generation, forced=False, wait=False)
                 if attempted is None:
-                    return anahtar
+                    return key
             else:
                 attempted = self._attempt_refresh(generation, forced=False)
             if not self._usable():
                 raise JwksUnavailable("Anahtar listesi alınamadı")
-            anahtar, _, generation = self._lookup(kid)
-            if anahtar is not None:
-                return anahtar
+            key, _, generation = self._lookup(kid)
+            if key is not None:
+                return key
             if attempted is None:
                 # Waited `wait_timeout` for another thread's fetch and the kid is still not cached.
                 raise JwksUnavailable("Anahtar listesi alınamadı")
         if not attempted:
             attempted = self._attempt_refresh(generation, forced=True)
-            anahtar = self._lookup(kid)[0]
-            if anahtar is not None:
-                return anahtar
+            key = self._lookup(kid)[0]
+            if key is not None:
+                return key
             if attempted is None:
                 raise JwksUnavailable("Anahtar listesi alınamadı")
         raise TokenError("unknown_kid")

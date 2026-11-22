@@ -1,12 +1,16 @@
 """Merge review finding O4: the total download deadline covers every stage, and a caller with a valid
 cached key never waits for the refresh lock.
 
+Second review: the deadline starts at the first network step. Name resolution and the TLS handshake are
+inside it too, and the call and the refresh lock are free again when it is over.
+
 1. A server that sends the status line and then trickles header bytes must not keep a refresh alive past
    `total_timeout`. The per-operation socket timeout alone does not stop it.
 2. Two callers with an expired but still usable cached key can both see the refresh lock free. The one
    that loses the race must serve the cached key at once, not wait `wait_timeout`.
 """
 
+import socket
 import socketserver
 import threading
 import time
@@ -51,6 +55,65 @@ class SlowHeaderTest(unittest.TestCase):
         elapsed = time.monotonic() - begin
         self.assertLess(elapsed, 2.0, f"refresh took {elapsed:.2f} s; total_timeout is 0.8 s")
         self.assertFalse(cache._refresh_lock.locked())
+
+
+class SlowNameResolutionTest(unittest.TestCase):
+    def test_total_deadline_covers_name_resolution(self):
+        real = socket.getaddrinfo
+        started = threading.Event()
+
+        def slow_getaddrinfo(*args, **kwargs):
+            started.set()
+            time.sleep(TRICKLE_SECONDS)
+            return real(*args, **kwargs)
+
+        socket.getaddrinfo = slow_getaddrinfo
+        self.addCleanup(setattr, socket, "getaddrinfo", real)
+        cache = JwksCache(
+            "https://slow-dns.example.test/certs", timeout=5.0, total_timeout=0.8, min_refresh_seconds=0
+        )
+        begin = time.monotonic()
+        with self.assertRaises(JwksUnavailable):
+            cache.get_signing_key("kid-1")
+        elapsed = time.monotonic() - begin
+        self.assertTrue(started.is_set(), "the download must have started name resolution")
+        self.assertLess(elapsed, 2.0, f"refresh took {elapsed:.2f} s; total_timeout is 0.8 s")
+        self.assertFalse(cache._refresh_lock.locked())
+
+
+class _SilentTlsHandler(socketserver.BaseRequestHandler):
+    """Accepts the TCP connection, reads the TLS ClientHello and never answers it."""
+
+    def handle(self):
+        try:
+            self.request.recv(4096)
+            time.sleep(TRICKLE_SECONDS)
+        except OSError:
+            return
+
+
+class SlowTlsHandshakeTest(unittest.TestCase):
+    def setUp(self):
+        server = socketserver.ThreadingTCPServer(("127.0.0.1", 0), _SilentTlsHandler)
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        self.url = f"https://127.0.0.1:{server.server_address[1]}/certs"
+
+    def test_total_deadline_covers_the_tls_handshake(self):
+        cache = JwksCache(self.url, timeout=5.0, total_timeout=0.8, min_refresh_seconds=0)
+        begin = time.monotonic()
+        with self.assertRaises(JwksUnavailable):
+            cache.get_signing_key("kid-1")
+        elapsed = time.monotonic() - begin
+        self.assertLess(elapsed, 2.0, f"refresh took {elapsed:.2f} s; total_timeout is 0.8 s")
+        self.assertFalse(cache._refresh_lock.locked())
+        # The next call is not blocked by the abandoned download.
+        begin = time.monotonic()
+        with self.assertRaises(JwksUnavailable):
+            cache.get_signing_key("kid-1")
+        self.assertLess(time.monotonic() - begin, 2.0)
 
 
 class _RacingLock:

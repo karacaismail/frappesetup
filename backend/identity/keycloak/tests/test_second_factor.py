@@ -18,9 +18,9 @@ from test_eklentiler import _ac, _cerezli_acici, _form_hedefi
 from yardimci import admin, canli_var_mi, istek, ortam, tenant_authorize_url, tenant_authorize_with_pkce, tenant_callback_url, yonetici_belirteci
 
 TOTP_USER = "totp.ornek@example.test"
-TOTP_PASSWORD = "Ornek-Parola-Totp-2026"
+TOTP_PASSWORD = "Ornek-Parola-Totp-2026"  # gitleaks:allow (synthetic test value, development realm only)
 # Keycloak uses the raw UTF-8 bytes of the stored secret (TimeBasedOTP.generateTOTP(String)).
-TOTP_SECRET = b"dev-totp-secret-0123456789"
+TOTP_SECRET = b"dev-totp-secret-0123456789"  # gitleaks:allow (synthetic test value, development realm only)
 
 
 def totp_code(secret: bytes, at: float | None = None, period: int = 30, digits: int = 6) -> str:

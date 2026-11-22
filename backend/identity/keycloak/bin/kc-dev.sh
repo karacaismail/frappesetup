@@ -7,7 +7,8 @@ set -euo pipefail
 KLASOR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND="$(cd "$KLASOR/../.." && pwd)"
 COMPOSE_DOSYASI="$BACKEND/dev/compose.keycloak.yaml"
-ENV_DOSYASI="$KLASOR/.env"
+# Tests may point to their own environment file with made-up values.
+ENV_DOSYASI="${KC_ENV_FILE:-$KLASOR/.env}"
 PROJE="${COMPOSE_PROJECT_NAME:-fs-kimlik-realm}"
 # Profil FS_COLIMA_PROFILE değişkeninden seçilir (backend/AGENTS.md, "Disk dar"). Değer "default" ise colima profili kullanılır.
 if [ "${FS_COLIMA_PROFILE:-factory}" = "default" ]; then
@@ -148,11 +149,13 @@ case "$komut" in
     prod_port="$((PANE_PORT + 8))"
     prod_ad="${PROJE}-prod-check"
     docker --context "$BAGLAM" build -q --target prod -t "$prod_etiket" "$KLASOR" >/dev/null
+    # Merge review O5: the secret goes to docker by variable name only, never as a value on the command line.
+    export KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET="$IDENTITY_SYNC_WEBHOOK_SECRET"
     prod_calistir() {
       docker --context "$BAGLAM" run -d --name "$1" --env-file "$ENV_DOSYASI" \
         -e KC_HTTP_ENABLED=true -e KC_HOSTNAME="http://127.0.0.1:$prod_port" -e KC_HEALTH_ENABLED=true \
         -e KC_DB=dev-file -e ATONOTA_SITE_KIRACI1_URL -e ATONOTA_PRESS_URL \
-        -e KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET="$IDENTITY_SYNC_WEBHOOK_SECRET" \
+        -e KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET \
         -e KC_SPI_EVENTS_LISTENER__WEBHOOK__URL="$2" $3 "$prod_etiket" start --import-realm >/dev/null
     }
     prod_tunel_pid="$KLASOR/.tunel-prod.pid"
