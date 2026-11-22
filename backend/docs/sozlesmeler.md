@@ -60,6 +60,8 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - Bu kapsamlar varsayılan değildir. İstekte `scope` ile istenir.
 - Servis belirteci yalnız bir `aud` değeri taşır.
 - Admin API yetkileri kiracıya giden belirtece girmez.
+- `identity-sync` Admin API belirtecini ayrı ister. İstekte `scope=admin-api kc-admin-api` olur. Bu belirtecin `aud` değeri `realm-management` ve Admin API adresidir. Keycloak 26.8 Admin API'si bu kapsamı ister.
+- `press-service` istemcisi `aud-press` kapsamını isteyemez. Keycloak bu isteği `invalid_scope` ile reddeder.
 
 ### Politikalar
 

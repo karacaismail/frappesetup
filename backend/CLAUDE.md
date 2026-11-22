@@ -94,6 +94,16 @@ Proje sahibi her şeyin yapay zekâyla yönetilebilir olmasını istedi (D-9). A
 - Port tabanını `PANE_PORT` değişkeninden alın. Her Pane'in kendi 10 portluk aralığı vardır.
 - İşiniz bitince kendi container'larınızı `docker compose down` ile kapatın. Birimleri silmeyin.
 
+### Bilinen ortam sorunları
+
+kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler öteki projelere dokunmaz.
+
+1. **Klasör bağlama çalışmaz.** `colima-factory` profili yalnız `/Users/w6x/Developer/software-factory` klasörünü görür. Depo klasörünü bağlarsanız container'da boş klasör görünür. Kodu imaja `COPY` ile koyun ya da `docker cp` ile kopyalayın. Örnek: `backend/identity/keycloak/Dockerfile`.
+2. **Yeni portlar bilgisayara açılmaz.** Profilin port yönlendirmesi bozuk. Portu bilgisayara ayrı bir ssh tüneliyle taşıyın. Örnek: `backend/identity/keycloak/bin/kc-dev.sh tunel`.
+3. **`docker pull` hata verebilir.** Docker ayarındaki şifre yardımcısı eksik. İmajı boş bir `DOCKER_CONFIG` klasörüyle çekin. Kullanıcının Docker ayarını değiştirmeyin.
+4. **Colima'yı yeniden başlatmayın.** Kalıcı çözüm `colima restart factory` ister. Bu komut başka projelerin container'larını yeniden başlatır.
+
+
 ### Tarayıcı testi
 
 - Firefox testi çalıştırmayın. Proje sahibinin kalıcı kuralı bunu yasaklar.
