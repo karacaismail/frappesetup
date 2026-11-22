@@ -314,6 +314,33 @@ Kullanıcı bir telefon kurulumunu iptal edince kiracı sitesi `POST /v1/session
 - Yeni kiracı eklerken istemcisini bu listeye de yazın. Yazmazsanız o kiracı oturum kapatamaz.
 - Bu istemciler öteki uçları çağıramaz.
 
+## Yetki tablosu
+
+Bu tablo her ucu her çağıran türüyle gösterir. Tabloyu `tests/test_access_matrix.py` dosyası gerçek HTTP girişinden sınar. Reddedilen hiçbir çağıran hedefe yazmaz. Test bunu da denetler.
+
+| Uç | Belirteçsiz | Listede olmayan istemci | Yanlış `azp` | Yanlış `aud` | Süresi dolmuş | Başka kiracının istemcisi | Doğru istemci |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `POST /v1/reconcile`, önizleme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
+| `POST /v1/reconcile`, yürütme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | Kabul |
+| `GET /v1/dead-letters` | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
+| `POST /v1/dead-letters/replay`, önizleme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
+| `POST /v1/dead-letters/replay`, yürütme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | Kabul |
+| `GET /v1/operations` | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
+| `POST /v1/operations/{kimlik}/resolve` | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | Kabul |
+| `POST /v1/invitations`, önizleme | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/invitations`, yürütme | 401 | 401 | 403 | 401 | 401 | 403 | Kabul |
+| `POST /v1/sessions/revoke` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/account-deletions` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/events` | 401 | 401 | 401 | 401 | 401 | 401 | 202, imzayla |
+| `GET /healthz` | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
+
+- “Kabul” şu demektir: istek yetki denetimini geçer ve işleyiciye ulaşır. Testte bu satırlar eski bir özet gönderir ve 409 alır. Çözme ucu olmayan bir işlem için 404 alır.
+- “Yanlış `azp`” listede olan ama bu uç için yetkisi olmayan istemcidir. Örneğin önizleme istemcisi yürütme isterse 403 alır.
+- Yanlış `aud` ve süresi dolmuş belirteç sütunları gerçek `oidc_verify` kitaplığını ister. Kitaplık yoksa bu iki sütunun testi atlanır.
+- Olay ucu belirteç kabul etmez. Yalnız imzayı kabul eder. Bozuk imza, eski zaman damgası ve ikinci kez kullanılan imza 401 alır.
+- Sağlık ucu kimlik istemez. Yanıt yalnız servisin ayakta olduğunu söyler.
+- Mutabakat, yeniden işletme ve işlem uçları bütün platformda çalışır. Bu yüzden tek kiracıya bağlı değildir. Yürütme listesindeki her kiracı istemcisi bu uçları çağırabilir.
+
 ## İstek sınırı
 
 Bir istemci adresi bir dakikada en çok 600 istek gönderebilir. Sınırı `IDENTITY_SYNC_RATE_LIMIT` ayarı değiştirir.

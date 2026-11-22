@@ -2,8 +2,10 @@ The largest number of records in the response. The default is 100. A value outsi
 "The number of records to skip. The default is 0. The order is stable, so pages do not overlap.","Atlanacak kayıt sayısı. Varsayılan değer 0'dır. Sıra kararlıdır, bu yüzden sayfalar çakışmaz.",identity_sync.openapi.yaml: components.parameters.Offset.description
 "The token is valid but the client has no permission for this operation. The error code is `forbidden`.
 For example, a client in the preview list asked for execution.
+A tenant site client also gets this response when it asks for work in the organization of another tenant.
 ","Belirteç geçerli ama istemcinin bu işe izni yok. Hata kodu `forbidden` olur.
 Örneğin önizleme listesindeki istemci yürütme istedi.
+Kiracı sitesinin istemcisi başka kiracının kuruluşunda iş isterse de bu yanıtı alır.
 ",identity_sync.openapi.yaml: components.responses.Forbidden.description
 "The service executed no operation. A new preview and a new approval are needed. There can be two reasons.
 If the error code is `preview_changed`, the plan changed after the preview.
@@ -466,6 +468,9 @@ A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute. This list holds th
 The human gives the approval in the AI layer of the tenant site. So the tenant site calls the execution.
 A client in the `IDENTITY_SYNC_SESSION_AZP` list can end a session. This list holds the same tenant site clients.
 A client in the preview list or in the deletion list cannot be in another list.
+A tenant site client can invite a user only into the organization of its own tenant.
+The service finds the tenant from the `azp` value of the token. The body cannot choose the tenant.
+The reconcile, replay and operation endpoints work on the whole platform. They are not bound to one tenant.
 This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
 A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
 Only a trusted service client goes into the execute list.
@@ -647,6 +652,9 @@ Servis dört istemci listesi tutar.
 İnsan onayı kiracı sitesindeki yapay zekâ katmanında verir. Bu yüzden yürütmeyi kiracı sitesi çağırır.
 `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
 Önizleme listesindeki ya da silme listesindeki istemci başka bir listede olamaz.
+Kiracı sitesinin istemcisi yalnız kendi kiracısının kuruluşuna kullanıcı davet edebilir.
+Servis kiracıyı belirtecin `azp` değerinden bulur. Gövde kiracıyı seçemez.
+Mutabakat, yeniden işletme ve işlem uçları bütün platformda çalışır. Bu uçlar tek kiracıya bağlı değildir.
 Bu servis Keycloak'ta istemci açmaz. Yeni kiracının istemcisini kimlik-realm işi açar. O komutu insan başlatır.
 `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
 Yürütme listesine yalnız güvenilir servis istemcisi girer.

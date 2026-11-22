@@ -330,6 +330,9 @@ class PagedListTest(ReconcileFlowCase):
             self.assertEqual([c.query["start"] for c in calls], [["0"], ["2"], ["4"]][: len(calls)])
             self.assertGreaterEqual(len(calls), 2)
             self.assertEqual({c.query["page_length"][0] for c in calls}, {"2"})
+            # GET with exactly these two query fields. No `cursor`, no `limit`, no body.
+            self.assertEqual({frozenset(c.query) for c in calls}, {frozenset({"start", "page_length"})})
+            self.assertEqual({c.body for c in calls}, {b""})
 
     def test_page_length_follows_the_contract(self) -> None:
         from identity_sync import sites

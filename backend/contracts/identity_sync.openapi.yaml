@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.11.0
+  version: 0.11.1
   summary: Endpoints of the user sync service
   description: |
     This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
@@ -64,6 +64,9 @@ info:
     The human gives the approval in the AI layer of the tenant site. So the tenant site calls the execution.
     A client in the `IDENTITY_SYNC_SESSION_AZP` list can end a session. This list holds the same tenant site clients.
     A client in the preview list or in the deletion list cannot be in another list.
+    A tenant site client can invite a user only into the organization of its own tenant.
+    The service finds the tenant from the `azp` value of the token. The body cannot choose the tenant.
+    The reconcile, replay and operation endpoints work on the whole platform. They are not bound to one tenant.
     This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
     A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
     Only a trusted service client goes into the execute list.
@@ -799,6 +802,7 @@ components:
       description: |
         The token is valid but the client has no permission for this operation. The error code is `forbidden`.
         For example, a client in the preview list asked for execution.
+        A tenant site client also gets this response when it asks for work in the organization of another tenant.
       content:
         application/json:
           schema:
