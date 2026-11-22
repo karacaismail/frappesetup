@@ -204,7 +204,12 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Girişte Press, kullanıcının hiç takımı yoksa takım açar. Kullanıcı başka bir takımın üyesiyse yeni takım açılmaz.
 - Takıma `free_account` bayrağı yazılmaz. Bu bayrak yalnız iç ve deneme siteleri içindir (G-24).
 - Yanıt `team` ve `created` alanlarını taşır. `team`, Press'teki takımın adıdır.
-- `remove_team_member` isteği `issuer`, `subject` ve `organization_id` alanlarını taşır.
+- `remove_team_member` isteği `issuer` ve `subject` alanlarını taşır. İstek ayrıca şu iki alandan yalnız birini taşır:
+  - `organization_id`: Press üyeyi yalnız bu kuruluşun takımından çıkarır.
+  - `all_organizations: true`: Press üyeyi `keycloak_org_id` alanı dolu olan bütün takımlardan çıkarır. Bu biçim silinen kullanıcı içindir. Silinen kullanıcının kuruluşları Keycloak'tan artık okunamaz.
+- İki alan birlikte gelirse ya da ikisi de gelmezse Press 400 döner. Boş `organization_id` değeri “bütün takımlar” anlamına gelmez, 400 döner.
+- `keycloak_org_id` alanı boş takımlara `remove_team_member` dokunmaz. Bu takımlar Keycloak dışında elle açılmıştır.
+- Aynı `remove_team_member` isteği iki kez gelirse ikinci istek de 200 döner ve bir şey değiştirmez.
 - Takım adı istekte gelmez. Takım adını Press üretir.
 
 - Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
@@ -410,10 +415,13 @@ Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinde
 - Bağlantı denetimi ücretli bir çağrıdır. Bu yüzden ücretli işaretini taşır.
 - Mesaj içeriği varsayılan olarak günlüğe yazılmaz.
 - Yol kaydının veri kısıtı, model çağrısından önce veri seçimini ve maskelemeyi ister (G-90).
+- Dış sağlayıcıya giden içerik her zaman maskelenir. Yolun veri kısıtını “AI Manager” rolü seçer. Kısıt `masked` ise maskelenmiş içerik dış sağlayıcıya gidebilir. Ayrıca içerik bazında ön onay istenmez.
+- Aracı belirteci model ucunda geçmez. Aracı modele `yapay_zeka` katmanı üzerinden ulaşır. Bu katman `model_gecidi` modülünün açık işlevini çağırır. Böylece belirtecin biçimi tek yerde, `yapay_zeka` modülünde kalır.
+- `model_gecidi` modülünün açık çağrı işlevi arka plan işinde de çalışır. İşlev o anki kullanıcının yetkisini denetler. Misafir kullanıcı çağıramaz.
 
 ### Uç
 
 | Yol | Yöntem | Kimlik | İşi |
 | --- | --- | --- | --- |
-| `platform_core.api.model.complete` | POST | Oturum ya da aracı belirteci | Ortak çağrıyı yapar. Yetki ve kota denetlenir. |
+| `platform_core.api.model.complete` | POST | İnsan oturumu ya da API anahtarı | Ortak çağrıyı yapar. Yetki ve kota denetlenir. |
 | `platform_core.api.model.test_api` | POST | “AI Manager” rolü | Bir API'ye küçük deneme çağrısı yapar. Ücretlidir. |
