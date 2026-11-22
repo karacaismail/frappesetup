@@ -71,6 +71,7 @@ doc_events = {
 }
 
 before_request = ["platform_core.kabuk.native_metadata.guard_website_rpc_before_request"]
+after_request = ["platform_core.kabuk.headers.add_security_headers"]
 
 # Keep a single list assignment. Credential hooks must precede the metadata guard when merged.
 auth_hooks = ["platform_core.kabuk.native_metadata.guard_native_metadata"]
