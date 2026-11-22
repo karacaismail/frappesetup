@@ -20,10 +20,6 @@ from platform_core.yapay_zeka import policy
 from platform_core.yapay_zeka.tests.base import CHILD_DOCTYPE, DOCTYPE, MANAGER, USER_A, USER_B, YzTestCase
 from platform_core.yapay_zeka.tools import read
 
-# DocTypes of modules that are not merged into this branch yet. A name must leave this set as soon
-# as its DocType is installed. The test below fails if it stays.
-NOT_INSTALLED_HERE = {"Platform Identity Link", "Access Rule"}
-
 
 def with_hook(hook_name: str, value: list):
 	original = frappe.get_hooks
@@ -181,10 +177,8 @@ class TestClosedDoctypeLists(YzTestCase):
 			policy.FRAMEWORK_OPEN,
 		)
 		missing = {name for name in names if not frappe.db.exists("DocType", name)}
-		installed_meanwhile = {name for name in NOT_INSTALLED_HERE if frappe.db.exists("DocType", name)}
 
-		self.assertEqual(missing - NOT_INSTALLED_HERE, set())
-		self.assertEqual(installed_meanwhile, set())
+		self.assertEqual(missing, set())
 		self.assertGreater(len(names), 60)
 
 
