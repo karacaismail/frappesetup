@@ -10,4 +10,4 @@ export KIRACI_SOCKET_PORT="$((PANE_PORT + 2))"
 exec docker --context colima-factory compose \
     --project-name "fs-dev-ortam-${PANE_PORT}" \
     --env-file "${DEV_ENV_FILE:-$DEV_DIR/.env}" \
-    --file "$DEV_DIR/compose.kiraci.yaml" "$@"
+    --file "$DEV_DIR/compose.tenant.yaml" "$@"

@@ -2,13 +2,13 @@
 
 Bu iş geliştirme ortamını kurar. `platform_core` uygulamasının iskeletini de üretir. Öteki işler bu ortamda test çalıştırır. Bu yüzden ilk kontrol noktası önemlidir.
 
-Önce `backend/AGENTS.md`, `backend/PROJE-KAYDI.md` ve `backend/docs/sozlesmeler.md` dosyalarını okuyun.
+Önce `backend/AGENTS.md`, `backend/PROJECT-RECORD.md` ve `backend/docs/contracts.md` dosyalarını okuyun.
 
 ## Sahip olduğunuz yerler
 
 - `backend/dev/` klasörü. Yalnız `compose.keycloak.yaml` ve `compose.press.yaml` başka işlerindir.
 - `backend/apps/platform_core/` iskeleti: `pyproject.toml`, `hooks.py`, `modules.txt`, `patches.txt`, uygulama `__init__.py`, `.gitignore` ve araç ayarları.
-- `backend/PROJE-KAYDI.md` dosyasında yalnız “Denetim komutları” bölümü.
+- `backend/PROJECT-RECORD.md` dosyasında yalnız “Denetim komutları” bölümü.
 - `backend/README.md` dosyasında kurulum bölümü.
 
 ## Kontrol noktası 1: iskelet ve kiracı sitesi
@@ -20,15 +20,15 @@ Bu iş geliştirme ortamını kurar. `platform_core` uygulamasının iskeletini 
    docker --context colima save frappe/erpnext:v16.55.0 | docker --context colima-factory load
    ```
 
-3. `backend/dev/compose.kiraci.yaml` dosyasını yazın. Dosyada Frappe 16, MariaDB ve Redis olsun.
+3. `backend/dev/compose.tenant.yaml` dosyasını yazın. Dosyada Frappe 16, MariaDB ve Redis olsun.
    - MariaDB sürümünü Frappe 16'nın resmî kurulum belgesinden doğrulayın.
    - Web portu `PANE_PORT+1`, anlık bağlantı portu `PANE_PORT+2` olsun.
-   - Web servisi ağda `kiraci1.localhost` takma adını taşısın. Sözleşmenin 9. bölümündeki adres yolunu deneyin.
+   - Web servisi ağda `tenant1.localhost` takma adını taşısın. Sözleşmenin 9. bölümündeki adres yolunu deneyin.
 4. Container içinde `bench new-app platform_core --no-git` ile iskeleti üretin. Lisans MIT olsun. Yayıncı e-postası olarak `noreply@example.test` yazın. Kişisel e-posta yazmayın.
 5. Üretilen iskeleti `backend/apps/platform_core/` klasörüne alın. Uygulama klasörünü container'a bağlayın. Uygulamayı düzenlenebilir kurulumla kurun.
 6. `pyproject.toml` içinde Frappe aralığını `[tool.bench.frappe-dependencies]` bölümüne yazın. Aralık `>=16.0.0,<17.0.0` olsun.
-7. Modül olarak `Kimlik` ve `Kabuk` ekleyin. Klasör adları `kimlik` ve `kabuk` olsun. Varsayılan modülü bırakmak gerekirse nedenini yazın.
-8. `kiraci1.localhost` sitesini açın ve `platform_core` uygulamasını kurun.
+7. Modül olarak `Identity` ve `Shell` ekleyin. Klasör adları `identity` ve `shell` olsun. Varsayılan modülü bırakmak gerekirse nedenini yazın.
+8. `tenant1.localhost` sitesini açın ve `platform_core` uygulamasını kurun.
 9. İlk duman testini yazın. Test uygulamanın kurulu olduğunu doğrulasın. Testi `bench run-tests` ile çalıştırın.
 10. Commit atın ve `ready` raporlayın. Raporda şu bilgiler olsun:
     - çalışan Frappe, ERPNext, Python ve MariaDB sürümleri,
@@ -48,7 +48,7 @@ Bu iş geliştirme ortamını kurar. `platform_core` uygulamasının iskeletini 
    - izin listesinde olmayan modül bağı,
    - bağımlılık döngüsü,
    - başka modülün DocType'ına doğrudan yazma çağrısı.
-5. İzin listesini `backend/dev/modul-sinirlari.json` dosyasında tutun. Proje kaydındaki bağımlılık yönünü kullanın.
+5. İzin listesini `backend/dev/module-boundaries.json` dosyasında tutun. Proje kaydındaki bağımlılık yönünü kullanın.
 6. Denetimi önce test edin. Bilerek bozuk bir örnek hazırlayın. Denetimin bu örneği reddettiğini gösterin (N-5).
 7. `backend/dev/compose.yaml` dosyasını yazın. Dosya şimdilik yalnız kiracı dosyasını içersin. Öteki dosyaları orkestratör birleştirmede ekler.
 8. “Denetim komutları” tablosunu doldurun. README'ye kurulum adımlarını yazın.

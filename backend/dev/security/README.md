@@ -1,6 +1,6 @@
 # Backend güvenlik denetimi
 
-Depo kökünde `backend/dev/bin/guvenlik-denetimi` komutunu çalıştırın.
+Depo kökünde `backend/dev/bin/security-check` komutunu çalıştırın.
 Komut için Python 3.9 veya üstü, `uvx` ve çalışan Colima gerekir.
 İlk çalıştırmada araç paketlerinin ve Gitleaks imajının indirilmesi gerekebilir.
 
