@@ -137,11 +137,11 @@ class TestPythonRules(FrappeAPITestCase):
 				auth_time=int(time.time()) - 30,
 			)
 		)
-		from platform_core.identity import api as kimlik_api
+		from platform_core.identity import api as identity_api
 		from platform_core.identity.exceptions import ServiceTokenRejected
 
 		with self.assertRaises(ServiceTokenRejected):
-			kimlik_api.verify_mobile_token(token)
+			identity_api.verify_mobile_token(token)
 
 	# --- V-8 ----------------------------------------------------------------------------------------
 

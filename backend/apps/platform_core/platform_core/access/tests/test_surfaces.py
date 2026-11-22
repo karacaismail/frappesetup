@@ -9,11 +9,11 @@ from platform_core.access.tests.base import (
 	EMPLOYEE_1,
 	EXPECTED_VISIBLE,
 	MANAGER_1,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 
-class TestSurfaces(ErisimTestCase):
+class TestSurfaces(AccessRuleTestCase):
 	def report_view_names(self, client) -> set[str]:
 		"""The list report (“Report Builder”) surface."""
 		response = self.send(

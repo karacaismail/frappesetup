@@ -41,7 +41,7 @@ class RequestGuardsTest(unittest.TestCase):
 
 	def test_native_password_recovery_cannot_be_enabled(self):
 		with (
-			patch.object(request_policy, "_", side_effect=lambda message, **_: message),
+			patch.object(request_policy, "_", side_effect=lambda message, **_translation_options: message),
 			patch.object(request_policy.frappe, "throw", side_effect=frappe.PermissionError) as throw,
 			self.assertRaises(frappe.PermissionError),
 		):
@@ -317,7 +317,7 @@ class RequestGuardsTest(unittest.TestCase):
 		from press.api.client import run_doc_method
 
 		with (
-			patch.object(request_policy, "_", side_effect=lambda message, **_: message),
+			patch.object(request_policy, "_", side_effect=lambda message, **_translation_options: message),
 			patch.object(request_policy, "frappe") as framework,
 		):
 			framework.form_dict = {"dt": "Team", "method": "invite_team_member"}

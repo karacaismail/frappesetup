@@ -62,6 +62,7 @@ test('preview webhook uses the Keycloak development hostname and its network ali
             done
             while [[ "$1" != --network-alias && $# -gt 1 ]]; do shift; done
             printf '%s\\n' "$2" > "$PREVIEW_DIR/alias"
+            printf '%s\\n' "$*" > "$PREVIEW_DIR/sync-create"
             exit 42 ;;
         esac
       `,
@@ -87,6 +88,7 @@ test('preview webhook uses the Keycloak development hostname and its network ali
     assert.equal(webhook.protocol, 'http:');
     assert.equal(webhook.hostname, 'event-sink.localhost');
     assert.equal(webhook.pathname, '/v1/events');
+    assert.match(readFileSync(join(root, 'sync-create'), 'utf8'), /--network-alias identity-sync(?: |\n)/);
     assert.equal(readFileSync(join(root, 'alias'), 'utf8').trim(), webhook.hostname);
     assert.equal(readFileSync(join(root, 'service-secret-in-env'), 'utf8'), '');
     assert.throws(() => readFileSync(join(root, 'service-secret-on-disk')), { code: 'ENOENT' });
@@ -94,6 +96,30 @@ test('preview webhook uses the Keycloak development hostname and its network ali
       'IDENTITY_SYNC_SESSION_AZP=site-tenant1-service',
       'IDENTITY_SYNC_EXECUTE_AZP=site-tenant1-service',
     ]);
+  } finally {
+    rmSync(root, { recursive: true });
+  }
+});
+
+test('factory mode probes the factory Docker context before creating resources', () => {
+  const root = mkdtempSync(join(process.env.PANE_SCRATCH_DIR || tmpdir(), 'runtime-factory-'));
+  try {
+    const worktree = join(root, 'worktree');
+    mkdirSync(worktree);
+    writeFileSync(join(root, 'docker'), `#!/bin/bash
+      [[ "$1 $2 $3" == "--context colima-factory run" ]] || exit 42
+      echo 'MemAvailable: 2097152 kB'
+    `, { mode: 0o700 });
+    const result = spawnSync('bash', [runtime, worktree], {
+      env: {
+        ...process.env, PATH: root + ':' + process.env.PATH,
+        PREVIEW_DIR: root, PREVIEW_PROJECT: 'fs-e2e-preview-factory-test', PANE_PORT: '6500',
+        FS_COLIMA_PROFILE: 'factory', E2E_BROWSER_RUNTIME: 'container',
+      },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /at least 3 GiB/);
   } finally {
     rmSync(root, { recursive: true });
   }

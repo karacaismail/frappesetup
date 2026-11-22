@@ -235,17 +235,17 @@ class StaleKeyWindowTest(unittest.TestCase):
         # Inside the window: ttl expired, refresh fails, the cached key is still served.
         self.now[0] += 600 + 3599
         self.assertEqual(self.access()["azp"], "identity-sync")
-        self.assertEqual(self.fetcher.cagri, 2)
+        self.assertEqual(self.fetcher.call_count, 2)
         # Past the window: the same kid raises JwksUnavailable even though it is in memory.
         self.now[0] += 10
         with self.assertRaises(JwksUnavailable):
             self.access()
-        self.assertEqual(self.fetcher.cagri, 3)
+        self.assertEqual(self.fetcher.call_count, 3)
         # Throttled retry inside min_refresh_seconds still refuses; no new fetch.
         self.now[0] += 1
         with self.assertRaises(JwksUnavailable):
             self.access()
-        self.assertEqual(self.fetcher.cagri, 3)
+        self.assertEqual(self.fetcher.call_count, 3)
 
     def test_successful_fetch_after_window_recovers(self):
         self.assertEqual(self.access()["azp"], "identity-sync")
@@ -256,7 +256,7 @@ class StaleKeyWindowTest(unittest.TestCase):
         self.fetcher.error = None
         self.now[0] += 6
         self.assertEqual(self.access()["azp"], "identity-sync")
-        self.assertEqual(self.fetcher.cagri, 3)
+        self.assertEqual(self.fetcher.call_count, 3)
         # The window restarts from the new load.
         self.fetcher.error = URLError("no connection")
         self.now[0] += 600 + 3000
@@ -308,7 +308,7 @@ class JwksFetchBoundsTest(unittest.TestCase):
 
         def slow_fetcher():
             data = inner()
-            if inner.cagri > 1:
+            if inner.call_count > 1:
                 started.set()
                 time.sleep(1.0)
             return data
@@ -327,7 +327,7 @@ class JwksFetchBoundsTest(unittest.TestCase):
         finally:
             refresher.join(10.0)
         self.assertLess(elapsed, 0.5, f"cached-kid reader waited {elapsed:.3f}s for the network fetch")
-        self.assertEqual(inner.cagri, 2)
+        self.assertEqual(inner.call_count, 2)
 
     def test_concurrent_unknown_kid_calls_trigger_one_fetch(self):
         key = Anahtar("kid-1")
@@ -338,7 +338,7 @@ class JwksFetchBoundsTest(unittest.TestCase):
 
         def slow_fetcher():
             data = inner()
-            if inner.cagri > 1:
+            if inner.call_count > 1:
                 in_fetch.release()
                 time.sleep(0.3)
             return data
@@ -366,7 +366,7 @@ class JwksFetchBoundsTest(unittest.TestCase):
         for thread in threads:
             thread.join(10.0)
         self.assertEqual(results, ["identity-sync"] * worker_count)
-        self.assertEqual(inner.cagri, 2)
+        self.assertEqual(inner.call_count, 2)
 
     def _serve(self, body: bytes) -> tuple[http.server.HTTPServer, str]:
         handler = type("Handler", (_OversizedJwksHandler,), {"body": body})

@@ -41,7 +41,7 @@ def local_issuer_parts(issuer):
 
 def get_token(client: str, secret: str, scope: str) -> str:
     parts = local_issuer_parts(ISS)
-    veri = urllib.parse.urlencode(
+    jwks_payload = urllib.parse.urlencode(
         {"grant_type": "client_credentials", "client_id": client, "client_secret": secret, "scope": scope}
     ).encode()
     # The fixed Keycloak alias is only an HTTP Host value. No redirect or proxy is used.
@@ -49,7 +49,7 @@ def get_token(client: str, secret: str, scope: str) -> str:
         connection.request(
             "POST",
             f"{parts.path}/protocol/openid-connect/token",
-            body=veri,
+            body=jwks_payload,
             headers={"Host": parts.netloc, "Content-Type": "application/x-www-form-urlencoded"},
         )
         with connection.getresponse() as response:

@@ -109,7 +109,7 @@ class TestClientText(AiTestCase):
 		name = "tool for Jane Example " + FAKE_TOKEN
 
 		by_session = self.rpc(client, "tools/call", {"name": name, "arguments": {}})
-		for _ in range(21):
+		for _iteration in range(21):
 			by_token = self.rpc(self.anonymous(), "tools/call", {"name": name, "arguments": {}}, token=token)
 
 		self.assertEqual((by_session.status_code, by_token.status_code), (404, 401))

@@ -5,13 +5,13 @@ The detailed behavior tests are in the `platform_core/erisim/tests/` folder.
 
 import frappe
 
-from platform_core.access.tests.base import DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, ROLE_EMPLOYEE, ErisimTestCase
+from platform_core.access.tests.base import DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, ROLE_EMPLOYEE, AccessRuleTestCase
 
 FIELD_BODY = {"doctype": DOCTYPE, "fieldname": "salary_amount", "permlevel": 0}
 LEVEL_BODY = {"doctype": DOCTYPE, "role": ROLE_EMPLOYEE, "permlevel": 1, "read": True, "write": True}
 
 
-class TestAccessEndpoints(ErisimTestCase):
+class TestAccessEndpoints(AccessRuleTestCase):
 	def explain(self, client, name: str, **query):
 		return self.api(
 			client, "GET", "explain_permission", query={"doctype": DOCTYPE, "name": name, **query}

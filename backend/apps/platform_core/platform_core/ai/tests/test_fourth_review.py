@@ -261,7 +261,7 @@ class TestByteLimitCoversTheWholeResult(AiTestCase):
 		self.open_report_gate()
 		manager = self.login(MANAGER)
 		columns = [{"fieldname": f"c{index}", "label": "L" * 100, "fieldtype": "Data"} for index in range(20)]
-		fake = {"columns": columns, "result": [{f"c{index}": "v" for index in range(20)} for _ in range(30)]}
+		fake = {"columns": columns, "result": [{f"c{index}": "v" for index in range(20)} for _iteration in range(30)]}
 
 		with (
 			patch("frappe.desk.query_report.run", return_value=fake),

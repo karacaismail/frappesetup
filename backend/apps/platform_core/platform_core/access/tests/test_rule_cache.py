@@ -10,12 +10,12 @@ from collections import defaultdict
 import frappe
 
 from platform_core.access import rules
-from platform_core.access.tests.base import DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, RULE_DOCTYPE, ErisimTestCase
+from platform_core.access.tests.base import DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, RULE_DOCTYPE, AccessRuleTestCase
 
 OWN_RULE = "Calisan kendi kaydi"
 
 
-class TestRuleCacheWithinARequest(ErisimTestCase):
+class TestRuleCacheWithinARequest(AccessRuleTestCase):
 	def setUp(self):
 		super().setUp()
 		# A real request has a request cache. The test process has none, so it gets one here.
