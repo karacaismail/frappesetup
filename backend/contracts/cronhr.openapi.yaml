@@ -1,0 +1,58 @@
+openapi: 3.1.0
+info:
+  title: CronHR izin talebi
+  version: 0.1.0
+servers:
+  - url: /api
+paths:
+  /resource/Leave%20Application:
+    get:
+      summary: Kullanıcının görebildiği izin taleplerini listeler.
+      responses:
+        "200": {description: Kendi talepleri, bağlı ekip veya tüm site kayıtları.}
+  /resource/Leave%20Application/{name}:
+    parameters:
+      - in: path
+        name: name
+        required: true
+        schema: {type: string}
+        description: İzin talebinin kayıt adı.
+    get:
+      summary: İzin talebini açar.
+      responses:
+        "200": {description: Talep. İzin seviyesi 1 yoksa leave_balance alanı kapalıdır.}
+        "403": {description: Kullanıcının okuma izni yok.}
+  /method/cronhr.api.approve_leave:
+    post:
+      summary: Açık izin talebini onaylar ve gönderir.
+      description: Yönetici bağlı ekipteki talebi onaylar. İK sitedeki talepleri onaylar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/LeaveName"}
+      responses:
+        "200":
+          description: Onaylanan kaydın adı.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/LeaveName"}
+        "403": {description: Kullanıcının rolü veya kayıt izni yetersiz.}
+        "404": {description: Talep bulunamadı.}
+        "417": {description: Talep açık bir taslak değil veya HRMS doğrulaması başarısız.}
+x-ai-tool:
+  name: cronhr_approve_leave
+  arguments: {$ref: "#/components/schemas/LeaveName"}
+  description: Araç öneri oluşturur. İnsan onayından önce izin talebi değişmez.
+components:
+  schemas:
+    LeaveName:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 140, description: İzin talebinin kayıt adı.}
