@@ -1,15 +1,15 @@
-Issuer,Kimlik sunucusu,Press Identity Link
-Issuer URL from the verified Keycloak token.,Bu adres doğrulanmış Keycloak kimlik bilgisinden gelir.,Press Identity Link
-Subject,Kalıcı kullanıcı kimliği,Press Identity Link
-Permanent user identifier assigned by the issuer.,Kimlik sunucusu bu kalıcı değeri kullanıcıya verir.,Press Identity Link
-User,Kullanıcı,Press Identity Link
-Press user associated with this Keycloak identity.,Bu Keycloak kimliği bu Press kullanıcısına bağlıdır.,Press Identity Link
-Identity Link,Kimlik bağı,Press Keycloak Session
-Verified identity associated with the session.,Bu oturum doğrulanmış kimlik bağına aittir.,Press Keycloak Session
-Keycloak Session ID,Keycloak oturum kimliği,Press Keycloak Session
-Keycloak session identifier used to match logout requests.,Press çıkış isteğini bu Keycloak oturumuyla eşler.,Press Keycloak Session
-Press Session ID,Press oturum kimliği,Press Keycloak Session
-Secret Press session identifier used only to revoke the session.,Press bu gizli değeri yalnızca oturumu kapatmak için kullanır.,Press Keycloak Session
+Issuer,Kimlik sunucusu,PTR Identity Link
+Issuer URL from the verified Keycloak token.,Bu adres doğrulanmış Keycloak kimlik bilgisinden gelir.,PTR Identity Link
+Subject,Kalıcı kullanıcı kimliği,PTR Identity Link
+Permanent user identifier assigned by the issuer.,Kimlik sunucusu bu kalıcı değeri kullanıcıya verir.,PTR Identity Link
+User,Kullanıcı,PTR Identity Link
+Press user associated with this Keycloak identity.,Bu Keycloak kimliği bu Press kullanıcısına bağlıdır.,PTR Identity Link
+Identity Link,Kimlik bağı,PTR Keycloak Session
+Verified identity associated with the session.,Bu oturum doğrulanmış kimlik bağına aittir.,PTR Keycloak Session
+Keycloak Session ID,Keycloak oturum kimliği,PTR Keycloak Session
+Keycloak session identifier used to match logout requests.,Press çıkış isteğini bu Keycloak oturumuyla eşler.,PTR Keycloak Session
+Press Session ID,Press oturum kimliği,PTR Keycloak Session
+Secret Press session identifier used only to revoke the session.,Press bu gizli değeri yalnızca oturumu kapatmak için kullanır.,PTR Keycloak Session
 Keycloak Organization ID,Keycloak kuruluş kimliği,Team
 Unique identifier of the Keycloak organization mapped to this Press team.,Bu Press takımı bu Keycloak kuruluş kimliğine bağlıdır.,Team
 Send exactly one valid organization selector.,Bir kuruluş kimliği ya da bütün kuruluşları seçen değeri gönderin.,press_tr
@@ -23,8 +23,8 @@ Concurrent account update. Start sign-in again.,Hesap şu anda güncelleniyor. G
 Guest access is denied.,Misafirler bu işlemi yapamaz.,press_tr
 Another request is updating this organization. Try again.,Bu kuruluş şu anda güncelleniyor. Yeniden deneyin.,press_tr
 Press team invitations are disabled.,Press üzerinden takım daveti gönderilemez.,press_tr
-Links a verified Keycloak issuer and subject to a Press user account.,Doğrulanan Keycloak kimliğini Press hesabına bağlar.,Press Identity Link
-Maps a Keycloak session to a Press session so that Press can revoke it on logout.,Keycloak oturumunu Press oturumuna bağlar. Press çıkışta kendi oturumunu kapatır.,Press Keycloak Session
+Links a verified Keycloak issuer and subject to a Press user account.,Doğrulanan Keycloak kimliğini Press hesabına bağlar.,PTR Identity Link
+Maps a Keycloak session to a Press session so that Press can revoke it on logout.,Keycloak oturumunu Press oturumuna bağlar. Press çıkışta kendi oturumunu kapatır.,PTR Keycloak Session
 Get a single-use Keycloak login URL.,Tek kullanımlık Keycloak giriş adresini alın.,press_tr.openapi
 Starts a rate-limited browser login. A separate random value in an HttpOnly SameSite=Lax cookie binds the state record to the initiating browser for 600 seconds. HTTPS uses a Secure cookie with the __Host- prefix.,"Tarayıcıdan girişi başlatır ve istek sayısını sınırlar. HttpOnly ve SameSite=Lax çerezindeki rastgele değer, giriş kaydını tarayıcıya 600 saniye bağlar. HTTPS, __Host- önekli Secure çerez kullanır.",press_tr.openapi
 "The URL contains state, nonce and a PKCE S256 challenge.","Adres, state ve nonce değerlerini ve PKCE S256 özetini taşır.",press_tr.openapi

@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import frappe
 
-from press_tr.kimlik import anonymization
+from press_tr.press_identity import anonymization
 
 OLD_ADDRESS = "old@example.test"
 ANONYMOUS_ADDRESS = "deleted@invalid.example"

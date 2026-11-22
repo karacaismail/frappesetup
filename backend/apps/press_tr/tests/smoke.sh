@@ -1,10 +1,10 @@
 #!/bin/sh
 set -eu
 
-export PRESS_WEB_PORT="$((${PANE_PORT:?Set the Pane port base} + 3))"
-export PRESS_SOCKET_PORT="$((PANE_PORT + 4))"
+export PTR_WEB_PORT="$((${PANE_PORT:?Set the Pane port base} + 3))"
+export PTR_SOCKET_PORT="$((PANE_PORT + 4))"
 env_file="${PRESS_ENV_FILE:-backend/dev/press/.env.example}"
-base="http://127.0.0.1:$PRESS_WEB_PORT"
+base="http://127.0.0.1:$PTR_WEB_PORT"
 
 response=$(curl --fail --silent --show-error --max-time 10 \
     --header 'Host: press.localhost' "$base/api/method/ping")

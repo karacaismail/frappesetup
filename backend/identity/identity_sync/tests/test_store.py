@@ -39,12 +39,12 @@ class StoreTest(unittest.TestCase):
 
     def test_dead_letter_round_trip(self) -> None:
         store = self.open()
-        store.add_dead_letter(EVENT, "tenant.provision kiraci1: HTTP 503")
+        store.add_dead_letter(EVENT, "tenant.provision tenant1: HTTP 503")
         store.close()
 
         (letter,) = self.open().dead_letters()
         self.assertEqual(letter.event, EVENT)
-        self.assertEqual(letter.error, "tenant.provision kiraci1: HTTP 503")
+        self.assertEqual(letter.error, "tenant.provision tenant1: HTTP 503")
         self.assertEqual((letter.attempts, letter.first_failed_at, letter.last_failed_at), (1, 100.0, 100.0))
 
     def test_second_failure_counts_attempt_and_keeps_first_time(self) -> None:

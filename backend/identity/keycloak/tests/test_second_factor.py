@@ -14,8 +14,8 @@ import unittest
 import urllib.parse
 from hashlib import sha1
 
-from test_eklentiler import _ac, _cerezli_acici, _form_hedefi
-from yardimci import admin, canli_var_mi, istek, ortam, tenant_authorize_url, tenant_authorize_with_pkce, tenant_callback_url, yonetici_belirteci, safe_detail
+from test_extensions import _open, _cookie_opener, _form_hedefi
+from helpers import admin, live_available, request, get_environment_value, tenant_authorize_url, tenant_authorize_with_pkce, tenant_callback_url, admin_token, safe_detail
 
 TOTP_USER = "totp.ornek@example.test"
 TOTP_PASSWORD = "Ornek-Parola-Totp-2026"  # gitleaks:allow (synthetic test value, development realm only)
@@ -61,20 +61,20 @@ def _authorize_url() -> str:
     return tenant_authorize_url()
 
 
-@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL missing, live Keycloak test skipped")
+@unittest.skipUnless(live_available(), "KC_PUBLIC_URL missing, live Keycloak test skipped")
 class SecondFactorTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.kc = ortam("KC_PUBLIC_URL")
-        cls.admin_token = yonetici_belirteci()
+        cls.kc = get_environment_value("KC_PUBLIC_URL")
+        cls.admin_token = admin_token()
 
     def setUp(self):
         # The master admin token lives 60 seconds. A long test run outlives the one from setUpClass.
-        self.admin_token = yonetici_belirteci()
+        self.admin_token = admin_token()
         # Brute force detection locks a user who logs in twice within quickLoginCheckMilliSeconds.
         # Clear the counter so earlier attempts (or an earlier test) do not lock the sample user.
         user = admin(f"/users?email={TOTP_USER}&exact=true", self.admin_token).json()[0]
-        admin(f"/attack-detection/brute-force/users/{user['id']}", self.admin_token, yontem="DELETE")
+        admin(f"/attack-detection/brute-force/users/{user['id']}", self.admin_token, method="DELETE")
 
     def _pause_for_quick_login_check(self):
         # Two attempts within one second count as a quick login and lock the user for 60 seconds.
@@ -86,55 +86,55 @@ class SecondFactorTest(unittest.TestCase):
         self.assertIn("otp", {c["type"] for c in credentials})
 
     def test_password_login_requires_valid_totp(self):
-        opener = _cerezli_acici()
-        status, _, html = _ac(opener, _authorize_url())
+        opener = _cookie_opener()
+        status, _, html = _open(opener, _authorize_url())
         self.assertEqual(status, 200)
         form = urllib.parse.urlencode({"username": TOTP_USER, "password": TOTP_PASSWORD, "credentialId": ""}).encode()
-        status, headers, html = _ac(opener, _form_hedefi(html), form)
+        status, headers, html = _open(opener, _form_hedefi(html), form)
         self.assertEqual(status, 200, "password alone must not finish the login")
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "the OTP form must be shown after the password")
         self._pause_for_quick_login_check()
         # A wrong code is rejected.
-        status, headers, html = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": "000000"}).encode())
+        status, headers, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": "000000"}).encode())
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "wrong code must keep the OTP form")
         self._pause_for_quick_login_check()
         # The correct code completes the login with an authorization code.
-        status, headers, _ = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+        status, headers, _ = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         self.assertEqual(status, 302)
         self.assertTrue("code=" in headers.get("Location", ""), f"HTTP {status}")
 
     def test_authorization_code_is_bound_to_pkce_verifier(self):
         """The code from a full login can only be exchanged with the matching code_verifier."""
         url, verifier = tenant_authorize_with_pkce()
-        opener = _cerezli_acici()
-        _, _, html = _ac(opener, url)
+        opener = _cookie_opener()
+        _, _, html = _open(opener, url)
         form = urllib.parse.urlencode({"username": TOTP_USER, "password": TOTP_PASSWORD, "credentialId": ""}).encode()
-        _, _, html = _ac(opener, _form_hedefi(html), form)
+        _, _, html = _open(opener, _form_hedefi(html), form)
         self._pause_for_quick_login_check()
-        _, headers, _ = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+        _, headers, _ = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         code = urllib.parse.parse_qs(urllib.parse.urlsplit(headers["Location"]).query)["code"][0]
         token_url = f"{self.kc}/realms/platform/protocol/openid-connect/token"
         base = {
             "grant_type": "authorization_code",
-            "client_id": "site-kiraci1",
-            "client_secret": ortam("ATONOTA_SITE_KIRACI1_SECRET"),
+            "client_id": "site-tenant1",
+            "client_secret": get_environment_value("ATONOTA_SITE_TENANT1_SECRET"),
             "redirect_uri": tenant_callback_url(),
             "code": code,
         }
-        wrong = istek("POST", token_url, form={**base, "code_verifier": "wrong-" + verifier[:20]})
-        self.assertEqual(wrong.durum, 400, "a wrong verifier must be refused")
+        wrong = request("POST", token_url, form={**base, "code_verifier": "wrong-" + verifier[:20]})
+        self.assertEqual(wrong.status, 400, "a wrong verifier must be refused")
         self.assertTrue(wrong.json().get("error") == "invalid_grant", safe_detail(wrong))
         # Keycloak invalidates the code after a failed exchange, so a fresh login is needed for the good case.
         self._pause_for_quick_login_check()
         url, verifier = tenant_authorize_with_pkce()
-        opener = _cerezli_acici()
-        _, _, html = _ac(opener, url)
-        _, _, html = _ac(opener, _form_hedefi(html), form)
+        opener = _cookie_opener()
+        _, _, html = _open(opener, url)
+        _, _, html = _open(opener, _form_hedefi(html), form)
         self._pause_for_quick_login_check()
-        _, headers, _ = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+        _, headers, _ = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         code = urllib.parse.parse_qs(urllib.parse.urlsplit(headers["Location"]).query)["code"][0]
-        good = istek("POST", token_url, form={**base, "code": code, "code_verifier": verifier})
-        self.assertEqual(good.durum, 200, safe_detail(good))
+        good = request("POST", token_url, form={**base, "code": code, "code_verifier": verifier})
+        self.assertEqual(good.status, 200, safe_detail(good))
         self.assertTrue("access_token" in good.json(), safe_detail(good))

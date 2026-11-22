@@ -8,10 +8,10 @@ import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 
-from platform_core.kimlik import anonymization, provisioning, service_token, sign_in
-from platform_core.kimlik.exceptions import InvalidInput
-from platform_core.kimlik.reconciliation import list_linked_identities
-from platform_core.kimlik.safe_errors import safe_errors
+from platform_core.identity import anonymization, provisioning, service_token, sign_in
+from platform_core.identity.exceptions import InvalidInput
+from platform_core.identity.reconciliation import list_linked_identities
+from platform_core.identity.safe_errors import safe_errors
 
 SERVICE = "identity-sync"
 # identity-sync is one client. The limit leaves room for a reconciliation run (G-7, S-GIR-4).
@@ -24,7 +24,7 @@ def _only(*fields: str) -> None:
 	unknown = sorted(set(frappe.form_dict) - set(fields) - {"cmd"})
 	if unknown:
 		frappe.throw(
-			_("Unknown field: {0}", context="platform_core.kimlik").format(", ".join(unknown)), InvalidInput
+			_("Unknown field: {0}", context="platform_core.identity").format(", ".join(unknown)), InvalidInput
 		)
 
 
@@ -36,7 +36,7 @@ def list_identities(start: object = 0, page_length: object = 500) -> dict:
 	service_token.require_service(SERVICE)
 	if not frappe.has_permission(provisioning.LINK, "read"):
 		frappe.throw(
-			_("You do not have permission to read identity links.", context="platform_core.kimlik"),
+			_("You do not have permission to read identity links.", context="platform_core.identity"),
 			frappe.PermissionError,
 		)
 	_only("start", "page_length")

@@ -4,23 +4,23 @@ from uuid import uuid4
 
 import frappe
 
-from platform_core.model_gecidi.doctype.validation import parse_records
+from platform_core.model_gateway.doctype.validation import parse_records
 
 TARGET_DOCTYPE = "PLT AI Route Target"
 
 
 def execute():
 	# Frappe retains removed database columns. New installations have no JSON column.
-	if not frappe.db.has_column("AI Route", "targets"):
+	if not frappe.db.has_column("PLT AI Route", "targets"):
 		return
 
-	route = frappe.qb.DocType("AI Route")
+	route = frappe.qb.DocType("PLT AI Route")
 	for row in frappe.qb.from_(route).select(route.name, route.targets).run(as_dict=True):
 		migrate_route(row.name, row.targets)
 
 
 def migrate_route(name, legacy_json):
-	link = {"parent": name, "parenttype": "AI Route", "parentfield": "targets"}
+	link = {"parent": name, "parenttype": "PLT AI Route", "parentfield": "targets"}
 	targets = parse_records(legacy_json, "Targets")
 	if not targets:
 		return

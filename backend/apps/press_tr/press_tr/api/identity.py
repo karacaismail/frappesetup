@@ -8,12 +8,12 @@ from frappe.query_builder.functions import Cast
 from redis.exceptions import LockNotOwnedError
 from werkzeug.exceptions import Conflict
 
-from press_tr.kimlik.accounts import disable_user as disable_linked_user
-from press_tr.kimlik.anonymization import RECORD_PAGE_SIZE, anonymize_linked_user, iter_named_rows
-from press_tr.kimlik.identity import IDENTITY_LINK, as_press_user, bind_identity, create_team, find_identity
-from press_tr.kimlik.oidc import claim, reject
-from press_tr.kimlik.oidc import issuer as configured_issuer
-from press_tr.kimlik.service import require_service
+from press_tr.press_identity.accounts import disable_user as disable_linked_user
+from press_tr.press_identity.anonymization import RECORD_PAGE_SIZE, anonymize_linked_user, iter_named_rows
+from press_tr.press_identity.identity import IDENTITY_LINK, as_press_user, bind_identity, create_team, find_identity
+from press_tr.press_identity.oidc import claim, reject
+from press_tr.press_identity.oidc import issuer as configured_issuer
+from press_tr.press_identity.service import require_service
 
 IDENTITY_PAGE_SIZE = 500
 # MariaDB offsets support unsigned 64-bit integers.
@@ -29,7 +29,7 @@ def reset_read_snapshot() -> None:
 def lock_team(organization_id: str):
 	# Authentication opens a read snapshot before the Team lock.
 	reset_read_snapshot()
-	name = frappe.db.get_value("Team", {"keycloak_org_id": organization_id}, "name")
+	name = frappe.db.get_value("Team", {"custom_ptr_keycloak_org_id": organization_id}, "name")
 	if not name:
 		return None
 	# The name lookup uses a snapshot too. Start the write transaction with
@@ -38,7 +38,7 @@ def lock_team(organization_id: str):
 	if not frappe.db.get_value("Team", name, "name", for_update=True):
 		return None
 	doc = frappe.get_doc("Team", name, for_update=True)
-	if doc.keycloak_org_id != organization_id:
+	if doc.custom_ptr_keycloak_org_id != organization_id:
 		reject()
 	return doc
 
@@ -156,7 +156,7 @@ def remove_organization_memberships(user: str) -> None:
 	for candidates in batched(sorted(candidate_names), RECORD_PAGE_SIZE, strict=False):
 		team_names = frappe.db.get_values(
 			"Team",
-			{"name": ["in", candidates], "keycloak_org_id": ["is", "set"]},
+			{"name": ["in", candidates], "custom_ptr_keycloak_org_id": ["is", "set"]},
 			"name",
 			order_by="name asc",
 			for_update=True,

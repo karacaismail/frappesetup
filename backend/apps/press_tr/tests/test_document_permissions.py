@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from press_tr.kimlik import accounts
+from press_tr.press_identity import accounts
 
 
 class DocumentPermissionTest(TestCase):

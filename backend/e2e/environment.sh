@@ -8,12 +8,12 @@ if [[ ! "${PANE_PORT:-}" =~ ^[1-9][0-9]{3,4}$ ]] || (( PANE_PORT > 65526 )); the
     exit 2
 fi
 
-export KIRACI_WEB_PORT="$((PANE_PORT + 1))"
-export KIRACI_SOCKET_PORT="$((PANE_PORT + 2))"
+export FS_TENANT_WEB_PORT="$((PANE_PORT + 1))"
+export FS_TENANT_SOCKET_PORT="$((PANE_PORT + 2))"
 export DEV_ENV_FILE="${DEV_ENV_FILE:-$dev_dir/.env}"
 project="fs-integration-e2e-$PANE_PORT"
 provider_port="$((PANE_PORT + 7))"
-tenant_image="fs-kiraci-dev:$PANE_PORT"
+tenant_image="fs-tenant-dev:$PANE_PORT"
 colima_bin="${COLIMA_BIN:-$HOME/.local/bin/colima}"
 press=false
 if [[ "${1:-}" == --press ]]; then
@@ -67,32 +67,32 @@ case "${1:-}" in
                 exit 2
             fi
             printf 'Reusing tenant image: %s\n' "$tenant_image"
-            "${compose[@]}" up --no-build --pull never -d --wait --wait-timeout 90 kiraci-db kiraci-redis
-            "${compose[@]}" up --no-build --pull never -d kiraci-web kiraci-socket
+            "${compose[@]}" up --no-build --pull never -d --wait --wait-timeout 90 tenant-db tenant-redis
+            "${compose[@]}" up --no-build --pull never -d tenant-web tenant-socket
         else
             python3 "$dev_dir/init_env.py"
             "${compose[@]}" config --quiet
             if "${engine[@]}" image inspect "$tenant_image" >/dev/null 2>&1; then
                 printf 'Reusing tenant image: %s\n' "$tenant_image"
             else
-                "${compose[@]}" build kiraci-web
+                "${compose[@]}" build tenant-web
             fi
-            "${compose[@]}" up --no-build -d --wait --wait-timeout 90 kiraci-db kiraci-redis
-            "${compose[@]}" run --rm --no-deps kiraci-web \
-                env/bin/python /workspace/dev/bootstrap.py kiraci1.localhost --app erpnext --app platform_core
-            "${compose[@]}" up --no-build -d kiraci-web kiraci-socket
+            "${compose[@]}" up --no-build -d --wait --wait-timeout 90 tenant-db tenant-redis
+            "${compose[@]}" run --rm --no-deps tenant-web \
+                env/bin/python /workspace/dev/bootstrap.py tenant1.localhost --app erpnext --app platform_core
+            "${compose[@]}" up --no-build -d tenant-web tenant-socket
         fi
-        "$dev_dir/bin/tunel" kapat
+        "$dev_dir/bin/tunnel" close
         forward_ports=()
-        for port in "$KIRACI_WEB_PORT" "$KIRACI_SOCKET_PORT" "$provider_port"; do
+        for port in "$FS_TENANT_WEB_PORT" "$FS_TENANT_SOCKET_PORT" "$provider_port"; do
             if ! nc -z 127.0.0.1 "$port" 2>/dev/null; then
                 forward_ports+=("$port")
             fi
         done
         if [[ -n "${forward_ports[0]-}" ]]; then
-            "$dev_dir/bin/tunel" ac "${forward_ports[@]}"
+            "$dev_dir/bin/tunnel" open "${forward_ports[@]}"
         fi
-        printf 'Tenant URL: http://kiraci1.localhost:%s\n' "$KIRACI_WEB_PORT"
+        printf 'Tenant URL: http://kiraci1.localhost:%s\n' "$FS_TENANT_WEB_PORT"
         ;;
     down)
         if [[ ! -f "$DEV_ENV_FILE" ]]; then
@@ -107,7 +107,7 @@ case "${1:-}" in
         else
             "${compose[@]}" down
         fi
-        "$dev_dir/bin/tunel" kapat
+        "$dev_dir/bin/tunnel" close
         if [[ "$context" == colima ]]; then
             owned_image="$("${engine[@]}" image ls --filter "reference=$tenant_image" \
                 --filter "label=com.docker.compose.project=$project" --format '{{.ID}}')"

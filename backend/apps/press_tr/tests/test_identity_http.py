@@ -267,7 +267,7 @@ class IdentityHttpTest(
 		for method in ("ensure_team", "remove_team_member"):
 			for token, headers in (
 				(None, {}),
-				(self.token(audience="site-kiraci1"), {}),
+				(self.token(audience="site-tenant1"), {}),
 				(self.token(authorized_party="press-service"), {}),
 			):
 				with self.subTest(method=method, headers=headers):
@@ -319,13 +319,13 @@ class IdentityHttpTest(
 		try:
 			frappe.db.set_value("User", f"{closed_subject}@example.test", "enabled", 0)
 			frappe.db.set_value(
-				"Press Identity Link",
+				"PTR Identity Link",
 				{"issuer": ISSUER, "subject": tombstone_subject},
 				"issuer",
 				"urn:press-tr:deleted-identity",
 			)
 			frappe.db.set_value(
-				"Press Identity Link",
+				"PTR Identity Link",
 				{"issuer": ISSUER, "subject": other_issuer_subject},
 				"issuer",
 				ISSUER.upper(),
@@ -372,7 +372,7 @@ class IdentityHttpTest(
 		frappe.connect()
 		try:
 			frappe.db.bulk_insert(
-				"Press Identity Link",
+				"PTR Identity Link",
 				fields=["name", "issuer", "subject", "user"],
 				values=[(name, ISSUER, name, f"{name}@example.test") for name in fixtures],
 			)
@@ -388,7 +388,7 @@ class IdentityHttpTest(
 				[{"issuer": ISSUER, "subject": fixture, "enabled": False} for fixture in fixtures],
 			)
 		finally:
-			frappe.db.delete("Press Identity Link", {"name": ["in", fixtures]})
+			frappe.db.delete("PTR Identity Link", {"name": ["in", fixtures]})
 			frappe.db.commit()
 			frappe.destroy()
 
@@ -401,7 +401,7 @@ class IdentityHttpTest(
 			("missing", None, {}),
 			("malformed", "not-a-token", {}),
 			("bad_signature", f"{signed_input}.{bad_signature}", {}),
-			("wrong_audience", self.token(audience="site-kiraci1"), {}),
+			("wrong_audience", self.token(audience="site-tenant1"), {}),
 			("wrong_client", self.token(authorized_party="press-service"), {}),
 			("wrong_issuer", self.token(iss="https://other.example.test"), {}),
 			("expired", self.token(exp=int(time.time()) - 120), {}),
@@ -593,7 +593,7 @@ class IdentityHttpTest(
 			)
 			self.assertEqual(len(teams), 1)
 			self.assertNotIn(teams[0], organization_teams)
-			self.assertFalse(frappe.db.get_value("Team", teams[0], "keycloak_org_id"))
+			self.assertFalse(frappe.db.get_value("Team", teams[0], "custom_ptr_keycloak_org_id"))
 		finally:
 			frappe.destroy()
 
@@ -803,7 +803,7 @@ class IdentityHttpTest(
 		frappe.init("press.localhost")
 		frappe.connect()
 		try:
-			self.assertFalse(frappe.db.exists("Press Identity Link", body))
+			self.assertFalse(frappe.db.exists("PTR Identity Link", body))
 			self.assertFalse(frappe.db.get_value("Team", team, "enabled"))
 			self.assertEqual(
 				frappe.db.get_value("Team", team, ["billing_name", "phone_number"]), (None, None)
@@ -820,7 +820,7 @@ class IdentityHttpTest(
 				secret_key.encode(), json.dumps([ISSUER, subject], separators=(",", ":")).encode(), "sha256"
 			).hexdigest()
 			self.assertEqual(
-				frappe.db.get_value("Press Identity Link", {"user": user}, "subject"), expected_digest
+				frappe.db.get_value("PTR Identity Link", {"user": user}, "subject"), expected_digest
 			)
 			self.assertEqual(frappe.db.get_value("Team", team, "user"), user)
 			self.assertEqual(
@@ -925,7 +925,7 @@ class IdentityHttpTest(
 		for token in (
 			None,
 			self.token(authorized_party="press-service"),
-			self.token(audience="site-kiraci1"),
+			self.token(audience="site-tenant1"),
 			self.token(exp=int(time.time()) - 300),
 		):
 			with self.subTest(token_present=token is not None):

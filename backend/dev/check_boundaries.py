@@ -265,7 +265,7 @@ def check(root: Path, policy: dict) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--policy", type=Path, default=Path(__file__).with_name("modul-sinirlari.json"))
+    parser.add_argument("--policy", type=Path, default=Path(__file__).with_name("module-boundaries.json"))
     args = parser.parse_args()
     try:
         violations = check(args.root.resolve(), json.loads(args.policy.read_text()))

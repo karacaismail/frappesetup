@@ -6,9 +6,9 @@ from frappe.desk.form.load import getdoctype
 from frappe.tests import IntegrationTestCase
 from werkzeug.wrappers import Request
 
-from platform_core.kabuk.metadata import visible_schema
-from platform_core.kabuk.metadata_policy import MetadataPolicy
-from platform_core.kabuk.native_metadata import (
+from platform_core.shell.metadata import visible_schema
+from platform_core.shell.metadata_policy import MetadataPolicy
+from platform_core.shell.native_metadata import (
 	guard_native_metadata,
 	resolve_method,
 	resolve_request_target,
@@ -24,8 +24,8 @@ class TestWebsiteRPC(IntegrationTestCase):
 			patch.object(frappe.local, "form_dict", frappe._dict(), create=True),
 			patch.object(frappe.local, "lang", "tr", create=True),
 			patch.dict(frappe.session, {"user": "website-user@example.test"}),
-			patch("platform_core.kabuk.native_metadata.is_system_user", return_value=False),
-			patch("platform_core.kabuk.native_metadata.resolve_request_target", return_value=object()),
+			patch("platform_core.shell.native_metadata.is_system_user", return_value=False),
+			patch("platform_core.shell.native_metadata.resolve_request_target", return_value=object()),
 		):
 			with self.assertRaises(frappe.PermissionError) as denied:
 				guard_native_metadata()
@@ -67,7 +67,7 @@ class TestWebsiteRPC(IntegrationTestCase):
 		with (
 			patch.object(frappe.local, "request", request, create=True),
 			patch.object(frappe.local, "form_dict", frappe._dict(), create=True),
-			patch("platform_core.kabuk.native_metadata.resolve_request_target") as resolve,
+			patch("platform_core.shell.native_metadata.resolve_request_target") as resolve,
 		):
 			guard_native_metadata()
 		resolve.assert_not_called()
@@ -86,7 +86,7 @@ class TestWebsiteRPC(IntegrationTestCase):
 
 	def test_unexpected_rpc_lookup_failure_is_not_a_validation_error(self):
 		for target, doctype in (
-			("platform_core.kabuk.native_metadata.load_doctype_module", "ToDo"),
+			("platform_core.shell.native_metadata.load_doctype_module", "ToDo"),
 			("frappe.get_attr", None),
 		):
 			with (

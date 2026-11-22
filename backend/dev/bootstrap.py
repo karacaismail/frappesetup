@@ -14,12 +14,12 @@ def configure() -> None:
     path = BENCH / "sites/common_site_config.json"
     config = json.loads(path.read_text()) if path.exists() else {}
     config.update(
-        db_host="kiraci-db",
-        redis_cache="redis://kiraci-redis:6379/0",
-        redis_queue="redis://kiraci-redis:6379/1",
-        redis_socketio="redis://kiraci-redis:6379/1",
-        socketio_port=int(os.environ["KIRACI_SOCKET_PORT"]),
-        webserver_port=int(os.environ["KIRACI_WEB_PORT"]),
+        db_host="tenant-db",
+        redis_cache="redis://tenant-redis:6379/0",
+        redis_queue="redis://tenant-redis:6379/1",
+        redis_socketio="redis://tenant-redis:6379/1",
+        socketio_port=int(os.environ["FS_TENANT_SOCKET_PORT"]),
+        webserver_port=int(os.environ["FS_TENANT_WEB_PORT"]),
         pause_scheduler=True,
         disable_scheduler=True,
         server_script_enabled=False,
@@ -47,7 +47,7 @@ def prepare(site: str, apps: list[str]) -> None:
                 "--db-type",
                 "mariadb",
                 "--db-host",
-                "kiraci-db",
+                "tenant-db",
                 "--mariadb-user-host-login-scope",
                 "%",
                 "--db-root-password",
@@ -65,7 +65,7 @@ def prepare(site: str, apps: list[str]) -> None:
         pause_scheduler=True,
         disable_scheduler=True,
         mute_emails=True,
-        host_name=f"http://{site}:{os.environ['KIRACI_WEB_PORT']}",
+        host_name=f"http://{site}:{os.environ['FS_TENANT_WEB_PORT']}",
     )
     path.write_text(json.dumps(config, indent=2) + "\n")
     path.chmod(0o600)
@@ -80,8 +80,8 @@ def main() -> None:
     parser.add_argument("site")
     parser.add_argument("--app", action="append", default=[])
     args = parser.parse_args()
-    if args.site != "kiraci1.localhost" and not re.fullmatch(r"test-[a-z0-9-]+\.localhost", args.site):
-        parser.error("Only kiraci1.localhost and test-*.localhost are allowed")
+    if args.site != "tenant1.localhost" and not re.fullmatch(r"test-[a-z0-9-]+\.localhost", args.site):
+        parser.error("Only tenant1.localhost and test-*.localhost are allowed")
     if any(not re.fullmatch(r"[a-z][a-z0-9_]*", app) for app in args.app):
         parser.error("Invalid app name")
     prepare(args.site, args.app)

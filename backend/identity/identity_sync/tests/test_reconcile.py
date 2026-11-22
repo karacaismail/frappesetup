@@ -22,10 +22,10 @@ from identity_sync.mapping import (
 )
 from identity_sync.reconcile import Difference, Identity, deleted_subjects, find_differences, plan_repairs
 
-ISSUER = "http://kimlik.localhost:6110/realms/platform"
-ORG = Organization(id="o-1", alias="kiraci1", name="Kiracı 1")
+ISSUER = "http://identity.localhost:6110/realms/platform"
+ORG = Organization(id="o-1", alias="tenant1", name="Kiracı 1")
 OTHER = Organization(id="o-2", alias="baska", name="Başka")
-TENANTS = (Tenant(name="kiraci1", base_url="http://kiraci1.localhost:6111", organization="kiraci1"),)
+TENANTS = (Tenant(name="tenant1", base_url="http://tenant1.localhost:6111", organization="tenant1"),)
 
 
 def user(subject: str, *, orgs=(ORG,), verified: bool = True, enabled: bool = True, email: str | None = None):
@@ -51,7 +51,7 @@ def identity(subject: str, *, email: str | None = None, enabled: bool = True, is
 
 
 def differences(users, press=(), tenant=()):
-    return find_differences(users, press, {"kiraci1": tenant}, issuer=ISSUER, tenants=TENANTS)
+    return find_differences(users, press, {"tenant1": tenant}, issuer=ISSUER, tenants=TENANTS)
 
 
 def in_sync(subject: str = "a"):
@@ -64,17 +64,17 @@ class TenantDifferenceTest(unittest.TestCase):
 
     def test_missing_link(self) -> None:
         users, press, _tenant = in_sync()
-        self.assertEqual(differences(users, press, []), [Difference("kiraci1", "a", "missing")])
+        self.assertEqual(differences(users, press, []), [Difference("tenant1", "a", "missing")])
 
     def test_disabled_in_keycloak_but_enabled_on_tenant(self) -> None:
         found = differences([user("a", enabled=False)], [], [identity("a")])
-        self.assertEqual(found, [Difference("kiraci1", "a", "closed_in_keycloak")])
+        self.assertEqual(found, [Difference("tenant1", "a", "closed_in_keycloak")])
 
     def test_deleted_in_keycloak_is_its_own_kind_on_the_tenant(self) -> None:
         # The record still names a user Keycloak no longer has. Enabled or not, the deletion is unfinished.
         for record in (identity("a"), identity("a", enabled=False)):
             with self.subTest(enabled=record.enabled):
-                self.assertEqual(differences([], [], [record]), [Difference("kiraci1", "a", "deleted_in_keycloak")])
+                self.assertEqual(differences([], [], [record]), [Difference("tenant1", "a", "deleted_in_keycloak")])
 
     def test_closed_everywhere_is_not_a_difference(self) -> None:
         # A closed user stays on the target as a disabled record. That is the expected end state (X-11).
@@ -82,28 +82,28 @@ class TenantDifferenceTest(unittest.TestCase):
 
     def test_enabled_on_tenant_without_membership(self) -> None:
         found = differences([user("a", orgs=(OTHER,))], [identity("a", orgs=("o-2",))], [identity("a")])
-        self.assertEqual(found, [Difference("kiraci1", "a", "unexpected")])
+        self.assertEqual(found, [Difference("tenant1", "a", "unexpected")])
 
     def test_member_disabled_on_tenant(self) -> None:
         users, press, _tenant = in_sync()
         found = differences(users, press, [identity("a", enabled=False)])
-        self.assertEqual(found, [Difference("kiraci1", "a", "disabled")])
+        self.assertEqual(found, [Difference("tenant1", "a", "disabled")])
 
     def test_email_mismatch_ignores_case(self) -> None:
         users, press, _tenant = in_sync()
         self.assertEqual(differences(users, press, [identity("a", email="A@Example.test")]), [])
         found = differences(users, press, [identity("a", email="eski@example.test")])
-        self.assertEqual(found, [Difference("kiraci1", "a", "email_mismatch")])
+        self.assertEqual(found, [Difference("tenant1", "a", "email_mismatch")])
 
     def test_unverified_member_is_reported_but_not_expected(self) -> None:
         # The first link needs a verified e-mail (AU-4). The comparison does not ask for it.
         self.assertEqual(differences([user("a", verified=False)], [], []), [])
         found = differences([user("a", verified=False)], [], [identity("a")])
-        self.assertEqual(found, [Difference("kiraci1", "a", "unverified_in_keycloak")])
+        self.assertEqual(found, [Difference("tenant1", "a", "unverified_in_keycloak")])
 
     def test_record_of_another_issuer_is_reported(self) -> None:
         foreign = identity("z", issuer="http://baska.example.test/realms/x")
-        self.assertEqual(differences([], [], [foreign]), [Difference("kiraci1", "z", "foreign_issuer")])
+        self.assertEqual(differences([], [], [foreign]), [Difference("tenant1", "z", "foreign_issuer")])
         self.assertEqual(differences([], [foreign], []), [Difference("press", "z", "foreign_issuer")])
 
 
@@ -144,7 +144,7 @@ class PressDifferenceTest(unittest.TestCase):
         closed = Identity(issuer=ISSUER, subject="a", email="", enabled=False, organization_ids=None)
         self.assertEqual(
             differences(users, [closed], [closed]),
-            [Difference("press", "a", "disabled"), Difference("kiraci1", "a", "disabled")],
+            [Difference("press", "a", "disabled"), Difference("tenant1", "a", "disabled")],
         )
 
     def test_deleted_subjects_are_listed_once(self) -> None:
@@ -154,7 +154,7 @@ class PressDifferenceTest(unittest.TestCase):
 
     def test_deleted_accounts_get_no_single_repair_action(self) -> None:
         # They are finished by the ordered account job, not by loose actions.
-        found = [Difference("press", "a", "deleted_in_keycloak"), Difference("kiraci1", "a", "deleted_in_keycloak")]
+        found = [Difference("press", "a", "deleted_in_keycloak"), Difference("tenant1", "a", "deleted_in_keycloak")]
         self.assertEqual(plan_repairs(found, [], issuer=ISSUER, tenants=TENANTS), ())
 
     def test_member_disabled_on_press(self) -> None:
@@ -176,7 +176,7 @@ class ReportShapeTest(unittest.TestCase):
         users, press, _tenant = in_sync()
         (found,) = differences(users, press, [identity("a", email="eski@example.test")])
         self.assertNotIn("example.test", repr(found))
-        self.assertEqual(found.to_dict(), {"target": "kiraci1", "subject": "a", "kind": "email_mismatch"})
+        self.assertEqual(found.to_dict(), {"target": "tenant1", "subject": "a", "kind": "email_mismatch"})
 
     def test_team_difference_names_the_organization(self) -> None:
         users, _press, tenant = in_sync()
@@ -187,7 +187,7 @@ class ReportShapeTest(unittest.TestCase):
         users = [user("b"), user("a")]
         found = differences(users, [], [])
         self.assertEqual(
-            [(d.target, d.subject) for d in found], [("press", "a"), ("press", "b"), ("kiraci1", "a"), ("kiraci1", "b")]
+            [(d.target, d.subject) for d in found], [("press", "a"), ("press", "b"), ("tenant1", "a"), ("tenant1", "b")]
         )
 
 
@@ -198,9 +198,9 @@ class RepairPlanTest(unittest.TestCase):
     def sync_actions(self, subject: str = "a"):
         email = f"{subject}@example.test"
         return (
-            TenantChangeEmail(tenant="kiraci1", issuer=ISSUER, subject=subject, new_email=email),
+            TenantChangeEmail(tenant="tenant1", issuer=ISSUER, subject=subject, new_email=email),
             TenantProvision(
-                tenant="kiraci1",
+                tenant="tenant1",
                 issuer=ISSUER,
                 subject=subject,
                 email=email,
@@ -214,18 +214,18 @@ class RepairPlanTest(unittest.TestCase):
     def test_missing_disabled_and_mismatched_tenant_users_are_synced(self) -> None:
         for kind in ("missing", "disabled", "email_mismatch"):
             with self.subTest(kind=kind):
-                actions = self.repairs([Difference("kiraci1", "a", kind)], [user("a")])
+                actions = self.repairs([Difference("tenant1", "a", kind)], [user("a")])
                 self.assertEqual(actions, self.sync_actions())
 
     def test_closed_or_unexpected_tenant_user_is_disabled(self) -> None:
         # Closing a user on a tenant also revokes the phone installations there.
         disable = (
-            TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject="a", enabled=False),
-            TenantRevokeUserInstallations(tenant="kiraci1", issuer=ISSUER, subject="a"),
+            TenantSetEnabled(tenant="tenant1", issuer=ISSUER, subject="a", enabled=False),
+            TenantRevokeUserInstallations(tenant="tenant1", issuer=ISSUER, subject="a"),
         )
         closed = [user("a", enabled=False)]
-        self.assertEqual(self.repairs([Difference("kiraci1", "a", "closed_in_keycloak")], closed), disable)
-        self.assertEqual(self.repairs([Difference("kiraci1", "a", "unexpected")], [user("a", orgs=(OTHER,))]), disable)
+        self.assertEqual(self.repairs([Difference("tenant1", "a", "closed_in_keycloak")], closed), disable)
+        self.assertEqual(self.repairs([Difference("tenant1", "a", "unexpected")], [user("a", orgs=(OTHER,))]), disable)
 
     def test_team_membership_repairs(self) -> None:
         found = [
@@ -256,7 +256,7 @@ class RepairPlanTest(unittest.TestCase):
         manual = [
             Difference("press", "a", "disabled"),
             Difference("press", "a", "email_mismatch"),
-            Difference("kiraci1", "a", "unverified_in_keycloak"),
+            Difference("tenant1", "a", "unverified_in_keycloak"),
         ]
         self.assertEqual(self.repairs(manual, [user("a")]), ())
 
@@ -264,20 +264,20 @@ class RepairPlanTest(unittest.TestCase):
         # The difference says "closed", but Keycloak shows an open member now. The plan must not close the user.
         for kind in ("closed_in_keycloak", "unexpected"):
             with self.subTest(kind=kind):
-                self.assertEqual(self.repairs([Difference("kiraci1", "a", kind)], [user("a")]), ())
+                self.assertEqual(self.repairs([Difference("tenant1", "a", kind)], [user("a")]), ())
         self.assertEqual(self.repairs([Difference("press", "a", "closed_in_keycloak")], [user("a")]), ())
 
     def test_repairs_are_not_duplicated(self) -> None:
-        found = [Difference("kiraci1", "a", "disabled"), Difference("kiraci1", "a", "email_mismatch")]
+        found = [Difference("tenant1", "a", "disabled"), Difference("tenant1", "a", "email_mismatch")]
         self.assertEqual(self.repairs(found, [user("a")]), self.sync_actions())
 
     def test_record_of_another_issuer_is_left_alone(self) -> None:
         # The targets reject another issuer. Such a record needs a human.
-        self.assertEqual(self.repairs([Difference("kiraci1", "z", "foreign_issuer")], []), ())
+        self.assertEqual(self.repairs([Difference("tenant1", "z", "foreign_issuer")], []), ())
 
     def test_repair_is_skipped_when_the_user_changed_meanwhile(self) -> None:
         # The difference says "sync", but the user is closed now. The plan must not re-open the user.
-        actions = self.repairs([Difference("kiraci1", "a", "missing")], [user("a", enabled=False)])
+        actions = self.repairs([Difference("tenant1", "a", "missing")], [user("a", enabled=False)])
         self.assertEqual(actions, ())
 
 

@@ -41,7 +41,7 @@ class ApprovalEndpointTest(TestCase):
 		doc = Mock()
 		doc.check_permission.side_effect = frappe.PermissionError("Foreign application")
 		with patch.object(leave, "frappe") as fake:
-			fake.get_roles.return_value = ["HRMS TR Admin"]
+			fake.get_roles.return_value = ["HRT Admin"]
 			fake.get_doc.return_value = doc
 			with self.assertRaises(frappe.PermissionError):
 				cancel_leave("LEAVE-FOREIGN-0001", "2026-11-22 12:00:00")
@@ -57,7 +57,7 @@ class ApprovalEndpointTest(TestCase):
 			patch(f"{native_module}.validate_leave_access", side_effect=frappe.PermissionError) as validate,
 			patch(f"{native_module}.get_employee_leave_approver") as lookup,
 		):
-			fake.get_roles.return_value = ["HRMS TR Employee"]
+			fake.get_roles.return_value = ["HRT Employee"]
 			fake.db.exists.return_value = True
 			fake.get_attr.return_value = native_lookup
 			with self.assertRaises(frappe.PermissionError):
@@ -70,7 +70,7 @@ class ApprovalEndpointTest(TestCase):
 		doc = Mock()
 		doc.check_permission.side_effect = frappe.PermissionError("Foreign application")
 		with patch.object(leave, "frappe") as fake:
-			fake.get_roles.return_value = ["HRMS TR Manager"]
+			fake.get_roles.return_value = ["HRT Manager"]
 			fake.get_doc.return_value = doc
 			with self.assertRaises(frappe.PermissionError):
 				approve_leave("LEAVE-FOREIGN-0001", "2026-11-22 12:00:00")
@@ -83,7 +83,7 @@ class ApprovalEndpointTest(TestCase):
 			patch.object(leave, "frappe") as fake,
 			patch.object(leave, "_", side_effect=lambda message: message),
 		):
-			fake.get_roles.return_value = ["HRMS TR Manager"]
+			fake.get_roles.return_value = ["HRT Manager"]
 			fake.session.user = "manager@example.test"
 			fake.db.get_value.return_value = "employee@example.test"
 			fake.get_doc.return_value = doc

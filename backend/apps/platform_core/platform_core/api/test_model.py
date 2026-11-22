@@ -14,7 +14,7 @@ import frappe
 from frappe.utils import add_days, now_datetime
 from frappe.utils.password import get_decrypted_password, set_encrypted_password
 
-from platform_core.model_gecidi import adapters, gateway, policy
+from platform_core.model_gateway import adapters, gateway, policy
 
 
 class TestModelHTTP(unittest.TestCase):
@@ -25,7 +25,7 @@ class TestModelHTTP(unittest.TestCase):
 	def setUpClass(cls):
 		if cls.fixture is None:
 			raise unittest.SkipTest("Run the disposable Frappe HTTP fixture")
-		from platform_core.model_gecidi.tests.contract_validation import GatewayContract
+		from platform_core.model_gateway.tests.contract_validation import GatewayContract
 
 		cls.gateway_contract = GatewayContract()
 
@@ -33,7 +33,7 @@ class TestModelHTTP(unittest.TestCase):
 		self.fixture["provider_payloads"].clear()
 		for api in (self.fixture["first_api"], self.fixture["second_api"]):
 			frappe.cache.delete(self._cooldown_key(api))
-			frappe.db.delete("AI Usage Log", {"api": api})
+			frappe.db.delete("PLT AI Usage Log", {"api": api})
 		frappe.db.commit()
 		self.fixture["provider_status"]["/first/api/chat"] = 429
 
@@ -97,19 +97,19 @@ class TestModelHTTP(unittest.TestCase):
 	def test_regular_user_cannot_list_or_read_provider_credentials(self):
 		for name in ("", self.fixture["credential_api"]):
 			with self.subTest(detail=bool(name)):
-				response = self.request("regular", "GET", self.resource("AI API", name))
+				response = self.request("regular", "GET", self.resource("PLT AI API", name))
 				self.assertEqual(response.status_code, 403)
 
 	def test_manager_can_read_api_without_getting_secret(self):
 		name = self.fixture["credential_api"]
-		detail = self.request("manager", "GET", self.resource("AI API", name))
+		detail = self.request("manager", "GET", self.resource("PLT AI API", name))
 		self.assertEqual(detail.status_code, 200)
 		self.assertEqual(detail.json()["data"]["name"], name)
 		self.assertNotIn("api_key", detail.json()["data"])
 		listing = self.request(
 			"manager",
 			"GET",
-			self.resource("AI API"),
+			self.resource("PLT AI API"),
 			params={"fields": json.dumps(["name", "api_key"]), "filters": json.dumps({"name": name})},
 		)
 		self.assertEqual(listing.status_code, 200)
@@ -118,7 +118,7 @@ class TestModelHTTP(unittest.TestCase):
 			"manager",
 			"GET",
 			"/api/method/frappe.client.get",
-			params={"doctype": "AI API", "name": name},
+			params={"doctype": "PLT AI API", "name": name},
 		)
 		self.assertEqual(document.status_code, 200)
 		self.assertEqual(document.json()["message"]["name"], name)
@@ -143,7 +143,7 @@ class TestModelHTTP(unittest.TestCase):
 		usage = self.request(
 			"manager",
 			"GET",
-			self.resource("AI Usage Log"),
+			self.resource("PLT AI Usage Log"),
 			params={"filters": json.dumps({"route": route}), "fields": '["*"]'},
 		)
 		self.assertEqual(usage.status_code, 200)
@@ -202,7 +202,7 @@ class TestModelHTTP(unittest.TestCase):
 			"system_manager",
 			"POST",
 			"/api/method/frappe.client.get_password",
-			json={"doctype": "AI API", "name": self.fixture["credential_api"], "fieldname": "api_key"},
+			json={"doctype": "PLT AI API", "name": self.fixture["credential_api"], "fieldname": "api_key"},
 		)
 		self.assertEqual(response.status_code, 403)
 		self.assertNotIn(self.fixture["credential"], response.text)
@@ -215,7 +215,7 @@ class TestModelHTTP(unittest.TestCase):
 					"manager",
 					"GET",
 					"/api/method/frappe.desk.form.load.getdoc",
-					params={"doctype": "AI API", "name": name},
+					params={"doctype": "PLT AI API", "name": name},
 				)
 				self.assertEqual(loaded.status_code, 200)
 				document = next(row for row in loaded.json()["docs"] if row["name"] == name)
@@ -230,7 +230,7 @@ class TestModelHTTP(unittest.TestCase):
 				self.assertEqual(saved.status_code, 200, saved.json().get("exc_type"))
 				self.assertNotIn(self.fixture["credential"], saved.text)
 				frappe.db.rollback()
-				actual = get_decrypted_password("AI API", name, "api_key", raise_exception=False)
+				actual = get_decrypted_password("PLT AI API", name, "api_key", raise_exception=False)
 				self.assertTrue(actual == self.fixture["credential"])
 
 	def test_authentication_failure_is_recorded_and_skipped(self):
@@ -240,7 +240,7 @@ class TestModelHTTP(unittest.TestCase):
 		try:
 			failed_over = self.complete("manager")
 			self.assertEqual(failed_over.status_code, 200)
-			doc = self.request("manager", "GET", self.resource("AI API", api)).json()["data"]
+			doc = self.request("manager", "GET", self.resource("PLT AI API", api)).json()["data"]
 			self.assertEqual(doc["health_status"], "auth_failed")
 			second = self.complete("manager")
 			self.assertEqual(second.status_code, 200)
@@ -254,7 +254,7 @@ class TestModelHTTP(unittest.TestCase):
 			)
 		finally:
 			frappe.db.rollback()
-			frappe.db.set_value("AI API", api, "health_status", "healthy", update_modified=False)
+			frappe.db.set_value("PLT AI API", api, "health_status", "healthy", update_modified=False)
 			frappe.db.commit()
 
 	def test_provider_forbidden_does_not_disable_connection(self):
@@ -262,7 +262,7 @@ class TestModelHTTP(unittest.TestCase):
 		count = len(self.fixture["attempts"])
 		self.fixture["provider_status"]["/first/api/chat"] = 403
 		self.assertEqual(self.complete("manager").json()["message"]["api"], self.fixture["second_api"])
-		document = self.request("manager", "GET", self.resource("AI API", api)).json()["data"]
+		document = self.request("manager", "GET", self.resource("PLT AI API", api)).json()["data"]
 		self.assertNotEqual(document["health_status"], "auth_failed")
 		self.fixture["provider_status"]["/first/api/chat"] = 200
 		self.assertEqual(self.complete("manager").json()["message"]["api"], api)
@@ -276,7 +276,7 @@ class TestModelHTTP(unittest.TestCase):
 		)
 
 	def test_only_ai_manager_can_change_route_data_policy(self):
-		route = self.resource("AI Route", self.fixture["role_route"])
+		route = self.resource("PLT AI Route", self.fixture["role_route"])
 		denied = self.request("system_manager", "PUT", route, json={"data_policy": "masked"})
 		self.assertEqual(denied.status_code, 403, denied.json().get("exc_type"))
 		allowed = self.request("manager", "PUT", route, json={"data_policy": "masked"})
@@ -385,10 +385,10 @@ class TestModelHTTP(unittest.TestCase):
 		for actor, user_type in actor_types.items():
 			with self.subTest(actor=actor):
 				self.assertEqual(frappe.db.get_value("User", users[actor], "user_type"), user_type)
-		route_role = frappe.db.get_value("AI Route", self.fixture["role_route"], "required_role")
+		route_role = frappe.db.get_value("PLT AI Route", self.fixture["role_route"], "required_role")
 		desk_roles = set(frappe.get_roles(users["desk_no_gateway_role"]))
-		self.assertTrue(desk_roles.isdisjoint({route_role, "AI Manager", "System Manager"}))
-		self.assertIn("AI Manager", frappe.get_roles(users["manager"]))
+		self.assertTrue(desk_roles.isdisjoint({route_role, "PLT AI Manager", "System Manager"}))
+		self.assertIn("PLT AI Manager", frappe.get_roles(users["manager"]))
 		self.assertNotIn("System Manager", frappe.get_roles(users["manager"]))
 		self.assertIn("System Manager", frappe.get_roles(users["system_manager"]))
 
@@ -401,7 +401,7 @@ class TestModelHTTP(unittest.TestCase):
 	def test_d6_resolve_usage(self):
 		def request(actor):
 			log = self._probe_log()
-			frappe.db.set_value("AI Usage Log", log, {"result": "unknown", "cost_known": 0})
+			frappe.db.set_value("PLT AI Usage Log", log, {"result": "unknown", "cost_known": 0})
 			frappe.db.commit()
 			return self._maintenance(actor, "resolve_usage", {"log": log, "cost": "0.125", "currency": "USD"})
 
@@ -411,7 +411,7 @@ class TestModelHTTP(unittest.TestCase):
 		def request(actor):
 			log = self._probe_log()
 			frappe.db.set_value(
-				"AI Usage Log", log, {"result": "pending", "attempted_at": add_days(now_datetime(), -1)}
+				"PLT AI Usage Log", log, {"result": "pending", "attempted_at": add_days(now_datetime(), -1)}
 			)
 			frappe.db.commit()
 			return self._maintenance(actor, "reconcile_stale_pending", {})
@@ -427,7 +427,7 @@ class TestModelHTTP(unittest.TestCase):
 
 	def test_d6_purge_execute(self):
 		log = self._probe_log()
-		frappe.db.set_value("AI Usage Log", log, "attempted_at", add_days(now_datetime(), -366))
+		frappe.db.set_value("PLT AI Usage Log", log, "attempted_at", add_days(now_datetime(), -366))
 		frappe.db.commit()
 		preview = self._maintenance("system_manager", "purge_usage", {"dry_run": True}).json()["message"]
 		self.assertEqual(preview["targets"], [log])
@@ -450,8 +450,8 @@ class TestModelHTTP(unittest.TestCase):
 		api_name = self.fixture["d6_clearable_api"]
 
 		def request(actor):
-			frappe.db.set_value("AI API", api_name, "enabled", 0)
-			set_encrypted_password("AI API", api_name, self.fixture["credential"], "api_key")
+			frappe.db.set_value("PLT AI API", api_name, "enabled", 0)
+			set_encrypted_password("PLT AI API", api_name, self.fixture["credential"], "api_key")
 			frappe.db.commit()
 			return self._maintenance(actor, "clear_api_credential", {"api": api_name})
 
@@ -487,7 +487,7 @@ class TestModelHTTP(unittest.TestCase):
 	def test_manager_can_reconcile_a_stale_pending_reservation(self):
 		log = self._probe_log()
 		frappe.db.set_value(
-			"AI Usage Log",
+			"PLT AI Usage Log",
 			log,
 			{
 				"result": "pending",
@@ -501,7 +501,7 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
 		self.assertEqual(response.json()["message"], {"closed": 1, "targets": [log]})
 		frappe.db.rollback()
-		record = frappe.get_doc("AI Usage Log", log)
+		record = frappe.get_doc("PLT AI Usage Log", log)
 		self.assertEqual(
 			(record.result, record.failure_code, record.reserved_cost), ("unknown", "pending_recovery", 0.125)
 		)
@@ -515,7 +515,7 @@ class TestModelHTTP(unittest.TestCase):
 		response = self.request(
 			"manager",
 			"PUT",
-			self.resource("AI API", self.fixture["second_api"]),
+			self.resource("PLT AI API", self.fixture["second_api"]),
 			json={"requests_per_minute": 1},
 		)
 		self.assertEqual(response.status_code, 200)
@@ -526,7 +526,7 @@ class TestModelHTTP(unittest.TestCase):
 			self.request(
 				"manager",
 				"PUT",
-				self.resource("AI API", self.fixture["second_api"]),
+				self.resource("PLT AI API", self.fixture["second_api"]),
 				json={"requests_per_minute": 0},
 			).status_code,
 			200,
@@ -536,12 +536,12 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertEqual(self._test_api_request("manager").status_code, 200)
 		frappe.db.rollback()
 		return frappe.db.get_value(
-			"AI Usage Log", {"api": self.fixture["second_api"]}, "name", order_by="attempted_at desc"
+			"PLT AI Usage Log", {"api": self.fixture["second_api"]}, "name", order_by="attempted_at desc"
 		)
 
 	def test_manager_can_resolve_an_unknown_attempt(self):
 		log = self._probe_log()
-		frappe.db.set_value("AI Usage Log", log, {"result": "unknown", "cost_known": 0})
+		frappe.db.set_value("PLT AI Usage Log", log, {"result": "unknown", "cost_known": 0})
 		frappe.db.commit()
 		note = "Verified using a fixture invoice."
 		request = {"log": log, "cost": "0.125000001", "currency": "USD", "note": note}
@@ -563,7 +563,7 @@ class TestModelHTTP(unittest.TestCase):
 			{"name": log, "result": "resolved", "cost": "0.125000001", "currency": "USD"},
 		)
 		frappe.db.rollback()
-		record = frappe.get_doc("AI Usage Log", log)
+		record = frappe.get_doc("PLT AI Usage Log", log)
 		self.assertEqual(record.result, "resolved")
 		self.assertEqual(record.cost_known, 1)
 		self.assertEqual(str(record.cost), "0.125000001")
@@ -578,8 +578,8 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertEqual(baseline.status_code, 200, baseline.json().get("exc_type"))
 		eligible = baseline.json()["message"]["eligible"]
 		old = add_days(now_datetime(), -366)
-		frappe.db.set_value("AI Usage Log", closed, {"attempted_at": old, "result": "success"})
-		frappe.db.set_value("AI Usage Log", unknown, {"attempted_at": old, "result": "unknown"})
+		frappe.db.set_value("PLT AI Usage Log", closed, {"attempted_at": old, "result": "success"})
+		frappe.db.set_value("PLT AI Usage Log", unknown, {"attempted_at": old, "result": "unknown"})
 		frappe.db.commit()
 		response = self._maintenance("system_manager", "purge_usage", {"dry_run": True})
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
@@ -595,11 +595,11 @@ class TestModelHTTP(unittest.TestCase):
 			},
 		)
 		frappe.db.rollback()
-		self.assertTrue(frappe.db.exists("AI Usage Log", closed))
-		self.assertTrue(frappe.db.exists("AI Usage Log", unknown))
+		self.assertTrue(frappe.db.exists("PLT AI Usage Log", closed))
+		self.assertTrue(frappe.db.exists("PLT AI Usage Log", unknown))
 		self.assertEqual(eligible, 0, "The isolated fixture must own every record eligible for deletion")
 		audit_filters = {
-			"reference_doctype": "AI Usage Log",
+			"reference_doctype": "PLT AI Usage Log",
 			"subject": "Model gateway usage logs purged",
 			"user": self.fixture["users"]["system_manager"],
 		}
@@ -616,11 +616,11 @@ class TestModelHTTP(unittest.TestCase):
 			{"eligible": 1, "deleted": 1, "dry_run": False, "targets": [closed], "preview_token": None},
 		)
 		frappe.db.rollback()
-		self.assertFalse(frappe.db.exists("AI Usage Log", closed))
+		self.assertFalse(frappe.db.exists("PLT AI Usage Log", closed))
 		audit = frappe.db.exists("Activity Log", audit_filters)
 		self.assertTrue(audit)
 		self.addCleanup(self._delete_activity_log, audit)
-		self.assertTrue(frappe.db.exists("AI Usage Log", unknown))
+		self.assertTrue(frappe.db.exists("PLT AI Usage Log", unknown))
 
 	def test_purge_rejects_an_ai_manager_for_preview_and_execution(self):
 		for dry_run in (True, False):
@@ -664,18 +664,18 @@ class TestModelHTTP(unittest.TestCase):
 		denied = self._maintenance("manager", "clear_api_credential", {"api": name})
 		self.assertEqual(denied.status_code, 417)
 		self.assertEqual(
-			self.request("manager", "PUT", self.resource("AI API", name), json={"enabled": 0}).status_code,
+			self.request("manager", "PUT", self.resource("PLT AI API", name), json={"enabled": 0}).status_code,
 			200,
 		)
 		cleared = self._maintenance("manager", "clear_api_credential", {"api": name})
 		self.assertEqual(cleared.status_code, 200)
 		self.assertNotIn(self.fixture["credential"], cleared.text)
 		frappe.db.rollback()
-		self.assertFalse(get_decrypted_password("AI API", name, "api_key", raise_exception=False))
+		self.assertFalse(get_decrypted_password("PLT AI API", name, "api_key", raise_exception=False))
 		comment = frappe.db.get_value(
 			"Comment",
 			{
-				"reference_doctype": "AI API",
+				"reference_doctype": "PLT AI API",
 				"reference_name": name,
 				"comment_type": "Info",
 				"owner": self.fixture["users"]["manager"],
@@ -687,7 +687,7 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertNotIn(self.fixture["credential"], comment)
 
 	def test_tenant_manager_can_create_multiple_providers(self):
-		resource = self.resource("AI Provider")
+		resource = self.resource("PLT AI Provider")
 		names = []
 		for adapter in ("openai", "ollama"):
 			response = self.request(
@@ -702,11 +702,11 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertNotEqual(*names)
 
 	def test_zero_budget_stops_probe_before_provider_call(self):
-		api = self.resource("AI API", self.fixture["second_api"])
-		account = self.resource("AI Account", self.fixture["second_account"])
+		api = self.resource("PLT AI API", self.fixture["second_api"])
+		account = self.resource("PLT AI Account", self.fixture["second_account"])
 		self.addCleanup(
 			self._restore_fields,
-			"AI Account",
+			"PLT AI Account",
 			self.fixture["second_account"],
 			{
 				"has_monthly_budget": 0,
@@ -740,25 +740,25 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertEqual(response.json()["message"]["error"], "output_limit_exceeds_deadline")
 		self.assertEqual(len(self.fixture["attempts"]), count)
 		frappe.db.rollback()
-		self.assertEqual(frappe.db.count("AI Usage Log", {"api": self.fixture["second_api"]}), 0)
+		self.assertEqual(frappe.db.count("PLT AI Usage Log", {"api": self.fixture["second_api"]}), 0)
 
 	def _complete_concurrently(self, *, budget, expected_second_status):
 		account = self.fixture["second_account"]
 		model = self.fixture["model"]
 		self.addCleanup(
 			self._restore_fields,
-			"AI Account",
+			"PLT AI Account",
 			account,
 			{"has_monthly_budget": 0, "monthly_budget": 0},
 		)
 		self.addCleanup(
 			self._restore_fields,
-			"AI Model",
+			"PLT AI Model",
 			model,
 			{"prices_known": 0, "input_price": 0, "output_price": 0},
 		)
-		frappe.db.set_value("AI Account", account, {"has_monthly_budget": 1, "monthly_budget": budget})
-		frappe.db.set_value("AI Model", model, {"prices_known": 1, "input_price": 0, "output_price": 1000})
+		frappe.db.set_value("PLT AI Account", account, {"has_monthly_budget": 1, "monthly_budget": budget})
+		frappe.db.set_value("PLT AI Model", model, {"prices_known": 1, "input_price": 0, "output_price": 1000})
 		frappe.db.commit()
 
 		first_dispatched, release_first, second_dispatched = Event(), Event(), Event()
@@ -799,5 +799,5 @@ class TestModelHTTP(unittest.TestCase):
 		self._complete_concurrently(budget=0.012, expected_second_status=503)
 
 	def delete_provider(self, name):
-		response = self.request("manager", "DELETE", self.resource("AI Provider", name))
+		response = self.request("manager", "DELETE", self.resource("PLT AI Provider", name))
 		self.assertEqual(response.status_code, 202)

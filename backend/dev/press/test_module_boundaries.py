@@ -15,11 +15,11 @@ SPEC.loader.exec_module(CHECKER)
 
 
 def press_policy():
-    policy = json.loads((DEV / "modul-sinirlari.json").read_text())
+    policy = json.loads((DEV / "module-boundaries.json").read_text())
     policy["path_owners"].update(
         {
-            "press_tr.api": "press_tr.kimlik",
-            "press_tr.www": "press_tr.kimlik",
+            "press_tr.api": "press_tr.press_identity",
+            "press_tr.www": "press_tr.press_identity",
         }
     )
     return policy
@@ -31,9 +31,9 @@ class PressModuleBoundaryTest(unittest.TestCase):
         scratch.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=scratch) as temp:
             root = Path(temp)
-            foreign = root / "apps/platform_core/platform_core/erisim/doctype/foreign_rule/foreign_rule.json"
+            foreign = root / "apps/platform_core/platform_core/access/doctype/foreign_rule/foreign_rule.json"
             foreign.parent.mkdir(parents=True)
-            foreign.write_text(json.dumps({"name": "Foreign Rule", "module": "Erisim"}))
+            foreign.write_text(json.dumps({"name": "Foreign Rule", "module": "Access"}))
 
             for entry in ("api", "www"):
                 target = root / "apps/press_tr/press_tr" / entry / "example.py"
@@ -51,6 +51,6 @@ class PressModuleBoundaryTest(unittest.TestCase):
         press_errors = [
             error
             for error in errors
-            if error.startswith("apps/press_tr/") or ("CYCLE" in error and "press_tr.kimlik" in error)
+            if error.startswith("apps/press_tr/") or ("CYCLE" in error and "press_tr.press_identity" in error)
         ]
         self.assertEqual(press_errors, [])

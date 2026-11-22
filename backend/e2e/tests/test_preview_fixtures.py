@@ -12,7 +12,7 @@ from backend.e2e.preview import fixtures
 class PreviewFixturesTest(unittest.TestCase):
     def test_live_credentials_are_split_between_tenant_clients(self):
         claims = base64.urlsafe_b64encode(json.dumps({
-            "aud": "identity-sync", "azp": "site-kiraci1-service",
+            "aud": "identity-sync", "azp": "site-tenant1-service",
         }).encode()).decode().rstrip("=")
         settings = {
             "E2E_KEYCLOAK_CLIENT_SECRET": "browser-secret",
@@ -28,7 +28,7 @@ class PreviewFixturesTest(unittest.TestCase):
             fixtures.check_tenant_clients(43820)
         forms = [call.kwargs["data"] for call in request.call_args_list]
         self.assertEqual([form["client_id"] for form in forms], [
-            "site-kiraci1", "site-kiraci1", "site-kiraci1-service",
+            "site-tenant1", "site-tenant1", "site-tenant1-service",
         ])
         self.assertEqual([form.get("scope") for form in forms], [None, "aud-identity-sync", "aud-identity-sync"])
         self.assertEqual([form["client_secret"] for form in forms], [

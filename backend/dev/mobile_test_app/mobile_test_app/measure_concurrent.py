@@ -12,7 +12,7 @@ from time import perf_counter_ns
 from urllib.error import HTTPError, URLError
 
 import frappe
-from platform_core.mobil.tests.loopback_http import open_loopback
+from platform_core.mobile.tests.loopback_http import open_loopback
 
 from .measure_performance import LIMITS_MS, TIMING_HEADER, benchmark_server, call, mobile_request, p95
 from .performance_data import EMPLOYEES, LEAVE_PER_EMPLOYEE, performance_fixture, test_database, verify_counts

@@ -10,14 +10,14 @@ import re
 import unittest
 import urllib.parse
 
-from yardimci import (KLASOR, ORNEK_ENV, admin, assert_refused_without_pkce, canli_var_mi, get_without_redirect, istemci_belirteci, istek,
-                      jwt_govdesi, ortam, pkce_pair, realm_oku, yonetici_belirteci, safe_detail)
+from helpers import (DIRECTORY, EXAMPLE_ENV, admin, assert_refused_without_pkce, live_available, get_without_redirect, client_token, request,
+                      jwt_payload, get_environment_value, pkce_pair, read_realm, admin_token, safe_detail)
 
 PLACEHOLDER = re.compile(r"^\$\{[A-Z0-9_]+\}$")
-PRODUCTION_ENV = KLASOR / "production.env.example"
-COMPOSE = KLASOR.parents[1] / "dev" / "compose.keycloak.yaml"
+PRODUCTION_ENV = DIRECTORY / "production.env.example"
+COMPOSE = DIRECTORY.parents[1] / "dev" / "compose.keycloak.yaml"
 MOBILE_CLIENT = "mobile-app"
-TENANT_SERVICE_CLIENTS = {"site-kiraci1-service"}
+TENANT_SERVICE_CLIENTS = {"site-tenant1-service"}
 # Contract 42f8e32: press-service may also request aud-identity-sync.
 IDENTITY_SYNC_AUDIENCE_CLIENTS = TENANT_SERVICE_CLIENTS | {"press-service"}
 
@@ -34,10 +34,10 @@ def _env_values(path) -> dict:
 class RealmBacklogFileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.realm = realm_oku()
+        cls.realm = read_realm()
         cls.clients = {c["clientId"]: c for c in cls.realm["clients"]}
         cls.scopes = {s["name"]: s for s in cls.realm["clientScopes"]}
-        cls.dev_env = _env_values(ORNEK_ENV)
+        cls.dev_env = _env_values(EXAMPLE_ENV)
         cls.prod_env = _env_values(PRODUCTION_ENV) if PRODUCTION_ENV.exists() else {}
         cls.compose = COMPOSE.read_text(encoding="utf-8")
 
@@ -87,7 +87,7 @@ class RealmBacklogFileTest(unittest.TestCase):
         self.assertNotRegex(compose, r"(?m)^ +KC_DB_URL:")
         for option in ("HOST: keycloak-db", 'PORT: "5432"', "DATABASE: keycloak"):
             self.assertIn(f"KC_DB_URL_{option}", compose)
-        self.assertIn("ATONOTA_APPLE_P8_KEY=\n", ORNEK_ENV.read_text(encoding="utf-8"))
+        self.assertIn("ATONOTA_APPLE_P8_KEY=\n", EXAMPLE_ENV.read_text(encoding="utf-8"))
         self.assertIn("ATONOTA_APPLE_P8_KEY: ${ATONOTA_APPLE_P8_KEY:-}", compose)
 
     def test_production_example_covers_every_development_key(self):
@@ -106,9 +106,9 @@ class RealmBacklogFileTest(unittest.TestCase):
     # kimlik-tema request 4: the account console uses the atonota theme; the image copies the whole theme.
     def test_account_theme_is_atonota_and_copied(self):
         self.assertEqual(self.realm["accountTheme"], "atonota")
-        dockerfile = (KLASOR / "Dockerfile").read_text(encoding="utf-8")
+        dockerfile = (DIRECTORY / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn("COPY --chown=1000:0 themes/ /opt/keycloak/themes/", dockerfile)
-        ignore = (KLASOR / ".dockerignore").read_text(encoding="utf-8").splitlines()
+        ignore = (DIRECTORY / ".dockerignore").read_text(encoding="utf-8").splitlines()
         self.assertIn("!themes/**", ignore)
         self.assertFalse([line for line in ignore if "account" in line], ignore)
 
@@ -123,11 +123,11 @@ class RealmBacklogFileTest(unittest.TestCase):
         self.assertEqual(len(scope["protocolMappers"]), 1)
 
     def test_tenant_browser_and_service_are_separate(self):
-        browser = self.clients["site-kiraci1"]
+        browser = self.clients["site-tenant1"]
         self.assertTrue(browser["standardFlowEnabled"])
         self.assertFalse(browser["serviceAccountsEnabled"])
         self.assertEqual(browser["optionalClientScopes"], [])
-        service = self.clients["site-kiraci1-service"]
+        service = self.clients["site-tenant1-service"]
         self.assertTrue(service["serviceAccountsEnabled"])
         self.assertFalse(service["standardFlowEnabled"])
         self.assertEqual(service["redirectUris"], [])
@@ -146,7 +146,7 @@ class RealmBacklogFileTest(unittest.TestCase):
 def _authorize(client_id: str, redirect_uri: str, **extra) -> object:
     query = urllib.parse.urlencode({"client_id": client_id, "response_type": "code", "scope": "openid",
                                     "state": "s", "nonce": "n", "redirect_uri": redirect_uri, **extra})
-    return get_without_redirect(f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{query}")
+    return get_without_redirect(f"{get_environment_value('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{query}")
 
 
 def _audiences(claims: dict) -> list:
@@ -154,76 +154,76 @@ def _audiences(claims: dict) -> list:
     return [aud] if isinstance(aud, str) else list(aud)
 
 
-@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
+@unittest.skipUnless(live_available(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
 class RealmBacklogLiveTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.admin_token = yonetici_belirteci()
+        cls.admin_token = admin_token()
         cls.realm = admin("", cls.admin_token).json()
 
     def test_resolved_values_come_from_the_environment(self):
-        self.assertEqual(self.realm["displayName"], ortam("IDENTITY_BRAND_NAME"))
-        self.assertEqual(self.realm["sslRequired"], ortam("ATONOTA_SSL_REQUIRED"))
+        self.assertEqual(self.realm["displayName"], get_environment_value("IDENTITY_BRAND_NAME"))
+        self.assertEqual(self.realm["sslRequired"], get_environment_value("ATONOTA_SSL_REQUIRED"))
         smtp = self.realm["smtpServer"]
-        self.assertEqual(smtp["auth"], ortam("ATONOTA_SMTP_AUTH"))
-        self.assertEqual(smtp["starttls"], ortam("ATONOTA_SMTP_STARTTLS"))
-        self.assertEqual(smtp["fromDisplayName"], ortam("IDENTITY_BRAND_NAME"))
+        self.assertEqual(smtp["auth"], get_environment_value("ATONOTA_SMTP_AUTH"))
+        self.assertEqual(smtp["starttls"], get_environment_value("ATONOTA_SMTP_STARTTLS"))
+        self.assertEqual(smtp["fromDisplayName"], get_environment_value("IDENTITY_BRAND_NAME"))
         self.assertNotIn("${", str(smtp))
 
     def test_mobile_client_refuses_login_without_pkce(self):
-        assert_refused_without_pkce(self, _authorize("mobile-app", ortam("ATONOTA_MOBILE_REDIRECT_URI")))
+        assert_refused_without_pkce(self, _authorize("mobile-app", get_environment_value("ATONOTA_MOBILE_REDIRECT_URI")))
 
     def test_mobile_client_opens_login_with_pkce(self):
         _, challenge = pkce_pair()
-        response = _authorize("mobile-app", ortam("ATONOTA_MOBILE_REDIRECT_URI"),
+        response = _authorize("mobile-app", get_environment_value("ATONOTA_MOBILE_REDIRECT_URI"),
                               code_challenge=challenge, code_challenge_method="S256")
-        self.assertEqual(response.durum, 200, response.basliklar.get("Location"))
-        self.assertTrue(b'name="username"' in response.govde, safe_detail(response))
+        self.assertEqual(response.status, 200, response.headers.get("Location"))
+        self.assertTrue(b'name="username"' in response.body, safe_detail(response))
 
     def test_mobile_client_refuses_a_plain_challenge(self):
-        response = _authorize("mobile-app", ortam("ATONOTA_MOBILE_REDIRECT_URI"),
+        response = _authorize("mobile-app", get_environment_value("ATONOTA_MOBILE_REDIRECT_URI"),
                               code_challenge="a" * 43, code_challenge_method="plain")
         assert_refused_without_pkce(self, response)
 
     def test_mobile_client_has_no_password_or_client_credentials_grant(self):
-        token_url = f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/token"
-        password = istek("POST", token_url, form={"grant_type": "password", "client_id": "mobile-app",
+        token_url = f"{get_environment_value('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/token"
+        password = request("POST", token_url, form={"grant_type": "password", "client_id": "mobile-app",
                                                   "username": "nobody@example.test", "password": "x"})
-        self.assertIn(password.durum, (400, 401), safe_detail(password))
+        self.assertIn(password.status, (400, 401), safe_detail(password))
         self.assertTrue(password.json().get("error") in ("unauthorized_client", "invalid_client"), safe_detail(password))
-        service = istek("POST", token_url, form={"grant_type": "client_credentials", "client_id": "mobile-app"})
-        self.assertIn(service.durum, (400, 401), safe_detail(service))
+        service = request("POST", token_url, form={"grant_type": "client_credentials", "client_id": "mobile-app"})
+        self.assertIn(service.status, (400, 401), safe_detail(service))
 
     def test_press_client_refuses_login_without_pkce(self):
-        redirect = f"{ortam('ATONOTA_PRESS_URL')}/api/method/press_tr.api.auth.keycloak_callback"
+        redirect = f"{get_environment_value('ATONOTA_PRESS_URL')}/api/method/press_tr.api.auth.keycloak_callback"
         assert_refused_without_pkce(self, _authorize("press", redirect))
 
     def test_tenant_service_client_gets_identity_sync_audience(self):
-        response = istemci_belirteci("site-kiraci1-service", ortam("ATONOTA_SITE_KIRACI1_SERVICE_SECRET"), "aud-identity-sync")
-        self.assertEqual(response.durum, 200, safe_detail(response))
-        claims = jwt_govdesi(response.json()["access_token"])
+        response = client_token("site-tenant1-service", get_environment_value("ATONOTA_SITE_TENANT1_SERVICE_SECRET"), "aud-identity-sync")
+        self.assertEqual(response.status, 200, safe_detail(response))
+        claims = jwt_payload(response.json()["access_token"])
         self.assertEqual(claims["aud"], "identity-sync")
-        self.assertEqual(claims["azp"], "site-kiraci1-service")
+        self.assertEqual(claims["azp"], "site-tenant1-service")
         self.assertNotIn("realm_access", claims)
         self.assertNotIn("resource_access", claims)
 
     def test_press_service_gets_identity_sync_audience(self):
-        response = istemci_belirteci("press-service", ortam("ATONOTA_PRESS_SERVICE_SECRET"), "aud-identity-sync")
-        self.assertEqual(response.durum, 200, safe_detail(response))
-        claims = jwt_govdesi(response.json()["access_token"])
+        response = client_token("press-service", get_environment_value("ATONOTA_PRESS_SERVICE_SECRET"), "aud-identity-sync")
+        self.assertEqual(response.status, 200, safe_detail(response))
+        claims = jwt_payload(response.json()["access_token"])
         self.assertEqual(claims["aud"], "identity-sync")
         self.assertEqual(claims["azp"], "press-service")
 
     def test_tenant_service_token_without_scope_has_no_identity_sync_audience(self):
-        response = istemci_belirteci("site-kiraci1-service", ortam("ATONOTA_SITE_KIRACI1_SERVICE_SECRET"))
-        self.assertEqual(response.durum, 200, safe_detail(response))
-        self.assertNotIn("identity-sync", _audiences(jwt_govdesi(response.json()["access_token"])))
+        response = client_token("site-tenant1-service", get_environment_value("ATONOTA_SITE_TENANT1_SERVICE_SECRET"))
+        self.assertEqual(response.status, 200, safe_detail(response))
+        self.assertNotIn("identity-sync", _audiences(jwt_payload(response.json()["access_token"])))
 
     def test_other_clients_cannot_get_identity_sync_audience(self):
         for client_id, secret in (("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET"),
-                                  ("site-kiraci1", "ATONOTA_SITE_KIRACI1_SECRET"),
+                                  ("site-tenant1", "ATONOTA_SITE_TENANT1_SECRET"),
                                   ("press", "ATONOTA_PRESS_SECRET")):
-            response = istemci_belirteci(client_id, ortam(secret), "aud-identity-sync")
+            response = client_token(client_id, get_environment_value(secret), "aud-identity-sync")
             # identity-sync has a service account: the scope is refused. press is a browser client
             # without client credentials grant: the grant is refused first.
             expected = "HTTP 400 invalid_scope" if client_id == "identity-sync" else "HTTP 401 unauthorized_client"

@@ -5,7 +5,7 @@ The detailed behavior tests are in the `platform_core/erisim/tests/` folder.
 
 import frappe
 
-from platform_core.erisim.tests.base import DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, ROLE_EMPLOYEE, ErisimTestCase
+from platform_core.access.tests.base import DOCTYPE, EMPLOYEE_1, EMPLOYEE_2, ROLE_EMPLOYEE, ErisimTestCase
 
 FIELD_BODY = {"doctype": DOCTYPE, "fieldname": "salary_amount", "permlevel": 0}
 LEVEL_BODY = {"doctype": DOCTYPE, "role": ROLE_EMPLOYEE, "permlevel": 1, "read": True, "write": True}
@@ -29,7 +29,7 @@ class TestAccessEndpoints(ErisimTestCase):
 		other_user = self.explain(client, self.records[EMPLOYEE_1], user=EMPLOYEE_2)
 		other_record = self.explain(client, self.records[EMPLOYEE_2])
 		rule_doctype = self.api(
-			client, "GET", "explain_permission", query={"doctype": "Access Rule", "name": "AR-00001"}
+			client, "GET", "explain_permission", query={"doctype": "PLT Access Rule", "name": "AR-00001"}
 		)
 
 		self.assertEqual(other_user.status_code, 403)
@@ -47,7 +47,7 @@ class TestAccessEndpoints(ErisimTestCase):
 	def test_get_access_summary_foreign_data_denied(self):
 		"""The employee has no read permission on the “Access Rule” document type."""
 		response = self.api(
-			self.login(EMPLOYEE_1), "GET", "get_access_summary", query={"doctype": "Access Rule"}
+			self.login(EMPLOYEE_1), "GET", "get_access_summary", query={"doctype": "PLT Access Rule"}
 		)
 
 		self.assertEqual(response.status_code, 403)

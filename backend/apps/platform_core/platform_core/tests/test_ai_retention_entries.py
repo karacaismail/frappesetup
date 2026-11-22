@@ -1,7 +1,7 @@
 """The three ways into the retention delete clean real records of both modules together.
 
 The AI access layer owns the action log and the proposals. The model gateway owns the usage log
-and cleans it with `platform_core.model_gecidi.api.purge_usage_logs` (contract, section 10).
+and cleans it with `platform_core.model_gateway.api.purge_usage_logs` (contract, section 10).
 This test belongs to neither module: it writes usage records as test data and then enters
 through the web endpoint, the command line function and the approved AI tool.
 """
@@ -12,10 +12,10 @@ from uuid import uuid4
 import frappe
 from frappe.utils import add_days, now_datetime
 
-from platform_core.yapay_zeka import retention
-from platform_core.yapay_zeka.tests.base import DESK_USER, MANAGER, USER_A, YzTestCase
+from platform_core.ai import retention
+from platform_core.ai.tests.base import DESK_USER, MANAGER, USER_A, AiTestCase
 
-USAGE_LOG = "AI Usage Log"
+USAGE_LOG = "PLT AI Usage Log"
 # Names of the usage records this test made. Only these are cleaned up.
 MADE: list[str] = []
 
@@ -42,7 +42,7 @@ def usage_record(days: int, result: str = "success") -> str:
 	return doc.name
 
 
-class TestRetentionEntries(YzTestCase):
+class TestRetentionEntries(AiTestCase):
 	def setUp(self):
 		super().setUp()
 		self.clean()
@@ -61,7 +61,7 @@ class TestRetentionEntries(YzTestCase):
 		"""The delete goes through the gateway only if its function takes the chosen names (contract, section 10)."""
 		import inspect
 
-		from platform_core.model_gecidi import api
+		from platform_core.model_gateway import api
 
 		if "names" not in inspect.signature(api.purge_usage_logs).parameters:
 			self.skipTest("The model gateway on this branch does not take `names` yet.")
@@ -116,7 +116,7 @@ class TestRetentionEntries(YzTestCase):
 		young, old = self.records()
 		manager = self.login(MANAGER)
 
-		result = self.call_tool(manager, "purge_action_log", {})
+		result = self.call_tool(manager, "plt_purge_action_log", {})
 		proposal = result["structuredContent"]
 		untouched = self.exists(old)
 		outcome = self.approve(manager, proposal["proposal_id"]).json["message"]
@@ -132,7 +132,7 @@ class TestRetentionEntries(YzTestCase):
 
 		web = [self.human(client, "POST", "purge_logs", body={}).status_code for client in (desk, end_user)]
 		forced = self.human(desk, "POST", "purge_logs", body={"dry_run": False, "confirmation_token": "x"})
-		tool = self.call_tool(desk, "purge_action_log", {})
+		tool = self.call_tool(desk, "plt_purge_action_log", {})
 		frappe.set_user(DESK_USER)
 		with self.assertRaises(frappe.PermissionError):
 			retention.purge(365, dry_run=False)
