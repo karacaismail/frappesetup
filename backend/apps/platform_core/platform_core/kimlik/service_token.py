@@ -13,7 +13,8 @@ from platform_core.kimlik.exceptions import KeycloakKeysUnavailable, ServiceToke
 
 LEEWAY = 30
 IDENTITY_ENDPOINTS = frozenset(
-	helpers.IDENTITY_API_PREFIX + name for name in ("provision", "set_enabled", "change_email")
+	helpers.IDENTITY_API_PREFIX + name
+	for name in ("provision", "set_enabled", "change_email", "anonymize_user")
 )
 CLAIMS_ATTR = "kimlik_service_claims"
 # Service operations run as the administrator. The path and azp restrictions confine the token to these endpoints.

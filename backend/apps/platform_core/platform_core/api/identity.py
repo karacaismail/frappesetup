@@ -5,7 +5,7 @@ module runs. `provisioning` validates every field and answers 400 `InvalidInput`
 
 import frappe
 
-from platform_core.kimlik import provisioning, service_token
+from platform_core.kimlik import anonymization, provisioning, service_token, sign_in
 
 SERVICE = "identity-sync"
 
@@ -49,3 +49,11 @@ def change_email(issuer=None, subject=None, new_email=None) -> dict:
 	"""Changes the e-mail with `rename_doc`. The identity link follows the user."""
 	service_token.require_service(SERVICE)
 	return provisioning.change_email({"issuer": issuer, "subject": subject, "new_email": new_email})
+
+
+@frappe.whitelist(methods=["POST"])
+def anonymize_user(issuer=None, subject=None) -> dict:
+	"""Disables the user and anonymizes the person. Business records stay (O-27). Irreversible."""
+	service_token.require_service(SERVICE)
+	sign_in.guard_guest_request()
+	return anonymization.anonymize_user({"issuer": issuer, "subject": subject})

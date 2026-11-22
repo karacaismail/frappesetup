@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: platform_core kimlik uçları
-  version: 0.3.0
+  version: 0.4.0
   summary: Keycloak ile giriş, dönüş, çıkış ve kullanıcı eşitleme uçları.
   description: |
     Bu sözleşme `platform_core.kimlik` modülünün uçlarını tarif eder.
@@ -927,6 +927,88 @@ paths:
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
+  /platform_core.api.identity.anonymize_user:
+    post:
+      tags: [eşitleme]
+      operationId: identityAnonymizeUser
+      summary: Bağlı kullanıcıyı kapatır ve kişiyi gösteren alanları anonim yapar.
+      description: |
+        Eşitleme servisi bu ucu hesap silme akışının 4. adımında çağırır (Proje kaydı O-27).
+        Servis belirteci `azp=identity-sync` taşımalıdır.
+
+        **Bu uç geri alınamaz.** Kullanıcı kapanır. Kullanıcının bütün oturumları kapanır.
+        Kullanıcının adı `deleted-user-<sıra>@<site>` biçiminde anonim bir ada çevrilir.
+        Kişiyi gösteren alanlar anonim yapılır. Örneğin ad, soyad, telefon ve e-posta böyledir.
+        İş kayıtları silinmez. Örneğin izin talebi kalır. Talepteki kişi alanı anonim ada döner.
+
+        Uç Frappe 16'nın hazır anonimleştirme yolunu kullanır.
+        Anonim yapılacak alanları her uygulama kendi `user_data_fields` kancasında yazar.
+        Frappe, ERPNext ve öteki kurulu uygulamaların kancaları birlikte uygulanır.
+        Sunucu her istek için bir “Personal Data Deletion Request” kaydı açar.
+        Kayıt işin izini tutar. İş bitince kaydın durumu “Deleted” olur. Kayıtta özgün e-posta kalmaz.
+        Frappe'nin e-posta onayı ve yönetici onayı adımları kullanılmaz. Kullanıcıya e-posta gitmez.
+        Onayı hesap silme isteğiyle eşitleme servisi almıştır.
+
+        Kimlik bağı silinmez. Bağ anonim kullanıcıyı gösterir.
+        Aynı istek ikinci kez gelirse uç bir şey değiştirmez. Uç ilk istekteki gövdeyi döner.
+        Bağ `(issuer, subject)` yoksa 404 döner. Eşitleme servisi 404 yanıtını “bu sitede kullanıcı yok” diye okur.
+        `Administrator` ve `Guest` hesapları anonim yapılamaz. Bu durumda 409 döner.
+        İstek gövdesi en çok 16 KB olur.
+      x-yikici: true
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnonymizeUserRequest"
+            examples:
+              sil:
+                summary: Kullanıcıyı anonim yap.
+                value:
+                  issuer: http://kimlik.localhost:8660/realms/platform
+                  subject: 11111111-1111-4111-8111-111111111111
+      responses:
+        "200":
+          description: Kullanıcı kapandı ve anonim yapıldı. İkinci istek de aynı gövdeyi alır.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/AnonymizeUserResult"}
+              examples:
+                anonim:
+                  value:
+                    message:
+                      user: deleted-user-0001@kiraci1.localhost
+                      enabled: false
+                      status: Deleted
+        "400":
+          $ref: "#/components/responses/GirdiGecersiz"
+        "401":
+          $ref: "#/components/responses/ServisBelirteciReddi"
+        "403":
+          $ref: "#/components/responses/ServisYetkisiYok"
+        "404":
+          $ref: "#/components/responses/BagYok"
+        "409":
+          description: "Bağlı hesap `Administrator` ya da `Guest`. `exc_type` değeri `IdentityConflict` olur."
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "413":
+          description: İstek gövdesi 16 KB'tan büyük. `exc_type` değeri `PayloadTooLarge` olur.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "417":
+          $ref: "#/components/responses/GovdeBozuk"
+        "503":
+          $ref: "#/components/responses/AnahtarListesiYok"
+
 components:
   securitySchemes:
     frappeSession:
@@ -1251,6 +1333,32 @@ components:
           allOf:
             - $ref: "#/components/schemas/Email"
           description: Kullanıcının yeni e-postası. Başka kullanıcıya ait olamaz.
+
+    AnonymizeUserRequest:
+      type: object
+      required: [issuer, subject]
+      additionalProperties: false
+      properties:
+        issuer: {$ref: "#/components/schemas/Issuer"}
+        subject: {$ref: "#/components/schemas/Subject"}
+
+    AnonymizeUserResult:
+      type: object
+      required: [user, enabled, status]
+      additionalProperties: false
+      properties:
+        user:
+          type: string
+          maxLength: 140
+          description: Kullanıcının anonim adı. Biçimi `deleted-user-<sıra>@<site>` olur. Kişiyi göstermez.
+        enabled:
+          type: boolean
+          const: false
+          description: Kullanıcı her zaman kapalıdır.
+        status:
+          type: string
+          const: Deleted
+          description: “Personal Data Deletion Request” kaydının son durumu.
 
     ChangeEmailResult:
       type: object

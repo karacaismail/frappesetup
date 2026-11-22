@@ -6,10 +6,12 @@ The real mobile endpoints are not in this branch; a stub under the tests package
 
 from unittest.mock import patch
 
+import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
 from platform_core.kimlik import provider_setup
 from platform_core.kimlik.tests import helpers as h
+from platform_core.kimlik.tests import mobile_stub
 
 STUB = "/api/method/platform_core.kimlik.tests.mobile_stub.v1_whoami"
 STUB_PREFIX = "/api/method/platform_core.kimlik.tests.mobile_stub.v1_"
@@ -39,6 +41,7 @@ class TestMobileIdentity(FrappeAPITestCase):
 		cls.prefix = patch("platform_core.kimlik.helpers.MOBILE_PATH_PREFIX", STUB_PREFIX)
 		cls.prefix.start()
 		cls.addClassCleanup(cls.prefix.stop)
+		cls.addClassCleanup(mobile_stub.register())
 
 	@classmethod
 	def tearDownClass(cls):
@@ -126,3 +129,18 @@ class TestMobileIdentity(FrappeAPITestCase):
 			headers={"Authorization": f"Bearer {token}"},
 		)
 		self.assertEqual(generic.status_code, 401)
+
+
+class TestMobileStubIsNotAnEndpoint(FrappeAPITestCase):
+	"""On a running site the stub is not whitelisted: nobody can call it through `/api/method`."""
+
+	def test_stub_is_not_whitelisted_without_a_test(self):
+		self.assertNotIn(mobile_stub.v1_whoami, frappe.whitelisted)
+		guest = h.request(h.new_client().post, STUB, json={})
+		self.assertEqual(guest.status_code, 403, guest.data[:300])
+		self.assertEqual(guest.json.get("exc_type"), "PermissionError")
+
+	def test_register_refuses_outside_tests(self):
+		with patch.object(frappe, "in_test", False):
+			with self.assertRaises(RuntimeError):
+				mobile_stub.register()
