@@ -36,7 +36,7 @@ Bu iş `platform_core` içinde yapay zekâ erişim katmanını kurar. Proje sahi
 
 ## Kontrol noktası 2: çekirdek katman
 
-Bu bölüm `platform_core` iskeletini ister. İskelet dev-ortam işinden gelir.
+Bu bölüm `platform_core` iskeletini ister. Orkestratör iskeleti `backend` dalına birleştirince haber verir. Sonra `backend` dalını kendi dalınıza alın.
 
 1. Önce OpenAPI sözleşmesini ve araç şemasını yazın.
 2. Önce testleri yazın. Testler şunları göstersin:
@@ -60,6 +60,13 @@ Bu bölüm `platform_core` iskeletini ister. İskelet dev-ortam işinden gelir.
 2. Bu araçlar yalnız yönetici rolüne açılır. Her biri önizleme ve insan onayı ister.
 3. Elle başlatılan komutların HTTP uçlarını araç olarak kaydedin.
 4. Commit atın ve `done` raporlayın.
+
+## Model geçidiyle ilişki
+
+- Sağlayıcı, hesap ve API kaydını platform-core-gecit işi kurar. Kayıt `model_gecidi` modülündedir.
+- Bu kayıt da DocType olduğu için genel araçlardan görünür. Gizli anahtar hiçbir araçtan dönmez.
+- Yapay zekâ kaydı yönetim araçlarıyla değiştirebilir. Her değişiklik önizleme ve insan onayı ister.
+- Bu katman model çağırmaz. Model çağrısı gerekirse `model_gecidi` modülünün açık işlevini kullanın.
 
 ## Kapsam dışı
 
