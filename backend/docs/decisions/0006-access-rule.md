@@ -642,7 +642,7 @@ Motor dört aracı `ai_tools` kancasıyla bildirir (D-9). Kod `erisim/ai_tools.p
 
 `access/tests/test_ai_tools.py` içindeki `TestGenericWriteToolsAreClosed` bu kancayı doğrular. Test ayrıca motorun kendi yazma araçlarının açık kaldığını denetler. Kanca sözleşmesi `backend/contracts/platform_core-access.openapi.yaml` dosyasının `x-hooks` bölümündedir.
 
-Yapay zekâ katmanı henüz `backend` dalında değildir. Testler araçları sözleşmenin anlattığı gibi çağırır: kullanıcı kimliğiyle ve doğrulanmış girdiyle. Araçlar gerçek MCP ucundan sınanmadı.
+Yapay zekâ katmanı `backend` dalındadır. `ai/policy.py` içindeki `is_closed_by_app` kancayı okur. `ai/tests/test_gap_analysis.py` içindeki `test_access_rule_changes_only_through_admin_tools` genel yazma araçlarının reddini sınar. Araçlar gerçek MCP ucundan sınanmadı.
 
 ## 12. Önbellek
 

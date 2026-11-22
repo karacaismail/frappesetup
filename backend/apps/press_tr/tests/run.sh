@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
 
-# Run from the repository root against the disposable fs-press-tr environment.
+# Run from the repository root against a disposable Press Compose project.
+project="${PRESS_TEST_COMPOSE_PROJECT:?Set the disposable Press Compose project name}"
 export PRESS_TEST_PANEL_URL="${PRESS_TEST_PANEL_URL:?Set platform_panel_url for the test site}"
 export PRESS_TEST_PORT="${PRESS_TEST_PORT:-3363}"
 export PRESS_TEST_MEASURE_ANONYMIZATION="${PRESS_TEST_MEASURE_ANONYMIZATION:-0}"
@@ -10,7 +11,14 @@ case "${FS_COLIMA_PROFILE:-factory}" in
 	default) press_context=colima ;;
 	*) printf '%s\n' 'FS_COLIMA_PROFILE must be factory or default.' >&2; exit 2 ;;
 esac
-container=fs-press-tr-web-1
+container="$(docker --context "$press_context" ps -q \
+    --filter "label=com.docker.compose.project=$project" \
+    --filter "label=com.docker.compose.service=web" \
+    --filter "label=com.docker.compose.oneoff=False")"
+if [ -z "$container" ] || [ "$(printf '%s\n' "$container" | wc -l)" -ne 1 ]; then
+    printf 'Expected exactly one running web service in Compose project %s.\n' "$project" >&2
+    exit 2
+fi
 repo_app=backend/apps/press_tr
 container_app=/home/frappe/benches/source/press_tr
 
