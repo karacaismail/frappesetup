@@ -197,6 +197,17 @@ Adres biçimi `/api/method/<yol>` olur.
 - Yönetici kurtarma yolu yalnız site ayarıyla açılır. Ayarı sunucuya erişen yönetici yazar. Yol README'de anlatılır.
 - `/panel` sayfası `platform_core/www/` altında durur. Sayfa CSRF belirtecini taşır (G-45). Sahibi platform-core-kabuk işidir.
 
+### Kabuk yanıt boyutu
+
+- Açılış ve DocType tanımı uçları en çok 262.144 bayt döner.
+- Sunucu, sıkıştırılmamış JSON gövdesini ölçer. Frappe'nin eklediği alanları da sayar.
+- Tam yanıt sınırı aşarsa sunucu HTTP 200 ve `truncated: true` döner.
+- Kısa açılış yanıtında kullanıcı kimliği ve biçim ayarları kalır.
+- Sunucu rol, uygulama ve menü listelerini boş olarak gönderir.
+- Kısa tanımda DocType kimliği ve sürüm bilgileri kalır.
+- Sunucu alanları ve alt tablo tanımlarını çıkarır. Telefon bu tanımı çevrimdışı saklayamaz.
+- Sunucu `ETag` değerini dönecek veriden üretir.
+
 ### Website User için yöntem izin listesi
 
 - Website User yalnız izin listesindeki yöntemleri çağırabilir. Öteki her yöntem 403 döner. Kural `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsine uygulanır.
@@ -326,6 +337,12 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
 6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
 7. Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
 - `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır.
+- Onaylı işlem yürütme ucunu da kiracı sitesinin servis istemcisi çağırır. Onay kiracı sitesindeki yapay zekâ katmanında verilir. Bu yüzden `IDENTITY_SYNC_EXECUTE_AZP` ayarı kiracı servis istemcilerinin listesidir. Liste `IDENTITY_SYNC_SESSION_AZP` ile aynı istemcileri taşır.
+- Mutabakat için Press ve kiracı sitesi `list_identities` ucunu sunar. Uç yalnız identity-sync servis belirtecini kabul eder. Yanıt sayfalıdır ve her satırda yalnız `issuer`, `subject` ve hesabın açık ya da kapalı durumu bulunur. E-posta ve ad dönmez. Uç adları `press_tr.api.identity.list_identities` ve `platform_core.api.identity.list_identities` olur.
+  - Uç `GET` ile çağrılır. İstek `start` ve `page_length` sorgu alanlarını alır. `cursor` ve `limit` alanları kullanılmaz. `start` varsayılan 0 olur. `page_length` en çok 500, varsayılan 500 olur. Sıra `subject` değerine göre artandır.
+  - Yanıt `{"identities": [...], "has_next_page": true|false}` biçimindedir.
+  - identity-sync bütün sayfaları toplar. Farkları ancak son sayfadan sonra hesaplar.
+- identity-sync, Keycloak'ta istemci açmaz. Servis hesabı `manage-clients` rolünü almaz. Yeni kiracının Keycloak istemcisini kimlik-realm işinin elle başlatılan komutu açar. Komut insan onayıyla çalışır.
 - Hesap silme akışının 3. ve 4. adımı şu uçları çağırır: `platform_core.api.mobile.revoke_user_installations`, `platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user`.
 
 ## 8. Site ayarları

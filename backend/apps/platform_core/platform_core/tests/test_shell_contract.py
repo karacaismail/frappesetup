@@ -25,6 +25,7 @@ SCHEMA_KEYWORDS = {
 	"$ref",
 	"type",
 	"enum",
+	"const",
 	"description",
 	"minimum",
 	"not",
@@ -32,8 +33,13 @@ SCHEMA_KEYWORDS = {
 	"properties",
 	"additionalProperties",
 	"items",
+	"maxItems",
+	"maxProperties",
 	"uniqueItems",
 	"allOf",
+	"if",
+	"then",
+	"else",
 }
 
 
@@ -48,11 +54,15 @@ def matches(value, schema, components):
 			return False
 	if "enum" in schema and value not in schema["enum"]:
 		return False
+	if "const" in schema and value != schema["const"]:
+		return False
 	if "minimum" in schema and value < schema["minimum"]:
 		return False
 	if "not" in schema and matches(value, schema["not"], components):
 		return False
 	if isinstance(value, dict):
+		if "maxProperties" in schema and len(value) > schema["maxProperties"]:
+			return False
 		if set(schema.get("required", [])) - value.keys():
 			return False
 		properties = schema.get("properties", {})
@@ -66,17 +76,19 @@ def matches(value, schema, components):
 			):
 				return False
 	if isinstance(value, list):
+		if "maxItems" in schema and len(value) > schema["maxItems"]:
+			return False
 		if "items" in schema and not all(matches(item, schema["items"], components) for item in value):
 			return False
 		if schema.get("uniqueItems") and len({json.dumps(item, sort_keys=True) for item in value}) != len(
 			value
 		):
 			return False
-	for rule in schema.get("allOf", []):
-		branch = "then" if matches(value, rule["if"], components) else "else"
-		if not matches(value, rule.get(branch, {}), components):
+	if "if" in schema:
+		branch = "then" if matches(value, schema["if"], components) else "else"
+		if not matches(value, schema.get(branch, {}), components):
 			return False
-	return True
+	return all(matches(value, rule, components) for rule in schema.get("allOf", []))
 
 
 class TestShellProjectionContract(unittest.TestCase):

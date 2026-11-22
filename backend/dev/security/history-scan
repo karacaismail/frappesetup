@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
+security_dir=backend/dev/security
+if [[ $# -gt 1 || ( $# -eq 1 && "$1" != --self-test ) ]]; then
+    printf '%s\n' 'Usage: history-scan [--self-test]' >&2
+    exit 2
+fi
+source "$security_dir/container-settings"
+
+self_test() {
+    "${docker_command[@]}" run "${container_flags[@]}" "$gitleaks_image" -es \
+        < "$security_dir/fixtures/gitleaks.sh"
+}
+
+self_test
+if [[ "${1:-}" == --self-test ]]; then
+    exit 0
+fi
+
+if [[ "$(git rev-parse --is-shallow-repository)" != false ]]; then
+    printf '%s\n' 'Secret scanning requires a complete Git checkout.' >&2
+    exit 1
+fi
+
+GITLEAKS_IGNORES="$(cat "$security_dir/.gitleaksignore")"
+export GITLEAKS_IGNORES
+
+git bundle create - --all HEAD |
+    "${docker_command[@]}" run "${container_flags[@]}" --env GITLEAKS_IGNORES "$gitleaks_image" -ec '
+        cat > /tmp/history.bundle
+        git clone --quiet --mirror /tmp/history.bundle /tmp/scan.git
+        git -C /tmp/scan.git fetch --quiet /tmp/history.bundle HEAD:refs/gitleaks/scan-head
+        printf "%s\n" "$GITLEAKS_IGNORES" > /tmp/.gitleaksignore
+        cat > /tmp/template <<EOF_TEMPLATE
+{{range .}}{{printf "%q\t%q\t%d\t%q\t%q\n" .RuleID .File .StartLine .Commit .Fingerprint}}{{end}}
+EOF_TEMPLATE
+        status=0
+        gitleaks git --no-banner --redact=100 --gitleaks-ignore-path /tmp/.gitleaksignore \
+            --report-format template --report-template /tmp/template --report-path /tmp/findings \
+            --log-opts="--all" /tmp/scan.git || status=$?
+        if [ -f /tmp/findings ]; then cat /tmp/findings; fi
+        exit "$status"'

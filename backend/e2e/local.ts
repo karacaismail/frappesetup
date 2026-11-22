@@ -1,6 +1,7 @@
 export function localUrl(host: string, offset: number): string {
-  const port = Number(process.env.PANE_PORT);
-  if (!Number.isInteger(port) || port < 1000 || port > 65526) {
+  const setting = process.env.PANE_PORT ?? '';
+  const port = Number(setting);
+  if (!/^[1-9][0-9]{3,4}$/.test(setting) || port > 65526) {
     throw new Error('PANE_PORT must be an integer from 1000 to 65526.');
   }
   return `http://${host}:${port + offset}`;

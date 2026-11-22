@@ -78,6 +78,31 @@ def get_doctype(doctype: str, user: str, *, surface: str = "web") -> dict:
 	}
 
 
+def compact_metadata(payload: dict) -> dict:
+	"""Keep the DocType identity without exposing an incomplete form."""
+	schema = payload["schema"]
+	projection = {
+		"schema": {
+			"name": schema["name"],
+			"module": schema["module"],
+			"fields": [],
+			"title_field": None,
+			"search_fields": "",
+			"sort_field": None,
+			"sensitivity": schema["sensitivity"],
+		},
+		"child_tables": {},
+	}
+	return {
+		**projection,
+		"meta_hash": digest(projection),
+		"catalog_version": payload["catalog_version"],
+		"mobile_cache_allowed": False,
+		"perm_version": payload["perm_version"],
+		"truncated": True,
+	}
+
+
 def visible_schema(
 	meta,
 	raw: dict,

@@ -163,3 +163,17 @@ def workspace_target_allowed(page: dict, context) -> bool:
 			return safe_url(page.get("external_link"))
 		return bool(page.get("link_to")) and is_item_allowed(page["link_to"], link_type, context)
 	return True
+
+
+def compact_bootstrap(payload: dict) -> dict:
+	"""Keep identity and formatting without returning a broken navigation tree."""
+	summary = {
+		"user": {**payload["user"], "roles": []},
+		"formatting": payload["formatting"],
+		"installed_apps": [],
+		"workspaces": [],
+		"sidebars": [],
+		"perm_version": payload["perm_version"],
+		"truncated": True,
+	}
+	return {**summary, "meta_hash": digest(summary)}
