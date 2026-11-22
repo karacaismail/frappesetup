@@ -2,9 +2,11 @@ import { spawn } from 'node:child_process';
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
+import { engineFixture } from './browser-fixtures.mjs';
 
 const worktree = resolve(process.argv[2]);
 const previewDir = process.env.PREVIEW_DIR;
+const fullPreview = process.env.E2E_FULL_BROWSER_FIXTURES === '1';
 const containerRuntime = process.env.E2E_BROWSER_RUNTIME === 'container';
 const require = createRequire(join(worktree, 'package.json'));
 const { chromium, request, webkit } = require('@playwright/test');
@@ -94,11 +96,11 @@ async function browserAvailable(engine, browserType) {
   return true;
 }
 
-async function runPlaywright(label, args, reporter = 'list') {
+async function runPlaywright(label, args, reporter = 'list', settings = env) {
   const child = spawn(join(worktree, 'node_modules', '.bin', 'playwright'), [
     'test', '-c', 'backend/e2e/playwright.config.ts', '--reporter=' + reporter,
     '--output=' + join(previewDir, label), ...args,
-  ], { cwd: worktree, env });
+  ], { cwd: worktree, env: settings });
   const output = [];
   const errors = [];
   child.stdout.setEncoding('utf8').on('data', (chunk) => output.push(chunk));
@@ -143,37 +145,81 @@ async function runPlaywright(label, args, reporter = 'list') {
   return status;
 }
 
+async function runFullPreview(projects) {
+  const ref = await request.newContext();
+  try {
+    const identity = 'http://identity.localhost:' + Number(process.env.PANE_PORT);
+    const response = await ref.post(identity + '/realms/platform/protocol/openid-connect/token', {
+      maxRedirects: 0,
+      form: { grant_type: 'client_credentials', client_id: fixture.E2E_LIFECYCLE_READER_CLIENT,
+        client_secret: fixture.E2E_LIFECYCLE_READER_SECRET },
+    });
+    if (!response.ok()) throw new Error('Keycloak preview reader HTTP ' + response.status());
+    env.E2E_LIFECYCLE_KEYCLOAK_READER_TOKEN = (await response.json()).access_token;
+    if (!env.E2E_LIFECYCLE_KEYCLOAK_READER_TOKEN) throw new Error('Keycloak preview reader token is missing.');
+    await openTenantSession('OPERATOR', 'Administrator', process.env.E2E_ADMIN_PASSWORD);
+  } finally {
+    await ref.dispose();
+  }
+
+  const shared = Object.fromEntries(Object.entries(env)
+    .filter(([name]) => !/^E2E_(CHROMIUM|WEBKIT)_/.test(name) && name !== 'E2E_LIFECYCLE_READER_SECRET'));
+  return Promise.all(projects.flatMap((project) => {
+    const engine = project.slice('--project='.length);
+    const settings = {
+      ...shared, ...engineFixture(fixture, engine),
+      E2E_ACCOUNT_DELETION: '1', E2E_MOBILE_SESSION_REVOKE: '1', E2E_EMPLOYEE_IDLE: '1',
+      E2E_MAGIC_LINK: '1', E2E_MOBILE_PKCE: '1',
+      E2E_DELETE_TENANT_READER_COOKIE: env.E2E_OPERATOR_COOKIE,
+      E2E_REVOKE_ADMIN_COOKIE: env.E2E_OPERATOR_COOKIE,
+      E2E_REVOKE_ADMIN_CSRF: env.E2E_OPERATOR_CSRF,
+      E2E_MOBILE_SESSION_COOKIE: env.E2E_OPERATOR_COOKIE,
+    };
+    const idle = 'employee must authenticate again';
+    return [
+      runPlaywright(engine + '-idle', [project, 'lifecycle.spec.ts', '--grep', idle], 'json', settings),
+      runPlaywright(engine + '-scenarios', [project, 'lifecycle.spec.ts', 'magic-link.spec.ts',
+        'mobile-pkce.spec.ts', '--grep-invert', idle], 'json', settings),
+    ];
+  }));
+}
+
 try {
   const results = [];
   const projects = [];
   if (await browserAvailable('chromium', chromium)) projects.push('--project=chromium');
-  else env.E2E_CHROMIUM_UNAVAILABLE = '1';
+  else if (!fullPreview) env.E2E_CHROMIUM_UNAVAILABLE = '1';
   if (await browserAvailable('webkit', webkit)) projects.push('--project=webkit');
-  if (projects.length) {
-    results.push(await runPlaywright('browser', [
-      ...projects, 'browser.spec.ts', 'magic-link.spec.ts', 'mobile-pkce.spec.ts',
-    ], containerRuntime ? 'json' : 'list'));
-  }
-  try {
-    if (!containerRuntime || env.E2E_ACCOUNT_DELETION === '1' || env.E2E_MOBILE_SESSION_REVOKE === '1') {
-      await openTenantSession('OPERATOR', 'Administrator', process.env.E2E_ADMIN_PASSWORD);
-      env.E2E_DELETE_TENANT_READER_COOKIE ||= env.E2E_OPERATOR_COOKIE;
-      env.E2E_REVOKE_ADMIN_COOKIE ||= env.E2E_OPERATOR_COOKIE;
-      env.E2E_REVOKE_ADMIN_CSRF ||= env.E2E_OPERATOR_CSRF;
+  if (fullPreview) {
+    results.push(...await runFullPreview(projects));
+    if (projects.length !== 2) results.push(1);
+  } else {
+    if (projects.length) {
+      results.push(await runPlaywright('browser', [
+        ...projects, 'browser.spec.ts', 'magic-link.spec.ts', 'mobile-pkce.spec.ts',
+      ], containerRuntime ? 'json' : 'list'));
     }
-    if (!containerRuntime) {
-      await openTenantSession('READER', fixture.E2E_PREVIEW_READER_EMAIL, fixture.E2E_PREVIEW_READER_PASSWORD);
-      results.push(await runPlaywright('api', ['--project=api', 'integration.spec.ts']));
+    try {
+      if (!containerRuntime || env.E2E_ACCOUNT_DELETION === '1' || env.E2E_MOBILE_SESSION_REVOKE === '1') {
+        await openTenantSession('OPERATOR', 'Administrator', process.env.E2E_ADMIN_PASSWORD);
+        env.E2E_DELETE_TENANT_READER_COOKIE ||= env.E2E_OPERATOR_COOKIE;
+        env.E2E_REVOKE_ADMIN_COOKIE ||= env.E2E_OPERATOR_COOKIE;
+        env.E2E_REVOKE_ADMIN_CSRF ||= env.E2E_OPERATOR_CSRF;
+      }
+      if (!containerRuntime) {
+        await openTenantSession('READER', fixture.E2E_PREVIEW_READER_EMAIL, fixture.E2E_PREVIEW_READER_PASSWORD);
+        results.push(await runPlaywright('api', ['--project=api', 'integration.spec.ts']));
+      }
+    } catch (error) {
+      const message = 'API fixture failed: ' + sanitize(String(error)) + '\n';
+      process.stderr.write(message);
+      writeFileSync(join(previewDir, 'api.log'), message, { mode: 0o600 });
+      results.push(1);
     }
-  } catch (error) {
-    const message = 'API fixture failed: ' + sanitize(String(error)) + '\n';
-    process.stderr.write(message);
-    writeFileSync(join(previewDir, 'api.log'), message, { mode: 0o600 });
-    results.push(1);
-  }
-  const lifecycleProjects = containerRuntime ? projects : ['--project=chromium'];
-  if (lifecycleProjects.length) {
-    results.push(await runPlaywright('lifecycle', [...lifecycleProjects, 'lifecycle.spec.ts'], 'json'));
+    const lifecycleProjects = containerRuntime ? projects : ['--project=chromium'];
+    if (lifecycleProjects.length) {
+      results.push(await runPlaywright('lifecycle', [...lifecycleProjects, 'lifecycle.spec.ts'], 'json'));
+    }
   }
   process.exitCode = results.find((code) => code !== 0) ?? 0;
 } catch (error) {

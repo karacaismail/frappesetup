@@ -142,3 +142,55 @@ class PreviewFixturesTest(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "private address on the preview network"):
                 fixtures.main()
             seed.assert_not_called()
+
+    def test_full_browser_accounts_are_distinct_and_only_otp_accounts_enroll(self):
+        accounts = fixtures.browser_keycloak.browser_accounts()
+        self.assertEqual(len(accounts), 12)
+        self.assertEqual(len({account["email"] for account in accounts.values()}), 12)
+        self.assertEqual(len({account["password"] for account in accounts.values()}), 12)
+        enrolled = {key for key, account in accounts.items() if "otp_seed" in account}
+        self.assertEqual(enrolled, {"chromium_magic-otp", "webkit_magic-otp"})
+        seeds = [accounts[key]["otp_seed"] for key in enrolled]
+        self.assertNotEqual(*seeds)
+        credential = fixtures.browser_keycloak.otp_credential(seeds[0])
+        self.assertEqual(json.loads(credential["secretData"])["value"], seeds[0])
+        self.assertEqual(json.loads(credential["credentialData"])["period"], 30)
+
+    def test_browser_client_configuration_grants_the_reader_only_view_users(self):
+        responses = {
+            "/client-scopes": [
+                {"name": "mobile", "id": "mobile-scope"},
+                {"name": "aud-site-tenant1", "id": "tenant-scope"},
+            ],
+            "/clients?clientId=mobile-app": [{"id": "mobile", "attributes": {}}],
+            "/clients?clientId=e2e-expired-mobile": [{"id": "expired"}],
+            "/clients/mobile/default-client-scopes": [{"id": "roles-scope", "name": "roles"}],
+            "/clients/expired/default-client-scopes": [],
+            "/authentication/flows/atonota-browser-magic-link/executions": [
+                {"providerId": "magiclink", "authenticationConfig": "magic"},
+                {"providerId": "conditional-user-configured", "authenticationConfig": "other"},
+            ],
+            "/authentication/config/magic": {"id": "magic", "config": {}},
+            "/clients?clientId=e2e-browser-reader": [{"id": "reader"}],
+            "/clients?clientId=realm-management": [{"id": "management"}],
+            "/clients/reader/service-account-user": {"id": "reader-user"},
+            "/clients/management/roles/view-users": {"id": "view", "name": "view-users"},
+        }
+        calls = []
+
+        def call(path, **kwargs):
+            calls.append((path, kwargs))
+            return responses.get(path)
+
+        redirect = "http://127.0.0.1:43828/callback"
+        reader, secret = fixtures.browser_keycloak.configure_browser_clients(call, redirect)
+        self.assertEqual(reader, "e2e-browser-reader")
+        self.assertTrue(secret)
+        self.assertIn(("/clients/mobile/default-client-scopes/roles-scope", {"method": "DELETE"}), calls)
+        self.assertIn(("/clients/mobile/optional-client-scopes/tenant-scope", {"method": "PUT", "data": {}}), calls)
+        role = {"id": "view", "name": "view-users"}
+        grants = [(path, values["data"]) for path, values in calls if "/clients/management" in path and "data" in values]
+        self.assertEqual(grants, [
+            ("/users/reader-user/role-mappings/clients/management", [role]),
+            ("/clients/reader/scope-mappings/clients/management", [role]),
+        ])

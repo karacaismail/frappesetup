@@ -78,6 +78,11 @@ def seed_tenant(provider_urls):
     }
 
 
+def deletion_accounts(identities):
+    return [(f"E2E_{name.split('_')[0].upper()}_" if "_" in name else "E2E_", account)
+            for name, account in identities.items() if name.split("_")[-1] == "delete"]
+
+
 def seed_lifecycle_identities(identities, issuer, tenant):
     if tenant:
         from platform_core.identity.provisioning import provision
@@ -92,15 +97,25 @@ def seed_lifecycle_identities(identities, issuer, tenant):
     from frappe.core.doctype.user.user import generate_keys
     from press_tr.press_identity.identity import bind_identity
 
-    account = identities["delete"]
-    link = bind_identity({
-        "iss": issuer, "sub": account["subject"], "email": account["email"], "email_verified": True,
-    })
-    keys = generate_keys(account["email"])
-    return {
-        "E2E_DELETE_PRESS_AUTHORIZATION": f"token {keys['api_key']}:{keys['api_secret']}",
-        "E2E_DELETE_PRESS_ANONYMOUS_USER": f"deleted-{sha256(link.name.encode()).hexdigest()[:32]}@invalid.example",
-    }
+    fixture = {}
+    for prefix, account in deletion_accounts(identities):
+        link = bind_identity({
+            "iss": issuer, "sub": account["subject"], "email": account["email"], "email_verified": True,
+        })
+        keys = generate_keys(account["email"])
+        fixture[prefix + "DELETE_PRESS_AUTHORIZATION"] = f"token {keys['api_key']}:{keys['api_secret']}"
+        fixture[prefix + "DELETE_PRESS_ANONYMOUS_USER"] = (
+            f"deleted-{sha256(link.name.encode()).hexdigest()[:32]}@invalid.example"
+        )
+    if os.environ["E2E_FULL_BROWSER_FIXTURES"] == "1":
+        from frappe.sessions import Session
+        from werkzeug.wrappers import Request
+
+        frappe.local.request = Request.from_values()
+        frappe.local.request_ip = "127.0.0.1"
+        session = Session("Administrator", full_name="Administrator", user_type="System User")
+        fixture["E2E_DELETE_PRESS_READER_COOKIE"] = "sid=" + session.sid
+    return fixture
 
 
 def main():
@@ -119,6 +134,8 @@ def main():
     provider_urls = {}
     if tenant:
         config.pop("keycloak_service_client_secret", None)
+        if os.environ["E2E_FULL_BROWSER_FIXTURES"] == "1":
+            config["allow_cors"] = [f"http://127.0.0.1:{port + 8}"]
         provider_urls = {
             part: f"http://e2e-provider:{port + 7}/{part}" for part in ("limited", "fallback")
         }
@@ -128,7 +145,8 @@ def main():
             keycloak_service_client_id="site-tenant1-service",
             extra_config="preview_site_config.tenant_service_config",
             identity_brand_name="Atonota",
-            kimlik_mobil_azp=["mobile-app"],
+            kimlik_mobil_azp=["mobile-app", "e2e-expired-mobile"] if
+            os.environ["E2E_FULL_BROWSER_FIXTURES"] == "1" else ["mobile-app"],
             kimlik_deletion_hmac_key=token_urlsafe(32),
             mobile_cursor_key=token_urlsafe(32),
             model_gateway_endpoints={
@@ -160,19 +178,19 @@ def main():
         from platform_core.identity.anonymization import identity_hash
 
         fixture.update(seed_tenant(provider_urls))
-        delete_account = lifecycle["delete"]
-        doctype = fixture["E2E_DOCTYPE"]
-        digest = identity_hash(issuer, delete_account["subject"])
-        anonymous = f"deleted-user-{digest[:16]}@deleted.invalid"
-        fixture.update(
-            E2E_DELETE_RECORD_DOCTYPE=doctype,
-            E2E_DELETE_RECORD_NAME=insert(
-                doctype, title="Retained lifecycle request", request_user=delete_account["email"],
-            ),
-            E2E_DELETE_RECORD_PERSON_FIELD="request_user",
-            E2E_DELETE_RECORD_ANONYMOUS_VALUE=json.dumps(anonymous),
-            E2E_DELETE_TENANT_ANONYMOUS_USER=anonymous,
-        )
+        for prefix, account in deletion_accounts(lifecycle):
+            doctype = fixture["E2E_DOCTYPE"]
+            digest = identity_hash(issuer, account["subject"])
+            anonymous = f"deleted-user-{digest[:16]}@deleted.invalid"
+            fixture.update({
+                prefix + "DELETE_RECORD_DOCTYPE": doctype,
+                prefix + "DELETE_RECORD_NAME": insert(
+                    doctype, title="Retained lifecycle request", request_user=account["email"],
+                ),
+                prefix + "DELETE_RECORD_PERSON_FIELD": "request_user",
+                prefix + "DELETE_RECORD_ANONYMOUS_VALUE": json.dumps(anonymous),
+                prefix + "DELETE_TENANT_ANONYMOUS_USER": anonymous,
+            })
     frappe.db.commit()
     print(json.dumps(fixture))
 
