@@ -11,6 +11,7 @@ mkdir -p "$STATE_DIR"
 chmod 700 "$STATE_DIR"
 cd "$STATE_DIR"
 SOCKET="$PANE_PORT.sock"
+PORTS_FILE="$PANE_PORT.ports"
 CONFIG="$HOME/.colima/_lima/colima-factory/ssh.config"
 ACTION="${1:-ac}"
 shift || true
@@ -21,9 +22,6 @@ fi
 SSH=(ssh -F "$CONFIG" -o ControlPath="$SOCKET" -o ControlPersist=no)
 case "$ACTION" in
     ac)
-        if "${SSH[@]}" -O check lima-colima-factory 2>/dev/null; then
-            exit 0
-        fi
         if (( $# == 0 )); then
             set -- "$((PANE_PORT + 1))" "$((PANE_PORT + 2))"
         fi
@@ -35,12 +33,21 @@ case "$ACTION" in
             fi
             FORWARDS+=(-L "127.0.0.1:$port:127.0.0.1:$port")
         done
+        if "${SSH[@]}" -O check lima-colima-factory 2>/dev/null; then
+            if [[ -f "$PORTS_FILE" && "$(cat "$PORTS_FILE")" == "$*" ]]; then
+                exit 0
+            fi
+            printf '%s\n' 'Close the current tunnel first, then open it with all required ports.' >&2
+            exit 2
+        fi
         "${SSH[@]}" -M -f -N -o ExitOnForwardFailure=yes "${FORWARDS[@]}" lima-colima-factory
+        printf '%s\n' "$*" > "$PORTS_FILE"
         ;;
     kapat)
         if [[ -S "$SOCKET" ]]; then
             "${SSH[@]}" -O exit lima-colima-factory
         fi
+        rm -f -- "$PORTS_FILE"
         ;;
     durum) "${SSH[@]}" -O check lima-colima-factory ;;
     *) printf '%s\n' 'Usage: tunel <ac|kapat|durum> [ports]' >&2; exit 2 ;;
