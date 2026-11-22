@@ -425,11 +425,22 @@ Bu imaj 22 Kasım 2026 Pazar günü `colima-factory` profilinde derlendi ve ağs
 
 Proje kaydının O-31 kararı iki sınır koyar. Okuma ucunda p95 en çok 500 milisaniyedir. Yazma ucunda p95 en çok 1 saniyedir. p95, çağrıların yüzde 95'inin altında kaldığı süredir.
 
-Ölçümü elle başlatın. Komutu bu klasörde çalıştırın:
+Ölçümü elle başlatın. Şu sırayı izleyin:
 
-```bash
-python3 -m tests.measure
-```
+1. Bu klasöre geçin.
+2. Komutu çalıştırın. Komut sonucu bir dosyaya yazar:
+
+   ```bash
+   python3 -m tests.measure > olcum-sonucu.json
+   ```
+
+3. Komutun çıkış kodunu denetleyin. 0 kodu, bütün uçların sınırın altında kaldığını gösterir. 1 kodu, bir sınırın aşıldığını ya da bir isteğin hata verdiğini gösterir.
+4. `olcum-sonucu.json` dosyasını açın. `endpoints` listesindeki her satır bir ucun sonucudur.
+5. Her uç için şu değerleri durum dosyasına tablo olarak yazın: `endpoint`, `kind`, `calls`, `p95_ms`, `limit_ms`, `errors`, `concurrent_errors` ve `concurrent_requests`.
+6. Tablonun altına ölçüm gününü, Python sürümünü ve `passed` değerini yazın.
+7. `olcum-sonucu.json` dosyasını silin. Bu dosya depoya girmez.
+
+Proje kaydının O-31 kararı sonucun durum dosyasına yazılmasını ister. Durum dosyası `.pane/prompts/durum.md` yolundadır.
 
 - Komut zamanlanmaz. Yalnız siz başlatınca çalışır.
 - Bu servis bir Frappe sitesi değildir. Geliştirme kurulumu, gerçek HTTP sunucusu ile sahte Keycloak, Press ve kiracıdır. Komut bu kurulumu açar. Ağa çıkmaz.
