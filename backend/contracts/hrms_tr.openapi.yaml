@@ -42,11 +42,11 @@ paths:
                   - type: object
                     additionalProperties: false
                     properties:
-                      name: {type: string}
-                      employee: {type: string}
-                      leave_type: {type: string}
-                      status: {type: string, enum: [Open, Approved, Rejected, Cancelled]}
-                      docstatus: {type: integer, enum: [0, 1, 2]}
+                      name: {type: string, description: Match a leave application record name.}
+                      employee: {type: string, description: Match an employee record name.}
+                      leave_type: {type: string, description: Match the leave category.}
+                      status: {type: string, enum: [Open, Approved, Rejected, Cancelled], description: Match the leave workflow state.}
+                      docstatus: {type: integer, enum: [0, 1, 2], description: Match the Frappe document state.}
                   - type: array
                     items:
                       type: array
@@ -64,6 +64,7 @@ paths:
           schema:
             type: string
             enum: ["modified desc, name asc", "name asc"]
+          example: "modified desc, name asc"
         - name: limit_start
           in: query
           description: Number of records to skip. The first record is at offset 0.
@@ -71,6 +72,7 @@ paths:
             type: integer
             minimum: 0
             default: 0
+          example: 0
         - name: limit_page_length
           in: query
           description: |
@@ -81,6 +83,7 @@ paths:
             minimum: 1
             maximum: 100
             default: 20
+          example: 20
       responses:
         "200":
           description: "The user's own applications, their team's applications, or all applications on the site."
@@ -88,6 +91,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeaveApplicationListResponse"
+              example:
+                data:
+                  - name: HR-LAP-TEST-01
+                    status: Open
+                    modified: "2026-11-22 09:00:00.000001"
         "401":
           $ref: "#/components/responses/AuthenticationFailed"
         "403":
@@ -98,6 +106,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FrappeError"
+              example: {exc_type: ValidationError}
   /resource/Leave%20Application/{name}:
     parameters:
       - in: path
@@ -106,6 +115,7 @@ paths:
         schema:
           type: string
         description: Leave application record name.
+        example: HR-LAP-TEST-01
     get:
       operationId: getLeaveApplication
       summary: Read a leave application.
@@ -116,6 +126,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LeaveApplicationResponse"
+              example:
+                data:
+                  name: HR-LAP-TEST-01
+                  employee: HR-EMP-TEST-01
+                  employee_name: Synthetic Employee
+                  company: HRMS TR Synthetic
+                  leave_approver: hrms-tr-manager@example.test
+                  leave_type: Synthetic Annual Leave
+                  from_date: "2026-11-24"
+                  to_date: "2026-11-25"
+                  description: Synthetic leave request.
+                  amended_from: null
+                  status: Open
+                  docstatus: 0
+                  modified: "2026-11-22 09:00:00.000001"
+                  total_leave_days: 2
+                  leave_balance: 8.5
         "401":
           $ref: "#/components/responses/AuthenticationFailed"
         "403":
@@ -136,12 +163,14 @@ paths:
           description: Frappe requires this header for a write request if the session has a CSRF token.
           schema:
             type: string
+          example: synthetic-csrf-token
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/ApproveLeaveRequest"
+            example: {name: HR-LAP-TEST-01, version: "2026-11-22 09:00:00.000001"}
       responses:
         "200":
           description: Name of the approved record.
@@ -149,6 +178,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApproveLeaveResponse"
+              example: {message: {name: HR-LAP-TEST-01}}
         "401":
           $ref: "#/components/responses/AuthenticationFailed"
         "403":
@@ -156,11 +186,7 @@ paths:
         "404":
           $ref: "#/components/responses/LeaveNotFound"
         "429":
-          description: The authenticated user exceeded the approval request limit.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FrappeError"
+          $ref: "#/components/responses/RateLimitExceeded"
         "417":
           description: |
             The application version changed, input validation failed, the application is not an open draft,
@@ -181,12 +207,14 @@ paths:
           name: X-Frappe-CSRF-Token
           description: Frappe requires this header if the session has a CSRF token.
           schema: {type: string}
+          example: synthetic-csrf-token
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/ApproveLeaveRequest"
+            example: {name: HR-LAP-TEST-01, version: "2026-11-22 09:05:00.000001"}
       responses:
         "200":
           description: Name of the cancelled record.
@@ -194,6 +222,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApproveLeaveResponse"
+              example: {message: {name: HR-LAP-TEST-01}}
         "401":
           $ref: "#/components/responses/AuthenticationFailed"
         "403":
@@ -208,7 +237,7 @@ paths:
                 $ref: "#/components/schemas/FrappeError"
               example: {exc_type: TimestampMismatchError}
         "429":
-          description: The authenticated user exceeded the cancellation request limit.
+          $ref: "#/components/responses/RateLimitExceeded"
   /method/hrms_tr.api.get_leave_approver:
     get:
       operationId: getLeaveApprover
@@ -219,6 +248,8 @@ paths:
           name: employee
           required: true
           schema: {type: string, minLength: 1, maxLength: 140}
+          description: Employee record name.
+          example: HR-EMP-TEST-01
       responses:
         "200":
           description: Approver account, or null when nobody is assigned.
@@ -230,18 +261,28 @@ paths:
                 properties:
                   message:
                     type: object
+                    description: Result of the default approver lookup.
                     required: [approver]
                     properties:
-                      approver: {type: [string, "null"]}
+                      approver:
+                        type: [string, "null"]
+                        description: Default approver account, or null when nobody is assigned.
+              example: {message: {approver: hrms-tr-manager@example.test}}
         "401":
           $ref: "#/components/responses/AuthenticationFailed"
         "403":
           $ref: "#/components/responses/PermissionDenied"
         "417":
           description: Invalid employee input.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrappeError"
+              example: {exc_type: ValidationError}
   /method/hrms_tr.hrms_endpoints.deny_legacy_leave_query:
     get:
       operationId: denyLegacyLeaveQueryGet
+      x-request-example: "GET /api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
       x-frappe-original:
         - hrms.www.hrms.get_context_for_dev
         - hrms.hr.doctype.leave_application.leave_application.get_leave_details
@@ -258,6 +299,7 @@ paths:
           $ref: "#/components/responses/PermissionDenied"
     post:
       operationId: denyLegacyLeaveQueryPost
+      x-request-example: "POST /api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
       x-frappe-original:
         - hrms.www.hrms.get_context_for_dev
         - hrms.hr.doctype.leave_application.leave_application.get_leave_details
@@ -279,16 +321,17 @@ paths:
         required: true
         schema: {type: string}
         description: Attendance request record name.
+        example: HR-ATT-TEST-01
     get:
       summary: Deny requests for legacy attendance warnings.
       responses:
         "403":
-          $ref: "#/components/responses/PermissionDenied"
+          $ref: "#/components/responses/PermissionDeniedV2"
     post:
       summary: Deny requests for legacy attendance warnings.
       responses:
         "403":
-          $ref: "#/components/responses/PermissionDenied"
+          $ref: "#/components/responses/PermissionDeniedV2"
 x-ai-tool:
   name: hrms_tr_approve_leave
   kind: write
@@ -310,15 +353,16 @@ x-ai-tool:
     properties:
       changes:
         type: array
+        description: Field changes that the human reviewer will see before approval.
         items:
           type: object
           additionalProperties: false
           required: [fieldname, label, old, new]
           properties:
-            fieldname: {type: string}
-            label: {type: string}
-            old: {type: [string, integer]}
-            new: {type: [string, integer]}
+            fieldname: {type: string, description: Internal field name of the proposed change.}
+            label: {type: string, description: Display label for the field.}
+            old: {type: [string, integer], description: Current value shown to the reviewer.}
+            new: {type: [string, integer], description: Proposed value shown to the reviewer.}
 components:
   securitySchemes:
     frappeSession:
@@ -354,6 +398,24 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/FrappeError"
+          example: {exc_type: DoesNotExistError}
+    RateLimitExceeded:
+      description: The authenticated user exceeded the allowed request rate.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FrappeError"
+          example: {exc_type: RateLimitExceededError}
+    PermissionDeniedV2:
+      description: The Frappe v2 endpoint denied access to the attendance warning method.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/FrappeV2Error"
+          example:
+            errors:
+              - type: PermissionError
+                message: You are not permitted to call this method.
   schemas:
     LeaveName:
       type: object
@@ -378,22 +440,22 @@ components:
       description: A leave application can include additional fields that the user has permission to read.
       required: [name]
       properties:
-        name: {type: string}
-        employee: {type: [string, "null"]}
-        employee_name: {type: [string, "null"]}
-        company: {type: [string, "null"]}
-        leave_approver: {type: [string, "null"]}
-        leave_type: {type: [string, "null"]}
-        from_date: {type: [string, "null"], format: date}
-        to_date: {type: [string, "null"], format: date}
-        description: {type: [string, "null"]}
-        amended_from: {type: [string, "null"]}
-        status: {type: [string, "null"], enum: [Open, Approved, Rejected, Cancelled, null]}
-        docstatus: {type: integer, enum: [0, 1, 2]}
+        name: {type: string, description: Leave application record name.}
+        employee: {type: [string, "null"], description: Employee record linked to the request.}
+        employee_name: {type: [string, "null"], description: Employee display name.}
+        company: {type: [string, "null"], description: Company responsible for the leave request.}
+        leave_approver: {type: [string, "null"], description: Account assigned to review this request.}
+        leave_type: {type: [string, "null"], description: Leave category linked to the request.}
+        from_date: {type: [string, "null"], format: date, description: First requested leave day.}
+        to_date: {type: [string, "null"], format: date, description: Last requested leave day.}
+        description: {type: [string, "null"], description: Optional explanation supplied with the request.}
+        amended_from: {type: [string, "null"], description: Cancelled request that this amendment replaces.}
+        status: {type: [string, "null"], enum: [Open, Approved, Rejected, Cancelled, null], description: Business workflow state of the request.}
+        docstatus: {type: integer, enum: [0, 1, 2], description: "Frappe state: 0 draft, 1 submitted, 2 cancelled."}
         modified:
           type: string
           description: Frappe returns this version in the site time zone without a UTC offset. Send it unchanged in approval and cancellation requests.
-        total_leave_days: {type: [number, "null"]}
+        total_leave_days: {type: [number, "null"], description: Leave days calculated by HRMS.}
         leave_balance:
           type: [number, "null"]
           description: Frappe returns this field only when the user has read permission.
@@ -403,6 +465,7 @@ components:
       properties:
         data:
           type: array
+          description: Page of readable leave applications.
           items:
             $ref: "#/components/schemas/LeaveApplication"
       examples:
@@ -415,6 +478,7 @@ components:
       required: [data]
       properties:
         data:
+          description: Readable fields of the requested leave application.
           $ref: "#/components/schemas/LeaveApplication"
       examples:
         - data:
@@ -426,6 +490,7 @@ components:
       required: [message]
       properties:
         message:
+          description: Record name returned by the completed leave action.
           $ref: "#/components/schemas/LeaveName"
       examples:
         - message:
@@ -433,6 +498,20 @@ components:
     FrappeError:
       type: object
       properties:
-        exc_type: {type: string}
-        exception: {type: string}
-        _server_messages: {type: string}
+        exc_type: {type: string, description: Frappe exception class name.}
+        exception: {type: string, description: Exception text when included by Frappe.}
+        _server_messages: {type: string, description: Server messages encoded as a JSON string.}
+    FrappeV2Error:
+      type: object
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          minItems: 1
+          description: Errors reported by the Frappe v2 endpoint.
+          items:
+            type: object
+            required: [type]
+            properties:
+              type: {type: string, description: Frappe exception class name.}
+              message: {type: string, description: Explanation when Frappe supplies one.}
