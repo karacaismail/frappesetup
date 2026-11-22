@@ -4,6 +4,7 @@ Proje kaydındaki D-9, arka uç işlemlerinin yapay zekâyla yönetilebilmesini 
 O-13, model adlarını kayıtta tutar ve sağlayıcı kitaplıklarını yasaklar.
 
 Depo kökünde `backend/dev/bin/ai-readiness` komutunu çalıştırın.
+Arka uç kodunu tararken `python3` komutu Python 3.14'ü çalıştırmalı.
 Komut her bulguda dosyayı ve satırı gösterir.
 Bir bulgu varsa komut 1, bulgu yoksa 0 döndürür.
 Başka bir arka uç klasörünü taramak için `--root` kullanın.
