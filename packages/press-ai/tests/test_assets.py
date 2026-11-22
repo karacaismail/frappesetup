@@ -72,6 +72,14 @@ class ContractTests(unittest.TestCase):
         for op_id in self.contract.order:
             self.assertEqual(self.contract.operations[op_id]["verification"]["live"], "not_run", op_id)
 
+    def test_dns_handoff_preserves_role_order(self):
+        handoff = self.contract.operations["dns.record"]["owner_handoff"]
+        self.assertEqual(handoff["role"], "dns_owner")
+        roles = ["DevOps sorumlusu", "Alan adı sorumlusu", "DevOps sorumlusu"]
+        self.assertEqual(len(handoff["steps"]), len(roles))
+        for step, role in zip(handoff["steps"], roles):
+            self.assertTrue(step.startswith(role + " "), step)
+
     def test_human_only_work_is_not_executable(self):
         executable = set(implemented_schemas())
         for op_id in self.contract.order:
