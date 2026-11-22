@@ -22,9 +22,9 @@ class TestPlatformIdentityDeletion(IntegrationTestCase):
 		)
 
 	def test_digest_is_the_name_and_unique(self):
-		self.assertEqual(self.new().insert(ignore_permissions=True).name, DIGEST)
+		self.assertEqual(self.new().insert().name, DIGEST)
 		with self.assertRaises((frappe.DuplicateEntryError, frappe.UniqueValidationError)):
-			self.new().insert(ignore_permissions=True)
+			self.new().insert()
 
 	def test_nobody_creates_or_edits_it_from_the_desk(self):
 		for permission in frappe.get_meta(DELETION).permissions:

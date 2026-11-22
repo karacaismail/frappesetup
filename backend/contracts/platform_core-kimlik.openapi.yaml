@@ -713,6 +713,7 @@ paths:
       summary: Lists the site's linked identities for reconciliation.
       description: |
         Only a service token with `azp=identity-sync` is accepted.
+        The Frappe user assigned to the service must have permission to read identity links.
         Returns identities in ascending subject order, then issuer order for equal subjects.
         A page contains only the issuer, subject and enabled state of each linked account.
       x-yikici: false
@@ -2097,10 +2098,11 @@ components:
                 _server_messages: '["{\"message\": \"Service token rejected: expired\"}"]'
     ServisYetkisiYok:
       description: |
-        The caller has no permission for this endpoint. The `exc_type` value is `PermissionError`. It is returned in two cases.
+        The caller has no permission for this endpoint. The `exc_type` value is `PermissionError`.
 
         - The request carries no service token. For example there is only a session cookie or no identity at all.
         - The token is valid but the `azp` value is not `identity-sync`.
+        - The service user lacks permission to read the identity links on a list request.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}

@@ -34,6 +34,11 @@ def _only(*fields: str) -> None:
 def list_identities(start: object = 0, page_length: object = 500) -> dict:
 	"""Lists a page of linked identities for the identity-sync service."""
 	service_token.require_service(SERVICE)
+	if not frappe.has_permission(provisioning.LINK, "read"):
+		frappe.throw(
+			_("You do not have permission to read identity links.", context="platform_core.kimlik"),
+			frappe.PermissionError,
+		)
 	_only("start", "page_length")
 	return list_linked_identities(start, page_length)
 

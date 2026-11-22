@@ -493,3 +493,4 @@ The identity endpoint failed.,Kimlik ucu başarısız oldu.,platform_core.kimlik
 The requested method could not be resolved.,İstenen yöntem bulunamadı.,shell.request
 Field {0} must be an integer from {1} to {2}.,{0} alanına {1} ile {2} arasında bir tam sayı yazın.,platform_core.kimlik
 The identity link changed. Try again.,Kimlik bağı değişti. Yeniden deneyin.,platform_core.kimlik
+You do not have permission to read identity links.,Kimlik bağlarını okuma izniniz yok.,platform_core.kimlik

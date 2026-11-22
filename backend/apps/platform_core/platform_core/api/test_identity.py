@@ -1,5 +1,7 @@
 """Exercise the reconciliation endpoint over Frappe RPC (contract section 7)."""
 
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
@@ -58,6 +60,17 @@ class TestListIdentities(FrappeAPITestCase):
 				response = self.call(params=params)
 				self.assertEqual(response.status_code, 400, response.data[:300])
 				self.assertEqual(response.json["exc_type"], "InvalidInput")
+
+	def test_list_identities_requires_frappe_read_permission(self):
+		check = frappe.has_permission
+
+		def deny_identity_links(doctype, *args, **kwargs):
+			return False if doctype == "Platform Identity Link" else check(doctype, *args, **kwargs)
+
+		with patch.object(frappe, "has_permission", side_effect=deny_identity_links):
+			response = self.call()
+		self.assertEqual(response.status_code, 403, response.data[:300])
+		self.assertNotIn("message", response.json)
 
 	def test_list_identities_guest_denied(self):
 		response = self.call(with_token=False)
