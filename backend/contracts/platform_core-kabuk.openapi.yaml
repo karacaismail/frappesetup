@@ -1,0 +1,748 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Platform Core shell API",
+    "version": "0.1.0",
+    "description": "Read-only shell contract for Frappe 16. Effective permissions are checked for every request. Observed image frappe/erpnext:v16.55.0 contains Frappe 16.56.0 and the new Sidebar model."
+  },
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/api/method/platform_core.api.shell.get_bootstrap": {
+      "get": {
+        "operationId": "getBootstrap",
+        "summary": "Read the current user's shell data",
+        "description": "Returns the current user, installed applications and native permission-filtered navigation. No manually maintained menu is added.",
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "Previous ETag. Lists, weak validators and * follow conditional GET semantics.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authenticated representation.",
+            "headers": {
+              "ETag": {
+                "description": "Opaque, quoted validator scoped to the site, current user, permission version and response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Private, no-cache, must-revalidate. Effective permissions may only be retained in client memory.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Cookie and Authorization separate authenticated representations.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Frappe v1 method response envelope.",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "$ref": "#/components/schemas/Bootstrap"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The current authorized representation matches If-None-Match. No response body.",
+            "headers": {
+              "ETag": {
+                "description": "Opaque, quoted validator scoped to the site, current user, permission version and response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Private, no-cache, must-revalidate. Effective permissions may only be retained in client memory.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Cookie and Authorization separate authenticated representations.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guest or denied permission. Authorization is rechecked before conditional handling.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method is not permitted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/method/platform_core.api.meta.get_doctype": {
+      "get": {
+        "operationId": "getDocType",
+        "summary": "Read an effective DocType definition",
+        "description": "Checks read permission before loading the real site definition and filtering field levels. Child tables require parent context and are rejected by this version. Authorization is rechecked before 304. Schema cache is site-scoped and content-addressed; effective cache is also user- and permission-scoped.",
+        "parameters": [
+          {
+            "name": "doctype",
+            "in": "query",
+            "required": true,
+            "description": "Exact DocType name. A non-empty string of at most 140 characters.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 140
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "Previous ETag. Lists, weak validators and * follow conditional GET semantics.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current authenticated representation.",
+            "headers": {
+              "ETag": {
+                "description": "Opaque, quoted validator scoped to the site, current user, permission version and response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Private, no-cache, must-revalidate. Effective permissions may only be retained in client memory.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Cookie and Authorization separate authenticated representations.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Frappe v1 method response envelope.",
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The current authorized representation matches If-None-Match. No response body.",
+            "headers": {
+              "ETag": {
+                "description": "Opaque, quoted validator scoped to the site, current user, permission version and response.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "Private, no-cache, must-revalidate. Effective permissions may only be retained in client memory.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Cookie and Authorization separate authenticated representations.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guest or denied permission. Authorization is rechecked before conditional handling.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "DocType does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "HTTP method is not permitted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "417": {
+            "description": "Invalid DocType argument.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel": {
+      "get": {
+        "operationId": "getPanel",
+        "summary": "Open the authenticated placeholder shell",
+        "description": "Serves no frontend application yet. Injects the session-bound CSRF token in an escaped HTML meta element. Server and shared caching are disabled. The token must be sent as X-Frappe-CSRF-Token for writes.",
+        "responses": {
+          "200": {
+            "description": "Authenticated shell. Cache-Control is private, no-store.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Guest redirect to /login?redirect-to=%2Fpanel. No CSRF token is returned.",
+            "headers": {
+              "Location": {
+                "description": "Same-origin login route.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "sid",
+        "description": "Host-bound Frappe session cookie. The API never accepts a target user parameter."
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "description": "Current authenticated user. Values come from the current site.",
+        "required": [
+          "name",
+          "full_name",
+          "language",
+          "roles"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Frappe user identifier."
+          },
+          "full_name": {
+            "type": "string",
+            "description": "Display name."
+          },
+          "language": {
+            "type": "string",
+            "description": "Effective request language."
+          },
+          "roles": {
+            "type": "array",
+            "description": "Effective roles. This list does not grant record access.",
+            "items": {
+              "type": "string",
+              "description": "Role name."
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "Workspace": {
+        "type": "object",
+        "description": "A visible Workspace, derived by Frappe's native permission checks.",
+        "required": [
+          "name",
+          "title",
+          "module",
+          "app",
+          "parent_page",
+          "icon"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Workspace identifier."
+          },
+          "title": {
+            "type": "string",
+            "description": "Workspace display title."
+          },
+          "module": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Owning module, when configured."
+          },
+          "app": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Installed application derived by Frappe from the module."
+          },
+          "parent_page": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Visible parent Workspace, otherwise null."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Configured icon identifier."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Sidebar": {
+        "type": "object",
+        "description": "Permission-filtered native Sidebar. Workspace Sidebar is archival in observed Frappe 16.56.0.",
+        "required": [
+          "name",
+          "data"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Exact sidebar identity."
+          },
+          "data": {
+            "type": "object",
+            "description": "Frappe 16.56.0 as_boot_entry payload, filtered by the native resolver. No raw Workspace content.",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Bootstrap": {
+        "type": "object",
+        "description": "Initial, read-only shell data. Subscription, branding and frontend rendering are outside this checkpoint.",
+        "required": [
+          "user",
+          "installed_apps",
+          "workspaces",
+          "sidebars",
+          "meta_hash",
+          "perm_version"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "installed_apps": {
+            "type": "array",
+            "description": "Applications installed on this tenant site.",
+            "items": {
+              "type": "string",
+              "description": "Application name."
+            }
+          },
+          "workspaces": {
+            "type": "array",
+            "description": "Visible Workspaces. Hidden pages and other users' private pages are excluded.",
+            "items": {
+              "$ref": "#/components/schemas/Workspace"
+            }
+          },
+          "sidebars": {
+            "type": "array",
+            "description": "Native, permission-filtered sidebars.",
+            "items": {
+              "$ref": "#/components/schemas/Sidebar"
+            }
+          },
+          "meta_hash": {
+            "type": "string",
+            "description": "SHA-256 digest of this bootstrap representation."
+          },
+          "perm_version": {
+            "type": "string",
+            "description": "Opaque permission generation. Changes on permission/cache invalidation."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Field": {
+        "type": "object",
+        "description": "Effective DocField properties from get_meta, including Custom Field and Property Setter. Only readable permission levels remain.",
+        "required": [
+          "fieldname",
+          "fieldtype",
+          "read_only"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "fieldname": {
+            "type": "string",
+            "description": "Field name."
+          },
+          "fieldtype": {
+            "type": "string",
+            "description": "Native Frappe field type."
+          },
+          "read_only": {
+            "type": "boolean",
+            "description": "True when the field is intrinsically read-only or the current user cannot write it."
+          },
+          "label": {
+            "description": "Display label.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "Field help text.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "options": {
+            "description": "Native field options.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "default": {
+            "description": "Configured default. Password defaults are omitted.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "reqd": {
+            "description": "Whether the field is required.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "hidden": {
+            "description": "Native hidden UI setting, independent from authorization.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "permlevel": {
+            "description": "Permission level.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "depends_on": {
+            "description": "Native visibility expression. Consumers must not execute it as code.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "mandatory_depends_on": {
+            "description": "Native conditional required expression.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "read_only_depends_on": {
+            "description": "Native conditional read-only expression.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "fetch_from": {
+            "description": "Native source field path.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "fetch_if_empty": {
+            "description": "Fetch only when empty.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "set_only_once": {
+            "description": "Native one-time assignment setting.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "unique": {
+            "description": "Native uniqueness setting.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "in_list_view": {
+            "description": "List display hint.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "in_standard_filter": {
+            "description": "Standard filter hint.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "precision": {
+            "description": "Configured numeric precision.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "length": {
+            "description": "Configured length.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "non_negative": {
+            "description": "Reject negative values.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "collapsible": {
+            "description": "Layout collapse setting.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "collapsible_depends_on": {
+            "description": "Native collapse expression.",
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "DocType": {
+        "type": "object",
+        "description": "Effective schema projection. Raw permission rows, scripts, actions and audit metadata are excluded.",
+        "required": [
+          "name",
+          "module",
+          "fields",
+          "title_field",
+          "search_fields",
+          "sort_field"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "DocType name."
+          },
+          "module": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Owning module."
+          },
+          "fields": {
+            "type": "array",
+            "description": "Readable fields and layout entries in source order.",
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            }
+          },
+          "title_field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Readable title field, otherwise null."
+          },
+          "search_fields": {
+            "type": "string",
+            "description": "Comma-separated readable search fields."
+          },
+          "sort_field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Readable sort field, otherwise null."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Meta": {
+        "type": "object",
+        "description": "User-specific effective schema. Never persist this permission-filtered payload in IndexedDB.",
+        "required": [
+          "schema",
+          "meta_hash",
+          "perm_version"
+        ],
+        "properties": {
+          "schema": {
+            "$ref": "#/components/schemas/DocType"
+          },
+          "meta_hash": {
+            "type": "string",
+            "description": "SHA-256 of the underlying schema, including effective custom permission rows."
+          },
+          "perm_version": {
+            "type": "string",
+            "description": "Permission version including the current permission fingerprint."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "description": "Native Frappe error envelope. Developer mode may add diagnostics.",
+        "properties": {
+          "exc_type": {
+            "type": "string",
+            "description": "Frappe exception type."
+          },
+          "_server_messages": {
+            "type": "string",
+            "description": "Native serialized error messages."
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}
