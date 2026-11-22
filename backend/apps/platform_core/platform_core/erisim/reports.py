@@ -22,6 +22,7 @@ Decision note: `docs/kararlar/0006-erisim-kurali.md`, section 9.
 """
 
 import logging
+from collections import defaultdict
 
 import frappe
 from frappe import _
@@ -227,7 +228,11 @@ def refuse_reference_loop(report_name: str, reference: str | None) -> None:
 	Opening a report loads that report only, so a report in a loop can still be opened and
 	repaired. A missing reference is left to Frappe, which answers "not found".
 	"""
-	loaded = frappe.local.request_cache.setdefault(LOADED_IN_REQUEST, {})
+	cache = getattr(frappe.local, "request_cache", None)
+	if cache is None:
+		# A process that runs outside a request can come without it. The loop must be caught there too.
+		cache = frappe.local.request_cache = defaultdict(dict)
+	loaded = cache.setdefault(LOADED_IN_REQUEST, {})
 	references, counts = loaded.setdefault("references", {}), loaded.setdefault("counts", {})
 	followed = any(target == report_name for source, target in references.items() if source != report_name)
 	references[report_name] = reference

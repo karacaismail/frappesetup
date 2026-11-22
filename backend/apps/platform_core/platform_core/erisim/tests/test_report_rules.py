@@ -335,6 +335,16 @@ class TestWhichReportRuns(ReportRulesTestCase):
 		opened = self.send(client, "GET", f"/api/v2/document/Report/{self.LOOP_A}")
 		self.assertEqual(opened.status_code, 200, opened.get_data(as_text=True)[:300])
 
+	def test_loop_check_works_without_a_request_cache(self):
+		"""Some processes run without `frappe.local.request_cache`. Loading a report must still work there."""
+		saved = frappe.local.request_cache
+		self.addCleanup(setattr, frappe.local, "request_cache", saved)
+		del frappe.local.request_cache
+
+		self.assertEqual(frappe.get_doc("Report", self.CUSTOM).name, self.CUSTOM)
+		frappe.get_doc("Report", self.LOOP_A)
+		self.assertRaises(frappe.PermissionError, frappe.get_doc, "Report", self.LOOP_B)
+
 	def test_script_of_a_reference_loop_is_refused_too(self):
 		response = self.send(
 			self.login(ADMIN),

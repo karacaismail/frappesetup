@@ -414,7 +414,8 @@ def list_times(doctype: str, user: str, calls: int, page: int) -> list[float]:
 	samples = []
 	for _number in range(calls + 1):
 		# A new request starts with no rules read. Without this the first loop would pay for all.
-		frappe.local.request_cache.clear()
+		if getattr(frappe.local, "request_cache", None) is not None:
+			frappe.local.request_cache.clear()
 		started = time.perf_counter()
 		frappe.get_list(doctype, fields=LIST_FIELDS, limit=page)
 		samples.append((time.perf_counter() - started) * 1000)
