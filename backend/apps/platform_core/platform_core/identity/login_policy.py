@@ -8,11 +8,14 @@ through `LoginManager.login`, which runs the `before_login` trigger (frappe/auth
 A-7: the built-in portal pages are closed to end users (“Website User”).
 """
 
+from inspect import signature
+
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
 
 from platform_core.identity import helpers, site_settings
+from platform_core.identity.exceptions import InvalidInput
 
 PORTAL_PATHS = ("/me", "/update-profile", "/update-password", "/third_party_apps", "/billing", "/portal")
 GUEST_LIMIT = 20
@@ -66,7 +69,16 @@ def _call_gated(original: str, args: tuple, kwargs: dict) -> object:
 			),
 			frappe.PermissionError,
 		)
-	return frappe.call(frappe.get_attr(original), *args, **kwargs)
+	target = frappe.get_attr(original)
+	forwarded = frappe.get_newargs(target, kwargs)
+	try:
+		signature(target).bind(*args, **forwarded)
+	except TypeError:
+		frappe.throw(
+			_("Required sign-in arguments are missing.", context="platform_core.identity"),
+			InvalidInput,
+		)
+	return target(*args, **forwarded)
 
 
 # HTTP methods are explicit (review: Frappe opens GET, POST, PUT and DELETE when `methods` is missing).

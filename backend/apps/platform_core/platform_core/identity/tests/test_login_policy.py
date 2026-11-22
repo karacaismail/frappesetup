@@ -162,6 +162,24 @@ class TestKeycloakOnly(FrappeAPITestCase):
 						self.assertEqual(answer.json.get("exc_type"), "PermissionError", f"{label} {path}")
 			self.assertEqual(h.logged_user(signed_in), h.AYSE)
 
+	def test_gate_off_rejects_missing_local_sign_in_arguments(self):
+		with h.SiteSettings({"identity_keycloak_only": 0}):
+			website_user = h.new_client()
+			response = h.login_with_keycloak(website_user, h.userinfo("sub-ayse", h.AYSE))
+			self.assertEqual(response.status_code, 302, response.data[:200])
+			for name, methods in login_policy.GATED_FUNCTIONS.values():
+				if "GET" not in methods:
+					continue
+				with self.subTest(name=name):
+					path = f"/api/method/platform_core.identity.login_policy.{name}"
+					guest = h.request(h.new_client().get, path)
+					self.assertEqual(guest.status_code, 400, guest.data[:200])
+					self.assertEqual(guest.json.get("exc_type"), "InvalidInput")
+					denied = h.request(website_user.get, path)
+					self.assertEqual(denied.status_code, 403, denied.data[:200])
+					self.assertEqual(denied.json.get("exc_type"), "PermissionError")
+			self.assertEqual(h.logged_user(website_user), h.AYSE)
+
 	def test_gate_off_delegates_to_the_original_functions(self):
 		# With the gate off the wrappers must behave like Frappe: reset_password answers 200 for any address.
 		response = h.request(

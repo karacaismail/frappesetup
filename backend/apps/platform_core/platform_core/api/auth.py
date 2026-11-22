@@ -1,5 +1,8 @@
 """Sign-in and sign-out endpoints. Business rules live in `platform_core.kimlik`; this file stays thin."""
 
+from collections.abc import Callable
+from functools import wraps
+
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
@@ -7,6 +10,26 @@ from frappe.rate_limiter import rate_limit
 from platform_core.identity import provider_setup, sign_in, sign_out
 from platform_core.identity.exceptions import InvalidRedirect, KeycloakLoginNotConfigured
 from platform_core.identity.safe_errors import safe_errors
+
+
+def _render_browser_rate_limit(function: Callable[..., None]) -> Callable[..., None]:
+	@wraps(function)
+	def wrapped(*args: object, **kwargs: object) -> None:
+		try:
+			return function(*args, **kwargs)
+		except frappe.RateLimitExceededError:
+			accept = frappe.get_request_header("Accept") or ""
+			if not accept.startswith("text") or "application/json" in accept or frappe.local.is_ajax:
+				raise
+			# Frappe's site-wide limiter cannot render an endpoint-level 429.
+			frappe.respond_as_web_page(
+				_("Sign-in failed", context="platform_core.identity"),
+				_("You hit the rate limit because of too many requests. Please try after sometime."),
+				http_status_code=429,
+				indicator_color="red",
+			)
+
+	return wrapped
 
 
 # The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
@@ -19,6 +42,7 @@ def get_login_url(redirect_to: str | None = None) -> dict:
 
 # The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: frappe-missing-permission
+@_render_browser_rate_limit
 @rate_limit(limit=20, seconds=60)
 def start_login(redirect_to: str | None = None) -> None:
 	"""Browser entry point of the sign-in: same work as `get_login_url`, then a 302 to Keycloak.
@@ -39,6 +63,7 @@ def start_login(redirect_to: str | None = None) -> None:
 
 # The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: frappe-missing-permission
+@_render_browser_rate_limit
 @rate_limit(limit=20, seconds=60)
 @safe_errors
 def keycloak_callback(

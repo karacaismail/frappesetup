@@ -232,7 +232,7 @@ class TestIdentityEndpoints(FrappeAPITestCase):
 		self.assertEqual(disabled.json["message"], {"user": NEW, "enabled": False})
 
 		body = {**identity, "new_email": NEW_2}
-		for _ in range(2):
+		for _attempt in range(2):
 			response = self.call(CHANGE_EMAIL, body)
 			self.assertEqual(response.status_code, 200, response.data[:300])
 			self.assertEqual(response.json["message"], {"user": NEW_2})

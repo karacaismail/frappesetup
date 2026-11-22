@@ -152,6 +152,24 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		response = h.finish_login(self.client, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE)))
 		self.assertEqual(response.status_code, 400)
 
+	def test_browser_rate_limit_returns_the_requested_response_format(self):
+		for endpoint, query in (
+			("start_login", {"redirect_to": "//external.example"}),
+			("keycloak_callback", {}),
+		):
+			path = f"/api/method/platform_core.api.auth.{endpoint}"
+			for _attempt in range(20):
+				answer = h.request(self.client.get, path, query_string=query)
+				self.assertEqual(answer.status_code, 400, answer.data[:200])
+				self.assertEqual(answer.mimetype, "text/html")
+			for accept in ("application/json", "text/html"):
+				with self.subTest(endpoint=endpoint, accept=accept):
+					answer = h.request(self.client.get, path, query_string=query, headers={"Accept": accept})
+					self.assertEqual(answer.status_code, 429, answer.data[:200])
+					self.assertEqual(answer.mimetype, accept)
+					if accept == "application/json":
+						self.assertEqual(answer.json.get("exc_type"), "RateLimitExceededError")
+
 	def test_callback_without_cookie_is_refused(self):
 		_started, query = h.start_login(self.client)
 		stranger = h.new_client()
