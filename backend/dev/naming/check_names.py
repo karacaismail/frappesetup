@@ -11,11 +11,15 @@ import argparse
 import ast
 import json
 import re
+import shutil
 import subprocess
 import unicodedata
 from dataclasses import asdict, dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
+
+GIT_PATH = shutil.which("git")
+GIT = str(Path(GIT_PATH).absolute()) if GIT_PATH else None
 
 APP_PREFIXES = {"platform_core": "PLT", "press_tr": "PTR", "hrms_tr": "HRT"}
 RECORD_KINDS = {"DocType", "Report", "Role", "Workspace", "Print Format"}
@@ -87,7 +91,7 @@ def scrub(name: str) -> str:
 
 
 def git_output(root: Path, *arguments: str) -> str:
-    result = subprocess.run(["git", "-C", str(root), *arguments], text=True, capture_output=True, check=False)
+    result = subprocess.run([GIT, "-C", str(root), *arguments], text=True, capture_output=True, check=False)
     return result.stdout if result.returncode == 0 else ""
 
 
@@ -386,9 +390,7 @@ def changed_files(root: Path, base: str) -> set[str]:
         ("diff", "--name-only", "-z", "--diff-filter=ACMRTUXB", base, "--", "backend/"),
         ("ls-files", "--others", "--exclude-standard", "-z", "--", "backend/"),
     ):
-        response = subprocess.run(
-            ["git", "-C", str(root), *args], text=True, capture_output=True, check=False
-        )
+        response = subprocess.run([GIT, "-C", str(root), *args], text=True, capture_output=True, check=False)
         if response.returncode:
             raise ValueError(f"Could not list changes from {base!r} in this Git worktree.")
         outputs.extend(response.stdout.split("\0"))
@@ -669,6 +671,8 @@ def main() -> int:
         help="Only report changed backend files relative to BASE (default: HEAD).",
     )
     arguments = parser.parse_args()
+    if GIT is None:
+        parser.exit(2, "Git executable not found on PATH.\n")
     try:
         selection = (
             changed_files(normalized_root(arguments.root), arguments.changed_files)
