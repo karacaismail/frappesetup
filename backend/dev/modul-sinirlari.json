@@ -19,7 +19,9 @@
     "press_tr.kimlik": [
       "oidc_verify"
     ],
-    "identity_sync": [],
+    "identity_sync": [
+      "oidc_verify"
+    ],
     "oidc_verify": []
   },
   "public_paths": {

@@ -248,6 +248,22 @@ Denetçiler proje sahibinin projelerinde 22 sorun gördü. Sorunlar düzeltilmed
 
 Listeler çalışma klasöründeki teslim notlarındadır. Her sorunun dosyası ve satırı orada yazılıdır.
 
+## Ad verme raporunun açık işleri
+
+Ad verme raporu `naming_rules_report.md` dosyasındadır. Rapor 22 Kasım 2026 Pazar günü yazıldı. Raporun açık işleri şunlardır:
+
+1. frappesetup dışındaki iki Frappe uygulamasında eski adlar Türkçedir. Bu adları düzeltme işi henüz kimseye verilmedi. Liste raporun 12. bölümündedir.
+2. Ad denetim araçları hiçbir projede kurulu değil. Bu araçlar raporun AV-71 ve AV-72 kurallarındadır.
+3. Rapor gerçek okurla denenmedi.
+
+Raporun dört açık kararı vardı. frappesetup projesinde Claude üçünü kapattı. Kararlar `backend/PROJE-KAYDI.md` dosyasında D-14 maddesindedir:
+
+- Uygulama ön ekleri `PLT`, `PTR` ve `HRT` oldu.
+- Keycloak rol adları küçük harf ve tireyle yazılır.
+- Commit mesajında tür ve kapsam İngilizce olur. Açıklama Türkçe kalır.
+
+Öteki uygulamalar için bu kararlar henüz verilmedi.
+
 ## Python dosyasının cevapsız soruları
 
 Python dosyası şu sorulara cevap vermiyor:
