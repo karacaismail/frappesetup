@@ -306,6 +306,9 @@ class MobileStore:
 		return self.append_changes([(record_type, record_id, kind)], target_installation=target_installation)
 
 	def append_changes(self, changes, *, target_installation=None):
+		if not changes:
+			return self.sequence
+
 		# Reserve at the end of the batch. Commit order must match sequence order,
 		# or a cursor could pass a lower event that another transaction still holds.
 		count = len(changes)

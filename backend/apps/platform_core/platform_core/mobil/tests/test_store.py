@@ -27,6 +27,15 @@ if frappe is not None:
 			self.assertEqual(store.sequence, 1)
 			self.assertFalse(db.get_value.call_args.kwargs.get("for_update", False))
 
+		def test_empty_batch_keeps_the_sequence_without_allocating(self):
+			with patch.object(
+				storage, "_sequence_row", return_value=SimpleNamespace(sequence=7, retention_floor=0)
+			):
+				store = storage.MobileStore()
+			with patch.object(storage, "_reserve_sequences") as reserve:
+				self.assertEqual(store.append_changes([]), 7)
+			reserve.assert_not_called()
+
 		def test_user_cleanup_removes_mobile_metadata(self):
 			db = Mock()
 			with (
