@@ -60,3 +60,5 @@ uv pip install --python env/bin/python -e 'apps/press_tr[test]' "${identity_whee
 grep -qxF press_tr sites/apps.txt || printf '\n%s\n' press_tr >> sites/apps.txt
 bench --site press.localhost install-app press_tr
 bench --site press.localhost disable-scheduler
+# Press preserves these caches during clear-cache. Evict them after installation commits.
+bench --site press.localhost execute frappe.cache.delete_value --args '[["all_apps", "app_hooks"]]'

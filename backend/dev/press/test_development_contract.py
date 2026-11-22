@@ -17,6 +17,17 @@ REPO = PRESS_DEV.parents[2]
 
 
 class ImageContractTest(unittest.TestCase):
+    def test_site_setup_refreshes_hooks_after_press_install(self):
+        commands = (PRESS_DEV / "install.sh").read_text().splitlines()
+        install = commands.index("bench --site press.localhost install-app press_tr")
+        disable_scheduler = commands.index("bench --site press.localhost disable-scheduler")
+        self.assertLess(install, disable_scheduler)
+        self.assertIn(
+            "bench --site press.localhost execute frappe.cache.delete_value "
+            """--args '[["all_apps", "app_hooks"]]'""",
+            commands[disable_scheduler + 1 :],
+        )
+
     def test_oidc_dependency_is_declared_and_bundled(self):
         metadata = (REPO / "backend/apps/press_tr/pyproject.toml").read_text()
         dockerfile = (PRESS_DEV / "Dockerfile").read_text()
