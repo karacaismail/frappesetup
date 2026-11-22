@@ -103,6 +103,21 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-14. Kayıt önce kiracı sitesindedir.** Her kiracı kendi sağlayıcılarını, hesaplarını ve API'lerini ekleyebilir. Platformun ortak hesapları sonraki turda Press'ten site ayarına gelir.
 - **O-15. Sağlık denetimi zamanlanmaz.** API'nin sağlığı gerçek çağrıların sonucundan çıkar. Elle başlatılan bağlantı denetimi de vardır (D-6).
 
+## Karar sitesine işlenecek farklar
+
+Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:
+
+| Sitedeki madde | Yeni durum | Kaynak |
+| --- | --- | --- |
+| K1: Press Frappe 15 üzerinde çalışır. | Press de Frappe 16 üzerinde çalışır. | D-7, O-9 |
+| K9: Claude Agent SDK ve adı yazılı Claude modelleri | Sağlayıcıdan bağımsız ajan servisi ve model geçidi | D-9, D-11, O-10 |
+| G-84: Kiracı MCP'si `frappe_mcp` ile kurulur. | `frappe/mcp` deposu arşivlendi. Katmanı `platform_core.yapay_zeka` kurar. | Karar notu 0002 |
+| Rail 5: Onay `confirm=true` alanıyla verilir. | Modelde onay alanı yoktur. Onay insan oturumundaki ayrı uçtan gelir. | Sözleşme 10. bölüm |
+| G-64: Günlük model, token ve maliyet tutar. | Bu alanlar “AI Usage Log” kaydındadır. | Karar notu 0002 |
+| G-57: Kiracıda kullanıcı “System User” olur. | Son kullanıcı “Website User” olur. | D-5, O-3 |
+| G-80: Tema Keycloakify ile yapılır. | Tema Keycloak'ın kendi tema yapısıyla yapılır. | O-4 |
+| Rail 4: Saatlik yoklama ve gece mutabakatı | Zamanlanmış iş yok. Mutabakat elle başlar. | D-6, O-11 |
+
 ## Değişmeyen sınırlar
 
 - Türkiye'deki kişilerin verisi güvence kurulmadan Hetzner'e konmaz (Karar 27). Bu tur yalnız yerel ortamda ve örnek veriyle yürür.
@@ -111,7 +126,15 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 
 ## Kişisel veri
 
-Bu turda gerçek kişisel veri yoktur. Kullanıcı tablosu e-posta, ad ve Keycloak kimliği taşır. Saklama süresi ve silme yolu MVP yayınından önce yazılır (G-15).
+Bu turda gerçek kişisel veri yoktur. Saklama süresi ve silme yolu MVP yayınından önce yazılır (G-15). Kişisel veri taşıyan kayıtlar şunlardır:
+
+| Kayıt | Kişisel veri | Saklama | Silme yolu |
+| --- | --- | --- | --- |
+| “User” ve kimlik bağı | E-posta, ad, Keycloak kimliği | Hesap açık kaldıkça | Hesap silme isteği |
+| “AI Action Log” | Kullanıcı adı, IP adresi | 365 gün (Rail 5) | Elle başlatılan silme komutu. Komut henüz yok. |
+| “AI Usage Log” | Kullanıcı adı | Belirlenmedi | Belirlenmedi |
+
+Mesaj içeriği ve araç girdisi günlüğe yazılmaz. Günlük yalnız girdinin özetini tutar.
 
 ## Teknik borç
 
