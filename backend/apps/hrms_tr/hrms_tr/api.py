@@ -1,8 +1,11 @@
-"""HTTP entry point for a manager or HR user."""
+"""HTTP entry points for leave application actions."""
+
+from typing import Annotated
 
 import frappe
 from frappe import _
 from frappe.rate_limiter import rate_limit
+from pydantic import StringConstraints
 
 from hrms_tr import leave
 from hrms_tr.leave import LeaveName, LeaveVersion
@@ -15,3 +18,18 @@ def approve_leave(name: LeaveName, version: LeaveVersion | None = None) -> dict[
 	if version is None:
 		frappe.throw(_("Read the leave application version before approving."), frappe.ValidationError)
 	return leave.approve(name, expected_version=version)
+
+
+# leave.cancel locks the target and checks HR, read, and cancel permissions.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+@rate_limit(limit=60, seconds=60, methods=["POST"], ip_based=False, user_based=True)
+def cancel_leave(name: LeaveName, version: LeaveVersion | None = None) -> dict[str, str]:
+	if version is None:
+		frappe.throw(_("Read the leave application version before cancelling."), frappe.ValidationError)
+	return leave.cancel(name, expected_version=version)
+
+
+# The HRMS lookup checks the caller's access to this employee before returning the approver.
+@frappe.whitelist(methods=["GET"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+def get_leave_approver(employee: Annotated[str, StringConstraints(min_length=1, max_length=140)]):
+	return {"approver": leave.get_approver(employee)}

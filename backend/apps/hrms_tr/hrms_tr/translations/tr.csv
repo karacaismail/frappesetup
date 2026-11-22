@@ -45,7 +45,6 @@ Leave application not found.,İzin talebi bulunamadı.
 The modified value returned when reading the leave application.,İzin talebini okurken gelen modified değeri.
 Record version sent as version in the approval request.,Onay isteğinde version olarak gönderilen kayıt sürümü.
 Frappe returns this field only when the user has read permission.,Frappe bu alanı yalnız okuma izni varsa döndürür.
-Leave Balance Before Application,Talep Öncesi İzin Bakiyesi
 HRMS TR Employee Leave Application,HRMS TR çalışanının izin talebi
 HRMS TR Manager Leave Application,HRMS TR yöneticisinin ekip izin talepleri
 HRMS TR Admin Leave Application,HRMS TR insan kaynaklarının izin talepleri
@@ -59,5 +58,8 @@ Use the tenant portal to access HRMS TR.,HRMS TR için kiracı panelini kullanı
 Use this order for stable paging when modification timestamps match.,Bu sırayı kullanırsanız değişiklik saati eşit kayıtlar sayfalar arasında yer değiştirmez.
 The authenticated user exceeded the approval request limit.,Kullanıcının onay isteği sayısı sınırı aştı.
 Read the leave application version before approving.,Onaylamadan önce izin talebinin güncel kaydını açın.
+Read the leave application version before cancelling.,İptal etmeden önce izin talebinin güncel kaydını açın.
+The leave application changed. Open it again before cancelling.,İzin talebi değişti. İptal etmeden önce talebi yeniden açın.
+Only submitted leave applications can be cancelled.,Yalnız gönderilen izin taleplerini iptal edebilirsiniz.
 The leave application could not be approved.,İzin talebi onaylanamadı.
 Managers can only change the status of a team leave application.,Yöneticiler ekip izin taleplerinde yalnız durumu değiştirebilir.

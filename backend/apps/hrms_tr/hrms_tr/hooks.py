@@ -8,7 +8,11 @@ app_license = "GPL-3.0-only"
 required_apps = ["hrms", "platform_core"]
 
 before_request = ["hrms_tr.users.require_tenant_portal"]
-website_user_allowed_methods = ["hrms_tr.api.approve_leave"]
+website_user_allowed_methods = [
+	"hrms_tr.api.approve_leave",
+	"hrms_tr.api.cancel_leave",
+	"hrms_tr.api.get_leave_approver",
+]
 
 before_install = "hrms_tr.setup.check_install"
 before_migrate = "hrms_tr.setup.before_migrate"

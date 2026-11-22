@@ -218,6 +218,22 @@ class LeaveHttpTest(unittest.TestCase):
             f"{HRMS_LEAVE}.get_leave_approver?{urlencode({'employee': own['employee']})}"
         )
         self.assertEqual(status, 403, result.get("exception"))
+        lookup = "/api/method/hrms_tr.api.get_leave_approver"
+        for actor in ("outsider", "guest"):
+            with self.subTest(actor=actor):
+                caller = self.login(actor) if actor != "guest" else Client(self, None)
+                code, error = caller.send(
+                    f"{lookup}?{urlencode({'employee': own['employee']})}"
+                )
+                self.assertEqual(
+                    (code, error.get("exc_type")), (403, "PermissionError")
+                )
+        status, result = client.send(
+            f"{lookup}?{urlencode({'employee': own['employee']})}"
+        )
+        self.assertEqual(status, 200, result.get("exc_type"))
+        self.contract_validators["approver"].validate(result)
+        self.assertEqual(result["message"], {"approver": self.data["users"]["manager"]})
         self.assertEqual(self.login("manager").page("/app")[0], 403)
         day = (date.fromisoformat(own["from_date"]) + timedelta(days=8)).isoformat()
         draft = {key: own[key] for key in ("employee", "company", "leave_type")}
@@ -430,6 +446,7 @@ class LeaveHttpTest(unittest.TestCase):
             with self.subTest(option=option):
                 query = urlencode({option: json.dumps({"leave_balance": [">", 5]})})
                 code, payload = client.send(f"{LEAVE_PATH}?{query}")
+                print(f"\nLeave balance {option}: HTTP {code}", flush=True)
                 self.assertIn(code, (200, 403, 417), payload.get("exc_type"))
                 if code == 200:
                     self.assertEqual(payload["data"], [])
@@ -492,7 +509,29 @@ class LeaveHttpTest(unittest.TestCase):
         status, result = manager.send(leave_path, {"docstatus": 2}, method="PUT")
         self.assertEqual(status, 403, result.get("exception"))
         status, result = hr.send(leave_path, {"docstatus": 2}, method="PUT")
-        self.assertEqual(status, 200, result.get("exception"))
+        self.assertEqual(status, 403, result.get("exception"))
+        cancel = "/api/method/hrms_tr.api.cancel_leave"
+        submitted = self.document(hr, "hr_approve")
+        args = self.approval_payload(submitted)
+        for actor in ("manager", "employee"):
+            with self.subTest(actor=actor):
+                status, result = self.login(actor).send(cancel, args)
+                self.assertEqual(
+                    (status, result.get("exc_type")), (403, "PermissionError")
+                )
+        status, result = hr.send(cancel, {"name": name})
+        self.assertEqual((status, result.get("exc_type")), (417, "ValidationError"))
+        status, result = hr.send(cancel, self.approval_payload(target))
+        self.assertEqual(
+            (status, result.get("exc_type")), (417, "TimestampMismatchError")
+        )
+        self.assertEqual(
+            self.document(hr, "hr_approve")["modified"], submitted["modified"]
+        )
+        status, result = hr.send(cancel, args)
+        self.assertEqual(status, 200, result.get("exc_type"))
+        self.contract_validators["cancel"].validate(result)
+        self.assertEqual(result["message"], {"name": name})
         old = self.document(hr, "hr_approve")
         self.assertEqual(old["docstatus"], 2)
         amendment = {
@@ -901,14 +940,16 @@ def load_contract_validators(path):
         response: Draft202012Validator(
             {
                 **contract,
-                **contract["paths"][path]["get"]["responses"]["200"]["content"][
+                **contract["paths"][path][method]["responses"]["200"]["content"][
                     "application/json"
                 ]["schema"],
             }
         )
-        for response, path in (
-            ("list", "/resource/Leave%20Application"),
-            ("detail", "/resource/Leave%20Application/{name}"),
+        for response, path, method in (
+            ("list", "/resource/Leave%20Application", "get"),
+            ("detail", "/resource/Leave%20Application/{name}", "get"),
+            ("approver", "/method/hrms_tr.api.get_leave_approver", "get"),
+            ("cancel", "/method/hrms_tr.api.cancel_leave", "post"),
         )
     }
 

@@ -171,6 +171,73 @@ paths:
                 $ref: "#/components/schemas/FrappeError"
               example:
                 exc_type: TimestampMismatchError
+  /method/hrms_tr.api.cancel_leave:
+    post:
+      operationId: cancelLeaveApplication
+      summary: Cancel a submitted leave application as HRMS TR Admin.
+      description: Send the modified value from the submitted application in the version field.
+      parameters:
+        - in: header
+          name: X-Frappe-CSRF-Token
+          description: Frappe requires this header if the session has a CSRF token.
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveLeaveRequest"
+      responses:
+        "200":
+          description: Name of the cancelled record.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApproveLeaveResponse"
+        "401":
+          $ref: "#/components/responses/AuthenticationFailed"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+        "404":
+          $ref: "#/components/responses/LeaveNotFound"
+        "417":
+          description: Invalid input, stale version, or a record that has not been submitted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrappeError"
+              example: {exc_type: TimestampMismatchError}
+        "429":
+          description: The authenticated user exceeded the cancellation request limit.
+  /method/hrms_tr.api.get_leave_approver:
+    get:
+      operationId: getLeaveApprover
+      summary: Read the default leave approver for an employee the caller can access through HRMS.
+      parameters:
+        - in: query
+          name: employee
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 140}
+      responses:
+        "200":
+          description: Approver account, or null when nobody is assigned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [approver]
+                    properties:
+                      approver: {type: [string, "null"]}
+        "401":
+          $ref: "#/components/responses/AuthenticationFailed"
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+        "417":
+          description: Invalid employee input.
   /method/hrms_tr.hrms_endpoints.deny_legacy_leave_query:
     get:
       operationId: denyLegacyLeaveQueryGet

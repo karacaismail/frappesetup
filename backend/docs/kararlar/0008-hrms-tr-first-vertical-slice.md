@@ -35,16 +35,21 @@ Bu karar izin talebindeki alanı kapsar. Ayrı HRMS bakiye uçlarının durumu a
 ## İnceleme sonrası kararlar
 
 HRMS TR rolleri masaüstü erişimi vermez. Üç rol de “Website User” türünü kullanır.
-HRMS TR, izin listesine yalnız insan onay ucunu ekler.
+HRMS TR, izin listesine onay, iptal ve onaylayan kişi sorgusu uçlarını ekler.
 Onay ucu rolü, kayıt erişimini ve sürümü ayrıca denetler.
 Eski HRMS yolları izin listesinde yer almaz.
+Çalışan, `hrms_tr.api.get_leave_approver` ile izin talebini kimin onaylayacağını öğrenir.
+Sunucu, sorgu için HRMS'in çalışan erişim kuralını uygular.
 Yönetici ve İK rol profilleri çalışan rolünü de taşır.
 HRMS, varsayılan onaylayıcıya kendi “Leave Approver” rolünü ekler.
 HRMS TR, bu rolü HRMS TR hesabından çıkarır.
 HRMS TR hesapları masaüstü erişimi veren başka rol alamaz.
 
-İK, onaylı talebi kayıt adresinden iptal edebilir. İK, iptal edilen talebin düzeltme kopyasını açabilir.
-İzin listesi, İK ve yönetici için `frappe.client.cancel` yöntemini kapatır.
+İK, gönderilen izin talebini `hrms_tr.api.cancel_leave` ile iptal eder.
+İK, iptal isteğinde kaydın `modified` değerini sürüm olarak gönderir.
+Sunucu rolü, kayıt iznini ve sürümü denetler. Ardından Frappe iptali yapar.
+İK, iptal edilen talebin düzeltme kopyasını açabilir.
+Portal kullanıcısı, genel kayıt adresinden veya `frappe.client.cancel` ile iptal yapamaz.
 İK rolü, bu işlem için kiracıdaki `Employee` kayıtlarını okuyabilir.
 İK rolünün çalışan kayıtlarına yazma, rapor alma, dışa aktarma ve yazdırma izni yoktur.
 Yönetici ve çalışan rolleri, başka bir kişinin `Employee` kaydını okuyamaz.

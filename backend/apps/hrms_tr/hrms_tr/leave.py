@@ -34,9 +34,12 @@ def check_hr_role():
 
 
 def validate_cancellation(doc, method=None):
-	if frappe.session.user != "Administrator" and not set((HR_ROLE, *OPERATIONS_ROLES)).intersection(
-		frappe.get_roles()
-	):
+	if frappe.session.user == "Administrator":
+		return
+	roles = frappe.get_roles()
+	if set(OPERATIONS_ROLES).intersection(roles):
+		return
+	if HR_ROLE not in roles or not doc.flags.hrms_tr_version_checked:
 		frappe.throw(_("You do not have permission to cancel leave."), frappe.PermissionError)
 
 
@@ -51,6 +54,7 @@ def validate_manager_fields(doc, method=None):
 	if frappe.db.get_value("Employee", before.employee, "user_id") == frappe.session.user:
 		return
 	# Frappe sets these audit columns before validation. The manager cannot set their values.
+	# get_valid_columns checks parent fields. Leave Application currently has no writable child table.
 	status_and_audit_fields = {"status", "docstatus", "modified", "modified_by"}
 	protected_fields = set(doc.meta.get_valid_columns()) - status_and_audit_fields
 	if any(doc.has_value_changed(fieldname) for fieldname in protected_fields):
@@ -98,3 +102,29 @@ def approve(name: str, *, expected_version: str | None = None) -> dict[str, str]
 	doc.status = "Approved"
 	doc.submit()
 	return {"name": doc.name}
+
+
+def cancel(name: str, *, expected_version: str) -> dict[str, str]:
+	if HR_ROLE not in frappe.get_roles():
+		frappe.throw(_("You do not have permission to cancel leave."), frappe.PermissionError)
+	doc = frappe.get_doc(DOCTYPE, name, for_update=True)
+	doc.check_permission("read")
+	doc.check_permission("cancel")
+	if str(doc.modified) != expected_version:
+		frappe.throw(
+			_("The leave application changed. Open it again before cancelling."),
+			frappe.TimestampMismatchError,
+		)
+	if not doc.docstatus.is_submitted():
+		frappe.throw(_("Only submitted leave applications can be cancelled."), frappe.ValidationError)
+	doc.flags.hrms_tr_version_checked = True
+	doc.cancel()
+	return {"name": doc.name}
+
+
+def get_approver(employee: str) -> str | None:
+	from hrms.hr.doctype.leave_application.leave_application import get_leave_approver
+
+	if not frappe.db.exists("Employee", employee):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
+	return get_leave_approver(employee)
