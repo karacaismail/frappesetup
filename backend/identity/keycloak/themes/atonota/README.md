@@ -128,8 +128,9 @@ Müşteri hesabını Press'teki silme sayfasında siler (proje kaydı O-27, söz
 - Keycloak'ın kendi `delete_account` eylemi kapalıdır. Bu eylem kullanıcıyı ilk adımda siler. Konsol bu eylemi hiç sunmaz.
 - Bağlantı “Kişisel bilgiler” sayfasının altında görünür. Metni “Hesap silme sayfasına gidin” olur.
 - Bağlantının adresi ayardan gelir: `IDENTITY_ACCOUNT_DELETION_URL` ortam değişkeni.
-- Bağlantıyı yalnız müşteri görür. Müşteri, `account` istemcisinin `delete-account` rolünü taşıyan kullanıcıdır.
+- Bağlantıyı yalnız müşteri görür. Müşteri, `request-account-deletion` adlı realm rolünü taşıyan kullanıcıdır.
 - Çalışan bu rolü taşımaz. Sunucu çalışana giden sayfaya bağlantıyı hiç koymaz.
+- Bu rol Keycloak'ın `delete-account` rolü değildir. O rol Keycloak'ın kendi silme eylemine yetki verir. O rolü kimseye vermeyin.
 
 Görünürlük kararını sunucu verir, tarayıcı vermez. Kararı küçük bir Keycloak eklentisi verir. Eklenti `account-provider/` klasöründedir.
 
@@ -143,19 +144,25 @@ Görünürlük kararını sunucu verir, tarayıcı vermez. Kararı küçük bir 
 Eklenti şu durumlarda bağlantıyı eklemez:
 
 - kullanıcı oturum açmamışsa,
-- kullanıcının `delete-account` rolü yoksa,
+- kullanıcının `request-account-deletion` rolü yoksa,
 - adres boşsa,
 - adres `http` ya da `https` ile başlamıyorsa. Örneğin `javascript:` adresi reddedilir.
+- adresin sunucu adında alt çizgi ya da Türkçe harf varsa. Böyle bir adı ASCII biçimiyle yazın.
+
+Müşteri bağlantıyı alamazsa eklenti Keycloak günlüğüne bir uyarı yazar. Uyarı “Account deletion link is not shown” diye başlar. Beklenmedik bir hata hesap konsolunu bozmaz: eklenti hatayı günlüğe yazar ve sayfayı bağlantısız gönderir.
+
+Adres ve kaçış kurallarını küçük bir Java denetimi ölçer: `account-provider/src/test/java/.../AccountDeletionLinkConsoleCheck.java`. Denetim imaj derlenirken çalışır. Denetim başarısız olursa imaj derlenmez.
 
 Bağlantı bir yetki denetimi değildir. Silme sayfası kullanıcıyı yeniden doğrular.
 
 Eklentiyi Keycloak'a kurmak için kimlik-realm işi şunları yapmalıdır:
 
-1. Eklentiyi derleyin. Derleme adımı `test/Dockerfile` dosyasının ikinci aşamasındadır. Adım yalnız `javac` kullanır.
+1. Eklentiyi derleyin. Derleme adımı `test/Dockerfile` dosyasının ikinci aşamasındadır. Adım yalnız `javac` kullanır. Aynı aşama Java denetimini de çalıştırır.
 2. Çıkan `account-deletion-link-provider.jar` dosyasını `/opt/keycloak/providers/` klasörüne koyun.
 3. Keycloak container'ına `IDENTITY_ACCOUNT_DELETION_URL` değişkenini verin.
-4. `delete-account` rolünü müşterilere verin. Çalışanlara vermeyin.
-5. `delete_account` gerekli işlemini kapalı tutun.
+4. Realm'de `request-account-deletion` adlı bir realm rolü açın. Rolü müşterilere verin, çalışanlara vermeyin.
+5. `delete_account` gerekli işlemini kapalı tutun. `delete-account` rolünü kimseye vermeyin.
+6. Kurulumdan sonra deneyin: müşteri hesabıyla girin ve bağlantıyı görün. Çalışan hesabıyla girin ve bağlantının olmadığını görün.
 
 Eklenti kurulu değilse hesap konsolu 404 yanıtı verir. Bu, bilerek seçilmiş güvenli davranıştır: tema eklentisiz çalışırsa görünürlük kuralı sessizce kaybolurdu.
 
@@ -224,6 +231,7 @@ npx playwright test
 | `tests/account.spec.ts` | Hesap konsolu: yerleşim, odak, hareket, axe, Türkçe iletiler ve token eşliği |
 | `tests/focus-diff.ts` | Odak çizgisini ölçen ortak yardımcı |
 | `tests/delete-account.spec.ts` | Hesap silme bağlantısı: müşteri görür, çalışan görmez, adres ayardan gelir |
+| `tests/realm-settings.spec.ts` | Keycloak'ın silme eylemi yanlışlıkla açılsa da konsol onu sunmaz. Bu test realm ayarını değiştirir, bu yüzden öteki testlerden önce tek başına koşar. |
 | `tests/security.spec.ts` | Güvenlik başlıkları, XSS denemeleri, tarayıcı deposu ve kaynak denetimi |
 | `tests/brand.spec.ts` | Marka adı değişkenden gelir: giriş, e-posta, hesap konsolu ve kaynak denetimi |
 | `tests/gorsel.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi |

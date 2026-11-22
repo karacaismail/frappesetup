@@ -1,14 +1,16 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { focusDiff } from './focus-diff';
-import { ACCOUNT_DELETION_URL, createUser, ensureKeycloakDeleteActionOff, KC, loginUrl, REALM, submitPassword, userExists } from './helpers';
+import { ACCOUNT_DELETION_URL, createUser, ensureKeycloakDeleteActionOff, grantStockDeleteRole, KC, loginUrl, REALM, submitPassword, userExists } from './helpers';
 
 // Account deletion path (project record O-27, contract section 7).
 // - Keycloak's own "delete_account" action is switched off. It deletes the user in the first step.
 // - The account console shows a link to the account deletion page of Press instead.
 // - The address comes from a setting (IDENTITY_ACCOUNT_DELETION_URL).
-// - Only a customer sees the link. A customer holds the "delete-account" role of the "account" client.
+// - Only a customer sees the link. A customer holds the realm role "request-account-deletion".
 //   An invited employee does not hold it and never receives the link.
+// - Keycloak's own "delete-account" role authorises Keycloak's delete action. The product grants it to nobody,
+//   and it does not show the link.
 // The server decides: the link is part of the page that Keycloak sends. It is not added or hidden in the browser.
 
 const LINK = '#at-account-deletion-link';
@@ -160,17 +162,20 @@ test("Keycloak's own delete action stays off, also for a customer", async ({ pag
   expect(await userExists(email)).toBe(true);
 });
 
-// The three cases below need a different server setting, so they do not run in the normal suite.
-// Run one case at a time after changing "accountDeletionUrl" in account/theme.properties and "tema-dev.sh sync account":
-//   DELETION_URL_CASE=missing|script|relative npx playwright test delete-account -g "bad address"
-test('bad address: a customer gets no link when the setting is missing or unsafe', async ({ page }) => {
-  test.skip(!process.env.DELETION_URL_CASE, 'Runs only with DELETION_URL_CASE and a changed server setting');
-  await signIn(page, { customer: true });
-  const html = await serverPage(page);
-  expect(html).not.toContain('at-account-deletion');
-  expect(html).not.toContain('javascript:');
+test("Keycloak's own delete-account role does not show the link", async ({ page }) => {
+  // The customer marker is a separate role. Granting Keycloak's role alone must change nothing.
+  const email = await createUser();
+  await grantStockDeleteRole(email);
+  await ensureKeycloakDeleteActionOff();
+  await page.goto(`${KC}/realms/${REALM}/account/`);
+  await submitPassword(page, email);
+  await expect(page.locator('#save-btn')).toBeVisible({ timeout: 20_000 });
+  expect(await serverPage(page)).not.toContain('at-account-deletion');
   await expect(page.locator(SECTION)).toHaveCount(0);
 });
+
+// Unsafe and missing addresses are checked in the image build, without a browser:
+// account-provider/src/test/java/platform/identity/account/AccountDeletionLinkConsoleCheck.java
 
 // Produces screenshots for an independent review. Runs only with VISUAL=1.
 for (const scheme of ['light', 'dark'] as const) {

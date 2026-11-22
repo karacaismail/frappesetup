@@ -7,9 +7,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
-import org.keycloak.models.AccountRoles;
+import org.jboss.logging.Logger;
 import org.keycloak.models.ClientModel;
-import org.keycloak.models.Constants;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
@@ -30,8 +29,9 @@ import org.keycloak.theme.freemarker.FreeMarkerProvider;
  *       This class always switches the stock delete feature off in the page model.</li>
  *   <li>A customer gets a link to the deletion page instead. The address comes from the theme property
  *       {@value #URL_PROPERTY}, which the theme fills from a server setting.</li>
- *   <li>Only a customer gets the link. A customer holds the "delete-account" role of the "account"
- *       client. An invited employee does not hold it.</li>
+ *   <li>Only a customer gets the link. A customer holds the realm role {@value #CUSTOMER_ROLE}.
+ *       An invited employee does not hold it. The role is not Keycloak's "delete-account" role:
+ *       that role authorises Keycloak's own delete action and must not be granted to anyone.</li>
  * </ul>
  *
  * <p>The decision is made here, on the server. A user without the role receives a page without the
@@ -44,11 +44,14 @@ public class AccountDeletionLinkConsole extends AccountConsole {
     static final String STOCK_DELETE_FLAG = "deleteAccountAllowed";
     /** Theme property that holds the address of the deletion page. */
     static final String URL_PROPERTY = "accountDeletionUrl";
+    /** Realm role that marks a user who may ask for the deletion of the own account. */
+    static final String CUSTOMER_ROLE = "request-account-deletion";
     /** Message keys of the two texts. */
     static final String INTRO_KEY = "atAccountDeletionIntro";
     static final String LINK_KEY = "atAccountDeletionLink";
 
     private static final String BODY_END = "</body>";
+    private static final Logger LOG = Logger.getLogger(AccountDeletionLinkConsole.class);
 
     private final Theme accountTheme;
 
@@ -62,9 +65,20 @@ public class AccountDeletionLinkConsole extends AccountConsole {
             throws FreeMarkerException {
         map.put(STOCK_DELETE_FLAG, false);
         String page = super.renderAccountConsole(freeMarkerUtil, map);
-        String section = deletionSection();
+        String section;
+        try {
+            section = deletionSection();
+        } catch (RuntimeException e) {
+            // The link is an addition. A failure here must not take the whole account console down.
+            LOG.warn("Account deletion link was not added because of an unexpected error", e);
+            return page;
+        }
+        if (section == null) {
+            return page;
+        }
         int end = page.lastIndexOf(BODY_END);
-        if (section == null || end < 0) {
+        if (end < 0) {
+            LOG.warn("Account deletion link was not added: the account console page has no closing body tag");
             return page;
         }
         return page.substring(0, end) + section + page.substring(end);
@@ -78,8 +92,12 @@ public class AccountDeletionLinkConsole extends AccountConsole {
             return null;
         }
         try {
+            // From here on the user is a customer. A missing piece is a configuration mistake:
+            // customers would lose their way to delete the account, so it is written to the log.
             String address = safeAddress(accountTheme.getProperties().getProperty(URL_PROPERTY));
             if (address == null) {
+                LOG.warnf("Account deletion link is not shown: theme property '%s' is empty or not an absolute http(s) address",
+                        URL_PROPERTY);
                 return null;
             }
             Locale locale = session.getContext().resolveLocale(user);
@@ -87,6 +105,8 @@ public class AccountDeletionLinkConsole extends AccountConsole {
             String intro = messages.getProperty(INTRO_KEY);
             String link = messages.getProperty(LINK_KEY);
             if (isBlank(intro) || isBlank(link)) {
+                LOG.warnf("Account deletion link is not shown: message '%s' or '%s' is missing for locale %s",
+                        INTRO_KEY, LINK_KEY, locale);
                 return null;
             }
             return "<footer id=\"at-account-deletion\" class=\"at-account-deletion\">"
@@ -95,6 +115,7 @@ public class AccountDeletionLinkConsole extends AccountConsole {
                     + " class=\"at-account-deletion__link\">" + escape(link) + "</a>"
                     + "</footer>";
         } catch (IOException e) {
+            LOG.warn("Account deletion link is not shown: the account theme could not be read", e);
             return null;
         }
     }
@@ -106,12 +127,8 @@ public class AccountDeletionLinkConsole extends AccountConsole {
     }
 
     private static boolean isCustomer(RealmModel realm, UserModel user) {
-        ClientModel accountClient = realm.getClientByClientId(Constants.ACCOUNT_MANAGEMENT_CLIENT_ID);
-        if (accountClient == null) {
-            return false;
-        }
-        RoleModel deleteRole = accountClient.getRole(AccountRoles.DELETE_ACCOUNT);
-        return deleteRole != null && user.hasRole(deleteRole);
+        RoleModel customerRole = realm.getRole(CUSTOMER_ROLE);
+        return customerRole != null && user.hasRole(customerRole);
     }
 
     /**

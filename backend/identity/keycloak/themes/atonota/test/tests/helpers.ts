@@ -56,7 +56,7 @@ type UserOptions = {
   webauthn?: boolean;
   locale?: string;
   emailVerified?: boolean;
-  /** Marks the user as a customer: grants the "delete-account" role of the "account" client. An employee does not have it. */
+  /** Marks the user as a customer: grants the realm role "request-account-deletion". An employee does not have it. */
   canDeleteAccount?: boolean;
 };
 
@@ -310,12 +310,41 @@ export async function ensureKeycloakDeleteActionOff(): Promise<void> {
   if (!res.ok) throw new Error(`Could not disable delete_account: ${res.status}`);
 }
 
+/** Realm role that marks a customer. The account console provider shows the deletion link only to this role. */
+export const CUSTOMER_ROLE = 'request-account-deletion';
+
 async function grantDeleteAccount(userId: string): Promise<void> {
   await ensureKeycloakDeleteActionOff();
+  // The role is created on first use. A second create answers 409, which is fine.
+  const created = await admin('/roles', { method: 'POST', body: { name: CUSTOMER_ROLE, description: 'May ask for the deletion of the own account' } });
+  if (!created.ok && created.status !== 409) throw new Error(`Could not create ${CUSTOMER_ROLE}: ${created.status}`);
+  const role = await (await admin(`/roles/${CUSTOMER_ROLE}`)).json();
+  const res = await admin(`/users/${userId}/role-mappings/realm`, { method: 'POST', body: [role] });
+  if (!res.ok) throw new Error(`Could not grant ${CUSTOMER_ROLE}: ${res.status}`);
+}
+
+/**
+ * Grants Keycloak's own "delete-account" role of the "account" client.
+ * The product grants this role to nobody. Tests use it to prove that it does not show the deletion link.
+ */
+export async function grantStockDeleteRole(email: string): Promise<void> {
+  const [user] = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`)).json()) as { id: string }[];
   const [client] = (await (await admin('/clients?clientId=account')).json()) as { id: string }[];
   const role = await (await admin(`/clients/${client.id}/roles/delete-account`)).json();
-  const res = await admin(`/users/${userId}/role-mappings/clients/${client.id}`, { method: 'POST', body: [role] });
+  const res = await admin(`/users/${user.id}/role-mappings/clients/${client.id}`, { method: 'POST', body: [role] });
   if (!res.ok) throw new Error(`Could not grant delete-account: ${res.status}`);
+}
+
+/** Reads the current state of Keycloak's "delete_account" required action. */
+export async function keycloakDeleteActionEnabled(): Promise<boolean> {
+  return ((await (await admin('/authentication/required-actions/delete_account')).json()) as { enabled: boolean }).enabled;
+}
+
+/** Switches Keycloak's "delete_account" required action on or off. Only the serial realm-settings tests use it. */
+export async function setKeycloakDeleteAction(enabled: boolean): Promise<void> {
+  const action = (await (await admin('/authentication/required-actions/delete_account')).json()) as { enabled: boolean };
+  const res = await admin('/authentication/required-actions/delete_account', { method: 'PUT', body: { ...action, enabled } });
+  if (!res.ok) throw new Error(`Could not set delete_account to ${enabled}: ${res.status}`);
 }
 
 /** Returns true when a user with this email still exists in the test realm. */

@@ -25,11 +25,22 @@ export default defineConfig({
   timeout: 60_000,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   use: { locale: 'tr-TR', trace: 'retain-on-failure' },
-  projects: (['chromium', 'webkit'] as const).flatMap((browserName) =>
-    Object.entries(viewports).map(([name, viewport]) => ({
-      name: `${browserName}-${name}`,
-      grep: fullRun.has(name) ? undefined : /@matris/,
-      use: { browserName, viewport },
-    })),
-  ),
+  projects: [
+    // Tests that change a realm-wide setting run first and alone. Every other project depends on this one.
+    {
+      name: 'realm-settings',
+      testMatch: /realm-settings\.spec\.ts/,
+      fullyParallel: false,
+      use: { browserName: 'chromium', viewport: viewports.masaustu },
+    },
+    ...(['chromium', 'webkit'] as const).flatMap((browserName) =>
+      Object.entries(viewports).map(([name, viewport]) => ({
+        name: `${browserName}-${name}`,
+        grep: fullRun.has(name) ? undefined : /@matris/,
+        testIgnore: /realm-settings\.spec\.ts/,
+        dependencies: ['realm-settings'],
+        use: { browserName, viewport },
+      })),
+    ),
+  ],
 });
