@@ -136,6 +136,9 @@ runpane report --state <ready|blocked|failed|done> --summary-file <durum dosyas�
 - Durum dosyasını `.pane/prompts/durum.md` yoluna yazın. Bu klasör Git'e girmez.
 - Durum dosyasına her denetimin komutunu ve sonucunu yazın. Sonuç `pass`, `fail`, `not_run` ya da `not_applicable` olur.
 - Kontrol noktasında `ready` raporlayın. Orkestratör dalınızı inceler ve birleştirir.
+- Rapordan sonra durmayın. Beklemeden sonraki kontrol noktasına geçin. Proje sahibi işin hiç durmamasını istedi.
+- Bütün kontrol noktaları bitince `done` raporlayın. Orkestratör size yeni iş verir.
+- Bir önkoşul henüz gelmediyse onu beklemeyin. O işe bağlı olmayan bölümü yapın. Örneğin testleri ve sözleşmeyi önce yazın.
 - Proje sahibi kararları ajana bıraktı (D-10). Proje sahibine soru sormayın.
 - Karar gerekiyorsa en güvenli ve en yalın seçeneği seçin. Kararı gerekçesiyle durum dosyasına ve gerekiyorsa `docs/kararlar/` notuna yazın. Sonra işe devam edin.
 - Orkestratör kararı birleştirmede inceler. Gerekirse değiştirir.
