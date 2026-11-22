@@ -342,7 +342,7 @@ class AiTestCase(IntegrationTestCase):
 		return result["structuredContent"]
 
 	def digest_of(self, client, proposal_id: str) -> str:
-		response = self.human(client, "GET", "get_proposal", query={"proposal_id": proposal_id})
+		response = self.human(client, "GET", "plt_get_proposal", query={"proposal_id": proposal_id})
 		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
 		return response.json["message"]["digest"]
 
