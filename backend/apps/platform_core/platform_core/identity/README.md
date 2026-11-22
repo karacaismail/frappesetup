@@ -115,6 +115,20 @@ bench --site <site> set-config identity_keycloak_only 0
 
 Ayar kapanınca yerel giriş hemen açılır. Yeniden başlatma gerekmez.
 
+## Hesap silme sırasında bozuk geçmiş kaydını onarma
+
+Hesap silme HTTP 417 dönebilir. Hata iletisi bir “Version” kaydının adını verirse hesap kapalı kalır. Veri temizliği tamamlanana kadar istek açık kalır.
+
+1. Hata iletisindeki kayıt adını alın. Bu adımları yalnız yetkili yönetici uygular.
+2. “Version” kaydını bulun. Kaydın belge türünü ve belge adını doğrulayın.
+3. `data` alanını güvenilir bir kopyayla karşılaştırın. JSON verisi bir nesne olmalıdır. `changed` alanı varsa bir liste olmalıdır. Her satır üç değer taşımalıdır. Sıra alan adı, eski değer ve yeni değerdir. Alan adı metin olmalıdır.
+4. Geçerli geçmişi koruyarak yalnız bozuk veriyi onarın. Güvenilir kopya yoksa kayıt sahibine ve veri sorumlusuna başvurun. Geçmiş değerlerini tahmin etmeyin.
+5. Hesabı kapalı tutun. Eşitleme hizmetindeki bekleyen silme işini yeniden çalıştırın.
+   [Yeniden çalıştırma adımları](../../../../identity/identity_sync/README.md#komutlar)
+6. Silme isteğinin tamamlandığını doğrulayın. Kayıt geçmişinde eski e-posta adresini arayın.
+
+Geçmiş verisini destek kaydına veya günlüğe kopyalamayın. Sorunu izlemek için “Version” kaydının adını kullanın.
+
 ## Bilinen sınırlar
 
 - Çıkış adresinde `id_token_hint` yoktur. Kimlik belirteci girişten sonra saklanmaz. Keycloak çıkış onay ekranı gösterebilir.

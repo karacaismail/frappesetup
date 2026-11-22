@@ -219,34 +219,56 @@ def _redact_fields(ref: dict, user: str, anon: str, owned: frappe._dict) -> None
 	attachment_fields = [
 		f for f in fields if values[f] is None and meta.get_field(f).fieldtype in ATTACH_TYPES
 	]
-	redacted_fields = set(fields)
+	retained_attachment_fields = []
+	if attachment_fields:
+		retained_attachment_fields = [
+			df.fieldname for df in meta.fields if df.fieldtype in ATTACH_TYPES and df.fieldname not in values
+		]
 	filter_by = ref.get("filter_by", "owner")
+	redacted_fields = {*fields, filter_by}
 	rows = [
 		row for row in _bound_rows(doctype, filter_by, user, []) if not _shared(owned, doctype, row["name"])
 	]
 	for index, row in enumerate(rows):
 		name = row["name"]
 		# Recheck the binding on a current read before clearing a row found in an earlier snapshot.
-		if not frappe.db.get_value(doctype, {filter_by: user, "name": name}, "name", for_update=True):
+		current = frappe.db.get_value(
+			doctype,
+			{filter_by: user, "name": name},
+			["name", *attachment_fields, *retained_attachment_fields],
+			as_dict=True,
+			for_update=True,
+		)
+		if not current:
 			continue
 		frappe.db.set_value(doctype, name, values, update_modified=False)
 		_redact_version_fields(doctype, name, redacted_fields)
 		if attachment_fields:
-			for file_name in _rows(
-				"File",
-				filters={
-					"attached_to_doctype": doctype,
-					"attached_to_name": name,
-					"attached_to_field": ("in", attachment_fields),
-				},
-				pluck="name",
-				for_update=True,
-			):
-				_delete_personal_file(file_name)
+			removed_urls = {current[field] for field in attachment_fields if current[field]}
+			retained_urls = {current[field] for field in retained_attachment_fields}
+			_delete_field_attachments(doctype, name, attachment_fields, removed_urls - retained_urls)
 		if ref.get("rename") and doctype != "User" and name != anon:
 			new_name = anon if index == 0 else f"{anon}-{index}"
 			if not frappe.db.exists(doctype, new_name):
 				frappe.rename_doc(doctype, name, new_name, force=True, show_alert=False)
+
+
+def _delete_field_attachments(doctype: str, name: str, fields: list[str], urls: set[str]) -> None:
+	reference = {"attached_to_doctype": doctype, "attached_to_name": name}
+	for file_name in _rows(
+		"File", filters={**reference, "attached_to_field": ("in", fields)}, pluck="name", for_update=True
+	):
+		_delete_personal_file(file_name)
+
+	if urls:
+		# Files attached to the document first may have no field even if a field uses their URL.
+		for file_name in _rows(
+			"File",
+			filters={**reference, "attached_to_field": ("is", "not set"), "file_url": ("in", sorted(urls))},
+			pluck="name",
+			for_update=True,
+		):
+			_delete_personal_file(file_name)
 
 
 def _redact_version_fields(doctype: str, name: str, fields: set[str]) -> None:

@@ -330,7 +330,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 ### Kapanan teknik borç
 
-- **Çalışan fotoğrafı ve kart geçmişi (O-41).** Hesap silme, fotoğraf alanına bağlı dosya kaydını siler. Paylaşılan dosya içeriği son kayıt silinene kadar diskte kalır. Sistem, karttaki seçili alanların eski ve yeni değerlerini geçmişten temizler.
+- **Çalışan fotoğrafı ve kart geçmişi (O-41).** Hesap silme, fotoğraf alanına bağlı dosya kaydını siler. Paylaşılan dosya içeriği son kayıt silinene kadar diskte kalır. Sistem, seçili alanları ve kullanıcı bağını kartın geçmişinden temizler. Sistem, aynı karttaki alan bağı olmayan eki de eski dosya adresinden bulur. Başka bir dosya alanı adresi kullanıyorsa sistem eki korur.
 
 - `list_identities` uçları tamamlandı. Kiracı ve Press uçları aynı sayfalama sözleşmesini kullanır.
 - Kiracı HTTP testleri ikinci sayfayı ve yetkisiz istek reddini doğruladı.
