@@ -1,0 +1,45 @@
+name: fs-press-tr
+services:
+  mariadb:
+    image: mariadb:11.8.9
+    environment:
+      MARIADB_ROOT_PASSWORD: ${PRESS_DB_PASSWORD:?Set PRESS_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - db:/var/lib/mysql
+
+  redis:
+    image: redis:7.4-alpine
+
+  web:
+    image: fs-press-tr-base:py3.14.8
+    working_dir: /home/frappe/benches
+    command: ["sleep", "infinity"]
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      CI: "Yes"
+      PRESS_DB_PASSWORD: ${PRESS_DB_PASSWORD:?Set PRESS_DB_PASSWORD}
+      PRESS_ADMIN_PASSWORD: ${PRESS_ADMIN_PASSWORD:?Set PRESS_ADMIN_PASSWORD}
+      PRESS_WEB_PORT: ${PRESS_WEB_PORT:?Set to PANE_PORT plus 3}
+      PRESS_SOCKET_PORT: ${PRESS_SOCKET_PORT:?Set to PANE_PORT plus 4}
+    networks:
+      default:
+        aliases:
+          - press.localhost
+    ports:
+      - "127.0.0.1:${PRESS_WEB_PORT}:${PRESS_WEB_PORT}"
+      - "127.0.0.1:${PRESS_SOCKET_PORT}:${PRESS_SOCKET_PORT}"
+    volumes:
+      - bench:/home/frappe/benches
+
+volumes:
+  db:
+  bench:
