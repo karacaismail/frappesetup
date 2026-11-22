@@ -10,6 +10,10 @@ readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     "oidc_verify==0.1.0",
+    "packaging>=24",
+    "redis>=5",
+    "requests>=2.31",
+    "Werkzeug>=3.1",
 ]
 
 [build-system]

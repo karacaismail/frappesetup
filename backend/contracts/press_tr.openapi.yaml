@@ -56,6 +56,8 @@ paths:
           description: State, token or identity binding was rejected.
         "409":
           description: A concurrent account update interrupted sign-in. Start a new login.
+        "429":
+          description: Login callback request limit reached.
         "503":
           description: Keycloak configuration or verification keys are unavailable.
   /api/method/press_tr.api.keycloak_backchannel_logout:

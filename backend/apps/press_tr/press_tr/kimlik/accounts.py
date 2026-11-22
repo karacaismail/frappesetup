@@ -23,5 +23,7 @@ def disable_user(user: str) -> None:
 class AccountRequestPolicy:
 	def before_insert(self) -> None:
 		if self.invited_by:
-			frappe.throw(_("Press team invitations are disabled."), frappe.PermissionError)
+			frappe.throw(
+				_("Press team invitations are disabled.", context="press_tr"), frappe.PermissionError
+			)
 		super().before_insert()

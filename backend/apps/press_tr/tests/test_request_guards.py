@@ -2,6 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
+import frappe
 from oidc_verify import JwksUnavailable
 from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
@@ -91,6 +92,30 @@ class RequestGuardsTest(unittest.TestCase):
 			old.delete.assert_not_called()
 			current.delete.assert_called_once_with(ignore_permissions=True)
 
+	def test_callback_redacts_fields_before_rate_limiting(self):
+		import frappe.rate_limiter
+
+		class Rejected(Exception):
+			pass
+
+		form = {"state": "state-fixture", "code": "code-fixture"}
+		with (
+			patch.object(frappe.rate_limiter, "frappe") as framework,
+			patch.object(auth, "frappe", framework),
+		):
+			framework.form_dict = frappe._dict(form)
+			framework.local.request_ip = "198.18.0.1"
+			framework.cache.get.return_value = 10
+			framework.cache.incrby.return_value = 11
+
+			def reject(*args):
+				self.assertTrue(form.keys().isdisjoint(framework.form_dict))
+				raise Rejected
+
+			framework.throw.side_effect = reject
+			with self.assertRaises(Rejected):
+				auth.keycloak_callback(**form)
+
 	def test_logout_redacts_token_before_verification(self):
 		form = {"logout_token": "fixture"}
 		with (
@@ -163,6 +188,20 @@ class RequestGuardsTest(unittest.TestCase):
 			expired.delete.assert_called_once_with(ignore_permissions=True)
 			orphan.delete.assert_called_once_with(ignore_permissions=True)
 
+	def test_maintenance_reads_session_names_in_bounded_pages(self):
+		with (
+			patch.object(maintenance, "frappe") as facade,
+			patch.object(maintenance, "get_expired_threshold", return_value="2026-11-22 00:00:00"),
+		):
+			facade.get_all.side_effect = [[f"link-{i:03}" for i in range(100)], ["link-100"]]
+			facade.db.get_value.return_value = "2026-11-22 01:00:00"
+			self.assertEqual(maintenance.cleanup_expired_sessions(), {"removed": 0})
+			self.assertEqual(facade.get_all.call_count, 2)
+			first, second = facade.get_all.call_args_list
+			self.assertEqual(first.kwargs["limit"], 100)
+			self.assertEqual(first.kwargs["order_by"], "name asc")
+			self.assertEqual(second.kwargs["filters"], {"name": [">", "link-099"]})
+
 	def test_frappe_1656_does_not_rewrite_the_rate_limit_command(self):
 		form = {"cmd": "original"}
 		with (
@@ -174,7 +213,6 @@ class RequestGuardsTest(unittest.TestCase):
 			count.assert_called_once()
 
 	def test_unknown_rpc_app_is_not_resolved(self):
-		import frappe
 
 		with (
 			patch.object(request_policy, "frappe") as facade,

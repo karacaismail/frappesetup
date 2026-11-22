@@ -183,4 +183,4 @@ def enforce_guest_allowlist():
 	if target is None or frappe.session.user != "Guest":
 		return
 	if target[0] not in allowed_guest_targets() and target[0] not in machine_targets():
-		frappe.throw(_("Guest access is denied."), frappe.PermissionError)
+		frappe.throw(_("Guest access is denied.", context="press_tr"), frappe.PermissionError)

@@ -7,13 +7,13 @@ from werkzeug.exceptions import ServiceUnavailable
 
 
 def reject():
-	frappe.throw(_("Keycloak identity was rejected."), frappe.PermissionError)
+	frappe.throw(_("Keycloak identity was rejected.", context="press_tr"), frappe.PermissionError)
 
 
 def client_id():
 	value = frappe.conf.keycloak_client_id
 	if not value:
-		raise ServiceUnavailable(_("Set the Keycloak client ID for this site."))
+		raise ServiceUnavailable(_("Set the Keycloak client ID for this site.", context="press_tr"))
 	return value
 
 
@@ -21,7 +21,7 @@ def issuer():
 	public = frappe.conf.keycloak_public_url
 	realm = frappe.conf.keycloak_realm
 	if not public or not realm:
-		raise ServiceUnavailable(_("Set the Keycloak URL and realm for this site."))
+		raise ServiceUnavailable(_("Set the Keycloak URL and realm for this site.", context="press_tr"))
 	return f"{public.rstrip('/')}/realms/{realm}"
 
 
@@ -35,7 +35,9 @@ def server_endpoint(endpoint):
 def callback_url():
 	origin = frappe.conf.host_name
 	if not origin or urlsplit(origin).scheme not in {"https", "http"}:
-		raise ServiceUnavailable(_("Set the Press site address before enabling Keycloak."))
+		raise ServiceUnavailable(
+			_("Set the Press site address before enabling Keycloak.", context="press_tr")
+		)
 	return origin.rstrip("/") + "/api/method/press_tr.api.auth.keycloak_callback"
 
 
@@ -58,7 +60,7 @@ def verify(verifier, token, **options):
 			**options,
 		)
 	except JwksUnavailable:
-		raise ServiceUnavailable(_("Keycloak keys are temporarily unavailable."))
+		raise ServiceUnavailable(_("Keycloak keys are temporarily unavailable.", context="press_tr"))
 	except TokenError:
 		reject()
 

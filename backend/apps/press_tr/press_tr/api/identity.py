@@ -54,7 +54,7 @@ def ensure_team(
 		frappe.cache.make_key(f"press_tr:provision:{organization_id}"), timeout=60, blocking_timeout=5
 	)
 	if not lock.acquire():
-		raise Conflict(_("Another request is updating this organization. Try again."))
+		raise Conflict(_("Another request is updating this organization. Try again.", context="press_tr"))
 
 	def release_lock():
 		with suppress(LockNotOwnedError):
@@ -64,7 +64,7 @@ def ensure_team(
 		result = provision_team(issuer, subject, email, email_verified, organization_id, title)
 	except frappe.QueryDeadlockError, frappe.QueryTimeoutError:
 		release_lock()
-		raise Conflict(_("Another request is updating this organization. Try again."))
+		raise Conflict(_("Another request is updating this organization. Try again.", context="press_tr"))
 	except Exception:
 		release_lock()
 		raise
@@ -116,7 +116,9 @@ def remove_team_member(
 		)
 		or (has_all_organizations and all_organizations is not True)
 	):
-		frappe.throw(_("Send exactly one valid organization selector."), InvalidTeamSelector)
+		frappe.throw(
+			_("Send exactly one valid organization selector.", context="press_tr"), InvalidTeamSelector
+		)
 
 	link = find_identity(issuer, claim({"subject": subject}, "subject"))
 	if has_all_organizations:
@@ -156,7 +158,9 @@ def remove_organization_memberships(user: str) -> None:
 def remove_memberships(teams, user: str, *, allow_owner: bool = False) -> None:
 	# Check owners before the first write so a rejected request has no partial result.
 	if not allow_owner and any(team.user == user for team in teams):
-		frappe.throw(_("Change team ownership before removing the owner."), frappe.PermissionError)
+		frappe.throw(
+			_("Change team ownership before removing the owner.", context="press_tr"), frappe.PermissionError
+		)
 	for team in teams:
 		if any(member.user == user for member in team.team_members):
 			# Use the team owner so the Press save retains a valid team context.

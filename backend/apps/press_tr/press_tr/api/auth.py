@@ -2,6 +2,7 @@ import base64
 import hashlib
 import json
 import secrets
+from functools import wraps
 from urllib.parse import urlencode
 
 import frappe
@@ -117,11 +118,21 @@ def exchange_code(code, verifier):
 	reject()
 
 
+def redact_login_callback_fields(callback):
+	@wraps(callback)
+	def redacted(*args, **kwargs):
+		# Frappe includes form fields in exception logs, including rate-limit errors.
+		frappe.form_dict.pop("state", None)
+		frappe.form_dict.pop("code", None)
+		return callback(*args, **kwargs)
+
+	return redacted
+
+
 @frappe.whitelist(allow_guest=True, methods=["GET"])
+@redact_login_callback_fields
+@rate_limit(limit=10, seconds=60)
 def keycloak_callback(state: str | None = None, code: str | None = None) -> None:
-	# Frappe includes form fields in exception logs.
-	frappe.form_dict.pop("state", None)
-	frappe.form_dict.pop("code", None)
 	login = consume_login(state)
 	if not isinstance(code, str) or not code:
 		reject()
@@ -135,7 +146,7 @@ def keycloak_callback(state: str | None = None, code: str | None = None) -> None
 		link = bind_identity(claims)
 		ensure_personal_team(link.user)
 	except frappe.QueryDeadlockError, frappe.QueryTimeoutError:
-		raise Conflict(_("Concurrent account update. Start sign-in again."))
+		raise Conflict(_("Concurrent account update. Start sign-in again.", context="press_tr"))
 	except frappe.DuplicateEntryError, frappe.UniqueValidationError:
 		reject()
 

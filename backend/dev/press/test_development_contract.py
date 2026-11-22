@@ -25,6 +25,13 @@ class ImageContractTest(unittest.TestCase):
         self.assertIn("--wheel", dockerfile)
         self.assertIn("/opt/press-local/wheels/oidc_verify-*.whl", install)
 
+    def test_direct_runtime_dependencies_are_declared(self):
+        metadata = (REPO / "backend/apps/press_tr/pyproject.toml").read_text()
+        dependencies = re.search(r"(?ms)^dependencies = \[(.*?)^\]", metadata).group(1)
+        for name in ("oidc_verify", "packaging", "redis", "requests", "Werkzeug"):
+            with self.subTest(name=name):
+                self.assertRegex(dependencies, rf'(?i)"{name}(?=[<>=~"])')
+
     def test_bootstrap_uses_the_pinned_image_python(self):
         self.assertIn(
             '.pyenv/versions/3.14.10/bin/python3',

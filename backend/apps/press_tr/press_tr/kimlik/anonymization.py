@@ -122,7 +122,7 @@ def rename_profile(doctype: str, old: str, new: str) -> None:
 		"Comment",
 		{"reference_name": new, "comment_type": "Edit", "content": rename_message},
 		"content",
-		_("Account profile anonymized."),
+		_("Account profile anonymized.", context="press_tr"),
 		update_modified=False,
 	)
 
