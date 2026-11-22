@@ -84,3 +84,16 @@ Betik taşınacak dosyaları önce denetler. Hedef doluysa betik durur.
 İş yarıda kesilirse Git farkını inceleyin. Sorunu giderince betiği yeniden çalıştırın.
 Betik yalnız Git'in izlediği dosyaları taşır.
 Betik ilgili uygulama varsa ortak sözlüğü uygulamanın köküne ekler.
+
+Orkestratör geçişi başlatınca komutu kendi iş dalınızda çalıştırın.
+Komuta dalınızın Python testini verin. Aşağıdaki örnek geliştirme testlerini çalıştırır.
+
+```sh
+backend/dev/naming/apply-to-branch -- python3 -B -m unittest discover -s backend/dev/tests
+```
+
+Komut temiz çalışma ağacı ister. Önce yerel `backend` dalının birleştiğini denetler.
+Komut adları uygular. Sonra modül adlarını, ad kurallarını ve verilen testi denetler.
+Tüm denetimler geçerse komut tek Git kaydı oluşturur.
+Denetim durursa değişiklikler inceleme için çalışma ağacında kalır.
+Yeni değişiklik yoksa komut yeni Git kaydı oluşturmaz.

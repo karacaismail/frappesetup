@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+fail() {
+    printf '%s\n' "$1" >&2
+    exit 1
+}
+
+if [[ ${1:-} != -- || $# -lt 2 ]]; then
+    printf 'Usage: %s -- PYTHON_TEST_COMMAND [ARG ...]\n' "$0" >&2
+    exit 2
+fi
+shift
+
+naming_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+cd -- "$(git rev-parse --show-toplevel)"
+worktree_status="$(git status --porcelain=v1 --untracked-files=all)"
+[[ -z "$worktree_status" ]] || fail "The worktree and index must be clean."
+for operation in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD rebase-apply rebase-merge sequencer; do
+    [[ ! -e "$(git rev-parse --git-path "$operation")" ]] ||
+        fail "Finish the Git operation in progress first."
+done
+
+branch="$(git symbolic-ref --quiet --short HEAD)" || fail "Switch to your work branch first."
+case "$branch" in
+    backend|main) fail "Run this command on your work branch." ;;
+esac
+initial_head="$(git rev-parse HEAD)"
+backend_ref=refs/heads/backend
+git show-ref --verify --quiet "$backend_ref" || fail "The local backend branch is required."
+git merge-base --is-ancestor "$backend_ref" "$initial_head" ||
+    fail "Merge the local backend branch before applying renames."
+
+unset GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+identity='karacaismail <35493655+karacaismail@users.noreply.github.com>'
+for role in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+    effective_identity="$(git var "$role")"
+    [[ "$effective_identity" == "$identity "* ]] ||
+        fail "Git author and committer must use the configured personal identity."
+done
+
+python_bin="${PYTHON:-python3}"
+"$python_bin" -B "$naming_dir/apply_renames.py"
+git add -A -- backend/
+planned_tree="$(git write-tree)"
+
+"$python_bin" -B "$naming_dir/apply_renames.py" --check-modules
+"$python_bin" -B "$naming_dir/check_names.py" --root "$PWD"
+PYTHONDONTWRITEBYTECODE=1 "$@" || {
+    test_status=$?
+    printf 'The branch tests failed. Review the uncommitted changes with git status.\n' >&2
+    exit "$test_status"
+}
+
+untracked="$(git ls-files --others --exclude-standard)"
+[[ "$(git rev-parse HEAD)" == "$initial_head" &&
+   "$(git symbolic-ref --quiet --short HEAD)" == "$branch" &&
+   "$(git write-tree)" == "$planned_tree" ]] &&
+    git diff --quiet -- &&
+    [[ -z "$untracked" ]] ||
+    fail "The worktree, index or branch changed during validation. Review the changes."
+
+git merge-base --is-ancestor "$backend_ref" "$initial_head" ||
+    fail "The local backend branch advanced during validation. Review the changes."
+
+if git diff --cached --quiet --; then
+    printf 'No naming changes to commit.\n'
+    exit 0
+fi
+git commit -m "refactor(naming): D-14 ad eşleşmesini uygula"
