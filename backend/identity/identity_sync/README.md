@@ -481,10 +481,27 @@ Ağ erişimi kapalı deneme container'ında `/healthz` isteği 200 döndü.
 Deneme container'ı, geçici birimi ve imaj etiketi iş bitince silindi.
 Bu kontrol, canlı Press ve kiracı uyumunu doğrulamaz.
 
+## Canlı olay alıcısı doğrulaması
+
+22 Kasım 2026 Pazar günü ayrı bir Keycloak örneği açıldı.
+Deneme, `fs-keycloak-atonota:dev-5070` imajındaki gerçek olay eklentisini kullandı.
+Keycloak, deneme kullanıcısının oluşturulma olayını çalışan identity-sync sunucusuna gönderdi.
+Sunucu gerçek imzayı ve realm kimliğini kabul etti. Yanıt 202 oldu.
+
+Aynı gerçek olayla iki ret denemesi yapıldı:
+
+1. İmza bozulunca sunucu 401 döndü.
+2. Sunucu saati 601 saniye ilerletilince sunucu 401 döndü.
+
+Deneme ayrı, dış erişimi kapalı bir ağda çalıştı. Bilgisayara port açılmadı.
+Deneme bitince iki container, geçici birimler ve deneme ağı silindi.
+Press ve kiracı hedefleri bu denemede sahtedir.
+Bu sonuç bütün servislerin birlikte canlı çalıştığını göstermez.
+
 ## Bilinen eksikler
 
 Bu maddeler bilerek bırakılan eksiklerdir. Her biri bir teknik borçtur. `BORC(mvp)` işareti, eksiğin MVP seviyesini tamamlamayı engellediğini gösterir.
 
-- `BORC(mvp)`: Servis canlı Keycloak, Press ve kiracı ile denenmedi. Olay eklentisinin yalnız imza kodu denendi. Etki: Sahte hedeflerin kaçırdığı bir uyumsuzluk üretimde ortaya çıkabilir. Sorumlu: integration-e2e işi. Kapanma koşulu: Uçtan uca test gerçek servislerle geçer.
+- `BORC(mvp)`: Servis canlı Keycloak, Press ve kiracıyla birlikte denenmedi. Gerçek Keycloak eklentisinin olay gönderimi ayrıca doğrulandı. Etki: Sahte hedeflerin kaçırdığı bir uyumsuzluk üretimde ortaya çıkabilir. Sorumlu: integration-e2e işi. Kapanma koşulu: Uçtan uca test gerçek servislerle geçer.
 - `BORC(mvp)`: `list_identities` satırı e-posta ve takım taşımaz. Etki: Mutabakat, var olan kaydın e-posta farkını ve fazla takım üyeliğini göremez. Sorumlu: orkestratör. Kapanma koşulu: Bu iki farkın nasıl bulunacağı sözleşmeye yazılır ya da farklar kapsam dışı sayılır.
 - `BORC(mvp)`: Bu servisin testleri ve biçim denetimi CI'da koşmaz. Etki: Bozulma yalnız elle çalıştırılan testte görülür. Sorumlu: DevOps sorumlusu. Kapanma koşulu: CI bu klasörün testlerini her değişiklikte koşar.
