@@ -15,7 +15,7 @@
 Kiracı ortamı açıldı. Kiracı, `ping` isteğine yanıt verdi.
 Container içinde Frappe 16.56.0 ve ERPNext 16.55.0 çalıştı.
 
-Playwright 1.64.0 güncel yapılandırmada on test buldu.
+Playwright 1.64.0 güncel yapılandırmada 18 test buldu.
 Chromium ve WebKit ön denemeleri giriş düğmesini bulamadı.
 Bu sonuç, kiracı girişi henüz birleşmediği için bekleniyordu.
 
@@ -68,3 +68,13 @@ Parolaları, oturum çerezlerini ve anahtarları yalnız yerel ortam değişkenl
 - **Yetki ve onay.** Örnek kayıt türünü `E2E_DOCTYPE` değişkenine verin. Örnek kayıt adlarını `E2E_VISIBLE_RECORD` ve `E2E_HIDDEN_RECORD` değişkenlerine verin. Okuyucu yalnız ilk kayda erişebilmeli. Yetkili test hesabı iki kaydı da okuyabilmeli. Bu hesap ilk kaydı değiştirebilmeli. Yazılabilir metin alanının adını `E2E_UPDATE_FIELD` değişkenine verin.
 - **Oturumlar.** Okuyucu için `E2E_READER_COOKIE` ve `E2E_READER_CSRF` kullanın. Yetkili hesap için `E2E_OPERATOR_COOKIE` ve `E2E_OPERATOR_CSRF` kullanın. CSRF değeri, sitenin yazma isteğini doğruladığı oturum anahtarıdır.
 - **Model geçidi.** `backend/e2e/environment.sh provider` komutuyla sahte sağlayıcıyı açın. `e2e-local-only` yoluna iki kimliksiz Ollama uyumlu adres ekleyin. Yol kaydının adını `E2E_MODEL_ROUTE` değişkenine verin. İlk adres `http://e2e-provider:<PANE_PORT+7>/limited` olur. İkinci adres `http://e2e-provider:<PANE_PORT+7>/fallback` olur. İkinci API kaydının adını `E2E_FALLBACK_API` değişkenine verin. Bu yola gerçek sağlayıcı eklemeyin. Tekrar öncesi ilk adresin bekleme süresi dolmalı.
+
+## Sihirli bağlantı ve telefon paketi
+
+Bu iki test grubu, örnek ortam hazır olunca açılır.
+
+- **Sihirli bağlantı.** `E2E_MAGIC_LINK=1` kullanın. Mailpit, `PANE_PORT + 6` adresinde çalışmalı. Doğrulanmış test e-postasını `E2E_MAGIC_EMAIL` değişkenine verin. İkinci doğrulaması açık hesabı `E2E_MAGIC_OTP_EMAIL` değişkenine verin. Bu hesabın Base32 anahtarını `E2E_MAGIC_OTP_SEED` değişkenine verin. Etkin bağlantı süresini saniye olarak `E2E_MAGIC_TTL_SECONDS` değişkenine verin. Üst sınır 300 saniyedir.
+- **Telefon paketi.** `E2E_MOBILE_PKCE=1` kullanın. Keycloak'ta herkese açık test istemcisine PKCE S256 şartı koyun. İstemciyi ve dönüş adresini `E2E_MOBILE_CLIENT_ID` ve `E2E_MOBILE_REDIRECT_URI` ile verin. Dönüş adresi yerel olmalı. İzin kapsamını ve hedefi `E2E_MOBILE_SCOPE` ve `E2E_MOBILE_AUDIENCE` ile verin. CORS için izinli kökeni `E2E_MOBILE_ORIGIN` ile verin. Örnek hesabı ve parolasını `E2E_MOBILE_EMAIL` ve `E2E_MOBILE_PASSWORD` ile verin. Ret denemeleri için `E2E_MOBILE_EXPIRED_TOKEN`, `E2E_MOBILE_WRONG_AUDIENCE_TOKEN` ve `E2E_MOBILE_SESSION_COOKIE` hazırlayın.
+
+Sihirli bağlantı için `magic-link.spec.ts` dosyasını seçin.
+Telefon paketi için `mobile-pkce.spec.ts` dosyasını seçin.

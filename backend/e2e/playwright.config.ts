@@ -6,8 +6,8 @@ export default defineConfig({
   retries: 0,
   reporter: 'list',
   projects: [
-    { name: 'chromium', testMatch: 'browser.spec.ts', use: { browserName: 'chromium' } },
-    { name: 'webkit', testMatch: 'browser.spec.ts', use: { browserName: 'webkit' } },
+    { name: 'chromium', testMatch: ['browser.spec.ts', 'magic-link.spec.ts', 'mobile-pkce.spec.ts'], use: { browserName: 'chromium' } },
+    { name: 'webkit', testMatch: ['browser.spec.ts', 'magic-link.spec.ts', 'mobile-pkce.spec.ts'], use: { browserName: 'webkit' } },
     { name: 'api', testMatch: 'integration.spec.ts' },
   ],
 });
