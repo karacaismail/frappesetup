@@ -267,6 +267,13 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Kapsamdaki bir dosya değişirse kapı bu onayları yeniden ister.
   - Onay kapsamları çakışırsa kapı hata verir.
 
+- **O-43. Press Semgrep onayları dosya listesine bağlıdır.**
+  - Liste, 19 onayın geçtiği dosyaları ve yetki yardımcılarını kapsar.
+  - Liste, ortak OIDC doğrulama kitaplığını da kapsar.
+  - Kapsam dışı belge ve test değişiklikleri Press onaylarını düşürmez.
+  - Listelenen dosya değişirse kapı Press onaylarını yeniden ister.
+  - Tam liste `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:

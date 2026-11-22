@@ -24,15 +24,18 @@ class SemgrepExceptionsTests(unittest.TestCase):
     def test_cli_snapshot_prints_the_current_digest(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            scope = json.loads(CONFIG.read_text())["scope"]
-            source = root / scope
-            source.mkdir(parents=True)
-            (source / "api.py").write_text("pass\n")
+            review = json.loads(CONFIG.read_text())
+            scope = review["scope"]
+            files = review.get("files")
+            for filename in files or [f"{scope}/api.py"]:
+                source = root / filename
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text("pass\n")
             rules = root / RULES
-            rules.parent.mkdir(parents=True)
+            rules.parent.mkdir(parents=True, exist_ok=True)
             rules.write_text("rules: []")
             self.git(root, "init", "-q")
-            expected = source_digest(root, scope)
+            expected = source_digest(root, scope, files)
             self.assertIsNotNone(expected)
             result = self.run_cli(root, "--snapshot")
             self.assertEqual((result.returncode, result.stderr), (0, ""))
@@ -151,6 +154,41 @@ class SemgrepExceptionsTests(unittest.TestCase):
             self.assertEqual(reviewed_findings(root, config, [finding, other], {"core": before}), [finding, other])
             (root / files[1]).unlink()
             self.assertIsNone(source_digest(root, "core", files))
+
+    def test_press_approvals_survive_unrelated_change_but_not_authorization_change(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            review = json.loads(CONFIG.read_text())
+            scope, files = review["scope"], review["files"]
+            press_test = "backend/apps/press_tr/tests/run.sh"
+            helpers = (
+                "backend/apps/press_tr/press_tr/press_identity/request_policy.py",
+                "backend/libs/oidc_verify/src/oidc_verify/verification.py",
+            )
+            self.assertNotIn(press_test, files)
+            self.assertTrue(set(helpers).issubset(files))
+            for filename in [*files, press_test, RULES]:
+                source = root / filename
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text("fixture\n")
+            self.git(root, "init", "-q")
+            self.git(root, "add", "backend")
+            before = source_digest(root, scope, files)
+            self.assertIsNotNone(before)
+            config = root / "exceptions.json"
+            config.write_text(json.dumps({**review, "sha256": before, "additionalReviews": []}))
+            findings = [
+                {"check_id": entry["rule"], "path": entry["path"], "start": {"line": entry["line"]}}
+                for entry in review["findings"]
+            ]
+            (root / press_test).write_text("changed\n")
+            self.assertEqual(reviewed_findings(root, config, findings, {scope: before}), [])
+            for filename in helpers:
+                with self.subTest(filename=filename):
+                    helper = root / filename
+                    helper.write_text("changed\n")
+                    self.assertEqual(reviewed_findings(root, config, findings, {scope: before}), findings)
+                    helper.write_text("fixture\n")
 
     def test_missing_rule_file_cannot_produce_a_digest(self):
         with tempfile.TemporaryDirectory() as directory:
