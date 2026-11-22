@@ -9,6 +9,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
+from platform_core.identity import api as identity_api
 from platform_core.identity import provider_setup
 from platform_core.identity.tests import helpers as h
 from platform_core.identity.tests import mobile_stub
@@ -30,6 +31,12 @@ def mobile_payload(**overrides) -> dict:
 	)
 	payload.update(overrides)
 	return {k: v for k, v in payload.items() if v is not None}
+
+
+def authenticate_mobile_before_platform_hooks():
+	"""Models an installed app authenticating the phone before Platform Core runs."""
+	token = frappe.get_request_header("Authorization").removeprefix("Bearer ")
+	identity_api.authenticate_mobile_request(token)
 
 
 class TestMobileIdentity(FrappeAPITestCase):
@@ -78,6 +85,29 @@ class TestMobileIdentity(FrappeAPITestCase):
 		self.assertEqual(identity["issuer"], h.ISSUER)
 		self.assertEqual(identity["subject"], "sub-ayse")
 		self.assertEqual(identity["sid"], "11111111-1111-4111-8111-111111111111")
+
+	def test_mobile_identity_from_an_earlier_hook_survives_platform_hooks(self):
+		real_get_hooks = frappe.get_hooks
+
+		def get_hooks(hook=None, *args, **kwargs):
+			value = real_get_hooks(hook, *args, **kwargs)
+			if hook == "auth_hooks":
+				return [f"{__name__}.authenticate_mobile_before_platform_hooks", *value]
+			return value
+
+		browser = h.new_client()
+		h.login_with_keycloak(browser, h.userinfo("sub-ayse", h.AYSE))
+		self.assertEqual(h.logged_user(browser), h.AYSE)
+		token = self.key.sign(mobile_payload())
+
+		with patch.object(frappe, "get_hooks", side_effect=get_hooks):
+			response = self.call(token)
+			with_cookie = self.call(token, client=browser)
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		self.assertEqual(response.json["message"]["identity"]["account"], h.AYSE)
+		self.assertEqual(with_cookie.status_code, 401)
+		self.assertEqual(with_cookie.json.get("exc_type"), "ServiceTokenRejected")
 
 	def test_mobile_identity_matches_the_contract(self):
 		# docs/sozlesmeler.md section 3, "Telefon kimliği": account, scope, site, installation and sid are text.
