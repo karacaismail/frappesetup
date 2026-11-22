@@ -140,8 +140,10 @@ function Explorer({ items }: Props) {
   const [rail, setRail] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(true);
+  const [hasTable, setHasTable] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const detailRef = useRef<HTMLInputElement>(null);
+  const cardsRef = useRef<HTMLUListElement>(null);
 
   // Ada JS'i inmeden önce sunucu HTML'ine yazılan metin DOM'da kalır, ama React durumu boş başlar:
   // React 19 hidrasyonda DOM değerini korur, değer izleyicisini bu değerle başlatır ve değişikliği
@@ -149,6 +151,7 @@ function Explorer({ items }: Props) {
   useEffect(() => {
     if (searchRef.current) setQ(searchRef.current.value);
     if (detailRef.current) setShowDetail(detailRef.current.checked);
+    if (!cardsRef.current?.contains(document.activeElement)) setHasTable(true);
   }, []);
 
   const sorted = useMemo(() => [...items].sort(byId), [items]);
@@ -286,8 +289,17 @@ function Explorer({ items }: Props) {
         )}
       </div>
 
-      {/* Dar ekran: kart listesi */}
-      <Box hiddenFrom="sm" component="ul" className="req-cards" aria-label="Gereksinimler (kart görünümü)">
+      {/* Sunucu önce kartları gönderir. Tablo tarayıcıda hazırlanır. */}
+      <Box
+        ref={cardsRef}
+        hiddenFrom={hasTable ? 'sm' : undefined}
+        component="ul"
+        className="req-cards"
+        aria-label="Gereksinimler (kart görünümü)"
+        onBlur={hasTable ? undefined : (event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setHasTable(true);
+        }}
+      >
         {filtered.map((r) => (
           <li key={r.id} className="req-card" id={`req-${r.id}`}>
             <div className="req-card-top">
@@ -308,56 +320,58 @@ function Explorer({ items }: Props) {
       </Box>
 
       {/* Geniş ekran: tablo, kendi kapsayıcısında yatay kayar */}
-      <Box visibleFrom="sm">
-        <Table.ScrollContainer
-          minWidth={showDetail ? 936 : 808}
-          type="native"
-          tabIndex={0}
-          role="region"
-          aria-label="Gereksinim tablosu (yatay kaydırılabilir)"
-        >
-          <Table highlightOnHover withRowBorders data-testid="req-table" className="req-table">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th style={{ minWidth: '5.5rem' }}>ID</Table.Th>
-                <Table.Th style={{ minWidth: showDetail ? '24rem' : '16rem' }}>Gereksinim</Table.Th>
-                <Table.Th style={{ minWidth: '10rem' }}>Ray</Table.Th>
-                <Table.Th style={{ minWidth: '7rem' }}>Öncelik</Table.Th>
-                <Table.Th style={{ minWidth: '5rem' }}>Faz</Table.Th>
-                <Table.Th style={{ minWidth: '7rem' }}>Kaynak</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filtered.map((r) => (
-                <Table.Tr key={r.id}>
-                  <Table.Td>
-                    <code className="req-id">{r.id}</code>
-                  </Table.Td>
-                  <Table.Td>
-                    <p className="req-title">{r.title}</p>
-                    {showDetail && <p className="req-detail">{inlineCode(r.detail)}</p>}
-                    {/* Sahip ayrı sütun değil, kart görünümündeki gibi gereksinim hücresindedir; içerik sığmazsa tablo kendi kapsayıcısında kayar. */}
-                    {r.owner && <p className="req-owner">Sahip: {r.owner}</p>}
-                  </Table.Td>
-                  <Table.Td>{r.rail}</Table.Td>
-                  <Table.Td>
-                    <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
-                  </Table.Td>
-                  <Table.Td>{r.phase}</Table.Td>
-                  <Table.Td>{r.source}</Table.Td>
-                </Table.Tr>
-              ))}
-              {filtered.length === 0 && (
+      {hasTable && (
+        <Box visibleFrom="sm">
+          <Table.ScrollContainer
+            minWidth={showDetail ? 936 : 808}
+            type="native"
+            tabIndex={0}
+            role="region"
+            aria-label="Gereksinim tablosu (yatay kaydırılabilir)"
+          >
+            <Table highlightOnHover withRowBorders data-testid="req-table" className="req-table">
+              <Table.Thead>
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
-                    <Text c="dimmed">Bu filtrelerle eşleşen gereksinim yok.</Text>
-                  </Table.Td>
+                  <Table.Th style={{ minWidth: '5.5rem' }}>ID</Table.Th>
+                  <Table.Th style={{ minWidth: showDetail ? '24rem' : '16rem' }}>Gereksinim</Table.Th>
+                  <Table.Th style={{ minWidth: '10rem' }}>Ray</Table.Th>
+                  <Table.Th style={{ minWidth: '7rem' }}>Öncelik</Table.Th>
+                  <Table.Th style={{ minWidth: '5rem' }}>Faz</Table.Th>
+                  <Table.Th style={{ minWidth: '7rem' }}>Kaynak</Table.Th>
                 </Table.Tr>
-              )}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
-      </Box>
+              </Table.Thead>
+              <Table.Tbody>
+                {filtered.map((r) => (
+                  <Table.Tr key={r.id}>
+                    <Table.Td>
+                      <code className="req-id">{r.id}</code>
+                    </Table.Td>
+                    <Table.Td>
+                      <p className="req-title">{r.title}</p>
+                      {showDetail && <p className="req-detail">{inlineCode(r.detail)}</p>}
+                      {/* Sahip ayrı sütun değil, kart görünümündeki gibi gereksinim hücresindedir; içerik sığmazsa tablo kendi kapsayıcısında kayar. */}
+                      {r.owner && <p className="req-owner">Sahip: {r.owner}</p>}
+                    </Table.Td>
+                    <Table.Td>{r.rail}</Table.Td>
+                    <Table.Td>
+                      <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
+                    </Table.Td>
+                    <Table.Td>{r.phase}</Table.Td>
+                    <Table.Td>{r.source}</Table.Td>
+                  </Table.Tr>
+                ))}
+                {filtered.length === 0 && (
+                  <Table.Tr>
+                    <Table.Td colSpan={6}>
+                      <Text c="dimmed">Bu filtrelerle eşleşen gereksinim yok.</Text>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        </Box>
+      )}
     </Box>
   );
 }

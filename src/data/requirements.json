@@ -32,7 +32,7 @@
  {
   "id": "G-4",
   "title": "Press Settings temel yapılandırması",
-  "detail": "domain/cluster, `docker_registry_url`, `namespace` ve kimlik, build_server, monitor_server, log_server, certbot_directory, `eff_registration_email`, rsa_key_size, `realtime_job_updates=1`, enable_site_pooling, `tls_renewal_queue_size`, Telegram/e-posta bildirim alıcıları; `enable_google_oauth=0`, `enable_email_pre_verification=0`, `disallow_disposable_emails=1`, trial_sites_count=1. bench_configuration yalnızca yeni bench varsayılanıdır (bkz. G-38).",
+  "detail": "domain/cluster, `docker_registry_url`, `namespace` ve kimlik, build_server, monitor_server, log_server, certbot_directory, `eff_registration_email`, rsa_key_size, `realtime_job_updates=1`, enable_site_pooling, `tls_renewal_queue_size`, Telegram/e-posta bildirim alıcıları; `enable_google_oauth=0`, `enable_email_pre_verification=0`, `disallow_disposable_emails=1`, `trial_sites_count=1`. bench_configuration yalnızca yeni bench varsayılanıdır (bkz. G-38).",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P0",
@@ -302,7 +302,7 @@
  {
   "id": "G-31",
   "title": "Product Trial: Keycloak sarmalayıcısı ve Türkçe kurulum yükü",
-  "detail": "Press trial girişi OTP'ye bağlıdır ve kurulum sihirbazına language 'en' / Asia-Kolkata yazar (doğrulandı). `press_tr.api.trial.start(product)` Keycloak oturumundaki Team ile `_get_or_create_site_request` → `ProductTrialRequest.create_site` zincirini çağırır; `override_doctype_class Product Trial Request` ile `get_setup_wizard_payload` country='Türkiye', `time_zone='Europe/Istanbul'`, language='tr', currency='TRY' döner. Product Trial: apps (frappe, erpnext, tr_localization, hrms_tr), domain Root Domain, release_group prod, enable_pooling=1, standby_pool_size/queue, trial_days=14, trial_plan, `redirect_to_after_login` panel URL'si; deneme bitiminde `change_plan` ile ücretli plana geçiş ve kart zorunluluğu.",
+  "detail": "Press trial girişi OTP'ye bağlıdır ve kurulum sihirbazına language 'en' / Asia-Kolkata yazar (doğrulandı). `press_tr.api.trial.start(product)` Keycloak oturumundaki Team ile `_get_or_create_site_request` → `ProductTrialRequest.create_site` zincirini çağırır; `override_doctype_class Product Trial Request` ile `get_setup_wizard_payload` country='Türkiye', `time_zone='Europe/Istanbul'`, `language='tr'`, currency='TRY' döner. Product Trial: apps (frappe, erpnext, tr_localization, hrms_tr), domain Root Domain, release_group prod, enable_pooling=1, standby_pool_size/queue, trial_days=14, trial_plan, `redirect_to_after_login` panel URL'si; deneme bitiminde `change_plan` ile ücretli plana geçiş ve kart zorunluluğu.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P4",
@@ -832,7 +832,7 @@
  {
   "id": "G-84",
   "title": "MCP kaynakları: Press MCP, press_tr MCP ve kiracı MCP",
-  "detail": "Agent üç MCP sunucusuna bağlanır: Press `press.mcp.handler` (ops, System User, yalnızca iç ekip ajanı), `press_tr.mcp.handler` (ticari araçlar, kullanıcı bearer'ı), kiracı sitede frappe/mcp uygulaması (`frappe_mcp`, Press'in bağımlı olduğu paket; v16 uyumu kurulumda doğrulanır: olası) + platform_core/uygulamaların kayıt ettiği araçlar (tipli domain adaptörü üzerinden kapsamlı belge, rapor, workflow ve uygulama araçları; ham REST/RPC modele açılmaz). Araç tanımları yetki gereksinimi ve yıkıcı/ücretli bayrağı taşır; agent araç listesini kullanıcının kurulu uygulamaları ve rollerine göre daraltır.",
+  "detail": "Agent üç MCP sunucusuna bağlanır: Press `press.mcp.handler` (ops, System User, yalnızca iç ekip ajanı), `press_tr.mcp.handler` (ticari araçlar, kullanıcı bearer'ı), kiracı sitede frappe/mcp uygulaması (`frappe_mcp`, Press'in bağımlı olduğu paket; v16 uyumu kurulumda doğrulanır: olası) + `platform_core` ve uygulamaların kayıt ettiği araçlar (tipli domain adaptörü üzerinden kapsamlı belge, rapor, workflow ve uygulama araçları; ham REST/RPC modele açılmaz). Araç tanımları yetki gereksinimi ve yıkıcı/ücretli bayrağı taşır; agent araç listesini kullanıcının kurulu uygulamaları ve rollerine göre daraltır.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -1172,7 +1172,7 @@
  {
   "id": "G-118",
   "title": "Repo görünürlüğü, lisans ve Git yazarlık politikası",
-  "detail": "Platform depoları (`press_tr`, press_tr_finance, press_ops_bridge, `platform_core`, tr_localization, panel monorepo, agent) varsayılan olarak public/açık kaynak; lisans seçimi ürün sahibinin açık onayı ve hukuk değerlendirmesiyle yapılır (K-1) ve onaysız değiştirilmez. Bağımlılık lisansları karar girdisidir, hüküm değildir: Frappe Framework MIT, ERPNext/HRMS GPL-3.0, Press/Agent/CRM/Helpdesk AGPL-3.0 (doğrulandı); kod ilişkisi (aynı süreçte genişletme mi, API üzerinden mi) ve dağıtım biçimi birlikte değerlendirilir; karar sonrası SPDX başlıkları ve CI lisans taraması. Sırlar, gerçek .env ve yedekler depoya girmez (G-112); public kaynak kod servisleri internete açma talimatı değildir, Tailscale/özel ağ kuralları korunur; tüm commit'ler karacaismail yazar/committer kimliğiyle, bot co-author ve üretim imzası olmadan, yazar koruması atlanmadan yapılır.",
+  "detail": "Platform depoları (`press_tr`, `press_tr_finance`, `press_ops_bridge`, `platform_core`, tr_localization, panel monorepo, agent) varsayılan olarak public/açık kaynak; lisans seçimi ürün sahibinin açık onayı ve hukuk değerlendirmesiyle yapılır (K-1) ve onaysız değiştirilmez. Bağımlılık lisansları karar girdisidir, hüküm değildir: Frappe Framework MIT, ERPNext/HRMS GPL-3.0, Press/Agent/CRM/Helpdesk AGPL-3.0 (doğrulandı); kod ilişkisi (aynı süreçte genişletme mi, API üzerinden mi) ve dağıtım biçimi birlikte değerlendirilir; karar sonrası SPDX başlıkları ve CI lisans taraması. Sırlar, gerçek .env ve yedekler depoya girmez (G-112); public kaynak kod servisleri internete açma talimatı değildir, Tailscale/özel ağ kuralları korunur; tüm commit'ler karacaismail yazar/committer kimliğiyle, bot co-author ve üretim imzası olmadan, yazar koruması atlanmadan yapılır.",
   "rail": "Çapraz",
   "priority": "SHOULD",
   "phase": "P0",
@@ -1662,7 +1662,7 @@
  {
   "id": "SA-13",
   "title": "Yapılandırılabilir ve Türkçe tahsilat (dunning) zinciri",
-  "detail": "`suspend_sites.SUSPENSION_DAYS`, `site.ARCHIVE_AFTER_SUSPEND_DAYS`, `NOTIFY_BEFORE_ARCHIVAL_DAYS` ve arşiv sonrası yedek saklama süresi `press_tr` ile Press Settings alanlarına taşınır; suspended_sites, payment_failed, `payment_method_invalid` e-posta şablonlarının Türkçe karşılıkları eklenir. `mark_as_uncollectible` için açık zamanlama veya press_tr.api.ops uç noktası tanımlanır; ERPNext Dunning/Dunning Type ile resmi ihtar üretilir ve Press Invoice'a yorum olarak yazılır.",
+  "detail": "`suspend_sites.SUSPENSION_DAYS`, `site.ARCHIVE_AFTER_SUSPEND_DAYS`, `NOTIFY_BEFORE_ARCHIVAL_DAYS` ve arşiv sonrası yedek saklama süresi `press_tr` ile Press Settings alanlarına taşınır; suspended_sites, payment_failed, `payment_method_invalid` e-posta şablonlarının Türkçe karşılıkları eklenir. `mark_as_uncollectible` için açık zamanlama veya `press_tr.api.ops` uç noktası tanımlanır; ERPNext Dunning/Dunning Type ile resmi ihtar üretilir ve Press Invoice'a yorum olarak yazılır.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P2",
@@ -1772,7 +1772,7 @@
  {
   "id": "SA-24",
   "title": "Superadmin paneli operatör modu ekranları",
-  "detail": "React kabuğu Keycloak operatör rolüyle operatör moduna geçer: Müşteri 360, Tahsilat ve kredi (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), Abonelik ve modüller, Destek (HD Ticket + Support Access + Support Session), Tahsilat aşaması, KVKK denetim raporu, gece mutabakat farkları. Ant Design tokenları, 320 px'den başlayan akışkan yerleşim; panel kendi veri tabanı tutmaz, yazma press_tr.api.ops veya ops sitesine gider.",
+  "detail": "React kabuğu Keycloak operatör rolüyle operatör moduna geçer: Müşteri 360, Tahsilat ve kredi (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), Abonelik ve modüller, Destek (HD Ticket + Support Access + Support Session), Tahsilat aşaması, KVKK denetim raporu, gece mutabakat farkları. Ant Design tokenları, 320 px'den başlayan akışkan yerleşim; panel kendi veri tabanı tutmaz, yazma `press_tr.api.ops` veya ops sitesine gider.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
@@ -1782,7 +1782,7 @@
  {
   "id": "SA-25",
   "title": "İki katmanlı operatör yetkisi",
-  "detail": "Site düzeyi destek eylemleri (Site/Release Group işlemleri; login_as_admin yalnız ayrı Administrator yükseltme talebiyle, SA-44) panelden Press Support Agent + Accepted Support Access ile `press.api.client.run_doc_method` üzerinden yapılır; ticari tekil okuma/yazmalar (Team, Invoice, Balance Transaction) yalnız System User servis hesabı + press_tr.api.ops ile. get_list skip bayrağı kullanımı loglanır ve KVKK envanterine işlenir.",
+  "detail": "Site düzeyi destek eylemleri (Site/Release Group işlemleri; login_as_admin yalnız ayrı Administrator yükseltme talebiyle, SA-44) panelden Press Support Agent + Accepted Support Access ile `press.api.client.run_doc_method` üzerinden yapılır; ticari tekil okuma/yazmalar (Team, Invoice, Balance Transaction) yalnız System User servis hesabı + `press_tr.api.ops` ile. get_list skip bayrağı kullanımı loglanır ve KVKK envanterine işlenir.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",

@@ -225,12 +225,10 @@ const embeds = EMBEDS[entry.id] ?? [];
         c.scrollLeft = scrolled[i];
         c.addEventListener('blur', schedule, { once: true });
       } else if (overflows[i]) {
-        if (c.matches(':is(.req-card-detail, .req-detail) > code')) {
-          c.setAttribute('data-scroll', 'single-line');
-        }
+        c.setAttribute('data-scroll', 'single-line');
         c.setAttribute('tabindex', '0');
         c.setAttribute('role', 'group');
-        c.setAttribute('aria-label', 'Kaydırılabilir kod');
+        c.setAttribute('aria-label', `Kaydırılabilir kod: ${c.textContent?.trim().replace(/\s+/g, ' ')}`);
         c.scrollLeft = scrolled[i];
       } else {
         c.removeAttribute('tabindex');

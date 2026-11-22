@@ -743,6 +743,20 @@ test.describe('touch targets', () => {
 });
 
 test.describe('requirements explorer', () => {
+  test('server sends one readable requirements view without JavaScript @touch', async ({ browser, baseURL }) => {
+    const page = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 1366, height: 900 }, baseURL });
+    try {
+      await page.goto('gereksinimler/');
+      const cards = page.locator('.req-cards .req-card');
+      await expect(cards).toHaveCount(requirements.length);
+      await expect(cards.first().locator('.req-card-detail')).toBeVisible();
+      await expect(page.getByTestId('req-table')).toHaveCount(0);
+      await noHorizontalOverflow(page);
+    } finally {
+      await page.close();
+    }
+  });
+
   const shouldCount = requirements.filter((r) => r.priority === 'SHOULD').length;
   const mayCount = requirements.filter((r) => r.priority === 'MAY').length;
   const keycloakCount = requirements.filter((r) =>
@@ -876,8 +890,8 @@ test.describe('requirements explorer', () => {
   // eşleşir (alt dizgi değil): süzülmemiş "N / N" metni hiçbir veri durumunda kabul edilmez.
   const exactCount = (n: number) => new RegExp(`^${n} / ${requirements.length} gereksinim$`);
   for (const vp of [
-    { name: 'desktop', width: 1366, height: 900, detailSelector: '.req-detail', tag: '' },
-    { name: '320', width: 320, height: 640, detailSelector: '.req-card-detail', tag: ' @touch' },
+    { name: 'desktop', width: 1366, height: 900, tableVisible: true, tag: '' },
+    { name: '320', width: 320, height: 640, tableVisible: false, tag: ' @touch' },
   ]) {
     test(`text typed once before hydration is kept and applied at ${vp.name} (slow island JS)${vp.tag}`, async ({ page }) => {
       expect(keycloakCount).toBeGreaterThan(0);
@@ -894,7 +908,8 @@ test.describe('requirements explorer', () => {
       const search = page.getByRole('textbox', { name: 'Ara' });
       const detail = page.getByRole('switch', { name: 'Ayrıntıları göster' });
       await expect(island).toHaveAttribute('ssr', '');
-      await expect(page.locator(vp.detailSelector).first()).toBeVisible();
+      await expect(page.locator('.req-card-detail').first()).toBeVisible();
+      await expect(page.getByTestId('req-table')).toHaveCount(0);
       await search.fill('Keycloak');
       await detail.uncheck();
       // Girdi anında ada hâlâ sunucu HTML'idir (React bağlı değil).
@@ -905,8 +920,38 @@ test.describe('requirements explorer', () => {
       await expect(detail).not.toBeChecked();
       await expect(page.locator('.req-detail, .req-card-detail')).toHaveCount(0);
       await expect(island).not.toHaveAttribute('ssr', '');
+      const table = page.getByTestId('req-table');
+      if (vp.tableVisible) await expect(table).toBeVisible();
+      else await expect(table).toBeHidden();
     });
   }
+
+  test('desktop fallback keeps a focused code box while the table loads', async ({ page }) => {
+    await page.setViewportSize({ width: 770, height: 900 });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(/\/_astro\/RequirementsExplorer\.[^/]+\.js$/, async (route) => {
+      await gate;
+      await route.continue();
+    });
+    try {
+      await page.goto('gereksinimler/', { waitUntil: 'domcontentloaded' });
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = '200%';
+      });
+      const code = page.locator('.req-card-detail code[tabindex="0"]').first();
+      await code.focus();
+      await expect(code).toBeFocused();
+      release();
+      await waitForHydration(page);
+      await expect(code).toBeFocused();
+      await expect(page.getByTestId('req-table')).toHaveCount(0);
+      await page.getByRole('textbox', { name: 'Ara' }).focus();
+      await expect(page.getByTestId('req-table')).toBeVisible();
+    } finally {
+      release();
+    }
+  });
 
   test('search text and focus survive orientation change', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -965,12 +1010,17 @@ test.describe('long inline code', () => {
     await page.evaluate(() => document.fonts.ready);
     const codes = page.locator('.req-cards .req-card-detail > code');
     const stops = codes.and(page.locator('[tabindex="0"]'));
-    const namedStops = stops.and(page.getByRole('group', { name: 'Kaydırılabilir kod', exact: true }));
+    const namedStops = stops.and(page.getByRole('group', { name: /^Kaydırılabilir kod: .+/ }));
     await expect.poll(() => stops.count()).toBeGreaterThan(0);
     const count = await stops.count();
     console.log(`[kod durakları] ${test.info().project.name}: ${count}`);
     expect(count, '320 px kod durakları').toBeLessThanOrEqual(194);
     await expect(namedStops).toHaveCount(count);
+    expect(await namedStops.evaluateAll((elements) =>
+      elements.every((element) =>
+        element.getAttribute('aria-label') === `Kaydırılabilir kod: ${element.textContent?.trim().replace(/\s+/g, ' ')}`,
+      ),
+    )).toBe(true);
     await expect(codes.and(page.locator('[role="group"]:not([tabindex="0"])'))).toHaveCount(0);
   });
 
@@ -1057,6 +1107,7 @@ test.describe('long inline code', () => {
     await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
     const code = page.locator('[data-test-code]');
     await expect(code).toBeFocused();
+    await expect(code).toHaveCSS('white-space', 'nowrap');
     expect(await code.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none')).toBe(true);
     // WebKit odak değişiminden sonraki ilk ok tuşunu kaydırmaya kullanmaz ve kaydırmayı canlandırır: her basıştan sonra
     // sonuç 1 sn'ye kadar beklenir, en çok üç basış.
@@ -1086,7 +1137,7 @@ test.describe('long inline code', () => {
     await expect.poll(() => mismatched(page), '1366 px: yalnız taşan kod Tab sırasında').toBe(0);
     await expect.poll(() => code.evaluate((el) => el.hasAttribute('tabindex')), '1366 px: sığan kod Tab sırasında değil').toBe(false);
     await expect(code).not.toHaveAttribute('role', 'group');
-    await expect(code).not.toHaveAttribute('aria-label', 'Kaydırılabilir kod');
+    await expect(code).not.toHaveAttribute('aria-label', /Kaydırılabilir kod/);
   });
 
   test('requirement card code stays keyboard reachable after filtering re-renders the cards', async ({ page }) => {
@@ -1329,9 +1380,9 @@ test.describe('network budget', () => {
 
     const reqs = await load(page, 'gereksinimler/');
     const reqsHtml = kb(reqs, 'html');
-    test.info().annotations.push({ type: 'ölçüm', description: `Gereksinimler HTML ${reqsHtml.toFixed(1)} KB gzip (bütçe 200)` });
+    test.info().annotations.push({ type: 'ölçüm', description: `Gereksinimler HTML ${reqsHtml.toFixed(1)} KB gzip (test sınırı 180)` });
     console.log(`[bütçe] Gereksinimler HTML ${reqsHtml.toFixed(1)} KB`);
-    expect(reqsHtml, 'Gereksinimler HTML').toBeLessThanOrEqual(200);
+    expect(reqsHtml, 'Gereksinimler HTML').toBeLessThanOrEqual(180);
     // Ada bütçesi: Gereksinimler sayfasının kabuğa EK olarak indirdiği tüm JS (adanın kendi parçası + yalnız onun
     // çektiği paylaşılmayan parçalar).
     const islandExtra = kb(reqs, 'js', (a) => !shellUrls.has(a.url));
