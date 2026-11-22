@@ -148,6 +148,21 @@ Kendi düzenlemeniz varsa bu komutu çalıştırmayın.
 `git status` altında kalan izlenmeyen dosyaları tek tek inceleyin.
 Çalışma ağacı temiz olunca uygulama komutunu tekrar çalıştırın.
 
+## Uygunluk kapısında ad denetimi
+
+O-30 gereği kapı, ad denetimi kipini `backend/dev/naming/enforcement.json` dosyasından okur.
+`advisory` kipinde kapı ad bulgularını uyarı olarak yazar.
+Dosya yoksa kapı `advisory` kipini kullanır ve bunu çıktıda belirtir.
+Bütün dallarda ad değişimi bitince orkestratör değeri `enforce` yapar.
+`enforce` kipinde şu dört kuralın bulguları kapıyı durdurur:
+
+- `legacy-name`
+- `turkish-name`
+- `module-name`
+- `translation-binding`
+
+Kapı diğer ad bulgularını her iki kipte de uyarı olarak yazar.
+
 ## Belgelerdeki eski kod adları
 
 Orkestratör, belgelerde kalan eski kod adlarının listesini yönetir.
