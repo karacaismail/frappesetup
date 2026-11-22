@@ -207,12 +207,23 @@ class TestMetadataHTTP(ShellHTTPFixture):
 			frappe.set_user("Administrator")
 
 	def test_website_user_cannot_read_native_doctype_metadata(self):
-		path = f"/api/v2/doctype/{quote(DOCTYPE)}/meta"
-		status, _, body = self.request(path, self.reader_sid)
-		self.assertEqual(status, 403)
-		self.assertNotIn("data", json.loads(body))
+		missing = "Shell Missing Native DocType"
+		self.assertFalse(frappe.db.exists("DocType", missing))
+		for doctype in (DOCTYPE, missing):
+			with self.subTest(doctype=doctype):
+				path = f"/api/v2/doctype/{quote(doctype)}/meta"
+				status, _, body = self.request(path, self.reader_sid)
+				self.assertEqual(status, 403)
+				payload = json.loads(body)
+				self.assertNotIn("data", payload)
+				self.assertEqual([error["type"] for error in payload["errors"]], ["PermissionError"])
+				self.assertNotIn(doctype.encode(), body)
 		status, _, _ = self.metadata(self.reader_sid)
 		self.assertEqual(status, 200)
+
+	def test_website_user_cannot_open_desk(self):
+		status, _, _ = self.request("/desk", self.reader_sid)
+		self.assertEqual(status, 403)
 
 	def test_website_user_cannot_read_native_form_rpc_or_alias(self):
 		method = "frappe.desk.form.load.getdoctype"
@@ -273,6 +284,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		with (
 			patch.object(frappe.local, "request", request, create=True),
 			patch.object(frappe.local, "response_headers", {}, create=True),
+			patch.object(frappe.local, "form_dict", frappe._dict(), create=True),
 		):
 			self.assertEqual(
 				frappe.get_attr("platform_core.api.meta.validate_mobile_policy")(),
