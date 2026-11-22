@@ -130,6 +130,16 @@ class SessionLifetimeLiveTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn('name="password"', html)
 
+    def test_a_lower_requested_level_does_not_skip_the_login(self):
+        # minimum.acr.value=employee: acr_values=0 or an unknown ACR must not let the cookie answer after expiry.
+        opener, status, headers, _ = _login(tenant_authorize_url())
+        self.assertIn("code=", headers["Location"])
+        time.sleep(self.SHORT + 2)
+        for extra in ("&acr_values=0", "&acr_values=unknown"):
+            with self.subTest(extra=extra):
+                status, headers, html = _ac(opener, tenant_authorize_url() + extra)
+                self.assertNotIn("code=", headers.get("Location", ""), "a lower level must not skip the login")
+
     def test_customer_cookie_is_not_affected(self):
         opener, status, headers, _ = _login(tenant_authorize_url())
         self.assertIn("code=", headers["Location"])

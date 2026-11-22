@@ -37,18 +37,18 @@ public class WebhookEventListenerProviderFactory implements EventListenerProvide
             LOG.warn("Webhook listener has no URL. Events are not sent.");
             return;
         }
-        URI target = URI.create(url);
-        if (!"https".equals(target.getScheme()) && !"http".equals(target.getScheme())) {
-            throw new IllegalArgumentException("webhook URL must use http or https");
-        }
-        // A missing or short secret stops Keycloak from starting. An unsigned request is never sent.
+        // A wrong URL, or a missing or short secret, stops Keycloak from starting. An unsigned request is never sent.
+        URI target = WebhookUrls.check(url);
         WebhookSigner signer = new WebhookSigner(secret);
-        HttpClient http = HttpClient.newBuilder()
+        sender = new WebhookSender(newHttpClient(), target, signer, () -> System.currentTimeMillis() / 1000L,
+                MAX_ATTEMPTS, FIRST_RETRY_DELAY, REQUEST_TIMEOUT);
+    }
+
+    static HttpClient newHttpClient() {
+        return HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(3))
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
-        sender = new WebhookSender(http, target, signer, () -> System.currentTimeMillis() / 1000L,
-                MAX_ATTEMPTS, FIRST_RETRY_DELAY, REQUEST_TIMEOUT);
     }
 
     @Override

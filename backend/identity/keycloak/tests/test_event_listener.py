@@ -64,7 +64,7 @@ class EventListenerFileTest(unittest.TestCase):
         self.assertIn("KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET: ${IDENTITY_SYNC_WEBHOOK_SECRET:?}", compose)
         example = ORNEK_ENV.read_text(encoding="utf-8")
         self.assertRegex(example, r"(?m)^IDENTITY_SYNC_WEBHOOK_SECRET=degistir-")
-        self.assertRegex(example, r"(?m)^IDENTITY_SYNC_EVENTS_URL=http://event-sink:8080/v1/events$")
+        self.assertRegex(example, r"(?m)^IDENTITY_SYNC_EVENTS_URL=http://event-sink.localhost:8080/v1/events$")
 
 
 def _sink_requests() -> list:

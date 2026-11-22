@@ -99,6 +99,11 @@ services:
       dockerfile: Dockerfile
       target: event-sink
     pull_policy: missing
+    networks:
+      default:
+        # Plain http is allowed only for a development address (event-listener WebhookUrls).
+        aliases:
+          - event-sink.localhost
 
   mailpit:
     image: axllent/mailpit:v1.34.0

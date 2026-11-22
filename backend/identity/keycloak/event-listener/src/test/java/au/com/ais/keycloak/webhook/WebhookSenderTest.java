@@ -43,6 +43,9 @@ class WebhookSenderTest {
                     new String(body, StandardCharsets.UTF_8)));
             int index = call.getAndIncrement();
             int status = index < statuses.length ? statuses[index] : 200;
+            if (status == 307) {
+                exchange.getResponseHeaders().add("Location", "/elsewhere");
+            }
             exchange.sendResponseHeaders(status, -1);
             exchange.close();
         });
@@ -93,6 +96,22 @@ class WebhookSenderTest {
         int status = sender(url, new AtomicLong(1795000000L), 3).send(BODY).get(10, TimeUnit.SECONDS);
         assertEquals(401, status);
         assertEquals(1, received.size());
+    }
+
+    @Test
+    void redirectIsNotFollowed() throws Exception {
+        URI url = start(307, 200);
+        HttpClient noRedirect = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
+        WebhookSender sender = new WebhookSender(noRedirect, url, new WebhookSigner(SECRET),
+                new AtomicLong(1795000000L)::getAndIncrement, 3, Duration.ofMillis(10), Duration.ofSeconds(5));
+        assertEquals(307, sender.send(BODY).get(10, TimeUnit.SECONDS));
+        assertEquals(1, received.size());
+        assertEquals("/v1/events", received.get(0).path());
+    }
+
+    @Test
+    void factoryClientDoesNotFollowRedirects() {
+        assertEquals(HttpClient.Redirect.NEVER, WebhookEventListenerProviderFactory.newHttpClient().followRedirects());
     }
 
     @Test
