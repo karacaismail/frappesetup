@@ -61,6 +61,17 @@ class RealmBacklogFileTest(unittest.TestCase):
     def test_press_client_requires_pkce(self):
         self.assertEqual(self.clients["press"]["attributes"]["pkce.code.challenge.method"], "S256")
 
+    def test_compose_passes_mcp_environment_settings_into_keycloak(self):
+        for name in (
+            "ATONOTA_MCP_REDIRECT_URI",
+            "ATONOTA_MCP_RESOURCE_URL",
+            "ATONOTA_MCP_INTROSPECTION_SECRET",
+        ):
+            with self.subTest(name=name):
+                self.assertIn(name, self.dev_env)
+                self.assertIn(name, self.prod_env)
+                self.assertIn(f"{name}: ${{{name}:?}}", self.compose)
+
     # Item 4: every SMTP setting comes from the environment; production has TLS and authentication on.
     def test_smtp_settings_come_from_the_environment(self):
         smtp = self.realm["smtpServer"]
@@ -179,6 +190,19 @@ class RealmBacklogLiveTest(unittest.TestCase):
                               code_challenge=challenge, code_challenge_method="S256")
         self.assertEqual(response.status, 200, response.headers.get("Location"))
         self.assertTrue(b'name="username"' in response.body, safe_detail(response))
+        headers = {name.lower(): value for name, value in response.headers.items()}
+        self.assertEqual(headers.get("x-frame-options"), "DENY")
+        self.assertIn("frame-ancestors 'none'", headers["content-security-policy"])
+
+    def test_oidc_session_probe_documents_can_still_be_framed(self):
+        endpoint = get_environment_value("KC_PUBLIC_URL") + "/realms/platform/protocol/openid-connect/"
+        for path in ("3p-cookies/step1.html", "3p-cookies/step2.html", "login-status-iframe.html"):
+            with self.subTest(path=path):
+                response = request("GET", endpoint + path)
+                self.assertEqual(response.status, 200)
+                headers = {name.lower(): value for name, value in response.headers.items()}
+                self.assertNotIn("frame-ancestors", headers["content-security-policy"])
+                self.assertIsNone(headers.get("x-frame-options"))
 
     def test_mobile_client_refuses_a_plain_challenge(self):
         response = _authorize("mobile-app", get_environment_value("ATONOTA_MOBILE_REDIRECT_URI"),

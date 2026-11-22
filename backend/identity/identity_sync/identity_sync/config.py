@@ -1,6 +1,6 @@
-"""Servis ayarları. Ayarlar ve sırlar ortam değişkeninden okunur.
+"""Service settings. Read configuration and secrets from environment variables.
 
-Sırlar depoya, günlüğe ve hata metnine yazılmaz.
+Never write secrets to the repository, logs, or error messages.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ _TENANT_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 
 
 class ConfigError(Exception):
-    """Ayar eksik ya da hatalı. Metin sır değeri taşımaz."""
+    """A setting is missing or invalid. The message contains no secret values."""
 
 
 @dataclass(frozen=True)
@@ -46,15 +46,15 @@ class Settings:
     host: str = "127.0.0.1"
     port: int = 8085
     service_audience: str = "identity-sync"
-    # İş kilidini beklemenin en uzun süresi. Birim saniyedir.
+    # Maximum time to wait for the work lock, in seconds.
     lock_timeout: float = 10.0
     # Requests one client address may send in one minute. Over the limit the answer is 429.
     rate_limit: int = 600
-    # Keycloak realm'in iç kimliği. Keycloak olaylarındaki `realmId` bu değerdir, realm adı değildir.
+    # The internal Keycloak realm ID. Events use this value for `realmId`, not the realm name.
     realm_id: str = ""
-    # Yürütebilen istemciler: yalnız insan onayını denetleyen güvenilir servisler.
+    # Execution clients: only trusted services that check human approval.
     execute_azp: frozenset[str] = frozenset()
-    # Yalnız okuyabilen ve önizleyebilen istemciler. Yapay zekâ aracısı bu listeye girer.
+    # Clients allowed only to read and preview. The AI agent belongs in this list.
     preview_azp: frozenset[str] = frozenset()
     # Service clients of platform_core sites that may call /v1/sessions/revoke.
     session_azp: frozenset[str] = frozenset()
@@ -75,12 +75,12 @@ class Settings:
 
     @property
     def issuer(self) -> str:
-        """Belirteçteki `iss` değeri. Her zaman tarayıcının gördüğü adresten üretilir."""
+        """The token `iss` value, always derived from the browser-visible address."""
         return f"{self.keycloak_public_url.rstrip('/')}/realms/{self.realm}"
 
     @property
     def keycloak_base_url(self) -> str:
-        """Servisin Keycloak'a ulaştığı adres."""
+        """The address the service uses to reach Keycloak."""
         return (self.keycloak_internal_url or self.keycloak_public_url).rstrip("/")
 
     @property
@@ -121,7 +121,7 @@ def _names(raw: str) -> frozenset[str]:
 
 
 def load_settings(env: Mapping[str, str]) -> Settings:
-    """Ayarları ortamdan okur. Eksik ayarların adlarını tek hatada listeler."""
+    """Read settings from the environment. List all missing setting names in one error."""
     required = (
         "KEYCLOAK_PUBLIC_URL",
         "CLIENT_SECRET",

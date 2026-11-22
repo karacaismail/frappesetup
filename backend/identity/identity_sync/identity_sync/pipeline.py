@@ -2,7 +2,7 @@
 
 Order of work: read the user's current state, plan the actions, run the actions.
 A failed event goes to the dead-letter queue. The queue is replayed only by hand.
-This module has no scheduled job and no polling loop (Proje kaydı D-6).
+This module has no scheduled job and no polling loop (project record D-6).
 
 All work on an event runs under the work lock, so the server and the
 `replay-dead-letters` command cannot run the same event together, and two events of

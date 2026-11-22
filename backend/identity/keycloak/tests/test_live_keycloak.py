@@ -137,6 +137,16 @@ class RealmSettingsTest(unittest.TestCase):
         self.assertEqual(r["loginTheme"], "atonota")
         self.assertEqual(r["emailTheme"], "atonota")
 
+    def test_account_console_receives_roles_without_full_scope(self):
+        console = admin("/clients?clientId=account-console", self.admin_token).json()[0]
+        self.assertEqual(console["defaultClientScopes"], ["roles"])
+        self.assertFalse(console["fullScopeAllowed"])
+        self.assertEqual(console["attributes"]["pkce.code.challenge.method"], "S256")
+        account = admin("/clients?clientId=account", self.admin_token).json()[0]
+        path = f'/clients/{console["id"]}/scope-mappings/clients/{account["id"]}'
+        mappings = admin(path, self.admin_token).json()
+        self.assertCountEqual([role["name"] for role in mappings], ["manage-account", "view-groups"])
+
     def test_g78_policies_are_loaded(self):
         r = self.realm
         self.assertTrue(r["loginWithEmailAllowed"])

@@ -1,7 +1,7 @@
-"""Servis belirtecini doğrulayan işlevi kurar.
+"""Build the service token verifier.
 
-Doğrulamayı ortak `oidc_verify` kitaplığı yapar (`docs/sozlesmeler.md`, 3. bölüm).
-Servis kendi doğrulama kodunu yazmaz. Kitaplık yoksa bütün istekler reddedilir.
+The shared `oidc_verify` library verifies tokens (`docs/sozlesmeler.md`, section 3).
+The service has no separate verification implementation. Without the library, every request is rejected.
 
 There are five client lists (O-38):
 
@@ -31,7 +31,7 @@ JWKS_TTL_SECONDS = 600
 
 
 class TokenRejected(Exception):
-    """Belirteç geçersiz ya da doğrulanamadı."""
+    """The token is invalid or could not be verified."""
 
 
 def reject_all(_token: str) -> Mapping[str, object]:
@@ -39,7 +39,7 @@ def reject_all(_token: str) -> Mapping[str, object]:
 
 
 def build_verifier(settings: Settings) -> Verifier:
-    """`oidc_verify` ile çalışan doğrulayıcıyı döner. Kitaplık yoksa `reject_all` döner."""
+    """Return the `oidc_verify` verifier, or `reject_all` if the library is unavailable."""
     try:
         import oidc_verify
     except ImportError:

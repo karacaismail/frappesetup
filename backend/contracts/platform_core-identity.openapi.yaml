@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: platform_core identity endpoints
-  version: 0.5.0
+  version: 0.5.1
   summary: Endpoints for Keycloak sign-in, callback, sign-out and user sync.
   description: |
     This contract describes the identity endpoints of the `platform_core` app.
@@ -99,6 +99,21 @@ x-site-settings:
     The `iss` value is `<keycloak_public_url>/realms/<keycloak_realm>`.
     The key list address is `<keycloak_internal_url or keycloak_public_url>/realms/<keycloak_realm>/protocol/openid-connect/certs`.
   settings:
+    - key: mcp_oauth_enabled
+      example: false
+      required: false
+      note: External MCP OAuth is disabled by default. The remaining MCP settings are required to enable it.
+    - key: mcp_oauth_resource
+      example: https://tenant.example.test/api/method/platform_core.api.ai.mcp
+      required: false
+      note: Exact HTTPS MCP URL. The single audience and the signed mcp_resource claim must equal this URL.
+    - key: mcp_oauth_client_ids
+      example: [mcp-external]
+      required: false
+      note: IDs of public Keycloak clients registered for authorization code and S256 PKCE.
+    - key: mcp_oauth_introspection_secret
+      required: false
+      note: Keep the confidential Keycloak resource client's secret in site configuration only. Its client ID is the full resource URL.
     - key: keycloak_public_url
       example: http://identity.localhost:8660
       required: true
@@ -295,7 +310,7 @@ paths:
       description: |
         The “Sign in with {0}” button on the sign-in page goes to this endpoint. The user has not signed in yet.
         This endpoint is a browser flow. The response is a redirect or an HTML page.
-        Error responses are not JSON. So there is no `exc_type`. The page shows a title and a short explanation.
+        Sign-in error pages show a title and a short explanation. Rate-limit responses can also be JSON.
 
         The endpoint does the same work as `get_login_url`. The server generates `state`, a PKCE verifier and `nonce`.
         The server writes the browser value to the `kimlik_login` cookie. The cookie rules are the same as on the `get_login_url` endpoint.
@@ -356,13 +371,11 @@ paths:
             text/html:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}
         "429":
-          description: The rate limit was exceeded. The limit is counted per IP address. The response is an HTML page.
-          content:
-            text/html:
-              schema: {$ref: "#/components/schemas/HtmlSayfa"}
+          $ref: "#/components/responses/TarayiciIstekSiniri"
         "503":
           description: |
             Keycloak sign-in is not set up on this site. One of the required site settings is missing.
+            Use a site configured for Keycloak when checking the successful browser flow.
             The page title is “Sign-in failed”. The page body says sign-in is not set up on this site. The page does not show the name of the missing key.
           content:
             text/html:
@@ -376,7 +389,7 @@ paths:
       description: |
         Keycloak sends the browser back to this endpoint. The user has signed in at Keycloak.
         This endpoint is a browser flow. The response is an HTML page or a redirect.
-        Error responses are not JSON. So there is no `exc_type`. The page shows a title and a short explanation.
+        Sign-in error pages show a title and a short explanation. Rate-limit responses can also be JSON.
 
         The server works in this order.
 
@@ -486,10 +499,7 @@ paths:
             text/html:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}
         "429":
-          description: The rate limit was exceeded. The limit is counted per IP address. The response is an HTML page.
-          content:
-            text/html:
-              schema: {$ref: "#/components/schemas/HtmlSayfa"}
+          $ref: "#/components/responses/TarayiciIstekSiniri"
         "503":
           description: |
             The code exchange failed or the key list could not be fetched. The page title is “Sign-in failed”. The page body says the identity provider could not be reached.
@@ -789,6 +799,10 @@ paths:
 
         The endpoint then compares the `issuer` value with the `iss` value of the site. If they differ, it returns 400.
 
+        The server makes up to three attempts to acquire the identity locks. It retries database deadlocks
+        and stale snapshots (`QueryDeadlockError`). A lock wait timeout fails immediately.
+        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
+
         If the `(issuer, subject)` link exists, the user is found. The endpoint updates the first name, last name, `enabled` and
         `role_profiles` fields. If `email` differs from the user name, it returns 409.
         An e-mail change is made only through the `change_email` endpoint.
@@ -901,6 +915,8 @@ paths:
           $ref: "#/components/responses/KimlikSilindi"
         "417":
           $ref: "#/components/responses/GovdeBozuk"
+        "500":
+          $ref: "#/components/responses/IdentityLockRetryExhausted"
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
@@ -911,6 +927,10 @@ paths:
       summary: Enables or disables the linked user.
       description: |
         The sync service calls this endpoint. The service token must carry `azp=identity-sync`.
+
+        The server makes up to three attempts to acquire the identity locks. It retries database deadlocks
+        and stale snapshots (`QueryDeadlockError`). A lock wait timeout fails immediately.
+        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
 
         **This endpoint can disable the user.** When `enabled` comes as false, the user is disabled.
         A disabled user cannot sign in. When the same endpoint is called with `enabled` true, the user is enabled again.
@@ -961,6 +981,8 @@ paths:
           $ref: "#/components/responses/KimlikSilindi"
         "417":
           $ref: "#/components/responses/GovdeBozuk"
+        "500":
+          $ref: "#/components/responses/IdentityLockRetryExhausted"
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
@@ -971,6 +993,10 @@ paths:
       summary: Changes the e-mail of the linked user.
       description: |
         The sync service calls this endpoint. The service token must carry `azp=identity-sync`.
+
+        The server makes up to three attempts to acquire the identity locks. It retries database deadlocks
+        and stale snapshots (`QueryDeadlockError`). A lock wait timeout fails immediately.
+        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
 
         **This endpoint changes the user name.** In Frappe the user name is the e-mail.
         The endpoint renames the record with `rename_doc`. All records linked to the user move to the new name.
@@ -1035,6 +1061,8 @@ paths:
           $ref: "#/components/responses/KimlikSilindi"
         "417":
           $ref: "#/components/responses/GovdeBozuk"
+        "500":
+          $ref: "#/components/responses/IdentityLockRetryExhausted"
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
@@ -1048,11 +1076,14 @@ paths:
         The service token must carry `azp=identity-sync`.
 
         **This endpoint cannot be undone.** The rules are in docs/sozlesmeler.md section 7, anonymization rules.
-        The same rules apply in Press (`press_tr.api.identity.anonymize_user`).
+        The general account deletion rules also apply in Press (`press_tr.api.identity.anonymize_user`).
 
         The work has two steps. Both steps are safe to repeat.
+        The server makes up to three attempts per step. It retries database deadlocks and stale snapshots
+        (`QueryDeadlockError`). A lock wait timeout fails immediately.
+        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
 
-        1. Step 1 locks the identity link and the deletion record. It disables the user.
+        1. Step 1 locks the existing User first, then the identity link and the deletion record. It disables the user.
            It deletes the API key, the API secret and the stored password.
            It writes the deletion record with state “Disabled” and commits.
            Then it closes every session of the user, page by page. Frappe returns at most 100 sessions per query.
@@ -1063,7 +1094,7 @@ paths:
 
         The deletion record is the “Platform Identity Deletion” DocType. It does not keep the raw identity.
         It keeps the HMAC-SHA256 digest of the `(issuer, subject)` pair. The key is the `kimlik_deletion_hmac_key` site setting.
-        `provision`, `set_enabled` and `change_email` check this record first and take the same row locks.
+        `provision`, `set_enabled` and `change_email` check this record before changing data and take the same row locks.
         A deleted identity gets 410 `IdentityDeleted` there. It cannot be provisioned, enabled or renamed again.
         This holds already after step 1. Sign-in with a deleted identity gets 403.
 
@@ -1134,9 +1165,17 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
         "417":
-          $ref: "#/components/responses/GovdeBozuk"
+          description: |
+            Frappe returns `DataError` when it cannot parse the request body as JSON.
+            The anonymization step returns `ValidationError` for a required field in `clear_fields`
+            or malformed field changes in a Version record. Correct the site data or configuration before retrying.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
         "410":
           $ref: "#/components/responses/KimlikSilindi"
+        "500":
+          $ref: "#/components/responses/IdentityLockRetryExhausted"
         "503":
           description: |
             Either the identity provider keys are not available (`KeycloakKeysUnavailable`),
@@ -1167,6 +1206,8 @@ paths:
       x-frappe-original: [frappe.core.doctype.user.user.reset_password]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1200,6 +1241,8 @@ paths:
       x-frappe-original: [frappe.core.doctype.user.user.update_password]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1233,6 +1276,8 @@ paths:
       x-frappe-original: [frappe.core.doctype.user.user.sign_up]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1266,6 +1311,8 @@ paths:
       x-frappe-original: [frappe.www.login.send_login_link]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1299,6 +1346,8 @@ paths:
       x-frappe-original: [frappe.www.login.login_via_key]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1332,6 +1381,8 @@ paths:
       x-frappe-original: [frappe.www.login.login_via_token]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1364,6 +1415,8 @@ paths:
       x-frappe-original: [frappe.www.login.login_via_token]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1397,6 +1450,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_google]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1429,6 +1484,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_google]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1462,6 +1519,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_github]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1494,6 +1553,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_github]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1527,6 +1588,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_facebook]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1559,6 +1622,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_facebook]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1592,6 +1657,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_frappe]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1624,6 +1691,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_frappe]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1657,6 +1726,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_office365]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1689,6 +1760,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_office365]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1722,6 +1795,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_salesforce]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1754,6 +1829,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_salesforce]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1787,6 +1864,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_fairlogin]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1819,6 +1898,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_fairlogin]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1852,6 +1933,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_keycloak]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1884,6 +1967,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.login_via_keycloak]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1917,6 +2002,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.custom]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1949,6 +2036,8 @@ paths:
       x-frappe-original: [frappe.integrations.oauth2_logins.custom]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -1982,6 +2071,8 @@ paths:
       x-frappe-original: [frappe.integrations.doctype.ldap_settings.ldap_settings.login]
       security: []
       responses:
+        "400":
+          $ref: "#/components/responses/EksikYerelGirisBilgisi"
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         "413":
@@ -2044,6 +2135,22 @@ components:
               value:
                 exc_type: PermissionError
                 exception: "frappe.exceptions.PermissionError: Local sign-in is disabled. Sign in with the identity provider."
+    EksikYerelGirisBilgisi:
+      description: The local sign-in gate is off, but the request does not supply the required arguments.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/FrappeError"}
+        text/html:
+          schema: {$ref: "#/components/schemas/HtmlSayfa"}
+    TarayiciIstekSiniri:
+      description: |
+        The per-IP rate limit was exceeded. API paths return JSON by default or HTML when requested.
+        Legacy `cmd` dispatch returns JSON.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/FrappeError"}
+        text/html:
+          schema: {$ref: "#/components/schemas/HtmlSayfa"}
     IstekSiniri:
       description: |
         The rate limit was exceeded. The limit is counted per IP address.
@@ -2054,7 +2161,7 @@ components:
     KimlikSilindi:
       description: |
         The identity `(issuer, subject)` was deleted. The `exc_type` value is `IdentityDeleted`.
-        The deletion record is checked first, under the same row locks as the deletion (docs/sozlesmeler.md section 7, rule 3).
+        The deletion record is checked before changes, under the same row locks as the deletion (docs/sozlesmeler.md section 7, rule 3).
         If the `kimlik_deletion_hmac_key` setting is missing, the endpoint returns 503 `DeletionKeyMissing` instead.
       content:
         application/json:
@@ -2150,6 +2257,11 @@ components:
                 exc_type: IdentityNotFound
                 exception: "platform_core.identity.exceptions.IdentityNotFound: subject"
                 _server_messages: '["{\"message\": \"No user is linked to this identity.\"}"]'
+    IdentityLockRetryExhausted:
+      description: A lock conflict remained after three attempts. The `exc_type` value is `IdentityInternalError`.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/FrappeError"}
 
   schemas:
     Issuer:
@@ -2391,9 +2503,9 @@ components:
         The custom values in this file are these: `InvalidRedirect`, `KeycloakLoginNotConfigured`,
         `InvalidLogoutToken`, `ServiceTokenRejected`, `UnknownIssuer`, `EmailMismatch`,
         `EmailNotVerified`, `IdentityConflict`, `DeskRoleNotAllowed`, `IdentityNotFound`,
-        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput` and `KeycloakKeysUnavailable`.
+        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput`, `KeycloakKeysUnavailable` and `IdentityInternalError`.
         The general Frappe values can be `PermissionError`, `AuthenticationError`, `CSRFTokenError`,
-        `DataError` and `RateLimitExceededError`.
+        `DataError`, `RateLimitExceededError` and `ValidationError`.
         The `start_login` and `keycloak_callback` endpoints do not return this body. These two endpoints return an HTML page.
       required: [exc_type]
       properties:

@@ -121,7 +121,7 @@ Proje sahibi her şeyin yapay zekâyla yönetilebilir olmasını istedi (D-9). A
 
 kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler öteki projelere dokunmaz.
 
-1. **Klasör bağlama çalışmaz.** `colima-factory` profili yalnız `/Users/w6x/Developer/software-factory` klasörünü görür. Depo klasörünü bağlarsanız container'da boş klasör görünür. Kodu imaja `COPY` ile koyun ya da `docker cp` ile kopyalayın. Örnek: `backend/identity/keycloak/Dockerfile`.
+1. **Klasör bağlama çalışmaz.** Bu not proje sahibinin Mac'indeki yerel `factory` profilini anlatır. Bu profil yalnız bir klasörü görür. O klasör depo klasörü değildir. Depo klasörünü bağlarsanız container'da boş klasör görünür. Kendi bilgisayarınızda bağlı klasörleri profil ayarı gösterir. Ayar `~/.colima/<profil>/colima.yaml` dosyasının `mounts` bölümündedir. Kodu imaja `COPY` ile koyun ya da `docker cp` ile kopyalayın. Örnek: `backend/identity/keycloak/Dockerfile`.
 2. **Yeni portlar bilgisayara açılmaz.** Profilin port yönlendirmesi bozuk. Portu bilgisayara ayrı bir ssh tüneliyle taşıyın. Örnek: `backend/identity/keycloak/bin/kc-dev.sh tunel`.
 3. **`docker pull` hata verebilir.** Docker ayarındaki şifre yardımcısı eksik. İmajı boş bir `DOCKER_CONFIG` klasörüyle çekin. Kullanıcının Docker ayarını değiştirmeyin.
 4. **Disk dar.** `colima-factory` profilinin Docker diski 22 Kasım 2026 Pazar günü %99 doldu. Kullanılmayan derleme önbelleği silindi. Boş yer yaklaşık 8 GB'tır.
@@ -136,7 +136,7 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
    - `colima-factory` profilinde yeniden imaj derleyebilir ve site açabilirsiniz. Önce boş yeri ölçün. Boş yer 10 GB'ın altına inerse yeni ortamı `colima` profilinde açın.
    - Port başına ayrı imaj etiketi biriktirmeyin. Örneğin `fs-kiraci-dev:3820` gibi etiketler birikiyordu. İşiniz bitince kendi etiketinizi silin.
    - `colima` (default) profilinde 57 GB boş disk ve yaklaşık 5 GB boş bellek var. `frappe/erpnext:v16.55.0` imajı orada da var.
-   - Profili `FS_COLIMA_PROFILE=default` değişkeni seçer. `dev/bin/compose` ve `dev/bin/tunel` bu değişkeni okur. Kendi betiğinizde `docker --context colima` kullanın.
+   - Profili `FS_COLIMA_PROFILE=default` değişkeni seçer. `dev/bin/compose` ve `dev/bin/tunnel` bu değişkeni okur. Kendi betiğinizde `docker --context colima` kullanın.
    - `colima` profilinde başlatmadan önce `colima ssh -- free -g` ile en az 2 GB boş bellek ölçün. Bellek yoksa bekleyin ve başka bölümü yapın.
    - Bir deneme bitince kendi geçici sitesini ve birimlerini silin. Bir işin en çok bir sitesi açık kalır.
    - Her `up` imajı yeniden derlemesin. İmaj varsa yeniden kullanın.

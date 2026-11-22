@@ -69,6 +69,51 @@ cd tests && python3 -I -m unittest discover -s . -p 'test_realm_files.py'
 
 Testlerin lint denetimi `uvx ruff check tests` komutudur. Ayar `ruff.toml` dosyasındadır.
 
+### Dış MCP istemcisi
+
+MCP, yapay zekâ istemcisinin araç çağırdığı yöntemdir.
+Realm şablonu MCP istemcilerini kapalı tutar. Kabul testleri bitene kadar kapalı bırakın.
+Keycloak 26.8.2, kaynak adresini denetlemek için `resource-indicators` özelliğini ister. [Keycloak kılavuzu](https://www.keycloak.org/securing-apps/mcp-authz-server)
+İstemci, kiracı çalışanı için 1 saat boşta kalma sınırı uygular.
+Çalışan oturumu en çok 24 saat sürer.
+Keycloak ilk izin sırasında dış istemcinin adını ve kapsamı gösterir.
+Kullanıcı onay verirse Keycloak erişim kodunu üretir.
+Dönüş adresini `ATONOTA_MCP_REDIRECT_URI` değerinde tam olarak belirtin.
+Keycloak, istekteki adresi kayıtlı adresle birebir karşılaştırır.
+Keycloak, adresi kayıtta ve izin isteğinde denetler.
+Keycloak, yıldız, kullanıcı bilgisi veya `#` parçası içeren adresleri reddeder.
+Keycloak, geliştirme dışında HTTPS ister.
+Geliştirmede yalnız sabit portlu yerel adres HTTP kullanabilir.
+
+`ATONOTA_MCP_RESOURCE_URL` sitenin tam MCP adresidir.
+İstemci, izin, kod değiştirme ve belirteç yenileme isteklerinde bu adresi gönderir.
+Keycloak, erişim belirtecinin hedefini bu adrese bağlar.
+Keycloak, belirteç isteğinde adres eksik veya farklıysa isteği reddeder.
+Platform, oturumun açık olduğunu Keycloak'a sorar.
+Bu sorguda istemci adı olarak tam MCP adresini kullanır.
+Sorgu, `ATONOTA_MCP_INTROSPECTION_SECRET` değerini parola olarak kullanır.
+Geliştirme betiği eksik MCP ayarlarını ekler ve rastgele parola üretir.
+Realm'i doğrudan içe aktarırsanız üç `ATONOTA_MCP_*` değerini önceden verin.
+
+Yeni MCP istemcisini kaydederken `mcp.external-client` değerini `true` yapın.
+`mcp.expected-resource` değerine sitenin tam MCP adresini yazın.
+İstemciye `mcp` kapsamını ekleyin. Bu kapsam MCP araçlarına erişim isteğini bildirir.
+
+Canlı realm testleri için ayrı bir yerel Keycloak kullanın.
+Şablondaki üç MCP istemcisini yükleyin.
+`acr`, `basic` ve `mcp` kapsamlarını da yükleyin.
+Çalışan doğrulama düzeyini uygulayan giriş akışını yükleyin.
+Şablondaki istemci kurallarını ve eklentiyi de yükleyin.
+MCP istemcilerini yalnız bu test ortamında açın. Örnek bir kullanıcı oluşturun.
+Örnek kullanıcıya ad, soyad ve e-posta adresi verin.
+Sunucu adresini `KC_PUBLIC_URL`, portu `KC_PORT` ile verin.
+Örnek kullanıcı bilgilerini `KC_MCP_TEST_USER` ve `KC_MCP_TEST_PASSWORD` ile verin.
+Yerel yönetici bilgilerini `KC_BOOTSTRAP_ADMIN_USERNAME` ve `KC_BOOTSTRAP_ADMIN_PASSWORD` ile verin.
+
+```bash
+KC_MCP_TEST=1 python3 -m unittest discover -s tests -p 'test_mcp_*.py'
+```
+
 ## Realm'i yeniden içe almak
 
 Keycloak var olan realm'i yeniden içe almaz. Realm dosyası değişince şu komut realm'i siler ve Keycloak'ı yeniden başlatır:
@@ -98,6 +143,9 @@ Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzd
 Üç eklenti imaja eklenir. Seçim gerekçesi `backend/docs/decisions/0003-keycloak-extensions.md` notundadır.
 
 - Olay dinleyiciyi `keycloak-webhook-listener` çatalı sağlar. Kaynak `event-listener/` klasöründedir. İmaj derlemesinde JUnit testleriyle derlenir. Olayları identity-sync servisine imzalı gönderir. Adres HTTPS olmalıdır. Düz HTTP yalnız `conf/webhook-plain-http-hosts.txt` listesindeki adrese izinlidir. Bu liste yalnız geliştirme imajına girer.
+- Hesap ekranı `account-deletion-link-provider` eklentisini kullanır. Keycloak imajı eklentiyi `themes/atonota/account-provider/build.sh` ile derler. Geliştirme örnekleri, yeni kullanıcılarla aynı varsayılan rolü alır.
+- İlk kurulumda Keycloak, yerleşik `account-console` istemcisine `roles` kapsamını ekler. Kapsam, hesap rollerini belirtece yazar.
+- Önceden kurulmuş `platform` alanında `account-console` istemcisini açın. “Client scopes” sekmesinde `roles` kapsamını “Default” olarak ekleyin. “Full scope allowed” ayarı kapalı kalsın.
 
 - Sihirli bağlantıyı `cloudflightio/keycloak-magic-link` eklentisi sağlar. Jar adı `keycloak-magic-link` olur. Eklenti imaj derlemesinde sabit bir commit'ten derlenir. Bağlantı akışın adımıdır. Tıklamadan sonra ikinci adım sorulur. Bağlantı yalnız isteyen tarayıcıda, 300 saniye ve tek kullanım geçerlidir. REST ucu ve çapraz cihaz yolu `conf/keycloak.conf` ayarıyla kapalıdır.
 - Apple ile girişi `klausbetz/apple-identity-provider-keycloak` 1.17.0 eklentisi sağlar. Jar adı `apple-identity-provider` olur. Sağlayıcı realm'de kapalıdır. Gerçek anahtar gelince `.env` dosyasındaki `ATONOTA_APPLE_*` değerleri doldurulur. Sonra sağlayıcı açılır.

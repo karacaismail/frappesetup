@@ -4,6 +4,7 @@ The scope comes from the `user_data_fields` hooks of every installed app, plus t
 the contract. Only rows bound to the user change:
 
 - an entry with `redact_fields` changes those fields in rows where `filter_by` (default `owner`) is the user,
+- `clear_fields` empties optional scalar fields selected by `redact_fields`,
 - an entry without `redact_fields` replaces the user's e-mail and full name in the text fields of rows
   where `filter_by` is the user. Frappe's “strict” mode would scan every row of the table for the full
   name (personal_data_deletion_request.py:317), which can change another person with the same name.
@@ -19,8 +20,10 @@ import re
 from collections.abc import Iterator
 from email.utils import getaddresses, parseaddr
 from itertools import batched, chain
+from urllib.parse import quote
 
 import frappe
+from frappe import _
 
 REDACTED = "[REDACTED]"
 # P-3: growing lists are read page by page with a stable order.
@@ -31,6 +34,7 @@ TEXT_TYPES = frozenset(
 	("Data", "Small Text", "Text", "Long Text", "Text Editor", "Code", "HTML Editor", "Markdown Editor")
 )
 EMPTY_TYPES = frozenset(("Date", "Datetime", "Time", "Attach", "Attach Image", "Phone", "Int", "Float"))
+ATTACH_TYPES = frozenset(("Attach", "Attach Image"))
 
 
 def _rows(
@@ -40,6 +44,7 @@ def _rows(
 	fields: list[str] | None = None,
 	pluck: str | None = None,
 	or_filters: dict | None = None,
+	for_update: bool = False,
 ) -> Iterator:
 	"""Reads bounded pages by name so updates to matching rows cannot shift later pages.
 
@@ -50,14 +55,17 @@ def _rows(
 	projection = list(dict.fromkeys(["name", *(fields or []), *([pluck] if pluck else [])]))
 	fixed_name = "name" in filters
 	while True:
-		page = frappe.get_all(
-			doctype,
-			filters=filters,
-			or_filters=or_filters,
-			fields=projection,
-			order_by="name asc",
-			limit=PAGE_SIZE,
-		)
+		query = {
+			"filters": filters,
+			"or_filters": or_filters,
+			"fields": projection,
+			"order_by": "name asc",
+			"limit": PAGE_SIZE,
+		}
+		if for_update:
+			page = frappe.qb.get_query(doctype, **query, for_update=True).run(as_dict=True)
+		else:
+			page = frappe.get_all(doctype, **query)
 		for row in page:
 			yield row[pluck] if pluck else row
 		if fixed_name or len(page) < PAGE_SIZE:
@@ -195,20 +203,128 @@ def _value_for(df, anon: str):
 def _redact_fields(ref: dict, user: str, anon: str, owned: frappe._dict) -> None:
 	doctype = ref["doctype"]
 	meta = frappe.get_meta(doctype)
+	clear_fields = set(ref.get("clear_fields") or ())
+	for field in sorted(clear_fields):
+		definition = meta.get_field(field)
+		if definition and definition.reqd:
+			frappe.throw(
+				_("Remove required field {0} from clear_fields.", context="platform_core.identity").format(
+					f"{doctype}.{field}"
+				)
+			)
 	fields = [f for f in ref["redact_fields"] if meta.get_field(f)]
 	if not fields:
 		return
-	values = {f: _value_for(meta.get_field(f), anon) for f in fields}
+	values = {f: None if f in clear_fields else _value_for(meta.get_field(f), anon) for f in fields}
+	attachment_fields = [
+		f for f in fields if values[f] is None and meta.get_field(f).fieldtype in ATTACH_TYPES
+	]
+	redacted_fields = set(fields)
 	filter_by = ref.get("filter_by", "owner")
 	rows = [
 		row for row in _bound_rows(doctype, filter_by, user, []) if not _shared(owned, doctype, row["name"])
 	]
 	for index, row in enumerate(rows):
-		frappe.db.set_value(doctype, row["name"], values, update_modified=False)
-		if ref.get("rename") and doctype != "User" and row["name"] != anon:
+		name = row["name"]
+		# Recheck the binding on a current read before clearing a row found in an earlier snapshot.
+		if not frappe.db.get_value(doctype, {filter_by: user, "name": name}, "name", for_update=True):
+			continue
+		frappe.db.set_value(doctype, name, values, update_modified=False)
+		_redact_version_fields(doctype, name, redacted_fields)
+		if attachment_fields:
+			for file_name in _rows(
+				"File",
+				filters={
+					"attached_to_doctype": doctype,
+					"attached_to_name": name,
+					"attached_to_field": ("in", attachment_fields),
+				},
+				pluck="name",
+				for_update=True,
+			):
+				_delete_personal_file(file_name)
+		if ref.get("rename") and doctype != "User" and name != anon:
 			new_name = anon if index == 0 else f"{anon}-{index}"
 			if not frappe.db.exists(doctype, new_name):
-				frappe.rename_doc(doctype, row["name"], new_name, force=True, show_alert=False)
+				frappe.rename_doc(doctype, name, new_name, force=True, show_alert=False)
+
+
+def _redact_version_fields(doctype: str, name: str, fields: set[str]) -> None:
+	"""Remove selected top-level fields from Frappe's Version.changed entries, regardless of author."""
+	for row in _rows(
+		"Version", filters={"ref_doctype": doctype, "docname": name}, fields=["data"], for_update=True
+	):
+		if not row.data:
+			continue
+		try:
+			data = json.loads(row.data)
+		except ValueError:
+			data = None
+		changes = data.get("changed", []) if isinstance(data, dict) else None
+		if not isinstance(changes, list) or any(
+			not isinstance(change, list) or len(change) != 3 or not isinstance(change[0], str)
+			for change in changes
+		):
+			frappe.throw(
+				_(
+					"Repair Version record {0} before account deletion.", context="platform_core.identity"
+				).format(row.name)
+			)
+		kept = [change for change in changes if change[0] not in fields]
+		if kept != changes:
+			data["changed"] = kept
+			frappe.db.set_value("Version", row.name, "data", json.dumps(data), update_modified=False)
+
+
+def _delete_personal_file(name: str) -> None:
+	fields = [
+		"attached_to_doctype",
+		"attached_to_name",
+		"attached_to_field",
+		"file_url",
+		"file_name",
+		"content_hash",
+		"thumbnail_url",
+		"modified",
+	]
+	file = frappe.db.get_value("File", name, fields, as_dict=True, for_update=True)
+	if not file:
+		return
+	# delete_doc reads through the transaction snapshot. Retry if it would see an older attachment.
+	if file != frappe.db.get_value("File", name, fields, as_dict=True):
+		raise frappe.QueryDeadlockError("File changed before account deletion")
+	if file.thumbnail_url:
+		shared_thumbnail = {"thumbnail_url": file.thumbnail_url, "name": ("!=", name)}
+		# Lock indexed, same-URL copies. Check older references with a different main URL without table locks.
+		same_url = frappe.db.get_value(
+			"File", {**shared_thumbnail, "file_url": file.file_url}, "name", for_update=True
+		)
+		if same_url or frappe.db.exists("File", shared_thumbnail):
+			# Frappe can delete just the thumbnail of a shared file.
+			frappe.db.set_value("File", name, "thumbnail_url", None, update_modified=False)
+	frappe.delete_doc("File", name, force=True, delete_permanently=True)
+	reference = {"reference_doctype": file.attached_to_doctype, "reference_name": file.attached_to_name}
+	# Frappe File.on_trash schedules disk cleanup and writes the filename into the timeline.
+	frappe.db.delete(
+		"Comment", {**reference, "comment_type": "Attachment Removed", "content": file.file_name}
+	)
+	if not file.file_url or frappe.db.get_value(
+		"File",
+		{
+			"attached_to_doctype": file.attached_to_doctype,
+			"attached_to_name": file.attached_to_name,
+			"file_url": file.file_url,
+		},
+		"name",
+		for_update=True,
+	):
+		return
+	# File.create_attachment_record quotes the URL. Comment sanitization can change the HTML quotes.
+	url = quote(file.file_url, safe="/:")
+	links = (f'href="{url}"', f"href='{url}'")
+	for comment in _rows("Comment", filters={**reference, "comment_type": "Attachment"}, fields=["content"]):
+		if comment.content and any(link in comment.content for link in links):
+			frappe.db.delete("Comment", {"name": comment.name})
 
 
 def _text_fields(doctype: str) -> list[str]:
@@ -356,7 +472,7 @@ def _extra_records(user: str, anon: str, full_name: str, owned: frappe._dict) ->
 			frappe.db.set_value("Version", row["name"], "data", scrubbed, update_modified=False)
 
 	# Personal files (merge review E3): files bound to the User record or to the person's own records
-	# (Contact). A file on a business record is a business record and stays, whoever uploaded it.
+	# (Contact). Business attachments stay unless a selected attachment field binds them.
 	files = set(
 		_rows("File", filters={"attached_to_doctype": "User", "attached_to_name": user}, pluck="name")
 	)
@@ -369,18 +485,7 @@ def _extra_records(user: str, anon: str, full_name: str, owned: frappe._dict) ->
 			)
 		)
 	for name in files:
-		file = frappe.get_doc("File", name)
-		frappe.delete_doc("File", name, force=True, delete_permanently=True)
-		# File.on_trash schedules disk cleanup and writes the filename into a timeline comment.
-		frappe.db.delete(
-			"Comment",
-			{
-				"reference_doctype": file.attached_to_doctype,
-				"reference_name": file.attached_to_name,
-				"comment_type": "Attachment Removed",
-				"content": file.file_name,
-			},
-		)
+		_delete_personal_file(name)
 	frappe.db.set_value("User", user, {"user_image": None, "banner_image": None}, update_modified=False)
 
 	# Communication and the e-mail queue.

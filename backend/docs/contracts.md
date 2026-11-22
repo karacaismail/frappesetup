@@ -38,14 +38,17 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 
 | İstemci | Tür | Akış | Dönüş adresi | Çıkış bildirimi |
 | --- | --- | --- | --- | --- |
-| `site-kiraci1` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<kiracı adresi>/api/method/platform_core.api.auth.keycloak_callback` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
+| `site-tenant1` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<kiracı adresi>/api/method/platform_core.api.auth.keycloak_callback` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
 | `press` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<Press adresi>/api/method/press_tr.api.auth.keycloak_callback` | `<Press adresi>/api/method/press_tr.api.keycloak_backchannel_logout` |
 | `site-tenant1-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `mobile-app` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | `ATONOTA_MOBILE_REDIRECT_URI` | Yok |
+| `account-console` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | Realm dosyasındaki Keycloak hesap sayfaları | Yok |
 
 - Dönüş adresini tam adresle kaydedin. Joker karakter kullanmayın.
+- Keycloak hesap ekranı kendi belirtecini kullanır. Bu belirtecin hedefi `account` olur.
+- `account-console` yalnız kullanıcıya verilmiş hesap rollerini taşır. İstemci yönetim rolü alamaz.
 - Çıkış bildiriminde “oturum gerekli” ayarını açın.
 - Yeni kiracı için aynı biçimi kullanın. Örneğin `site-kiraci2` yazın.
 - Her kiracının iki istemcisi vardır. `site-<kiracı>` yalnız tarayıcı girişi içindir. Servis hesabı kapalıdır ve isteğe bağlı servis kapsamı taşımaz. `site-<kiracı>-service` yalnız servis hesabıdır. Tarayıcı akışı kapalıdır. Kiracının iki istemcisi içinde `aud-identity-sync` kapsamını yalnız servis istemcisi isteyebilir. Böylece tarayıcı girişi servis hedefli belirteç alamaz. Press'teki `press` ve `press-service` ayrımı da böyledir.
@@ -57,7 +60,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 
 | Kapsam | Eklediği `aud` | Kullanan |
 | --- | --- | --- |
-| `aud-site-kiraci1` | `site-kiraci1` | `identity-sync`, `press-service` |
+| `aud-site-tenant1` | `site-tenant1` | `identity-sync`, `press-service`, `mobile-app` |
 | `aud-press` | `press` | `identity-sync` |
 | `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri ve `press-service`. Örnek: `site-tenant1-service` |
 
@@ -71,6 +74,13 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - Sihirli bağlantı eklentisinin bağlantı üreten yönetim ucu kapalıdır. Bu uç, belirteçteki rolü değil hesabın kayıtlı rolünü denetliyordu. Kapalı olduğu canlı testle (404) gösterilir.
 
 ### Politikalar
+
+Keycloak giriş sayfası çerçeve içinde açılamaz. Yanıt `frame-ancestors 'none'` ve
+`X-Frame-Options: DENY` taşır. Keycloak yalnız kendi üç oturum denetimi belgesini çerçevede açar.
+
+Keycloak giriş sayfası kendi satır içi betiklerini kullanır. Giriş formu, kullanıcıyı
+doğrulanmış istemci adresine yönlendirir. O-40'ın kiracıya özgü betik ve form kuralları
+Frappe giriş ve panel sayfalarında uygulanır.
 
 Realm politikaları G-78 ve G-144'ü uygular. Örneğin şu ayarlar vardır:
 
@@ -109,6 +119,9 @@ Keycloak çıkışta `logout_token` gönderir. Doğrulamada şunları denetleyin
 - `nonce` alanının yokluğu.
 
 ### Telefon kimliği
+
+Telefon uygulaması giriş isteğinde `scope=openid aud-site-tenant1 mobile` gönderir.
+Keycloak, erişim belirtecine `aud=site-tenant1` ve `scope` alanına `mobile` ekler.
 
 Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_identity` değerini yazar. Değer şu alanları taşıyan bir sözlüktür:
 
@@ -324,7 +337,7 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 
 ### Anonim yapma kuralları
 
-Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve Press'te (`press_tr.api.identity.anonymize_user`) aynıdır. Kararın kaynağı proje kaydındaki O-27'dir.
+Temel kurallar kiracı sitesi (`platform_core.api.identity.anonymize_user`) ve Press (`press_tr.api.identity.anonymize_user`) için geçerlidir. Kuralların kaynağı proje kaydındaki O-27'dir.
 
 1. Silme iki adımdır. Birinci adım hesabı kapatır, oturumları sayfalayarak kapatır, API anahtarlarını iptal eder ve silme durumunu kaydeder. İkinci adım kişisel veriyi anonim yapar. İki adım da tekrar güvenlidir.
 2. Silme kaydı ham kimliği tutmaz. Kayıt `(iss, sub)` çiftinin HMAC-SHA256 özetini tutar. Anahtar site ayarındaki gizli değerdir. Kimlik bağındaki ham `sub` silinir.
@@ -332,11 +345,18 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
 4. Kapsam Frappe'nin `user_data_fields` kancasından türer. Ek olarak şunlar temizlenir ya da anonim yapılır:
    - kullanıcıya bağlı “Contact” ve adres kayıtları,
    - “Activity Log” kayıtlarındaki ad ve IP adresi,
-   - “Version” kayıtlarındaki eski kişisel değerler,
-   - profil fotoğrafı ve kullanıcının yüklediği kişisel dosyalar,
+   - kiracıda “User” ve kişiye ait “Contact” geçmişi ile kullanıcının yazdığı “Version” kayıtlarındaki ad ve e-posta,
+   - profil fotoğrafı ve kişiye ait “User” veya “Contact” kayıtlarına bağlı dosyalar,
    - “Communication” ve e-posta kuyruğundaki adresler,
    - iki adımlı doğrulama anahtarları, varsayılan değer satırları, sosyal giriş ve ek e-posta satırları,
    - Press'te takımın fatura adı ve telefonu, SSH anahtarları ve sertifikaları.
+
+   Kiracı sitesi `user_data_fields` kancasını aşağıdaki kurallarla uygular.
+
+   - `clear_fields`, `redact_fields` içindeki tek değerli alanları boşaltır. Sistem, zorunlu olmayan alana `null` yazar. Listede zorunlu bir alan varsa sistem hata verir.
+   - Sistem, boşalttığı `Attach` ve `Attach Image` alanlarına bağlı “File” kayıtlarını siler. Başka bir dosya kaydı aynı içeriği kullanıyorsa içerik diskte kalır. Başka bir kayıt ortak küçük resmi kullanıyorsa sistem küçük resmi korur. Son bağlı kayıt silindiğinde dosya da diskten silinir. Sistem, aynı kayıtta aynı dosya adresi kullanılmıyorsa geçmişteki yükleme bağlantısını da siler.
+   - Sistem, ilgili kaydın “Version” geçmişinde seçili tek değerli alanların eski ve yeni değerlerini temizler. Sistem bu işlemi geçmişi kimin yazdığına bakmadan yapar. Alt tablo ve diğer alanların geçmişi kalır. Geçmiş verisi bozuksa sistem hata verir ve mevcut geçmişi korur.
+
 5. Frappe'nin tam adı bütün satırlarda arayan değiştirmesi kullanılmaz. Yalnız kullanıcıya bağlı alanlar değişir. Böylece aynı adı taşıyan başka bir kişinin verisi değişmez.
 6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
 7. Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
@@ -365,13 +385,19 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `keycloak_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
 | `keycloak_service_client_id` | `site-tenant1-service` ya da `press-service` | Servis belirteci için |
 | `keycloak_service_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
+| `mobile_allow_development_http` | Kapalı | Yalnız geliştirmede açılır. `developer_mode` da açık olmalıdır. Mobil iptal isteği yalnız yerel kimlik servisine HTTP ile gider. Keycloak belirteç adresi HTTPS kalır. |
 | `kimlik_marka_adi` | `Atonota` | Düğme metni bundan üretilir |
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 | `hrms_tr_retention_days` | Ayar verilmez | Hukuk sorumlusu süreyi gün olarak belirler. |
 
+### Kişisel veri silme yolları
+
+Aşağıdaki tablo, HRMS TR kayıtlarında kişisel verinin nasıl silindiğini gösterir.
+
 | Kişisel veri | Silme yolu |
 | --- | --- |
-| HRMS TR çalışan ve izin kayıtları | Hesap silme, çalışanın kişisel alanlarını anonim yapar. `hrms_tr.retention.purge` süresi dolan izin kayıtlarını O-39 kapsamında siler. |
+| HRMS TR çalışan kartı | `user_data_fields` kancası kartı `user_id` ile bulur. Adlar, e-posta, telefon, acil durum kişisi, yakınlık, adresler ve biyografi anonimleşir. Pasaport numarası ve düzenlenme yeri anonimleşir. Banka adı, hesap numarası, IBAN, sağlık notu, sigorta numarası ve aile bilgisi anonimleşir. Doğum tarihi, pasaport tarihleri, devam cihazı kimliği, kan grubu ve medeni durum alanları boşalır. Sistem fotoğraf alanını boşaltır ve bağlı dosya kaydını siler. Dosyanın diskten silinmesi ve yükleme bağlantısının temizlenmesi 7. bölümdeki kurallara uyar. Sistem, seçili kart alanlarının eski ve yeni değerlerini İK'nın yazdığı geçmişten de temizler. Eğitim ve önceki iş alt tabloları kalır (O-41). |
+| HRMS TR iş kayıtları | Hesap silme kayıtları korur. İzin, devam ve bordrodaki çalışan adı kopyaları değişmez (O-41). `hrms_tr.retention.purge` yalnız süresi dolan taslak ve iptal edilmiş izinleri siler (O-39). |
 
 ## 9. Geliştirme ortamı
 
@@ -472,7 +498,8 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 | Yol | Yöntem | Kimlik | İşi |
 | --- | --- | --- | --- |
-| `platform_core.api.ai.mcp` | POST | İnsan oturumu ya da aracı belirteci | MCP ucu: araç listesi ve araç çağrısı |
+| `platform_core.api.ai.mcp` | POST | İnsan oturumu, aracı belirteci veya açıkken OAuth | Araçları listeler ve çağırır. |
+| `platform_core.api.ai.mcp_resource_metadata` | GET | Herkese açık | OAuth açıkken Keycloak adresini ve kapsamı bildirir. |
 | `platform_core.api.ai.issue_agent_token` | POST | İnsan oturumu | 300 saniyelik, 20 çağrılık aracı belirteci üretir. |
 | `platform_core.api.ai.list_proposals` | GET | İnsan oturumu | Kullanıcının önerilerini listeler. |
 | `platform_core.api.ai.get_proposal` | GET | İnsan oturumu | Önerinin önizlemesini ve özetini döner. |
@@ -484,7 +511,27 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 - `list_proposals` yanıtı bir nesnedir: `proposals` ve `has_next_page`. İstek `start` alır. Süzme ve sayfalama veritabanında yapılır.
 - Öneri `created_at` ve `expires_at` taşır. Zaman sitenin saat dilimiyle ve farkıyla ISO 8601 biçiminde döner.
 - Okuma araçlarının sonucu `as_of`, `site` ve `source` taşır. Sonuç sınırı aşarsa `truncated: true` döner. Alt tablo en çok 200 satır, sonuç verisi en çok 262.144 bayttır.
-- Oturumsuz istek 403, süresi dolmuş oturum 401 alır.
+- OAuth kapalıyken kimliksiz MCP isteği 403 alır. Süresi dolmuş oturum 401 alır.
+- OAuth varsayılan olarak kapalıdır. Açıkken kimliksiz MCP isteği 401 alır.
+- Sunucu 401 yanıtında keşif adresini `WWW-Authenticate` başlığına yazar.
+- Keşif ucu yanıtı doğrudan JSON olarak döner.
+- Keşif ucu, bir IP adresinden dakikada en çok 60 istek kabul eder.
+- MCP ucu, kullanıcı başına dakikada en çok 120 istek kabul eder.
+- MCP ucu, misafirler için bu sınırı IP adresine uygular.
+- Sunucu, Keycloak sorgusundan önce IP adresi başına dakikada 120 istek sınırı uygular.
+- Kiracı ara sunucusu, `X-Forwarded-For` başlığını doğruladığı istemci adresiyle değiştirmelidir.
+- İstemci Keycloak'ta yetki kodu akışını ve PKCE S256 yöntemini kullanır.
+- Sunucu `mcp` kapsamını ve tek hedef olarak sitenin tam MCP adresini ister.
+- Sunucu her istekte imzalı `mcp_resource` alanını da tam MCP adresiyle karşılaştırır.
+- Keycloak dönüş adresini tam eşleşmeyle denetler. Joker, parça işareti ve kullanıcı bilgisi reddedilir.
+- Sunucu her çağrıda Keycloak oturumunun açık olduğunu denetler.
+- Oturum sorgusu 3 saniyeyi aşarsa sunucu 503 döner.
+- Belirteç en çok 300 saniye geçerlidir. Bir belirteç en çok 20 araç çağrısı yapabilir.
+- Sayaç veritabanında kalır. Önceki kullanımı gösteren kayıt Redis'te kalır.
+- Bu iki kayıt, tek kayıp durumunda belirtecin yeniden hak almasını önler.
+- İki kayıt deposu birlikte geri yüklenirse OAuth desteğini 300 saniye kapalı tutun.
+- İstemci belirteci yalnız `Authorization` başlığında gönderir.
+- OAuth ile yazma aracı öneri açar. İnsan ayrı oturumda onay verir.
 
 #### Kullanım günlüğü temizliğinin modül arayüzü
 

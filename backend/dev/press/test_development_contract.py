@@ -4,6 +4,7 @@ import json
 import os
 import re
 import runpy
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,53 @@ REPO = PRESS_DEV.parents[2]
 
 
 class ImageContractTest(unittest.TestCase):
+    def test_press_runner_uses_the_selected_compose_web_service(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bin_dir = Path(directory)
+            docker = bin_dir / "docker"
+            docker.write_text(
+                "#!/bin/sh\n"
+                'if [ "$3" = ps ]; then\n'
+                '    printf "%s\\n" "$*" >&2\n'
+                '    printf "%s\\n" web-container\n'
+                "else\n"
+                '    printf "%s\\n" "$*"\n'
+                "fi\n"
+            )
+            python = bin_dir / "python3.14"
+            python.write_text("#!/bin/sh\nexit 0\n")
+            for command in (docker, python):
+                command.chmod(0o755)
+            result = subprocess.run(
+                ["sh", "backend/apps/press_tr/tests/run.sh"],
+                cwd=REPO,
+                env={
+                    **os.environ,
+                    "PATH": directory + os.pathsep + os.environ.get("PATH", os.defpath),
+                    "FS_COLIMA_PROFILE": "factory",
+                    "PRESS_TEST_COMPOSE_PROJECT": "press-test-fixture",
+                    "PRESS_TEST_PANEL_URL": "https://panel.example.test/",
+                },
+                capture_output=True,
+                text=True,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stderr.splitlines()[0],
+            "--context colima-factory ps -q --filter label=com.docker.compose.project=press-test-fixture "
+            "--filter label=com.docker.compose.service=web --filter label=com.docker.compose.oneoff=False",
+        )
+        self.assertEqual(result.stdout.count("web-container"), 4)
+        self.assertNotIn("fs-press-tr-web-1", result.stdout)
+
+    def test_readme_python_matches_shared_press_image_tag(self):
+        decision = (REPO / "backend/docs/decisions/0009-naming-history-fix.md").read_text()
+        image = re.search(r"`fs-press-tr-base:py(?P<version>\d+\.\d+\.\d+)`", decision)
+        self.assertIsNotNone(image)
+        readme = (PRESS_DEV / "README.md").read_text()
+        versions = re.findall(r"(?m)^.*\bPython\b.* (\d+\.\d+\.\d+)\.$", readme)
+        self.assertEqual(versions, [image["version"]])
+
     def test_site_setup_refreshes_hooks_after_press_install(self):
         commands = (PRESS_DEV / "install.sh").read_text().splitlines()
         install = commands.index("bench --site press.localhost install-app press_tr")
@@ -150,9 +198,7 @@ class ImageContractTest(unittest.TestCase):
         utils.CallbackManager = Mock()
         with (
             patch.dict(sys.modules, {"frappe": frappe, "frappe.installer": installer, "frappe.utils": utils}),
-            patch.dict(
-                os.environ, {"PTR_DB_PASSWORD": "db-fixture", "PTR_ADMIN_PASSWORD": "admin-fixture"}
-            ),
+            patch.dict(os.environ, {"PTR_DB_PASSWORD": "db-fixture", "PTR_ADMIN_PASSWORD": "admin-fixture"}),
             patch("tempfile.NamedTemporaryFile"),
         ):
             runpy.run_path(str(PRESS_DEV / "create_site.py"), run_name="__main__")
@@ -187,9 +233,7 @@ class ImageContractTest(unittest.TestCase):
         installer._new_site = create_fixture
         with (
             patch.dict(sys.modules, {"frappe": frappe, "frappe.installer": installer, "frappe.utils": utils}),
-            patch.dict(
-                os.environ, {"PTR_DB_PASSWORD": "db-fixture", "PTR_ADMIN_PASSWORD": "admin-fixture"}
-            ),
+            patch.dict(os.environ, {"PTR_DB_PASSWORD": "db-fixture", "PTR_ADMIN_PASSWORD": "admin-fixture"}),
             patch("tempfile.NamedTemporaryFile", return_value=handle),
         ):
             runpy.run_path(str(PRESS_DEV / "create_site.py"), run_name="__main__")
@@ -289,3 +333,45 @@ class ComposeContractTest(unittest.TestCase):
         )
         dockerfile = (PRESS_DEV / "Dockerfile").read_text()
         self.assertRegex(dockerfile, re.compile(r"^FROM \S+@sha256:[0-9a-f]{64} AS \w+$", re.MULTILINE))
+
+
+@unittest.skipUnless(shutil.which("docker"), "Docker Compose is required")
+class UnpatchedComposeContractTest(unittest.TestCase):
+    def config(self, with_port=False):
+        docker_path = shutil.which("docker")
+        self.assertIsNotNone(docker_path)
+        process_env = {name: setting for name, setting in os.environ.items() if name != "PANE_PORT"}
+        if with_port:
+            process_env["PANE_PORT"] = "47320"
+        completed = subprocess.run(
+            [
+                docker_path,
+                "--context",
+                "colima-factory",
+                "compose",
+                "-f",
+                str(PRESS_DEV / "compose.unpatched.yaml"),
+                "config",
+                "--format",
+                "json",
+            ],
+            env=process_env,
+            capture_output=True,
+            text=True,
+            check=False,
+            shell=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        return json.loads(completed.stdout)
+
+    def test_probe_does_not_require_or_publish_a_port(self):
+        probe = self.config()["services"]["probe"]
+        self.assertNotIn("PANE_PORT", probe.get("environment", {}))
+        self.assertNotIn("ports", probe)
+        self.assertEqual(probe["network_mode"], "none")
+
+    def test_probe_never_pulls_a_missing_local_image(self):
+        self.assertEqual(self.config(with_port=True)["services"]["probe"].get("pull_policy"), "never")
+
+    def test_probe_project_uses_the_assigned_task_name(self):
+        self.assertEqual(self.config(with_port=True)["name"], "fs-pd-press-py314")

@@ -52,12 +52,30 @@ Ayarlar `site_config.json` dosyasında durur. Sır depoya girmez.
 | `keycloak_client_secret` | Evet | Tarayıcı istemcisinin sırrı |
 | `keycloak_service_client_id` | Servis çağrısında | Servis istemcisi. Örnek `site-tenant1-service`. |
 | `keycloak_service_client_secret` | Servis çağrısında | Servis istemcisinin sırrı |
+| `mcp_oauth_enabled` | İsteğe bağlı | Dış MCP erişimini açar. Bu erişim varsayılan olarak kapalıdır. |
+| `mcp_oauth_resource` | Dış MCP erişiminde | MCP ucunun tam HTTPS adresi. |
+| `mcp_oauth_client_ids` | Dış MCP erişiminde | İzin verilen açık Keycloak istemcilerinin kimlik listesi. |
+| `mcp_oauth_introspection_secret` | Dış MCP erişiminde | Keycloak belirtecini denetleyen istemcinin sırrı. Yalnız site ayarında saklanır. |
 | `identity_brand_name` | Evet | Düğme metni bundan üretilir, örneğin `Atonota` |
 | `platform_panel_url` | Evet | Girişten ve çıkıştan sonra dönülen adres |
 | `identity_keycloak_only` | Hayır | `1` ise Frappe'nin yerel giriş yolları kapanır |
 | `identity_service_azp` | Hayır | Servis belirtecinde izinli `azp` listesi. Varsayılan `["identity-sync"]` |
 | `kimlik_mobil_azp` | Hayır | Telefon belirtecinde izinli `azp` listesi. Varsayılan `["mobile"]` |
 | `kimlik_deletion_hmac_key` | Evet | Silme kaydındaki özetin gizli anahtarı. Yoksa kimlik değiştiren uçlar 503 döner. |
+| `mcp_oauth_enabled` | Hayır | Dış MCP erişimi başlangıçta kapalıdır. Açmak için `true` veya `1` yazın. |
+| `mcp_oauth_resource` | Dış MCP açıksa | MCP ucunun tam HTTPS adresi. Örnek `https://tenant.example.test/api/method/platform_core.api.ai.mcp`. |
+| `mcp_oauth_client_ids` | Dış MCP açıksa | İzinli Keycloak istemcilerinin kimlik listesi. Örnek `["mcp-external"]`. |
+| `mcp_oauth_introspection_secret` | Dış MCP açıksa | Sunucu bu sırla Keycloak'a belirtecin hâlâ geçerli olup olmadığını sorar. |
+
+MCP, dış araçların bu siteye bağlanmak için kullandığı bir protokoldür.
+Dış MCP erişimi açıkken Keycloak adresleri HTTPS kullanır.
+İzinli dış istemciler, yetki koduyla giriş yapar.
+İstemci kodu S256 PKCE yöntemiyle korur.
+Sunucu, belirteci denetlemek için ayrı bir Keycloak istemcisi kullanır.
+Bu istemcinin kimliği MCP ucunun tam adresidir.
+Belirteç tek bir hedef taşır.
+Hedef ve imzalı `mcp_resource` alanı MCP adresiyle eşleşir.
+Sunucu, istemci sırrını yalnız `site_config.json` dosyasından okur.
 
 ## Kurulum adımı
 

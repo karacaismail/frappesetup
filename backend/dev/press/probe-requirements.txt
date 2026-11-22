@@ -1,0 +1,12 @@
+# Diagnostic imports only, not a complete Press dependency lock or production profile.
+ansible==14.0.0
+ansible-core==2.21.5
+python-telegram-bot-raw==13.15
+urllib3==1.26.20
+stripe==3.1.0
+standard-imghdr==3.13.0
+standard-pipes==3.13.0
+standard-cgi==3.13.0
+standard-crypt==3.13.0
+dnspython==1.16.0
+wrapt==1.17.3

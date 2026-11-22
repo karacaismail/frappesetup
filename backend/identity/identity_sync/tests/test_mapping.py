@@ -1,7 +1,7 @@
-"""Olay ile eylem eşlemesinin testleri.
+"""Event-to-action mapping tests.
 
-Beklenen sonuçların kaynağı karar sitesinin `rail-4-keycloak.md` sayfasının 4. bölümüdür.
-Alan adlarının kaynağı `docs/sozlesmeler.md` dosyasının 5. ve 6. bölümüdür.
+Expected results come from section 4 of the decision site page `rail-4-keycloak.md`.
+Field names come from sections 5 and 6 of `docs/sozlesmeler.md`.
 """
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ def plan(ev: Event, snapshot: UserSnapshot | None, organization: Organization | 
     return plan_actions(ev, snapshot, issuer=ISSUER, tenants=TENANTS, organization=organization)
 
 
-# Alanlar `docs/sozlesmeler.md` dosyasının "Kuruluş ile takım eşlemesi" bölümünden gelir.
+# Fields come from the organization-to-team mapping section of `docs/sozlesmeler.md`.
 # `email_verified` is required by contracts/press_tr.openapi.yaml (ensure_team request).
 TEAM = PressEnsureTeam(
     issuer=ISSUER,
@@ -117,11 +117,11 @@ ACCOUNT_DELETION = (
 
 class RegistrationTest(unittest.TestCase):
     def test_register_with_unverified_email_does_nothing(self) -> None:
-        # İlk bağ yalnız doğrulanmış e-postayla kurulur (AU-4).
+        # The initial link requires a verified email address (AU-4).
         self.assertEqual(plan(event("user", "REGISTER"), user(verified=False, orgs=())), ())
 
     def test_verified_user_without_organization_gets_an_organization(self) -> None:
-        # Kayıt akışı: servis Organization açar ve kullanıcıyı ekler.
+        # Registration flow: the service creates an Organization and adds the user.
         self.assertEqual(
             plan(event("user", "VERIFY_EMAIL"), user(orgs=())),
             (EnsureOrganization(alias=f"t-{SUB}", name=f"t-{SUB}", subject=SUB, organization_id=None),),
@@ -142,13 +142,13 @@ class RegistrationTest(unittest.TestCase):
         self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user(orgs=(OTHER_ORG,))), (team,))
 
     def test_admin_created_user_without_organization_gets_no_organization(self) -> None:
-        # Kendi Organization'ı yalnız kendi kaydolan kullanıcıya açılır.
+        # An own Organization is created only for a user who self-registers.
         self.assertEqual(plan(event("admin", "USER_CREATE"), user(orgs=())), ())
 
 
 class EmailChangeTest(unittest.TestCase):
     def test_update_email_renames_user_on_tenant(self) -> None:
-        # E-posta değişikliği kiracıda `change_email` ile uygulanır (G-57).
+        # An email change is applied on the tenant through `change_email` (G-57).
         self.assertEqual(plan(event("user", "UPDATE_EMAIL"), user()), (TEAM, CHANGE_EMAIL, PROVISION))
 
     def test_unverified_new_email_is_not_applied(self) -> None:
@@ -259,12 +259,12 @@ class MembershipTest(unittest.TestCase):
         )
 
     def test_late_delete_event_does_not_remove_current_member(self) -> None:
-        # Olay geç geldi. Kullanıcı yeniden üye. Güncel durum geçerlidir.
+        # The event arrived late. The user is a member again. The current state applies.
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_DELETE", ORG.id)
         self.assertEqual(plan(ev, user(), ORG), (TEAM, CHANGE_EMAIL, PROVISION))
 
     def test_membership_of_deleted_organization_disables_non_member_tenants(self) -> None:
-        # Organization silindi. Takma adı bilinmez. Kullanıcı üyesi olmadığı her kiracıda kapanır.
+        # The Organization was deleted. Its alias is unknown. The user is disabled on every tenant without membership.
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_DELETE", ORG.id)
         tenant2 = Organization(id="o-2", alias="tenant2")
         self.assertEqual(
@@ -282,7 +282,7 @@ class MembershipTest(unittest.TestCase):
         self.assertLess(actions.index(CHANGE_EMAIL), actions.index(PROVISION))
 
     def test_verify_after_admin_email_change_still_renames(self) -> None:
-        # Yönetici e-postayı değiştirdi. Kullanıcı sonra doğruladı. Kiracıda ad yine değişmelidir (G-57).
+        # An administrator changed the email address. The user verified it later. The tenant must still rename the user (G-57).
         self.assertIn(CHANGE_EMAIL, plan(event("user", "VERIFY_EMAIL"), user()))
 
     def test_membership_event_without_organization_plans_nothing(self) -> None:

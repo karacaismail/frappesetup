@@ -30,12 +30,14 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 | `platform_core` | `access` | Erişim kuralı motoru: kayıt kuralı, hiyerarşi ve alan düzeyi (K8) |
 | `platform_core` | `model_gateway` | Sağlayıcı, hesap, API ve model kaydı. Yönlendirme, model çağrısı ve kullanım kaydı. |
 | `press_tr` | `press_identity` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
+| `press_tr` | `ansible_bridge` | Press ile Ansible arasında görev sonuçlarını iletir. |
 | `identity_sync` | Yok | Keycloak ile Press ve kiracı siteleri arasında kullanıcı eşitleme |
 | `oidc_verify` | Yok | Belirteç doğrulama. Frappe'ye bağlı değildir. |
 
 ## Bağımlılık yönü
 
 - `platform_core.identity` ve `press_tr.press_identity` yalnız `oidc_verify` kitaplığını kullanır.
+- `press_tr.ansible_bridge` depo içindeki öteki modülleri çağırmaz. Bu modül başka modülün DocType kayıtlarına yazmaz.
 - `platform_core.shell` ile `platform_core.identity` birbirini çağırmaz.
 - `platform_core.mobile` yalnız `identity` modülünün açık doğrulama işlevini çağırabilir. Öteki modüller `mobile` modülünü çağırmaz.
 - `platform_core.access` öteki modülleri çağırmaz. Motor Frappe'nin izin kancalarıyla çalışır.
@@ -109,7 +111,7 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
   - Yapay zekâ uygunluk kapısı yasaklı adı SHA-256 özetiyle tanır. Böylece kapının kendisi de adı taşımaz.
   - Eski commit mesajlarında ad geçer. Geçmiş yeniden yazılmadı, çünkü bu on dört dalı bozar. `backend` dalı `main` dalına birleşirken geçmiş tek commit'e indirilebilir.
 
-- **D-14. Geçmiş adlar ad verme kuralları raporuna göre düzeltilir.** Proje sahibi şöyle yazdı: “oluşturunca, onu da paralel ayrı bir pane görevi ile başlatıp, geçmişi düzelttirirsin.” Rapor `/Users/w6x/Documents/rules ai/naming_rules_report.md` dosyasıdır (AV-1..AV-73). İşi `naming-history-fix` yapar. Bu iş bitene kadar öteki işçiler var olan adları kendileri değiştirmez. Değişikliği ortak betik yapar.
+- **D-14. Geçmiş adlar ad verme kuralları raporuna göre düzeltilir.** Proje sahibi şöyle yazdı: “oluşturunca, onu da paralel ayrı bir pane görevi ile başlatıp, geçmişi düzelttirirsin.” Rapor `naming_rules_report.md` dosyasıdır (AV-1..AV-73). Rapor depoda değildir. Asıl kopya proje sahibinin `rules ai` klasöründedir. İşi `naming-history-fix` yapar. Bu iş bitene kadar öteki işçiler var olan adları kendileri değiştirmez. Değişikliği ortak betik yapar.
   - Uygulama ön ekleri (AV-69) şunlardır: `platform_core` için `PLT`, `press_tr` için `PTR`, `hrms_tr` için `HRT`. Ön ek DocType, rapor, rol, çalışma alanı ve yazdırma biçimi adlarına girer.
   - `press_tr` ve `hrms_tr` adlarındaki `tr`, Türkiye'nin ülke kodudur. Bu anlam terim sözlüğüne yazılır.
   - Keycloak rol adları küçük harfle ve tireyle yazılır. Örnek: `leave-approver`.
@@ -154,7 +156,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 
 - **O-16. `hrms_tr` lisansı GPL-3.0 olur.** `hrms_tr`, GPL-3.0 lisanslı `hrms` uygulamasını aynı süreçte kullanır. En güvenli seçim budur. Hukuk görüşü alınmadı.
 - **O-17. Yapay zekâ katmanı her sitede çalışacak.** Press ve operasyon sitesi de aynı katmanı kullanmalı. Katmanın ayrı bir uygulamaya bölünmesi sonraki turda karara bağlanır.
-- **O-18. Press'in geliştirme yaması geçici bir istisnadır.** `dev/press/patch-py314.sh` betiği Press'in kurulu kodunu değiştirir. Bu, M-4 kuralına aykırıdır. Press v0.154.1 başka yolla Python 3.14 üzerinde açılmıyor. Yama yalnız geliştirme imajında çalışır. Üretim imajına girmez. Kapanma koşulu borç tablosundadır.
+- **O-18. Press'in geliştirme yaması geçici bir istisnadır.** `dev/press/patch-py314.sh` betiği Press'in kurulu kodunu değiştirir. Bu, M-4 kuralına aykırıdır. Yama yalnız geliştirme imajında çalışır. Üretim imajına girmez. 22 Kasım 2026 Pazar günü temiz Press v0.154.1 kaynağı denendi. Python 3.14.10 ve Frappe 16.56.0 kullanıldı. Ansible, Telegram ve Stripe paket adayları içe aktarıldı. Press kaynak farkı boştu. Eski `TypedDict` tanımı ve kaldırılan `init_telemetry` işlevi modül açılışını engelledi. İnceleme, `press/api/cookies.py:7` satırında üçüncü kaynak engelini doğruladı. Frappe 16, `get_cookie_dict_from_headers` işlevini sunmuyor. `pyproject.toml` bağımlılık şartları da aday paketlerle karşılanmadı. `--no-deps` tanı kurulumu tam çözüm veya bağımlılık kilidi değildir. İnceleme sonrası başlangıç kaynağında 13 test çalıştı. Yedi test geçti ve altı test başarısız oldu. Kaynak bütünlüğü ve yama izi denetimleri geçti. `uv pip check`, 177 pakette 32 uyumsuzluk buldu. Site ve masa denemeleri çalıştırılmadı. Yama kaldırılmadı ve borç açık kaldı. [Press değişiklik önerisi](docs/press-python314-upstream.md) hazırlandı. Öneri henüz gönderilmedi. Ardından 162 yeni etikette iki kaynak dosyası tarandı. İki dalın aynı dosyalara ait geçmişi de tarandı. `TypedDict` ve telemetri engelleri hepsinde korundu. Bu tarama çerez dosyasını veya bağımlılık çözümünü kapsamadı. Son develop commit koduyla ilk dar kapsamlı kabul testleri de başarısız oldu. [Sürüm taramasının kanıtı](docs/press-python314-version-audit.md) kaydedildi. Bu araştırma kolu kapatıldı. Kapanma koşulu borç tablosundadır.
 - **O-19. Dallar sırayla birleşir.** Sıra şudur: kimlik-realm, platform-core-kimlik, identity-sync, press-tr, platform-core-kabuk, platform-core-yz, platform-core-gecit, erisim-kurali, platform-core-mobil, ilk-dikey-dilim, kimlik-tema, integration-e2e.
   - Her birleştirmeden önce bağımsız inceleme `pass` olur.
   - `hooks.py` dosyasını orkestratör birleştirir. Liste değerleri birleşir, hiçbiri silinmez. Örneğin iki dalın `override_whitelisted_methods` satırları yan yana kalır.
@@ -194,11 +196,14 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Çalışan kendi hesabını açamaz. Çalışan yalnız davetle gelir.
   - Müşteri silme isteğini Press'te verir. Press kullanıcıyı önce Keycloak'ta yeniden doğrular. Keycloak'ın kendi hesap silme eylemi kapalıdır, çünkü bu eylem kullanıcıyı ilk adımda siler. Hesap ekranındaki bağlantı Press'teki silme sayfasına gider.
   - identity-sync isteği kaydeder. Sonra Keycloak kullanıcısını kapatır ve siler. Press kullanıcısını kapatır ve API anahtarlarını geçersiz kılar. Kiracı sitelerindeki kullanıcıyı kapatır. Telefon kurulumlarını ve bildirim bağlarını siler (CK-7).
-  - İş kayıtları silinmez. Kişiyi gösteren alanlar anonim yapılır. Örneğin izin talebi kalır, çalışanın adı silinir. Proje sahibi bu varsayılanı değiştirebilir.
+  - İş kayıtları silinmez. Çalışan kartındaki kişisel alanlar O-41 kapsamına göre anonim yapılır. İzin, devam ve bordro kayıtlarındaki ad kopyaları şimdilik kalır. Ad kopyalarının silinmesi hedeftir. Bu iş O-41 borcudur. Proje sahibi bu varsayılanı değiştirebilir.
   - Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır.
   - Silinen kimliğin ham değeri saklanmaz. Yeniden açmayı engellemek için yalnız kimliğin HMAC özeti tutulur.
   - Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
   - Ayrıntılı kurallar sözleşmenin 7. bölümündedir.
+  - Kiracı sitesi, `clear_fields` listesindeki zorunlu olmayan alanları boşaltır. Listede zorunlu bir alan varsa sistem hata verir.
+  - Sistem, boşalttığı dosya ve fotoğraf alanlarına bağlı dosya kayıtlarını siler. Başka bir kayıt dosyayı kullanmıyorsa sistem dosyayı diskten de siler.
+  - Sistem, anonim yaptığı alanların eski ve yeni değerlerini kart geçmişinden temizler. Sistem bu işlemi geçmişi kimin yazdığına bakmadan yapar. Diğer alanların geçmişi kalır.
 - **O-28. Yapay zekâ katmanı genel Frappe erişimi değildir.** D-9 her şeyin yapay zekâyla yönetilmesini ister. AX-2 modele genel Frappe erişimi vermeyi yasaklar. İki kural şöyle birleşir:
   - Model yalnız kayıtlı araçları çağırır. Her araç kullanıcının yetkisiyle çalışır.
   - Yazma önce öneri olur. İnsan ayrı uçtan onay verir.
@@ -225,12 +230,13 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Dosyayı platform-core-mobil dalı yazdı. Orkestratör bu yazımı bir kez onayladı. Mobil dal birleşene kadar dosyayı mobil çalışanı düzeltir. Birleşmeden sonra dosyanın sahibi platform-core-kimlik işidir.
   - Modülün açık yolu `platform_core.kimlik.service_client` olur. Yol `dev/modul-sinirlari.json` dosyasına eklendi.
   - Belirteç adresi Keycloak ayarlarından türetilir. Önce `keycloak_internal_url`, yoksa `keycloak_public_url` kullanılır. `mobile_identity_sync_token_url` ayarı kullanılmaz.
-  - Adres HTTPS olmalıdır. Bu yüzden geliştirme sitesinde uzak oturum kapatma `delivery_pending` durumunda kalır. Gerçek deneme için integration-e2e işi Keycloak'a HTTPS iç adres verir.
+  - Keycloak belirteç adresi her zaman HTTPS olmalıdır. integration-e2e işi geliştirme yığınında HTTPS iç adresi sağlar.
+  - T-5. Kimlik servisi adresi üretimde HTTPS olmalıdır. Yerel HTTP için `developer_mode` ve `mobile_allow_development_http` birlikte açılır. Yeni ayar varsayılan olarak kapalıdır. Mobil modül adresi ve ayarları denetler.
   - platform-core-kimlik dalı mobil dosyalarındaki değişikliklerini geri alır. Bu dosyalar `mobil/identity_sync_client.py`, onun testi ve `0007-mobil-esitleme.md` notudur.
 - **O-37. Birleştirmede ortak dosya ve bağımlılık kuralları.** 22 Kasım 2026 Pazar günü bütün backend dalları birleşti. Kurallar şunlardır:
   - `oidc_verify` kitaplığı iki uygulamada da `oidc_verify==0.1.0` kuralıyla istenir. Kitaplık depodadır ve sürüm paketiyle birlikte kurulur. Kural değişince güvenlik kilidi `backend/dev/security/compile-lock` ile yeniden üretilir.
   - `hooks.py` içinde her kanca bir kez atanır. Örneğin `override_whitelisted_methods` sözlüğü hem kimlik giriş kapılarını hem erişim kuralının bağlantı aramasını taşır. İkinci atama birinciyi sileceği için yazılmaz.
-  - `auth_hooks` sırası şudur: kimlik servis belirteci, yapay zekâ ajan belirteci, kabuk meta veri kapısı. Belirteç kancaları kapıdan önce çalışır.
+  - `auth_hooks` sırası şudur: kimlik servis belirteci, yapay zekâ ajan belirteci, MCP OAuth, kabuk meta veri kapısı. Belirteç kancaları kapıdan önce çalışır.
   - Press çıkış bildirim ucunda imzası doğrulanan bildirim sayaca girmez. Reddedilen bildirim dakikada 120 ile sınırlıdır. Sözleşme bu kuralı yazar. Uç denetimi bu ucu kodla eşleşen istisnayla kabul eder.
   - Semgrep istisna özeti yalnız Git'in izlediği ve yok saymadığı dosyalardan hesaplanır. Böylece geliştiricinin ön bellek klasörü özeti değiştirmez.
   - Bandit istisna listeleri birleşirken iki taraf korunur. Kod imzası artık eşleşmeyen kayıtları güvenlik işi sonraki taramada temizler.
@@ -239,8 +245,31 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Mutabakat, kuyruk yeniden oynatma ve platform listeleri yeni `IDENTITY_SYNC_OPERATOR_AZP` listesindeki istemcinindir.
   - Operatör, önizleme ve silme listelerinde `site-` ile başlayan istemci olmaz. Ayrıntı sözleşmenin 7. bölümündedir.
 - **O-39. Saklama komutu yalnız süresi dolan izin kayıtlarını siler.** Komut, çalışan kaydını ve diğer HR kayıtlarını korur.
-  - Hesap silme, çalışanın kişisel alanlarını anonim yapar. Ayrıntı sözleşmenin 6. bölümündedir.
+  - Hesap silme, çalışan kartındaki kişisel alanları O-41 kapsamına göre anonim yapar. Ayrıntı sözleşmenin 5. ve 7. bölümlerindedir.
+  - Gönderilmiş izin kayıtları komutun kapsamı dışındadır. HRMS iptali izin hareketlerine ve devam kayıtlarına yazar. Bu izinlerin silme yolu hukuk kararından sonra ayrıca belirlenir.
   - Bağlı HR kayıtlarının saklama süresini hukuk sorumlusu belirler. Bu süre teknik borç tablosunda açık kalır.
+- **O-40. Kiracı yanıtları içerik güvenliği politikası taşır.** Desk satır içi betik kullanır. Taban politika bu betiklere izin verir.
+  - Taban yanıt `frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'` politikasını taşır.
+  - Giriş ve Panel `default-src 'self'; script-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'` politikasını taşır.
+  - Giriş ve Panel yanıtları `X-Frame-Options: DENY` taşır. Yönlendirme yanıtları da aynı başlıkları taşır.
+  - Başlığı `platform_core` kancası ekler. Kanca, varsa yanıtın kendi başlığını korur. Frappe kodu değişmez.
+  - Üretimde ters vekil başlığı ekleyebilir. Uygulamanın taban politikası da yürürlükte kalır.
+
+- **O-41. Hesap silme, çalışan kartındaki kişisel alanları anonim yapar.** Sistem, çalışan kartını kullanıcı bağıyla bulur.
+  - Sistem adları, iletişim ve acil durum bilgilerini ve adresleri anonim yapar.
+  - Sistem pasaport numarasını, pasaportun düzenlendiği yeri, banka, sağlık, sigorta ve aile bilgilerini anonim yapar.
+  - Doğum tarihi, pasaport tarihleri, devam cihazı kimliği, kan grubu ve medeni durum alanları boşalır.
+  - Sistem fotoğraf alanını boşaltır ve bu alana bağlı dosya kaydını siler. Başka bir kayıt dosyayı kullanmıyorsa sistem dosyayı diskten de siler. Ortak küçük resim, ilgili son dosya kaydı silinene kadar kalır. Aynı kartta fotoğraf adresini kullanan başka dosya kaydı yoksa yükleme bağlantısı da silinir.
+  - Sistem, seçili kart alanlarının eski ve yeni değerlerini değişiklik geçmişinden temizler. İK'nın yazdığı geçmiş de bu kapsamdadır. Diğer alanların geçmişi kalır. Geçmiş verisi bozuksa sistem hata verir ve mevcut geçmişi korur.
+  - `clear_fields`, `redact_fields` içindeki zorunlu olmayan tek değerli alanları boşaltır. Listede zorunlu bir alan varsa sistem hata verir.
+  - Eğitim ve önceki iş alt tabloları bu kancayla temizlenmez. Bu tablolar açık teknik borçtur.
+  - İzin, devam ve bordro kayıtlarındaki çalışan adı kopyaları kalır. Bu kopyalar için `platform_core` tarafında ayrı bir kanca gerekir.
+
+- **O-42. Erişim Semgrep onayları dosya listesine bağlıdır.**
+  - Özet, beş onayın geçtiği iki dosyayı ve yetki yardımcılarını kapsar.
+  - Dosya listesi `backend/dev/security/README.md` içindedir.
+  - Kapsamdaki bir dosya değişirse kapı bu onayları yeniden ister.
+  - Onay kapsamları çakışırsa kapı hata verir.
 
 ## Karar sitesine işlenecek farklar
 
@@ -275,7 +304,7 @@ Bu turda gerçek kişisel veri yoktur. Saklama süresi ve silme yolu MVP yayın�
 | “AI Action Proposal” | Kullanıcı adı ve önizlemedeki kişi bilgisi. Örneğin çalışan adı ve izin tarihleri | Karar ya da süre dolumundan sonra 30 gün | Aynı silme komutu elle çalışır. Önizleme yalnız gerekli bilgiyi tutar |
 | Hesap silme isteği (O-27) | E-posta ve Keycloak kimliği | İş bitene kadar | İş bitince kayıt anonim yapılır |
 | identity-sync kayıt dosyası | Keycloak kullanıcı kimliği. E-posta ve ad tutulmaz | İş bitene kadar | İş bitince kimlik HMAC izine çevrilir (O-27) |
-| HRMS TR çalışan ve izin kayıtları | Ad, izin tarihleri, onaylayan kişi | İş ilişkisi sürdükçe. Yasal saklama süresini hukuk sorumlusu belirler. Bu madde teknik borçtur | Hesap silme kişinin alanlarını anonim yapar. İş kayıtları kalır (O-27) |
+| HRMS TR çalışan ve izin kayıtları | Ad, izin tarihleri, onaylayan kişi | İş ilişkisi sürdükçe. Yasal saklama süresini hukuk sorumlusu belirler. Bu madde teknik borçtur | Hesap silme, çalışan kartındaki alanları O-41 kapsamına göre anonim yapar. İş kayıtları ve ad kopyaları kalır (O-27). |
 
 Mesaj içeriği ve araç girdisi günlüğe yazılmaz. Günlük yalnız girdinin özetini tutar.
 
@@ -285,7 +314,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
-| `BORC(mvp)`: Dış MCP istemcileri OAuth 2.1 ile giremez | Dış yapay zekâ istemcisi yalnız oturum ya da API anahtarıyla bağlanır | platform-core-yz | MCP ucu OAuth 2.1 yetkilendirmesini Keycloak üzerinden destekler |
+| `BORC(mvp)`: Dış MCP istemcileri OAuth 2.1 ile giremez | Özellik varsayılan olarak kapalı. Yerel testler dönüş adresini, kaynak alanını ve 3 saniyelik süre sınırını doğruladı. | platform-core-yz | Tam realm, `resource-indicators` özelliğiyle hazırlanır. Hazır bir MCP istemcisiyle uçtan uca OAuth akışı doğrulanır. |
 | `BORC(mvp)`: Üretim işçi sayısı ölçülmedi | 50 eşzamanlı telefonda 4 Gunicorn işçisiyle istemci p95 1 saniyeyi aştı. Sunucu süresi sınırın altında kaldı | DevOps sorumlusu | Üretim kapasite ölçümü yapılır ve işçi sayısı ölçümle seçilir |
 | `BORC(mvp)`: identity-sync canlı Keycloak, Press ve kiracı ile denenmedi | Sahte hedeflerin kaçırdığı uyumsuzluk üretimde çıkabilir | integration-e2e | Uçtan uca test gerçek servislerle geçer |
 | `BORC(mvp)`: identity-sync testleri CI'da koşmaz | Bozulma yalnız elle çalışan testte görülür | DevOps sorumlusu | CI bu klasörün testlerini her değişiklikte koşar |
@@ -293,14 +322,17 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Bazı tema ekranları sınanmadı | Görünüm hatası fark edilmeyebilir | kimlik-tema | Sınanmamış ekranların listesi boşalır |
 | `BORC(mvp)`: Geçiş anahtarı testleri yük altında zaman aşımına uğruyor | Test sonucu güvenilmez olur | kimlik-tema | Testler yük altında da kararlı geçer |
 | `BORC(mvp)`: Performans ölçümü yalnız elle yapılır (O-31) | Canlı darboğaz görülmez | DevOps sorumlusu | P1'de Grafana ve gerçek kullanıcı ölçümü kurulur (G-149) |
-| `BORC(mvp)`: İzinlerin ve bağlı HR kayıtlarının yasal saklama süresi yok (O-39) | Silme zamanı belli değil | Hukuk sorumlusu | Hukuk sorumlusu süreleri proje kaydına yazar. İzin komutu site ayarındaki süreyi uygular. Bağlı HR kayıtları için silme yolu ayrıca belirlenir. |
+| `BORC(mvp)`: İzinlerin ve bağlı HR kayıtlarının yasal saklama süresi yok (O-39) | Silme zamanı belli değil | Hukuk sorumlusu | Hukuk sorumlusu süreleri proje kaydına yazar. İzin komutu yalnız taslak ve iptal edilmiş izinlerde site ayarındaki süreyi uygular. Bağlı HR kayıtları için silme yolu ayrıca belirlenir. |
+| `BORC(mvp)`: Çalışan kartının alt tabloları ve iş kayıtlarındaki ad kopyaları kalıyor (O-41) | Hesap silme bu alanları temizlemez | platform-core-kimlik ve ilk-dikey-dilim | `platform_core` hesap silme kancası alt tablolara ve kullanıcıya bağlı iş kayıtlarına güvenli erişim sağlar |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
-| `BORC(mvp)`: Press geliştirme imajı `patch-py314.sh` ile Press kodunu değiştiriyor (O-18) | M-4 kuralına aykırı. Press yükseltmesinde yama bozulabilir | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da yama Press'e gönderilip kabul edilir |
+| `BORC(mvp)`: Press geliştirme yaması açık kaldı (O-18) | M-4 ihlali sürüyor. Temiz v0.154.1 kaynağında `TypedDict`, telemetri ve çerez import'u başarısız. Tam bağımlılık çözümü ve kilidi de eksik. [Öneri ve test kanıtı](docs/press-python314-upstream.md) hazırlandı. [162 yeni etiketin iki dosyalık taraması](docs/press-python314-version-audit.md) ilk iki engeli kaldıramadı. | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da düzeltmeler Press'e kabul edilir. Üç kaynak engeli giderilir. Tam bağımlılık denetimi, kaynak bütünlüğü, site ve masa testleri geçer. |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
 | Bandit istisnaları 22 Şubat 2027 Pazartesi günü sona erer | Süresi dolan istisna taramayı durdurur | dev-ortam ve security-tooling | Sahipler her istisnayı yeniden inceler |
 | `BORC(mvp)`: Telefon paketi yok (O-26) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |
 
 ### Kapanan teknik borç
+
+- **Çalışan fotoğrafı ve kart geçmişi (O-41).** Hesap silme, fotoğraf alanına bağlı dosya kaydını siler. Paylaşılan dosya içeriği son kayıt silinene kadar diskte kalır. Sistem, karttaki seçili alanların eski ve yeni değerlerini geçmişten temizler.
 
 - `list_identities` uçları tamamlandı. Kiracı ve Press uçları aynı sayfalama sözleşmesini kullanır.
 - Kiracı HTTP testleri ikinci sayfayı ve yetkisiz istek reddini doğruladı.

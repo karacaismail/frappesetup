@@ -1,4 +1,4 @@
-"""Ayar okumanın ve komut satırının testleri."""
+"""Tests for configuration loading and the command line."""
 
 from __future__ import annotations
 
@@ -212,7 +212,7 @@ class ConfigTest(unittest.TestCase):
 
 class LoggingTest(unittest.TestCase):
     def test_serve_logging_keeps_info_records(self) -> None:
-        # İşlem günlüğü INFO düzeyindedir. Ayar yapılmazsa Python bu kayıtları atar.
+        # Audit entries use INFO. Without configuration, Python drops them.
         import logging
 
         stream = io.StringIO()

@@ -451,11 +451,15 @@ The identity provider keys are not available.,Kimlik sunucusunun anahtarları al
 There is no account for this e-mail address. Sign-up is closed.,Bu e-posta için hesap yok. Kayıt kapalı.,platform_core.identity
 This user is disabled.,Bu kullanıcı kapalı.,platform_core.identity
 Sign-in failed,Giriş başarısız,platform_core.identity
+You hit the rate limit because of too many requests. Please try after sometime.,Çok fazla istek gönderdiniz. Biraz sonra yeniden deneyin.,platform_core.identity
+Required sign-in arguments are missing.,Oturum açmak için gereken bilgiler eksik.,platform_core.identity
 Local sign-in is disabled. Sign in with the identity provider.,Yerel giriş kapalı. Kimlik sunucusu ile oturum açın.,platform_core.identity
 This e-mail belongs to a desk user and cannot be provisioned.,Bu e-posta bir yönetim kullanıcısına ait. Eşitleme ile açılamaz.,platform_core.identity
 Field {0} is longer than {1} characters.,{0} alanı {1} karakterden uzun.,platform_core.identity
 Field {0} must be text.,{0} alanı metin olmalıdır.,platform_core.identity
 This account cannot be anonymized.,Bu hesap anonim yapılamaz.,platform_core.identity
+Remove required field {0} from clear_fields.,Zorunlu {0} alanını clear_fields listesinden çıkarın.,platform_core.identity
+Repair Version record {0} before account deletion.,Hesap silmeden önce {0} adlı Version kaydını düzeltin.,platform_core.identity
 Mobile token rejected: {0},Telefon belirteci reddedildi: {0},platform_core.identity
 Request body is too large.,İstek gövdesi çok büyük.,platform_core.identity
 The identity provider did not confirm a fresh sign-in.,Kimlik sunucusu yeni bir giriş doğrulamadı.,platform_core.identity
@@ -484,7 +488,7 @@ Deleted At,Silinme zamanı,Platform Identity Deletion
 Disabled,Kapatıldı,Platform Identity Deletion
 Anonymized,Anonim yapıldı,Platform Identity Deletion
 "Records that an identity was deleted (project record O-27). It keeps no raw identity: only the HMAC-SHA256 digest of the issuer and subject pair. Provisioning, enabling and e-mail changes check this record first, so a deleted identity cannot come back.","Bir kimliğin silindiğini kaydeder (Proje kaydı O-27). Ham kimliği tutmaz. Yalnız veren ve kullanıcı kimliği çiftinin HMAC-SHA256 özetini tutar. Hesap açma, açıp kapama ve e-posta değiştirme önce bu kaydı denetler. Böylece silinen kimlik geri gelemez.",Platform Identity Deletion
-"HMAC-SHA256 digest of the issuer and subject pair, as 64 hexadecimal characters. The key is the site setting kimlik_deletion_hmac_key. The raw pair is not stored.","Veren ve kullanıcı kimliği çiftinin HMAC-SHA256 özeti, 64 onaltılık karakter. Anahtar kimlik_deletion_hmac_key site ayarıdır. Ham çift saklanmaz.",Platform Identity Deletion
+"HMAC-SHA256 digest of the issuer and subject pair, as 64 hexadecimal characters. The site supplies the deletion HMAC key. The raw pair is not stored.","Veren ve kullanıcı kimliği çiftinin HMAC-SHA256 özeti 64 onaltılık karakterden oluşur. Anahtar site ayarından gelir. Ham çift saklanmaz.",Platform Identity Deletion
 "Disabled: step 1 closed the account, its sessions and API keys. Anonymized: step 2 removed the personal data.","Kapatıldı durumunda 1. adım hesabı, oturumları ve API anahtarlarını kapattı. Anonim yapıldı durumunda 2. adım kişisel veriyi kaldırdı.",Platform Identity Deletion
 Current name of the Frappe user. It is the anonymous name after step 2.,Frappe kullanıcısının şimdiki adı. 2. adımdan sonra anonim addır.,Platform Identity Deletion
 When step 1 recorded the deletion.,1. adımın silmeyi kaydettiği zaman.,Platform Identity Deletion
@@ -787,3 +791,20 @@ The delete failed and was rolled back. Nothing was deleted.,Silme hata verdi ve 
 Field {0} must be an integer from {1} to {2}.,{0} alanına {1} ile {2} arasında bir tam sayı yazın.,platform_core.identity
 The identity link changed. Try again.,Kimlik bağı değişti. Yeniden deneyin.,platform_core.identity
 You do not have permission to read identity links.,Kimlik bağlarını okuma izniniz yok.,platform_core.identity
+Bootstrap data,Açılış verisi,shell.performance
+DocType metadata,DocType tanımı,shell.performance
+Warm cache,Önbellekli,shell.performance
+Cold cache,Önbelleksiz,shell.performance
+O-31 shell benchmark,O-31 kabuk ölçümü,shell.performance
+Sample data contains {0} employees and {1} leave records.,Örnek veri {0} çalışan ve {1} izin kaydı içerir.,shell.performance
+Requests ran sequentially over local HTTP. The account had the HR User role.,İstekler yerel HTTP üzerinden sırayla gitti. Hesapta HR User rolü vardı.,shell.performance
+Server timing starts when the server receives the request and ends when response headers are ready.,"Süre, isteğin sunucuya ulaştığı anda başlar. Yanıt başlıkları hazır olunca biter.",shell.performance
+The benchmark cleared the Frappe site and process caches before each cold-cache request.,"Ölçüm, her önbelleksiz istekten önce Frappe site ve işlem önbelleklerini temizledi.",shell.performance
+The benchmark kept the database and operating system caches intact.,"Ölçüm, veritabanı ve işletim sistemi önbelleklerini korudu.",shell.performance
+| Endpoint | Cache | Requests | p50 (ms) | p95 (ms) | Limit (ms) | Result |,| Uç | Durum | İstek | p50 (ms) | p95 (ms) | Sınır (ms) | Sonuç |,shell.performance
+MCP token rejected.,MCP belirteci reddedildi.,platform_core.identity
+MCP identity provider unavailable.,Kimlik sunucusuna ulaşılamıyor.,platform_core.identity
+Send either a session cookie or a bearer token.,Oturum çerezi veya belirteç gönderin.,platform_core.ai
+MCP call counters are internal.,MCP çağrı sayacını yalnız sistem değiştirebilir.,platform_core.ai
+Authentication required,Kimlik doğrulaması gerekli.,platform_core.ai
+MCP call allowance unavailable.,MCP çağrı sınırı denetlenemiyor.,platform_core.ai

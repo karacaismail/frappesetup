@@ -5,9 +5,9 @@ Expected behaviour comes from the orchestrator's decisions on the review finding
   and reads the account state again under the lock. Tested with two database connections.
 - E2: identity endpoints write only safe fields to the Error Log and the app log. `subject`, `email`,
   `new_email` and the token never appear there, nor in the response. Tested for 500 and 503.
-- Ö1: a cookie session is checked for idle time even when the request carries an Authorization header.
-- Ö2: a background method does not renew the idle time in any address form Frappe accepts.
-- Ö3: the back-channel logout fallback finds old sessions on every page, not only on the first one.
+- Important finding 1: a cookie session is checked for idle time even when the request carries an Authorization header.
+- Important finding 2: a background method does not renew the idle time in any address form Frappe accepts.
+- Important finding 3: the back-channel logout fallback finds old sessions on every page, not only on the first one.
 """
 
 import glob
@@ -135,6 +135,26 @@ class TestMergeReview(FrappeAPITestCase):
 		self.assertEqual(h.session_count(FAKE_EMAIL) + h.session_count(anon), 0)
 		self.assertEqual(h.logged_user(client), "Guest")
 
+	def test_deletion_retries_when_a_query_after_the_lock_deadlocks(self):
+		from platform_core.identity import anonymization_scope
+
+		anonymize = anonymization_scope.anonymize
+		attempts = 0
+
+		def fail_once(*args, **kwargs):
+			nonlocal attempts
+			attempts += 1
+			if attempts == 1:
+				raise frappe.QueryDeadlockError("Test deadlock after the identity lock")
+			return anonymize(*args, **kwargs)
+
+		with patch.object(anonymization_scope, "anonymize", side_effect=fail_once):
+			response, _token = self.service("anonymize_user", {"issuer": h.ISSUER, "subject": FAKE_SUBJECT})
+		self.assertEqual(response.status_code, 200, response.data[:200])
+		self.assertEqual(attempts, 2)
+		h.refresh()
+		self.assertFalse(frappe.db.exists(LINK, self.link.name))
+
 	def test_sign_in_after_step_one_is_refused_under_the_lock(self):
 		anonymization.disable_step(h.ISSUER, FAKE_SUBJECT)
 		frappe.db.commit()
@@ -153,6 +173,56 @@ class TestMergeReview(FrappeAPITestCase):
 			response = h.login_with_keycloak(client, h.userinfo(FAKE_SUBJECT, FAKE_EMAIL))
 		self.assertEqual(response.status_code, 403, response.data[:300])
 		self.assertEqual(h.logged_user(client), "Guest")
+
+	def test_sign_in_retries_a_stale_snapshot_and_refuses_the_disabled_account(self):
+		site = frappe.local.site
+		sign_in_locks = 0
+		deadlocks = 0
+		deletion_result = {}
+
+		def disable_in_separate_connection():
+			frappe.init(site=site)
+			try:
+				frappe.connect()
+				frappe.db.sql("SET SESSION innodb_lock_wait_timeout = 5")
+				frappe.set_user("Administrator")
+				record = anonymization.disable_step(h.ISSUER, FAKE_SUBJECT)
+				frappe.db.commit()
+				deletion_result["record"] = record
+			except Exception as error:
+				deletion_result["error"] = error
+				frappe.db.rollback()
+			finally:
+				frappe.destroy()
+
+		def lock_after_deletion(*args, **kwargs):
+			nonlocal sign_in_locks, deadlocks
+			if kwargs.get("require_key") is not False:
+				return _REAL_LOCK(*args, **kwargs)
+			sign_in_locks += 1
+			if sign_in_locks == 2:
+				# Establish the snapshot before the other connection commits the deletion step.
+				frappe.db.get_value(LINK, self.link.name, "user")
+				worker = threading.Thread(target=disable_in_separate_connection)
+				worker.start()
+				worker.join(timeout=30)
+				self.assertFalse(worker.is_alive(), "The deletion step did not finish before the second lock")
+				self.assertIsInstance(deletion_result.get("record"), dict, deletion_result)
+			try:
+				return _REAL_LOCK(*args, **kwargs)
+			except frappe.QueryDeadlockError:
+				deadlocks += 1
+				raise
+
+		client = h.new_client()
+		with patch.object(anonymization, "lock_identity", side_effect=lock_after_deletion):
+			response = h.login_with_keycloak(client, h.userinfo(FAKE_SUBJECT, FAKE_EMAIL))
+		self.assertEqual(response.status_code, 403, response.data[:300])
+		self.assertEqual(deadlocks, 1)
+		self.assertEqual(sign_in_locks, 3)
+		self.assertEqual(h.logged_user(client), "Guest")
+		h.refresh()
+		self.assertEqual(h.session_count(FAKE_EMAIL), 0)
 
 	# --- E2 -----------------------------------------------------------------------------------------
 
@@ -204,30 +274,37 @@ class TestMergeReview(FrappeAPITestCase):
 		self.assertEqual(response.json.get("exc_type"), "DeletionKeyMissing")
 		self._assert_no_personal_data(response, token, since)
 
-	# --- Ö1 -----------------------------------------------------------------------------------------
+	# --- Important finding 1 -----------------------------------------------------------------------------------------
 
 	def test_idle_cookie_session_ends_even_with_an_authorization_header(self):
 		for header in ("token abc:def", "Bearer not-a-token", "Basic YWJjOmRlZg=="):
 			client = h.new_client()
 			h.login_with_keycloak(client, h.userinfo(FAKE_SUBJECT, FAKE_EMAIL))
-			frappe.cache.delete_value(session_policy._session_key(client.get_cookie("sid").value))
+			sid = client.get_cookie("sid").value
+			frappe.cache.set_value(
+				session_policy._session_key(sid), int(time.time()) - 3601, expires_in_sec=3600
+			)
 			answer = h.request(
 				client.get,
 				"/api/method/frappe.client.get_count",
 				query_string={"doctype": "ToDo"},
 				headers={"Authorization": header},
 			)
-			self.assertIn(answer.status_code, (401, 403), f"{header}: {answer.data[:200]}")
+			self.assertEqual(answer.status_code, 401, f"{header}: {answer.data[:200]}")
+			self.assertEqual(answer.json.get("exc_type"), "SessionExpired", header)
+			h.refresh()
+			self.assertFalse(frappe.db.exists("Sessions", {"sid": sid}), header)
 			self.assertEqual(h.logged_user(client), "Guest", header)
 			h.reset_rate_limits()
 
-	# --- Ö2 -----------------------------------------------------------------------------------------
+	# --- Important finding 2 -----------------------------------------------------------------------------------------
 
 	def test_background_method_does_not_renew_in_any_address_form(self):
 		client = h.new_client()
 		h.login_with_keycloak(client, h.userinfo(FAKE_SUBJECT, FAKE_EMAIL))
 		key = session_policy._session_key(client.get_cookie("sid").value)
-		frappe.cache.set_value(key, 123, expires_in_sec=3600)
+		last_activity = int(time.time()) - 60
+		frappe.cache.set_value(key, last_activity, expires_in_sec=3600)
 		method = "frappe.auth.get_logged_user"
 		for call in (
 			lambda: h.request(client.get, f"/api/method/{method}"),
@@ -241,9 +318,9 @@ class TestMergeReview(FrappeAPITestCase):
 			answer = call()
 			self.assertEqual(answer.status_code, 200, answer.data[:200])
 			self.assertEqual(answer.json.get("message", answer.json.get("data")), FAKE_EMAIL)
-			self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), 123)
+			self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), last_activity)
 
-	# --- Ö3 -----------------------------------------------------------------------------------------
+	# --- Important finding 3 -----------------------------------------------------------------------------------------
 
 	def test_sub_fallback_finds_old_sessions_after_a_full_page_of_new_ones(self):
 		now = frappe.utils.now_datetime()
@@ -271,7 +348,7 @@ class TestMergeReview(FrappeAPITestCase):
 		self.assertEqual(h.session_count(FAKE_EMAIL), 105)
 
 	def test_sub_fallback_has_no_page_limit(self):
-		# Merge review 2, Ö3: the search goes to the last page. The page size and the old cap are made small
+		# Merge review 2, important finding 3: the search goes to the last page. The page size and the old cap are made small
 		# so that the old session sits after the old cap.
 		from platform_core.identity import sign_out
 

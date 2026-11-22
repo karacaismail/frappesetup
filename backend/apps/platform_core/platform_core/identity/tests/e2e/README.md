@@ -5,7 +5,7 @@ Bu testler kiracının `/login` sayfasını Chromium ve WebKit ile sınar. Firef
 Ön koşullar:
 
 1. Site `kimlik_yalniz_keycloak=1` ayarıyla çalışır.
-2. Site ana bilgisayardan `http://kiraci1.localhost:8661` adresinden açılır. Colima'da port tüneli gerekir: `PANE_PORT=8660 backend/dev/bin/tunel ac 8661`.
+2. Site ana bilgisayardan `http://kiraci1.localhost:8661` adresinden açılır. Colima'da port tüneli gerekir: `PANE_PORT=8660 backend/dev/bin/tunnel open 8661`.
 3. Playwright tarayıcıları depo kökünde kuruludur.
 4. Bench `--noreload` ile çalışır. Kod veya ayar değişince bu işin Bench sürecini yeniden başlatın.
 
