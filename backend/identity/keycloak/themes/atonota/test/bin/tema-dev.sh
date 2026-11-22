@@ -3,7 +3,7 @@
 # Kullanım: tema-dev.sh up | sync | tunel | tunel-kapat | down | env
 #   up    İmajı derler ve container'ları açar. Keycloak hazır olana kadar bekler.
 #   sync  Tema dosyalarını çalışan container'a kopyalar. Yeniden derleme gerekmez.
-#         "sync login" ya da "sync email" yalnız o bölümü kopyalar.
+#         "sync login", "sync email" ya da "sync account" yalnız o bölümü kopyalar.
 #   tunel Keycloak ve Mailpit portlarını ssh tüneliyle bu bilgisayara taşır.
 #   tunel-kapat Tüneli kapatır.
 #   down  Tüneli ve container'ları kapatır. Birimleri silmez.
@@ -90,13 +90,13 @@ case "${1:-}" in
     cid="$(compose ps -q keycloak)"
     # İkinci değer yalnız bir bölümü kopyalar: sync login ya da sync email.
     case "${2:-}" in
-      "" | login | email) ;;
+      "" | login | email | account) ;;
       *)
-        echo "Yalnız login ya da email kopyalanır." >&2
+        echo "Yalnız login, email ya da account kopyalanır." >&2
         exit 2
         ;;
     esac
-    for part in ${2:-login email}; do
+    for part in ${2:-login email account}; do
       docker exec -u 0 "$cid" rm -rf "/opt/keycloak/themes/atonota/$part"
       docker cp "$theme/$part" "$cid:/opt/keycloak/themes/atonota/$part"
     done

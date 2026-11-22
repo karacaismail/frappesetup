@@ -8,6 +8,7 @@
  * Kuralların içinde sabit değer yazılmaz.
  */
 
+/* tokens:start */
 /* ---------- Yazı tipi: Outfit kendi sunucumuzdan gelir (SIL OFL 1.1, fonts/OFL.txt) ---------- */
 
 @font-face {
@@ -55,6 +56,8 @@
   --at-color-success-surface: #e6f3ec;
   --at-color-info-surface: #e9edf8;
   --at-color-focus: #161d33;
+  --at-color-masthead: #161d33;
+  --at-color-on-masthead: #ffffff;
   --at-shadow-card: 0 1px 2px rgb(22 29 51 / 0.06), 0 12px 32px rgb(22 29 51 / 0.1);
 
   /* Yazı */
@@ -93,6 +96,9 @@
   /* Odak göstergesi: öğenin altında düz ve kısa bir çizgi */
   --at-focus-thickness: 3px;
   --at-focus-gap: 2px;
+  --at-focus-underline-offset: 4px;
+  --at-link-underline-offset: 3px;
+  --at-brand-mark-size: 2rem;
   --at-focus-bar:
     0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-surface),
     0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-focus);
@@ -125,6 +131,8 @@
   --at-color-success-surface: #1b3a2c;
   --at-color-info-surface: #252e52;
   --at-color-focus: #ffffff;
+  --at-color-masthead: #1a2036;
+  --at-color-on-masthead: #eef0f6;
   --at-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.35);
 }
 
@@ -141,6 +149,8 @@
     --at-hit: 3rem;
   }
 }
+
+/* tokens:end */
 
 /* PatternFly değişkenleri Atonota tokenlarına bağlanır. Böylece temel bileşenler de aynı kimliği taşır. */
 :root,
@@ -312,7 +322,7 @@
   font-weight: var(--at-weight-medium);
   text-decoration: underline;
   text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
+  text-underline-offset: var(--at-link-underline-offset);
   transition: color var(--at-motion-duration) var(--at-motion-ease);
 }
 
@@ -855,7 +865,7 @@
   text-decoration-line: underline;
   text-decoration-thickness: var(--at-focus-thickness);
   text-decoration-color: var(--at-color-focus);
-  text-underline-offset: 4px;
+  text-underline-offset: var(--at-focus-underline-offset);
 }
 
 /* Metin bağlantıları: kalın alt çizgi */
@@ -863,7 +873,7 @@
   text-decoration-line: underline;
   text-decoration-thickness: var(--at-focus-thickness);
   text-decoration-color: var(--at-color-focus);
-  text-underline-offset: 4px;
+  text-underline-offset: var(--at-focus-underline-offset);
 }
 
 @media (forced-colors: active) {

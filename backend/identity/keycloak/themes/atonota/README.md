@@ -10,16 +10,18 @@ Hedef sürüm Keycloak 26.8.2 sürümüdür. Giriş teması `keycloak.v2` temas�
 | --- | --- |
 | `login/` | Giriş teması. Giriş, kayıt, parola sıfırlama, TOTP ve passkey ekranlarını kapsar. |
 | `email/` | E-posta teması. |
+| `account/` | Hesap konsolu teması. Kullanıcı parolasını, ikinci doğrulamasını ve oturumlarını bu ekranda yönetir. |
 | `test/` | Deneme ortamı ve Playwright testleri. Bu klasör Keycloak imajına girmez. |
 
 TOTP, telefondaki doğrulama uygulamasının ürettiği tek kullanımlık koddur. Passkey, parola yerine kullanılan geçiş anahtarıdır.
 
 ## Temayı Keycloak'a koyma
 
-1. `login/` ve `email/` klasörlerini imaja kopyalayın. Hedef yol `/opt/keycloak/themes/atonota/` olur.
+1. `login/`, `email/` ve `account/` klasörlerini imaja kopyalayın. Hedef yol `/opt/keycloak/themes/atonota/` olur.
 2. Realm'de giriş temasını `atonota` yapın.
 3. Realm'de e-posta temasını `atonota` yapın.
-4. Realm'in görünen adını yazın. Tema marka adını bu ayardan okur.
+4. Realm'de hesap konsolu temasını `atonota` yapın.
+5. Realm'in görünen adını yazın. Giriş teması marka adını bu ayardan okur.
 
 Realm dosyası kimlik-realm işinindir. Bu klasör realm dosyasını değiştirmez.
 
@@ -72,6 +74,35 @@ Sihirli bağlantı, parola yazmadan oturum açtıran e-posta bağlantısıdır. 
 - Düz adres satırı harf arasından kırılır. Bu açık bir istisnadır. Adres sözcük değildir ve 320 piksele başka yolla sığmaz.
 - Keycloak'ın öteki hazır e-postaları yeni düzeni kullanır. Metinleri Keycloak'ın kendi Türkçesidir.
 
+## Hesap konsolu teması
+
+Hesap konsolu Keycloak'ın kendi React uygulamasıdır. Tema bu uygulamayı değiştirmez ve çatallamaz. Tema `keycloak.v3` temasından türer.
+
+Tema yalnız Keycloak'ın desteklediği ayarları kullanır. Bu ayarlar Keycloak 26.8.2 kaynağında doğrulandı. Kaynak `keycloak-account-ui-26.8.2.jar` içindeki `theme/keycloak.v3/account/index.ftl` dosyasıdır.
+
+| Ayar | Ne yapar |
+| --- | --- |
+| `styles` | `account/resources/css/atonota-account.css` dosyasını yükler. |
+| `scripts` | `account/resources/js/atonota-focus.js` dosyasını yükler. Bu betik klavye odak kipini yönetir. |
+| `logo` | Başlıktaki marka işaretini verir. |
+| `favIcon` | Sayfa simgesini verir. |
+| İleti dosyası | `account/messages/messages_tr.properties` 242 iletiyi yalın Türkçeyle yazar. İngilizce kaynak Keycloak'ın kendi dosyasıdır. |
+
+- Tokenlar giriş temasıyla aynıdır. İki stil dosyasının başındaki token bölümü birebir aynı olmalıdır. Bir test iki bölümü karşılaştırır. Token değişince iki dosyayı birlikte değiştirin.
+- Outfit yazı tipi dosyaları `account/resources/fonts/` klasöründe de durur. Keycloak her tema türüne ayrı kaynak klasörü verir.
+- Geçerli sayfa kalın yazı ve yüzey tonuyla gösterilir. Temel temanın renkli kenar çizgisi kapatıldı.
+
+Hesap konsolunun bilinen sınırları şunlardır:
+
+- Keycloak bazı “daha fazla” düğmelerine erişilebilir ad vermez. Tema uygulamanın HTML'ini değiştiremez. axe testi bu düğmeleri bilerek dışarıda bırakır.
+- Yükleme yazısı İngilizcedir. Bu metin Keycloak'ın şablonunda sabit durur.
+- Sayfa başlığı İngilizcedir. Başlık `title` ayarıyla değişir ama tek dilli kalır. Bu yüzden başlık değiştirilmedi.
+- Yazarak aranan seçim alanının odak çizgisi için kural yazıldı ama sınanmadı. Deneme realm'inde böyle bir alan yok.
+- Etiketsiz onay kutusunun odak göstergesi yok. Konsolun böyle bir kutu kullandığı doğrulanmadı.
+- Başlıkta marka adı yazmaz, yalnız marka işareti durur. Konsol logoyu resim olarak alır.
+- Seyrek koşularda tarayıcı Keycloak'ın bir yazı tipi dosyasını aynı sunucudan istedi. Nedeni doğrulanmadı. Test bu dosyaya adıyla izin verir, başka yazı tipi isteğini reddeder. Ekrandaki metin Outfit ile çizilir.
+- Bağlı hesaplar, gruplar ve kuruluşlar sayfaları testle sınanmadı. Deneme realm'inde bu özellikler kapalıdır.
+
 ## Temel temadan kopyalanan şablonlar
 
 Altı şablon Keycloak 26.8.2 kaynağından kopyalandı ve değiştirildi. Keycloak sürümü değişince bu dosyaları yeni temel şablonla karşılaştırın.
@@ -92,6 +123,7 @@ Komutları deponun kökünden çalıştırın. Container ortamı Colima'dır ve 
 1. Ortamı açın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh up`
 2. Portları bu bilgisayara taşıyın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh tunel`
 3. Tema dosyası değişince dosyaları kopyalayın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh sync`
+   Yalnız bir bölümü kopyalamak için `sync login`, `sync email` ya da `sync account` yazın.
 4. İş bitince ortamı kapatın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh down`
 
 Betik ilk çalışmada `test/.env` dosyasını üretir. Bu dosya Git'e girmez. Port tabanı `PANE_PORT` değişkeninden gelir. Keycloak taban portu, Mailpit ekranı bir sonraki portu kullanır. Mailpit, gönderilen e-postaları yakalayan deneme posta kutusudur.
@@ -116,6 +148,8 @@ npx playwright test
 | `tests/hareket.spec.ts` | Hareket eğrisi, süre, azaltılmış hareket ve stil kaynağı denetimi |
 | `tests/erisilebilirlik.spec.ts` | axe denetimi, açık ve koyu tema |
 | `tests/eposta.spec.ts` | E-posta şablonları ve Mailpit |
+| `tests/account.spec.ts` | Hesap konsolu: yerleşim, odak, hareket, axe, Türkçe iletiler ve token eşliği |
+| `tests/focus-diff.ts` | Odak çizgisini ölçen ortak yardımcı |
 | `tests/gorsel.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi |
 
 Yerleşim testleri yedi görünümde koşar: 320, 360, 375, 390, yatay telefon, tablet ve masaüstü. Öteki testler 320 ve masaüstü görünümünde koşar.
@@ -124,6 +158,12 @@ Ekran görüntülerini şu komut üretir:
 
 ```bash
 GORSEL=1 npx playwright test gorsel --project=chromium-320 --project=webkit-masaustu
+```
+
+Hesap konsolu görüntülerini şu komut üretir:
+
+```bash
+VISUAL=1 npx playwright test account -g screenshot --project=chromium-320 --project=webkit-masaustu
 ```
 
 Görüntüler `test/referans/` klasörüne yazılır. Bu görüntüler macOS'ta üretildi. Görüntüler otomatik karşılaştırma kapısı değildir. Görüntüyü üreten kişi kendi görüntüsünü onaylamaz.

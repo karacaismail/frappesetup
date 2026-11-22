@@ -1,0 +1,831 @@
+/*
+ * Atonota account console theme.
+ * The account console is the stock Keycloak React application (theme keycloak.v3, PatternFly 5).
+ * This file only restyles it. It is loaded through the supported "styles" theme property.
+ *
+ * All colour, type, spacing, radius and motion values live in the --at-* tokens below.
+ * Rules take their values from the tokens.
+ */
+
+/*
+ * Design tokens and the self-hosted Outfit font (SIL OFL 1.1, fonts/OFL.txt).
+ * This block is a copy of the token block in login/resources/css/atonota.css.
+ * A test fails when the two blocks differ. Change both files together.
+ */
+/* tokens:start */
+@font-face {
+  font-family: "Outfit Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../fonts/outfit-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Outfit Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../fonts/outfit-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  
+  --at-color-page: #f3f1ec;
+  --at-color-surface: #ffffff;
+  --at-color-surface-sunken: #eef0f5;
+  --at-color-surface-sunken-hover: #e1e5ee;
+  --at-color-ink: #161d33;
+  --at-color-ink-soft: #4a5268;
+  --at-color-line: #7d8496;
+  --at-color-line-strong: #4a5268;
+  --at-color-action: #1f2f63;
+  --at-color-action-hover: #16224a;
+  --at-color-action-active: #0f1836;
+  --at-color-on-action: #ffffff;
+  --at-color-link: #24397d;
+  --at-color-link-hover: #131f4a;
+  --at-color-seal: #c2452d;
+  --at-color-danger: #a8261b;
+  --at-color-danger-surface: #fbecea;
+  --at-color-warning-surface: #fbf1dc;
+  --at-color-success-surface: #e6f3ec;
+  --at-color-info-surface: #e9edf8;
+  --at-color-focus: #161d33;
+  --at-color-masthead: #161d33;
+  --at-color-on-masthead: #ffffff;
+  --at-shadow-card: 0 1px 2px rgb(22 29 51 / 0.06), 0 12px 32px rgb(22 29 51 / 0.1);
+
+  
+  --at-font-text: "Outfit Variable", "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --at-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --at-text-sm: 0.875rem;
+  --at-text-md: 1rem;
+  --at-text-lg: 1.125rem;
+  --at-text-title: 1.5rem;
+  --at-text-brand: 1.375rem;
+  --at-leading: 1.5;
+  --at-leading-tight: 1.25;
+  --at-weight-regular: 400;
+  --at-weight-medium: 500;
+  --at-weight-bold: 600;
+
+  
+  --at-space-1: 0.25rem;
+  --at-space-2: 0.5rem;
+  --at-space-3: 0.75rem;
+  --at-space-4: 1rem;
+  --at-space-5: 1.5rem;
+  --at-space-6: 2rem;
+  --at-page-gutter: 0.75rem;
+  --at-card-padding: 1.25rem;
+  --at-card-width: 27rem;
+
+  
+  --at-radius-card: 1rem;
+  --at-radius-control: 0.625rem;
+  --at-border-control: 1px;
+
+  
+  --at-hit: 2.75rem;
+
+  
+  --at-focus-thickness: 3px;
+  --at-focus-gap: 2px;
+  --at-focus-underline-offset: 4px;
+  --at-link-underline-offset: 3px;
+  --at-brand-mark-size: 2rem;
+  --at-focus-bar:
+    0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-surface),
+    0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-focus);
+
+  
+  --at-motion-duration: 160ms;
+  --at-motion-ease: cubic-bezier(.65, 0, .35, 1);
+  --at-motion-none: 0s;
+}
+
+:root.pf-v5-theme-dark {
+  --at-color-page: #0e1322;
+  --at-color-surface: #1a2036;
+  --at-color-surface-sunken: #262d47;
+  --at-color-surface-sunken-hover: #323a58;
+  --at-color-ink: #eef0f6;
+  --at-color-ink-soft: #b9bfd0;
+  --at-color-line: #8089a1;
+  --at-color-line-strong: #b9bfd0;
+  --at-color-action: #c9d3ff;
+  --at-color-action-hover: #dde3ff;
+  --at-color-action-active: #ffffff;
+  --at-color-on-action: #10172e;
+  --at-color-link: #bcc8ff;
+  --at-color-link-hover: #e0e6ff;
+  --at-color-seal: #ff8a6b;
+  --at-color-danger: #ffa799;
+  --at-color-danger-surface: #43201f;
+  --at-color-warning-surface: #3d3219;
+  --at-color-success-surface: #1b3a2c;
+  --at-color-info-surface: #252e52;
+  --at-color-focus: #ffffff;
+  --at-color-masthead: #1a2036;
+  --at-color-on-masthead: #eef0f6;
+  --at-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+@media (min-width: 30rem) {
+  :root {
+    --at-page-gutter: 1.5rem;
+    --at-card-padding: 2rem;
+    --at-text-title: 1.75rem;
+  }
+}
+
+@media (any-pointer: coarse) {
+  :root {
+    --at-hit: 3rem;
+  }
+}
+/* tokens:end */
+
+/* PatternFly variables are bound to the Atonota tokens, so stock components carry the same identity. */
+:root,
+:root.pf-v5-theme-dark {
+  --pf-v5-global--FontFamily--text: var(--at-font-text);
+  --pf-v5-global--FontFamily--heading: var(--at-font-text);
+  --pf-v5-global--FontFamily--text--vf: var(--at-font-text);
+  --pf-v5-global--FontFamily--heading--vf: var(--at-font-text);
+  --pf-v5-global--FontFamily--monospace: var(--at-font-mono);
+  --pf-v5-global--FontFamily--monospace--vf: var(--at-font-mono);
+  --pf-v5-global--FontSize--xs: var(--at-text-sm);
+  --pf-v5-global--FontSize--sm: var(--at-text-sm);
+  --pf-v5-global--FontSize--md: var(--at-text-md);
+  --pf-v5-global--Color--100: var(--at-color-ink);
+  --pf-v5-global--Color--200: var(--at-color-ink-soft);
+  --pf-v5-global--BackgroundColor--100: var(--at-color-surface);
+  --pf-v5-global--BackgroundColor--200: var(--at-color-page);
+  --pf-v5-global--BorderColor--100: var(--at-color-line);
+  --pf-v5-global--BorderColor--200: var(--at-color-line);
+  --pf-v5-global--BorderColor--300: var(--at-color-line);
+  --pf-v5-global--primary-color--100: var(--at-color-action);
+  --pf-v5-global--primary-color--200: var(--at-color-action-hover);
+  --pf-v5-global--active-color--100: var(--at-color-action);
+  --pf-v5-global--link--Color: var(--at-color-link);
+  --pf-v5-global--link--Color--hover: var(--at-color-link-hover);
+  --pf-v5-global--danger-color--100: var(--at-color-danger);
+  --pf-v5-global--danger-color--200: var(--at-color-danger);
+  --pf-v5-global--BorderRadius--sm: var(--at-radius-control);
+  /* The stock "transition: all" and its 250 ms duration are replaced by the central tokens. */
+  --pf-v5-global--TransitionDuration: var(--at-motion-duration);
+  --pf-v5-global--TimingFunction: var(--at-motion-ease);
+  --pf-v5-global--Transition: background-color var(--at-motion-duration) var(--at-motion-ease);
+  /* Components that move or rotate name the property they animate. */
+  --pf-v5-c-page__sidebar--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-alert__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-jump-links__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-form__field-group-toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-card__header-toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-table__toggle--c-button__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-table__toggle__icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-tabs__link-toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-tabs__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-data-list__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-expandable-section__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+  --pf-v5-c-nav__toggle-icon--Transition: transform var(--at-motion-duration) var(--at-motion-ease);
+}
+
+/* ---------- Page ---------- */
+
+body[data-page-id="account"] {
+  background: var(--at-color-page);
+  color: var(--at-color-ink);
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-md);
+  line-height: var(--at-leading);
+  overflow-wrap: break-word;
+}
+
+[data-page-id="account"] .keycloak__loading-container {
+  background: var(--at-color-page);
+  color: var(--at-color-ink);
+  font-family: var(--at-font-text);
+}
+
+[data-page-id="account"] .pf-v5-c-page {
+  --pf-v5-c-page--BackgroundColor: var(--at-color-page);
+  --pf-v5-c-page__main-section--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-page__main-section--m-light--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-page__sidebar--BackgroundColor: var(--at-color-page);
+  --pf-v5-c-page__sidebar--BoxShadow: none;
+}
+
+/* The sidebar sits on the paper-coloured page, so the gap above the focus line uses that colour. */
+[data-page-id="account"] .pf-v5-c-page__sidebar {
+  --at-focus-gap-local: var(--at-color-page);
+}
+
+[data-page-id="account"] .pf-v5-c-page__main-section {
+  min-inline-size: 0;
+}
+
+[data-page-id="account"] .pf-v5-c-title {
+  color: var(--at-color-ink);
+  font-weight: var(--at-weight-bold);
+  line-height: var(--at-leading-tight);
+}
+
+/* ---------- Masthead ---------- */
+
+[data-page-id="account"] .pf-v5-c-masthead {
+  --pf-v5-c-masthead--BackgroundColor: var(--at-color-masthead);
+  /* The focus bar must contrast with the masthead, not with the page surface. */
+  --at-focus-local: var(--at-color-on-masthead);
+  --at-focus-gap-local: var(--at-color-masthead);
+  color: var(--at-color-on-masthead);
+}
+
+[data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-button,
+[data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle {
+  color: var(--at-color-on-masthead);
+}
+
+/*
+ * The stock masthead stacks its content on a second row on narrow screens.
+ * The console has only two controls there, so they fit on one row at 320px.
+ */
+[data-page-id="account"] .pf-v5-c-masthead {
+  display: flex;
+  /* The row wraps only when the root font size is enlarged far enough. */
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--at-space-2);
+  min-block-size: 3.5rem;
+}
+
+[data-page-id="account"] .pf-v5-c-masthead__main {
+  flex: 0 0 auto;
+  min-block-size: 0;
+  padding: 0;
+  border: 0;
+}
+
+[data-page-id="account"] .pf-v5-c-masthead__main::before {
+  content: none;
+}
+
+[data-page-id="account"] .pf-v5-c-masthead__content {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  order: 0;
+}
+
+/* The stock toolbar paints its own dark surface inside the masthead. */
+[data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-toolbar {
+  --pf-v5-c-toolbar--BackgroundColor: transparent;
+  background: transparent;
+}
+
+[data-page-id="account"] .pf-v5-c-masthead__brand {
+  /* Raised above the stacked masthead row below it, so the focus line under the link stays visible. */
+  position: relative;
+  z-index: 1;
+  /* The link is as wide as the mark, so the focus line stays under the mark. */
+  inline-size: fit-content;
+  flex: none;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--at-hit);
+  min-inline-size: var(--at-hit);
+  border-radius: var(--at-radius-control);
+}
+
+[data-page-id="account"] .pf-v5-c-masthead__brand img {
+  block-size: var(--at-brand-mark-size);
+  inline-size: auto;
+}
+
+/* ---------- Navigation ---------- */
+
+[data-page-id="account"] .pf-v5-c-nav {
+  --pf-v5-c-nav__link--Color: var(--at-color-ink);
+  --pf-v5-c-nav__link--hover--Color: var(--at-color-ink);
+  --pf-v5-c-nav__link--focus--Color: var(--at-color-ink);
+  --pf-v5-c-nav__link--active--Color: var(--at-color-ink);
+  --pf-v5-c-nav__link--m-current--Color: var(--at-color-ink);
+  --pf-v5-c-nav__link--hover--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-nav__link--focus--BackgroundColor: transparent;
+  --pf-v5-c-nav__link--active--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-nav__link--m-current--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-nav__item--before--BorderColor: transparent;
+  --pf-v5-c-nav__subnav__link--hover--after--BorderColor: transparent;
+  --pf-v5-c-nav__subnav__link--focus--after--BorderColor: transparent;
+  --pf-v5-c-nav__subnav__link--active--after--BorderColor: transparent;
+  --pf-v5-c-nav__subnav__link--m-current--after--BorderColor: transparent;
+}
+
+/* The current page is marked by weight and surface tone. The stock coloured edge line is switched off. */
+[data-page-id="account"] .pf-v5-c-nav__link::before,
+[data-page-id="account"] .pf-v5-c-nav__link::after {
+  content: none;
+}
+
+[data-page-id="account"] .pf-v5-c-nav__link {
+  min-block-size: var(--at-hit);
+  font-size: var(--at-text-md);
+  text-decoration: none;
+  transition:
+    background-color var(--at-motion-duration) var(--at-motion-ease),
+    color var(--at-motion-duration) var(--at-motion-ease);
+}
+
+[data-page-id="account"] .pf-v5-c-nav__link.pf-m-current {
+  font-weight: var(--at-weight-bold);
+}
+
+[data-page-id="account"] .pf-v5-c-nav__subnav .pf-v5-c-nav__link {
+  font-size: var(--at-text-md);
+}
+
+/* The stock sub-navigation is a scroll container. Browsers put scroll containers in the Tab order. It never needs to scroll. */
+[data-page-id="account"] .pf-v5-c-nav__subnav {
+  overflow: hidden;
+}
+
+/* The stock toggle icons use "transition: all". Only the rotation is animated. */
+[data-page-id="account"] .pf-v5-c-data-list__toggle-icon,
+[data-page-id="account"] .pf-v5-c-expandable-section__toggle-icon,
+[data-page-id="account"] .pf-v5-c-nav__toggle-icon {
+  transition: transform var(--at-motion-duration) var(--at-motion-ease);
+}
+
+[data-page-id="account"] .pf-v5-c-jump-links__link {
+  min-block-size: var(--at-hit);
+  align-items: center;
+}
+
+/* ---------- Buttons ---------- */
+
+[data-page-id="account"] .pf-v5-c-button {
+  border: var(--at-border-control) solid transparent;
+  border-radius: var(--at-radius-control);
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-md);
+  font-weight: var(--at-weight-bold);
+  line-height: var(--at-leading-tight);
+  min-block-size: var(--at-hit);
+  min-inline-size: var(--at-hit);
+  max-inline-size: 100%;
+  white-space: normal;
+  transition:
+    background-color var(--at-motion-duration) var(--at-motion-ease),
+    border-color var(--at-motion-duration) var(--at-motion-ease),
+    color var(--at-motion-duration) var(--at-motion-ease);
+}
+
+/* An inline link button is part of a sentence. It keeps the size of the text around it. */
+[data-page-id="account"] .pf-v5-c-button.pf-m-inline {
+  border: 0;
+  min-block-size: 0;
+  min-inline-size: 0;
+  font-weight: var(--at-weight-medium);
+}
+
+/* The stock theme draws the button border with a pseudo-element and thickens it on focus. That drawing is switched off. */
+[data-page-id="account"] .pf-v5-c-button::after {
+  content: none;
+}
+
+[data-page-id="account"] .pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--at-color-action);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--at-color-action-hover);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--at-color-action);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--at-color-action-active);
+  --pf-v5-c-button--m-primary--Color: var(--at-color-on-action);
+  --pf-v5-c-button--m-primary--hover--Color: var(--at-color-on-action);
+  --pf-v5-c-button--m-primary--focus--Color: var(--at-color-on-action);
+  --pf-v5-c-button--m-primary--active--Color: var(--at-color-on-action);
+}
+
+[data-page-id="account"] .pf-v5-c-button.pf-m-secondary,
+[data-page-id="account"] .pf-v5-c-button.pf-m-tertiary,
+[data-page-id="account"] .pf-v5-c-button.pf-m-control {
+  background: transparent;
+  border-color: var(--at-color-line);
+  color: var(--at-color-ink);
+}
+
+[data-page-id="account"] .pf-v5-c-button.pf-m-secondary:hover,
+[data-page-id="account"] .pf-v5-c-button.pf-m-tertiary:hover,
+[data-page-id="account"] .pf-v5-c-button.pf-m-control:hover {
+  background: var(--at-color-surface-sunken);
+  border-color: var(--at-color-line-strong);
+}
+
+[data-page-id="account"] .pf-v5-c-button.pf-m-danger {
+  background: var(--at-color-danger);
+  color: var(--at-color-surface);
+}
+
+[data-page-id="account"] .pf-v5-c-button.pf-m-secondary.pf-m-danger {
+  background: transparent;
+  border-color: var(--at-color-danger);
+  color: var(--at-color-danger);
+}
+
+/*
+ * The stock icon buttons and plain toggles darken on plain :focus, also with a pointer.
+ * Their colour is fixed here, so focus alone changes nothing. The keyboard focus line is the only indicator.
+ */
+[data-page-id="account"] .pf-v5-c-button.pf-m-plain,
+[data-page-id="account"] .pf-v5-c-menu-toggle.pf-m-plain,
+[data-page-id="account"] .pf-v5-c-menu-toggle.pf-m-plain .pf-v5-c-menu-toggle__toggle-icon,
+[data-page-id="account"] .pf-v5-c-menu-toggle.pf-m-plain .pf-v5-c-menu-toggle__icon {
+  color: var(--at-color-ink);
+}
+
+[data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-button.pf-m-plain,
+[data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle,
+[data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle .pf-v5-c-menu-toggle__toggle-icon,
+[data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle .pf-v5-c-menu-toggle__icon {
+  color: var(--at-color-on-masthead);
+}
+
+[data-page-id="account"] .pf-v5-c-button.pf-m-link {
+  color: var(--at-color-link);
+}
+
+[data-page-id="account"] .pf-v5-c-button.pf-m-link:hover {
+  color: var(--at-color-link-hover);
+}
+
+[data-page-id="account"] .pf-v5-c-button:disabled,
+[data-page-id="account"] .pf-v5-c-button.pf-m-aria-disabled {
+  background: var(--at-color-surface-sunken);
+  border-color: transparent;
+  color: var(--at-color-ink-soft);
+}
+
+/* ---------- Form fields ---------- */
+
+[data-page-id="account"] .pf-v5-c-form__label {
+  font-size: var(--at-text-sm);
+}
+
+[data-page-id="account"] .pf-v5-c-form__label-text {
+  color: var(--at-color-ink);
+  font-weight: var(--at-weight-medium);
+}
+
+[data-page-id="account"] .pf-v5-c-form-control {
+  background: var(--at-color-surface);
+  border: var(--at-border-control) solid var(--at-color-line);
+  border-radius: var(--at-radius-control);
+  color: var(--at-color-ink);
+  min-block-size: var(--at-hit);
+  transition: border-color var(--at-motion-duration) var(--at-motion-ease);
+}
+
+/* The stock theme draws the field border with pseudo-elements and thickens the bottom line on focus. That drawing is switched off. */
+[data-page-id="account"] .pf-v5-c-form-control::before,
+[data-page-id="account"] .pf-v5-c-form-control::after {
+  content: none;
+}
+
+[data-page-id="account"] .pf-v5-c-form-control:hover {
+  border-color: var(--at-color-line-strong);
+}
+
+/* The error border runs on all four sides. The :has() rule is separate, so an older browser keeps the first one. */
+[data-page-id="account"] .pf-v5-c-form-control.pf-m-error {
+  border-color: var(--at-color-danger);
+}
+
+[data-page-id="account"] .pf-v5-c-form-control:has(> [aria-invalid="true"]) {
+  border-color: var(--at-color-danger);
+}
+
+[data-page-id="account"] .pf-v5-c-form-control.pf-m-readonly,
+[data-page-id="account"] .pf-v5-c-form-control.pf-m-disabled {
+  background: var(--at-color-surface-sunken);
+  color: var(--at-color-ink-soft);
+}
+
+[data-page-id="account"] .pf-v5-c-form-control > :is(input, textarea) {
+  border-radius: var(--at-radius-control);
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-md);
+  min-block-size: var(--at-hit);
+  padding-inline: var(--at-space-3);
+}
+
+[data-page-id="account"] .pf-v5-c-helper-text__item-text {
+  font-size: var(--at-text-sm);
+}
+
+[data-page-id="account"] .pf-v5-c-helper-text__item.pf-m-error .pf-v5-c-helper-text__item-text {
+  color: var(--at-color-danger);
+  font-weight: var(--at-weight-medium);
+}
+
+/* The stock action row clips its overflow. That would cut the focus line under the buttons. */
+[data-page-id="account"] .pf-v5-c-form__group.pf-m-action {
+  overflow: visible;
+}
+
+/* ---------- Menu toggle and menu ---------- */
+
+[data-page-id="account"] .pf-v5-c-menu-toggle {
+  --pf-v5-c-menu-toggle--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-menu-toggle--hover--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-menu-toggle--focus--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-menu-toggle--active--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-menu-toggle--m-expanded--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-menu-toggle--Color: var(--at-color-ink);
+  --pf-v5-c-menu-toggle--m-expanded--Color: var(--at-color-ink);
+  border: var(--at-border-control) solid var(--at-color-line);
+  border-radius: var(--at-radius-control);
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-md);
+  min-block-size: var(--at-hit);
+  min-inline-size: var(--at-hit);
+  transition:
+    background-color var(--at-motion-duration) var(--at-motion-ease),
+    border-color var(--at-motion-duration) var(--at-motion-ease);
+}
+
+[data-page-id="account"] .pf-v5-c-menu-toggle.pf-m-plain,
+[data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle {
+  --pf-v5-c-menu-toggle--BackgroundColor: transparent;
+  --pf-v5-c-menu-toggle--hover--BackgroundColor: transparent;
+  --pf-v5-c-menu-toggle--focus--BackgroundColor: transparent;
+  --pf-v5-c-menu-toggle--active--BackgroundColor: transparent;
+  --pf-v5-c-menu-toggle--m-expanded--BackgroundColor: transparent;
+  background: transparent;
+  border-color: transparent;
+}
+
+[data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-menu-toggle {
+  --pf-v5-c-menu-toggle--Color: var(--at-color-on-masthead);
+  --pf-v5-c-menu-toggle--m-expanded--Color: var(--at-color-on-masthead);
+}
+
+[data-page-id="account"] .pf-v5-c-menu__item {
+  --pf-v5-c-menu__item--Color: var(--at-color-ink);
+}
+
+/* The stock theme draws the toggle border with pseudo-elements and adds a coloured bottom line on focus. That drawing is switched off. */
+[data-page-id="account"] .pf-v5-c-menu-toggle::before,
+[data-page-id="account"] .pf-v5-c-menu-toggle::after {
+  content: none;
+}
+
+/*
+ * A type-ahead field lives inside the toggle. The stock theme thickens and colours its bottom line on focus.
+ * That change is switched off. The focus line goes under the whole toggle instead.
+ */
+[data-page-id="account"] .pf-v5-c-text-input-group {
+  --pf-v5-c-text-input-group__text--focus-within--after--BorderBottomWidth: var(--pf-v5-c-text-input-group__text--after--BorderBottomWidth);
+  --pf-v5-c-text-input-group__text--focus-within--after--BorderBottomColor: var(--pf-v5-c-text-input-group__text--after--BorderBottomColor);
+  --pf-v5-c-text-input-group--hover__text--after--BorderBottomColor: var(--pf-v5-c-text-input-group__text--after--BorderBottomColor);
+}
+
+[data-page-id="account"] .pf-v5-c-menu-toggle .pf-v5-c-text-input-group__text::before,
+[data-page-id="account"] .pf-v5-c-menu-toggle .pf-v5-c-text-input-group__text::after {
+  content: none;
+}
+
+[data-page-id="account"] .pf-v5-c-menu {
+  --pf-v5-c-menu--BackgroundColor: var(--at-color-surface);
+  /* A menu that opens from the masthead sits on the page surface again. */
+  --at-focus-local: var(--at-color-focus);
+  --at-focus-gap-local: var(--at-color-surface);
+  border-radius: var(--at-radius-control);
+  box-shadow: var(--at-shadow-card);
+  overflow: hidden;
+}
+
+[data-page-id="account"] .pf-v5-c-menu__item {
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-md);
+  min-block-size: var(--at-hit);
+}
+
+[data-page-id="account"] .pf-v5-c-menu__list-item:hover {
+  background: var(--at-color-surface-sunken);
+}
+
+/* ---------- Lists, alerts, labels ---------- */
+
+[data-page-id="account"] .pf-v5-c-data-list {
+  /* The stock theme adds a one-sided line to the neighbour of a hovered row. That line is switched off. */
+  --pf-v5-c-data-list__item--m-clickable--hover--item--BorderTopWidth: 0;
+  --pf-v5-c-data-list__item--before--BackgroundColor: transparent;
+  /* The stock list paints a thick top band and its own dark surface on narrow screens. */
+  --pf-v5-c-data-list--BorderTopWidth: var(--at-border-control);
+  --pf-v5-c-data-list--sm--BorderTopWidth: var(--at-border-control);
+  --pf-v5-c-data-list--BorderTopColor: var(--at-color-line);
+  --pf-v5-c-data-list--sm--BorderTopColor: var(--at-color-line);
+  --pf-v5-c-data-list__item--BackgroundColor: var(--at-color-surface);
+  --pf-v5-c-data-list__item--BorderBottomColor: var(--at-color-line);
+  --pf-v5-c-data-list__item--BorderBottomWidth: var(--at-border-control);
+  --pf-v5-c-data-list__item--sm--BorderBottomColor: var(--at-color-line);
+  --pf-v5-c-data-list__item--sm--BorderBottomWidth: var(--at-border-control);
+}
+
+[data-page-id="account"] .pf-v5-c-data-list__item::before {
+  content: none;
+}
+
+/* Rows keep the same inset and vertical rhythm at every width. */
+[data-page-id="account"] .pf-v5-c-data-list__item-row {
+  padding-inline: var(--at-space-3);
+  padding-block: var(--at-space-2);
+}
+
+[data-page-id="account"] .pf-v5-c-data-list__cell {
+  padding-block: var(--at-space-2);
+}
+
+[data-page-id="account"] .pf-v5-c-data-list__item-action {
+  margin-inline-start: 0;
+  padding-block: var(--at-space-2);
+}
+
+[data-page-id="account"] .pf-v5-c-data-list__item-row,
+[data-page-id="account"] .pf-v5-c-data-list__cell,
+[data-page-id="account"] .pf-v5-c-description-list__group,
+[data-page-id="account"] .pf-v5-l-grid > *,
+[data-page-id="account"] .pf-v5-l-split__item,
+[data-page-id="account"] .pf-v5-l-flex > * {
+  min-inline-size: 0;
+}
+
+/* Layout containers may shrink below their content, so a large root font size does not overflow the page. */
+[data-page-id="account"] .pf-v5-l-grid,
+[data-page-id="account"] .pf-v5-c-toolbar__content,
+[data-page-id="account"] .pf-v5-c-toolbar__content-section,
+[data-page-id="account"] .pf-v5-c-toolbar__item {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+[data-page-id="account"] .pf-v5-c-toolbar__content-section {
+  flex-wrap: wrap;
+}
+
+[data-page-id="account"] .pf-v5-c-alert {
+  --pf-v5-c-alert--BoxShadow: none;
+  --at-focus-gap-local: var(--at-color-info-surface);
+  background: var(--at-color-info-surface);
+  border: 0;
+  border-radius: var(--at-radius-control);
+  box-shadow: none;
+  color: var(--at-color-ink);
+}
+
+[data-page-id="account"] .pf-v5-c-alert.pf-m-danger {
+  --at-focus-gap-local: var(--at-color-danger-surface);
+  background: var(--at-color-danger-surface);
+}
+
+[data-page-id="account"] .pf-v5-c-alert.pf-m-warning {
+  --at-focus-gap-local: var(--at-color-warning-surface);
+  background: var(--at-color-warning-surface);
+}
+
+[data-page-id="account"] .pf-v5-c-alert.pf-m-success {
+  --at-focus-gap-local: var(--at-color-success-surface);
+  background: var(--at-color-success-surface);
+}
+
+[data-page-id="account"] .pf-v5-c-alert__title,
+[data-page-id="account"] .pf-v5-c-alert__icon {
+  color: var(--at-color-ink);
+}
+
+[data-page-id="account"] .pf-v5-c-label {
+  font-size: var(--at-text-sm);
+}
+
+[data-page-id="account"] .pf-v5-c-modal-box {
+  border-radius: var(--at-radius-card);
+  box-shadow: var(--at-shadow-card);
+}
+
+[data-page-id="account"] a:not([class]) {
+  color: var(--at-color-link);
+  font-weight: var(--at-weight-medium);
+  text-decoration: underline;
+  text-underline-offset: var(--at-link-underline-offset);
+}
+
+/* ---------- Focus ---------- */
+
+/*
+ * There is no surrounding focus ring. The browser ring and the stock ring are switched off.
+ * One indicator replaces them: a straight line under the element that does not touch the corners.
+ * The indicator shows only while keyboard mode is on and the element matches :focus-visible.
+ * If the script does not load (no data-at-js attribute), the indicator still shows with :focus-visible.
+ */
+[data-page-id="account"] :focus,
+[data-page-id="account"] :focus-visible {
+  outline: 0;
+}
+
+/*
+ * Box-shaped controls: buttons, toggles, standalone fields and the brand link.
+ * The last selector is the fallback for anything else that can take focus, such as a scroll container.
+ */
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
+  :is(button:not(.pf-m-inline, .pf-v5-c-menu__item, .pf-v5-c-nav__link), a[class*="c-button"]:not(.pf-m-inline), a.pf-v5-c-masthead__brand, [role="button"], summary):focus-visible,
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
+  :is(input:not([type="checkbox"], [type="radio"]), select, textarea):not(.pf-v5-c-form-control > *, .pf-v5-c-text-input-group *):focus-visible,
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
+  :focus-visible:not(a, button, input, select, textarea, summary, [role="button"]) {
+  box-shadow:
+    0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-gap-local, var(--at-color-surface)),
+    0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-local, var(--at-color-focus));
+}
+
+/* A field inside its wrapper: the line goes under the wrapper. The rule is separate because :has() is not everywhere. */
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
+  :is(.pf-v5-c-form-control, .pf-v5-c-menu-toggle):has(> :is(input, select, textarea):focus-visible, .pf-v5-c-text-input-group input:focus-visible) {
+  box-shadow:
+    0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-gap-local, var(--at-color-surface)),
+    0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-local, var(--at-color-focus));
+}
+
+/* A browser without :has() draws the line under the field itself, so keyboard focus is never invisible. */
+@supports not selector(:has(*)) {
+  :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
+    :is(input:not([type="checkbox"], [type="radio"]), select, textarea):focus-visible {
+    box-shadow:
+      0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-gap-local, var(--at-color-surface)),
+      0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-local, var(--at-color-focus));
+  }
+}
+
+/* Text-like controls: links, navigation entries, menu items and inline link buttons get a thick underline. */
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
+  :is(a:not([class*="c-button"], .pf-v5-c-masthead__brand), .pf-v5-c-button.pf-m-inline, .pf-v5-c-nav__link):focus-visible,
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
+  .pf-v5-c-menu__item:focus-visible .pf-v5-c-menu__item-text {
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--at-focus-thickness);
+  text-decoration-color: var(--at-focus-local, var(--at-color-focus));
+  text-underline-offset: var(--at-focus-underline-offset);
+}
+
+/* Checkbox, radio and switch: a thick line under the label text. WebKit draws no shadow on a native checkbox. */
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
+  input:is([type="checkbox"], [type="radio"]):focus-visible + label {
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--at-focus-thickness);
+  text-decoration-color: var(--at-color-focus);
+  text-underline-offset: var(--at-focus-underline-offset);
+}
+
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
+  label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--at-focus-thickness);
+  text-decoration-color: var(--at-color-focus);
+  text-underline-offset: var(--at-focus-underline-offset);
+}
+
+@media (forced-colors: active) {
+  :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
+    :focus-visible {
+    outline: 2px solid CanvasText;
+  }
+}
+
+/* ---------- Motion ---------- */
+
+/* Every transition that comes from the stock theme also uses the approved curve. */
+/*
+ * The body prefix raises the specificity above single-class component rules that load later with lazy chunks.
+ * Rules with two classes still win, so the component transition variables are also bound to the tokens above.
+ */
+body[data-page-id="account"] *,
+body[data-page-id="account"] *::before,
+body[data-page-id="account"] *::after {
+  transition-timing-function: var(--at-motion-ease);
+  animation-timing-function: var(--at-motion-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-page-id="account"] *,
+  body[data-page-id="account"] *::before,
+  body[data-page-id="account"] *::after {
+    transition-duration: var(--at-motion-none) !important;
+    animation-duration: var(--at-motion-none) !important;
+  }
+}
