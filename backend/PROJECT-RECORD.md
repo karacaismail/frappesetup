@@ -271,6 +271,11 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Kapsamdaki bir dosya değişirse kapı bu onayları yeniden ister.
   - Onay kapsamları çakışırsa kapı hata verir.
 
+- **O-44. Kiracı, hesap silme sonucunu eşitleme hizmetine bildirir.**
+  - Başarılı yanıtta `anonymized` ve `found` alanları `true` olur. Yanıt `user`, `enabled` ve `status` alanlarını da taşır.
+  - Kiracı kimlik bağı veya silme kaydı bulamazsa HTTP 200 döner. Yanıt yalnız `anonymized: true` ve `found: false` alanlarını taşır.
+  - Anonim yapma isteği HTTP 404 dönerse eşitleme hizmeti silme akışını durdurur.
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:
@@ -332,7 +337,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 ### Kapanan teknik borç
 
-- **Çalışan fotoğrafı ve kart geçmişi (O-41).** Hesap silme, fotoğraf alanına bağlı dosya kaydını siler. Paylaşılan dosya içeriği son kayıt silinene kadar diskte kalır. Sistem, karttaki seçili alanların eski ve yeni değerlerini geçmişten temizler.
+- **Çalışan fotoğrafı ve kart geçmişi (O-41).** Hesap silme, fotoğraf alanına bağlı dosya kaydını siler. Paylaşılan dosya içeriği son kayıt silinene kadar diskte kalır. Sistem, seçili alanları ve kullanıcı bağını kartın geçmişinden temizler. Sistem, aynı karttaki alan bağı olmayan eki de eski dosya adresinden bulur. Başka bir dosya alanı adresi kullanıyorsa sistem eki korur.
 
 - `list_identities` uçları tamamlandı. Kiracı ve Press uçları aynı sayfalama sözleşmesini kullanır.
 - Kiracı HTTP testleri ikinci sayfayı ve yetkisiz istek reddini doğruladı.

@@ -378,6 +378,8 @@ class FakeTenant(FakeSite):
     def _anonymize(self, req: Recorded) -> Reply:
         key, error = self._identity(req)
         if error:
+            if error[0] == 404:
+                return 200, {"message": {"anonymized": True, "found": False}}
             return error
         # Personal fields are blanked. The record itself stays: business records are not deleted.
         self.users[self.links[key]].update(first_name="", last_name="", anonymized=True, enabled=False)
