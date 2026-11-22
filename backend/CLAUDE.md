@@ -78,6 +78,15 @@ Proje sahibi `cron` kurulumunu istemedi. Bu yüzden şunları kurmayın:
 
 Karar sitesi bazı yerlerde saatlik ya da gecelik iş anar. Bu işleri elle başlatılan komut olarak yazın.
 
+### Ad dili
+
+Yeni kod İngilizce adlarla yazılır (D-12). Kural yalnız bundan sonrası içindir.
+
+- Yeni dosya, klasör, modül, DocType, işlev ve değişken adını İngilizce verin.
+- Yeni yazdığınız koddaki yorumu, hata iletisini ve günlük metnini İngilizce yazın.
+- Var olan dosya, klasör ve modüllerin adını değiştirmeyin.
+- Var olan bir klasöre yeni dosya eklerseniz yalnız yeni dosyanın adını İngilizce verin.
+
 ### Yapay zekâ erişimi
 
 Proje sahibi her şeyin yapay zekâyla yönetilebilir olmasını istedi (D-9). Ayrıntı sözleşmenin 10. bölümündedir.
