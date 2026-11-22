@@ -1,7 +1,8 @@
 FROM frappe/erpnext:v16.55.0@sha256:15a1270f7d8d674de5facd16c3390665a12bd632f5abb846bdd67b61d7461d84
 COPY --chown=frappe:frappe apps/platform_core /home/frappe/frappe-bench/apps/platform_core
 COPY --chown=frappe:frappe dev /workspace/dev
+COPY --chown=frappe:frappe contracts/platform_core-model-gecidi.openapi.yaml /home/frappe/frappe-bench/apps/platform_core/contracts/
 # Ruff matches the version supplied by bench new-app. No Git hooks are installed.
 RUN uv pip install --python env/bin/python --no-deps -e apps/platform_core \
-    && uv pip install --python env/bin/python ruff==0.14.10 \
+    && uv pip install --python env/bin/python ruff==0.14.10 -r /workspace/dev/requirements-contract-tests.txt \
     && printf '\nplatform_core\n' >> sites/apps.txt
