@@ -333,6 +333,8 @@ paths:
         Without a valid token nothing is deleted and the answer is 417 with the deny reason `preview_required`.
         The same answer comes if any number changed after the preview, for example if one more record waits. Ask for a new preview then.
         The AI tool `purge_action_log` follows the same rule: its approval is bound to the chosen records and the numbers.
+        A delete is all or nothing. If the gateway refuses the chosen usage records at the delete, nothing is deleted
+        anywhere: the web answer is 417 with `preview_required`, and the AI tool's action does not succeed.
         Retention periods:
         - "AI Action Log" records go after `older_than_days`, at least 365 days.
         - An "AI Action Proposal" goes 30 days after its decision or its expiry, whichever comes first. That period is fixed.
@@ -567,17 +569,17 @@ components:
         logs_waiting: {type: integer, description: Number of AI Action Log records past their period when the run started.}
         usage_logs:
           type: object
-          description: "What happened to the AI Usage Log. The model gateway owns that log and cleans it with its shared function `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run)`. The function checks the caller's permission, applies 365 days from the web and from the command line alike, and deletes for good. This field is never null."
+          description: "What happened to the AI Usage Log. The model gateway owns that log and cleans it with its shared function `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run, names)`. The counting call returns the names it would delete. This layer binds those names to the confirmation or the approval and hands exactly them back at the delete. The gateway deletes all of them or none. This field is never null."
           required: [status]
           properties:
             status:
               type: string
               enum: [ok, not_run, error]
-              description: "`ok`: the gateway ran. `not_run`: the gateway offers no such function. `error`: the gateway refused."
-            eligible: {type: integer, description: "With `ok`: number of records past 365 days that waited when the run started."}
-            to_delete: {type: integer, description: "With `ok`: number of records one run deletes. It is `eligible`, capped at the gateway's batch of 500. A preview shows this number."}
-            deleted: {type: integer, description: "With `ok`: number of records this run deleted. The gateway deletes in batches, so it may be smaller than `eligible`. Zero in the counting mode."}
-            reason: {type: string, description: "With `not_run`: `gateway_purge_unavailable`. With `error`: the type of the error, never its text."}
+              description: "`ok`: the gateway ran. `not_run`: nothing was asked of the gateway, see `reason`. `error`: the gateway refused the counting call."
+            eligible: {type: integer, description: "With `ok`: number of records past 365 days that wait."}
+            to_delete: {type: integer, description: "With `ok`: number of records this run deletes, at most 500. A preview shows this number."}
+            deleted: {type: integer, description: "With `ok`: number of records this run deleted. Zero in the counting mode."}
+            reason: {type: string, description: "With `not_run`: `gateway_purge_unavailable` if the gateway offers no such function, or `gateway_purge_outdated` if its function does not take `names`. With `error`: the type of the error, never its text."}
         proposals: {type: integer, description: Number of AI Action Proposal records this run deletes.}
         proposals_waiting: {type: integer, description: Number of AI Action Proposal records past their period when the run started.}
 

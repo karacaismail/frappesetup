@@ -12,6 +12,7 @@ import frappe
 from frappe.utils import add_days, now_datetime
 
 from platform_core.yapay_zeka.tests.base import DOCTYPE, MANAGER, YzTestCase
+from platform_core.yapay_zeka.tests.test_usage_selection import Gateway
 
 
 def ago(days: int):
@@ -107,10 +108,8 @@ class TestPurgeConfirmation(YzTestCase):
 
 		manager = self.login(MANAGER)
 
-		def fake(*, dry_run=False):
-			return {"eligible": 501, "deleted": 0 if dry_run else 500}
-
-		with patch.object(api, "purge_usage_logs", fake, create=True):
+		gateway = Gateway([f"u-{index}" for index in range(500)], waiting=501)
+		with patch.object(api, "purge_usage_logs", gateway, create=True):
 			preview = self.post(manager).json["message"]
 			real = self.post(manager, dry_run=False, confirmation_token=preview["confirmation_token"]).json[
 				"message"
@@ -130,9 +129,8 @@ class TestPurgeConfirmation(YzTestCase):
 
 		manager = self.login(MANAGER)
 
-		with patch.object(
-			api, "purge_usage_logs", lambda *, dry_run=False: {"eligible": 7, "deleted": 0}, create=True
-		):
+		gateway = Gateway([f"u-{index}" for index in range(7)])
+		with patch.object(api, "purge_usage_logs", gateway, create=True):
 			preview = self.post(manager).json["message"]
 
 		self.assertEqual(preview["usage_logs"]["to_delete"], 7)

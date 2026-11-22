@@ -113,39 +113,10 @@ class TestRetentionPeriods(YzTestCase):
 
 		self.assertFalse(self.exists(old))
 
-	def gateway(self, purge):
-		"""Put a purge function on the gateway's public interface for one test."""
-		from platform_core.model_gecidi import api
-
-		return patch.object(api, "purge_usage_logs", purge, create=True)
-
 	def without_gateway_purge(self):
 		from platform_core.model_gecidi import api
 
 		return patch.object(api, "purge_usage_logs", None, create=True)
-
-	def test_usage_log_is_cleaned_by_the_gateways_shared_function(self):
-		"""Contract, section 10: `purge_usage_logs(*, dry_run)` returns `eligible` and `deleted`."""
-		manager = self.login(MANAGER)
-		calls = []
-
-		def fake(*, dry_run=False):
-			calls.append((dry_run, frappe.session.user))
-			return {"eligible": 501, "deleted": 0 if dry_run else 500}
-
-		with self.gateway(fake):
-			dry = self.count_only(manager)
-			real = self.purge(manager)
-
-		# Counting calls come first: the preview and the count again at the confirmation.
-		# Exactly one call deletes, and it is the last one.
-		self.assertEqual([dry_run for dry_run, _user in calls].count(False), 1)
-		self.assertEqual(calls[-1], (False, MANAGER))
-		self.assertEqual({user for _dry_run, user in calls}, {MANAGER})
-		self.assertEqual(dry["usage_logs"], {"status": "ok", "eligible": 501, "to_delete": 500, "deleted": 0})
-		self.assertEqual(
-			real["usage_logs"], {"status": "ok", "eligible": 501, "to_delete": 500, "deleted": 500}
-		)
 
 	def test_missing_gateway_function_is_reported_as_not_run(self):
 		manager = self.login(MANAGER)
@@ -154,46 +125,6 @@ class TestRetentionPeriods(YzTestCase):
 			result = self.purge(manager)
 
 		self.assertEqual(result["usage_logs"], {"status": "not_run", "reason": "gateway_purge_unavailable"})
-
-	def test_refusal_of_the_gateway_is_reported_as_an_error(self):
-		manager = self.login(MANAGER)
-		old = self.proposal(manager, status="rejected", decided_at=ago(31))
-
-		def refuse(*, dry_run=False):
-			raise frappe.PermissionError("leak-marker in a gateway error")
-
-		with self.gateway(refuse):
-			response = self.confirmed_purge(manager)
-
-		self.assertEqual(response.status_code, 200)
-		self.assertEqual(
-			response.json["message"]["usage_logs"], {"status": "error", "reason": "PermissionError"}
-		)
-		self.assertNotIn("leak-marker", response.get_data(as_text=True))
-		self.assertFalse(self.exists(old))
-
-	def test_terminal_call_uses_the_same_function(self):
-		"""The command line has no session cookie. The same shared function is called there."""
-		from platform_core.yapay_zeka import retention
-
-		calls = []
-
-		def fake(*, dry_run=False):
-			calls.append(dry_run)
-			return {"eligible": 2, "deleted": 0 if dry_run else 2}
-
-		frappe.set_user(MANAGER)
-		with self.gateway(fake):
-			counted = retention.purge()
-			result = retention.purge(365, dry_run=False)
-		with self.without_gateway_purge():
-			missing = retention.purge(365, dry_run=False)
-
-		# V-10: without `dry_run` the command only counts, and the gateway is asked to count too.
-		self.assertEqual(calls, [True, False])
-		self.assertEqual(counted["usage_logs"], {"status": "ok", "eligible": 2, "to_delete": 2, "deleted": 0})
-		self.assertEqual(result["usage_logs"], {"status": "ok", "eligible": 2, "to_delete": 2, "deleted": 2})
-		self.assertEqual(missing["usage_logs"]["status"], "not_run")
 
 	def test_result_has_the_fields_the_contract_requires(self):
 		import yaml
@@ -224,10 +155,10 @@ class TestRetentionPeriods(YzTestCase):
 		for _ in range(4):
 			self.proposal(manager, status="rejected", decided_at=ago(31))
 
-		def fake(*, dry_run=False):
-			return {"eligible": 501, "deleted": 0}
+		from platform_core.yapay_zeka.tests.test_usage_selection import Gateway, installed
 
-		with self.gateway(fake), patch.object(retention, "BATCH_SIZE", 3):
+		gateway = Gateway([f"u-{index}" for index in range(500)], waiting=501)
+		with installed(gateway), patch.object(retention, "BATCH_SIZE", 3):
 			result = self.call_tool(manager, "purge_action_log", {"older_than_days": 800})
 
 		preview = result["structuredContent"]["preview"]

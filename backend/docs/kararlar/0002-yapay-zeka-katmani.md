@@ -605,7 +605,9 @@ Altıncı birleştirme incelemesi web ucunun silmeyi onaysız başlattığını 
 - **Silme yalnız seçilen kayıtları siler.** Katman silme adımında kayıtları yeniden seçmez. Örneğin saklama süresi önizlemeden sonra dolan kayıt silinmez.
 - **Sayı değişirse eski onay reddedilir.** Örneğin bekleyen kayıt 501 iken 502 olursa silme 417 döner ve hiçbir kayıt silinmez.
 - **Yapay zekâ aracı aynı kuralı uygular.** `purge_action_log` önizlemesinin sürümü, seçilen kayıtların ve sayıların özetidir. Onayda özet değiştiyse sonuç `document_changed` olur.
-- **Kullanım günlüğünde bağ sayıyladır.** Geçit kendi kayıtlarını kendisi seçer. Katman geçidin seçtiği kayıt adlarını göremez. Katman yalnız bekleyen toplamı ve silinecek sayıyı bağlar.
+- **Kullanım günlüğünde de bağ kayıt adıyladır.** Geçidin sayım çağrısı silinecek kayıtların adlarını döner. Katman bu adları onaya bağlar ve silmede aynı listeyi geçide verir. Arayüz sözleşmenin 10. bölümündedir: `purge_usage_logs(*, dry_run, names)`.
+- **Silme ya bütündür ya da hiçtir.** Katman önce geçide silmeyi yaptırır. Geçit reddederse katman kendi kayıtlarını silmez ve bütün işlemi geri alır. Web ucu 417 döner. Yapay zekâ aracının sonucu başarılı olmaz.
+- **Eski geçit çağrılmaz.** Geçidin işlevi `names` girdisini almıyorsa silme sırasında kendi kayıtlarını seçer. Katman böyle bir işlevi çağırmaz ve sonucu `gateway_purge_outdated` diye yazar.
 - **Ortak test üç girişi gerçek kayıtlarla sınar.** Test `platform_core/tests/test_ai_retention_entries.py` dosyasındadır. Dosya iki modülün ortak alanındadır, çünkü modül sınırı bir modülün ötekinin kaydına yazmasını yasaklar.
 - **Terminal komutu belirteç istemez.** Komutu terminalde bir insan başlatır. Komut `dry_run` verilmezse yalnız sayar.
 - **Yapay zekâ aracı öneri yolunu kullanır.** `purge_action_log` aracı önizleme ve insan onayı ister.

@@ -9,6 +9,7 @@ There is no scheduled job (D-6). The command starts in these three ways:
 """
 
 import hashlib
+import inspect
 import json
 import secrets
 
@@ -27,8 +28,6 @@ PROPOSAL_DAYS = 30
 MAX_DAYS = 36_500
 # Records of each kind one run deletes at most. Each delete loads its document, so a run is bounded.
 BATCH_SIZE = 500
-# Records the model gateway deletes from its usage log in one run, unless its interface names another number.
-USAGE_BATCH_SIZE = 500
 # A web delete needs the confirmation of a preview. The confirmation lives this long and works once.
 CONFIRMATION_SECONDS = 600
 CONFIRMATION_KEY = "yz_purge_confirmation:"
@@ -60,11 +59,17 @@ def purge(older_than_days: int = MIN_DAYS, dry_run: bool = True, selection: dict
 	The usage log belongs to the model gateway, which applies its own 365 day rule.
 	With `selection` exactly those records are deleted. Without it the records are chosen once,
 	here, and those are deleted. A record is never chosen a second time between count and delete.
+
+	A delete is all or nothing. The gateway deletes its chosen usage records first, all of them
+	or none. If it refuses, its error goes to the caller and nothing of this layer is deleted.
 	"""
 	frappe.only_for("System Manager")
 	days = _days(older_than_days)
-	chosen = selection or store.select_expired(days, PROPOSAL_DAYS, BATCH_SIZE)
+	chosen = selection or _choose(days)
+	usage = dict(chosen["usage"])
 	if not dry_run:
+		if chosen["usage_names"] is not None:
+			usage["deleted"] = _delete_usage_logs(chosen["usage_names"])
 		# Exactly the chosen records go. Nothing is chosen a second time.
 		store.delete_selected(chosen["logs"], chosen["proposals"])
 	return {
@@ -76,32 +81,40 @@ def purge(older_than_days: int = MIN_DAYS, dry_run: bool = True, selection: dict
 		"logs_waiting": chosen["logs_waiting"],
 		"proposals": len(chosen["proposals"]),
 		"proposals_waiting": chosen["proposals_waiting"],
-		"usage_logs": _purge_usage_logs(bool(dry_run)),
+		"usage_logs": usage,
+	}
+
+
+def _choose(days: int) -> dict:
+	"""Choose the records of one delete run: this layer's own and the gateway's usage records."""
+	usage, usage_names = _preview_usage_logs()
+	return {
+		**store.select_expired(days, PROPOSAL_DAYS, BATCH_SIZE),
+		"usage": usage,
+		"usage_names": usage_names,
 	}
 
 
 def select(older_than_days: int = MIN_DAYS) -> tuple[dict, dict, str]:
 	"""Preview a delete: the counts a human reads, the records chosen and a digest of both.
 
-	The digest covers the chosen names and every number of the preview. A confirmation or an
-	approval is bound to it, so it is valid only for exactly that preview.
+	The digest covers every chosen name, the usage records included, and every number of the
+	preview. A confirmation or an approval is bound to it, so it is valid only for that preview.
 	"""
 	frappe.only_for("System Manager")
 	days = _days(older_than_days)
-	chosen = store.select_expired(days, PROPOSAL_DAYS, BATCH_SIZE)
+	chosen = _choose(days)
 	counted = purge(days, dry_run=True, selection=chosen)
-	usage = counted["usage_logs"]
 	bound = [
 		days,
 		chosen["logs"],
 		chosen["proposals"],
 		chosen["logs_waiting"],
 		chosen["proposals_waiting"],
-		usage.get("status"),
-		usage.get("eligible"),
-		usage.get("to_delete"),
+		chosen["usage"],
+		chosen["usage_names"],
 	]
-	return counted, chosen, hashlib.sha256(json.dumps(bound).encode()).hexdigest()
+	return counted, chosen, hashlib.sha256(json.dumps(bound, sort_keys=True).encode()).hexdigest()
 
 
 def purge_from_web(
@@ -140,8 +153,14 @@ def purge_from_web(
 		raise refusal
 	try:
 		return purge(older_than_days, dry_run=False, selection=kept["selection"])
-	except store.SelectionChanged:
+	except frappe.PermissionError:
+		raise
+	except frappe.ValidationError as error:
+		# A chosen record of this layer or of the gateway is no longer eligible. The gateway
+		# deletes all or none, and this rollback undoes whatever else the request did.
 		frappe.db.rollback()
+		frappe.clear_messages()
+		log_tool_error("purge_logs", error)
 		raise refusal from None
 
 
@@ -150,35 +169,50 @@ def _confirmation_key(token: str, part: str) -> str:
 	return f"{CONFIRMATION_KEY}{part}:{hashlib.sha256(token.encode()).hexdigest()}"
 
 
-def _purge_usage_logs(dry_run: bool) -> dict:
-	"""Clean the "AI Usage Log" through the model gateway's shared function. Say plainly what happened.
-
-	The gateway owns that log. Its function `purge_usage_logs(*, dry_run)` checks the caller's
-	permission itself and applies the 365 days of the project record, from the web and from the
-	command line alike (contract, section 10). With `dry_run` it only counts. It deletes in
-	batches, so `eligible` may be larger than `deleted`.
-
-	The result is `ok` with both counts, `not_run` if the gateway offers no such function, or
-	`error` with the error type if the gateway refused. It is never empty.
-	"""
+def _gateway_purge():
+	"""The gateway's shared function and whether it takes the names to delete (contract, section 10)."""
 	import platform_core.model_gecidi.api as gateway
 
 	purge = getattr(gateway, "purge_usage_logs", None)
+	takes_names = purge is not None and "names" in inspect.signature(purge).parameters
+	return purge, takes_names
+
+
+def _preview_usage_logs() -> tuple[dict, list[str] | None]:
+	"""Ask the gateway which usage records one run would delete. Nothing is deleted.
+
+	The gateway owns the "AI Usage Log". Its function `purge_usage_logs(*, dry_run, names)` checks
+	the caller's permission itself and applies the 365 days of the project record, from the web
+	and from the command line alike. The counting call returns the names it would delete.
+
+	Returns what a human reads and the chosen names. The first is `ok` with the counts,
+	`not_run` with a reason, or `error` with the error type. It is never empty. The names are
+	None unless the status is `ok`: then no delete call is made.
+	An older gateway without `names` would choose its own records at delete time. It is not used.
+	"""
+	purge, takes_names = _gateway_purge()
 	if purge is None:
-		return {"status": "not_run", "reason": "gateway_purge_unavailable"}
+		return {"status": "not_run", "reason": "gateway_purge_unavailable"}, None
+	if not takes_names:
+		return {"status": "not_run", "reason": "gateway_purge_outdated"}, None
 	try:
-		result = purge(dry_run=dry_run)
-		eligible = int(result["eligible"])
-		# `eligible` is what waited. `to_delete` is what one run takes. `deleted` is what it took.
-		limit = int(getattr(gateway, "USAGE_PURGE_BATCH_SIZE", USAGE_BATCH_SIZE))
-		return {
-			"status": "ok",
-			"eligible": eligible,
-			"to_delete": min(eligible, limit),
-			"deleted": int(result["deleted"]),
-		}
+		result = purge(dry_run=True)
+		names = [str(name) for name in result["names"]]
+		# `eligible` is what waits. `to_delete` is what this run takes. `deleted` is what it took.
+		usage = {"status": "ok", "eligible": int(result["eligible"]), "to_delete": len(names), "deleted": 0}
+		return usage, names
 	except Exception as error:
 		# The text of the gateway's error may carry a value. Only its type is returned.
 		log_tool_error("purge_usage_logs", error)
 		frappe.clear_messages()
-		return {"status": "error", "reason": type(error).__name__}
+		return {"status": "error", "reason": type(error).__name__}, None
+
+
+def _delete_usage_logs(names: list[str]) -> int:
+	"""Have the gateway delete exactly the chosen usage records. Return how many it deleted.
+
+	The gateway checks the records again under a lock and deletes all of them or none. Its
+	error is not caught here: the caller must not go on and must not report a delete.
+	"""
+	purge, _takes_names = _gateway_purge()
+	return int(purge(dry_run=False, names=list(names))["deleted"])

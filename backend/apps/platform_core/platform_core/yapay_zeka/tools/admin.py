@@ -533,7 +533,11 @@ def write_purge(prepared: tuple) -> dict:
 	older_than_days, chosen = prepared
 	try:
 		return retention.purge(older_than_days, dry_run=False, selection=chosen)
-	except store.SelectionChanged:
+	except frappe.PermissionError:
+		raise
+	except frappe.ValidationError:
+		# A chosen record of this layer or of the gateway is no longer eligible. The layer rolls
+		# the whole write back, so the action did not succeed in part.
 		raise ToolDenied(
 			"document_changed", _("The target changed after the preview.", context=CONTEXT)
 		) from None
