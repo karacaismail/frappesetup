@@ -84,3 +84,20 @@ class DispatchTests(unittest.TestCase):
 		):
 			gateway._reserve(None, target, request)
 		begin.assert_not_called()
+
+	def test_denied_destination_is_a_no_send_attempt(self):
+		target = Mock()
+		entry = routing.Candidate("fixture", "fixture-model")
+		with (
+			patch.object(ledger, "is_pending", return_value=True),
+			patch.object(ledger, "finish") as settle,
+			patch.object(
+				adapters,
+				"complete",
+				side_effect=adapters.GatewayError("endpoint_unavailable", may_be_billed=False),
+			),
+			self.assertRaises(gateway.Denied) as failure,
+		):
+			gateway._attempt(entry, target, Mock(), 30, float("inf"), "fixture-log")
+		self.assertEqual((failure.exception.status, failure.exception.code), (503, "endpoint_unavailable"))
+		self.assertEqual(settle.call_args.args[2], "not_sent")

@@ -1,4 +1,5 @@
 import json
+import socket
 import threading
 import unittest
 from decimal import Decimal
@@ -8,6 +9,7 @@ from unittest.mock import patch
 
 import requests
 
+from platform_core.model_gecidi import adapters
 from platform_core.model_gecidi.adapters import Endpoint, GatewayError, complete
 from platform_core.model_gecidi.routing import Candidate, candidates, on_failure
 
@@ -62,6 +64,75 @@ class Handler(BaseHTTPRequestHandler):
 			pass
 
 
+class NetworkPolicyTests(unittest.TestCase):
+	def test_direct_loopback_is_denied_without_transmitting(self):
+		with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
+			server.paths = []
+			thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.02})
+			thread.start()
+			self.addCleanup(thread.join)
+			self.addCleanup(server.shutdown)
+			server.header_delay = 0
+			server.header_chunks = []
+			server.location = None
+			server.content_encoding = None
+			server.chunks = []
+			endpoint = Endpoint("fixture", "ollama", f"http://127.0.0.1:{server.server_port}")
+			with self.assertRaises(GatewayError) as failure:
+				complete(endpoint, "fake", [], 20, timeout=0.5)
+			self.assertEqual(failure.exception.code, "endpoint_unavailable")
+			self.assertFalse(failure.exception.may_be_billed)
+			self.assertEqual(server.paths, [])
+
+	def test_mixed_resolution_is_denied_before_any_socket_is_created(self):
+		addresses = [
+			(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("1.1.1.1", 443)),
+			(socket.AF_INET6, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("::ffff:127.0.0.1", 443, 0, 0)),
+		]
+		with (
+			patch("socket.getaddrinfo", return_value=addresses),
+			patch("socket.socket") as create_socket,
+			self.assertRaises(GatewayError) as failure,
+		):
+			adapters._ProviderHTTPSConnection("example.test")._new_conn()
+		self.assertEqual(failure.exception.code, "endpoint_unavailable")
+		create_socket.assert_not_called()
+
+	def test_connection_uses_the_validated_address_without_a_second_resolution(self):
+		address = ("2606:4700:4700::1111", 443, 0, 0)
+		resolution = [(socket.AF_INET6, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", address)]
+		with (
+			patch("socket.getaddrinfo", side_effect=[resolution]) as resolve,
+			patch("socket.socket") as create_socket,
+		):
+			connection = adapters._ProviderHTTPSConnection("example.test", timeout=1)
+			connection._new_conn()
+		resolve.assert_called_once()
+		create_socket.return_value.connect.assert_called_once_with(address)
+		self.assertEqual(connection.host, "example.test")
+
+	def test_private_oauth_target_never_receives_the_client_secret(self):
+		endpoint = Endpoint(
+			"fixture",
+			"openai",
+			"https://example.test",
+			auth="oauth_client_credentials",
+			secret=SECRET,
+			client_id="fixture",
+			token_url="https://127.0.0.1",
+		)
+		address = (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("127.0.0.1", 443))
+		with (
+			patch("socket.getaddrinfo", return_value=[address]),
+			patch("socket.socket") as create_socket,
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(endpoint, "fake", [], 20)
+		self.assertEqual(failure.exception.code, "endpoint_unavailable")
+		self.assertFalse(failure.exception.may_be_billed)
+		create_socket.assert_not_called()
+
+
 class AdapterTests(unittest.TestCase):
 	def setUp(self):
 		server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -78,6 +149,14 @@ class AdapterTests(unittest.TestCase):
 		self.addCleanup(server.shutdown)
 		self.server = server
 		self.url = f"http://127.0.0.1:{server.server_port}"
+		resolve = adapters._resolve_public_addresses
+
+		def fixture_resolve(host, port):
+			if host == "127.0.0.1" and port == server.server_port:
+				return socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+			return resolve(host, port)
+
+		self.enterContext(patch.object(adapters, "_resolve_public_addresses", fixture_resolve))
 
 	def test_header_drip_cannot_extend_absolute_deadline(self):
 		self.server.header_chunks = [

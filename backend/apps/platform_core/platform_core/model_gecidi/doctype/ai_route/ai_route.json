@@ -49,10 +49,11 @@
    "reqd": 1
   },
   {
-   "description": "Ordered JSON array of objects with model and api document names.",
+   "description": "Ordered list of model and API records for this route.",
    "fieldname": "targets",
-   "fieldtype": "JSON",
+   "fieldtype": "Table",
    "label": "Targets",
+   "options": "PLT AI Route Target",
    "reqd": 1
   },
   {

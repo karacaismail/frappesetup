@@ -1,0 +1,38 @@
+{
+ "actions": [],
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "model",
+  "api"
+ ],
+ "fields": [
+  {
+   "description": "Model record used by this route target.",
+   "fieldname": "model",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Model",
+   "options": "AI Model",
+   "reqd": 1
+  },
+  {
+   "description": "API connection used by this route target.",
+   "fieldname": "api",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "API",
+   "options": "AI API",
+   "reqd": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "module": "Model Gecidi",
+ "name": "PLT AI Route Target",
+ "permissions": [],
+ "sort_field": "idx",
+ "sort_order": "ASC",
+ "states": []
+}

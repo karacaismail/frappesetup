@@ -2,6 +2,7 @@
 
 Geçit, uygulamanın model sağlayıcılarıyla konuştuğu ortak giriş noktasıdır.
 Model adı ve bağlantı adresi site kaydından gelir.
+Yolun hedefleri bir alt tabloda sıralanır.
 
 ## Ortak istek ve yanıt
 
@@ -81,10 +82,13 @@ Geçit bir yol için en çok 105 saniye ayırır.
 Deneme ortamı `bench serve` kullanır. Temel imaj Gunicorn için 120 saniye ayırır.
 
 Yönetici, `model_gateway_endpoints` ayarına tam bağlantı adresini ekler.
-Adresin değeri yerel ağ için `local`, dış hizmet için `external` olur.
+Yönetici kendi hizmeti için `local`, dış hizmet için `external` seçer.
 Geçit, OAuth adresini de aynı listeye göre denetler.
 Dış hizmet bağlantısı HTTPS ister.
-`local_only` yolu yalnız yerel ağa çağrı yapar.
+`local_only` yolu yalnız yöneticinin `local` olarak işaretlediği hizmeti çağırır.
+Geçit bağlantı anında sunucu adını çözer.
+Geçit özel ağ adresi dönen bağlantıyı reddeder.
+Geçit yalnız denetlediği açık ağ adresine bağlanır.
 
 `masked` yolu, yaygın kimlik ve ödeme bilgilerini kalıpla örter.
 Geçit dış hizmete her gönderimde mesajı örter.
@@ -107,6 +111,8 @@ Geçit bu işlevde kullanıcının yetkisini denetler.
 Arka plan işi, model çağrısından önce kendi veritabanı yazısını bitirir.
 
 Yönetici sonucu bilinmeyen denemenin gerçek ücretini yazabilir.
+Geçit ücret tutarını ondalık metin olarak döner.
+Yanıtta para birimi de bulunur.
 Geçit önceki sonucu saklar. Yönetici kısa bir not ekleyebilir.
 Yönetici kapalı bağlantının anahtarını ayrı bir uçla silebilir.
 Geçit bağlantı kaydına silme notu ekler.

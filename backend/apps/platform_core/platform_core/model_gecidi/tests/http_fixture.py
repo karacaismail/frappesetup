@@ -1,17 +1,22 @@
 """Seed and exercise a disposable Frappe site through its real HTTP server."""
 
 import json
+import socket
 import unittest
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
+from unittest.mock import patch
 from uuid import uuid4
 
 import frappe
+import frappe.app
 import requests
 from frappe.utils import add_to_date, now_datetime
+from werkzeug.serving import WSGIRequestHandler, make_server
 
 from platform_core.api.test_model import TestModelHTTP
+from platform_core.model_gecidi import adapters
 
 TEST_SITE = "test-platform-core.localhost"
 FIXTURE_PORT = 19091
@@ -102,14 +107,14 @@ def _seed(suffix, credential, role, cleanup):
 		"AI Route",
 		route_name=f"Local route {suffix}",
 		selection_mode="priority",
-		targets=json.dumps([{"model": model, "api": api} for api in apis]),
+		targets=[{"model": model, "api": api} for api in apis],
 		data_policy="local_only",
 	)
 	role_route = insert(
 		"AI Route",
 		route_name=f"Role route {suffix}",
 		selection_mode="priority",
-		targets=json.dumps([{"model": model, "api": apis[1]}]),
+		targets=[{"model": model, "api": apis[1]}],
 		data_policy="local_only",
 		required_role=role,
 	)
@@ -201,6 +206,41 @@ def _oauth_session(base, user, cleanup):
 	return session
 
 
+class QuietRequestHandler(WSGIRequestHandler):
+	def log(self, _type, _message, *_args):
+		pass
+
+
+@contextmanager
+def _fixture_webserver():
+	"""Test the real WSGI entry point without a development-server policy bypass."""
+	resolve = adapters._resolve_public_addresses
+
+	def resolve_fixture(host, port):
+		if host == "127.0.0.1" and port == FIXTURE_PORT:
+			return socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+		return resolve(host, port)
+
+	with (
+		patch.object(adapters, "_resolve_public_addresses", resolve_fixture),
+		patch.object(frappe.app, "_sites_path", frappe.local.sites_path),
+		make_server(
+			"127.0.0.1",
+			0,
+			frappe.app.application,
+			threaded=True,
+			request_handler=QuietRequestHandler,
+		) as web,
+	):
+		thread = Thread(target=web.serve_forever, daemon=True)
+		thread.start()
+		try:
+			yield f"http://127.0.0.1:{web.server_port}"
+		finally:
+			web.shutdown()
+			thread.join()
+
+
 def run():
 	"""Run via bench execute on an isolated test site's own web container."""
 	if frappe.local.site != TEST_SITE or not frappe.conf.get("allow_tests"):
@@ -210,7 +250,6 @@ def run():
 	):
 		raise RuntimeError("Configure both loopback model gateway fixture endpoints first")
 
-	base = f"http://127.0.0.1:{int(frappe.conf.webserver_port)}"
 	suffix = uuid4().hex[:12]
 	password = f"Fixture#{uuid4().hex}"
 	credential = f"test-only-{uuid4().hex}"
@@ -235,6 +274,7 @@ def run():
 				thread.start()
 				connections.callback(thread.join)
 				connections.callback(server.shutdown)
+				base = connections.enter_context(_fixture_webserver())
 				fixture.update(
 					base=base,
 					users=users,

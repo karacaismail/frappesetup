@@ -122,8 +122,61 @@ class TestGatewayRegistry(IntegrationTestCase):
 		api = self._api()
 		return {
 			"route_name": f"Registry route {uuid4().hex}",
-			"targets": frappe.as_json([{"api": api.name, "model": model.name}]),
+			"targets": [{"api": api.name, "model": model.name}],
 		}
+
+	def test_route_targets_use_an_ordered_child_table(self):
+		field = frappe.get_meta("AI Route").get_field("targets")
+		self.assertEqual((field.fieldtype, field.options), ("Table", "PLT AI Route Target"))
+		fields = self._route_fields()
+		first = fields["targets"][0]
+		second = {"api": self._api().name, "model": first["model"]}
+		route = _insert("AI Route", **{**fields, "targets": [second, first]})
+		self.assertEqual(
+			[(row.api, row.model, row.idx) for row in route.reload().targets],
+			[(second["api"], second["model"], 1), (first["api"], first["model"], 2)],
+		)
+
+	def test_route_rejects_duplicate_child_targets(self):
+		fields = self._route_fields()
+		with self.assertRaises(frappe.ValidationError):
+			_insert("AI Route", **{**fields, "targets": fields["targets"] * 2})
+
+	def test_legacy_route_targets_are_copied_once_in_original_order(self):
+		from platform_core.patches.migrate_route_targets import migrate_route
+
+		fields = self._route_fields()
+		first = fields["targets"][0]
+		second = {"api": self._api().name, "model": first["model"]}
+		route = frappe.get_doc(
+			{
+				"doctype": "AI Route",
+				"name": str(uuid4()),
+				"route_name": fields["route_name"],
+				"data_policy": "local_only",
+			}
+		)
+		# Simulate a parent written before the child table was introduced.
+		route.db_insert()
+		legacy_json = frappe.as_json([second, first])
+		migrate_route(route.name, legacy_json)
+		migrate_route(route.name, legacy_json)
+		self.assertEqual(
+			[(row.api, row.model, row.idx) for row in route.reload().targets],
+			[(second["api"], second["model"], 1), (first["api"], first["model"], 2)],
+		)
+
+	def test_migration_rejects_conflicting_existing_target_rows(self):
+		from platform_core.patches.migrate_route_targets import migrate_route
+
+		fields = self._route_fields()
+		first = fields["targets"][0]
+		second = {"api": self._api().name, "model": first["model"]}
+		legacy_json = frappe.as_json([first, second])
+		route = _insert("AI Route", **fields)
+		with self.assertRaisesRegex(ValueError, "conflict"):
+			migrate_route(route.name, legacy_json)
+		self.assertEqual([row.api for row in route.reload().targets], [first["api"]])
 
 	def _role_user(self, role):
 		return _insert(

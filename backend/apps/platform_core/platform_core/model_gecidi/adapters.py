@@ -3,9 +3,12 @@
 import json
 import logging
 import re
+import socket
+import sys
 from contextlib import contextmanager, suppress
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from ipaddress import IPv6Address, ip_address, ip_network
 from socket import SHUT_RDWR
 from threading import Timer
 from time import monotonic
@@ -14,7 +17,13 @@ from urllib.parse import quote, quote_plus, urlsplit
 import requests
 from urllib3.connection import HTTPConnection, HTTPSConnection
 from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
-from urllib3.exceptions import HTTPError, MaxRetryError, NewConnectionError, ReadTimeoutError
+from urllib3.exceptions import (
+	ConnectTimeoutError,
+	HTTPError,
+	MaxRetryError,
+	NewConnectionError,
+	ReadTimeoutError,
+)
 
 LOGGER = logging.getLogger(__name__)
 _RESPONSE_DEADLINE = ContextVar("model_response_deadline", default=None)
@@ -79,7 +88,73 @@ def _interrupt_socket(socket, deadline):
 		timer.join()
 
 
-class _ResponseDeadline:
+# Standard translation prefixes can hide a nonpublic IPv4 destination.
+_TRANSLATION_NETWORKS = (ip_network("64:ff9b::/96"), ip_network("64:ff9b:1::/48"))
+
+
+def _is_public_address(address):
+	try:
+		ip = ip_address(address)
+	except ValueError:
+		return False
+	if isinstance(ip, IPv6Address):
+		if ip.scope_id or ip.sixtofour is not None or ip.teredo is not None:
+			return False
+		if any(ip in network for network in _TRANSLATION_NETWORKS):
+			return False
+		ip = ip.ipv4_mapped or ip
+	return ip.is_global and not ip.is_multicast
+
+
+def _resolve_public_addresses(host, port):
+	addresses = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP)
+	if not addresses or any(
+		family not in (socket.AF_INET, socket.AF_INET6)
+		or not _is_public_address(address[0])
+		or (family == socket.AF_INET6 and address[3])
+		for family, _kind, _proto, _canonical, address in addresses
+	):
+		raise GatewayError("endpoint_unavailable", may_be_billed=False)
+	return addresses
+
+
+class _ProviderConnection:
+	def _new_conn(self):
+		# Keep the DNS name on urllib3's connection for TLS verification and SNI.
+		# Connect the socket to the approved sockaddr without resolving it again.
+		deadline = _RESPONSE_DEADLINE.get()
+		if isinstance(self.timeout, (float, int)):
+			connect_deadline = monotonic() + self.timeout
+			deadline = connect_deadline if deadline is None else min(deadline, connect_deadline)
+		try:
+			addresses = _resolve_public_addresses(self._dns_host, self.port)
+		except OSError:
+			raise NewConnectionError(self, "Provider address resolution failed") from None
+		for family, kind, proto, _canonical, address in addresses:
+			remaining = deadline - monotonic() if deadline is not None else None
+			if remaining is not None and remaining <= 0:
+				raise ConnectTimeoutError(self, "Provider connection timed out")
+			try:
+				sock = socket.socket(family, kind, proto)
+			except OSError:
+				continue
+			try:
+				sock.settimeout(remaining)
+				for option in self.socket_options or ():
+					sock.setsockopt(*option)
+				if self.source_address:
+					sock.bind(self.source_address)
+				sys.audit("http.client.connect", self, self.host, self.port)
+				sock.connect(address)
+			except OSError:
+				sock.close()
+			except BaseException:
+				sock.close()
+				raise
+			else:
+				return sock
+		raise NewConnectionError(self, "Provider connection failed")
+
 	def getresponse(self):
 		deadline = _RESPONSE_DEADLINE.get()
 		if deadline is None:
@@ -88,11 +163,11 @@ class _ResponseDeadline:
 			return super().getresponse()
 
 
-class _ProviderHTTPConnection(_ResponseDeadline, HTTPConnection):
+class _ProviderHTTPConnection(_ProviderConnection, HTTPConnection):
 	pass
 
 
-class _ProviderHTTPSConnection(_ResponseDeadline, HTTPSConnection):
+class _ProviderHTTPSConnection(_ProviderConnection, HTTPSConnection):
 	pass
 
 

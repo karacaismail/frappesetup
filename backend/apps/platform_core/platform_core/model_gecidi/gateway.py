@@ -173,9 +173,10 @@ def _attempt(candidate, target, request, timeout, deadline, log):
 		return result, False
 	except adapters.GatewayError as failure:
 		code = failure_code = failure.code
-		if code == "reservation_lost":
+		if code in {"reservation_lost", "endpoint_unavailable"}:
 			outcome = "not_sent"
-			raise Denied(503, "gateway_unavailable") from None
+			error = "gateway_unavailable" if code == "reservation_lost" else code
+			raise Denied(503, error) from None
 		if failure.may_be_billed:
 			outcome = "unknown"
 		elif code in ledger.UNSETTLED:
@@ -326,10 +327,9 @@ def complete(route, messages, tools=None, schema=None, limit=1024):
 	request = policy.parse(messages, tools, schema, limit)
 	route = _document("AI Route", route)
 	policy.require_route(route)
-	pairs = _json(route.targets)
-	if len(pairs) > MAX_TARGETS:
+	if len(route.targets) > MAX_TARGETS:
 		raise Denied(400, "invalid_route")
-	targets = [_target(item["api"], item["model"]) for item in pairs]
+	targets = [_target(item.api, item.model) for item in route.targets]
 	try:
 		return _dispatch(route, targets, request, deadline)
 	except RedisError:
