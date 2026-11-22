@@ -4,7 +4,8 @@ Bu kurulum ayrı bir yerel Press sitesi açar. Press, kiracı sitelerini yöneti
 
 Frappe v16.50.0 ve Press v0.154.1 kullanılır. Python sürümü 3.14.10'dir.
 Uyum yamaları yalnız yerel Press denemesi içindir.
-Sunucu kurma ve Ansible bu kurulumda çalışmaz.
+Ansible `ansible-requirements.txt` sürümüne sabitlenir.
+Sunucu kurma akışının denemesi [kurma yolunda](provisioning-readiness.md) anlatılır.
 
 Komutları depo kökünde çalıştırın. Birleşik kaynakta `backend/libs/oidc_verify` bulunmalı.
 Press imajı bu kitaplığı bir Python kurulum paketi olarak taşır.
