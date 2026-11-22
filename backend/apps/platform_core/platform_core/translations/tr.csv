@@ -176,6 +176,12 @@ You cannot read this DocType.,Bu kayıt türünü okuma izniniz yok.,shell.metad
 Skip to main content,Ana içeriğe geçin,shell.panel
 Go to site home,Sitenin ana sayfasına gidin,shell.panel
 A valid metadata surface is required.,Tanım için geçerli bir kullanım alanı seçin.,shell.metadata
+{0} must be an array of DocType names.,{0} ayarı kayıt türü adlarından oluşan bir liste olmalıdır.,shell.metadata
+{0} contains an unknown DocType: {1},{0} ayarı tanınmayan {1} kayıt türünü içeriyor.,shell.metadata
+shell_restricted_fields must map DocType names to field names.,shell_restricted_fields ayarında kayıt türlerini alan adlarıyla eşleştirin.,shell.metadata
+shell_restricted_fields contains an unknown DocType: {0},shell_restricted_fields ayarı tanınmayan {0} kayıt türünü içeriyor.,shell.metadata
+shell_restricted_fields entry for {0} must be an array of field names.,shell_restricted_fields ayarında {0} için alan adlarını listeleyin.,shell.metadata
+shell_restricted_fields contains an unknown field: {0}.{1},shell_restricted_fields ayarı tanınmayan {0}.{1} alanını içeriyor.,shell.metadata
 The request has invalid parameters.,İstekte geçersiz alanlar var.,shell.request
 Mobile Account State,Mobil Hesap Durumu,
 Stores the token cutoff for mobile installation registration.,Yeni telefon kurulumunda geçerli belirteç zamanını tutar.,Mobile Account State
@@ -371,3 +377,4 @@ Revokes one owned installation without signing out the current browser.,Hesabın
 Keycloak user ID,Keycloak kullanıcı kimliği,Mobile Installation
 The Keycloak user identifier bound to this session.,Bu oturuma bağlı Keycloak kullanıcı kimliği.,Mobile Installation
 You are not permitted to call this method.,Bu yöntemi çağırma izniniz yok.,shell.request
+The requested method could not be resolved.,İstenen yöntem bulunamadı.,shell.request

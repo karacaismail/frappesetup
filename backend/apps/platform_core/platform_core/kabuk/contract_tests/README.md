@@ -31,8 +31,14 @@ Unknown names cause the mobile metadata service to fail closed.
 
 The official Frappe runner checks projection components using
 `tests/shell_contract_components.json`. The live suite enforces parity with
-the authoritative OpenAPI schemas. Regenerate the snapshot whenever a
-covered component changes.
+the authoritative OpenAPI schemas. From the repository root, regenerate
+the snapshot whenever a covered component changes:
+
+```sh
+python3 backend/apps/platform_core/platform_core/kabuk/contract_tests/generate_snapshot.py
+```
+
+Add `--check` to verify that the tracked snapshot matches without writing it.
 
 For absolute navigation URLs, configure `shell_navigation_hosts` as an array
 of exact hostnames. Relative same-origin links require no host entry.
