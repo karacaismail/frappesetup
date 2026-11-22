@@ -101,7 +101,10 @@ def merge_inputs(worktree, inputs, branch, report, base):
 
 def trusted_scratch(repo, value):
     """Keep preview artifacts inside the repository's ignored Pane directory."""
-    trusted = (repo / ".pane").resolve()
+    # The fixed in-repository location is the trust anchor. Never follow a link here.
+    trusted = repo.resolve() / ".pane"
+    if trusted.is_symlink() or (trusted.exists() and not trusted.is_dir()):
+        raise MergeError(f"{trusted} must be a real directory, not a symbolic link.")
     if "\0" in value or "\n" in value:
         raise MergeError("PANE_SCRATCH_DIR contains a control character.")
     scratch = Path(value).resolve()

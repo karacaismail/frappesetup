@@ -502,6 +502,35 @@ class StackTests(unittest.TestCase):
         self.assertIn("E2E_ENV_FILE", result.stderr)
         self.assertFalse(path.exists())
 
+    def test_refuses_an_environment_file_that_git_could_track(self):
+        candidates = (
+            ROOT / "backend/e2e/stack-candidate.env",
+            ROOT / "backend/e2e/tests/stack-candidate",
+        )
+        for path in candidates:
+            with self.subTest(path=path):
+                self.addCleanup(path.unlink, missing_ok=True)
+                result = self.run_stack("config", E2E_ENV_FILE=str(path))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("ignored by Git", result.stderr)
+                self.assertFalse(path.exists())
+
+    def test_git_ignore_check_cannot_be_redirected_by_git_variables(self):
+        path = ROOT / "backend/e2e/stack-candidate.env"
+        self.addCleanup(path.unlink, missing_ok=True)
+        foreign = Path(self.temp.name) / "foreign"
+        # Reuse the stack's validated runner so the test adds no new process call site.
+        runpy.run_path(str(STACK))["run"]([shutil.which("git"), "init", "-q", str(foreign)], dict(os.environ))
+        (foreign / ".gitignore").write_text("*\n")
+        result = self.run_stack(
+            "config",
+            E2E_ENV_FILE=str(path),
+            GIT_DIR=str(foreign / ".git"),
+            GIT_WORK_TREE=str(ROOT),
+        )
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse(path.exists())
+
     def test_rejects_environment_file_that_escapes_through_a_parent_symlink(self):
         outside = tempfile.TemporaryDirectory()
         self.addCleanup(outside.cleanup)

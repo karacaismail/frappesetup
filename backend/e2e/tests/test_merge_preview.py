@@ -1,5 +1,7 @@
 """Exercise the preview command without Docker or the developer's Git repository."""
 
+import contextlib
+import io
 import os
 import re
 import runpy
@@ -197,6 +199,26 @@ class MergePreviewTest(unittest.TestCase):
         self.assertFalse(self.artifacts.exists())
         self.assertEqual(before, self.refs())
 
+    def run_in_process(self, env):
+        """Run the command's main function without starting a separate process."""
+        namespace = runpy.run_path(str(COMMAND))
+        errors = io.StringIO()
+        current = os.getcwd()
+        os.chdir(self.repo)
+        try:
+            with (
+                patch.dict(os.environ, env, clear=True),
+                patch("sys.argv", [str(COMMAND), "--merge-only"]),
+                contextlib.redirect_stderr(errors),
+            ):
+                try:
+                    code = namespace["main"]()
+                except SystemExit as error:
+                    code = error.code
+        finally:
+            os.chdir(current)
+        return code, errors.getvalue()
+
     def test_rejects_scratch_outside_the_repository_pane_directory(self):
         before = self.refs()
         outside = self.root / "outside"
@@ -205,14 +227,28 @@ class MergePreviewTest(unittest.TestCase):
         alias.symlink_to(outside, target_is_directory=True)
         for scratch in (outside, self.repo / ".pane" / ".." / "escape", alias, self.repo / ".pane"):
             with self.subTest(scratch=scratch):
-                env = {**self.env, "PANE_SCRATCH_DIR": str(scratch)}
-                result = subprocess.run(
-                    [str(COMMAND), "--merge-only"], cwd=self.repo, env=env, text=True, capture_output=True
-                )
-                self.assertEqual(result.returncode, 2, result.stderr)
-                self.assertIn("PANE_SCRATCH_DIR", result.stderr)
+                code, errors = self.run_in_process({**self.env, "PANE_SCRATCH_DIR": str(scratch)})
+                self.assertEqual(code, 2, errors)
+                self.assertIn("PANE_SCRATCH_DIR", errors)
         self.assertFalse(outside.exists())
         self.assertFalse((self.repo / "escape").exists())
+        self.assertEqual(before, self.refs())
+
+    def test_rejects_a_pane_directory_that_is_a_symbolic_link(self):
+        before = self.refs()
+        for target in (self.root / "outside-pane", self.repo / "inside-pane"):
+            with self.subTest(target=target):
+                target.mkdir()
+                pane = self.repo / ".pane"
+                pane.symlink_to(target, target_is_directory=True)
+                try:
+                    code, errors = self.run_in_process({**self.env, "PANE_SCRATCH_DIR": str(pane / "scratch")})
+                finally:
+                    pane.unlink()
+                self.assertEqual(code, 2, errors)
+                self.assertIn(".pane", errors)
+                self.assertEqual(list(target.iterdir()), [])
+                target.rmdir()
         self.assertEqual(before, self.refs())
 
     def test_live_run_refuses_a_worktree_outside_the_trusted_scratch(self):

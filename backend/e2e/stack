@@ -8,6 +8,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import stat
 import subprocess
 import sys
@@ -41,6 +42,24 @@ def env_file(value):
     if not path.is_relative_to(REPOSITORY.resolve()):
         raise ValueError(f"E2E_ENV_FILE must be inside {REPOSITORY}.")
     return path
+
+
+def assert_ignored(path):
+    """Refuse a credential path that Git could add to the public repository."""
+    git = shutil.which("git")
+    if not git:
+        raise ValueError("Git is required to check that E2E_ENV_FILE is ignored by Git.")
+    # GIT_* variables could point the check at another repository.
+    clean = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    result = run(
+        [git, "-C", str(REPOSITORY), "check-ignore", "-q", "--", str(path)],
+        clean,
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode != 0:
+        raise ValueError("E2E_ENV_FILE must be a path that is ignored by Git.")
 
 
 def container_ids(output):
@@ -111,6 +130,7 @@ def setup():
     port = int(port)
     context = "colima-factory" if profile == "factory" else "colima"
     path = env_file(os.environ.get("E2E_ENV_FILE", BACKEND / "e2e/.env"))
+    assert_ignored(path)
     environment = dict(os.environ, **credentials(path))
     environment.update(
         {
