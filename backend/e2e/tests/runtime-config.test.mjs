@@ -8,6 +8,15 @@ import { fileURLToPath } from 'node:url';
 
 const runtime = fileURLToPath(new URL('../preview/runtime.sh', import.meta.url));
 
+test('tenant seeding and web server use the private module directory', () => {
+  const script = readFileSync(runtime, 'utf8');
+  const fixtures = readFileSync(new URL('../preview/fixtures.py', import.meta.url), 'utf8');
+  assert.match(script, /E2E_TENANT_MODULE_DIR=.*tempfile\.mkdtemp/);
+  assert.ok(script.includes('$tenant:$E2E_TENANT_MODULE_DIR/preview_site_config.py'));
+  assert.ok(script.includes('PYTHONPATH="$E2E_TENANT_MODULE_DIR"'));
+  assert.ok(fixtures.includes('"PYTHONPATH": os.environ["E2E_TENANT_MODULE_DIR"]'));
+});
+
 test('preview writes the fixture configuration before starting either Frappe web process', () => {
   const script = readFileSync(runtime, 'utf8');
   const fixture = script.indexOf('preview/fixtures.py" prepare');
