@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import frappe
 
 from press_tr.api import identity
-from press_tr.kimlik import anonymization
+from press_tr.press_identity import anonymization
 
 
 class MembershipPaginationTest(TestCase):

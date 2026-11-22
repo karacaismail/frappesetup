@@ -1,0 +1,74 @@
+{
+ "actions": [],
+ "autoname": "field:identity_hash",
+ "creation": "2026-11-22 11:00:00.000000",
+ "description": "Records that an identity was deleted (project record O-27). It keeps no raw identity: only the HMAC-SHA256 digest of the issuer and subject pair. Provisioning, enabling and e-mail changes check this record first, so a deleted identity cannot come back.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "identity_hash",
+  "state",
+  "user",
+  "deleted_at"
+ ],
+ "fields": [
+  {
+   "description": "HMAC-SHA256 digest of the issuer and subject pair, as 64 hexadecimal characters. The key is the site setting kimlik_deletion_hmac_key. The raw pair is not stored.",
+   "fieldname": "identity_hash",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Identity Hash",
+   "length": 64,
+   "read_only": 1,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Disabled: step 1 closed the account, its sessions and API keys. Anonymized: step 2 removed the personal data.",
+   "fieldname": "state",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "State",
+   "options": "Disabled\nAnonymized",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "Current name of the Frappe user. It is the anonymous name after step 2.",
+   "fieldname": "user",
+   "fieldtype": "Data",
+   "label": "User",
+   "length": 140,
+   "read_only": 1
+  },
+  {
+   "description": "When step 1 recorded the deletion.",
+   "fieldname": "deleted_at",
+   "fieldtype": "Datetime",
+   "label": "Deleted At",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-22 11:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Identity",
+ "name": "Platform Identity Deletion",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

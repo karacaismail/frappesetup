@@ -14,12 +14,12 @@ import os
 import re
 import unittest
 
-from yardimci import KLASOR, istek, safe_detail
+from helpers import DIRECTORY, request, safe_detail
 
-DOCKERFILE = (KLASOR / "Dockerfile").read_text(encoding="utf-8")
-COMPOSE = (KLASOR.parents[1] / "dev" / "compose.keycloak.yaml").read_text(encoding="utf-8")
-CONF = KLASOR / "conf" / "keycloak.conf"
-HOSTS = KLASOR / "conf" / "webhook-plain-http-hosts.txt"
+DOCKERFILE = (DIRECTORY / "Dockerfile").read_text(encoding="utf-8")
+COMPOSE = (DIRECTORY.parents[1] / "dev" / "compose.keycloak.yaml").read_text(encoding="utf-8")
+CONF = DIRECTORY / "conf" / "keycloak.conf"
+HOSTS = DIRECTORY / "conf" / "webhook-plain-http-hosts.txt"
 MAGIC_LINK_OFF = (
     "spi-realm-restapi-extension--magiclink-login--enabled=false",
     "spi-authenticator--magiclink-continuation--enabled=false",
@@ -61,25 +61,25 @@ PROD_URL = os.environ.get("PROD_KC_URL", "")
 @unittest.skipUnless(PROD_URL, "PROD_KC_URL is not set; run this test with bin/kc-dev.sh prod-check")
 class ProductionImageLiveTest(unittest.TestCase):
     def _admin_token(self) -> str:
-        response = istek("POST", f"{PROD_URL}/realms/master/protocol/openid-connect/token", form={
+        response = request("POST", f"{PROD_URL}/realms/master/protocol/openid-connect/token", form={
             "grant_type": "password", "client_id": "admin-cli",
             "username": os.environ["KC_BOOTSTRAP_ADMIN_USERNAME"],
             "password": os.environ["KC_BOOTSTRAP_ADMIN_PASSWORD"]})
-        self.assertEqual(response.durum, 200, safe_detail(response))
+        self.assertEqual(response.status, 200, safe_detail(response))
         return response.json()["access_token"]
 
     def test_rest_resource_answers_404(self):
         sample = "00000000-0000-4000-8000-000000000000"
-        response = istek("GET", f"{PROD_URL}/realms/platform/{MAGIC_LINK_REST_PATH}?id={sample}&magicKey={sample}")
-        self.assertEqual(response.durum, 404)
+        response = request("GET", f"{PROD_URL}/realms/platform/{MAGIC_LINK_REST_PATH}?id={sample}&magicKey={sample}")
+        self.assertEqual(response.status, 404)
 
     def test_cross_device_authenticator_is_not_loaded(self):
-        providers = istek("GET", f"{PROD_URL}/admin/serverinfo", belirtec=self._admin_token()).json()["providers"]
+        providers = request("GET", f"{PROD_URL}/admin/serverinfo", token=self._admin_token()).json()["providers"]
         self.assertIn("magiclink", providers["authenticator"]["providers"])
         self.assertNotIn(MAGIC_LINK_CONTINUATION, providers["authenticator"]["providers"])
 
     def test_webhook_listener_is_loaded(self):
-        providers = istek("GET", f"{PROD_URL}/admin/serverinfo", belirtec=self._admin_token()).json()["providers"]
+        providers = request("GET", f"{PROD_URL}/admin/serverinfo", token=self._admin_token()).json()["providers"]
         self.assertIn("webhook", providers["eventsListener"]["providers"])
 
     def test_production_image_refused_a_plain_http_event_address(self):

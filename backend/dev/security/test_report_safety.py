@@ -1,3 +1,4 @@
+import ast
 import hashlib
 import json
 import io
@@ -73,7 +74,35 @@ class ReportSafetyTests(unittest.TestCase):
                         self.assertIn("Unused exception", " ".join(result.findings))
                         self.assertIn("B603 · backend/a.py:1", result.findings)
 
-    def test_malformed_dirty_field_reports_unknown(self):
+    def test_bandit_exception_requires_exact_reviewed_count(self):
+        source_text = 'example = {"password": "fixture", "secret": "fixture"}'
+        code, digest = scans.bandit_source_signature(source_text, ast.parse(source_text), 1)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / scans.SECURITY / "bandit-exceptions.json"
+            config.parent.mkdir(parents=True)
+            config.write_text(json.dumps([{
+                "rule": "B105", "file": "backend/a.py", "code": code, "statementSha256": digest,
+                "owner": "dev", "reason": "Two fixture fields", "ignoreUntil": "2100-01-01",
+                "occurrences": 2,
+            }]))
+            source = root / "backend/a.py"
+            finding = {"test_id": "B105", "line_number": 1, "filename": "backend/a.py"}
+            for lines, content, expected in (
+                ([1, 1], source_text, "pass"),
+                ([1], source_text, "fail"),
+                ([1, 1, 1], source_text, "fail"),
+                ([1, 2], f"{source_text}\n{source_text}", "pass"),
+                ([1, 1], source_text.replace("fixture", "changed"), "fail"),
+            ):
+                with self.subTest(lines=lines, content=content):
+                    source.write_text(content)
+                    findings = [dict(finding, line_number=line) for line in lines]
+                    with patch.object(scans, "ROOT", root), patch.object(scans, "git", return_value="backend/a.py\0"), \
+                            patch.object(scans, "bandit_findings", side_effect=[[{"test_id": "B101", "line_number": 1}], findings]):
+                        self.assertEqual(scans.scan_bandit().status, expected)
+
+
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "full.json").write_text('{"dirty": [], "results": []}')

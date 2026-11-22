@@ -3,7 +3,7 @@
 import unittest
 from pathlib import Path
 
-CONTRACT = Path(__file__).resolve().parents[2] / "docs" / "sozlesmeler.md"
+CONTRACT = Path(__file__).resolve().parents[2] / "docs" / "contracts.md"
 
 
 class ShellIdentityContractTests(unittest.TestCase):

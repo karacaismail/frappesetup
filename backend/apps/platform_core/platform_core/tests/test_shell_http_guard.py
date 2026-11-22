@@ -19,7 +19,7 @@ class TestShellHTTPGuard(unittest.TestCase):
 
 	def test_connection_must_bind_the_isolated_site_before_fixtures(self):
 		with (
-			patch.dict("os.environ", {"KABUK_TEST_SITE": SITE}),
+			patch.dict("os.environ", {"PLT_SHELL_TEST_SITE": SITE}),
 			patch("platform_core.tests.shell_http_fixture.frappe") as frappe,
 		):
 			frappe.local.site = None
@@ -35,7 +35,7 @@ class TestShellHTTPGuard(unittest.TestCase):
 
 	def test_explicit_opt_in_refuses_an_existing_frappe_context(self):
 		with (
-			patch.dict("os.environ", {"KABUK_TEST_SITE": SITE}),
+			patch.dict("os.environ", {"PLT_SHELL_TEST_SITE": SITE}),
 			patch("platform_core.tests.shell_http_fixture.frappe") as frappe,
 		):
 			frappe.local.site = "already-active.localhost"

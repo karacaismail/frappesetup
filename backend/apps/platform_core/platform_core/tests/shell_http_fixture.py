@@ -14,12 +14,12 @@ from urllib.parse import urlencode
 
 import frappe
 
-SITE = "test-kabuk.localhost"
+SITE = "test-shell.localhost"
 DOCTYPE = "Kabuk Test Record"
 CHILD_DOCTYPE = "Shell Test Child"
 PROTECTED_DOCTYPE = "Shell Test Protected"
-READER = "kabuk-reader@example.test"
-PRIVILEGED = "kabuk-privileged@example.test"
+READER = "shell-reader@example.test"
+PRIVILEGED = "shell-privileged@example.test"
 DESK = "shell-desk@example.test"
 
 
@@ -28,7 +28,7 @@ class ShellHTTPFixture(unittest.TestCase):
 
 	@classmethod
 	def setUpClass(cls):
-		cls.site = os.environ.get("KABUK_TEST_SITE")
+		cls.site = os.environ.get("PLT_SHELL_TEST_SITE")
 		if not cls.site:
 			raise unittest.SkipTest("Set KABUK_TEST_SITE explicitly to run shell HTTP tests.")
 		if cls.site != SITE:
@@ -56,7 +56,7 @@ class ShellHTTPFixture(unittest.TestCase):
 				{
 					"doctype": "DocType",
 					"name": DOCTYPE,
-					"module": "Kabuk",
+					"module": "Shell",
 					"custom": 1,
 					"fields": [
 						{
@@ -92,7 +92,7 @@ class ShellHTTPFixture(unittest.TestCase):
 				{
 					"doctype": "DocType",
 					"name": CHILD_DOCTYPE,
-					"module": "Kabuk",
+					"module": "Shell",
 					"custom": 1,
 					"istable": 1,
 					"fields": [
@@ -141,7 +141,7 @@ class ShellHTTPFixture(unittest.TestCase):
 				{
 					"doctype": "DocType",
 					"name": PROTECTED_DOCTYPE,
-					"module": "Kabuk",
+					"module": "Shell",
 					"custom": 1,
 					"fields": [
 						{
@@ -200,7 +200,7 @@ class ShellHTTPFixture(unittest.TestCase):
 						"name": title,
 						"title": title,
 						"label": title,
-						"module": "Kabuk",
+						"module": "Shell",
 						"public": 1,
 						"is_hidden": hidden,
 						"content": "[]",
@@ -214,7 +214,7 @@ class ShellHTTPFixture(unittest.TestCase):
 						"doctype": "Workspace",
 						"title": title,
 						"label": title,
-						"module": "Kabuk",
+						"module": "Shell",
 						"public": 0,
 						"for_user": owner,
 						"content": "[]",
@@ -226,7 +226,7 @@ class ShellHTTPFixture(unittest.TestCase):
 					"doctype": "Workspace",
 					"title": "Shell Unsafe Shortcut",
 					"label": "Shell Unsafe Shortcut",
-					"module": "Kabuk",
+					"module": "Shell",
 					"public": 1,
 					"type": "URL",
 					"external_link": "javascript:void(0)",
@@ -238,7 +238,7 @@ class ShellHTTPFixture(unittest.TestCase):
 				{
 					"doctype": "Sidebar",
 					"title": "Shell Review Links",
-					"module": "Kabuk",
+					"module": "Shell",
 					"items": [
 						{"type": "Link", "link_type": "URL", "label": "Shell Safe Link", "url": "/panel"},
 						{
@@ -260,7 +260,7 @@ class ShellHTTPFixture(unittest.TestCase):
 	@classmethod
 	def request(cls, path, sid=None, method="GET", data=None, headers=None, *, response_header_type=dict):
 		connection = http.client.HTTPConnection(
-			"127.0.0.1", int(os.environ.get("KABUK_TEST_PORT", "8000")), timeout=30
+			"127.0.0.1", int(os.environ.get("PLT_SHELL_TEST_PORT", "8000")), timeout=30
 		)
 		request_headers = {"Host": cls.site, "Accept": "application/json"}
 		if sid:
@@ -280,7 +280,7 @@ class ShellHTTPFixture(unittest.TestCase):
 	def login(cls, user):
 		cookies = SimpleCookie()
 		connection = http.client.HTTPConnection(
-			"127.0.0.1", int(os.environ.get("KABUK_TEST_PORT", "8000")), timeout=30
+			"127.0.0.1", int(os.environ.get("PLT_SHELL_TEST_PORT", "8000")), timeout=30
 		)
 		try:
 			connection.request(

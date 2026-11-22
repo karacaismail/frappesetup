@@ -16,16 +16,16 @@ test_options=()
 if [[ "$APP" == platform_core ]]; then
     REQUIRED_APPS=(--app erpnext)
     test_options=(
-        -e SHELL_TEST_OPENAPI=/workspace/contracts/platform_core-kabuk.openapi.yaml
+        -e SHELL_TEST_OPENAPI=/workspace/contracts/platform_core-shell.openapi.yaml
     )
 fi
 python3 "$DEV_DIR/init_env.py"
 "$DEV_DIR/bin/compose" config --quiet
-"$DEV_DIR/bin/compose" build kiraci-web
-"$DEV_DIR/bin/compose" up -d --wait --wait-timeout 90 kiraci-db kiraci-redis
-"$DEV_DIR/bin/compose" run --rm --no-deps kiraci-web \
+"$DEV_DIR/bin/compose" build tenant-web
+"$DEV_DIR/bin/compose" up -d --wait --wait-timeout 90 tenant-db tenant-redis
+"$DEV_DIR/bin/compose" run --rm --no-deps tenant-web \
     env/bin/python /workspace/dev/bootstrap.py "$SITE" ${REQUIRED_APPS[@]+"${REQUIRED_APPS[@]}"} --app "$APP"
-"$DEV_DIR/bin/compose" run --rm --no-deps kiraci-web \
+"$DEV_DIR/bin/compose" run --rm --no-deps tenant-web \
     bench --site "$SITE" migrate --skip-search-index
-"$DEV_DIR/bin/compose" run --rm --no-deps "${test_options[@]}" kiraci-web \
+"$DEV_DIR/bin/compose" run --rm --no-deps "${test_options[@]}" tenant-web \
     bench --site "$SITE" run-tests --app "$APP" "$@"

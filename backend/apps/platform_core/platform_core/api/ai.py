@@ -11,8 +11,8 @@ endpoint refuses a guest and refuses another user's data.
 import frappe
 from werkzeug.wrappers import Response
 
-from platform_core.yapay_zeka import access, agent_token, proposals, retention
-from platform_core.yapay_zeka import mcp as mcp_endpoint
+from platform_core.ai import access, agent_token, proposals, retention
+from platform_core.ai import mcp as mcp_endpoint
 
 
 # Checked in `mcp._check_principal` (identity type) and, per tool, by the tool's own permission check.

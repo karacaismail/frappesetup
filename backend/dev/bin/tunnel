@@ -1,0 +1,59 @@
+#!/bin/bash
+# Forward only this task's loopback ports through a separate Colima SSH connection.
+set -euo pipefail
+DEV_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ ! "${PANE_PORT:-}" =~ ^[1-9][0-9]{3,4}$ ]] || (( PANE_PORT > 65526 )); then
+    printf '%s\n' 'PANE_PORT must be an integer from 1000 to 65526.' >&2
+    exit 2
+fi
+STATE_DIR="${PANE_SCRATCH_DIR:-$DEV_DIR/../../.pane/scratch}/tunnels"
+mkdir -p "$STATE_DIR"
+chmod 700 "$STATE_DIR"
+cd "$STATE_DIR"
+SOCKET="$PANE_PORT.sock"
+PORTS_FILE="$PANE_PORT.ports"
+case "${FS_COLIMA_PROFILE:-factory}" in
+    factory) LIMA_NAME=colima-factory ;;
+    default) LIMA_NAME=colima ;;
+    *) printf '%s\n' 'FS_COLIMA_PROFILE must be factory or default.' >&2; exit 2 ;;
+esac
+CONFIG="$HOME/.colima/_lima/$LIMA_NAME/ssh.config"
+ACTION="${1:-ac}"
+shift || true
+if [[ ! -f "$CONFIG" ]]; then
+    printf '%s\n' "Colima $LIMA_NAME SSH configuration is missing." >&2
+    exit 1
+fi
+SSH=(ssh -F "$CONFIG" -o ControlPath="$SOCKET" -o ControlPersist=no)
+case "$ACTION" in
+    open)
+        if (( $# == 0 )); then
+            set -- "$((PANE_PORT + 1))" "$((PANE_PORT + 2))"
+        fi
+        FORWARDS=()
+        for port in "$@"; do
+            if [[ ! "$port" =~ ^[1-9][0-9]{3,4}$ ]] || (( port < PANE_PORT || port > PANE_PORT + 9 )); then
+                printf '%s\n' 'Each port must be inside this Pane port range.' >&2
+                exit 2
+            fi
+            FORWARDS+=(-L "127.0.0.1:$port:127.0.0.1:$port")
+        done
+        if "${SSH[@]}" -O check "lima-$LIMA_NAME" 2>/dev/null; then
+            if [[ -f "$PORTS_FILE" && "$(cat "$PORTS_FILE")" == "$*" ]]; then
+                exit 0
+            fi
+            printf '%s\n' 'Close the current tunnel first, then open it with all required ports.' >&2
+            exit 2
+        fi
+        "${SSH[@]}" -M -f -N -o ExitOnForwardFailure=yes "${FORWARDS[@]}" "lima-$LIMA_NAME"
+        printf '%s\n' "$*" > "$PORTS_FILE"
+        ;;
+    close)
+        if [[ -S "$SOCKET" ]]; then
+            "${SSH[@]}" -O exit "lima-$LIMA_NAME"
+        fi
+        rm -f -- "$PORTS_FILE"
+        ;;
+    status) "${SSH[@]}" -O check "lima-$LIMA_NAME" ;;
+    *) printf '%s\n' 'Usage: tunel <ac|kapat|durum> [ports]' >&2; exit 2 ;;
+esac

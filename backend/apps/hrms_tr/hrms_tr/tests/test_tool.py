@@ -22,7 +22,7 @@ class ApprovalToolTest(unittest.TestCase):
 		self.assertEqual(tool["name"], "approve_leave")
 		self.assertEqual(tool["kind"], "write")
 		self.assertIs(tool["versioned"], True)
-		self.assertEqual(tool["roles"], ["HRMS TR Manager", "HRMS TR Admin"])
+		self.assertEqual(tool["roles"], ["HRT Manager", "HRT Admin"])
 		self.assertNotEqual(tool["preview"], tool["handler"])
 
 	def test_confirmation_cannot_be_passed_as_an_argument(self):

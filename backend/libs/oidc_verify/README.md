@@ -62,7 +62,7 @@ uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -e .
 cd tests && ../.venv/bin/python -I -m unittest discover -s .
 ```
 
-Canlı Keycloak testi `KC_PUBLIC_URL` ve `ATONOTA_IDENTITY_SYNC_SECRET` değişkenlerini ister. Değişkenler yoksa test atlanır. Keycloak ortamı `backend/identity/keycloak/README.md` dosyasında anlatılır.
+Canlı Keycloak testi `KC_PUBLIC_URL`, `KC_PORT` ve `ATONOTA_IDENTITY_SYNC_SECRET` değişkenlerini ister. Test, `KC_PORT` ile belirtilen yerel porta bağlanır. Değişkenler yoksa test atlanır. Keycloak ortamı `backend/identity/keycloak/README.md` dosyasında anlatılır.
 
 ## Hazır çözümle karşılaştırma
 

@@ -35,7 +35,7 @@ Anonim yapma süresini yalnız geçici test sitesinde ölçün.
 Betik 50 ayrı hesap kullanır. İlk çağrıların yüzde 95'i 1 saniyede bitmelidir.
 
 ```sh
-PRESS_TEST_MEASURE_ANONYMIZATION=1 PRESS_TEST_PANEL_URL=http://kiraci1.localhost:3201/panel \
+PRESS_TEST_MEASURE_ANONYMIZATION=1 PRESS_TEST_PANEL_URL=http://tenant1.localhost:3201/panel \
   sh backend/apps/press_tr/tests/run.sh
 ```
 

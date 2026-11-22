@@ -11,7 +11,7 @@ import threading
 import unittest
 import warnings
 
-from anahtarlar import Anahtar, jwks
+from keys import Anahtar, jwks
 
 from oidc_verify import JwksCache, JwksUnavailable
 
@@ -24,7 +24,7 @@ class SchemeTest(unittest.TestCase):
         for url in (
             "http://idp.example.test/certs",
             "http://localhost.example.test/certs",
-            "http://kimlik.localhost.example.com/certs",
+            "http://identity.localhost.example.com/certs",
             "http://10.0.0.5/certs",
             "http://[2001:db8::1]/certs",
         ):
@@ -34,7 +34,7 @@ class SchemeTest(unittest.TestCase):
     def test_plain_http_to_a_development_address_is_allowed(self):
         for url in (
             "http://localhost:8080/certs",
-            "http://kimlik.localhost:5070/realms/platform/protocol/openid-connect/certs",
+            "http://identity.localhost:5070/realms/platform/protocol/openid-connect/certs",
             "http://127.0.0.1:5070/certs",
             "http://[::1]:5070/certs",
         ):

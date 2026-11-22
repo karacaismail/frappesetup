@@ -1,37 +1,37 @@
 [
   {
     "doctype": "Role Profile",
-    "name": "HRMS TR Employee",
-    "role_profile": "HRMS TR Employee",
+    "name": "HRT Employee",
+    "role_profile": "HRT Employee",
     "roles": [
       {
-        "role": "HRMS TR Employee"
+        "role": "HRT Employee"
       }
     ]
   },
   {
     "doctype": "Role Profile",
-    "name": "HRMS TR Manager",
-    "role_profile": "HRMS TR Manager",
+    "name": "HRT Manager",
+    "role_profile": "HRT Manager",
     "roles": [
       {
-        "role": "HRMS TR Manager"
+        "role": "HRT Manager"
       },
       {
-        "role": "HRMS TR Employee"
+        "role": "HRT Employee"
       }
     ]
   },
   {
     "doctype": "Role Profile",
-    "name": "HRMS TR Admin",
-    "role_profile": "HRMS TR Admin",
+    "name": "HRT Admin",
+    "role_profile": "HRT Admin",
     "roles": [
       {
-        "role": "HRMS TR Admin"
+        "role": "HRT Admin"
       },
       {
-        "role": "HRMS TR Employee"
+        "role": "HRT Employee"
       }
     ]
   }

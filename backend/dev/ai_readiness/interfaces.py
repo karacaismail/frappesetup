@@ -171,7 +171,7 @@ def show_table(headers, rows):
 def list_interfaces(root, source_files, whitelist_checks):
     policy_path = root / "dev/module-boundaries.json"
     if not policy_path.exists():
-        policy_path = root / "dev/modul-sinirlari.json"
+        policy_path = root / "dev/module-boundaries.json"
     policy = json.loads(policy_path.read_text(encoding="utf-8")) if policy_path.is_file() else {}
     if not isinstance(policy, dict) or any(
         not isinstance(policy.get(key, {}), dict) for key in ("modules", "path_owners", "public_paths")

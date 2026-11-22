@@ -13,7 +13,7 @@ from identity_sync.pipeline import PreviewChanged
 from . import fakes
 from .fakes import ORG_ID, Stack, keycloak_user
 
-ORG = {"id": ORG_ID, "name": "Kiracı 1", "alias": "kiraci1"}
+ORG = {"id": ORG_ID, "name": "Kiracı 1", "alias": "tenant1"}
 MEMBER, CLOSED, NEWCOMER = "member-1", "closed-1", "newcomer-1"
 
 
@@ -54,8 +54,8 @@ class ReportTest(ReconcileFlowCase):
             [
                 ("press", CLOSED, "closed_in_keycloak"),
                 ("press", NEWCOMER, "missing_team_membership"),
-                ("kiraci1", CLOSED, "closed_in_keycloak"),
-                ("kiraci1", NEWCOMER, "missing"),
+                ("tenant1", CLOSED, "closed_in_keycloak"),
+                ("tenant1", NEWCOMER, "missing"),
             ],
         )
         self.assertEqual(self.writes(), [])
@@ -119,7 +119,7 @@ class MissedDeletionTest(ReconcileFlowCase):
         plan = self.stack.app.reconcile_plan()
 
         self.assertIn(("press", self.GONE, "deleted_in_keycloak"), self.kinds(plan))
-        self.assertIn(("kiraci1", self.GONE, "deleted_in_keycloak"), self.kinds(plan))
+        self.assertIn(("tenant1", self.GONE, "deleted_in_keycloak"), self.kinds(plan))
         self.assertEqual(
             self.gone_previews(plan.report()),
             [
@@ -197,7 +197,7 @@ class MissedDeletionTest(ReconcileFlowCase):
         report = plan.report()
 
         gone = [d for d in report["differences"] if d["kind"] == "deleted_in_keycloak"]
-        self.assertEqual([(d["target"], d.get("job_id")) for d in gone], [("press", self.job_id), ("kiraci1", self.job_id)])
+        self.assertEqual([(d["target"], d.get("job_id")) for d in gone], [("press", self.job_id), ("tenant1", self.job_id)])
         self.assertTrue(all("subject" not in d for d in gone))
         self.assertNotIn(self.GONE, json.dumps(report))
         # Other kinds still name the user: the reader needs the id to act.
@@ -322,7 +322,7 @@ class PagedListTest(ReconcileFlowCase):
         kinds = self.kinds(plan)
         # The deleted account on a later page is found on both targets.
         self.assertIn(("press", "zz-gone", "deleted_in_keycloak"), kinds)
-        self.assertIn(("kiraci1", "zz-gone", "deleted_in_keycloak"), kinds)
+        self.assertIn(("tenant1", "zz-gone", "deleted_in_keycloak"), kinds)
         # The open account on a later page is known, so it is not reported as missing.
         self.assertEqual([kind for _target, subject, kind in kinds if subject == "zz-open"], [])
         for site, path in ((self.stack.press, fakes.PRESS_LIST), (self.stack.tenant, fakes.TENANT_LIST)):

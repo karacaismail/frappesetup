@@ -7,7 +7,7 @@ from frappe import _
 
 
 # The route never reads a document and always raises PermissionError.
-# nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+# nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 @frappe.whitelist(methods=["GET", "POST"])
 def deny_legacy_leave_query() -> Never:
 	frappe.throw(_("Read leave information through an authorized leave application."), frappe.PermissionError)

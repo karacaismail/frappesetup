@@ -4,10 +4,10 @@ import frappe
 from frappe import _
 
 DOCTYPE = "Leave Application"
-RULE_DOCTYPE = "Access Rule"
+RULE_DOCTYPE = "PLT Access Rule"
 ENGINE_HOOKS = {
-	"permission_query_conditions": "platform_core.erisim.hooks.query_conditions",
-	"has_permission": "platform_core.erisim.hooks.has_permission",
+	"permission_query_conditions": "platform_core.access.hooks.query_conditions",
+	"has_permission": "platform_core.access.hooks.has_permission",
 }
 
 

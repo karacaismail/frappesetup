@@ -17,7 +17,7 @@ from . import fakes
 from .fakes import ORG_ID, SUBJECT, FakeKeycloak, keycloak_user
 
 CLIENT_UUID = "44444444-4444-4444-8444-444444444444"
-TENANT_URL = "http://kiraci2.localhost:6111"
+TENANT_URL = "http://tenant2.localhost:6111"
 
 
 class AdminCase(unittest.TestCase):
@@ -39,7 +39,7 @@ class AdminCase(unittest.TestCase):
 
 class ReadTest(AdminCase):
     def test_snapshot_joins_user_and_organizations(self) -> None:
-        self.kc.add_user(keycloak_user(), [{"id": ORG_ID, "name": "Kiracı 1", "alias": "kiraci1"}])
+        self.kc.add_user(keycloak_user(), [{"id": ORG_ID, "name": "Kiracı 1", "alias": "tenant1"}])
 
         snapshot = self.admin.get_user_snapshot(SUBJECT)
 
@@ -47,7 +47,7 @@ class ReadTest(AdminCase):
         self.assertEqual(snapshot.email, "ayse@example.test")
         self.assertTrue(snapshot.email_verified)
         self.assertTrue(snapshot.enabled)
-        self.assertEqual(snapshot.organizations, (Organization(id=ORG_ID, alias="kiraci1", name="Kiracı 1"),))
+        self.assertEqual(snapshot.organizations, (Organization(id=ORG_ID, alias="tenant1", name="Kiracı 1"),))
 
     def test_missing_user_gives_none(self) -> None:
         self.kc.remove_user(SUBJECT)
@@ -97,18 +97,18 @@ class OrganizationTest(AdminCase):
             (201, None, {"Location": f"{self.kc.url}{self.base}/organizations/{ORG_ID}"}),
         )
 
-        outcome = self.admin.create_organization("kiraci2", "Kiracı 2")
+        outcome = self.admin.create_organization("tenant2", "Kiracı 2")
 
         self.assertTrue(outcome.executed)
         self.assertEqual(outcome.value, ORG_ID)
-        self.assertEqual(self.writes()[0].json(), {"name": "Kiracı 2", "alias": "kiraci2", "enabled": True})
+        self.assertEqual(self.writes()[0].json(), {"name": "Kiracı 2", "alias": "tenant2", "enabled": True})
 
     def test_create_organization_dry_run_sends_nothing(self) -> None:
-        outcome = self.admin.create_organization("kiraci2", "Kiracı 2", dry_run=True)
+        outcome = self.admin.create_organization("tenant2", "Kiracı 2", dry_run=True)
 
         self.assertFalse(outcome.executed)
         self.assertEqual(outcome.preview.operation, "keycloak.create_organization")
-        self.assertEqual(outcome.preview.target, "kiraci2")
+        self.assertEqual(outcome.preview.target, "tenant2")
         self.assertFalse(outcome.preview.destructive)
         self.assertEqual(self.kc.requests, [])
 
@@ -128,24 +128,24 @@ class OrganizationTest(AdminCase):
         self.assertTrue(outcome.executed)
 
     def test_find_organization_searches_by_name_and_checks_the_alias(self) -> None:
-        self.kc.on("GET", f"{self.base}/organizations", (200, [{"id": ORG_ID, "name": "Kiracı 2", "alias": "kiraci2"}]))
+        self.kc.on("GET", f"{self.base}/organizations", (200, [{"id": ORG_ID, "name": "Kiracı 2", "alias": "tenant2"}]))
 
-        self.assertEqual(self.admin.find_organization("Kiracı 2", "kiraci2").id, ORG_ID)
+        self.assertEqual(self.admin.find_organization("Kiracı 2", "tenant2").id, ORG_ID)
         search = self.kc.calls("GET", f"{self.base}/organizations")[0]
         # Keycloak's search looks at the name, not the alias (OrganizationsResource.java).
         self.assertEqual(search.query["search"], ["Kiracı 2"])
         self.assertEqual(search.query["exact"], ["true"])
 
     def test_find_organization_ignores_a_similar_alias(self) -> None:
-        self.kc.on("GET", f"{self.base}/organizations", (200, [{"id": "baska", "name": "Kiracı 2", "alias": "kiraci20"}]))
+        self.kc.on("GET", f"{self.base}/organizations", (200, [{"id": "baska", "name": "Kiracı 2", "alias": "tenant20"}]))
 
-        self.assertIsNone(self.admin.find_organization("Kiracı 2", "kiraci2"))
+        self.assertIsNone(self.admin.find_organization("Kiracı 2", "tenant2"))
 
     def test_join_adds_the_member_to_exactly_the_planned_organization(self) -> None:
         # The plan named the organization by its id. No new lookup may pick another target.
         self.kc.on("POST", f"{self.base}/organizations/{ORG_ID}/members", (201, None))
 
-        self.admin.ensure_organization_member("kiraci2", "Kiracı 2", SUBJECT, ORG_ID)
+        self.admin.ensure_organization_member("tenant2", "Kiracı 2", SUBJECT, ORG_ID)
 
         self.assertEqual([(r.method, r.path) for r in self.kc.requests if "/admin/" in r.path],
                          [("POST", f"{self.base}/organizations/{ORG_ID}/members")])
@@ -156,7 +156,7 @@ class OrganizationTest(AdminCase):
         )
         self.kc.on("POST", f"{self.base}/organizations/{ORG_ID}/members", (201, None))
 
-        self.admin.ensure_organization_member("kiraci2", "Kiracı 2", SUBJECT, None)
+        self.admin.ensure_organization_member("tenant2", "Kiracı 2", SUBJECT, None)
 
         self.assertEqual([r.path for r in self.writes()],
                          [f"{self.base}/organizations", f"{self.base}/organizations/{ORG_ID}/members"])
@@ -166,7 +166,7 @@ class OrganizationTest(AdminCase):
         self.kc.on("POST", f"{self.base}/organizations", (409, {"errorMessage": "exists"}))
 
         with self.assertRaises(HttpError):
-            self.admin.ensure_organization_member("kiraci2", "Kiracı 2", SUBJECT, None)
+            self.admin.ensure_organization_member("tenant2", "Kiracı 2", SUBJECT, None)
         self.assertEqual(len(self.writes()), 1)
 
 
@@ -216,7 +216,7 @@ class RolesTest(AdminCase):
         tokens = TokenProvider(
             f"{self.kc.url}/realms/platform/protocol/openid-connect/token", "identity-sync", "test-client-secret", timeout=5
         )
-        for scope in ("", "aud-site-kiraci1", "aud-press", "admin-api"):
+        for scope in ("", "aud-site-tenant1", "aud-press", "admin-api"):
             with self.subTest(scope=scope):
                 admin = KeycloakAdmin(self.kc.url, "platform", tokens, admin_scope=scope, timeout=5)
                 with self.assertRaises(HttpError) as caught:
@@ -319,7 +319,7 @@ class InviteTest(AdminCase):
         with self.assertRaises(TransportError):
             self.admin.send_execute_actions_email(SUBJECT, ("UPDATE_PASSWORD",))
         with self.assertRaises(TransportError):
-            self.admin.create_organization("kiraci2", "Kiracı 2")
+            self.admin.create_organization("tenant2", "Kiracı 2")
 
     def test_invite_dry_run_only_reads(self) -> None:
         self.kc.on("GET", f"{self.base}/users", (200, []))
