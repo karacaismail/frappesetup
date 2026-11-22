@@ -206,6 +206,8 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Komut yalnız kendi oluşturduğu kayıtları siler. Kayıtları tür ve ad çiftiyle seçer.
   - Ölçüm bitince site silinebilir. Geri yükleme gerekmez.
   - Bu kural bütün işlerin ölçüm komutlarına uygulanır.
+  - Veritabanını değiştiren ölçüm testleri yalnız `perf-` sitesinde koşar, öteki sitede açık nedenle atlanır. Ölçüm mantığının testleri sahte veriyle çalışır.
+  - Adı `test-` ile başlayan siteler atılabilir deneme siteleridir. Ortak test sınıflarının bu sitelerdeki toplu temizliği kabul edilir.
 
 ## Karar sitesine işlenecek farklar
 
