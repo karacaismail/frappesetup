@@ -15,6 +15,7 @@ Pane, çakışmaları önlemek için her çalışma alanına ayrı bir `PANE_POR
 
 1. Ortamı `backend/dev/bin/ac` ile açın.
 2. Komutun yazdığı kiracı adresini tarayıcıda açın.
+   Site ilk istekte yanıt vermezse birkaç saniye sonra tekrar deneyin.
 3. `backend/dev/bin/test platform_core` ile kurulum testlerini çalıştırın.
 4. İşiniz bitince `backend/dev/bin/kapat` ile ortamı kapatın.
 
@@ -27,7 +28,7 @@ Frappe, adresin bu bölümünden siteyi seçer.
 Açma komutu yerel bağlantı için SSH tünelini de başlatır.
 Tüneli ayrı açmak için `backend/dev/bin/tunel ac` komutunu kullanın.
 Farklı portlar gerekirse önce `backend/dev/bin/tunel kapat` komutunu çalıştırın.
-Sonra `tunel ac` komutuna gereken tüm portları yazın.
+Sonra `backend/dev/bin/tunel ac` komutuna gereken tüm portları yazın.
 
 Test komutu `test-platform-core.localhost` sitesini kullanır.
 `allow_tests` ayarı yalnız test sitesinde açıktır.
