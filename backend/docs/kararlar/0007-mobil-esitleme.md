@@ -33,8 +33,11 @@ Sunucu kurulum ve iptal işlemlerini aynı mobil hesap kaydıyla sıraya alır.
 Bu denetim, silinmiş hesabın eski okuma bilgisiyle yeniden açılmasını önler.
 Sonraki eşitlemeler mobil hesap kaydındaki kilidi kullanır.
 Bütün kurulumları iptal eden istek de bu anı saklar.
-Yeni kurulum, iptal anından sonra verilen belirteci ister.
-Aynı saniyede verilen belirteç de reddedilir.
+Yeni kurulum, iptal sınırından sonra verilen belirteci ister.
+Sunucu belirtecin verildiği saatte 30 saniye ileriye izin verir.
+Bu pay, iki sunucunun saat farkı içindir.
+Sunucu iptal sınırına da 30 saniye ekler.
+Sınır anında verilen belirteç de reddedilir.
 Sistem `cmd` alanını, boş bile olsa, gövdede ve adres parametrelerinde reddeder.
 Sistem etkin oturum çereziyle belirteç birlikte gelirse isteği reddeder.
 Misafir çerezi etkin oturum sayılmaz.
@@ -79,6 +82,10 @@ Plan bağlı kayıtları, izinleri ve geçerli durum değişimlerini belirtir.
 Plan ayrıca alanları, ekleri, çevrimdışı okuma süresini ve taslak ömrünü belirtir.
 Testler sahte kayıt türüyle sözleşme davranışını sınar.
 Sahte komutlar yalnız ayrı deneme sitesine bağlanır.
+Mobil uç, deneme araçlarını yalnız `allow_tests` açıkken okur.
+Deneme kancası araçları isteğin sunucu belleğine yerleştirir.
+İstek gövdesi ve başlıkları bu araçları doğrudan belirleyemez.
+Canlı site bu ayarı kapalı tutar.
 
 ## Sunucudaki kayıtlar
 
@@ -164,6 +171,7 @@ Telefon bu yüzden geç kesinleşen 8 numaralı kaydı atlamaz.
 Geri alınan yazma kayıt ve sıra ilerlemesini birlikte geri alır.
 MariaDB eski okuma görünümünden yeni bir satır kilidine geçişi reddedebilir.
 Sunucu bu hatada işlemi geri alır ve en çok üç kez dener.
+Sunucu yeniden denemeden önce kısa ve rastgele bir süre bekler.
 Üç deneme başarısız olursa sunucu `503` ve `Retry-After` döner.
 Kilit bekleme süresi dolarsa sunucu hemen aynı yanıtı döner.
 Bu deneme, veritabanı dışında etkisi olan komutu çalıştırmaz.
@@ -200,7 +208,9 @@ Site bu süreleri ayrı ayrı değiştirebilir.
 - `mobile_upsert_retention_days` yeni ve güncel kayıt olaylarının süresidir.
 - `mobile_removal_retention_days` kaldırma işaretlerinin süresidir.
 
-Sunucu teslim kayıtlarını kurulum silinene kadar saklar.
+Sunucu etkin kurulumların teslim kayıtlarını saklar.
+El ile temizlik, iptal edilen kurulumların teslim kayıtlarını da kaldırır.
+Önizleme bu kayıtları ayrı sayar.
 Kullanıcı silinince sunucu kurulumları, teslimleri ve hedefli olayları temizler.
 Bir yanıt kaybolursa telefon aynı imleçle kaldırma işaretini yeniden alabilir.
 İşaretin yeniden alınması eski iş kaydını geri getirmez.

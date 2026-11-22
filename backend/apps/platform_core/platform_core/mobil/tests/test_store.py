@@ -14,6 +14,7 @@ except ModuleNotFoundError as exc:
 	frappe = None
 else:
 	from platform_core.mobil import store as storage
+	from platform_core.mobil.retention import cleanup
 
 if frappe is not None:
 
@@ -59,6 +60,34 @@ if frappe is not None:
 			installation = str(uuid4())
 			storage.MobileStore().install(identity, installation)
 			return installation
+
+		def test_cleanup_removes_only_deliveries_for_revoked_installations(self):
+			revoked = self.make_installation("Administrator")
+			active = self.make_installation("Administrator")
+			store = storage.MobileStore()
+			record_id = str(uuid4())
+			for installation in (revoked, active):
+				store.record_delivery(installation, "fixture", record_id)
+			frappe.db.set_value("Mobile Installation", revoked, "revoked", 1)
+
+			preview = cleanup(dry_run=True)
+			self.assertTrue(store.may_have_delivered(revoked, "fixture", record_id))
+			result = cleanup()
+			self.assertFalse(store.may_have_delivered(revoked, "fixture", record_id))
+			self.assertTrue(store.may_have_delivered(active, "fixture", record_id))
+			self.assertGreaterEqual(preview["eligible_deliveries"], 1)
+			self.assertEqual(preview["deliveries_removed"], 0)
+			self.assertEqual(result["deliveries_removed"], preview["eligible_deliveries"])
+			self.assertTrue(frappe.db.exists("Mobile Installation", revoked))
+
+		def test_delivery_audit_is_due_at_300_seconds(self):
+			installation = self.make_installation("Administrator")
+			store = storage.MobileStore()
+			finished_at = 1_700_000_000
+			self.assertTrue(store.audit_due(installation, finished_at))
+			store.finish_audit(installation, finished_at)
+			self.assertFalse(store.audit_due(installation, finished_at + 299))
+			self.assertTrue(store.audit_due(installation, finished_at + 300))
 
 		def test_second_access_loss_emits_a_new_targeted_removal(self):
 			installation = self.make_installation("Administrator")

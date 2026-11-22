@@ -47,7 +47,8 @@
    "fieldname": "target_installation",
    "fieldtype": "Link",
    "label": "Hedef kurulum",
-   "options": "Mobile Installation"
+   "options": "Mobile Installation",
+   "search_index": 1
   }
  ],
  "links": [],

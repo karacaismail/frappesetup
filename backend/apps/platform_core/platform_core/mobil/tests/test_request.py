@@ -77,6 +77,21 @@ class MobileRequestTest(unittest.TestCase):
 				self.frappe.local.mobile_identity["iat"] = invalid
 				self.assert_rejected("mobile_token_required", 401)
 
+	def test_issued_at_allows_thirty_seconds_of_clock_skew(self):
+		with patch.object(request.time, "time", return_value=self.issued_at):
+			self.frappe.local.mobile_identity["iat"] = self.issued_at + 30
+			identity, _ = request.mobile_request("v1_register")
+			self.assertEqual(identity.issued_at, self.issued_at + 30)
+			self.frappe.local.mobile_identity["iat"] += 1
+			self.assert_rejected("mobile_token_required", 401)
+
+	def test_empty_query_cmd_and_noncanonical_route_are_rejected(self):
+		self.request.args = {"cmd": ""}
+		self.assert_rejected("invalid_mobile_route", 400)
+		self.request.args = {}
+		self.request.path += "/"
+		self.assert_rejected("invalid_mobile_route", 400)
+
 	def test_cookie_login_is_rejected_even_with_verified_identity(self):
 		self.request.cookies = {"sid": "fake-session"}
 		self.frappe.local.login_manager.user = self.frappe.session.user
@@ -110,6 +125,13 @@ class MobileRequestTest(unittest.TestCase):
 		action.assert_called_once()
 		self.assertEqual(self.frappe.local.response, {"http_status_code": 503, "code": "mobile_busy"})
 		self.assertEqual(self.frappe.local.response_headers, {"Retry-After": "1"})
+
+	def test_deadlocks_wait_after_rollbacks_only_between_attempts(self):
+		action = Mock(side_effect=Deadlock())
+		with patch.object(request.time, "sleep") as sleep:
+			request.endpoint_response("v1_register", action)
+		self.assertEqual(sleep.call_count, 2)
+		self.assertTrue(all(0 < call.args[0] <= 0.24 for call in sleep.call_args_list))
 
 	def test_exhausted_deadlocks_return_retry_after(self):
 		action = Mock(side_effect=Deadlock())

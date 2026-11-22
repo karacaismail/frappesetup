@@ -5,7 +5,12 @@ import time
 
 import frappe
 
-from platform_core.mobil.lifecycle import check_new_installation, lock_account, record_revocation
+from platform_core.mobil.lifecycle import (
+	_require_enabled_user,
+	check_new_installation,
+	lock_account,
+	record_revocation,
+)
 from platform_core.mobil.protocol import PAGE_SIZE, MobileError, uuid4_id
 from platform_core.mobil.request import endpoint_response
 from platform_core.mobil.retention import cleanup
@@ -71,6 +76,7 @@ def _push(identity, body):
 
 
 def _pull(identity, body):
+	_require_enabled_user(identity.account)
 	_keys(body, {"installation_id"}, {"limit", "cursor"})
 	site_secret = frappe.conf.get("mobile_cursor_key")
 	if not isinstance(site_secret, str) or len(site_secret) < 32:

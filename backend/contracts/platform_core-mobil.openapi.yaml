@@ -200,13 +200,15 @@ components:
               status: { const: applied }
     CleanupResult:
       type: object
-      required: [dry_run, removed, operations_removed, eligible_changes, eligible_operations]
+      required: [dry_run, removed, operations_removed, eligible_changes, eligible_operations, deliveries_removed, eligible_deliveries]
       properties:
         dry_run: { type: boolean }
         removed: { type: integer, minimum: 0, maximum: 2000 }
         operations_removed: { type: integer, minimum: 0, maximum: 1000 }
         eligible_changes: { type: integer, minimum: 0, maximum: 2000 }
         eligible_operations: { type: integer, minimum: 0, maximum: 1000 }
+        deliveries_removed: { type: integer, minimum: 0, maximum: 1000 }
+        eligible_deliveries: { type: integer, minimum: 0, maximum: 1000 }
     Error:
       type: object
       anyOf:

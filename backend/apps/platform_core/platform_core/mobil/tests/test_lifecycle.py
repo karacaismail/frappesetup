@@ -63,11 +63,23 @@ class MobileLifecycleTest(IntegrationTestCase):
 		with patch("platform_core.mobil.lifecycle.time.time", return_value=self.now):
 			self.assertEqual(_register(old, first), first)
 			self.assertEqual(_revoke(old, first), {"revoked": 1})
-			for issued_at in (self.now - 1, self.now):
+			for issued_at in (self.now - 1, self.now, self.now + 30):
 				with self.assertRaises(MobileError) as raised:
 					_register(self.identity(issued_at), second)
 				self.assertEqual(raised.exception.code, "mobile_token_revoked")
-			self.assertEqual(_register(self.identity(self.now + 1), second), second)
+			self.assertEqual(_register(self.identity(self.now + 31), second), second)
+
+	def test_pull_rejects_disabled_account_before_opening_cursor(self):
+		from platform_core.api.mobile import _pull, _register
+		from platform_core.mobil.protocol import MobileError
+
+		identity = self.identity(self.now)
+		body = {"installation_id": str(uuid4())}
+		_register(identity, body)
+		frappe.db.set_value("User", self.account, "enabled", 0)
+		with self.assertRaises(MobileError) as raised:
+			_pull(identity, body)
+		self.assertEqual((raised.exception.code, raised.exception.status), ("mobile_token_required", 401))
 
 	def test_installation_limit_leaves_existing_registration_idempotent(self):
 		from platform_core.api.mobile import _register

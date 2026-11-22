@@ -1,4 +1,4 @@
-"""Manual cleanup for the mobile event log and operation receipts."""
+"""Manual cleanup for mobile events, receipts, and revoked delivery records."""
 
 from datetime import timedelta
 
@@ -31,6 +31,21 @@ def _eligible(doctype, filters, fields, *, for_update):
 	)
 
 
+def _revoked_delivery_names():
+	delivery = frappe.qb.DocType("Mobile Delivery")
+	installation = frappe.qb.DocType("Mobile Installation")
+	return (
+		frappe.qb.from_(delivery)
+		.inner_join(installation)
+		.on(delivery.installation_id == installation.name)
+		.select(delivery.name)
+		.where(installation.revoked == 1)
+		.orderby(delivery.name)
+		.limit(CLEANUP_LIMIT)
+		.run(pluck=True)
+	)
+
+
 def cleanup(dry_run=False):
 	"""Preview or remove one bounded batch. Bench or the HTTP request owns the transaction."""
 	if type(dry_run) is not bool:
@@ -48,6 +63,12 @@ def cleanup(dry_run=False):
 	)
 	if operations and not dry_run:
 		frappe.db.delete("Mobile Operation", {"name": ["in", [row.name for row in operations]]})
+
+	# Delivery audits can hold a delivery lock while trying to acquire the sequence lock.
+	# Follow that same lock order when removing a revoked installation's delivery rows.
+	deliveries = _revoked_delivery_names()
+	if deliveries and not dry_run:
+		frappe.db.delete("Mobile Delivery", {"name": ["in", deliveries]})
 
 	floor = frappe.db.get_value(SEQUENCE_DOCTYPE, SEQUENCE_NAME, "retention_floor", for_update=not dry_run)
 	if floor is None:
@@ -72,4 +93,6 @@ def cleanup(dry_run=False):
 		"operations_removed": 0 if dry_run else len(operations),
 		"eligible_changes": len(changes),
 		"eligible_operations": len(operations),
+		"eligible_deliveries": len(deliveries),
+		"deliveries_removed": 0 if dry_run else len(deliveries),
 	}

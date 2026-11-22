@@ -4,7 +4,7 @@ import time
 
 import frappe
 
-from .protocol import MobileError
+from .protocol import TOKEN_CLOCK_SKEW_SECONDS, MobileError
 from .store import _insert
 
 ACCOUNT_STATE = "Mobile Account State"
@@ -52,7 +52,7 @@ def lock_revocation_scope(account):
 
 def record_revocation(account):
 	state = _account_state(account)
-	cutoff = int(time.time())
+	cutoff = int(time.time()) + TOKEN_CLOCK_SKEW_SECONDS
 	if state is None:
 		_insert(ACCOUNT_STATE, account=account, revoked_through=str(cutoff))
 	elif cutoff > int(state.revoked_through):

@@ -132,9 +132,9 @@ class MobileHTTPTest(unittest.TestCase):
 			extra_headers=old,
 		)
 		self.assertEqual(status, 403, payload)
-		# Integer iat is second-granular. Wait until a subsequent second to issue a new token.
-		issued_after = int(time()) + 1
-		while int(time()) < issued_after:
+		# Send a new issuance after the cutoff, within the allowed clock skew.
+		issued_after = int(time()) + 31
+		while int(time()) + 30 < issued_after:
 			sleep(0.02)
 		fresh = {"X-Mobile-Test-Iat": str(issued_after)}
 		status, payload, _ = self.post(
@@ -164,9 +164,10 @@ class MobileHTTPTest(unittest.TestCase):
 		self.assertEqual(status, 200, response)
 		self.assertIn("changes", response["message"])
 
+	@unittest.skipUnless(FIXTURE, "The fixture lets an empty cmd reach the mobile endpoint")
 	def test_mobile_identity_rejects_cmd_query_even_with_json_body(self):
 		status, payload, _ = self.post("v1_register", {"installation_id": str(uuid4())}, suffix="?cmd=")
-		self.assertIn(status, {400, 401, 403}, payload)
+		self.assertEqual((status, payload.get("code")), (400, "invalid_mobile_route"), payload)
 
 	@unittest.skipUnless(FIXTURE, "Synthetic identity marker is required")
 	def test_request_gate_rejects_untrusted_identity_and_invalid_body(self):

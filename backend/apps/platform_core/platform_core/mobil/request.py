@@ -1,13 +1,14 @@
 """Mobile HTTP boundary. Identity verification belongs to the identity hook."""
 
 import json
+import random
 import re
 import time
 from dataclasses import dataclass
 
 import frappe
 
-from .protocol import BODY_BYTES, REQUESTS_PER_MINUTE, MobileError, content_digest
+from .protocol import BODY_BYTES, REQUESTS_PER_MINUTE, TOKEN_CLOCK_SKEW_SECONDS, MobileError, content_digest
 
 APP_VERSION = re.compile(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}")
 CONTRACT_VERSION = re.compile(r"[1-9][0-9]{0,2}")
@@ -107,7 +108,7 @@ def mobile_request(endpoint):
 	if not isinstance(issuer, str) or not issuer or not isinstance(subject, str) or not subject:
 		raise MobileError("mobile_token_required", 401)
 	issued_at = identity.get("iat")
-	if type(issued_at) is not int or not 0 < issued_at <= int(time.time()):
+	if type(issued_at) is not int or not 0 < issued_at <= int(time.time()) + TOKEN_CLOCK_SKEW_SECONDS:
 		raise MobileError("mobile_token_required", 401)
 	principal = content_digest([issuer, subject])
 
@@ -143,7 +144,7 @@ def endpoint_response(endpoint, action):
 
 	# MariaDB can reject a locking read when auth opened an older snapshot.
 	# Roll back the entire attempt before rerunning database-only commands.
-	for _ in range(3):
+	for attempt in range(3):
 		try:
 			return action(identity, body)
 		except MobileError as error:
@@ -152,5 +153,8 @@ def endpoint_response(endpoint, action):
 			break
 		except frappe.QueryDeadlockError:
 			frappe.db.rollback()
+			if attempt < 2:
+				# Let other writers finish before reopening the transaction.
+				time.sleep(random.uniform(0.03, 0.12) * 2**attempt)
 
 	return _error_response(MobileError("mobile_busy", 503))

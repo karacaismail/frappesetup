@@ -11,6 +11,8 @@ from platform_core.mobil.protocol import (
 	uuid4_id,
 )
 
+from .load_accounts import LOAD_ACCOUNTS
+
 SITE = "test-mobile.localhost"
 FIRST = "mobile-first@example.test"
 SECOND = "mobile-second@example.test"
@@ -24,6 +26,7 @@ MOBILE_PATHS = frozenset(
 )
 PROBE_PATH = "/api/method/mobile_test_app.fixture.commit_probe"
 TOKENS = {
+	**LOAD_ACCOUNTS,
 	"Bearer fixture-first": FIRST,
 	"Bearer fixture-second": SECOND,
 	"Bearer fixture-rate": RATE,
@@ -46,6 +49,7 @@ def setup():
 		(RATE, "Rate Test"),
 		(REVOKE, "Revocation Test"),
 		(REVOKE_ONE, "Single Revocation Test"),
+		*((account, "Load Test") for account in LOAD_ACCOUNTS.values()),
 	):
 		if not frappe.db.exists("User", user):
 			frappe.get_doc(
@@ -102,7 +106,7 @@ def _hold_commit(record_id):
 def authenticate():
 	_require_test_site()
 	request = frappe.local.request
-	if frappe.session.user != "Guest" or "cmd" in request.args or frappe.form_dict.get("cmd"):
+	if frappe.session.user != "Guest" or any(request.args.getlist("cmd")) or frappe.form_dict.get("cmd"):
 		return
 	header = request.headers.get("Authorization")
 	if request.path == PROBE_PATH and header == "Bearer fixture-control":
