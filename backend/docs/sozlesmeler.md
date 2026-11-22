@@ -472,6 +472,15 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 - Okuma araçlarının sonucu `as_of`, `site` ve `source` taşır. Sonuç sınırı aşarsa `truncated: true` döner. Alt tablo en çok 200 satır, sonuç verisi en çok 262.144 bayttır.
 - Oturumsuz istek 403, süresi dolmuş oturum 401 alır.
 
+#### Kullanım günlüğü temizliğinin modül arayüzü
+
+- “AI Usage Log” kaydının sahibi model geçididir. Temizlik işlevi `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False)` olur.
+- İşlev yetkiyi kendisi denetler. Yalnız “System Manager” çağırabilir. Öteki kullanıcı `frappe.PermissionError` alır.
+- Süre 365 gündür. Ayar bu süreyi değiştiremez. Kayıtlar O-32'ye göre kalıcı silinir.
+- İşlev `{"eligible": <sayı>, "deleted": <sayı>}` döner. `dry_run=True` iken hiçbir kayıt silinmez ve `deleted` 0 olur.
+- İşlev önizleme belirteci istemez. İnsan onayını çağıran taraf yönetir. Örneğin `platform_core.api.ai.purge_logs` kendi önizleme ve onay yolunu kullanır. Geçidin kendi HTTP ucu da kendi önizleme belirtecini kullanabilir.
+
+
 ### Genel araçlar
 
 `search_doctypes`, `get_doctype_schema`, `list_documents`, `get_document`, `run_report`, `create_document`, `update_document`, `submit_document`, `cancel_document`, `delete_document` ve `get_proposal`.
