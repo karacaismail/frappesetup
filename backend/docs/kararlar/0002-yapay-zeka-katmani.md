@@ -137,7 +137,9 @@ Bazı DocType'lar kod ya da kimlik bilgisi taşır. Genel yazma araçları bunla
 - Bazı DocType'lar yönetim kaydıdır. Örneğin “Custom Field”, “Role” ve izin kayıtları böyledir. Bunlar yalnız yönetim araçlarıyla değişir.
 - “AI Action Log” ve “AI Action Proposal” katmanın kendi kayıtlarıdır. Bunlar yapay zekâ yoluyla değişmez.
 
-Tam liste kodda tek yerde durur. Testler listeyi sınar.
+Frappe çatısının kendi DocType'ları da genel yazma araçlarına kapalıdır. Bunlar ayar, kod ya da sistem kaydıdır. Çatıdan yalnız beş DocType açıktır: “ToDo”, “Note”, “Event”, “Contact” ve “Address”. Uygulamaların ve kullanıcıların kendi DocType'ları açıktır. Bu kural listeden güvenlidir. Çatıya yeni bir sistem DocType'ı gelirse kendiliğinden kapalı kalır.
+
+Tam liste kodda tek yerde durur. Dosya `yapay_zeka/policy.py` dosyasıdır. Testler listeyi sınar.
 
 ### Uygulama araçları (`ai_tools`, G-105)
 
@@ -168,6 +170,7 @@ Tek tık akışları (Prompts) bu işte yoktur. O iş Rail 5'e kalır.
 - İnsan panelde Keycloak ile giriş yapar. Tarayıcı Frappe oturum çerezini ve CSRF belirtecini taşır.
 - Onay verme, reddetme ve aracı belirteci alma yalnız bu kimlikle yapılır.
 - İstek `Authorization` başlığı taşıyorsa insan oturumu sayılmaz.
+- Yazan insan isteği CSRF belirteci ister. CSRF belirteci, isteğin kendi sayfamızdan geldiğini kanıtlayan değerdir. Frappe bu denetimi oturumda belirteç yoksa atlar (`frappe/auth.py:92`). Katman belirteci olmayan oturumu reddeder.
 
 ### Aracı belirteci
 
@@ -192,6 +195,7 @@ Belirtecin sınırları şunlardır:
 | Yetki | Okuma ve öneri açma. Onay veremez. |
 
 - Belirteç yalnız bu sitede geçer. Kayıt bu sitenin önbelleğindedir.
+- İstek `cmd` alanı taşıyorsa belirteç kimliğe çevrilmez. Frappe bu alanla yolu yok sayar ve başka işlevi çalıştırır (`frappe/app.py:121`). Bağımsız inceleme bu açığı buldu. Test bu yolu sınar.
 - Önbellek temizlenirse belirteçler geçersiz olur. Bu güvenli yöndür.
 - İstek hem oturum çerezi hem belirteç taşıyorsa reddedilir. Sözleşmenin 3. bölümü aynı kuralı koyar.
 
@@ -259,14 +263,22 @@ Sunucu şu denetimleri sırayla yapar. Biri başarısız olursa iş yürümez.
 | Kullanıcının izni hâlâ var mı? | İzin kalktıysa iş reddedilir. |
 | Aynı hedefte sonucu bilinmeyen iş var mı? | Kör tekrar yapılmaz. |
 
-Özet, şu değerlerin SHA-256 özetidir: kullanıcı, site, araç, hedef kayıt, kaydın `modified` değeri, girdi ve önizleme.
+Özet bir SHA-256 değeridir. Özete şunlar girer: kullanıcı, site, araç, hedef kayıt, kaydın `modified` değeri, girdi ve önizleme. Özete rastgele bir değer de girer. Rastgele değer yüzünden model özeti hesaplayamaz. Özet yalnız insan ucundan döner. Model öneri kaydını genel araçlarla okuyamaz.
+
+Başka kullanıcının onayı 403 alır. Yanıt öneriyi taşımaz. Önizleme o kullanıcının verisidir.
 
 ### Yürütme ve “unknown” kuralı
 
-1. Sunucu aynı araç ve hedef için kilit alır. Kilit Frappe'nin `filelock` işlevidir.
+1. Sunucu aynı hedefin bütün öneri satırlarını veritabanında kilitler. Yarışan ikinci onay bekler. Kilit birden çok sunucuda da çalışır.
+   - Kilit sırası her istekte aynıdır. Sunucu önce hedefin önerilerini, sonra bu öneriyi kilitler.
+   - MariaDB, yarışan bir onayın değiştirdiği satırda kilitli okumayı reddedebilir (`frappe/database/mariadb/database.py:27`). O zaman sunucu işlemi geri alır ve denetimleri güncel veriyle yeniden yapar. En çok dört kez dener.
+   - Yarış testleri bu durumu sınar. İki onay aynı anda gelir ve yalnız biri yürür.
 2. Sunucu öneriyi `consumed` yapar ve sonucu `unknown` yazar. Bu yazıyı hemen kesinleştirir.
 3. Sunucu işi yürütür.
-4. İş başarılıysa sonuç `succeeded` olur. İş hata verirse yazılar geri alınır ve sonuç `failed` olur.
+4. İş başarılıysa sonuç `succeeded` olur. İş hata verirse yazılar geri alınır.
+   - Hata katmanın kendi denetiminde oluştuysa sonuç `failed` olur. Bu denetim yalnız katmanın kodudur ve kayıt yöntemi çağırmaz.
+   - Katmanın denetimi bittikten sonraki her hata `unknown` olur. Bu bölümde Frappe'nin kayıt yöntemleri ve kancaları çalışır. Uygulama aracının bütün işlevleri de bu bölümdedir.
+   - Sınır kodda tek yerdedir: `proposals.py` içindeki `_execute` işlevi.
 5. Süreç arada ölürse sonuç `unknown` kalır.
 
 İkinci adımdaki erken kesinleştirme bilinçli bir istisnadır (V-2). Bu yazı olmadan ölen iş iz bırakmaz. Tek kullanım kuralı da bu yazıya dayanır.
@@ -281,6 +293,8 @@ Sonucu `unknown` olan hedefe yeni öneri açılmaz. İnsan `resolve_proposal` uc
 - Süre zamanlanmış işle değil, okuma anında denetlenir (D-6).
 - İnsan öneriyi `reject_proposal` ucuyla reddedebilir.
 - Risk sınıfını model belirlemez. Sınıf aracın tanımından gelir.
+- Yerleşik yazma araçları kaydı yürütmede satır kilidiyle okur. Sürüm önizlemedekinden farklıysa yazmaz.
+- Okuma aracı kalıcı yazı bırakamaz. Katman okuma aracından sonra işlemi geri alır.
 
 ## 8. “AI Action Log” hangi alanları tutar (G-64)
 
@@ -290,11 +304,11 @@ Her araç çağrısı bir kayıt açar. Ret de kayıt açar. Onay, ret ve yürü
 | --- | --- |
 | `user` | İşlemi yapan kullanıcı |
 | `principal` | Kimlik türü: insan oturumu ya da aracı belirteci |
-| `session_id` | İstemcinin verdiği konuşma kimliği |
-| `client_info` | MCP istemcisinin adı ve sürümü. Güvenilmeyen metindir. |
-| `stage` | Adım: çağrı, önizleme, onay, ret, yürütme ya da kapatma |
+| `session_id` | İstemcinin verdiği konuşma kimliğinin SHA-256 özeti |
+| `client_info` | Tanınan istemcinin sabit adı ya da `other` |
+| `stage` | Adım: kimlik (`auth`), çağrı, önizleme, onay, ret, yürütme ya da kapatma |
 | `tool` | Araç adı |
-| `tool_class` | Araç türü: tanım, okuma, yazma, yönetim ya da uygulama |
+| `tool_class` | Araç türü: tanım, okuma, yazma, yönetim, uygulama ya da akış (`flow`) |
 | `target_doctype` | Hedef DocType |
 | `target_name` | Hedef kaydın adı |
 | `args_hash` | Girdinin SHA-256 özeti |
@@ -309,7 +323,7 @@ Her araç çağrısı bir kayıt açar. Ret de kayıt açar. Onay, ret ve yürü
 
 - Zaman, Frappe'nin hazır `creation` alanındadır.
 - Günlük girdinin kendisini tutmaz. Yalnız özetini tutar. Böylece günlüğe kişisel veri ve gizli değer girmez.
-- Günlük yalnız eklenir. Kayıt değişmez ve silinmez. Controller bunu engeller.
+- Günlük yalnız eklenir. Kayıt değişmez. Kaydı yalnız saklama komutu, süresi dolunca siler. Controller öteki her silmeyi engeller.
 - Günlüğü yalnız “System Manager” rolü okur.
 - Ret durumunda istek hata vermez. Araç `isError` taşıyan sonuç döner. Böylece günlük yazısı geri alınmaz.
 - Beklenmeyen hatada sunucu yazıları geri alır. Sonra günlüğü yazar ve kesinleştirir.
@@ -322,9 +336,9 @@ G-64 `model`, token ve maliyet alanlarını da sayar. Bu alanlar bu kayıtta yok
 - Token ve maliyet “AI Usage Log” kaydındadır. O kaydın sahibi `model_gecidi` modülüdür.
 - İki kayıt `session_id` değeriyle eşleşir.
 
-Bu konu `BORC(mvp)` etiketli bir teknik borçtur. Günlüğün saklama süresi 365 gündür (Rail 5). Eski kaydı silen elle başlatılan komut henüz yoktur. Sorumlu platform-core-yz işidir. Komut ve HTTP ucu yazılınca bu borç kapanır.
+Günlüğün saklama süresi 365 gündür (Rail 5). Eski kaydı elle başlatılan bir komut siler. Komut `retention.purge` işlevidir. Komutun HTTP ucu `purge_logs`, aracı `purge_action_log` olur. Zamanlanmış iş yoktur (D-6). Sonucu bilinmeyen öneriler silinmez.
 
-Günlük kullanıcı adını ve adresini tutar. Bunlar kişisel veridir. Proje kaydının “Kişisel veri” bölümüne eklenmelidir (G-15). Bunu raporda isteyeceğiz.
+Günlük kullanıcı adını ve adresini tutar. Bunlar kişisel veridir. Proje kaydının “Kişisel veri” bölümü bu kaydı sayar (G-15). Rol araçlarında `target_name` alanı kullanıcının e-posta adresini de taşır.
 
 ## 9. Gizli alanlar nasıl dışarıda kalır
 
@@ -366,10 +380,269 @@ Bütün uçlar `platform_core/api/ai.py` dosyasındadır. Dosya ince kalır. İ�
 | `platform_core.api.ai.approve_proposal` | POST | İnsan oturumu | Öneriyi onaylar ve yürütür. Yıkıcı olabilir. |
 | `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
 | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
+| `platform_core.api.ai.purge_logs` | POST | İnsan oturumu ve yönetici rolü | Saklama süresi dolan kayıtları siler. Yıkıcıdır. Varsayılan yalnız sayar. |
 
-Ayrıntılı biçim `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasına yazılır. Bu dosya ikinci kontrol noktasında, koddan önce yazılır.
+Ayrıntılı biçim `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasına yazılır. Bu dosya ikinci kontrol noktasında, koddan önce yazıldı.
 
-## 11. Karar sitesiyle çelişkiler
+## 11. Yönetim araçları
+
+Yönetim araçları yalnız “System Manager” rolüne görünür. Her biri önizleme ve insan onayı ister. İşlevler rolü kendileri de denetler.
+
+| Araç | İşi | Kullandığı Frappe yolu |
+| --- | --- | --- |
+| `add_custom_field` | DocType'a özel alan ekler. Açıklama zorunludur (D-9). | “Custom Field” kaydı |
+| `set_field_property` | Alanın bir ayarını değiştirir. Örneğin zorunluluğu değiştirir. | “Property Setter” kaydı |
+| `set_role_permission` | Rolün bir DocType'taki iznini değiştirir. | Frappe'nin izin yöneticisi işlevleri |
+| `assign_role` | Kullanıcıya rol verir. | Kullanıcı kaydının `add_roles` işlevi |
+| `remove_role` | Kullanıcıdan rol alır. | Kullanıcı kaydının `remove_roles` işlevi |
+| `purge_action_log` | Saklama süresi dolan günlükleri siler. | `retention.purge` komutu |
+
+- Alan ayarı aracı yalnız 13 ayarı kabul eder. İfade çalıştıran ayarlar listede yoktur. Örneğin `depends_on` ve `fetch_from` reddedilir.
+- Korunan roller yapay zekâ yoluyla verilmez ve alınmaz. Bunlar “Administrator”, “System Manager”, “Guest”, “All” ve “Desk User” rolleridir.
+- “Guest” ve “All” rollerinin izinleri yapay zekâ yoluyla değişmez. Bu roller herkesi kapsar.
+- Model geçidinin kayıtları olağan DocType'lardır. Onları genel yazma araçları değiştirir. Yetkiyi o DocType'ların izinleri belirler.
+
+### Elle başlatılan komutlar
+
+Bu katmanın tek komutu günlük temizliğidir. Komut üç yoldan başlar: `bench execute`, HTTP ucu ve araç. `bench` komutu bench klasöründe çalışır. Komut `dry_run` verilmezse yalnız sayar.
+
+Öteki modüller kendi komut uçlarını `ai_tools` kancasıyla araç olarak bildirir. Bildirim `yapay_zeka` modülünü içe aktarmayı gerektirmez. Böylece bağımlılık yönü korunur. Bu turda öteki modüllerin kodu bu dalda yoktur. Onların bildirimi kendi işlerine kalır.
+
+## 12. Bağımsız inceleme
+
+Kod bağımsız bir inceleyiciye okutuldu. İnceleyici yalnız okudu, komut çalıştırmadı. Bulgular ve sonuçları şunlardır:
+
+| Bulgu | Sonuç |
+| --- | --- |
+| Aracı belirteci `cmd` alanıyla başka işlevi çalıştırabiliyordu. | Kapatıldı. Test eklendi. |
+| “unknown” denetimi iki sunucuda yarışabiliyordu. | Dosya kilidi yerine veritabanı satır kilidi geldi. |
+| Kapalı DocType listesi eksikti. | Çatı DocType'ları toptan kapandı. Okuma listesi ve gizli ad kalıbı genişledi. |
+| Başkasının onay denemesi öneriyi döndürüyordu. | Artık 403 döner. Test eklendi. |
+| Bozuk bir `ai_tools` bildirimi ucu durduruyordu. | Bozuk bildirim yalnız kendini düşürür. Test eklendi. |
+| Model onay özetini hesaplayabiliyordu. | Özete rastgele değer girdi. Öneri kaydı modele kapandı. CSRF belirteci zorunlu oldu. |
+| Yürütme, kayıt arada değişirse üstüne yazabiliyordu. | Yerleşik araçlar sürümü satır kilidiyle yeniden denetler. |
+| Hata veren uygulama aracı `failed` yazılıyordu. | Artık `unknown` kalır. Ham hata metni modele dönmez. |
+| Bilinmeyen araç çağrısı günlüğe düşmüyordu. | Artık düşer. |
+| Okuma diye bildirilen araç yazabiliyordu. | Okuma aracından sonra işlem geri alınır. Test eklendi. |
+
+Açık kalan, bilinçli bırakılan noktalar şunlardır:
+
+- Misafir ve bilinmeyen belirteç retleri günlüğe yazılmaz. Yazılsaydı kimliksiz istekler günlüğü doldururdu.
+- Günlük kaydı Frappe ekranından ve kayıt yolundan değişmez. Veritabanına doğrudan erişen yönetici yine değiştirebilir. Bu, uygulama katmanının sınırıdır.
+- Kayıt yoksa `not_found`, izin yoksa `permission` döner. Frappe'nin REST ucu da aynı ayrımı yapar.
+- Her giriş yapmış kullanıcı alt tablo tanımını okuyabilir. Tanım veri değildir.
+- Uygulama araçlarının yürütme işlevi sürüm denetimini kendisi yapar. Katman önizlemeyi kilit altında yeniden çalıştırır.
+- Uygulamaların kendi DocType'ları genel yazma araçlarına açıktır. Sahibi hassas DocType'ı kancayla kapatır. Bu, D-9 kararının sonucudur.
+- Rapor, kaynağı belli olmayan gizli değeri yanlış adla döndürürse katman bunu tanıyamaz. Rapor yazarı sütunu işaretlemelidir.
+
+### İkinci inceleme: Codex
+
+İkinci bağımsız incelemeyi başka bir model yaptı. Bir engelleyici ve beş önemli bulgu verdi. Her bulgu için önce saldırıyı gösteren test yazıldı. Test başarısız oldu. Sonra kod düzeltildi. Testler `tests/test_codex.py` dosyasındadır.
+
+| Bulgu | Düzeltme |
+| --- | --- |
+| B1. Alt tablo satırı başka kayda ait olabiliyordu. Satır alanında izin aranmıyordu. | Satır adı yalnız aynı ana kaydın satırı olabilir. Yeni satırın adı istemciden alınmaz. Satır alanında da yazma izni aranır. Denetim önizlemede ve yürütmede çalışır. |
+| B2. Rapor, “Password” türündeki sütunu modele verebiliyordu. | Sütunun türü, adı, etiketi ve kaynak DocType'taki alanı denetlenir. |
+| B3. Kalıcı etki bırakan hata `failed` yazılıyordu. | Yürütme yazdıysa ya da işlemi kesinleştirdiyse sonuç `unknown` kalır. |
+| B4. Yönetim araçları araya giren değişikliğin üstüne yazabiliyordu. | Araç asıl hedefi kilitler. Sürümü yazmadan hemen önce yeniden karşılaştırır. |
+| B5. Aracı belirteci süresi dolmuş oturuma bağlı kalabiliyordu. | Oturumun hareketsizlik süresi ve bitiş zamanı Frappe'nin ölçütleriyle denetlenir. |
+| B6. Bazı insan çağrıları ve retleri günlüğe düşmüyordu. | Belirteç üretimi, öneri okuma, öneri listeleme ve bütün retler günlüğe düşer. |
+
+Bu incelemede Frappe'nin şu davranışları imajdaki kaynakta doğrulandı:
+
+- Frappe, gönderilen satır adını korur ve satıra yeni ana kaydı yazar (`frappe/model/document.py:2477`).
+- Frappe, yeni kayıtta alt tablonun alan iznini denetlemez (`frappe/model/document.py:1303`).
+- Frappe'nin izinli alan listesi tablo alanlarını saymaz. Bu yüzden katman alt tabloyu önce hiç döndürmüyor ve yazdırmıyordu. Artık tablo alanı kendi izin seviyesine göre okunur ve yazılır.
+- Frappe oturumu hareketsizlik süresi ve `session_end` değeriyle sınar (`frappe/sessions.py:363`).
+
+Aynı turda kendi başlattığım ikinci inceleme de şu ek düzeltmeleri getirdi:
+
+- Rol izni önizlemesi, yeni kuralın getirdiği okuma iznini de gösterir.
+- Kod ve yönetim DocType'larının izinleri yapay zekâ yoluyla değişmez. Örneğin “Server Script” ve “User” böyledir.
+- “Desk User” rolünün izinleri değişmez. “Script Manager” gibi dört rol daha verilemez.
+- Eski değerleri taşıyan DocType'lar okumaya kapandı. Örneğin “Version” ve “Deleted Document” böyledir.
+- Uygulama bir DocType'ı `ai_write_closed_doctypes` kancasıyla yazmaya kapatabilir.
+- Hedefi olmayan işte de “unknown” engeli çalışır. Anahtar araç ve girdiden üretilir.
+- CSRF başlığı her yazan insan isteğinde katmanın kendisi tarafından karşılaştırılır.
+- Aracı belirtecinin çağrı hakkı bilinmeyen araç adında da düşer.
+
+### Üçüncü tur: Codex'in ikinci incelemesi ve HRMS TR incelemesi
+
+Codex'in ikinci incelemesi B1, B2, B4 ve B5 bulgularını kapalı buldu. B3 ve B6 kısmen açık kaldı. Orkestratör iki bulgu için karar verdi. Kararlar şöyle uygulandı:
+
+- **B3.** Sonuç yalnız bir durumda `failed` olur. Hata katmanın kendi denetiminde oluşmuştur. Katmanın denetimi bittikten sonraki her hata `unknown` olur. `ToolDenied` türü de buna dahildir.
+- Her yerleşik yazma aracı iki işleve ayrıldı. `prepare_*` işlevi ön denetimi yapar ve kayıt yöntemi çağırmaz. `write_*` işlevi kayıt yöntemini çağırır.
+- Sınır kodda tek yerdedir. Yer `proposals.py` içindeki `_execute` işlevinde “WRITE BOUNDARY” yorumuyla işaretlidir.
+- **B6.** Kimliği bilinen üç ret daha günlüğe düşer. Birincisi API anahtarıyla gelen MCP isteğidir. İkincisi süresi dolmuş oturuma bağlı belirteçtir. Üçüncüsü çerezle birlikte gelen belirteçtir. Kayıt hata yanıtından önce kesinleştirilir. Bilinmeyen belirteç ve misafir istisna kalır.
+
+HRMS TR incelemesi iki konu getirdi:
+
+- Uygulama aracının önizlemesi `frappe.ValidationError` verirse araç `invalid_arguments` döner ve ret günlüğe düşer. Onay anında verirse öneri `rejected` olur. Önceden öneri `pending` kalıyor ve yanıt 417 oluyordu.
+- Uygulama aracı `prepare` ve `versioned` bildirebilir. `versioned` bildirirse katman hedef satırı kilitler, önizlemeyi yeniden çalıştırır ve sürümü karşılaştırır.
+- Uygulama aracının `prepare` işlevi katmanın denetimi sayılmaz. O işlev başladıktan sonraki her hata `unknown` olur. Bunu Codex'in üçüncü incelemesi buldu.
+- Rapor aracı raporu çalıştırmadan önce erişim motorunun rapor kapısını çağırır. Kapı `platform_core.erisim.reports.guard` işlevidir. Kapı kurulu değilse rapor aracı kapalı kalır.
+
+Aynı turda araçların sonuç şeması sözleşmeye yazıldı (D-1). Şema `x-mcp-results` bölümündedir. Araç listesi aynı şemayı `outputSchema` olarak yayımlar. Bir test kodu sözleşmeye bağlar.
+
+### Dördüncü tur: Codex'in üçüncü incelemesi
+
+Üçüncü inceleme engelleyici bulmadı. Dört konu açık kaldı ve kapatıldı:
+
+- **B3.** `failed` sonucu yalnız katmanın kendi denetimi içindir. Uygulama aracının `prepare` işlevi sınırın öte yanına alındı.
+- **B6.** Kimliği bilinen kullanıcının erken MCP reddi de günlüğe düşer. Örneğin yasak `Origin` başlığı böyledir. Kayıt hata yanıtından önce kesinleştirilir.
+- **Y1.** `versioned` bildiren araç önizlemede üç değeri vermek zorundadır: `target_doctype`, `target_name` ve `target_version`. Biri eksikse araç `invalid_preview` döner. Denetim öneri açılmadan önce, onay anında ve yürütmeden hemen önce yapılır.
+- **Y2.** Bu notun 7. bölümündeki eski sonuç kuralı yeni kuralla aynı yapıldı.
+
+Proje sahibi yalnız Frappe 16'yı hedefledi (D-15). Bu katman baştan beri yalnız Frappe 16 ile yazıldı. Katman Frappe 16'nın hazır MCP protokol modüllerini ve izin yöneticisi işlevlerini kullanır.
+
+### Beşinci tur: boşluk analizi ve gerçek MCP istemcisi
+
+Bağımsız boşluk analizi şu konuları getirdi. Hepsi testle kapatıldı:
+
+- `assign_role` aracı, son kullanıcıya masaüstü rolü önermez. Frappe 16 böyle bir kullanıcıyı “System User” yapar (`frappe/core/doctype/user/user.py:445`).
+- “Platform Identity Link” yapay zekâ yazmasına tümüyle kapalıdır. Yönetim araçları da ona dokunamaz.
+- “Access Rule” yönetim sınıfındadır. Genel yazma araçları ona yazamaz.
+- Katmanın istek içindeki tek kesinleştirme satırı `access.commit_own_writes` işlevindedir. Ret kaydından önce bekleyen yazılar geri alınır. Onay, bekleyen yazı taşıyan işlemde çalışmaz.
+- İnsanın öneri listesi tek ve sınırlı sorguyla okunur.
+- Katmanın kendi kayıtlarını yazarken açtığı izin bayrağı `finally` içinde geri döner.
+- Rapor aracı en çok `limit` kadar satır okur. Arka planda hazırlanan raporu istek içinde çalıştırmaz.
+- Rapor kapısı erişim modülünün açık yolundan çağrılır: `platform_core.erisim.api.report_guard`.
+
+Masaüstü rolü kuralı kimlik modülündeki kuralla aynı sonucu verir, ama ortak bir işlev kullanmaz. Kimlik modülünün açık yolunda böyle bir işlev henüz yoktur. Ortak işlev açılınca iki yer ona bağlanmalıdır.
+
+Rapor için bir sınır kalır. Frappe'nin rapor işlevi sonucun tamamını kendisi üretir. Katman rapor işlevinin içini sınırlayamaz. Katman yalnız kendi okuduğu ve kopyaladığı satırı sınırlar.
+
+Resmî Python MCP istemcisiyle (sürüm 2.3.0) gerçek oturum açıldı. İstemci `2025-11-25` ve `2026-07-28` sürümleriyle bağlandı. Araç listesi, okuma aracı, öneri ve insan onayı çalıştı. Belirteçsiz istek, süresi dolmuş belirteç ve çerezle birlikte belirteç reddedildi. Oturum bir sözleşme hatası gösterdi: kimliksiz istek 401 değil 403 alıyor. Sözleşme düzeltildi.
+
+### Altıncı tur: eksik işler listesi
+
+`docs/gap-backlog.md` dosyasındaki sekiz madde kapatıldı (O-28):
+
+1. Öneri zamanları saat farkıyla ISO 8601 biçiminde döner. Örneğin `2026-11-22T12:41:57+03:00`.
+2. Süresi dolmuş oturum 401, oturumsuz istek 403 alır. Sözleşme bütün uçlarda 401 yanıtını yazar. Kaynak `frappe/__init__.py:483` satırıdır.
+3. Önizleme saklanmadan önce şemayla denetlenir. Değişiklik satırının anahtarları `fieldname`, `label`, `old` ve `new` olur. Uymayan önizleme `invalid_preview` döner.
+4. `ai_write_closed_doctypes` kancası sınanır. Kancadaki ve güvenlik listelerindeki her DocType'ın sitede var olduğu da sınanır.
+5. Okuma sonuçları `as_of`, `site` ve `source` taşır. Öneri `created_at` taşır.
+6. Okuma sonucunun satır ve bayt sınırı vardır. Alt tablo en çok 200 satır döner. Sonucun verisi en çok 262.144 bayttır. Sınır aşılınca `truncated` doğru olur.
+7. Öneri listesi veritabanında süzülür ve sayfalanır. Uç `start` parametresini alır ve `has_next_page` döner.
+8. GET isteği günlüğe yalnız reddi yazar. Başarılı okuma satır yazmaz ve kesinleştirme yapmaz.
+
+Sekizinci madde, B6 bulgusuyla gelen bir kuralı daraltır. Önceden başarılı öneri okuması da günlüğe düşüyordu. Artık düşmüyor. Neden şudur: Oturum çerezi başka siteden gelen GET isteğiyle de gider. Böyle bir istek günlüğü doldurabilirdi.
+
+İki DocType'a açıklama yazıldı. Yapay zekâ uygunluk kapısı bunu istedi (D-9).
+
+### Yedinci tur: Codex'in dördüncü incelemesi
+
+Codex dördüncü incelemede bir engel, dört önemli ve iki küçük bulgu yazdı. Katman hepsini düzeltti. Her düzeltmenin testi `tests/test_fourth_review.py` dosyasındadır.
+
+- **Onay önizlemenin tamamına bağlıdır.** Katman öneriyi açarken önizlemenin ve hedefin özetini `preview_digest` alanına yazar. Katman onayda önizlemeyi yeniden üretir ve özeti karşılaştırır. Özet farklıysa katman hiçbir şey yürütmez ve `document_changed` döner. O zaman yeni öneri ve yeni insan onayı gerekir. Bu kural sürümlü ve sürümsüz araçta aynıdır.
+- **Aynı karşılaştırma yürütmeden hemen önce yinelenir.** Bu denetim katmanın kendi ön denetimidir ve yazma sınırından öncedir. Bu yüzden sonuç `failed` olur.
+- **Sürümlü uygulama aracında katman saklanan hedefi kilitler.** Katman hedef satırın `modified` değerini aynı kilitli okumadan alır. Kilitli okuma en son kaydedilmiş satırı verir. Kilitsiz okuma tekrarlanabilir okuma kipinde eski satırı gösterebilir. Bu yüzden katman karşılaştırmada kilitsiz okumanın sonucunu kullanmaz.
+- **Önizleme yayımlanan şemaya uyar.** Katman önizlemeyi `tools/results.py` dosyasındaki şemayla denetler. Örneğin `label` alanı sayı ise öneri açılmaz ve yanıt `invalid_preview` olur.
+- **Bayt sınırı sonucun tamamını sayar.** Rapor aracı sütun tanımlarını da sayar. Sütunlar tek başına sınırı aşarsa sütun ve satır listesi boş döner. `get_doctype_schema` alan listesini sınırda keser ve `truncated` değerini döner.
+- **Kesilen liste devam yerini söyler.** `list_documents` yanıtı `next_start` alanını taşır. Son sayfada bu alan boştur. İlk kayıt tek başına sınıra sığmazsa katman o kaydı kırparak döner. Böylece istemci aynı boş sayfayı yeniden almaz.
+- **Öneri listesinin başlangıç değeri sınırlıdır.** `start` en çok 10.000 olabilir. Daha büyük değer 417 döner.
+- **Model adı testi geri geldi.** Test model ailesi adlarını düz yazıyla taşımaz, özetleriyle arar. Uygunluk kapısı `backend` dalına birleşince bu test kaldırılabilir.
+- **Günlüğe yazılmayanlar sözleşmededir.** Başarılı GET isteği, kimliği bilinmeyen istek ve Frappe'nin uçtan önce reddettiği istek günlüğe yazılmaz. Sonuncusunun kanıtı web sunucusunun erişim günlüğüdür.
+
+Veritabanı MariaDB 11.8.9 sürümüdür. Yalıtım kipi `REPEATABLE-READ` ve `innodb_snapshot_isolation` ayarı açıktır. Bu ayar açıkken veritabanı, anlık görüntüden sonra değişmiş satırı kilitlemeyi reddeder. Katman bu ayara güvenmez ve kilitli okumanın sonucunu kullanır.
+
+### Sekizinci tur: birleştirme öncesi inceleme
+
+Birleştirme öncesi inceleme bir engel, bir önemli ve bir küçük bulgu yazdı. Katman üçünü de düzeltti. Testler `tests/test_merge_review.py` dosyasındadır.
+
+- **Alan ayarı aracı güncel değeri kilit altında okur.** Araç ön denetimde önce “Property Setter” satırlarını kilitli okur. Bu okuma her kilitsiz okumadan önce gelir. Kilit var olan satırı ve ilk eklemeyi birlikte korur. Araç sürümü aynı kilitli okumanın satırlarından üretir. Satır değiştiyse ya da ilk satır eklendiyse sonuç `document_changed` olur.
+- **Veritabanı kilidi reddederse araç durur.** MariaDB, anlık görüntüden sonra değişmiş satırın kilidini reddedebilir. Araç bu hatayı da `document_changed` sayar.
+- **DocType açıklaması bayt sınırına girer.** `get_doctype_schema` önce üst bilgiyi ölçer, sonra alanları kalan yere sığdırır. Açıklama tek başına sınırı aşarsa araç açıklamayı kısaltır ve `truncated` değerini doğru döner.
+- **Çeviri dosyası LF satır sonu kullanır.**
+
+### Dokuzuncu tur: birleştirme öncesi ikinci inceleme
+
+İkinci inceleme bir engel ve bir önemli bulgu yazdı. Katman ikisini de düzeltti.
+
+- **Alanın kendi tanımı da aynı kilitle korunur.** Araç ön denetimde alanın “DocField” ve “Custom Field” satırlarını da kilitli okur. Araç sürümü bu satırların değerinden ve `modified` alanından da üretir. Tanım arada değiştiyse sonuç `document_changed` olur ve ayar kaydı oluşmaz. Test `tests/test_merge_review.py` dosyasındadır.
+- **Aracın hata metni dışarı çıkmaz.** Bir araç hata metnine alan değeri koyabilir. Bu değer kişisel veri olabilir. Katman bu metni yanıta, öneri kaydına ve günlüğe yazmaz.
+- MCP yanıtı sabit ve çevrilmiş bir metin döner. Kodlar `permission`, `not_found` ve `invalid_arguments` kodlarıdır.
+- Öneri kaydının `error` alanı sabit kod taşır. Kodlar `validation_error`, `permission`, `document_changed` ve `internal_error` kodlarıdır.
+- Sunucu günlüğü yalnız aracın adını ve hata türünü yazar. Günlük dosyası `logs/platform_core.yapay_zeka.log` dosyasıdır. “Error Log” kaydı hatanın yerini ve türünü taşır, hata metnini taşımaz.
+- Katmanın kendi `ToolDenied` iletileri yanıtta kalır. Bu iletileri katman ya da aracın sahibi bilerek yazar. Uygulama aracı bu iletiye alan değeri koymamalıdır. Kural `ai_tools` kancasının sözleşmesine yazıldı.
+- Testler `tests/test_error_text.py` dosyasındadır.
+
+### Çeviri (O-21 ve O-23)
+
+Katmanın yorumları, docstring'leri, iletileri ve OpenAPI açıklamaları İngilizcedir. Türkçe metin `translations/tr.csv` dosyasındadır. Her ileti `platform_core.yapay_zeka` bağlamını taşır. DocType etiketleri ve açıklamaları bağlam olarak DocType adını kullanır. Kuralı `tests/test_translations.py` sınar.
+
+### Website User yöntemleri
+
+Son kullanıcı panelde Website User olarak çalışır. Katmanın yedi ucu `website_user_allowed_methods` kancasındadır. `purge_logs` ucu listede yoktur, çünkü bu uç “System Manager” rolü ister. Kuralı `tests/test_website_user_methods.py` sınar.
+
+### Onuncu tur: birleştirme öncesi üçüncü inceleme ve saklama kararları
+
+Üçüncü inceleme bir engel ve bir önemli bulgu yazdı. Katman ikisini de düzeltti. O-32 kararı da bu turda uygulandı.
+
+- **Öneri 30 gün sonra silinir.** Süre karar tarihinden ya da süre dolumundan başlar. Hangisi önceyse o geçerlidir. Her önerinin `expires_at` değeri vardır. Bu yüzden sonucu `unknown` olan öneri de aynı kuralla silinir.
+- **“AI Action Log” 365 gün kalır.** `older_than_days` girdisi yalnız bu günlüğün süresidir. En az 365 olabilir.
+- **“AI Usage Log” 365 gün kalır.** Bu günlük model geçidi modülünündür. Silme komutu geçidin ortak işlevini çağırır: `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run)`. İşlev yetkiyi kendisi denetler. Terminal ve web girişi aynı işlevi çağırır.
+- **Kullanım günlüğünün sonucu açıktır.** `usage_logs` alanı boş dönmez. Durum `ok`, `not_run` ya da `error` olur. İşlev henüz yoksa durum `not_run` olur. Geçit reddederse durum `error` olur ve yalnız hata türü döner.
+- **Sayım kipi silinecek kayıtları sayar.** `dry_run` ile gelen sayı, silmenin kaldırdığı sayıya eşittir.
+- **Silme kopya bırakmaz (O-32).** Komut her kaydı `delete_permanently=True` ile siler. “Deleted Document” tablosunda kopya kalmaz. Günlük kaydının denetleyicisi öteki her silmeyi yine reddeder.
+- **Konuşma kimliğinin yalnız özeti saklanır.** `session_id` alanı kimliğin SHA-256 özetini tutar. Aynı konuşmanın satırları aynı özeti taşır.
+- **İstemcinin kendi metni saklanmaz.** Katman tanıdığı istemci için kendi sabit adını yazar. Tanınan istemciler `policy.KNOWN_CLIENTS` listesindedir. Öteki her istemci `other` adıyla yazılır. Sürüm hiç saklanmaz.
+- **Tanınmayan araç adı saklanmaz.** Yanıt sabit metin döner: “Unknown tool.” Günlük satırı araç adı taşımaz, yalnız `unknown_tool` nedenini taşır.
+- **Silme önizlemesi iki süreyi ayrı yazar.** Özet, işlem günlüğünün süresini ve kullanım günlüğünün 365 gününü ayrı söyler. Onayda sayım yeniden yapılır. Sayı değiştiyse sonuç `document_changed` olur.
+- Testler `tests/test_retention.py` ve `tests/test_client_text.py` dosyalarındadır.
+
+Frappe'nin liste süzgeci boş tarihi çok eski bir tarih sayar. Kaynak Frappe 16.56.0 sürümünde `frappe/database/query.py` dosyasının 745. satırıdır. Bu yüzden komut önce karar tarihi dolu olan önerileri ister.
+
+### On ikinci tur: web ucunda onaylı silme
+
+Altıncı birleştirme incelemesi web ucunun silmeyi onaysız başlattığını buldu. Katman bunu düzeltti. Testler `tests/test_purge_confirmation.py` dosyasındadır.
+
+- **Sayım çağrısı önizlemedir.** `purge_logs` ucu `dry_run` açıkken sayıları ve bir onay belirteci döner.
+- **Silme çağrısı belirteci ister.** Belirteç yoksa ya da geçersizse hiçbir kayıt silinmez. Yanıt 417 olur ve ret nedeni `preview_required` olur.
+- **Belirteç tek kullanımlıktır.** Belirteç 10 dakika yaşar. Katman belirteci tek adımda alır ve siler.
+- **Belirteç önizlemeye bağlıdır.** Katman önizlemede silinecek kayıtları seçer ve belirteçle birlikte saklar. Kullanıcı, süre, seçilen kayıtlar ve bütün sayılar belirtece bağlanır. Bekleyen toplam da bu sayılardandır.
+- **Silme yalnız seçilen kayıtları siler.** Katman silme adımında kayıtları yeniden seçmez. Örneğin saklama süresi önizlemeden sonra dolan kayıt silinmez.
+- **Sayı değişirse eski onay reddedilir.** Örneğin bekleyen kayıt 501 iken 502 olursa silme 417 döner ve hiçbir kayıt silinmez.
+- **Yapay zekâ aracı aynı kuralı uygular.** `purge_action_log` önizlemesinin sürümü, seçilen kayıtların ve sayıların özetidir. Onayda özet değiştiyse sonuç `document_changed` olur.
+- **Kullanım günlüğünde de bağ kayıt adıyladır.** Geçidin sayım çağrısı silinecek kayıtların adlarını döner. Katman bu adları onaya bağlar ve silmede aynı listeyi geçide verir. Arayüz sözleşmenin 10. bölümündedir: `purge_usage_logs(*, dry_run, names)`.
+- **Silme ya bütündür ya da hiçtir.** Katman önce geçide silmeyi yaptırır. Geçit reddederse katman kendi kayıtlarını silmez ve bütün işlemi geri alır. Web ucu 417 döner. Yapay zekâ aracının sonucu başarılı olmaz.
+- **Beklenmeyen hata güvenli yanıt alır.** Silme beklenmeyen bir hatayla kesilirse katman bütün isteği geri alır. Geçit o ana kadar bir kayıt silmiş olsa da kayıt geri gelir. Web ucu 417 döner ve ret nedeni `purge_failed` olur. Yanıt ve işlem günlüğü hata metnini taşımaz. Sunucu günlüğü yalnız hata türünü yazar. Rol eksikliği 403 olarak kalır.
+- **Silme hataları tek yerde biter.** `retention._stop` işlevi önce işlemi geri alır. Sonra Frappe'nin biriktirdiği mesajları temizler. İzin hatası sabit 403 yanıtına döner. Öteki her hata sabit 417 yanıtına döner. Yanıt yalnız sözleşmedeki sabit mesajı taşır. Site hata ayrıntısını gizlese de bu mesaj yanıtta olur. Site ayrıntıyı gösterse de özgün hata metni yanıtta olmaz.
+- **Geliştirme kipinde hata kaydı yazılmaz.** Frappe geliştirme kipinde 403 ve 417 hataları için de hata kaydı açar. Bu kayıt yerel değişkenlerin değerlerini taşır. Silme durduğunda bu değişkenler seçilen kayıt adlarını ve kullanıcıyı tutar. Katman sabit hataya `skip_error_log` işaretini koyar. Kaynak Frappe 16.56.0 sürümünde `frappe/utils/error.py` dosyasının 165. satırıdır. Ret zaten işlem günlüğündedir.
+- **Eski geçit çağrılmaz.** Geçidin işlevi `names` girdisini almıyorsa silme sırasında kendi kayıtlarını seçer. Katman böyle bir işlevi çağırmaz ve sonucu `gateway_purge_outdated` diye yazar.
+- **Ortak test üç girişi gerçek kayıtlarla sınar.** Test `platform_core/tests/test_ai_retention_entries.py` dosyasındadır. Dosya iki modülün ortak alanındadır, çünkü modül sınırı bir modülün ötekinin kaydına yazmasını yasaklar.
+- **Terminal komutu belirteç istemez.** Komutu terminalde bir insan başlatır. Komut `dry_run` verilmezse yalnız sayar.
+- **Yapay zekâ aracı öneri yolunu kullanır.** `purge_action_log` aracı önizleme ve insan onayı ister.
+- **Kullanım günlüğü üç sayı taşır.** `eligible` bekleyen toplamdır. `to_delete` bu çalıştırmanın sileceği sayıdır ve en çok 500 olur. `deleted` gerçekten silinen sayıdır.
+
+### On birinci tur: kural öz denetimi
+
+Katman `docs/standartlar/` dosyalarındaki kurallara göre denetlendi. Üç yardımcı ajan kodu kural kural okudu. Bulguların testleri `tests/test_standards.py` dosyasındadır.
+
+Düzeltilen kurallar şunlardır:
+
+- **V-3.** Onayda hata veren önizlemenin yazdığı geri alınır. Önceki kodda bu yazı kalıcı olabiliyordu.
+- **V-10.** Silme komutu `dry_run` verilmezse yalnız sayar.
+- **M-1.** Öneri kaydı kendi kuralını korur. Onaylanan içerik ve karar verilmiş durum hiçbir yazma yolunda değişmez.
+- **G-8.** Girdilerin üst sınırı vardır. Örneğin saklama süresi en çok 36.500 gündür ve ad en çok 140 karakterdir.
+- **G-12.** Paylaşılan kayıt testleri eklendi.
+- **P-1 ve P-3.** Silme bir çalıştırmada her türden en çok 500 kayıt alır. Yanıt bekleyen toplamı ayrı yazar. Liste sıralaması ad alanıyla kesinleşir.
+- **A-5.** Yalnız testin çağırdığı on bir sarmalayıcı işlev kaldırıldı.
+- **R-7.** Doğrudan veritabanı okumaları `store.py` dosyasına taşındı.
+- **H-3.** İki DocType dosyası Frappe'nin dışa aktarım biçimindedir.
+- **H-10.** Sözleşmedeki etiket ve güvenlik şeması adları İngilizcedir.
+
+Bilerek bırakılan yerler şunlardır:
+
+- **G-3 ve G-4.** Katman kendi kayıtlarını sistem kipinde yazar ve listeler. Yalnız “System Manager” bu DocType'ları okuyabilir. Sahiplik her okumada ayrıca denetlenir. Bayrak yalnız `store.py` dosyasındadır ve `finally` içinde geri döner.
+- **V-1.** `setup.py` hazır MCP ucunu `set_single_value` ile kapatır. Bu adım kurulum ve geçiş kancasıdır. “System Settings” doğrulaması bu ayar için gerekmez.
+- **M-5.** İki DocType dosyası elle tutulur. İlk izinleri bu notun 8. bölümü açıklar.
+- **M-8.** Önizleme özetleri ve MCP protokol hataları İngilizce kalır. Özet saklanır ve onay özetine girer. Çevrilirse özet dile göre değişir.
+- **F-4.** Select seçenekleri çevrilmez. Bu değerler API'nin döndürdüğü kodlardır. Örneğin `human_session` ve `consumed` böyledir.
+- **S-1.** Katmanda tek sorumluluk şöyle bölünür: `access.py` kimlik ve günlük, `proposals.py` öneri akışı, `store.py` kayıt, `tools/` araçlar.
+
+## 13. Karar sitesiyle çelişkiler
 
 | Konu | Karar sitesi | Bu karar | Neden |
 | --- | --- | --- | --- |
@@ -378,9 +651,10 @@ Ayrıntılı biçim `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasına
 | Günlük alanları | G-64 model, token ve maliyet yazar. | Bu alanlar “AI Usage Log” kaydında. | Bu katman model çağırmaz. |
 | Model adları | Rail 5 model adlarını yazar. | Kodda model adı yok. | Proje kaydı O-10 ve sözleşme kural 8. |
 
-## 12. Doğrulanmayanlar
+## 14. Doğrulanmayanlar
 
 - `frappe/mcp` paketinin Frappe 16'da çalışıp çalışmadığı denenmedi.
 - Gerçek bir MCP istemcisiyle oturum açılmadı. Testler istemciyi taklit edecek.
-- Bu not yazılırken kod çalıştırılmadı. Frappe davranışları kaynak koddan okundu.
+- Sürecin yürütme ortasında ölmesi testle denenmedi. Bu durumda sonuç `unknown` kalır. Kod okunarak incelendi.
 - GitHub'daki `version-16` dalı 16.60.2 sürümündedir. İmajdaki sürüm 16.56.0'dır. Aradaki fark incelenmedi.
+- Katman uygulama aracının `ToolDenied` iletisini denetlemez. Aracın sahibi bu iletiye alan değeri koyarsa değer yanıta girer.

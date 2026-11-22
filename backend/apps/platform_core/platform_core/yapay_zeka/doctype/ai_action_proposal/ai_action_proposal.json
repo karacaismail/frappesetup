@@ -1,0 +1,214 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-22 09:00:00.000000",
+ "description": "A write that an AI asked for and that waits for a human. It holds the preview the human sees, the digest that binds the approval to that preview, and the outcome. Nothing is written to the target until the owner approves the proposal.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "principal",
+  "session_id",
+  "tool",
+  "tool_class",
+  "target_doctype",
+  "target_name",
+  "target_key",
+  "target_modified",
+  "args_json",
+  "preview_json",
+  "digest",
+  "preview_digest",
+  "destructive",
+  "billable",
+  "expires_at",
+  "status",
+  "result",
+  "result_document",
+  "error",
+  "decided_at"
+ ],
+ "fields": [
+  {
+   "description": "User who asked for the write and who alone may approve it.",
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Identity type that opened the proposal.",
+   "fieldname": "principal",
+   "fieldtype": "Select",
+   "label": "Principal",
+   "options": "human_session\nagent_token\nother\nguest",
+   "read_only": 1
+  },
+  {
+   "description": "SHA-256 of the conversation id the client sent. The id itself is not stored.",
+   "fieldname": "session_id",
+   "fieldtype": "Data",
+   "label": "Session ID",
+   "read_only": 1
+  },
+  {
+   "description": "Name of the write tool that will run after approval.",
+   "fieldname": "tool",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Tool",
+   "read_only": 1
+  },
+  {
+   "description": "Kind of the tool: write, admin or app.",
+   "fieldname": "tool_class",
+   "fieldtype": "Data",
+   "label": "Tool Class",
+   "read_only": 1
+  },
+  {
+   "description": "DocType the write is aimed at.",
+   "fieldname": "target_doctype",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Target DocType",
+   "read_only": 1
+  },
+  {
+   "description": "Document the write is aimed at. Empty for a new document.",
+   "fieldname": "target_name",
+   "fieldtype": "Data",
+   "label": "Target Name",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Hash of the target. Blocks a blind retry on the same target.",
+   "fieldname": "target_key",
+   "fieldtype": "Data",
+   "label": "Target Key",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Version marker of the target when the preview was made.",
+   "fieldname": "target_modified",
+   "fieldtype": "Data",
+   "label": "Target Version",
+   "read_only": 1
+  },
+  {
+   "description": "Validated tool arguments as JSON. Never holds a secret field.",
+   "fieldname": "args_json",
+   "fieldtype": "Long Text",
+   "label": "Arguments",
+   "read_only": 1
+  },
+  {
+   "description": "What the human sees before approving, as JSON.",
+   "fieldname": "preview_json",
+   "fieldtype": "Long Text",
+   "label": "Preview",
+   "read_only": 1
+  },
+  {
+   "description": "SHA-256 that binds an approval to this exact preview.",
+   "fieldname": "digest",
+   "fieldtype": "Data",
+   "label": "Digest",
+   "read_only": 1
+  },
+  {
+   "description": "SHA-256 of the whole preview and its target. The server previews again at approval and compares.",
+   "fieldname": "preview_digest",
+   "fieldtype": "Data",
+   "label": "Preview Digest",
+   "read_only": 1
+  },
+  {
+   "description": "Set when the tool may destroy or overwrite data.",
+   "fieldname": "destructive",
+   "fieldtype": "Check",
+   "label": "Destructive",
+   "read_only": 1
+  },
+  {
+   "description": "Set when the tool may cost money.",
+   "fieldname": "billable",
+   "fieldtype": "Check",
+   "label": "Billable",
+   "read_only": 1
+  },
+  {
+   "description": "Moment after which the proposal can no longer be approved.",
+   "fieldname": "expires_at",
+   "fieldtype": "Datetime",
+   "label": "Expires At",
+   "read_only": 1
+  },
+  {
+   "description": "Where the proposal stands. Consumed means execution has started.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "pending\nrejected\nexpired\nconsumed",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Outcome of the execution. Unknown blocks new proposals on the same target.",
+   "fieldname": "result",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Result",
+   "options": "\nunknown\nsucceeded\nfailed",
+   "read_only": 1
+  },
+  {
+   "description": "Name of the document the execution touched.",
+   "fieldname": "result_document",
+   "fieldtype": "Data",
+   "label": "Result Document",
+   "read_only": 1
+  },
+  {
+   "description": "Why the proposal was rejected or the execution failed.",
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  },
+  {
+   "description": "When a human approved, rejected or resolved the proposal.",
+   "fieldname": "decided_at",
+   "fieldtype": "Datetime",
+   "label": "Decided At",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-22 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Yapay Zeka",
+ "name": "AI Action Proposal",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

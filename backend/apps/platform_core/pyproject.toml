@@ -48,6 +48,10 @@ select = [
     "UP",
     "B",
     "RUF",
+    "N",
+    "A",
+    "PLC2401",
+    "PLC2403",
 ]
 ignore = [
     "B017", # assertRaises(Exception) - should be more specific

@@ -93,6 +93,24 @@ def http():
     requests.get("https://example.invalid", timeout=None)
     # ok: http-missing-timeout
     requests.get("https://example.invalid", timeout=5)
+    # ok: http-missing-timeout
+    requests.post(
+        build_url(),
+        json={"client": read_config()},
+        timeout=10,
+    )
+    # ruleid: http-missing-timeout
+    requests.post(build_url(), json={"client": read_config()})
+    # ruleid: http-missing-timeout
+    requests.post(build_url(), timeout=None)
+    # ok: http-missing-timeout
+    httpx.post(build_url(), timeout=10)
+    # ruleid: http-missing-timeout
+    httpx.post(build_url())
+    # ok: http-missing-timeout
+    urllib.request.urlopen(build_url(), timeout=10)
+    # ruleid: http-missing-timeout
+    urllib.request.urlopen(build_url())
 
 # ruleid: ai-provider-sdk
 import openai

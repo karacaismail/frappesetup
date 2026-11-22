@@ -50,7 +50,7 @@ Orkestratör, D-10, 22 Kasım 2026 Pazar
 | Tür | Açık işlev veya olay | Görevi |
 | --- | --- | --- |
 | Python | `platform_core.model_gecidi.api.complete` | Yetkili yol üzerinden model çağrısı yapar. |
-| Python ve Bench | `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False)` | Yalnız “System Manager” çağırabilir. İşlev uygun kayıt sayısını `eligible`, silinen kayıt sayısını `deleted` alanında döndürür. |
+| Python ve Bench | `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False, names=None)` | Yalnız “System Manager” çağırabilir. İşlev `eligible`, `deleted` ve `names` alanlarını döndürür. |
 | HTTP | `platform_core.api.model.complete` | Oturum veya kullanıcı anahtarıyla model çağrısı yapar. |
 | HTTP | `platform_core.api.model.test_api` | Yöneticiye bağlantı denemesi sunar. |
 | HTTP | `platform_core.api.model.resolve_usage` | Yöneticinin doğruladığı tutarı kullanım kaydına işler. |
@@ -205,16 +205,17 @@ Geri dönüş için silme öncesi alınan veritabanı yedeği kullanılır.
 Geçit temizliği “Activity Log” kaydına yazar.
 
 Python işlevi 365 günden eski kapanmış kayıtları sayar.
-`dry_run=True` ise işlev kayıt silmez.
+`dry_run=True` ise işlev kayıt silmez. En çok 500 kayıt adı döndürür.
+Silme yalnız onaylanan adları kapsar. Bir kayıt silinemezse bütün silmeler geri alınır.
 İşlev önizleme belirteci istemez. Onayı çağıran taraf yönetir.
 
 Aşağıdaki terminal komutları önce önizler, sonra en çok 500 kaydı kalıcı siler.
-Önizleme sonucunu silme komutunu çalıştırmadan önce kontrol edin.
+Önce önizlemedeki kayıt adlarını kontrol edin. Silme komutuna onayladığınız adları verin.
 
 ```sh
 bench --site SITE execute platform_core.model_gecidi.api.purge_usage_logs --kwargs '{"dry_run":True}'
 ```
 
 ```sh
-bench --site SITE execute platform_core.model_gecidi.api.purge_usage_logs
+bench --site SITE execute platform_core.model_gecidi.api.purge_usage_logs --kwargs '{"names":["ONAYLANAN-KAYIT-ADI"]}'
 ```

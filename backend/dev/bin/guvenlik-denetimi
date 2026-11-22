@@ -21,11 +21,22 @@ scan_secrets() {
                 exec gitleaks dir --redact=100 /tmp/scan/backend'
 }
 
+scan_rules() (
+    local report before scan_status=0
+    report="$(mktemp "${PANE_SCRATCH_DIR:-${TMPDIR:-/tmp}}/semgrep-review.XXXXXX")" || exit 1
+    trap 'rm -f -- "$report"' EXIT
+    before="$(python3 -B backend/dev/guvenlik/semgrep_exceptions.py --snapshot)" || exit 1
+    "${semgrep[@]}" scan --error --strict --metrics=off --json \
+        --config "$rules" \
+        --exclude 'backend/dev/guvenlik/fixtures/' --exclude 'backend/dev/security/fixtures/' backend \
+        > "$report" || scan_status=$?
+    python3 -B backend/dev/guvenlik/semgrep_exceptions.py "$report" "$scan_status" "$before"
+)
+
 status=0
 "${semgrep[@]}" --test --strict --metrics=off "$rules" || status=1
-"${semgrep[@]}" scan --error --strict --metrics=off \
-    --config "$rules" \
-    --exclude 'backend/dev/guvenlik/fixtures/' --exclude 'backend/dev/security/fixtures/' backend || status=1
+scan_rules || status=1
+python3 -B -m unittest discover -s backend/dev/guvenlik -p test_semgrep_exceptions.py || status=1
 if backend/dev/security/history-scan --self-test; then
     scan_secrets || status=1
 else

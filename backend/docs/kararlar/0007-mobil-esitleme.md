@@ -294,8 +294,15 @@ Eski kurulumda oturum kimliği varsa çağrı yapılır.
 Oturuma bağlanmamış eski kurulum için yönetici kimlik tarafını kullanır.
 
 Servis adresi `mobile_identity_sync_url` ayarında bulunur.
-Belirteç adresi `mobile_identity_sync_token_url` ayarından okunur.
-Servis hesabı `mobile_identity_sync_client_id` ve `mobile_identity_sync_client_secret` kullanır.
+Mobil modül belirteci kimlik modülünün servis istemcisinden alır.
+Kimlik modülü Keycloak adresini ve realm adını site ayarından alır.
+İç adres varsa kimlik modülü o adresi kullanır. Yoksa genel adresi kullanır.
+Servis belirteci almak için seçilen adres HTTPS olmalıdır.
+Geliştirme sitesi HTTP kullanırsa uzak kapatma isteği gitmez.
+Uzak kapatma beklemede kalır. Sistem bu durumu `delivery_pending` alanında saklar.
+Yerel oturum reddi geçerli kalır.
+Servis hesabı `keycloak_service_client_id` ve `keycloak_service_client_secret` kullanır.
+Kiracı servis istemcisinin adı, tarayıcı istemcisinin adına `-service` eklenerek oluşturulur.
 Kiracı servis hesabı belirteci `aud-identity-sync` kapsamıyla ister.
 Sunucu bu ayarları güvenli site yapılandırmasından okur.
 Canlı servis için kimlik ekibi servis hesabını ve kapsamı tanımlar.

@@ -1,0 +1,20 @@
+- term_tr: Press TR
+  code: press_tr
+  scope: Frappe app
+  definition_tr: Adın tr bölümü Türkiye'nin ülke kodudur.
+- term_tr: Press kimliği
+  code: press_identity
+  scope: press_tr module
+  definition_tr: Bu modül Press kullanıcılarını Keycloak kimliğine bağlar.
+- term_tr: Press kimlik bağı
+  code: ptr_identity_link
+  doctype: PTR Identity Link
+  definition_tr: Bu kayıt Press kullanıcısını Keycloak kimliğine bağlar.
+- term_tr: Press Keycloak oturumu
+  code: ptr_keycloak_session
+  doctype: PTR Keycloak Session
+  definition_tr: Bu kayıt Press oturumunu Keycloak oturumuyla eşler.
+- term_tr: Keycloak kuruluş kimliği
+  code: custom_ptr_keycloak_org_id
+  scope: Team Custom Field
+  definition_tr: Bu alan Press takımına bağlı Keycloak kuruluşunun kimliğini saklar.
