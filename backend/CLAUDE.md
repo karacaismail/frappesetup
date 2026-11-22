@@ -40,6 +40,8 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `identity/keycloak/themes/atonota/` | Atonota giriş teması | kimlik-tema |
 | `identity/identity_sync/` | Kullanıcı eşitleme servisi | identity-sync |
 | `libs/oidc_verify/` | Ortak belirteç doğrulama kitaplığı | kimlik-realm |
+| `apps/platform_core/platform_core/erisim/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
+| `dev/guvenlik/`, `dev/bin/guvenlik-denetimi` | Güvenlik kapısı | guvenlik-kapisi |
 | `contracts/` | Uçların OpenAPI sözleşmeleri | Her uç kendi sahibinde |
 | `docs/`, `AGENTS.md`, `PROJE-KAYDI.md` | Talimat, kayıt ve sözleşme | Orkestratör |
 
@@ -121,6 +123,16 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
 - `--no-verify` kullanmayın. Yazar korumasını ve `core.hooksPath` ayarını değiştirmeyin.
 - Push yapmayın. Pull request açmayın. Dalları orkestratör birleştirir.
 - Commit mesajını yalın Türkçe yazın. Yapay zekâ imzası ve ortak yazar satırı eklemeyin.
+
+### Alt ajanlar
+
+Proje sahibi çok sayıda paralel ajan istedi. Bu yüzden alt ajan kullanabilirsiniz. Alt ajan, sizin başlattığınız yardımcı ajandır.
+
+- Birbirine bağlı olmayan işleri alt ajanlara bölün. Örneğin araştırma, test yazma ve bağımsız inceleme böyledir.
+- İki alt ajana aynı dosyayı yazdırmayın.
+- Alt ajanın sonucunu kendiniz doğrulayın. Testleri kendiniz çalıştırın.
+- Alt ajan da bu dosyadaki kurallara uyar.
+- Alt ajan sizin hesabınızın kullanım hakkını harcar. Gereksiz alt ajan açmayın.
 
 ### Yeni paket ve araç
 
