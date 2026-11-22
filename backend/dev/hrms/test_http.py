@@ -601,6 +601,43 @@ class LeaveHttpTest(unittest.TestCase):
                 code, result = client.send(endpoint)
                 self.assertEqual(code, 403, result.get("exception"))
 
+    def test_website_user_can_approve_but_cannot_call_closed_methods(self):
+        manager = self.login("manager")
+        doc = self.document(manager, "website_approval")
+        legacy = "hrms.hr.doctype.leave_application.leave_application.get_leave_details"
+        replacement = "hrms_tr.hrms_endpoints.deny_legacy_leave_query"
+        for method in (legacy, replacement):
+            for path in (
+                f"/api/method/{method}",
+                f"/api/v1/method/{method}",
+                f"/api/v2/method/{method}",
+                f"/?{urlencode({'cmd': method})}",
+            ):
+                with self.subTest(path=path):
+                    code, result = manager.send(path)
+                    self.assertEqual(code, 403)
+                    if path.startswith("/api/v2/"):
+                        (error,) = result["errors"]
+                        self.assertEqual(error["type"], "PermissionError")
+                        messages = [error["message"]]
+                    else:
+                        self.assertEqual(result["exc_type"], "PermissionError")
+                        messages = [
+                            json.loads(message)["message"]
+                            for message in json.loads(result["_server_messages"])
+                        ]
+                    self.assertIn(
+                        "You are not permitted to call this method.", messages
+                    )
+
+        code, result = manager.send(
+            "/api/method/hrms_tr.api.approve_leave", self.approval_payload(doc)
+        )
+        self.assertEqual(code, 200, result.get("exc_type"))
+        self.assertEqual(result["message"]["name"], doc["name"])
+        approved = self.document(manager, "website_approval")
+        self.assertEqual((approved["status"], approved["docstatus"]), ("Approved", 1))
+
     def test_guest_cannot_approve_or_call_legacy_replacement(self):
         guest = Client(self, None)
         outsider = self.document(self.login("hr"), "outsider")

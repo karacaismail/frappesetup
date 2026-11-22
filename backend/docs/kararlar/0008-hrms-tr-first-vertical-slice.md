@@ -35,6 +35,9 @@ Bu karar izin talebindeki alanı kapsar. Ayrı HRMS bakiye uçlarının durumu a
 ## İnceleme sonrası kararlar
 
 HRMS TR rolleri masaüstü erişimi vermez. Üç rol de “Website User” türünü kullanır.
+HRMS TR, izin listesine yalnız insan onay ucunu ekler.
+Onay ucu rolü, kayıt erişimini ve sürümü ayrıca denetler.
+Eski HRMS yolları izin listesinde yer almaz.
 Yönetici ve İK rol profilleri çalışan rolünü de taşır.
 HRMS, varsayılan onaylayıcıya kendi “Leave Approver” rolünü ekler.
 HRMS TR, bu rolü HRMS TR hesabından çıkarır.
