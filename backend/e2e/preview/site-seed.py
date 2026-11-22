@@ -153,6 +153,7 @@ def main():
             os.environ["E2E_FULL_BROWSER_FIXTURES"] == "1" else ["mobile-app"],
             kimlik_deletion_hmac_key=token_urlsafe(32),
             mobile_cursor_key=token_urlsafe(32),
+            mobile_identity_sync_url=os.environ["E2E_PREVIEW_SYNC_ORIGIN"],
             model_gateway_endpoints={
                 url: {"kind": "local", "addresses": [os.environ["E2E_PROVIDER_IP"]]}
                 for url in provider_urls.values()

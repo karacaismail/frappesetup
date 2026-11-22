@@ -1,5 +1,5 @@
 <#ftl output_format="plainText">
-<#-- Eklenti yalnız "link" ve "clientName" değişkenlerini verir. -->
+<#-- Cloudflight supplies the sign-in URL as "link". -->
 ${realmName}
 
 ${msg("atMagicTitle")}

@@ -1,4 +1,4 @@
-"""Stand-in mobile endpoint for the tests of `platform_core.kimlik.api` (the real ones belong to platform-core-mobil).
+"""Stand-in mobile endpoint for the tests of `platform_core.identity.api` (the real ones belong to platform-core-mobil).
 
 The function is not whitelisted at import time, so `/api/method` cannot call it on a running site.
 Only a test registers it, through `register()`, and removes it again (ai-readiness finding, D-9).

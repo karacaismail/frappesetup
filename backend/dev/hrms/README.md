@@ -47,7 +47,7 @@ Yeni ortam gerekiyorsa aşağıdaki adımları izleyin.
    backend/dev/hrms/compose exec -T web env/bin/python /workspace/hrms/seed.py \
      --site test-hrms-tr.localhost --manifest /tmp/hrms_tr-manifest.json
    backend/dev/hrms/compose exec -T web sh -c \
-     'env/bin/python /workspace/hrms/test_http.py --url "http://127.0.0.1:$KIRACI_WEB_PORT" \
+     'env/bin/python /workspace/hrms/test_http.py --url "http://127.0.0.1:$FS_TENANT_WEB_PORT" \
       --site test-hrms-tr.localhost --manifest /tmp/hrms_tr-manifest.json --with-ai'
    ```
 

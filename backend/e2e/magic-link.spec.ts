@@ -74,7 +74,9 @@ async function requestLink(page: Page, request: APIRequestContext, email: string
 
   const alternate = page.locator('form:has([name="tryAnotherWay"])');
   await alternate.evaluate((form: HTMLFormElement) => form.requestSubmit());
-  await page.getByRole('button', { name: /magiclink-display-name|magic link|sihirli bağlantı/i }).click();
+  await page.getByRole('button', {
+    name: /^(?:Email link Sign in with a link sent to your email|E-posta bağlantısı E-postanıza gelen bağlantıyla oturum açın)\.$/,
+  }).click();
 
   const emailInput = page.locator('input[name="username"]:visible');
   await emailInput.fill(email);

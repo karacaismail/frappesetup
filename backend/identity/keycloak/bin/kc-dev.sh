@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Keycloak geliştirme ortamını yönetir. Sahibi kimlik-realm işidir.
-# Kullanım: bin/kc-dev.sh <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-reload|realm-delete-only|delete-realm>
-# Portlar PANE_PORT değişkeninden türer. Keycloak P, Mailpit ekranı P+6 portunu alır.
+# Manages the Keycloak development environment. Owned by the kimlik-realm workstream.
+# Usage: bin/kc-dev.sh <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-reload|realm-delete-only|delete-realm>
+# Keycloak uses PANE_PORT. The Mailpit UI uses PANE_PORT + 6.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -10,7 +10,8 @@ COMPOSE_FILE="$BACKEND/dev/compose.keycloak.yaml"
 # Tests may point to their own environment file with made-up values.
 ENV_FILE="${KC_ENV_FILE:-$SCRIPT_DIR/.env}"
 PROJECT="${COMPOSE_PROJECT_NAME:-fs-kimlik-realm}"
-# Profil FS_COLIMA_PROFILE değişkeninden seçilir (backend/AGENTS.md, "Disk dar"). Değer "default" ise colima profili kullanılır.
+# FS_COLIMA_PROFILE selects the Colima profile. Use "default" for the standard Colima profile.
+# See the disk space guidance in backend/AGENTS.md.
 if [ "${FS_COLIMA_PROFILE:-factory}" = "default" ]; then
   CONTEXT="${DOCKER_CONTEXT:-colima}"
   LIMA_DEFAULT="colima"
@@ -20,7 +21,7 @@ else
 fi
 
 if [ -z "${PANE_PORT:-}" ]; then
-  echo "PANE_PORT boş. Örnek: PANE_PORT=5070 $0 up" >&2
+  echo "Set PANE_PORT. For example: PANE_PORT=5070 $0 up" >&2
   exit 2
 fi
 
@@ -35,14 +36,14 @@ example_line() {
 
 prepare_env() {
   if [ ! -f "$ENV_FILE" ]; then
-    echo ".env yok. .env.example dosyasından üretiliyor." >&2
+    echo "Creating the missing .env file from .env.example." >&2
     while IFS= read -r line; do
       example_line "$line"
     done < "$SCRIPT_DIR/.env.example" > "$ENV_FILE"
     chmod 600 "$ENV_FILE"
     return
   fi
-  # Örnek dosyaya sonradan eklenen anahtarlar .env dosyasına da eklenir. Var olan değerler değişmez.
+  # Copy new keys from the example file to .env while preserving existing values.
   local line key_file
   while IFS= read -r line; do
     case "$line" in
@@ -50,7 +51,7 @@ prepare_env() {
       *) continue ;;
     esac
     if ! grep -q "^${key_file}=" "$ENV_FILE"; then
-      echo ".env dosyasına yeni anahtar eklendi: $key_file" >&2
+      echo "Added a new key to .env: $key_file" >&2
       example_line "$line" >> "$ENV_FILE"
     fi
   done < "$SCRIPT_DIR/.env.example"
@@ -73,6 +74,55 @@ compose() {
   docker --context "$CONTEXT" compose -p "$PROJECT" -f "$COMPOSE_FILE" "$@"
 }
 
+suggest_port_base() {
+  local published
+  published="$(docker --context "$CONTEXT" ps --format '{{.Ports}}')" || return
+  python3 - "$KC_PORT" "$published" <<'PYTHON'
+import re
+import socket
+import sys
+from contextlib import ExitStack
+
+base = int(sys.argv[1])
+ranges = [(int(start), int(end or start)) for start, end in
+          re.findall(r":(\d+)(?:-(\d+))?->", sys.argv[2])]
+for candidate in range(base + 10, 65528, 10):
+    ports = (candidate, candidate + 6, candidate + 8)
+    if any(start <= port <= end for port in ports for start, end in ranges):
+        continue
+    try:
+        with ExitStack() as sockets:
+            for port in ports:
+                listener = sockets.enter_context(socket.socket())
+                listener.bind(("127.0.0.1", port))
+    except OSError:
+        continue
+    print(candidate)
+    break
+PYTHON
+}
+
+start_services() {
+  local output exit_code alternative
+  if output=$(compose up -d --wait "$@" 2>&1); then
+    printf '%s\n' "$output"
+    return
+  else
+    exit_code=$?
+  fi
+  printf '%s\n' "$output" >&2
+  if grep -Eiq 'port is already allocated|address already in use|ports are not available' <<< "$output"; then
+    printf 'Port conflict. Keycloak uses %s and Mailpit uses %s.\n' "$KC_PORT" "$MAILPIT_UI_PORT" >&2
+    alternative="$(suggest_port_base)" || alternative=""
+    if [ -n "$alternative" ]; then
+      printf 'Try PANE_PORT=%s %s up\n' "$alternative" "$0" >&2
+    else
+      printf 'Choose PANE_PORT so it and PANE_PORT + 6 are free.\n' >&2
+    fi
+  fi
+  return "$exit_code"
+}
+
 TUNNEL_PID="$SCRIPT_DIR/.tunnel.pid"
 
 # Opens one ssh connection to the Colima VM that carries the given ports to this Mac.
@@ -93,34 +143,34 @@ ssh_tunel() {
 }
 
 open_tunnel() {
-  # Colima'nın port yönlendirmesi bozulursa yeni portlar ana makineye açılmaz.
-  # Bu komut sanal makineye ayrı bir ssh bağlantısı açar ve iki portu ana makineye taşır.
-  # Colima'nın kendi bağlantısına dokunmaz. Yalnız bu Mac'teki Colima kurulumu için geçerlidir.
+  # When Colima port forwarding fails, new ports are unavailable on the host.
+  # This command opens a separate SSH connection to the VM and forwards both ports to the host.
+  # It leaves Colima's own connection in place. It applies only to the Colima setup on this Mac.
   local lima_name="${COLIMA_LIMA_AD:-$LIMA_DEFAULT}"
   local ssh_conf="$HOME/.colima/_lima/$lima_name/ssh.config"
   if [ ! -f "$ssh_conf" ]; then
-    echo "Colima ssh ayarı yok: $ssh_conf" >&2
+    echo "Colima SSH configuration is missing: $ssh_conf" >&2
     exit 1
   fi
   if [ -f "$TUNNEL_PID" ] && kill -0 "$(cat "$TUNNEL_PID")" 2>/dev/null; then
-    echo "Tünel zaten açık (pid $(cat "$TUNNEL_PID"))."
+    echo "The tunnel is already open (pid $(cat "$TUNNEL_PID"))."
     return
   fi
   ssh_tunel "$TUNNEL_PID" "$KC_PORT" "$MAILPIT_UI_PORT"
   sleep 2
   if ! kill -0 "$(cat "$TUNNEL_PID")" 2>/dev/null; then
-    echo "Tünel açılamadı." >&2
+    echo "Could not open the tunnel." >&2
     rm -f "$TUNNEL_PID"
     exit 1
   fi
-  echo "Tünel açık: $KC_PUBLIC_URL ve http://127.0.0.1:$MAILPIT_UI_PORT (pid $(cat "$TUNNEL_PID"))"
+  echo "Tunnel open: $KC_PUBLIC_URL and http://127.0.0.1:$MAILPIT_UI_PORT (pid $(cat "$TUNNEL_PID"))"
 }
 
 close_tunnel() {
   if [ -f "$TUNNEL_PID" ]; then
     kill "$(cat "$TUNNEL_PID")" 2>/dev/null || true
     rm -f "$TUNNEL_PID"
-    echo "Tünel kapandı."
+    echo "The tunnel is closed."
   fi
 }
 
@@ -136,8 +186,8 @@ case "$command" in
       *) echo "Usage: $0 config [--quiet]" >&2; exit 2 ;;
     esac
     ;;
-  # İmaj varsa yeniden kullanılır. Realm ya da eklenti değişince imajı "build" komutuyla derleyin.
-  up) compose up -d --wait "$@" ;;
+  # Reuses the existing image. Run "build" after changing the realm or a provider.
+  up) start_services "$@" ;;
   build) compose build "$@" ;;
   down) close_tunnel; compose down "$@" ;;
   restart) compose restart "$@" ;;
@@ -242,18 +292,18 @@ case "$command" in
       | curl -fsS -K - -o /dev/null -w 'realm deleted: %{http_code}\n' -X DELETE "$KC_PUBLIC_URL/admin/realms/platform"
     ;;
   delete-realm)
-    # Realm'i siler ve Keycloak'ı var olan imajla yeniden kurar. Böylece imajdaki realm dosyası yeniden içe alınır.
-    # Realm dosyası değiştiyse önce "build" komutunu çalıştırın.
-    # Bu komut geliştirme realm'indeki bütün veriyi siler. Onay bayrağı zorunludur.
+    # Deletes the realm and recreates Keycloak with the existing image so it imports the bundled realm file.
+    # Run "build" first if the realm file changed.
+    # This command deletes all data in the development realm. The confirmation flag is required.
     if [ "${1:-}" != "--yes" ]; then
-      echo "Bu komut platform realm'ini ve içindeki bütün veriyi siler. Onaylamak için: $0 delete-realm --yes" >&2
+      echo "This deletes the platform realm and all its data. To confirm: $0 delete-realm --yes" >&2
       exit 2
     fi
     "$0" realm-delete-only --yes
     compose up -d --force-recreate --wait keycloak
     ;;
   *)
-    echo "Kullanım: $0 <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-reload|realm-delete-only|delete-realm>" >&2
+    echo "Usage: $0 <config|up|build|down|restart|logs|ps|exec|test|tunnel|close-tunnel|prod-check|realm-reload|realm-delete-only|delete-realm>" >&2
     exit 2
     ;;
 esac
