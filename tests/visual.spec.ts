@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { test, expect, type Page } from '@playwright/test';
+import { waitForRequirementsView } from './requirements-view';
 
 // Görsel regresyon (rapor Y-11): referans görüntüler yalnız Linux CI ortamında (ubuntu-24.04 + Playwright'ın kendi
 // tarayıcıları) üretilir ve karşılaştırılır. Yazı tipi işleme işletim sistemine göre değiştiği için macOS yerel
@@ -12,6 +13,7 @@ const HIDE_CHROME = fileURLToPath(new URL('./visual-hide-chrome.css', import.met
 
 async function settle(page: Page) {
   await page.waitForFunction(() => !document.querySelector('astro-island[ssr]'), undefined, { timeout: 20_000 });
+  await waitForRequirementsView(page);
   await page.evaluate(async () => {
     await document.fonts.ready;
   });
@@ -34,7 +36,7 @@ test.describe('visual regression', () => {
       await settle(page);
       // İçerikle değişen gezgin sonuç listesi maskelenir: test kabuk, süzgeç ve tipografi gerilemelerini yakalar.
       await expect(page).toHaveScreenshot(`${shot.name}.png`, {
-        mask: [page.locator('.req-table tbody'), page.locator('.req-cards')],
+        mask: [page.locator('.req-table tbody')],
       });
     });
   }
