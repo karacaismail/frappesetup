@@ -6,7 +6,7 @@ Beklenen değerler docs/sozlesmeler.md 2. bölümünden ve görev belgesinden al
 import re
 import unittest
 
-from yardimci import KULLANICI_DOSYASI, ORNEK_ENV, PAROLA_LISTESI, REALM_DOSYASI, kullanicilari_oku, realm_oku
+from yardimci import KLASOR, KULLANICI_DOSYASI, ORNEK_ENV, PAROLA_LISTESI, REALM_DOSYASI, kullanicilari_oku, realm_oku
 
 YER_TUTUCU = re.compile(r"^\$\{[A-Z0-9_]+\}$")
 ISTEMCILER = {"site-kiraci1", "press", "identity-sync", "press-service"}
@@ -139,6 +139,13 @@ class RealmDosyasiTesti(unittest.TestCase):
         self.assertNotIn(b"\r", veri)
         self.assertTrue(veri.endswith(b"\n"))
         self.assertGreater(veri.count(b"\n"), 100)
+
+
+class ComposeFileTest(unittest.TestCase):
+    def test_image_tag_is_unique_per_pane(self):
+        # Parallel Panes build the same image. The tag must include the Pane port (KC_PORT = PANE_PORT).
+        compose = (KLASOR.parents[1] / "dev" / "compose.keycloak.yaml").read_text(encoding="utf-8")
+        self.assertRegex(compose, r"image: fs-keycloak-atonota:dev-\$\{KC_PORT:\?\}")
 
 
 class OrnekKullaniciTesti(unittest.TestCase):

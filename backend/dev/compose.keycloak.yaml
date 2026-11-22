@@ -9,7 +9,8 @@
 # Realm dosyası değişince `kc-dev.sh up` imajı yeniden derler.
 services:
   keycloak:
-    image: fs-keycloak-atonota:dev
+    # The tag carries the Pane port so parallel Panes do not overwrite each other's image.
+    image: fs-keycloak-atonota:dev-${KC_PORT:?}
     build:
       context: ../identity/keycloak
       dockerfile: Dockerfile

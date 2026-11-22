@@ -62,13 +62,13 @@ Tünel Colima'nın kendi bağlantısına dokunmaz. `bin/kc-dev.sh down` tüneli 
 
 ## Realm dosyaları imajın içindedir
 
-Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzden compose dosyası bind mount kullanmaz. `Dockerfile` realm dosyasını ve parola listesini imaja kopyalar. `dev` hedefi örnek kullanıcıları da ekler. Üretim imajı `prod` hedefinden alınır. `bin/kc-dev.sh up` her çalışmada imajı yeniden derler.
+Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzden compose dosyası bind mount kullanmaz. `Dockerfile` realm dosyasını ve parola listesini imaja kopyalar. `dev` hedefi örnek kullanıcıları da ekler. Üretim imajı `prod` hedefinden alınır. `bin/kc-dev.sh up` her çalışmada imajı yeniden derler. İmaj etiketi `fs-keycloak-atonota:dev-<PANE_PORT>` biçimindedir. Böylece paralel Pane'ler birbirinin imajını ezmez.
 
 ## Eklentiler
 
 İki eklenti imaja eklenir. Seçim gerekçesi `backend/docs/kararlar/0003-keycloak-eklentileri.md` notundadır.
 
-- Sihirli bağlantıyı `sky-cloak/keycloak-magic-link` v0.3.0 eklentisi sağlar. Giriş sayfasında “Başka yol dene” bağlantısı sihirli bağlantıyı açar. Bağlantı 300 saniye geçerlidir ve tek kullanımlıktır. Bağlantı yalnız isteyen tarayıcıda çalışır.
+- Sihirli bağlantıyı `sky-cloak/keycloak-magic-link` v0.3.0 eklentisi sağlar. Adım şimdilik realm'de kapalıdır. Eklenti bağlantıdan sonra ikinci doğrulamayı sormuyor. Ayrıntı karar notundadır. Açılınca bağlantı 300 saniye geçerlidir ve tek kullanımlıktır.
 - Apple ile girişi `klausbetz/apple-identity-provider-keycloak` 1.17.0 eklentisi sağlar. Sağlayıcı realm'de kapalıdır. Gerçek anahtar gelince `.env` dosyasındaki `ATONOTA_APPLE_*` değerleri doldurulur. Sonra sağlayıcı açılır.
 
 ## Kapatma

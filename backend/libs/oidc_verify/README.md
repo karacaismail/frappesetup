@@ -7,7 +7,7 @@ Arayüz `backend/docs/sozlesmeler.md` dosyasının 3. bölümünde sabitlendi:
 ```python
 from oidc_verify import JwksCache, TokenError, verify_access_token, verify_id_token, verify_logout_token
 
-cache = JwksCache(jwks_url, ttl_seconds=600)
+cache = JwksCache(jwks_url, ttl_seconds=600)  # isteğe bağlı: max_stale_seconds=3600, max_bytes=1_048_576
 claims = verify_access_token(token, cache=cache, issuer=iss, audience="site-kiraci1", allowed_azp={"identity-sync"}, leeway=30)
 claims = verify_id_token(token, cache=cache, issuer=iss, client_id="press", nonce=nonce, leeway=30)
 claims = verify_logout_token(token, cache=cache, issuer=iss, client_id="press", leeway=30)
@@ -18,10 +18,16 @@ claims = verify_logout_token(token, cache=cache, issuer=iss, client_id="press", 
 - Yalnız RS256 imzası kabul edilir. `none` ve öteki algoritmalar `invalid_signature` verir.
 - `iss` tam eşleşir. `aud` tek değerdir ve beklenen istemcidir. `azp` izin listesinde olmalıdır.
 - `exp` zorunludur. Saat payı varsayılan 30 saniyedir.
+- `exp`, `iat` ve `nbf` alanları sayı olmalıdır. Liste, metin, `true` ya da sonsuz değer `malformed` verir.
+- Her işlev belirtecin türünü denetler. Belirteçteki `typ` alanı servis belirtecinde `Bearer`, kimlik belirtecinde `ID`, çıkış belirtecinde `Logout` olmalıdır. `typ` alanı yoksa belirteç kabul edilir. Yanlış `typ` değeri servis ve kimlik doğrulamasında `malformed` verir. Çıkış doğrulamasında `not_logout_token` verir. Metin olmayan `typ` her yerde `malformed` verir.
+- Servis ve kimlik belirtecinde `events` alanı bulunamaz. Bulunursa `malformed` verir. Böylece çıkış belirteci başka bir uçta kullanılamaz.
 - Anahtar listesi `ttl_seconds` süresince saklanır. Bilinmeyen `kid` gelince liste bir kez yenilenir. Art arda gelen bilinmeyen `kid` istekleri listeyi 5 saniyede en çok bir kez yeniletir.
 - Liste çekilemezse önbellekteki eski anahtarlar kullanılmaya devam eder. Yeni deneme en erken 5 saniye sonra yapılır. Listedeki tek bir bozuk anahtar kaydı atlanır, öteki anahtarlar yüklenir.
+- Eski anahtarlar sınırsız süre kullanılmaz. Son başarılı çekimden sonra `ttl_seconds + max_stale_seconds` saniye geçince eski anahtarlar da reddedilir. Bu durumda `JwksUnavailable` yükselir. Yeni bir çekim başarılı olunca süre yeniden başlar. `max_stale_seconds` varsayılan 3600 saniyedir ve `JwksCache` kurucusuna anahtar kelimeyle verilir.
+- Aynı anda yalnız bir çekim çalışır. Anahtarı önbellekte olan çağrı, süren çekimi beklemez. Bilinmeyen `kid` ile gelen çağrılar süren çekimi bekler ve ikinci bir çekim başlatmaz.
+- Çekilen yanıt en çok `max_bytes` bayt okunur. Varsayılan 1 MiB'dir. Daha büyük yanıt hata sayılır ve eski anahtarlar korunur.
 - Kimlik belirtecinde `nonce=None` verilirse `nonce` denetimi atlanır. Bu yalnız `nonce` göndermeyen akışlar içindir. Giriş akışı `nonce` gönderdiyse çağıran değeri vermek zorundadır.
-- Çıkış belirtecinde imza, `iss`, `aud`, `iat`, `events` anahtarı, `sid` ya da `sub` varlığı ve `nonce` yokluğu denetlenir.
+- Çıkış belirtecinde imza, `iss`, `aud`, `exp`, `iat`, `jti`, `events` anahtarı, `sid` ya da `sub` varlığı ve `nonce` yokluğu denetlenir. `exp`, `iat` ve `jti` zorunludur. `jti` boş olmayan metin olmalıdır. `events` bir nesne olmalı ve `http://schemas.openid.net/event/backchannel-logout` anahtarının değeri de nesne olmalıdır. `sid` ve `sub` varsa boş olmayan metin olmalıdır.
 - Geçersiz belirteçte `TokenError` yükselir. `code` alanı nedeni söyler: `malformed`, `invalid_signature`, `unknown_kid`, `wrong_issuer`, `wrong_audience`, `wrong_azp`, `expired`, `not_yet_valid`, `wrong_nonce`, `not_logout_token`.
 - Anahtar listesi alınamazsa ve önbellekte hiç anahtar yoksa `JwksUnavailable` yükselir. Bu hata `TokenError` değildir. Belirteç geçersiz sayılmaz. Çağıran uç bu hatayı 503 benzeri geçici hata yanıtıyla karşılar. `JwksUnavailable` da `oidc_verify` paketinden içe aktarılır.
 - Kitaplık belirteci günlüğe yazmaz. Hata mesajı belirteç içeriği taşımaz.

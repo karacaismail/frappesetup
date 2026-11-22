@@ -117,7 +117,9 @@ case "$komut" in
     belirtec="$(printf 'data-urlencode = "username=%s"\ndata-urlencode = "password=%s"\n' "$KC_BOOTSTRAP_ADMIN_USERNAME" "$KC_BOOTSTRAP_ADMIN_PASSWORD" \
       | curl -fsS -K - -X POST "$KC_PUBLIC_URL/realms/master/protocol/openid-connect/token" \
       -d grant_type=password -d client_id=admin-cli | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
-    curl -fsS -o /dev/null -w 'realm silindi: %{http_code}\n' -X DELETE "$KC_PUBLIC_URL/admin/realms/platform" -H "Authorization: Bearer $belirtec"
+    # The admin token is passed through a curl config on stdin so it never appears in the process list.
+    printf 'header = "Authorization: Bearer %s"\n' "$belirtec" \
+      | curl -fsS -K - -o /dev/null -w 'realm silindi: %{http_code}\n' -X DELETE "$KC_PUBLIC_URL/admin/realms/platform"
     compose up -d --build --force-recreate --wait keycloak
     ;;
   *)

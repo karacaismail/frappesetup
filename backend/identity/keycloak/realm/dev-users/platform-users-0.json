@@ -45,6 +45,27 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "username": "totp.ornek@example.test",
+      "email": "totp.ornek@example.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Totp",
+      "lastName": "Örnek",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Ornek-Parola-Totp-2026",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "dev-totp",
+          "secretData": "{\"value\":\"dev-totp-secret-0123456789\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\"}"
+        }
+      ]
     }
   ]
 }

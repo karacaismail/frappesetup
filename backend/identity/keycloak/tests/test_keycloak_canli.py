@@ -4,6 +4,7 @@ Beklenen değerler docs/sozlesmeler.md 2. bölümünden alındı. Testler bin/kc
 Keycloak yoksa testler atlanır ve not_run sayılır.
 """
 
+import hmac
 import unittest
 
 from yardimci import admin, canli_var_mi, istek, istemci_belirteci, jwt_govdesi, ortam, yonetici_belirteci
@@ -138,7 +139,8 @@ class RealmAyarlariTesti(unittest.TestCase):
         yanit = admin("/clients?clientId=identity-sync", self.yonetici)
         kimlik = yanit.json()[0]["id"]
         sir = admin(f"/clients/{kimlik}/client-secret", self.yonetici).json()["value"]
-        self.assertEqual(sir, ortam("ATONOTA_IDENTITY_SYNC_SECRET"))
+        # Compare without printing either value on failure; the values are secrets.
+        self.assertTrue(hmac.compare_digest(sir, ortam("ATONOTA_IDENTITY_SYNC_SECRET")), "client secret differs from .env")
         self.assertFalse(sir.startswith("${"))
 
     def test_donus_adresleri_ortamdan_geldi(self):

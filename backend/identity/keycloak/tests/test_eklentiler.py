@@ -41,7 +41,9 @@ class EklentiDosyaTesti(unittest.TestCase):
         yurutmeler = [y for a in akislar.values() for y in a["authenticationExecutions"]]
         sihirli = [y for y in yurutmeler if y.get("authenticator") == SIHIRLI]
         self.assertEqual(len(sihirli), 1)
-        self.assertEqual(sihirli[0]["requirement"], "ALTERNATIVE")
+        # Disabled until the extension continues the browser flow after the link (review finding E1).
+        # Enabling it would let a TOTP user log in without the second factor.
+        self.assertEqual(sihirli[0]["requirement"], "DISABLED")
         parola = [y for y in yurutmeler if y.get("authenticator") == "auth-username-password-form"]
         self.assertEqual(len(parola), 1, "parola yolu korunur")
         otp = [y for y in yurutmeler if y.get("authenticator") == "auth-otp-form"]
@@ -152,7 +154,7 @@ class EklentiCanliTesti(unittest.TestCase):
         self.assertEqual(saglayicilar["auth-otp-form"]["requirement"], "ALTERNATIVE")
         self.assertEqual(saglayicilar["conditional-credential"]["requirement"], "REQUIRED")
         self.assertEqual(saglayicilar["webauthn-authenticator"]["requirement"], "ALTERNATIVE")
-        self.assertEqual(saglayicilar[SIHIRLI]["requirement"], "ALTERNATIVE")
+        self.assertEqual(saglayicilar[SIHIRLI]["requirement"], "DISABLED")
         self.assertEqual(saglayicilar["auth-username-password-form"]["requirement"], "REQUIRED")
 
     def test_tarayici_akisi_bagli_ve_apple_kapali(self):
@@ -162,8 +164,14 @@ class EklentiCanliTesti(unittest.TestCase):
         self.assertFalse(apple["enabled"])
         self.assertEqual(apple["config"]["teamId"], ortam("ATONOTA_APPLE_TEAM_ID"))
 
+    def _magic_link_enabled(self) -> bool:
+        yurutmeler = admin(f"/authentication/flows/{AKIS}/executions", self.yonetici).json()
+        return [y for y in yurutmeler if y.get("providerId") == SIHIRLI][0]["requirement"] != "DISABLED"
+
     def _sihirli_baglanti_iste(self, eposta: str):
         """Giriş sayfasını açar, 'başka yol' ile sihirli bağlantıyı seçer, e-postayı gönderir."""
+        if not self._magic_link_enabled():
+            self.skipTest("magic link step is disabled in the realm (review finding E1); flow test not run")
         acici = _cerezli_acici()
         sorgu = urllib.parse.urlencode(
             {

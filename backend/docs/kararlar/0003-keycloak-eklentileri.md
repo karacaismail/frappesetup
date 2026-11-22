@@ -46,10 +46,20 @@ Proje sahibi iki giriş yolunu MVP'ye aldı (O-6). Birincisi sihirli bağlantıd
 - Skycloak eklentisinin yönetici ucu (`/realms/platform/skycloak-magic-link`) `manage-users` rolü ister. Bu uç hesaba giriş vermekle eşdeğerdir. Bu turda hiçbir servis bu ucu çağırmaz.
 - İki depoda da yayımlanmış bir güvenlik açığı kaydı bulunmadı (GitHub Security Advisories, 22 Kasım 2026).
 
+## Durum: sihirli bağlantı adımı kapalı (22 Kasım 2026, güvenlik incelemesi E1)
+
+Bağımsız güvenlik incelemesi bir engelleyici buldu. Eklentinin v0.3.0 sürümü bağlantıya tıklanınca tarayıcı akışının kalan adımlarını çalıştırmıyor. `MagicLinkActionTokenHandler.handleToken` doğrudan `nextRequiredAction` ve `redirectToRequiredActions` çağırıyor (kaynak: `src/main/java/io/skycloak/keycloak/magiclink/MagicLinkActionTokenHandler.java`, 119 ve 121. satırlar). Bu yüzden ikinci doğrulama adımı atlanıyor. TOTP kurmuş kullanıcı e-postadaki bağlantıyla kod girmeden giriş yapabiliyor. Bu durum canlı testle gösterildi: `tests/test_second_factor.py`.
+
+Karar: `skycloak-magic-link` yürütmesi realm'de `DISABLED` durumunda kalır. Eklenti ve ayarları imajda ve realm'de durur. Giriş sayfası sihirli bağlantı seçeneğini göstermez. Kullanıcı parola ve passkey ile girer.
+
+Açılma koşulu şudur: eklenti bağlantıdan sonra tarayıcı akışını sürdürmeli ya da ikinci doğrulamayı kendisi istemelidir. Bu düzeltme gelince `tests/test_second_factor.py` içindeki `test_magic_link_cannot_skip_totp` testi geçmelidir. Test, TOTP'li kullanıcının bağlantıdan sonra OTP formu görmesini bekler.
+
+Bu açık iş teknik borçtur. Sorumlusu kimlik-realm işidir. Eklenti deposuna sorun kaydı açmak proje sahibinin kararıdır. Dış servise yazma bu turda yapılmadı.
+
 ## Kurulum
 
 - `backend/identity/keycloak/Dockerfile` iki jar dosyasını `/opt/keycloak/providers/` klasörüne ekler. Özetler sabittir.
-- Realm'in tarayıcı akışı `atonota-browser` adını taşır. Kullanıcı önce parola ve passkey ekranını görür. “Başka yol dene” bağlantısı sihirli bağlantıyı açar.
+- Realm'in tarayıcı akışı `atonota-browser` adını taşır. Kullanıcı parola ve passkey ekranını görür. Sihirli bağlantı adımı yukarıdaki nedenle kapalıdır. Açılınca “Başka yol dene” bağlantısı sihirli bağlantıyı gösterir.
 - Sihirli bağlantı ömrü 300 saniyedir. Bu süre realm'in e-posta eylem bağlantılarıyla aynıdır. Kullanıcı kendiliğinden açılmaz. Bir IP dakikada 20, bir e-posta dakikada 3 bağlantı isteyebilir.
 - Apple sağlayıcısı realm'de kapalı durur. Anahtarlar `.env` dosyasındaki yer tutuculardan gelir. Gerçek anahtar yoktur.
 

@@ -900,7 +900,7 @@
     },
     {
       "alias": "atonota-browser-giris",
-      "description": "Kullanıcı parola yolunu ya da sihirli bağlantıyı seçer.",
+      "description": "Kullanıcı parola yolunu kullanır. Sihirli bağlantı adımı kapalıdır: eklenti v0.3.0 bağlantıdan sonra ikinci doğrulamayı sormaz (docs/kararlar/0003-keycloak-eklentileri.md).",
       "providerId": "basic-flow",
       "topLevel": false,
       "builtIn": false,
@@ -914,7 +914,7 @@
         },
         {
           "authenticatorFlow": false,
-          "requirement": "ALTERNATIVE",
+          "requirement": "DISABLED",
           "priority": 20,
           "userSetupAllowed": false,
           "authenticator": "skycloak-magic-link",
