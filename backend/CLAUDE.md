@@ -103,7 +103,12 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
 1. **Klasör bağlama çalışmaz.** `colima-factory` profili yalnız `/Users/w6x/Developer/software-factory` klasörünü görür. Depo klasörünü bağlarsanız container'da boş klasör görünür. Kodu imaja `COPY` ile koyun ya da `docker cp` ile kopyalayın. Örnek: `backend/identity/keycloak/Dockerfile`.
 2. **Yeni portlar bilgisayara açılmaz.** Profilin port yönlendirmesi bozuk. Portu bilgisayara ayrı bir ssh tüneliyle taşıyın. Örnek: `backend/identity/keycloak/bin/kc-dev.sh tunel`.
 3. **`docker pull` hata verebilir.** Docker ayarındaki şifre yardımcısı eksik. İmajı boş bir `DOCKER_CONFIG` klasörüyle çekin. Kullanıcının Docker ayarını değiştirmeyin.
-4. **Colima'yı yeniden başlatmayın.** Kalıcı çözüm `colima restart factory` ister. Bu komut başka projelerin container'larını yeniden başlatır.
+4. **Disk dar.** `colima-factory` profilinin Docker diski 22 Kasım 2026 Pazar günü %99 doldu. Kullanılmayan derleme önbelleği silindi. Boş yer yaklaşık 8 GB'tır.
+   - Büyük imaj kurmadan önce `colima ssh -p factory -- df -h /var/lib/docker` ile boş yeri ölçün.
+   - Frappe için yeni temel imaj üretmeyin. `frappe/erpnext:v16.55.0` ve `press-local-bench:latest` imajlarını temel alın.
+   - Kendi eski `fs-*` imajlarınızı ve derleme önbelleğinizi silin. Başka projenin imajına dokunmayın.
+   - Boş yer 5 GB'ın altına inerse raporlayın. Gerekirse `colima` profili kullanılır. O profilde 64 GB boş disk ama 8 GB bellek var.
+5. **Colima'yı yeniden başlatmayın.** Kalıcı çözüm `colima restart factory` ister. Bu komut başka projelerin container'larını yeniden başlatır.
 
 
 ### Tarayıcı testi
