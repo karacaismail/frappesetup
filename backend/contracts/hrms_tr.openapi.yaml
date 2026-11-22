@@ -174,6 +174,15 @@ paths:
   /method/hrms_tr.hrms_endpoints.deny_legacy_leave_query:
     get:
       operationId: denyLegacyLeaveQueryGet
+      x-frappe-original:
+        - hrms.www.hrms.get_context_for_dev
+        - hrms.hr.doctype.leave_application.leave_application.get_leave_details
+        - hrms.hr.doctype.leave_application.leave_application.get_leave_balance_on
+        - hrms.api.get_leave_balance_map
+        - hrms.api.get_leave_types
+        - hrms.payroll.doctype.salary_slip.salary_slip.make_salary_slip_from_timesheet
+        - hrms.payroll.doctype.salary_structure.salary_structure.make_salary_slip
+        - hrms.hr.doctype.leave_application.leave_application.get_events
       summary: Deny access to an unsupported legacy leave endpoint.
       description: Denies the request without reading leave data.
       responses:
@@ -181,112 +190,17 @@ paths:
           $ref: "#/components/responses/PermissionDenied"
     post:
       operationId: denyLegacyLeaveQueryPost
+      x-frappe-original:
+        - hrms.www.hrms.get_context_for_dev
+        - hrms.hr.doctype.leave_application.leave_application.get_leave_details
+        - hrms.hr.doctype.leave_application.leave_application.get_leave_balance_on
+        - hrms.api.get_leave_balance_map
+        - hrms.api.get_leave_types
+        - hrms.payroll.doctype.salary_slip.salary_slip.make_salary_slip_from_timesheet
+        - hrms.payroll.doctype.salary_structure.salary_structure.make_salary_slip
+        - hrms.hr.doctype.leave_application.leave_application.get_events
       summary: Deny access to an unsupported legacy leave endpoint.
       description: Denies the request without reading leave data.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-  /method/hrms.www.hrms.get_context_for_dev:
-    get:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-    post:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-  /method/hrms.hr.doctype.leave_application.leave_application.get_leave_details:
-    get:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-    post:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-  /method/hrms.hr.doctype.leave_application.leave_application.get_leave_balance_on:
-    get:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-    post:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-  /method/hrms.api.get_leave_balance_map:
-    get:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-    post:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-  /method/hrms.api.get_leave_types:
-    get:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-    post:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-  /method/hrms.payroll.doctype.salary_slip.salary_slip.make_salary_slip_from_timesheet:
-    get:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-    post:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-  /method/hrms.payroll.doctype.salary_structure.salary_structure.make_salary_slip:
-    get:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-    post:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-  /method/hrms.hr.doctype.leave_application.leave_application.get_events:
-    get:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
-      responses:
-        "403":
-          $ref: "#/components/responses/PermissionDenied"
-    post:
-      summary: Deny access to an unsupported legacy HRMS endpoint.
-      description: Rejects the legacy method before it can read or write HRMS records.
       responses:
         "403":
           $ref: "#/components/responses/PermissionDenied"
