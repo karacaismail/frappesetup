@@ -99,6 +99,21 @@ x-site-settings:
     The `iss` value is `<keycloak_public_url>/realms/<keycloak_realm>`.
     The key list address is `<keycloak_internal_url or keycloak_public_url>/realms/<keycloak_realm>/protocol/openid-connect/certs`.
   settings:
+    - key: mcp_oauth_enabled
+      example: false
+      required: false
+      note: External MCP OAuth is disabled by default. The remaining MCP settings are required to enable it.
+    - key: mcp_oauth_resource
+      example: https://tenant.example.test/api/method/platform_core.api.ai.mcp
+      required: false
+      note: Exact HTTPS MCP URL. The token must have this single audience.
+    - key: mcp_oauth_client_ids
+      example: [mcp-external]
+      required: false
+      note: IDs of public Keycloak clients registered for authorization code and S256 PKCE.
+    - key: mcp_oauth_introspection_secret
+      required: false
+      note: Keep the confidential Keycloak resource client's secret in site configuration only. Its client ID is the full resource URL.
     - key: keycloak_public_url
       example: http://identity.localhost:8660
       required: true

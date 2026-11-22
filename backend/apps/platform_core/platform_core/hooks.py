@@ -18,6 +18,7 @@ on_session_creation = ["platform_core.identity.session_policy.on_session_creatio
 auth_hooks = [
 	"platform_core.identity.service_token.validate",
 	"platform_core.ai.agent_token.authenticate_request",
+	"platform_core.ai.oauth.authenticate_request",
 	"platform_core.shell.native_metadata.guard_native_metadata",
 ]
 # AU-19: local sign-in functions are replaced by gated wrappers (kimlik/login_policy.py).

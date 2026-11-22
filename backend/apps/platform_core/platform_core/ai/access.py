@@ -14,6 +14,7 @@ from platform_core.ai.errors import CONTEXT
 
 HUMAN = "human_session"
 AGENT = "agent_token"
+OAUTH = "oauth"
 OTHER = "other"
 GUEST = "guest"
 CONVERSATION_HEADER = "Mcp-Conversation-Id"
@@ -23,9 +24,11 @@ def principal() -> str:
 	"""Return the identity type of the request.
 
 	A human session is only a session that comes with a cookie. A request that carries an
-	`Authorization` header does not count as a human session. `agent_token.authenticate_request`
-	marks the agent token.
+	`Authorization` header does not count as a human session. The MCP authentication hooks
+	mark their accepted bearer credentials.
 	"""
+	if getattr(frappe.local, "mcp_oauth", None):
+		return OAUTH
 	if getattr(frappe.local, "yz_agent", None):
 		return AGENT
 	if frappe.session.user in ("", "Guest"):

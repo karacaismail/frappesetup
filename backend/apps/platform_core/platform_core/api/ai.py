@@ -11,15 +11,22 @@ endpoint refuses a guest and refuses another user's data.
 import frappe
 from werkzeug.wrappers import Response
 
-from platform_core.ai import access, agent_token, proposals, retention
+from platform_core.ai import access, agent_token, oauth, proposals, retention
 from platform_core.ai import mcp as mcp_endpoint
 
 
 # Checked in `mcp._check_principal` (identity type) and, per tool, by the tool's own permission check.
-@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: frappe-missing-permission
 def mcp() -> Response:
-	"""MCP endpoint. Requires a human session or an agent token."""
+	"""MCP endpoint. Requires an accepted session or bearer credential."""
 	return mcp_endpoint.handle()
+
+
+# This public document discloses only validated discovery settings when OAuth is enabled.
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: frappe-missing-permission
+def mcp_resource_metadata() -> Response:
+	"""Return the OAuth protected resource metadata as bare JSON."""
+	return oauth.resource_metadata()
 
 
 # Checked in `access.require_human`: a human session with a CSRF token. The token acts only as that user.
