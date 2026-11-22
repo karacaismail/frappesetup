@@ -247,6 +247,61 @@ paths:
           description: An account update is in progress or a database lock timed out. Retry the request.
         "503":
           description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.account.request_deletion:
+    post:
+      operationId: requestAccountDeletion
+      summary: Request deletion of your own Press account.
+      description: Starts Keycloak reauthentication or submits an irreversible deletion request after explicit confirmation. The same browser session must have been reauthenticated within 300 seconds. Invoices remain unchanged.
+      security:
+        - pressSession: []
+      parameters:
+        - in: header
+          name: X-Frappe-CSRF-Token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [confirm]
+              properties:
+                confirm:
+                  type: boolean
+                  description: Send false to start reauthentication and true to confirm deletion.
+      responses:
+        "200":
+          description: Returns a Keycloak login URL or confirms that Identity Sync accepted the deletion request.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    oneOf:
+                      - type: object
+                        required: [url]
+                        properties:
+                          url:
+                            type: string
+                            format: uri
+                      - type: object
+                        required: [submitted]
+                        properties:
+                          submitted:
+                            const: true
+        "400":
+          description: Frappe rejected the browser request or its CSRF token.
+        "403":
+          description: A human Press session and fresh Keycloak reauthentication are required.
+        "502":
+          description: Keycloak or Identity Sync did not accept the service request.
+        "503":
+          description: The account deletion service or Keycloak verification keys are unavailable.
   /api/method/press_tr.api.maintenance.cleanup_expired_sessions:
     post:
       operationId: cleanupExpiredPressSessions
@@ -261,6 +316,11 @@ paths:
           description: The caller cannot run System Manager maintenance.
 components:
   securitySchemes:
+    pressSession:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: A human Press browser session with a Frappe CSRF token.
     deskSession:
       type: apiKey
       in: cookie

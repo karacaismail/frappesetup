@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import threading
 import time
 import unittest
@@ -21,6 +22,7 @@ from test_auth_http import PressHttpClient
 ISSUER = "http://keycloak.example.test/realms/platform"
 KID = uuid4().hex
 ACCOUNT_ROUTE = "/api/method/press.api.account.get"
+DELETION_ROUTE = "/api/method/press_tr.api.account.request_deletion"
 
 
 class IdentityHttpTest(PressHttpClient, unittest.TestCase):
@@ -32,6 +34,8 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		jwks = json.dumps({"keys": [jwk]}).encode()
 
 		cls.codes = {}
+		cls.service_tokens = {}
+		cls.deletion_requests = []
 
 		class IssuerHandler(BaseHTTPRequestHandler):
 			def do_GET(self):
@@ -41,10 +45,28 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 				self.send_json(jwks)
 
 			def do_POST(self):
+				body = self.rfile.read(int(self.headers["Content-Length"])).decode()
+				if self.path == "/v1/account-deletions":
+					token = self.headers.get("Authorization", "").removeprefix("Bearer ")
+					if token not in cls.service_tokens:
+						self.send_error(403)
+						return
+					cls.deletion_requests.append(json.loads(body))
+					self.send_json(b'{"status":"accepted"}')
+					return
 				if self.path != "/realms/platform/protocol/openid-connect/token":
 					self.send_error(404)
 					return
-				values = parse_qs(self.rfile.read(int(self.headers["Content-Length"])).decode())
+				values = parse_qs(body)
+				if values.get("grant_type") == ["client_credentials"]:
+					expected = base64.b64encode(b"press-service:press-test-fixture").decode()
+					if self.headers.get("Authorization") != f"Basic {expected}" or values.get("scope") != [
+						"aud-identity-sync"
+					]:
+						self.send_error(403)
+						return
+					self.send_json(json.dumps({"access_token": next(iter(cls.service_tokens))}).encode())
+					return
 				code = values.get("code", [""])[0]
 				fixture = cls.codes.pop(code, None)
 				verifier = values.get("code_verifier", [""])[0]
@@ -93,6 +115,82 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			"POST", f"/api/method/press_tr.api.identity.{method}", headers, json.dumps(body)
 		)
 		return status, json.loads(response) if response.startswith(b"{") else response.decode()
+
+	def test_account_deletion_requires_reauthentication(self):
+		subject = uuid4().hex
+		session = self.sign_in(subject, f"{subject}@example.test", uuid4().hex)
+		status, response_headers, payload = self.exchange("GET", "/account-deletion", session)
+		self.assertEqual(status, 200, payload)
+		self.assertIn("no-store", response_headers["Cache-Control"])
+		self.assertEqual(self.exchange("GET", "/account-deletion")[0], 403)
+		self.assertEqual(self.exchange("POST", DELETION_ROUTE, body='{"confirm": true}')[0], 403)
+		self.assertIn(b"cannot be undone", payload)
+		csrf = re.search(rb'name="csrf_token" value="([^"]+)"', payload).group(1).decode()
+		headers = {**session, "X-Frappe-CSRF-Token": csrf, "Content-Type": "application/json"}
+		self.assertEqual(self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')[0], 403)
+		self.assertEqual(self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": "false"}')[0], 403)
+		status, _, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": false}')
+		self.assertEqual(status, 200, payload)
+		query = parse_qs(urlsplit(json.loads(payload)["message"]["url"]).query)
+		self.assertEqual(query["prompt"], ["login"])
+		self.assertEqual(query["max_age"], ["0"])
+		self.assertEqual(query["code_challenge_method"], ["S256"])
+
+	def test_account_deletion_sends_only_verified_identity(self):
+		subject = uuid4().hex
+		email = f"{subject}@example.test"
+		session = self.sign_in(subject, email, uuid4().hex)
+		status, _, page = self.exchange("GET", "/account-deletion", session)
+		self.assertEqual(status, 200)
+		csrf = re.search(rb'name="csrf_token" value="([^"]+)"', page).group(1).decode()
+		headers = {**session, "X-Frappe-CSRF-Token": csrf, "Content-Type": "application/json"}
+		self.assertIn(self.exchange("POST", DELETION_ROUTE, session, '{"confirm": true}')[0], {400, 403})
+		status, response_headers, payload = self.exchange(
+			"POST", DELETION_ROUTE, headers, '{"confirm": false}'
+		)
+		self.assertEqual(status, 200, payload)
+		query = parse_qs(urlsplit(json.loads(payload)["message"]["url"]).query)
+		cookies = SimpleCookie()
+		for cookie in response_headers.get_all("Set-Cookie"):
+			cookies.load(cookie)
+		callback_session = {
+			"Cookie": f"{session['Cookie']}; press_tr_login={cookies['press_tr_login'].value}"
+		}
+		auth_time = int(time.time())
+		code = uuid4().hex
+		self.codes[code] = (
+			query["code_challenge"][0],
+			self.token(
+				authorized_party="press",
+				sub=subject,
+				email=email,
+				nonce=query["nonce"][0],
+				auth_time=auth_time,
+			),
+		)
+		callback = "/api/method/press_tr.api.auth.keycloak_callback?" + urlencode(
+			{"state": query["state"][0], "code": code}
+		)
+		status, result_headers, payload = self.exchange("GET", callback, callback_session)
+		self.assertEqual(status, 302, payload)
+		self.assertEqual(result_headers["Location"], "/account-deletion")
+		status, _, page = self.exchange("GET", "/account-deletion", session)
+		self.assertEqual(status, 200)
+		self.assertIn(b"Confirm account deletion", page)
+
+		service_token = self.token(audience="identity-sync", authorized_party="press-service")
+		self.service_tokens[service_token] = True
+		status, _, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
+		self.assertEqual(status, 200, payload)
+		self.assertEqual(json.loads(payload)["message"], {"submitted": True})
+		self.assertEqual(
+			self.deletion_requests[-1],
+			{
+				"issuer": ISSUER,
+				"subject": subject,
+				"reauthenticated_at": auth_time,
+			},
+		)
 
 	def test_service_rejects_wrong_credentials(self):
 		for method in ("ensure_team", "remove_team_member"):

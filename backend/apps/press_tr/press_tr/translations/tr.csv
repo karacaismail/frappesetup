@@ -79,3 +79,22 @@ Irreversibly anonymizes a linked account after revoking access. Invoices remain 
 An account update is in progress or a database lock timed out. Retry the request.,Hesap güncelleniyor veya kilit bekleme süresi doldu. İsteği yeniden gönderin.,press_tr.openapi
 "This account is being updated. Try again.",Hesap güncelleniyor. Yeniden deneyin.,press_tr
 Anonymize account data without changing invoices or unrelated accounts.,Hesap verilerini anonim yapar. Faturalar ve ilgisiz hesaplar korunur.,press_tr.docstring
+Configure the account deletion service.,Hesap silme servisini ayarlayın.,press_tr
+Verify your identity again before deleting your account.,Hesabınızı silmeden önce kimliğinizi yeniden doğrulayın.,press_tr
+Delete your account,Hesabınızı silin,press_tr
+Deleting your account cannot be undone. Your access will end. Invoices and other business records will be kept.,Hesap silme işlemi geri alınamaz. Erişiminiz kapanır. Fatura ve diğer iş kayıtları korunur.,press_tr
+Your deletion request was submitted.,Hesap silme isteğiniz gönderildi.,press_tr
+The request could not be submitted.,İstek gönderilemedi.,press_tr
+Reload this page to try again.,Tekrar denemek için bu sayfayı yenileyin.,press_tr
+Confirm account deletion,Hesap silmeyi onaylayın,press_tr
+Verify your identity to continue.,Devam etmek için kimliğinizi doğrulayın.,press_tr
+Verify your identity,Kimliğinizi doğrulayın,press_tr
+Request deletion of your own Press account.,Kendi Press hesabınızın silinmesini isteyin.,press_tr.openapi
+Starts Keycloak reauthentication or submits an irreversible deletion request after explicit confirmation. The same browser session must have been reauthenticated within 300 seconds. Invoices remain unchanged.,Keycloak kimliği yeniden doğrular. Kullanıcı onaylarsa Press geri alınamaz silme isteğini gönderir. Aynı oturum son 300 saniyede doğrulanmış olmalıdır. Faturalar değişmez.,press_tr.openapi
+Send false to start reauthentication and true to confirm deletion.,Yeniden doğrulamayı başlatmak için false gönderin. Silmeyi onaylamak için true gönderin.,press_tr.openapi
+Returns a Keycloak login URL or confirms that Identity Sync accepted the deletion request.,Press giriş adresini döner veya Identity Sync'in isteği aldığını bildirir.,press_tr.openapi
+Frappe rejected the browser request or its CSRF token.,Frappe tarayıcı isteğini veya istek koruma belirtecini kabul etmedi.,press_tr.openapi
+A human Press session and fresh Keycloak reauthentication are required.,Press oturumu ve yakın zamanda yapılmış Keycloak doğrulaması gerekir.,press_tr.openapi
+Keycloak or Identity Sync did not accept the service request.,Keycloak veya Identity Sync servis isteğini kabul etmedi.,press_tr.openapi
+The account deletion service or Keycloak verification keys are unavailable.,Hesap silme servisine veya Keycloak doğrulama anahtarlarına ulaşılamadı.,press_tr.openapi
+A human Press browser session with a Frappe CSRF token.,Frappe istek koruma belirteci olan bir Press tarayıcı oturumu gerekir.,press_tr.openapi

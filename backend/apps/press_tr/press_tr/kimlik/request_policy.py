@@ -8,6 +8,7 @@ from frappe.modules.utils import load_doctype_module
 from werkzeug.exceptions import Forbidden, HTTPException
 from werkzeug.utils import redirect
 
+from press_tr.kimlik.deletion import ACCOUNT_DELETION_PAGE
 from press_tr.kimlik.machine_routes import MACHINE_METHODS, MONITORING_ALERT, machine_targets
 from press_tr.kimlik.service import SERVICE_PARAMETERS
 
@@ -54,6 +55,7 @@ LOCAL_IDENTITY_METHODS = (
 )
 API_PREFIXES = ("/api/method/", "/api/v1/method/", "/api/v2/method/")
 ADMIN_METHOD = "press_tr.api.maintenance.cleanup_expired_sessions"
+ACCOUNT_METHOD = "press_tr.api.account.request_deletion"
 
 
 def block_native_login(login_manager=None):
@@ -149,6 +151,9 @@ def block_team_invitation(target, arguments):
 
 def before_request():
 	path = frappe.request.path.rstrip("/")
+	if path == ACCOUNT_DELETION_PAGE:
+		frappe.local.no_cache = True
+		frappe.local.response_headers["Cache-Control"] = "private, no-store"
 	if path in LEGACY_PAGES:
 		panel_url = frappe.conf.platform_panel_url
 		if not panel_url:
@@ -170,7 +175,10 @@ def before_request():
 	from press.auth import ALLOWED_PATHS
 
 	routes = {prefix + name for prefix in API_PREFIXES for name in GUEST_METHODS}
-	routes.update(f"/api/method/{name}" for name in (*SERVICE_PARAMETERS, *MACHINE_METHODS, ADMIN_METHOD))
+	routes.update(
+		f"/api/method/{name}"
+		for name in (*SERVICE_PARAMETERS, *MACHINE_METHODS, ADMIN_METHOD, ACCOUNT_METHOD)
+	)
 	if path in routes and path not in ALLOWED_PATHS:
 		ALLOWED_PATHS.append(path)
 

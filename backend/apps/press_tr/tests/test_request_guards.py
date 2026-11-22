@@ -106,6 +106,31 @@ class RequestGuardsTest(unittest.TestCase):
 			):
 				identity.anonymize_user("issuer", "subject")
 
+	def test_account_deletion_reauthentication_expires_after_300_seconds(self):
+		from press_tr.kimlik import deletion
+
+		with (
+			patch.object(deletion, "frappe") as facade,
+			patch.object(deletion.time, "time", return_value=1000),
+		):
+			for stamp, result in ((700, 700), (699, None), (1001, None), (True, None), (None, None)):
+				with self.subTest(stamp=stamp):
+					facade.session.data = {"press_deletion_reauthenticated_at": stamp}
+					self.assertEqual(deletion.fresh_reauthentication(), result)
+
+	def test_account_deletion_reauthentication_is_bound_to_the_press_session(self):
+		from press_tr.kimlik import deletion
+
+		with patch.object(deletion, "frappe") as facade, patch.object(deletion, "human_identity") as human:
+			human.return_value = SimpleNamespace(issuer="issuer", subject="subject")
+			facade.session.sid = "second-session"
+			with patch.object(deletion, "reject", side_effect=Forbidden), self.assertRaises(Forbidden):
+				deletion.record_reauthentication(
+					{"sid": "initiating-session", "subject": "subject", "started_at": 0},
+					{"iss": "issuer", "sub": "subject", "auth_time": int(deletion.time.time())},
+				)
+			facade.local.session_obj.update.assert_not_called()
+
 	def test_snapshot_reset_rejects_pending_writes(self):
 		with patch.object(identity, "frappe") as facade:
 			facade.db.transaction_writes = 1

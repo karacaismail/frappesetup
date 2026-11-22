@@ -87,3 +87,9 @@ Silme kaydı, Keycloak kimliği yerine gizli anahtarla üretilen bir özet tutar
 `press_anonymization_hmac_key` için sabit bir site sırrı kullanın.
 Bu ayar yoksa Press, Frappe'nin `encryption_key` değerini kullanır.
 Silme kayıtları durduğu sürece kullanılan anahtarı değiştirmeyin.
+
+Müşteri `/account-deletion` sayfasında hesap silme isteği verir.
+Press, Identity Sync'in iç adresini `identity_sync_url` ayarından okur.
+`press_service_client_secret` değerini site ayarındaki sır olarak saklayın.
+Keycloak'ta `press-service` istemcisine `aud-identity-sync` kapsamını verin.
+Press yalnız yeniden doğrulanan tarayıcı oturumundan silme isteği gönderir.

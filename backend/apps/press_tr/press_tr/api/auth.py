@@ -11,6 +11,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from werkzeug.exceptions import Conflict
 
+from press_tr.kimlik.deletion import ACCOUNT_DELETION_PAGE, record_reauthentication
 from press_tr.kimlik.identity import bind_identity, ensure_personal_team
 from press_tr.kimlik.oidc import callback_url, claim, client_id, issuer, reject, server_endpoint, verify
 
@@ -30,6 +31,10 @@ def state_key(state: str, browser_digest: str) -> bytes:
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=10, seconds=60)
 def get_login_url() -> dict[str, str]:
+	return start_login()
+
+
+def start_login(reauthentication: dict | None = None) -> dict[str, str]:
 	state, nonce, verifier, browser = (secrets.token_urlsafe(32) for _ in range(4))
 	browser_digest = hashlib.sha256(browser.encode("ascii")).hexdigest()
 	challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
@@ -42,6 +47,8 @@ def get_login_url() -> dict[str, str]:
 		"verifier": verifier,
 		"return_path": "/dashboard",
 	}
+	if reauthentication:
+		login["reauthentication"] = reauthentication
 	frappe.cache.setex(state_key(state, browser_digest), STATE_TTL, json.dumps(login))
 	frappe.local.cookie_manager.set_cookie(
 		state_cookie(),
@@ -51,19 +58,19 @@ def get_login_url() -> dict[str, str]:
 		samesite="Lax",
 		max_age=STATE_TTL,
 	)
-	query = urlencode(
-		{
-			"client_id": client_id(),
-			"redirect_uri": redirect_uri,
-			"response_type": "code",
-			"scope": "openid email profile",
-			"state": state,
-			"nonce": nonce,
-			"code_challenge": challenge,
-			"code_challenge_method": "S256",
-		}
-	)
-	return {"url": f"{authorization_url}?{query}"}
+	parameters = {
+		"client_id": client_id(),
+		"redirect_uri": redirect_uri,
+		"response_type": "code",
+		"scope": "openid email profile",
+		"state": state,
+		"nonce": nonce,
+		"code_challenge": challenge,
+		"code_challenge_method": "S256",
+	}
+	if reauthentication:
+		parameters.update(prompt="login", max_age=0)
+	return {"url": f"{authorization_url}?{urlencode(parameters)}"}
 
 
 def consume_login(state: str | None):
@@ -141,6 +148,10 @@ def keycloak_callback(state: str | None = None, code: str | None = None) -> None
 
 	token = exchange_code(code, login["verifier"])
 	claims = verify(verify_id_token, token, client_id=client_id(), nonce=login["nonce"])
+	if reauthentication := login.get("reauthentication"):
+		record_reauthentication(reauthentication, claims)
+		frappe.local.response.update(type="redirect", location=ACCOUNT_DELETION_PAGE)
+		return
 	keycloak_sid = claim(claims, "sid")
 	try:
 		link = bind_identity(claims)

@@ -41,10 +41,22 @@ assert frappe.db.get_value("User", email, "user_type") == "System User"
 frappe.db.commit()
 PY
 
+fixture_state="$(mktemp /dev/shm/press-deletion-fixture.XXXXXX)"
+fixture_script=/home/frappe/benches/source/press_tr/tests/deletion_fixture.py
+test_server=
+cleanup() {
+    if [ -n "$test_server" ]; then
+        kill "$test_server" 2>/dev/null || true
+        wait "$test_server" 2>/dev/null || true
+    fi
+    "$bench_root/env/bin/python" "$fixture_script" restore "$fixture_state"
+}
+trap cleanup EXIT
+"$bench_root/env/bin/python" "$fixture_script" setup "$fixture_state"
+
 "$bench_root/env/bin/python" -m frappe.utils.bench_helper frappe serve \
     --port "$PRESS_TEST_PORT" --noreload > "$bench_root/logs/press-tr-tests.log" 2>&1 &
 test_server=$!
-trap 'kill "$test_server" 2>/dev/null || true; wait "$test_server" 2>/dev/null || true' EXIT
 ready=
 for _ in {1..40}; do
     if curl -fs -H 'Host: press.localhost' \
