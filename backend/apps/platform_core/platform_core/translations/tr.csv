@@ -370,3 +370,4 @@ Revokes one owned installation and requests closure of its Keycloak session when
 Revokes one owned installation without signing out the current browser.,Hesabın bir kurulumunu iptal eder. Tarayıcı oturumu açık kalır.,Mobile sync API
 Keycloak user ID,Keycloak kullanıcı kimliği,Mobile Installation
 The Keycloak user identifier bound to this session.,Bu oturuma bağlı Keycloak kullanıcı kimliği.,Mobile Installation
+You are not permitted to call this method.,Bu yöntemi çağırma izniniz yok.,shell.request
