@@ -7,10 +7,10 @@ from frappe import _
 from frappe.model.docstatus import DocStatus
 from pydantic import StringConstraints
 
-from cronhr.access import DOCTYPE
+from hrms_tr.access import DOCTYPE
 
-HR_ROLE = "CronHR HR"
-APPROVER_ROLES = ("CronHR Manager", HR_ROLE)
+HR_ROLE = "HRMS TR Admin"
+APPROVER_ROLES = ("HRMS TR Manager", HR_ROLE)
 
 LeaveName = Annotated[str, StringConstraints(min_length=1, max_length=140)]
 
@@ -27,7 +27,7 @@ def check_not_own_leave(doc):
 
 def check_hr_role():
 	if frappe.session.user != "Administrator" and HR_ROLE not in frappe.get_roles():
-		frappe.throw(_("Only CronHR HR can cancel or amend leave applications."), frappe.PermissionError)
+		frappe.throw(_("Only HRMS TR Admin can cancel or amend leave applications."), frappe.PermissionError)
 
 
 def validate_cancellation(doc, method=None):

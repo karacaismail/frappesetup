@@ -1,4 +1,4 @@
-"""Seed one isolated CronHR test site with synthetic employees and requests."""
+"""Seed one isolated HRMS TR test site with synthetic employees and requests."""
 
 import argparse
 import json
@@ -9,18 +9,18 @@ from pathlib import Path
 import frappe
 from frappe.utils import add_days, today
 
-COMPANY = "CronHR Synthetic"
-LEAVE_TYPE = "CronHR Synthetic Unpaid"
-ALLOCATED_LEAVE_TYPE = "CronHR Synthetic Annual"
+COMPANY = "HRMS TR Synthetic"
+LEAVE_TYPE = "HRMS TR Synthetic Unpaid"
+ALLOCATED_LEAVE_TYPE = "HRMS TR Synthetic Annual"
 USERS = {
-    actor: f"cronhr-{actor}@example.test"
+    actor: f"hrms-tr-{actor}@example.test"
     for actor in ("employee", "manager", "outsider", "hr")
 }
 ROLES = {
     "employee": "Employee",
     "manager": "Manager",
     "outsider": "Employee",
-    "hr": "HR",
+    "hr": "Admin",
 }
 
 
@@ -78,15 +78,15 @@ def seed(password):
         insert(
             "User",
             email=username,
-            first_name=f"CronHR {actor}",
+            first_name=f"HRMS TR {actor}",
             send_welcome_email=0,
             new_password=password,
             user_type="Website User",
-            role_profiles=[{"role_profile": f"CronHR {ROLES[actor]}"}],
+            role_profiles=[{"role_profile": f"HRMS TR {ROLES[actor]}"}],
         )
         employees[actor] = insert(
             "Employee",
-            first_name=f"CronHR {actor}",
+            first_name=f"HRMS TR {actor}",
             company=company.name,
             status="Active",
             gender="Other",
@@ -154,7 +154,7 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch(r"test-[a-z0-9-]+\.localhost", args.site):
         parser.error("Use a dedicated test-*.localhost site.")
-    password = os.environ["CRONHR_TEST_PASSWORD"]
+    password = os.environ["HRMS_TR_TEST_PASSWORD"]
     manifest = args.manifest.resolve()
     os.chdir("sites")
     frappe.init(site=args.site, sites_path=".")

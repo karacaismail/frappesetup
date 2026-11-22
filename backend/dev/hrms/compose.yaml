@@ -11,14 +11,14 @@ services:
     image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
 
   web:
-    image: fs-ilk-dikey-dilim:cronhr
+    image: fs-ilk-dikey-dilim:hrms_tr
     command: ["bench", "serve", "--port", "${KIRACI_WEB_PORT:?Use ./compose}", "--noreload"]
     environment:
       KIRACI_WEB_PORT: ${KIRACI_WEB_PORT:?Use ./compose}
       KIRACI_SOCKET_PORT: ${KIRACI_SOCKET_PORT:?Use ./compose}
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Create .env}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Create .env}
-      CRONHR_TEST_PASSWORD: ${CRONHR_TEST_PASSWORD:?Create .env}
+      HRMS_TR_TEST_PASSWORD: ${HRMS_TR_TEST_PASSWORD:?Create .env}
     volumes:
       - sites:/home/frappe/frappe-bench/sites
 

@@ -1,22 +1,22 @@
 [
   {
     "doctype": "Role",
-    "name": "CronHR Employee",
-    "role_name": "CronHR Employee",
+    "name": "HRMS TR Employee",
+    "role_name": "HRMS TR Employee",
     "desk_access": 0,
     "is_custom": 1
   },
   {
     "doctype": "Role",
-    "name": "CronHR Manager",
-    "role_name": "CronHR Manager",
+    "name": "HRMS TR Manager",
+    "role_name": "HRMS TR Manager",
     "desk_access": 0,
     "is_custom": 1
   },
   {
     "doctype": "Role",
-    "name": "CronHR HR",
-    "role_name": "CronHR HR",
+    "name": "HRMS TR Admin",
+    "role_name": "HRMS TR Admin",
     "desk_access": 0,
     "is_custom": 1
   }

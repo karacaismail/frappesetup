@@ -3,8 +3,8 @@
 from frappe import _
 from pydantic import BaseModel, ConfigDict, Field
 
-from cronhr import leave
-from cronhr.leave import LeaveName
+from hrms_tr import leave
+from hrms_tr.leave import LeaveName
 
 
 class ApprovalArguments(BaseModel):
@@ -19,12 +19,12 @@ def declarations() -> list[dict]:
 		{
 			"name": "approve_leave",
 			"description": "Propose approving and submitting an open leave application.",
-			"arguments": "cronhr.ai_tools.ApprovalArguments",
+			"arguments": "hrms_tr.ai_tools.ApprovalArguments",
 			"kind": "write",
 			"destructive": True,
 			"roles": list(leave.APPROVER_ROLES),
-			"handler": "cronhr.ai_tools.execute_approval",
-			"preview": "cronhr.ai_tools.preview_approval",
+			"handler": "hrms_tr.ai_tools.execute_approval",
+			"preview": "hrms_tr.ai_tools.preview_approval",
 		}
 	]
 

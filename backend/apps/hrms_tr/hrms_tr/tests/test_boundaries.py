@@ -1,4 +1,4 @@
-"""CronHR depends on public Frappe APIs and provider contracts."""
+"""HRMS TR depends on public Frappe APIs and provider contracts."""
 
 import ast
 import unittest

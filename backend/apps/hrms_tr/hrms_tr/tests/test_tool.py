@@ -1,10 +1,10 @@
-"""CronHR's app declaration exposes the approval only as a write tool."""
+"""HRMS TR's app declaration exposes the approval only as a write tool."""
 
 import unittest
 
 from pydantic import ValidationError
 
-from cronhr import ai_tools
+from hrms_tr import ai_tools
 
 
 class ApprovalToolTest(unittest.TestCase):
@@ -12,7 +12,7 @@ class ApprovalToolTest(unittest.TestCase):
 		(tool,) = ai_tools.declarations()
 		self.assertEqual(tool["name"], "approve_leave")
 		self.assertEqual(tool["kind"], "write")
-		self.assertEqual(tool["roles"], ["CronHR Manager", "CronHR HR"])
+		self.assertEqual(tool["roles"], ["HRMS TR Manager", "HRMS TR Admin"])
 		self.assertNotEqual(tool["preview"], tool["handler"])
 
 	def test_confirmation_cannot_be_passed_as_an_argument(self):

@@ -24,14 +24,14 @@ def engine_available():
 
 
 def rules_active():
-	active = getattr(frappe.local, "cronhr_access_rules_active", None)
+	active = getattr(frappe.local, "hrms_tr_access_rules_active", None)
 	if active is None:
 		active = (
 			engine_available()
 			and bool(frappe.db.exists("DocType", RULE_DOCTYPE))
 			and bool(frappe.db.exists(RULE_DOCTYPE, {"document_type": DOCTYPE, "is_active": 1}))
 		)
-		frappe.local.cronhr_access_rules_active = active
+		frappe.local.hrms_tr_access_rules_active = active
 	return active
 
 

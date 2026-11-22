@@ -14,7 +14,7 @@ Bu iş yol haritasındaki ilk dikey dilimin backend'ini hazırlar. Dilim “İzi
 - `backend/apps/hrms_tr/`
 - `backend/dev/hrms/`
 - `backend/contracts/hrms_tr.openapi.yaml`
-- `backend/docs/kararlar/0008-ilk-dikey-dilim.md`
+- `backend/docs/kararlar/0008-hrms-tr-first-vertical-slice.md`
 
 ## Kararlar
 

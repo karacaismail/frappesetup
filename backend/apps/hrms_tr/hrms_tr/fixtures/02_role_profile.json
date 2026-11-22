@@ -1,0 +1,38 @@
+[
+  {
+    "doctype": "Role Profile",
+    "name": "HRMS TR Employee",
+    "role_profile": "HRMS TR Employee",
+    "roles": [
+      {
+        "role": "HRMS TR Employee"
+      }
+    ]
+  },
+  {
+    "doctype": "Role Profile",
+    "name": "HRMS TR Manager",
+    "role_profile": "HRMS TR Manager",
+    "roles": [
+      {
+        "role": "HRMS TR Manager"
+      },
+      {
+        "role": "HRMS TR Employee"
+      }
+    ]
+  },
+  {
+    "doctype": "Role Profile",
+    "name": "HRMS TR Admin",
+    "role_profile": "HRMS TR Admin",
+    "roles": [
+      {
+        "role": "HRMS TR Admin"
+      },
+      {
+        "role": "HRMS TR Employee"
+      }
+    ]
+  }
+]

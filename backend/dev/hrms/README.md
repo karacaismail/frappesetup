@@ -1,4 +1,4 @@
-# CronHR geliştirme ortamı
+# HRMS TR geliştirme ortamı
 
 Bu komutlar depoda, ayrı bir test sitesi kurar.
 Platform Core, “Access Rule” kayıt türünü sağlamalıdır.
@@ -14,7 +14,7 @@ Yapay zekâ testi için Platform Core yapay zekâ uçlarını da sağlamalıdır
 
    ```sh
    docker --context colima-factory build -t fs-kiraci-dev:v16.55.0 -f backend/dev/Dockerfile.kiraci backend
-   docker --context colima-factory build -t fs-ilk-dikey-dilim:cronhr -f backend/dev/hrms/Dockerfile backend
+   docker --context colima-factory build -t fs-ilk-dikey-dilim:hrms_tr -f backend/dev/hrms/Dockerfile backend
    ```
 
 3. `.env.example` dosyasını aynı klasöre `.env` adıyla kopyalayın.
@@ -24,7 +24,7 @@ Yapay zekâ testi için Platform Core yapay zekâ uçlarını da sağlamalıdır
    ```sh
    backend/dev/hrms/compose up -d kiraci-db kiraci-redis
    backend/dev/hrms/compose run --rm web env/bin/python /workspace/dev/bootstrap.py \
-     test-cronhr.localhost --app hrms --app platform_core --app cronhr
+     test-hrms-tr.localhost --app hrms --app platform_core --app hrms_tr
    backend/dev/hrms/compose up -d web
    ```
 
@@ -32,10 +32,10 @@ Yapay zekâ testi için Platform Core yapay zekâ uçlarını da sağlamalıdır
 
    ```sh
    backend/dev/hrms/compose exec -T web env/bin/python /workspace/hrms/seed.py \
-     --site test-cronhr.localhost --manifest /tmp/cronhr-manifest.json
+     --site test-hrms-tr.localhost --manifest /tmp/hrms_tr-manifest.json
    backend/dev/hrms/compose exec -T web sh -c \
      'env/bin/python /workspace/hrms/test_http.py --url "http://127.0.0.1:$KIRACI_WEB_PORT" \
-      --site test-cronhr.localhost --manifest /tmp/cronhr-manifest.json --with-ai'
+      --site test-hrms-tr.localhost --manifest /tmp/hrms_tr-manifest.json --with-ai'
    ```
 
    Yapay zekâ katmanı eksikse `--with-ai` seçeneğini çıkarın.

@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: CronHR izin talebi
+  title: HRMS TR izin talebi
   version: 0.1.0
 servers:
   - url: /api
@@ -22,7 +22,7 @@ paths:
       responses:
         "200": {description: Talep. İzin seviyesi 2 yoksa leave_balance alanı kapalıdır.}
         "403": {description: Kullanıcının okuma izni yok.}
-  /method/cronhr.api.approve_leave:
+  /method/hrms_tr.api.approve_leave:
     post:
       summary: Açık izin talebini onaylar ve gönderir.
       description: Yönetici bağlı ekipteki talebi onaylar. İK sitedeki talepleri onaylar.
@@ -45,7 +45,7 @@ paths:
         "404": {description: Talep bulunamadı.}
         "417": {description: Talep açık bir taslak değil veya HRMS doğrulaması başarısız.}
 x-ai-tool:
-  name: cronhr_approve_leave
+  name: hrms_tr_approve_leave
   destructive: true
   arguments:
     type: object

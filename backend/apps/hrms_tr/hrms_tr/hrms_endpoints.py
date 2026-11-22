@@ -1,4 +1,4 @@
-"""Close legacy HRMS RPC routes that do not enforce CronHR leave access."""
+"""Close legacy HRMS RPC routes that do not enforce HRMS TR leave access."""
 
 import frappe
 from frappe import _

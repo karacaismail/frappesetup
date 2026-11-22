@@ -6,8 +6,8 @@ RUN git clone --depth 1 --branch v16.54.1 https://github.com/frappe/hrms.git app
     && uv pip install --python env/bin/python -e apps/hrms \
     && printf '\nhrms\n' >> sites/apps.txt
 
-FROM hrms AS cronhr
-COPY --chown=frappe:frappe apps/cronhr apps/cronhr
+FROM hrms AS hrms_tr
+COPY --chown=frappe:frappe apps/hrms_tr apps/hrms_tr
 COPY --chown=frappe:frappe dev/hrms/seed.py dev/hrms/test_http.py /workspace/hrms/
-RUN uv pip install --python env/bin/python --no-deps -e apps/cronhr \
-    && printf '\ncronhr\n' >> sites/apps.txt
+RUN uv pip install --python env/bin/python --no-deps -e apps/hrms_tr \
+    && printf '\nhrms_tr\n' >> sites/apps.txt

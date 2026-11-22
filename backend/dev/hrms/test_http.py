@@ -1,4 +1,4 @@
-"""Run CronHR checks against a seeded, isolated Frappe HTTP server."""
+"""Run HRMS TR checks against a seeded, isolated Frappe HTTP server."""
 
 import argparse
 import json
@@ -92,7 +92,7 @@ class LeaveHttpTest(unittest.TestCase):
             if self.data["leave_owners"][key] in actors
         }
 
-    def test_cronhr_roles_do_not_grant_desk_access(self):
+    def test_hrms_tr_roles_do_not_grant_desk_access(self):
         for actor in ("employee", "manager", "hr"):
             with self.subTest(actor=actor):
                 client = self.login(actor)
@@ -116,7 +116,7 @@ class LeaveHttpTest(unittest.TestCase):
         self.document(client, "outsider", 403)
         self.assertEqual(
             client.send(
-                "/api/method/cronhr.api.approve_leave",
+                "/api/method/hrms_tr.api.approve_leave",
                 {"name": self.data["leaves"]["employee"]},
             )[0],
             403,
@@ -169,7 +169,7 @@ class LeaveHttpTest(unittest.TestCase):
         )
         self.assertEqual(self.document(client, "employee")["leave_balance"], 7)
         self.document(client, "outsider", 403)
-        endpoint = "/api/method/cronhr.api.approve_leave"
+        endpoint = "/api/method/hrms_tr.api.approve_leave"
         self.assertEqual(
             client.send(endpoint, {"name": self.data["leaves"]["outsider"]})[0], 403
         )
@@ -253,7 +253,7 @@ class LeaveHttpTest(unittest.TestCase):
     def test_hr_manages_approval_cancellation_and_amendment(self):
         hr = self.login("hr")
         manager = self.login("manager")
-        approve = "/api/method/cronhr.api.approve_leave"
+        approve = "/api/method/hrms_tr.api.approve_leave"
         name = self.data["leaves"]["hr_approve"]
         approved = hr.send(approve, {"name": name})
         self.assertEqual(approved[0], 200, approved[1].get("exception"))
@@ -305,7 +305,7 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertEqual(status, 200, payload.get("exception"))
         names = [row["name"] for row in payload["data"]]
         self.assertEqual(len(names), 3)
-        self.assertTrue(all(name.startswith("CronHR ") for name in names))
+        self.assertTrue(all(name.startswith("HRMS TR ") for name in names))
         changed = []
         self.assertTrue(self.listed(client))
         try:
@@ -358,7 +358,7 @@ class LeaveHttpTest(unittest.TestCase):
                 "id": 1,
                 "method": "tools/call",
                 "params": {
-                    "name": "cronhr_approve_leave",
+                    "name": "hrms_tr_approve_leave",
                     "arguments": {"name": name, "version": version},
                 },
             },
@@ -471,6 +471,6 @@ if __name__ == "__main__":
     LeaveHttpTest.base = args.url.rstrip("/")
     LeaveHttpTest.site = args.site
     LeaveHttpTest.data = json.loads(args.manifest.read_text())
-    LeaveHttpTest.password = os.environ["CRONHR_TEST_PASSWORD"]
+    LeaveHttpTest.password = os.environ["HRMS_TR_TEST_PASSWORD"]
     LeaveHttpTest.with_ai = args.with_ai
     unittest.main(argv=[__file__], verbosity=2)

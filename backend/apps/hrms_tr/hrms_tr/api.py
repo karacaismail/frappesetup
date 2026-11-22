@@ -2,8 +2,8 @@
 
 import frappe
 
-from cronhr import leave
-from cronhr.leave import LeaveName
+from hrms_tr import leave
+from hrms_tr.leave import LeaveName
 
 
 @frappe.whitelist(methods=["POST"])
