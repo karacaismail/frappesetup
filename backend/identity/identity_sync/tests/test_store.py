@@ -203,6 +203,29 @@ class StoreTest(unittest.TestCase):
         store.operation_begin("onay-1", "invite_user", "o-1", ["a"])
         self.assertNotIn("@", repr(store.operations()))
 
+    def test_progress_of_an_ordered_plan_survives_a_restart(self) -> None:
+        store = self.open()
+        store.begin(EVENT)
+        self.assertEqual(store.progress(EVENT.id), (0, ""))
+        store.set_progress(EVENT.id, 3, "d" * 64)
+        store.add_dead_letter(EVENT, "x")  # a failure must not reset the progress
+        store.close()
+
+        self.assertEqual(self.open().progress(EVENT.id), (3, "d" * 64))
+        self.assertEqual(self.open().progress("yok"), (0, ""))
+
+    def test_approval_and_operation_are_recorded_together(self) -> None:
+        # A crash between "approval used" and "operation recorded" would lose the request.
+        store = self.open()
+        claimed = store.claim_approval("onay-1", "a" * 64, "invite_user", journal=("o-1", ["s1", "s2"]))
+
+        self.assertTrue(claimed)
+        (operation,) = store.operations()
+        self.assertEqual((operation["operation_id"], [s["step"] for s in operation["steps"]]), ("onay-1", ["s1", "s2"]))
+        # A second claim changes nothing.
+        self.assertFalse(store.claim_approval("onay-1", "a" * 64, "invite_user", journal=("o-1", ["s1"])))
+        self.assertEqual(len(store.operations()), 1)
+
     def test_old_database_file_gets_the_state_column(self) -> None:
         import sqlite3
 
@@ -218,8 +241,10 @@ class StoreTest(unittest.TestCase):
         old.commit()
         old.close()
 
-        (letter,) = self.open().dead_letters()
+        store = self.open()
+        (letter,) = store.dead_letters()
         self.assertEqual((letter.error, letter.state), ("eski", "failed"))
+        self.assertEqual(store.progress("e-1"), (0, ""))
 
     def test_remove_dead_letter(self) -> None:
         store = self.open()

@@ -301,14 +301,16 @@ class AmbiguousReadTest(PipelineCase):
 
 class FanOutTest(unittest.TestCase):
     def setUp(self) -> None:
+        # A user that Keycloak disabled. Closing it on each target is independent work,
+        # unlike the ordered deletion flow.
         self.stack = Stack(two_tenants=True)
         self.addCleanup(self.stack.close)
-        self.stack.keycloak.remove_user(SUBJECT)
+        self.stack.keycloak.add_user(keycloak_user(enabled=False), [])
 
     def test_failing_press_does_not_stop_tenant_disable(self) -> None:
         self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, (503, None))
 
-        result = self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+        result = self.stack.app.processor.handle(event("USER_UPDATE", "admin"))
 
         self.assertEqual(result.status, "dead_lettered")
         self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_SET_ENABLED)), 1)
@@ -318,7 +320,7 @@ class FanOutTest(unittest.TestCase):
         self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, (403, None))
         self.stack.tenant.on("POST", fakes.TENANT_SET_ENABLED, (404, None))
 
-        self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+        self.stack.app.processor.handle(event("USER_UPDATE", "admin"))
 
         (letter,) = self.stack.app.store.dead_letters()
         self.assertIn("press.remove_team_member press: HTTP 403; tenant.set_enabled kiraci1: HTTP 404", letter.error)
@@ -514,38 +516,112 @@ class AccountDeletionTest(PipelineCase):
         self.assertNotIn(SUBJECT, dump)
         self.assertIsInstance(self.stack.app.store._db, sqlite3.Connection)
 
-    def test_failed_step_keeps_the_keycloak_user_and_queues_the_request(self) -> None:
-        # Anonymizing fails on the tenant. The Keycloak user must not be deleted yet.
-        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+    STEP_PATHS = (
+        ("press", fakes.PRESS_REMOVE_MEMBER, []),
+        ("tenant", fakes.TENANT_SET_ENABLED, ["keycloak.disable_user", "press.remove_team_member"]),
+        (
+            "tenant",
+            fakes.TENANT_REVOKE_INSTALLATIONS,
+            ["keycloak.disable_user", "press.remove_team_member", "tenant.set_enabled"],
+        ),
+        (
+            "press",
+            fakes.PRESS_ANONYMIZE,
+            ["keycloak.disable_user", "press.remove_team_member", "tenant.set_enabled", "tenant.revoke_user_installations"],
+        ),
+    )
 
-        result = self.stack.app.processor.handle(self.request())
+    def test_flow_stops_at_the_first_failed_step(self) -> None:
+        # docs/sozlesmeler.md, section 7: the steps run in order. A later step never runs before
+        # an earlier one is done. For example nothing is anonymized while installations remain.
+        for index, (site, path, _done) in enumerate(self.STEP_PATHS):
+            with self.subTest(path=path):
+                stack = Stack()
+                self.addCleanup(stack.close)
+                stack.keycloak.add_user(keycloak_user(), [self.org])
+                stack.press.seed_member(stack.issuer, SUBJECT, "ayse@example.test", ORG_ID)
+                stack.tenant.seed_user(stack.issuer, SUBJECT, "ayse@example.test")
+                getattr(stack, site).on("POST", path, (503, None))
 
-        self.assertEqual(result.status, "dead_lettered")
-        self.assertIn(SUBJECT, self.stack.keycloak.users)
-        self.assertEqual(self.stack.keycloak.calls("DELETE", f"{self.stack.keycloak.admin}/users/{SUBJECT}"), [])
-        (letter,) = self.stack.app.store.dead_letters()
-        self.assertIn("tenant.anonymize_user kiraci1: HTTP 503", letter.error)
-        self.assertIn("keycloak.delete_user keycloak: skipped", letter.error)
-        # The steps before the failed one still ran.
-        self.assertFalse(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["enabled"])
+                result = stack.app.processor.handle(self.request(f"onay-f{index}"))
 
-    def test_replay_finishes_a_failed_deletion(self) -> None:
-        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
-        self.stack.app.processor.handle(self.request())
-        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, fakes.DONE)
+                self.assertEqual(result.status, "dead_lettered")
+                later = [later_path for _site, later_path, _d in self.STEP_PATHS[index + 1 :]]
+                later += [fakes.TENANT_ANONYMIZE]
+                called = [r.path for r in stack.press.writes() + stack.tenant.writes()]
+                for later_path in later:
+                    self.assertNotIn(later_path, called)
+                self.assertIn(SUBJECT, stack.keycloak.users)
+                self.assertEqual(stack.keycloak.calls("DELETE", f"{stack.keycloak.admin}/users/{SUBJECT}"), [])
 
-        results = self.stack.app.processor.replay_dead_letters()
-
-        self.assertEqual([r.status for _i, r in results], ["processed"])
-        self.assertNotIn(SUBJECT, self.stack.keycloak.users)
-        self.assertTrue(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["anonymized"])
-
-    def test_unknown_outcome_also_keeps_the_keycloak_user(self) -> None:
+    def test_unknown_outcome_stops_the_flow_too(self) -> None:
         self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, (202, {"message": {"status": "queued"}}))
 
         result = self.stack.app.processor.handle(self.request())
 
         self.assertEqual(result.status, "unknown")
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+        self.assertEqual(self.stack.tenant.calls("POST", fakes.TENANT_ANONYMIZE), [])
+
+    def test_retry_continues_from_the_step_that_failed(self) -> None:
+        # The last step failed. A retry must not revoke installations or anonymize again.
+        keycloak = self.stack.keycloak
+        keycloak.on("DELETE", f"{keycloak.admin}/users/{SUBJECT}", (500, None))
+        self.assertEqual(self.stack.app.processor.handle(self.request()).status, "dead_lettered")
+        before = len(self.stack.press.writes() + self.stack.tenant.writes())
+        keycloak.on("DELETE", f"{keycloak.admin}/users/{SUBJECT}", lambda _r: keycloak._delete_user(SUBJECT))
+
+        results = self.stack.app.processor.replay_dead_letters()
+
+        self.assertEqual([(r.status, r.actions) for _i, r in results], [("processed", ("keycloak.delete_user",))])
+        self.assertEqual(len(self.stack.press.writes() + self.stack.tenant.writes()), before)
+        self.assertNotIn(SUBJECT, keycloak.users)
+
+    def test_retry_preview_shows_only_the_remaining_steps(self) -> None:
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+        self.stack.app.processor.handle(self.request())
+
+        ((_id, preview),) = self.stack.app.processor.replay_dead_letters(dry_run=True)
+
+        self.assertEqual([p.operation for p in preview.previews], ["tenant.anonymize_user", "keycloak.delete_user"])
+
+    def test_same_request_sent_again_resumes_instead_of_starting_over(self) -> None:
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+        self.stack.app.processor.handle(self.request())
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, fakes.DONE)
+        revokes = len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS))
+
+        again = self.stack.app.processor.handle(self.request())
+
+        self.assertEqual((again.status, again.actions), ("processed", ("tenant.anonymize_user", "keycloak.delete_user")))
+        self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS)), revokes)
+        self.assertEqual(self.stack.app.processor.handle(self.request()).status, "duplicate")
+
+    def test_lock_conflict_on_anonymize_is_retried(self) -> None:
+        # docs/sozlesmeler.md, section 6: 409 means a lock conflict or timeout. The service retries.
+        replies = iter([(409, None), (409, None)])
+
+        def anonymize(_req: fakes.Recorded) -> fakes.Reply:
+            return next(replies, fakes.DONE)
+
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, anonymize)
+
+        result = self.stack.app.processor.handle(self.request())
+
+        self.assertEqual(result.status, "processed")
+        self.assertEqual(len(self.stack.press.calls("POST", fakes.PRESS_ANONYMIZE)), 3)
+
+    def test_anonymize_reply_must_follow_the_contract(self) -> None:
+        # The old proposed body had no `found` field. It is no longer a success.
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, (200, {"message": {"anonymized": True}}))
+
+        self.assertEqual(self.stack.app.processor.handle(self.request()).status, "unknown")
+
+    def test_user_that_was_found_but_not_anonymized_is_not_done(self) -> None:
+        reply = {"message": {"anonymized": False, "found": True}}
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, (200, reply))
+
+        self.assertEqual(self.stack.app.processor.handle(self.request()).status, "unknown")
         self.assertIn(SUBJECT, self.stack.keycloak.users)
 
     def test_flow_is_repeatable_when_everything_is_already_gone(self) -> None:
@@ -556,6 +632,7 @@ class AccountDeletionTest(PipelineCase):
         self.assertEqual(again.status, "processed")
 
     def test_user_unknown_to_the_targets_is_not_an_error(self) -> None:
+        # Press answers found false. The tenant answers 404 IdentityNotFound. Both mean nothing to do.
         stack = Stack()
         self.addCleanup(stack.close)
         stack.keycloak.add_user(keycloak_user(), [])
@@ -565,16 +642,35 @@ class AccountDeletionTest(PipelineCase):
         self.assertEqual(result.status, "processed")
         self.assertNotIn(SUBJECT, stack.keycloak.users)
 
-    def test_keycloak_delete_account_event_starts_the_same_flow(self) -> None:
-        # Keycloak already deleted the user. Steps 1 and 5 have nothing to do.
-        self.stack.keycloak.remove_user(SUBJECT)
+    def test_admin_delete_event_runs_steps_two_to_four(self) -> None:
+        # An administrator deleted the user in Keycloak. The event still closes and anonymizes
+        # the user on Press and on the tenant. There is no Keycloak write.
+        keycloak = self.stack.keycloak
+        keycloak.remove_user(SUBJECT)
 
-        result = self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+        result = self.stack.app.processor.handle(event("USER_DELETE", "admin"))
 
         self.assertEqual(result.status, "processed")
-        self.assertIn("tenant.anonymize_user", result.actions)
+        self.assertEqual(
+            result.actions,
+            (
+                "press.remove_team_member",
+                "tenant.set_enabled",
+                "tenant.revoke_user_installations",
+                "press.anonymize_user",
+                "tenant.anonymize_user",
+            ),
+        )
         self.assertTrue(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["anonymized"])
         self.assertFalse(self.stack.press.user_of(self.stack.issuer, SUBJECT)["enabled"])
+        self.assertEqual([r for r in keycloak.requests if r.method != "GET" and "/admin/" in r.path], [])
+
+    def test_delete_event_while_the_user_still_exists_anonymizes_nothing(self) -> None:
+        result = self.stack.app.processor.handle(event("USER_DELETE", "admin"))
+
+        self.assertEqual(result.status, "processed")
+        self.assertNotIn("tenant.anonymize_user", result.actions)
+        self.assertNotIn("anonymized", self.stack.tenant.user_of(self.stack.issuer, SUBJECT))
 
     def test_preview_writes_nothing(self) -> None:
         result = self.stack.app.processor.handle(self.request(), dry_run=True)

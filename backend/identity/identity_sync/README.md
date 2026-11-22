@@ -182,20 +182,33 @@ Servis ayarları ve sırları ortam değişkeninden okur. Örnek değerler `.env
 
 ## Hesap silme
 
-Kullanıcı kendi hesabının silinmesini isteyebilir (Proje kaydı O-27). Uç `POST /v1/account-deletions` adresidir. Akış beş adımdır ve sırası sabittir:
+Müşteri hesabının silinmesini Press'te ister (Proje kaydı O-27). Press o zaman `POST /v1/account-deletions` ucunu çağırır.
 
-1. Servis Keycloak kullanıcısını kapatır ve oturumlarını sonlandırır.
+- Ucu yalnız Press çağırabilir. İzinli istemci `IDENTITY_SYNC_DELETION_AZP` ayarındadır. Varsayılan değer `press-service` olur.
+- Gövde `issuer`, `subject` ve `reauthenticated_at` alanlarını taşır.
+- Press müşteriyi Keycloak'ta yeniden doğrular. `reauthenticated_at` bu girişin zamanıdır.
+- Servis 300 saniyeden eski girişi reddeder. Yanıt 403 ve `reauthentication_required` olur.
+- Bu uçta önizleme ve onay kimliği yoktur. Onay, hesap sahibinin yeni girişidir.
+
+Akış beş adımdır ve sırası sabittir:
+
+1. Servis Keycloak kullanıcısını kapatır. Bu adımda kullanıcıyı silmez.
 2. Servis Press'e `all_organizations: true` isteği gönderir. Press kullanıcıyı kapatır ve API anahtarlarını geçersiz yapar.
 3. Servis kullanıcıyı her kiracıda kapatır ve telefon kurulumlarını iptal ettirir.
 4. Servis kişiyi gösteren alanları Press'te ve her kiracıda anonim yaptırır. İş kayıtları silinmez.
 5. Servis Keycloak kullanıcısını siler.
 
 - Her adım tekrar edilebilir.
-- Bir adım başarısız olursa istek bekleme kuyruğuna girer. Servis o zaman 5. adımı atlar. Yani Keycloak kullanıcısını silmez.
-- İnsan isteği `replay-dead-letters` komutuyla yeniden işletir.
-- Bu iş geri alınamaz. Bu yüzden önizleme ve onay akışından geçer. Buradaki onay, hesabın sahibinin kendi onayıdır.
+- Adımlar birbirine bağlıdır. Bir adım başarısız olursa servis sonraki adımları yürütmez.
+- Başarısız istek bekleme kuyruğuna girer. Servis kaç adımın bittiğini saklar.
+- İnsan isteği `replay-dead-letters` komutuyla yeniden işletir. İş bitmemiş ilk adımdan sürer.
+- Press aynı isteği yeniden gönderirse iş yine bitmemiş ilk adımdan sürer.
+- İsteğin kimliği hesabın anahtarlı özetidir. Bu yüzden bir hesap her zaman tek istektir.
 - Servis e-postayı hiç saklamaz. İş bitince kayıtta yalnız isteğin kimliği kalır.
-- Keycloak'ın hesap silme olayı da aynı akışı başlatır.
+- Hedef `anonymize_user` ucu 409 dönerse servis isteği yeniden dener.
+- Keycloak'ın kendi `delete_account` eylemi kapalıdır. O eylem kullanıcıyı ilk adımda siler.
+
+Yönetici bir kullanıcıyı Keycloak yönetim ekranından silebilir. Olay dinleyici o zaman olayı gönderir. Servis 2., 3. ve 4. adımı yürütür.
 
 Keycloak'ta kapatılan kullanıcının telefon kurulumları da iptal edilir. Bu iş kapatma planının parçasıdır.
 
@@ -208,11 +221,14 @@ Keycloak olayları kimlik-realm işinin kurduğu eklentiden gelir. Eklenti olay�
 
 ## Oturum kapatma
 
-Kullanıcı bir telefon kurulumunu iptal edince kiracı sitesi `POST /v1/sessions/revoke` ucunu çağırır. Gövde oturumun `sid` değerini taşır.
+Kullanıcı bir telefon kurulumunu iptal edince kiracı sitesi `POST /v1/sessions/revoke` ucunu çağırır. Gövde `sid` ve `subject` alanlarını taşır.
 
-- Servis o oturumu Keycloak'ta siler. Yenileme belirteci de geçersiz olur.
+- Servis kiracıyı belirtecin `azp` değerinden bulur. Örneğin `site-kiraci1` istemcisi `kiraci1` kiracısıdır.
+- Kullanıcı o kiracının kuruluşuna üye değilse servis 403 döner.
+- Servis yalnız o kullanıcının oturum listesindeki oturumu siler. Yenileme belirteci de geçersiz olur.
 - Uç tekrar edilebilir. Oturum zaten kapalıysa servis yine 200 döner.
 - Ucu yalnız `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci çağırabilir. Bu liste kiracı sitelerinin servis istemcilerini taşır.
+- Yeni kiracı eklerken istemcisini bu listeye de yazın. Yazmazsanız o kiracı oturum kapatamaz.
 - Bu istemciler öteki uçları çağıramaz.
 
 ## Kimlik denetimi
@@ -261,6 +277,6 @@ Bu komutta hiçbir test atlanmamalıdır. Testler RSA anahtarını kendisi üret
 - Onay katmanının istemci adı ortak sözleşmede henüz yok.
 - Bu dalda Press'in ve kiracının sözleşme dosyaları yok. Testler o dosyalara göre yazılmış sahte hedefler kullanır. Gerçek bütünleşme testi `integration-e2e` işindedir.
 - Mutabakat Press'te ve kiracıda kullanıcı listesi veren uç ister. Bu uçlar o sözleşmelerde henüz yok.
-- Hesap silme ve kapatma üç hedef ucu çağırır: `revoke_user_installations` ve iki `anonymize_user` ucu. Ortak sözleşme bu uçların adını verir ama yanıt gövdesini tanımlamaz. Bu servis `Target` şemalarındaki gövdeyi bekler. Uçlar yazılana kadar bu adımlar başarısız olur.
+- Hesap silme ve kapatma üç hedef ucu çağırır: `revoke_user_installations` ve iki `anonymize_user` ucu. Bu uçlar öteki dallarda yazıldı. Bu dalda yalnız sahte hedeflerle denendi.
 - Eklenti canlı Keycloak üzerinde bu servisle denenmedi. Yalnız eklentinin imza kodu denendi.
 - `ensure_site_client` işlevi Keycloak'ta `manage-clients` rolünü ister. Ortak sözleşme servis hesabına bu rolü vermez.

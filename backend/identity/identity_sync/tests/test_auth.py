@@ -56,7 +56,9 @@ class FailClosedTest(unittest.TestCase):
         import dataclasses
 
         empty = frozenset()
-        settings = dataclasses.replace(self.stack.settings, execute_azp=empty, preview_azp=empty, session_azp=empty)
+        settings = dataclasses.replace(
+            self.stack.settings, execute_azp=empty, preview_azp=empty, session_azp=empty, deletion_azp=empty
+        )
 
         self.assertIs(build_verifier(settings), reject_all)
 
@@ -148,7 +150,7 @@ class RealVerificationTest(unittest.TestCase):
         self.assertEqual(self.status(self.token(iss="http://baska.example.test/realms/platform")), 401)
 
     def test_unlisted_client_is_rejected(self) -> None:
-        self.assertEqual(self.status(self.token(azp="press-service")), 401)
+        self.assertEqual(self.status(self.token(azp="stranger-service")), 401)
 
     def test_missing_azp_is_rejected(self) -> None:
         self.assertEqual(self.status(self.token(azp=None)), 401)

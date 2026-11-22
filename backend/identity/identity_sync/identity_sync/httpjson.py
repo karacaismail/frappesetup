@@ -35,10 +35,13 @@ class HttpError(Exception):
         super().__init__(f"HTTP {status} {code}" if code else f"HTTP {status}")
         self.status = status
         self.code = code
+        # A caller that knows the endpoint may mark another status as worth a retry,
+        # for example 409 for a lock conflict.
+        self.retryable = status >= 500 or status in (408, 429)
 
     @property
     def transient(self) -> bool:
-        return self.status >= 500 or self.status in (408, 429)
+        return self.retryable
 
 
 class UnknownOutcome(Exception):

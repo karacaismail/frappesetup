@@ -14,6 +14,7 @@ from identity_sync.mapping import Tenant
 
 PREFIX = "IDENTITY_SYNC_"
 DEFAULT_ADMIN_SCOPE = "admin-api kc-admin-api"
+DEFAULT_DELETION_AZP = "press-service"
 MIN_DIGEST_KEY_LENGTH = 16
 # The Keycloak event listener refuses a shorter secret too.
 MIN_WEBHOOK_SECRET_LENGTH = 16
@@ -55,6 +56,8 @@ class Settings:
     preview_azp: frozenset[str] = frozenset()
     # Service clients of platform_core sites. They may only call /v1/sessions/revoke.
     session_azp: frozenset[str] = frozenset()
+    # Clients that may request an account deletion. Only Press does (docs/sozlesmeler.md, section 7).
+    deletion_azp: frozenset[str] = frozenset()
 
     @property
     def staff_azp(self) -> frozenset[str]:
@@ -63,7 +66,7 @@ class Settings:
 
     @property
     def known_azp(self) -> frozenset[str]:
-        return self.execute_azp | self.preview_azp | self.session_azp
+        return self.execute_azp | self.preview_azp | self.session_azp | self.deletion_azp
 
     @property
     def issuer(self) -> str:
@@ -140,10 +143,13 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT or {PREFIX}LOCK_TIMEOUT is out of range")
     execute_azp, preview_azp = _names(get("EXECUTE_AZP")), _names(get("PREVIEW_AZP"))
     session_azp = _names(get("SESSION_AZP"))
-    if execute_azp & preview_azp or session_azp & (execute_azp | preview_azp):
+    deletion_azp = _names(get("DELETION_AZP", DEFAULT_DELETION_AZP))
+    lists = (execute_azp, preview_azp, session_azp, deletion_azp)
+    if sum(len(names) for names in lists) != len(frozenset().union(*lists)):
         # Each list grants a different right. A client in two lists would blur that line.
         raise ConfigError(
-            f"a client can be in only one of {PREFIX}EXECUTE_AZP, {PREFIX}PREVIEW_AZP and {PREFIX}SESSION_AZP"
+            f"a client can be in only one of {PREFIX}EXECUTE_AZP, {PREFIX}PREVIEW_AZP, "
+            f"{PREFIX}SESSION_AZP and {PREFIX}DELETION_AZP"
         )
     if len(get("WEBHOOK_SECRET")) < MIN_WEBHOOK_SECRET_LENGTH:
         raise ConfigError(f"{PREFIX}WEBHOOK_SECRET must be at least {MIN_WEBHOOK_SECRET_LENGTH} characters long")
@@ -170,5 +176,6 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         execute_azp=execute_azp,
         preview_azp=preview_azp,
         session_azp=session_azp,
+        deletion_azp=deletion_azp,
         lock_timeout=lock_timeout,
     )

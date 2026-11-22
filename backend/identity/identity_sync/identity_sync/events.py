@@ -21,8 +21,9 @@ ADMIN_TYPES = frozenset({"USER_CREATE", "USER_UPDATE", "USER_DELETE"}) | MEMBERS
 # `parse_event` accepts only the kinds `user` and `admin`.
 REQUEST_KIND = "request"
 ACCOUNT_DELETION = "ACCOUNT_DELETION"
-# Event types that start the account deletion flow (docs/sozlesmeler.md, section 7).
-DELETION_TYPES = frozenset({"DELETE_ACCOUNT", ACCOUNT_DELETION})
+# Events that say Keycloak no longer has the user. Keycloak's own delete_account action is
+# switched off, so in practice this is an administrator's delete (docs/sozlesmeler.md, section 7).
+USER_REMOVED_TYPES = frozenset({"USER_DELETE", "DELETE_ACCOUNT"})
 
 MAX_ID_LENGTH = 128
 # Kimlikler adres yoluna girer. Bu yüzden yalnız güvenli karakterler kabul edilir.

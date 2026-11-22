@@ -39,7 +39,9 @@ CREATE TABLE IF NOT EXISTS dead_letters (
     state TEXT NOT NULL DEFAULT 'failed',
     attempts INTEGER NOT NULL,
     first_failed_at REAL NOT NULL,
-    last_failed_at REAL NOT NULL
+    last_failed_at REAL NOT NULL,
+    done_steps INTEGER NOT NULL DEFAULT 0,
+    plan_digest TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS used_signatures (
     signature TEXT PRIMARY KEY,
@@ -120,9 +122,15 @@ class Store:
     def _migrate(self) -> None:
         """Eski sürümün kayıt dosyasına eksik sütunu ekler."""
         columns = {row[1] for row in self._db.execute("PRAGMA table_info(dead_letters)")}
-        if "state" not in columns:
-            with self._transaction():
-                self._db.execute("ALTER TABLE dead_letters ADD COLUMN state TEXT NOT NULL DEFAULT 'failed'")
+        missing = {
+            "state": "TEXT NOT NULL DEFAULT 'failed'",
+            "done_steps": "INTEGER NOT NULL DEFAULT 0",
+            "plan_digest": "TEXT NOT NULL DEFAULT ''",
+        }
+        for name, definition in missing.items():
+            if name not in columns:
+                with self._transaction():
+                    self._db.execute(f"ALTER TABLE dead_letters ADD COLUMN {name} {definition}")
 
     def close(self) -> None:
         self._db.close()
@@ -210,19 +218,57 @@ class Store:
                 (event_id,),
             )
 
-    def claim_approval(self, approval_id: str, preview_digest: str, operation: str) -> bool:
+    def progress(self, event_id: str) -> tuple[int, str]:
+        """How many steps of an ordered plan are done, and the digest of that plan."""
+        row = self._db.execute(
+            "SELECT done_steps, plan_digest FROM dead_letters WHERE event_id = ?", (event_id,)
+        ).fetchone()
+        return (row[0], row[1]) if row else (0, "")
+
+    def set_progress(self, event_id: str, done_steps: int, plan_digest: str) -> None:
+        """Record that the first `done_steps` steps of the plan are done. Written after each step."""
+        with self._transaction():
+            self._db.execute(
+                "UPDATE dead_letters SET done_steps = ?, plan_digest = ? WHERE event_id = ?",
+                (done_steps, plan_digest, event_id),
+            )
+
+    def claim_approval(
+        self,
+        approval_id: str,
+        preview_digest: str,
+        operation: str,
+        *,
+        journal: tuple[str, list[str]] | None = None,
+    ) -> bool:
         """Consume a human approval. Returns False when the approval was used before.
 
         An approval works once and belongs to the preview digest it was first used with.
         The claim is written before any external write starts.
+
+        `journal` is `(organization_id, steps)`. The operation journal is then opened in the
+        same transaction. A crash right after the claim cannot leave a spent approval with no
+        record of the work it was spent on.
         """
+        now = self._clock()
         with self._transaction():
             cursor = self._db.execute(
                 "INSERT OR IGNORE INTO used_approvals (approval_id, preview_digest, operation, used_at) "
                 "VALUES (?, ?, ?, ?)",
-                (approval_id, preview_digest, operation, self._clock()),
+                (approval_id, preview_digest, operation, now),
             )
-            return cursor.rowcount == 1
+            if cursor.rowcount != 1:
+                return False
+            if journal is not None:
+                organization_id, steps = journal
+                plan = json.dumps([{"step": step, "status": "pending"} for step in steps])
+                self._db.execute(
+                    "INSERT INTO operations "
+                    "(operation_id, operation, organization_id, steps, state, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, 'running', ?, ?)",
+                    (approval_id, operation, organization_id, plan, now, now),
+                )
+            return True
 
     # --- operation journal: multi-step writes that are not events (for example an invitation) ---
 

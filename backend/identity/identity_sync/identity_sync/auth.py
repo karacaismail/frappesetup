@@ -3,9 +3,15 @@
 Doğrulamayı ortak `oidc_verify` kitaplığı yapar (`docs/sozlesmeler.md`, 3. bölüm).
 Servis kendi doğrulama kodunu yazmaz. Kitaplık yoksa bütün istekler reddedilir.
 
-İstemci listesi iki parçadır. `preview_azp` yalnız okur ve önizler. `execute_azp` yürütür.
-Yürütme listesine yalnız insan onayını denetleyen güvenilir servisler girer.
-Bu ayrımı sunucu uygular. Doğrulayıcı iki listenin birleşimini kabul eder.
+There are four client lists. Each one grants a different right, and a client can be in only one:
+
+- `preview_azp` may read and preview.
+- `execute_azp` may also execute. Only trusted services that check the human approval go here.
+- `session_azp` may only call `/v1/sessions/revoke`. It holds the service clients of the
+  platform_core sites. A new tenant's client must be added here, or it cannot end a session.
+- `deletion_azp` may only call `/v1/account-deletions`. It holds the Press service client.
+
+The server enforces the split. The verifier accepts the union of the four lists.
 """
 
 from __future__ import annotations

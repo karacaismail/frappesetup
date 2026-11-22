@@ -155,6 +155,7 @@ class FakeKeycloak(FakeServer):
         self.memberships: dict[str, list[dict[str, object]]] = {}
         self.organizations: dict[str, dict[str, object]] = {}
         self.logged_out: list[str] = []
+        self.sessions: dict[str, list[str]] = {}
         self.on("POST", f"/realms/{ISSUER_REALM}/protocol/openid-connect/token", self._token)
         self.on("GET", f"/admin/realms/{ISSUER_REALM}/users/count", lambda _r: (200, len(self.users)))
 
@@ -184,11 +185,29 @@ class FakeKeycloak(FakeServer):
         self.on("PUT", f"{self.admin}/users/{subject}", lambda req: self._update_user(subject, req))
         self.on("POST", f"{self.admin}/users/{subject}/logout", lambda _r: self._logout(subject))
         self.on("DELETE", f"{self.admin}/users/{subject}", lambda _r: self._delete_user(subject))
+        self.on("GET", f"{self.admin}/users/{subject}/sessions", lambda _r: self._sessions(subject))
         self.on(
             "GET",
             f"{self.admin}/organizations/members/{subject}/organizations",
             lambda _r: (200, self.memberships.get(subject, [])),
         )
+
+    def add_session(self, subject: str, session_id: str) -> None:
+        """Give the user an active session. Keycloak lists it and can delete it."""
+        self.sessions.setdefault(subject, []).append(session_id)
+        self.on("DELETE", f"{self.admin}/sessions/{session_id}", lambda _r: self._delete_session(session_id))
+
+    def _sessions(self, subject: str) -> Reply:
+        if subject not in self.users:
+            return 404, {"error": "User not found"}
+        return 200, [{"id": session_id, "userId": subject} for session_id in self.sessions.get(subject, [])]
+
+    def _delete_session(self, session_id: str) -> Reply:
+        for sessions in self.sessions.values():
+            if session_id in sessions:
+                sessions.remove(session_id)
+                return 204, None
+        return 404, {"error": "Session not found"}
 
     def _update_user(self, subject: str, req: Recorded) -> Reply:
         if subject not in self.users:
@@ -343,8 +362,9 @@ class FakeTenant(FakeSite):
         if error:
             return error
         # Personal fields are blanked. The record itself stays: business records are not deleted.
-        self.users[self.links[key]].update(first_name="", last_name="", anonymized=True)
-        return 200, {"message": {"anonymized": True}}
+        self.users[self.links[key]].update(first_name="", last_name="", anonymized=True, enabled=False)
+        # Body from docs/sozlesmeler.md, section 6 ("anonymized" and "found"). The tenant follows the same rules.
+        return 200, {"message": {"anonymized": True, "found": True}}
 
     def _list(self, _req: Recorded) -> Reply:
         rows = [
@@ -437,9 +457,10 @@ class FakePress(FakeSite):
             return frappe_error(400, "ValidationError")
         email = self.links.get((body["issuer"], body["subject"]))
         if email is None:
-            return frappe_error(404, "IdentityNotFound")
-        self.users[email]["anonymized"] = True
-        return 200, {"message": {"anonymized": True}}
+            # docs/sozlesmeler.md, section 6: an unknown identity gets 200 with found false.
+            return 200, {"message": {"anonymized": True, "found": False}}
+        self.users[email].update(anonymized=True, enabled=False, api_keys=[])
+        return 200, {"message": {"anonymized": True, "found": True}}
 
     def _list(self, _req: Recorded) -> Reply:
         rows = [
@@ -532,7 +553,8 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
         realm_id=REALM_ID,
         execute_azp=frozenset({"approval-service"}),
         preview_azp=frozenset({"ai-agent"}),
-        session_azp=frozenset({"site-kiraci1"}),
+        session_azp=frozenset({"site-kiraci1", "site-kiraci2"}),
+        deletion_azp=frozenset({"press-service"}),
     )
 
 

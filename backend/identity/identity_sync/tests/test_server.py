@@ -24,7 +24,9 @@ from .fakes import DONE, ORG_ID, REALM_ID, SUBJECT, WEBHOOK_SECRET, Stack, keycl
 NOW = 1_795_000_000
 PREVIEW_TOKEN = "preview-token"  # yapay zekâ aracısının belirteci: yalnız okur ve önizler
 EXECUTE_TOKEN = "execute-token"  # onay katmanının belirteci: yürütebilir
-SESSION_TOKEN = "session-token"  # a platform_core site's service token: may only revoke sessions
+SESSION_TOKEN = "session-token"  # the service token of tenant kiraci1: may only revoke sessions
+OTHER_SITE_TOKEN = "other-site-token"  # the service token of tenant kiraci2
+PRESS_TOKEN = "press-token"  # the Press service token: may only request an account deletion
 EVENT = {"id": "e-1", "kind": "user", "type": "VERIFY_EMAIL", "realm": "platform", "time": 1, "user_id": SUBJECT}
 ALL_ACTIONS = ["press.ensure_team", "tenant.change_email", "tenant.provision"]
 
@@ -34,6 +36,8 @@ def fake_verifier(token: str) -> dict[str, object]:
         PREVIEW_TOKEN: "ai-agent",
         EXECUTE_TOKEN: "approval-service",
         SESSION_TOKEN: "site-kiraci1",
+        OTHER_SITE_TOKEN: "site-kiraci2",
+        PRESS_TOKEN: "press-service",
         "stranger-token": "baska-istemci",
     }.get(token)
     if azp is None:
@@ -48,9 +52,10 @@ def sign(body: bytes, timestamp: int, mode: str = "execute", secret: str = WEBHO
 
 class ServerCase(unittest.TestCase):
     request_timeout = 0.5
+    two_tenants = False
 
     def setUp(self) -> None:
-        self.stack = Stack()
+        self.stack = Stack(two_tenants=self.two_tenants)
         self.addCleanup(self.stack.close)
         self.now = float(NOW)
         self.start_server(fake_verifier)
@@ -721,42 +726,90 @@ class ApprovalLayerTest(ServerCase):
 
 
 class SessionRevokeTest(ServerCase):
-    """POST /v1/sessions/revoke (docs/sozlesmeler.md, section 7)."""
+    """POST /v1/sessions/revoke (docs/sozlesmeler.md, section 7).
+
+    Two tenants share one Keycloak realm. A tenant may only end the session of a user who is
+    a member of its own organization, and only a session that belongs to that user.
+    """
 
     PATH = "/v1/sessions/revoke"
     SID = "55555555-5555-4555-8555-555555555555"
+    OTHER_USER = "99999999-9999-4999-8999-999999999999"
+    OTHER_SID = "66666666-6666-4666-8666-666666666666"
+    two_tenants = True
 
-    def session_path(self) -> str:
-        return f"{self.stack.keycloak.admin}/sessions/{self.SID}"
+    def setUp(self) -> None:
+        super().setUp()
+        keycloak = self.stack.keycloak
+        # SUBJECT is a member of kiraci1 (base setup). OTHER_USER is a member of kiraci2 only.
+        other_org = {"id": "o-kiraci2", "name": "kiraci2", "alias": "kiraci2"}
+        keycloak.add_user(keycloak_user(subject=self.OTHER_USER, email="ikinci@example.test"), [other_org])
+        keycloak.add_session(SUBJECT, self.SID)
+        keycloak.add_session(self.OTHER_USER, self.OTHER_SID)
 
     def revoke(self, payload: object = None, token: str = SESSION_TOKEN) -> tuple[int, object]:
-        return self.post_json(self.PATH, {"sid": self.SID} if payload is None else payload, token)
+        body = {"sid": self.SID, "subject": SUBJECT} if payload is None else payload
+        return self.post_json(self.PATH, body, token)
 
-    def test_site_revokes_a_session(self) -> None:
-        self.stack.keycloak.on("DELETE", self.session_path(), (204, None))
-
+    def test_tenant_ends_the_session_of_its_own_member(self) -> None:
         with self.assertLogs("identity_sync", level="INFO") as logs:
             reply = self.revoke()
 
         self.assertEqual(reply, (200, {"sid": self.SID, "revoked": True}))
-        self.assertEqual(len(self.stack.keycloak.calls("DELETE", self.session_path())), 1)
+        self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [])
+        self.assertEqual(self.stack.keycloak.sessions[self.OTHER_USER], [self.OTHER_SID])
         audit = "\n".join(logs.output)
         self.assertIn("operation=revoke_session", audit)
         self.assertIn("site-kiraci1", audit)
 
     def test_closed_session_also_gets_200(self) -> None:
         # Repeatable: the same request twice gives the same answer.
-        self.stack.keycloak.on("DELETE", self.session_path(), (404, {"error": "Session not found"}))
+        self.assertEqual(self.revoke()[0], 200)
 
         self.assertEqual(self.revoke(), (200, {"sid": self.SID, "revoked": True}))
 
+    def test_other_tenant_cannot_end_the_session(self) -> None:
+        # kiraci2 knows the session id and the user id. The user is not a member of kiraci2.
+        reply = self.revoke(token=OTHER_SITE_TOKEN)
+
+        self.assertEqual(reply, (403, {"error": "forbidden"}))
+        self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [self.SID])
+
+    def test_tenant_cannot_end_a_session_of_another_user_by_naming_its_own_member(self) -> None:
+        # kiraci1 sends the session id of kiraci2's user together with its own member's id.
+        # The session does not belong to that member, so it is not deleted.
+        status, _body = self.revoke({"sid": self.OTHER_SID, "subject": SUBJECT})
+
+        self.assertEqual(status, 200)
+        self.assertEqual(self.stack.keycloak.sessions[self.OTHER_USER], [self.OTHER_SID])
+        self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [self.SID])
+
+    def test_tenant_cannot_name_a_user_of_another_tenant(self) -> None:
+        reply = self.revoke({"sid": self.OTHER_SID, "subject": self.OTHER_USER})
+
+        self.assertEqual(reply, (403, {"error": "forbidden"}))
+        self.assertEqual(self.stack.keycloak.sessions[self.OTHER_USER], [self.OTHER_SID])
+
+    def test_unknown_user_is_forbidden(self) -> None:
+        self.assertEqual(self.revoke({"sid": self.SID, "subject": "yok-boyle-kullanici"}), (403, {"error": "forbidden"}))
+        self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [self.SID])
+
+    def test_site_client_without_a_configured_tenant_is_forbidden(self) -> None:
+        # The client is in the session list but no tenant in the settings belongs to it.
+        import dataclasses
+
+        self.stack.app.settings = dataclasses.replace(self.stack.app.settings, tenants=self.stack.app.settings.tenants[:1])
+        self.start_server(fake_verifier)
+
+        self.assertEqual(self.revoke({"sid": self.OTHER_SID, "subject": self.OTHER_USER}, OTHER_SITE_TOKEN)[0], 403)
+        self.assertEqual(self.stack.keycloak.sessions[self.OTHER_USER], [self.OTHER_SID])
+
     def test_only_a_site_client_may_call(self) -> None:
-        self.stack.keycloak.on("DELETE", self.session_path(), (204, None))
-        for token in (PREVIEW_TOKEN, EXECUTE_TOKEN, "stranger-token"):
+        for token in (PREVIEW_TOKEN, EXECUTE_TOKEN, PRESS_TOKEN, "stranger-token"):
             with self.subTest(token=token):
                 self.assertEqual(self.revoke(token=token), (403, {"error": "forbidden"}))
-        self.assertEqual(self.call("POST", self.PATH, b'{"sid": "x"}')[0], 401)
-        self.assertEqual(self.stack.keycloak.calls("DELETE", self.session_path()), [])
+        self.assertEqual(self.call("POST", self.PATH, b'{"sid": "x", "subject": "y"}')[0], 401)
+        self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [self.SID])
 
     def test_site_client_cannot_use_the_other_endpoints(self) -> None:
         for method, path, body in ServiceTokenTest.PROTECTED:
@@ -765,19 +818,33 @@ class SessionRevokeTest(ServerCase):
                 self.assertEqual(status, 403)
 
     def test_bad_request_bodies(self) -> None:
-        for payload in ({}, {"sid": ""}, {"sid": ".."}, {"sid": 5}, {"sid": "a/b"}, {"sid": self.SID, "user": "x"}):
+        good = {"sid": self.SID, "subject": SUBJECT}
+        for payload in (
+            {},
+            {"sid": self.SID},
+            {"subject": SUBJECT},
+            {**good, "sid": ""},
+            {**good, "sid": ".."},
+            {**good, "sid": 5},
+            {**good, "subject": "a/b"},
+            {**good, "user": "x"},
+        ):
             with self.subTest(payload=payload):
                 self.assertEqual(self.revoke(payload), (400, {"error": "bad_request"}))
         self.assertEqual(self.keycloak_writes(), [])
 
     def test_keycloak_failure_is_an_upstream_failure(self) -> None:
-        self.stack.keycloak.on("DELETE", self.session_path(), (500, None))
+        kc = self.stack.keycloak
+        kc.on("DELETE", f"{kc.admin}/sessions/{self.SID}", (500, None))
 
         self.assertEqual(self.revoke(), (502, {"error": "upstream_failed"}))
 
 
 class AccountDeletionEndpointTest(ServerCase):
-    """POST /v1/account-deletions (docs/sozlesmeler.md, section 7; PROJE-KAYDI.md, O-27)."""
+    """POST /v1/account-deletions (docs/sozlesmeler.md, section 7; PROJE-KAYDI.md, O-27).
+
+    Only Press calls it, after it re-authenticated the customer in Keycloak.
+    """
 
     PATH = "/v1/account-deletions"
 
@@ -788,52 +855,22 @@ class AccountDeletionEndpointTest(ServerCase):
         self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
         self.stack.tenant.installations[(issuer, SUBJECT)] = ["phone-1"]
 
-    def preview(self, token: str = PREVIEW_TOKEN) -> dict[str, object]:
-        status, body = self.post_json(self.PATH, {"subject": SUBJECT, "dry_run": True}, token)
-        self.assertEqual(status, 200)
-        return body
+    def body(self, **changes: object) -> dict[str, object]:
+        return {"issuer": self.stack.issuer, "subject": SUBJECT, "reauthenticated_at": NOW - 10, **changes}
 
-    def execute(self, digest: object, token: str = EXECUTE_TOKEN, approval_id: str = "onay-s1"):
-        payload = {"subject": SUBJECT, "dry_run": False, "preview_digest": digest, "approval_id": approval_id}
-        return self.post_json(self.PATH, payload, token)
+    def request(self, token: str = PRESS_TOKEN, **changes: object) -> tuple[int, object]:
+        return self.post_json(self.PATH, self.body(**changes), token)
 
-    def test_preview_lists_the_destructive_plan_and_writes_nothing(self) -> None:
-        body = self.preview()
-
-        self.assertEqual(body["status"], "preview")
-        self.assertEqual(
-            [p["operation"] for p in body["previews"]],
-            [
-                "keycloak.disable_user",
-                "press.remove_team_member",
-                "tenant.set_enabled",
-                "tenant.revoke_user_installations",
-                "press.anonymize_user",
-                "tenant.anonymize_user",
-                "keycloak.delete_user",
-            ],
-        )
-        self.assertTrue(all(p["destructive"] for p in body["previews"]))
-        self.assertRegex(body["preview_digest"], r"^[0-9a-f]{64}$")
-        self.assertNotIn("example.test", json.dumps(body))
-        self.assertEqual(self.downstream_writes() + self.keycloak_writes(), [])
-        self.assertEqual(self.stack.app.store.dead_letters(), [])
-
-    def test_agent_cannot_delete_an_account(self) -> None:
-        digest = self.preview()["preview_digest"]
-
-        self.assertEqual(self.execute(digest, token=PREVIEW_TOKEN), (403, {"error": "forbidden"}))
+    def nothing_written(self) -> None:
         self.assertEqual(self.downstream_writes() + self.keycloak_writes(), [])
         self.assertIn(SUBJECT, self.stack.keycloak.users)
 
-    def test_approval_layer_deletes_the_account(self) -> None:
-        digest = self.preview()["preview_digest"]
-
+    def test_press_request_deletes_the_account(self) -> None:
         with self.assertLogs("identity_sync", level="INFO") as logs:
-            status, body = self.execute(digest)
+            status, body = self.request()
 
         self.assertEqual(status, 200)
-        self.assertEqual((body["status"], body["request_id"]), ("processed", "onay-s1"))
+        self.assertEqual(body["status"], "processed")
         self.assertEqual(body["actions"][0], "keycloak.disable_user")
         self.assertEqual(body["actions"][-1], "keycloak.delete_user")
         issuer = self.stack.issuer
@@ -843,67 +880,116 @@ class AccountDeletionEndpointTest(ServerCase):
         self.assertNotIn((issuer, SUBJECT), self.stack.tenant.installations)
         audit = "\n".join(logs.output)
         self.assertIn("operation=delete_account", audit)
+        self.assertIn("press-service", audit)
         self.assertIn("outcome=processed", audit)
+        # The log names the request, not the person.
         self.assertNotIn("example.test", audit)
+        self.assertNotIn(SUBJECT, audit)
 
-    def test_approval_works_once(self) -> None:
-        digest = self.preview()["preview_digest"]
-        self.assertEqual(self.execute(digest)[0], 200)
+    def test_request_id_does_not_reveal_the_user(self) -> None:
+        _status, body = self.request()
 
-        self.assertEqual(self.execute(digest), (409, {"error": "approval_used"}))
+        self.assertRegex(body["request_id"], r"^del-[0-9a-f]{40}$")
+        self.assertNotIn(SUBJECT, json.dumps(body))
 
-    def test_digest_of_another_user_is_refused(self) -> None:
-        other = self.post_json(self.PATH, {"subject": "baska-kullanici", "dry_run": True})[1]["preview_digest"]
+    def test_old_reauthentication_is_refused(self) -> None:
+        # Press re-authenticated the customer more than 300 seconds ago.
+        for age in (301, 3600):
+            with self.subTest(age=age):
+                reply = self.request(reauthenticated_at=NOW - age)
+                self.assertEqual(reply, (403, {"error": "reauthentication_required"}))
+        self.nothing_written()
 
-        self.assertEqual(self.execute(other), (409, {"error": "preview_changed"}))
-        self.assertIn(SUBJECT, self.stack.keycloak.users)
-        self.assertEqual(self.downstream_writes(), [])
+    def test_reauthentication_at_the_edge_is_accepted(self) -> None:
+        self.assertEqual(self.request(reauthenticated_at=NOW - 300)[0], 200)
+
+    def test_reauthentication_from_the_future_is_refused(self) -> None:
+        self.assertEqual(self.request(reauthenticated_at=NOW + 120), (403, {"error": "reauthentication_required"}))
+        self.nothing_written()
+
+    def test_only_press_may_request_a_deletion(self) -> None:
+        for token in (PREVIEW_TOKEN, EXECUTE_TOKEN, SESSION_TOKEN, "stranger-token"):
+            with self.subTest(token=token):
+                self.assertEqual(self.request(token=token), (403, {"error": "forbidden"}))
+        self.assertEqual(self.call("POST", self.PATH, b"{}")[0], 401)
+        self.nothing_written()
+
+    def test_press_cannot_use_the_other_endpoints(self) -> None:
+        for method, path, body in ServiceTokenTest.PROTECTED:
+            with self.subTest(path=path):
+                self.assertEqual(self.call(method, path, body, self.bearer(PRESS_TOKEN))[0], 403)
 
     def test_bad_requests(self) -> None:
-        digest = self.preview()["preview_digest"]
         for payload in (
             {},
-            {"subject": SUBJECT},
-            {"subject": "..", "dry_run": True},
-            {"subject": 5, "dry_run": True},
-            {"dry_run": True},
-            {"subject": SUBJECT, "dry_run": False},
-            {"subject": SUBJECT, "dry_run": False, "preview_digest": digest},
+            {"issuer": self.stack.issuer, "subject": SUBJECT},
+            self.body(issuer="http://baska.example.test/realms/platform"),
+            self.body(subject=".."),
+            self.body(subject=5),
+            self.body(reauthenticated_at="simdi"),
+            self.body(reauthenticated_at=True),
+            self.body(reauthenticated_at=1.5),
+            self.body(approval_id="onay-1"),
+            self.body(dry_run=True),
         ):
             with self.subTest(payload=payload):
-                self.assertEqual(self.post_json(self.PATH, payload), (400, {"error": "bad_request"}))
-        self.assertEqual(self.downstream_writes() + self.keycloak_writes(), [])
+                self.assertEqual(self.post_json(self.PATH, payload, PRESS_TOKEN), (400, {"error": "bad_request"}))
+        self.nothing_written()
 
-    def test_failed_step_queues_the_request_and_replay_finishes_it(self) -> None:
+    def test_same_account_twice_is_one_job(self) -> None:
+        first = self.request()[1]
+
+        status, second = self.request(reauthenticated_at=NOW - 5)
+
+        self.assertEqual((status, second["status"]), (200, "duplicate"))
+        self.assertEqual(second["request_id"], first["request_id"])
+
+    def test_failed_step_queues_the_request_and_a_resend_resumes_it(self) -> None:
         self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
-        digest = self.preview()["preview_digest"]
 
-        status, body = self.execute(digest)
+        status, body = self.request()
 
         self.assertEqual((status, body["status"]), (200, "dead_lettered"))
         self.assertIn(SUBJECT, self.stack.keycloak.users)
         _status, listing = self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN))
         (letter,) = listing["dead_letters"]
-        self.assertEqual((letter["event"]["id"], letter["event"]["kind"], letter["event"]["type"]), ("onay-s1", "request", "ACCOUNT_DELETION"))
+        self.assertEqual((letter["event"]["kind"], letter["event"]["type"]), ("request", "ACCOUNT_DELETION"))
+        self.assertEqual(letter["event"]["id"], body["request_id"])
 
         self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, DONE)
-        _status, preview = self.post_json("/v1/dead-letters/replay", {"dry_run": True})
-        replay = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-s2"}
-        status, body = self.post_json("/v1/dead-letters/replay", replay)
+        revokes = len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS))
+        status, body = self.request()
 
-        self.assertEqual((status, body["results"][0]["status"]), (200, "processed"))
+        self.assertEqual((status, body["status"]), (200, "processed"))
+        self.assertEqual(body["actions"], ["tenant.anonymize_user", "keycloak.delete_user"])
+        self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS)), revokes)
         self.assertNotIn(SUBJECT, self.stack.keycloak.users)
 
+    def test_request_is_on_record_before_the_first_write(self) -> None:
+        # The process dies during the first step. The request must not be lost.
+        keycloak = self.stack.app.keycloak
+        original = keycloak.disable_user
+
+        def die(_subject: str) -> None:
+            raise KeyboardInterrupt
+
+        keycloak.disable_user = die
+        try:
+            self.request()
+        except Exception:  # the dropped connection reaches the client as an error
+            pass
+        keycloak.disable_user = original
+        self.start_server(fake_verifier)
+
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual(letter.event.type, "ACCOUNT_DELETION")
+
     def test_deletion_cannot_be_injected_through_the_event_endpoint(self) -> None:
-        # The event endpoint takes Keycloak events only. A request kind must come through the approval flow.
+        # The event endpoint takes Keycloak events only.
         forged = {"id": "x-1", "kind": "request", "type": "ACCOUNT_DELETION", "realm": "platform", "time": 1, "user_id": SUBJECT}
 
         self.assertEqual(self.post_event(forged), (400, {"error": "bad_request"}))
         self.assertIn(SUBJECT, self.stack.keycloak.users)
-
-    def test_needs_a_service_token(self) -> None:
-        self.assertEqual(self.call("POST", self.PATH, b"{}")[0], 401)
-        self.assertEqual(self.post_json(self.PATH, {"subject": SUBJECT, "dry_run": True}, SESSION_TOKEN)[0], 403)
 
 
 class OperationJournalTest(ServerCase):
@@ -933,6 +1019,30 @@ class OperationJournalTest(ServerCase):
     def test_finished_invitation_leaves_no_open_operation(self) -> None:
         self.assertEqual(self.invite()[0], 200)
         self.assertEqual(self.operations(), [])
+
+    def test_approval_and_journal_are_written_together(self) -> None:
+        # A crash right after the approval is consumed must leave the operation on record.
+        store = self.stack.app.store
+        original = self.stack.app.keycloak.invite_user
+        calls = {"count": 0}
+
+        def die_on_execute(*args, **kwargs):
+            calls["count"] += 1
+            if not kwargs.get("dry_run"):
+                raise KeyboardInterrupt
+            return original(*args, **kwargs)
+
+        self.stack.app.keycloak.invite_user = die_on_execute
+        try:
+            self.invite("onay-d7")
+        except Exception:  # the dropped connection reaches the client as an error
+            pass
+        self.stack.app.keycloak.invite_user = original
+        self.start_server(fake_verifier)
+
+        (operation,) = store.operations()
+        self.assertEqual((operation["operation_id"], operation["state"]), ("onay-d7", "unknown"))
+        self.assertEqual([step["status"] for step in operation["steps"]], ["pending"] * 3)
 
     def test_failed_step_is_listed_with_the_state_of_every_step(self) -> None:
         self.stack.keycloak.on("PUT", self.email_path, (500, None))

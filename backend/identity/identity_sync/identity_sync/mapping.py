@@ -15,7 +15,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 
-from identity_sync.events import DELETION_TYPES, MEMBERSHIP_TYPES, Event, is_handled
+from identity_sync.events import ACCOUNT_DELETION, MEMBERSHIP_TYPES, USER_REMOVED_TYPES, Event, is_handled
 
 # Kendi kaydolan kullanıcıya Organization açan olaylar.
 _SELF_REGISTRATION_TYPES = frozenset({"REGISTER", "VERIFY_EMAIL"})
@@ -305,24 +305,47 @@ def close_on_tenant(tenant: str, issuer: str, subject: str) -> list[Action]:
     ]
 
 
-def plan_account_deletion(subject: str, *, issuer: str, tenants: Sequence[Tenant]) -> tuple[Action, ...]:
+class OrderedPlan(tuple):
+    """A plan whose steps depend on each other.
+
+    The pipeline stops at the first step that is not done and later continues from that step.
+    A plain tuple is a plan of independent steps: every step is attempted.
+    """
+
+    __slots__ = ()
+
+
+def _removal_steps(subject: str, issuer: str, tenants: Sequence[Tenant]) -> list[Action]:
+    """Steps 2, 3 and 4 of the deletion flow: close the user everywhere, then anonymize."""
+    actions: list[Action] = [PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=None)]
+    for tenant in tenants:
+        actions += close_on_tenant(tenant.name, issuer, subject)
+    actions.append(PressAnonymizeUser(issuer=issuer, subject=subject))
+    actions += [TenantAnonymizeUser(tenant=tenant.name, issuer=issuer, subject=subject) for tenant in tenants]
+    return actions
+
+
+def plan_account_deletion(subject: str, *, issuer: str, tenants: Sequence[Tenant]) -> OrderedPlan:
     """The account deletion flow (docs/sozlesmeler.md, section 7; PROJE-KAYDI.md, O-27).
 
     The order is fixed and every step is repeatable:
     1. disable the Keycloak user, 2. close the Press user, 3. close the user on every tenant
     and revoke the phone installations, 4. anonymize the personal fields, 5. delete the Keycloak user.
+    Step 1 only disables. The Keycloak user is deleted in step 5, after everything else is done.
     The plan does not depend on the user's current state.
     """
-    actions: list[Action] = [
-        KeycloakDisableUser(subject=subject),
-        PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=None),
-    ]
-    for tenant in tenants:
-        actions += close_on_tenant(tenant.name, issuer, subject)
-    actions.append(PressAnonymizeUser(issuer=issuer, subject=subject))
-    actions += [TenantAnonymizeUser(tenant=tenant.name, issuer=issuer, subject=subject) for tenant in tenants]
-    actions.append(KeycloakDeleteUser(subject=subject))
-    return tuple(actions)
+    return OrderedPlan(
+        [KeycloakDisableUser(subject=subject), *_removal_steps(subject, issuer, tenants), KeycloakDeleteUser(subject=subject)]
+    )
+
+
+def plan_removed_user(subject: str, *, issuer: str, tenants: Sequence[Tenant]) -> OrderedPlan:
+    """Steps 2, 3 and 4 for a user that Keycloak no longer has.
+
+    An administrator deleted the user in Keycloak. There is nothing left to disable or delete
+    there, but the user is still closed and anonymized on Press and on the tenants.
+    """
+    return OrderedPlan(_removal_steps(subject, issuer, tenants))
 
 
 def plan_actions(
@@ -342,8 +365,13 @@ def plan_actions(
         return ()
     subject = event.user_id
 
-    if event.type in DELETION_TYPES:
+    if event.type == ACCOUNT_DELETION:
         return plan_account_deletion(subject, issuer=issuer, tenants=tenants)
+
+    if snapshot is None and event.type in USER_REMOVED_TYPES:
+        # The event says the user was deleted and Keycloak confirms it. If Keycloak still had
+        # the user, the plan below would follow that state and anonymize nothing.
+        return plan_removed_user(subject, issuer=issuer, tenants=tenants)
 
     if snapshot is None or not snapshot.enabled:
         # Deleted or disabled: the user is disabled on every tenant and leaves every Press team (X-11).

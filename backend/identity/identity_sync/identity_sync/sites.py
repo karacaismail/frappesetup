@@ -35,6 +35,7 @@ def tenant_scope(tenant: str) -> str:
     return f"aud-site-{tenant}"
 
 
+
 Success = Callable[[object], bool]
 IDENTITY_NOT_FOUND = "IdentityNotFound"
 
@@ -49,8 +50,12 @@ def _call_method(
     body: Mapping[str, object] | None = None,
     is_success: Success | None = None,
     missing_identity_is_success: bool = False,
+    retry_statuses: tuple[int, ...] = (),
 ) -> object:
     """Call a Frappe method and return the `message` value of the reply.
+
+    `retry_statuses`: statuses this endpoint uses for "try again", for example 409 for a
+    lock conflict. The pipeline then retries a bounded number of times.
 
     A write (`body` given) counts as done only on HTTP 200 with a body that `is_success`
     accepts. The exact success bodies come from the target contracts. Being queued is not
@@ -88,6 +93,8 @@ def _call_method(
     except HttpError as error:
         if missing_identity_is_success and error.status == 404 and error.code == IDENTITY_NOT_FOUND:
             return None
+        if error.status in retry_statuses:
+            error.retryable = True
         raise
     message = response.body.get("message") if isinstance(response.body, Mapping) else None
     if body is not None and not (response.status == 200 and is_success is not None and is_success(message)):
@@ -105,9 +112,21 @@ def _is_team(message: object) -> bool:
     return _text(message, "team") is not None and isinstance(message.get("created"), bool)  # type: ignore[union-attr]
 
 
+# anonymize_user answers 409 on a lock conflict or timeout. The caller retries (docs/sozlesmeler.md, section 6).
+ANONYMIZE_RETRY_STATUSES = (409,)
+
+
 def _is_anonymized(message: object) -> bool:
-    """anonymize_user: `anonymized` is true. The shared contract does not define this body yet."""
-    return isinstance(message, Mapping) and message.get("anonymized") is True
+    """anonymize_user (docs/sozlesmeler.md, section 6): the body carries `anonymized` and `found`.
+
+    Done means the user is anonymized, or the target does not know the identity (`found` false).
+    """
+    if not isinstance(message, Mapping):
+        return False
+    anonymized, found = message.get("anonymized"), message.get("found")
+    if not isinstance(anonymized, bool) or not isinstance(found, bool):
+        return False
+    return anonymized or not found
 
 
 def _is_revoked(message: object) -> bool:
@@ -160,7 +179,7 @@ class PressClient:
         method_path: str,
         body: Mapping[str, object] | None = None,
         is_success: Success | None = None,
-        missing_identity_is_success: bool = False,
+        retry_statuses: tuple[int, ...] = (),
     ) -> object:
         return _call_method(
             self._base_url,
@@ -170,16 +189,16 @@ class PressClient:
             timeout=self._timeout,
             body=body,
             is_success=is_success,
-            missing_identity_is_success=missing_identity_is_success,
+            retry_statuses=retry_statuses,
         )
 
     def anonymize_user(self, action: PressAnonymizeUser) -> None:
         """Close the Press user, revoke the API keys and anonymize the personal fields (docs/sozlesmeler.md, section 6).
 
-        A user Press does not know has nothing to anonymize, so that counts as done.
+        Press answers `found: false` for an identity it does not know. That counts as done.
         """
         body = {"issuer": action.issuer, "subject": action.subject}
-        self._call("press_tr.api.identity.anonymize_user", body, _is_anonymized, missing_identity_is_success=True)
+        self._call("press_tr.api.identity.anonymize_user", body, _is_anonymized, ANONYMIZE_RETRY_STATUSES)
 
     def ensure_team(self, action: PressEnsureTeam) -> None:
         body = asdict(action)
@@ -223,6 +242,7 @@ class TenantClient:
         body: Mapping[str, object] | None = None,
         is_success: Success | None = None,
         missing_identity_is_success: bool = False,
+        retry_statuses: tuple[int, ...] = (),
     ) -> object:
         # The target address comes only from the configured tenant list (G-13).
         return _call_method(
@@ -234,6 +254,7 @@ class TenantClient:
             body=body,
             is_success=is_success,
             missing_identity_is_success=missing_identity_is_success,
+            retry_statuses=retry_statuses,
         )
 
     @staticmethod
@@ -300,6 +321,7 @@ class TenantClient:
             self._body(action),
             _is_anonymized,
             missing_identity_is_success=True,
+            retry_statuses=ANONYMIZE_RETRY_STATUSES,
         )
 
     def list_identities(self, tenant: str) -> list[Identity]:

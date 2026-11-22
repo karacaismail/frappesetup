@@ -20,7 +20,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, replace
 from typing import TypeVar
 
-from identity_sync.events import DELETION_TYPES, MEMBERSHIP_TYPES, Event, is_handled
+from identity_sync.events import ACCOUNT_DELETION, MEMBERSHIP_TYPES, Event, is_handled
 from identity_sync.httpjson import HttpError, TransportError, UnknownOutcome
 from identity_sync.keycloak_admin import KeycloakAdmin
 from identity_sync.mapping import (
@@ -28,6 +28,7 @@ from identity_sync.mapping import (
     EnsureOrganization,
     KeycloakDeleteUser,
     KeycloakDisableUser,
+    OrderedPlan,
     PressAnonymizeUser,
     PressEnsureTeam,
     PressRemoveTeamMember,
@@ -165,12 +166,21 @@ class Processor:
             actions = self._plan(event)
         except _Failed:
             return EventResult("failed"), None
+        # An ordered plan may be partly done. The preview shows what is still to do.
+        pending = actions[self._done_steps(event, actions) :]
         result = EventResult(
             "preview",
-            previews=tuple(action.preview() for action in actions),
-            plan_digest=plan_digest(actions, self._digest_key),
+            previews=tuple(action.preview() for action in pending),
+            plan_digest=plan_digest(pending, self._digest_key),
         )
         return result, actions
+
+    def _done_steps(self, event: Event, actions: tuple[Action, ...]) -> int:
+        """How many leading steps of an ordered plan were finished by an earlier run."""
+        if not isinstance(actions, OrderedPlan):
+            return 0
+        done, digest = self._store.progress(event.id)
+        return done if digest == plan_digest(actions, self._digest_key) else 0
 
     def _handle_locked(self, event: Event, allow_unknown: bool, planned: tuple[Action, ...] | None) -> EventResult:
         """Run one event. The caller holds the work lock.
@@ -276,7 +286,7 @@ class Processor:
 
     def _plan(self, event: Event) -> tuple[Action, ...]:
         subject = event.user_id or ""
-        if event.type in DELETION_TYPES:
+        if event.type == ACCOUNT_DELETION:
             # The deletion flow is the same whatever the user's state is. It needs no read.
             return plan_actions(event, None, issuer=self._issuer, tenants=self._tenants)
         snapshot = self._retry("keycloak.read", lambda: self._keycloak.get_user_snapshot(subject))
@@ -290,7 +300,8 @@ class Processor:
         actions = plan_actions(
             event, snapshot, issuer=self._issuer, tenants=self._tenants, organization=organization
         )
-        return tuple(self._resolve(action) for action in actions)
+        # Keep the plan's type: an ordered plan must stay ordered.
+        return type(actions)(self._resolve(action) for action in actions)
 
     def _resolve(self, action: Action) -> Action:
         """Put the real organization id into an organization step.
@@ -318,21 +329,19 @@ class Processor:
                     # The organization was created but the membership is still not visible.
                     # The team and tenant work did not run.
                     raise _Failed("keycloak.ensure_organization: membership not visible yet")
-            if actions and pass_number == 1:
+            ordered = isinstance(actions, OrderedPlan)
+            full_digest = plan_digest(actions, self._digest_key) if ordered else ""
+            start = self._done_steps(event, actions)
+            if len(actions) > start and pass_number == 1:
                 # From the first external write on, a crash leaves the outcome unknown.
                 self._store.mark_writing(event.id)
             failures: list[str] = []
             unknown = False
-            for action in actions:
+            for index, action in enumerate(actions):
+                if index < start:
+                    continue  # finished by an earlier run of this ordered plan
                 preview = action.preview()
                 label = f"{preview.operation} {preview.target}"
-                if isinstance(action, KeycloakDeleteUser) and failures:
-                    # Deleting the Keycloak user is the last, irreversible step. It waits until
-                    # every earlier step is done. The request stays in the queue for a replay.
-                    failures.append(f"{label}: skipped because an earlier step is not done")
-                    continue
-                # A failed step does not stop the others. For example the user is still disabled
-                # on every tenant when Press does not answer. The steps are repeatable.
                 try:
                     self._retry(label, lambda action=action: self._execute(action))
                 except _Failed as failure:
@@ -343,6 +352,17 @@ class Processor:
                     unknown = True
                 else:
                     names.append(preview.operation)
+                    if ordered:
+                        # Recorded after every step, so a retry continues from the next one.
+                        self._store.set_progress(event.id, index + 1, full_digest)
+                    continue
+                if ordered:
+                    # The steps of an ordered plan depend on each other. Nothing runs after a
+                    # step that is not done. For example nothing is anonymized while phone
+                    # installations remain, and the Keycloak user is not deleted.
+                    break
+                # In a plain plan a failed step does not stop the others. For example the user is
+                # still disabled on every tenant when Press does not answer.
             if failures:
                 raise _Failed("; ".join(failures), unknown=unknown)
             if not any(isinstance(action, EnsureOrganization) for action in actions):

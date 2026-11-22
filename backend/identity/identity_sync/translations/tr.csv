@@ -12,21 +12,18 @@ Hata kodu `approval_used` ise bu `approval_id` daha önce kullanıldı.
 ",identity_sync.openapi.yaml: components.responses.PreviewChanged.description
 The service token is missing or invalid. The error code is `unauthorized`.,Servis belirteci yok ya da geçersiz. Hata kodu `unauthorized` olur.,identity_sync.openapi.yaml: components.responses.Unauthorized.description
 "Keycloak, Press or the tenant site did not respond or rejected the request.","Keycloak, Press ya da kiracı sitesi yanıt vermedi ya da isteği reddetti.",identity_sync.openapi.yaml: components.responses.UpstreamFailed.description
-An execute request. Only the approval layer can send it.,Yürütme isteği. Yalnız onay katmanı gönderebilir.,identity_sync.openapi.yaml: components.schemas.AccountDeletionExecuteRequest.description
-A preview request. The service changes no record.,Önizleme isteği. Servis hiçbir kaydı değiştirmez.,identity_sync.openapi.yaml: components.schemas.AccountDeletionPreviewRequest.description
-The caller must write the `dry_run` field explicitly. One of two forms is valid.,Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.,identity_sync.openapi.yaml: components.schemas.AccountDeletionRequest.description
-The names of the steps that finished with definite success.,Kesin başarıyla biten adımların adları.,identity_sync.openapi.yaml: components.schemas.AccountDeletionResult.properties.actions.description
-Returned only in a preview.,Yalnız önizlemede döner.,identity_sync.openapi.yaml: components.schemas.AccountDeletionResult.properties.previews.description
-"`preview` shows that only the plan was returned.
-`processed` shows that all five steps finished.
+The issuer of the realm. It must be equal to the issuer in the service settings.,Realm'in yayıncı adresi. Servis ayarındaki yayıncı adresine eşit olmalıdır.,identity_sync.openapi.yaml: components.schemas.AccountDeletionRequest.properties.issuer.description
+The time when Press authenticated the customer again in Keycloak. The unit is seconds since 1970.,Press'in müşteriyi Keycloak'ta yeniden doğruladığı zaman. Birim 1970'ten beri geçen saniyedir.,identity_sync.openapi.yaml: components.schemas.AccountDeletionRequest.properties.reauthenticated_at.description
+The names of the steps that finished with definite success in this call.,Bu çağrıda kesin başarıyla biten adımların adları.,identity_sync.openapi.yaml: components.schemas.AccountDeletionResult.properties.actions.description
+"The id of the request. It is a keyed digest of the account, so it does not show the user.","İsteğin kimliği. Hesabın anahtarlı özetidir, bu yüzden kullanıcıyı göstermez.",identity_sync.openapi.yaml: components.schemas.AccountDeletionResult.properties.request_id.description
+"`processed` shows that every step that was left finished.
 `dead_lettered` shows that a step failed and the request waits in the queue.
 `unknown` shows that the result of a step is not known.
-`duplicate` shows that this request finished before.
-","`preview` değeri yalnız planın döndüğünü gösterir.
-`processed` değeri beş adımın da bittiğini gösterir.
+`duplicate` shows that the request for this account finished before.
+","`processed` değeri kalan bütün adımların bittiğini gösterir.
 `dead_lettered` değeri bir adımın başarısız olduğunu ve isteğin kuyrukta beklediğini gösterir.
 `unknown` değeri bir adımın sonucunun bilinmediğini gösterir.
-`duplicate` değeri bu isteğin daha önce bittiğini gösterir.
+`duplicate` değeri bu hesabın isteğinin daha önce bittiğini gösterir.
 ",identity_sync.openapi.yaml: components.schemas.AccountDeletionResult.properties.status.description
 "The id of the approval record in the approval layer.
 The service writes this value to the operation log. The approval layer checks the validity of the value.
@@ -225,19 +222,27 @@ The session no longer exists.,Oturum artık yok.,identity_sync.openapi.yaml: com
 The id of the ended session.,Kapanan oturumun kimliği.,identity_sync.openapi.yaml: components.schemas.SessionRevokeResult.properties.sid.description
 "The response expected from the `platform_core.api.identity.anonymize_user` and `press_tr.api.identity.anonymize_user` endpoints.
 The names of the endpoints are in the shared contract (`docs/sozlesmeler.md`), sections 5 and 6.
-The shared contract does not define the response body. This schema is a proposal.
+The shared contract defines the response: 200 with the `anonymized` and `found` fields.
 The endpoint disables the user and anonymizes the fields that identify the person. It does not delete business records.
 The endpoint in Press also invalidates the API keys.
-The request carries the `issuer` and `subject` fields. The endpoint must be safe to repeat.
-If there is no link, the endpoint returns 404 and `IdentityNotFound`. The service counts this response as success.
+The request carries the `issuer` and `subject` fields. A repeated call gets the same response.
+If the endpoint does not know the identity, `found` is false. The service counts this response as success.
+The tenant can also return 404 and `IdentityNotFound` for an unknown identity. The service counts this response as success too.
+The endpoint returns 409 for a lock conflict or a timeout. The service then tries the request again.
+If a field is missing, the service does not know the result and does not continue with the next step.
 ","`platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user` uçlarından beklenen yanıt.
 Uçların adı ortak sözleşmenin 5. ve 6. bölümündedir.
-Ortak sözleşme yanıt gövdesini tanımlamaz. Bu şema bir öneridir.
+Ortak sözleşme yanıtı tanımlar: 200 ile `anonymized` ve `found` alanları.
 Uç kullanıcıyı kapatır ve kişiyi gösteren alanları anonim yapar. İş kayıtlarını silmez.
 Press'teki uç API anahtarlarını da geçersiz yapar.
-İstek `issuer` ve `subject` alanlarını taşır. Uç tekrar edilebilir olmalıdır.
-Bağ yoksa uç 404 ve `IdentityNotFound` döner. Servis bu yanıtı başarı sayar.
+İstek `issuer` ve `subject` alanlarını taşır. Tekrar çağrı aynı yanıtı alır.
+Uç kimliği tanımıyorsa `found` yanlış olur. Servis bu yanıtı başarı sayar.
+Kiracı, bilinmeyen kimlik için 404 ve `IdentityNotFound` da dönebilir. Servis bu yanıtı da başarı sayar.
+Uç kilit çakışmasında ya da zaman aşımında 409 döner. Servis o zaman isteği yeniden dener.
+Bir alan eksikse servis sonucu bilmez ve sonraki adıma geçmez.
 ",identity_sync.openapi.yaml: components.schemas.TargetAnonymizeUserResult.description
+True when the personal fields are anonymized or there was nothing to anonymize.,Kişisel alanlar anonim yapıldıysa ya da anonim yapılacak bir şey yoksa doğrudur.,identity_sync.openapi.yaml: components.schemas.TargetAnonymizeUserResult.properties.message.properties.anonymized.description
+False when the endpoint does not know the identity.,Uç kimliği tanımıyorsa yanlıştır.,identity_sync.openapi.yaml: components.schemas.TargetAnonymizeUserResult.properties.message.properties.found.description
 "The definite success response expected from the `platform_core.api.identity.change_email` endpoint.
 The source is the `platform_core` identity contract in the `contracts/` folder.
 The service also compares the `user` value with the new email it sent.
@@ -277,13 +282,13 @@ The user is no longer a member.,Kullanıcı artık üye değil.,identity_sync.op
 The name of the team. It is null in a request for all teams or if there is no team.,Takımın adı. Bütün takımlar için istekte ya da takım yoksa boştur.,identity_sync.openapi.yaml: components.schemas.TargetRemoveTeamMemberResult.properties.message.properties.team.description
 "The response expected from the `platform_core.api.mobile.revoke_user_installations` endpoint.
 The name of the endpoint is in the shared contract (`docs/sozlesmeler.md`), section 5. Its owner is the platform-core-mobil job.
-The shared contract does not define the response body. This schema is a proposal.
+The shared contract does not define the response body. This schema follows the code of the platform-core-mobil job.
 The endpoint deletes all phone installations and notification links of the user.
 The request carries the `issuer` and `subject` fields. The endpoint must be safe to repeat.
 If there is no link, the endpoint returns 404 and `IdentityNotFound`. The service counts this response as success.
 ","`platform_core.api.mobile.revoke_user_installations` ucundan beklenen yanıt.
 Ucun adı ortak sözleşmenin 5. bölümündedir. Sahibi platform-core-mobil işidir.
-Ortak sözleşme yanıt gövdesini tanımlamaz. Bu şema bir öneridir.
+Ortak sözleşme yanıt gövdesini tanımlamaz. Bu şema platform-core-mobil işinin kodunu izler.
 Uç kullanıcının bütün telefon kurulumlarını ve bildirim bağlarını siler.
 İstek `issuer` ve `subject` alanlarını taşır. Uç tekrar edilebilir olmalıdır.
 Bağ yoksa uç 404 ve `IdentityNotFound` döner. Servis bu yanıtı başarı sayar.
@@ -373,10 +378,11 @@ The status extension key tells whether the endpoint exists in code. It is the `x
 Destructive work is work that disables a user or removes a membership.
 No endpoint does paid work.
 
-`x-yurutme` tells who can execute the endpoint. It takes three values.
+`x-yurutme` tells who can execute the endpoint. It takes four values.
 The value that names the approval layer means this. Only the approval layer starts the real execution.
 `otomatik` means the endpoint needs no human approval. For example, the event endpoint is like this.
 `yalniz-okur` means the endpoint changes no record.
+`yalniz-press` means only the Press service client starts the work. The account deletion endpoint is like this.
 
 ## AI and human approval
 
@@ -412,9 +418,11 @@ One request can cover more than one event. If the plan of any event changed, the
 The service writes no event in that request.
 The service computes the plan once more at execution time. If the plan is not exactly the same, the operation does not run.
 
-The service keeps two client lists.
+The service keeps four client lists. A client can be in only one list.
 A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
 A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute.
+A client in the `IDENTITY_SYNC_SESSION_AZP` list can only end a session. It is the client of a tenant site.
+A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
 Only a trusted service client goes into the execute list.
 The agent token and the model identity do not go into this list.
 The trust boundary is this. Only the client of the approval layer can call execution.
@@ -427,20 +435,27 @@ A request rejected because the plan changed also consumes the approval. A new pl
 The source of the account deletion flow is the shared contract (`docs/sozlesmeler.md`), section 7, and project record O-27.
 The flow has five steps and the order is fixed.
 
-1. The service disables the Keycloak user and ends the user's sessions.
+1. The service disables the Keycloak user. It does not delete the user in this step.
 2. The service sends an `all_organizations: true` request to Press. Press disables the user and invalidates the API keys.
 3. The service disables the user in every tenant. Then it has the phone installations and the notification links deleted.
 4. The service has the fields that identify the person anonymized in Press and in every tenant. Business records are not deleted.
 5. The service deletes the Keycloak user.
 
-Every step can be repeated. If a step fails, the request goes into the dead-letter queue.
-If one of the earlier steps failed, the service skips step 5. That is, it does not delete the Keycloak user.
-A human replays the request with the `POST /v1/dead-letters/replay` endpoint.
-When the work is done, only the id of the request stays in the service record. The record carries no email.
+Only Press starts this flow, with the `POST /v1/account-deletions` endpoint.
+The customer asks for the deletion on Press. Press authenticates the customer again in Keycloak before it calls the service.
+The `delete_account` action of Keycloak itself is switched off. That action deletes the user in the first step.
+
+Every step can be repeated. The steps depend on each other.
+If a step fails, the service executes no later step and the request goes into the dead-letter queue.
+The service stores how many steps are finished. A replay continues from the first step that is not finished.
+A human replays the request with the `POST /v1/dead-letters/replay` endpoint. Press can also send the same request again.
+The id of the request is a keyed digest of the account. So one account is always one request.
+When the work is done, only this id stays in the service record. The record carries no email and no user id.
 The service processes the user by the `sub` id. It never stores the email.
 
-The Keycloak `DELETE_ACCOUNT` event also starts the same flow.
-In that case the user is already deleted in Keycloak. Steps 1 and 5 do nothing.
+An administrator can delete a user on the Keycloak admin screen. The event listener then sends the `USER_DELETE` event.
+The service confirms that Keycloak no longer has the user. Then it executes steps 2, 3 and 4 in the same order.
+If the event is lost, the reconcile command finds the deleted user.
 
 For a user disabled in Keycloak, the service also has the phone installations revoked.
 This operation is part of the disable plan.
@@ -448,9 +463,9 @@ This operation is part of the disable plan.
 Steps 3 and 4 call three endpoints in the tenant and in Press. The names are in the shared contract (`docs/sozlesmeler.md`), sections 5, 6 and 7.
 The endpoints are named `platform_core.api.mobile.revoke_user_installations`,
 `platform_core.api.identity.anonymize_user` and `press_tr.api.identity.anonymize_user`.
-The shared contract does not define the response body of these endpoints.
-The responses the service expects are in the `Target` schemas at the end of this file. These schemas are a proposal.
-Until these endpoints are written, those steps fail and the request stays in the dead-letter queue.
+The shared contract defines the response of the two anonymize endpoints: 200 with the `anonymized` and `found` fields.
+These endpoints return 409 for a lock conflict or a timeout. The service then tries the request again.
+The responses the service expects are in the `Target` schemas at the end of this file.
 
 ## Common errors of all endpoints
 
@@ -525,10 +540,11 @@ Eylemleri bu güncel duruma göre seçer. Bu yüzden aynı olay iki kez gelse de
 Yıkıcı iş, kullanıcıyı kapatan ya da üyeliği kaldıran iştir.
 Hiçbir uç ücretli iş yapmaz.
 
-`x-yurutme` alanı ucu kimin yürütebildiğini söyler.
+`x-yurutme` alanı ucu kimin yürütebildiğini söyler. Alan dört değer alır.
 `yalniz-onay-katmani` değeri şunu söyler: gerçek yürütmeyi yalnız onay katmanı başlatır.
 `otomatik` değeri ucun insan onayı istemediğini söyler. Örneğin olay ucu böyledir.
 `yalniz-okur` değeri ucun hiçbir kaydı değiştirmediğini söyler.
+`yalniz-press` değeri işi yalnız Press servis istemcisinin başlattığını söyler. Hesap silme ucu böyledir.
 
 ## Yapay zekâ ve insan onayı
 
@@ -564,9 +580,11 @@ Bir istek birden çok olay kapsayabilir. Herhangi bir olayın planı değiştiys
 Servis o istekte hiçbir olayı yazmaz.
 Servis yürütme anında planı bir kez daha hesaplar. Plan birebir aynı değilse iş yürümez.
 
-Servis iki istemci listesi tutar.
+Servis dört istemci listesi tutar. Bir istemci yalnız bir listede olabilir.
 `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
 `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir.
+`IDENTITY_SYNC_SESSION_AZP` listesindeki istemci yalnız oturum kapatabilir. Bu istemci bir kiracı sitesinin istemcisidir.
+`IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
 Yürütme listesine yalnız güvenilir servis istemcisi girer.
 Aracı belirteci ve model kimliği bu listeye girmez.
 Güven sınırı şudur: yürütmeyi yalnız onay katmanının istemcisi çağırabilir.
@@ -579,20 +597,27 @@ Plan değiştiği için reddedilen istek de onayı tüketir. Yeni plan yeni onay
 Hesap silme akışının kaynağı ortak sözleşmenin 7. bölümü ve proje kaydının O-27 kararıdır.
 Akış beş adımdır ve sırası sabittir.
 
-1. Servis Keycloak kullanıcısını kapatır ve oturumlarını sonlandırır.
+1. Servis Keycloak kullanıcısını kapatır. Bu adımda kullanıcıyı silmez.
 2. Servis Press'e `all_organizations: true` isteği gönderir. Press kullanıcıyı kapatır ve API anahtarlarını geçersiz yapar.
 3. Servis kullanıcıyı her kiracıda kapatır. Sonra telefon kurulumlarını ve bildirim bağlarını sildirir.
 4. Servis kişiyi gösteren alanları Press'te ve her kiracıda anonim yaptırır. İş kayıtları silinmez.
 5. Servis Keycloak kullanıcısını siler.
 
-Her adım tekrar edilebilir. Bir adım başarısız olursa istek bekleme kuyruğuna girer.
-Önceki adımlardan biri başarısızsa servis 5. adımı atlar. Yani Keycloak kullanıcısını silmez.
-İnsan isteği `POST /v1/dead-letters/replay` ucuyla yeniden işletir.
-İş bitince servisin kaydında yalnız isteğin kimliği kalır. Kayıt e-posta taşımaz.
+Bu akışı yalnız Press başlatır. Press `POST /v1/account-deletions` ucunu çağırır.
+Müşteri silme isteğini Press'te verir. Press servisi çağırmadan önce müşteriyi Keycloak'ta yeniden doğrular.
+Keycloak'ın kendi `delete_account` eylemi kapalıdır. O eylem kullanıcıyı ilk adımda siler.
+
+Her adım tekrar edilebilir. Adımlar birbirine bağlıdır.
+Bir adım başarısız olursa servis sonraki adımları yürütmez ve istek bekleme kuyruğuna girer.
+Servis kaç adımın bittiğini saklar. Yeniden işletme, bitmemiş ilk adımdan sürer.
+İnsan isteği `POST /v1/dead-letters/replay` ucuyla yeniden işletir. Press de aynı isteği yeniden gönderebilir.
+İsteğin kimliği hesabın anahtarlı özetidir. Bu yüzden bir hesap her zaman tek istektir.
+İş bitince servisin kaydında yalnız bu kimlik kalır. Kayıt e-posta ve kullanıcı kimliği taşımaz.
 Servis kullanıcıyı `sub` kimliğiyle işler. E-postayı hiç saklamaz.
 
-Keycloak'ın `DELETE_ACCOUNT` olayı da aynı akışı başlatır.
-O durumda kullanıcı Keycloak'ta zaten silinmiştir. 1. ve 5. adım iş yapmaz.
+Yönetici bir kullanıcıyı Keycloak yönetim ekranından silebilir. Olay dinleyici o zaman `USER_DELETE` olayını gönderir.
+Servis kullanıcının Keycloak'ta artık olmadığını doğrular. Sonra 2., 3. ve 4. adımı aynı sırayla yürütür.
+Olay kaybolursa mutabakat komutu silinen kullanıcıyı bulur.
 
 Keycloak'ta kapatılan kullanıcı için servis telefon kurulumlarını da iptal ettirir.
 Bu iş kapatma planının parçasıdır.
@@ -600,9 +625,9 @@ Bu iş kapatma planının parçasıdır.
 3. ve 4. adım kiracıda ve Press'te üç ucu çağırır. Adlar ortak sözleşmenin 5., 6. ve 7. bölümündedir.
 Uçlar `platform_core.api.mobile.revoke_user_installations`,
 `platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user` adını taşır.
-Ortak sözleşme bu uçların yanıt gövdesini tanımlamaz.
-Servisin beklediği yanıtlar bu dosyanın sonundaki `Target` şemalarındadır. Bu şemalar bir öneridir.
-Bu uçlar yazılana kadar o adımlar başarısız olur ve istek bekleme kuyruğunda kalır.
+Ortak sözleşme iki anonim yapma ucunun yanıtını tanımlar: 200 ile `anonymized` ve `found` alanları.
+Bu uçlar kilit çakışmasında ya da zaman aşımında 409 döner. Servis o zaman isteği yeniden dener.
+Servisin beklediği yanıtlar bu dosyanın sonundaki `Target` şemalarındadır.
 
 ## Bütün uçların ortak hataları
 
@@ -668,44 +693,51 @@ This endpoint only reads. It needs no authentication. It returns no personal dat
 The service is up.,Servis ayakta.,identity_sync.openapi.yaml: paths./healthz.get.responses.200.description
 Tells that the service is up.,Servisin ayakta olduğunu söyler.,identity_sync.openapi.yaml: paths./healthz.get.summary
 "The source is the shared contract (`docs/sozlesmeler.md`), section 7, and project record O-27.
-A user asks for the deletion of the user's own account. The service records the request and executes the five steps in order.
+A customer asks for the deletion of the customer's own account on Press. Press then calls this endpoint.
+The service records the request and executes the five steps in order.
 The steps are in the ""Account deletion and disabled accounts"" section at the top of this file.
 
 This endpoint is destructive and cannot be undone. The user is disabled everywhere and deleted from Keycloak.
 The fields that identify the person are anonymized. Business records are not deleted.
 
-The preview is open to both lists. A client in either list can send the `dry_run: true` request.
-The preview only returns the plan. It changes no record.
-Only the approval layer starts the real execution.
-The execute request must carry the `preview_digest` and `approval_id` fields.
-The approval here is the account owner's own approval. The approval layer collects the approval.
+Only Press can call the endpoint. The token carries `azp=press-service` and `aud=identity-sync`.
+The allowed clients are in the `IDENTITY_SYNC_DELETION_AZP` setting. Clients in the other lists get 403.
+This endpoint has no preview and no approval id. The consent is the fresh login of the account owner.
+Press authenticates the customer again in Keycloak and sends the time of that login in `reauthenticated_at`.
+The service refuses a login that is older than 300 seconds. It also refuses a time that is in the future.
 
-The service records the request before it starts the work. The id of the request is the `approval_id` value.
-If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`.
+The service records the request before it starts the work. The id of the request is a keyed digest of the account.
+If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`. No later step is executed.
 The request is then in the dead-letter queue. A human replays the request with `POST /v1/dead-letters/replay`.
+Press can also send the same request again. The service continues from the first step that is not finished.
 ","Kaynak ortak sözleşmenin 7. bölümü ve proje kaydının O-27 kararıdır.
-Kullanıcı kendi hesabının silinmesini ister. Servis isteği kaydeder ve beş adımı sırayla yürütür.
+Müşteri kendi hesabının silinmesini Press'te ister. Press o zaman bu ucu çağırır.
+Servis isteği kaydeder ve beş adımı sırayla yürütür.
 Adımlar bu dosyanın başındaki “Hesap silme ve kapalı hesap” bölümündedir.
 
 Bu uç yıkıcıdır ve geri alınamaz. Kullanıcı her yerde kapanır ve Keycloak'tan silinir.
 Kişiyi gösteren alanlar anonim yapılır. İş kayıtları silinmez.
 
-Önizleme herkese açıktır: `dry_run: true` isteğini iki listedeki istemci de gönderebilir.
-Önizleme yalnız planı döner. Hiçbir kaydı değiştirmez.
-Gerçek yürütmeyi yalnız onay katmanı başlatır.
-Yürütme isteği `preview_digest` ve `approval_id` alanlarını taşımalıdır.
-Buradaki onay, hesabın sahibinin kendi onayıdır. Onayı onay katmanı alır.
+Ucu yalnız Press çağırabilir. Belirteç `azp=press-service` ve `aud=identity-sync` taşır.
+İzinli istemciler `IDENTITY_SYNC_DELETION_AZP` ayarındadır. Öteki listelerdeki istemciler 403 alır.
+Bu uçta önizleme ve onay kimliği yoktur. Onay, hesap sahibinin yeni girişidir.
+Press müşteriyi Keycloak'ta yeniden doğrular ve bu girişin zamanını `reauthenticated_at` alanında gönderir.
+Servis 300 saniyeden eski girişi reddeder. Gelecekteki bir zamanı da reddeder.
 
-Servis isteği işe başlamadan önce kaydeder. İsteğin kimliği `approval_id` değeridir.
-Bir adım başarısız olursa yanıt yine 200 olur ve durum `dead_lettered` ya da `unknown` olur.
+Servis isteği işe başlamadan önce kaydeder. İsteğin kimliği hesabın anahtarlı özetidir.
+Bir adım başarısız olursa yanıt yine 200 olur ve durum `dead_lettered` ya da `unknown` olur. Sonraki adımlar yürümez.
 İstek o zaman bekleme kuyruğundadır. İnsan isteği `POST /v1/dead-letters/replay` ile yeniden işletir.
+Press de aynı isteği yeniden gönderebilir. Servis bitmemiş ilk adımdan sürdürür.
 ",identity_sync.openapi.yaml: paths./v1/account-deletions.post.description
-"In a preview it returns the plan and `preview_digest`.
-In an execution it returns the result of the request. The status is `processed`, `dead_lettered`, `unknown` or `duplicate`.
-","Önizlemede plan ve `preview_digest` döner.
-Yürütmede isteğin sonucu döner. Durum `processed`, `dead_lettered`, `unknown` ya da `duplicate` olur.
-",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.200.description
-"The body is invalid. For example, `dry_run` is missing or the approval fields are missing in an execution.",Gövde hatalı. Örneğin `dry_run` yok ya da yürütmede onay alanları eksik.,identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.400.description
+"The result of the request. The status is `processed`, `dead_lettered`, `unknown` or `duplicate`.","İsteğin sonucu. Durum `processed`, `dead_lettered`, `unknown` ya da `duplicate` olur.",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.200.description
+"The body is invalid. For example, a field is missing, the body carries another field or `issuer` is not the issuer of the realm.","Gövde geçersiz. Örneğin bir alan eksiktir, gövde başka bir alan taşır ya da `issuer` realm'in yayıncı adresi değildir.",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.400.description
+"The client is not in the deletion list. The error code is `forbidden`.
+Or the login in `reauthenticated_at` is older than 300 seconds. The error code is `reauthentication_required`.
+Press then authenticates the customer again and sends a new request.
+","İstemci silme listesinde değildir. Hata kodu `forbidden` olur.
+Ya da `reauthenticated_at` alanındaki giriş 300 saniyeden eskidir. Hata kodu `reauthentication_required` olur.
+Press o zaman müşteriyi yeniden doğrular ve yeni istek gönderir.
+",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.403.description
 Requests the deletion of one account and executes the flow.,Bir hesabın silinmesini ister ve akışı yürütür.,identity_sync.openapi.yaml: paths./v1/account-deletions.post.summary
 "This endpoint is the HTTP counterpart of the `dead-letters` command.
 The endpoint only reads. The records carry no email.
@@ -975,37 +1007,52 @@ Düzeltmede farklar ve her işin sonucu döner.
 "Compares Keycloak, Press and tenant users and repairs the difference.","Keycloak, Press ve kiracı kullanıcılarını karşılaştırır ve farkı düzeltir.",identity_sync.openapi.yaml: paths./v1/reconcile.post.summary
 "The source is the shared contract (`docs/sozlesmeler.md`), section 7.
 When a user revokes a phone installation, `platform_core` calls this endpoint.
-The phone installation stores the `sid` value of the token at registration time. The body carries this value.
-The service deletes that session with the Keycloak Admin API. When the session is deleted, the refresh token also becomes invalid.
+The phone installation stores the `sid` value of the token at registration time. The body carries this value and the id of the user.
+
+The service limits the caller to its own tenant. It finds the tenant from the `azp` value of the token and the tenant list.
+The body cannot choose the tenant. The service reads two facts from the Keycloak Admin API before it deletes anything.
+First, the user must be a member of the organization of the calling tenant. If not, the service returns 403.
+Second, the session must be in the session list of that user. The service deletes only such a session.
+When the session is deleted, the refresh token also becomes invalid.
 
 The endpoint can be repeated. If the session is already ended, the service still returns 200.
-The service counts a ""session not found"" response as success only after it confirms that the realm responds.
-The reason is that a wrong address also returns 404.
+If the session is not in the list of the user, the service deletes nothing and returns 200.
 
 Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint.
 This list carries the service clients of the `platform_core` sites. An example is `site-kiraci1`.
 The site requests the token with the `aud-identity-sync` scope (the shared contract, `docs/sozlesmeler.md`, section 2).
-Clients in the preview and execute lists cannot call this endpoint.
+Clients in the other lists cannot call this endpoint.
 This endpoint needs no human approval. The reason is that the user's own revoke action starts the work.
 This endpoint is destructive. An ended session cannot be opened again. The user logs in again.
 ","Kaynak ortak sözleşmenin 7. bölümüdür.
 Kullanıcı bir telefon kurulumunu iptal edince `platform_core` bu ucu çağırır.
-Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Gövde bu değeri taşır.
-Servis Keycloak Admin API ile o oturumu siler. Oturum silinince yenileme belirteci de geçersiz olur.
+Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Gövde bu değeri ve kullanıcının kimliğini taşır.
+
+Servis çağıranı kendi kiracısıyla sınırlar. Kiracıyı belirtecin `azp` değerinden ve kiracı listesinden bulur.
+Gövde kiracıyı seçemez. Servis bir şey silmeden önce Keycloak Admin API'den iki bilgiyi okur.
+Birincisi: kullanıcı, çağıran kiracının kuruluşuna üye olmalıdır. Değilse servis 403 döner.
+İkincisi: oturum o kullanıcının oturum listesinde olmalıdır. Servis yalnız böyle bir oturumu siler.
+Oturum silinince yenileme belirteci de geçersiz olur.
 
 Uç tekrar edilebilir. Oturum zaten kapalıysa servis yine 200 döner.
-Servis “oturum yok” yanıtını ancak realm'in yanıt verdiğini doğrulayınca başarı sayar.
-Çünkü yanlış adres de 404 döner.
+Oturum kullanıcının listesinde yoksa servis hiçbir şey silmez ve 200 döner.
 
 Ucu yalnız `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci çağırabilir.
 Bu liste `platform_core` sitelerinin servis istemcilerini taşır. Örnek: `site-kiraci1`.
 Site belirteci `aud-identity-sync` kapsamıyla ister (ortak sözleşme, 2. bölüm).
-Önizleme ve yürütme listelerindeki istemciler bu ucu çağıramaz.
+Öteki listelerdeki istemciler bu ucu çağıramaz.
 Bu uç insan onayı istemez. Çünkü işi kullanıcının kendi iptal işlemi başlatır.
 Bu uç yıkıcıdır: kapanan oturum geri açılamaz. Kullanıcı yeniden giriş yapar.
 ",identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.description
 "The session is ended. If the session was ended before this request, the response is still this one.",Oturum kapalı. Oturum bu istekten önce kapalıysa yanıt yine budur.,identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.responses.200.description
-"The body is invalid. For example, `sid` is missing or invalid.",Gövde hatalı. Örneğin `sid` yok ya da geçersiz.,identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.responses.400.description
+"The body is invalid. For example, `sid` or `subject` is missing or invalid.",Gövde geçersiz. Örneğin `sid` ya da `subject` eksik ya da geçersizdir.,identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.responses.400.description
+"The client is not in the session list, or no tenant in the tenant list belongs to the client.
+The response is the same when the user is not a member of the organization of the calling tenant.
+The error code is `forbidden`.
+","İstemci oturum listesinde değildir ya da kiracı listesindeki hiçbir kiracı bu istemciye ait değildir.
+Kullanıcı çağıran kiracının kuruluşuna üye değilse de yanıt aynıdır.
+Hata kodu `forbidden` olur.
+",identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.responses.403.description
 Ends one Keycloak session.,Bir Keycloak oturumunu kapatır.,identity_sync.openapi.yaml: paths./v1/sessions/revoke.post.summary
 "Press calls this endpoint when it creates a new site (G-39, G-112).
 The core of the work exists in code. The HTTP endpoint does not exist yet.

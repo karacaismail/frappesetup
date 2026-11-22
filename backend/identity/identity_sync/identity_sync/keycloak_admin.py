@@ -358,6 +358,10 @@ class KeycloakAdmin:
                 raise
             self._confirm_realm_answers()
 
+    def list_user_session_ids(self, subject: str) -> tuple[str, ...]:
+        """Ids of the user's active sessions. Used to check that a session belongs to the user."""
+        return tuple(str(row.get("id", "")) for row in self._list(f"/users/{_quote(subject)}/sessions"))
+
     def delete_session(self, session_id: str) -> None:
         """End one Keycloak session. Its refresh token stops working too.
 

@@ -76,6 +76,14 @@ class ConfigTest(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load_settings({**self.ENV, "IDENTITY_SYNC_PREVIEW_AZP": "ai-agent, approval-service"})
 
+    def test_only_press_may_request_account_deletions_by_default(self) -> None:
+        # docs/sozlesmeler.md, section 7: the caller is the press-service client.
+        settings = load_settings(self.ENV)
+        self.assertEqual(settings.deletion_azp, frozenset({"press-service"}))
+        self.assertIn("press-service", settings.known_azp)
+        with self.assertRaises(ConfigError):
+            load_settings({**self.ENV, "IDENTITY_SYNC_PREVIEW_AZP": "press-service"})
+
     def test_session_clients_are_their_own_list(self) -> None:
         settings = load_settings(self.ENV)
         self.assertEqual(settings.session_azp, frozenset({"site-kiraci1"}))

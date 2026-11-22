@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.6.0
+  version: 0.7.0
   summary: Endpoints of the user sync service
   description: |
     This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
@@ -19,10 +19,11 @@ info:
     Destructive work is work that disables a user or removes a membership.
     No endpoint does paid work.
 
-    `x-yurutme` tells who can execute the endpoint. It takes three values.
+    `x-yurutme` tells who can execute the endpoint. It takes four values.
     The value that names the approval layer means this. Only the approval layer starts the real execution.
     `otomatik` means the endpoint needs no human approval. For example, the event endpoint is like this.
     `yalniz-okur` means the endpoint changes no record.
+    `yalniz-press` means only the Press service client starts the work. The account deletion endpoint is like this.
 
     ## AI and human approval
 
@@ -58,9 +59,11 @@ info:
     The service writes no event in that request.
     The service computes the plan once more at execution time. If the plan is not exactly the same, the operation does not run.
 
-    The service keeps two client lists.
+    The service keeps four client lists. A client can be in only one list.
     A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
     A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute.
+    A client in the `IDENTITY_SYNC_SESSION_AZP` list can only end a session. It is the client of a tenant site.
+    A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
     Only a trusted service client goes into the execute list.
     The agent token and the model identity do not go into this list.
     The trust boundary is this. Only the client of the approval layer can call execution.
@@ -73,20 +76,27 @@ info:
     The source of the account deletion flow is the shared contract (`docs/sozlesmeler.md`), section 7, and project record O-27.
     The flow has five steps and the order is fixed.
 
-    1. The service disables the Keycloak user and ends the user's sessions.
+    1. The service disables the Keycloak user. It does not delete the user in this step.
     2. The service sends an `all_organizations: true` request to Press. Press disables the user and invalidates the API keys.
     3. The service disables the user in every tenant. Then it has the phone installations and the notification links deleted.
     4. The service has the fields that identify the person anonymized in Press and in every tenant. Business records are not deleted.
     5. The service deletes the Keycloak user.
 
-    Every step can be repeated. If a step fails, the request goes into the dead-letter queue.
-    If one of the earlier steps failed, the service skips step 5. That is, it does not delete the Keycloak user.
-    A human replays the request with the `POST /v1/dead-letters/replay` endpoint.
-    When the work is done, only the id of the request stays in the service record. The record carries no email.
+    Only Press starts this flow, with the `POST /v1/account-deletions` endpoint.
+    The customer asks for the deletion on Press. Press authenticates the customer again in Keycloak before it calls the service.
+    The `delete_account` action of Keycloak itself is switched off. That action deletes the user in the first step.
+
+    Every step can be repeated. The steps depend on each other.
+    If a step fails, the service executes no later step and the request goes into the dead-letter queue.
+    The service stores how many steps are finished. A replay continues from the first step that is not finished.
+    A human replays the request with the `POST /v1/dead-letters/replay` endpoint. Press can also send the same request again.
+    The id of the request is a keyed digest of the account. So one account is always one request.
+    When the work is done, only this id stays in the service record. The record carries no email and no user id.
     The service processes the user by the `sub` id. It never stores the email.
 
-    The Keycloak `DELETE_ACCOUNT` event also starts the same flow.
-    In that case the user is already deleted in Keycloak. Steps 1 and 5 do nothing.
+    An administrator can delete a user on the Keycloak admin screen. The event listener then sends the `USER_DELETE` event.
+    The service confirms that Keycloak no longer has the user. Then it executes steps 2, 3 and 4 in the same order.
+    If the event is lost, the reconcile command finds the deleted user.
 
     For a user disabled in Keycloak, the service also has the phone installations revoked.
     This operation is part of the disable plan.
@@ -94,9 +104,9 @@ info:
     Steps 3 and 4 call three endpoints in the tenant and in Press. The names are in the shared contract (`docs/sozlesmeler.md`), sections 5, 6 and 7.
     The endpoints are named `platform_core.api.mobile.revoke_user_installations`,
     `platform_core.api.identity.anonymize_user` and `press_tr.api.identity.anonymize_user`.
-    The shared contract does not define the response body of these endpoints.
-    The responses the service expects are in the `Target` schemas at the end of this file. These schemas are a proposal.
-    Until these endpoints are written, those steps fail and the request stays in the dead-letter queue.
+    The shared contract defines the response of the two anonymize endpoints: 200 with the `anonymized` and `found` fields.
+    These endpoints return 409 for a lock conflict or a timeout. The service then tries the request again.
+    The responses the service expects are in the `Target` schemas at the end of this file.
 
     ## Common errors of all endpoints
 
@@ -543,17 +553,21 @@ paths:
       description: |
         The source is the shared contract (`docs/sozlesmeler.md`), section 7.
         When a user revokes a phone installation, `platform_core` calls this endpoint.
-        The phone installation stores the `sid` value of the token at registration time. The body carries this value.
-        The service deletes that session with the Keycloak Admin API. When the session is deleted, the refresh token also becomes invalid.
+        The phone installation stores the `sid` value of the token at registration time. The body carries this value and the id of the user.
+
+        The service limits the caller to its own tenant. It finds the tenant from the `azp` value of the token and the tenant list.
+        The body cannot choose the tenant. The service reads two facts from the Keycloak Admin API before it deletes anything.
+        First, the user must be a member of the organization of the calling tenant. If not, the service returns 403.
+        Second, the session must be in the session list of that user. The service deletes only such a session.
+        When the session is deleted, the refresh token also becomes invalid.
 
         The endpoint can be repeated. If the session is already ended, the service still returns 200.
-        The service counts a "session not found" response as success only after it confirms that the realm responds.
-        The reason is that a wrong address also returns 404.
+        If the session is not in the list of the user, the service deletes nothing and returns 200.
 
         Only a client in the `IDENTITY_SYNC_SESSION_AZP` list can call the endpoint.
         This list carries the service clients of the `platform_core` sites. An example is `site-kiraci1`.
         The site requests the token with the `aud-identity-sync` scope (the shared contract, `docs/sozlesmeler.md`, section 2).
-        Clients in the preview and execute lists cannot call this endpoint.
+        Clients in the other lists cannot call this endpoint.
         This endpoint needs no human approval. The reason is that the user's own revoke action starts the work.
         This endpoint is destructive. An ended session cannot be opened again. The user logs in again.
       x-durum: uygulandi
@@ -575,7 +589,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/SessionRevokeResult"
         "400":
-          description: The body is invalid. For example, `sid` is missing or invalid.
+          description: The body is invalid. For example, `sid` or `subject` is missing or invalid.
           content:
             application/json:
               schema:
@@ -583,7 +597,14 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
+          description: |
+            The client is not in the session list, or no tenant in the tenant list belongs to the client.
+            The response is the same when the user is not a member of the organization of the calling tenant.
+            The error code is `forbidden`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "502":
           $ref: "#/components/responses/UpstreamFailed"
   /v1/account-deletions:
@@ -592,24 +613,26 @@ paths:
       summary: Requests the deletion of one account and executes the flow.
       description: |
         The source is the shared contract (`docs/sozlesmeler.md`), section 7, and project record O-27.
-        A user asks for the deletion of the user's own account. The service records the request and executes the five steps in order.
+        A customer asks for the deletion of the customer's own account on Press. Press then calls this endpoint.
+        The service records the request and executes the five steps in order.
         The steps are in the "Account deletion and disabled accounts" section at the top of this file.
 
         This endpoint is destructive and cannot be undone. The user is disabled everywhere and deleted from Keycloak.
         The fields that identify the person are anonymized. Business records are not deleted.
 
-        The preview is open to both lists. A client in either list can send the `dry_run: true` request.
-        The preview only returns the plan. It changes no record.
-        Only the approval layer starts the real execution.
-        The execute request must carry the `preview_digest` and `approval_id` fields.
-        The approval here is the account owner's own approval. The approval layer collects the approval.
+        Only Press can call the endpoint. The token carries `azp=press-service` and `aud=identity-sync`.
+        The allowed clients are in the `IDENTITY_SYNC_DELETION_AZP` setting. Clients in the other lists get 403.
+        This endpoint has no preview and no approval id. The consent is the fresh login of the account owner.
+        Press authenticates the customer again in Keycloak and sends the time of that login in `reauthenticated_at`.
+        The service refuses a login that is older than 300 seconds. It also refuses a time that is in the future.
 
-        The service records the request before it starts the work. The id of the request is the `approval_id` value.
-        If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`.
+        The service records the request before it starts the work. The id of the request is a keyed digest of the account.
+        If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`. No later step is executed.
         The request is then in the dead-letter queue. A human replays the request with `POST /v1/dead-letters/replay`.
+        Press can also send the same request again. The service continues from the first step that is not finished.
       x-durum: uygulandi
       x-yikici: true
-      x-yurutme: yalniz-onay-katmani
+      x-yurutme: yalniz-press
       security:
         - serviceToken: []
       requestBody:
@@ -620,15 +643,13 @@ paths:
               $ref: "#/components/schemas/AccountDeletionRequest"
       responses:
         "200":
-          description: |
-            In a preview it returns the plan and `preview_digest`.
-            In an execution it returns the result of the request. The status is `processed`, `dead_lettered`, `unknown` or `duplicate`.
+          description: The result of the request. The status is `processed`, `dead_lettered`, `unknown` or `duplicate`.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AccountDeletionResult"
         "400":
-          description: The body is invalid. For example, `dry_run` is missing or the approval fields are missing in an execution.
+          description: The body is invalid. For example, a field is missing, the body carries another field or `issuer` is not the issuer of the realm.
           content:
             application/json:
               schema:
@@ -636,9 +657,14 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
-        "409":
-          $ref: "#/components/responses/PreviewChanged"
+          description: |
+            The client is not in the deletion list. The error code is `forbidden`.
+            Or the login in `reauthenticated_at` is older than 300 seconds. The error code is `reauthentication_required`.
+            Press then authenticates the customer again and sends a new request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /v1/tenants/{tenant}/client:
     post:
       operationId: ensureTenantClient
@@ -1255,9 +1281,11 @@ components:
           enum: [completed, abandoned]
     SessionRevokeRequest:
       type: object
-      required: [sid]
+      required: [sid, subject]
       properties:
         sid:
+          $ref: "#/components/schemas/ResourceId"
+        subject:
           $ref: "#/components/schemas/ResourceId"
       additionalProperties: false
     SessionRevokeResult:
@@ -1272,61 +1300,41 @@ components:
           const: true
           description: The session no longer exists.
     AccountDeletionRequest:
-      description: The caller must write the `dry_run` field explicitly. One of two forms is valid.
-      oneOf:
-        - $ref: "#/components/schemas/AccountDeletionPreviewRequest"
-        - $ref: "#/components/schemas/AccountDeletionExecuteRequest"
-    AccountDeletionPreviewRequest:
       type: object
-      description: A preview request. The service changes no record.
-      required: [subject, dry_run]
+      required: [issuer, subject, reauthenticated_at]
       properties:
+        issuer:
+          type: string
+          maxLength: 512
+          description: The issuer of the realm. It must be equal to the issuer in the service settings.
         subject:
           $ref: "#/components/schemas/ResourceId"
-        dry_run:
-          type: boolean
-          const: true
-    AccountDeletionExecuteRequest:
-      type: object
-      description: An execute request. Only the approval layer can send it.
-      required: [subject, dry_run, preview_digest, approval_id]
-      properties:
-        subject:
-          $ref: "#/components/schemas/ResourceId"
-        dry_run:
-          type: boolean
-          const: false
-        preview_digest:
-          $ref: "#/components/schemas/PreviewDigest"
-        approval_id:
-          $ref: "#/components/schemas/ApprovalId"
+        reauthenticated_at:
+          type: integer
+          description: The time when Press authenticated the customer again in Keycloak. The unit is seconds since 1970.
+      additionalProperties: false
     AccountDeletionResult:
       type: object
       required: [status]
       properties:
         status:
           type: string
-          enum: [preview, processed, dead_lettered, unknown, duplicate]
+          enum: [processed, dead_lettered, unknown, duplicate]
           description: |
-            `preview` shows that only the plan was returned.
-            `processed` shows that all five steps finished.
+            `processed` shows that every step that was left finished.
             `dead_lettered` shows that a step failed and the request waits in the queue.
             `unknown` shows that the result of a step is not known.
-            `duplicate` shows that this request finished before.
+            `duplicate` shows that the request for this account finished before.
         request_id:
-          $ref: "#/components/schemas/ApprovalId"
+          type: string
+          pattern: "^del-[0-9a-f]{40}$"
+          description: The id of the request. It is a keyed digest of the account, so it does not show the user.
         actions:
           type: array
-          description: The names of the steps that finished with definite success.
+          description: The names of the steps that finished with definite success in this call.
           items:
             type: string
-        previews:
-          type: array
-          description: Returned only in a preview.
-          items:
-            $ref: "#/components/schemas/Preview"
-        preview_digest:
-          $ref: "#/components/schemas/PreviewDigest"
+      additionalProperties: false
     ReconcileRequest:
       description: The caller must write the `dry_run` field explicitly. One of two forms is valid.
       oneOf:
@@ -1540,7 +1548,7 @@ components:
       description: |
         The response expected from the `platform_core.api.mobile.revoke_user_installations` endpoint.
         The name of the endpoint is in the shared contract (`docs/sozlesmeler.md`), section 5. Its owner is the platform-core-mobil job.
-        The shared contract does not define the response body. This schema is a proposal.
+        The shared contract does not define the response body. This schema follows the code of the platform-core-mobil job.
         The endpoint deletes all phone installations and notification links of the user.
         The request carries the `issuer` and `subject` fields. The endpoint must be safe to repeat.
         If there is no link, the endpoint returns 404 and `IdentityNotFound`. The service counts this response as success.
@@ -1559,20 +1567,26 @@ components:
       description: |
         The response expected from the `platform_core.api.identity.anonymize_user` and `press_tr.api.identity.anonymize_user` endpoints.
         The names of the endpoints are in the shared contract (`docs/sozlesmeler.md`), sections 5 and 6.
-        The shared contract does not define the response body. This schema is a proposal.
+        The shared contract defines the response: 200 with the `anonymized` and `found` fields.
         The endpoint disables the user and anonymizes the fields that identify the person. It does not delete business records.
         The endpoint in Press also invalidates the API keys.
-        The request carries the `issuer` and `subject` fields. The endpoint must be safe to repeat.
-        If there is no link, the endpoint returns 404 and `IdentityNotFound`. The service counts this response as success.
+        The request carries the `issuer` and `subject` fields. A repeated call gets the same response.
+        If the endpoint does not know the identity, `found` is false. The service counts this response as success.
+        The tenant can also return 404 and `IdentityNotFound` for an unknown identity. The service counts this response as success too.
+        The endpoint returns 409 for a lock conflict or a timeout. The service then tries the request again.
+        If a field is missing, the service does not know the result and does not continue with the next step.
       required: [message]
       properties:
         message:
           type: object
-          required: [anonymized]
+          required: [anonymized, found]
           properties:
             anonymized:
               type: boolean
-              const: true
+              description: True when the personal fields are anonymized or there was nothing to anonymize.
+            found:
+              type: boolean
+              description: False when the endpoint does not know the identity.
           additionalProperties: true
     TargetChangeEmailResult:
       type: object
@@ -1598,6 +1612,7 @@ components:
           type: string
           enum:
             - bad_request
+            - reauthentication_required
             - bad_signature
             - unauthorized
             - forbidden

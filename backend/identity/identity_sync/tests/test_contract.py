@@ -55,7 +55,9 @@ class DocumentationTest(unittest.TestCase):
                 self.assertGreater(len(operation.get("description", "")), 40)
                 self.assertIn(operation.get("x-durum"), ("uygulandi", "planlandi"))
                 self.assertIsInstance(operation.get("x-yikici"), bool)
-                self.assertIn(operation.get("x-yurutme"), ("yalniz-okur", "otomatik", "yalniz-onay-katmani"))
+                self.assertIn(
+                    operation.get("x-yurutme"), ("yalniz-okur", "otomatik", "yalniz-onay-katmani", "yalniz-press")
+                )
 
     def test_write_operations_are_reserved_for_the_approval_layer(self) -> None:
         # İnsanın başlattığı her yazma ucu onay alanlarını ister ve işaretlidir.
@@ -413,41 +415,45 @@ class SchemaTest(ServerCase):
 
         path, sid = "/v1/sessions/revoke", "55555555-5555-4555-8555-555555555555"
         kc = self.stack.keycloak
-        kc.on("DELETE", f"{kc.admin}/sessions/{sid}", (204, None))
-        request = {"sid": sid}
+        kc.add_session(SUBJECT, sid)
+        request = {"sid": sid, "subject": SUBJECT}
 
         self.assert_request(request, "POST", path)
         self.assert_response(self.post_json(path, request, SESSION_TOKEN), "POST", path, 200)
         self.assert_response(self.post_json(path, request, PREVIEW_TOKEN), "POST", path, 403)
-        for rejected in ({}, {"sid": ".."}, {"sid": sid, "user": "x"}):
+        stranger = {"sid": sid, "subject": "yok-boyle-kullanici"}
+        self.assert_request(stranger, "POST", path)
+        self.assert_response(self.post_json(path, stranger, SESSION_TOKEN), "POST", path, 403)
+        for rejected in ({}, {"sid": sid}, {"sid": "..", "subject": SUBJECT}, {**request, "user": "x"}):
             with self.subTest(rejected=rejected):
                 self.assertNotEqual(schema_errors(rejected, request_schema("POST", path), CONTRACT), [])
                 self.assert_response(self.post_json(path, rejected, SESSION_TOKEN), "POST", path, 400)
         self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
+        kc.add_session(SUBJECT, sid)
         kc.on("DELETE", f"{kc.admin}/sessions/{sid}", (500, None))
         self.assert_response(self.post_json(path, request, SESSION_TOKEN), "POST", path, 502)
 
     def test_account_deletion(self) -> None:
+        from .test_server import NOW, PRESS_TOKEN
+
         path = "/v1/account-deletions"
         issuer = self.stack.issuer
         self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
         self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
-        preview_request = {"subject": SUBJECT, "dry_run": True}
+        request = {"issuer": issuer, "subject": SUBJECT, "reauthenticated_at": NOW - 10}
 
-        self.assert_request(preview_request, "POST", path)
-        preview = self.assert_response(self.post_json(path, preview_request, PREVIEW_TOKEN), "POST", path, 200)
-        execute = {**preview_request, "dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-s1"}
-        self.assert_request(execute, "POST", path)
-        self.assert_response(self.post_json(path, execute, PREVIEW_TOKEN), "POST", path, 403)
-        stale = {**execute, "preview_digest": "0" * 64, "approval_id": "onay-s0"}
-        self.assert_response(self.post_json(path, stale), "POST", path, 409)
-        queued = self.assert_response(self.post_json(path, execute), "POST", path, 200)
+        self.assert_request(request, "POST", path)
+        self.assert_response(self.post_json(path, request, PREVIEW_TOKEN), "POST", path, 403)
+        stale = {**request, "reauthenticated_at": NOW - 301}
+        self.assert_request(stale, "POST", path)
+        refused = self.assert_response(self.post_json(path, stale, PRESS_TOKEN), "POST", path, 403)
+        self.assertEqual(refused, {"error": "reauthentication_required"})
+        queued = self.assert_response(self.post_json(path, request, PRESS_TOKEN), "POST", path, 200)
         self.assertEqual(queued["status"], "dead_lettered")
-        self.assert_response(self.post_json(path, execute), "POST", path, 409)
-        for rejected in ({}, {"subject": SUBJECT}, {"subject": "..", "dry_run": True}, {"subject": SUBJECT, "dry_run": False}):
+        for rejected in ({}, {"issuer": issuer, "subject": SUBJECT}, {**request, "subject": ".."}, {**request, "dry_run": True}):
             with self.subTest(rejected=rejected):
                 self.assertNotEqual(schema_errors(rejected, request_schema("POST", path), CONTRACT), [])
-                self.assert_response(self.post_json(path, rejected), "POST", path, 400)
+                self.assert_response(self.post_json(path, rejected, PRESS_TOKEN), "POST", path, 400)
         self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
         # The queued request is listed with its own event kind.
         self.assert_response(
@@ -473,6 +479,13 @@ class SchemaTest(ServerCase):
                 status, body = TargetReplyTest.post(self, site, target_path, identity)
                 self.assertEqual(status, 200)
                 self.assertEqual(schema_errors(body, CONTRACT["components"]["schemas"][schema_name], CONTRACT), [])
+        # An identity Press does not know: 200 with found false (docs/sozlesmeler.md, section 6).
+        unknown = {"issuer": issuer, "subject": "yok-boyle-kullanici"}
+        status, body = TargetReplyTest.post(self, press, fakes.PRESS_ANONYMIZE, unknown)
+        self.assertEqual((status, body), (200, {"message": {"anonymized": True, "found": False}}))
+        schema = CONTRACT["components"]["schemas"]["TargetAnonymizeUserResult"]
+        self.assertEqual(schema_errors(body, schema, CONTRACT), [])
+        self.assertNotEqual(schema_errors({"message": {"anonymized": True}}, schema, CONTRACT), [])
 
     def test_operations(self) -> None:
         kc = self.stack.keycloak

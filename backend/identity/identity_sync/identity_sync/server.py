@@ -39,7 +39,7 @@ from identity_sync.events import (
     parse_event,
 )
 from identity_sync.httpjson import HttpError, TransportError
-from identity_sync.keycloak_admin import InviteResult, PlanChanged
+from identity_sync.keycloak_admin import InviteResult, PlanChanged, site_client_id
 from identity_sync.pipeline import PreviewChanged, replay_report
 from identity_sync.store import Busy
 
@@ -50,6 +50,9 @@ _MAX_DRAIN_BYTES = 1024 * 1024
 SIGNATURE_HEADER = "X-Identity-Sync-Signature"
 TIMESTAMP_HEADER = "X-Identity-Sync-Timestamp"
 SIGNATURE_WINDOW_SECONDS = 300
+# docs/sozlesmeler.md, section 7: a re-authentication older than this is refused.
+REAUTHENTICATION_MAX_AGE_SECONDS = 300
+CLOCK_SKEW_SECONDS = 30
 _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,189}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _TIMESTAMP = re.compile(r"^[0-9]{1,12}$")
@@ -183,6 +186,12 @@ class _Api:
         Yürütmeyi yalnız `execute_azp` listesindeki istemci başlatır. İstek onay kimliğini
         ve önizleme özetini taşır. Servis çağıranı, onayı ve özeti günlüğe yazar.
         """
+        digest = self._approved_digest(operation, payload, azp)
+        self._claim(operation, payload, azp, digest)
+        return digest
+
+    def _approved_digest(self, operation: str, payload: Mapping[str, object], azp: str) -> str:
+        """Check who asks and the shape of the approval. Consumes nothing."""
         if azp not in self._settings.execute_azp:
             _LOG.warning("execute operation=%s azp=%s outcome=forbidden", operation, azp)
             raise _Forbidden
@@ -190,12 +199,24 @@ class _Api:
         approval_id = _text(payload, "approval_id", required=True, max_length=128)
         if not _DIGEST.fullmatch(digest) or not RESOURCE_ID.fullmatch(approval_id):
             raise _BadRequest
-        # An approval works once. It is consumed here, before any external write, and stays
-        # bound to this digest. A changed plan needs a new preview and a new approval anyway.
-        if not self._app.store.claim_approval(approval_id, digest, operation):
+        return digest
+
+    def _claim(
+        self,
+        operation: str,
+        payload: Mapping[str, object],
+        azp: str,
+        digest: str,
+        journal: tuple[str, list[str]] | None = None,
+    ) -> None:
+        """Consume the approval, and open the operation journal in the same transaction.
+
+        An approval works once. It is consumed before any external write and stays bound to
+        this digest. A changed plan needs a new preview and a new approval anyway.
+        """
+        if not self._app.store.claim_approval(str(payload["approval_id"]), digest, operation, journal=journal):
             self._audit(operation, payload, azp, "approval_used")
             raise _ApprovalUsed
-        return digest
 
     @staticmethod
     def _audit(operation: str, payload: Mapping[str, object], azp: str, outcome: str) -> None:
@@ -233,7 +254,7 @@ class _Api:
         first_name, last_name = _text(payload, "first_name"), _text(payload, "last_name")
         if not _EMAIL.fullmatch(email) or not RESOURCE_ID.fullmatch(organization_id):
             raise _BadRequest
-        digest = None if dry_run else self._approval("invite_user", payload, azp)
+        digest = None if dry_run else self._approved_digest("invite_user", payload, azp)
         keycloak = self._app.keycloak
         preview = keycloak.invite_user(email, first_name, last_name, organization_id, dry_run=True)
         previews = [item.to_dict() for item in preview.previews]
@@ -251,8 +272,12 @@ class _Api:
         if dry_run:
             return 200, {"subject": preview.subject, "previews": previews, "preview_digest": current}
         if digest != current:
+            self._claim("invite_user", payload, azp, digest)  # a refused approval is spent too
             self._audit("invite_user", payload, azp, "preview_changed")
             return 409, {"error": "preview_changed"}
+        # The approval and the journal are written together. A crash after this line leaves
+        # the operation on record, so the spent approval is never the only trace.
+        self._claim("invite_user", payload, azp, digest, (organization_id, [item.operation for item in preview.previews]))
         return self._run_invitation(payload, azp, email, first_name, last_name, organization_id, preview)
 
     def _run_invitation(
@@ -273,7 +298,6 @@ class _Api:
         """
         store = self._app.store
         operation_id = str(payload["approval_id"])
-        store.operation_begin(operation_id, "invite_user", organization_id, [item.operation for item in preview.previews])
         if preview.subject:
             store.operation_subject(operation_id, preview.subject)
         try:
@@ -306,61 +330,86 @@ class _Api:
     # --- account deletion (docs/sozlesmeler.md, section 7; PROJE-KAYDI.md, O-27) ---
 
     def post_account_deletion(self, body: bytes, azp: str, now: float) -> Reply:
-        """Preview or run the account deletion flow for one user.
+        """Record and run the account deletion flow for one user. Only Press calls this.
 
-        The run is recorded as a request event whose id is the approval id. It goes through the
-        same pipeline as a Keycloak event: recorded before work starts, queued when a step fails,
-        replayed by hand. The record holds the user's `sub` only, never an e-mail.
+        The customer asks for the deletion on Press. Press re-authenticates the customer in
+        Keycloak and sends the time of that login. That fresh login is the owner's consent,
+        so there is no preview and no approval id here.
+
+        The request is recorded before the first write and goes through the same pipeline as a
+        Keycloak event: queued when a step fails, continued from that step by hand or when Press
+        sends the request again. The request id is a keyed digest of the account, so the same
+        account is always the same job and the finished record does not name the user.
         """
         payload = _json_object(body)
-        dry_run = _flag(payload, "dry_run")
-        subject = _text(payload, "subject", required=True, max_length=128)
-        if not RESOURCE_ID.fullmatch(subject):
+        if set(payload) != {"issuer", "subject", "reauthenticated_at"}:
             raise _BadRequest
-        processor = self._app.processor
-        realm = self._settings.realm
-
-        def request(event_id: str) -> Event:
-            return Event(
-                id=event_id, kind=REQUEST_KIND, type=ACCOUNT_DELETION, realm=realm, time=int(now * 1000), user_id=subject
-            )
-
-        preview = processor.handle(request("preview"), dry_run=True)
-        current = self._app.digest({"operation": "delete_account", "subject": subject, "plan": preview.plan_digest})
-        if dry_run:
-            previews = [item.to_dict() for item in preview.previews]
-            return 200, {"status": "preview", "previews": previews, "preview_digest": current}
-        digest = self._approval("delete_account", payload, azp)
-        request_id = str(payload["approval_id"])
-        if digest != current:
-            self._audit("delete_account", payload, azp, "preview_changed")
-            return 409, {"error": "preview_changed"}
-        try:
-            result = processor.handle(request(request_id), approved_digest=preview.plan_digest)
-        except PreviewChanged:
-            self._audit("delete_account", payload, azp, "preview_changed")
-            return 409, {"error": "preview_changed"}
-        self._audit("delete_account", payload, azp, result.status)
+        subject = _text(payload, "subject", required=True, max_length=128)
+        issuer = _text(payload, "issuer", required=True, max_length=512)
+        reauthenticated_at = payload["reauthenticated_at"]
+        if not RESOURCE_ID.fullmatch(subject) or issuer != self._settings.issuer:
+            raise _BadRequest
+        if isinstance(reauthenticated_at, bool) or not isinstance(reauthenticated_at, int):
+            raise _BadRequest
+        request_id = "del-" + self._app.digest({"operation": "delete_account", "issuer": issuer, "subject": subject})[:40]
+        age = now - reauthenticated_at
+        if age > REAUTHENTICATION_MAX_AGE_SECONDS or age < -CLOCK_SKEW_SECONDS:
+            self._audit_deletion(azp, request_id, "reauthentication_required")
+            return 403, {"error": "reauthentication_required"}
+        request = Event(
+            id=request_id,
+            kind=REQUEST_KIND,
+            type=ACCOUNT_DELETION,
+            realm=self._settings.realm,
+            time=int(now * 1000),
+            user_id=subject,
+        )
+        result = self._app.processor.handle(request)
+        self._audit_deletion(azp, request_id, result.status)
         return 200, {"status": result.status, "request_id": request_id, "actions": list(result.actions)}
+
+    @staticmethod
+    def _audit_deletion(azp: str, request_id: str, outcome: str) -> None:
+        # The log names the request, never the person.
+        _LOG.info("execute operation=delete_account azp=%s request_id=%s outcome=%s", azp, request_id, outcome)
 
     # --- sessions: called by platform_core sites, not by the approval flow ---
 
     def post_revoke_session(self, body: bytes, azp: str) -> Reply:
-        """End one Keycloak session (docs/sozlesmeler.md, section 7). Repeatable."""
+        """End one Keycloak session (docs/sozlesmeler.md, section 7). Repeatable.
+
+        A site may only end a session of a member of its own organization. The tenant comes from
+        the token's `azp`, never from the body. The session must belong to the named user.
+        """
         payload = _json_object(body)
-        if set(payload) != {"sid"}:
+        if set(payload) != {"sid", "subject"}:
             raise _BadRequest
         sid = _text(payload, "sid", required=True, max_length=128)
-        if not RESOURCE_ID.fullmatch(sid):
+        subject = _text(payload, "subject", required=True, max_length=128)
+        if not RESOURCE_ID.fullmatch(sid) or not RESOURCE_ID.fullmatch(subject):
             raise _BadRequest
+        keycloak = self._app.keycloak
         try:
-            self._app.keycloak.delete_session(sid)
+            tenant = next((t for t in self._settings.tenants if site_client_id(t.name) == azp), None)
+            if tenant is None or not self._is_member(subject, tenant.organization):
+                _LOG.warning("execute operation=revoke_session azp=%s outcome=forbidden", azp)
+                raise _Forbidden
+            # A session that is not in the user's list is already closed, or it belongs to
+            # someone else. Either way nothing is deleted and the answer is the same.
+            if sid in keycloak.list_user_session_ids(subject):
+                keycloak.delete_session(sid)
         except (HttpError, TransportError):
             _LOG.warning("execute operation=revoke_session azp=%s outcome=upstream_failed", azp)
             raise
         # The session id is not a secret, but it is not needed in the log either.
         _LOG.info("execute operation=revoke_session azp=%s outcome=executed", azp)
         return 200, {"sid": sid, "revoked": True}
+
+    def _is_member(self, subject: str, organization_alias: str) -> bool:
+        keycloak = self._app.keycloak
+        if keycloak.get_user(subject) is None:
+            return False
+        return any(org.alias == organization_alias for org in keycloak.list_user_organizations(subject))
 
     # --- unfinished multi-step work ---
 
@@ -418,7 +467,8 @@ def make_server(
         "/v1/account-deletions": ("POST", lambda body, azp: api.post_account_deletion(body, azp, clock())),
     }
     # Routes for platform_core site clients. Every other token route is for the preview and approval flow.
-    session_routes = frozenset({"/v1/sessions/revoke"})
+    # Each of these routes has its own caller list. A client is in one list only.
+    special_routes = {"/v1/sessions/revoke": settings.session_azp, "/v1/account-deletions": settings.deletion_azp}
     methods = {"/healthz": "GET", "/v1/events": "POST", **{path: route[0] for path, route in token_routes.items()}}
 
     class RequestHandler(BaseHTTPRequestHandler):
@@ -493,7 +543,7 @@ def make_server(
             azp = self._caller()
             if azp is None:
                 return 401, {"error": "unauthorized"}
-            allowed = settings.session_azp if path in session_routes else settings.staff_azp
+            allowed = special_routes.get(path, settings.staff_azp)
             if azp not in allowed:
                 return 403, {"error": "forbidden"}
             if resolve is not None:

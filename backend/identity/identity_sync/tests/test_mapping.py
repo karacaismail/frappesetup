@@ -12,6 +12,7 @@ from identity_sync.events import Event
 from identity_sync.mapping import (
     EnsureOrganization,
     KeycloakDeleteUser,
+    OrderedPlan,
     KeycloakDisableUser,
     PressAnonymizeUser,
     TenantAnonymizeUser,
@@ -155,10 +156,6 @@ class EmailChangeTest(unittest.TestCase):
 
 
 class RemovalTest(unittest.TestCase):
-    def test_account_deletion_event_runs_the_full_deletion_flow(self) -> None:
-        # Keycloak's own account deletion starts the same flow as the request endpoint.
-        self.assertEqual(plan(event("user", "DELETE_ACCOUNT"), None), ACCOUNT_DELETION)
-
     def test_account_deletion_request_runs_the_full_deletion_flow(self) -> None:
         self.assertEqual(plan(event("request", "ACCOUNT_DELETION"), None), ACCOUNT_DELETION)
 
@@ -169,14 +166,21 @@ class RemovalTest(unittest.TestCase):
             with self.subTest(snapshot=snapshot):
                 self.assertEqual(plan(request, snapshot), ACCOUNT_DELETION)
 
-    def test_keycloak_user_is_deleted_last(self) -> None:
-        # Everything else is keyed by (issuer, subject) and must finish before the user disappears.
+    def test_keycloak_user_is_disabled_first_and_deleted_last(self) -> None:
+        # docs/sozlesmeler.md, section 7: step 1 only disables. Step 5 deletes.
         actions = plan(event("request", "ACCOUNT_DELETION"), None)
         self.assertIsInstance(actions[0], KeycloakDisableUser)
         self.assertIsInstance(actions[-1], KeycloakDeleteUser)
+        self.assertEqual(sum(isinstance(a, KeycloakDeleteUser) for a in actions), 1)
         first_anonymize = min(i for i, a in enumerate(actions) if isinstance(a, (PressAnonymizeUser, TenantAnonymizeUser)))
         last_close = max(i for i, a in enumerate(actions) if isinstance(a, (TenantSetEnabled, TenantRevokeUserInstallations)))
         self.assertLess(last_close, first_anonymize)
+
+    def test_deletion_plans_are_ordered(self) -> None:
+        # An ordered plan stops at the first step that is not done.
+        self.assertIsInstance(plan(event("request", "ACCOUNT_DELETION"), None), OrderedPlan)
+        self.assertIsInstance(plan(event("admin", "USER_DELETE"), None), OrderedPlan)
+        self.assertNotIsInstance(plan(event("admin", "USER_UPDATE"), user(enabled=False)), OrderedPlan)
 
     def test_every_deletion_step_is_destructive(self) -> None:
         for action in plan(event("request", "ACCOUNT_DELETION"), None):
@@ -187,8 +191,21 @@ class RemovalTest(unittest.TestCase):
     def test_request_kind_with_another_type_is_not_handled(self) -> None:
         self.assertEqual(plan(event("request", "VERIFY_EMAIL"), user()), ())
 
-    def test_admin_deleted_user_is_disabled_everywhere(self) -> None:
-        self.assertEqual(plan(event("admin", "USER_DELETE"), None), DEPROVISION_EVERYWHERE)
+    def test_user_deleted_in_keycloak_gets_steps_two_to_four(self) -> None:
+        # An administrator deleted the user in Keycloak. There is nothing left to disable or delete
+        # there, but steps 2, 3 and 4 still run (docs/sozlesmeler.md, section 7).
+        for kind, type_ in (("admin", "USER_DELETE"), ("user", "DELETE_ACCOUNT")):
+            with self.subTest(type=type_):
+                self.assertEqual(plan(event(kind, type_), None), ACCOUNT_DELETION[1:-1])
+
+    def test_delete_event_for_a_user_that_still_exists_does_not_anonymize(self) -> None:
+        # The event says "deleted" but Keycloak still has the user. The current state decides.
+        actions = plan(event("admin", "USER_DELETE"), user())
+        self.assertFalse(any(isinstance(a, (PressAnonymizeUser, TenantAnonymizeUser)) for a in actions))
+        self.assertEqual(plan(event("admin", "USER_DELETE"), user(enabled=False)), DEPROVISION_EVERYWHERE)
+
+    def test_other_event_for_a_missing_user_only_closes(self) -> None:
+        self.assertEqual(plan(event("user", "VERIFY_EMAIL"), None), DEPROVISION_EVERYWHERE)
 
     def test_disabled_user_is_disabled_everywhere(self) -> None:
         self.assertEqual(plan(event("admin", "USER_UPDATE"), user(enabled=False)), DEPROVISION_EVERYWHERE)
