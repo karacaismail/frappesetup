@@ -19,9 +19,7 @@ Playwright 1.64.0 güncel yapılandırmada on test buldu.
 Chromium ve WebKit ön denemeleri giriş düğmesini bulamadı.
 Bu sonuç, kiracı girişi henüz birleşmediği için bekleniyordu.
 
-`list_documents` testinde `documents` alanı geçici olarak kullanılıyor.
-Yapay zekâ katmanının sözleşmesi henüz bu alanın biçimini tanımlamıyor.
-Sözleşme güncellenince testin beklentisini sözleşmeyle karşılaştırın.
+Önizlemedeki yapay zekâ sözleşmesi, `list_documents` sonucunda `documents` alanını tanımlar.
 
 Sahte sağlayıcı **429** ve **200** sırasını doğruladı.
 Kiracı ağı da sahte sağlayıcıya ulaştı.

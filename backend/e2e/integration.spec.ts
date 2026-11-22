@@ -109,7 +109,6 @@ test('agent token lists permitted records only', async ({ request }) => {
     doctype, filters: { name: ['in', [visible, hidden]] }, fields: ['name'],
   });
   expect(result.isError).toBe(false);
-  // The list_documents result schema is pending in the owning contract.
   expect(result.structuredContent.documents).toEqual([{ name: visible }]);
   const denied = await mcp(token, 'get_document', { doctype, name: hidden });
   expect(denied.isError).toBe(true);
