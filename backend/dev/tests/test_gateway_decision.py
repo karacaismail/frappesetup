@@ -87,3 +87,4 @@ class GatewayDecisionTests(unittest.TestCase):
         self.assertIn("github.com/frappe/pypika@", runtime["pypika"])
         testing = manifest["tool"]["bench"]["dev-dependencies"]
         self.assertLessEqual({"jsonschema", "PyYAML", "referencing", "Werkzeug"}, testing.keys())
+        self.assertEqual(testing["Werkzeug"], "~=3.1.9")
