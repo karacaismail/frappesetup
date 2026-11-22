@@ -315,7 +315,12 @@ test.describe('text scaling', () => {
     await expect.soft(page.locator('.req-meta').first()).toHaveCSS('line-height', '24px', { timeout: 1000 });
   });
 
-  for (const { width, root } of [{ width: 320, root: 150 }, { width: 320, root: 200 }, { width: 360, root: 200 }, { width: 412, root: 200 }]) {
+  for (const { width, root } of [
+    { width: 320, root: 150 },
+    { width: 320, root: 200 },
+    { width: 360, root: 200 },
+    { width: 412, root: 200 },
+  ]) {
     test(`@touch home action labels fit at ${width}px with ${root}% root font`, async ({ page }) => {
       await page.setViewportSize({ width, height: 640 });
       await page.goto('');
@@ -328,17 +333,18 @@ test.describe('text scaling', () => {
       await expect(actions).toHaveCount(3);
       for (const action of await actions.all()) {
         await expect(action).toBeVisible();
-        await expect(action).toHaveCSS('font-size', '32px');
+        await expect(action).toHaveCSS('font-size', `${BROWSER_DEFAULT_PX * root / 100}px`);
         const layout = await action.evaluate((link) => {
           const hero = link.closest('.hero')!.getBoundingClientRect();
+          const actions = link.closest('.actions')!.getBoundingClientRect();
           const button = link.getBoundingClientRect();
           const label = document.createRange();
           const text = (link.querySelector('span') ?? link).firstChild!;
           label.selectNodeContents(text);
           const labelRects = Array.from(label.getClientRects()).filter((rect) => rect.width > 0 && rect.height > 0);
           const fits = labelRects.length > 0 && [button, ...labelRects].every((rect) =>
-            rect.left >= Math.max(hero.left, button.left) - 0.5 &&
-            rect.right <= Math.min(hero.right, button.right) + 0.5 &&
+            rect.left >= Math.max(hero.left, actions.left, button.left) - 0.5 &&
+            rect.right <= Math.min(hero.right, actions.right, button.right) + 0.5 &&
             rect.top >= Math.max(hero.top, button.top) - 0.5 &&
             rect.bottom <= Math.min(hero.bottom, button.bottom) + 0.5,
           );
