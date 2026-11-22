@@ -13,6 +13,9 @@ Bu aralık `v0.155.0` ile başlar. Son etiket `v0.204.1` olur.
 
 Varsayılan dal `develop` olarak doğrulandı. `master` dalı da incelendi.
 İki dosyanın dal geçmişleri ayrıca tarandı.
+Bu tarama yalnız `cache_utils.py` ve ürün denemesi modülünü kapsar.
+`cookies.py`, test dosyasındaki ikinci `TypedDict` ve bağımlılık bildirimi bu taramada yoktur.
+Bu konular için bütün sürümlerin tarandığı iddia edilmez.
 
 | Kaynak | Kapsam |
 | --- | --- |
@@ -76,7 +79,10 @@ Geçmiş listelerinin tamlığı ve 22 farklı dosyanın içeriği de doğruland
 [Develop telemetri kaynağı](https://github.com/frappe/press/blob/d7d1cd2ae8352b8a78f0aefb210f9ea6d83cc410/press/saas/doctype/product_trial_request/product_trial_request.py#L16)
 [Master telemetri kaynağı](https://github.com/frappe/press/blob/a9a7acd487902e54253d38bd9ef79ce52be9bc86/press/saas/doctype/product_trial_request/product_trial_request.py#L16)
 
-## Çalıştırılan kabul testleri
+## İlk sürüm karşılaştırmasının kabul testleri
+
+Bu bölüm 22 Kasım 2026 Pazar günkü ilk develop denemesini kaydeder.
+Test sayıları, inceleme sonrası genişletilen testlerin sonucu değildir.
 
 Yeni Frappe temel imajı üretilmedi.
 Deneme `frappe/erpnext:v16.55.0` temel imajında çalıştı.
@@ -85,12 +91,12 @@ Derleme tek başına çalıştırıldı. Aynı anda başka ağır derleme başla
 Başlangıçta kullanılabilir bellek 49 GiB oldu. Boş disk 87 GB oldu.
 
 ```sh
-PANE_PORT=47320 docker --context colima-factory build \
+docker --context colima-factory build \
   --build-arg PRESS_REVISION=d7d1cd2ae8352b8a78f0aefb210f9ea6d83cc410 \
   -f backend/dev/press/Dockerfile.unpatched \
   -t fs-pd-press-py314:probe .
 
-PANE_PORT=47320 docker --context colima-factory compose \
+docker --context colima-factory compose \
   -f backend/dev/press/compose.unpatched.yaml run --rm probe
 ```
 
@@ -124,6 +130,40 @@ Son etiket ve master için aynı deneme yeniden derlenmedi.
 Site açılışının ön koşulu başarısız olduğundan site ve masa denenmedi.
 Deneme imajı ayrıca tam Press bağımlılık kurulumu değildir.
 Bu kapsamın dışında kalan işlevler çalışıyor diye sunulmaz.
+
+## Bağımsız incelemeyle tamamlanan kapsam
+
+İnceleme, v0.154.1 kaynağında üçüncü kaynak engelini doğruladı.
+`press/api/cookies.py:7`, Frappe'den `get_cookie_dict_from_headers` işlevini ister.
+Kurulu Frappe 16.56.0 bu işlevi sunmaz. Çerez tercihi modülü açılamaz.
+`Dockerfile.unpatched`, Press'i `--no-deps` seçeneğiyle kurar.
+Bu seçim bağımlılık çözümünü atlar. Tam bağımlılık kilidi sağlamaz.
+Press'in paket şartlarıyla aday sürümler arasında çelişkiler vardır.
+Örneğin Ansible `3.4.0` şartını aday `14.0.0` karşılamaz.
+`uv pip check` eksik paketleri ve bu çelişkileri reddeder.
+
+Genişletilen kabul testleri iki yeni engeli ayrı ayrı denetler.
+Testler, geliştirme işaretini ve yama betiğini de reddeder.
+Kurulu paketlerdeki `.orig` yedekleri ve `press-local:` izleri ayrıca denetlenir.
+Bu iz taraması, paket dosyalarının tam bütünlüğünü kanıtlamaz.
+Önceki on testlik sonuç bu kapsamın çalıştırıldığı anlamına gelmez.
+[Press önerisi](press-python314-upstream.md) güncel engelleri ve kabul sonuçlarını kaydeder.
+
+22 Kasım 2026 Pazar günü genişletilen testler başlangıç kaynağıyla çalıştırıldı.
+Bu devam denemesi `7a4384d5eec9f0f0dce4124e9dd48b106e51222f` kaynağına sabitlendi.
+On üç testin yedisi geçti. Altısı başarısız oldu.
+`TypedDict` ve telemetri engelleri ayrı ayrı ikişer testi düşürdü.
+Çerez import'u bir testi düşürdü. Bağımlılık denetimi de bir testi düşürdü.
+Kaynak bütünlüğü ve yama izi denetimleri geçti.
+`uv pip check`, 177 pakette 32 uyumsuzluk buldu.
+Bu sayı eksik paketleri ve sürüm çelişkilerini birlikte içerir.
+Bu yeni sonuç, bütün etiketlerin genişletilen testlerden geçtiği anlamına gelmez.
+
+Hazır telemetri yardımcısı `press/utils/telemetry.py:14` içinde bulunur.
+Öneri, bu yardımcıyı yeniden kullanmayı değerlendirir.
+İkinci `TypedDict`, `test_deploy_candidate.py:39` satırındaki `AppInfo` tanımıdır.
+Bu tanım `typing.TYPE_CHECKING` bloğundadır. Ek çalışma zamanı hatası sayılmaz.
+İki dosyalık tarihsel taramanın kanıt dosyası bu kapsamla genişletilmedi.
 
 ## Diğer yolların sonucu
 
@@ -164,6 +204,6 @@ Bu sonuç yalnız kaydedilen tarama kapsamı ve tarih için geçerlidir.
 Deneme container'ları ve geçici birimler kapatılıp silinir.
 Bu görevin bütün imaj etiketleri de silinir.
 Görev C için çalışan yamasız Press ortamı sağlanamadı.
-Yeni commit, `8b91fcd` üzerine eklenir. Geçmiş yeniden yazılmaz.
+İnceleme düzeltmeleri `67d0c95` üzerine eklenir. Geçmiş yeniden yazılmaz.
 
 Gerçek okurla denenmedi.
