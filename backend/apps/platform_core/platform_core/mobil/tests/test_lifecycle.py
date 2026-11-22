@@ -46,7 +46,7 @@ class MobileLifecycleTest(IntegrationTestCase):
 		with (
 			patch.object(lifecycle, "_account_state", return_value=None),
 			patch.object(frappe.db, "get_value", side_effect=enabled_snapshot),
-			patch.object(lifecycle, "_insert") as insert,
+			patch.object(lifecycle, "insert_metadata") as insert,
 		):
 			with self.assertRaises(MobileError) as raised:
 				lifecycle.lock_account(self.identity(self.now))

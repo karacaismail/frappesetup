@@ -124,6 +124,7 @@ class MobileSessionTest(IntegrationTestCase):
 			patch("platform_core.mobil.sessions.send_session_revocations", return_value=()) as send,
 			patch.object(frappe.db, "commit"),
 		):
+			after_commit.cut.return_value = []
 			self.assertEqual(_revoke(self.identity, self.body), {"revoked": 1})
 			with self.assertRaises(MobileError) as raised:
 				_register(self.identity, {"installation_id": str(uuid4())})
