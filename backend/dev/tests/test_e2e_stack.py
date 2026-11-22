@@ -59,10 +59,65 @@ class StackTests(unittest.TestCase):
         names = [model["name"] for model in models]
         self.assertEqual(len(set(names)), 4, names)
         volumes = [{volume["name"] for volume in model["volumes"].values()} for model in models]
+        images = [
+            {
+                service.get("image") or model["name"] + "-" + name
+                for name, service in model["services"].items()
+                if "build" in service
+            }
+            for model in models
+        ]
         for index, model in enumerate(models):
             self.assertTrue(all(name.startswith(model["name"] + "_") for name in volumes[index]))
             for previous in volumes[:index]:
                 self.assertTrue(volumes[index].isdisjoint(previous))
+            self.assertTrue(all(model["name"] in name for name in images[index]))
+            for previous in images[:index]:
+                self.assertTrue(images[index].isdisjoint(previous))
+
+    def test_invalid_realm_id_stops_before_receiver_or_bootstrap(self):
+        namespace = runpy.run_path(str(STACK))
+        for realm_id in ("", "first-id\nsecond-id\n", "invalid realm"):
+            with self.subTest(realm_id=realm_id):
+                environment = {}
+                with (
+                    patch.dict(
+                        namespace["up"].__globals__,
+                        {
+                            "check_resources": lambda *args: None,
+                            "config": lambda *args: {},
+                            "ensure_images": lambda *args: None,
+                        },
+                    ),
+                    patch(
+                        "subprocess.run", return_value=subprocess.CompletedProcess([], 0, stdout=realm_id)
+                    ) as execute,
+                ):
+                    with self.assertRaisesRegex(ValueError, "one valid internal ID"):
+                        namespace["up"](["docker"], ["compose"], environment)
+                commands = [call.args[0] for call in execute.call_args_list]
+                self.assertEqual(len(commands), 2)
+                self.assertEqual(commands[-1][-1], "SELECT id FROM realm WHERE name = 'platform'")
+                self.assertFalse(any(command[-1] == "identity-sync" for command in commands))
+                self.assertFalse(any("/workspace/dev/bootstrap.py" in command for command in commands))
+                self.assertNotIn("IDENTITY_SYNC_REALM_ID", environment)
+
+    def test_standalone_compose_keeps_its_image_names(self):
+        namespace = runpy.run_path(str(STACK))
+        with patch.dict(os.environ, self.env):
+            environment, _, compose = namespace["setup"]()
+        environment.pop("FS_STACK_IMAGE_TAG")
+        for fragment, expected in (
+            ("tenant", {"tenant-web": "fs-tenant-dev:7150"}),
+            (
+                "keycloak",
+                {"keycloak": "fs-keycloak-atonota:dev-7150", "event-sink": "fs-kimlik-realm-event-sink:dev"},
+            ),
+        ):
+            command = [*compose[:-1], str(ROOT / "backend/dev" / f"compose.{fragment}.yaml")]
+            model = namespace["config"](command, environment)
+            for service, image in expected.items():
+                self.assertEqual(model["services"][service]["image"], image)
 
     def test_isolated_owners_preserve_foreign_and_legacy_volumes(self):
         namespace = runpy.run_path(str(STACK))

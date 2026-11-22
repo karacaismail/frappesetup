@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: platform_core identity endpoints
-  version: 0.5.0
+  version: 0.5.1
   summary: Endpoints for Keycloak sign-in, callback, sign-out and user sync.
   description: |
     This contract describes the identity endpoints of the `platform_core` app.
@@ -99,6 +99,21 @@ x-site-settings:
     The `iss` value is `<keycloak_public_url>/realms/<keycloak_realm>`.
     The key list address is `<keycloak_internal_url or keycloak_public_url>/realms/<keycloak_realm>/protocol/openid-connect/certs`.
   settings:
+    - key: mcp_oauth_enabled
+      example: false
+      required: false
+      note: External MCP OAuth is disabled by default. The remaining MCP settings are required to enable it.
+    - key: mcp_oauth_resource
+      example: https://tenant.example.test/api/method/platform_core.api.ai.mcp
+      required: false
+      note: Exact HTTPS MCP URL. The single audience and the signed mcp_resource claim must equal this URL.
+    - key: mcp_oauth_client_ids
+      example: [mcp-external]
+      required: false
+      note: IDs of public Keycloak clients registered for authorization code and S256 PKCE.
+    - key: mcp_oauth_introspection_secret
+      required: false
+      note: Keep the confidential Keycloak resource client's secret in site configuration only. Its client ID is the full resource URL.
     - key: keycloak_public_url
       example: http://identity.localhost:8660
       required: true
@@ -360,6 +375,7 @@ paths:
         "503":
           description: |
             Keycloak sign-in is not set up on this site. One of the required site settings is missing.
+            Use a site configured for Keycloak when checking the successful browser flow.
             The page title is “Sign-in failed”. The page body says sign-in is not set up on this site. The page does not show the name of the missing key.
           content:
             text/html:
@@ -1046,7 +1062,7 @@ paths:
 
         The work has two steps. Both steps are safe to repeat.
 
-        1. Step 1 locks the identity link and the deletion record. It disables the user.
+        1. Step 1 locks the existing User first, then the identity link and the deletion record. It disables the user.
            It deletes the API key, the API secret and the stored password.
            It writes the deletion record with state “Disabled” and commits.
            Then it closes every session of the user, page by page. Frappe returns at most 100 sessions per query.
@@ -1057,7 +1073,7 @@ paths:
 
         The deletion record is the “Platform Identity Deletion” DocType. It does not keep the raw identity.
         It keeps the HMAC-SHA256 digest of the `(issuer, subject)` pair. The key is the `kimlik_deletion_hmac_key` site setting.
-        `provision`, `set_enabled` and `change_email` check this record first and take the same row locks.
+        `provision`, `set_enabled` and `change_email` check this record before changing data and take the same row locks.
         A deleted identity gets 410 `IdentityDeleted` there. It cannot be provisioned, enabled or renamed again.
         This holds already after step 1. Sign-in with a deleted identity gets 403.
 
@@ -2098,7 +2114,9 @@ components:
         text/html:
           schema: {$ref: "#/components/schemas/HtmlSayfa"}
     TarayiciIstekSiniri:
-      description: The per-IP rate limit was exceeded. Frappe returns JSON by default or HTML when requested.
+      description: |
+        The per-IP rate limit was exceeded. API paths return JSON by default or HTML when requested.
+        Legacy `cmd` dispatch returns JSON.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
@@ -2114,7 +2132,7 @@ components:
     KimlikSilindi:
       description: |
         The identity `(issuer, subject)` was deleted. The `exc_type` value is `IdentityDeleted`.
-        The deletion record is checked first, under the same row locks as the deletion (docs/sozlesmeler.md section 7, rule 3).
+        The deletion record is checked before changes, under the same row locks as the deletion (docs/sozlesmeler.md section 7, rule 3).
         If the `kimlik_deletion_hmac_key` setting is missing, the endpoint returns 503 `DeletionKeyMissing` instead.
       content:
         application/json:

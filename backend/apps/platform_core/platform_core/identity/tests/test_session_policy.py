@@ -169,7 +169,7 @@ class TestSessionPolicy(FrappeAPITestCase):
 		self.assertNotEqual(real.status_code, 401, real.data[:200])
 		self.assertNotEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), last_activity)
 
-	# --- O-25 and minor finding 2: an idle employee authenticates again ----------------------------
+	# --- O-25 and important finding 2: an idle employee authenticates again ----------------------------
 
 	def test_idle_employee_is_sent_back_to_keycloak_even_with_a_fresh_keycloak_cookie(self):
 		# No real activity on this site in the last hour. Keycloak's open session does not count.

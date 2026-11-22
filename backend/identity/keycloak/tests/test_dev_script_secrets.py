@@ -7,9 +7,11 @@ environment file with a made-up secret, so no development secret is touched.
 
 from __future__ import annotations
 
+import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -39,6 +41,14 @@ if [ "${0##*/}" = seq ]; then
   printf '%s\\n' 1 2
   exit 0
 fi
+case " $* " in
+  *" up "*)
+    if [ "${PORT_CONFLICT:-}" = yes ]; then
+      echo "Bind for 127.0.0.1:5990 failed: port is already allocated" >&2
+      exit 17
+    fi ;;
+  *" ps "*) printf '%s\\n' '127.0.0.1:5990->8080/tcp, 127.0.0.1:5996->8025/tcp, 127.0.0.1:6006->8025/tcp' ;;
+esac
 case " $* " in
   *" config "*--quiet*) ;;
   *" config "*)
@@ -91,9 +101,33 @@ class ProdCheckSecretTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.dir)
 
+    def test_up_reports_port_conflict_and_suggests_a_free_pair(self):
+        python = self.dir / "stand-ins" / "python3"
+        python.unlink()
+        python.symlink_to(sys.executable)
+        env = {**self.env, "PORT_CONFLICT": "yes"}
+        result = subprocess.run(
+            ["bash", str(self.script), "up"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(result.returncode, 17)
+        self.assertIn("5990", result.stderr)
+        self.assertIn("5996", result.stderr)
+        suggested = re.search(r"PANE_PORT=(\d+)", result.stderr)
+        self.assertIsNotNone(suggested)
+        port = int(suggested.group(1))
+        self.assertTrue({port, port + 6}.isdisjoint({5990, 5996, 6006}))
+
     def test_config_preview_never_resolves_secrets(self):
         result = subprocess.run(
-            ["bash", str(self.script), "config"], env=self.env, capture_output=True, text=True, timeout=5,
+            ["bash", str(self.script), "config"],
+            env=self.env,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         self.assertEqual(result.returncode, 0)
         self.assertFalse(FAKE_SECRET in result.stdout)
@@ -101,8 +135,11 @@ class ProdCheckSecretTest(unittest.TestCase):
 
     def test_config_refuses_environment_output(self):
         result = subprocess.run(
-            ["bash", str(self.script), "config", "--environment"], env=self.env, capture_output=True,
-            text=True, timeout=5,
+            ["bash", str(self.script), "config", "--environment"],
+            env=self.env,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         self.assertEqual(result.returncode, 2)
         self.assertFalse(FAKE_SECRET in result.stdout)
@@ -110,29 +147,37 @@ class ProdCheckSecretTest(unittest.TestCase):
 
     def test_prod_check_stops_if_the_server_never_becomes_ready(self):
         result = subprocess.run(
-            ["bash", str(self.script), "prod-check"], env={**self.env, "UNREADY_KEYCLOAK": "yes"},
-            capture_output=True, text=True, timeout=10,
+            ["bash", str(self.script), "prod-check"],
+            env={**self.env, "UNREADY_KEYCLOAK": "yes"},
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         self.assertEqual(result.returncode, 1)
         self.assertIn("Production Keycloak did not become ready.", result.stderr)
         recorded = self.log.read_text(encoding="utf-8")
         self.assertNotIn("python3 -I -m unittest", recorded)
-        probes = [line for line in recorded.splitlines()
-                  if line.startswith("curl ") and line.endswith("/realms/platform")]
+        probes = [
+            line for line in recorded.splitlines() if line.startswith("curl ") and line.endswith("/realms/platform")
+        ]
         self.assertEqual(len(probes), 2)
         self.assertTrue(all("--max-time 2" in line for line in probes))
 
     def test_redirect_does_not_mean_keycloak_is_ready(self):
         result = subprocess.run(
-            ["bash", str(self.script), "prod-check"], env={**self.env, "UNREADY_KEYCLOAK": "redirect"},
-            capture_output=True, text=True, timeout=10,
+            ["bash", str(self.script), "prod-check"],
+            env={**self.env, "UNREADY_KEYCLOAK": "redirect"},
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         self.assertEqual(result.returncode, 1)
         self.assertNotIn("python3 -I -m unittest", self.log.read_text(encoding="utf-8"))
 
     def test_prod_check_keeps_the_secret_off_every_command_line(self):
-        subprocess.run(["bash", str(self.script), "prod-check"], env=self.env, capture_output=True,
-                       timeout=600, check=False)
+        subprocess.run(
+            ["bash", str(self.script), "prod-check"], env=self.env, capture_output=True, timeout=600, check=False
+        )
         recorded = self.log.read_text(encoding="utf-8")
         runs = [line for line in recorded.splitlines() if line.startswith("docker ") and " run " in line]
         self.assertEqual(len(runs), 2, "both prod containers must be started")
@@ -142,6 +187,7 @@ class ProdCheckSecretTest(unittest.TestCase):
         self.assertNotIn(FAKE_SECRET, recorded, "a secret value reached a command line")
         self.assertEqual(recorded.count("secret-in-env"), 2, "docker must get the secret from the environment")
         self.assertIn("python3 -I -m unittest", recorded, "the final test run must be the stand-in")
+
 
 if __name__ == "__main__":
     unittest.main()

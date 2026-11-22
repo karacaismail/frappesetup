@@ -1,0 +1,2 @@
+net.atonota.keycloak.mcp.McpResourcePolicyFactory
+net.atonota.keycloak.mcp.McpRedirectPolicyFactory

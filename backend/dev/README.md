@@ -5,6 +5,8 @@ Compose, bu servisleri tek proje altında yönetir.
 Proje adı `fs-e2e-<port>-<özet>` biçimindedir.
 Betik özeti çalışma ağacının tam yolundan ve `PANE_PORT` değerinden üretir.
 Her çalışma ağacı ve port birleşimi ayrı veri birimleri kullanır.
+Ortak yığında yerel kaynaklardan derlenen imajların adları da ayrıdır.
+Ayrı kiracı ve Keycloak betikleri mevcut imaj adlarını korur.
 Aynı anda açık yığınların port aralıkları çakışmamalıdır.
 Sahiplik koruması başka sahibin verisini kullanmayı veya değiştirmeyi reddeder.
 Eski `fs-e2e-ortam` birimleri korunur. Yeni yığın bu verileri kendiliğinden taşımaz.
@@ -134,6 +136,7 @@ Test başarılı olayı elle göndermez. Keycloak olayı kendisi gönderir.
 Test aynı olay kimliği için `processed` kaydını bekler.
 Bozuk imza ve eski zaman damgası için HTTP 401 yanıtını denetler.
 Örnek hesap geliştirme veritabanında kalır. Test gerçek müşteri hesabını değiştirmez.
+Son koşunun kaydı [canlı olay kanıtı](../e2e/keycloak-delivery-result.md) dosyasındadır.
 
 İş bitince bu projenin servislerini kapatın.
 

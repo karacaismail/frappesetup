@@ -26,6 +26,10 @@ def assert_replay(self, replay):
 
 
 def assert_error_diagnostics(self, response):
+    # ruleid: test-raw-http-diagnostic
+    self.assertEqual(response.status_code, 200, response.json)
+    # ok: test-raw-http-diagnostic
+    self.assertIn("expected", response.json)
     # ok: test-raw-http-diagnostic
     self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
     # ruleid: test-raw-http-diagnostic

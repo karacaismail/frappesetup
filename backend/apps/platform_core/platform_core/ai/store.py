@@ -9,6 +9,7 @@ spread to another file.
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from time import time
 
 import frappe
 from frappe.model.document import Document
@@ -16,6 +17,9 @@ from frappe.utils import add_days, now_datetime
 
 LOG = "PLT AI Action Log"
 PROPOSAL = "PLT AI Action Proposal"
+MCP_BUDGET = "PLT MCP Call Budget"
+MCP_ADMISSION_PREFIX = "mcp_oauth_admitted:"
+MCP_BUDGET_RETENTION_SECONDS = 86400
 
 
 @contextmanager
@@ -243,3 +247,49 @@ def delete_selected(logs: list[str], proposals: list[str]) -> None:
 			if not frappe.db.get_value(doctype, name, "name", for_update=True):
 				raise SelectionChanged
 			_delete_for_good(doctype, name)
+
+
+def charge_mcp_call(name: str, expires_at: int, max_calls: int) -> str | None:
+	"""Lock a site counter and keep a separate admission marker in Redis until token expiry."""
+	if expires_at <= time():
+		return "token_expired"
+
+	table = frappe.qb.DocType(MCP_BUDGET)
+	insert = (
+		frappe.qb.into(table).columns(table.name, table.calls, table.expires_at).insert(name, 0, expires_at)
+	)
+	# The no-op update acquires an exclusive lock on MariaDB. A plain duplicate insert may
+	# acquire shared locks and deadlock when multiple callers try to upgrade them together.
+	if frappe.db.db_type == "postgres":
+		insert.on_conflict(table.name).do_nothing().run()
+	else:
+		insert.on_duplicate_key_update(table.name, table.name).run()
+
+	calls = frappe.db.get_value(MCP_BUDGET, name, "calls", for_update=True)
+	now = int(time())
+	if expires_at <= now:
+		return "token_expired"
+
+	# Write the marker while the database row stays locked. A lost Redis key is repaired using
+	# the surviving count. A surviving marker with a fresh database row refuses the token.
+	marker = frappe.cache.make_key(MCP_ADMISSION_PREFIX + name)
+	first_admission = frappe.cache.set(marker, 1, nx=True, ex=expires_at - now + 1)
+	if calls == 0 and not first_admission:
+		return "token_call_state_lost"
+	if calls >= max_calls:
+		return "token_call_limit"
+	frappe.db.set_value(MCP_BUDGET, name, "calls", calls + 1, update_modified=False)
+
+	# A row becomes eligible only well after its token has expired.
+	expired = frappe.qb.get_query(
+		MCP_BUDGET,
+		filters={"expires_at": ("<=", now - MCP_BUDGET_RETENTION_SECONDS)},
+		fields=["name"],
+		order_by="expires_at asc, name asc",
+		limit=20,
+		for_update=True,
+		skip_locked=True,
+	).run(pluck=True)
+	if expired:
+		frappe.db.delete(MCP_BUDGET, {"name": ("in", expired)})
+	return None

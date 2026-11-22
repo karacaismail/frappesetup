@@ -56,7 +56,9 @@ def _is_portal_path(path: str) -> bool:
 	return any(path == root or path.startswith(root + "/") for root in PORTAL_PATHS)
 
 
-def _call_gated(original: str, args: tuple, kwargs: dict) -> object:
+def _call_gated(
+	original: str, args: tuple, kwargs: dict, *, required_form_fields: tuple[str, ...] = ()
+) -> object:
 	"""403 while the gate is on, otherwise the original Frappe function with the same arguments."""
 	from platform_core.identity.sign_in import guard_guest_request
 
@@ -73,7 +75,9 @@ def _call_gated(original: str, args: tuple, kwargs: dict) -> object:
 	forwarded = frappe.get_newargs(target, kwargs)
 	try:
 		signature(target).bind(*args, **forwarded)
-	except TypeError:
+		if any(not frappe.form_dict.get(field) for field in required_form_fields):
+			raise ValueError("A required form field is missing")
+	except (TypeError, ValueError):
 		frappe.throw(
 			_("Required sign-in arguments are missing.", context="platform_core.identity"),
 			InvalidInput,
@@ -216,7 +220,12 @@ def custom(*args: object, **kwargs: object) -> object:
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def ldap_login(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.doctype.ldap_settings.ldap_settings.login` (AU-19)."""
-	return _call_gated("frappe.integrations.doctype.ldap_settings.ldap_settings.login", args, kwargs)
+	return _call_gated(
+		"frappe.integrations.doctype.ldap_settings.ldap_settings.login",
+		args,
+		kwargs,
+		required_form_fields=("usr", "pwd"),
+	)
 
 
 def override_map() -> dict[str, str]:

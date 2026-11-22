@@ -10,12 +10,13 @@ Expected behaviour comes from docs/sozlesmeler.md sections 4 and 5 (D-1):
 
 import base64
 import hashlib
+import time
 from unittest.mock import patch
 
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
-from platform_core.identity import anonymization, provider_setup
+from platform_core.identity import anonymization, provider_setup, session_policy
 from platform_core.identity.tests import helpers as h
 
 SID = "11111111-1111-4111-8111-111111111111"
@@ -47,10 +48,14 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		self.client = h.new_client()
 
 	def test_hooks_are_wired(self):
-		self.assertNotIn("platform_core.identity.sign_in.on_social_login", frappe.get_hooks("on_social_login"))
+		self.assertNotIn(
+			"platform_core.identity.sign_in.on_social_login", frappe.get_hooks("on_social_login")
+		)
 		self.assertIn("platform_core.identity.service_token.validate", frappe.get_hooks("auth_hooks"))
 		self.assertIn("platform_core.identity.login_policy.before_login", frappe.get_hooks("before_login"))
-		self.assertIn("platform_core.identity.login_policy.before_request", frappe.get_hooks("before_request"))
+		self.assertIn(
+			"platform_core.identity.login_policy.before_request", frappe.get_hooks("before_request")
+		)
 		overrides = frappe.get_hooks("override_whitelisted_methods")
 		self.assertIn(
 			"platform_core.identity.login_policy.send_login_link",
@@ -104,9 +109,7 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		self.assertEqual(h.logged_user(self.client), h.AYSE)
 		h.refresh()
 		self.assertEqual(
-			frappe.db.get_value(
-				"PLT Identity Link", {"issuer": h.ISSUER, "subject": "sub-ayse"}, "user"
-			),
+			frappe.db.get_value("PLT Identity Link", {"issuer": h.ISSUER, "subject": "sub-ayse"}, "user"),
 			h.AYSE,
 		)
 		self.assertEqual(len(h.sessions_containing(f'"keycloak_sid":"{SID}"')), 1)
@@ -169,6 +172,11 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 					self.assertEqual(answer.mimetype, accept)
 					if accept == "application/json":
 						self.assertEqual(answer.json.get("exc_type"), "RateLimitExceededError")
+
+			root = h.request(self.client.get, "/", query_string={**query, "cmd": path.rsplit("/", 1)[-1]})
+			self.assertEqual(root.status_code, 429)
+			self.assertEqual(root.mimetype, "application/json")
+			self.assertEqual(root.json["exc_type"], "RateLimitExceededError")
 
 	def test_callback_without_cookie_is_refused(self):
 		_started, query = h.start_login(self.client)
@@ -326,23 +334,38 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		for error_type in (frappe.QueryDeadlockError, frappe.QueryTimeoutError):
 			with self.subTest(error=error_type.__name__):
 				attempts = 0
+				opened_sid = None
 
 				def fail_second_lock(*args, **kwargs):
-					nonlocal attempts
+					nonlocal attempts, opened_sid
 					attempts += 1
-					if attempts == 2:
+					if attempts >= 2:
+						opened_sid = frappe.session.sid
 						raise error_type("Test lock failure after the session commit")
 					return lock_identity(*args, **kwargs)
 
 				client = h.new_client()
+				user_key = session_policy._user_key(h.AYSE)
+				previous_activity = int(time.time()) - 60
+				frappe.cache.set_value(user_key, previous_activity, expires_in_sec=3600)
 				with patch.object(anonymization, "lock_identity", side_effect=fail_second_lock):
 					response = h.login_with_keycloak(client, h.userinfo("sub-ayse", h.AYSE))
 
-				self.assertEqual(attempts, 2)
+				self.assertEqual(attempts, 4 if error_type is frappe.QueryDeadlockError else 2)
 				self.assertEqual(response.status_code, 500)
 				self.assertEqual(response.json.get("exc_type"), "IdentityInternalError")
+				self.assertFalse({"message", "home_page", "full_name"} & response.json.keys())
 				h.refresh()
 				self.assertEqual(h.session_count(h.AYSE), 0)
+				for name in ("sid", "user_id", "full_name", "system_user", "user_image", "user_lang"):
+					cookie = client.get_cookie(name)
+					self.assertFalse(cookie and cookie.value, name)
+				self.assertIsNone(
+					frappe.cache.get_value(f"kimlik_activity:sid:{opened_sid}", use_local_cache=False)
+				)
+				self.assertEqual(
+					frappe.cache.get_value(user_key, expires=True, use_local_cache=False), previous_activity
+				)
 				self.assertEqual(h.logged_user(client), "Guest")
 
 	def test_logout_is_closed_to_guests(self):

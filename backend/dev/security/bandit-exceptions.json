@@ -2505,5 +2505,14 @@
     "reason": "The test invokes Bash from the test runner PATH to exercise a fixture script.",
     "ignoreUntil": "2027-02-22",
     "occurrences": 2
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/test_semgrep_exceptions.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "1056fa27157270019254851f8cc87b58727e58ec8085bd19adcfcfe803fd8933",
+    "reason": "Executes the repository CLI with the current Python interpreter and test-owned arguments, without a shell.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
   }
 ]
