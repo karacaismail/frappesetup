@@ -191,6 +191,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Hassas DocType'lar genel yazma araçlarına kapalıdır. Bunlar kimlik bağı, erişim kuralı, AI API, AI Account ve telefon kurulumudur. Her sahip kendi DocType'ını `ai_write_closed_doctypes` kancasına ekler. Bu kayıtlar yalnız kendi özel araçlarıyla değişir.
 - **O-29. Güvenlik taramaları elle başlatılan komutlardır.** Zamanlanmış tarama kurulmaz (D-6). Komutları security-tooling işi yazar. Bandit, gizli bilgi taraması, sözleşme tabanlı API testi ve yerel DAST taraması bu kapsamdadır. CI kurulumunun teknik sahibi DevOps sorumlusudur. Ajanlar CI dosyasını değiştirmez, devir notu yazar.
 - **O-30. Ad denetimi geçiş süresinde uyarı verir.** Ad denetim betiği birleşince kapı bütün dallarda 389 ad bulgusu verdi. Eski adlar ancak ad değiştirme betiği bütün dallarda çalışınca kalkar. Bu yüzden kapı ad bulgularını şimdilik yalnız yazar ve başarısız olmaz. Kip `backend/dev/naming/enforcement.json` dosyasındaki `mode` alanında durur. Değer `advisory` ya da `enforce` olur. Başlangıç değeri `advisory` olur. Ad değiştirme bütün dallarda bitince orkestratör değeri `enforce` yapar. `enforce` kipinde `legacy-name`, `turkish-name`, `module-name` ve `translation-binding` bulguları kapıyı durdurur. Öteki ad bulguları yine yalnız uyarıdır. Kip dosyası yoksa kapı `advisory` kabul eder ve bunu çıktısına yazar.
+- **O-31. MVP performans sınırı.** Sunucu süresi okuma uçlarında p95 500 milisaniyeyi, yazma uçlarında p95 1 saniyeyi geçmez. Ölçüm geliştirme sitesinde örnek veriyle yapılır. Örnek veri 200 çalışan ve 2.000 izin kaydıdır. Her uç en az 50 kez çağrılır. Ölçümü elle başlatılan bir komut yapar ve sonucu durum dosyasına yazar. Grafana ve gerçek kullanıcı ölçümü P1 işidir (G-149). Bu yüzden teknik borç tablosuna yazıldı.
 
 
 ## Karar sitesine işlenecek farklar
@@ -221,10 +222,11 @@ Bu turda gerçek kişisel veri yoktur. Saklama süresi ve silme yolu MVP yayın�
 | Kayıt | Kişisel veri | Saklama | Silme yolu |
 | --- | --- | --- | --- |
 | “User” ve kimlik bağı | E-posta, ad, Keycloak kimliği | Hesap açık kaldıkça | Hesap silme isteği |
-| “AI Action Log” | Kullanıcı adı, IP adresi | 365 gün (Rail 5) | Elle başlatılan silme komutu. Komut henüz yok. |
-| “AI Usage Log” | Kullanıcı adı | Belirlenmedi | Belirlenmedi |
-| “AI Action Proposal” | Kullanıcı adı ve önizlemedeki kişi bilgisi. Örneğin çalışan adı ve izin tarihleri | Belirlenmedi | Belirlenmedi. Önizleme yalnız gerekli bilgiyi tutar |
+| “AI Action Log” | Kullanıcı adı, IP adresi | 365 gün (Rail 5) | `platform_core.api.ai.purge_logs` komutu elle çalışır |
+| “AI Usage Log” | Kullanıcı adı | 365 gün. Bütçe ve fatura denetimi bu süreyi ister | Aynı silme komutu elle çalışır |
+| “AI Action Proposal” | Kullanıcı adı ve önizlemedeki kişi bilgisi. Örneğin çalışan adı ve izin tarihleri | Karar ya da süre dolumundan sonra 30 gün | Aynı silme komutu elle çalışır. Önizleme yalnız gerekli bilgiyi tutar |
 | Hesap silme isteği (O-27) | E-posta ve Keycloak kimliği | İş bitene kadar | İş bitince kayıt anonim yapılır |
+| HRMS TR çalışan ve izin kayıtları | Ad, izin tarihleri, onaylayan kişi | İş ilişkisi sürdükçe. Yasal saklama süresini hukuk sorumlusu belirler. Bu madde teknik borçtur | Hesap silme kişinin alanlarını anonim yapar. İş kayıtları kalır (O-27) |
 
 Mesaj içeriği ve araç girdisi günlüğe yazılmaz. Günlük yalnız girdinin özetini tutar.
 
@@ -234,6 +236,8 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
+| `BORC(mvp)`: Performans ölçümü yalnız elle yapılır (O-31) | Canlı darboğaz görülmez | DevOps sorumlusu | P1'de Grafana ve gerçek kullanıcı ölçümü kurulur (G-149) |
+| `BORC(mvp)`: HRMS TR kayıtlarının yasal saklama süresi yok | Silme zamanı belli değil | Hukuk sorumlusu | Süre proje kaydına yazılır ve silme komutu bu süreyi uygular |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
 | `BORC(mvp)`: Press geliştirme imajı `patch-py314.sh` ile Press kodunu değiştiriyor (O-18) | M-4 kuralına aykırı. Press yükseltmesinde yama bozulabilir | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da yama Press'e gönderilip kabul edilir |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
