@@ -177,3 +177,4 @@ Skip to main content,Ana içeriğe geçin,shell.panel
 Go to site home,Sitenin ana sayfasına gidin,shell.panel
 A valid metadata surface is required.,Tanım için geçerli bir kullanım alanı seçin.,shell.metadata
 The request has invalid parameters.,İstekte geçersiz alanlar var.,shell.request
+You are not permitted to call this method.,Bu yöntemi çağırma izniniz yok.,shell.request
