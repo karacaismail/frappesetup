@@ -60,7 +60,11 @@ def set_level_access(doctype: str, role: str, permlevel: int, read: bool, write:
 	existing = frappe.db.get_value("Custom DocPerm", filters)
 	if not read:
 		if existing:
-			frappe.delete_doc("Custom DocPerm", existing)
+			# `force` skips the search for records that link to this row. Nothing links to a
+			# permission row, and that search took most of the request (measured for O-31).
+			# Frappe's own permission manager removes the row the same way
+			# (`frappe/core/page/permission_manager/permission_manager.py:170`).
+			frappe.delete_doc("Custom DocPerm", existing, force=True)
 	else:
 		if not existing:
 			existing = add_permission(doctype, role, permlevel, "read")

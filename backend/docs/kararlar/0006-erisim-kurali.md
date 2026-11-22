@@ -50,6 +50,18 @@ Kayıt türünün adı “Access Rule” olur. Modülü `Erisim` olur. Kaydı ya
 
 Her alan `description` taşır (D-9). Açıklamalar İngilizce yazılır.
 
+### Kayıt türünün ilk izinleri
+
+Kayıt türü tanımı elle yazıldı. Bu yöntem proje kaydında izinlidir (O-24). M-5 kuralı ilk izinlerin onaylanmasını ister.
+
+| Rol | Düzey | Okuma | Yazma | Oluşturma | Silme | Rapor | Dışa aktarma | Yazdırma | E-posta | Paylaşma |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| “System Manager” | 0 | Evet | Evet | Evet | Evet | Evet | Evet | Evet | Evet | Evet |
+
+Başka hiçbir rolün bu kayıt türünde izni yoktur. Kayıt türü onaya gönderilmez (`is_submittable` kapalı). Değişiklik izi açıktır (`track_changes`). Genel yapay zekâ yazma araçları bu türe kapalıdır (O-28).
+
+Onay: Orkestratör, D-10, 22 Kasım 2026 Pazar.
+
 ### Karar sitesinden iki fark
 
 - Karar sitesi bayrakları `read` ve `delete` gibi adlarla yazar. Bu notta adlar `allow_read` ve `allow_delete` olur. Nedeni şudur: `delete` Frappe'de kaydın bir yöntemidir. Aynı adlı alan yöntemle karışır.
@@ -771,6 +783,36 @@ Kod adları bu işte değişmedi. Örneğin `erisim` klasörünün adı aynıdı
 - Motor Frappe'nin ve ERPNext'in kodunu değiştirmez (M-4).
 - Motor zamanlanmış iş kurmaz (D-6).
 
+### Motoru kullanan yerler
+
+B-6 kuralı ortak işlev değişince kullanan yerlerin bulunmasını ister. Liste 22 Kasım 2026 Pazar günü depo aramasıyla çıkarıldı.
+
+| Kullanan yer | Kullandığı yol | Tür |
+| --- | --- | --- |
+| `hooks.py` | Motorun kanca işlevleri ve sınıf ekleri | Bağlama |
+| `api/access.py` | `explain` ve `field_level` modülleri | Motorun kendi uçları |
+| `yapay_zeka` modülü | `platform_core.erisim.api.report_guard` | Açık yol |
+| `kabuk/native_metadata.py` | `platform_core.erisim.link_search.search_link` adı, metin olarak | İç yol |
+| `e2e/preview/site-seed.py` | `platform_core.erisim.tests.base` içindeki örnek veri | Test yardımcısı |
+
+İç yolu kullanan tek yer kabuk modülüdür. Kabuk, Website User için izinli yöntem listesinde sarmalayıcının adını yazar. Modül sınırı denetimi metni görmez. Bu yüzden bir test paketi tarar. Açık yol dışında yeni bir kullanım çıkarsa test başarısız olur. Sarmalayıcının adı değişirse kabuk dosyası da değişmelidir.
+
+`e2e` klasörü motorun test örnek verisini kullanır. `tests/base.py` içindeki adlar değişirse o betik de değişmelidir.
+
+### Tasarım ilkeleri incelemesi
+
+S-1 kuralı yeni sınıflarda ilkelerin incelenmesini ister. Motorun sınıfları şunlardır: “Access Rule” kaydının sınıfı ve dört sınıf eki.
+
+| İlke | Durum | Not |
+| --- | --- | --- |
+| Tek görev | Uyar | Her modülün bir işi var. `rules` kuralı okur, `engine` koşulu kurar, `reports` rapor kapısıdır, `link_search` arama kapısıdır. |
+| Genişlemeye açıklık | Uyar | Yeni kapsam `SCOPES` ve `engine.scope_criterion` içine eklenir. Var olan kapsamların kodu değişmez. |
+| Yerine geçebilirlik | Uyar | Dört sınıf eki her yöntemde `super()` çağırır ve aynı değeri döner. Frappe'nin sınıfı beklenen gibi çalışır. Kanıt 9. bölümdedir. |
+| Dar arayüz | Uyar | Öteki modüller yalnız `erisim.api` içindeki üç işlevi görür. |
+| Bağımlılık yönü | Uyar | Motor öteki `platform_core` modüllerini içe aktarmaz. Modül sınırı denetimi bunu sınar. |
+
+Bilinen bir taviz vardır. `reports.py` dört sınıf ekini ve kapı işlevlerini tek dosyada tutar. Dosya 360 satırı geçti. Hepsi aynı kuralı uygular, bu yüzden bölünmedi. Yeni bir yüzey eklenirse dosya bölünmelidir. Bu taviz veri ya da yetki ihlali değildir.
+
 ## 18. Ertelenen işler
 
 | İş | Neden ertelendi | Nerede |
@@ -803,3 +845,64 @@ Geri dönüşün iki yolu vardır.
 İki yolda da “Access Rule” kayıtları veritabanında kalır. Veri geçişi gerekmez.
 
 Motorun kapattığı e-posta raporları kendiliğinden açılmaz. Yönetici onları elle açar. Kapatılan kayıtların adları `migrate` sırasında günlüğe yazılır.
+
+## 20. Performans sınırı (O-31)
+
+Sınır sunucu süresinin p95 değeri içindir. p95, ölçümlerin yüzde 95'inin altında kaldığı değerdir. Bu değer okuma uçlarında 500 milisaniyeyi geçmez. Yazma uçlarında 1 saniyeyi geçmez.
+
+Ölçümü elle başlatılan bir komut yapar:
+
+```bash
+bench --site <site> execute platform_core.erisim.tests.performance.measure
+```
+
+- Komut 200 çalışan ve 2.000 kayıt kurar. Sonra her ucu 50 kez çağırır. Sonunda örnek veriyi siler.
+- Komut yalnız `allow_tests` ayarı açık sitede çalışır. Örnek veri yazdığı için HTTP ucu yoktur.
+- İstekler Frappe'nin WSGI uygulamasından geçer. Süre isteğin tamamıdır. Ağ süresi sayılmaz.
+- Örnek kayıt türü test türüdür (“ER Test Talep”). HRMS TR'nin izin kaydı türü başka işin klasöründedir.
+
+Ölçüm 22 Kasım 2026 Pazar günü geliştirme sitesinde yapıldı.
+
+| Tür | Uç | Ortanca (ms) | p95 (ms) | Sınır (ms) | Sonuç |
+| --- | --- | --- | --- | --- | --- |
+| Okuma | Liste, `own` kapsamı | 7,1 | 11,8 | 500 | `pass` |
+| Okuma | Liste, `team` kapsamı | 8,2 | 23,3 | 500 | `pass` |
+| Okuma | Liste, `all` kapsamı | 11,3 | 16,9 | 500 | `pass` |
+| Okuma | Tek kayıt | 10,2 | 14,5 | 500 | `pass` |
+| Okuma | Sayım, `team` kapsamı | 7,8 | 9,9 | 500 | `pass` |
+| Okuma | Rapor görünümü, `team` kapsamı | 7,4 | 12,4 | 500 | `pass` |
+| Okuma | Bağlantı araması | 7,6 | 9,9 | 500 | `pass` |
+| Okuma | Bağlantı doğrulama | 5,8 | 8,8 | 500 | `pass` |
+| Okuma | `explain_permission` | 6,4 | 7,2 | 500 | `pass` |
+| Okuma | `get_access_summary` | 3,5 | 4,9 | 500 | `pass` |
+| Yazma | Kayıt oluşturma | 9,1 | 12,3 | 1.000 | `pass` |
+| Yazma | Kayıt güncelleme | 8,9 | 16,6 | 1.000 | `pass` |
+| Yazma | Kayıt silme | 31,4 | 42,2 | 1.000 | `pass` |
+| Yazma | “Access Rule” değiştirme | 9,2 | 11,8 | 1.000 | `pass` |
+| Yazma | `set_level_access` | 162,6 | 225,9 | 1.000 | `pass` |
+
+### Kuralın liste sorgusuna eklediği süre
+
+Komut aynı liste okumasını iki kez ölçer: kurallar açıkken ve kurallar kapalıyken. Fark kuralın eklediği süredir. Ölçüm istek yolunu değil yalnız `frappe.get_list` çağrısını sayar.
+
+| Kapsam | Sayfa | Kurallı ortanca (ms) | Kuralsız ortanca (ms) | Eklenen (ms) | Kurallı p95 (ms) |
+| --- | --- | --- | --- | --- | --- |
+| `own` | 20 | 2,39 | 0,61 | 1,78 | 3,13 |
+| `team` | 20 | 2,34 | 0,64 | 1,71 | 3,63 |
+| `all` | 20 | 1,81 | 0,85 | 0,96 | 3,36 |
+| `own` | 500 | 3,11 | 1,36 | 1,75 | 4,02 |
+| `team` | 500 | 4,94 | 1,49 | 3,45 | 6,09 |
+| `all` | 500 | 2,80 | 1,70 | 1,10 | 3,78 |
+
+Kural bir liste okumasına en çok 3,5 milisaniye ekler. Sürenin çoğu kural tablosunun ve öznenin okunmasıdır.
+
+### Sınırı aşan uç ve düzeltmesi
+
+İlk ölçümde `set_level_access` ucu sınırı aştı. p95 değeri 1.557 milisaniye idi. İki neden vardı.
+
+1. Geliştirme sitemde arka plan işçisi yoktu ve kuyrukta 551 iş birikmişti. Bu ortamın sorunuydu. Kuyruk boşalınca p95 926 milisaniye oldu.
+2. Uç izin satırını silerken Frappe o satıra bağlı kayıtları arıyordu. Bu arama isteğin 685 milisaniyesini alıyordu.
+
+İzin satırına hiçbir kayıt bağlanmaz. Frappe'nin kendi izin yöneticisi de satırı bu aramayı atlayarak siler (`core/page/permission_manager/permission_manager.py:170`). Uç artık aynı yolu kullanır. p95 değeri 226 milisaniyeye indi.
+
+Bu ölçüm tek istekle ve küçük bir sitede yapıldı. Eşzamanlı yük ve gerçek kullanıcı ölçümü P1 işidir (G-149).

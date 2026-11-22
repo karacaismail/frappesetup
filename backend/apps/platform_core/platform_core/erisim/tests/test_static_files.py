@@ -178,3 +178,32 @@ class TestEngineCode(unittest.TestCase):
 		]
 
 		self.assertEqual(missing, [])
+
+
+# Every place outside the engine that names an engine path which is not its public module (B-6).
+# A change to one of these paths must be checked against the file next to it.
+KNOWN_INTERNAL_USERS = {
+	# The shell allows a Website User to call the guarded search and must name the replacement.
+	("kabuk/native_metadata.py", "platform_core.erisim.link_search.search_link"),
+}
+ENGINE_PATH = re.compile(r"platform_core\.erisim(?:\.\w+)+")
+
+
+class TestWhoUsesTheEngine(unittest.TestCase):
+	def test_other_modules_use_only_the_public_module(self):
+		"""Other modules call `platform_core.erisim.api`. Anything else must be listed above."""
+		found = set()
+		for path in APP.rglob("*.py"):
+			relative = path.relative_to(APP).as_posix()
+			# `hooks.py` binds the engine to Frappe; `api/access.py` holds the engine's own endpoints.
+			if relative.startswith("erisim/") or relative in (
+				"hooks.py",
+				"api/access.py",
+				"api/test_access.py",
+			):
+				continue
+			for reference in ENGINE_PATH.findall(path.read_text(encoding="utf-8")):
+				if not reference.startswith("platform_core.erisim.api"):
+					found.add((relative, reference))
+
+		self.assertEqual(found, KNOWN_INTERNAL_USERS)
