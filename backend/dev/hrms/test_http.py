@@ -217,8 +217,7 @@ class LeaveHttpTest(unittest.TestCase):
         status, result = client.send(
             f"{HRMS_LEAVE}.get_leave_approver?{urlencode({'employee': own['employee']})}"
         )
-        self.assertEqual(status, 200, result.get("exception"))
-        self.assertEqual(result.get("message"), self.data["users"]["manager"])
+        self.assertEqual(status, 403, result.get("exception"))
         self.assertEqual(self.login("manager").page("/app")[0], 403)
         day = (date.fromisoformat(own["from_date"]) + timedelta(days=8)).isoformat()
         draft = {key: own[key] for key in ("employee", "company", "leave_type")}
@@ -488,6 +487,11 @@ class LeaveHttpTest(unittest.TestCase):
         status, result = manager.send(cancel, args)
         self.assertEqual(status, 403, result.get("exception"))
         status, result = hr.send(cancel, args)
+        self.assertEqual(status, 403, result.get("exception"))
+        leave_path = self.leave_path("hr_approve")
+        status, result = manager.send(leave_path, {"docstatus": 2}, method="PUT")
+        self.assertEqual(status, 403, result.get("exception"))
+        status, result = hr.send(leave_path, {"docstatus": 2}, method="PUT")
         self.assertEqual(status, 200, result.get("exception"))
         old = self.document(hr, "hr_approve")
         self.assertEqual(old["docstatus"], 2)

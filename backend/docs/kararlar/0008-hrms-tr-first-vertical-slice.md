@@ -43,7 +43,8 @@ HRMS, varsayılan onaylayıcıya kendi “Leave Approver” rolünü ekler.
 HRMS TR, bu rolü HRMS TR hesabından çıkarır.
 HRMS TR hesapları masaüstü erişimi veren başka rol alamaz.
 
-İK, onaylı talebi iptal edebilir. İK, iptal edilen talebin düzeltme kopyasını açabilir.
+İK, onaylı talebi kayıt adresinden iptal edebilir. İK, iptal edilen talebin düzeltme kopyasını açabilir.
+İzin listesi, İK ve yönetici için `frappe.client.cancel` yöntemini kapatır.
 İK rolü, bu işlem için kiracıdaki `Employee` kayıtlarını okuyabilir.
 İK rolünün çalışan kayıtlarına yazma, rapor alma, dışa aktarma ve yazdırma izni yoktur.
 Yönetici ve çalışan rolleri, başka bir kişinin `Employee` kaydını okuyamaz.
