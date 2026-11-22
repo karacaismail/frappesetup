@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "field:sequence_key",
- "description": "Sitenin e\u015fitleme s\u0131ras\u0131n\u0131 tutar.",
+ "description": "Tracks the sync sequence for the site.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -11,7 +11,7 @@
  ],
  "fields": [
   {
-   "description": "Site i\u00e7in tek saya\u00e7 kayd\u0131 bu anahtar\u0131 ta\u015f\u0131r.",
+   "description": "The site's only counter record uses this key.",
    "fieldname": "sequence_key",
    "fieldtype": "Data",
    "label": "Counter key",
@@ -21,7 +21,7 @@
   },
   {
    "default": "0",
-   "description": "Sunucu her yeni de\u011fi\u015fikli\u011fe bu say\u0131dan b\u00fcy\u00fck bir s\u0131ra numaras\u0131 verir.",
+   "description": "The server assigns each new change a sequence number higher than this value.",
    "fieldname": "sequence",
    "fieldtype": "Int",
    "label": "Latest sequence number",
@@ -29,7 +29,7 @@
   },
   {
    "default": "0",
-   "description": "Sunucu daha eski s\u0131ra numaras\u0131 olan imle\u00e7le gelen iste\u011fi reddeder.",
+   "description": "The server rejects requests with a cursor below this sequence number.",
    "fieldname": "retention_floor",
    "fieldtype": "Int",
    "label": "Oldest valid sequence",

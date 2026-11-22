@@ -1,12 +1,12 @@
 openapi: 3.1.0
 info:
-  title: Telefon eşitlemesi
+  title: Mobile sync
   version: 1.0.0
   description: |
-    Telefon, bağlantı gelince bekleyen işleri gönderir ve değişiklikleri alır.
-    İstek gövdesi en çok 256 KiB olabilir. Aşımda 413 döner.
-    Sunucu her hesaba dakikada en çok 60 istek işler. Aşımda 429 döner.
-    Bu sürümde izin listesi boş başlar. Sunucu dosya kabul etmez.
+    The phone sends pending operations and receives changes when connectivity returns.
+    Request bodies may be at most 256 KiB. Larger requests return 413.
+    The server accepts up to 60 requests per account per minute. Further requests return 429.
+    This version starts with an empty allowlist. The server does not accept files.
 servers:
   - url: /api/method
 security:
@@ -14,14 +14,14 @@ security:
 paths:
   /platform_core.api.mobile.v1_register:
     post:
-      summary: Telefon kurulumunu kaydet
+      summary: Register a mobile installation
       operationId: mobileV1Register
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
-        Telefon kurulumunu doğrulanmış Keycloak oturumuna bağlar.
-        İptal edilen kurulum yeniden açılamaz. Yeni oturum yeni kurulum kimliği ister.
+        Binds the installation to a verified Keycloak session.
+        A revoked installation cannot be reactivated. A new session requires a new installation ID.
       requestBody:
         required: true
         content:
@@ -36,15 +36,15 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_revoke:
     post:
-      summary: Telefon kurulumunu iptal et
+      summary: Revoke a mobile installation
       operationId: mobileV1Revoke
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
-        Hesabın bir kurulumunu veya bütün etkin kurulumlarını iptal eder.
-        Yanıttaki sayı yerel iptali gösterir. Sunucu daha sonra oturum kapatma isteği gönderir.
-        Başka bir geçerli oturumla tekli iptal yinelenebilir.
+        Revokes one installation or all active installations for the account.
+        The returned count reflects local revocations. The server then requests session closure.
+        A single-installation revocation can be retried from another valid session.
       requestBody:
         required: true
         content:
@@ -66,11 +66,11 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_activity:
     post:
-      summary: Kullanıcının son işlem saatini kaydet
+      summary: Record the user's last activity time
       operationId: mobileV1Activity
       description: |
-        İstemci bu ucu yalnız kullanıcı işlem yaptığında çağırır.
-        Sunucu kendi saatini kaydeder. Arka plan eşitlemesi bu saati değiştirmez.
+        The client calls this endpoint only when the user acts.
+        The server records its own time. Background sync does not change it.
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
@@ -81,7 +81,7 @@ paths:
             schema: { $ref: '#/components/schemas/Device' }
       responses:
         '200':
-          description: Sunucu son işlem saatini Unix saniyesi olarak döndürür.
+          description: The server returns the last activity time in Unix seconds.
           content:
             application/json:
               schema:
@@ -101,14 +101,14 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_push:
     post:
-      summary: Telefondaki değişiklikleri sunucuya gönder
+      summary: Push mobile changes to the server
       operationId: mobileV1Push
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
-        En çok 20 işi sırayla işler. Bir iş başarısız olursa bütün grubu geri alır.
-        Sunucu aynı kimlik ve içerikle gelen işe ilk kesinleşen sonucu verir.
+        Processes up to 20 operations in order. If any operation fails, the server rolls back the entire batch.
+        For an operation with the same ID and content, the server returns the original committed result.
       requestBody:
         required: true
         content:
@@ -126,7 +126,7 @@ paths:
                   items: { $ref: '#/components/schemas/Operation' }
       responses:
         '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
-        '409': { $ref: '#/components/responses/Error', description: İşlem içeriği değişti veya kayıt sürümü eski. }
+        '409': { $ref: '#/components/responses/Error', description: The operation content changed or the record version is stale. }
         '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
@@ -134,12 +134,12 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_pull:
     post:
-      summary: Kayıtları sunucudan telefona al
+      summary: Pull records to the phone
       operationId: mobileV1Pull
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: İmleç yoksa ilk kopyayı başlatır. Sonraki çağrılar sunucunun verdiği imleci kullanır.
+      description: Starts the initial copy when no cursor is provided. Later calls use the cursor returned by the server.
       requestBody:
         required: true
         content:
@@ -154,7 +154,7 @@ paths:
                 limit: { type: integer, minimum: 1, maximum: 100, default: 100 }
       responses:
         '200': { $ref: '#/components/responses/Page' }
-        '410': { $ref: '#/components/responses/Error', description: İmleç geçersiz veya süresi doldu. Tam kopya alın. }
+        '410': { $ref: '#/components/responses/Error', description: The cursor is invalid or has expired. Request a full copy. }
         '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
@@ -162,12 +162,12 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_cleanup:
     post:
-      summary: Süresi dolan eşitleme kayıtlarını temizle
+      summary: Clean up expired sync records
       operationId: mobileV1Cleanup
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: Site yöneticisi süresi dolmuş olayları ve işlem kayıtlarını elle temizler. Önizleme kayıt silmez.
+      description: A site administrator manually removes expired events and operation records. A dry run leaves records intact.
       requestBody:
         required: true
         content:
@@ -186,14 +186,14 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.revoke_user_installations:
     post:
-      summary: Kullanıcının tüm telefon kurulumlarını iptal et
+      summary: Revoke all mobile installations for a user
       operationId: mobileRevokeUserInstallations
       security:
         - identitySyncBearer: []
       description: |
-        Kimlik servisi kullanıcının bütün telefon kurulumlarını iptal eder.
-        Sunucu bildirim bağlarını siler. Aynı istek aynı durumu ve sayıyı döndürür.
-        Sunucu kullanıcıyı veren ve konu kimliğiyle bulur.
+        The identity service revokes all mobile installations for the user.
+        The server removes notification bindings. Repeating the request returns the same status and count.
+        The server finds the user by issuer and subject.
       requestBody:
         required: true
         content:
@@ -207,7 +207,7 @@ paths:
                 subject: { type: string, minLength: 1, maxLength: 255 }
       responses:
         '200':
-          description: Kullanıcının iptal edilmiş kurulum sayısı.
+          description: The number of revoked installations for the user.
           content:
             application/json:
               schema:
@@ -220,14 +220,14 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404':
-          description: Kimlik bağı bulunamadı. exc_type alanı IdentityNotFound döner.
+          description: The identity link was not found. The exc_type field is IdentityNotFound.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '503': { $ref: '#/components/responses/Unavailable' }
   /platform_core.api.mobile_pwa.v1_register:
     post:
-      summary: Telefon kurulumunu kaydet
+      summary: Register a mobile installation
       operationId: mobilePwaV1Register
       security:
         - pwaSession: []
@@ -237,8 +237,8 @@ paths:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
-        Telefon kurulumunu aynı kökendeki Frappe oturumuyla kaydeder.
-        İptal edilen kurulum yeniden açılamaz. Yeni oturum yeni kurulum kimliği ister.
+        Registers the mobile installation using a same-origin Frappe session.
+        A revoked installation cannot be reactivated. A new session requires a new installation ID.
       requestBody:
         required: true
         content:
@@ -253,7 +253,7 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile_pwa.v1_revoke:
     post:
-      summary: Telefon kurulumunu iptal et
+      summary: Revoke a mobile installation
       operationId: mobilePwaV1Revoke
       security:
         - pwaSession: []
@@ -263,9 +263,9 @@ paths:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
-        Hesabın bir kurulumunu veya bütün etkin kurulumlarını iptal eder.
-        Yanıttaki sayı yerel iptali gösterir. Sunucu daha sonra oturum kapatma isteği gönderir.
-        Başka bir geçerli oturumla tekli iptal yinelenebilir.
+        Revokes one installation or all active installations for the account.
+        The returned count reflects local revocations. The server then requests session closure.
+        A single-installation revocation can be retried from another valid session.
       requestBody:
         required: true
         content:
@@ -287,14 +287,14 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile_pwa.v1_activity:
     post:
-      summary: Kullanıcının son işlem saatini kaydet
+      summary: Record the user's last activity time
       operationId: mobilePwaV1Activity
       security:
         - pwaSession: []
           pwaCsrf: []
       description: |
-        İstemci bu ucu yalnız kullanıcı işlem yaptığında çağırır.
-        Sunucu kendi saatini kaydeder. Arka plan eşitlemesi bu saati değiştirmez.
+        The client calls this endpoint only when the user acts.
+        The server records its own time. Background sync does not change it.
       parameters:
         - { $ref: '#/components/parameters/PwaOrigin' }
         - { $ref: '#/components/parameters/AppVersion' }
@@ -306,7 +306,7 @@ paths:
             schema: { $ref: '#/components/schemas/Device' }
       responses:
         '200':
-          description: Sunucu son işlem saatini Unix saniyesi olarak döndürür.
+          description: The server returns the last activity time in Unix seconds.
           content:
             application/json:
               schema:
@@ -326,7 +326,7 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile_pwa.v1_push:
     post:
-      summary: Telefondaki değişiklikleri sunucuya gönder
+      summary: Push mobile changes to the server
       operationId: mobilePwaV1Push
       security:
         - pwaSession: []
@@ -336,8 +336,8 @@ paths:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
       description: |
-        En çok 20 işi sırayla işler. Bir iş başarısız olursa bütün grubu geri alır.
-        Sunucu aynı kimlik ve içerikle gelen işe ilk kesinleşen sonucu verir.
+        Processes up to 20 operations in order. If any operation fails, the server rolls back the entire batch.
+        For an operation with the same ID and content, the server returns the original committed result.
       requestBody:
         required: true
         content:
@@ -355,7 +355,7 @@ paths:
                   items: { $ref: '#/components/schemas/Operation' }
       responses:
         '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
-        '409': { $ref: '#/components/responses/Error', description: İşlem içeriği değişti veya kayıt sürümü eski. }
+        '409': { $ref: '#/components/responses/Error', description: The operation content changed or the record version is stale. }
         '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
@@ -363,7 +363,7 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile_pwa.v1_pull:
     post:
-      summary: Kayıtları sunucudan telefona al
+      summary: Pull records to the phone
       operationId: mobilePwaV1Pull
       security:
         - pwaSession: []
@@ -372,7 +372,7 @@ paths:
         - { $ref: '#/components/parameters/PwaOrigin' }
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: İmleç yoksa ilk kopyayı başlatır. Sonraki çağrılar sunucunun verdiği imleci kullanır.
+      description: Starts the initial copy when no cursor is provided. Later calls use the cursor returned by the server.
       requestBody:
         required: true
         content:
@@ -387,7 +387,7 @@ paths:
                 limit: { type: integer, minimum: 1, maximum: 100, default: 100 }
       responses:
         '200': { $ref: '#/components/responses/Page' }
-        '410': { $ref: '#/components/responses/Error', description: İmleç geçersiz veya süresi doldu. Tam kopya alın. }
+        '410': { $ref: '#/components/responses/Error', description: The cursor is invalid or has expired. Request a full copy. }
         '401': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
@@ -398,7 +398,7 @@ components:
     identitySyncBearer:
       type: http
       scheme: bearer
-      description: Kimlik kancasının doğruladığı ve azp değeri identity-sync olan servis belirteci.
+      description: Service token verified by the identity hook with azp set to identity-sync.
     mobileBearer: { type: http, scheme: bearer }
     pwaSession: { type: apiKey, in: cookie, name: sid }
     pwaCsrf: { type: apiKey, in: header, name: X-Frappe-CSRF-Token }
@@ -407,7 +407,7 @@ components:
       name: Origin
       in: header
       required: true
-      description: PWA ve kiracı sitesi aynı kökenden sunulur.
+      description: The PWA and tenant site are served from the same origin.
       schema: { type: string }
     AppVersion:
       name: X-Mobile-App-Version
@@ -422,7 +422,7 @@ components:
   schemas:
     ServerTime:
       type: integer
-      description: Sunucunun istek başındaki saati. Unix saniyesi olarak verilir.
+      description: Server time at the start of the request, expressed in Unix seconds.
     UUID:
       type: string
       format: uuid
@@ -441,8 +441,8 @@ components:
         operation_id: { $ref: '#/components/schemas/UUID' }
         command: { type: string, minLength: 1, maxLength: 80 }
         record_id: { $ref: '#/components/schemas/UUID' }
-        version: { type: string, minLength: 1, maxLength: 128, description: Güncelleme ve silmede zorunlu kayıt sürümü. }
-        fields: { type: object, description: Komutun izin verdiği alanlar. }
+        version: { type: string, minLength: 1, maxLength: 128, description: Record version required for updates and deletions. }
+        fields: { type: object, description: Fields allowed by the command. }
     Change:
       type: object
       additionalProperties: false
@@ -496,7 +496,7 @@ components:
         server_time: { $ref: '#/components/schemas/ServerTime' }
         code:
           type: string
-          description: Mobil ucun verdiği hata kodu.
+          description: Error code returned by the mobile endpoint.
           enum:
             - IdentityNotFound
             - body_too_large
@@ -537,11 +537,11 @@ components:
             - unsupported_contract_version
             - version_conflict
             - version_required
-        exc_type: { type: string, description: Frappe isteği uca ulaşmadan reddederse gelen hata türü. }
-        current: { $ref: '#/components/schemas/Change', description: Kullanıcının görebildiği güncel kayıt. }
+        exc_type: { type: string, description: Error type returned if Frappe rejects the request before it reaches the endpoint. }
+        current: { $ref: '#/components/schemas/Change', description: Current record visible to the user. }
   responses:
     DeviceSuccess:
-      description: İstek tamamlandı.
+      description: The request completed.
       content:
         application/json:
           schema:
@@ -551,7 +551,7 @@ components:
               server_time: { $ref: '#/components/schemas/ServerTime' }
               message: { $ref: '#/components/schemas/Device' }
     RevokedSuccess:
-      description: İstek tamamlandı.
+      description: The request completed.
       content:
         application/json:
           schema:
@@ -561,7 +561,7 @@ components:
               server_time: { $ref: '#/components/schemas/ServerTime' }
               message: { $ref: '#/components/schemas/Revoked' }
     AppliedOperationsSuccess:
-      description: İstek tamamlandı.
+      description: The request completed.
       content:
         application/json:
           schema:
@@ -571,7 +571,7 @@ components:
               server_time: { $ref: '#/components/schemas/ServerTime' }
               message: { $ref: '#/components/schemas/AppliedOperations' }
     CleanupResultSuccess:
-      description: İstek tamamlandı.
+      description: The request completed.
       content:
         application/json:
           schema:
@@ -581,7 +581,7 @@ components:
               server_time: { $ref: '#/components/schemas/ServerTime' }
               message: { $ref: '#/components/schemas/CleanupResult' }
     Page:
-      description: Kayıt sayfası ve sonraki çağrı için imleç.
+      description: A page of records and the cursor for the next request.
       content:
         application/json:
           schema:
@@ -597,7 +597,7 @@ components:
                   cursor: { type: string, maxLength: 2048 }
                   has_more: { type: boolean }
     Error:
-      description: İstek reddedildi.
+      description: The request was rejected.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -605,15 +605,15 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
-      description: İstek sıklığı sınırı aşıldı.
+      description: The request rate limit was exceeded.
       headers:
         Retry-After:
           schema: { type: integer, minimum: 1 }
     Unavailable:
-      description: Sunucu şu anda işlemi tamamlayamadı.
+      description: The server could not complete the operation.
       headers:
         Retry-After:
-          description: Yeni denemeden önce beklenecek saniye.
+          description: Seconds to wait before trying again.
           schema: { type: integer, minimum: 1 }
       content:
         application/json:
