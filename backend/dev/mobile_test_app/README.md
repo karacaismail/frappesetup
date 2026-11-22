@@ -22,3 +22,13 @@ Komut mevcut çalışan, izin ve telefon kayıtlarını silmez.
 - Bir telefon 1.000 bekleyen değişikliği on sayfada çeker. Bu ölçüm beş kez yapılır.
 - Sunucu süresi kimlik denetimini, isteği ve veritabanı işlemini kapsar.
 - Mobil uçlar yalıtılmış test izin görünümünü kullanır. Canlı HRMS iş akışı çalışmaz.
+
+## Telefon sözleşmesi örnekleri
+
+Komut, her uçtaki istek ve yanıt örneklerini sözleşmenin şemasına göre denetler.
+Depo kökünden çalıştırın.
+
+```bash
+uv run --no-project --with-requirements backend/dev/requirements-contract-tests.txt \
+  python -m unittest discover -s backend/dev/mobile_test_app/tests
+```
