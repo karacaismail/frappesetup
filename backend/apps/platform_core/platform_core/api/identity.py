@@ -1,7 +1,8 @@
 """identity-sync endpoints. Only the `identity-sync` service token is accepted (docs/sozlesmeler.md, section 5).
 
-Parameters carry no type hints on purpose: Frappe would answer a wrong type with its own 417 before the
-module runs. `provisioning` validates every field and answers 400 `InvalidInput` (the contract's single shape)."""
+Parameters are typed `object` (G-8): Frappe's type check then accepts every value, and `provisioning`
+validates each field itself and answers 400 `InvalidInput` (the contract's single shape). A narrower hint
+would let Frappe answer a wrong type with its own 417 first."""
 
 import frappe
 from frappe import _
@@ -9,6 +10,7 @@ from frappe.rate_limiter import rate_limit
 
 from platform_core.kimlik import anonymization, provisioning, service_token, sign_in
 from platform_core.kimlik.exceptions import InvalidInput
+from platform_core.kimlik.reconciliation import list_linked_identities
 from platform_core.kimlik.safe_errors import safe_errors
 
 SERVICE = "identity-sync"
@@ -26,18 +28,28 @@ def _only(*fields: str) -> None:
 		)
 
 
+@frappe.whitelist(methods=["GET"])
+@rate_limit(limit=SERVICE_LIMIT, seconds=SERVICE_WINDOW, user_based=True)
+@safe_errors
+def list_identities(start: object = 0, page_length: object = 500) -> dict:
+	"""Lists a page of linked identities for the identity-sync service."""
+	service_token.require_service(SERVICE)
+	_only("start", "page_length")
+	return list_linked_identities(start, page_length)
+
+
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=SERVICE_LIMIT, seconds=SERVICE_WINDOW, user_based=True)
 @safe_errors
 def provision(
-	issuer=None,
-	subject=None,
-	email=None,
-	email_verified=None,
-	first_name=None,
-	last_name=None,
-	enabled=None,
-	role_profiles=None,
+	issuer: object = None,
+	subject: object = None,
+	email: object = None,
+	email_verified: object = None,
+	first_name: object = None,
+	last_name: object = None,
+	enabled: object = None,
+	role_profiles: object = None,
 ) -> dict:
 	"""Creates or updates the user. The same request returns the same result twice."""
 	service_token.require_service(SERVICE)
@@ -61,7 +73,7 @@ def provision(
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=SERVICE_LIMIT, seconds=SERVICE_WINDOW, user_based=True)
 @safe_errors
-def set_enabled(issuer=None, subject=None, enabled=None) -> dict:
+def set_enabled(issuer: object = None, subject: object = None, enabled: object = None) -> dict:
 	"""Enables or disables the user. Disabling closes all of the user's sessions."""
 	service_token.require_service(SERVICE)
 	_only("issuer", "subject", "enabled")
@@ -71,7 +83,7 @@ def set_enabled(issuer=None, subject=None, enabled=None) -> dict:
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=SERVICE_LIMIT, seconds=SERVICE_WINDOW, user_based=True)
 @safe_errors
-def change_email(issuer=None, subject=None, new_email=None) -> dict:
+def change_email(issuer: object = None, subject: object = None, new_email: object = None) -> dict:
 	"""Changes the e-mail with `rename_doc`. The identity link follows the user."""
 	service_token.require_service(SERVICE)
 	_only("issuer", "subject", "new_email")
@@ -81,7 +93,7 @@ def change_email(issuer=None, subject=None, new_email=None) -> dict:
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=SERVICE_LIMIT, seconds=SERVICE_WINDOW, user_based=True)
 @safe_errors
-def anonymize_user(issuer=None, subject=None) -> dict:
+def anonymize_user(issuer: object = None, subject: object = None) -> dict:
 	"""Disables the user and anonymizes the person. Business records stay (O-27). Irreversible."""
 	service_token.require_service(SERVICE)
 	_only("issuer", "subject")

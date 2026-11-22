@@ -16,17 +16,74 @@ The caller renames the user afterwards; Frappe then rewrites every Link, `owner`
 
 import json
 import re
+from collections.abc import Iterator
 from email.utils import getaddresses, parseaddr
+from itertools import batched, chain
 
 import frappe
 
 REDACTED = "[REDACTED]"
+# P-3: growing lists are read page by page with a stable order.
+PAGE_SIZE = 500
 # Rows that `_extra_records` handles with the own or shared distinction (merge review 2, E3).
 HANDLED_BY_OWNERSHIP = frozenset(("Contact", "Contact Email", "Address"))
 TEXT_TYPES = frozenset(
 	("Data", "Small Text", "Text", "Long Text", "Text Editor", "Code", "HTML Editor", "Markdown Editor")
 )
 EMPTY_TYPES = frozenset(("Date", "Datetime", "Time", "Attach", "Attach Image", "Phone", "Int", "Float"))
+
+
+def _rows(
+	doctype: str,
+	*,
+	filters: dict | None = None,
+	fields: list[str] | None = None,
+	pluck: str | None = None,
+	or_filters: dict | None = None,
+) -> Iterator:
+	"""Reads bounded pages by name so updates to matching rows cannot shift later pages.
+
+	G-3: the identity-sync deletion runs as Administrator and selects fields by
+	the deleted account's identifiers (docs/sozlesmeler.md section 7).
+	"""
+	filters = dict(filters or {})
+	projection = list(dict.fromkeys(["name", *(fields or []), *([pluck] if pluck else [])]))
+	fixed_name = "name" in filters
+	while True:
+		page = frappe.get_all(
+			doctype,
+			filters=filters,
+			or_filters=or_filters,
+			fields=projection,
+			order_by="name asc",
+			limit=PAGE_SIZE,
+		)
+		for row in page:
+			yield row[pluck] if pluck else row
+		if fixed_name or len(page) < PAGE_SIZE:
+			return
+		filters["name"] = (">", page[-1]["name"])
+
+
+def scrub_after_rename(user: str, anon: str) -> None:
+	"""Redacts the address in Edit comments on records renamed by Frappe's User hooks.
+
+	Frappe 16.56.0 writes the rename note as an Edit comment (model/rename_doc.py:206).
+	User.after_rename also renames the user's Notification Settings (user.py:745).
+	"""
+	for row in _rows(
+		"Comment",
+		filters={
+			"reference_doctype": ("in", ("User", "Notification Settings")),
+			"reference_name": anon,
+			"comment_type": "Edit",
+			"content": ("like", f"%{user}%"),
+		},
+		fields=["name", "content"],
+	):
+		content = _scrub(row.content, user, anon, "")
+		if content != row.content:
+			frappe.db.set_value("Comment", row.name, "content", content, update_modified=False)
 
 
 def anonymize(user: str, anon: str) -> None:
@@ -52,52 +109,55 @@ def _ownership(user: str) -> frappe._dict:
 	person's own when every link points to the person's own Contacts, or when it has no link and its
 	e-mail is the person's address. Shared records keep the other people's data.
 	"""
-	candidates = set(frappe.get_all("Contact", filters={"user": user}, pluck="name"))
-	candidates |= set(frappe.get_all("Contact Email", filters={"email_id": user}, pluck="parent"))
-	own_contacts, shared_contacts = set(), set()
-	for name in candidates:
-		addresses = frappe.get_all(
-			"Contact Email", filters={"parent": name, "parenttype": "Contact"}, pluck="email_id"
-		)
-		# Frappe fills `user` from the primary e-mail by itself, so that field is not an explicit tie.
-		# The e-mail rows decide: every address is the person's, or there is no address and `user` points
-		# to the person.
-		# Merge review 3: a Contact linked to a business record (Customer, Supplier, any document) is shared,
-		# even with one e-mail. The company phone and the record's files belong to that business record.
-		linked = frappe.db.exists(
-			"Dynamic Link", {"parent": name, "parenttype": "Contact", "link_doctype": ("!=", "User")}
-		)
-		if not linked and (
-			(addresses and all(_same_address(address, user) for address in addresses))
-			or (not addresses and frappe.db.get_value("Contact", name, "user") == user)
+	candidates = set(_rows("Contact Email", filters={"email_id": user}, pluck="parent"))
+	user_contacts = set()
+	for row in _rows("Contact", filters={"user": user}, fields=["user"]):
+		candidates.add(row.name)
+		if row.user == user:
+			user_contacts.add(row.name)
+	addresses = set(_rows("Address", filters={"email_id": user}, pluck="name"))
+	own_contacts = set()
+
+	for batch in batched(candidates, PAGE_SIZE, strict=False):
+		contacts_with_email, contacts_with_other_email = set(), set()
+		for row in _rows(
+			"Contact Email",
+			filters={"parent": ("in", batch), "parenttype": "Contact"},
+			fields=["parent", "email_id"],
 		):
-			own_contacts.add(name)
-		else:
-			shared_contacts.add(name)
-	address_names = set(frappe.get_all("Address", filters={"email_id": user}, pluck="name"))
-	for contact in candidates:
-		address_names |= set(
-			frappe.get_all(
+			contacts_with_email.add(row.parent)
+			if not _same_address(row.email_id, user):
+				contacts_with_other_email.add(row.parent)
+		business_contacts = set(
+			_rows(
 				"Dynamic Link",
-				filters={"link_doctype": "Contact", "link_name": contact, "parenttype": "Address"},
+				filters={"parent": ("in", batch), "parenttype": "Contact", "link_doctype": ("!=", "User")},
 				pluck="parent",
 			)
 		)
-	own_addresses, shared_addresses = set(), set()
-	for name in address_names:
-		links = frappe.get_all(
-			"Dynamic Link",
-			filters={"parent": name, "parenttype": "Address"},
-			fields=["link_doctype", "link_name"],
+		eligible_contacts = contacts_with_email | user_contacts.intersection(batch)
+		own_contacts.update(eligible_contacts - contacts_with_other_email - business_contacts)
+		addresses.update(
+			_rows(
+				"Dynamic Link",
+				filters={"link_doctype": "Contact", "link_name": ("in", batch), "parenttype": "Address"},
+				pluck="parent",
+			)
 		)
-		if all(link.link_doctype == "Contact" and link.link_name in own_contacts for link in links):
-			own_addresses.add(name)
-		else:
-			shared_addresses.add(name)
+
+	shared_addresses = set()
+	for batch in batched(addresses, PAGE_SIZE, strict=False):
+		for link in _rows(
+			"Dynamic Link",
+			filters={"parent": ("in", batch), "parenttype": "Address"},
+			fields=["parent", "link_doctype", "link_name"],
+		):
+			if link.link_doctype != "Contact" or link.link_name not in own_contacts:
+				shared_addresses.add(link.parent)
 	return frappe._dict(
 		contacts=own_contacts,
-		shared_contacts=shared_contacts,
-		addresses=own_addresses,
+		shared_contacts=candidates - own_contacts,
+		addresses=addresses - shared_addresses,
 		shared_addresses=shared_addresses,
 	)
 
@@ -108,11 +168,11 @@ def _shared(owned: frappe._dict, doctype: str, name: str) -> bool:
 	)
 
 
-def _bound_rows(doctype: str, filter_by: str, user: str, fields: list[str]) -> list[dict]:
+def _bound_rows(doctype: str, filter_by: str, user: str, fields: list[str]) -> Iterator:
 	meta = frappe.get_meta(doctype)
 	if filter_by not in ("owner", "name") and not meta.get_field(filter_by):
-		return []
-	return frappe.get_all(doctype, filters={filter_by: user}, fields=["name", *fields])
+		return
+	yield from _rows(doctype, filters={filter_by: user}, fields=fields)
 
 
 def _value_for(df, anon: str):
@@ -249,33 +309,20 @@ def _extra_records(user: str, anon: str, full_name: str, owned: frappe._dict) ->
 			},
 			update_modified=False,
 		)
-	# Shared Contacts lose only the person's own e-mail rows.
-	for name in owned.shared_contacts:
-		for row in frappe.get_all(
-			"Contact Email", filters={"parent": name, "parenttype": "Contact"}, fields=["name", "email_id"]
-		):
-			if _same_address(row.email_id, user):
-				frappe.db.delete("Contact Email", {"name": row.name})
-		if frappe.db.get_value("Contact", name, "user") == user:
-			frappe.db.set_value("Contact", name, "user", None, update_modified=False)
-		if _same_address(frappe.db.get_value("Contact", name, "email_id"), user):
-			remaining = frappe.get_all(
-				"Contact Email", filters={"parent": name, "parenttype": "Contact"}, pluck="email_id", limit=1
-			)
-			frappe.db.set_value(
-				"Contact", name, "email_id", remaining[0] if remaining else None, update_modified=False
-			)
+	_clear_shared_contacts(owned.shared_contacts, user)
 	for address in owned.addresses:
 		_blank_address(address)
 	# Shared addresses lose only the person's e-mail.
-	for address in owned.shared_addresses:
-		if _same_address(frappe.db.get_value("Address", address, "email_id"), user):
-			frappe.db.set_value("Address", address, "email_id", None, update_modified=False)
+	for batch in batched(owned.shared_addresses, PAGE_SIZE, strict=False):
+		for row in _rows("Address", filters={"name": ("in", batch)}, fields=["email_id"]):
+			if _same_address(row.email_id, user):
+				frappe.db.set_value("Address", row.name, "email_id", None, update_modified=False)
 
 	# Activity Log: name and IP address.
-	for row in frappe.get_all(
-		"Activity Log", filters={"user": user}, fields=["name", "subject", "full_name"]
-	) + frappe.get_all("Activity Log", filters={"owner": user}, fields=["name", "subject", "full_name"]):
+	for row in chain(
+		_rows("Activity Log", filters={"user": user}, fields=["subject", "full_name"]),
+		_rows("Activity Log", filters={"owner": user}, fields=["subject", "full_name"]),
+	):
 		frappe.db.set_value(
 			"Activity Log",
 			row["name"],
@@ -288,13 +335,13 @@ def _extra_records(user: str, anon: str, full_name: str, owned: frappe._dict) ->
 		)
 
 	# Version: old personal values of the user's own records and of records the user changed.
-	for row in frappe.get_all(
+	for row in _rows(
 		"Version",
 		filters={"ref_doctype": ("in", ("User", "Contact")), "docname": ("in", [user, *contacts])},
 		pluck="name",
 	):
 		frappe.db.set_value("Version", row, "data", json.dumps({"redacted": True}), update_modified=False)
-	for row in frappe.get_all("Version", filters={"owner": user}, fields=["name", "data"]):
+	for row in _rows("Version", filters={"owner": user}, fields=["name", "data"]):
 		scrubbed = _scrub(row["data"], user, anon, full_name)
 		if scrubbed != row["data"]:
 			frappe.db.set_value("Version", row["name"], "data", scrubbed, update_modified=False)
@@ -302,24 +349,24 @@ def _extra_records(user: str, anon: str, full_name: str, owned: frappe._dict) ->
 	# Personal files (merge review E3): files bound to the User record or to the person's own records
 	# (Contact). A file on a business record is a business record and stays, whoever uploaded it.
 	files = set(
-		frappe.get_all(
-			"File", filters={"attached_to_doctype": "User", "attached_to_name": user}, pluck="name"
-		)
+		_rows("File", filters={"attached_to_doctype": "User", "attached_to_name": user}, pluck="name")
 	)
 	if contacts:
 		files |= set(
-			frappe.get_all(
+			_rows(
 				"File",
 				filters={"attached_to_doctype": "Contact", "attached_to_name": ("in", list(contacts))},
 				pluck="name",
 			)
 		)
 	for name in files:
+		# G-4: the request runs as the administrator under the identity-sync token. The files are the
+		# person's own (bound to the User record or the person's own Contact), found by those links.
 		frappe.delete_doc("File", name, force=True, ignore_permissions=True)
 	frappe.db.set_value("User", user, {"user_image": None, "banner_image": None}, update_modified=False)
 
 	# Communication and the e-mail queue.
-	for row in frappe.get_all(
+	for row in _rows(
 		"Communication",
 		or_filters={
 			"sender": user,
@@ -337,13 +384,11 @@ def _extra_records(user: str, anon: str, full_name: str, owned: frappe._dict) ->
 			values["sender_full_name"] = REDACTED
 		if values:
 			frappe.db.set_value("Communication", row["name"], values, update_modified=False)
-	for row in frappe.get_all(
-		"Email Queue", filters={"sender": ("like", f"%{user}%")}, fields=["name", "sender"]
-	):
+	for row in _rows("Email Queue", filters={"sender": ("like", f"%{user}%")}, fields=["name", "sender"]):
 		scrubbed = _replace_in_address_list(row["sender"], user, anon)
 		if scrubbed != row["sender"]:
 			frappe.db.set_value("Email Queue", row["name"], "sender", scrubbed, update_modified=False)
-	for row in frappe.get_all("Email Queue Recipient", filters={"recipient": user}, pluck="name"):
+	for row in _rows("Email Queue Recipient", filters={"recipient": user}, pluck="name"):
 		frappe.db.set_value("Email Queue Recipient", row, "recipient", anon, update_modified=False)
 
 	# Two-factor keys, default values, social sign-in rows and extra e-mail rows.
@@ -359,6 +404,29 @@ def _extra_records(user: str, anon: str, full_name: str, owned: frappe._dict) ->
 		new_name = anon if index == 0 else f"{anon}-{index}"
 		if name != new_name and not frappe.db.exists("Contact", new_name):
 			frappe.rename_doc("Contact", name, new_name, force=True, show_alert=False)
+
+
+def _clear_shared_contacts(contacts: set[str], user: str) -> None:
+	"""Removes only the deleted account's addresses from the shared contacts."""
+	for batch in batched(contacts, PAGE_SIZE, strict=False):
+		remaining = {}
+		for row in _rows(
+			"Contact Email",
+			filters={"parent": ("in", batch), "parenttype": "Contact"},
+			fields=["parent", "email_id"],
+		):
+			if _same_address(row.email_id, user):
+				frappe.db.delete("Contact Email", {"name": row.name})
+			else:
+				remaining.setdefault(row.parent, row.email_id)
+		for row in _rows("Contact", filters={"name": ("in", batch)}, fields=["user", "email_id"]):
+			values = {}
+			if row.user == user:
+				values["user"] = None
+			if _same_address(row.email_id, user):
+				values["email_id"] = remaining.get(row.name)
+			if values:
+				frappe.db.set_value("Contact", row.name, values, update_modified=False)
 
 
 def _blank_address(name: str) -> None:

@@ -186,10 +186,24 @@ def anonymize_step(issuer: str, subject: str) -> dict:
 	anonymization_scope.anonymize(user, anon)
 	if frappe.db.exists("User", user) and user != anon:
 		rename_doc("User", user, anon, force=True, show_alert=False)
+		# The Frappe rename writes an Edit comment that names the old address.
+		anonymization_scope.scrub_after_rename(user, anon)
 	if link:
-		frappe.db.delete(provisioning.LINK, {"name": link.name})
+		_forget_link(link.name)
 	frappe.db.set_value(DELETION, record.name, {"state": ANONYMIZED, "user": anon}, update_modified=False)
 	return _result(anon)
+
+
+def _forget_link(name: str) -> None:
+	"""Deletes the identity link and its history, so the raw `sub` is gone (G-15, contract rule 2).
+
+	V-1 exception: `frappe.delete_doc` would keep a full copy in “Deleted Document”, raw `sub` included.
+	The link has no controller hooks that must run on deletion, so a direct delete is used. The link tracks
+	changes, so its Version rows and comments are deleted too.
+	"""
+	frappe.db.delete("Version", {"ref_doctype": provisioning.LINK, "docname": name})
+	frappe.db.delete("Comment", {"reference_doctype": provisioning.LINK, "reference_name": name})
+	frappe.db.delete(provisioning.LINK, {"name": name})
 
 
 def _anonymous_name(record_name: str) -> str:

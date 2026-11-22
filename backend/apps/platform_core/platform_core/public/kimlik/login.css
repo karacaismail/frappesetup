@@ -1,8 +1,9 @@
 /* Tenant sign-in page of platform_core. Tokens are central on :root; components use tokens only.
    Rules: Outfit self-hosted, text >= 14 CSS px (body 16), mobile first from 320 px, no surrounding focus
    ring (a non-surrounding underline indicator that appears only after Tab), forced-colors exception,
-   no coloured accent edge on rounded boxes. The panel's design tokens (platform-core-kabuk) are not
-   merged yet; these tokens carry the same names so they can be unified later. */
+   no coloured accent edge on rounded boxes. The login and panel styles still define their tokens separately.
+   BORC(mvp): owners platform-core-kimlik and platform-core-kabuk. Closes when the login page and the panel
+   share one token file and one font folder (the Outfit files are also in public/panel/fonts). */
 
 @font-face {
 	font-family: "Outfit Variable";
@@ -120,7 +121,11 @@ body {
 	transition: background-color var(--fs-motion), color var(--fs-motion);
 }
 
-.button--primary { background: var(--fs-accent); color: var(--fs-accent-ink); }
+.button--primary {
+	--fs-control-focus: var(--fs-accent-ink);
+	background: var(--fs-accent);
+	color: var(--fs-accent-ink);
+}
 .button--primary:hover { background: var(--fs-accent-hover); }
 .button--secondary { background: var(--fs-surface-2); color: var(--fs-ink); }
 .button--secondary:hover { background: var(--fs-line); }
@@ -146,7 +151,7 @@ body {
 html[data-kbd] .button:focus-visible,
 html[data-kbd] a:focus-visible,
 html[data-kbd] .form__input:focus-visible {
-	box-shadow: inset 0 calc(-1 * var(--fs-focus-width)) 0 0 var(--fs-focus);
+	box-shadow: inset 0 calc(-1 * var(--fs-focus-width)) 0 0 var(--fs-control-focus, var(--fs-focus));
 }
 
 @media (forced-colors: active) {

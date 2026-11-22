@@ -229,8 +229,6 @@ def _lock_identity_for_sign_in(issuer: str, claims: dict, user: str, session_ope
 
 	frappe.db.commit()
 	link, record = anonymization.lock_identity(issuer, claims["sub"].strip(), require_key=False)
-	if not session_open:
-		_after_identity_lock()
 	refused = record or not link or link.user != user
 	if not refused and not frappe.db.get_value("User", user, "enabled", for_update=True):
 		refused = True
@@ -247,10 +245,6 @@ def _close_new_session() -> None:
 	if sid and sid != "Guest":
 		delete_session(sid, reason="Account deleted during sign-in")
 	frappe.local.cookie_manager.delete_cookie("sid")
-
-
-def _after_identity_lock() -> None:
-	"""Test seam: runs while the sign-in holds the identity lock. Does nothing in production."""
 
 
 def resolve_user(issuer: str, claims: dict) -> str:
@@ -312,8 +306,25 @@ def create_link(issuer: str, subject: str, user: str) -> str:
 	"""
 	doc = frappe.new_doc(LINK_DOCTYPE)
 	doc.update({"issuer": issuer, "subject": subject, "user": user})
-	doc.insert(ignore_permissions=True)
-	return doc.name
+	from frappe.database.database import savepoint
+
+	inserted = False
+	with savepoint(catch=(frappe.UniqueValidationError, frappe.DuplicateEntryError)):
+		doc.insert(ignore_permissions=True)
+		inserted = True
+	if inserted:
+		return doc.name
+	# V-8: never accept an unseen winner. MariaDB can reject a locking read from this older snapshot.
+	existing = frappe.db.get_value(
+		LINK_DOCTYPE, {"issuer": issuer, "subject": subject}, ["name", "user"], as_dict=True
+	)
+	if existing and existing.user == user:
+		return existing.name
+	if not existing:
+		raise SignInRefused(403, _("The identity link changed. Try again.", context="platform_core.kimlik"))
+	raise SignInRefused(
+		403, _("This identity is linked to a different user.", context="platform_core.kimlik")
+	)
 
 
 def exchange_code(settings, code: str, code_verifier: str, redirect_uri: str) -> dict:

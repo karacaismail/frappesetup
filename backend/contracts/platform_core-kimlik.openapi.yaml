@@ -135,6 +135,10 @@ x-site-settings:
       example: ["identity-sync"]
       required: false
       note: List of `azp` values accepted in the service token. The default is `["identity-sync"]`.
+    - key: kimlik_mobil_azp
+      example: ["mobile"]
+      required: false
+      note: List of `azp` values accepted in the phone token. The default is `["mobile"]`.
     - key: kimlik_deletion_hmac_key
       example: "(secret, not written in this file)"
       required: true
@@ -702,6 +706,68 @@ paths:
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
+  /platform_core.api.identity.list_identities:
+    get:
+      tags: [eşitleme]
+      operationId: listIdentities
+      summary: Lists the site's linked identities for reconciliation.
+      description: |
+        Only a service token with `azp=identity-sync` is accepted.
+        Returns identities in ascending subject order, then issuer order for equal subjects.
+        A page contains only the issuer, subject and enabled state of each linked account.
+      x-yikici: false
+      security:
+        - serviceToken: []
+      parameters:
+        - name: start
+          in: query
+          schema: {type: integer, minimum: 0, maximum: 9223372036854775807, default: 0}
+        - name: page_length
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 500, default: 500}
+      responses:
+        "200":
+          description: The requested page and whether another page exists.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                additionalProperties: false
+                properties:
+                  message:
+                    type: object
+                    required: [identities, has_next_page]
+                    additionalProperties: false
+                    properties:
+                      identities:
+                        type: array
+                        maxItems: 500
+                        items:
+                          type: object
+                          required: [issuer, subject, enabled]
+                          additionalProperties: false
+                          properties:
+                            issuer: {type: string}
+                            subject: {type: string}
+                            enabled: {type: boolean}
+                      has_next_page: {type: boolean}
+        "400":
+          $ref: "#/components/responses/GirdiGecersiz"
+        "401":
+          $ref: "#/components/responses/ServisBelirteciReddi"
+        "403":
+          $ref: "#/components/responses/ServisYetkisiYok"
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
+        "500":
+          description: The identity list could not be read. The error type is `IdentityInternalError`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "503":
+          $ref: "#/components/responses/AnahtarListesiYok"
+
   /platform_core.api.identity.provision:
     post:
       tags: [eşitleme]
@@ -1139,38 +1205,6 @@ paths:
         default:
           description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.sign_up:
-    get:
-      tags: [yerel-giris-kapisi]
-      operationId: gatedSignUpGet
-      summary: Closed local sign-in function. It replaces the Frappe function `frappe.core.doctype.user.user.sign_up`.
-      description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.sign_up`. It creates a new account.
-        The `override_whitelisted_methods` hook routes the Frappe address to this function.
-        So `/api/method/frappe.core.doctype.user.user.sign_up` gets the same response. The address is listed in `x-frappe-original`.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
-
-        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
-        Calls with and without sign-in get the same response. The endpoint changes no record.
-        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
-        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
-        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
-        The request body is at most 16 KB. A larger body gets 413.
-        The scope is in the `x-yerel-giris-kapisi` extension.
-      x-yikici: false
-      x-frappe-original: [frappe.core.doctype.user.user.sign_up]
-      security: []
-      responses:
-        "403":
-          $ref: "#/components/responses/YerelGirisKapali"
-        "413":
-          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/FrappeError"}
-        "429":
-          $ref: "#/components/responses/IstekSiniri"
-        default:
-          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedSignUpPost
@@ -1184,7 +1218,7 @@ paths:
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
-        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        Allowed HTTP methods: POST. Other methods are refused by Frappe.
         At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
         The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
@@ -1920,38 +1954,6 @@ paths:
         default:
           description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.ldap_login:
-    get:
-      tags: [yerel-giris-kapisi]
-      operationId: gatedLdapLoginGet
-      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.doctype.ldap_settings.ldap_settings.login`.
-      description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.doctype.ldap_settings.ldap_settings.login`. It signs in with the LDAP directory of the organization.
-        The `override_whitelisted_methods` hook routes the Frappe address to this function.
-        So `/api/method/frappe.integrations.doctype.ldap_settings.ldap_settings.login` gets the same response. The address is listed in `x-frappe-original`.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
-
-        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
-        Calls with and without sign-in get the same response. The endpoint changes no record.
-        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
-        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
-        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
-        The request body is at most 16 KB. A larger body gets 413.
-        The scope is in the `x-yerel-giris-kapisi` extension.
-      x-yikici: false
-      x-frappe-original: [frappe.integrations.doctype.ldap_settings.ldap_settings.login]
-      security: []
-      responses:
-        "403":
-          $ref: "#/components/responses/YerelGirisKapali"
-        "413":
-          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/FrappeError"}
-        "429":
-          $ref: "#/components/responses/IstekSiniri"
-        default:
-          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLdapLoginPost
@@ -1965,7 +1967,7 @@ paths:
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
-        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        Allowed HTTP methods: POST. Other methods are refused by Frappe.
         At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
         The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.

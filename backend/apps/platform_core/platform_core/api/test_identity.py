@@ -1,0 +1,79 @@
+"""Exercise the reconciliation endpoint over Frappe RPC (contract section 7)."""
+
+import frappe
+from frappe.tests.test_api import FrappeAPITestCase
+
+from platform_core.kimlik.tests import helpers as h
+
+ENDPOINT = "/api/method/platform_core.api.identity.list_identities"
+DISABLED_USER = "reconciliation.disabled@example.test"
+
+
+class TestListIdentities(FrappeAPITestCase):
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		settings = h.SiteSettings()
+		settings.__enter__()
+		cls.addClassCleanup(settings.__exit__, None, None, None)
+		h.clear_links(DISABLED_USER)
+		cls.addClassCleanup(h.clear_links, DISABLED_USER)
+		h.ensure_user(h.AYSE)
+		h.ensure_user(DISABLED_USER)
+		frappe.db.set_value("User", DISABLED_USER, "enabled", 0)
+		h.make_link("reconciliation-z", h.AYSE)
+		h.make_link("reconciliation-a", DISABLED_USER)
+		cls.key = h.key()
+		patcher = h.jwks_patch(cls.key)
+		patcher.start()
+		cls.addClassCleanup(patcher.stop)
+
+	def call(self, *, params=None, claims=None, client=None, with_token=True):
+		token = self.key.sign(h.access_payload(**(claims or {}))) if with_token else None
+		headers = {"Authorization": f"Bearer {token}"} if token else {}
+		return h.request((client or h.new_client()).get, ENDPOINT, query_string=params, headers=headers)
+
+	def page(self, **params):
+		response = self.call(params=params)
+		self.assertEqual(response.status_code, 200, response.data[:400])
+		return response.json["message"]
+
+	def test_orders_and_paginates_with_only_the_contract_fields(self):
+		first = {"issuer": h.ISSUER, "subject": "reconciliation-a", "enabled": False}
+		second = {"issuer": h.ISSUER, "subject": "reconciliation-z", "enabled": True}
+		self.assertEqual(self.page(), {"identities": [first, second], "has_next_page": False})
+		self.assertEqual(self.page(page_length=1), {"identities": [first], "has_next_page": True})
+		self.assertEqual(self.page(start=1, page_length=1), {"identities": [second], "has_next_page": False})
+		self.assertEqual(self.page(start=2), {"identities": [], "has_next_page": False})
+
+	def test_refuses_invalid_query_parameters(self):
+		for params in (
+			{"start": -1},
+			{"start": "1.5"},
+			{"page_length": 0},
+			{"page_length": 501},
+			{"user": h.AYSE},
+		):
+			with self.subTest(params=params):
+				response = self.call(params=params)
+				self.assertEqual(response.status_code, 400, response.data[:300])
+				self.assertEqual(response.json["exc_type"], "InvalidInput")
+
+	def test_list_identities_guest_denied(self):
+		response = self.call(with_token=False)
+		self.assertEqual(response.status_code, 403, response.data[:300])
+		self.assertNotIn("message", response.json)
+
+	def test_list_identities_foreign_data_denied(self):
+		admin = h.new_client()
+		admin.set_cookie("sid", self.sid)
+		with h.SiteSettings({"kimlik_servis_azp": ["identity-sync", "another-service"]}):
+			for response, status in (
+				(self.call(with_token=False, client=admin), 403),
+				(self.call(claims={"azp": "mobile"}), 401),
+				(self.call(claims={"azp": "another-service"}), 403),
+				(self.call(claims={"aud": "other-tenant"}), 401),
+				(self.call(client=admin), 401),
+			):
+				self.assertEqual(response.status_code, status, response.data[:300])
+				self.assertNotIn("message", response.json)

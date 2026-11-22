@@ -15,7 +15,7 @@ from platform_core.kimlik.exceptions import KeycloakKeysUnavailable, ServiceToke
 LEEWAY = 30
 IDENTITY_ENDPOINTS = frozenset(
 	helpers.IDENTITY_API_PREFIX + name
-	for name in ("provision", "set_enabled", "change_email", "anonymize_user")
+	for name in ("provision", "set_enabled", "change_email", "anonymize_user", "list_identities")
 )
 # Service endpoints of other modules that identity-sync calls with its service token (docs/sozlesmeler.md
 # section 7). They are checked before the mobile path rule, so a service token is never read as a phone token.

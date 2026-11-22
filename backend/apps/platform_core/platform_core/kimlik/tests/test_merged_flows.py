@@ -6,7 +6,6 @@ with a real mobile token through the identity hook, the shell guard and the mobi
 """
 
 import time
-import unittest
 import uuid
 
 import frappe
@@ -49,11 +48,6 @@ class TestMergedFlows(FrappeAPITestCase):
 		self.assertIn("/protocol/openid-connect/logout?", out.json["message"]["logout_url"])
 		self.assertEqual(h.logged_user(client), "Guest")
 
-	# Known merge conflict, reported to the orchestrator (status file, tenth round). The shell guard in
-	# `auth_hooks` checks the final user, and a phone request runs as the Website User. The mobile module
-	# keeps its token endpoints out of the Website User allow list on purpose. So the phone registration
-	# gets 403 on the merged code. This test turns into an unexpected success once the owners resolve it.
-	@unittest.expectedFailure
 	def test_phone_registration_with_a_real_mobile_token(self):
 		token = self.key.sign(
 			h.access_payload(

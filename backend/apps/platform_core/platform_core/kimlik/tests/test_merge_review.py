@@ -29,6 +29,23 @@ LINK = "Platform Identity Link"
 DELETION = "Platform Identity Deletion"
 
 
+_REAL_LOCK = anonymization.lock_identity
+
+
+def _after_sign_in_lock(hook):
+	"""Wraps the real identity lock. Runs `hook` once, right after the sign-in took its first lock (D-4)."""
+	state = {"done": False}
+
+	def wrapper(*args, **kwargs):
+		result = _REAL_LOCK(*args, **kwargs)
+		if kwargs.get("require_key") is False and not state["done"]:
+			state["done"] = True
+			hook()
+		return result
+
+	return wrapper
+
+
 def _deletion_worker(site: str, results: dict, done: threading.Event):
 	frappe.init(site=site)
 	frappe.connect()
@@ -105,7 +122,7 @@ class TestMergeReview(FrappeAPITestCase):
 			observed["thread"] = thread
 
 		client = h.new_client()
-		with patch.object(sign_in, "_after_identity_lock", side_effect=while_locked):
+		with patch.object(anonymization, "lock_identity", side_effect=_after_sign_in_lock(while_locked)):
 			response = h.login_with_keycloak(client, h.userinfo(FAKE_SUBJECT, FAKE_EMAIL))
 		observed["thread"].join(timeout=120)
 		# Either order ends without a live session: the sign-in wins and the deletion closes its session,
@@ -132,7 +149,7 @@ class TestMergeReview(FrappeAPITestCase):
 			frappe.db.set_value("User", FAKE_EMAIL, "enabled", 0)
 
 		client = h.new_client()
-		with patch.object(sign_in, "_after_identity_lock", side_effect=disable_meanwhile):
+		with patch.object(anonymization, "lock_identity", side_effect=_after_sign_in_lock(disable_meanwhile)):
 			response = h.login_with_keycloak(client, h.userinfo(FAKE_SUBJECT, FAKE_EMAIL))
 		self.assertEqual(response.status_code, 403, response.data[:300])
 		self.assertEqual(h.logged_user(client), "Guest")

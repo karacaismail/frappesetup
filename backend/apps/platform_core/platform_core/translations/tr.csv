@@ -485,9 +485,11 @@ Disabled,Kapatıldı,Platform Identity Deletion
 Anonymized,Anonim yapıldı,Platform Identity Deletion
 "Records that an identity was deleted (project record O-27). It keeps no raw identity: only the HMAC-SHA256 digest of the issuer and subject pair. Provisioning, enabling and e-mail changes check this record first, so a deleted identity cannot come back.","Bir kimliğin silindiğini kaydeder (Proje kaydı O-27). Ham kimliği tutmaz. Yalnız veren ve kullanıcı kimliği çiftinin HMAC-SHA256 özetini tutar. Hesap açma, açıp kapama ve e-posta değiştirme önce bu kaydı denetler. Böylece silinen kimlik geri gelemez.",Platform Identity Deletion
 "HMAC-SHA256 digest of the issuer and subject pair, as 64 hexadecimal characters. The key is the site setting kimlik_deletion_hmac_key. The raw pair is not stored.","Veren ve kullanıcı kimliği çiftinin HMAC-SHA256 özeti, 64 onaltılık karakter. Anahtar kimlik_deletion_hmac_key site ayarıdır. Ham çift saklanmaz.",Platform Identity Deletion
-"Disabled: step 1 closed the account, its sessions and API keys. Anonymized: step 2 removed the personal data.","Disabled: 1. adım hesabı, oturumları ve API anahtarlarını kapattı. Anonymized: 2. adım kişisel veriyi kaldırdı.",Platform Identity Deletion
+"Disabled: step 1 closed the account, its sessions and API keys. Anonymized: step 2 removed the personal data.","Kapatıldı durumunda 1. adım hesabı, oturumları ve API anahtarlarını kapattı. Anonim yapıldı durumunda 2. adım kişisel veriyi kaldırdı.",Platform Identity Deletion
 Current name of the Frappe user. It is the anonymous name after step 2.,Frappe kullanıcısının şimdiki adı. 2. adımdan sonra anonim addır.,Platform Identity Deletion
 When step 1 recorded the deletion.,1. adımın silmeyi kaydettiği zaman.,Platform Identity Deletion
 Unknown field: {0},Bilinmeyen alan: {0},platform_core.kimlik
 The identity endpoint failed.,Kimlik ucu başarısız oldu.,platform_core.kimlik
 The requested method could not be resolved.,İstenen yöntem bulunamadı.,shell.request
+Field {0} must be an integer from {1} to {2}.,{0} alanına {1} ile {2} arasında bir tam sayı yazın.,platform_core.kimlik
+The identity link changed. Try again.,Kimlik bağı değişti. Yeniden deneyin.,platform_core.kimlik

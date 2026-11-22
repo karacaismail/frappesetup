@@ -13,12 +13,20 @@ Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis be
 | `sign_out.py` | Çıkış ve Keycloak arka kanal çıkışı. Tekrar koruması vardır. |
 | `service_token.py` | `auth_hooks` kancası. Servis belirtecini `oidc_verify` ile doğrular. |
 | `provisioning.py` | identity-sync için kullanıcı açma, kapatma ve e-posta değiştirme. |
+| `reconciliation.py` | Bağlı kimlikleri sayfa sayfa listeler. |
 | `login_policy.py` | Yerel girişi kapatan kapı ve portal sayfalarının kapatılması. |
 | `jwks.py` | Anahtar listesi önbelleği. |
 | `session_policy.py` | Oturum 1 saat işlem olmazsa kapanır. Eski girişli çalışan yeniden kimlik doğrular (O-25). |
 | `anonymization.py` | Hesap silme: kullanıcıyı kapatır ve kişi alanlarını anonim yapar (O-27, karar notu 0013). |
+| `anonymization_scope.py` | Silmenin kapsamı: kişinin kendi kayıtları ile ortak kayıtları ayırır. |
+| `safe_errors.py` | Kimlik, giriş ve çıkış uçlarında hata kaydına yalnız güvenli alanları yazar. |
+| `exceptions.py` | Uçların hata sınıfları. Sınıf adı yanıtta `exc_type` olur. |
 | `api.py` | Telefon belirtecini doğrulayan açık işlevler. |
 | `doctype/platform_identity_link/` | Kimlik bağı kaydı. `issuer` ve `subject` çifti tekildir. |
+| `doctype/platform_identity_deletion/` | Silme kaydı. Ham kimliği değil, `(iss, sub)` çiftinin özetini tutar. |
+| `../www/login.py`, `../www/login.html` | Kiracının `/login` sayfası. |
+| `../public/kimlik/` | Giriş sayfasının CSS, betik ve yazı tipi dosyaları. |
+| `tests/e2e/` | Giriş sayfasının Chromium ve WebKit tarayıcı testleri. |
 
 ## Giriş akışı
 
@@ -46,6 +54,8 @@ Ayarlar `site_config.json` dosyasında durur. Sır depoya girmez.
 | `platform_panel_url` | Evet | Girişten ve çıkıştan sonra dönülen adres |
 | `kimlik_yalniz_keycloak` | Hayır | `1` ise Frappe'nin yerel giriş yolları kapanır |
 | `kimlik_servis_azp` | Hayır | Servis belirtecinde izinli `azp` listesi. Varsayılan `["identity-sync"]` |
+| `kimlik_mobil_azp` | Hayır | Telefon belirtecinde izinli `azp` listesi. Varsayılan `["mobile"]` |
+| `kimlik_deletion_hmac_key` | Evet | Silme kaydındaki özetin gizli anahtarı. Yoksa kimlik değiştiren uçlar 503 döner. |
 
 ## Kurulum adımı
 
@@ -93,5 +103,7 @@ Ayar kapanınca yerel giriş hemen açılır. Yeniden başlatma gerekmez.
 
 - Çıkış adresinde `id_token_hint` yoktur. Kimlik belirteci girişten sonra saklanmaz. Keycloak çıkış onay ekranı gösterebilir.
 - Arka kanal çıkışında `sid` eşleşmezse `sub` yedeği devreye girer. Yedek yalnız belirteçten önce açılmış oturumları kapatır.
-- Servis belirteci yalnız dört identity ucunda kabul edilir. Başka uçta Bearer başlığı 401 alır.
+- Kimlik servis belirteci beş kimlik ucunda ve `revoke_user_installations` ucunda geçerlidir.
+- `list_identities` yalnız identity-sync belirtecini kabul eder. Her sayfa en çok 500 kimlik döner.
+- Her satır kimliği veren sunucuyu, kullanıcı kimliğini ve hesabın açık olup olmadığını içerir.
 - `kimlik_yalniz_keycloak` açıkken `/login` sayfasında yalnız marka düğmesi vardır. Parola girişi yine de doğrudan çağrılırsa 401 alır.

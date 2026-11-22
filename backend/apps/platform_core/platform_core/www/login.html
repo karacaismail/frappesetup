@@ -1,69 +1,34 @@
 <!DOCTYPE html>
-<html lang="{{ lang }}" dir="ltr">
+<html lang="{{ lang | e }}" dir="ltr">
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="robots" content="noindex">
-	<title>{{ title }}</title>
+	<title>{{ title | e }}</title>
 	<link rel="stylesheet" href="/assets/platform_core/kimlik/login.css">
-	<script>
-		// Visible keyboard focus starts off and is switched on only by Tab or Shift+Tab (AGENT.md focus rule).
-		(function () {
-			var root = document.documentElement;
-			document.addEventListener("keydown", function (event) {
-				if (event.key === "Tab") { root.setAttribute("data-kbd", ""); }
-			}, true);
-			["pointerdown", "touchstart"].forEach(function (name) {
-				document.addEventListener(name, function () { root.removeAttribute("data-kbd"); }, true);
-			});
-		})();
-	</script>
+	<script src="/assets/platform_core/kimlik/login.js"></script>
 </head>
 <body data-page="platform-core-login">
 	<main class="login" aria-labelledby="login-title">
-		<h1 id="login-title" class="login__title">{{ title }}</h1>
+		<h1 id="login-title" class="login__title">{{ title | e }}</h1>
 		{% if configured %}
-			<p class="login__lead">{{ _("Use your {0} account to continue.", context="platform_core.kimlik").format(brand_name) }}</p>
-			<a class="button button--primary" href="{{ start_url }}" rel="nofollow">{{ button_label }}</a>
+			<p class="login__lead">{{ _("Use your {0} account to continue.", context="platform_core.kimlik").format(brand_name) | e }}</p>
+			<a class="button button--primary" href="{{ start_url | e }}" rel="nofollow">{{ button_label | e }}</a>
 			{% if not keycloak_only %}
 				<section class="login__local" aria-labelledby="local-title">
-					<h2 id="local-title" class="login__subtitle">{{ _("Sign in with password", context="platform_core.kimlik") }}</h2>
-					<form class="form" method="post" action="{{ login_endpoint }}" data-login-endpoint="{{ login_endpoint }}" data-after-login="{{ after_login }}" novalidate>
-						<label class="form__label" for="usr">{{ _("E-mail", context="platform_core.kimlik") }}</label>
+					<h2 id="local-title" class="login__subtitle">{{ _("Sign in with password", context="platform_core.kimlik") | e }}</h2>
+					<form class="form" method="post" action="{{ login_endpoint | e }}" data-login-endpoint="{{ login_endpoint | e }}" data-after-login="{{ after_login | e }}" data-failed-message="{{ _("Sign-in failed. Check your e-mail and password.", context="platform_core.kimlik") | e }}" data-offline-message="{{ _("The server could not be reached. Try again.", context="platform_core.kimlik") | e }}" novalidate>
+						<label class="form__label" for="usr">{{ _("E-mail", context="platform_core.kimlik") | e }}</label>
 						<input class="form__input" id="usr" name="usr" type="email" autocomplete="username" required>
-						<label class="form__label" for="pwd">{{ _("Password", context="platform_core.kimlik") }}</label>
+						<label class="form__label" for="pwd">{{ _("Password", context="platform_core.kimlik") | e }}</label>
 						<input class="form__input" id="pwd" name="pwd" type="password" autocomplete="current-password" required>
 						<p class="form__error" id="login-error" role="alert" aria-live="assertive" hidden></p>
-						<button class="button button--secondary" type="submit">{{ _("Sign in", context="platform_core.kimlik") }}</button>
+						<button class="button button--secondary" type="submit">{{ _("Sign in", context="platform_core.kimlik") | e }}</button>
 					</form>
 				</section>
-				<script>
-					(function () {
-						var form = document.querySelector("form[data-login-endpoint]");
-						var error = document.getElementById("login-error");
-						form.addEventListener("submit", function (event) {
-							event.preventDefault();
-							error.hidden = true;
-							var body = new URLSearchParams(new FormData(form));
-							fetch(form.dataset.loginEndpoint, {
-								method: "POST",
-								headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
-								body: body,
-								credentials: "same-origin"
-							}).then(function (response) {
-								if (response.ok) { window.location.assign(form.dataset.afterLogin); return; }
-								error.textContent = {{ _("Sign-in failed. Check your e-mail and password.", context="platform_core.kimlik") | tojson }};
-								error.hidden = false;
-							}).catch(function () {
-								error.textContent = {{ _("The server could not be reached. Try again.", context="platform_core.kimlik") | tojson }};
-								error.hidden = false;
-							});
-						});
-					})();
-				</script>
 			{% endif %}
 		{% else %}
-			<p class="login__lead" role="alert">{{ _("Sign in with the identity provider is not configured.", context="platform_core.kimlik") }}</p>
+			<p class="login__lead" role="alert">{{ _("Sign in with the identity provider is not configured.", context="platform_core.kimlik") | e }}</p>
 		{% endif %}
 	</main>
 </body>

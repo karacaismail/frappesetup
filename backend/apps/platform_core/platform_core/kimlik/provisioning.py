@@ -81,7 +81,10 @@ def provision(data: dict) -> dict:
 		doc.set("role_profiles", [{"role_profile": name} for name in role_profiles])
 	doc.save()
 	if not user:
-		sign_in.create_link(issuer, subject, doc.name)
+		try:
+			sign_in.create_link(issuer, subject, doc.name)
+		except sign_in.SignInRefused as error:
+			frappe.throw(error.message, IdentityConflict)
 	return {"user": doc.name, "enabled": bool(doc.enabled), "linked": True, "user_type": doc.user_type}
 
 
@@ -121,19 +124,6 @@ def _locked_user(issuer: str, subject: str) -> str | None:
 
 def _locked_user_or_404(issuer: str, subject: str) -> str:
 	user = _locked_user(issuer, subject)
-	if not user:
-		frappe.throw(
-			_("No user is linked to this identity.", context="platform_core.kimlik"), IdentityNotFound
-		)
-	return user
-
-
-def _linked_user(issuer: str, subject: str) -> str | None:
-	return frappe.db.get_value(LINK, {"issuer": issuer, "subject": subject}, "user")
-
-
-def _linked_user_or_404(issuer: str, subject: str) -> str:
-	user = _linked_user(issuer, subject)
 	if not user:
 		frappe.throw(
 			_("No user is linked to this identity.", context="platform_core.kimlik"), IdentityNotFound

@@ -68,6 +68,11 @@ def verify_mobile_token(token: str) -> dict:
 	subject = claims.get("sub")
 	if not isinstance(subject, str) or not subject.strip():
 		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("malformed"))
+	from platform_core.kimlik import anonymization
+
+	# M-2: one rule for every way in. A deleted identity is refused here as in sign-in.
+	if anonymization.is_deleted(settings.issuer, subject.strip()):
+		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("deleted_identity"))
 	user = frappe.db.get_value(LINK, {"issuer": settings.issuer, "subject": subject.strip()}, "user")
 	if not user:
 		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("unknown_identity"))

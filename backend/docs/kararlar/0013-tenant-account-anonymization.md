@@ -1,6 +1,6 @@
 # Karar notu 0013: kiracı sitesinde hesap silme
 
-Tarih: 22 Kasım 2026 Pazar. Sahibi: platform-core-kimlik işi. Orkestratör birleştirmede gözden geçirir.
+Platform kimlik ekibi bu kararı 22 Kasım 2026 Pazar günü yazdı. Orkestratör kararı birleştirme sırasında inceler.
 
 ## İhtiyaç
 
@@ -48,9 +48,16 @@ Her yerde önce kimlik bağı, sonra silme kaydı kilitlenir. Giriş de aynı ki
 - Yalnız kişisel dosya silinir. Kişisel dosya, “User” kaydına ya da kişinin kendi “Contact” kaydına bağlı dosyadır. İş kaydına bağlı dosya kalır.
 - E-posta alanlarında yalnız tam adres değişir. Adres listeleri tek tek ayrıştırılır.
 
+### Modül sınırı
+
+- Her uygulama kişi alanlarını `user_data_fields` kancasına yazar.
+- Kimlik modülü yeni iş tablolarını bu kanca üzerinden öğrenir.
+- `_ownership` işlevi kişisel ve ortak kayıtları ayırır.
+- `test_anonymization` ve `test_python_rules` bu ayrımı sınar.
+
 ## Bilinen sınırlar ve geri dönüş
 
 - Kişi alanı taşıyan her yeni DocType `user_data_fields` kancasına girmelidir. Girmezse alan anonim olmaz.
 - Telefon kurulumları bu uçla kapanmaz. Onları `platform_core.api.mobile.revoke_user_installations` ucu kapatır.
 - `kimlik_deletion_hmac_key` değeri sonradan değişirse eski kayıtlar okunamaz.
-- Geri dönüş: Uç kaldırılır. Silme adımı elle yürütülür.
+- Geri dönüş gerekirse ekip ucu kaldırır. Ekip silme adımını elle yürütür.
