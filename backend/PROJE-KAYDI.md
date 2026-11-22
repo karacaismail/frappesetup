@@ -207,6 +207,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-30. Ad denetimi geçiş süresinde uyarı verir.** Ad denetim betiği birleşince kapı bütün dallarda 389 ad bulgusu verdi. Eski adlar ancak ad değiştirme betiği bütün dallarda çalışınca kalkar. Bu yüzden kapı ad bulgularını şimdilik yalnız yazar ve başarısız olmaz. Kip `backend/dev/naming/enforcement.json` dosyasındaki `mode` alanında durur. Değer `advisory` ya da `enforce` olur. Başlangıç değeri `advisory` olur. Ad değiştirme bütün dallarda bitince orkestratör değeri `enforce` yapar. `enforce` kipinde `legacy-name`, `turkish-name`, `module-name` ve `translation-binding` bulguları kapıyı durdurur. Öteki ad bulguları yine yalnız uyarıdır. Kip dosyası yoksa kapı `advisory` kabul eder ve bunu çıktısına yazar.
 - **O-31. MVP performans sınırı.** Sunucu süresi okuma uçlarında p95 500 milisaniyeyi, yazma uçlarında p95 1 saniyeyi geçmez. Ölçüm geliştirme sitesinde örnek veriyle yapılır. Örnek veri 200 çalışan ve 2.000 izin kaydıdır. Her uç en az 50 kez çağrılır. Ölçümü elle başlatılan bir komut yapar ve sonucu durum dosyasına yazar. Grafana ve gerçek kullanıcı ölçümü P1 işidir (G-149). Bu yüzden teknik borç tablosuna yazıldı.
 - **O-32. Saklama temizliği kopya bırakmaz.** Saklama süresi dolan kayıt kalıcı silinir. Kod `frappe.delete_doc` çağrısına `delete_permanently=True` verir. Böylece “Deleted Document” tablosunda kopya kalmaz. Geri dönüş yolu veritabanı yedeğidir. V-10 kuralının geri yükleme kopyası yalnız yöneticinin iş kaydını elle silmesi için geçerlidir. Bu kural bütün modüllerin saklama temizliğine uygulanır. Örneğin model geçidi ve yapay zekâ katmanının günlük temizliği böyledir.
+- **O-33. Bağımsız dal sırayı beklemez.** O-19 sırası bağımlılık içindir. Bağımsız inceleme `pass` veren ve başka dala bağlı olmayan dal hemen birleşir. Bağımlı dal bağlı olduğu daldan sonra birleşir. Örneğin press-tr dalı kimlik-realm dalından sonra birleşir. ilk-dikey-dilim dalı platform-core-yz ve erisim-kurali dallarından sonra birleşir. Her birleşmeden sonra orkestratör kapıları, modül sınırını ve ortak dosya denetimlerini çalıştırır.
 
 
 ## Karar sitesine işlenecek farklar
@@ -241,6 +242,7 @@ Bu turda gerçek kişisel veri yoktur. Saklama süresi ve silme yolu MVP yayın�
 | “AI Usage Log” | Kullanıcı adı | 365 gün. Bütçe ve fatura denetimi bu süreyi ister | Aynı silme komutu elle çalışır |
 | “AI Action Proposal” | Kullanıcı adı ve önizlemedeki kişi bilgisi. Örneğin çalışan adı ve izin tarihleri | Karar ya da süre dolumundan sonra 30 gün | Aynı silme komutu elle çalışır. Önizleme yalnız gerekli bilgiyi tutar |
 | Hesap silme isteği (O-27) | E-posta ve Keycloak kimliği | İş bitene kadar | İş bitince kayıt anonim yapılır |
+| identity-sync kayıt dosyası | Keycloak kullanıcı kimliği. E-posta ve ad tutulmaz | İş bitene kadar | İş bitince kimlik HMAC izine çevrilir (O-27) |
 | HRMS TR çalışan ve izin kayıtları | Ad, izin tarihleri, onaylayan kişi | İş ilişkisi sürdükçe. Yasal saklama süresini hukuk sorumlusu belirler. Bu madde teknik borçtur | Hesap silme kişinin alanlarını anonim yapar. İş kayıtları kalır (O-27) |
 
 Mesaj içeriği ve araç girdisi günlüğe yazılmaz. Günlük yalnız girdinin özetini tutar.
@@ -251,6 +253,11 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
+| `BORC(mvp)`: identity-sync canlı Keycloak, Press ve kiracı ile denenmedi | Sahte hedeflerin kaçırdığı uyumsuzluk üretimde çıkabilir | integration-e2e | Uçtan uca test gerçek servislerle geçer |
+| `BORC(mvp)`: `list_identities` uçları yok | Mutabakat gerçek hedeflerde çalışmaz | press-tr ve platform-core-kimlik | İki uç sözleşmeye uygun yazılır ve sayfalı yanıt verir |
+| `BORC(mvp)`: Yeni kiracının Keycloak istemcisini açan komut yok | Yeni kiracı istemcisi elle açılır | kimlik-realm | Elle başlatılan, insan onaylı komut yazılır |
+| `BORC(mvp)`: identity-sync container dosyası yok | Servis ortak geliştirme ortamında başlamaz | identity-sync | Container dosyası yazılır ve servis `oidc_verify` ile açılır |
+| `BORC(mvp)`: identity-sync testleri CI'da koşmaz | Bozulma yalnız elle çalışan testte görülür | DevOps sorumlusu | CI bu klasörün testlerini her değişiklikte koşar |
 | `BORC(mvp)`: Tema derleme adımının iki kopyası var | Bir kopya değişince öteki eski kalabilir | kimlik-tema | Derleme adımı tek yerde durur ve test bunu denetler |
 | `BORC(mvp)`: Bazı tema ekranları sınanmadı | Görünüm hatası fark edilmeyebilir | kimlik-tema | Sınanmamış ekranların listesi boşalır |
 | `BORC(mvp)`: Geçiş anahtarı testleri yük altında zaman aşımına uğruyor | Test sonucu güvenilmez olur | kimlik-tema | Testler yük altında da kararlı geçer |
@@ -259,4 +266,5 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
 | `BORC(mvp)`: Press geliştirme imajı `patch-py314.sh` ile Press kodunu değiştiriyor (O-18) | M-4 kuralına aykırı. Press yükseltmesinde yama bozulabilir | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da yama Press'e gönderilip kabul edilir |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
+| Bandit istisnaları 22 Şubat 2027 Pazartesi günü sona erer | Süresi dolan istisna taramayı durdurur | dev-ortam ve security-tooling | Sahipler her istisnayı yeniden inceler |
 | `BORC(mvp)`: Telefon paketi yok (O-26) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |

@@ -9,6 +9,60 @@ Veri taşıma işlemi eski JSON sütununu bilinçli olarak bırakır.
 Bütün sütunları isteyen Frappe çağrısı bu eski değeri de döndürebilir.
 Geçit hedefleri artık alt tablodan okur.
 
+## Hazır çözüm karşılaştırması
+
+Geçit birden çok sağlayıcıyı tek biçimde çağırmalı.
+Her kiracı kendi erişim, kota, bütçe ve bağlantı kurallarını uygulamalı.
+D-10 kapsamında hazır seçenekler ve kalan işler karşılaştırıldı.
+
+| Seçenek | Lisans | Hazır karşılık ve kalan iş |
+| --- | --- | --- |
+| Kurulu Frappe 16 ve ERPNext 16 | Frappe MIT. ERPNext GPL-3.0. | Frappe kayıt, rol, parola alanı ve HTTP ucu sağlar. ERPNext bu kurulumda iş uygulamasıdır. Sağlayıcı biçimleri ve çağrı yönlendirmesi geçit kodunda kalır. [Frappe kayıt türleri](https://docs.frappe.io/framework/user/en/basics/doctypes), [Frappe lisansı](https://github.com/frappe/frappe/blob/version-16/LICENSE), [ERPNext lisansı](https://github.com/frappe/erpnext/blob/version-16/license.txt) |
+| LiteLLM | Açık çekirdek MIT. Enterprise klasöründe ayrı lisans vardır. | Ortak model çağrısı, yönlendirme ve maliyet takibi sunar. Frappe rolü ve çağrıdan önce kalıcı bütçe ayırma yine kiracıya bağlanır. Geçit sunucusu seçilirse ayrı servis işletilir. [LiteLLM geçit kılavuzu](https://docs.litellm.ai/docs/proxy/quick_start), [LiteLLM lisansı](https://github.com/BerriAI/litellm/blob/main/LICENSE) |
+| Ollama | Sunucu MIT. Model lisansları ayrı değerlendirilir. | Yerel model çalıştırır ve OpenAI arayüzünün bir bölümünü sunar. Kiracı bütçesini ve diğer sağlayıcılara geçişi Frappe geçidi yönetir. [Ollama API](https://docs.ollama.com/api/openai-compatibility), [Ollama lisansı](https://github.com/ollama/ollama/blob/main/LICENSE) |
+
+**Seçim nedeni.** Geçit, kurulu Frappe kayıtlarını ve rol denetimini yeniden kullanır.
+Sağlayıcı farklarını küçük bağlantı işlevlerinde toplar.
+Bu seçim ayrı bir geçit servisi kurma ihtiyacını kaldırır.
+Ollama, yerel model sağlayıcısı olarak kalır.
+
+## İlk kayıt izinleri
+
+Tabloda `create` oluşturma, `delete` silme, `read` okuma, `write` yazma iznidir.
+İzin seviyesi 0 kayda, seviye 1 ise `api_key` parola alanına uygulanır.
+Alt tablo erişimini bağlı olduğu yol kaydından alır.
+
+| Kayıt türü | İzin seviyesi | Rol | İşlemler |
+| --- | --- | --- | --- |
+| `AI Account` | 0 | AI Manager, System Manager | create, delete, read, write |
+| `AI API` | 0 | AI Manager, System Manager | create, delete, read, write |
+| `AI API` | 1 | AI Manager, System Manager | write |
+| `AI Model` | 0 | AI Manager, System Manager | create, delete, read, write |
+| `AI Provider` | 0 | AI Manager, System Manager | create, delete, read, write |
+| `AI Route` | 0 | AI Manager, System Manager | create, delete, read, write |
+| `AI Usage Log` | 0 | AI Manager, System Manager | read |
+| `PLT AI Route Target` | 0 | Yok | Yok |
+
+Orkestratör, D-10, 22 Kasım 2026 Pazar
+
+## Modül arayüzü
+
+| Tür | Açık işlev veya olay | Görevi |
+| --- | --- | --- |
+| Python | `platform_core.model_gecidi.api.complete` | Yetkili yol üzerinden model çağrısı yapar. |
+| HTTP | `platform_core.api.model.complete` | Oturum veya kullanıcı anahtarıyla model çağrısı yapar. |
+| HTTP | `platform_core.api.model.test_api` | Yöneticiye bağlantı denemesi sunar. |
+| HTTP | `platform_core.api.model.resolve_usage` | Yöneticinin doğruladığı tutarı kullanım kaydına işler. |
+| HTTP | `platform_core.api.model.reconcile_stale_pending` | Yönetici oturumuyla takılı kayıt grubunu kapatır. |
+| HTTP | `platform_core.api.model.purge_usage` | Silinecek kayıtları gösterir veya onaylı önizlemeye göre siler. |
+| HTTP | `platform_core.api.model.clear_api_credential` | Kapalı bağlantının anahtarını siler. |
+| Bench | `platform_core.model_gecidi.maintenance.reconcile_stale_pending` | Takılı kullanım kayıtlarını elle başlatılan işlemle kapatır. |
+| Kanca | `ai_tools` | `create_ai_api`, `update_ai_api`, `create_ai_account`, `update_ai_account` araçlarını bildirir. |
+| Yapay zekâ aracı | `reconcile_stale_pending` | İnsan onayından sonra seçilen takılı kaydı kapatır. |
+| Kanca | `ai_write_closed_doctypes` | Genel yapay zekâ yazmasını `AI API` ve `AI Account` için kapatır. |
+| Kayıt olayı | `validate` | `AI API`, `AI Model`, `AI Provider` ve `AI Route` kayıtlarını yazmadan önce denetler. |
+| Şema olayı | `on_doctype_update` | `PLT AI Route Target` için aynı hedefin ikinci kez yazılmasını engeller. |
+
 ## Ortak istek ve yanıt
 
 İstek bir yol adı ve mesaj listesi taşır.
@@ -83,7 +137,7 @@ Geçit bağlantı için 5 saniye ayırır.
 Geçit okuma süresini model hızına ve çıktı sınırına göre hesaplar.
 Hız belirtilmezse geçit saniyede 30 token kullanır.
 Süreye sığmayan çağrı bütçeden pay ayırmadan reddedilir.
-Geçit bir yol için en çok 105 saniye ayırır.
+Geçit bir yol için en çok 60 saniye ayırır.
 Deneme ortamı `bench serve` kullanır. Temel imaj Gunicorn için 120 saniye ayırır.
 
 Yönetici, `model_gateway_endpoints` ayarına tam bağlantı adresini ekler.
@@ -107,8 +161,19 @@ HTTP uçları izin denetimini ortak işlevlere bırakır.
 Statik tarama bu işlevleri izleyemediği için uçlarda dar istisna vardır.
 HTTP testleri hem misafir hem yetkisiz kullanıcı erişimini sınar.
 Kullanım günlüğüne yazan iç işlev yalnız sunucunun seçtiği alanları alır.
-İşlev, sağlayıcı çağrısından önce deneme kaydını veritabanına yazar.
+İşlev, sağlayıcı çağrısından önce `pending` kaydını kalıcı olarak yazar.
 Bu kayıt, istek yarıda kalırsa bütçe denetiminde korunur.
+Geçit çağrı bitince son durumu kalıcı olarak kaydeder.
+Elle başlatılan mutabakat, takılı kayıtları `unknown` durumuna alır.
+Gerçek ücret belirlenene kadar ayrılan tutar korunur.
+Yönetici mutabakatı HTTP üzerinden de başlatabilir.
+Yapay zekâ aracı yalnız önizlemede seçilen tek kaydı kapatır.
+Araç yazımdan önce insan onayı ister.
+İşletim komutu aşağıdadır.
+
+```sh
+bench --site SITE execute platform_core.model_gecidi.maintenance.reconcile_stale_pending
+```
 
 Model çağrısı insan oturumunu ve Frappe kullanıcı anahtarını kabul eder.
 Aracı, çağrıyı yapay zekâ katmanından başlatır.
@@ -128,6 +193,11 @@ Geçit bağlantı kaydına silme notu ekler.
 Boş anahtar alanıyla form kaydetmek mevcut anahtarı korur.
 Kullanım günlükleri varsayılan olarak 365 gün tutulur.
 Site yöneticisi süreyi `model_gateway_usage_retention_days` ayarında belirler.
-Yönetici temizliği önizleyebilir veya elle başlatabilir.
+Yönetici önce silinecek kayıtları önizler.
+Geçit önizleme kodunu `preview_token` alanında döner.
+Yönetici silmeyi aynı kodla elle başlatır.
 Temizlik yalnız kapanmış kayıtları siler. Her çağrı en çok 500 kayıt siler.
+O-32 kararı gereği saklama temizliği kayıtları kalıcı siler.
+Frappe “Deleted Document” tablosuna kopya yazmaz.
+Geri dönüş için silme öncesi alınan veritabanı yedeği kullanılır.
 Geçit temizliği “Activity Log” kaydına yazar.

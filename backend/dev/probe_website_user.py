@@ -86,14 +86,14 @@ def probe(site: str, port: int) -> None:
         if frappe.db.get_value("Role", role, "desk_access"):
             raise AssertionError("Fixture role unexpectedly grants Desk access")
 
-        status, _ = request("/api/method/login", {"usr": email, "pwd": password})
+        status, _unused = request("/api/method/login", {"usr": email, "pwd": password})
         if status != 200:
             raise AssertionError(f"Login returned {status}")
         path = "/api/v2/document/" + urllib.parse.quote(doctype) + "/" + urllib.parse.quote(doc.name)
         status, data = request(path)
         if status != 200 or data.get("data", {}).get("sample") != "synthetic":
             raise AssertionError(f"Allowed API v2 read returned {status}")
-        status, _ = request("/api/v2/document/User/Administrator")
+        status, _unused = request("/api/v2/document/User/Administrator")
         if status != 403:
             raise AssertionError(f"Forbidden API v2 read returned {status}")
         print("PASS Website User login=200, own permitted DocType=200, forbidden User=403")
