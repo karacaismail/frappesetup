@@ -369,9 +369,13 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 | `hrms_tr_retention_days` | Ayar verilmez | Hukuk sorumlusu süreyi gün olarak belirler. |
 
+### Kişisel veri silme yolları
+
+Aşağıdaki tablo, HRMS TR kayıtlarında kişisel verinin nasıl silindiğini gösterir.
+
 | Kişisel veri | Silme yolu |
 | --- | --- |
-| HRMS TR çalışan ve izin kayıtları | Hesap silme, çalışanın kişisel alanlarını anonim yapar. `hrms_tr.retention.purge` süresi dolan izin kayıtlarını O-39 kapsamında siler. |
+| HRMS TR çalışan ve izin kayıtları | Hesap silme, `user_data_fields` kancasıyla kullanıcıya bağlı çalışan kaydını seçer. Ad, soyad, kişisel ve tercih edilen e-posta, cep telefonu ve doğum tarihi anonimleşir. Çalışan ve iş kayıtları kalır. `hrms_tr.retention.purge` süresi dolan izin kayıtlarını O-39 kapsamında siler. |
 
 ## 9. Geliştirme ortamı
 
