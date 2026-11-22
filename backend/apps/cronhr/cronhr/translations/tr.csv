@@ -1,0 +1,20 @@
+You do not have permission to approve leave.,İzin talebini onaylama yetkiniz yok.
+You cannot approve your own leave.,Kendi izin talebinizi onaylayamazsınız.
+The selected approver cannot submit this leave application.,Seçtiğiniz kişi bu talebi onaya gönderemez.
+Only open draft leave applications can be approved.,Yalnız açık izin taslaklarını onaylayabilirsiniz.
+The leave application changed. Open it again before approving.,İzin talebi değişti. Onaylamadan önce talebi yeniden açın.
+Leave applications cannot be shared.,İzin taleplerini paylaşamazsınız.
+Install Platform Core with Access Rule before syncing CronHR.,CronHR verisini eşitlemeden önce “Access Rule” içeren Platform Core sürümünü kurun.
+Resolve existing Leave Application shares before syncing CronHR.,CronHR verisini eşitlemeden önce mevcut izin talebi paylaşımlarını giderin.
+Resolve existing level 2 Leave Application permissions before installing CronHR.,CronHR kurulumundan önce izin taleplerindeki 2. seviye izinleri gözden geçirin.
+Resolve existing leave balance field settings before installing CronHR.,CronHR kurulumundan önce mevcut izin bakiyesi ayarlarını gözden geçirin.
+Only CronHR HR can cancel or amend leave applications.,Yalnız CronHR İK rolü izin talebini iptal edebilir veya düzeltme kopyası açabilir.
+The employee cannot change on a saved leave application.,Kaydedilmiş izin talebindeki çalışanı değiştiremezsiniz.
+The employee cannot change on an amended leave application.,Düzeltme kopyasındaki çalışanı değiştiremezsiniz.
+Read leave information through an authorized leave application.,İzin bilgilerini erişim izniniz olan izin talebinden okuyun.
+CronHR users cannot be assigned Desk roles.,CronHR kullanıcılarına masaüstü erişimi veren rol atayamazsınız.
+Propose approving and submitting an open leave application.,Açık izin talebini onaylamak ve göndermek için öneri oluşturun.
+Approve and submit leave application {0}.,{0} adlı izin talebini onaylayın ve gönderin.
+Document name of the leave application.,İzin talebinin kayıt adı.
+Modified value of the reviewed draft.,İncelenen taslağın son değişiklik değeri.
+Leave balance before the application.,Talep öncesindeki izin bakiyesi.

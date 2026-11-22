@@ -46,6 +46,7 @@ paths:
         "417": {description: Talep açık bir taslak değil veya HRMS doğrulaması başarısız.}
 x-ai-tool:
   name: cronhr_approve_leave
+  destructive: true
   arguments:
     type: object
     additionalProperties: false

@@ -12,7 +12,8 @@
     "allow_create": 1,
     "allow_write": 1,
     "allow_submit": 0,
-    "description": "Read and edit own leave drafts."
+    "description": "Read and edit own leave drafts.",
+    "allow_cancel": 0
   },
   {
     "doctype": "Access Rule",
@@ -27,7 +28,8 @@
     "allow_create": 0,
     "allow_write": 1,
     "allow_submit": 1,
-    "description": "Read and approve leave for the reporting team."
+    "description": "Read and approve leave for the reporting team.",
+    "allow_cancel": 0
   },
   {
     "doctype": "Access Rule",
@@ -41,6 +43,7 @@
     "allow_create": 1,
     "allow_write": 1,
     "allow_submit": 1,
-    "description": "Manage leave applications in this site."
+    "description": "Manage leave applications in this site.",
+    "allow_cancel": 1
   }
 ]

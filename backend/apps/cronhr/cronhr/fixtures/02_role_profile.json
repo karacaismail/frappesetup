@@ -16,6 +16,9 @@
     "roles": [
       {
         "role": "CronHR Manager"
+      },
+      {
+        "role": "CronHR Employee"
       }
     ]
   },
@@ -26,6 +29,9 @@
     "roles": [
       {
         "role": "CronHR HR"
+      },
+      {
+        "role": "CronHR Employee"
       }
     ]
   }

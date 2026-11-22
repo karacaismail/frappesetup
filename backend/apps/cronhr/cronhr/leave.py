@@ -9,7 +9,8 @@ from pydantic import StringConstraints
 
 from cronhr.access import DOCTYPE
 
-APPROVER_ROLES = ("CronHR Manager", "CronHR HR")
+HR_ROLE = "CronHR HR"
+APPROVER_ROLES = ("CronHR Manager", HR_ROLE)
 
 LeaveName = Annotated[str, StringConstraints(min_length=1, max_length=140)]
 
@@ -24,8 +25,23 @@ def check_not_own_leave(doc):
 		frappe.throw(_("You cannot approve your own leave."), frappe.PermissionError)
 
 
+def check_hr_role():
+	if frappe.session.user != "Administrator" and HR_ROLE not in frappe.get_roles():
+		frappe.throw(_("Only CronHR HR can cancel or amend leave applications."), frappe.PermissionError)
+
+
+def validate_cancellation(doc, method=None):
+	check_hr_role()
+
+
 def validate_approval(doc, method=None):
-	"""Apply the approval role even when a draft is changed through a native Frappe route."""
+	"""Apply the approval policy to native Frappe writes."""
+	if not doc.is_new() and doc.has_value_changed("employee"):
+		frappe.throw(_("The employee cannot change on a saved leave application."))
+	if doc.is_new() and doc.amended_from:
+		check_hr_role()
+		if frappe.db.get_value(DOCTYPE, doc.amended_from, "employee") != doc.employee:
+			frappe.throw(_("The employee cannot change on an amended leave application."))
 	if doc.leave_approver and not frappe.has_permission(
 		DOCTYPE, "submit", doc, user=doc.leave_approver, ignore_share_permissions=True
 	):

@@ -11,6 +11,7 @@ from frappe.utils import add_days, today
 
 COMPANY = "CronHR Synthetic"
 LEAVE_TYPE = "CronHR Synthetic Unpaid"
+ALLOCATED_LEAVE_TYPE = "CronHR Synthetic Annual"
 USERS = {
     actor: f"cronhr-{actor}@example.test"
     for actor in ("employee", "manager", "outsider", "hr")
@@ -57,6 +58,9 @@ def seed(password):
     leave_type = insert(
         "Leave Type", leave_type_name=LEAVE_TYPE, is_lwp=1, include_holiday=1
     )
+    allocated_type = insert(
+        "Leave Type", leave_type_name=ALLOCATED_LEAVE_TYPE, include_holiday=1
+    )
     frappe.db.set_single_value(
         "HR Settings",
         {
@@ -77,8 +81,8 @@ def seed(password):
             first_name=f"CronHR {actor}",
             send_welcome_email=0,
             new_password=password,
-            user_type="System User",
-            roles=[{"role": f"CronHR {ROLES[actor]}"}],
+            user_type="Website User",
+            role_profiles=[{"role_profile": f"CronHR {ROLES[actor]}"}],
         )
         employees[actor] = insert(
             "Employee",
@@ -91,15 +95,31 @@ def seed(password):
             user_id=username,
             create_user_permission=0,
             reports_to=employees.get("manager") if actor == "employee" else None,
+            leave_approver=USERS["manager"] if actor == "employee" else None,
         ).name
 
+    for actor in ("employee", "outsider"):
+        insert(
+            "Leave Allocation",
+            employee=employees[actor],
+            company=company.name,
+            leave_type=allocated_type.name,
+            from_date=add_days(today(), -1),
+            to_date=add_days(today(), 30),
+            new_leaves_allocated=12,
+        ).submit()
+
     leaves = {}
+    leave_owners = {}
     for offset, (key, actor) in enumerate(
         (
             ("employee", "employee"),
             ("manager", "manager"),
             ("outsider", "outsider"),
             ("ai", "employee"),
+            ("ai_stale", "employee"),
+            ("hr", "hr"),
+            ("hr_approve", "outsider"),
         ),
         start=2,
     ):
@@ -116,8 +136,15 @@ def seed(password):
         )
         leave.db_set("leave_balance", 7, update_modified=False)
         leaves[key] = leave.name
+        leave_owners[key] = actor
 
-    return {"users": USERS, "leaves": leaves}
+    return {
+        "users": USERS,
+        "employees": employees,
+        "leaves": leaves,
+        "leave_owners": leave_owners,
+        "allocated_leave_type": allocated_type.name,
+    }
 
 
 def main():

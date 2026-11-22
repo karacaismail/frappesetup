@@ -6,13 +6,15 @@ authors = [
 description = "Leave application workflow"
 requires-python = ">=3.14"
 readme = "README.md"
+license = "GPL-3.0-only"
+license-files = ["license.txt"]
 dynamic = ["version"]
 dependencies = [
     # "frappe~=16.0.0" # Installed and managed by bench.
 ]
 
 [build-system]
-requires = ["flit_core >=3.4,<4"]
+requires = ["flit_core >=3.11,<4"]
 build-backend = "flit_core.buildapi"
 
 # These dependencies are only installed when developer mode is enabled

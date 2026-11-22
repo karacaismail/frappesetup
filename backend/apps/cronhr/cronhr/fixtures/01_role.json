@@ -3,21 +3,21 @@
     "doctype": "Role",
     "name": "CronHR Employee",
     "role_name": "CronHR Employee",
-    "desk_access": 1,
+    "desk_access": 0,
     "is_custom": 1
   },
   {
     "doctype": "Role",
     "name": "CronHR Manager",
     "role_name": "CronHR Manager",
-    "desk_access": 1,
+    "desk_access": 0,
     "is_custom": 1
   },
   {
     "doctype": "Role",
     "name": "CronHR HR",
     "role_name": "CronHR HR",
-    "desk_access": 1,
+    "desk_access": 0,
     "is_custom": 1
   }
 ]

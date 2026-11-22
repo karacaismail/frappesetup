@@ -30,4 +30,38 @@ Daha önce paylaşım veya özel seviye 2 izni varsa kurulum durur.
 Tüm erişim kuralları kapanırsa CronHR listeyi ve belgeyi kapatır.
 Yönetici ve İK, kendi taleplerini onaylayamaz.
 Standart HRMS rolü, CronHR rolünün yerini tutmaz.
-Bu karar izin talebindeki alanı kapsar. Ayrı HRMS bakiye uçları değişmez.
+Bu karar izin talebindeki alanı kapsar. Ayrı HRMS bakiye uçlarının durumu aşağıda açıklanır.
+
+## İnceleme sonrası kararlar
+
+CronHR rolleri masaüstü erişimi vermez. Üç rol de “Website User” türünü kullanır.
+Yönetici ve İK rol profilleri çalışan rolünü de taşır.
+HRMS, varsayılan onaylayıcıya kendi “Leave Approver” rolünü ekler.
+CronHR, bu rolü CronHR hesabından çıkarır.
+CronHR hesapları masaüstü erişimi veren başka rol alamaz.
+
+İK, onaylı talebi iptal edebilir. İK, iptal edilen talebin düzeltme kopyasını açabilir.
+Kaydedilen talepte çalışan değiştirilemez. Düzeltme kopyasında aynı çalışan kalır.
+Yönetici ve İK kendi taleplerini onaylayamaz.
+
+CronHR, eski HRMS bakiye ve takvim uçlarını kiracı sitesinde kapatır.
+Yetkili kullanıcı bakiyeyi izin talebi üzerinden okur.
+İzin kuralı veya motor kancası yoksa kayıt erişimi kapanır.
+
+Frappe, özel izin satırları varsa bu satırları standart izinlerin yerine kullanır.
+HRMS ve “System Manager” rolleri tek başına CronHR erişimi vermez.
+Frappe’nin “Administrator” hesabı kendi yönetim yetkisini korur.
+
+Frappe, alan ayarlarına standart ad verir. CronHR bu adları korur.
+Kurulum, çakışan alan ayarı, ikinci seviye izin veya paylaşım varsa durur.
+Frappe, geçiş sırasında örnek kayıtları yeniden yükler.
+CronHR, geçişten önce kapalı olan kendi erişim kurallarını kapalı tutar.
+Kaldırma işlemi CronHR izinlerini, kurallarını ve alan ayarlarını temizler.
+Ön deneme kayıt silmez. Kullanıcı rolleri ve profilleri saklanır.
+
+CronHR, GPL-3.0-only lisansını kullanır. Bu ifade yalnız GPL sürüm 3’ü seçer.
+
+Geçiş, mevcut izin talebi paylaşımı varsa durur.
+Kaldırma sonrası temizlik yarıda kalırsa yetkili operatör aynı işlemi yeniden çalıştırabilir.
+Operatör, site konsolundan `cronhr.setup.remove_policy_fixtures()` işlevini çağırır.
+İşlev CronHR hâlâ kuruluysa kayıt silmez.

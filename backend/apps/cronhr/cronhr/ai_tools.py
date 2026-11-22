@@ -1,5 +1,6 @@
 """Register a proposal-only operation with the platform AI layer."""
 
+from frappe import _
 from pydantic import BaseModel, ConfigDict, Field
 
 from cronhr import leave
@@ -9,7 +10,7 @@ from cronhr.leave import LeaveName
 class ApprovalArguments(BaseModel):
 	model_config = ConfigDict(extra="forbid")
 
-	name: LeaveName
+	name: LeaveName = Field(description="Document name of the leave application.")
 	version: str = Field(min_length=1, max_length=40, description="Modified value of the reviewed draft.")
 
 
@@ -20,6 +21,7 @@ def declarations() -> list[dict]:
 			"description": "Propose approving and submitting an open leave application.",
 			"arguments": "cronhr.ai_tools.ApprovalArguments",
 			"kind": "write",
+			"destructive": True,
 			"roles": list(leave.APPROVER_ROLES),
 			"handler": "cronhr.ai_tools.execute_approval",
 			"preview": "cronhr.ai_tools.preview_approval",
@@ -30,7 +32,7 @@ def declarations() -> list[dict]:
 def preview_approval(name: str, version: str) -> dict:
 	doc = leave.pending_leave(name, expected_version=version)
 	return {
-		"summary": f"Approve and submit leave application {doc.name}.",
+		"summary": _("Approve and submit leave application {0}.").format(doc.name),
 		"target_doctype": doc.doctype,
 		"target_name": doc.name,
 		"target_version": str(doc.modified),
@@ -38,7 +40,13 @@ def preview_approval(name: str, version: str) -> dict:
 			{"field": "status", "before": "Open", "after": "Approved"},
 			{"field": "docstatus", "before": 0, "after": 1},
 		],
-		"details": {"name": doc.name},
+		"details": {
+			"name": doc.name,
+			"employee_name": doc.employee_name,
+			"from_date": str(doc.from_date),
+			"to_date": str(doc.to_date),
+			"total_leave_days": doc.total_leave_days,
+		},
 	}
 
 
