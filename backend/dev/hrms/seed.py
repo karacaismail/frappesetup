@@ -27,10 +27,11 @@ def insert(doctype, **fields):
     return frappe.get_doc({"doctype": doctype, **fields}).insert()
 
 
-def seed(password):
+def seed(password, *, performance=False):
     if frappe.db.exists("Company", COMPANY):
         raise SystemExit("Start with a fresh test site before seeding.")
-    frappe.db.set_single_value("System Settings", "enable_telemetry", 0)
+    if not performance:
+        frappe.db.set_single_value("System Settings", "enable_telemetry", 0)
     if not frappe.db.exists("Warehouse Type", "Transit"):
         insert("Warehouse Type", name="Transit")
     holiday_list = insert(
@@ -55,6 +56,19 @@ def seed(password):
         from_date=holiday_list.from_date,
     ).submit()
     leave_type = insert("Leave Type", leave_type_name=LEAVE_TYPE, is_lwp=1, include_holiday=1)
+    if not frappe.db.exists("Gender", "Other"):
+        insert("Gender", gender="Other")
+    if performance:
+        insert(
+            "User",
+            email=USERS["hr"],
+            first_name="HRMS TR Performance Reviewer",
+            send_welcome_email=0,
+            new_password=password,
+            user_type="Website User",
+            role_profiles=[{"role_profile": "HRMS TR Admin"}],
+        )
+        return
     allocated_type = insert("Leave Type", leave_type_name=ALLOCATED_LEAVE_TYPE, include_holiday=1)
     frappe.db.set_single_value(
         "HR Settings",
@@ -63,9 +77,6 @@ def seed(password):
             "leave_approver_mandatory_in_leave_application": 0,
         },
     )
-
-    if not frappe.db.exists("Gender", "Other"):
-        insert("Gender", gender="Other")
 
     employees = {}
     for actor in ("manager", "employee", "outsider", "hr"):

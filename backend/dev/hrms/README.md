@@ -76,12 +76,13 @@ backend/dev/hrms/compose exec -T web bench worker --queue long --burst
 
 ## O-31 performans ölçümü
 
-Güncel HRMS TR imajıyla ayrı ve boş bir test sitesi kurun.
-Bu siteye başka test verisi eklemeyin.
+Güncel HRMS TR imajıyla boş bir `perf-hrms-tr.localhost` sitesi kurun.
+Site ayarında `allow_performance_fixture` değerini sayı olarak 1 yapın.
+Kuyrukta bekleyen veya çalışan iş varsa komut veri oluşturmadan durur.
 Ölçüm komutu 200 çalışan ve 2.000 izin kaydı üretir.
 
 ```sh
-backend/dev/hrms/measure test-hrms-tr.localhost .pane/prompts/durum.md
+backend/dev/hrms/measure perf-hrms-tr.localhost .pane/prompts/durum.md
 ```
 
 Komut her yolu 50 kez çağırır. Onay ve iptal aynı 50 test kaydında çalışır.
@@ -89,4 +90,7 @@ Komut her yolu 50 kez çağırır. Onay ve iptal aynı 50 test kaydında çalı�
 Okuma sınırı 500 ms, yazma sınırı 1.000 ms’dir. Sınırlar p95 için geçerlidir.
 p95, ölçülen çağrıların yüzde 95’inin tamamlandığı süredir.
 Komut tabloyu durum dosyasına ekler. Bir sınır aşılırsa komut başarısız olur.
+Komut, ölçümde kullandığı izin ve devam kayıtlarını türü ve adıyla seçip siler.
+Onaylı kalmış kayıtlar ve kurulum verisi geçici sitede kalır.
+Ölçüm bitince geçici siteyi silin.
 Tekrar ölçüm için yeni ve boş bir site kullanın.

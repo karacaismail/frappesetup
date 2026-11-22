@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ "$#" -ne 2 ]]; then
-    printf '%s\n' 'Usage: measure test-<name>.localhost STATUS_FILE' >&2
+    printf '%s\n' 'Usage: measure perf-<name>.localhost STATUS_FILE' >&2
     exit 2
 fi
 

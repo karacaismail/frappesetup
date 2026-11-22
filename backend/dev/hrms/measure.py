@@ -12,7 +12,8 @@ from urllib.parse import quote
 import frappe
 from frappe.app import application
 from frappe.utils import add_days, today
-from seed import COMPANY, LEAVE_TYPE, insert, seed
+from frappe.utils.background_jobs import get_queues, get_running_jobs_in_queue
+from seed import COMPANY, LEAVE_TYPE, USERS, insert, seed
 from werkzeug.test import Client
 
 EMPLOYEES = 200
@@ -23,18 +24,25 @@ WRITE_LIMIT_MS = 1_000
 RESOURCE = "/api/resource/Leave%20Application"
 METHOD = "/api/method/hrms_tr.api."
 DENIAL = "/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
+PERFORMANCE_SITE = re.compile(r"perf-[a-z0-9-]+\.localhost")
 
 
 def make_workload(site, password):
+    if not PERFORMANCE_SITE.fullmatch(site):
+        raise SystemExit("Use a dedicated perf-*.localhost site.")
     frappe.init(site=site, sites_path=".")
     try:
+        site_config = frappe.get_file_json(os.path.join(site, "site_config.json"))
+        opt_in = site_config.get("allow_performance_fixture")
+        if type(opt_in) is not int or opt_in != 1:
+            raise SystemExit("The site must have allow_performance_fixture set to 1.")
         frappe.connect()
-        if not frappe.conf.allow_tests:
-            raise SystemExit("The site must have allow_tests enabled.")
+        if any(queue.count or get_running_jobs_in_queue(queue) for queue in get_queues()):
+            raise SystemExit("The background job queue must be empty before seeding.")
         if frappe.db.count("Employee") or frappe.db.count("Leave Application"):
             raise SystemExit("Start with an empty HRMS TR test site.")
         frappe.set_user("Administrator")
-        data = seed(password)
+        seed(password, performance=True)
         day = today()
         for ordinal in range(EMPLOYEES - frappe.db.count("Employee")):
             insert(
@@ -54,6 +62,7 @@ def make_workload(site, password):
             order_by="name asc",
         )
         draft_names = []
+        records = []
         for ordinal in range(LEAVES - frappe.db.count("Leave Application")):
             offset, employee = divmod(ordinal, len(employees))
             leave_day = add_days(day, 35 + offset)
@@ -67,16 +76,18 @@ def make_workload(site, password):
                 posting_date=day,
                 status="Open",
             )
+            records.append((leave.doctype, leave.name))
             if ordinal < SAMPLES:
                 draft_names.append(leave.name)
         attendance_day = add_days(day, 60)
         attendance = insert(
             "Attendance Request",
-            employee=data["employees"]["employee"],
+            employee=employees[0],
             from_date=attendance_day,
             to_date=attendance_day,
             reason="Work From Home",
         )
+        records.append((attendance.doctype, attendance.name))
         if (
             frappe.db.count("Employee") != EMPLOYEES
             or frappe.db.count("Leave Application") != LEAVES
@@ -84,7 +95,24 @@ def make_workload(site, password):
         ):
             raise SystemExit("The workload does not match the O-31 record counts.")
         frappe.db.commit()
-        return data, draft_names, employees, attendance.name
+        return draft_names, employees, attendance.name, records
+    finally:
+        frappe.destroy()
+
+
+def cleanup_records(records):
+    for doctype, name in reversed(records):
+        if frappe.db.exists(doctype, name) and frappe.get_doc(doctype, name).docstatus != 1:
+            frappe.delete_doc(doctype, name, delete_permanently=True)
+
+
+def cleanup_workload(site, records):
+    frappe.init(site=site, sites_path=".")
+    try:
+        frappe.connect()
+        frappe.set_user("Administrator")
+        cleanup_records(records)
+        frappe.db.commit()
     finally:
         frappe.destroy()
 
@@ -132,8 +160,8 @@ def record_version(session, name):
     return {"name": name, "version": response.json["data"]["modified"]}
 
 
-def measure(site, data, draft_names, employees, attendance, password):
-    hr = MeasurementSession(site, data["users"]["hr"], password, portal=True)
+def measure(site, draft_names, employees, attendance, password):
+    hr = MeasurementSession(site, USERS["hr"], password, portal=True)
     admin = MeasurementSession(site, "Administrator", os.environ["ADMIN_PASSWORD"])
     operations = {
         ("GET", RESOURCE, READ_LIMIT_MS): [],
@@ -203,16 +231,19 @@ def main():
     parser.add_argument("--site", required=True)
     parser.add_argument("--revision", required=True)
     args = parser.parse_args()
-    if not re.fullmatch(r"test-[a-z0-9-]+\.localhost", args.site):
-        parser.error("Use a dedicated test-*.localhost site.")
+    if not PERFORMANCE_SITE.fullmatch(args.site):
+        parser.error("Use a dedicated perf-*.localhost site.")
     if not re.fullmatch(r"[0-9a-f]{7,40}", args.revision):
         parser.error("Pass the Git revision of the test image.")
     password = os.environ["HRMS_TR_TEST_PASSWORD"]
     os.chdir("sites")
     # Frappe prints tracebacks for the expected 403 responses. Only the report goes to stdout.
     with redirect_stdout(sys.stderr):
-        data, drafts, employees, attendance = make_workload(args.site, password)
-        operations = measure(args.site, data, drafts, employees, attendance, password)
+        drafts, employees, attendance, records = make_workload(args.site, password)
+        try:
+            operations = measure(args.site, drafts, employees, attendance, password)
+        finally:
+            cleanup_workload(args.site, records)
     return report(args.revision, operations)
 
 
