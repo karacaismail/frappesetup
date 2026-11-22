@@ -82,6 +82,14 @@ class RealmBacklogFileTest(unittest.TestCase):
         self.assertEqual(self.dev_env["ATONOTA_SSL_REQUIRED"], "external")
         self.assertEqual(self.prod_env.get("ATONOTA_SSL_REQUIRED"), "all")
 
+    def test_compose_uses_separate_database_options_and_allows_an_empty_apple_key(self):
+        compose = COMPOSE.read_text(encoding="utf-8")
+        self.assertNotRegex(compose, r"(?m)^ +KC_DB_URL:")
+        for option in ("HOST: keycloak-db", 'PORT: "5432"', "DATABASE: keycloak"):
+            self.assertIn(f"KC_DB_URL_{option}", compose)
+        self.assertIn("ATONOTA_APPLE_P8_KEY=\n", ORNEK_ENV.read_text(encoding="utf-8"))
+        self.assertIn("ATONOTA_APPLE_P8_KEY: ${ATONOTA_APPLE_P8_KEY:-}", compose)
+
     def test_production_example_covers_every_development_key(self):
         missing = set(self.dev_env) - set(self.prod_env)
         self.assertEqual(missing, set())
