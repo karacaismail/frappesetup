@@ -15,14 +15,16 @@ review decisions E1, E2, E3 and important finding 1 (D-1):
 import base64
 import hashlib
 import hmac
+import json
 import threading
 from pathlib import Path
 from unittest.mock import patch
 
 import frappe
+from frappe.custom.doctype.custom_field.custom_field import create_custom_field
 from frappe.tests.test_api import FrappeAPITestCase
 
-from platform_core.identity import anonymization, provider_setup
+from platform_core.identity import anonymization, anonymization_scope, provider_setup
 from platform_core.identity.tests import helpers as h
 
 ANONYMIZE = "/api/method/platform_core.api.identity.anonymize_user"
@@ -236,6 +238,261 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.assertFalse(
 			frappe.db.exists("Deleted Document", {"deleted_doctype": "File", "deleted_name": personal})
 		)
+
+	def _custom_todo_field(self, name: str, fieldtype: str, **properties):
+		field = create_custom_field(
+			"ToDo", {"fieldname": name, "label": name, "fieldtype": fieldtype, **properties}
+		)
+		self.addCleanup(frappe.delete_doc, "Custom Field", field.name, force=True, delete_permanently=True)
+
+	def _with_todo_data_fields(self, **configuration):
+		get_hooks = frappe.get_hooks
+
+		def hooks(hook=None, *args, **kwargs):
+			configured = get_hooks(hook, *args, **kwargs)
+			if hook == "user_data_fields":
+				return [*configured, {"doctype": "ToDo", **configuration}]
+			return configured
+
+		return patch.object(frappe, "get_hooks", side_effect=hooks)
+
+	def test_clear_fields_clears_an_optional_unique_data_field(self):
+		field = "custom_test_privacy_unique"
+		self._custom_todo_field(field, "Data", unique=1)
+		frappe.db.set_value("ToDo", self.todo.name, field, "TEST-ONLY-UNIQUE-DATA")
+		frappe.db.commit()
+
+		with self._with_todo_data_fields(redact_fields=[field], clear_fields=[field]):
+			response = self.call()
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		h.refresh()
+		self.assertTrue(frappe.db.exists("ToDo", self.todo.name))
+		self.assertIsNone(frappe.db.get_value("ToDo", self.todo.name, field))
+
+	def test_clear_fields_rejects_a_required_field_without_changing_the_row(self):
+		field = "description"
+		original = frappe.db.get_value("ToDo", self.todo.name, field)
+		self.addCleanup(frappe.db.delete, "ToDo", {"name": self.todo.name})
+
+		with self._with_todo_data_fields(redact_fields=[field], clear_fields=[field]):
+			response = self.call()
+
+		self.assertEqual(response.status_code, 417, response.data[:300])
+		self.assertEqual(response.json["exc_type"], "ValidationError")
+		self.assertIn(b"clear_fields", response.data)
+		self.assertIn(b"ToDo.description", response.data)
+		h.refresh()
+		self.assertEqual(frappe.db.get_value("ToDo", self.todo.name, field), original)
+
+	def test_redacted_attach_fields_delete_files_and_keep_unrelated_attachments(self):
+		fields = {"custom_test_privacy_file": "Attach", "custom_test_privacy_image": "Attach Image"}
+		personal = []
+		for field, fieldtype in fields.items():
+			self._custom_todo_field(field, fieldtype)
+			file = self._file(f"{field}.txt", "ToDo", self.todo.name, field=field)
+			doc = frappe.get_doc("File", file)
+			path = Path(doc.get_full_path())
+			self.assertTrue(path.is_file())
+			frappe.db.set_value("ToDo", self.todo.name, field, doc.file_url)
+			personal.append((file, path))
+		unrelated = self._file("test-only-business-attachment.txt", "ToDo", self.todo.name)
+		unrelated_path = Path(frappe.get_doc("File", unrelated).get_full_path())
+		frappe.db.commit()
+
+		with self._with_todo_data_fields(redact_fields=list(fields)):
+			response = self.call()
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		h.refresh()
+		for field in fields:
+			self.assertFalse(frappe.db.get_value("ToDo", self.todo.name, field))
+		for file, path in personal:
+			self.assertFalse(frappe.db.exists("File", file))
+			self.assertFalse(path.exists())
+			self.assertFalse(
+				frappe.db.exists("Deleted Document", {"deleted_doctype": "File", "deleted_name": file})
+			)
+			self.assertFalse(
+				frappe.db.exists(
+					"Comment",
+					{
+						"reference_doctype": "ToDo",
+						"reference_name": self.todo.name,
+						"comment_type": ("in", ["Attachment", "Attachment Removed"]),
+						"content": ("like", f"%{path.name}%"),
+					},
+				)
+			)
+		self.assertTrue(frappe.db.exists("File", unrelated))
+		self.assertTrue(unrelated_path.is_file())
+
+	def test_redacted_attach_field_keeps_file_and_thumbnail_shared_by_another_record(self):
+		field = "custom_test_privacy_shared_file"
+		self._custom_todo_field(field, "Attach")
+		personal = self._file("test-only-shared-attachment.txt", "ToDo", self.todo.name, field=field)
+		file = frappe.get_doc("File", personal)
+		path = Path(file.get_full_path())
+		another_todo = frappe.get_doc(
+			{"doctype": "ToDo", "description": "TEST-ONLY-SHARED-FILE-RECORD", "allocated_to": NAMESAKE}
+		).insert(ignore_permissions=True)
+		self.addCleanup(frappe.db.delete, "ToDo", {"name": another_todo.name})
+		shared = file.create_attachment_copy("ToDo", another_todo.name, ignore_permissions=True)
+		self.addCleanup(frappe.delete_doc, "File", shared.name, force=True, ignore_missing=True)
+		self.assertEqual(shared.file_url, file.file_url)
+		self.assertTrue(path.is_file())
+		thumbnail_content = b"TEST-ONLY-SHARED-THUMBNAIL"
+		thumbnail = path.with_name(f"thumbnail-{path.name}")
+		thumbnail.write_bytes(thumbnail_content)
+		self.addCleanup(thumbnail.unlink, missing_ok=True)
+		thumbnail_url = f"/private/files/{thumbnail.name}"
+		for name in (personal, shared.name):
+			frappe.db.set_value("File", name, "thumbnail_url", thumbnail_url)
+		frappe.db.set_value("ToDo", self.todo.name, field, file.file_url)
+		frappe.db.commit()
+
+		with self._with_todo_data_fields(redact_fields=[field]):
+			response = self.call()
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		h.refresh()
+		self.assertFalse(frappe.db.exists("File", personal))
+		self.assertTrue(frappe.db.exists("File", shared.name))
+		self.assertTrue(path.is_file())
+		self.assertEqual(frappe.db.get_value("File", shared.name, "thumbnail_url"), thumbnail_url)
+		self.assertTrue(thumbnail.is_file(), "The surviving attachment still references the thumbnail")
+		self.assertEqual(thumbnail.read_bytes(), thumbnail_content)
+
+	def test_redacted_attach_field_keeps_thumbnail_used_by_a_different_file(self):
+		field = "custom_test_privacy_thumbnail"
+		self._custom_todo_field(field, "Attach Image")
+		personal = self._file("test-only-personal-thumbnail.txt", "ToDo", self.todo.name, field=field)
+		other = self._file("test-only-other-thumbnail.txt", "ToDo", self.todo.name)
+		doc = frappe.get_doc("File", personal)
+		path = Path(doc.get_full_path())
+		thumbnail = path.with_name(f"thumbnail-{path.name}")
+		thumbnail.write_bytes(b"TEST-ONLY-SHARED-THUMBNAIL")
+		self.addCleanup(thumbnail.unlink, missing_ok=True)
+		thumbnail_url = f"/private/files/{thumbnail.name}"
+		self.assertNotEqual(doc.file_url, frappe.db.get_value("File", other, "file_url"))
+		for name in (personal, other):
+			frappe.db.set_value("File", name, "thumbnail_url", thumbnail_url)
+		frappe.db.set_value("ToDo", self.todo.name, field, doc.file_url)
+		frappe.db.commit()
+
+		with self._with_todo_data_fields(redact_fields=[field]):
+			response = self.call()
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		h.refresh()
+		self.assertFalse(path.exists())
+		self.assertFalse(frappe.db.exists("File", personal))
+		self.assertEqual(frappe.db.get_value("File", other, "thumbnail_url"), thumbnail_url)
+		self.assertTrue(thumbnail.is_file(), "The other attachment uses this thumbnail")
+
+	def test_history_scrubs_old_and_new_redacted_values_from_another_author(self):
+		old = "TEST-ONLY-OLD-VALUE"
+		new = "TEST-ONLY-NEW-VALUE"
+		business_change = ["priority", "Low", "High"]
+		changes = {"changed": [["description", old, new], business_change]}
+		self.addCleanup(frappe.db.delete, "ToDo", {"name": self.todo.name})
+		another_todo = frappe.get_doc(
+			{"doctype": "ToDo", "description": "TEST-ONLY-OTHER-RECORD", "allocated_to": NAMESAKE}
+		).insert(ignore_permissions=True)
+		self.addCleanup(frappe.db.delete, "ToDo", {"name": another_todo.name})
+		versions = []
+		for doc in (self.todo, another_todo):
+			version = frappe.get_doc(
+				{
+					"doctype": "Version",
+					"ref_doctype": "ToDo",
+					"docname": doc.name,
+					"data": json.dumps(changes),
+				}
+			).insert(ignore_permissions=True)
+			frappe.db.set_value("Version", version.name, "owner", "Administrator", update_modified=False)
+			self.addCleanup(frappe.db.delete, "Version", {"name": version.name})
+			versions.append(version.name)
+		frappe.db.commit()
+
+		with self._with_todo_data_fields(redact_fields=["description"]):
+			response = self.call()
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		h.refresh()
+		target, unrelated = [frappe.db.get_value("Version", version, "data") for version in versions]
+		self.assertNotIn(old, target)
+		self.assertNotIn(new, target)
+		self.assertIn(business_change, json.loads(target)["changed"])
+		self.assertEqual(json.loads(unrelated), changes)
+
+	def test_history_scrubs_version_committed_after_anonymization_snapshot(self):
+		old = "TEST-ONLY-LATE-OLD-VALUE"
+		new = "TEST-ONLY-LATE-NEW-VALUE"
+		business_change = ["priority", "Low", "High"]
+		changes = {"changed": [["description", old, new], business_change]}
+		name = frappe.generate_hash(length=10)
+		site = frappe.local.site
+		todo = self.todo.name
+		self.addCleanup(frappe.db.delete, "ToDo", {"name": todo})
+		self.addCleanup(frappe.db.delete, "Version", {"name": name})
+		result = {}
+
+		def insert_version():
+			frappe.init(site=site)
+			try:
+				frappe.connect()
+				frappe.db.sql("SET SESSION innodb_lock_wait_timeout = 5")
+				version = frappe.get_doc(
+					{
+						"doctype": "Version",
+						"name": name,
+						"ref_doctype": "ToDo",
+						"docname": todo,
+						"data": json.dumps(changes),
+					}
+				)
+				version.set_user_and_timestamp()
+				version.db_insert()
+				frappe.db.commit()
+				result["committed"] = True
+			except Exception as error:
+				result["error"] = error
+			finally:
+				frappe.destroy()
+
+		def redact_after_snapshot(_issuer, _subject):
+			if not result:
+				frappe.db.sql("START TRANSACTION WITH CONSISTENT SNAPSHOT")
+				self.assertIsNone(frappe.db.get_value("Version", name, "name"))
+				worker = threading.Thread(target=insert_version)
+				worker.start()
+				worker.join(timeout=15)
+				self.assertFalse(worker.is_alive(), "The Version writer did not finish")
+				self.assertTrue(result.get("committed"), result)
+				self.assertIsNone(frappe.db.get_value("Version", name, "name"))
+			anonymization_scope._redact_version_fields("ToDo", todo, {"description"})
+
+		anonymization._with_retry(redact_after_snapshot, h.ISSUER, SUBJECT)
+		h.refresh()
+		data = frappe.db.get_value("Version", name, "data")
+		self.assertNotIn(old, data)
+		self.assertNotIn(new, data)
+		self.assertIn(business_change, json.loads(data)["changed"])
+
+	def test_history_rejects_malformed_field_changes_without_overwriting_the_version(self):
+		data = json.dumps(
+			{"changed": {"description": "TEST-ONLY-MALFORMED"}, "added": [["tags", {"label": "Keep"}]]}
+		)
+		version = frappe.get_doc(
+			{"doctype": "Version", "ref_doctype": "ToDo", "docname": self.todo.name, "data": data}
+		).insert(ignore_permissions=True)
+		self.addCleanup(frappe.db.delete, "Version", {"name": version.name})
+
+		with self.assertRaisesRegex(frappe.ValidationError, "Version"):
+			anonymization_scope._redact_version_fields("ToDo", self.todo.name, {"description"})
+
+		self.assertEqual(frappe.db.get_value("Version", version.name, "data"), data)
 
 	def test_communication_redacts_only_the_deleted_sender(self):
 		body = "<p>Shared name and personal signature</p>"
@@ -485,7 +742,7 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.assertIn(anon, value)
 		self.assertTrue(value.endswith(other), value)
 
-	def _file(self, name: str, doctype: str, docname: str) -> str:
+	def _file(self, name: str, doctype: str, docname: str, *, field: str | None = None) -> str:
 		doc = frappe.get_doc(
 			{
 				"doctype": "File",
@@ -494,6 +751,7 @@ class TestAnonymizeUser(FrappeAPITestCase):
 				"is_private": 1,
 				"attached_to_doctype": doctype,
 				"attached_to_name": docname,
+				"attached_to_field": field,
 			}
 		).insert(ignore_permissions=True)
 		frappe.db.set_value("File", doc.name, "owner", DELETED, update_modified=False)

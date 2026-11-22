@@ -199,6 +199,9 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Silinen kimliğin ham değeri saklanmaz. Yeniden açmayı engellemek için yalnız kimliğin HMAC özeti tutulur.
   - Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
   - Ayrıntılı kurallar sözleşmenin 7. bölümündedir.
+  - Kiracı sitesi, `clear_fields` listesindeki zorunlu olmayan alanları boşaltır. Listede zorunlu bir alan varsa sistem hata verir.
+  - Sistem, boşalttığı dosya ve fotoğraf alanlarına bağlı dosya kayıtlarını siler. Başka bir kayıt dosyayı kullanmıyorsa sistem dosyayı diskten de siler.
+  - Sistem, anonim yaptığı alanların eski ve yeni değerlerini kart geçmişinden temizler. Sistem bu işlemi geçmişi kimin yazdığına bakmadan yapar. Diğer alanların geçmişi kalır.
 - **O-28. Yapay zekâ katmanı genel Frappe erişimi değildir.** D-9 her şeyin yapay zekâyla yönetilmesini ister. AX-2 modele genel Frappe erişimi vermeyi yasaklar. İki kural şöyle birleşir:
   - Model yalnız kayıtlı araçları çağırır. Her araç kullanıcının yetkisiyle çalışır.
   - Yazma önce öneri olur. İnsan ayrı uçtan onay verir.
@@ -253,9 +256,9 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Sistem adları, iletişim ve acil durum bilgilerini ve adresleri anonim yapar.
   - Sistem pasaport numarasını, pasaportun düzenlendiği yeri, banka, sağlık, sigorta ve aile bilgilerini anonim yapar.
   - Doğum tarihi, pasaport tarihleri, devam cihazı kimliği, kan grubu ve medeni durum alanları boşalır.
-  - Fotoğraf alanı boşalır. Karta yüklenen fotoğraf dosyası şimdilik kalır.
-  - Çalışan kartının değişiklik geçmişi eski değerleri şimdilik tutar.
-  - Orkestratör, kiracıda `clear_fields` seçeneğini kabul etti. Seçenek, `redact_fields` içindeki zorunlu olmayan alanları boşaltır. `platform-core-kimlik` bu seçenek için kendi testini ekleyecek.
+  - Sistem fotoğraf alanını boşaltır ve bu alana bağlı dosya kaydını siler. Başka bir kayıt dosyayı kullanmıyorsa sistem dosyayı diskten de siler. Ortak küçük resim, ilgili son dosya kaydı silinene kadar kalır. Aynı kartta fotoğraf adresini kullanan başka dosya kaydı yoksa yükleme bağlantısı da silinir.
+  - Sistem, seçili kart alanlarının eski ve yeni değerlerini değişiklik geçmişinden temizler. İK'nın yazdığı geçmiş de bu kapsamdadır. Diğer alanların geçmişi kalır. Geçmiş verisi bozuksa sistem hata verir ve mevcut geçmişi korur.
+  - `clear_fields`, `redact_fields` içindeki zorunlu olmayan tek değerli alanları boşaltır. Listede zorunlu bir alan varsa sistem hata verir.
   - Eğitim ve önceki iş alt tabloları bu kancayla temizlenmez. Bu tablolar açık teknik borçtur.
   - İzin, devam ve bordro kayıtlarındaki çalışan adı kopyaları kalır. Bu kopyalar için `platform_core` tarafında ayrı bir kanca gerekir.
 
@@ -312,8 +315,6 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Performans ölçümü yalnız elle yapılır (O-31) | Canlı darboğaz görülmez | DevOps sorumlusu | P1'de Grafana ve gerçek kullanıcı ölçümü kurulur (G-149) |
 | `BORC(mvp)`: İzinlerin ve bağlı HR kayıtlarının yasal saklama süresi yok (O-39) | Silme zamanı belli değil | Hukuk sorumlusu | Hukuk sorumlusu süreleri proje kaydına yazar. İzin komutu yalnız taslak ve iptal edilmiş izinlerde site ayarındaki süreyi uygular. Bağlı HR kayıtları için silme yolu ayrıca belirlenir. |
 | `BORC(mvp)`: Çalışan kartının alt tabloları ve iş kayıtlarındaki ad kopyaları kalıyor (O-41) | Hesap silme bu alanları temizlemez | platform-core-kimlik ve ilk-dikey-dilim | `platform_core` hesap silme kancası alt tablolara ve kullanıcıya bağlı iş kayıtlarına güvenli erişim sağlar |
-| `BORC(mvp)`: Çalışan fotoğrafı dosyası kalıyor (O-41) | Fotoğraf alanı boşalır. Karta yüklenen fotoğraf dosyası şimdilik kalır. | platform-core-kimlik | Hesap silme, çalışan fotoğrafı dosyasını temizler. |
-| `BORC(mvp)`: Çalışan kartı geçmişi kalıyor (O-41) | Çalışan kartının değişiklik geçmişi eski değerleri şimdilik tutar. | platform-core-kimlik | Hesap silme, kart geçmişindeki kişisel değerleri temizler. |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
 | `BORC(mvp)`: Press geliştirme imajı `patch-py314.sh` ile Press kodunu değiştiriyor (O-18) | M-4 kuralına aykırı. Press yükseltmesinde yama bozulabilir | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da yama Press'e gönderilip kabul edilir |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
@@ -321,6 +322,8 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Telefon paketi yok (O-26) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |
 
 ### Kapanan teknik borç
+
+- **Çalışan fotoğrafı ve kart geçmişi (O-41).** Hesap silme, fotoğraf alanına bağlı dosya kaydını siler. Paylaşılan dosya içeriği son kayıt silinene kadar diskte kalır. Sistem, karttaki seçili alanların eski ve yeni değerlerini geçmişten temizler.
 
 - `list_identities` uçları tamamlandı. Kiracı ve Press uçları aynı sayfalama sözleşmesini kullanır.
 - Kiracı HTTP testleri ikinci sayfayı ve yetkisiz istek reddini doğruladı.

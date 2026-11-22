@@ -1076,7 +1076,7 @@ paths:
         The service token must carry `azp=identity-sync`.
 
         **This endpoint cannot be undone.** The rules are in docs/sozlesmeler.md section 7, anonymization rules.
-        The same rules apply in Press (`press_tr.api.identity.anonymize_user`).
+        The general account deletion rules also apply in Press (`press_tr.api.identity.anonymize_user`).
 
         The work has two steps. Both steps are safe to repeat.
         The server makes up to three attempts per step. It retries database deadlocks and stale snapshots
@@ -1165,7 +1165,13 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
         "417":
-          $ref: "#/components/responses/GovdeBozuk"
+          description: |
+            Frappe returns `DataError` when it cannot parse the request body as JSON.
+            The anonymization step returns `ValidationError` for a required field in `clear_fields`
+            or malformed field changes in a Version record. Correct the site data or configuration before retrying.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
         "410":
           $ref: "#/components/responses/KimlikSilindi"
         "500":
@@ -2499,7 +2505,7 @@ components:
         `EmailNotVerified`, `IdentityConflict`, `DeskRoleNotAllowed`, `IdentityNotFound`,
         `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput`, `KeycloakKeysUnavailable` and `IdentityInternalError`.
         The general Frappe values can be `PermissionError`, `AuthenticationError`, `CSRFTokenError`,
-        `DataError` and `RateLimitExceededError`.
+        `DataError`, `RateLimitExceededError` and `ValidationError`.
         The `start_login` and `keycloak_callback` endpoints do not return this body. These two endpoints return an HTML page.
       required: [exc_type]
       properties:
