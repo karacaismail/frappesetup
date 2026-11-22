@@ -4,7 +4,9 @@ from unittest.mock import Mock, call, patch
 from uuid import uuid4
 
 import frappe
+import requests
 from oidc_verify import JwksUnavailable
+from urllib3.exceptions import ReadTimeoutError
 from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
 from press_tr import api, hooks
@@ -13,6 +15,63 @@ from press_tr.press_identity import oidc, request_policy, service, sessions
 
 
 class RequestGuardsTest(unittest.TestCase):
+	def test_only_identity_sync_timeout_reports_pending_deletion(self):
+		from press_tr.press_identity import deletion
+
+		link = SimpleNamespace(issuer="https://issuer.example.test", subject="fixture")
+		config = frappe._dict(
+			identity_sync_url="https://sync.example.test", press_service_client_secret="fixture"
+		)
+		token_response = Mock(status_code=200)
+		token_response.json.return_value = {"access_token": "fixture"}
+		processed = Mock(status_code=200)
+		processed.raw.read.return_value = b'{"status":"processed"}'
+		with (
+			patch.object(deletion, "frappe", SimpleNamespace(conf=config)),
+			patch.object(deletion, "server_endpoint", return_value="https://issuer.example.test/token"),
+			patch.object(deletion, "verify"),
+			patch.object(deletion.requests, "post") as post,
+		):
+			with self.subTest(timeout="default"):
+				post.side_effect = [token_response, requests.ReadTimeout()]
+				self.assertFalse(deletion.send_deletion_request(link, 1))
+				self.assertEqual(post.call_args.kwargs["timeout"], (10, 45))
+			for valid in (60.5, 90):
+				with self.subTest(timeout=valid):
+					config.press_deletion_request_timeout = valid
+					post.side_effect = [token_response, processed]
+					self.assertTrue(deletion.send_deletion_request(link, 1))
+					self.assertEqual(post.call_args.kwargs["timeout"], (10, valid))
+			unknown = Mock(status_code=200)
+			unknown.raw.read.return_value = b'{"status":"unknown"}'
+			post.side_effect = [token_response, unknown]
+			self.assertFalse(deletion.send_deletion_request(link, 1))
+			body_timeout = Mock(status_code=200)
+			body_timeout.raw.read.side_effect = ReadTimeoutError(None, "/fixture", "Read timed out.")
+			post.side_effect = [token_response, body_timeout]
+			self.assertFalse(deletion.send_deletion_request(link, 1))
+			body_timeout.close.assert_called_once()
+			post.side_effect = requests.ReadTimeout()
+			with self.assertRaises(deletion.BadGateway):
+				deletion.send_deletion_request(link, 1)
+
+			for error in (requests.ConnectTimeout(), requests.ConnectionError()):
+				post.side_effect = [token_response, error]
+				with self.subTest(error=type(error).__name__), self.assertRaises(deletion.BadGateway):
+					deletion.send_deletion_request(link, 1)
+
+			for invalid in (90.1, float("nan"), float("inf"), 0, -1, True, "60", None):
+				config.press_deletion_request_timeout = invalid
+				post.reset_mock(side_effect=True)
+				post.side_effect = [token_response, Mock(status_code=200)]
+				with (
+					self.subTest(timeout=invalid),
+					self.assertLogs("press_tr", level="WARNING"),
+					self.assertRaises(deletion.ServiceUnavailable),
+				):
+					deletion.send_deletion_request(link, 1)
+				post.assert_not_called()
+
 	def test_identity_link_is_closed_to_generic_ai_writes(self):
 		self.assertIn("PTR Identity Link", getattr(hooks, "ai_write_closed_doctypes", []))
 		self.assertIn("PTR Keycloak Session", getattr(hooks, "ai_write_closed_doctypes", []))

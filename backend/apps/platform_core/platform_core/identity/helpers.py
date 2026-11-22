@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 PROVIDER = "keycloak"
 PROVIDER_BASE_NAME = "Keycloak"
 IDENTITY_API_PREFIX = "/api/method/platform_core.api.identity."
-SESSION_ID_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
+SESSION_ID_RE = re.compile(r"[A-Za-z0-9_-]{8,64}")
 _CONTROL_OR_SPACE = re.compile(r"[\x00-\x20\x7f]")
 # G-11: only characters that are safe inside an HTML attribute and a URL path, query and fragment.
 _SAFE_REDIRECT = re.compile(r"/[A-Za-z0-9\-._~/?#@!$&()*+,;=%:\[\]]*")
@@ -54,8 +54,8 @@ def is_safe_redirect(path: object) -> bool:
 
 
 def is_session_id(value: object) -> bool:
-	"""Keycloak `sid` is a UUID. Other characters could act as LIKE wildcards."""
-	return isinstance(value, str) and bool(SESSION_ID_RE.match(value))
+	"""Keycloak 26.8.2 generates Base64url session IDs. Keep accepting UUIDs."""
+	return isinstance(value, str) and SESSION_ID_RE.fullmatch(value) is not None
 
 
 def session_claims(claims: dict, issuer: str) -> dict:

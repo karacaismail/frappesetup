@@ -262,7 +262,7 @@ The endpoint disables the user and anonymizes the fields that identify the perso
 The endpoint in Press also invalidates the API keys.
 The request carries the `issuer` and `subject` fields. A repeated call gets the same response.
 If the endpoint does not know the identity, `found` is false. The service counts this response as success.
-The tenant can also return 404 and `IdentityNotFound` for an unknown identity. The service counts this response as success too.
+Any HTTP 404 from either anonymize endpoint is a failure. The service stops the deletion flow.
 The endpoint returns 409 for a lock conflict or a timeout. The service then tries the request again.
 If a field is missing, the service does not know the result and does not continue with the next step.
 ","`platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user` uçlarından beklenen yanıt.
@@ -272,7 +272,7 @@ Uç kullanıcıyı kapatır ve kişiyi gösteren alanları anonim yapar. İş ka
 Press'teki uç API anahtarlarını da geçersiz yapar.
 İstek `issuer` ve `subject` alanlarını taşır. Tekrar çağrı aynı yanıtı alır.
 Uç kimliği tanımıyorsa `found` yanlış olur. Servis bu yanıtı başarı sayar.
-Kiracı, bilinmeyen kimlik için 404 ve `IdentityNotFound` da dönebilir. Servis bu yanıtı da başarı sayar.
+Anonim yapma isteği HTTP 404 dönerse servis silme akışını durdurur.
 Uç kilit çakışmasında ya da zaman aşımında 409 döner. Servis o zaman isteği yeniden dener.
 Bir alan eksikse servis sonucu bilmez ve sonraki adıma geçmez.
 ",identity_sync.openapi.yaml: components.schemas.TargetAnonymizeUserResult.description

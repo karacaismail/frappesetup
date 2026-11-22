@@ -337,7 +337,7 @@ paths:
                   description: Send false to start reauthentication and true to confirm deletion.
       responses:
         "200":
-          description: Returns a Keycloak login URL or confirms that Identity Sync accepted the deletion request.
+          description: Returns a Keycloak login URL or the latest known deletion request state.
           content:
             application/json:
               schema:
@@ -357,6 +357,12 @@ paths:
                         properties:
                           submitted:
                             const: true
+                      - type: object
+                        required: [pending]
+                        properties:
+                          pending:
+                            const: true
+                            description: Press timed out reading the Identity Sync response or Identity Sync reported an unknown outcome. The same account can be retried safely.
         "400":
           description: Frappe rejected the browser request or its CSRF token.
         "403":

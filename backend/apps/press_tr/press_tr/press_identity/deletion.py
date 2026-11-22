@@ -1,10 +1,13 @@
 """Authorize deletion requests using a freshly verified Press browser session."""
 
+import json
+import logging
 import time
 
 import frappe
 import requests
 from frappe import _
+from urllib3.exceptions import HTTPError, ReadTimeoutError
 from werkzeug.exceptions import BadGateway, ServiceUnavailable
 
 from press_tr.press_identity.identity import IDENTITY_LINK, remember_press_session, validate_local_user
@@ -13,6 +16,10 @@ from press_tr.press_identity.oidc import claim, issuer, reject, server_endpoint,
 ACCOUNT_DELETION_PAGE = "/account-deletion"
 REAUTHENTICATION_TTL = 300
 REAUTHENTICATION_CLOCK_SKEW = 5
+DEFAULT_DELETION_TIMEOUT = 45
+MAX_DELETION_TIMEOUT = 90
+DELETION_CONNECT_TIMEOUT = 10
+MAX_DELETION_RESPONSE_BYTES = 8 * 1024 * 1024
 
 
 def human_identity(*, for_update=False):
@@ -76,12 +83,33 @@ def record_reauthentication(attempt: dict, claims: dict) -> None:
 	frappe.local.flags.commit = True
 
 
-def send_deletion_request(link, authenticated_at: int) -> None:
+def deletion_status() -> str | None:
+	for status in ("submitted", "pending"):
+		if frappe.cache.get_value(f"press_tr:deletion:{status}:{frappe.session.sid}"):
+			return status
+	return None
+
+
+def mark_deletion_status(status: str) -> None:
+	frappe.cache.set_value(
+		f"press_tr:deletion:{status}:{frappe.session.sid}", True, expires_in_sec=REAUTHENTICATION_TTL
+	)
+
+
+def send_deletion_request(link, authenticated_at: int) -> bool:
 	from oidc_verify import verify_access_token
 
 	service_url = frappe.conf.identity_sync_url
 	service_secret = frappe.conf.press_service_client_secret
 	if not service_url or not service_secret:
+		raise ServiceUnavailable(_("Configure the account deletion service.", context="press_tr"))
+
+	timeout = frappe.conf.get("press_deletion_request_timeout", DEFAULT_DELETION_TIMEOUT)
+	if type(timeout) not in (int, float) or not 0 < timeout <= MAX_DELETION_TIMEOUT:
+		logging.getLogger("press_tr").warning(
+			"press_deletion_request_timeout must be a positive number no greater than %s seconds.",
+			MAX_DELETION_TIMEOUT,
+		)
 		raise ServiceUnavailable(_("Configure the account deletion service.", context="press_tr"))
 
 	try:
@@ -98,14 +126,37 @@ def send_deletion_request(link, authenticated_at: int) -> None:
 		if not isinstance(token, str) or not token:
 			raise BadGateway()
 		verify(verify_access_token, token, audience="identity-sync", allowed_azp={"press-service"})
+	except (requests.RequestException, ValueError, AttributeError):
+		raise BadGateway() from None
+
+	try:
 		response = requests.post(
 			f"{service_url.rstrip('/')}/v1/account-deletions",
 			headers={"Authorization": f"Bearer {token}"},
 			json={"issuer": link.issuer, "subject": link.subject, "reauthenticated_at": authenticated_at},
-			timeout=10,
+			timeout=(DELETION_CONNECT_TIMEOUT, timeout),
 			allow_redirects=False,
+			stream=True,
 		)
-	except (requests.RequestException, ValueError, AttributeError):
+	except requests.ReadTimeout:
+		return False
+	except requests.RequestException:
 		raise BadGateway() from None
-	if response.status_code not in {200, 201, 202}:
-		raise BadGateway()
+	try:
+		if response.status_code not in {200, 201, 202}:
+			raise BadGateway()
+		if response.status_code != 200:
+			return True
+		body = response.raw.read(MAX_DELETION_RESPONSE_BYTES + 1, decode_content=True)
+		if len(body) > MAX_DELETION_RESPONSE_BYTES:
+			raise BadGateway()
+		result = json.loads(body)
+		if not isinstance(result, dict) or not isinstance(result.get("status"), str):
+			raise BadGateway()
+		return result["status"] != "unknown"
+	except (requests.ReadTimeout, ReadTimeoutError):
+		return False
+	except (requests.RequestException, HTTPError, ValueError):
+		raise BadGateway() from None
+	finally:
+		response.close()

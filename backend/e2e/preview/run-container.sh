@@ -46,7 +46,7 @@ docker_preview exec --workdir /suite "${settings[@]}" "$container" \
     node /suite/backend/e2e/preview/container-entry.mjs /suite || status=$?
 
 # Copy only logs that the Node runner has already redacted.
-for log in chromium-launch webkit-launch browser api lifecycle; do
+for log in chromium-launch webkit-launch browser api lifecycle chromium-idle webkit-idle chromium-scenarios webkit-scenarios; do
     if docker_preview exec "$container" test -f "/results/$log.log"; then
         docker_preview cp "$container:/results/$log.log" "$PREVIEW_DIR/$log.log"
     fi

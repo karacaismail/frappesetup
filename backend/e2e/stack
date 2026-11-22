@@ -373,6 +373,28 @@ def check_resources(engine, environment):
         raise ValueError("Startup requires 10 GiB free disk and 3 GiB available memory.")
 
 
+def configure_press(compose, environment):
+    settings = {
+        "host_name": environment["ATONOTA_PRESS_URL"],
+        "keycloak_public_url": environment["KC_PUBLIC_URL"],
+        "keycloak_internal_url": environment["KC_PUBLIC_URL"],
+        "keycloak_realm": "platform",
+        "keycloak_client_id": "press",
+        "keycloak_client_secret": environment["ATONOTA_PRESS_SECRET"],
+        "press_identity_sync_user": "identity-sync@example.test",
+        "press_service_client_secret": environment["ATONOTA_PRESS_SERVICE_SECRET"],
+        "identity_sync_url": "http://identity-sync.localhost:6115",
+    }
+    script = (BACKEND / "e2e/preview/configure-stack-press.py").read_text()
+    run(
+        [*compose, "exec", "-T", "--workdir", "/home/frappe/benches/frappe-bench",
+         "web", "env/bin/python", "-c", script],
+        environment,
+        input=json.dumps(settings),
+        text=True,
+    )
+
+
 def up(engine, compose, environment):
     check_resources(engine, environment)
     model = config(compose, environment)
@@ -506,6 +528,7 @@ def up(engine, compose, environment):
             ],
             environment,
         )
+    configure_press(compose, environment)
     run(
         [
             *compose,

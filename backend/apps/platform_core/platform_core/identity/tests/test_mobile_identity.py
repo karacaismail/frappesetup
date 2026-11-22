@@ -43,8 +43,7 @@ class TestMobileIdentity(FrappeAPITestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		cls.settings = h.SiteSettings().__enter__()
-		cls.addClassCleanup(cls.settings.__exit__, None, None, None)
+		cls.enterClassContext(h.SiteSettings({"kimlik_mobil_azp": ["mobile"]}))
 		provider_setup.ensure_social_login_key()
 		h.ensure_user(h.AYSE)
 		h.refresh()
@@ -85,6 +84,12 @@ class TestMobileIdentity(FrappeAPITestCase):
 		self.assertEqual(identity["issuer"], h.ISSUER)
 		self.assertEqual(identity["subject"], "sub-ayse")
 		self.assertEqual(identity["sid"], "11111111-1111-4111-8111-111111111111")
+
+	def test_mobile_access_token_keeps_base64url_session_id(self):
+		sid = "Synthetic_-Example123456"
+		response = self.call(self.key.sign(mobile_payload(sid=sid)))
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		self.assertEqual(response.json["message"]["identity"]["sid"], sid)
 
 	def test_mobile_identity_from_an_earlier_hook_survives_platform_hooks(self):
 		real_get_hooks = frappe.get_hooks

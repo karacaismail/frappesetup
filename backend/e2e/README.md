@@ -86,6 +86,12 @@ Komut dört tarayıcı dosyasını seçer. Örnek verisi eksik testler `not_run`
 Bu seçenekte ayrı API test grubu çalışmaz.
 Varsayılan profilde bellek yetmezse `FS_COLIMA_PROFILE=factory` ile deneyin.
 
+Kalan tarayıcı senaryoları için `E2E_FULL_BROWSER_FIXTURES=1` de ekleyin.
+Önizleme, her tarayıcı için ayrı örnek hesaplar açar. Parolaları çalışırken üretir.
+Çalışan oturumu testi iki tarayıcıda aynı anda ilerler. Test gerçek saatte bir saat bekler.
+Önizleme, telefon iptali için geçici HTTPS sertifikasını çalışırken üretir.
+Sertifika yalnız geçici kiracı ortamında güvenilir sayılır. Ortam kapanınca dosyalar silinir.
+
 ### Press gerektirmeyen testler
 
 1. Yeni kiracı için `FS_COLIMA_PROFILE=default backend/e2e/environment.sh up` çalıştırın.
@@ -130,9 +136,9 @@ Telefon paketi için `mobile-pkce.spec.ts` dosyasını seçin.
 
 ## Hesap ve oturum testleri
 
-| Senaryo | Sonuç | Eksik önkoşul |
+| Senaryo | Sonuç | Neden veya önkoşul |
 | --- | --- | --- |
-| Müşteri hesabını siler. | `not_run` | Press silme sayfası, kimlik eşitleme servisi ve örnek müşteri hesabı. |
+| Müşteri hesabını siler. | `fail` (Chromium ve WebKit) | Kiracı yanıtında `anonymized` ve `found` alanları eksik. Sahip iş `platform-core-kimlik`. |
 | Yönetici telefonu iptal eder. | `not_run` | Mobil kimlik doğrulaması ve Keycloak oturumu iptal ucu. |
 | Çalışan bir saat boşta kalır. | `not_run` | Çalışan için süre ayarı ve zorunlu yeniden doğrulama. |
 

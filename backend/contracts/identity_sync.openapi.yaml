@@ -1625,7 +1625,7 @@ components:
         The endpoint in Press also invalidates the API keys.
         The request carries the `issuer` and `subject` fields. A repeated call gets the same response.
         If the endpoint does not know the identity, `found` is false. The service counts this response as success.
-        The tenant can also return 404 and `IdentityNotFound` for an unknown identity. The service counts this response as success too.
+        Any HTTP 404 from either anonymize endpoint is a failure. The service stops the deletion flow.
         The endpoint returns 409 for a lock conflict or a timeout. The service then tries the request again.
         If a field is missing, the service does not know the result and does not continue with the next step.
       required: [message]
