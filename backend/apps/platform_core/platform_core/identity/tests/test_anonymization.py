@@ -48,6 +48,20 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		super().setUpClass()
 		cls.settings = h.SiteSettings().__enter__()
 		cls.addClassCleanup(cls.settings.__exit__, None, None, None)
+		cls.address_country = frappe.db.get_value("Country", {}, "name")
+		if not (
+			frappe.db.exists("Address Template", {"country": cls.address_country})
+			or frappe.db.exists("Address Template", {"is_default": 1})
+		):
+			template = frappe.get_doc(
+				{
+					"doctype": "Address Template",
+					"country": cls.address_country,
+					"template": "{{ address_line1 }}",
+				}
+			).insert()
+			cls.addClassCleanup(h.refresh)
+			cls.addClassCleanup(frappe.db.delete, "Address Template", {"name": template.name})
 		provider_setup.ensure_social_login_key()
 		h.refresh()
 		cls.key = h.key()
@@ -273,7 +287,7 @@ class TestAnonymizeUser(FrappeAPITestCase):
 				"address_type": "Office",
 				"address_line1": "Private street",
 				"city": "Fixture city",
-				"country": frappe.db.get_value("Country", {}, "name"),
+				"country": self.address_country,
 				"links": [{"link_doctype": "User", "link_name": DELETED}],
 			}
 		).insert()
@@ -345,7 +359,7 @@ class TestAnonymizeUser(FrappeAPITestCase):
 				"address_type": "Office",
 				"address_line1": "Ornek Cadde 1",
 				"city": "Ornekkent",
-				"country": frappe.db.get_value("Country", {}, "name"),
+				"country": self.address_country,
 				"email_id": DELETED,
 				"links": [{"link_doctype": "Contact", "link_name": shared.name}],
 			}

@@ -65,7 +65,13 @@ class TestSessionPolicy(FrappeAPITestCase):
 		self.addCleanup(frappe.db.set_single_value, "System Settings", "session_expiry", previous)
 		frappe.db.set_single_value("System Settings", "session_expiry", "170:00")
 		session_policy.apply()
-		self.assertEqual(frappe.db.get_single_value("System Settings", "session_expiry"), "01:00:00")
+		settings = frappe.get_doc("System Settings")
+		settings.language = settings.language or "en"
+		settings.time_zone = settings.time_zone or "UTC"
+		# O-25 requires one hour. Frappe's controller validates the persisted hh:mm format.
+		settings.save()
+		self.assertEqual(settings.session_expiry, "01:00")
+		self.assertEqual(frappe.sessions.get_expiry_in_seconds(), 3600)
 
 	def test_keycloak_session_carries_one_hour_idle_timeout(self):
 		# The session record keeps its own expiry. A later System Settings change does not extend it.

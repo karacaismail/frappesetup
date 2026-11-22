@@ -15,7 +15,7 @@ from helpers import DIRECTORY, EXAMPLE_ENV, admin, live_available, request, clie
 
 DOCKERFILE = DIRECTORY / "Dockerfile"
 PLACEHOLDER = re.compile(r"^\$\{[A-Z0-9_]+\}$")
-SIHIRLI = "skycloak-magic-link"
+MAGIC_LINK_AUTHENTICATOR = "skycloak-magic-link"
 AKIS = "atonota-browser"
 POST_BROKER = "atonota-post-broker"
 
@@ -38,7 +38,7 @@ class ExtensionFileTest(unittest.TestCase):
     def test_browser_flow_has_no_magic_link(self):
         self.assertEqual(self.realm["browserFlow"], AKIS)
         yurutmeler = [y for a in self.realm["authenticationFlows"] for y in a["authenticationExecutions"]]
-        self.assertEqual([y for y in yurutmeler if y.get("authenticator") == SIHIRLI], [])
+        self.assertEqual([y for y in yurutmeler if y.get("authenticator") == MAGIC_LINK_AUTHENTICATOR], [])
         password = [y for y in yurutmeler if y.get("authenticator") == "auth-username-password-form"]
         self.assertEqual(len(password), 1, "password path stays")
         otp = [y for y in yurutmeler if y.get("authenticator") == "auth-otp-form"]
@@ -89,7 +89,7 @@ def _open(opener, address, request_body=None):
             return error.code, dict(error.headers), error.read().decode("utf-8", "replace")
 
 
-def _keycloak_icinde_izle(opener, address: str, kc: str):
+def _follow_keycloak_redirect(opener, address: str, kc: str):
     """Keycloak içindeki yönlendirmeleri izler. Keycloak dışına çıkan ilk adreste durur."""
     status, headers, body = _open(opener, address)
     for _ in range(5):
@@ -100,7 +100,7 @@ def _keycloak_icinde_izle(opener, address: str, kc: str):
     return status, headers, body
 
 
-def _form_hedefi(html: str) -> str:
+def _form_action(html: str) -> str:
     eslesme = re.search(r'action="([^"]*login-actions/authenticate[^"]*)"', html)
     if not eslesme:
         raise AssertionError("giriş formu bulunamadı")
@@ -129,7 +129,7 @@ class LiveExtensionTest(unittest.TestCase):
         self.assertEqual(saglayicilar["auth-otp-form"]["requirement"], "ALTERNATIVE")
         self.assertEqual(saglayicilar["conditional-credential"]["requirement"], "REQUIRED")
         self.assertEqual(saglayicilar["webauthn-authenticator"]["requirement"], "ALTERNATIVE")
-        self.assertNotIn(SIHIRLI, saglayicilar)
+        self.assertNotIn(MAGIC_LINK_AUTHENTICATOR, saglayicilar)
         self.assertEqual(saglayicilar["auth-username-password-form"]["requirement"], "REQUIRED")
 
     def test_browser_flow_bound_and_apple_disabled(self):
@@ -153,7 +153,7 @@ class LiveExtensionTest(unittest.TestCase):
         )
         self.assertEqual(production.status, 404)
         bilgi = request("GET", f"{self.kc}/admin/serverinfo", token=self.admin_token).json()["providers"]
-        self.assertNotIn(SIHIRLI, bilgi["authenticator"]["providers"])
+        self.assertNotIn(MAGIC_LINK_AUTHENTICATOR, bilgi["authenticator"]["providers"])
 
     def test_post_broker_flow_is_bound_to_social_providers(self):
         for alias in ("google", "apple"):

@@ -9,13 +9,13 @@ from platform_core.access.tests.base import (
 	EMPLOYEE_1,
 	EMPLOYEE_2,
 	EMPLOYEE_3,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 SHARE = "/api/method/frappe.share.add"
 
 
-class TestSharing(ErisimTestCase):
+class TestSharing(AccessRuleTestCase):
 	def share_with_employee_1(self, name: str, **rights) -> None:
 		frappe.set_user("Administrator")
 		frappe.share.add_docshare(DOCTYPE, name, EMPLOYEE_1, read=1, **rights)

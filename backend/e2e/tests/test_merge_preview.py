@@ -279,6 +279,18 @@ class MergePreviewTest(unittest.TestCase):
         self.assertFalse(list(preview.glob("*.env")))
         self.assertFalse((preview / "docker-config").exists())
 
+        log.write_text("")
+        env["FS_COLIMA_PROFILE"] = "factory"
+        executable = fake_bin / "docker"
+        executable.write_text(executable.read_text().replace('== colima ]]', '== colima-factory ]]'))
+        result = subprocess.run(["bash", str(runtime), str(worktree)], env=env, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 42, result.stderr)
+        commands = log.read_text()
+        self.assertIn("context use colima-factory", commands)
+        self.assertIn(" build web keycloak", commands)
+        self.assertNotIn("buildx create", commands)
+        self.assertIn("down --volumes", commands)
+
 
 if __name__ == "__main__":
     unittest.main()

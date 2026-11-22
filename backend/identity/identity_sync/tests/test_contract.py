@@ -15,7 +15,7 @@ from identity_sync.auth import reject_all
 from . import fakes
 from .contract_tools import load_yaml, schema_errors
 from .fakes import ORG_ID, REALM_ID, SUBJECT, keycloak_user
-from .test_server import EVENT, EXECUTE_TOKEN, PREVIEW_TOKEN, ServerCase
+from .test_server import EVENT, EXECUTE_TOKEN, OPERATOR_TOKEN, PREVIEW_TOKEN, ServerCase
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 CONTRACT = load_yaml((ROOT / "contracts" / "identity_sync.openapi.yaml").read_text(encoding="utf-8"))
@@ -313,7 +313,7 @@ class SchemaTest(ServerCase):
         self.assertEqual(body["status"], "dead_lettered")
 
         listing = self.assert_response(
-            self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN)), "GET", "/v1/dead-letters", 200
+            self.call("GET", "/v1/dead-letters", None, self.bearer(OPERATOR_TOKEN)), "GET", "/v1/dead-letters", 200
         )
         self.assertEqual(sorted(letter["state"] for letter in listing["dead_letters"]), ["failed", "unknown"])
 
@@ -325,15 +325,15 @@ class SchemaTest(ServerCase):
 
         preview_request = {"dry_run": True}
         self.assert_request(preview_request, "POST", path)
-        preview = self.assert_response(self.post_json(path, preview_request, PREVIEW_TOKEN), "POST", path, 200)
+        preview = self.assert_response(self.post_json(path, preview_request, OPERATOR_TOKEN), "POST", path, 200)
         execute_request = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-1"}
         self.assert_request(execute_request, "POST", path)
         self.assert_response(self.post_json(path, execute_request, PREVIEW_TOKEN), "POST", path, 403)
         stale = {**execute_request, "preview_digest": "0" * 64, "approval_id": "onay-0"}
         self.assert_response(self.post_json(path, stale), "POST", path, 409)
-        self.assert_response(self.post_json(path, execute_request, EXECUTE_TOKEN), "POST", path, 200)
+        self.assert_response(self.post_json(path, execute_request, OPERATOR_TOKEN), "POST", path, 200)
         # The same approval a second time: 409 approval_used.
-        used = self.assert_response(self.post_json(path, execute_request, EXECUTE_TOKEN), "POST", path, 409)
+        used = self.assert_response(self.post_json(path, execute_request, OPERATOR_TOKEN), "POST", path, 409)
         self.assertEqual(used, {"error": "approval_used"})
         self.assert_response(self.post_json(path, {}), "POST", path, 400)
         # Sunucunun reddettiği gövde şemaya da uymaz.
@@ -374,7 +374,7 @@ class SchemaTest(ServerCase):
 
         preview_request = {"dry_run": True}
         self.assert_request(preview_request, "POST", path)
-        preview = self.assert_response(self.post_json(path, preview_request, PREVIEW_TOKEN), "POST", path, 200)
+        preview = self.assert_response(self.post_json(path, preview_request, OPERATOR_TOKEN), "POST", path, 200)
         self.assertEqual([d["kind"] for d in preview["differences"]], ["closed_in_keycloak"])
         execute = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-m1"}
         self.assert_request(execute, "POST", path)
@@ -399,7 +399,7 @@ class SchemaTest(ServerCase):
         self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
         self.stack.tenant.seed_user(issuer, "gone-1", "gone@example.test", enabled=False)
 
-        preview = self.assert_response(self.post_json(path, {"dry_run": True}, PREVIEW_TOKEN), "POST", path, 200)
+        preview = self.assert_response(self.post_json(path, {"dry_run": True}, OPERATOR_TOKEN), "POST", path, 200)
         self.assertEqual([(d["target"], d["kind"]) for d in preview["differences"]], [("tenant1", "deleted_in_keycloak")])
         self.assertEqual(preview["previews"][-1]["operation"], "tenant.anonymize_user")
         execute = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-g1"}
@@ -417,7 +417,7 @@ class SchemaTest(ServerCase):
             failed = Event(id=f"e-{number}", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT)
             store.add_dead_letter(failed, "tenant.provision tenant1: HTTP 503")
             store.operation_begin(f"o-{number}", "invite_user", ORG_ID, ["s1"])
-        bearer = self.bearer(PREVIEW_TOKEN)
+        bearer = self.bearer(OPERATOR_TOKEN)
         for path, key in (("/v1/dead-letters", "dead_letters"), ("/v1/operations", "operations")):
             with self.subTest(path=path):
                 first = self.assert_response(self.call("GET", path + "?limit=2", None, bearer), "GET", path, 200)
@@ -516,7 +516,7 @@ class SchemaTest(ServerCase):
         self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
         # The queued request is listed with its own event kind.
         self.assert_response(
-            self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN)), "GET", "/v1/dead-letters", 200
+            self.call("GET", "/v1/dead-letters", None, self.bearer(OPERATOR_TOKEN)), "GET", "/v1/dead-letters", 200
         )
 
     def test_proposed_target_replies_match_the_target_schemas(self) -> None:
@@ -557,7 +557,7 @@ class SchemaTest(ServerCase):
         self.assert_response(self.post_json("/v1/invitations", execute), "POST", "/v1/invitations", 502)
 
         listing = self.assert_response(
-            self.call("GET", "/v1/operations", None, self.bearer(PREVIEW_TOKEN)), "GET", "/v1/operations", 200
+            self.call("GET", "/v1/operations", None, self.bearer(OPERATOR_TOKEN)), "GET", "/v1/operations", 200
         )
         self.assertEqual([s["status"] for s in listing["operations"][0]["steps"]], ["done", "failed", "pending"])
         path, template = "/v1/operations/onay-1/resolve", "/v1/operations/{operation_id}/resolve"

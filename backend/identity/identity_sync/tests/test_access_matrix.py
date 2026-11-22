@@ -37,6 +37,7 @@ from .test_server import NOW, sign
 
 SITE, OTHER_SITE, AGENT, PRESS = "site-tenant1-service", "site-tenant2-service", "ai-agent", "press-service"
 # The browser login client of the same tenant. It has no service account (docs/sozlesmeler.md, section 2).
+OPERATOR = "identity-sync-operator"
 BROWSER = "site-tenant1"
 SID = "55555555-5555-4555-8555-555555555555"
 STALE = {"dry_run": False, "preview_digest": "0" * 64, "approval_id": "onay-x1"}
@@ -58,17 +59,17 @@ class Row:
     right: str
     right_status: int
     wrong_azp: str
-    other_tenant: int | None = None
+    other_tenant: int | None = 403
 
 
 ROWS = (
-    Row("reconcile preview", "POST", "/v1/reconcile", {"dry_run": True}, AGENT, 200, PRESS),
-    Row("reconcile execute", "POST", "/v1/reconcile", STALE, SITE, 409, AGENT),
-    Row("dead-letters list", "GET", "/v1/dead-letters", None, AGENT, 200, PRESS),
-    Row("replay preview", "POST", "/v1/dead-letters/replay", {"dry_run": True}, AGENT, 200, PRESS),
-    Row("replay execute", "POST", "/v1/dead-letters/replay", STALE, SITE, 409, AGENT),
-    Row("operations list", "GET", "/v1/operations", None, AGENT, 200, PRESS),
-    Row("operation resolve", "POST", "/v1/operations/o-1/resolve", {"resolution": "abandoned"}, SITE, 404, AGENT),
+    Row("reconcile preview", "POST", "/v1/reconcile", {"dry_run": True}, OPERATOR, 200, AGENT),
+    Row("reconcile execute", "POST", "/v1/reconcile", STALE, OPERATOR, 409, AGENT),
+    Row("dead-letters list", "GET", "/v1/dead-letters", None, OPERATOR, 200, AGENT),
+    Row("replay preview", "POST", "/v1/dead-letters/replay", {"dry_run": True}, OPERATOR, 200, AGENT),
+    Row("replay execute", "POST", "/v1/dead-letters/replay", STALE, OPERATOR, 409, AGENT),
+    Row("operations list", "GET", "/v1/operations", None, OPERATOR, 200, AGENT),
+    Row("operation resolve", "POST", "/v1/operations/o-1/resolve", {"resolution": "abandoned"}, SITE, 200, AGENT),
     Row("invitation preview", "POST", "/v1/invitations", {**INVITATION, "dry_run": True}, SITE, 200, PRESS, 403),
     Row("invitation execute", "POST", "/v1/invitations", {**INVITATION, **STALE}, SITE, 409, AGENT, 403),
     Row("session revoke", "POST", "/v1/sessions/revoke", {"sid": SID, "subject": SUBJECT}, SITE, 200, AGENT, 403),
@@ -87,10 +88,12 @@ class MatrixCase(unittest.TestCase):
         self.stack.app.settings = dataclasses.replace(
             self.stack.app.settings,
             preview_azp=frozenset({AGENT}),
+            operator_azp=frozenset({OPERATOR}),
             execute_azp=sites,
             session_azp=sites,
             deletion_azp=frozenset({PRESS}),
         )
+        self.stack.app.store.operation_begin("o-1", "invite_user", ORG_ID, ["create_user"])
         keycloak = self.stack.keycloak
         org = keycloak.add_organization(ORG_ID, "tenant1")
         keycloak.add_user(keycloak_user(), [org])
@@ -235,7 +238,7 @@ class AccessMatrixTest(MatrixCase):
         self.run_common_columns()
 
     def test_health_check_needs_no_credential(self) -> None:
-        health = Row("health", "GET", "/healthz", None, AGENT, 200, PRESS)
+        health = Row("health", "GET", "/healthz", None, OPERATOR, 200, AGENT)
         for authorization in (None, self.credential("stranger"), self.credential(AGENT)):
             self.assertEqual(self.send(health, authorization), 200)
 

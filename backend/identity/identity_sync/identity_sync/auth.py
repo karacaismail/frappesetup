@@ -3,18 +3,17 @@
 Doğrulamayı ortak `oidc_verify` kitaplığı yapar (`docs/sozlesmeler.md`, 3. bölüm).
 Servis kendi doğrulama kodunu yazmaz. Kitaplık yoksa bütün istekler reddedilir.
 
-There are four client lists. Each one grants a different right:
+There are five client lists (O-38):
 
-- `preview_azp` may read and preview.
-- `execute_azp` may also execute. It holds the service clients of the tenant sites: the human
-  approves in the AI layer of the tenant site, so that site starts the execution.
-- `session_azp` may call `/v1/sessions/revoke`. It holds the same tenant site clients.
-  A new tenant's client must be added to both lists, or it cannot execute or end a session.
-- `deletion_azp` may only call `/v1/account-deletions`. It holds the Press service client.
+- `execute_azp` and `session_azp` contain the same configured tenant service clients.
+  They execute approved invitations and resolve operations only in their own organization.
+  They may also revoke sessions of their own members.
+- `operator_azp` alone grants access to platform reconciliation, replay and queue lists.
+- `preview_azp` permits invitation previews, never platform queue access or execution.
+- `deletion_azp` permits Press to request global account deletion.
 
-The execute list and the session list must carry the same clients, and each one must be the
-service client of a configured tenant (`site-<tenant>-service`). A client in the preview
-list or in the deletion list cannot be in any other list (`config.load_settings` refuses it).
+Operator, preview and deletion lists are disjoint from each other and from tenant lists.
+They must not contain any client whose name starts with `site-`.
 
 The server enforces the split. The verifier accepts the union of the four lists.
 """
