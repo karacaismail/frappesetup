@@ -203,6 +203,26 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		status, _, _ = self.metadata(self.reader_sid)
 		self.assertEqual(status, 200)
 
+	def test_website_user_cannot_read_native_form_rpc_or_alias(self):
+		method = "frappe.desk.form.load.getdoctype"
+		alias = "frappe.tests.test_form_load.getdoctype"
+		query = urlencode({"doctype": PROTECTED_DOCTYPE})
+		paths = [
+			f"/api/method/{method}?{query}",
+			f"/api/v1/method/{method}?{query}",
+			f"/api/v2/method/{method}?{query}",
+			"/?" + urlencode({"cmd": method, "doctype": PROTECTED_DOCTYPE}),
+			f"/api/method/{alias}?{query}",
+			f"/api/v2/method/{alias}?{query}",
+			"/?" + urlencode({"cmd": alias, "doctype": PROTECTED_DOCTYPE}),
+		]
+		for path in paths:
+			with self.subTest(path=path):
+				status, _, body = self.request(path, self.reader_sid)
+				self.assertEqual(status, 403)
+				self.assertNotIn("data", json.loads(body))
+				self.assertNotIn("message", json.loads(body))
+
 	def test_catalog_marks_unapproved_field_types(self):
 		from frappe.custom.doctype.custom_field.custom_field import create_custom_field
 

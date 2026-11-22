@@ -448,7 +448,7 @@
       "get": {
         "operationId": "getNativeDoctypeMetadata",
         "summary": "Read native metadata as a system user",
-        "description": "Platform Core rejects Website Users on the native Frappe endpoint. Website Users must use the permission-filtered shell metadata endpoint.",
+        "description": "Platform Core rejects Website Users on native Frappe metadata and form metadata, including aliases resolved by Frappe RPC. Website Users must use the permission-filtered shell metadata endpoint.",
         "parameters": [
           {
             "name": "doctype",
