@@ -1,0 +1,193 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-22 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "principal",
+  "session_id",
+  "client_info",
+  "stage",
+  "tool",
+  "tool_class",
+  "target_doctype",
+  "target_name",
+  "args_hash",
+  "decision",
+  "deny_reason",
+  "proposal",
+  "approval_state",
+  "result",
+  "version",
+  "ip",
+  "duration_ms"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "description": "User on whose behalf the action ran.",
+   "options": "User",
+   "in_list_view": 1,
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "principal",
+   "fieldtype": "Select",
+   "label": "Principal",
+   "description": "How the caller proved its identity: a human session or an agent token.",
+   "options": "human_session\nagent_token\nother\nguest",
+   "read_only": 1
+  },
+  {
+   "fieldname": "session_id",
+   "fieldtype": "Data",
+   "label": "Session ID",
+   "description": "Conversation id sent by the client. Untrusted text. Joins this log to the AI Usage Log.",
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "client_info",
+   "fieldtype": "Data",
+   "label": "Client Info",
+   "description": "Name and version the MCP client reported. Untrusted text.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "stage",
+   "fieldtype": "Select",
+   "label": "Stage",
+   "description": "Step of the flow this row records.",
+   "options": "call\npreview\napprove\nreject\nexecute\nresolve\nauth",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "tool",
+   "fieldtype": "Data",
+   "label": "Tool",
+   "description": "Name of the tool that was called.",
+   "in_list_view": 1,
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "tool_class",
+   "fieldtype": "Select",
+   "label": "Tool Class",
+   "description": "Kind of the tool.",
+   "options": "\ndefinition\nread\nwrite\nflow\nadmin\napp",
+   "read_only": 1
+  },
+  {
+   "fieldname": "target_doctype",
+   "fieldtype": "Data",
+   "label": "Target DocType",
+   "description": "DocType or report the call was aimed at.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "target_name",
+   "fieldtype": "Data",
+   "label": "Target Name",
+   "description": "Name of the document the call was aimed at.",
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "args_hash",
+   "fieldtype": "Data",
+   "label": "Arguments Hash",
+   "description": "SHA-256 of the call arguments. The arguments themselves are not stored.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "decision",
+   "fieldtype": "Select",
+   "label": "Decision",
+   "description": "Whether the layer allowed the step, denied it, or it failed unexpectedly.",
+   "options": "allowed\ndenied\nerror",
+   "in_list_view": 1,
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "deny_reason",
+   "fieldtype": "Data",
+   "label": "Deny Reason",
+   "description": "Code that says why the step was denied, for example permission or expired.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "proposal",
+   "fieldtype": "Link",
+   "label": "Proposal",
+   "description": "Write proposal this step belongs to.",
+   "options": "AI Action Proposal",
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "approval_state",
+   "fieldtype": "Data",
+   "label": "Approval State",
+   "description": "Status of the proposal when this row was written.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Select",
+   "label": "Result",
+   "description": "Outcome of an executed write. Unknown means the outcome could not be confirmed.",
+   "options": "\nunknown\nsucceeded\nfailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "version",
+   "fieldtype": "Data",
+   "label": "Version",
+   "description": "Name of the Version document the write produced, if any.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ip",
+   "fieldtype": "Data",
+   "label": "IP Address",
+   "description": "Network address the request came from.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "duration_ms",
+   "fieldtype": "Int",
+   "label": "Duration (ms)",
+   "description": "How long the step took in milliseconds.",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-22 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Yapay Zeka",
+ "name": "AI Action Log",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "role": "System Manager"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

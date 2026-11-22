@@ -1,0 +1,605 @@
+openapi: 3.1.0
+info:
+  title: platform_core yapay zekâ erişim katmanı
+  version: 0.1.0
+  summary: MCP ucu, aracı belirteci ve insan onayı uçları.
+  description: |
+    Bu sözleşme `platform_core.yapay_zeka` modülünün uçlarını tarif eder.
+    Karar notu `docs/kararlar/0002-yapay-zeka-katmani.md` dosyasıdır.
+
+    Kimlik türleri:
+
+    - İnsan oturumu: Frappe oturum çerezi ve `X-Frappe-CSRF-Token` başlığı.
+      `Authorization` başlığı taşıyan istek insan oturumu sayılmaz.
+    - Aracı belirteci: `Authorization: Bearer fsat_...` başlığı. Yalnız MCP ucunda geçer.
+
+    API anahtarı ve OAuth belirteci bu uçlarda kabul edilmez.
+    Hem çerez hem `Authorization` başlığı taşıyan istek reddedilir.
+
+    Hiçbir şemada `confirm`, `approved` ya da `force` alanı yoktur.
+    Onay yalnız `approve_proposal` ucundan ve yalnız insan oturumundan gelir.
+servers:
+  - url: /api/method
+    description: Kiracı sitesinin Frappe uç kökü
+tags:
+  - name: mcp
+    description: Modelin kullandığı MCP ucu
+  - name: belirtec
+    description: Aracı belirteci
+  - name: oneri
+    description: Yazma önerileri ve insan onayı
+  - name: yonetim
+    description: Elle başlatılan bakım komutları
+
+paths:
+  /platform_core.api.ai.mcp:
+    post:
+      tags: [mcp]
+      operationId: mcp
+      summary: MCP ucu (Streamable HTTP, tek JSON yanıt).
+      description: |
+        JSON-RPC 2.0 isteği alır. Desteklenen yöntemler `initialize` (yalnız 2025-11-25),
+        `server/discover` (yalnız 2026-07-28), `ping`, `tools/list` ve `tools/call` olur.
+        Uç oturum tutmaz. Yanıt akış değil, tek JSON'dur. Bildirim 202 döner.
+
+        Okuma araçları kullanıcının izniyle çalışır. Yazma araçları kaydı değiştirmez.
+        Yazma aracı bir öneri açar ve `approval_required` durumunu döner.
+        Araç hatası HTTP hatası değildir. Araç hatası `isError: true` taşıyan sonuçtur.
+        Her çağrı ve her ret “AI Action Log” kaydına yazılır.
+      security:
+        - insanOturumu: []
+        - araciBelirteci: []
+      parameters:
+        - name: MCP-Protocol-Version
+          in: header
+          required: false
+          description: 2026-07-28 sürümünde zorunludur. Yoksa 2025-11-25 varsayılır.
+          schema: {type: string, enum: ["2026-07-28", "2025-11-25"]}
+        - name: Mcp-Method
+          in: header
+          required: false
+          description: 2026-07-28 sürümünde zorunludur. Gövdedeki `method` ile aynı olmalıdır.
+          schema: {type: string}
+        - name: Mcp-Name
+          in: header
+          required: false
+          description: 2026-07-28 sürümünde `tools/call` için zorunludur. Araç adıyla aynı olmalıdır.
+          schema: {type: string}
+        - name: Mcp-Conversation-Id
+          in: header
+          required: false
+          description: İstemcinin konuşma kimliği. Günlükte `session_id` alanına yazılır. Güvenilmeyen metindir.
+          schema: {type: string, maxLength: 140}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/JsonRpcRequest"}
+      responses:
+        "200":
+          description: JSON-RPC sonucu ya da JSON-RPC hatası.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/JsonRpcResponse"}
+        "202": {description: Bildirim kabul edildi. Gövde yoktur.}
+        "400": {description: Geçersiz JSON-RPC gövdesi, başlık uyuşmazlığı ya da desteklenmeyen sürüm.}
+        "401": {description: Kimlik yok, belirteç geçersiz, süresi dolmuş ya da çağrı sınırı aşılmış.}
+        "403": {description: Köken izinli değil, kimlik türü kabul edilmiyor ya da çerezle belirteç birlikte geldi.}
+        "404": {description: Bilinmeyen yöntem ya da bilinmeyen araç.}
+        "406": {description: "`Accept` başlığı `application/json` değerine izin vermiyor."}
+        "415": {description: "`Content-Type` değeri `application/json` değil."}
+
+  /platform_core.api.ai.issue_agent_token:
+    post:
+      tags: [belirtec]
+      operationId: issueAgentToken
+      summary: İnsan oturumundan kısa ömürlü aracı belirteci üretir.
+      description: |
+        Belirteç 300 saniye ve en çok 20 araç çağrısı için geçerlidir. Belirteç yalnız MCP ucunda geçer.
+        Belirteç, isteği yapan Frappe oturumuna bağlıdır. Oturum kapanınca belirteç geçersiz olur.
+        Sunucu belirtecin yalnız özetini saklar. Belirteç yalnız bu yanıtta görünür.
+        Belirteci tarayıcı deposuna yazmayın. Yalnız bellekte tutun (G-148).
+      security: [{insanOturumu: []}]
+      responses:
+        "200":
+          description: Belirteç üretildi.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/AgentToken"}
+        "403": {description: İstek insan oturumundan gelmedi.}
+
+  /platform_core.api.ai.list_proposals:
+    get:
+      tags: [oneri]
+      operationId: listProposals
+      summary: Oturumdaki kullanıcının yazma önerilerini listeler.
+      description: Yalnız kullanıcının kendi önerileri döner. En yeni öneri başta gelir.
+      security: [{insanOturumu: []}]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: "#/components/schemas/ProposalStatus"}
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+      responses:
+        "200":
+          description: Öneri listesi.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: array
+                    items: {$ref: "#/components/schemas/Proposal"}
+        "403": {description: İstek insan oturumundan gelmedi.}
+
+  /platform_core.api.ai.get_proposal:
+    get:
+      tags: [oneri]
+      operationId: getProposal
+      summary: Bir önerinin önizlemesini, özetini ve durumunu döner.
+      description: İnsan bu yanıttaki önizlemeyi okur. Onay isteği bu yanıttaki `digest` değerini taşır.
+      security: [{insanOturumu: []}]
+      parameters:
+        - name: proposal_id
+          in: query
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Öneri.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/Proposal"}
+        "403": {description: İstek insan oturumundan gelmedi ya da öneri başka kullanıcıya ait.}
+        "404": {description: Öneri yok.}
+
+  /platform_core.api.ai.approve_proposal:
+    post:
+      tags: [oneri]
+      operationId: approveProposal
+      summary: Öneriyi onaylar ve işi bu istekte yürütür.
+      description: |
+        YIKICI OLABİLİR. Bu uç kaydı oluşturur, değiştirir, onaya gönderir, iptal eder ya da siler.
+        Uygulama aracı ücretli bir iş de başlatabilir. Önerideki `destructive` ve `billable` alanlarına bakın.
+
+        Onay tek kullanımlıktır. Sunucu sırayla şunları denetler: insan oturumu, aynı kullanıcı,
+        `pending` durumu, süre, özet eşleşmesi, kaydın değişmemiş olması, güncel izin ve
+        aynı hedefte sonucu bilinmeyen iş.
+        Denetim başarısızsa iş yürümez ve yanıt `executed: false` ile ret nedenini taşır.
+
+        Sunucu yürütmeden önce sonucu `unknown` olarak kaydeder. Süreç yarıda kesilirse sonuç `unknown` kalır.
+        Aynı hedefe kör tekrar yapılmaz. İnsan durumu `resolve_proposal` ile kapatır.
+      security: [{insanOturumu: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [proposal_id, digest]
+              properties:
+                proposal_id: {type: string}
+                digest:
+                  type: string
+                  description: İnsanın gördüğü önizlemenin özeti. `get_proposal` yanıtından alınır.
+                  pattern: "^[0-9a-f]{64}$"
+      responses:
+        "200":
+          description: Onay sonucu. Ret de 200 döner ve `executed` yanlış olur.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/ApprovalOutcome"}
+        "401": {description: "İstek aracı belirteci taşıyor. Belirteç yalnız MCP ucunda geçer. Ret günlüğe `token_out_of_scope` koduyla yazılır."}
+        "403": {description: İstek insan oturumundan gelmedi. Örneğin API anahtarıyla geldi.}
+        "404": {description: Öneri yok.}
+
+  /platform_core.api.ai.reject_proposal:
+    post:
+      tags: [oneri]
+      operationId: rejectProposal
+      summary: Bekleyen öneriyi reddeder.
+      description: Kayda hiçbir şey yazılmaz. Reddedilen öneri sonradan onaylanamaz. Öneri `pending` değilse 417 döner.
+      security: [{insanOturumu: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [proposal_id]
+              properties:
+                proposal_id: {type: string}
+      responses:
+        "200":
+          description: Önerinin yeni durumu.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/Proposal"}
+        "403": {description: İstek insan oturumundan gelmedi ya da öneri başka kullanıcıya ait.}
+
+  /platform_core.api.ai.resolve_proposal:
+    post:
+      tags: [oneri]
+      operationId: resolveProposal
+      summary: Sonucu bilinmeyen öneriyi insan kararıyla kapatır.
+      description: |
+        İnsan hedef kaydı kendi gözüyle denetler. Sonra işin uygulanıp uygulanmadığını bildirir.
+        Bu uç kayda yazmaz. Yalnız önerinin sonucunu `succeeded` ya da `failed` yapar.
+        Sonra aynı hedefe yeni öneri açılabilir.
+      security: [{insanOturumu: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [proposal_id, outcome]
+              properties:
+                proposal_id: {type: string}
+                outcome: {type: string, enum: [succeeded, failed]}
+      responses:
+        "200":
+          description: Önerinin yeni durumu.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/Proposal"}
+        "403": {description: İstek insan oturumundan gelmedi ya da öneri başka kullanıcıya ait.}
+
+components:
+  securitySchemes:
+    insanOturumu:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Frappe oturum çerezi. POST isteği `X-Frappe-CSRF-Token` başlığını da taşır.
+    araciBelirteci:
+      type: http
+      scheme: bearer
+      description: "`issue_agent_token` ucunun ürettiği `fsat_` önekli belirteç."
+
+  schemas:
+    JsonRpcRequest:
+      type: object
+      required: [jsonrpc, method]
+      properties:
+        jsonrpc: {const: "2.0"}
+        id:
+          description: Bildirimde bulunmaz.
+          oneOf: [{type: string}, {type: integer}]
+        method:
+          type: string
+          enum: [initialize, server/discover, ping, tools/list, tools/call, notifications/initialized]
+        params:
+          type: object
+          description: "`tools/call` için `name` ve `arguments` taşır."
+
+    JsonRpcResponse:
+      type: object
+      required: [jsonrpc]
+      properties:
+        jsonrpc: {const: "2.0"}
+        id:
+          oneOf: [{type: string}, {type: integer}, {type: "null"}]
+        result:
+          description: "`tools/call` için ToolResult, `tools/list` için araç tanımları."
+          type: object
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: integer}
+            message: {type: string}
+
+    ToolResult:
+      type: object
+      description: MCP araç sonucu.
+      required: [content, isError]
+      properties:
+        content:
+          type: array
+          items:
+            type: object
+            required: [type, text]
+            properties:
+              type: {const: text}
+              text: {type: string}
+        structuredContent:
+          type: object
+          description: Başarıda aracın sonucu. Rette `error` nesnesi.
+        isError: {type: boolean}
+
+    ToolError:
+      type: object
+      description: Ret ya da hata durumunda `structuredContent` içeriği.
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {$ref: "#/components/schemas/DenyReason"}
+            message: {type: string}
+
+    DenyReason:
+      type: string
+      description: Ret nedeninin kodu. “AI Action Log” kaydındaki `deny_reason` alanıyla aynıdır.
+      enum:
+        - invalid_arguments
+        - unknown_doctype
+        - permission
+        - field_not_permitted
+        - secret_field
+        - blocked_doctype
+        - admin_only
+        - role_required
+        - not_found
+        - not_human_session
+        - token_out_of_scope
+        - token_call_limit
+        - not_owner
+        - not_pending
+        - expired
+        - digest_mismatch
+        - document_changed
+        - unresolved_unknown
+        - execution_failed
+        - internal_error
+
+    AgentToken:
+      type: object
+      required: [token, expires_in, max_calls, audience]
+      properties:
+        token: {type: string, description: "`fsat_` önekli belirteç. Yalnız bu yanıtta görünür."}
+        expires_in: {type: integer, description: Saniye cinsinden ömür., examples: [300]}
+        max_calls: {type: integer, description: İzinli araç çağrısı sayısı., examples: [20]}
+        audience: {type: string, description: "Belirtecin hedef servisi. `ai_agent_audience` site ayarından gelir."}
+
+    ProposalStatus:
+      type: string
+      enum: [pending, rejected, expired, consumed]
+      description: |
+        `pending`: insan kararını bekler. `rejected`: insan reddetti ya da onay denetimi kalıcı olarak başarısız oldu.
+        `expired`: süre doldu. `consumed`: onaylandı ve yürütme başladı. Sonuç `result` alanındadır.
+
+    ProposalResult:
+      type: string
+      enum: ["", unknown, succeeded, failed]
+      description: Boş değer yürütmenin başlamadığını gösterir. `unknown` kör tekrar yapılmayacağını gösterir.
+
+    Proposal:
+      type: object
+      required: [proposal_id, status, result, tool, preview, digest, expires_at, destructive, billable]
+      properties:
+        proposal_id: {type: string}
+        status: {$ref: "#/components/schemas/ProposalStatus"}
+        result: {$ref: "#/components/schemas/ProposalResult"}
+        tool: {type: string}
+        target_doctype: {type: [string, "null"]}
+        target_name: {type: [string, "null"]}
+        destructive: {type: boolean}
+        billable: {type: boolean}
+        preview: {$ref: "#/components/schemas/Preview"}
+        digest: {type: string, pattern: "^[0-9a-f]{64}$"}
+        expires_at: {type: string, description: Sitenin saatine göre son geçerlilik zamanı.}
+        result_document:
+          type: [string, "null"]
+          description: Yürütme başarılıysa etkilenen kaydın adı.
+        error: {type: [string, "null"], description: Yürütme başarısızsa hata metni.}
+
+    Preview:
+      type: object
+      description: İnsanın onaylayacağı değişikliğin özeti. Gizli alan değeri taşımaz.
+      required: [action, summary]
+      properties:
+        action: {type: string, enum: [create, update, submit, cancel, delete, app_tool, admin]}
+        summary: {type: string}
+        changes:
+          type: array
+          items:
+            type: object
+            required: [fieldname, new]
+            properties:
+              fieldname: {type: string}
+              label: {type: [string, "null"]}
+              old: {}
+              new: {}
+        details: {type: object, description: Uygulama aracının önizleme üreticisinden gelen ek veri.}
+
+    ApprovalOutcome:
+      type: object
+      required: [executed, proposal]
+      properties:
+        executed: {type: boolean}
+        deny_reason:
+          oneOf: [{$ref: "#/components/schemas/DenyReason"}, {type: "null"}]
+        proposal: {$ref: "#/components/schemas/Proposal"}
+
+    ApprovalRequired:
+      type: object
+      description: Yazma aracının model tarafına döndüğü sonuç. Kayıt henüz değişmemiştir.
+      required: [status, proposal_id, preview, expires_at]
+      properties:
+        status: {const: approval_required}
+        proposal_id: {type: string}
+        preview: {$ref: "#/components/schemas/Preview"}
+        expires_at: {type: string}
+
+# Araç şeması. `tools/list` bu adları ve girdi şemalarını döner.
+# Her girdi şeması `additionalProperties: false` taşır. Bilinmeyen alan çağrıyı reddettirir.
+x-mcp-tools:
+  - name: search_doctypes
+    class: definition
+    annotations: {readOnlyHint: true}
+    description: Search DocType names the user may read. Child tables are left out.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        query: {type: string, minLength: 1}
+        limit: {type: integer, minimum: 1, maximum: 100, default: 50}
+  - name: get_doctype_schema
+    class: definition
+    annotations: {readOnlyHint: true}
+    description: >-
+      Get the fields of a DocType with their descriptions, and what the user may do with it.
+      Secret fields are listed with secret=true and never carry a value.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype]
+      properties:
+        doctype: {type: string, minLength: 1}
+  - name: list_documents
+    class: read
+    annotations: {readOnlyHint: true}
+    description: List documents the user may read. Filters and fields work as in frappe.get_list.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype]
+      properties:
+        doctype: {type: string, minLength: 1}
+        filters: {type: object, description: "Field name to value, or to an [operator, value] pair."}
+        fields: {type: array, items: {type: string}}
+        order_by: {type: string, description: "A field name, optionally followed by asc or desc."}
+        start: {type: integer, minimum: 0, default: 0}
+        limit: {type: integer, minimum: 1, maximum: 100, default: 20}
+  - name: get_document
+    class: read
+    annotations: {readOnlyHint: true}
+    description: Get one document with its child tables. Fields the user may not read are left out.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, name]
+      properties:
+        doctype: {type: string, minLength: 1}
+        name: {type: string, minLength: 1}
+  - name: run_report
+    class: read
+    annotations: {readOnlyHint: true}
+    description: Run a report the user may run and return its columns and rows.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [report]
+      properties:
+        report: {type: string, minLength: 1}
+        filters: {type: object}
+        limit: {type: integer, minimum: 1, maximum: 500, default: 100}
+  - name: create_document
+    class: write
+    annotations: {readOnlyHint: false, destructiveHint: false}
+    description: Propose a new document. Nothing is written until a human approves the proposal.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, data]
+      properties:
+        doctype: {type: string, minLength: 1}
+        data: {type: object}
+  - name: update_document
+    class: write
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    description: Propose changes to a document. Nothing is written until a human approves the proposal.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, name, data]
+      properties:
+        doctype: {type: string, minLength: 1}
+        name: {type: string, minLength: 1}
+        data: {type: object}
+  - name: submit_document
+    class: write
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    description: Propose submitting a draft document. Nothing happens until a human approves the proposal.
+    inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
+  - name: cancel_document
+    class: write
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    description: Propose cancelling a submitted document. Nothing happens until a human approves the proposal.
+    inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
+  - name: delete_document
+    class: write
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    description: Propose deleting a document. Nothing is deleted until a human approves the proposal.
+    inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
+  - name: get_proposal
+    class: flow
+    annotations: {readOnlyHint: true}
+    description: >-
+      Read the status and result of a proposal the user opened. A result of unknown means
+      the outcome is not known. Do not repeat the action. Ask the user to check and resolve it.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [proposal_id]
+      properties:
+        proposal_id: {type: string, minLength: 1}
+
+x-mcp-schemas:
+  DocumentTarget:
+    type: object
+    additionalProperties: false
+    required: [doctype, name]
+    properties:
+      doctype: {type: string, minLength: 1}
+      name: {type: string, minLength: 1}
+
+# Uygulamaların `ai_tools` kancasıyla bildirdiği aracın biçimi (G-105).
+x-ai-tools-hook:
+  description: |
+    Uygulama `hooks.py` dosyasına `ai_tools = ["uygulama.yol.islev"]` yazar.
+    İşlev aşağıdaki biçimde bir liste döner. Katman bildirimi yüklerken doğrular.
+  declaration:
+    type: object
+    additionalProperties: false
+    required: [name, description, arguments, kind, handler]
+    properties:
+      name:
+        type: string
+        pattern: "^[a-z][a-z0-9_]{2,63}$"
+        description: Araç adı. Katman başına uygulama adını ekler. Örnek sonuç `cronhr_approve_leave` olur.
+      description: {type: string, description: İngilizce açıklama. Türkçesi çeviri dosyasındadır.}
+      arguments: {type: string, description: "Girdi modelinin yolu. Model bir `pydantic.BaseModel` sınıfıdır ve `extra=\"forbid\"` ayarını taşır. `confirm`, `approved` ve `force` gibi alan adları reddedilir."}
+      kind: {type: string, enum: [read, write]}
+      roles: {type: array, items: {type: string}, description: Aracı görebilen roller. Boşsa giriş yapmış her kullanıcı görür.}
+      destructive: {type: boolean, default: false}
+      billable: {type: boolean, default: false}
+      handler: {type: string, description: "İşi yapan işlevin yolu. İşlev kendi izin denetimini yapar. Yazma aracında `name` anahtarıyla etkilenen kaydın adını döner."}
+      preview:
+        type: string
+        description: |
+          Önizleme üreten işlevin yolu. `kind: write` için zorunludur. İşlev izni denetler ve bir sözlük döner.
+          Sözlükte `summary` zorunludur. `target_doctype`, `target_name`, `target_version`, `changes` ve `details` isteğe bağlıdır.
+          Katman önizlemeyi onay anında yeniden çalıştırır. `target_version` değiştiyse onayı reddeder.

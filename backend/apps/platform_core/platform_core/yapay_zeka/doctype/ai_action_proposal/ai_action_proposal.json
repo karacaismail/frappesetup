@@ -1,0 +1,205 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-22 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "principal",
+  "session_id",
+  "tool",
+  "tool_class",
+  "target_doctype",
+  "target_name",
+  "target_key",
+  "target_modified",
+  "args_json",
+  "preview_json",
+  "digest",
+  "destructive",
+  "billable",
+  "expires_at",
+  "status",
+  "result",
+  "result_document",
+  "error",
+  "decided_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "description": "User who asked for the write and who alone may approve it.",
+   "options": "User",
+   "in_list_view": 1,
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "principal",
+   "fieldtype": "Select",
+   "label": "Principal",
+   "description": "Identity type that opened the proposal.",
+   "options": "human_session\nagent_token\nother\nguest",
+   "read_only": 1
+  },
+  {
+   "fieldname": "session_id",
+   "fieldtype": "Data",
+   "label": "Session ID",
+   "description": "Conversation id sent by the client. Untrusted text.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tool",
+   "fieldtype": "Data",
+   "label": "Tool",
+   "description": "Name of the write tool that will run after approval.",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "tool_class",
+   "fieldtype": "Data",
+   "label": "Tool Class",
+   "description": "Kind of the tool: write, admin or app.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "target_doctype",
+   "fieldtype": "Data",
+   "label": "Target DocType",
+   "description": "DocType the write is aimed at.",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "target_name",
+   "fieldtype": "Data",
+   "label": "Target Name",
+   "description": "Document the write is aimed at. Empty for a new document.",
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "target_key",
+   "fieldtype": "Data",
+   "label": "Target Key",
+   "description": "Hash of the target. Blocks a blind retry on the same target.",
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "target_modified",
+   "fieldtype": "Data",
+   "label": "Target Version",
+   "description": "Version marker of the target when the preview was made.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "args_json",
+   "fieldtype": "Long Text",
+   "label": "Arguments",
+   "description": "Validated tool arguments as JSON. Never holds a secret field.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "preview_json",
+   "fieldtype": "Long Text",
+   "label": "Preview",
+   "description": "What the human sees before approving, as JSON.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "digest",
+   "fieldtype": "Data",
+   "label": "Digest",
+   "description": "SHA-256 that binds an approval to this exact preview.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "destructive",
+   "fieldtype": "Check",
+   "label": "Destructive",
+   "description": "Set when the tool may destroy or overwrite data.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "billable",
+   "fieldtype": "Check",
+   "label": "Billable",
+   "description": "Set when the tool may cost money.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "expires_at",
+   "fieldtype": "Datetime",
+   "label": "Expires At",
+   "description": "Moment after which the proposal can no longer be approved.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "description": "Where the proposal stands. Consumed means execution has started.",
+   "options": "pending\nrejected\nexpired\nconsumed",
+   "in_list_view": 1,
+   "search_index": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Select",
+   "label": "Result",
+   "description": "Outcome of the execution. Unknown blocks new proposals on the same target.",
+   "options": "\nunknown\nsucceeded\nfailed",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "result_document",
+   "fieldtype": "Data",
+   "label": "Result Document",
+   "description": "Name of the document the execution touched.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "description": "Why the proposal was rejected or the execution failed.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "decided_at",
+   "fieldtype": "Datetime",
+   "label": "Decided At",
+   "description": "When a human approved, rejected or resolved the proposal.",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-22 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Yapay Zeka",
+ "name": "AI Action Proposal",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "role": "System Manager"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}
