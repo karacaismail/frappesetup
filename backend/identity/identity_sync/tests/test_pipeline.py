@@ -617,6 +617,97 @@ class AccountDeletionTest(PipelineCase):
 
         self.assertEqual(self.stack.app.processor.handle(self.request()).status, "unknown")
 
+    # --- one job per account (docs/sozlesmeler.md, section 7) ---
+
+    def job(self) -> Event:
+        return self.stack.app.processor.account_job(SUBJECT, time=1)
+
+    def target_writes(self) -> int:
+        return len(self.stack.press.writes() + self.stack.tenant.writes())
+
+    def test_job_id_is_a_keyed_digest_of_the_account(self) -> None:
+        job = self.job()
+
+        self.assertRegex(job.id, r"^del-[0-9a-f]{40}$")
+        self.assertNotIn(SUBJECT, job.id)
+        self.assertEqual(job.id, self.stack.app.processor.account_job(SUBJECT, time=99).id)
+        self.assertNotEqual(job.id, self.stack.app.processor.account_job("someone-else", time=1).id)
+
+    def test_keycloak_delete_event_of_a_finished_job_starts_no_second_job(self) -> None:
+        # Step 5 deletes the Keycloak user. The event listener reports that delete.
+        self.assertEqual(self.stack.app.processor.handle(self.job()).status, "processed")
+        before = self.target_writes()
+
+        result = self.stack.app.processor.handle(event("USER_DELETE", "admin"))
+
+        self.assertEqual(result.status, "duplicate")
+        self.assertEqual(self.target_writes(), before)
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+
+    def test_delete_event_continues_the_job_press_started(self) -> None:
+        # The Press request stopped at step 4. Then an administrator deleted the user in Keycloak.
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+        self.assertEqual(self.stack.app.processor.handle(self.job()).status, "dead_lettered")
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, fakes.DONE)
+        self.stack.keycloak.remove_user(SUBJECT)
+        revokes = len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS))
+        press_calls = len(self.stack.press.writes())
+
+        result = self.stack.app.processor.handle(event("USER_DELETE", "admin"))
+
+        # Only the step that was left runs. Finished steps are not called again.
+        self.assertEqual((result.status, result.actions), ("processed", ("tenant.anonymize_user",)))
+        self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS)), revokes)
+        self.assertEqual(len(self.stack.press.writes()), press_calls)
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+        self.assertEqual(self.stack.app.processor.handle(self.job()).status, "duplicate")
+
+    def test_admin_delete_is_queued_as_the_account_job(self) -> None:
+        self.stack.keycloak.remove_user(SUBJECT)
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, (503, None))
+
+        first = self.stack.app.processor.handle(event("USER_DELETE", "admin"))
+
+        self.assertEqual(first.status, "dead_lettered")
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual((letter.event.id, letter.event.kind), (self.job().id, "request"))
+        # The listener sends the event again with a new id. It is the same job.
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, fakes.DONE)
+        revokes = len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS))
+        again = Event(id="e-2", kind="admin", type="USER_DELETE", realm="platform", time=2, user_id=SUBJECT)
+
+        second = self.stack.app.processor.handle(again)
+
+        self.assertEqual((second.status, second.actions), ("processed", ("press.anonymize_user", "tenant.anonymize_user")))
+        self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS)), revokes)
+
+    def test_delete_event_that_could_not_be_checked_becomes_the_job_on_replay(self) -> None:
+        keycloak = self.stack.keycloak
+        keycloak.remove_user(SUBJECT)
+        keycloak.on("GET", f"{keycloak.admin}/users/{SUBJECT}", (500, None))
+        self.assertEqual(self.stack.app.processor.handle(event("USER_DELETE", "admin")).status, "dead_lettered")
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual(letter.event.id, "e-1")
+        keycloak.on("GET", f"{keycloak.admin}/users/{SUBJECT}", (404, {"error": "User not found"}))
+
+        ((_id, result),) = self.stack.app.processor.replay_dead_letters()
+
+        self.assertEqual(result.status, "processed")
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+        self.assertEqual(self.stack.app.processor.handle(self.job()).status, "duplicate")
+
+    def test_retry_preview_names_the_job_not_the_account(self) -> None:
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+        self.stack.app.processor.handle(self.job())
+
+        ((_id, preview),) = self.stack.app.processor.replay_dead_letters(dry_run=True)
+
+        text = " ".join(f"{p.operation} {p.target} {p.summary}" for p in preview.previews)
+        self.assertNotIn(SUBJECT, text)
+        self.assertIn(self.job().id, text)
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertNotIn(SUBJECT, letter.error)
+
     def test_user_that_was_found_but_not_anonymized_is_not_done(self) -> None:
         reply = {"message": {"anonymized": False, "found": True}}
         self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, (200, reply))

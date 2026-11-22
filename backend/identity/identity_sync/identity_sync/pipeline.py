@@ -20,7 +20,16 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, replace
 from typing import TypeVar
 
-from identity_sync.events import ACCOUNT_DELETION, MEMBERSHIP_TYPES, Event, is_handled
+from identity_sync.events import (
+    ACCOUNT_DELETION,
+    ACCOUNT_REMOVAL,
+    JOB_TYPES,
+    MEMBERSHIP_TYPES,
+    REQUEST_KIND,
+    USER_REMOVED_TYPES,
+    Event,
+    is_handled,
+)
 from identity_sync.httpjson import HttpError, TransportError, UnknownOutcome
 from identity_sync.keycloak_admin import KeycloakAdmin
 from identity_sync.mapping import (
@@ -160,33 +169,107 @@ class Processor:
                     raise PreviewChanged
             return self._handle_locked(event, allow_unknown, planned)
 
+    def account_job(self, subject: str, *, time: int, removed: bool = False) -> Event:
+        """The one deletion job of an account (docs/sozlesmeler.md, section 7).
+
+        The Press request, the Keycloak delete event and the reconcile repair all become this
+        job. Its id is a keyed digest of the account, so they share one record and one list of
+        finished steps, and the record does not show whose account it is.
+        `removed`: Keycloak no longer has the user, so only steps 2, 3 and 4 are planned.
+        """
+        key = {"operation": "delete_account", "issuer": self._issuer, "subject": subject}
+        return Event(
+            id="del-" + digest_of(key, self._digest_key)[:40],
+            kind=REQUEST_KIND,
+            type=ACCOUNT_REMOVAL if removed else ACCOUNT_DELETION,
+            realm=self._realm,
+            time=time,
+            user_id=subject,
+        )
+
+    def _as_job(self, event: Event) -> Event:
+        """Turn a Keycloak delete event into the account job, once Keycloak confirms the user is gone."""
+        subject = event.user_id
+        if event.kind == REQUEST_KIND or event.type not in USER_REMOVED_TYPES or not subject:
+            return event
+        try:
+            user = self._retry("keycloak.read", lambda: self._keycloak.get_user(subject))
+        except _Failed:
+            return event  # stays an event; the normal path records the failure and a replay tries again
+        if user is not None:
+            return event  # Keycloak still has the user: the current state decides, nothing is anonymized
+        return self.account_job(subject, time=event.time, removed=True)
+
+    def _step_key(self, action: Action) -> str:
+        return plan_digest((action,), self._digest_key)
+
+    def _pending(self, event: Event, actions: tuple[Action, ...]) -> tuple[Action, ...]:
+        """The steps still to run. An ordered plan skips the steps an earlier run finished."""
+        if not isinstance(actions, OrderedPlan):
+            return actions
+        finished = self._store.progress(event.id)
+        return tuple(action for action in actions if self._step_key(action) not in finished)
+
+    @staticmethod
+    def _describe(event: Event, action: Action) -> Preview:
+        """The preview of one step. An account job is named by its id, not by the account."""
+        preview = action.preview()
+        if event.kind != REQUEST_KIND or not event.user_id:
+            return preview
+        summary = preview.summary.replace(f"user {event.user_id}", f"the user of deletion job {event.id}")
+        return replace(preview, summary=summary.replace(event.user_id, event.id))
+
     def _preview(self, event: Event) -> tuple[EventResult, tuple[Action, ...] | None]:
         """Plan the event and describe the plan. Reads only. The second value is None when planning failed."""
+        event = self._as_job(event)
         try:
             actions = self._plan(event)
         except _Failed:
             return EventResult("failed"), None
         # An ordered plan may be partly done. The preview shows what is still to do.
-        pending = actions[self._done_steps(event, actions) :]
+        pending = self._pending(event, actions)
         result = EventResult(
             "preview",
-            previews=tuple(action.preview() for action in pending),
+            previews=tuple(self._describe(event, action) for action in pending),
             plan_digest=plan_digest(pending, self._digest_key),
         )
         return result, actions
 
-    def _done_steps(self, event: Event, actions: tuple[Action, ...]) -> int:
-        """How many leading steps of an ordered plan were finished by an earlier run."""
-        if not isinstance(actions, OrderedPlan):
-            return 0
-        done, digest = self._store.progress(event.id)
-        return done if digest == plan_digest(actions, self._digest_key) else 0
+    def removal_preview(self, subject: str) -> EventResult:
+        """Preview the job for an account that Keycloak no longer has. Used by reconcile. Reads only."""
+        return self._preview(self.account_job(subject, time=0, removed=True))[0]
+
+    def run_removal(self, subject: str) -> dict[str, str]:
+        """Run the job for an account that Keycloak no longer has. The caller holds the work lock.
+
+        The steps run in order and stop at the first one that is not done. Steps that an
+        earlier run finished are not called again.
+        """
+        job = self.account_job(subject, time=int(time.time() * 1000), removed=True)
+        result = {"operation": "account_deletion", "target": job.id}
+        if self._store.is_processed(job.id):
+            # The job finished before, yet a target still lists the account. A human must look.
+            return {**result, "status": "failed", "error": "the deletion job finished before; check the target"}
+        status = self._handle_job(job, False, None).status
+        if status == "processed":
+            return {**result, "status": "done"}
+        if status == "unknown":
+            return {**result, "status": "unknown", "error": "a step has an unknown outcome; see the dead-letter queue"}
+        return {**result, "status": "failed", "error": "a step failed; see the dead-letter queue"}
 
     def _handle_locked(self, event: Event, allow_unknown: bool, planned: tuple[Action, ...] | None) -> EventResult:
         """Run one event. The caller holds the work lock.
 
         `planned` is a plan that was already checked against an approval. It is written as it is.
         """
+        job = self._as_job(event)
+        result = self._handle_job(job, allow_unknown, planned)
+        if job.id != event.id:
+            # The event is now the account job. A queued copy of the event itself is a leftover.
+            self._store.remove_dead_letter(event.id)
+        return result
+
+    def _handle_job(self, event: Event, allow_unknown: bool, planned: tuple[Action, ...] | None) -> EventResult:
         if self._store.is_processed(event.id):
             # A row left in the queue is a leftover. It would make every replay look failed.
             self._store.remove_dead_letter(event.id)
@@ -286,7 +369,7 @@ class Processor:
 
     def _plan(self, event: Event) -> tuple[Action, ...]:
         subject = event.user_id or ""
-        if event.type == ACCOUNT_DELETION:
+        if event.type in JOB_TYPES:
             # The deletion flow is the same whatever the user's state is. It needs no read.
             return plan_actions(event, None, issuer=self._issuer, tenants=self._tenants)
         snapshot = self._retry("keycloak.read", lambda: self._keycloak.get_user_snapshot(subject))
@@ -330,16 +413,13 @@ class Processor:
                     # The team and tenant work did not run.
                     raise _Failed("keycloak.ensure_organization: membership not visible yet")
             ordered = isinstance(actions, OrderedPlan)
-            full_digest = plan_digest(actions, self._digest_key) if ordered else ""
-            start = self._done_steps(event, actions)
-            if len(actions) > start and pass_number == 1:
+            pending = self._pending(event, actions)
+            if pending and pass_number == 1:
                 # From the first external write on, a crash leaves the outcome unknown.
                 self._store.mark_writing(event.id)
             failures: list[str] = []
             unknown = False
-            for index, action in enumerate(actions):
-                if index < start:
-                    continue  # finished by an earlier run of this ordered plan
+            for action in pending:
                 preview = action.preview()
                 label = f"{preview.operation} {preview.target}"
                 try:
@@ -353,8 +433,8 @@ class Processor:
                 else:
                     names.append(preview.operation)
                     if ordered:
-                        # Recorded after every step, so a retry continues from the next one.
-                        self._store.set_progress(event.id, index + 1, full_digest)
+                        # Recorded after every step, so a retry never calls a finished step again.
+                        self._store.add_progress(event.id, self._step_key(action))
                     continue
                 if ordered:
                     # The steps of an ordered plan depend on each other. Nothing runs after a

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import unittest
 
+from identity_sync.events import Event
 from identity_sync.pipeline import PreviewChanged
 
 from . import fakes
@@ -92,6 +93,108 @@ class ReportTest(ReconcileFlowCase):
         report = stack.app.reconcile_plan().report()
 
         self.assertEqual((report["count"], report["differences"], report["previews"]), (0, [], []))
+
+
+class MissedDeletionTest(ReconcileFlowCase):
+    """An administrator deleted GONE in Keycloak and the event never arrived.
+
+    docs/sozlesmeler.md, section 7: reconcile finds the deleted user and shows a preview. After
+    the approval the remaining deletion steps run in order, even if the local account is closed.
+    """
+
+    GONE = "gone-1"
+
+    def setUp(self) -> None:
+        super().setUp()
+        issuer = self.stack.issuer
+        self.stack.press.seed_member(issuer, self.GONE, "gone@example.test", ORG_ID, api_keys=1)
+        self.stack.tenant.seed_user(issuer, self.GONE, "gone@example.test", enabled=False)
+        self.stack.press.users["gone@example.test"]["enabled"] = False
+        self.job_id = self.stack.app.processor.account_job(self.GONE, time=1).id
+
+    def gone_previews(self, report: dict) -> list[str]:
+        return [p["operation"] for p in report["previews"] if self.job_id in p["summary"]]
+
+    def test_deleted_user_with_closed_local_accounts_is_reported(self) -> None:
+        plan = self.stack.app.reconcile_plan()
+
+        self.assertIn(("press", self.GONE, "deleted_in_keycloak"), self.kinds(plan))
+        self.assertIn(("kiraci1", self.GONE, "deleted_in_keycloak"), self.kinds(plan))
+        self.assertEqual(
+            self.gone_previews(plan.report()),
+            [
+                "press.remove_team_member",
+                "tenant.set_enabled",
+                "tenant.revoke_user_installations",
+                "press.anonymize_user",
+                "tenant.anonymize_user",
+            ],
+        )
+        self.assertEqual(self.writes(), [])
+
+    def test_approved_repair_runs_the_remaining_steps_in_order(self) -> None:
+        issuer = self.stack.issuer
+        digest = self.stack.app.reconcile_plan().report()["preview_digest"]
+        revoked_before_anonymize: list[int] = []
+
+        def anonymize(_req: fakes.Recorded) -> fakes.Reply:
+            revokes = self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS)
+            revoked_before_anonymize.append(sum(self.GONE in r.body.decode("utf-8") for r in revokes))
+            return fakes.DONE
+
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, anonymize)
+
+        result = self.stack.app.reconcile_execute(digest)
+
+        self.assertIn({"operation": "account_deletion", "target": self.job_id, "status": "done"}, result["results"])
+        # Step 3 (installations) ran before step 4 (anonymize).
+        self.assertEqual(revoked_before_anonymize, [1])
+        self.assertTrue(self.stack.tenant.user_of(issuer, self.GONE)["anonymized"])
+        self.assertTrue(self.stack.press.user_of(issuer, self.GONE)["anonymized"])
+        # The drift is gone and the event, if it ever arrives, starts nothing.
+        self.assertNotIn(self.GONE, [d.subject for d in self.stack.app.reconcile_plan().differences])
+        late = Event(id="late-1", kind="admin", type="USER_DELETE", realm="platform", time=5, user_id=self.GONE)
+        self.assertEqual(self.stack.app.processor.handle(late).status, "duplicate")
+
+    def test_failed_step_stops_the_job_and_the_next_run_resumes(self) -> None:
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, (503, None))
+        digest = self.stack.app.reconcile_plan().report()["preview_digest"]
+
+        result = self.stack.app.reconcile_execute(digest)
+
+        (job,) = [r for r in result["results"] if r["operation"] == "account_deletion"]
+        self.assertEqual(job["status"], "failed")
+        self.assertEqual(self.stack.tenant.calls("POST", fakes.TENANT_ANONYMIZE), [])
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, fakes.DONE)
+        # The next preview shows only what is left.
+        report = self.stack.app.reconcile_plan().report()
+        self.assertEqual(self.gone_previews(report), ["press.anonymize_user", "tenant.anonymize_user"])
+        revokes = len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS))
+
+        self.stack.app.reconcile_execute(report["preview_digest"])
+
+        self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS)), revokes)
+        self.assertTrue(self.stack.tenant.user_of(self.stack.issuer, self.GONE)["anonymized"])
+
+    def test_approval_does_not_fit_when_the_remaining_steps_changed(self) -> None:
+        # The human saw five steps. Meanwhile the late event ran three of them and stopped.
+        # The differences are the same, but the work that is left is not what was approved.
+        digest = self.stack.app.reconcile_plan().report()["preview_digest"]
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, (503, None))
+        late = Event(id="late-2", kind="admin", type="USER_DELETE", realm="platform", time=5, user_id=self.GONE)
+        self.assertEqual(self.stack.app.processor.handle(late).status, "dead_lettered")
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, fakes.DONE)
+
+        with self.assertRaises(PreviewChanged):
+            self.stack.app.reconcile_execute(digest)
+        self.assertFalse(self.stack.press.user_of(self.stack.issuer, self.GONE).get("anonymized"))
+
+    def test_preview_changes_when_a_deleted_account_appears(self) -> None:
+        digest = self.stack.app.reconcile_plan().report()["preview_digest"]
+        self.stack.tenant.seed_user(self.stack.issuer, "gone-2", "gone2@example.test")
+
+        with self.assertRaises(PreviewChanged):
+            self.stack.app.reconcile_execute(digest)
 
 
 class RepairTest(ReconcileFlowCase):

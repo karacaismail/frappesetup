@@ -210,6 +210,20 @@ Akış beş adımdır ve sırası sabittir:
 
 Yönetici bir kullanıcıyı Keycloak yönetim ekranından silebilir. Olay dinleyici o zaman olayı gönderir. Servis 2., 3. ve 4. adımı yürütür.
 
+Press isteği ve Keycloak silme olayı bir hesap için tek iştir:
+
+- İşin kimliği hesabın anahtarlı özetidir. Kimlik `del-` ile başlar.
+- 5. adım Keycloak kullanıcısını siler. Olay dinleyici bu silmeyi de bildirir. O olay bitmiş işi bulur ve hiçbir iş başlatmaz.
+- Press isteği bir adımda durduysa silme olayı aynı işi sürdürür. Servis bitmiş adımı yeniden çağırmaz.
+- Önizleme ve bekleme kuyruğu listesi işin kimliğini gösterir. Hesabın kimliğini göstermez.
+
+Silme olayı kaybolabilir. O zaman `reconcile` komutu silinen kullanıcıyı bulur:
+
+1. Komut farkı `deleted_in_keycloak` türüyle raporlar.
+2. Önizleme işin kalan adımlarını gösterir.
+3. İnsan onay verir.
+4. Komut kalan adımları sırayla yürütür. Yerel hesap önceden kapalı olsa da adımlar çalışır.
+
 Keycloak'ta kapatılan kullanıcının telefon kurulumları da iptal edilir. Bu iş kapatma planının parçasıdır.
 
 ## Olay dinleyici eklentisi

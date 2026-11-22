@@ -15,7 +15,14 @@ import json
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 
-from identity_sync.events import ACCOUNT_DELETION, MEMBERSHIP_TYPES, USER_REMOVED_TYPES, Event, is_handled
+from identity_sync.events import (
+    ACCOUNT_DELETION,
+    ACCOUNT_REMOVAL,
+    MEMBERSHIP_TYPES,
+    USER_REMOVED_TYPES,
+    Event,
+    is_handled,
+)
 
 # Kendi kaydolan kullanıcıya Organization açan olaylar.
 _SELF_REGISTRATION_TYPES = frozenset({"REGISTER", "VERIFY_EMAIL"})
@@ -367,6 +374,9 @@ def plan_actions(
 
     if event.type == ACCOUNT_DELETION:
         return plan_account_deletion(subject, issuer=issuer, tenants=tenants)
+
+    if event.type == ACCOUNT_REMOVAL:
+        return plan_removed_user(subject, issuer=issuer, tenants=tenants)
 
     if snapshot is None and event.type in USER_REMOVED_TYPES:
         # The event says the user was deleted and Keycloak confirms it. If Keycloak still had

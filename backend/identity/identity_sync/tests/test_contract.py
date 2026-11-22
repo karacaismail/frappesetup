@@ -390,6 +390,25 @@ class SchemaTest(ServerCase):
                 self.assert_response(self.post_json(path, rejected), "POST", path, 400)
         self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
 
+    def test_reconcile_finishes_an_account_deleted_in_keycloak(self) -> None:
+        # The delete event was lost. The local account is already disabled.
+        path = "/v1/reconcile"
+        issuer = self.stack.issuer
+        self.stack.keycloak.serve_directory()
+        self.stack.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID)
+        self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
+        self.stack.tenant.seed_user(issuer, "gone-1", "gone@example.test", enabled=False)
+
+        preview = self.assert_response(self.post_json(path, {"dry_run": True}, PREVIEW_TOKEN), "POST", path, 200)
+        self.assertEqual([(d["target"], d["kind"]) for d in preview["differences"]], [("kiraci1", "deleted_in_keycloak")])
+        self.assertEqual(preview["previews"][-1]["operation"], "tenant.anonymize_user")
+        execute = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-g1"}
+        done = self.assert_response(self.post_json(path, execute), "POST", path, 200)
+        (job,) = done["results"]
+        self.assertEqual((job["operation"], job["status"]), ("account_deletion", "done"))
+        self.assertRegex(job["target"], r"^del-[0-9a-f]{40}$")
+        self.assertTrue(self.stack.tenant.user_of(issuer, "gone-1")["anonymized"])
+
     def test_every_difference_kind_is_in_the_contract(self) -> None:
         import inspect
 
@@ -401,13 +420,14 @@ class SchemaTest(ServerCase):
             "disabled",
             "email_mismatch",
             "closed_in_keycloak",
+            "deleted_in_keycloak",
             "unexpected",
             "unverified_in_keycloak",
             "missing_team_membership",
             "unexpected_team_membership",
             "foreign_issuer",
         }
-        self.assertEqual(len(used), 9)
+        self.assertEqual(len(used), 10)
         self.assertEqual(documented, used)
 
     def test_session_revoke(self) -> None:

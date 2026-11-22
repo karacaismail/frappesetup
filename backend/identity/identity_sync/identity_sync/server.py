@@ -351,19 +351,12 @@ class _Api:
             raise _BadRequest
         if isinstance(reauthenticated_at, bool) or not isinstance(reauthenticated_at, int):
             raise _BadRequest
-        request_id = "del-" + self._app.digest({"operation": "delete_account", "issuer": issuer, "subject": subject})[:40]
+        request = self._app.processor.account_job(subject, time=int(now * 1000))
+        request_id = request.id
         age = now - reauthenticated_at
         if age > REAUTHENTICATION_MAX_AGE_SECONDS or age < -CLOCK_SKEW_SECONDS:
             self._audit_deletion(azp, request_id, "reauthentication_required")
             return 403, {"error": "reauthentication_required"}
-        request = Event(
-            id=request_id,
-            kind=REQUEST_KIND,
-            type=ACCOUNT_DELETION,
-            realm=self._settings.realm,
-            time=int(now * 1000),
-            user_id=subject,
-        )
         result = self._app.processor.handle(request)
         self._audit_deletion(azp, request_id, result.status)
         return 200, {"status": result.status, "request_id": request_id, "actions": list(result.actions)}

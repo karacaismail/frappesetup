@@ -206,13 +206,30 @@ class StoreTest(unittest.TestCase):
     def test_progress_of_an_ordered_plan_survives_a_restart(self) -> None:
         store = self.open()
         store.begin(EVENT)
-        self.assertEqual(store.progress(EVENT.id), (0, ""))
-        store.set_progress(EVENT.id, 3, "d" * 64)
+        self.assertEqual(store.progress(EVENT.id), frozenset())
+        store.add_progress(EVENT.id, "a" * 64)
+        store.add_progress(EVENT.id, "b" * 64)
+        store.add_progress(EVENT.id, "a" * 64)  # the same step twice is one step
         store.add_dead_letter(EVENT, "x")  # a failure must not reset the progress
         store.close()
 
-        self.assertEqual(self.open().progress(EVENT.id), (3, "d" * 64))
-        self.assertEqual(self.open().progress("yok"), (0, ""))
+        self.assertEqual(self.open().progress(EVENT.id), frozenset({"a" * 64, "b" * 64}))
+        self.assertEqual(self.open().progress("yok"), frozenset())
+
+    def test_account_job_is_listed_without_the_user_id(self) -> None:
+        from identity_sync.events import Event
+
+        store = self.open()
+        job = Event(id="del-" + "0" * 40, kind="request", type="ACCOUNT_DELETION", realm="platform", time=1, user_id="u-1")
+        store.add_dead_letter(job, "x")
+        store.add_dead_letter(EVENT, "x")
+
+        listed = {letter.event.id: letter.to_dict()["event"] for letter in store.dead_letters()}
+
+        self.assertNotIn("user_id", listed[job.id])
+        self.assertEqual(listed[EVENT.id].get("user_id"), EVENT.user_id)
+        # The record itself keeps the id: the job needs it to continue.
+        self.assertEqual({letter.event.user_id for letter in store.dead_letters()}, {"u-1", EVENT.user_id})
 
     def test_approval_and_operation_are_recorded_together(self) -> None:
         # A crash between "approval used" and "operation recorded" would lose the request.
@@ -244,7 +261,7 @@ class StoreTest(unittest.TestCase):
         store = self.open()
         (letter,) = store.dead_letters()
         self.assertEqual((letter.error, letter.state), ("eski", "failed"))
-        self.assertEqual(store.progress("e-1"), (0, ""))
+        self.assertEqual(store.progress("e-1"), frozenset())
 
     def test_remove_dead_letter(self) -> None:
         store = self.open()

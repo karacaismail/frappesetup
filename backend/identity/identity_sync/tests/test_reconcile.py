@@ -20,7 +20,7 @@ from identity_sync.mapping import (
     TenantSetEnabled,
     UserSnapshot,
 )
-from identity_sync.reconcile import Difference, Identity, find_differences, plan_repairs
+from identity_sync.reconcile import Difference, Identity, deleted_subjects, find_differences, plan_repairs
 
 ISSUER = "http://kimlik.localhost:6110/realms/platform"
 ORG = Organization(id="o-1", alias="kiraci1", name="Kiracı 1")
@@ -70,8 +70,11 @@ class TenantDifferenceTest(unittest.TestCase):
         found = differences([user("a", enabled=False)], [], [identity("a")])
         self.assertEqual(found, [Difference("kiraci1", "a", "closed_in_keycloak")])
 
-    def test_deleted_in_keycloak_but_enabled_on_tenant(self) -> None:
-        self.assertEqual(differences([], [], [identity("a")]), [Difference("kiraci1", "a", "closed_in_keycloak")])
+    def test_deleted_in_keycloak_is_its_own_kind_on_the_tenant(self) -> None:
+        # The record still names a user Keycloak no longer has. Enabled or not, the deletion is unfinished.
+        for record in (identity("a"), identity("a", enabled=False)):
+            with self.subTest(enabled=record.enabled):
+                self.assertEqual(differences([], [], [record]), [Difference("kiraci1", "a", "deleted_in_keycloak")])
 
     def test_closed_everywhere_is_not_a_difference(self) -> None:
         # A closed user stays on the target as a disabled record. That is the expected end state (X-11).
@@ -123,10 +126,23 @@ class PressDifferenceTest(unittest.TestCase):
         )
 
     def test_closed_in_keycloak_but_enabled_on_press(self) -> None:
-        for users in ([user("a", enabled=False)], []):
-            with self.subTest(users=users):
-                found = differences(users, [identity("a", orgs=("o-1",))], [])
-                self.assertEqual(found, [Difference("press", "a", "closed_in_keycloak")])
+        found = differences([user("a", enabled=False)], [identity("a", orgs=("o-1",))], [])
+        self.assertEqual(found, [Difference("press", "a", "closed_in_keycloak")])
+
+    def test_deleted_in_keycloak_is_its_own_kind_on_press(self) -> None:
+        for record in (identity("a", orgs=("o-1",)), identity("a", enabled=False)):
+            with self.subTest(enabled=record.enabled):
+                self.assertEqual(differences([], [record], []), [Difference("press", "a", "deleted_in_keycloak")])
+
+    def test_deleted_subjects_are_listed_once(self) -> None:
+        found = differences([], [identity("a"), identity("b")], [identity("a")])
+        self.assertEqual(deleted_subjects(found), ("a", "b"))
+        self.assertEqual(deleted_subjects(differences(*in_sync())), ())
+
+    def test_deleted_accounts_get_no_single_repair_action(self) -> None:
+        # They are finished by the ordered account job, not by loose actions.
+        found = [Difference("press", "a", "deleted_in_keycloak"), Difference("kiraci1", "a", "deleted_in_keycloak")]
+        self.assertEqual(plan_repairs(found, [], issuer=ISSUER, tenants=TENANTS), ())
 
     def test_member_disabled_on_press(self) -> None:
         users, _press, tenant = in_sync()
@@ -194,7 +210,8 @@ class RepairPlanTest(unittest.TestCase):
             TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject="a", enabled=False),
             TenantRevokeUserInstallations(tenant="kiraci1", issuer=ISSUER, subject="a"),
         )
-        self.assertEqual(self.repairs([Difference("kiraci1", "a", "closed_in_keycloak")], []), disable)
+        closed = [user("a", enabled=False)]
+        self.assertEqual(self.repairs([Difference("kiraci1", "a", "closed_in_keycloak")], closed), disable)
         self.assertEqual(self.repairs([Difference("kiraci1", "a", "unexpected")], [user("a", orgs=(OTHER,))]), disable)
 
     def test_team_membership_repairs(self) -> None:
@@ -218,7 +235,7 @@ class RepairPlanTest(unittest.TestCase):
         )
 
     def test_closed_press_user_gets_all_organizations(self) -> None:
-        actions = self.repairs([Difference("press", "a", "closed_in_keycloak")], [])
+        actions = self.repairs([Difference("press", "a", "closed_in_keycloak")], [user("a", enabled=False)])
         self.assertEqual(actions, (PressRemoveTeamMember(issuer=ISSUER, subject="a", organization_id=None),))
 
     def test_differences_without_a_safe_repair_plan_nothing(self) -> None:

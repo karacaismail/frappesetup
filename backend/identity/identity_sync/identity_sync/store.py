@@ -24,7 +24,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from identity_sync.events import Event
+from identity_sync.events import REQUEST_KIND, Event
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS processed_events (
@@ -40,8 +40,7 @@ CREATE TABLE IF NOT EXISTS dead_letters (
     attempts INTEGER NOT NULL,
     first_failed_at REAL NOT NULL,
     last_failed_at REAL NOT NULL,
-    done_steps INTEGER NOT NULL DEFAULT 0,
-    plan_digest TEXT NOT NULL DEFAULT ''
+    finished_steps TEXT NOT NULL DEFAULT '[]'
 );
 CREATE TABLE IF NOT EXISTS used_signatures (
     signature TEXT PRIMARY KEY,
@@ -90,8 +89,12 @@ class DeadLetter:
     state: str = "failed"
 
     def to_dict(self) -> dict[str, object]:
+        event = self.event.to_dict()
+        if self.event.kind == REQUEST_KIND:
+            # An account job is named by its id, a keyed digest. The listing does not show whose it is.
+            event.pop("user_id", None)
         return {
-            "event": self.event.to_dict(),
+            "event": event,
             "error": self.error,
             "state": self.state,
             "attempts": self.attempts,
@@ -124,8 +127,7 @@ class Store:
         columns = {row[1] for row in self._db.execute("PRAGMA table_info(dead_letters)")}
         missing = {
             "state": "TEXT NOT NULL DEFAULT 'failed'",
-            "done_steps": "INTEGER NOT NULL DEFAULT 0",
-            "plan_digest": "TEXT NOT NULL DEFAULT ''",
+            "finished_steps": "TEXT NOT NULL DEFAULT '[]'",
         }
         for name, definition in missing.items():
             if name not in columns:
@@ -218,20 +220,19 @@ class Store:
                 (event_id,),
             )
 
-    def progress(self, event_id: str) -> tuple[int, str]:
-        """How many steps of an ordered plan are done, and the digest of that plan."""
-        row = self._db.execute(
-            "SELECT done_steps, plan_digest FROM dead_letters WHERE event_id = ?", (event_id,)
-        ).fetchone()
-        return (row[0], row[1]) if row else (0, "")
+    def progress(self, event_id: str) -> frozenset[str]:
+        """Keys of the steps of an ordered plan that are finished. A key is a keyed digest of the step."""
+        row = self._db.execute("SELECT finished_steps FROM dead_letters WHERE event_id = ?", (event_id,)).fetchone()
+        return frozenset(json.loads(row[0])) if row else frozenset()
 
-    def set_progress(self, event_id: str, done_steps: int, plan_digest: str) -> None:
-        """Record that the first `done_steps` steps of the plan are done. Written after each step."""
+    def add_progress(self, event_id: str, step_key: str) -> None:
+        """Record one finished step. Written after each step, so a retry never calls it again."""
         with self._transaction():
-            self._db.execute(
-                "UPDATE dead_letters SET done_steps = ?, plan_digest = ? WHERE event_id = ?",
-                (done_steps, plan_digest, event_id),
-            )
+            row = self._db.execute("SELECT finished_steps FROM dead_letters WHERE event_id = ?", (event_id,)).fetchone()
+            if row is None:
+                return
+            steps = sorted({*json.loads(row[0]), step_key})
+            self._db.execute("UPDATE dead_letters SET finished_steps = ? WHERE event_id = ?", (json.dumps(steps), event_id))
 
     def claim_approval(
         self,

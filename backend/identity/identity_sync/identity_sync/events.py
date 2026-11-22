@@ -24,6 +24,10 @@ ACCOUNT_DELETION = "ACCOUNT_DELETION"
 # Events that say Keycloak no longer has the user. Keycloak's own delete_account action is
 # switched off, so in practice this is an administrator's delete (docs/sozlesmeler.md, section 7).
 USER_REMOVED_TYPES = frozenset({"USER_DELETE", "DELETE_ACCOUNT"})
+# The account job for a user that Keycloak no longer has: steps 2, 3 and 4 only.
+ACCOUNT_REMOVAL = "ACCOUNT_REMOVAL"
+# Both are the same job for one account. They differ only in the Keycloak steps.
+JOB_TYPES = frozenset({ACCOUNT_DELETION, ACCOUNT_REMOVAL})
 
 MAX_ID_LENGTH = 128
 # Kimlikler adres yoluna girer. Bu yüzden yalnız güvenli karakterler kabul edilir.
@@ -54,7 +58,7 @@ def is_handled(event: Event) -> bool:
     if event.kind == "user":
         return event.type in USER_TYPES
     if event.kind == REQUEST_KIND:
-        return event.type == ACCOUNT_DELETION
+        return event.type in JOB_TYPES
     return event.kind == "admin" and event.type in ADMIN_TYPES
 
 

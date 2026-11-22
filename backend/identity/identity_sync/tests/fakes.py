@@ -370,6 +370,8 @@ class FakeTenant(FakeSite):
         rows = [
             {"issuer": issuer, "subject": subject, "email": email, "enabled": self.users[email]["enabled"]}
             for (issuer, subject), email in self.links.items()
+            # An anonymized record no longer carries the raw `sub` (docs/sozlesmeler.md, section 7).
+            if not self.users[email].get("anonymized")
         ]
         return 200, {"message": rows}
 
@@ -472,6 +474,7 @@ class FakePress(FakeSite):
                 "organization_ids": self.teams_of(issuer, subject),
             }
             for (issuer, subject), email in self.links.items()
+            if not self.users[email].get("anonymized")
         ]
         return 200, {"message": rows}
 

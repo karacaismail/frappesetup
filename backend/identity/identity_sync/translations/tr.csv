@@ -50,7 +50,9 @@ Süreç bir yazmadan sonra durduysa durum yine `unknown` olur.
 "`missing` shows that the user has no link in the tenant.
 `disabled` shows that the expected user is disabled at the target.
 `email_mismatch` shows that the email at the target is different.
-`closed_in_keycloak` shows this. The user is disabled or deleted in Keycloak and enabled at the target.
+`closed_in_keycloak` shows this. The user is disabled in Keycloak and enabled at the target.
+`deleted_in_keycloak` shows this. Keycloak no longer has the user but the target still has the record.
+The record can be enabled or disabled. The repair is the deletion job of the account.
 `unexpected` shows that the user is enabled in the tenant but is not a member of the tenant's organization.
 `unverified_in_keycloak` shows that the user is enabled in the tenant but the email in Keycloak is not verified.
 `missing_team_membership` shows a team membership that is missing in Press.
@@ -59,7 +61,9 @@ Süreç bir yazmadan sonra durduysa durum yine `unknown` olur.
 ","`missing` değeri kullanıcının kiracıda bağı olmadığını gösterir.
 `disabled` değeri beklenen kullanıcının hedefte kapalı olduğunu gösterir.
 `email_mismatch` değeri hedefteki e-postanın farklı olduğunu gösterir.
-`closed_in_keycloak` değeri şunu gösterir: kullanıcı Keycloak'ta kapalı ya da silinmiş, hedefte açık.
+`closed_in_keycloak` değeri şunu gösterir: kullanıcı Keycloak'ta kapalı, hedefte açık.
+`deleted_in_keycloak` değeri şunu gösterir: kullanıcı Keycloak'ta artık yok ama hedefte kaydı duruyor.
+Kayıt açık ya da kapalı olabilir. Onarım, hesabın silme işidir.
 `unexpected` değeri kullanıcının kiracıda açık olduğunu ama kiracının kuruluşuna üye olmadığını gösterir.
 `unverified_in_keycloak` değeri kullanıcının kiracıda açık ama Keycloak'taki e-postasının doğrulanmamış olduğunu gösterir.
 `missing_team_membership` değeri Press'te eksik takım üyeliğini gösterir.
@@ -186,11 +190,15 @@ The execute request must carry the same digest.
 Yürütme isteği aynı özeti taşımalıdır.
 ",identity_sync.openapi.yaml: components.schemas.PreviewDigest.description
 "One record in the dead-letter queue. The record can be a Keycloak event or the service's own request.
-If the `kind` value is `request`, the record is an account deletion request. Then the `type` value is `ACCOUNT_DELETION`.
-The `request` kind cannot come from the event endpoint. Only the `/v1/account-deletions` endpoint produces it.
+If the `kind` value is `request`, the record is the deletion job of one account.
+Then the `type` value is `ACCOUNT_DELETION`, or `ACCOUNT_REMOVAL` when Keycloak no longer has the user.
+The id of such a record is the id of the job. The record does not show the `user_id` field.
+The `request` kind cannot come from the event endpoint. The service itself produces it.
 ","Bekleme kuyruğundaki bir kayıt. Kayıt bir Keycloak olayı ya da servisin kendi isteği olabilir.
-`kind` değeri `request` ise kayıt bir hesap silme isteğidir. O zaman `type` değeri `ACCOUNT_DELETION` olur.
-`request` türü olay ucundan gelemez. Yalnız `/v1/account-deletions` ucu üretir.
+`kind` değeri `request` ise kayıt bir hesabın silme işidir.
+O zaman `type` değeri `ACCOUNT_DELETION` olur. Kullanıcı Keycloak'ta artık yoksa `ACCOUNT_REMOVAL` olur.
+Böyle bir kaydın kimliği işin kimliğidir. Kayıt `user_id` alanını göstermez.
+`request` türü olay ucundan gelemez. Onu servis kendisi üretir.
 ",identity_sync.openapi.yaml: components.schemas.QueuedEvent.description
 A repair request. Only the approval layer can send it.,Düzeltme isteği. Yalnız onay katmanı gönderebilir.,identity_sync.openapi.yaml: components.schemas.ReconcileExecuteRequest.description
 A preview request. The service changes no record.,Önizleme isteği. Servis hiçbir kaydı değiştirmez.,identity_sync.openapi.yaml: components.schemas.ReconcilePreviewRequest.description
@@ -199,7 +207,11 @@ Returned only in a preview. It is the preview of the operations that will remove
 Returned only in a repair. It is the result of every operation.,Yalnız düzeltmede döner. Her işin sonucudur.,identity_sync.openapi.yaml: components.schemas.ReconcileReport.properties.results.description
 The caller must write the `dry_run` field explicitly. One of two forms is valid.,Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.,identity_sync.openapi.yaml: components.schemas.ReconcileRequest.description
 The failed step and its status code. It carries no response body.,Başarısız adım ve durum kodu. Yanıt gövdesi taşımaz.,identity_sync.openapi.yaml: components.schemas.RepairResult.properties.error.description
-"The name of the operation. For example, `tenant.set_enabled`.",İşin adı. Örneğin `tenant.set_enabled`.,identity_sync.openapi.yaml: components.schemas.RepairResult.properties.operation.description
+"The name of the operation. For example, `tenant.set_enabled`.
+The value `account_deletion` is the deletion job of one account that Keycloak no longer has.
+","İşin adı. Örneğin `tenant.set_enabled`.
+`account_deletion` değeri, Keycloak'ta artık olmayan bir hesabın silme işidir.
+",identity_sync.openapi.yaml: components.schemas.RepairResult.properties.operation.description
 "`done` shows that the target gave a definite success response.
 `failed` shows that the target rejected the operation or could not be reached.
 `unknown` shows that it is not known whether the operation finished.
@@ -207,7 +219,11 @@ The failed step and its status code. It carries no response body.,Başarısız a
 `failed` değeri hedefin işi reddettiğini ya da ulaşılamadığını gösterir.
 `unknown` değeri işin bitip bitmediğinin bilinmediğini gösterir.
 ",identity_sync.openapi.yaml: components.schemas.RepairResult.properties.status.description
-The target of the operation. The value is `press` or the name of the tenant.,İşin hedefi. Değer `press` ya da kiracının adıdır.,identity_sync.openapi.yaml: components.schemas.RepairResult.properties.target.description
+"The target of the operation. The value is `press` or the name of the tenant.
+For the `account_deletion` operation it is the id of the job.
+","İşin hedefi. Değer `press` ya da kiracının adıdır.
+`account_deletion` işinde değer işin kimliğidir.
+",identity_sync.openapi.yaml: components.schemas.RepairResult.properties.target.description
 An execute request. Only the approval layer can send it.,Yürütme isteği. Yalnız onay katmanı gönderebilir.,identity_sync.openapi.yaml: components.schemas.ReplayExecuteRequest.description
 It must be the same as the value in the preview. Otherwise the digest does not match.,Önizlemedeki değerle aynı olmalıdır. Yoksa özet tutmaz.,identity_sync.openapi.yaml: components.schemas.ReplayExecuteRequest.properties.include_unknown.description
 A preview request. The service changes no record.,Önizleme isteği. Servis hiçbir kaydı değiştirmez.,identity_sync.openapi.yaml: components.schemas.ReplayPreviewRequest.description
@@ -455,7 +471,15 @@ The service processes the user by the `sub` id. It never stores the email.
 
 An administrator can delete a user on the Keycloak admin screen. The event listener then sends the `USER_DELETE` event.
 The service confirms that Keycloak no longer has the user. Then it executes steps 2, 3 and 4 in the same order.
-If the event is lost, the reconcile command finds the deleted user.
+
+The Press request and the Keycloak delete event are one job for one account. The id of the job is the keyed digest of the account.
+Step 5 deletes the Keycloak user, so the event listener reports that delete too. That event finds the finished job and starts nothing.
+If the Press request stopped at a step, the delete event continues the same job. The service does not call a finished step again.
+A preview and the dead-letter list show the id of the job. They do not show the id of the account.
+
+If the delete event is lost, the reconcile command finds the deleted user. Its difference kind is `deleted_in_keycloak`.
+The reconcile preview shows the steps of the job that are left. After the human approves, these steps are executed in order.
+This also works when the local account is already disabled.
 
 For a user disabled in Keycloak, the service also has the phone installations revoked.
 This operation is part of the disable plan.
@@ -617,7 +641,15 @@ Servis kullanıcıyı `sub` kimliğiyle işler. E-postayı hiç saklamaz.
 
 Yönetici bir kullanıcıyı Keycloak yönetim ekranından silebilir. Olay dinleyici o zaman `USER_DELETE` olayını gönderir.
 Servis kullanıcının Keycloak'ta artık olmadığını doğrular. Sonra 2., 3. ve 4. adımı aynı sırayla yürütür.
-Olay kaybolursa mutabakat komutu silinen kullanıcıyı bulur.
+
+Press isteği ve Keycloak silme olayı bir hesap için tek iştir. İşin kimliği hesabın anahtarlı özetidir.
+5. adım Keycloak kullanıcısını siler. Olay dinleyici bu silmeyi de bildirir. O olay bitmiş işi bulur ve hiçbir iş başlatmaz.
+Press isteği bir adımda durduysa silme olayı aynı işi sürdürür. Servis bitmiş adımı yeniden çağırmaz.
+Önizleme ve bekleme kuyruğu listesi işin kimliğini gösterir. Hesabın kimliğini göstermez.
+
+Silme olayı kaybolursa mutabakat komutu silinen kullanıcıyı bulur. Bu farkın türü `deleted_in_keycloak` olur.
+Mutabakat önizlemesi işin kalan adımlarını gösterir. İnsan onay verince bu adımlar sırayla yürür.
+Yerel hesap önceden kapalı olsa da bu yol çalışır.
 
 Keycloak'ta kapatılan kullanıcı için servis telefon kurulumlarını da iptal ettirir.
 Bu iş kapatma planının parçasıdır.

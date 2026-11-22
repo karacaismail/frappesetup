@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.7.0
+  version: 0.8.0
   summary: Endpoints of the user sync service
   description: |
     This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
@@ -96,7 +96,15 @@ info:
 
     An administrator can delete a user on the Keycloak admin screen. The event listener then sends the `USER_DELETE` event.
     The service confirms that Keycloak no longer has the user. Then it executes steps 2, 3 and 4 in the same order.
-    If the event is lost, the reconcile command finds the deleted user.
+
+    The Press request and the Keycloak delete event are one job for one account. The id of the job is the keyed digest of the account.
+    Step 5 deletes the Keycloak user, so the event listener reports that delete too. That event finds the finished job and starts nothing.
+    If the Press request stopped at a step, the delete event continues the same job. The service does not call a finished step again.
+    A preview and the dead-letter list show the id of the job. They do not show the id of the account.
+
+    If the delete event is lost, the reconcile command finds the deleted user. Its difference kind is `deleted_in_keycloak`.
+    The reconcile preview shows the steps of the job that are left. After the human approves, these steps are executed in order.
+    This also works when the local account is already disabled.
 
     For a user disabled in Keycloak, the service also has the phone installations revoked.
     This operation is part of the disable plan.
@@ -892,8 +900,10 @@ components:
       type: object
       description: |
         One record in the dead-letter queue. The record can be a Keycloak event or the service's own request.
-        If the `kind` value is `request`, the record is an account deletion request. Then the `type` value is `ACCOUNT_DELETION`.
-        The `request` kind cannot come from the event endpoint. Only the `/v1/account-deletions` endpoint produces it.
+        If the `kind` value is `request`, the record is the deletion job of one account.
+        Then the `type` value is `ACCOUNT_DELETION`, or `ACCOUNT_REMOVAL` when Keycloak no longer has the user.
+        The id of such a record is the id of the job. The record does not show the `user_id` field.
+        The `request` kind cannot come from the event endpoint. The service itself produces it.
       required: [id, kind, type, realm, time]
       properties:
         id:
@@ -1389,10 +1399,14 @@ components:
       properties:
         operation:
           type: string
-          description: The name of the operation. For example, `tenant.set_enabled`.
+          description: |
+            The name of the operation. For example, `tenant.set_enabled`.
+            The value `account_deletion` is the deletion job of one account that Keycloak no longer has.
         target:
           type: string
-          description: The target of the operation. The value is `press` or the name of the tenant.
+          description: |
+            The target of the operation. The value is `press` or the name of the tenant.
+            For the `account_deletion` operation it is the id of the job.
         status:
           type: string
           enum: [done, failed, unknown]
@@ -1420,6 +1434,7 @@ components:
             - disabled
             - email_mismatch
             - closed_in_keycloak
+            - deleted_in_keycloak
             - unexpected
             - unverified_in_keycloak
             - missing_team_membership
@@ -1429,7 +1444,9 @@ components:
             `missing` shows that the user has no link in the tenant.
             `disabled` shows that the expected user is disabled at the target.
             `email_mismatch` shows that the email at the target is different.
-            `closed_in_keycloak` shows this. The user is disabled or deleted in Keycloak and enabled at the target.
+            `closed_in_keycloak` shows this. The user is disabled in Keycloak and enabled at the target.
+            `deleted_in_keycloak` shows this. Keycloak no longer has the user but the target still has the record.
+            The record can be enabled or disabled. The repair is the deletion job of the account.
             `unexpected` shows that the user is enabled in the tenant but is not a member of the tenant's organization.
             `unverified_in_keycloak` shows that the user is enabled in the tenant but the email in Keycloak is not verified.
             `missing_team_membership` shows a team membership that is missing in Press.

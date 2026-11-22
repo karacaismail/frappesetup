@@ -25,6 +25,7 @@ from identity_sync.mapping import (
 )
 
 PRESS = "press"
+DELETED = "deleted_in_keycloak"
 
 # Kinds a tenant user is brought back in sync for.
 _SYNC_KINDS = frozenset({"missing", "disabled", "email_mismatch"})
@@ -52,7 +53,9 @@ class Difference:
     - `missing`: the user should be on the tenant but has no link there.
     - `disabled`: the user should be enabled on the target but is disabled there.
     - `email_mismatch`: the target has another e-mail.
-    - `closed_in_keycloak`: disabled or deleted in Keycloak, still enabled on the target.
+    - `closed_in_keycloak`: disabled in Keycloak, still enabled on the target.
+    - `deleted_in_keycloak`: Keycloak no longer has the user, but the target still has the record,
+      enabled or not. The account deletion is unfinished there.
     - `unexpected`: enabled on the tenant, but not a member of the tenant's organization.
     - `unverified_in_keycloak`: enabled on the tenant, member, but the Keycloak e-mail is not verified.
     - `missing_team_membership`: member in Keycloak, not in the Press team of `organization_id`.
@@ -93,6 +96,9 @@ def _tenant_differences(
             found[identity.subject] = identity
     for subject in sorted(set(users) | set(found)):
         user, record = users.get(subject), found.get(subject)
+        if user is None:
+            differences.append(Difference(tenant.name, subject, DELETED))
+            continue
         is_member = user is not None and any(org.alias == tenant.organization for org in user.organizations)
         if _is_open(user) and is_member:
             assert user is not None
@@ -128,7 +134,10 @@ def _press_differences(users: Mapping[str, UserSnapshot], actual: Iterable[Ident
             found[identity.subject] = identity
     for subject in sorted(set(users) | set(found)):
         user, record = users.get(subject), found.get(subject)
-        if user is None or not user.enabled:
+        if user is None:
+            differences.append(Difference(PRESS, subject, DELETED))
+            continue
+        if not user.enabled:
             if record is not None and record.enabled:
                 differences.append(Difference(PRESS, subject, "closed_in_keycloak"))
             continue
@@ -167,6 +176,15 @@ def find_differences(
     for tenant in tenants:
         differences += _tenant_differences(tenant, by_subject, tenant_records.get(tenant.name, ()), issuer)
     return differences
+
+
+def deleted_subjects(differences: Iterable[Difference]) -> tuple[str, ...]:
+    """Users that Keycloak no longer has but a target still does, each once, in order.
+
+    Each one is finished by its ordered account job, not by loose repair actions
+    (docs/sozlesmeler.md, section 7).
+    """
+    return tuple(sorted({difference.subject for difference in differences if difference.kind == DELETED}))
 
 
 def plan_repairs(

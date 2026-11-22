@@ -10,7 +10,8 @@ from identity_sync.config import Settings
 from identity_sync.keycloak_admin import KeycloakAdmin, snapshot_from_user
 from identity_sync.mapping import Action, Organization, digest_of
 from identity_sync.pipeline import PreviewChanged, Processor, plan_digest
-from identity_sync.reconcile import Difference, find_differences, plan_repairs
+from identity_sync.mapping import Preview
+from identity_sync.reconcile import Difference, deleted_subjects, find_differences, plan_repairs
 from identity_sync.sites import PressClient, TenantClient
 from identity_sync.store import Store
 from identity_sync.tokens import TokenProvider
@@ -24,13 +25,19 @@ class ReconcilePlan:
     actions: tuple[Action, ...]
     # Keyed digest of the differences and of everything the repair would write.
     digest: str
+    # Accounts deleted in Keycloak. Each is finished by its ordered account job.
+    deleted: tuple[str, ...] = ()
+    job_previews: tuple[Preview, ...] = ()
+
+    def previews(self) -> list[Preview]:
+        return [action.preview() for action in self.actions] + list(self.job_previews)
 
     def report(self) -> dict[str, object]:
         """The report for a human. It carries no e-mail: users are named by `sub`."""
         return {
             "count": len(self.differences),
             "differences": [difference.to_dict() for difference in self.differences],
-            "previews": [action.preview().to_dict() for action in self.actions],
+            "previews": [preview.to_dict() for preview in self.previews()],
             "preview_digest": self.digest,
         }
 
@@ -68,13 +75,18 @@ class App:
             users, self.press.list_identities(), tenant_records, issuer=self.settings.issuer, tenants=tenants
         )
         actions = plan_repairs(differences, users, issuer=self.settings.issuer, tenants=tenants)
+        deleted = deleted_subjects(differences)
+        # The remaining steps of each account job. A step an earlier run finished is not shown.
+        jobs = [self.processor.removal_preview(subject) for subject in deleted]
         digest = self.digest(
             {
                 "differences": [difference.to_dict() for difference in differences],
                 "plan": plan_digest(actions, self.digest_key),
+                "jobs": [job.plan_digest for job in jobs],
             }
         )
-        return ReconcilePlan(tuple(differences), actions, digest)
+        job_previews = tuple(preview for job in jobs for preview in job.previews)
+        return ReconcilePlan(tuple(differences), actions, digest, deleted, job_previews)
 
     def reconcile_execute(self, expected_digest: str) -> dict[str, object]:
         """Run the approved repair.
@@ -87,6 +99,8 @@ class App:
             if plan.digest != expected_digest:
                 raise PreviewChanged
             results = self.processor.run_actions(plan.actions)
+            # Each deleted account: the remaining deletion steps, in order.
+            results += [self.processor.run_removal(subject) for subject in plan.deleted]
         return {
             "count": len(plan.differences),
             "differences": [difference.to_dict() for difference in plan.differences],

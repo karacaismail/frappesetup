@@ -87,7 +87,8 @@ class ServerCase(unittest.TestCase):
             with urllib.request.urlopen(request, timeout=10) as response:
                 return response.status, json.loads(response.read() or b"null")
         except urllib.error.HTTPError as error:
-            return error.code, json.loads(error.read() or b"null")
+            with error:  # the error owns the response; close it
+                return error.code, json.loads(error.read() or b"null")
 
     def timestamp(self) -> int:
         # Her isteğin imzası ayrı olsun diye zaman damgası ilerler.
@@ -964,6 +965,33 @@ class AccountDeletionEndpointTest(ServerCase):
         self.assertEqual(body["actions"], ["tenant.anonymize_user", "keycloak.delete_user"])
         self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS)), revokes)
         self.assertNotIn(SUBJECT, self.stack.keycloak.users)
+
+    def test_queued_job_never_shows_the_account_id_over_http(self) -> None:
+        # A preview client can list the queue and preview the retry. It must not learn who it is.
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+        _status, body = self.request()
+        bearer = self.bearer(PREVIEW_TOKEN)
+
+        _s, listing = self.call("GET", "/v1/dead-letters", None, bearer)
+        _s, preview = self.post_json("/v1/dead-letters/replay", {"dry_run": True}, PREVIEW_TOKEN)
+
+        for reply in (listing, preview):
+            self.assertNotIn(SUBJECT, json.dumps(reply))
+            self.assertIn(body["request_id"], json.dumps(reply))
+        operations = [p["operation"] for p in preview["results"][0]["previews"]]
+        self.assertEqual(operations, ["tenant.anonymize_user", "keycloak.delete_user"])
+
+    def test_keycloak_delete_event_after_the_press_request_is_the_same_job(self) -> None:
+        # Both real entry paths in one test: the Press request, then the event its last step causes.
+        _status, body = self.request()
+        self.assertEqual(body["status"], "processed")
+        writes = len(self.downstream_writes())
+        deleted = {"id": "e-del-1", "kind": "admin", "type": "USER_DELETE", "realm": "platform", "time": 1, "user_id": SUBJECT}
+
+        status, reply = self.post_event(deleted)
+
+        self.assertEqual((status, reply["status"]), (202, "duplicate"))
+        self.assertEqual(len(self.downstream_writes()), writes)
 
     def test_request_is_on_record_before_the_first_write(self) -> None:
         # The process dies during the first step. The request must not be lost.
