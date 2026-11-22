@@ -574,6 +574,22 @@
   color: var(--at-color-ink);
 }
 
+/*
+ * Link-style button, for example the print, download and copy actions of the recovery codes screen.
+ * The base theme gives it its own blue and changes colour and background on plain focus.
+ * Here it uses the link tokens. Focus alone changes nothing. The shared focus line shows keyboard focus.
+ */
+.login-pf .pf-v5-c-button.pf-m-link {
+  --pf-v5-c-button--m-link--Color: var(--at-color-link);
+  --pf-v5-c-button--m-link--BackgroundColor: transparent;
+  --pf-v5-c-button--m-link--focus--Color: var(--at-color-link);
+  --pf-v5-c-button--m-link--focus--BackgroundColor: transparent;
+  --pf-v5-c-button--m-link--hover--Color: var(--at-color-link-hover);
+  --pf-v5-c-button--m-link--hover--BackgroundColor: var(--at-color-surface-sunken);
+  --pf-v5-c-button--m-link--active--Color: var(--at-color-link-hover);
+  --pf-v5-c-button--m-link--active--BackgroundColor: var(--at-color-surface-sunken-hover);
+}
+
 .login-pf .pf-v5-c-button.pf-m-control {
   background: var(--at-color-surface-sunken);
   color: var(--at-color-ink);
