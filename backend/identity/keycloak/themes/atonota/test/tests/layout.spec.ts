@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { KC, screens } from './helpers';
+import { KC, screen, screens } from './helpers';
 
 // Yerleşim testleri bütün görünümlerde koşar: 320, 360, 375, 390, yatay telefon, tablet ve masaüstü.
 for (const item of screens) {
@@ -81,6 +81,21 @@ for (const item of screens) {
     expect(smallTargets, 'küçük dokunma alanı').toEqual([]);
   });
 }
+
+test('@matrix recovery codes stay on one line and within their column', async ({ page }) => {
+  await screen('recovery-codes-setup').open(page);
+  await page.evaluate(() => document.fonts.ready);
+  const wrappedOrOverflowing = await page.locator('#kc-recovery-codes-list li').evaluateAll((items) =>
+    items.flatMap((item, index) => {
+      const range = document.createRange();
+      range.selectNodeContents(item);
+      const lines = range.getClientRects();
+      const box = item.getBoundingClientRect();
+      return lines.length !== 1 || lines[0].right > box.right + 0.5 ? [index + 1] : [];
+    }),
+  );
+  expect(wrappedOrOverflowing).toEqual([]);
+});
 
 // Kullanıcı kök yazı boyutunu büyütebilir. Yerleşim taşmamalı ve kontroller görünür kalmalıdır.
 for (const percent of [125, 200]) {
