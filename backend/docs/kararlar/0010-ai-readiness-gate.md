@@ -47,3 +47,14 @@ Kapı metni küçük harfe çevirir ve harf ile rakam dışındaki işaretleri a
 Kapı kalan metindeki her altı karakterin özetini karşılaştırır.
 Yolda eşleşme varsa kapı, yol yerine o yola ait kısa bir kod gösterir.
 Kapı eşleşen metni çıktıya yazmaz.
+
+## Modül değişikliği ve ad denetimi
+
+Kapı, yapay zekâ ve MCP uçlarının modülünü sınır dosyasından bulur.
+Modül adı değişince kapı güncel sınır dosyasını okur.
+Araç kancasıyla bildirilen işlevler ayrıca denetlenir.
+
+Sekizinci denetim, varsa `dev/naming/check_names.py` betiğini çağırır.
+Betik yoksa kapı hata akışına `naming: not_run` yazar.
+JSON bulgu listesi ve çıkış kodu bu durumda değişmez.
+Betik çalışamazsa kapı bunu bulgu sayar.

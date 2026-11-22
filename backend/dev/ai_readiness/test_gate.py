@@ -37,6 +37,7 @@ class GateTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, int(bool(rules)), result.stderr)
+        self.assertTrue(result.stdout, result.stderr)
         violations = json.loads(result.stdout)
         self.assertCountEqual([item["rule"] for item in violations], rules)
         for item in violations:
@@ -171,10 +172,63 @@ class GateTests(unittest.TestCase):
         self.assertEqual([finding["rule"] for finding in findings], ["forbidden-name"] * 2)
         self.assertIn(("guide.txt", 2), {(finding["path"], finding["line"]) for finding in findings})
 
+    def test_sql_scope_follows_module_policy_through_rename(self):
+        sql = 'import frappe\n\nfrappe.db.sql("SELECT 1")\n'
+        for module, policy in (
+            ("yapay_zeka", "modul-sinirlari.json"),
+            ("ai", "module-boundaries.json"),
+        ):
+            with self.subTest(module=module):
+                self.write(
+                    f"dev/{policy}",
+                    json.dumps({"path_owners": {"sample_app.api.ai": f"sample_app.{module}"}}),
+                )
+                self.write(f"{APP}/{module}/tests/test_setup.py", sql)
+                path = f"{APP}/{module}/read_card.py"
+                self.write(path, sql)
+                try:
+                    findings = self.scan("sql")
+                    self.assertEqual(findings[0]["path"], path)
+                finally:
+                    (self.root / path).unlink()
+                    (self.root / "dev" / policy).unlink()
+
+    def test_missing_naming_checker_reports_not_run(self):
+        result = subprocess.run([COMMAND, "--root", self.root, "--json"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(json.loads(result.stdout), [])
+        self.assertIn("naming: not_run", result.stderr)
+
+    def test_naming_checker_reports_findings_and_execution_errors(self):
+        checker = "dev/naming/check_names.py"
+        self.write("apps/example.py", "# Example\n")
+        self.write(
+            checker,
+            """
+            import argparse
+            import json
+            from pathlib import Path
+
+            parser = argparse.ArgumentParser()
+            parser.add_argument("--root", type=Path, required=True)
+            parser.add_argument("--json", action="store_true", required=True)
+            args = parser.parse_args()
+            assert (args.root / "backend/apps/example.py").is_file()
+            print(json.dumps([{
+                "path": "backend/apps/example.py", "line": 1,
+                "rule": "module-name", "message": "Invalid module name."
+            }]))
+            raise SystemExit(1)
+            """,
+        )
+        findings = self.scan("naming.module-name")
+        self.assertEqual(findings[0]["path"], "apps/example.py")
+        self.write(checker, "raise SystemExit(2)")
+        self.scan("naming")
+
     def test_sql_in_ai_module_and_registered_tool(self):
         command = 'import frappe\n\ndef run():\n    return frappe.db.sql("SELECT 1")\n'
         self.write(f"{APP}/tools.py", command)
-        self.write(f"{APP}/yapay_zeka/tests/test_setup.py", command)
         self.write(
             f"{APP}/declarations.py",
             """
@@ -189,10 +243,8 @@ class GateTests(unittest.TestCase):
             """,
         )
         self.scan()
-        self.write(f"{APP}/yapay_zeka/read_card.py", command)
-        self.scan("sql")
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.declarations.tools"]\n')
-        self.scan("sql", "sql")
+        self.scan("sql")
 
 
 if __name__ == "__main__":

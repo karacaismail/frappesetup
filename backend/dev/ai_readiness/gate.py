@@ -4,6 +4,7 @@ import argparse
 import ast
 import json
 import re
+import subprocess
 import sys
 import tokenize
 from dataclasses import asdict, dataclass
@@ -50,7 +51,9 @@ def has_text(value):
 
 
 def module_name(path, root):
-    parts = list(path.relative_to(root / "apps").with_suffix("").parts[1:])
+    parts = list(path.relative_to(root / "apps").with_suffix("").parts)
+    if len(parts) > 1:
+        parts.pop(0)
     if parts[-1] == "__init__":
         parts.pop()
     return ".".join(parts)
@@ -125,6 +128,71 @@ def doctype_checks(path, emit):
         emit(path, line, "doctype", f"Field {fieldname!r} needs a description.")
 
 
+def ai_module_owners(root: Path) -> set[str]:
+    """Resolve the owner of the public AI and MCP endpoints from repository policy."""
+    dev = root / "dev"
+    current = dev / "module-boundaries.json"
+    policy = current if current.exists() else dev / "modul-sinirlari.json"
+    if not policy.exists() and not (root / "apps/platform_core").exists():
+        return set()
+    data = json.loads(policy.read_text(encoding="utf-8"))
+    owners = data.get("path_owners") if isinstance(data, dict) else None
+    if not isinstance(owners, dict):
+        raise ValueError("Module boundary policy has no path owners.")
+    if (root / "apps/platform_core").exists() and not any(
+        owners.get(endpoint) for endpoint in ("platform_core.api.ai", "platform_core.api.mcp")
+    ):
+        raise ValueError("Module boundary policy has no platform AI owner.")
+    prefixes = {owner for endpoint, owner in owners.items() if endpoint.endswith((".api.ai", ".api.mcp"))}
+    if any(not isinstance(prefix, str) or not prefix.strip() for prefix in prefixes):
+        raise ValueError("Module boundary policy has an invalid AI owner.")
+    return prefixes
+
+
+def naming_findings(root: Path) -> list[Finding]:
+    checker = root / "dev/naming/check_names.py"
+    relative = checker.relative_to(root).as_posix()
+    if not checker.exists():
+        print("naming: not_run (checker unavailable)", file=sys.stderr)
+        return []
+    if not checker.is_file() or checker.resolve() != checker:
+        return [Finding(relative, 1, "naming", "Naming checker must be a regular in-tree file.")]
+    try:
+        result = subprocess.run(
+            [sys.executable, "-B", str(checker), "--root", str(root.parent), "--json"],
+            cwd=root.parent,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        if result.returncode not in {0, 1}:
+            raise ValueError("Naming checker returned an unexpected status.")
+        records = json.loads(result.stdout)
+        if not isinstance(records, list) or bool(records) != bool(result.returncode):
+            raise ValueError("Naming checker returned inconsistent findings.")
+        findings = []
+        for record in records:
+            path, line, rule, message = (record[key] for key in ("path", "line", "rule", "message"))
+            if (
+                not isinstance(path, str)
+                or not path
+                or Path(path).is_absolute()
+                or ".." in Path(path).parts
+                or type(line) is not int
+                or line < 1
+                or not isinstance(rule, str)
+                or not rule
+                or not isinstance(message, str)
+                or not message.strip()
+            ):
+                raise ValueError("Naming checker returned an invalid finding.")
+            findings.append(Finding(path.removeprefix("backend/"), line, f"naming.{rule}", message))
+        return findings
+    except (KeyError, OSError, TypeError, ValueError, subprocess.TimeoutExpired):
+        return [Finding(relative, 1, "naming", "Naming checker could not complete.")]
+
+
 def scan(root):
     findings = set()
     functions = {}
@@ -134,6 +202,12 @@ def scan(root):
 
     def emit(path, line, rule, message):
         findings.add(Finding(path.relative_to(root).as_posix(), line, rule, message))
+
+    try:
+        ai_owners = ai_module_owners(root)
+    except (OSError, TypeError, ValueError):
+        ai_owners = set()
+        emit(root / "dev", 1, "input", "Could not resolve the AI module from boundary policy.")
 
     if not (root / "apps").is_dir():
         emit(root / "apps", 1, "input", "Backend apps directory is missing.")
@@ -193,7 +267,7 @@ def scan(root):
                 if isinstance(item, ast.AnnAssign) and dotted(item.target) == "ai_tools" and item.value:
                     registered.update((name, (path, item.lineno)) for name in tool_references(item.value, ()))
 
-        if not is_test and "yapay_zeka" in module.split("."):
+        if not is_test and any(module == owner or module.startswith(f"{owner}.") for owner in ai_owners):
             for line in sql_calls(tree, aliases):
                 emit(path, line, "sql", "Raw SQL is forbidden in AI tools.")
     targets = dict(registered)
@@ -229,6 +303,7 @@ def scan(root):
 
     for path, line, message in tracked_findings(root):
         findings.add(Finding(path, line, "forbidden-name", message))
+    findings.update(naming_findings(root))
     return sorted(findings)
 
 
@@ -241,7 +316,7 @@ def main():
         Finding(
             redact_path(finding.path),
             finding.line,
-            finding.rule,
+            finding.rule if next(match_lines([finding.rule]), None) is None else "redacted",
             finding.message if next(match_lines([finding.message]), None) is None else "Details redacted.",
         )
         for finding in scan(args.root.resolve())
