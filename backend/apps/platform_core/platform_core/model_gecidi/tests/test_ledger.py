@@ -29,6 +29,8 @@ class TestLedger(IntegrationTestCase):
 			}
 		).insert()
 		frappe.db.set_value("AI Account", account.name, "monthly_budget", Decimal("100000000000.123456792"))
+		api_name = str(uuid4())
+		model_name = str(uuid4())
 		for outcome, known, amount in (
 			("success", 1, Decimal("100000000000.123456789")),
 			("pending", 0, Decimal("0.000000001")),
@@ -42,8 +44,8 @@ class TestLedger(IntegrationTestCase):
 					"user": frappe.session.user,
 					"provider": provider.name,
 					"account": account.name,
-					"api": "ledger-fixture",
-					"model": "ledger-fixture",
+					"api": api_name,
+					"model": model_name,
 					"result": outcome,
 					"currency": "USD",
 				}
