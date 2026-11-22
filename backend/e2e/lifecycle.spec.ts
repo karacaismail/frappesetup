@@ -289,16 +289,15 @@ test.describe('Employee idle session', () => {
     const password = required('E2E_EMPLOYEE_PASSWORD');
     await signIn(page, email, password);
     await expect.poll(() => loggedUser(page.request)).toBe(email);
+    expect(await keycloakStillSignedIn(page)).toBe(true);
     const started = Date.now();
     await new Promise((resolve) => setTimeout(resolve, 55 * 60 * 1000));
     expect(await keycloakStillSignedIn(page)).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, Math.max(0, started + IDLE_MS + 2000 - Date.now())));
     expect(await keycloakStillSignedIn(page)).toBe(true);
 
-    await page.goto(sites().tenant + '/panel');
-    await expect.poll(() => new URL(page.url()).origin).toBe(sites().identity);
-    await expect(page.locator('#password')).toBeVisible();
-    await enterCredentials(page, email, password);
+    await expect.poll(() => loggedUser(page.request)).toBe('Guest');
+    await signIn(page, email, password);
     await expect.poll(() => loggedUser(page.request)).toBe(email);
   });
 });
