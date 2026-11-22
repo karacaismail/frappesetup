@@ -1,8 +1,6 @@
 """Seed and exercise a disposable Frappe site through its real HTTP server."""
 
-import hashlib
 import json
-import secrets
 import unittest
 from contextlib import ExitStack
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -11,6 +9,7 @@ from uuid import uuid4
 
 import frappe
 import requests
+from frappe.utils import add_to_date, now_datetime
 
 from platform_core.api.test_model import TestModelHTTP
 
@@ -28,6 +27,8 @@ class ProviderHandler(BaseHTTPRequestHandler):
 		payload = self.rfile.read(int(self.headers["Content-Length"]))
 		self.server.attempts.append(self.path)
 		self.server.provider_payloads.append(payload)
+		if self.server.provider_gate is not None:
+			self.server.provider_gate(self.path)
 		status = self.server.provider_status.get(self.path)
 		if status is not None and status != 200:
 			response = {"error": "fixture provider failure"}
@@ -58,7 +59,7 @@ def _identities(suffix, password, role, auth, cleanup):
 	users = {}
 	roles = {"manager": "AI Manager", "system_manager": "System Manager", "authorized": role}
 	for actor in ("manager", "regular", "authorized", "system_manager"):
-		credentials = {"api_key": auth[0], "api_secret": auth[1]} if actor == "authorized" else {}
+		credentials = {"api_key": auth[actor][0], "api_secret": auth[actor][1]} if actor in auth else {}
 		users[actor] = _insert(
 			"User",
 			email=f"gateway-{actor}-{suffix}@example.test",
@@ -172,22 +173,29 @@ def _session(base, user=None, password=None):
 	return session
 
 
-def _agent_session(base, manager, user, cleanup):
-	token = "fsat_" + secrets.token_urlsafe(32)
-	key = "yz_agent_token:" + hashlib.sha256(token.encode()).hexdigest()
-	counter_key = frappe.cache.make_key(key + ":calls")
-	frappe.cache.set_value(
-		key,
-		{
-			"user": user,
-			"sid": manager.cookies["sid"],
-			"audience": frappe.conf.get("ai_agent_audience") or "agent-service",
-		},
-		expires_in_sec=300,
+def _oauth_session(base, user, cleanup):
+	client = _insert(
+		"OAuth Client",
+		app_name=f"Gateway fixture {uuid4().hex[:12]}",
+		default_redirect_uri="https://fixture.example.test/callback",
+		redirect_uris="https://fixture.example.test/callback",
+		scopes="all",
+		grant_type="Authorization Code",
+		response_type="Code",
 	)
-	frappe.cache.set(counter_key, 1, ex=300)
-	cleanup.callback(frappe.cache.delete_value, key)
-	cleanup.callback(frappe.cache.delete, counter_key)
+	cleanup.callback(frappe.delete_doc, "OAuth Client", client)
+	token = _insert(
+		"OAuth Bearer Token",
+		client=client,
+		user=user,
+		scopes="all",
+		access_token=uuid4().hex,
+		expiration_time=add_to_date(now_datetime(), minutes=10),
+		expires_in=600,
+		status="Active",
+	)
+	cleanup.callback(frappe.delete_doc, "OAuth Bearer Token", token)
+	frappe.db.commit()
 	session = _session(base)
 	session.headers["Authorization"] = f"Bearer {token}"
 	return session
@@ -206,7 +214,7 @@ def run():
 	suffix = uuid4().hex[:12]
 	password = f"Fixture#{uuid4().hex}"
 	credential = f"test-only-{uuid4().hex}"
-	auth = (uuid4().hex, uuid4().hex)
+	auth = {actor: (uuid4().hex, uuid4().hex) for actor in ("authorized", "manager")}
 	frappe.set_user("Administrator")
 	try:
 		with ExitStack() as cleanup:
@@ -221,6 +229,7 @@ def run():
 				)
 				server.attempts = []
 				server.provider_status = {}
+				server.provider_gate = None
 				server.provider_payloads = []
 				thread = Thread(target=server.serve_forever, daemon=True)
 				thread.start()
@@ -233,15 +242,19 @@ def run():
 					provider_status=server.provider_status,
 					provider_payloads=server.provider_payloads,
 					provider_url=SECOND_URL,
+					provider_server=server,
 					sessions={"guest": connections.enter_context(_session(base))},
 				)
 				for actor, user in users.items():
 					fixture["sessions"][actor] = connections.enter_context(_session(base, user, password))
-				fixture["sessions"]["agent"] = connections.enter_context(
-					_agent_session(base, fixture["sessions"]["manager"], users["manager"], cleanup)
+				fixture["sessions"]["oauth"] = connections.enter_context(
+					_oauth_session(base, users["manager"], cleanup)
 				)
-				fixture["sessions"]["api_key"] = connections.enter_context(_session(base))
-				fixture["sessions"]["api_key"].headers["Authorization"] = f"token {auth[0]}:{auth[1]}"
+				for actor, session_name in (("authorized", "api_key"), ("manager", "manager_key")):
+					key, secret = auth[actor]
+					session = connections.enter_context(_session(base))
+					session.headers["Authorization"] = f"token {key}:{secret}"
+					fixture["sessions"][session_name] = session
 				TestModelHTTP.fixture = fixture
 				try:
 					suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestModelHTTP)

@@ -8,6 +8,7 @@
   "model_id",
   "capabilities",
   "context_size",
+  "output_tokens_per_second",
   "prices_known",
   "input_price",
   "output_price",
@@ -44,6 +45,15 @@
    "fieldname": "context_size",
    "fieldtype": "Int",
    "label": "Context Size",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "30",
+   "description": "Conservative output generation rate in tokens per second for planning the request deadline.",
+   "fieldname": "output_tokens_per_second",
+   "fieldtype": "Int",
+   "label": "Output Tokens per Second",
    "non_negative": 1,
    "reqd": 1
   },

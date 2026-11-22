@@ -24,6 +24,7 @@
   "reserved_cost",
   "reserved_tokens",
   "resolved_by",
+  "previous_result",
   "resolved_at",
   "resolution_note"
  ],
@@ -203,6 +204,13 @@
    "fieldtype": "Link",
    "label": "Resolved By",
    "options": "User",
+   "read_only": 1
+  },
+  {
+   "description": "Attempt result before a manager reconciled the cost.",
+   "fieldname": "previous_result",
+   "fieldtype": "Data",
+   "label": "Previous Result",
    "read_only": 1
   },
   {

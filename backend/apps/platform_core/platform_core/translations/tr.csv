@@ -28,6 +28,7 @@ Capabilities,Yetenekler
 Client identifier used during the OAuth exchange.,Geçit OAuth belirtecini alırken bu kimliği kullanır.
 Connection selected for this attempt.,Geçit bu denemede bu bağlantıyı seçti.
 Context Size,Bağlam Boyutu
+Conservative output generation rate in tokens per second for planning the request deadline.,Geçit istek süresini bu hızla hesaplar. Değer saniye başına token sayısıdır.
 Controls whether the route sends masked data or uses only local models.,Geçit maskeli veri gönderir veya yalnız yerel model kullanır.
 Cost Currency,Maliyetin Para Birimi
 Currency of both model prices.,Girdi ve çıktı fiyatları bu para birimindedir.
@@ -125,6 +126,8 @@ Disable the API connection before clearing its credential.,Gizli bağlantı bilg
 "{0} must be an HTTPS address without credentials, a query, or a fragment.","{0} alanına geçerli bir HTTPS adresi yazın. Adres kullanıcı bilgisi, sorgu veya bölüm içermesin."
 "{0} must be an HTTP or HTTPS address without credentials, a query, or a fragment.","{0} alanına geçerli bir HTTP veya HTTPS adresi yazın. Adres kullanıcı bilgisi, sorgu veya bölüm içermesin."
 Context size must be at least 1 token.,Bağlam boyutu en az 1 token olmalıdır.
+Output Tokens per Second,Saniye Başına Çıktı Tokenı
+Output speed must be at least 1 token per second.,Model hızı saniyede en az 1 token olmalıdır.
 Reservation Known,Ayrılan Tutar Biliniyor
 Whether the attempt has a bounded reserved cost.,Geçit bu deneme için üst tutarı hesapladı.
 Reserved Cost,Ayrılan Tutar
@@ -140,3 +143,5 @@ Manager note explaining how the uncertain charge was reconciled.,Yönetici sağl
 Model currency used to reserve and calculate the attempt cost.,Geçit deneme tutarını modelin para birimiyle ayırır ve hesaplar.
 Failure Code,Hata Kodu
 Fixed provider failure code recorded when an attempt outcome is uncertain.,Geçit denemenin sonucu bilinmiyorsa bu hata kodunu yazar.
+Attempt result before a manager reconciled the cost.,Yönetici tutarı doğrulamadan önceki deneme sonucu.
+Previous Result,Önceki Sonuç

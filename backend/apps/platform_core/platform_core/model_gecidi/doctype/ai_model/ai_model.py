@@ -11,3 +11,5 @@ class AIModel(Document):
 		self.capabilities = encode_identifiers(self.capabilities, "Capabilities")
 		if cint(self.context_size) < 1:
 			frappe.throw(_("Context size must be at least 1 token."))
+		if cint(self.output_tokens_per_second) < 1:
+			frappe.throw(_("Output speed must be at least 1 token per second."))

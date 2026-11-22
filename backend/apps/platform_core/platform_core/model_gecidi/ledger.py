@@ -117,6 +117,12 @@ def begin(route, api, account, provider, model, *, cost, tokens):
 	return log.name
 
 
+def is_pending(name):
+	"""Use a fresh snapshot so a reconciled attempt cannot start another network request."""
+	frappe.db.commit()  # nosemgrep
+	return frappe.db.get_value("AI Usage Log", name, "result") == "pending"
+
+
 def finish(name, model, result, duration_ms, usage=None, *, failure_code=None):
 	usage = usage or {}
 	tokens_in, tokens_out = usage.get("input"), usage.get("output")

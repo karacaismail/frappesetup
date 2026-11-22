@@ -34,6 +34,15 @@ class Handler(BaseHTTPRequestHandler):
 			return
 		self.server.body = json.loads(raw)
 		sleep(self.server.header_delay)
+		if self.server.header_chunks:
+			try:
+				for chunk in self.server.header_chunks:
+					sleep(0.025)
+					self.wfile.write(chunk)
+					self.wfile.flush()
+			except (BrokenPipeError, ConnectionResetError):
+				pass
+			return
 		self.send_response(self.status)
 		self.send_header("Content-Type", "application/json")
 		if self.server.location:
@@ -61,6 +70,7 @@ class AdapterTests(unittest.TestCase):
 		server.content_encoding = None
 		server.chunks = []
 		server.header_delay = 0
+		server.header_chunks = []
 		thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.02})
 		thread.start()
 		self.addCleanup(server.server_close)
@@ -68,6 +78,48 @@ class AdapterTests(unittest.TestCase):
 		self.addCleanup(server.shutdown)
 		self.server = server
 		self.url = f"http://127.0.0.1:{server.server_port}"
+
+	def test_header_drip_cannot_extend_absolute_deadline(self):
+		self.server.header_chunks = [
+			b"HTTP/1.1 200 OK\r\n",
+			*[b"X-Fixture: value\r\n"] * 32,
+			b"\r\n{}",
+		]
+		started = monotonic()
+		with self.assertRaises(GatewayError) as failure:
+			complete(
+				Endpoint("fixture", "ollama", self.url),
+				"fake",
+				[],
+				20,
+				timeout=0.15,
+				connect_timeout=0.05,
+				deadline=started + 0.2,
+			)
+		self.assertEqual(failure.exception.code, "timeout")
+		self.assertTrue(failure.exception.may_be_billed)
+		self.assertLess(monotonic() - started, 0.65)
+
+	def test_unexpected_error_after_model_request_is_potentially_billed(self):
+		with (
+			patch("requests.Session.post", side_effect=ValueError("Unexpected transport error")),
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(Endpoint("fixture", "ollama", self.url), "fake", [], 20)
+		self.assertEqual(failure.exception.code, "invalid_response")
+		self.assertTrue(failure.exception.may_be_billed)
+
+	def test_session_teardown_after_model_response_is_potentially_billed(self):
+		Handler.status = 200
+		Handler.response = {"message": {"content": "hello"}}
+		with (
+			patch("requests.Session.__exit__", side_effect=ValueError("Unexpected teardown error")),
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(Endpoint("fixture", "ollama", self.url), "fake", [], 20)
+		self.assertEqual(self.server.paths, ["/api/chat"])
+		self.assertEqual(failure.exception.code, "invalid_response")
+		self.assertTrue(failure.exception.may_be_billed)
 
 	def test_four_protocols_return_same_text_and_usage(self):
 		cases = {

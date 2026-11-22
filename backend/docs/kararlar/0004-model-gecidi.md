@@ -64,15 +64,19 @@ Maliyeti hesaplanamayan çağrı bütçeli hesaba gitmez.
 Geçit, her sağlayıcı denemesinden önce kullanım kaydı açar.
 Kayıt, çağrının sonucunu ve ölçülen kullanımı tutar.
 Geçit mesaj metnini, anahtarı ve araç girdisini kayda yazmaz.
-Geçit aynı hesapta süren denemeler için hesap başına kilit alır.
-Farklı hesaplar aynı anda çağrı yapabilir.
+Geçit bütçe ayırırken hesap başına kilit alır.
+Geçit çağrıdan önce kilidi bırakır.
+Bütçe yeterse aynı hesapta iki çağrı birlikte çalışabilir.
 Geçit çağrıdan önce tahmini üst tutarı bütçeden ayırır.
 Çağrı hiç çıkmadıysa geçit ayrılan tutarı geri bırakır.
 Sonuç bilinmiyorsa tahmini tutar, yönetici gerçek tutarı girene kadar ayrılır.
 Eski kayıtta tahmin yoksa geçit yönetici çözümünü bekler.
 Geçit bütçeyi her takvim ayı için ayrı hesaplar.
 Geçit, bütçeli hesapta sonucu bilinmeyen süre aşımından sonra yedeğe geçmez.
-Geçit bağlantı için 5 saniye ayırır. Okuma süresi çıktı sınırına göre artar.
+Geçit bağlantı için 5 saniye ayırır.
+Geçit okuma süresini model hızına ve çıktı sınırına göre hesaplar.
+Hız belirtilmezse geçit saniyede 30 token kullanır.
+Süreye sığmayan çağrı bütçeden pay ayırmadan reddedilir.
 Geçit bir yol için en çok 105 saniye ayırır.
 Deneme ortamı `bench serve` kullanır. Temel imaj Gunicorn için 120 saniye ayırır.
 
@@ -98,13 +102,17 @@ Bu kayıt, istek yarıda kalırsa bütçe denetiminde korunur.
 
 Model çağrısı insan oturumunu ve Frappe kullanıcı anahtarını kabul eder.
 Aracı, çağrıyı yapay zekâ katmanından başlatır.
-Geçidin ortak işlevi arka plan işinde de kullanıcının yetkisini denetler.
+Arka plan işi `platform_core.model_gecidi.api.complete` işlevini kullanır.
+Geçit bu işlevde kullanıcının yetkisini denetler.
 Arka plan işi, model çağrısından önce kendi veritabanı yazısını bitirir.
 
-Yönetici, sonucu bilinmeyen denemenin gerçek ücretini kayda yazabilir.
-Yönetici, kapalı bağlantının anahtarını ayrı bir uçla silebilir.
+Yönetici sonucu bilinmeyen denemenin gerçek ücretini yazabilir.
+Geçit önceki sonucu saklar. Yönetici kısa bir not ekleyebilir.
+Yönetici kapalı bağlantının anahtarını ayrı bir uçla silebilir.
+Geçit bağlantı kaydına silme notu ekler.
 Boş anahtar alanıyla form kaydetmek mevcut anahtarı korur.
 Kullanım günlükleri varsayılan olarak 365 gün tutulur.
 Site yöneticisi süreyi `model_gateway_usage_retention_days` ayarında belirler.
 Yönetici temizliği önizleyebilir veya elle başlatabilir.
 Temizlik yalnız kapanmış kayıtları siler. Her çağrı en çok 500 kayıt siler.
+Geçit temizliği “Activity Log” kaydına yazar.

@@ -9,6 +9,7 @@ readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     "pydantic~=2.12.5",
+    "urllib3>=2.2.0,<3",
 ]
 
 [tool.bench.frappe-dependencies]

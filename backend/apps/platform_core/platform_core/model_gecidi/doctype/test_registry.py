@@ -1,5 +1,6 @@
 """Regression coverage for provider registry persistence and credentials."""
 
+from unittest.mock import patch
 from uuid import uuid4
 
 import frappe
@@ -88,6 +89,31 @@ class TestGatewayRegistry(IntegrationTestCase):
 	def test_rejects_zero_model_context(self):
 		with self.assertRaises(frappe.ValidationError):
 			_insert("AI Model", provider=self.provider.name, model_id="registry-fixture", context_size=0)
+
+	def test_model_speed_defaults_to_thirty_output_tokens_per_second(self):
+		model = _insert(
+			"AI Model", provider=self.provider.name, model_id="registry-speed-fixture", context_size=128
+		)
+		self.assertEqual(model.reload().get("output_tokens_per_second"), 30)
+
+	def test_model_speed_must_be_positive(self):
+		for speed in (0, -1):
+			with self.subTest(speed=speed), self.assertRaises(frappe.ValidationError):
+				_insert(
+					"AI Model",
+					provider=self.provider.name,
+					model_id="registry-speed-fixture",
+					context_size=128,
+					output_tokens_per_second=speed,
+				)
+
+	def test_public_completion_forwards_gateway_arguments(self):
+		from platform_core.model_gecidi.api import complete
+
+		messages = [{"role": "user", "content": "Hello"}]
+		with patch("platform_core.model_gecidi.gateway.complete", return_value={"text": "Hello"}) as gateway:
+			self.assertEqual(complete("fixture", messages), {"text": "Hello"})
+		gateway.assert_called_once_with("fixture", messages, tools=None, schema=None, limit=1024)
 
 	def _route_fields(self):
 		model = _insert(

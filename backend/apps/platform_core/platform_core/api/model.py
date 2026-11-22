@@ -2,7 +2,7 @@
 
 import frappe
 
-from platform_core.model_gecidi import gateway, maintenance, policy
+from platform_core.model_gecidi import api, gateway, maintenance, policy
 
 
 def _respond(call, *args, allow_api_key=False):
@@ -18,7 +18,7 @@ def _respond(call, *args, allow_api_key=False):
 @frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
 def complete(route, messages, tools=None, schema=None, limit=1024):
 	"""Generate a response through one tenant route. Provider use may incur a charge."""
-	return _respond(gateway.complete, route, messages, tools, schema, limit, allow_api_key=True)
+	return _respond(api.complete, route, messages, tools, schema, limit, allow_api_key=True)
 
 
 # Gateway operations check manager permissions and record access in the service layer.
@@ -29,9 +29,9 @@ def test_api(api, model):
 
 
 @frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
-def resolve_usage(log, cost):
+def resolve_usage(log, cost, note=None):
 	"""Reconcile a model attempt with its verified cost."""
-	return _respond(maintenance.resolve_usage, log, cost)
+	return _respond(maintenance.resolve_usage, log, cost, note)
 
 
 @frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission

@@ -3,14 +3,21 @@
 import json
 import logging
 import re
+from contextlib import contextmanager, suppress
+from contextvars import ContextVar
 from dataclasses import dataclass, field
+from socket import SHUT_RDWR
+from threading import Timer
 from time import monotonic
 from urllib.parse import quote, quote_plus, urlsplit
 
 import requests
+from urllib3.connection import HTTPConnection, HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
 from urllib3.exceptions import HTTPError, MaxRetryError, NewConnectionError, ReadTimeoutError
 
 LOGGER = logging.getLogger(__name__)
+_RESPONSE_DEADLINE = ContextVar("model_response_deadline", default=None)
 CALL_ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 POTENTIALLY_BILLED = {"timeout", "upstream", "invalid_response"}
 PATHS = {
@@ -39,7 +46,76 @@ class GatewayError(Exception):
 		self.may_be_billed = code in POTENTIALLY_BILLED if may_be_billed is None else may_be_billed
 
 
+@contextmanager
+def _interrupt_socket(socket, deadline):
+	"""Interrupt a blocking HTTP parser at a wall-clock deadline."""
+	remaining = deadline - monotonic()
+	if remaining <= 0:
+		raise GatewayError("timeout")
+	if socket is None:
+		yield
+		return
+
+	def interrupt():
+		# Shutdown wakes a blocked socket reader. Closing its buffered file
+		# from here could instead wait for the read to release its buffer lock.
+		with suppress(OSError):
+			socket.shutdown(SHUT_RDWR)
+
+	timer = Timer(remaining, interrupt)
+	timer.daemon = True
+	timer.start()
+	try:
+		yield
+	except Exception:
+		if monotonic() >= deadline:
+			raise GatewayError("timeout") from None
+		raise
+	else:
+		if monotonic() >= deadline:
+			raise GatewayError("timeout")
+	finally:
+		timer.cancel()
+		timer.join()
+
+
+class _ResponseDeadline:
+	def getresponse(self):
+		deadline = _RESPONSE_DEADLINE.get()
+		if deadline is None:
+			return super().getresponse()
+		with _interrupt_socket(self.sock, deadline):
+			return super().getresponse()
+
+
+class _ProviderHTTPConnection(_ResponseDeadline, HTTPConnection):
+	pass
+
+
+class _ProviderHTTPSConnection(_ResponseDeadline, HTTPSConnection):
+	pass
+
+
+class _ProviderHTTPPool(HTTPConnectionPool):
+	ConnectionCls = _ProviderHTTPConnection
+
+
+class _ProviderHTTPSPool(HTTPSConnectionPool):
+	ConnectionCls = _ProviderHTTPSConnection
+
+
+class _ProviderAdapter(requests.adapters.HTTPAdapter):
+	def init_poolmanager(self, *args, **kwargs):
+		super().init_poolmanager(*args, **kwargs)
+		self.poolmanager.pool_classes_by_scheme = {"http": _ProviderHTTPPool, "https": _ProviderHTTPSPool}
+
+
 class _ProviderSession(requests.Session):
+	def __init__(self):
+		super().__init__()
+		self.mount("http://", _ProviderAdapter())
+		self.mount("https://", _ProviderAdapter())
+
 	def get_redirect_target(self, response):
 		# Requests otherwise drains redirect bodies even with allow_redirects=False.
 		return None
@@ -68,20 +144,11 @@ def _read_body(response, deadline, max_bytes):
 	buffered = getattr(getattr(raw, "_fp", None), "fp", None)
 	socket = getattr(getattr(buffered, "raw", None), "_sock", None)
 	body = bytearray()
-	while True:
-		remaining = deadline - monotonic()
-		if remaining <= 0:
-			raise GatewayError("timeout")
-		if socket is not None and socket.fileno() >= 0:
-			socket.settimeout(remaining)
-		chunk = raw.read1(8192, decode_content=False)
-		if not chunk:
-			break
-		body.extend(chunk)
-		if len(body) > max_bytes:
-			raise GatewayError("invalid_response")
-	if monotonic() >= deadline:
-		raise GatewayError("timeout")
+	with _interrupt_socket(socket, deadline):
+		while chunk := raw.read1(8192, decode_content=False):
+			body.extend(chunk)
+			if len(body) > max_bytes:
+				raise GatewayError("invalid_response")
 	try:
 		return json.loads(body)
 	except (ValueError, RecursionError):
@@ -97,6 +164,7 @@ def _post_json(session, url, *, timeout, connect_timeout, deadline, max_bytes, b
 	# Keep both socket timeouts inside the shared route budget.
 	connect = min(connect_timeout, remaining / 2)
 	read = min(timeout, remaining - connect)
+	response_deadline = _RESPONSE_DEADLINE.set(deadline)
 	try:
 		with session.post(
 			url, timeout=(connect, read), allow_redirects=False, stream=True, **kwargs
@@ -117,6 +185,14 @@ def _post_json(session, url, *, timeout, connect_timeout, deadline, max_bytes, b
 		raise GatewayError("configuration") from None
 	except (requests.RequestException, HTTPError):
 		raise GatewayError("upstream") from None
+	except GatewayError:
+		raise
+	except Exception:
+		# Once post has started, an unexpected transport failure may follow
+		# a provider charge. Never expose the raw transport exception.
+		raise GatewayError("invalid_response") from None
+	finally:
+		_RESPONSE_DEADLINE.reset(response_deadline)
 
 
 def _contains_secret(value, secrets):
@@ -352,6 +428,7 @@ def complete(
 			except GatewayError as failure:
 				# Token issuance cannot have sent a model request.
 				raise GatewayError(failure.code, may_be_billed=False) from None
+			error = GatewayError("invalid_response")
 			status, body = _post_json(
 				session,
 				base.rstrip("/") + path,
@@ -365,7 +442,6 @@ def complete(
 			)
 		if status != 200:
 			raise GatewayError(_status_code(status))
-		error = GatewayError("invalid_response")
 		if body.get("error") or body.get("promptFeedback", {}).get("blockReason"):
 			raise GatewayError("rejected", may_be_billed=True)
 		text, calls, input_tokens, output_tokens = _normalize(endpoint.adapter, body)
@@ -391,7 +467,8 @@ def complete(
 		}
 	except GatewayError as failure:
 		error = failure
-	except (KeyError, IndexError, ValueError, TypeError, AttributeError, RecursionError):
+	except Exception:
+		# Preserve the dispatch phase without exposing provider data.
 		pass
 	LOGGER.warning("Model gateway attempt failed: %s", error.code)
 	raise GatewayError(error.code, may_be_billed=error.may_be_billed)

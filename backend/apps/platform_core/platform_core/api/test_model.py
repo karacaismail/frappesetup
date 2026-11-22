@@ -2,6 +2,8 @@
 
 import json
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
 from time import time
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -36,7 +38,7 @@ class TestModelHTTP(unittest.TestCase):
 
 	def request(self, actor, method, path, **kwargs):
 		session = self.fixture["sessions"][actor]
-		if actor in {"agent", "api_key"}:
+		if actor in {"oauth", "api_key", "manager_key"}:
 			session.cookies.clear()
 		return session.request(
 			method, self.fixture["base"] + path, timeout=15, allow_redirects=False, **kwargs
@@ -48,7 +50,7 @@ class TestModelHTTP(unittest.TestCase):
 			path += "/" + quote(name, safe="")
 		return path
 
-	def complete(self, actor, route=None):
+	def complete(self, actor, route=None, *, limit=12):
 		return self.request(
 			actor,
 			"POST",
@@ -56,7 +58,7 @@ class TestModelHTTP(unittest.TestCase):
 			json={
 				"route": route or self.fixture["route"],
 				"messages": [{"role": "user", "content": "fixture message for failover"}],
-				"limit": 12,
+				"limit": limit,
 			},
 		)
 
@@ -69,13 +71,13 @@ class TestModelHTTP(unittest.TestCase):
 		)
 
 	def test_complete_guest_denied(self):
-		self.assertIn(self.complete("guest").status_code, {401, 403})
+		self.assertEqual(self.complete("guest").status_code, 403)
 
 	def test_complete_foreign_data_denied(self):
 		self.assertEqual(self.complete("regular").status_code, 403)
 
 	def test_test_api_guest_denied(self):
-		self.assertIn(self._test_api_request("guest").status_code, {401, 403})
+		self.assertEqual(self._test_api_request("guest").status_code, 403)
 
 	def test_test_api_foreign_data_denied(self):
 		self.assertEqual(self._test_api_request("regular").status_code, 403)
@@ -98,9 +100,8 @@ class TestModelHTTP(unittest.TestCase):
 			self.resource("AI API"),
 			params={"fields": json.dumps(["name", "api_key"]), "filters": json.dumps({"name": name})},
 		)
-		self.assertIn(listing.status_code, {200, 403, 417})
-		if listing.ok:
-			self.assertNotIn("api_key", listing.json()["data"][0])
+		self.assertEqual(listing.status_code, 200)
+		self.assertNotIn("api_key", listing.json()["data"][0])
 		document = self.request(
 			"manager",
 			"GET",
@@ -144,11 +145,31 @@ class TestModelHTTP(unittest.TestCase):
 		}
 		self.assertEqual(attempts, expected)
 
-	def test_route_rejects_agent_token(self):
+	def test_route_rejects_native_oauth_bearer_after_authentication(self):
+		identity = self.request("oauth", "GET", "/api/method/frappe.auth.get_logged_user")
+		self.assertEqual(identity.status_code, 200)
+		self.assertEqual(identity.json()["message"], self.fixture["users"]["manager"])
 		count = len(self.fixture["attempts"])
-		self.assertIn(self.complete("agent").status_code, {401, 403})
-		self.assertIn(self._test_api_request("agent").status_code, {401, 403})
+		for response in (self.complete("oauth"), self._test_api_request("oauth")):
+			self.assertEqual(response.status_code, 401)
+			self.assertEqual(response.json()["message"]["error"], "authentication_required")
 		self.assertEqual(len(self.fixture["attempts"]), count)
+
+	def test_manager_operations_reject_native_api_key(self):
+		identity = self.request("manager_key", "GET", "/api/method/frappe.auth.get_logged_user")
+		self.assertEqual(identity.status_code, 200)
+		self.assertEqual(identity.json()["message"], self.fixture["users"]["manager"])
+		checks = {
+			"test_api": {"api": self.fixture["second_api"], "model": self.fixture["model"]},
+			"resolve_usage": {"log": "missing-fixture-log", "cost": 0},
+			"purge_usage": {"dry_run": True},
+			"clear_api_credential": {"api": self.fixture["clearable_api"]},
+		}
+		for endpoint, payload in checks.items():
+			with self.subTest(endpoint=endpoint):
+				response = self._maintenance("manager_key", endpoint, payload)
+				self.assertEqual(response.status_code, 401)
+				self.assertEqual(response.json()["message"]["error"], "authentication_required")
 
 	def test_ordinary_user_with_matching_role_can_complete(self):
 		count = len(self.fixture["attempts"])
@@ -171,7 +192,7 @@ class TestModelHTTP(unittest.TestCase):
 			"/api/method/frappe.client.get_password",
 			json={"doctype": "AI API", "name": self.fixture["credential_api"], "fieldname": "api_key"},
 		)
-		self.assertIn(response.status_code, {401, 403})
+		self.assertEqual(response.status_code, 403)
 		self.assertNotIn(self.fixture["credential"], response.text)
 
 	def test_desk_save_preserves_hidden_credentials(self):
@@ -327,7 +348,7 @@ class TestModelHTTP(unittest.TestCase):
 
 	def test_resolve_usage_guest_denied(self):
 		response = self._maintenance("guest", "resolve_usage", {"log": "missing", "cost": "0"})
-		self.assertIn(response.status_code, {401, 403})
+		self.assertEqual(response.status_code, 403)
 
 	def test_resolve_usage_foreign_data_denied(self):
 		response = self._maintenance("regular", "resolve_usage", {"log": "missing", "cost": "0"})
@@ -335,7 +356,7 @@ class TestModelHTTP(unittest.TestCase):
 
 	def test_purge_usage_guest_denied(self):
 		response = self._maintenance("guest", "purge_usage", {"dry_run": True})
-		self.assertIn(response.status_code, {401, 403})
+		self.assertEqual(response.status_code, 403)
 
 	def test_purge_usage_foreign_data_denied(self):
 		response = self._maintenance("regular", "purge_usage", {"dry_run": True})
@@ -374,7 +395,8 @@ class TestModelHTTP(unittest.TestCase):
 		log = self._probe_log()
 		frappe.db.set_value("AI Usage Log", log, {"result": "unknown", "cost_known": 0})
 		frappe.db.commit()
-		response = self._maintenance("manager", "resolve_usage", {"log": log, "cost": 0.125})
+		note = "Verified using a fixture invoice."
+		response = self._maintenance("manager", "resolve_usage", {"log": log, "cost": 0.125, "note": note})
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
 		frappe.db.rollback()
 		record = frappe.get_doc("AI Usage Log", log)
@@ -383,7 +405,8 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertAlmostEqual(record.cost, 0.125)
 		self.assertEqual(record.resolved_by, self.fixture["users"]["manager"])
 		self.assertTrue(record.resolved_at)
-		self.assertTrue(record.resolution_note)
+		self.assertEqual(record.resolution_note, note)
+		self.assertEqual(record.previous_result, "unknown")
 
 	def test_retention_preserves_old_unknown_attempts(self):
 		closed, unknown = self._probe_log(), self._probe_log()
@@ -403,12 +426,25 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertTrue(frappe.db.exists("AI Usage Log", closed))
 		self.assertTrue(frappe.db.exists("AI Usage Log", unknown))
 		self.assertEqual(eligible, 0, "The isolated fixture must own every record eligible for deletion")
+		audit_filters = {
+			"reference_doctype": "AI Usage Log",
+			"subject": "Model gateway usage logs purged",
+			"user": self.fixture["users"]["manager"],
+		}
+		self.assertFalse(frappe.db.exists("Activity Log", audit_filters))
 		response = self._maintenance("manager", "purge_usage", {"dry_run": False})
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
 		self.assertEqual(response.json()["message"], {"eligible": 1, "deleted": 1, "dry_run": False})
 		frappe.db.rollback()
 		self.assertFalse(frappe.db.exists("AI Usage Log", closed))
+		audit = frappe.db.exists("Activity Log", audit_filters)
+		self.assertTrue(audit)
+		self.addCleanup(self._delete_activity_log, audit)
 		self.assertTrue(frappe.db.exists("AI Usage Log", unknown))
+
+	def _delete_activity_log(self, name):
+		frappe.db.delete("Activity Log", {"name": name})
+		frappe.db.commit()
 
 	def test_background_user_can_complete_and_guest_cannot(self):
 		route = self.fixture["role_route"]
@@ -428,7 +464,7 @@ class TestModelHTTP(unittest.TestCase):
 
 	def test_clear_api_credential_guest_denied(self):
 		response = self._maintenance("guest", "clear_api_credential", {"api": self.fixture["credential_api"]})
-		self.assertIn(response.status_code, {401, 403})
+		self.assertEqual(response.status_code, 403)
 
 	def test_clear_api_credential_foreign_data_denied(self):
 		response = self._maintenance(
@@ -439,7 +475,7 @@ class TestModelHTTP(unittest.TestCase):
 	def test_manager_can_explicitly_clear_disabled_credential(self):
 		name = self.fixture["clearable_api"]
 		denied = self._maintenance("manager", "clear_api_credential", {"api": name})
-		self.assertGreaterEqual(denied.status_code, 400)
+		self.assertEqual(denied.status_code, 417)
 		self.assertEqual(
 			self.request("manager", "PUT", self.resource("AI API", name), json={"enabled": 0}).status_code,
 			200,
@@ -449,6 +485,19 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertNotIn(self.fixture["credential"], cleared.text)
 		frappe.db.rollback()
 		self.assertFalse(get_decrypted_password("AI API", name, "api_key", raise_exception=False))
+		comment = frappe.db.get_value(
+			"Comment",
+			{
+				"reference_doctype": "AI API",
+				"reference_name": name,
+				"comment_type": "Info",
+				"owner": self.fixture["users"]["manager"],
+			},
+			"content",
+			order_by="creation desc",
+		)
+		self.assertTrue(comment)
+		self.assertNotIn(self.fixture["credential"], comment)
 
 	def test_tenant_manager_can_create_multiple_providers(self):
 		resource = self.resource("AI Provider")
@@ -468,6 +517,15 @@ class TestModelHTTP(unittest.TestCase):
 	def test_zero_budget_stops_probe_before_provider_call(self):
 		api = self.resource("AI API", self.fixture["second_api"])
 		account = self.resource("AI Account", self.fixture["second_account"])
+		self.addCleanup(
+			self._restore_fields,
+			"AI Account",
+			self.fixture["second_account"],
+			{
+				"has_monthly_budget": 0,
+				"monthly_budget": 0,
+			},
+		)
 		self.assertEqual(
 			self.request("manager", "PUT", api, json={"requests_per_minute": 0}).status_code, 200
 		)
@@ -484,6 +542,75 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertEqual(self._test_api_request("manager").status_code, 503)
 		self.assertEqual(len(self.fixture["attempts"]), count)
 
+	def _restore_fields(self, doctype, name, fields):
+		frappe.db.set_value(doctype, name, fields)
+		frappe.db.commit()
+
+	def test_output_limit_that_cannot_fit_is_rejected_before_reservation(self):
+		count = len(self.fixture["attempts"])
+		response = self.complete("manager", self.fixture["role_route"], limit=4096)
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(response.json()["message"]["error"], "output_limit_exceeds_deadline")
+		self.assertEqual(len(self.fixture["attempts"]), count)
+		frappe.db.rollback()
+		self.assertEqual(frappe.db.count("AI Usage Log", {"api": self.fixture["second_api"]}), 0)
+
+	def _complete_concurrently(self, *, budget, expected_second_status):
+		account = self.fixture["second_account"]
+		model = self.fixture["model"]
+		self.addCleanup(
+			self._restore_fields,
+			"AI Account",
+			account,
+			{"has_monthly_budget": 0, "monthly_budget": 0},
+		)
+		self.addCleanup(
+			self._restore_fields,
+			"AI Model",
+			model,
+			{"prices_known": 0, "input_price": 0, "output_price": 0},
+		)
+		frappe.db.set_value("AI Account", account, {"has_monthly_budget": 1, "monthly_budget": budget})
+		frappe.db.set_value("AI Model", model, {"prices_known": 1, "input_price": 0, "output_price": 1000})
+		frappe.db.commit()
+
+		first_dispatched, release_first, second_dispatched = Event(), Event(), Event()
+
+		def gate(path):
+			if path != "/second/api/chat":
+				return
+			if first_dispatched.is_set():
+				second_dispatched.set()
+			else:
+				first_dispatched.set()
+				release_first.wait(8)
+
+		server = self.fixture["provider_server"]
+		server.provider_gate = gate
+		try:
+			with ThreadPoolExecutor(2) as pool:
+				first = pool.submit(self.complete, "manager", self.fixture["role_route"])
+				try:
+					self.assertTrue(first_dispatched.wait(5), "First request never reached the provider")
+					second = pool.submit(self.complete, "authorized", self.fixture["role_route"])
+					second_response = second.result(timeout=5)
+					self.assertEqual(second_response.status_code, expected_second_status)
+					self.assertEqual(second_dispatched.is_set(), expected_second_status == 200)
+					if expected_second_status == 503:
+						self.assertEqual(second_response.json()["message"]["error"], "provider_unavailable")
+				finally:
+					release_first.set()
+				self.assertEqual(first.result(timeout=5).status_code, 200)
+		finally:
+			server.provider_gate = None
+
+	def test_same_account_can_dispatch_two_concurrent_calls_with_sufficient_budget(self):
+		# Each 12-token reservation costs USD 0.012 at USD 1000 per million output tokens.
+		self._complete_concurrently(budget=0.024, expected_second_status=200)
+
+	def test_same_account_rejects_second_concurrent_call_when_budget_is_reserved(self):
+		self._complete_concurrently(budget=0.012, expected_second_status=503)
+
 	def delete_provider(self, name):
 		response = self.request("manager", "DELETE", self.resource("AI Provider", name))
-		self.assertIn(response.status_code, {200, 202, 204})
+		self.assertEqual(response.status_code, 202)

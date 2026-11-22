@@ -2,6 +2,7 @@
 
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
+from uuid import uuid4
 
 import frappe
 from frappe.utils import now_datetime
@@ -32,17 +33,22 @@ def _usage_log(name, *, for_update=False):
 		raise policy.Denied(403, "permission_denied") from None
 
 
-def resolve_usage(log, cost):
+def resolve_usage(log, cost, note=None):
 	policy.require_user(managers_only=True)
 	verified_cost = _cost(cost)
+	if note is None:
+		note = ""
+	if not isinstance(note, str) or len(note) > 240 or (note and not note.isprintable()):
+		raise policy.Denied(400, "invalid_note")
 	initial = _usage_log(log)
 	initial.check_permission("read")
 	with gateway.scoped_lock("account", initial.account):
 		frappe.db.commit()  # nosemgrep
+		gateway.lock_row("AI Account", initial.account, ("name",))
 		current = _usage_log(log, for_update=True)
 		if current.result == "pending":
 			# A live attempt may still settle. Reconcile only after its lease is stale.
-			if current.attempted_at > now_datetime() - timedelta(seconds=gateway.LOCK_SECONDS):
+			if current.attempted_at > now_datetime() - timedelta(seconds=gateway.STALE_ATTEMPT_SECONDS):
 				raise policy.Denied(409, "attempt_in_progress")
 		elif current.result not in ledger.UNSETTLED and (current.result != "success" or current.cost_known):
 			raise policy.Denied(409, "attempt_already_settled")
@@ -55,7 +61,8 @@ def resolve_usage(log, cost):
 				"cost_known": 1,
 				"resolved_by": frappe.session.user,
 				"resolved_at": now_datetime(),
-				"resolution_note": "Cost verified by a manager.",
+				"previous_result": current.result,
+				"resolution_note": note.strip() or "Cost verified by a manager.",
 			},
 		)
 		# Commit before releasing the account lock so a new reservation sees the cost.
@@ -87,9 +94,19 @@ def purge_usage(dry_run=True):
 		if names:
 			frappe.db.delete("AI Usage Log", {**filters, "name": ["in", names]})
 			deleted = len(names)
-		frappe.logger("model_gateway").info(
-			"Usage retention run by %s: %s records", frappe.session.user, deleted
-		)
+		# The management operation writes a fixed audit record in the same transaction.
+		frappe.get_doc(
+			{
+				"doctype": "Activity Log",
+				"name": uuid4().hex,
+				"reference_doctype": "AI Usage Log",
+				"subject": "Model gateway usage logs purged",
+				"content": f"Deleted usage records: {deleted}",
+				"status": "Success",
+				"user": frappe.session.user,
+				"communication_date": now_datetime(),
+			}
+		).db_insert()
 	return {"eligible": eligible, "deleted": deleted, "dry_run": dry_run}
 
 
@@ -97,5 +114,5 @@ def clear_api_credential(api):
 	policy.require_user(managers_only=True)
 	target = gateway._document("AI API", api)
 	clear_credential(target.name)
-	frappe.logger("model_gateway").info("API credential cleared by %s: %s", frappe.session.user, target.name)
+	target.add_comment("Info", "Model gateway API credential cleared.")
 	return {"name": target.name, "cleared": True}

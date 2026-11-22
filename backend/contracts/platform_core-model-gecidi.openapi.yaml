@@ -79,7 +79,7 @@ paths:
   /api/method/platform_core.api.model.resolve_usage:
     post:
       summary: Resolve an unsettled attempt
-      description: A manager records the verified charge in the attempt currency. This changes the usage log and budget.
+      description: A manager records the verified charge in the attempt currency and can add a short note. The original result is retained.
       operationId: resolve_usage
       security:
         - session: []
@@ -94,6 +94,10 @@ paths:
               properties:
                 log: {type: string, minLength: 1, maxLength: 140}
                 cost: {type: number, minimum: 0, exclusiveMaximum: 1000000000000, multipleOf: 0.000000001}
+                note:
+                  type: string
+                  maxLength: 240
+                  description: Optional single-line reconciliation note.
       responses:
         '200':
           description: Reconciled usage record
@@ -206,7 +210,7 @@ components:
                     properties:
                       error:
                         type: string
-                        enum: [invalid_request, invalid_route, invalid_target, invalid_cost,
+                        enum: [invalid_request, invalid_route, invalid_target, invalid_cost, invalid_note, output_limit_exceeds_deadline,
                           authentication_required, permission_denied, data_policy_denied,
                           transaction_active, attempt_in_progress, attempt_already_settled,
                           quota_exceeded, gateway_busy, endpoint_unavailable, gateway_unavailable,
@@ -275,7 +279,7 @@ components:
           minimum: 1
           maximum: 16384
           default: 1024
-          description: Maximum output tokens
+          description: Maximum output tokens. The gateway rejects limits that exceed the model speed and route deadline.
     Result:
       type: object
       required: [text, tool_calls, usage, model, api]
