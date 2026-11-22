@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from uuid import UUID
 
 from hrms_tr import access, ai_tools, leave, setup
 
@@ -89,6 +90,23 @@ class ApprovalReviewTest(unittest.TestCase):
 
 
 class PortalUserTest(unittest.TestCase):
+	def test_leave_names_only_change_for_new_portal_requests(self):
+		for user, role, name, uses_uuid in (
+			("employee@example.test", "HRMS TR Employee", None, True),
+			("employee@example.test", "HRMS TR Employee", "HR-LAP-EXISTING", False),
+			("Administrator", "HRMS TR Employee", None, False),
+			("operations@example.test", "HR Manager", None, False),
+		):
+			with self.subTest(user=user, name=name), patch.object(leave, "frappe") as framework:
+				framework.session.user = user
+				framework.get_roles.return_value = [role]
+				doc = SimpleNamespace(name=name)
+				leave.name_portal_leave(doc)
+				if uses_uuid:
+					self.assertEqual(UUID(doc.name).version, 7)
+				else:
+					self.assertEqual(doc.name, name)
+
 	def test_native_approver_role_does_not_turn_portal_user_into_system_user(self):
 		from hrms_tr import users
 

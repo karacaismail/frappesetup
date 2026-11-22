@@ -25,6 +25,7 @@ permission_query_conditions = {"Leave Application": "hrms_tr.access.query_condit
 has_permission = {"Leave Application": "hrms_tr.access.has_permission"}
 doc_events = {
 	"Leave Application": {
+		"autoname": "hrms_tr.leave.name_portal_leave",
 		"before_validate": "hrms_tr.leave.validate_manager_fields",
 		"before_update_after_submit": "hrms_tr.leave.validate_manager_fields",
 		"validate": "hrms_tr.leave.validate_approval",

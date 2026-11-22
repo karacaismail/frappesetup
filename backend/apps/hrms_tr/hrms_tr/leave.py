@@ -1,6 +1,7 @@
 """Use Frappe and HRMS permissions and validation for leave approvals."""
 
 from typing import Annotated
+from uuid import uuid7
 
 import frappe
 from frappe import _
@@ -18,6 +19,14 @@ HRMS_APPROVER_METHOD = "hrms.hr.doctype.leave_application.leave_application.get_
 
 LeaveName = Annotated[str, StringConstraints(min_length=1, max_length=140)]
 LeaveVersion = Annotated[str, StringConstraints(min_length=1, max_length=40)]
+
+
+def name_portal_leave(doc, method=None):
+	"""Use a unique identifier without locking the shared naming series."""
+	if doc.name or frappe.session.user == "Administrator":
+		return
+	if set(HRMS_TR_ROLES).intersection(frappe.get_roles()):
+		doc.name = str(uuid7())
 
 
 def check_approver_role():

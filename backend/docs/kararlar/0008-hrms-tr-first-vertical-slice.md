@@ -121,6 +121,8 @@ Liste alanları, süzgeç ve sayfalama seçenekleri OpenAPI sözleşmesinde yer 
 Frappe kayıt ve alan izinlerini bu yolda uygular.
 Sözleşme, sayfa başına 1 ile 100 kayıt aralığını destekler.
 Frappe, sıfırı sayfa sınırı olmadan okuma isteği olarak yorumlar.
+Yeni portal talepleri UUIDv7 kimliği alır. Bu kimlik, ortak sayaç kullanmadan üretilir.
+Önceki kayıt adları geçerlidir. Frappe düzeltme kopyasının adını kendi kuralıyla verir.
 
 İnsan onay isteği, okunan kaydın `modified` değerini `version` olarak taşır.
 Sunucu kaydı kilitler.

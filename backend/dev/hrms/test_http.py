@@ -5,12 +5,18 @@ import json
 import os
 import re
 import unittest
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from http.cookiejar import CookieJar
+from math import ceil
 from pathlib import Path
-from urllib.error import HTTPError
+from threading import Barrier
+from time import perf_counter
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import HTTPCookieProcessor, Request, build_opener
+from uuid import UUID
 
 LEAVE_PATH = "/api/resource/Leave%20Application"
 HRMS_LEAVE = "/api/method/hrms.hr.doctype.leave_application.leave_application"
@@ -103,7 +109,7 @@ class LeaveHttpTest(unittest.TestCase):
                     {"transaction_type": "Leave Application", "transaction_name": name}
                 ),
                 "fields": json.dumps(["name"]),
-                "limit_page_length": 1,
+                "limit_page_length": 100,
             }
         )
         code, result = client.send(f"/api/resource/Leave%20Ledger%20Entry?{query}")
@@ -122,6 +128,121 @@ class LeaveHttpTest(unittest.TestCase):
             for key, name in self.data["leaves"].items()
             if self.data["leave_owners"][key] in actors
         }
+
+    def simultaneous_posts(self, path, requests):
+        start = Barrier(len(requests))
+
+        def post(request):
+            client, body = request
+            start.wait(timeout=20)
+            started = perf_counter()
+            try:
+                status, payload = client.send(path, body)
+            except (URLError, TimeoutError) as error:
+                status, payload = 0, {"exc_type": type(error).__name__}
+            return status, payload, (perf_counter() - started) * 1_000
+
+        with ThreadPoolExecutor(max_workers=len(requests)) as pool:
+            return list(pool.map(post, requests))
+
+    def test_concurrent_approvals_and_cancellations_keep_one_result(self):
+        hr = self.login("hr")
+        other_hr = Client(self, self.data["concurrency"]["reviewer"])
+        admin = Client(self, "Administrator", password=os.environ["ADMIN_PASSWORD"])
+        initial = self.document(hr, "concurrent")
+        name = initial["name"]
+        self.assertEqual(self.leave_ledger_entries(admin, name), [])
+        key = {field: initial[field] for field in ("employee", "from_date", "to_date")}
+        query = urlencode({"filters": json.dumps(key)})
+
+        for action, expected_docstatus, ledger_count in (
+            ("approve", 1, 1),
+            ("cancel", 2, 0),
+        ):
+            with self.subTest(action=action):
+                body = self.approval_payload(self.document(hr, "concurrent"))
+                results = self.simultaneous_posts(
+                    f"/api/method/hrms_tr.api.{action}_leave",
+                    [(hr, body), (other_hr, body)],
+                )
+                outcomes = sorted(
+                    (status, payload.get("exc_type", ""))
+                    for status, payload, _ in results
+                )
+                print(f"Concurrency {action}: {outcomes}")
+                self.assertEqual(outcomes, [(200, ""), (417, "TimestampMismatchError")])
+                for status, payload, _ in results:
+                    if status == 200:
+                        self.assertEqual(payload["message"], {"name": name})
+                self.assertEqual(
+                    self.document(hr, "concurrent")["docstatus"], expected_docstatus
+                )
+                self.assertEqual(
+                    len(self.leave_ledger_entries(admin, name)), ledger_count
+                )
+                status, listed = hr.send(f"{LEAVE_PATH}?{query}")
+                self.assertEqual(status, 200, listed.get("exc_type"))
+                self.assertEqual(listed["data"], [{"name": name}])
+
+    def test_concurrent_employee_requests_have_no_lost_or_duplicate_records(self):
+        scenario = self.data["concurrency"]
+        actors = scenario["employees"]
+        self.assertEqual(len(actors), 20)
+        hr = self.login("hr")
+        template = self.document(hr, "employee")
+        employees = [self.data["employees"][actor] for actor in actors]
+        requests = [
+            (
+                self.login(actor),
+                {
+                    "employee": employee,
+                    "company": template["company"],
+                    "leave_type": template["leave_type"],
+                    "from_date": scenario["request_day"],
+                    "to_date": scenario["request_day"],
+                    "status": "Open",
+                },
+            )
+            for actor, employee in zip(actors, employees, strict=True)
+        ]
+        results = self.simultaneous_posts(LEAVE_PATH, requests)
+        errors = Counter(
+            (status, payload.get("exc_type"))
+            for status, payload, _ in results
+            if status != 200
+        )
+        sample_count = len(results)
+        p95 = sorted(elapsed for _, _, elapsed in results)[
+            ceil(sample_count * 0.95) - 1
+        ]
+        error_count = sum(errors.values())
+        print(
+            f"Concurrency employees: requests={sample_count} errors={error_count} error_rate={error_count / sample_count:.0%} p95_ms={p95:.2f} details={dict(errors)}"
+        )
+        self.assertEqual(errors, {})
+        expected = {
+            payload["data"]["name"]: employee
+            for employee, (_, payload, _) in zip(employees, results, strict=True)
+        }
+        self.assertEqual(len(expected), sample_count)
+        self.assertTrue(all(UUID(name).version == 7 for name in expected))
+        query = urlencode(
+            {
+                "fields": json.dumps(["name", "employee"]),
+                "filters": json.dumps(
+                    {
+                        "employee": ["in", employees],
+                        "from_date": scenario["request_day"],
+                    }
+                ),
+                "limit_page_length": 100,
+            }
+        )
+        status, payload = hr.send(f"{LEAVE_PATH}?{query}")
+        self.assertEqual(status, 200, payload.get("exc_type"))
+        self.assertEqual(
+            {row["name"]: row["employee"] for row in payload["data"]}, expected
+        )
 
     def test_d6_http_permission_matrix(self):
         fixture = self.data["d6"]

@@ -440,7 +440,9 @@ components:
       description: A leave application can include additional fields that the user has permission to read.
       required: [name]
       properties:
-        name: {type: string, description: Leave application record name.}
+        name:
+          type: string
+          description: Opaque leave application identifier. New portal requests use UUIDv7. Existing record names stay valid.
         employee: {type: [string, "null"], description: Employee record linked to the request.}
         employee_name: {type: [string, "null"], description: Employee display name.}
         company: {type: [string, "null"], description: Company responsible for the leave request.}

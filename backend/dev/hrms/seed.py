@@ -296,6 +296,62 @@ def seed_permission_matrix(password, data):
     }
 
 
+def seed_concurrency(password, data):
+    reviewer = insert(
+        "User",
+        email="hrms-tr-race-reviewer@example.test",
+        first_name="Synthetic Second Reviewer",
+        user_type="Website User",
+        role_profiles=[{"role_profile": "HRMS TR Admin"}],
+        new_password=password,
+        send_welcome_email=0,
+    )
+    day = add_days(today(), 36)
+    application = insert(
+        "Leave Application",
+        employee=data["employees"]["employee"],
+        company=COMPANY,
+        leave_type=LEAVE_TYPE,
+        from_date=day,
+        to_date=day,
+        posting_date=today(),
+        status="Open",
+    )
+    data["leaves"]["concurrent"] = application.name
+    data["leave_owners"]["concurrent"] = "employee"
+    actors = []
+    for number in range(1, 21):
+        actor = f"concurrent-{number}"
+        user = insert(
+            "User",
+            email=f"hrms-tr-{actor}@example.test",
+            first_name=f"Synthetic Requester {number}",
+            user_type="Website User",
+            role_profiles=[{"role_profile": "HRMS TR Employee"}],
+            new_password=password,
+            send_welcome_email=0,
+        )
+        employee = insert(
+            "Employee",
+            first_name=user.first_name,
+            company=COMPANY,
+            gender="Other",
+            status="Active",
+            date_of_birth="1990-01-01",
+            date_of_joining=add_days(today(), -30),
+            user_id=user.name,
+            create_user_permission=0,
+        )
+        data["users"][actor] = user.name
+        data["employees"][actor] = employee.name
+        actors.append(actor)
+    data["concurrency"] = {
+        "reviewer": reviewer.name,
+        "employees": actors,
+        "request_day": day,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site", required=True)
@@ -314,6 +370,7 @@ def main():
         frappe.set_user("Administrator")
         data = seed(password)
         seed_permission_matrix(password, data)
+        seed_concurrency(password, data)
         frappe.db.commit()
         manifest.write_text(json.dumps(data, indent=2) + "\n")
     finally:
