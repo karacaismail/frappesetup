@@ -12,11 +12,16 @@ chmod 700 "$STATE_DIR"
 cd "$STATE_DIR"
 SOCKET="$PANE_PORT.sock"
 PORTS_FILE="$PANE_PORT.ports"
-CONFIG="$HOME/.colima/_lima/colima-factory/ssh.config"
+case "${FS_COLIMA_PROFILE:-factory}" in
+    factory) LIMA_NAME=colima-factory ;;
+    default) LIMA_NAME=colima ;;
+    *) printf '%s\n' 'FS_COLIMA_PROFILE must be factory or default.' >&2; exit 2 ;;
+esac
+CONFIG="$HOME/.colima/_lima/$LIMA_NAME/ssh.config"
 ACTION="${1:-ac}"
 shift || true
 if [[ ! -f "$CONFIG" ]]; then
-    printf '%s\n' 'Colima factory SSH configuration is missing.' >&2
+    printf '%s\n' "Colima $LIMA_NAME SSH configuration is missing." >&2
     exit 1
 fi
 SSH=(ssh -F "$CONFIG" -o ControlPath="$SOCKET" -o ControlPersist=no)
@@ -33,22 +38,22 @@ case "$ACTION" in
             fi
             FORWARDS+=(-L "127.0.0.1:$port:127.0.0.1:$port")
         done
-        if "${SSH[@]}" -O check lima-colima-factory 2>/dev/null; then
+        if "${SSH[@]}" -O check "lima-$LIMA_NAME" 2>/dev/null; then
             if [[ -f "$PORTS_FILE" && "$(cat "$PORTS_FILE")" == "$*" ]]; then
                 exit 0
             fi
             printf '%s\n' 'Close the current tunnel first, then open it with all required ports.' >&2
             exit 2
         fi
-        "${SSH[@]}" -M -f -N -o ExitOnForwardFailure=yes "${FORWARDS[@]}" lima-colima-factory
+        "${SSH[@]}" -M -f -N -o ExitOnForwardFailure=yes "${FORWARDS[@]}" "lima-$LIMA_NAME"
         printf '%s\n' "$*" > "$PORTS_FILE"
         ;;
     kapat)
         if [[ -S "$SOCKET" ]]; then
-            "${SSH[@]}" -O exit lima-colima-factory
+            "${SSH[@]}" -O exit "lima-$LIMA_NAME"
         fi
         rm -f -- "$PORTS_FILE"
         ;;
-    durum) "${SSH[@]}" -O check lima-colima-factory ;;
+    durum) "${SSH[@]}" -O check "lima-$LIMA_NAME" ;;
     *) printf '%s\n' 'Usage: tunel <ac|kapat|durum> [ports]' >&2; exit 2 ;;
 esac
