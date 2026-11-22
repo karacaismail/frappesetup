@@ -83,7 +83,11 @@ Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi y
 - **İptal:** Revoke veya süre dolumu Hocuspocus bağlantılarını sunucudan kapatır, yeniden kimlik doğrulamayı reddeder, temsil oturumunu sonlandırır, bekleyen önerileri düşürür ve biletleri iptal listesine alır. Kabul: 2 sn içinde WebSocket kapanır, temsil oturumundaki API çağrısı 401/403.
 - **Maskeleme:** permlevel ile gizli alanlar, uygulamanın `support_mask_fields` listesi ve kişisel veri sınıfları (TCKN, IBAN, kart, maaş) ağa hiç çıkmaz.
 
-**Hocuspocus.** v4.7.0 (MIT) Hetzner'de ayrı servis (owner: DevOps sorumlusu): Node + reverse proxy TLS, `extension-redis` (çoklu düğüm), `extension-webhook` (olaylar Press/ops denetim kaydına), `onAuthenticate` kiracı sitesinin (`platform_core`) bastığı tek kullanımlık bileti (G-148), aktif Support Session'ı ve kapsamı doğrular. Biletleri tek yayıncı basar: müşteri kendi site oturumuyla, operatör ise operatör BFF'inin (`ops-bff`) kendi belirtecinden token exchange ile aldığı `aud=site-<kiracı>` belirteciyle (`sub` = operatör; G-59, G-82) aynı siteden alır; operatörün kiracı API oturumu yoktur; Origin denetimi bilet türüne bağlıdır: müşteri bileti yalnız basan kiracının kayıtlı origin'lerinden, operatör bileti yalnız `operator.` origin'inden (`ops.` listede yok; G-119); oda `support-session:{site}:{id}`; oturum kapanınca oda silinir. İptal ve süre dolumunda sunucu açık bağlantıları kapatır ve yeniden kimlik doğrulamayı reddeder; imleç akışı saklanmaz (K-18).
+**Hocuspocus.** DevOps sorumlusu 4.7.0 sürümünü Hetzner’de ayrı servis olarak kurar. Lisans MIT’dir. Node servisi ters vekil üzerinden TLS kullanır. `extension-redis` birden fazla düğümü bağlar. `extension-webhook` olayları Press ve operasyon denetim kaydına yollar.
+
+`onAuthenticate` tek kullanımlık bileti, destek oturumunu ve kapsamı denetler (G-148). Bileti yalnız kiracı sitesi basar. Müşteri kendi oturumuyla bilet alır. Operatör, `ops-bff` üzerinden kiracıya özel belirteçle bilet alır. Belirteçte `aud=site-<kiracı>` olur ve `sub` operatörü gösterir (G-59, G-82). Operatörün kiracı API oturumu yoktur.
+
+Müşteri bileti yalnız kayıtlı kiracı adreslerinden kabul edilir. Operatör bileti yalnız `operator.` adresinden kabul edilir (G-119). Oda adı `support-session:{site}:{id}` olur. Oturum kapanınca sunucu odayı siler. İptal veya süre dolumunda bağlantıları kapatır ve yeniden doğrulamayı reddeder. Sistem imleç akışını saklamaz (K-18).
 
 ```mermaid
 sequenceDiagram
