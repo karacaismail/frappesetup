@@ -223,6 +223,23 @@ async function outlinedElements(page: Page) {
 }
 
 /* ------------------------------------------------------------------ */
+test('page typography follows the semantic scale @touch', async ({ page }) => {
+  for (const [path, body] of [['', '.lede'], ['kararlar/', '.prose > p']]) {
+    for (const width of [320, 1366]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(path);
+      const heading = page.locator('main h1');
+      const rootSize = await page.locator('html').evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      const headingSize = await heading.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      expect(headingSize).toBeGreaterThanOrEqual(rootSize * 1.5);
+      expect(headingSize).toBeLessThanOrEqual(rootSize * 2);
+      const prose = page.locator(body).first();
+      await expect(prose).toHaveCSS('font-size', `${rootSize}px`);
+      await expect(prose).toHaveCSS('line-height', `${rootSize * 1.5}px`);
+    }
+  }
+});
+
 test.describe('viewport matrix', () => {
   for (const vp of VIEWPORTS) {
     const pages = vp.name === '320' ? ALL_PAGES : KEY_PAGES;
