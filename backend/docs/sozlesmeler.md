@@ -75,7 +75,7 @@ Realm politikaları G-78 ve G-144'ü uygular. Örneğin şu ayarlar vardır:
 - 300 saniyede 5 hatalı denemeden sonra kilit,
 - en az 12 karakterli parola, parola geçmişi ve yaygın parola listesi,
 - TOTP ve passkey,
-- 30 dakika boşta kalma ve 12 saat toplam oturum süresi,
+- Karar 19 oturum süreleri (Proje kaydı O-25): kiracı sitesi ve telefon istemcileri için 1 saat boşta kalma ve 24 saat toplam süre, Press için 7 gün boşta kalma ve 30 gün toplam süre,
 - 5 dakikalık erişim belirteci,
 - her kullanımda değişen yenileme belirteci,
 - kapalı “Beni hatırla” seçeneği.
