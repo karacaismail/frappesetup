@@ -89,6 +89,11 @@ def visible_schema(
 	limited: bool = True,
 	mobile: bool = False,
 ) -> dict:
+	"""Project fields for the session user, whose permissions Frappe uses for masks."""
+	if user != frappe.session.user:
+		frappe.throw(
+			frappe._("You cannot read this DocType.", context="shell.metadata"), frappe.PermissionError
+		)
 	readable = permitted_fields(meta, user, "read", parenttype=parenttype)
 	writable = permitted_fields(meta, user, "write", parenttype=parenttype)
 	restricted_doctype = meta.name in policy.restricted_doctypes
