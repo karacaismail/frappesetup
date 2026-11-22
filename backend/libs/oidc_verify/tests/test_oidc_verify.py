@@ -1,6 +1,6 @@
-"""oidc_verify birim testleri. Beklenen davranış docs/sozlesmeler.md 3. bölümünden alındı.
+"""Unit tests for oidc_verify. Section 3 of docs/contracts.md defines the expected behavior.
 
-Anahtarlar yerelde üretilir. Ağ yoktur. JwksCache sahte sağlayıcıyla beslenir.
+Tests generate keys locally and use a fake fetcher for JwksCache without network access.
 """
 
 import re
@@ -150,7 +150,7 @@ class AccessTokenTest(Temel):
         yabanci = Anahtar("kid-yok")
         self.assertEqual(self.error_code(self.access, yabanci.sign(access_payload())), "unknown_kid")
         self.assertEqual(self.provider.call_count, 2)
-        # Art arda gelen bilinmeyen kid listeyi yeniden çektirmez.
+        # Consecutive unknown key IDs do not trigger another fetch.
         self.assertEqual(self.error_code(self.access, yabanci.sign(access_payload())), "unknown_kid")
         self.assertEqual(self.provider.call_count, 2)
 
@@ -194,7 +194,7 @@ class IdentityTokenTest(Temel):
         self.assertEqual(self.error_code(self.identity, token), "wrong_nonce")
 
     def test_skips_nonce_validation_when_unset(self):
-        # Çağıran nonce göndermediyse None verir. Belirteçteki nonce varlığı sonucu değiştirmez.
+        # A caller that sent no nonce passes None. A nonce in the token does not affect the result.
         fields = self.identity(self.anahtar.sign(identity_payload()), nonce=None)
         self.assertEqual(fields["nonce"], "n-123")
         fields = self.identity(self.anahtar.sign(identity_payload(nonce=None)), nonce=None)
@@ -297,20 +297,20 @@ class JwksCacheTest(unittest.TestCase):
         token = self.anahtar.sign(access_payload())
         self.assertEqual(self.access(token)["azp"], "identity-sync")
         self.assertEqual(self.provider.call_count, 1)
-        self.provider.error = URLError("bağlantı yok")
+        self.provider.error = URLError("connection unavailable")
         self.time_now[0] += 601
-        # Süre doldu. Çekim başarısız. Eski anahtar yine de doğrular.
+        # The fetch fails after the TTL. Verification still succeeds with the stale key.
         self.assertEqual(self.access(token)["azp"], "identity-sync")
         self.assertEqual(self.provider.call_count, 2)
-        # Aynı pencere içinde yeniden denenmez.
+        # No retry occurs during the same window.
         self.time_now[0] += 2
         self.assertEqual(self.access(token)["azp"], "identity-sync")
         self.assertEqual(self.provider.call_count, 2)
-        # Pencere geçince bir kez daha denenir.
+        # The cache retries once after the window ends.
         self.time_now[0] += 4
         self.assertEqual(self.access(token)["azp"], "identity-sync")
         self.assertEqual(self.provider.call_count, 3)
-        # Sağlayıcı düzelince liste yenilenir ve yeni anahtar bulunur.
+        # When the fetcher recovers, the cache refreshes and finds the new key.
         self.provider.error = None
         yeni = Anahtar("kid-2")
         self.provider.keys.append(yeni)
@@ -320,23 +320,23 @@ class JwksCacheTest(unittest.TestCase):
     def test_preserves_old_key_for_invalid_json_and_payload(self):
         token = self.anahtar.sign(access_payload())
         self.access(token)
-        for error in (ValueError("bozuk json"), OSError("yanıt 500"), TimeoutError()):
+        for error in (ValueError("malformed JSON"), OSError("HTTP 500 response"), TimeoutError()):
             self.provider.error = error
             self.time_now[0] += 601
             self.assertEqual(self.access(token)["azp"], "identity-sync")
 
     def test_failed_cold_cache_fetch_raises_jwks_unavailable(self):
-        self.provider.error = URLError("bağlantı yok")
+        self.provider.error = URLError("connection unavailable")
         token = self.anahtar.sign(access_payload())
         with self.assertRaises(JwksUnavailable):
             self.access(token)
         self.assertEqual(self.provider.call_count, 1)
-        # Aynı pencere içinde sağlayıcı yeniden yorulmaz. Hata yine yükselir.
+        # The same window allows no retry. The lookup raises the error again.
         self.time_now[0] += 1
         with self.assertRaises(JwksUnavailable):
             self.access(token)
         self.assertEqual(self.provider.call_count, 1)
-        # Pencere geçince yeniden denenir ve sağlayıcı düzelmişse doğrulama geçer.
+        # After the window, the cache retries and verification succeeds if the fetcher has recovered.
         self.provider.error = None
         self.time_now[0] += 5
         self.assertEqual(self.access(token)["azp"], "identity-sync")
@@ -369,7 +369,7 @@ class FrappeIndependenceTest(unittest.TestCase):
         self.assertTrue(files)
         for file in files:
             for numara, line in enumerate(file.read_text(encoding="utf-8").splitlines(), 1):
-                self.assertIsNone(desen.match(line), f"{file.name}:{numara} frappe içe aktarıyor")
+                self.assertIsNone(desen.match(line), f"{file.name}:{numara} imports frappe")
 
 
 if __name__ == "__main__":
