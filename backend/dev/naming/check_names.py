@@ -12,6 +12,7 @@ import ast
 import json
 import re
 import subprocess
+import unicodedata
 from dataclasses import asdict, dataclass
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -46,10 +47,19 @@ SOURCE_SKIP = {
 PYTHON_COPY_CALLS = {"frappe._", "__", "frappe.throw", "frappe.msgprint", "msgprint"}
 JSON_STRING = re.compile(r'"(?:\\.|[^"\\])*"')
 JS_STRING = r"""(?:"(?:\\.|[^"\\\r\n])*"|'(?:\\.|[^'\\\r\n])*'|`(?:\\.|[^`\\])*`)"""
+JS_REGEX = (
+    r"(?:(?<=[({=,:;!?])|(?<=return)|(?<=throw))\s*/(?![/*])"
+    r"(?:\\.|\[(?:\\.|[^\]\\\n])*\]|[^/\\\[\r\n])+/[a-z]*"
+)
 JS_TOKENS = re.compile(
-    rf"//[^\n]*|/\*[\s\S]*?\*/|{JS_STRING}|"
+    rf"//[^\n]*|/\*[\s\S]*?\*/|{JS_REGEX}|{JS_STRING}|"
     r"(?P<call>(?<![\w$.])(?:__|frappe\._|frappe\.throw|(?:frappe\.)?msgprint)\s*\(\s*)"
 )
+CODE_TOKEN = re.compile(rf"//[^\n]*|/\*[\s\S]*?\*/|{JS_REGEX}|{JS_STRING}|(?P<identifier>[^\W\d]\w*)")
+HTML_TAG = re.compile(rf"""<!--[\s\S]*?-->|</?[A-Za-z][\w:-]*(?:[^<>'"`]|{JS_STRING})*>""")
+HTML_ATTRIBUTE = re.compile(r"""\s(?P<key>[\w:-]+)\s*=\s*(["'])(?P<name>.*?)\2""", re.DOTALL)
+SCRIPT_SUFFIXES = {".js", ".jsx", ".mjs", ".ts", ".tsx"}
+MARKUP_SUFFIXES = {".html", ".htm", ".ftl", ".jinja", ".jinja2", ".j2", ".vue", ".astro", ".jsx", ".tsx"}
 DISCOURAGED = set(
     "data info item obj value result temp tmp stuff misc manager helper utils handler process".split()
 )
@@ -116,6 +126,40 @@ def name_rules(entries: list[dict]) -> dict[str, list[dict]]:
     return names
 
 
+def name_words(spelling: str) -> set[str]:
+    latin = unicodedata.normalize("NFKD", spelling.translate(str.maketrans({"ı": "i", "İ": "I"})))
+    latin = "".join(letter for letter in latin if not unicodedata.combining(letter))
+    latin = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", latin)
+    latin = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", latin)
+    return set(re.findall(r"[a-z]+", latin.lower()))
+
+
+def turkish_roots(entries: list[dict], glossaries: list[Path]) -> set[str]:
+    candidates = set()
+    english_names = set()
+    for entry in entries:
+        english_names.update(name_words(entry["new"]))
+        if entry["type"] in {"identifier", "module"} and re.fullmatch(r"[\w .-]+", entry["old"]):
+            candidates.update(name_words(entry["old"]))
+    for glossary in glossaries:
+        if not glossary.is_file() or glossary.is_symlink():
+            continue
+        for line in glossary.read_text(encoding="utf-8").splitlines():
+            if match := re.match(r"\s*(?:-\s+)?(?:term_tr|code):\s*(.+)", line):
+                target = candidates if "term_tr:" in line else english_names
+                target.update(name_words(match[1]))
+    return {
+        candidate
+        for candidate in candidates - english_names
+        if len(candidate) >= 3 and candidate not in {"break", "hrms", "keycloak", "kid", "ttl", "var", "yz"}
+    }
+
+
+def has_turkish_root(spelling: str, roots: set[str]) -> bool:
+    words = name_words(spelling)
+    return bool(words & roots or any(TURKISH_WORD.fullmatch(word) for word in words))
+
+
 def replacement(names: dict[str, list[dict]], name: str, path: str, kinds: set[str]) -> str:
     for entry in names.get(name, []):
         if entry["type"] in kinds and (
@@ -159,20 +203,37 @@ def python_bindings(tree):
                     yield alias.asname, node.lineno
 
 
-def check_python(path: Path, relative: str, avoid: set[str], names, legacy: bool, emit) -> None:
+def check_python(path: Path, relative: str, avoid: set[str], names, roots, legacy: bool, emit) -> None:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
     except SyntaxError as error:
         emit(path, "syntax", "Python source could not be parsed.", error.lineno or 1)
         return
-    for binding, line in sorted(set(python_bindings(tree)), key=lambda pair: (pair[1], pair[0])):
+    bindings = set(python_bindings(tree))
+    attributes = {(node.attr, node.lineno) for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+    reserves_translation_name = relative.startswith("backend/apps/") or any(
+        isinstance(node, ast.ImportFrom)
+        and (node.module or "").split(".")[0] == "frappe"
+        or isinstance(node, ast.Import)
+        and any(alias.name.split(".")[0] == "frappe" for alias in node.names)
+        for node in ast.walk(tree)
+    )
+    for binding, line in sorted(bindings | attributes, key=lambda pair: (pair[1], pair[0])):
+        attribute = (binding, line) not in bindings
+        mapped = replacement(names, binding, relative, {"identifier"})
+        if binding == "_" and (attribute or not reserves_translation_name):
+            continue
         if binding == "_":
             emit(path, "translation-binding", "The name '_' is reserved for translation.", line)
         elif not binding.isascii():
             emit(path, "python-name", f"Python name {binding!r} must use ASCII.", line)
-        elif not legacy and replacement(names, binding, relative, {"identifier"}) != binding:
+        elif not legacy and mapped != binding:
             emit(path, "legacy-name", f"Replace the mapped legacy name {binding!r}.", line)
-        elif binding in avoid or binding in DISCOURAGED or TEMPORARY_SUFFIX.search(binding):
+        elif (not legacy or binding == mapped) and has_turkish_root(binding, roots):
+            emit(path, "turkish-name", f"Use an English name in place of {binding!r}.", line)
+        elif not attribute and (
+            binding in avoid or binding in DISCOURAGED or TEMPORARY_SUFFIX.search(binding)
+        ):
             emit(path, "discouraged-name", f"Use a descriptive name in place of {binding!r}.", line)
 
 
@@ -204,9 +265,6 @@ def check_record(path, record, prefix, modules, glossary, mapped_names, doctype_
             fieldname = field.get("fieldname")
             if not isinstance(fieldname, str) or not FIELD_NAME.fullmatch(fieldname):
                 emit(path, "field-name", f"Invalid DocType field name: {fieldname!r}.")
-            source_text = (field.get(key) for key in ("label", "description"))
-            if any(isinstance(text, str) and TURKISH_LETTER.search(text) for text in source_text):
-                emit(path, "doctype-copy", f"English source text required for field {fieldname!r}.")
             check_select(path, field, emit)
 
     if kind == "Custom Field":
@@ -241,6 +299,22 @@ def check_select(path, field, emit):
         emit(path, "select-name", "Select options must use ASCII.")
 
 
+def check_doctype_copy(path: Path, record: dict, roots: set[str], emit) -> None:
+    if record.get("doctype") != "DocType":
+        return
+    fields = [record, *(record.get("fields") or [])]
+    for field in fields:
+        if not isinstance(field, dict):
+            continue
+        for key in COPY_KEYS:
+            copy_text = field.get(key)
+            if isinstance(copy_text, str):
+                prose = MARKDOWN_CODE.sub(" ", copy_text)
+                if turkish_text(prose) or has_turkish_root(prose, roots):
+                    fieldname = field.get("fieldname", record.get("name"))
+                    emit(path, "doctype-copy", f"English source text required for {fieldname!r} {key}.")
+
+
 def normalized_root(root: Path) -> Path:
     root = root.resolve()
     return root.parent if root.name == "backend" and not (root / "backend").is_dir() else root
@@ -267,7 +341,50 @@ def check_branch(root: Path, entries: list[dict], emit) -> None:
         emit(backend, "branch-name", "Branch name does not match the project naming pattern.")
 
 
-def scan(root: Path, *, legacy: bool = False, map_path: Path = DEFAULT_MAP) -> list[Finding]:
+def changed_files(root: Path, base: str) -> set[str]:
+    outputs = []
+    for args in (
+        ("diff", "--name-only", "-z", "--diff-filter=ACMRTUXB", base, "--", "backend/"),
+        ("ls-files", "--others", "--exclude-standard", "-z", "--", "backend/"),
+    ):
+        response = subprocess.run(
+            ["git", "-C", str(root), *args], text=True, capture_output=True, check=False
+        )
+        if response.returncode:
+            raise ValueError(f"Could not list changes from {base!r} in this Git worktree.")
+        outputs.extend(response.stdout.split("\0"))
+    return {name for name in outputs if name}
+
+
+def web_names(source: str, suffix: str):
+    if suffix in SCRIPT_SUFFIXES:
+        for match in CODE_TOKEN.finditer(source):
+            if token := match["identifier"]:
+                yield token, source.count("\n", 0, match.start()) + 1
+    if suffix in MARKUP_SUFFIXES:
+        for tag in HTML_TAG.finditer(source):
+            if tag[0].startswith("<!--"):
+                continue
+            for attribute in HTML_ATTRIBUTE.finditer(tag[0]):
+                if attribute["key"].lower() not in {"id", "class", "classname"}:
+                    continue
+                if any(symbol in attribute["name"] for symbol in ("{", "<", "$", "%")):
+                    continue
+                for html_name in attribute["name"].split():
+                    yield html_name, source.count("\n", 0, tag.start() + attribute.start("name")) + 1
+
+
+def check_web(path, relative, roots, names, legacy, emit):
+    source = path.read_text(encoding="utf-8")
+    for spelling, line in set(web_names(source, path.suffix)):
+        mapped = replacement(names, spelling, relative, {"identifier", "reference"})
+        if not spelling.isascii() or (mapped == spelling or not legacy) and has_turkish_root(spelling, roots):
+            emit(path, "turkish-name", f"Use an English ASCII name in place of {spelling!r}.", line)
+
+
+def scan(
+    root: Path, *, legacy: bool = False, map_path: Path = DEFAULT_MAP, selected: set[str] | None = None
+) -> list[Finding]:
     """Return sorted violations. Legacy mode recognizes mapped pre-transition names."""
     root = normalized_root(root)
     backend = root / "backend"
@@ -276,11 +393,20 @@ def scan(root: Path, *, legacy: bool = False, map_path: Path = DEFAULT_MAP) -> l
     findings = []
 
     def emit(path, rule, message, line=1):
-        findings.append(Finding(path.relative_to(root).as_posix(), line, rule, message))
+        relative = path.relative_to(root).as_posix()
+        if selected is None or relative in selected:
+            findings.append(Finding(relative, line, rule, message))
 
     entries = json.loads(map_path.read_text(encoding="utf-8"))
     names = name_rules(entries)
     files = tree_files(root)
+    if selected is not None:
+        files = sorted(
+            set(files) | {root / name for name in selected},
+            key=lambda path: (path.relative_to(root).as_posix() in selected, path),
+        )
+    glossaries = [path for path in files if path.name == "glossary.yaml"]
+    roots = turkish_roots(entries, glossaries)
     paths_by_fold = {}
     app_files = {}
     for path in files:
@@ -291,6 +417,14 @@ def scan(root: Path, *, legacy: bool = False, map_path: Path = DEFAULT_MAP) -> l
             emit(path, "path-collision", f"Case-insensitive collision with {previous.relative_to(root)}.")
         if relative.parts[:2] == ("backend", "apps") and len(relative.parts) > 3:
             app_files.setdefault(relative.parts[2], []).append(path)
+        if selected is not None and relative.as_posix() not in selected:
+            continue
+        if not path.is_file() or path.is_symlink() or relative.parts[:3] == ("backend", "dev", "naming"):
+            continue
+        if path.suffix in SCRIPT_SUFFIXES | MARKUP_SUFFIXES:
+            check_web(path, relative.as_posix(), roots, names, legacy, emit)
+        elif path.suffix == ".py" and relative.parts[:2] != ("backend", "apps"):
+            check_python(path, relative.as_posix(), set(), names, roots, legacy, emit)
 
     doctype_paths = {}
     for app_name, sources in app_files.items():
@@ -307,12 +441,13 @@ def scan(root: Path, *, legacy: bool = False, map_path: Path = DEFAULT_MAP) -> l
         if legacy and not glossary_path.is_file():
             glossary_path = backend / "dev/naming/glossaries" / app_name / "docs/glossary.yaml"
         glossary, avoid = read_glossary(glossary_path)
-        for path in sorted(sources):
+        for path in sources:
             if not path.is_file() or path.is_symlink():
                 continue
             relative = path.relative_to(root).as_posix()
             if path.suffix == ".py":
-                check_python(path, relative, avoid, names, legacy, emit)
+                if selected is None or relative in selected:
+                    check_python(path, relative, avoid, names, roots, legacy, emit)
             elif path.suffix == ".json" and JSON_RECORD_FOLDERS.intersection(path.relative_to(app).parts):
                 try:
                     records = list(json_records(path))
@@ -332,7 +467,10 @@ def scan(root: Path, *, legacy: bool = False, map_path: Path = DEFAULT_MAP) -> l
                                     {"doctype", "reference", "identifier"},
                                 )
                     check_record(path, record, prefix, modules, glossary, mapped_names, doctype_paths, emit)
-    check_branch(root, entries, emit)
+                    if selected is None or relative in selected:
+                        check_doctype_copy(path, record, roots, emit)
+    if selected is None:
+        check_branch(root, entries, emit)
     return sorted(findings, key=lambda finding: (finding.path, finding.line, finding.rule, finding.message))
 
 
@@ -438,12 +576,11 @@ def yaml_source_text(source: str):
         yield position, key, value
 
 
-def scan_source_text(root: Path) -> list[Finding]:
-    root = root.resolve()
-    if root.name == "backend":
-        root = root.parent
+def scan_source_text(root: Path, selected: set[str] | None = None) -> list[Finding]:
+    root = normalized_root(root)
     findings = []
-    for path in tree_files(root):
+    paths = tree_files(root) if selected is None else sorted(root / name for name in selected)
+    for path in paths:
         relative = path.relative_to(root)
         if path.is_symlink() or not path.is_file() or SOURCE_SKIP.intersection(relative.parts):
             continue
@@ -478,12 +615,26 @@ def main() -> int:
     mode.add_argument("--source-text", action="store_true", help="Find Turkish in visible source text.")
     parser.add_argument("--map", type=Path, default=DEFAULT_MAP)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--changed-files",
+        nargs="?",
+        const="HEAD",
+        metavar="BASE",
+        help="Only report changed backend files relative to BASE (default: HEAD).",
+    )
     arguments = parser.parse_args()
     try:
+        selection = (
+            changed_files(normalized_root(arguments.root), arguments.changed_files)
+            if arguments.changed_files
+            else None
+        )
         if arguments.source_text:
-            findings = scan_source_text(arguments.root)
+            findings = scan_source_text(arguments.root, selection)
         else:
-            findings = scan(arguments.root, legacy=arguments.legacy, map_path=arguments.map)
+            findings = scan(
+                arguments.root, legacy=arguments.legacy, map_path=arguments.map, selected=selection
+            )
     except (OSError, ValueError, SyntaxError) as error:
         parser.exit(2, f"Naming check could not finish: {error}\n")
     if arguments.json:
