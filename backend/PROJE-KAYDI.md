@@ -46,11 +46,14 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 
 ## Denetim komutları
 
-Bu bölümü dev-ortam işi doldurur. Her komutun çalıştığı klasör de yazılır.
+Ortam komutları Pane'in verdiği `PANE_PORT` değerini kullanır.
 
 | Denetim | Komut | Klasör |
 | --- | --- | --- |
-| Henüz yok | Yok | Yok |
+| Frappe kurulum testleri | `backend/dev/bin/test platform_core` | Depo kökü |
+| Python kod ve biçim denetimi | `backend/dev/bin/ruff` | Depo kökü |
+| Modül sınırları | `backend/dev/bin/modul-sinirlari` | Depo kökü |
+| Ortam betiklerinin Python testleri | `python3 -m unittest discover -s backend/dev/tests` | Depo kökü |
 
 ## Proje sahibinin kararları
 

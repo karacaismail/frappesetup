@@ -42,10 +42,19 @@ def prepare(site: str, apps: list[str]) -> None:
     if not path.exists():
         # Run the actual new-site command without placing secrets in process arguments.
         new_site.main(
-            [site, "--db-type", "mariadb", "--db-host", "kiraci-db",
-             "--mariadb-user-host-login-scope", "%",
-             "--db-root-password", os.environ["MARIADB_ROOT_PASSWORD"],
-             "--admin-password", os.environ["ADMIN_PASSWORD"]],
+            [
+                site,
+                "--db-type",
+                "mariadb",
+                "--db-host",
+                "kiraci-db",
+                "--mariadb-user-host-login-scope",
+                "%",
+                "--db-root-password",
+                os.environ["MARIADB_ROOT_PASSWORD"],
+                "--admin-password",
+                os.environ["ADMIN_PASSWORD"],
+            ],
             standalone_mode=False,
         )
         frappe.destroy()
