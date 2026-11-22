@@ -5,12 +5,15 @@ from unittest.mock import Mock, call, patch
 from oidc_verify import JwksUnavailable
 from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
-from press_tr import api
+from press_tr import api, hooks
 from press_tr.api import auth, identity, maintenance
 from press_tr.kimlik import oidc, request_policy, service, sessions
 
 
 class RequestGuardsTest(unittest.TestCase):
+	def test_identity_link_is_closed_to_generic_ai_writes(self):
+		self.assertIn("Press Identity Link", getattr(hooks, "ai_write_closed_doctypes", []))
+
 	def test_guest_allowlist_matches_the_contract(self):
 		targets = {
 			"press_tr.api.auth.get_login_url": Mock(),

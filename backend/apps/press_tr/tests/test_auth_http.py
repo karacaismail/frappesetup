@@ -58,6 +58,8 @@ class AuthHttpTest(PressHttpClient, unittest.TestCase):
 		self.assertTrue(url.path.endswith("/protocol/openid-connect/auth"))
 		query = parse_qs(url.query)
 		self.assertEqual(query["code_challenge_method"], ["S256"])
+		self.assertNotIn("code_verifier", query)
+		self.assertEqual(len({query[key][0] for key in ("state", "nonce", "code_challenge")}), 3)
 		for key in ("state", "nonce", "code_challenge"):
 			self.assertGreaterEqual(len(query[key][0]), 43)
 		cookies = SimpleCookie()
