@@ -11,9 +11,14 @@ before_login = ["platform_core.kimlik.login_policy.before_login"]
 before_request = [
 	"platform_core.kimlik.login_policy.before_request",
 	"platform_core.kimlik.session_policy.before_request",
+	"platform_core.kabuk.native_metadata.guard_website_rpc_before_request",
 ]
 on_session_creation = ["platform_core.kimlik.session_policy.on_session_creation"]
-auth_hooks = ["platform_core.kimlik.service_token.validate"]
+# Keep a single list assignment. Credential hooks must precede the metadata guard (platform-core-kabuk).
+auth_hooks = [
+	"platform_core.kimlik.service_token.validate",
+	"platform_core.kabuk.native_metadata.guard_native_metadata",
+]
 # AU-19: local sign-in functions are replaced by gated wrappers (kimlik/login_policy.py).
 override_whitelisted_methods = {
 	"frappe.core.doctype.user.user.reset_password": "platform_core.kimlik.login_policy.reset_password",
@@ -38,6 +43,66 @@ override_whitelisted_methods = {
 after_install = ["platform_core.kimlik.session_policy.apply"]
 after_migrate = ["platform_core.kimlik.session_policy.apply"]
 # O-28: the identity link changes only through the identity endpoints, never through generic AI writes.
-ai_write_closed_doctypes = ["Platform Identity Link", "Platform Identity Deletion"]
+ai_write_closed_doctypes = ["Platform Identity Link", "Platform Identity Deletion", "AI API", "AI Account"]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
-website_user_allowed_methods = ["platform_core.api.auth.logout"]
+website_user_allowed_methods = [
+	"platform_core.api.auth.logout",
+	"platform_core.api.shell.get_bootstrap",
+	"platform_core.api.meta.get_doctype",
+	"frappe.auth.get_logged_user",
+	"logout",
+	"frappe.desk.search.search_link",
+]
+
+fixtures = [{"dt": "Role", "filters": [["name", "=", "AI Manager"]]}]
+
+
+ai_tools = ["platform_core.model_gecidi.management_tools.declare"]
+
+# Shell permission generations. Keep other modules' hook entries alongside these.
+clear_cache = ["platform_core.kabuk.cache.clear_cache"]
+
+doc_events = {
+	"User": {
+		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Role": {
+		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Role Profile": {
+		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"User Permission": {
+		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Custom DocPerm": {
+		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"DocType": {
+		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Custom Field": {
+		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	"Property Setter": {
+		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+	# This DocType is installed with the access-rule module. Keep shell validators fresh after rule changes.
+	"Access Rule": {
+		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	},
+}
+
+
+
+
+after_build = ["platform_core.kabuk.assets.remove_panel_source_maps"]

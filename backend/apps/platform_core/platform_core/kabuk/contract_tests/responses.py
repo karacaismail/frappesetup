@@ -1,0 +1,144 @@
+"""Validate actual Frappe responses against the shell OpenAPI document."""
+
+import http.client
+import json
+import os
+import unittest
+from http.cookies import SimpleCookie
+from pathlib import Path
+from urllib.parse import urlencode, urlsplit
+
+from jsonschema import Draft202012Validator
+
+CONTRACT = Path("backend/contracts/platform_core-kabuk.openapi.yaml")
+SNAPSHOT = Path(__file__).resolve().parents[2] / "tests" / "shell_contract_components.json"
+BOOTSTRAP = "/api/method/platform_core.api.shell.get_bootstrap"
+METADATA = "/api/method/platform_core.api.meta.get_doctype"
+PROBE = "/api/method/frappe.auth.get_logged_user"
+DOCTYPE = "Kabuk Test Record"
+
+
+def parse_json(source: str | bytes):
+	def unique_object(pairs):
+		result = {}
+		for key, value in pairs:
+			if key in result:
+				raise ValueError(f"Duplicate JSON key: {key}")
+			result[key] = value
+		return result
+
+	return json.loads(source, object_pairs_hook=unique_object)
+
+
+class TestShellResponses(unittest.TestCase):
+	@classmethod
+	def setUpClass(cls):
+		cls.contract = parse_json(CONTRACT.read_text(encoding="utf-8"))
+		cls.target = urlsplit(os.environ["PANEL_TEST_URL"])
+		if cls.target.scheme != "http" or cls.target.hostname != "127.0.0.1":
+			raise ValueError("Use the dedicated test site on HTTP loopback.")
+		status, headers, _ = cls.request(
+			"/api/method/login",
+			method="POST",
+			form={"usr": os.environ["PANEL_TEST_USERNAME"], "pwd": os.environ["PANEL_TEST_PASSWORD"]},
+		)
+		if status != 200:
+			raise RuntimeError(f"Test login returned HTTP {status}.")
+		cookies = SimpleCookie()
+		for value in headers.get_all("Set-Cookie", []):
+			cookies.load(value)
+		cls.sid = cookies["sid"].value
+
+	@classmethod
+	def request(cls, path, *, sid=None, headers=None, method="GET", form=None):
+		connection = http.client.HTTPConnection(cls.target.hostname, cls.target.port, timeout=10)
+		request_headers = {"Host": "test-kabuk.localhost", "Accept": "application/json"}
+		if sid:
+			request_headers["Cookie"] = "sid=" + sid
+		if form:
+			request_headers["Content-Type"] = "application/x-www-form-urlencoded"
+		request_headers.update(headers or {})
+		try:
+			connection.request(method, path, body=urlencode(form) if form else None, headers=request_headers)
+			response = connection.getresponse()
+			return response.status, response.headers, response.read()
+		finally:
+			connection.close()
+
+	def validate(self, path, expected, result):
+		status, headers, body = result
+		self.assertEqual(status, expected)
+		response = self.contract["paths"][path]["get"]["responses"][str(status)]
+		for header, definition in response.get("headers", {}).items():
+			self.assertIn(header, headers)
+			Draft202012Validator(definition["schema"]).validate(headers[header])
+		if status == 304:
+			self.assertFalse(body)
+			self.assertNotIn("content", response)
+			return
+		self.assertEqual(headers.get_content_type(), "application/json")
+		media = response["content"]["application/json"]
+		validator = Draft202012Validator(
+			{
+				"$ref": "#/response",
+				"response": media["schema"],
+				"components": self.contract["components"],
+			}
+		)
+		validator.validate(parse_json(body))
+		self.assertIn("example", media)
+		validator.validate(media["example"])
+
+	def test_actual_200_304_401_and_403_match_the_contract(self):
+		for path in (BOOTSTRAP, METADATA):
+			with self.subTest(path=path):
+				route = path + "?" + urlencode({"doctype": DOCTYPE}) if path == METADATA else path
+				ok = self.request(route, sid=self.sid)
+				self.validate(path, 200, ok)
+				payload = parse_json(ok[2])["message"]
+				if path == METADATA:
+					choice = next(
+						field
+						for field in payload["schema"]["fields"]
+						if field["fieldname"] == "contract_choice"
+					)
+					self.assertEqual(choice["depends_on"]["op"], "eq")
+					self.assertTrue(choice["choices"])
+					self.assertIn("read_only_depends_on", choice["unsupported_conditions"])
+				else:
+					self.assertTrue(any(sidebar["data"]["items"] for sidebar in payload["sidebars"]))
+				conditional = self.request(route, sid=self.sid, headers={"If-None-Match": ok[1]["ETag"]})
+				self.validate(path, 304, conditional)
+				self.assertEqual(conditional[1]["ETag"], ok[1]["ETag"])
+				self.validate(path, 401, self.request(route, sid="missing-shell-contract-session"))
+				self.validate(path, 403, self.request(route))
+				separator = "&" if "?" in route else "?"
+				self.validate(path, 417, self.request(route + separator + "unknown=sample", sid=self.sid))
+		self.validate(PROBE, 200, self.request(PROBE, sid=self.sid))
+		self.validate(PROBE, 401, self.request(PROBE, sid="missing-shell-contract-session"))
+		self.validate(PROBE, 403, self.request(PROBE))
+
+	def test_rate_limit_response_matches_the_contract(self):
+		# The synthetic account starts with its own bucket on the isolated site.
+		for _ in range(121):
+			result = self.request(BOOTSTRAP, sid=self.sid)
+			if result[0] == 429:
+				self.validate(BOOTSTRAP, 429, result)
+				return
+			self.assertEqual(result[0], 200)
+		self.fail("The shell bootstrap rate limit did not respond with HTTP 429.")
+
+	def test_official_projection_snapshot_matches_openapi(self):
+		snapshot = parse_json(SNAPSHOT.read_text(encoding="utf-8"))
+		schemas = self.contract["components"]["schemas"]
+		self.assertEqual(snapshot, {key: schemas[key] for key in snapshot})
+
+
+class TestContractParsing(unittest.TestCase):
+	def test_duplicate_keys_are_rejected(self):
+		with self.assertRaisesRegex(ValueError, "Duplicate JSON key"):
+			parse_json('{"field": 1, "field": 2}')
+
+
+if __name__ == "__main__":
+	unittest.main()
