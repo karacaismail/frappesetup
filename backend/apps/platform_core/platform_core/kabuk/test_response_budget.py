@@ -25,6 +25,7 @@ def temporary_values(changes):
 			originals.append((doctype, name, field, original))
 			frappe.db.set_value(doctype, name, field, value, update_modified=False)
 		frappe.db.commit()
+		# Site cache clearing also removes browser session activity keys.
 		frappe.clear_cache()
 		yield
 	finally:
@@ -47,12 +48,12 @@ class TestResponseBudgetHTTP(ShellHTTPFixture):
 			]
 
 		with temporary_values(route_options("")):
-			status, _unused_headers, baseline = self.request(BOOTSTRAP, self.reader_sid)
+			status, _unused_headers, baseline = self.request(BOOTSTRAP, self.login(READER))
 			self.assertEqual(status, 200)
 		label = "x" * (LIMIT - len(baseline))
 		for increment in (0, 1):
 			with self.subTest(increment=increment), temporary_values(route_options(label + "x" * increment)):
-				status, _unused_headers, body = self.request(BOOTSTRAP, self.reader_sid)
+				status, _unused_headers, body = self.request(BOOTSTRAP, self.login(READER))
 				self.assertEqual(status, 200)
 				self.assertLessEqual(len(body), LIMIT)
 				if increment == 0:
@@ -70,7 +71,8 @@ class TestResponseBudgetHTTP(ShellHTTPFixture):
 				)
 			]
 		):
-			status, headers, body = self.request(BOOTSTRAP, self.reader_sid)
+			sid = self.login(READER)
+			status, headers, body = self.request(BOOTSTRAP, sid)
 			self.assertEqual(status, 200)
 			self.assertLessEqual(len(body), LIMIT)
 			payload = json.loads(body)["message"]
@@ -79,20 +81,20 @@ class TestResponseBudgetHTTP(ShellHTTPFixture):
 			self.assertTrue(payload["formatting"]["time_zone"])
 			self.assertEqual(payload["sidebars"], [])
 			self.assertEqual(payload["workspaces"], [])
-			cached = self.request(BOOTSTRAP, self.reader_sid, headers={"If-None-Match": headers["ETag"]})
+			cached = self.request(BOOTSTRAP, sid, headers={"If-None-Match": headers["ETag"]})
 			self.assertEqual((cached[0], cached[2]), (304, b""))
 			for path, key in (
 				(BOOTSTRAP.replace("/api/", "/api/v2/", 1), "data"),
 				("/?" + urlencode({"cmd": BOOTSTRAP.rsplit("/", 1)[-1]}), "message"),
 			):
 				with self.subTest(path=path):
-					status, response_headers, body = self.request(path, self.reader_sid)
+					status, response_headers, body = self.request(path, sid)
 					self.assertEqual(status, 200)
 					self.assertLessEqual(len(body), LIMIT)
 					self.assertEqual(json.loads(body)[key], payload)
 					self.assertEqual(response_headers["ETag"], headers["ETag"])
 		status, _unused_headers, body = self.request(
-			BOOTSTRAP, self.reader_sid, headers={"If-None-Match": headers["ETag"]}
+			BOOTSTRAP, self.login(READER), headers={"If-None-Match": headers["ETag"]}
 		)
 		self.assertEqual(status, 200)
 		self.assertIsNot(json.loads(body)["message"].get("truncated"), True)
@@ -116,7 +118,8 @@ class TestResponseBudgetHTTP(ShellHTTPFixture):
 				),
 			]
 		):
-			status, _unused_headers, body = self.metadata(self.reader_sid)
+			sid = self.login(READER)
+			status, _unused_headers, body = self.metadata(sid)
 			self.assertEqual(status, 200)
 			self.assertLessEqual(len(body), LIMIT)
 			payload = json.loads(body)["message"]
@@ -128,7 +131,7 @@ class TestResponseBudgetHTTP(ShellHTTPFixture):
 			components = parse_json(SCHEMA_FILE.read_bytes())
 			self.assertTrue(matches(payload, components["Meta"], components))
 			path = METADATA.replace("/api/", "/api/v2/", 1) + "?" + urlencode({"doctype": DOCTYPE})
-			status, _unused_headers, body = self.request(path, self.reader_sid)
+			status, _unused_headers, body = self.request(path, sid)
 			self.assertEqual(status, 200)
 			self.assertLessEqual(len(body), LIMIT)
 			self.assertEqual(json.loads(body)["data"], payload)
