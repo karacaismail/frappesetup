@@ -6,3 +6,5 @@ app_email = "noreply@example.test"
 app_license = "mit"
 
 fixtures = [{"dt": "Role", "filters": [["name", "=", "AI Manager"]]}]
+
+ai_write_closed_doctypes = ["AI API", "AI Account"]
