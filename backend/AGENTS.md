@@ -44,6 +44,8 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `dev/guvenlik/`, `dev/bin/guvenlik-denetimi` | Güvenlik kapısı | guvenlik-kapisi |
 | `apps/platform_core/platform_core/mobil/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
 | `apps/cronhr/`, `dev/hrms/` | CronHR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
+| `e2e/` | Uçtan uca entegrasyon testleri | integration-e2e |
+| `dev/naming/` | Geçmiş adların düzeltilmesi | naming-history-fix |
 | `contracts/` | Uçların OpenAPI sözleşmeleri | Her uç kendi sahibinde |
 | `docs/`, `AGENTS.md`, `PROJE-KAYDI.md` | Talimat, kayıt ve sözleşme | Orkestratör |
 
@@ -77,6 +79,15 @@ Proje sahibi `cron` kurulumunu istemedi. Bu yüzden şunları kurmayın:
 - gece mutabakatı ya da saatlik yedek iş.
 
 Karar sitesi bazı yerlerde saatlik ya da gecelik iş anar. Bu işleri elle başlatılan komut olarak yazın.
+
+### Ad dili
+
+Yeni kod İngilizce adlarla yazılır (D-12). Kural yalnız bundan sonrası içindir.
+
+- Yeni dosya, klasör, modül, DocType, işlev ve değişken adını İngilizce verin.
+- Yeni yazdığınız koddaki yorumu, hata iletisini ve günlük metnini İngilizce yazın.
+- Var olan dosya, klasör ve modüllerin adını değiştirmeyin.
+- Var olan bir klasöre yeni dosya eklerseniz yalnız yeni dosyanın adını İngilizce verin.
 
 ### Yapay zekâ erişimi
 
