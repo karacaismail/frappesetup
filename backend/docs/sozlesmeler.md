@@ -89,7 +89,7 @@ Bu kuralları `libs/oidc_verify` kitaplığı uygular. `platform_core` ve `press
 - `exp` zorunludur. Saat payı 30 saniyedir.
 - Anahtar listesini 10 dakika saklayın. Bilinmeyen `kid` gelirse listeyi bir kez yenileyin.
 - İstekte `cmd` alanı varsa isteği reddedin.
-- İstek hem oturum çerezi hem belirteç taşıyorsa isteği reddedin.
+- İstek hem geçerli bir kullanıcı oturumu çerezi hem belirteç taşıyorsa isteği reddedin. Misafir çerezi oturum sayılmaz (AU-5).
 
 ### Çıkış belirteci
 
@@ -194,11 +194,15 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 | --- | --- | --- |
 | `issuer` | metin | Zorunlu |
 | `subject` | metin | Zorunlu |
-| `email` | metin | Zorunlu. İlk bağ yalnız doğrulanmış e-postayla kurulur. |
+| `email` | metin | Zorunlu |
+| `email_verified` | doğru ya da yanlış | Zorunlu. Yanlışsa Press ilk bağı kurmaz. |
 | `organization_id` | metin | Zorunlu. Keycloak'taki kuruluşun kimliğidir. |
 | `organization_name` | metin | İsteğe bağlı. Yeni takımın görünen adı olur. |
 
 - Press takımı `keycloak_org_id` alanıyla arar. Takım yoksa açar ve alana kimliği yazar.
+- `keycloak_org_id` alanı veritabanında tekildir (V-8).
+- Girişte Press, kullanıcının hiç takımı yoksa takım açar. Kullanıcı başka bir takımın üyesiyse yeni takım açılmaz.
+- Takıma `free_account` bayrağı yazılmaz. Bu bayrak yalnız iç ve deneme siteleri içindir (G-24).
 - Yanıt `team` ve `created` alanlarını taşır. `team`, Press'teki takımın adıdır.
 - `remove_team_member` isteği `issuer`, `subject` ve `organization_id` alanlarını taşır.
 - Takım adı istekte gelmez. Takım adını Press üretir.
@@ -335,6 +339,7 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 | `platform_core.api.ai.approve_proposal` | POST | İnsan oturumu | Öneriyi onaylar ve yürütür. |
 | `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
 | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
+| `platform_core.api.ai.purge_logs` | POST | “System Manager” rolü | Saklama süresi dolan günlükleri elle siler. Yıkıcıdır. |
 
 ### Genel araçlar
 
@@ -342,6 +347,13 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 - Yazma araçları yalnız öneri açar. Öneri 10 dakika geçerlidir.
 - Uygulama araçlarının adı `<uygulama>_<araç>` biçimindedir. Uygulama araçlarını `ai_tools` kancasıyla bildirir.
+- Yönetim araçları şunlardır: `add_custom_field`, `set_field_property`, `set_role_permission`, `assign_role`, `remove_role` ve `purge_action_log`. Yalnız “System Manager” rolü kullanır. “System Manager” rolü yapay zekâ yoluyla verilmez.
+- MCP istemcisi konuşma kimliğini `Mcp-Conversation-Id` başlığıyla gönderir. Günlükler bu kimlikle eşleşir.
+- Panel, yazan her istekte `X-Frappe-CSRF-Token` başlığını gönderir. Oturumda CSRF belirteci yoksa onay reddedilir.
+
+### Öteki modüllerin araç bildirimi
+
+Her modül elle başlatılan komutlarını ve yazma işlerini `ai_tools` kancasıyla araç olarak bildirir. Bildirim biçimi `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir. Yazma araçları önizleme işlevi taşır. Bu bölüm platform-core-yz dalı birleşince geçerli olur.
 
 ## 11. Model geçidi ve sağlayıcı kaydı
 
