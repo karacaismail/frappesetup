@@ -189,6 +189,25 @@ class MissedDeletionTest(ReconcileFlowCase):
             self.stack.app.reconcile_execute(digest)
         self.assertFalse(self.stack.press.user_of(self.stack.issuer, self.GONE).get("anonymized"))
 
+    def test_reply_names_the_deletion_job_not_the_account(self) -> None:
+        # The account is deleted in Keycloak. Its raw id must not travel in a reply any more.
+        import json
+
+        plan = self.stack.app.reconcile_plan()
+        report = plan.report()
+
+        gone = [d for d in report["differences"] if d["kind"] == "deleted_in_keycloak"]
+        self.assertEqual([(d["target"], d.get("job_id")) for d in gone], [("press", self.job_id), ("kiraci1", self.job_id)])
+        self.assertTrue(all("subject" not in d for d in gone))
+        self.assertNotIn(self.GONE, json.dumps(report))
+        # Other kinds still name the user: the reader needs the id to act.
+        self.assertIn(CLOSED, json.dumps(report))
+
+        result = self.stack.app.reconcile_execute(report["preview_digest"])
+
+        self.assertNotIn(self.GONE, json.dumps(result))
+        self.assertIn(self.job_id, json.dumps(result))
+
     def test_preview_changes_when_a_deleted_account_appears(self) -> None:
         digest = self.stack.app.reconcile_plan().report()["preview_digest"]
         self.stack.tenant.seed_user(self.stack.issuer, "gone-2", "gone2@example.test")
@@ -275,3 +294,66 @@ class RepairTest(ReconcileFlowCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class PagedListTest(ReconcileFlowCase):
+    """docs/sozlesmeler.md, section 7: `list_identities` is paged. The service reads every page
+    and only then computes the differences."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        from identity_sync import sites
+
+        original = sites.IDENTITY_PAGE_LENGTH
+        sites.IDENTITY_PAGE_LENGTH = 2
+        self.addCleanup(setattr, sites, "IDENTITY_PAGE_LENGTH", original)
+        issuer = self.stack.issuer
+        # The order is by subject. With pages of two, "zz-gone" and "zz-open" are on a later page.
+        self.stack.keycloak.add_user(keycloak_user(subject="zz-open", email="zzopen@example.test"), [ORG])
+        self.stack.keycloak.serve_directory()
+        for subject in ("zz-gone", "zz-open"):
+            self.stack.press.seed_member(issuer, subject, f"{subject}@example.test", ORG_ID)
+            self.stack.tenant.seed_user(issuer, subject, f"{subject}@example.test")
+
+    def test_deleted_and_open_accounts_on_the_second_page_are_both_seen(self) -> None:
+        plan = self.stack.app.reconcile_plan()
+
+        kinds = self.kinds(plan)
+        # The deleted account on a later page is found on both targets.
+        self.assertIn(("press", "zz-gone", "deleted_in_keycloak"), kinds)
+        self.assertIn(("kiraci1", "zz-gone", "deleted_in_keycloak"), kinds)
+        # The open account on a later page is known, so it is not reported as missing.
+        self.assertEqual([kind for _target, subject, kind in kinds if subject == "zz-open"], [])
+        for site, path in ((self.stack.press, fakes.PRESS_LIST), (self.stack.tenant, fakes.TENANT_LIST)):
+            calls = site.calls("GET", path)
+            self.assertEqual([c.query["start"] for c in calls], [["0"], ["2"], ["4"]][: len(calls)])
+            self.assertGreaterEqual(len(calls), 2)
+            self.assertEqual({c.query["page_length"][0] for c in calls}, {"2"})
+
+    def test_page_length_follows_the_contract(self) -> None:
+        from identity_sync import sites
+
+        self.addCleanup(setattr, sites, "IDENTITY_PAGE_LENGTH", 2)
+        sites.IDENTITY_PAGE_LENGTH = 500
+        self.stack.app.reconcile_plan()
+
+        self.assertEqual(self.stack.press.calls("GET", fakes.PRESS_LIST)[0].query["page_length"], ["500"])
+
+    def test_list_that_never_ends_is_an_error(self) -> None:
+        from identity_sync.httpjson import TransportError
+
+        endless = {"message": {"identities": [{"issuer": self.stack.issuer, "subject": "a", "enabled": True}], "has_next_page": True}}
+        self.stack.press.on("GET", fakes.PRESS_LIST, (200, endless))
+
+        with self.assertRaises(TransportError):
+            self.stack.app.reconcile_plan()
+
+    def test_reply_in_another_shape_is_an_error(self) -> None:
+        from identity_sync.httpjson import TransportError
+
+        for body in ([], {"identities": []}, {"identities": [], "has_next_page": "no"}, {"has_next_page": False}):
+            with self.subTest(body=body):
+                self.stack.press.on("GET", fakes.PRESS_LIST, (200, {"message": body}))
+                with self.assertRaises(TransportError):
+                    self.stack.app.reconcile_plan()

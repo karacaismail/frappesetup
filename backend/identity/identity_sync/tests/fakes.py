@@ -322,6 +322,21 @@ class FakeSite(FakeServer):
         return [r for r in self.requests if r.method != "GET"]
 
 
+def paged_identities(req: Recorded, rows: list[dict[str, object]]) -> Reply:
+    """`list_identities` as docs/sozlesmeler.md, section 7 defines it.
+
+    The request takes `start` (default 0) and `page_length` (default 500, at most 500).
+    The order is `subject`, ascending. The reply is `{"identities": [...], "has_next_page": bool}`.
+    """
+    start = int(req.query.get("start", ["0"])[0])
+    page_length = int(req.query.get("page_length", ["500"])[0])
+    if start < 0 or not 1 <= page_length <= 500:
+        return frappe_error(400, "ValidationError")
+    ordered = sorted(rows, key=lambda row: str(row["subject"]))
+    page = ordered[start : start + page_length]
+    return 200, {"message": {"identities": page, "has_next_page": start + page_length < len(ordered)}}
+
+
 class FakeTenant(FakeSite):
     """A tenant site that behaves like `contracts/platform_core-kimlik.openapi.yaml` (0.2.0).
 
@@ -368,12 +383,12 @@ class FakeTenant(FakeSite):
 
     def _list(self, _req: Recorded) -> Reply:
         rows = [
-            {"issuer": issuer, "subject": subject, "email": email, "enabled": self.users[email]["enabled"]}
+            {"issuer": issuer, "subject": subject, "enabled": self.users[email]["enabled"]}
             for (issuer, subject), email in self.links.items()
             # An anonymized record no longer carries the raw `sub` (docs/sozlesmeler.md, section 7).
             if not self.users[email].get("anonymized")
         ]
-        return 200, {"message": rows}
+        return paged_identities(_req, rows)
 
     def seed_user(self, issuer: str, subject: str, email: str, *, enabled: bool = True) -> None:
         self.links[(issuer, subject)] = email
@@ -466,17 +481,12 @@ class FakePress(FakeSite):
 
     def _list(self, _req: Recorded) -> Reply:
         rows = [
-            {
-                "issuer": issuer,
-                "subject": subject,
-                "email": email,
-                "enabled": self.users[email]["enabled"],
-                "organization_ids": self.teams_of(issuer, subject),
-            }
+            # Only these three fields (docs/sozlesmeler.md, section 7). No e-mail, no name, no teams.
+            {"issuer": issuer, "subject": subject, "enabled": self.users[email]["enabled"]}
             for (issuer, subject), email in self.links.items()
             if not self.users[email].get("anonymized")
         ]
-        return 200, {"message": rows}
+        return paged_identities(_req, rows)
 
     def seed_member(self, issuer: str, subject: str, email: str, organization_id: str, *, api_keys: int = 0) -> None:
         self.links[(issuer, subject)] = email

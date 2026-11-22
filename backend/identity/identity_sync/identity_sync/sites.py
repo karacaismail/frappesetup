@@ -3,10 +3,8 @@
 Uç adlarının kaynağı `docs/sozlesmeler.md` dosyasının 5. ve 6. bölümüdür.
 Her hedefe yalnız o hedefin `aud` değerini taşıyan belirteç gider.
 
-The `list_identities` endpoints are named in the shared contract (docs/sozlesmeler.md, section 7).
-BORC(mvp): the contract says the reply is paged but not yet how. This client reads one reply.
-Effect: a long list is cut by the target. Owner: the press-tr and platform-core-kimlik jobs name
-the paging fields, then the identity-sync job reads every page. Closes when a contract test reads two pages.
+The `list_identities` endpoints and their paging are defined in the shared contract
+(docs/sozlesmeler.md, section 7). A row carries only issuer, subject and the enabled state.
 """
 
 from __future__ import annotations
@@ -53,6 +51,7 @@ def _call_method(
     is_success: Success | None = None,
     missing_identity_is_success: bool = False,
     retry_statuses: tuple[int, ...] = (),
+    query: Mapping[str, object] | None = None,
 ) -> object:
     """Call a Frappe method and return the `message` value of the reply.
 
@@ -75,6 +74,7 @@ def _call_method(
                 f"{base_url.rstrip('/')}/api/method/{method_path}",
                 timeout=timeout,
                 headers={"Authorization": f"Bearer {token}"},
+                query=query,
                 json_body=body,
             )
         except ConnectFailed:
@@ -152,6 +152,35 @@ def _organization_ids(value: object) -> tuple[str, ...]:
     return tuple(value)
 
 
+# `list_identities` paging (docs/sozlesmeler.md, section 7): `start` and `page_length`, at most 500.
+IDENTITY_PAGE_LENGTH = 500
+# A list longer than this is taken as a target that never ends its paging.
+_MAX_IDENTITY_PAGES = 2000
+
+
+def _all_identities(read_page: Callable[[Mapping[str, object]], object]) -> list[Identity]:
+    """Read every page of a `list_identities` endpoint.
+
+    The reply is `{"identities": [...], "has_next_page": bool}`, ordered by `subject`.
+    The differences are computed only after the last page: an account on a later page must
+    not look missing. A reply in another shape, or paging that never ends, is an error.
+    Nothing is concluded from half a list.
+    """
+    found: dict[tuple[str, str], Identity] = {}
+    for page in range(_MAX_IDENTITY_PAGES):
+        message = read_page({"start": page * IDENTITY_PAGE_LENGTH, "page_length": IDENTITY_PAGE_LENGTH})
+        if not isinstance(message, Mapping) or not isinstance(message.get("has_next_page"), bool):
+            raise TransportError("identity list is not a page")
+        before = len(found)
+        for identity in _identities(message.get("identities")):
+            found[(identity.issuer, identity.subject)] = identity
+        if not message["has_next_page"]:
+            return list(found.values())
+        if len(found) == before:
+            break  # the target says "more" but sends nothing new
+    raise TransportError("identity list does not end")
+
+
 def _identities(message: object) -> list[Identity]:
     if not isinstance(message, list):
         raise TransportError("identity list is not a list")
@@ -184,6 +213,7 @@ class PressClient:
         body: Mapping[str, object] | None = None,
         is_success: Success | None = None,
         retry_statuses: tuple[int, ...] = (),
+        query: Mapping[str, object] | None = None,
     ) -> object:
         return _call_method(
             self._base_url,
@@ -194,6 +224,7 @@ class PressClient:
             body=body,
             is_success=is_success,
             retry_statuses=retry_statuses,
+            query=query,
         )
 
     def anonymize_user(self, action: PressAnonymizeUser) -> None:
@@ -228,7 +259,7 @@ class PressClient:
         self._call("press_tr.api.identity.remove_team_member", body, _is_removed)
 
     def list_identities(self) -> list[Identity]:
-        return _identities(self._call("press_tr.api.identity.list_identities"))
+        return _all_identities(lambda page: self._call("press_tr.api.identity.list_identities", query=page))
 
 
 class TenantClient:
@@ -247,6 +278,7 @@ class TenantClient:
         is_success: Success | None = None,
         missing_identity_is_success: bool = False,
         retry_statuses: tuple[int, ...] = (),
+        query: Mapping[str, object] | None = None,
     ) -> object:
         # The target address comes only from the configured tenant list (G-13).
         return _call_method(
@@ -259,6 +291,7 @@ class TenantClient:
             is_success=is_success,
             missing_identity_is_success=missing_identity_is_success,
             retry_statuses=retry_statuses,
+            query=query,
         )
 
     @staticmethod
@@ -332,4 +365,5 @@ class TenantClient:
         )
 
     def list_identities(self, tenant: str) -> list[Identity]:
-        return _identities(self._call(tenant, "platform_core.api.identity.list_identities"))
+        method = "platform_core.api.identity.list_identities"
+        return _all_identities(lambda page: self._call(tenant, method, query=page))

@@ -430,6 +430,24 @@ class SchemaTest(ServerCase):
         self.assertEqual((limit["minimum"], limit["maximum"], limit["default"]), (1, 500, 100))
         self.assertNotEqual(schema_errors({"dead_letters": [], "next_offset": 0}, CONTRACT["components"]["schemas"]["DeadLetterList"], CONTRACT), [])
 
+    def test_identity_list_pages_match_the_target_schema(self) -> None:
+        schema = CONTRACT["components"]["schemas"]["TargetIdentityList"]
+        issuer = self.stack.issuer
+        for number in range(3):
+            self.stack.press.seed_member(issuer, f"u-{number}", f"u{number}@example.test", ORG_ID)
+            self.stack.tenant.seed_user(issuer, f"u-{number}", f"u{number}@example.test")
+        for site, path in ((self.stack.press, fakes.PRESS_LIST), (self.stack.tenant, fakes.TENANT_LIST)):
+            with self.subTest(path=path):
+                import urllib.request
+
+                request = urllib.request.Request(site.url + path + "?start=0&page_length=2")
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    body = json.loads(response.read())
+                self.assertEqual(schema_errors(body, schema, CONTRACT), [])
+                self.assertEqual((len(body["message"]["identities"]), body["message"]["has_next_page"]), (2, True))
+                self.assertEqual(set(body["message"]["identities"][0]), {"issuer", "subject", "enabled"})
+        self.assertNotEqual(schema_errors({"message": []}, schema, CONTRACT), [])
+
     def test_every_difference_kind_is_in_the_contract(self) -> None:
         import inspect
 

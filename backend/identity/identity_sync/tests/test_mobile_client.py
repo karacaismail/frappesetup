@@ -56,6 +56,7 @@ class MobileClientTest(ServerCase):
 
         keycloak.on("POST", token_path, token)
         self.warnings: list[str] = []
+        self.errors: list[str] = []
         self.client = self.load_client(
             {
                 "mobile_identity_sync_url": f"http://127.0.0.1:{self.httpd.server_address[1]}",
@@ -68,7 +69,7 @@ class MobileClientTest(ServerCase):
     def load_client(self, conf: dict[str, str]) -> types.ModuleType:
         frappe = types.ModuleType("frappe")
         frappe.conf = conf
-        frappe.logger = lambda _name: types.SimpleNamespace(warning=self.warnings.append)
+        frappe.logger = lambda _name: types.SimpleNamespace(warning=self.warnings.append, error=self.errors.append)
         previous = sys.modules.get("frappe")
         sys.modules["frappe"] = frappe
         try:
@@ -99,7 +100,7 @@ class MobileClientTest(ServerCase):
         # docs/sozlesmeler.md, section 7: the site asks for the token with this scope.
         self.assertEqual(form["scope"], ["aud-identity-sync"])
         self.assertEqual(form["grant_type"], ["client_credentials"])
-        self.assertEqual(self.warnings, [])
+        self.assertEqual((self.warnings, self.errors), ([], []))
 
     def test_client_request_body_matches_the_contract(self) -> None:
         from .test_contract import CONTRACT, request_schema, schema_errors
@@ -123,11 +124,35 @@ class MobileClientTest(ServerCase):
 
         self.assertEqual(self.client.send_session_revocations([(SID, SUBJECT)]), ())
 
-    def test_user_of_another_tenant_is_reported_as_failed(self) -> None:
+    def test_refusal_for_another_tenants_user_is_logged_and_the_allowed_session_ends(self) -> None:
         # The site names a user who is not a member of its organization. The service answers 403.
+        # The client logs the refusal and does not retry it. Its own user's session still ends.
+        statuses: list[int] = []
+        original = self.httpd.RequestHandlerClass.send_response
+
+        def record(handler, code, message=None):
+            statuses.append(code)
+            return original(handler, code, message)
+
+        self.httpd.RequestHandlerClass.send_response = record
+        self.addCleanup(setattr, self.httpd.RequestHandlerClass, "send_response", original)
+
         failed = self.client.send_session_revocations([(OTHER_SID, OTHER_USER), (SID, SUBJECT)])
 
-        self.assertEqual(failed, ((OTHER_SID, OTHER_USER),))
+        self.assertEqual(statuses, [403, 200])
+        self.assertEqual(failed, ())
         self.assertEqual(self.stack.keycloak.sessions[OTHER_USER], [OTHER_SID])
         self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [])
+        self.assertEqual(len(self.errors), 1)
+        self.assertIn("403", self.errors[0])
+        self.assertEqual(self.warnings, [])
+
+    def test_unreachable_service_is_reported_as_failed(self) -> None:
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+        failed = self.client.send_session_revocations([(SID, SUBJECT)])
+
+        self.assertEqual(failed, ((SID, SUBJECT),))
+        self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [SID])
         self.assertEqual(len(self.warnings), 1)

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.10.1
+  version: 0.11.0
   summary: Endpoints of the user sync service
   description: |
     This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
@@ -1424,14 +1424,24 @@ components:
           description: The failed step and its status code. It carries no response body.
     Difference:
       type: object
-      required: [target, subject, kind]
+      description: |
+        One difference between Keycloak and a target.
+        A difference of the `deleted_in_keycloak` kind carries `job_id` and no `subject`.
+        Every other kind carries `subject` and no `job_id`.
+      required: [target, kind]
       properties:
         target:
           type: string
           description: The place where the difference was seen. The value is `press` or the name of the tenant.
         subject:
           type: string
-          description: The Keycloak id of the user (`sub`).
+          description: The Keycloak id of the user (`sub`). It is not returned for an account that is deleted in Keycloak.
+        job_id:
+          type: string
+          pattern: "^del-[0-9a-f]{40}$"
+          description: |
+            Returned only for an account that is deleted in Keycloak. It is the id of the deletion job of that account.
+            The id is a keyed digest. The raw id of a deleted account does not leave the service.
         kind:
           type: string
           enum:
@@ -1466,29 +1476,32 @@ components:
         The response expected from the `list_identities` endpoints. This schema is not an endpoint of this service.
         The shared contract (`docs/sozlesmeler.md`, section 7) names the endpoints and the fields.
         Every row carries the `issuer` and `subject` fields and whether the account is enabled.
-        The `email` and `organization_ids` fields are optional. Without them the service does not compare the email or the teams.
-        The shared contract says the response is paged. It does not name the paging fields yet. The service reads one response.
+        The row carries no email and no name. So the service does not compare the email or the teams of an existing record.
+        The request takes `start` and `page_length`. The `page_length` value is at most 500. The order is `subject`, ascending.
+        The service reads every page. It computes the differences only after the last page.
+        If the response has another shape or the paging does not end, the service reports an error and concludes nothing.
       required: [message]
       properties:
         message:
-          type: array
-          items:
-            type: object
-            required: [issuer, subject, enabled]
-            properties:
-              issuer:
-                type: string
-              subject:
-                type: string
-              email:
-                type: string
-              enabled:
-                type: boolean
-              organization_ids:
-                type: array
-                description: Only Press sends it. These are the organization ids of the teams the user is a member of.
-                items:
-                  type: string
+          type: object
+          required: [identities, has_next_page]
+          properties:
+            identities:
+              type: array
+              maxItems: 500
+              items:
+                type: object
+                required: [issuer, subject, enabled]
+                properties:
+                  issuer:
+                    type: string
+                  subject:
+                    type: string
+                  enabled:
+                    type: boolean
+            has_next_page:
+              type: boolean
+              description: True when more records exist after this page.
     TargetEnsureTeamResult:
       type: object
       description: |

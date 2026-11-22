@@ -49,6 +49,18 @@ Deneme sayısı 0 ise servis olayı kabul etti ama işe başlayamadan durdu.
 `unknown` değeri işin bitip bitmediğinin bilinmediğini gösterir.
 Süreç bir yazmadan sonra durduysa durum yine `unknown` olur.
 ",identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.state.description
+"One difference between Keycloak and a target.
+A difference of the `deleted_in_keycloak` kind carries `job_id` and no `subject`.
+Every other kind carries `subject` and no `job_id`.
+","Keycloak ile bir hedef arasındaki bir fark.
+`deleted_in_keycloak` türündeki fark `job_id` taşır, `subject` taşımaz.
+Öteki bütün türler `subject` taşır, `job_id` taşımaz.
+",identity_sync.openapi.yaml: components.schemas.Difference.description
+"Returned only for an account that is deleted in Keycloak. It is the id of the deletion job of that account.
+The id is a keyed digest. The raw id of a deleted account does not leave the service.
+","Yalnız Keycloak'ta silinen hesap için döner. O hesabın silme işinin kimliğidir.
+Kimlik anahtarlı bir özettir. Silinen hesabın ham kimliği servisten çıkmaz.
+",identity_sync.openapi.yaml: components.schemas.Difference.properties.job_id.description
 "`missing` shows that the user has no link in the tenant.
 `disabled` shows that the expected user is disabled at the target.
 `email_mismatch` shows that the email at the target is different.
@@ -73,7 +85,7 @@ Kayıt açık ya da kapalı olabilir. Onarım, hesabın silme işidir.
 `foreign_issuer` değeri kaydın başka bir kimlik sunucusuna ait olduğunu gösterir.
 ",identity_sync.openapi.yaml: components.schemas.Difference.properties.kind.description
 Returned only in team membership differences. It is the id of the organization in Keycloak.,Yalnız takım üyeliği farklarında döner. Keycloak'taki kuruluşun kimliğidir.,identity_sync.openapi.yaml: components.schemas.Difference.properties.organization_id.description
-The Keycloak id of the user (`sub`).,Kullanıcının Keycloak kimliği (`sub`).,identity_sync.openapi.yaml: components.schemas.Difference.properties.subject.description
+The Keycloak id of the user (`sub`). It is not returned for an account that is deleted in Keycloak.,Kullanıcının Keycloak kimliği (`sub`). Keycloak'ta silinen hesap için dönmez.,identity_sync.openapi.yaml: components.schemas.Difference.properties.subject.description
 The place where the difference was seen. The value is `press` or the name of the tenant.,Farkın görüldüğü yer. Değer `press` ya da kiracının adıdır.,identity_sync.openapi.yaml: components.schemas.Difference.properties.target.description
 The service envelope. It carries no personal data.,Servis zarfı. Kişisel veri taşımaz.,identity_sync.openapi.yaml: components.schemas.Event.description
 The unique id of the event. The service does not process the same id a second time.,Olayın tekil kimliği. Servis aynı kimliği ikinci kez işlemez.,identity_sync.openapi.yaml: components.schemas.Event.properties.id.description
@@ -283,15 +295,19 @@ The name of the team in Press.,Press'teki takımın adı.,identity_sync.openapi.
 "The response expected from the `list_identities` endpoints. This schema is not an endpoint of this service.
 The shared contract (`docs/sozlesmeler.md`, section 7) names the endpoints and the fields.
 Every row carries the `issuer` and `subject` fields and whether the account is enabled.
-The `email` and `organization_ids` fields are optional. Without them the service does not compare the email or the teams.
-The shared contract says the response is paged. It does not name the paging fields yet. The service reads one response.
+The row carries no email and no name. So the service does not compare the email or the teams of an existing record.
+The request takes `start` and `page_length`. The `page_length` value is at most 500. The order is `subject`, ascending.
+The service reads every page. It computes the differences only after the last page.
+If the response has another shape or the paging does not end, the service reports an error and concludes nothing.
 ","`list_identities` uçlarından beklenen yanıt. Bu şema bu servisin bir ucu değildir.
 Ortak sözleşmenin 7. bölümü uçları ve alanları adlandırır.
 Her satır `issuer` ve `subject` alanlarını ve hesabın açık olup olmadığını taşır.
-`email` ve `organization_ids` alanları isteğe bağlıdır. Bu alanlar yoksa servis e-postayı ve takımları karşılaştırmaz.
-Ortak sözleşme yanıtın sayfalı olduğunu söyler. Sayfalama alanlarını henüz adlandırmaz. Servis tek yanıt okur.
+Satır e-posta ve ad taşımaz. Bu yüzden servis var olan kaydın e-postasını ve takımlarını karşılaştırmaz.
+İstek `start` ve `page_length` alır. `page_length` en çok 500 olur. Sıra `subject` değerine göre artandır.
+Servis bütün sayfaları okur. Farkları ancak son sayfadan sonra hesaplar.
+Yanıt başka biçimdeyse ya da sayfalama bitmiyorsa servis hata bildirir ve hiçbir sonuç çıkarmaz.
 ",identity_sync.openapi.yaml: components.schemas.TargetIdentityList.description
-Only Press sends it. These are the organization ids of the teams the user is a member of.,Yalnız Press gönderir. Kullanıcının üye olduğu takımların kuruluş kimlikleridir.,identity_sync.openapi.yaml: components.schemas.TargetIdentityList.properties.message.items.properties.organization_ids.description
+True when more records exist after this page.,Bu sayfadan sonra başka kayıt varsa doğrudur.,identity_sync.openapi.yaml: components.schemas.TargetIdentityList.properties.message.properties.has_next_page.description
 "The definite success response expected from the `platform_core.api.identity.provision` endpoint.
 The source is the `platform_core` identity contract in the `contracts/` folder.
 The service also compares the `enabled` value with the value it asked for.

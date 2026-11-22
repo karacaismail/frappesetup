@@ -296,14 +296,13 @@ class DeletionPathsTest(ServerCase):
         self.stack.keycloak.serve_directory()
         status, preview = self.post_json("/v1/reconcile", {"dry_run": True}, PREVIEW_TOKEN)
         self.assertEqual([p["operation"] for p in preview["previews"]], [*CLOSE, *ANONYMIZE])
-        # The difference names the user by `sub`: the contract defines that field for this reader.
-        self.assertEqual({d["kind"] for d in preview["differences"]}, {"deleted_in_keycloak"})
-        self.seen((status, preview["previews"]))
+        self.assertEqual({(d["kind"], d["job_id"]) for d in preview["differences"]}, {("deleted_in_keycloak", self.job_id)})
+        self.seen((status, preview))
 
         execute = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-m1"}
         status, done = self.post_json("/v1/reconcile", execute)
 
-        self.seen((status, done["results"]))
+        self.seen((status, done))
         self.assertEqual(done["results"], [{"operation": "account_deletion", "target": self.job_id, "status": "done"}])
         self.assertEqual(self.anonymized(), 2)
         self.assertEqual(self.record(), {"job_done": True, "event_done": False, "queue": []})

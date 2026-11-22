@@ -11,7 +11,7 @@ from identity_sync.keycloak_admin import KeycloakAdmin, snapshot_from_user
 from identity_sync.mapping import Action, Organization, digest_of
 from identity_sync.pipeline import PreviewChanged, Processor, plan_digest
 from identity_sync.mapping import Preview
-from identity_sync.reconcile import Difference, deleted_subjects, find_differences, plan_repairs
+from identity_sync.reconcile import DELETED, Difference, deleted_subjects, find_differences, plan_repairs
 from identity_sync.sites import PressClient, TenantClient
 from identity_sync.store import Store
 from identity_sync.tokens import TokenProvider
@@ -28,6 +28,8 @@ class ReconcilePlan:
     # Accounts deleted in Keycloak. Each is finished by its ordered account job.
     deleted: tuple[str, ...] = ()
     job_previews: tuple[Preview, ...] = ()
+    # The differences as a reply shows them. A deleted account is named by its job id.
+    shown: tuple[dict[str, str], ...] = ()
 
     def previews(self) -> list[Preview]:
         return [action.preview() for action in self.actions] + list(self.job_previews)
@@ -36,7 +38,7 @@ class ReconcilePlan:
         """The report for a human. It carries no e-mail: users are named by `sub`."""
         return {
             "count": len(self.differences),
-            "differences": [difference.to_dict() for difference in self.differences],
+            "differences": list(self.shown),
             "previews": [preview.to_dict() for preview in self.previews()],
             "preview_digest": self.digest,
         }
@@ -86,7 +88,20 @@ class App:
             }
         )
         job_previews = tuple(preview for job in jobs for preview in job.previews)
-        return ReconcilePlan(tuple(differences), actions, digest, deleted, job_previews)
+        shown = tuple(self._shown(difference) for difference in differences)
+        return ReconcilePlan(tuple(differences), actions, digest, deleted, job_previews, shown)
+
+    def _shown(self, difference: Difference) -> dict[str, str]:
+        """A difference as a reply shows it.
+
+        An account deleted in Keycloak is named by the id of its deletion job, a keyed digest.
+        Its raw id does not leave the service. Every other kind names the user by `sub`,
+        because the reader needs the id to act on a living account.
+        """
+        shown = difference.to_dict()
+        if difference.kind == DELETED:
+            shown["job_id"] = self.processor.account_job(shown.pop("subject"), time=0).id
+        return shown
 
     def reconcile_execute(self, expected_digest: str) -> dict[str, object]:
         """Run the approved repair.
@@ -103,7 +118,7 @@ class App:
             results += [self.processor.run_removal(subject) for subject in plan.deleted]
         return {
             "count": len(plan.differences),
-            "differences": [difference.to_dict() for difference in plan.differences],
+            "differences": list(plan.shown),
             "results": results,
         }
 

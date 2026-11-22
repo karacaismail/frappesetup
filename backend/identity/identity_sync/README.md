@@ -162,6 +162,13 @@ Rapor e-posta taşımaz. Rapor her fark için düzeltme işini de gösterir. Dü
 
 Bazı farkların güvenli bir düzeltmesi yoktur. Servis bunları yalnız raporlar. Örneğin Press'te kapalı bir kullanıcıyı açan uç yoktur.
 
+Mutabakat hedeflerin kullanıcı listesini `list_identities` ucundan okur:
+
+- Liste sayfalıdır. Servis her istekte en çok 500 kayıt ister.
+- Servis bütün sayfaları okur. Farkları ancak son sayfadan sonra hesaplar.
+- Yanıt beklenen biçimde değilse ya da sayfalama bitmiyorsa servis hata verir. Yarım listeden sonuç çıkarmaz.
+- Keycloak'ta silinen hesabın farkı `job_id` taşır. Hesabın ham kimliği yanıtta yer almaz.
+
 ## Yarıda kalan iş
 
 Süreç her an durabilir. Servis olayı kaybetmez ve yazmayı körlemesine tekrarlamaz.
@@ -392,5 +399,5 @@ Bu imaj 22 Kasım 2026 Pazar günü `colima-factory` profilinde derlendi ve ağs
 Bu maddeler bilerek bırakılan eksiklerdir. Her biri bir teknik borçtur. `BORC(mvp)` işareti, eksiğin MVP seviyesini tamamlamayı engellediğini gösterir.
 
 - `BORC(mvp)`: Servis canlı Keycloak, Press ve kiracı ile denenmedi. Olay eklentisinin yalnız imza kodu denendi. Etki: Sahte hedeflerin kaçırdığı bir uyumsuzluk üretimde ortaya çıkabilir. Sorumlu: integration-e2e işi. Kapanma koşulu: Uçtan uca test gerçek servislerle geçer.
-- `BORC(mvp)`: Ortak sözleşme `list_identities` yanıtının sayfalı olduğunu söyler. Sayfalama alanlarını adlandırmaz. Bu servis tek yanıt okur. Etki: Uzun kullanıcı listesinde mutabakat eksik kalır. Sorumlu: press-tr, platform-core-kimlik ve identity-sync işleri. Kapanma koşulu: Alan adları sözleşmeye girer ve bir test iki sayfa okur.
+- `BORC(mvp)`: `list_identities` satırı e-posta ve takım taşımaz. Etki: Mutabakat, var olan kaydın e-posta farkını ve fazla takım üyeliğini göremez. Sorumlu: orkestratör. Kapanma koşulu: Bu iki farkın nasıl bulunacağı sözleşmeye yazılır ya da farklar kapsam dışı sayılır.
 - `BORC(mvp)`: Bu servisin testleri ve biçim denetimi CI'da koşmaz. Etki: Bozulma yalnız elle çalıştırılan testte görülür. Sorumlu: DevOps sorumlusu. Kapanma koşulu: CI bu klasörün testlerini her değişiklikte koşar.

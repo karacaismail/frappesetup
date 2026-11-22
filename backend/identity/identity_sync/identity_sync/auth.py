@@ -3,13 +3,17 @@
 Doğrulamayı ortak `oidc_verify` kitaplığı yapar (`docs/sozlesmeler.md`, 3. bölüm).
 Servis kendi doğrulama kodunu yazmaz. Kitaplık yoksa bütün istekler reddedilir.
 
-There are four client lists. Each one grants a different right, and a client can be in only one:
+There are four client lists. Each one grants a different right:
 
 - `preview_azp` may read and preview.
-- `execute_azp` may also execute. Only trusted services that check the human approval go here.
-- `session_azp` may only call `/v1/sessions/revoke`. It holds the service clients of the
-  platform_core sites. A new tenant's client must be added here, or it cannot end a session.
+- `execute_azp` may also execute. It holds the service clients of the tenant sites: the human
+  approves in the AI layer of the tenant site, so that site starts the execution.
+- `session_azp` may call `/v1/sessions/revoke`. It holds the same tenant site clients.
+  A new tenant's client must be added to both lists, or it cannot execute or end a session.
 - `deletion_azp` may only call `/v1/account-deletions`. It holds the Press service client.
+
+The execute list and the session list may carry the same client. A client in the preview
+list or in the deletion list cannot be in any other list (`config.load_settings` refuses it).
 
 The server enforces the split. The verifier accepts the union of the four lists.
 """
