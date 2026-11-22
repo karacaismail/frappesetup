@@ -234,6 +234,65 @@ class TestMetadataHTTP(ShellHTTPFixture):
 				self.assertNotIn("data", json.loads(body))
 				self.assertNotIn("message", json.loads(body))
 
+	def test_standard_doctype_rpc_methods_are_denied_only_for_website_users(self):
+		methods = (
+			"frappe.custom.doctype.custom_field.custom_field.get_fields_label",
+			"frappe.desk.form.linked_with.get_linked_doctypes",
+			"frappe.desk.doctype.list_view_settings.list_view_settings.get_default_listview_fields",
+		)
+		for method in methods:
+			for prefix in ("/api/method/", "/api/v1/method/", "/api/v2/method/"):
+				with self.subTest(method=method, prefix=prefix):
+					path = f"{prefix}{method}?doctype=ToDo"
+					self.assertEqual(self.request(path, self.reader_sid)[0], 403)
+					self.assertEqual(self.request(path, self.desk_sid)[0], 200)
+		path = "/api/method/frappe.desk.search.search_widget?doctype=ToDo&txt="
+		self.assertEqual(self.request(path, self.reader_sid)[0], 403)
+
+	def test_guest_unresolved_rpc_returns_validation_error(self):
+		before = frappe.db.count("Error Log")
+		for path in ("/api/method/xyz", "/?cmd=xyz"):
+			with self.subTest(path=path):
+				status, _, body = self.request(path)
+				self.assertEqual(status, 417)
+				self.assertEqual(json.loads(body)["exc_type"], "ValidationError")
+		self.assertEqual(frappe.db.count("Error Log"), before)
+
+	def test_validate_mobile_policy_guest_denied(self):
+		path = "/api/method/platform_core.api.meta.validate_mobile_policy"
+		self.assertEqual(self.request(path)[0], 403)
+
+	def test_validate_mobile_policy_foreign_data_denied(self):
+		path = "/api/method/platform_core.api.meta.validate_mobile_policy"
+		self.assertEqual(self.request(path, self.reader_sid)[0], 403)
+		self.assertEqual(self.request(path, self.desk_sid)[0], 403)
+
+	def test_system_manager_can_validate_mobile_policy(self):
+		path = "/api/method/platform_core.api.meta.validate_mobile_policy"
+		request = Request.from_values(path=path)
+		with (
+			patch.object(frappe.local, "request", request, create=True),
+			patch.object(frappe.local, "response_headers", {}, create=True),
+		):
+			self.assertEqual(
+				frappe.get_attr("platform_core.api.meta.validate_mobile_policy")(),
+				{"valid": True, "errors": []},
+			)
+
+	def test_website_user_can_call_allowlisted_identity_method(self):
+		method = "frappe.auth.get_logged_user"
+		for path in (
+			f"/api/method/{method}",
+			f"/api/v1/method/{method}",
+			f"/api/v2/method/{method}",
+			"/?cmd=" + method,
+		):
+			with self.subTest(path=path):
+				status, _, body = self.request(path, self.reader_sid)
+				self.assertEqual(status, 200)
+				response = json.loads(body)
+				self.assertEqual(response.get("message", response.get("data")), READER)
+
 	def test_catalog_marks_unapproved_field_types(self):
 		from frappe.custom.doctype.custom_field.custom_field import create_custom_field
 
@@ -259,8 +318,16 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertNotIn("options", fields["unsupported_html"])
 
 	@contextmanager
-	def mobile_context(self):
-		identity = {"account": PRIVILEGED, "scope": "mobile", "site": frappe.local.site}
+	def mobile_context(self, *, omit=None):
+		identity = {
+			"account": PRIVILEGED,
+			"scope": "mobile",
+			"site": frappe.local.site,
+			"installation": "test-installation",
+			"sid": "test-identity-session",
+		}
+		if omit:
+			del identity[omit]
 		request = Request.from_values(path="/api/method/platform_core.api.mobile.get_metadata")
 		with (
 			patch.object(frappe.local, "mobile_identity", identity, create=True),
@@ -328,6 +395,13 @@ class TestMetadataHTTP(ShellHTTPFixture):
 				self.assertEqual(fields["title"]["sensitivity"], "restricted")
 			finally:
 				frappe.set_user("Administrator")
+			fields = {
+				entry["fieldname"]: entry
+				for entry in get_doctype(DOCTYPE, "Administrator")["schema"]["fields"]
+			}
+			self.assertEqual(fields["mask_test"]["sensitivity"], "restricted")
+			self.assertFalse(fields["mask_test"]["read_only"])
+
 			frappe.set_user(PRIVILEGED)
 			try:
 				fields = {
@@ -367,8 +441,32 @@ class TestMetadataHTTP(ShellHTTPFixture):
 	def test_verified_mobile_identity_cannot_select_web_metadata(self):
 		frappe.set_user(PRIVILEGED)
 		try:
-			with self.mobile_context():
-				with self.assertRaises(frappe.PermissionError):
-					get_doctype(DOCTYPE, PRIVILEGED, surface="web")
+			with patch.dict(frappe.conf, {"shell_mobile_doctypes": [DOCTYPE]}), self.mobile_context():
+				payload = get_doctype(DOCTYPE, PRIVILEGED, surface="web")
+			self.assertTrue(payload["mobile_cache_allowed"])
+			self.assertNotIn("private_note", {field["fieldname"] for field in payload["schema"]["fields"]})
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_mobile_allowlist_typo_does_not_disable_web_metadata(self):
+		frappe.set_user(PRIVILEGED)
+		try:
+			with patch.dict(frappe.conf, {"shell_mobile_doctypes": ["Unknown Shell Test DocType"]}):
+				payload = get_doctype(DOCTYPE, PRIVILEGED)
+			self.assertFalse(payload["mobile_cache_allowed"])
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_mobile_identity_requires_installation_and_sid(self):
+		frappe.set_user(PRIVILEGED)
+		try:
+			for field in ("installation", "sid"):
+				with (
+					self.subTest(field=field),
+					patch.dict(frappe.conf, {"shell_mobile_doctypes": [DOCTYPE]}),
+					self.mobile_context(omit=field),
+					self.assertRaises(frappe.PermissionError),
+				):
+					get_doctype(DOCTYPE, PRIVILEGED, surface="mobile")
 		finally:
 			frappe.set_user("Administrator")

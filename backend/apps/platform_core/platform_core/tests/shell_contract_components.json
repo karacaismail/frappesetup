@@ -503,7 +503,7 @@
       "standard",
       "restricted"
     ],
-    "description": "High privacy marker. Restricted fields are never returned to the mobile surface."
+    "description": "High privacy marker. Restricted fields are omitted for users without desktop access and for all mobile responses."
   },
   "DocType": {
     "type": "object",

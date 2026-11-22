@@ -1,5 +1,6 @@
 import json
 from html.parser import HTMLParser
+from urllib.parse import quote
 
 import frappe
 
@@ -50,17 +51,17 @@ class TestPanelHTTP(ShellHTTPFixture):
 		for token, expected in ((None, 400), (other, 400), (first, 200)):
 			headers = {"X-Frappe-CSRF-Token": token} if token else {}
 			status, _, body = self.request(
-				"/api/method/frappe.client.insert",
+				f"/api/resource/{quote(DOCTYPE)}",
 				self.reader_sid,
 				method="POST",
-				data={"doc": json.dumps({"doctype": DOCTYPE, "title": "Shell CSRF test"})},
+				data={"doctype": DOCTYPE, "title": "Shell CSRF test"},
 				headers=headers,
 			)
 			self.assertEqual(status, expected)
 			if expected == 400:
 				self.assertEqual(json.loads(body)["exc_type"], "CSRFTokenError")
 			else:
-				frappe.delete_doc(DOCTYPE, json.loads(body)["message"]["name"])
+				frappe.delete_doc(DOCTYPE, json.loads(body)["data"]["name"])
 				frappe.db.commit()
 
 	def test_panel_uses_the_requested_language(self):

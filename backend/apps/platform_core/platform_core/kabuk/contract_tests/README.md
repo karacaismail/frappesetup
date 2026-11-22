@@ -24,6 +24,9 @@ types and `shell_restricted_fields` for a mapping from DocType names to
 restricted field names. Masked fields, Password fields and elevated
 permission levels are also restricted. Validate configuration locally with
 `bench --site <site> execute platform_core.kabuk.metadata_policy.validate_mobile_policy`.
+An invalid mobile allowlist blocks mobile metadata only. Invalid restricted DocType or field
+configuration also blocks metadata for users without desktop access.
+System Managers can also run the check with `GET /api/method/platform_core.api.meta.validate_mobile_policy`.
 Unknown names cause the mobile metadata service to fail closed.
 
 The official Frappe runner checks projection components using

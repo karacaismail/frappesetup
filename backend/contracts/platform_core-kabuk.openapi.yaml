@@ -11,6 +11,38 @@
     }
   ],
   "paths": {
+    "/api/method/platform_core.api.meta.validate_mobile_policy": {
+      "get": {
+        "operationId": "validateMobilePolicy",
+        "summary": "Validate site metadata policy as a System Manager",
+        "responses": {
+          "200": {
+            "description": "Policy validation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["message"],
+                  "properties": {
+                    "message": {
+                      "type": "object",
+                      "required": ["valid", "errors"],
+                      "properties": {
+                        "valid": {"type": "boolean"},
+                        "errors": {"type": "array", "items": {"type": "string"}}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "System Manager permission required."
+          }
+        }
+      }
+    },
     "/api/method/platform_core.api.shell.get_bootstrap": {
       "get": {
         "operationId": "getBootstrap",
@@ -1311,7 +1343,7 @@
           "standard",
           "restricted"
         ],
-        "description": "High privacy marker. Restricted fields are never returned to the mobile surface."
+        "description": "High privacy marker. Restricted fields are omitted for users without desktop access and for all mobile responses."
       },
       "Formatting": {
         "type": "object",

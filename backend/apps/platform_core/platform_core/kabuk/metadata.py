@@ -40,7 +40,7 @@ def get_doctype(doctype: str, user: str, *, surface: str = "web") -> dict:
 		or not has_permission(meta.name, "read", user=user, print_logs=False)
 		or (mobile_requested and not mobile)
 		or (limited and policy.errors)
-		or (mobile and not policy.allows_mobile(meta.name))
+		or (mobile and (policy.mobile_errors or not policy.allows_mobile(meta.name)))
 	):
 		message = frappe._("You cannot read this DocType.", context="shell.metadata")
 		frappe.msgprint(message, indicator="red")
@@ -93,7 +93,7 @@ def visible_schema(
 	writable = permitted_fields(meta, user, "write", parenttype=parenttype)
 	restricted_doctype = meta.name in policy.restricted_doctypes
 	masked = {item.fieldname for item in meta.fields if item.get("mask")}
-	writable -= masked
+	writable -= {item.fieldname for item in meta.get_masked_fields(parenttype)}
 	restricted = {
 		field.fieldname
 		for field in meta.fields

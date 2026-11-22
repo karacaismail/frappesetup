@@ -23,10 +23,25 @@ class TestShellPermissionHooks(IntegrationTestCase):
 			if name in hooks:
 				self.assertLess(hooks.index(name), hooks.index(guard))
 
+	def test_website_request_guard_is_installed(self):
+		self.assertEqual(
+			frappe.get_hooks("before_request").count(
+				"platform_core.kabuk.native_metadata.guard_website_rpc_before_request"
+			),
+			1,
+		)
+
 	def test_list_hooks_have_one_assignment(self):
 		path = Path(frappe.get_app_path("platform_core", "hooks.py"))
 		tree = ast.parse(path.read_text(encoding="utf-8"))
-		for name in ("auth_hooks", "after_build", "clear_cache"):
+		for name in (
+			"auth_hooks",
+			"after_build",
+			"clear_cache",
+			"before_request",
+			"doc_events",
+			"website_user_allowed_methods",
+		):
 			assignments = [
 				node
 				for node in tree.body
@@ -35,14 +50,44 @@ class TestShellPermissionHooks(IntegrationTestCase):
 			]
 			self.assertEqual(len(assignments), 1, name)
 
-	def test_installed_access_rule_hooks_invalidate_cached_permissions(self):
-		events = frappe.get_hooks("doc_events").get("Access Rule", {})
-		for event in ("on_update", "on_trash"):
-			self.assertIn("platform_core.kabuk.cache.invalidate_permissions", events.get(event, []))
+		dictionary = next(
+			node.value
+			for node in tree.body
+			if isinstance(node, ast.Assign)
+			and any(isinstance(target, ast.Name) and target.id == "doc_events" for target in node.targets)
+		)
+		for level in (dictionary, *dictionary.values):
+			keys = [ast.literal_eval(key) for key in level.keys]
+			self.assertEqual(len(keys), len(set(keys)), keys)
+		for events in dictionary.values:
+			for handlers in events.values:
+				self.assertIsInstance(handlers, ast.List)
+
+	def test_installed_shell_permission_hooks_invalidate_cached_permissions(self):
+		installed = frappe.get_hooks("doc_events")
+		for doctype in (
+			"User",
+			"Role",
+			"Role Profile",
+			"User Permission",
+			"Custom DocPerm",
+			"DocType",
+			"Custom Field",
+			"Property Setter",
+			"Access Rule",
+		):
+			for event in ("on_update", "on_trash"):
+				self.assertIn(
+					"platform_core.kabuk.cache.invalidate_permissions",
+					installed[doctype][event],
+					(doctype, event),
+				)
 
 	def test_permission_hook_doctypes_exist_on_the_site(self):
 		for doctype, events in doc_events.items():
-			if not any(str(hook).startswith("platform_core.kabuk.cache.") for hook in events.values()):
+			if not any(
+				"platform_core.kabuk.cache.invalidate_permissions" in handlers for handlers in events.values()
+			):
 				continue
 			if doctype == "Access Rule" and not frappe.db.exists("Module Def", "Erisim"):
 				continue
