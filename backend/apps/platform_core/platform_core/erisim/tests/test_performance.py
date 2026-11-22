@@ -321,7 +321,15 @@ class TestMeasurementLogic(unittest.TestCase):
 
 	def test_log_rows_are_chosen_by_type_and_name_together(self):
 		"""Rule O-35. The searches of the clean-up are recorded; none of them is run."""
-		sample = performance.new_sample()
+		# Pure input: this test also runs after Frappe has released its site/database context.
+		sample = {
+			"started": "2026-11-22 12:00:00",
+			"doctype": "Measurement Request",
+			"users": {
+				"manager": "measurement.manager@example.test",
+				"employee": "measurement.employee@example.test",
+			},
+		}
 		made = [("Access Rule", "AR-00001"), ("Employee", "HR-EMP-00001"), ("Role", "A role")]
 		searches = []
 
@@ -329,13 +337,22 @@ class TestMeasurementLogic(unittest.TestCase):
 			searches.append((table, filters))
 			return []
 
-		with patch.object(frappe, "get_all", record), patch.object(frappe.db, "delete") as delete:
+		# Replace the module attribute, not a method on the unbound LocalProxy.
+		database = SimpleNamespace(delete=MagicMock())
+		with patch.object(frappe, "get_all", record), patch.object(frappe, "db", database):
 			performance.clean_traces(sample, made)
 
-		delete.assert_not_called()
+		database.delete.assert_not_called()
 		self.assertGreater(len(searches), 10)
 		users = set(sample["users"].values())
-		fields = {table: (kind, name) for table, kind, name in performance.LOG_TABLES}
+		# Frappe 16 DocType fields, independent of the cleanup implementation.
+		# O-35 requires the document type AND name to select the run's records.
+		fields = {
+			"Deleted Document": ("deleted_doctype", "deleted_name"),
+			"Version": ("ref_doctype", "docname"),
+			"Comment": ("reference_doctype", "reference_name"),
+			"Activity Log": ("reference_doctype", "reference_name"),
+		}
 		for table, filters in searches:
 			with self.subTest(table=table, filters=sorted(filters)):
 				# Never older than the run: a name can be given out again after a delete.
@@ -350,6 +367,8 @@ class TestMeasurementLogic(unittest.TestCase):
 				if name_field in filters:
 					# A name is never searched without its type.
 					self.assertIn(filters[kind_field], {kind for kind, _name in made})
+					expected_names = [name for kind, name in made if kind == filters[kind_field]]
+					self.assertEqual(filters[name_field], ("in", expected_names))
 
 
 class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
