@@ -9,6 +9,7 @@ Sunucu kurma ve Ansible bu kurulumda çalışmaz.
 Komutları depo kökünde çalıştırın. Birleşik kaynakta `backend/libs/oidc_verify` bulunmalı.
 Press imajı bu kitaplığı bir Python kurulum paketi olarak taşır.
 Kurulum betiği paketi Bench ortamına kurar.
+[Kitaplığın paketleme kararı](../../docs/kararlar/0016-press-oidc-wheel.md)
 Yerel kurulum, Press test paketlerini `apps/press_tr[test]` seçeneğiyle kurar.
 
 Yalnız yerel denemede örnek parolaları kullanın.

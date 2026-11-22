@@ -110,7 +110,7 @@ class AuthHttpTest(PressHttpClient, unittest.TestCase):
 		path = "/api/method/press_tr.api.auth.get_login_url"
 		for _ in range(10):
 			self.assertEqual(self.request("POST", path)[0], 200)
-		self.assertEqual(self.request("POST", path)[0], 429)
+		self.assertEqual(self.request("POST", path.replace("/api/method/", "/api/v2/method/"))[0], 429)
 
 	def test_legacy_pages_redirect_to_panel(self):
 		for path in ("/login", "/signup", "/dashboard/login"):

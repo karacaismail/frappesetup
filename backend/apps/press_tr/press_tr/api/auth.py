@@ -11,6 +11,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from werkzeug.exceptions import Conflict
 
+from press_tr.api import rate_limit_namespace
 from press_tr.kimlik.deletion import ACCOUNT_DELETION_PAGE, record_reauthentication
 from press_tr.kimlik.identity import bind_identity, ensure_personal_team, remember_press_session
 from press_tr.kimlik.oidc import callback_url, claim, client_id, issuer, reject, server_endpoint, verify
@@ -30,6 +31,7 @@ def state_key(state: str, browser_digest: str) -> bytes:
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
+@rate_limit_namespace("press_tr.api.auth.get_login_url")
 @rate_limit(limit=10, seconds=60)
 def get_login_url() -> dict[str, str]:
 	if set(frappe.form_dict) - {"cmd"}:

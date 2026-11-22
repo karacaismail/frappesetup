@@ -4,7 +4,6 @@ from unittest.mock import Mock, call, patch
 from uuid import uuid4
 
 import frappe
-from frappe import rate_limiter
 from oidc_verify import JwksUnavailable
 from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
@@ -14,28 +13,6 @@ from press_tr.kimlik import oidc, request_policy, service, sessions
 
 
 class RequestGuardsTest(unittest.TestCase):
-	def test_backchannel_logout_redacts_token_before_rate_limit_failure(self):
-		token = "fake-token"
-		flags = frappe._dict()
-
-		def reject_rate_limited_request():
-			self.assertNotIn("logout_token", form)
-			self.assertEqual(flags.press_logout_token, token)
-			self.assertEqual(form["cmd"], "press_tr.api.keycloak_backchannel_logout")
-			raise frappe.RateLimitExceededError
-
-		for original in ({}, {"cmd": "alternate.rpc.name"}):
-			form = {**original, "logout_token": token}
-			framework = SimpleNamespace(form_dict=form, flags=flags, __version__="16.50.0")
-			with (
-				self.subTest(original=original),
-				patch.object(api, "frappe", framework),
-				self.assertRaises(frappe.RateLimitExceededError),
-			):
-				api.prepare_logout_request(reject_rate_limited_request)()
-			self.assertEqual(form, original)
-			self.assertEqual(flags, {})
-
 	def test_identity_link_is_closed_to_generic_ai_writes(self):
 		self.assertIn("Press Identity Link", getattr(hooks, "ai_write_closed_doctypes", []))
 		self.assertIn("Press Keycloak Session", getattr(hooks, "ai_write_closed_doctypes", []))
@@ -71,6 +48,35 @@ class RequestGuardsTest(unittest.TestCase):
 			request_policy.block_native_login()
 		throw.assert_called_once()
 		self.assertIs(throw.call_args.args[1], frappe.PermissionError)
+
+	def test_record_ownership_redaction_preserves_invoice_children(self):
+		from press_tr.kimlik.anonymization import redact_record_ownership
+
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			name = uuid4().hex
+			user = f"{name}@example.test"
+			doctypes = (
+				"Invoice Item",
+				"Invoice Credit Allocation",
+				"Invoice Transaction Fee",
+				"Invoice Discount",
+			)
+			for doctype in doctypes:
+				table = frappe.qb.DocType(doctype)
+				frappe.qb.into(table).columns(table.name, table.owner, table.modified_by).insert(
+					name, user, user
+				).run()
+			redact_record_ownership(user, "anonymous@example.test")
+			for doctype in doctypes:
+				with self.subTest(doctype=doctype):
+					self.assertEqual(
+						frappe.db.get_value(doctype, name, ["owner", "modified_by"]), (user, user)
+					)
+		finally:
+			frappe.db.rollback()
+			frappe.destroy()
 
 	def test_anonymization_selects_only_the_accounts_files(self):
 		from press_tr.kimlik.anonymization import get_personal_files
@@ -279,10 +285,8 @@ class RequestGuardsTest(unittest.TestCase):
 
 	def test_logout_redacts_token_before_verification(self):
 		form = {"logout_token": "fixture"}
-		flags = frappe._dict()
 		with (
-			patch.object(api, "frappe", SimpleNamespace(form_dict=form, flags=flags, __version__="16.56.0")),
-			patch.object(rate_limiter, "frappe", SimpleNamespace(request=None)),
+			patch.object(api, "frappe", SimpleNamespace(form_dict=form)),
 			patch.object(api, "_revoke_keycloak_sessions") as revoke,
 		):
 

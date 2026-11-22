@@ -392,7 +392,17 @@ def redact_record_ownership(user: str, placeholder: str) -> None:
 		.select(columns.table_name, columns.column_name)
 		.where(columns.table_schema == frappe.db.cur_db_name)
 		.where(columns.table_name.like("tab%"))
-		.where(columns.table_name != "tabInvoice")
+		.where(
+			columns.table_name.notin(
+				(
+					"tabInvoice",
+					"tabInvoice Item",
+					"tabInvoice Credit Allocation",
+					"tabInvoice Transaction Fee",
+					"tabInvoice Discount",
+				)
+			)
+		)
 		.where(columns.column_name.isin(("owner", "modified_by")))
 		.orderby(columns.table_name, columns.column_name)
 		.run()

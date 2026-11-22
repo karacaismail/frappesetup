@@ -14,7 +14,7 @@ container=fs-press-tr-web-1
 repo_app=backend/apps/press_tr
 container_app=/home/frappe/benches/source/press_tr
 
-python3 -B -m unittest discover -s backend/dev/press
+python3.14 -B -m unittest discover -s backend/dev/press
 
 docker --context "$press_context" cp "$repo_app/press_tr/." "$container:$container_app/press_tr/"
 docker --context "$press_context" cp "$repo_app/tests/." "$container:$container_app/tests/"
