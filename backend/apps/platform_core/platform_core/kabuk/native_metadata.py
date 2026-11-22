@@ -1,5 +1,7 @@
 """Enforce the Website User RPC allowlist after Frappe resolves the request."""
 
+from functools import lru_cache
+
 import frappe
 from frappe.api import API_URL_MAP, v1, v2
 from frappe.core.doctype.server_script.server_script_utils import get_server_script_map
@@ -39,7 +41,10 @@ def guard_native_metadata() -> None:
 	if target is None or (target is LEGACY_LOGIN and legacy_login):
 		return
 	if target is V2_META or (frappe.session.user != "Guest" and not website_method_allowed(target)):
-		frappe.throw(frappe._("You are not permitted to call this method."), frappe.PermissionError)
+		frappe.throw(
+			frappe._("You are not permitted to call this method.", context="shell.request"),
+			frappe.PermissionError,
+		)
 
 
 def resolve_request_target(request, command):
@@ -83,7 +88,11 @@ def resolve_method(method: str, *, legacy: bool = False, doctype: str | None = N
 
 
 def website_method_allowed(target) -> bool:
+	installed_apps = frappe.get_installed_apps()
 	for name in frappe.get_hooks("website_user_allowed_methods"):
+		if not isinstance(name, str):
+			_warn_invalid_allowlist_entry(frappe.local.site, "<non-string entry>")
+			continue
 		if name == "logout":
 			if target is legacy_logout or target is V2_LOGOUT:
 				return True
@@ -93,6 +102,23 @@ def website_method_allowed(target) -> bool:
 			if frappe.override_whitelisted_method(SEARCH_LINK) != GUARDED_SEARCH_LINK:
 				continue
 			name = GUARDED_SEARCH_LINK
-		if target is frappe.get_attr(name):
+		app_name, separator, _method_path = name.partition(".")
+		if not separator or app_name not in installed_apps:
+			_warn_invalid_allowlist_entry(frappe.local.site, name)
+			continue
+		try:
+			method = frappe.get_attr(name)
+		except (ImportError, AttributeError):
+			_warn_invalid_allowlist_entry(frappe.local.site, name)
+			continue
+		if not callable(method):
+			_warn_invalid_allowlist_entry(frappe.local.site, name)
+			continue
+		if target is method:
 			return True
 	return False
+
+
+@lru_cache(maxsize=128)
+def _warn_invalid_allowlist_entry(_site: str, name: str) -> None:
+	frappe.logger("platform_core").warning("Ignoring invalid Website User allowlist entry: %r", name)
