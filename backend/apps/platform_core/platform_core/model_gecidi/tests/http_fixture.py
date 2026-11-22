@@ -75,10 +75,15 @@ def _insert(doctype, **fields):
 	return frappe.get_doc({"doctype": doctype, **fields}).insert().name
 
 
-def _identities(suffix, password, role, auth, cleanup):
+def _identities(suffix, password, role, desk_role, auth, cleanup):
 	users = {}
-	roles = {"manager": "AI Manager", "system_manager": "System Manager", "authorized": role}
-	for actor in ("manager", "regular", "authorized", "system_manager"):
+	roles = {
+		"manager": "AI Manager",
+		"system_manager": "System Manager",
+		"authorized": role,
+		"desk_no_gateway_role": desk_role,
+	}
+	for actor in ("manager", "regular", "authorized", "system_manager", "desk_no_gateway_role"):
 		credentials = {"api_key": auth[actor][0], "api_secret": auth[actor][1]} if actor in auth else {}
 		users[actor] = _insert(
 			"User",
@@ -149,6 +154,7 @@ def _seed(suffix, credential, role, cleanup):
 	credential_read_api = credential_api("Private")
 	editable_api = credential_api("Editable")
 	clearable_api = credential_api("Clearable")
+	d6_clearable_api = credential_api("D6 clearable")
 
 	for api in apis:
 		cleanup.callback(_remove_usage, api)
@@ -163,6 +169,7 @@ def _seed(suffix, credential, role, cleanup):
 		"credential_api": credential_read_api,
 		"editable_api": editable_api,
 		"clearable_api": clearable_api,
+		"d6_clearable_api": d6_clearable_api,
 		"credential": credential,
 	}
 
@@ -273,7 +280,9 @@ def _configured_fixture(wrap_app=None):
 			# Direct gateway RPC is exercised with a non-manager Desk user.
 			role = _insert("Role", role_name=f"Gateway fixture caller {suffix}", desk_access=1)
 			cleanup.callback(frappe.delete_doc, "Role", role)
-			users = _identities(suffix, password, role, auth, cleanup)
+			desk_role = _insert("Role", role_name=f"Gateway fixture Desk {suffix}", desk_access=1)
+			cleanup.callback(frappe.delete_doc, "Role", desk_role)
+			users = _identities(suffix, password, role, desk_role, auth, cleanup)
 			fixture = _seed(suffix, credential, role, cleanup)
 			frappe.db.commit()
 			with ExitStack() as connections:

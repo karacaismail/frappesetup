@@ -18,16 +18,16 @@ class ModelHttpTypesTests(unittest.TestCase):
 		self.enterContext(patch.object(frappe.local, "db", Mock(), create=True))
 		self.enterContext(patch.object(model.policy, "require_session"))
 		self.enterContext(patch.object(model.policy, "require_user"))
+		self.enterContext(
+			patch.object(frappe.local, "session", frappe._dict(user="Administrator"), create=True)
+		)
+		self.enterContext(patch.object(frappe, "get_roles", return_value=["System Manager"]))
 		self.enterContext(patch.object(model.gateway, "_require_clean_transaction"))
 
 	def test_every_whitelisted_operation_declares_its_boundary_types(self):
-		for endpoint in (
-			model.complete,
-			model.test_api,
-			model.resolve_usage,
-			model.purge_usage,
-			model.clear_api_credential,
-		):
+		endpoints = [endpoint for endpoint in frappe.whitelisted if endpoint.__module__ == model.__name__]
+		self.assertIn(model.reconcile_stale_pending, endpoints)
+		for endpoint in endpoints:
 			with self.subTest(endpoint=endpoint.__name__):
 				self.assertEqual(
 					set(get_type_hints(endpoint)), {*inspect.signature(endpoint).parameters, "return"}

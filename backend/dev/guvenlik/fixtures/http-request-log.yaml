@@ -1,0 +1,31 @@
+rules:
+  - id: http-raw-request-log
+    languages: [python]
+    severity: ERROR
+    message: "Günlüğe ham istek adresi yerine sabit işlem adını yazın."
+    mode: taint
+    pattern-sources:
+      - exact: true
+        patterns:
+          - pattern-either:
+              - pattern: $REQUEST.path
+              - pattern: $REQUEST.full_path
+              - pattern: $REQUEST.raw_path
+              - pattern: $REQUEST.url
+              - pattern: $REQUEST.url.path
+          - metavariable-regex:
+              metavariable: $REQUEST
+              regex: ^(?:[a-zA-Z_][a-zA-Z_0-9]*\.)*(?:request|req|http_request)$
+    pattern-sinks:
+      - pattern: print(...)
+      - patterns:
+          - pattern-either:
+              - patterns:
+                  - pattern: $LOGGER.$LEVEL(...)
+                  - metavariable-regex:
+                      metavariable: $LOGGER
+                      regex: (?i)^(?:[a-z_][a-z_0-9]*\.)*(?:logger|logging|log)$
+              - pattern: frappe.logger(...).$LEVEL(...)
+          - metavariable-regex:
+              metavariable: $LEVEL
+              regex: ^(?:debug|info|warning|warn|error|exception|critical|log)$

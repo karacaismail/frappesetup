@@ -11,6 +11,8 @@ from frappe.tests.test_api import make_request
 from frappe.utils import get_datetime, get_test_client, now_datetime
 from frappe.utils.password import update_password
 
+from platform_core.mobil.tests.http_diagnostics import http_diagnostic, safe_http_error_code
+
 
 class MobilePwaTest(IntegrationTestCase):
 	def setUp(self):
@@ -86,7 +88,9 @@ class MobilePwaTest(IntegrationTestCase):
 		self.assertEqual(frappe.cache.hget("session", sid)["data"]["user_type"], "Website User")
 		body = {"installation_id": str(uuid4())}
 		response = self.post(client, "v1_register", body, headers)
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(
+			response.status_code, 200, http_diagnostic(response.status_code, response.get_json(silent=True))
+		)
 		self.assertEqual(response.json["message"], body)
 		cookie_denied = {method for method in methods if ".api.mobile." in method}
 		for path in sorted(cookie_denied | {"platform_core.api.mobile.revoke_user_installations"}):
@@ -98,7 +102,8 @@ class MobilePwaTest(IntegrationTestCase):
 			)
 			if path in cookie_denied and frappe.override_whitelisted_method(path) == path:
 				self.assertEqual(
-					(response.status_code, response.json.get("code")), (401, "mobile_token_required")
+					(response.status_code, safe_http_error_code(response.get_json(silent=True))),
+					(401, "mobile_token_required"),
 				)
 			else:
 				self.assertEqual(response.status_code, 403)
@@ -123,7 +128,9 @@ class MobilePwaTest(IntegrationTestCase):
 		command = SampleCommand()
 		with patch("platform_core.api.mobile.COMMANDS", {"sample.update": command}):
 			first = self.post(client, "v1_push", payload, headers)
-			self.assertEqual(first.status_code, 200, first.get_data(as_text=True))
+			self.assertEqual(
+				first.status_code, 200, http_diagnostic(first.status_code, first.get_json(silent=True))
+			)
 			frappe.rename_doc("User", account, renamed, force=True)
 			self.identity_links[renamed] = self.identity_links.pop(account)
 			password = uuid4().hex
@@ -138,7 +145,9 @@ class MobilePwaTest(IntegrationTestCase):
 			frappe.cache.hset("session", new_sid, session)
 			headers["X-Frappe-CSRF-Token"] = session["data"]["csrf_token"]
 			replay = self.post(client, "v1_push", payload, headers)
-		self.assertEqual(replay.status_code, 200, replay.get_data(as_text=True))
+		self.assertEqual(
+			replay.status_code, 200, http_diagnostic(replay.status_code, replay.get_json(silent=True))
+		)
 		self.assertEqual(replay.json["message"], first.json["message"])
 		self.assertEqual(command.effects, 1)
 
@@ -154,10 +163,18 @@ class MobilePwaTest(IntegrationTestCase):
 			self.assertIn(response.status_code, (400, 403))
 		with patch.object(Session, "update", autospec=True) as refresh:
 			response = self.post(client, "v1_register", body, headers)
-			self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+			self.assertEqual(
+				response.status_code,
+				200,
+				http_diagnostic(response.status_code, response.get_json(silent=True)),
+			)
 			refresh.assert_not_called()
 			response = self.post(client, "v1_activity", body, headers)
-			self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+			self.assertEqual(
+				response.status_code,
+				200,
+				http_diagnostic(response.status_code, response.get_json(silent=True)),
+			)
 			refresh.assert_called_once()
 		current = frappe.cache.hget("session", sid)
 		self.assertEqual(get_datetime(current["data"]["last_updated"]), aged)
@@ -177,7 +194,11 @@ class MobilePwaTest(IntegrationTestCase):
 			body["operations"] = []
 		response = self.post(other, operation, body, other_headers)
 		expected = 200 if operation == "v1_revoke" else 403
-		self.assertEqual(response.status_code, expected, response.get_data(as_text=True))
+		self.assertEqual(
+			response.status_code,
+			expected,
+			http_diagnostic(response.status_code, response.get_json(silent=True)),
+		)
 		if operation == "v1_revoke":
 			self.assertEqual(response.json["message"], {"revoked": 0})
 

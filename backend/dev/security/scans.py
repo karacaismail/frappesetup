@@ -365,9 +365,20 @@ def scan_dependencies(requirements=None, *, reproduce=False):
                     findings.add(f"{file} · {package['name']} {package['version']} · {vulnerability['id']}")
         if code == 1 and not findings:
             raise ValueError("OSV returned no findings for a failed scan.")
-        for finding in sorted(findings):
-            print(f"OSV: {finding}")
-        return replace(result, status="fail" if findings else "pass", findings=tuple(sorted(findings)))
+        unchecked = []
+        for lock in locks:
+            path = Path(lock)
+            if path.suffix != ".txt":
+                continue
+            label = path.name if path.is_absolute() else path
+            names = re.findall(r"(?mi)^[ 	]*([a-z0-9][a-z0-9_.-]*)[ 	]*@[ 	]*git\+",
+                               (ROOT / path).read_text())
+            unchecked.extend(f"not_run · {label} · {name} · Git dependency outside offline OSV scan"
+                             for name in sorted(set(names)))
+        notes = (*sorted(findings), *unchecked)
+        for note in notes:
+            print(f"OSV: {note}")
+        return replace(result, status="fail" if findings else "pass", findings=notes)
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         print(f"OSV check failed: {error}")
         return result
@@ -624,6 +635,8 @@ def scan_zap(url, status, reason, headers, body):
                 {"type": "import", "parameters": {"type": "har", "fileName": "/tmp/scan/response.har",
                                                   "sendRequests": False}},
                 {"type": "passiveScan-wait", "parameters": {"maxDuration": 2}},
+                {"type": "report", "parameters": {"template": "traditional-json", "reportDir": "/tmp/scan",
+                                                  "reportFile": "report.json"}},
                 {"type": "exitStatus", "parameters": {"errorLevel": "Medium", "warnLevel": "Low"}},
             ]}
     payload = io.BytesIO()
@@ -636,8 +649,40 @@ def scan_zap(url, status, reason, headers, body):
     command = ["docker", *contexts[profile], "run", "--rm", "-i", "--pull", "never", "--network", "none",
                "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--entrypoint", "/bin/sh", image,
                "-ec", "mkdir -p /tmp/scan; tar -xf - -C /tmp/scan; "
-                      "exec /zap/zap.sh -cmd -silent -dir /tmp/zap -autorun /tmp/scan/plan.yaml"]
-    return run("ZAP passive scan", version, command, input_data=payload.getvalue(), timeout=180)
+                      "status=0; /zap/zap.sh -cmd -silent -dir /tmp/zap -autorun /tmp/scan/plan.yaml "
+                      ">/tmp/scan/zap.log 2>&1 || status=$?; "
+                      "cat /tmp/scan/report.json || exit 3; exit \"$status\""]
+    result = Result("ZAP passive scan", version, shlex.join(command), "fail")
+    try:
+        process = subprocess.run(command, cwd=ROOT, check=False, input=payload.getvalue(),
+                                 capture_output=True, timeout=180)
+        findings = zap_findings(json.loads(process.stdout), url)
+    except (OSError, subprocess.TimeoutExpired, ValueError, KeyError, TypeError, AttributeError):
+        print("ZAP_REPORT_UNAVAILABLE")
+        return result
+    for finding in findings:
+        print(f"ZAP: {finding}")
+    return replace(result, status="pass" if process.returncode == 0 else "fail", findings=findings)
+
+
+def zap_findings(report, url):
+    risks = {"0": "Informational", "1": "Low", "2": "Medium", "3": "High"}
+    target = urlsplit(url)
+    findings = set()
+    for site in report["site"]:
+        for alert in site["alerts"]:
+            alert_id = str(alert.get("alertRef") or alert["pluginid"])
+            if not re.fullmatch(r"[0-9]+(?:-[0-9]+)*", alert_id):
+                raise ValueError("Invalid ZAP alert ID.")
+            risk = risks[str(alert["riskcode"])]
+            for instance in alert["instances"]:
+                address = urlsplit(instance["uri"])
+                if (address.scheme == target.scheme and address.hostname == target.hostname
+                        and (address.port if address.port is not None else 80) == (target.port or 80)
+                        and (address.path or "/") == (target.path or "/")
+                        and not (address.query or address.fragment or address.username is not None)):
+                    findings.add(f"{alert_id} · {risk} · {url}")
+    return tuple(sorted(findings))
 
 
 def scan_local(target, *, ci=False):

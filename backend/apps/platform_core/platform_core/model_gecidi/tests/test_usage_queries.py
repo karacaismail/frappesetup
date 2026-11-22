@@ -33,7 +33,7 @@ class UsageQueryTests(unittest.TestCase):
 			patch.object(maintenance, "frappe") as frappe,
 			patch.object(maintenance, "now_datetime", return_value=datetime(2026, 1, 1)),
 		):
-			frappe.conf.get.return_value = maintenance.DEFAULT_RETENTION_DAYS
+			frappe.get_roles.return_value = ["System Manager"]
 			frappe.qb.get_query.return_value.run.return_value = []
 			maintenance.purge_usage()
 			self.assertEqual(frappe.qb.get_query.call_args.kwargs["order_by"], "attempted_at asc, name asc")
