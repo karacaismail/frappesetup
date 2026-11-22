@@ -1109,8 +1109,8 @@ paths:
         Two calls at the same time finish once. The second call returns the same body.
         If the request comes again after the work is done, it returns the same body.
         A successful response includes `anonymized: true` and `found: true`.
-        If neither the `(issuer, subject)` link nor a deletion record exists, it returns 404 `IdentityNotFound`.
-        The sync service treats this response as “no user on this site”.
+        If neither the `(issuer, subject)` link nor a deletion record exists, it returns HTTP 200.
+        The response then carries only `anonymized: true` and `found: false`.
         The `Administrator` and `Guest` accounts cannot be anonymized. In this case it returns 409.
         If the `kimlik_deletion_hmac_key` setting is missing, it returns 503 `DeletionKeyMissing`. Nothing changes.
         The request body is at most 16 KB.
@@ -1131,7 +1131,7 @@ paths:
                   subject: 11111111-1111-4111-8111-111111111111
       responses:
         "200":
-          description: The user is disabled and anonymized. A second request gets the same body.
+          description: The account is anonymized or the identity is unknown. A repeated request gets the same body.
           content:
             application/json:
               schema:
@@ -1148,6 +1148,9 @@ paths:
                       status: Anonymized
                       anonymized: true
                       found: true
+                unknown_identity:
+                  value:
+                    message: {anonymized: true, found: false}
         "400":
           $ref: "#/components/responses/GirdiGecersiz"
         "401":
@@ -1156,8 +1159,6 @@ paths:
           $ref: "#/components/responses/IstekSiniri"
         "403":
           $ref: "#/components/responses/ServisYetkisiYok"
-        "404":
-          $ref: "#/components/responses/BagYok"
         "409":
           description: "The linked account is `Administrator` or `Guest`. The `exc_type` value is `IdentityConflict`."
           content:
@@ -2474,6 +2475,24 @@ components:
         subject: {$ref: "#/components/schemas/Subject"}
 
     AnonymizeUserResult:
+      oneOf:
+        - $ref: "#/components/schemas/AnonymizedIdentity"
+        - $ref: "#/components/schemas/UnknownAnonymizeIdentity"
+
+    UnknownAnonymizeIdentity:
+      type: object
+      description: The endpoint found neither an identity link nor a deletion record. There was nothing to anonymize.
+      required: [anonymized, found]
+      additionalProperties: false
+      properties:
+        anonymized:
+          type: boolean
+          const: true
+        found:
+          type: boolean
+          const: false
+
+    AnonymizedIdentity:
       type: object
       required: [user, enabled, status, anonymized, found]
       additionalProperties: false

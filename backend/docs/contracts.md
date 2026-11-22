@@ -326,6 +326,9 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 
 Temel kurallar kiracı sitesi (`platform_core.api.identity.anonymize_user`) ve Press (`press_tr.api.identity.anonymize_user`) için geçerlidir. Kuralların kaynağı proje kaydındaki O-27'dir.
 
+- İki uç da kimlik bulunamazsa HTTP 200 döner. Yanıt `anonymized: true` ve `found: false` alanlarını taşır.
+- Anonim yapma isteği HTTP 404 dönerse identity-sync silme akışını durdurur.
+
 1. Silme iki adımdır. Birinci adım hesabı kapatır, oturumları sayfalayarak kapatır, API anahtarlarını iptal eder ve silme durumunu kaydeder. İkinci adım kişisel veriyi anonim yapar. İki adım da tekrar güvenlidir.
 2. Silme kaydı ham kimliği tutmaz. Kayıt `(iss, sub)` çiftinin HMAC-SHA256 özetini tutar. Anahtar site ayarındaki gizli değerdir. Kimlik bağındaki ham `sub` silinir.
 3. Hesap açma, durum değiştirme ve e-posta değiştirme uçları önce silme kaydını denetler. Silinmiş kimlik yeniden açılamaz. Bu uçlar aynı satır kilidini kullanır.

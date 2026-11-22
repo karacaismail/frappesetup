@@ -266,7 +266,8 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 
 - **O-43. Kiracı, hesap silme sonucunu eşitleme hizmetine bildirir.**
   - Başarılı yanıtta `anonymized` ve `found` alanları `true` olur. Yanıt `user`, `enabled` ve `status` alanlarını da taşır.
-  - Sistem kimlik bağını ve silme kaydını bulamazsa HTTP 404 ve `IdentityNotFound` döner. Eşitleme hizmeti bu sitedeki silme adımını tamamlandı sayar.
+  - Kiracı kimlik bağı veya silme kaydı bulamazsa HTTP 200 döner. Yanıt yalnız `anonymized: true` ve `found: false` alanlarını taşır.
+  - Anonim yapma isteği HTTP 404 dönerse eşitleme hizmeti silme akışını durdurur.
 
 ## Karar sitesine işlenecek farklar
 

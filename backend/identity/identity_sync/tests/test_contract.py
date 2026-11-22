@@ -538,12 +538,13 @@ class SchemaTest(ServerCase):
                 status, body = TargetReplyTest.post(self, site, target_path, identity)
                 self.assertEqual(status, 200)
                 self.assertEqual(schema_errors(body, CONTRACT["components"]["schemas"][schema_name], CONTRACT), [])
-        # An identity Press does not know: 200 with found false (docs/sozlesmeler.md, section 6).
         unknown = {"issuer": issuer, "subject": "yok-boyle-kullanici"}
-        status, body = TargetReplyTest.post(self, press, fakes.PRESS_ANONYMIZE, unknown)
-        self.assertEqual((status, body), (200, {"message": {"anonymized": True, "found": False}}))
         schema = CONTRACT["components"]["schemas"]["TargetAnonymizeUserResult"]
-        self.assertEqual(schema_errors(body, schema, CONTRACT), [])
+        for site, target_path in ((tenant, fakes.TENANT_ANONYMIZE), (press, fakes.PRESS_ANONYMIZE)):
+            with self.subTest(path=target_path):
+                status, body = TargetReplyTest.post(self, site, target_path, unknown)
+                self.assertEqual((status, body), (200, {"message": {"anonymized": True, "found": False}}))
+                self.assertEqual(schema_errors(body, schema, CONTRACT), [])
         self.assertNotEqual(schema_errors({"message": {"anonymized": True}}, schema, CONTRACT), [])
 
     def test_operations(self) -> None:

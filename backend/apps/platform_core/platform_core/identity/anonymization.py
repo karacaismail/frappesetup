@@ -107,6 +107,8 @@ def anonymize_user(data: dict) -> dict:
 	issuer = provisioning._issuer(data)
 	subject = provisioning._text(data, "subject", provisioning.MAX_SUBJECT)
 	record = _with_retry(disable_step, issuer, subject)
+	if record is None:
+		return {"anonymized": True, "found": False}
 	if record.state == ANONYMIZED:
 		return _result(record.user)
 	close_sessions(record.user)
@@ -152,16 +154,14 @@ def _lock_identity_with_retry(
 				raise
 
 
-def disable_step(issuer: str, subject: str) -> frappe._dict:
+def disable_step(issuer: str, subject: str) -> frappe._dict | None:
 	"""Step 1. Records the deletion and closes the account. Commits before any session is closed."""
 	link, record = lock_identity(issuer, subject)
 	if record:
 		frappe.db.commit()
 		return record
 	if not link:
-		frappe.throw(
-			_("No user is linked to this identity.", context="platform_core.identity"), IdentityNotFound
-		)
+		return None
 	if link.user in PROTECTED_USERS:
 		frappe.throw(
 			_("This account cannot be anonymized.", context="platform_core.identity"), IdentityConflict

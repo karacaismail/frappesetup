@@ -929,11 +929,15 @@ class TestAnonymizeUser(FrappeAPITestCase):
 
 	# --- refusals ---------------------------------------------------------------------------------
 
-	def test_unknown_identity_gets_404(self):
+	def test_unknown_identity_gets_200_without_writes(self):
+		deletions = frappe.db.count(DELETION)
 		response = self.call(body=self.body(subject="sub-yok"))
-		self.assertEqual(response.status_code, 404, response.data[:300])
-		self.assertEqual(response.json.get("exc_type"), "IdentityNotFound")
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		self.assertEqual(response.json["message"], {"anonymized": True, "found": False})
+		self.assertIs(response.json["message"]["found"], False)
+		self.assertIs(response.json["message"]["anonymized"], True)
 		h.refresh()
+		self.assertEqual(frappe.db.count(DELETION), deletions)
 		self.assertTrue(frappe.db.get_value("User", DELETED, "enabled"))
 
 	def test_administrator_cannot_be_anonymized(self):
