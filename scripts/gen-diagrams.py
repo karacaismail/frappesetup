@@ -169,8 +169,8 @@ def rails() -> str:
         "<desc id='rails-desc'>Üst sırada Rail 3 headless panel yer alır. Ortada Rail 5 ajan servisi ve model geçidi ile Rail 4 Keycloak yer alır. Alt sırada Rail 1 "
         "Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext 16 siteleri ve Rail 6 operasyon sitesi yer alır. Panel, "
         "Press'e panel adresindeki press.api ve realtime üzerinden ulaşır. Kiracıya aynı kaynaktan /api/v2 ve bootstrap/meta ile ulaşır. Operasyon sitesine customer_360 "
-        "ve HD Ticket ile ulaşır. Ajan servisine SSE ile bağlanır. Panel, Keycloak'a OIDC ile yönlendirir. Kod sunucuda değiştirilir. Ajan servisi Press'e press.mcp ile bağlanır. Ajan servisi "
-        "kiracıya site aracı belirteciyle Kiracı MCP üzerinden bağlanır. Keycloak, Press ve kiracıya Social Login Key sağlar. Operasyon sitesi operatör realm "
+        "ve HD Ticket ile ulaşır. Ajan servisine SSE ile bağlanır. Panel, Keycloak'a OIDC ile yönlendirir. Sunucu, giriş kodunu belirteçle değiştirir. Ajan servisi Press'e press.mcp ile bağlanır. Ajan servisi "
+        "kiracıya site aracı belirteciyle Kiracı MCP üzerinden bağlanır. Keycloak, Social Login Key ile Press'e ve kiracıya giriş sağlar. Operasyon sitesi operatör realm "
         "rollerini kullanır. Press ile kiracı arasında site_config sk_app ve Agent Job kullanılır. Press, operasyon sitesine create-fc-invoice (press_tr_finance), "
         "delete-fc-team ve press_ops_bridge ile ulaşır. Operasyon sitesi Press'e press_tr.api.ops ile ulaşır. Taban bantları ortak sözleşmeleri (host'a bağlı oturum, "
         "has_permission, tasarım tokenları, audit) ve DevOps sorumlusunun yönettiği Hetzner sunucularını gösterir.</desc>",
