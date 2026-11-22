@@ -6,7 +6,7 @@ Sözleşme: contracts/platform_core-yapay-zeka.openapi.yaml
 import frappe
 from werkzeug.wrappers import Response
 
-from platform_core.yapay_zeka import agent_token, proposals
+from platform_core.yapay_zeka import access, agent_token, proposals, retention
 from platform_core.yapay_zeka import mcp as mcp_endpoint
 
 
@@ -50,3 +50,12 @@ def reject_proposal(proposal_id: str) -> dict:
 def resolve_proposal(proposal_id: str, outcome: str) -> dict:
 	"""Sonucu bilinmeyen öneriyi insan kararıyla kapatır."""
 	return proposals.resolve(proposal_id, outcome)
+
+
+@frappe.whitelist(methods=["POST"])
+def purge_logs(older_than_days: int = retention.MIN_DAYS, dry_run: bool = True) -> dict:
+	"""Saklama süresi dolan günlük ve öneri kayıtlarını siler. Yıkıcıdır. Varsayılan yalnız sayar."""
+	access.require_human("call", tool="purge_logs")
+	result = retention.purge(older_than_days, dry_run=dry_run)
+	access.record("call", decision="allowed", tool="purge_logs", tool_class="admin", arguments=result)
+	return result

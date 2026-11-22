@@ -114,22 +114,45 @@ class TestReadTools(YzTestCase):
 	def test_doctype_without_permission_is_denied_and_logged(self):
 		client_a = self.login(USER_A)
 
-		result = self.call_tool(client_a, "list_documents", {"doctype": "Error Log"})
+		result = self.call_tool(client_a, "list_documents", {"doctype": "Version"})
 		search = self.call_tool(client_a, "search_doctypes", {"query": "YZ Test"})
+		everything = self.call_tool(client_a, "search_doctypes", {})["structuredContent"]["doctypes"]
 
 		self.assert_denied(result, "permission")
-		self.assertEqual(self.last_log(tool="list_documents", target_doctype="Error Log").decision, "denied")
+		self.assertEqual(self.last_log(tool="list_documents", target_doctype="Version").decision, "denied")
 		self.assertIn(DOCTYPE, search["structuredContent"]["doctypes"])
-		self.assertNotIn(
-			"Error Log", self.call_tool(client_a, "search_doctypes", {})["structuredContent"]["doctypes"]
-		)
+		self.assertNotIn("Version", everything)
 
 	def test_credential_doctype_is_blocked_even_for_manager(self):
 		manager = self.login(MANAGER)
 
 		result = self.call_tool(manager, "list_documents", {"doctype": "OAuth Bearer Token"})
+		errors = self.call_tool(manager, "list_documents", {"doctype": "Error Log"})
+		proposals = self.call_tool(manager, "list_documents", {"doctype": "AI Action Proposal"})
+		schema = self.call_tool(manager, "get_doctype_schema", {"doctype": "Webhook"})
+		searched = self.call_tool(manager, "search_doctypes", {"query": "AI Action"})
 
 		self.assert_denied(result, "blocked_doctype")
+		self.assert_denied(errors, "blocked_doctype")
+		self.assert_denied(proposals, "blocked_doctype")
+		self.assert_denied(schema, "blocked_doctype")
+		self.assertEqual(searched["structuredContent"]["doctypes"], [])
+
+	def test_secret_looking_field_names(self):
+		from platform_core.yapay_zeka import policy
+
+		for name in (
+			"api_key",
+			"key",
+			"access_key_id",
+			"passphrase",
+			"client_secret",
+			"auth_token",
+			"new_password",
+		):
+			self.assertTrue(policy.is_secret_fieldname(name), name)
+		for name in ("title", "amount", "keyword", "monkey", "total_tokens_used", "description"):
+			self.assertFalse(policy.is_secret_fieldname(name), name)
 
 	def test_report_needs_report_permission(self):
 		client_a = self.login(USER_A)

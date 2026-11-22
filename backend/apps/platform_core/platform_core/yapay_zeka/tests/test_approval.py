@@ -6,7 +6,7 @@ import frappe
 from frappe.core.doctype.user.user import generate_keys
 from frappe.utils import add_to_date, now_datetime
 
-from platform_core.yapay_zeka.tests.base import DOCTYPE, MANAGER, USER_A, USER_B, YzTestCase
+from platform_core.yapay_zeka.tests.base import DOCTYPE, MANAGER, MCP_PATH, USER_A, USER_B, YzTestCase
 
 
 class TestApproval(YzTestCase):
@@ -152,11 +152,87 @@ class TestApproval(YzTestCase):
 		proposal_id = self.propose_update(client_a, name, title="Yeni")["proposal_id"]
 		digest = self.digest_of(client_a, proposal_id)
 
-		outcome = self.approve(manager, proposal_id, digest).json["message"]
+		response = self.approve(manager, proposal_id, digest)
 
-		self.assertFalse(outcome["executed"])
-		self.assertEqual(outcome["deny_reason"], "not_owner")
+		self.assertEqual(response.status_code, 403)
+		self.assertNotIn("Yeni", response.get_data(as_text=True))
 		self.assertEqual(self.value(name), "Eski")
+		log = self.last_log(proposal=proposal_id, deny_reason="not_owner")
+		self.assertEqual((log.user, log.decision), (MANAGER, "denied"))
+
+	def test_approval_needs_a_csrf_token_in_the_session(self):
+		name = self.make_record(USER_A, title="Eski")
+		client = self.login(USER_A)
+		proposal_id = self.propose_update(client, name, title="Yeni")["proposal_id"]
+		digest = self.digest_of(client, proposal_id)
+		no_csrf = self.login(USER_A, csrf=False)
+		client.csrf_token = "yanlis"
+
+		without_session_token = self.approve(no_csrf, proposal_id, digest)
+		wrong_header = self.approve(client, proposal_id, digest)
+
+		self.assertEqual(without_session_token.status_code, 403)
+		self.assertNotEqual(wrong_header.status_code, 200)
+		self.assertEqual(self.value(name), "Eski")
+
+	def test_agent_token_cannot_reach_other_methods_through_cmd(self):
+		name = self.make_record(USER_A, title="Eski")
+		client = self.login(USER_A)
+		token = self.issue_token(client)
+		headers = {"Authorization": f"Bearer {token}"}
+		body = {
+			"cmd": "frappe.client.set_value",
+			"doctype": DOCTYPE,
+			"name": name,
+			"fieldname": "title",
+			"value": "Ele gecirildi",
+		}
+
+		in_body = self.send(self.anonymous(), "POST", MCP_PATH, body=body, headers=headers)
+		in_query = self.send(
+			self.anonymous(),
+			"POST",
+			MCP_PATH,
+			body={"jsonrpc": "2.0", "id": 1, "method": "ping"},
+			headers=headers,
+			query={
+				"cmd": "frappe.client.get_value",
+				"doctype": DOCTYPE,
+				"filters": name,
+				"fieldname": "title",
+			},
+		)
+
+		self.assertEqual(in_body.status_code, 401)
+		self.assertEqual(in_query.status_code, 401)
+		self.assertNotIn("Eski", in_query.get_data(as_text=True))
+		self.assertEqual(self.value(name), "Eski")
+		self.assertEqual(self.last_log(deny_reason="token_out_of_scope").user, USER_A)
+
+	def test_execution_refuses_a_document_that_changed_under_it(self):
+		from platform_core.yapay_zeka.errors import ToolDenied
+		from platform_core.yapay_zeka.tools import write
+
+		name = self.make_record(USER_A, title="Eski")
+		frappe.set_user(USER_A)
+
+		with self.assertRaises(ToolDenied) as raised:
+			write.run_update(DOCTYPE, name, {"title": "Yeni"}, expected_version="2020-01-01 00:00:00")
+
+		self.assertEqual(raised.exception.code, "document_changed")
+
+	def test_framework_doctypes_are_closed_and_business_doctypes_stay_open(self):
+		manager = self.login(MANAGER)
+
+		closed = self.call_tool(
+			manager, "create_document", {"doctype": "Email Template", "data": {"subject": "x"}}
+		)
+		opened = self.call_tool(
+			manager, "create_document", {"doctype": "ToDo", "data": {"description": "Yapilacak"}}
+		)
+
+		self.assert_denied(closed, "blocked_doctype")
+		self.assertFalse(opened["isError"], opened)
 
 	def test_wrong_digest_is_rejected(self):
 		name = self.make_record(USER_A, title="Eski")

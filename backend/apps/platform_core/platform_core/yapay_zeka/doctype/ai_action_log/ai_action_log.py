@@ -11,6 +11,5 @@ class AIActionLog(Document):
 			frappe.throw(_("AI Action Log is append-only."), frappe.PermissionError)
 
 	def on_trash(self) -> None:
-		# BORC(mvp): 365 günlük saklama süresi için elle başlatılan silme komutu yok.
-		# Etki: günlük büyür. Sorumlu: platform-core-yz. Kapanma: komut ve HTTP ucu yazılır.
+		# Eski kayıtları yalnız `retention.purge` komutu, saklama süresi dolunca siler.
 		frappe.throw(_("AI Action Log entries cannot be deleted."), frappe.PermissionError)

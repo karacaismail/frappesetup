@@ -137,7 +137,9 @@ Bazı DocType'lar kod ya da kimlik bilgisi taşır. Genel yazma araçları bunla
 - Bazı DocType'lar yönetim kaydıdır. Örneğin “Custom Field”, “Role” ve izin kayıtları böyledir. Bunlar yalnız yönetim araçlarıyla değişir.
 - “AI Action Log” ve “AI Action Proposal” katmanın kendi kayıtlarıdır. Bunlar yapay zekâ yoluyla değişmez.
 
-Tam liste kodda tek yerde durur. Testler listeyi sınar.
+Frappe çatısının kendi DocType'ları da genel yazma araçlarına kapalıdır. Bunlar ayar, kod ya da sistem kaydıdır. Çatıdan yalnız beş DocType açıktır: “ToDo”, “Note”, “Event”, “Contact” ve “Address”. Uygulamaların ve kullanıcıların kendi DocType'ları açıktır. Bu kural listeden güvenlidir. Çatıya yeni bir sistem DocType'ı gelirse kendiliğinden kapalı kalır.
+
+Tam liste kodda tek yerde durur. Dosya `yapay_zeka/policy.py` dosyasıdır. Testler listeyi sınar.
 
 ### Uygulama araçları (`ai_tools`, G-105)
 
@@ -168,6 +170,7 @@ Tek tık akışları (Prompts) bu işte yoktur. O iş Rail 5'e kalır.
 - İnsan panelde Keycloak ile giriş yapar. Tarayıcı Frappe oturum çerezini ve CSRF belirtecini taşır.
 - Onay verme, reddetme ve aracı belirteci alma yalnız bu kimlikle yapılır.
 - İstek `Authorization` başlığı taşıyorsa insan oturumu sayılmaz.
+- Yazan insan isteği CSRF belirteci ister. CSRF belirteci, isteğin kendi sayfamızdan geldiğini kanıtlayan değerdir. Frappe bu denetimi oturumda belirteç yoksa atlar (`frappe/auth.py:92`). Katman belirteci olmayan oturumu reddeder.
 
 ### Aracı belirteci
 
@@ -192,6 +195,7 @@ Belirtecin sınırları şunlardır:
 | Yetki | Okuma ve öneri açma. Onay veremez. |
 
 - Belirteç yalnız bu sitede geçer. Kayıt bu sitenin önbelleğindedir.
+- İstek `cmd` alanı taşıyorsa belirteç kimliğe çevrilmez. Frappe bu alanla yolu yok sayar ve başka işlevi çalıştırır (`frappe/app.py:121`). Bağımsız inceleme bu açığı buldu. Test bu yolu sınar.
 - Önbellek temizlenirse belirteçler geçersiz olur. Bu güvenli yöndür.
 - İstek hem oturum çerezi hem belirteç taşıyorsa reddedilir. Sözleşmenin 3. bölümü aynı kuralı koyar.
 
@@ -259,14 +263,18 @@ Sunucu şu denetimleri sırayla yapar. Biri başarısız olursa iş yürümez.
 | Kullanıcının izni hâlâ var mı? | İzin kalktıysa iş reddedilir. |
 | Aynı hedefte sonucu bilinmeyen iş var mı? | Kör tekrar yapılmaz. |
 
-Özet, şu değerlerin SHA-256 özetidir: kullanıcı, site, araç, hedef kayıt, kaydın `modified` değeri, girdi ve önizleme.
+Özet bir SHA-256 değeridir. Özete şunlar girer: kullanıcı, site, araç, hedef kayıt, kaydın `modified` değeri, girdi ve önizleme. Özete rastgele bir değer de girer. Rastgele değer yüzünden model özeti hesaplayamaz. Özet yalnız insan ucundan döner. Model öneri kaydını genel araçlarla okuyamaz.
+
+Başka kullanıcının onayı 403 alır. Yanıt öneriyi taşımaz. Önizleme o kullanıcının verisidir.
 
 ### Yürütme ve “unknown” kuralı
 
-1. Sunucu aynı araç ve hedef için kilit alır. Kilit Frappe'nin `filelock` işlevidir.
+1. Sunucu aynı hedefin bütün öneri satırlarını veritabanında kilitler. Yarışan ikinci onay bekler. Kilit birden çok sunucuda da çalışır.
 2. Sunucu öneriyi `consumed` yapar ve sonucu `unknown` yazar. Bu yazıyı hemen kesinleştirir.
 3. Sunucu işi yürütür.
-4. İş başarılıysa sonuç `succeeded` olur. İş hata verirse yazılar geri alınır ve sonuç `failed` olur.
+4. İş başarılıysa sonuç `succeeded` olur. İş hata verirse yazılar geri alınır.
+   - Yerleşik araç yalnız veritabanına yazar. Geri alma kesindir ve sonuç `failed` olur.
+   - Uygulama aracı dış sisteme dokunmuş olabilir. Onun sonucu `unknown` kalır.
 5. Süreç arada ölürse sonuç `unknown` kalır.
 
 İkinci adımdaki erken kesinleştirme bilinçli bir istisnadır (V-2). Bu yazı olmadan ölen iş iz bırakmaz. Tek kullanım kuralı da bu yazıya dayanır.
@@ -281,6 +289,8 @@ Sonucu `unknown` olan hedefe yeni öneri açılmaz. İnsan `resolve_proposal` uc
 - Süre zamanlanmış işle değil, okuma anında denetlenir (D-6).
 - İnsan öneriyi `reject_proposal` ucuyla reddedebilir.
 - Risk sınıfını model belirlemez. Sınıf aracın tanımından gelir.
+- Yerleşik yazma araçları kaydı yürütmede satır kilidiyle okur. Sürüm önizlemedekinden farklıysa yazmaz.
+- Okuma aracı kalıcı yazı bırakamaz. Katman okuma aracından sonra işlemi geri alır.
 
 ## 8. “AI Action Log” hangi alanları tutar (G-64)
 
@@ -322,7 +332,7 @@ G-64 `model`, token ve maliyet alanlarını da sayar. Bu alanlar bu kayıtta yok
 - Token ve maliyet “AI Usage Log” kaydındadır. O kaydın sahibi `model_gecidi` modülüdür.
 - İki kayıt `session_id` değeriyle eşleşir.
 
-Bu konu `BORC(mvp)` etiketli bir teknik borçtur. Günlüğün saklama süresi 365 gündür (Rail 5). Eski kaydı silen elle başlatılan komut henüz yoktur. Sorumlu platform-core-yz işidir. Komut ve HTTP ucu yazılınca bu borç kapanır.
+Günlüğün saklama süresi 365 gündür (Rail 5). Eski kaydı elle başlatılan bir komut siler. Komut `retention.purge` işlevidir. Komutun HTTP ucu `purge_logs`, aracı `purge_action_log` olur. Zamanlanmış iş yoktur (D-6). Sonucu bilinmeyen öneriler silinmez.
 
 Günlük kullanıcı adını ve adresini tutar. Bunlar kişisel veridir. Proje kaydının “Kişisel veri” bölümüne eklenmelidir (G-15). Bunu raporda isteyeceğiz.
 
@@ -366,10 +376,60 @@ Bütün uçlar `platform_core/api/ai.py` dosyasındadır. Dosya ince kalır. İ�
 | `platform_core.api.ai.approve_proposal` | POST | İnsan oturumu | Öneriyi onaylar ve yürütür. Yıkıcı olabilir. |
 | `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
 | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
+| `platform_core.api.ai.purge_logs` | POST | İnsan oturumu ve yönetici rolü | Saklama süresi dolan kayıtları siler. Yıkıcıdır. Varsayılan yalnız sayar. |
 
 Ayrıntılı biçim `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasına yazılır. Bu dosya ikinci kontrol noktasında, koddan önce yazılır.
 
-## 11. Karar sitesiyle çelişkiler
+## 11. Yönetim araçları
+
+Yönetim araçları yalnız “System Manager” rolüne görünür. Her biri önizleme ve insan onayı ister. İşlevler rolü kendileri de denetler.
+
+| Araç | İşi | Kullandığı Frappe yolu |
+| --- | --- | --- |
+| `add_custom_field` | DocType'a özel alan ekler. Açıklama zorunludur (D-9). | “Custom Field” kaydı |
+| `set_field_property` | Alanın bir ayarını değiştirir. Örneğin zorunluluğu değiştirir. | “Property Setter” kaydı |
+| `set_role_permission` | Rolün bir DocType'taki iznini değiştirir. | Frappe'nin izin yöneticisi işlevleri |
+| `assign_role` | Kullanıcıya rol verir. | Kullanıcı kaydının `add_roles` işlevi |
+| `remove_role` | Kullanıcıdan rol alır. | Kullanıcı kaydının `remove_roles` işlevi |
+| `purge_action_log` | Saklama süresi dolan günlükleri siler. | `retention.purge` komutu |
+
+- Alan ayarı aracı yalnız 13 ayarı kabul eder. İfade çalıştıran ayarlar listede yoktur. Örneğin `depends_on` ve `fetch_from` reddedilir.
+- Korunan roller yapay zekâ yoluyla verilmez ve alınmaz. Bunlar “Administrator”, “System Manager”, “Guest”, “All” ve “Desk User” rolleridir.
+- “Guest” ve “All” rollerinin izinleri yapay zekâ yoluyla değişmez. Bu roller herkesi kapsar.
+- Model geçidinin kayıtları olağan DocType'lardır. Onları genel yazma araçları değiştirir. Yetkiyi o DocType'ların izinleri belirler.
+
+### Elle başlatılan komutlar
+
+Bu katmanın tek komutu günlük temizliğidir. Komut üç yoldan başlar: `bench execute`, HTTP ucu ve araç.
+
+Öteki modüller kendi komut uçlarını `ai_tools` kancasıyla araç olarak bildirir. Bildirim `yapay_zeka` modülünü içe aktarmayı gerektirmez. Böylece bağımlılık yönü korunur. Bu turda öteki modüllerin kodu bu dalda yoktur. Onların bildirimi kendi işlerine kalır.
+
+## 12. Bağımsız inceleme
+
+Kod bağımsız bir inceleyiciye okutuldu. İnceleyici yalnız okudu, komut çalıştırmadı. Bulgular ve sonuçları şunlardır:
+
+| Bulgu | Sonuç |
+| --- | --- |
+| Aracı belirteci `cmd` alanıyla başka işlevi çalıştırabiliyordu. | Kapatıldı. Test eklendi. |
+| “unknown” denetimi iki sunucuda yarışabiliyordu. | Dosya kilidi yerine veritabanı satır kilidi geldi. |
+| Kapalı DocType listesi eksikti. | Çatı DocType'ları toptan kapandı. Okuma listesi ve gizli ad kalıbı genişledi. |
+| Başkasının onay denemesi öneriyi döndürüyordu. | Artık 403 döner. Test eklendi. |
+| Bozuk bir `ai_tools` bildirimi ucu durduruyordu. | Bozuk bildirim yalnız kendini düşürür. Test eklendi. |
+| Model onay özetini hesaplayabiliyordu. | Özete rastgele değer girdi. Öneri kaydı modele kapandı. CSRF belirteci zorunlu oldu. |
+| Yürütme, kayıt arada değişirse üstüne yazabiliyordu. | Yerleşik araçlar sürümü satır kilidiyle yeniden denetler. |
+| Hata veren uygulama aracı `failed` yazılıyordu. | Artık `unknown` kalır. Ham hata metni modele dönmez. |
+| Bilinmeyen araç çağrısı günlüğe düşmüyordu. | Artık düşer. |
+| Okuma diye bildirilen araç yazabiliyordu. | Okuma aracından sonra işlem geri alınır. Test eklendi. |
+
+Açık kalan, bilinçli bırakılan noktalar şunlardır:
+
+- Misafir ve bilinmeyen belirteç retleri günlüğe yazılmaz. Yazılsaydı kimliksiz istekler günlüğü doldururdu.
+- Günlük kaydı Frappe ekranından ve kayıt yolundan değişmez. Veritabanına doğrudan erişen yönetici yine değiştirebilir. Bu, uygulama katmanının sınırıdır.
+- Kayıt yoksa `not_found`, izin yoksa `permission` döner. Frappe'nin REST ucu da aynı ayrımı yapar.
+- Her giriş yapmış kullanıcı alt tablo tanımını okuyabilir. Tanım veri değildir.
+- Uygulama araçlarının yürütme işlevi sürüm denetimini kendisi yapar. Katman önizlemeyi kilit altında yeniden çalıştırır.
+
+## 13. Karar sitesiyle çelişkiler
 
 | Konu | Karar sitesi | Bu karar | Neden |
 | --- | --- | --- | --- |
@@ -378,9 +438,10 @@ Ayrıntılı biçim `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasına
 | Günlük alanları | G-64 model, token ve maliyet yazar. | Bu alanlar “AI Usage Log” kaydında. | Bu katman model çağırmaz. |
 | Model adları | Rail 5 model adlarını yazar. | Kodda model adı yok. | Proje kaydı O-10 ve sözleşme kural 8. |
 
-## 12. Doğrulanmayanlar
+## 14. Doğrulanmayanlar
 
 - `frappe/mcp` paketinin Frappe 16'da çalışıp çalışmadığı denenmedi.
 - Gerçek bir MCP istemcisiyle oturum açılmadı. Testler istemciyi taklit edecek.
-- Bu not yazılırken kod çalıştırılmadı. Frappe davranışları kaynak koddan okundu.
+- Testler geçici bir test ortamında çalıştı. Ortak geliştirme ortamı ve gerçek `hooks.py` henüz bu dalda yoktur.
+- İki onayın aynı anda yarıştığı durum testle denenmedi. Kilit kodu okunarak incelendi.
 - GitHub'daki `version-16` dalı 16.60.2 sürümündedir. İmajdaki sürüm 16.56.0'dır. Aradaki fark incelenmedi.

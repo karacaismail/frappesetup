@@ -8,7 +8,8 @@ if TYPE_CHECKING:
 
 SECRET_FIELDTYPES = frozenset({"Password"})
 SECRET_NAME = re.compile(
-	r"(^|_)(password|passwd|pwd|secret|token|api_key|apikey|private_key|credential|credentials|otp|signature)(_|$)"
+	r"(^|_)(password|passwd|pwd|passphrase|secret|secretkey|token|key|keys|apikey|credential|credentials"
+	r"|authorization|otp|signature|salt)(_|$)"
 )
 
 # Kimlik bilgisi taşıyan kayıtlar. Okunmaz ve yazılmaz.
@@ -22,6 +23,17 @@ CREDENTIAL_DOCTYPES = frozenset(
 		"Social Login Key",
 		"User Social Login",
 		"Integration Request",
+		"Document Share Key",
+		"Email Account",
+		"Email Queue",
+		"Email Queue Recipient",
+		"LDAP Settings",
+		"SMS Settings",
+		"SMS Parameter",
+		"Webhook",
+		"Webhook Header",
+		"Webhook Request Log",
+		"Error Log",
 	}
 )
 
@@ -76,10 +88,33 @@ ADMIN_DOCTYPES = frozenset(
 # Katmanın kendi kayıtları. Yapay zekâ yoluyla değişmez.
 LAYER_DOCTYPES = frozenset({"AI Action Log", "AI Action Proposal"})
 
-READ_BLOCKED = CREDENTIAL_DOCTYPES
+# Frappe çatısının kendi DocType'larından genel yazma araçlarına açık olanlar.
+# Çatının öteki DocType'ları ayar, kod ya da sistem kaydıdır ve kapalıdır.
+FRAMEWORK_OPEN = frozenset({"ToDo", "Note", "Event", "Contact", "Address"})
+
+# Model önerileri yalnız `get_proposal` aracıyla okur. Böylece onay özetine ulaşamaz.
+READ_BLOCKED = CREDENTIAL_DOCTYPES | LAYER_DOCTYPES
 WRITE_BLOCKED = CREDENTIAL_DOCTYPES | CODE_DOCTYPES | LAYER_DOCTYPES
 
+# Yapay zekâ yoluyla verilmeyen ve alınmayan roller.
+PROTECTED_ROLES = frozenset({"Administrator", "System Manager", "Guest", "All", "Desk User"})
+# İzinleri yapay zekâ yoluyla değişmeyen roller. Bu roller herkesi ya da tam yetkiyi kapsar.
+PROTECTED_PERMISSION_ROLES = frozenset({"Administrator", "Guest", "All"})
+
 FORBIDDEN_ARGUMENT_NAMES = frozenset({"confirm", "confirmed", "approve", "approved", "force"})
+
+
+def is_framework_doctype(meta) -> bool:
+	"""DocType Frappe çatısına aitse ve açık listede değilse doğru döner.
+
+	Yeni bir sistem DocType'ı listeye eklenmese de kapalı kalır. Uygulamaların ve
+	kullanıcıların kendi DocType'ları bu kurala girmez.
+	"""
+	import frappe
+
+	if meta.custom or meta.name in FRAMEWORK_OPEN:
+		return False
+	return (frappe.local.module_app or {}).get(frappe.scrub(meta.module or "")) == "frappe"
 
 
 def is_secret_fieldname(fieldname: str) -> bool:

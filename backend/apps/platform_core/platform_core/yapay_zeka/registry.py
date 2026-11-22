@@ -2,7 +2,7 @@
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Any
 
@@ -30,7 +30,8 @@ class AiTool:
 	roles: tuple[str, ...] = ()
 	destructive: bool = False
 	billable: bool = False
-	extra: dict = field(default_factory=dict)
+	# Yürütme işlevi önizlemedeki sürümü `expected_version` olarak alıyorsa doğrudur.
+	versioned: bool = False
 
 	@cached_property
 	def input_schema(self) -> dict:
@@ -59,7 +60,7 @@ class AiTool:
 
 def builtin_tools() -> tuple[AiTool, ...]:
 	from platform_core.yapay_zeka import proposals
-	from platform_core.yapay_zeka.tools import definition, read, write
+	from platform_core.yapay_zeka.tools import admin, definition, read, write
 
 	target = write.DocumentTargetArguments
 	pending = " Nothing is written until a human approves the proposal."
@@ -118,6 +119,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 			"write",
 			write.preview_update,
 			destructive=True,
+			versioned=True,
 		),
 		AiTool(
 			"submit_document",
@@ -128,6 +130,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 			"write",
 			write.preview_submit,
 			destructive=True,
+			versioned=True,
 		),
 		AiTool(
 			"cancel_document",
@@ -138,6 +141,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 			"write",
 			write.preview_cancel,
 			destructive=True,
+			versioned=True,
 		),
 		AiTool(
 			"delete_document",
@@ -148,6 +152,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 			"write",
 			write.preview_delete,
 			destructive=True,
+			versioned=True,
 		),
 		AiTool(
 			"get_proposal",
@@ -156,6 +161,70 @@ def builtin_tools() -> tuple[AiTool, ...]:
 			proposals.GetProposalArguments,
 			proposals.read_for_model,
 			"flow",
+		),
+		*(
+			AiTool(
+				name,
+				description + " Admin only." + pending,
+				arguments,
+				handler,
+				"admin",
+				"write",
+				preview,
+				roles=(admin.ADMIN_ROLE,),
+				destructive=destructive,
+			)
+			for name, description, arguments, handler, preview, destructive in (
+				(
+					"add_custom_field",
+					"Propose a new custom field on a DocType. A description is required.",
+					admin.AddCustomFieldArguments,
+					admin.run_custom_field,
+					admin.preview_custom_field,
+					False,
+				),
+				(
+					"set_field_property",
+					"Propose a change to one display or validation property of a field.",
+					admin.SetFieldPropertyArguments,
+					admin.run_field_property,
+					admin.preview_field_property,
+					True,
+				),
+				(
+					"set_role_permission",
+					"Propose a change to what a role may do with a DocType at one permission level.",
+					admin.SetRolePermissionArguments,
+					admin.run_role_permission,
+					admin.preview_role_permission,
+					True,
+				),
+				(
+					"assign_role",
+					"Propose giving a role to a user. Protected roles cannot be given through AI.",
+					admin.UserRoleArguments,
+					admin.run_assign_role,
+					admin.preview_assign_role,
+					True,
+				),
+				(
+					"remove_role",
+					"Propose taking a role away from a user.",
+					admin.UserRoleArguments,
+					admin.run_remove_role,
+					admin.preview_remove_role,
+					True,
+				),
+				(
+					"purge_action_log",
+					"Propose deleting AI action logs and proposals older than the retention period. "
+					"Cannot be undone.",
+					admin.PurgeActionLogArguments,
+					admin.run_purge,
+					admin.preview_purge,
+					True,
+				),
+			)
 		),
 	)
 
@@ -166,19 +235,31 @@ def app_tools(taken: set[str]) -> list[AiTool]:
 	for path in frappe.get_hooks("ai_tools") or []:
 		app = path.split(".")[0]
 		try:
-			declarations = frappe.get_attr(path)()
-		except Exception:
-			frappe.log_error(title=f"ai_tools: {path} could not be loaded")
+			declarations = list(frappe.get_attr(path)() or [])
+		except Exception as error:
+			_report_once(f"ai_tools: {path} could not be loaded", error)
 			continue
-		for declaration in declarations or []:
+		for declaration in declarations:
 			try:
 				tool = build_app_tool(app, declaration, taken)
-			except (ValueError, TypeError, ImportError, AttributeError) as error:
-				frappe.log_error(title=f"ai_tools: invalid declaration in {app}", message=str(error))
+			except Exception as error:
+				# Bozuk bir bildirim öteki araçları durdurmaz. Yalnız o araç yüklenmez.
+				_report_once(f"ai_tools: invalid declaration in {app}", error)
 				continue
 			taken.add(tool.name)
 			tools.append(tool)
 	return tools
+
+
+_reported: set[str] = set()
+
+
+def _report_once(title: str, error: Exception) -> None:
+	"""Aynı hatayı süreç başına bir kez hata kaydına yazar. Kanca her istekte okunur."""
+	key = f"{title}: {error!r}"
+	if key not in _reported:
+		_reported.add(key)
+		frappe.log_error(title=title, message=repr(error))
 
 
 def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
@@ -196,6 +277,8 @@ def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
 	kind = declaration.get("kind")
 	if kind not in ("read", "write"):
 		raise ValueError(f"{name}: kind must be read or write")
+	if not isinstance(declaration.get("arguments"), str) or not isinstance(declaration.get("handler"), str):
+		raise ValueError(f"{name}: arguments and handler must be dotted paths")
 
 	# Yol kullanıcı girdisinden değil, kurulu uygulamanın hooks.py dosyasından gelir (G-10).
 	arguments = frappe.get_attr(declaration["arguments"])
@@ -228,8 +311,12 @@ def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
 
 
 def all_tools() -> list[AiTool]:
-	tools = list(builtin_tools())
-	return tools + app_tools({tool.name for tool in tools})
+	"""Araç listesi istek başına bir kez kurulur."""
+	cached = getattr(frappe.local, "yz_tools", None)
+	if cached is None:
+		tools = list(builtin_tools())
+		cached = frappe.local.yz_tools = tools + app_tools({tool.name for tool in tools})
+	return cached
 
 
 def find(name: str) -> AiTool | None:

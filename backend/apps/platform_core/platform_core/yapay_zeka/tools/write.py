@@ -42,6 +42,10 @@ def writable_meta(doctype: str):
 		raise ToolDenied("blocked_doctype", _("DocType {0} is closed to AI write tools.").format(doctype))
 	if doctype in policy.ADMIN_DOCTYPES:
 		raise ToolDenied("admin_only", _("DocType {0} changes only through admin tools.").format(doctype))
+	if policy.is_framework_doctype(meta):
+		raise ToolDenied(
+			"blocked_doctype", _("Framework DocType {0} is closed to AI write tools.").format(doctype)
+		)
 	if meta.istable:
 		raise ToolDenied("invalid_arguments", _("Change child rows through their parent document."))
 	return meta
@@ -90,10 +94,17 @@ def _spec(action: str, summary: str, doctype: str, doc=None, changes: list | Non
 	}
 
 
-def _load(doctype: str, name: str, ptype: str):
+def _load(doctype: str, name: str, ptype: str, expected_version: str | None = None):
+	"""Kaydı yükler ve izni denetler.
+
+	Yürütme `expected_version` verir. O zaman kayıt satır kilidiyle okunur ve önizlemedeki
+	sürümle karşılaştırılır. Böylece araya giren değişikliğin üstüne yazılmaz.
+	"""
 	meta = writable_meta(doctype)
-	doc = frappe.get_doc(doctype, name)
+	doc = frappe.get_doc(doctype, name, for_update=expected_version is not None)
 	doc.check_permission(ptype)
+	if expected_version is not None and str(doc.modified) != expected_version:
+		raise ToolDenied("document_changed", _("The document changed after the preview."))
 	return meta, doc
 
 
@@ -138,8 +149,8 @@ def preview_update(doctype: str, name: str, data: dict[str, Any]) -> dict:
 	return _spec("update", f"Update {doctype} {name}", doctype, doc, changes)
 
 
-def run_update(doctype: str, name: str, data: dict[str, Any]) -> dict:
-	_meta, doc = _load(doctype, name, "write")
+def run_update(doctype: str, name: str, data: dict[str, Any], expected_version: str | None = None) -> dict:
+	_meta, doc = _load(doctype, name, "write", expected_version)
 	doc.update(data)
 	doc.save()
 	return {"name": doc.name}
@@ -155,8 +166,8 @@ def preview_submit(doctype: str, name: str) -> dict:
 	return _spec("submit", f"Submit {doctype} {name}", doctype, doc)
 
 
-def run_submit(doctype: str, name: str) -> dict:
-	_meta, doc = _load(doctype, name, "submit")
+def run_submit(doctype: str, name: str, expected_version: str | None = None) -> dict:
+	_meta, doc = _load(doctype, name, "submit", expected_version)
 	doc.submit()
 	return {"name": doc.name}
 
@@ -168,8 +179,8 @@ def preview_cancel(doctype: str, name: str) -> dict:
 	return _spec("cancel", f"Cancel {doctype} {name}", doctype, doc)
 
 
-def run_cancel(doctype: str, name: str) -> dict:
-	_meta, doc = _load(doctype, name, "cancel")
+def run_cancel(doctype: str, name: str, expected_version: str | None = None) -> dict:
+	_meta, doc = _load(doctype, name, "cancel", expected_version)
 	doc.cancel()
 	return {"name": doc.name}
 
@@ -181,8 +192,8 @@ def preview_delete(doctype: str, name: str) -> dict:
 	return _spec("delete", f"Delete {doctype} {name}", doctype, doc)
 
 
-def run_delete(doctype: str, name: str) -> dict:
-	_load(doctype, name, "delete")
+def run_delete(doctype: str, name: str, expected_version: str | None = None) -> dict:
+	_load(doctype, name, "delete", expected_version)
 	# `frappe.delete_doc` silme iznini ve bağlı kayıtları kendisi de denetler.
 	frappe.delete_doc(doctype, name)
 	return {"name": name}

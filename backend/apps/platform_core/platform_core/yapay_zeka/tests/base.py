@@ -126,6 +126,8 @@ class YzTestCase(IntegrationTestCase):
 
 	def send(self, client, method: str, path: str, *, body=None, headers=None, query=None):
 		request_headers = {"Accept": "application/json"}
+		if getattr(client, "csrf_token", None) and method != "GET":
+			request_headers["X-Frappe-CSRF-Token"] = client.csrf_token
 		kwargs = {"path": path, "method": method, "headers": request_headers}
 		if body is not None:
 			request_headers["Content-Type"] = "application/json"
@@ -139,11 +141,21 @@ class YzTestCase(IntegrationTestCase):
 		finally:
 			frappe.db.rollback()
 
-	def login(self, user: str):
-		"""Kullanıcı adına oturum açar. Çerez istemcide kalır."""
+	def login(self, user: str, *, csrf: bool = True):
+		"""Kullanıcı adına oturum açar. Çerez istemcide kalır.
+
+		Panel sayfası oturuma CSRF belirteci koyar ve tarayıcı onu başlıkta gönderir.
+		Test aynı durumu kurar: belirteci oturuma yazar ve her yazan istekte gönderir.
+		"""
 		client = get_test_client(use_cookies=True)
 		response = self.send(client, "POST", "/api/method/login", body={"usr": user, "pwd": PASSWORD})
 		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		if csrf:
+			sid = client.get_cookie("sid").value
+			session = frappe.cache.hget("session", sid)
+			session["data"]["csrf_token"] = frappe.generate_hash()
+			frappe.cache.hset("session", sid, session)
+			client.csrf_token = session["data"]["csrf_token"]
 		return client
 
 	def anonymous(self):

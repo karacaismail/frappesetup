@@ -176,12 +176,14 @@ paths:
         YIKICI OLABİLİR. Bu uç kaydı oluşturur, değiştirir, onaya gönderir, iptal eder ya da siler.
         Uygulama aracı ücretli bir iş de başlatabilir. Önerideki `destructive` ve `billable` alanlarına bakın.
 
+        Yazan her insan isteği `X-Frappe-CSRF-Token` başlığını taşır. Oturumda CSRF belirteci yoksa istek reddedilir.
         Onay tek kullanımlıktır. Sunucu sırayla şunları denetler: insan oturumu, aynı kullanıcı,
         `pending` durumu, süre, özet eşleşmesi, kaydın değişmemiş olması, güncel izin ve
         aynı hedefte sonucu bilinmeyen iş.
         Denetim başarısızsa iş yürümez ve yanıt `executed: false` ile ret nedenini taşır.
 
         Sunucu yürütmeden önce sonucu `unknown` olarak kaydeder. Süreç yarıda kesilirse sonuç `unknown` kalır.
+        Uygulama aracı hata verirse sonuç yine `unknown` kalır. Araç dış sisteme dokunmuş olabilir.
         Aynı hedefe kör tekrar yapılmaz. İnsan durumu `resolve_proposal` ile kapatır.
       security: [{insanOturumu: []}]
       requestBody:
@@ -209,7 +211,7 @@ paths:
                 properties:
                   message: {$ref: "#/components/schemas/ApprovalOutcome"}
         "401": {description: "İstek aracı belirteci taşıyor. Belirteç yalnız MCP ucunda geçer. Ret günlüğe `token_out_of_scope` koduyla yazılır."}
-        "403": {description: İstek insan oturumundan gelmedi. Örneğin API anahtarıyla geldi.}
+        "403": {description: "İstek insan oturumundan gelmedi, oturumda CSRF belirteci yok ya da öneri başka kullanıcıya ait. Başkasının önerisi yanıtta dönmez."}
         "404": {description: Öneri yok.}
 
   /platform_core.api.ai.reject_proposal:
@@ -273,6 +275,42 @@ paths:
                 properties:
                   message: {$ref: "#/components/schemas/Proposal"}
         "403": {description: İstek insan oturumundan gelmedi ya da öneri başka kullanıcıya ait.}
+
+  /platform_core.api.ai.purge_logs:
+    post:
+      tags: [yonetim]
+      operationId: purgeLogs
+      summary: Saklama süresi dolan günlük ve öneri kayıtlarını siler.
+      description: |
+        YIKICI. Geri alınamaz. Yalnız “System Manager” rolü ve insan oturumu çağırabilir.
+        `dry_run` doğruysa hiçbir şey silinmez. Yanıt silinecek kayıt sayısını döner. Varsayılan budur.
+        Saklama süresi en az 365 gündür. Sonucu bilinmeyen öneriler silinmez.
+        Zamanlanmış iş yoktur. Bu uç elle başlatılır. Aynı işin komutu şudur:
+        `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs "{'older_than_days': 365}"`.
+        Yapay zekâ aynı işi `purge_action_log` aracıyla, önizleme ve insan onayıyla başlatır.
+      security: [{insanOturumu: []}]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                older_than_days: {type: integer, minimum: 365, default: 365}
+                dry_run: {type: boolean, default: true}
+      responses:
+        "200":
+          description: Silinen ya da silinecek kayıt sayıları.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/PurgeResult"}
+        "403": {description: İstek insan oturumundan gelmedi ya da kullanıcı yönetici değil.}
+        "417": {description: Saklama süresi 365 günden kısa verildi.}
 
 components:
   securitySchemes:
@@ -361,10 +399,12 @@ components:
         - blocked_doctype
         - admin_only
         - role_required
+        - protected_role
         - not_found
         - not_human_session
         - token_out_of_scope
         - token_call_limit
+        - unknown_tool
         - not_owner
         - not_pending
         - expired
@@ -443,6 +483,15 @@ components:
           oneOf: [{$ref: "#/components/schemas/DenyReason"}, {type: "null"}]
         proposal: {$ref: "#/components/schemas/Proposal"}
 
+    PurgeResult:
+      type: object
+      required: [dry_run, older_than_days, logs, proposals]
+      properties:
+        dry_run: {type: boolean}
+        older_than_days: {type: integer}
+        logs: {type: integer, description: Silinen ya da silinecek “AI Action Log” sayısı.}
+        proposals: {type: integer, description: Silinen ya da silinecek “AI Action Proposal” sayısı.}
+
     ApprovalRequired:
       type: object
       description: Yazma aracının model tarafına döndüğü sonuç. Kayıt henüz değişmemiştir.
@@ -481,7 +530,7 @@ x-mcp-tools:
   - name: list_documents
     class: read
     annotations: {readOnlyHint: true}
-    description: List documents the user may read. Filters and fields work as in frappe.get_list.
+    description: "List documents the user may read. A filter is a value or an [operator, value] pair."
     inputSchema:
       type: object
       additionalProperties: false
@@ -542,17 +591,17 @@ x-mcp-tools:
   - name: submit_document
     class: write
     annotations: {readOnlyHint: false, destructiveHint: true}
-    description: Propose submitting a draft document. Nothing happens until a human approves the proposal.
+    description: "Propose submitting a draft document. Nothing is written until a human approves the proposal."
     inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
   - name: cancel_document
     class: write
     annotations: {readOnlyHint: false, destructiveHint: true}
-    description: Propose cancelling a submitted document. Nothing happens until a human approves the proposal.
+    description: "Propose cancelling a submitted document. Nothing is written until a human approves the proposal."
     inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
   - name: delete_document
     class: write
     annotations: {readOnlyHint: false, destructiveHint: true}
-    description: Propose deleting a document. Nothing is deleted until a human approves the proposal.
+    description: "Propose deleting a document. Nothing is written until a human approves the proposal."
     inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
   - name: get_proposal
     class: flow
@@ -567,6 +616,77 @@ x-mcp-tools:
       properties:
         proposal_id: {type: string, minLength: 1}
 
+  # Yönetim araçları. Yalnız “System Manager” rolüne görünür. Hepsi önizleme ve insan onayı ister.
+  - name: add_custom_field
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: false}
+    description: "Propose a new custom field on a DocType. A description is required. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, fieldname, label, fieldtype, description]
+      properties:
+        doctype: {type: string, minLength: 1}
+        fieldname: {type: string, pattern: "^[a-z][a-z0-9_]{1,60}$"}
+        label: {type: string, minLength: 1}
+        fieldtype:
+          type: string
+          enum: [Data, Small Text, Text, Long Text, Int, Float, Currency, Percent, Check, Date, Datetime, Time, Select, Link, Password]
+        description: {type: string, minLength: 1}
+        options: {type: string}
+        reqd: {type: boolean, default: false}
+        insert_after: {type: string}
+        permlevel: {type: integer, minimum: 0, maximum: 9, default: 0}
+  - name: set_field_property
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    description: "Propose a change to one display or validation property of a field. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, fieldname, property, value]
+      properties:
+        doctype: {type: string, minLength: 1}
+        fieldname: {type: string, minLength: 1}
+        property:
+          type: string
+          enum: [label, description, reqd, hidden, read_only, in_list_view, in_standard_filter, bold, permlevel, options, default, allow_on_submit, print_hide]
+        value: {type: [string, integer, boolean]}
+  - name: set_role_permission
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    description: "Propose a change to what a role may do with a DocType at one permission level. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, role, permissions]
+      properties:
+        doctype: {type: string, minLength: 1}
+        role: {type: string, minLength: 1}
+        permlevel: {type: integer, minimum: 0, maximum: 9, default: 0}
+        permissions:
+          type: object
+          description: "Permission type to true or false. Types: read, write, create, delete, submit, cancel, amend, report, export, import, print, email, share, select, if_owner."
+  - name: assign_role
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    description: "Propose giving a role to a user. Protected roles cannot be given through AI. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema: {$ref: "#/x-mcp-schemas/UserRole"}
+  - name: remove_role
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    description: "Propose taking a role away from a user. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema: {$ref: "#/x-mcp-schemas/UserRole"}
+  - name: purge_action_log
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    description: "Propose deleting AI action logs and proposals older than the retention period. Cannot be undone. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        older_than_days: {type: integer, minimum: 365, default: 365}
+
 x-mcp-schemas:
   DocumentTarget:
     type: object
@@ -575,6 +695,13 @@ x-mcp-schemas:
     properties:
       doctype: {type: string, minLength: 1}
       name: {type: string, minLength: 1}
+  UserRole:
+    type: object
+    additionalProperties: false
+    required: [user, role]
+    properties:
+      user: {type: string, minLength: 1}
+      role: {type: string, minLength: 1}
 
 # Uygulamaların `ai_tools` kancasıyla bildirdiği aracın biçimi (G-105).
 x-ai-tools-hook:

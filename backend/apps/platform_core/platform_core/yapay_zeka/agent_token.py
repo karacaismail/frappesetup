@@ -58,10 +58,12 @@ def authenticate_request() -> None:
 	record = frappe.cache.get_value(_key(token), use_local_cache=False)
 	if not record:
 		return
-	if frappe.request.path != MCP_PATH:
+	# Frappe, `cmd` alanı varsa yolu yok sayar ve o işlevi çalıştırır (`frappe/app.py`).
+	# Bu yüzden `cmd` taşıyan istekte belirteç kimliğe çevrilmez.
+	if frappe.request.path != MCP_PATH or "cmd" in frappe.form_dict or "cmd" in frappe.request.args:
 		_log_denied(record, "token_out_of_scope")
 		return
-	if frappe.request.cookies.get("sid"):
+	if frappe.request.cookies.get("sid") not in (None, "", "Guest"):
 		raise frappe.PermissionError(_("Send either a session cookie or an agent token, not both."))
 	if not _session_alive(record["sid"]):
 		frappe.cache.delete_value(_key(token))

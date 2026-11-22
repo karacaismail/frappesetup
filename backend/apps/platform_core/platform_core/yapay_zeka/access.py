@@ -34,13 +34,24 @@ def principal() -> str:
 
 def require_human(stage: str, *, tool: str | None = None) -> None:
 	"""İstek insan oturumundan gelmediyse reddi günlüğe yazar ve 403 verir."""
-	if principal() == HUMAN:
+	if principal() == HUMAN and _csrf_checked():
 		return
 	record(stage, tool=tool, decision="denied", deny_reason="not_human_session")
 	# Hata yanıtı işlemi geri alır. Ret kaydı kaybolmasın diye burada kesinleştirilir.
 	# Bu noktaya kadar istekte başka yazı yoktur.
 	frappe.db.commit()  # nosemgrep
 	raise frappe.PermissionError(_("This action needs a human session."))
+
+
+def _csrf_checked() -> bool:
+	"""Yazan istekte oturumun CSRF belirteci olmalı.
+
+	Frappe başlığı yalnız oturumda belirteç varsa doğrular (`frappe/auth.py`). Belirteci
+	olmayan oturumda doğrulama atlanır. Onay gibi işlerde bu boşluk burada kapatılır.
+	"""
+	if frappe.request.method in ("GET", "HEAD", "OPTIONS"):
+		return True
+	return bool(frappe.session.data.get("csrf_token"))
 
 
 def args_hash(arguments: Any) -> str:

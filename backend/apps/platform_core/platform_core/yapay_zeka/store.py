@@ -8,6 +8,7 @@ türlere izni yoktur. Hedef kaydı kullanıcı seçmez. Kullanıcıya dönen sat
 
 import frappe
 from frappe.model.document import Document
+from frappe.utils import add_days, now_datetime
 
 LOG = "AI Action Log"
 PROPOSAL = "AI Action Proposal"
@@ -31,10 +32,10 @@ def save_proposal(doc: Document) -> None:
 	doc.save(ignore_permissions=True)
 
 
-def proposals_of(user: str, status: str | None, limit: int) -> list[str]:
+def proposals_of(user: str, statuses: tuple[str, ...] | None, limit: int) -> list[str]:
 	filters = {"user": user}
-	if status:
-		filters["status"] = status
+	if statuses:
+		filters["status"] = ("in", statuses)
 	return frappe.get_all(PROPOSAL, filters=filters, pluck="name", order_by="creation desc", limit=limit)
 
 
@@ -46,6 +47,17 @@ def unresolved_unknown_exists(target_key: str, *, exclude: str | None = None) ->
 	return bool(frappe.db.exists(PROPOSAL, filters))
 
 
+def lock_target(target_key: str) -> list[dict]:
+	"""Aynı hedefin bütün önerilerini satır kilidiyle okur.
+
+	İki onay aynı hedefte yarışırsa ikincisi burada bekler. Birincinin `unknown` yazısı
+	kesinleşince ikinci onu görür. Kilit veritabanındadır, birden çok sunucuda da çalışır.
+	"""
+	return frappe.db.get_values(
+		PROPOSAL, {"target_key": target_key}, ["name", "status", "result"], for_update=True, as_dict=True
+	)
+
+
 def latest_version(doctype: str | None, name: str | None) -> str | None:
 	"""Yazmanın ürettiği “Version” kaydının adı. Yalnız günlüğe bağ olarak yazılır."""
 	if not doctype or not name:
@@ -53,3 +65,22 @@ def latest_version(doctype: str | None, name: str | None) -> str | None:
 	return frappe.db.get_value(
 		"Version", {"ref_doctype": doctype, "docname": name}, "name", order_by="creation desc"
 	)
+
+
+def purge_older_than(days: int, *, delete: bool) -> tuple[int, int]:
+	"""Saklama süresi dolan kayıtları sayar, istenirse siler.
+
+	Silme doğrudan veritabanında yapılır. Günlüğün controller'ı tek tek silmeyi engeller.
+	Bu yolu yalnız `retention.purge` çağırır. O işlev yönetici rolünü denetler.
+	"""
+	cutoff = add_days(now_datetime(), -days)
+	log_filters = {"creation": ("<", cutoff)}
+	proposal_filters = {"creation": ("<", cutoff)}
+	unresolved = frappe.get_all(PROPOSAL, filters={"status": "consumed", "result": "unknown"}, pluck="name")
+	if unresolved:
+		proposal_filters["name"] = ("not in", unresolved)
+	counts = frappe.db.count(LOG, log_filters), frappe.db.count(PROPOSAL, proposal_filters)
+	if delete:
+		frappe.db.delete(LOG, log_filters)
+		frappe.db.delete(PROPOSAL, proposal_filters)
+	return counts

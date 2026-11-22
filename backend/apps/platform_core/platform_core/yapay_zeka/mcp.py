@@ -122,6 +122,11 @@ def call_tool(params: dict) -> dict:
 	name = params.get("name")
 	tool = registry.find(name) if isinstance(name, str) else None
 	if tool is None:
+		access.record(
+			"call", decision="denied", deny_reason="unknown_tool", tool=str(name)[:140], started=started
+		)
+		# 404 yanıtı işlemi geri alır. Ret kaydı için burada kesinleştirilir.
+		frappe.db.commit()  # nosemgrep
 		raise McpError(METHOD_NOT_FOUND, f"Unknown MCP tool: {name}", status=404)
 
 	raw = params.get("arguments", {})
@@ -155,6 +160,8 @@ def call_tool(params: dict) -> dict:
 			return _success(result)
 
 		result = tool.handler(**arguments)
+		# Okuma aracı kalıcı yazı bırakamaz. Yazdıysa burada geri alınır.
+		frappe.db.rollback()
 		access.record("call", decision="allowed", **context)
 		return _success(result)
 	except ToolDenied as error:

@@ -50,7 +50,13 @@ class TestAiToolsHook(YzTestCase):
 
 		self.assertIn("platform_core_count_records", names)
 		self.assertIn("platform_core_set_title", names)
-		for invalid in ("write_without_preview", "with_confirm_field", "loose_arguments", "Bad Name"):
+		for invalid in (
+			"write_without_preview",
+			"with_confirm_field",
+			"loose_arguments",
+			"Bad Name",
+			"no_handler",
+		):
 			self.assertFalse([name for name in names if invalid in name], invalid)
 
 	def test_role_limited_tool_is_hidden_and_denied(self):
@@ -97,6 +103,41 @@ class TestAiToolsHook(YzTestCase):
 		self.assertTrue(shown.json["message"]["billable"])
 		self.assertTrue(outcome["executed"], outcome)
 		self.assertEqual(frappe.db.get_value(DOCTYPE, name, "title"), "Yeni")
+
+	def test_read_tool_cannot_leave_a_write_behind(self):
+		name = self.make_record(USER_A, title="Eski")
+		client = self.login(USER_A)
+
+		with with_sample_tools():
+			result = self.call_tool(client, "platform_core_sneaky_write", {})
+
+		self.assertFalse(result["isError"], result)
+		self.assertEqual(frappe.db.get_value(DOCTYPE, name, "title"), "Eski")
+
+	def test_failed_app_write_stays_unknown_and_hides_the_raw_error(self):
+		name = self.make_record(USER_A, title="Eski")
+		client = self.login(USER_A)
+
+		with with_sample_tools():
+			proposal = self.call_tool(client, "platform_core_failing_write", {"name": name, "title": "Yeni"})[
+				"structuredContent"
+			]
+			outcome = self.approve(client, proposal["proposal_id"]).json["message"]
+			again = self.call_tool(client, "platform_core_set_title", {"name": name, "title": "Baska"})
+
+		self.assertFalse(outcome["executed"])
+		self.assertEqual(outcome["proposal"]["result"], "unknown")
+		self.assertEqual(outcome["proposal"]["error"], "internal_error")
+		self.assert_denied(again, "unresolved_unknown")
+
+	def test_unknown_tool_is_logged(self):
+		client = self.login(USER_A)
+
+		response = self.rpc(client, "tools/call", {"name": "call_method", "arguments": {}})
+
+		self.assertEqual(response.status_code, 404)
+		log = self.last_log(tool="call_method")
+		self.assertEqual((log.decision, log.deny_reason), ("denied", "unknown_tool"))
 
 	def test_app_write_tool_is_denied_for_another_users_record(self):
 		name = self.make_record(USER_A, title="Eski")
@@ -217,6 +258,7 @@ class TestContract(YzTestCase):
 			if "$ref" in schema:
 				schema = shared[schema["$ref"].rsplit("/", 1)[-1]]
 			declared[tool["name"]] = (
+				" ".join(tool["description"].split()),
 				tool["class"],
 				sorted(schema.get("properties", {})),
 				sorted(schema.get("required", [])),
@@ -224,6 +266,7 @@ class TestContract(YzTestCase):
 			)
 		actual = {
 			tool.name: (
+				tool.description,
 				tool.tool_class,
 				sorted(tool.input_schema["properties"]),
 				sorted(tool.input_schema.get("required", [])),
