@@ -63,6 +63,7 @@ _CONTENT_LENGTH = re.compile(r"^[0-9]{1,12}$")
 _LOG = logging.getLogger("identity_sync")
 RESOLUTIONS = ("completed", "abandoned")
 _RESOLVE_PATH = re.compile(r"^/v1/operations/([A-Za-z0-9_-]{1,128})/resolve$")
+RESOLVE_ROUTE = "/v1/operations/{operation_id}/resolve"
 
 Reply = tuple[int, object]
 Query = Mapping[str, list[str]]
@@ -536,6 +537,18 @@ def make_server(
     methods = {"/healthz": "GET", "/v1/events": "POST", **{path: route[0] for path, route in token_routes.items()}}
     methods.update(dict.fromkeys(list_routes, "GET"))
 
+    def route_name(path: str) -> str:
+        """The name a log line uses for a request path.
+
+        A known route is named by its template. Every other path is `unknown`: a client may
+        put anything into a path, for example an e-mail address, and the log must not keep it.
+        """
+        if path in methods:
+            return path
+        if _RESOLVE_PATH.fullmatch(path):
+            return RESOLVE_ROUTE
+        return "unknown"
+
     class RequestHandler(BaseHTTPRequestHandler):
         server_version = "identity_sync"
         sys_version = ""
@@ -580,10 +593,10 @@ def make_server(
                 # Başka bir süreç bir olayı işliyor. Çağıran yeniden denemelidir.
                 return 503, {"error": "busy"}
             except sqlite3.Error:
-                _LOG.error("storage failed on %s", parts.path[:200])
+                _LOG.error("storage failed on %s", route_name(parts.path))
                 return 500, {"error": "storage_failed"}
             except (HttpError, TransportError) as error:
-                _LOG.error("upstream failed on %s: %s", parts.path[:200], error)
+                _LOG.error("upstream failed on %s: %s", route_name(parts.path), error)
                 return 502, {"error": "upstream_failed"}
 
         def _respond(self, path: str, query: Query) -> Reply:
@@ -677,10 +690,11 @@ def make_server(
             return azp if isinstance(azp, str) and azp else None
 
         def log_message(self, format: str, *args: object) -> None:
-            # Günlüğe yalnız yol ve sayısal durum yazılır. Sorgu, gövde ve istemcinin metni yazılmaz.
-            # Bozuk istekte `path` henüz yoktur.
+            # The log carries the name of the route and the numeric status. Nothing the client
+            # wrote is logged: no raw path, no id from the path, no query, no body.
+            # A broken request has no `path` yet.
             status = str(args[1]) if len(args) > 1 else ""
-            path = urlsplit(getattr(self, "path", "")).path
-            _LOG.info("%s %s", path[:200], status if status.isdigit() else "-")
+            route = route_name(urlsplit(getattr(self, "path", "")).path)
+            _LOG.info("%s %s", route, status if status.isdigit() else "-")
 
     return HTTPServer((host, port), RequestHandler)

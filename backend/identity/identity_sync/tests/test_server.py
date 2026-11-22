@@ -1398,3 +1398,83 @@ class RateLimitTest(ServerCase):
         from .test_config_cli import ConfigTest
 
         self.assertEqual(load_settings(ConfigTest.ENV).rate_limit, 600)
+
+
+class RequestLogTest(ServerCase):
+    """The request log names the route, never the raw path (frappe-python-standartlari.md, G-15).
+
+    A client may put personal data into a path or a query by mistake. The service refuses
+    such a request, and its log must not keep what the client sent.
+    """
+
+    PERSONAL = "ayse.ornek@example.test"
+
+    def logged(self, method: str, path: str, body: bytes | None = None, headers: dict[str, str] | None = None) -> tuple[int, str]:
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            status, _reply = self.call(method, path, body, headers)
+        return status, "\n".join(logs.output)
+
+    def test_unknown_path_is_logged_under_a_fixed_name(self) -> None:
+        for path in (
+            f"/v1/users/{self.PERSONAL}",
+            f"/{self.PERSONAL}",
+            f"/v1/dead-letters/{self.PERSONAL}",
+            f"/v1/operations/{self.PERSONAL}/resolve",
+        ):
+            with self.subTest(path=path):
+                status, log = self.logged("GET", path)
+                self.assertEqual(status, 404)
+                self.assertNotIn(self.PERSONAL, log)
+                self.assertNotIn("ayse", log)
+                self.assertIn("unknown 404", log)
+
+    def test_query_values_are_not_logged(self) -> None:
+        status, log = self.logged("GET", f"/v1/dead-letters?email={self.PERSONAL}", None, self.bearer(PREVIEW_TOKEN))
+
+        self.assertEqual(status, 400)
+        self.assertNotIn(self.PERSONAL, log)
+        self.assertNotIn("email", log)
+        self.assertIn("/v1/dead-letters 400", log)
+
+    def test_id_in_a_known_path_is_logged_as_the_route_template(self) -> None:
+        status, log = self.logged("POST", "/v1/operations/onay-gizli-17/resolve", b'{"resolution": "abandoned"}', self.bearer())
+
+        self.assertEqual(status, 404)
+        self.assertNotIn("onay-gizli-17", log.replace("operation_id=onay-gizli-17", ""))
+        self.assertIn("/v1/operations/{operation_id}/resolve 404", log)
+
+    def test_known_routes_are_logged_by_name_and_status(self) -> None:
+        self.assertIn("/healthz 200", self.logged("GET", "/healthz")[1])
+        self.assertIn("/v1/dead-letters 200", self.logged("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN))[1])
+
+    def test_failure_logs_name_the_route_too(self) -> None:
+        keycloak = self.stack.keycloak
+        keycloak.add_session(SUBJECT, "sid-1")
+        keycloak.on("DELETE", f"{keycloak.admin}/sessions/sid-1", (500, None))
+        body = json.dumps({"sid": "sid-1", "subject": SUBJECT}).encode()
+
+        status, log = self.logged("POST", f"/v1/sessions/revoke?who={self.PERSONAL}", body, self.bearer(SESSION_TOKEN))
+
+        self.assertEqual(status, 502)
+        self.assertIn("upstream failed on /v1/sessions/revoke", log)
+        self.assertNotIn(self.PERSONAL, log)
+
+    def test_wrong_method_on_a_known_route_is_logged_by_name(self) -> None:
+        status, log = self.logged("DELETE", f"/v1/dead-letters?x={self.PERSONAL}")
+
+        self.assertEqual(status, 405)
+        self.assertIn("/v1/dead-letters 405", log)
+        self.assertNotIn(self.PERSONAL, log)
+
+    def test_broken_request_line_is_not_logged(self) -> None:
+        import socket
+
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            with socket.create_connection(self.httpd.server_address, timeout=5) as raw:
+                raw.sendall(f"BOGUS {self.PERSONAL} and more words HTTP/9.9\r\n\r\n".encode("ascii"))
+                raw.recv(4096)
+            self.call("GET", "/healthz")  # makes sure the first request was handled and logged
+        log = "\n".join(logs.output)
+
+        self.assertNotIn(self.PERSONAL, log)
+        self.assertNotIn("ayse", log)
