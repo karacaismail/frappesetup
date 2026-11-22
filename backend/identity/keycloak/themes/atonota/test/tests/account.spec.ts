@@ -41,7 +41,7 @@ const settle = (page: Page) =>
   page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => undefined))));
 
 for (const target of pages) {
-  test(`@matris account ${target.name}: overflow, text size, font and control size`, async ({ page }) => {
+  test(`@matrix account ${target.name}: overflow, text size, font and control size`, async ({ page }) => {
     const requests: string[] = [];
     page.on('request', (request) => requests.push(request.url()));
     await openAccount(page, target);
@@ -174,7 +174,7 @@ test('IC-3: the Turkish bundle has the same keys and placeholders as the English
 });
 
 for (const target of pages) {
-  test(`@matris account ${target.name}: every button and link has an accessible name`, async ({ page }) => {
+  test(`@matrix account ${target.name}: every button and link has an accessible name`, async ({ page }) => {
     await openAccount(page, target);
     // The names are checked through the accessibility tree, the way a screen reader reads them.
     const unnamed = await page.evaluate(() =>
@@ -438,7 +438,7 @@ for (const scheme of ['light', 'dark'] as const) {
         content:
           '* { caret-color: transparent !important; } html, body, #app, .pf-v5-c-page { height: auto !important; } .pf-v5-c-page__main { overflow: visible !important; }',
       });
-      const out = fileURLToPath(new URL(`../referans/${info.project.name}/`, import.meta.url));
+      const out = fileURLToPath(new URL(`../reference/${info.project.name}/`, import.meta.url));
       await page.screenshot({ path: `${out}account-${target.name}-${scheme}.png`, fullPage: true });
     });
   }

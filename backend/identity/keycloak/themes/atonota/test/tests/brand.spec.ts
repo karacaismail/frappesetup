@@ -16,14 +16,14 @@ test('the test environment uses a brand name that differs from the theme name', 
 });
 
 test('login screens show the brand name from the variable', async ({ page }) => {
-  for (const name of ['giris', 'kayit', 'parola-sifirlama']) {
+  for (const name of ['sign-in', 'register', 'password-reset']) {
     await screen(name).open(page);
     await expect(page.locator('#kc-header-wrapper .at-brand__name')).toHaveText(BRAND);
     await expect(page.locator('body')).not.toContainText(/atonota/i);
   }
 });
 
-test('@matris account console shows the brand name from the variable', async ({ page }) => {
+test('@matrix account console shows the brand name from the variable', async ({ page }) => {
   const email = await createUser();
   await page.goto(`${KC}/realms/${REALM}/account/`);
   await submitPassword(page, email);
@@ -56,7 +56,7 @@ test('@matris account console shows the brand name from the variable', async ({ 
   expect(edge.mastheadHeight, 'the masthead stays on one row').toBeLessThanOrEqual(80);
 });
 
-test('@matris account console: a ten-letter brand name fits next to the mark without being cut', async ({ page }) => {
+test('@matrix account console: a ten-letter brand name fits next to the mark without being cut', async ({ page }) => {
   const email = await createUser();
   await page.goto(`${KC}/realms/${REALM}/account/`);
   await submitPassword(page, email);
@@ -76,7 +76,7 @@ test('@matris account console: a ten-letter brand name fits next to the mark wit
 
 test('emails show the brand name from the variable', async ({ page }) => {
   const email = await createUser();
-  await screen('parola-sifirlama').open(page);
+  await screen('password-reset').open(page);
   await page.locator('#username').fill(email);
   await page.locator('#kc-reset-password-form [type=submit]').click();
   let id = '';

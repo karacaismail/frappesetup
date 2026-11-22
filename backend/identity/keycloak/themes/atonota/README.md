@@ -202,19 +202,19 @@ Altı şablon Keycloak 26.8.2 kaynağından kopyalandı ve değiştirildi. Keycl
 
 Komutları deponun kökünden çalıştırın. Container ortamı Colima'dır ve bağlam `colima-factory` olur.
 
-1. İmaj yoksa önce derleyin: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh build`
+1. İmaj yoksa önce derleyin: `backend/identity/keycloak/themes/atonota/test/bin/theme-dev.sh build`
    `colima-factory` diski dardır. İmaj varsa yeniden derlemeyin. Tema değişince `sync` komutunu kullanın.
-2. Ortamı açın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh up`
-3. Portları bu bilgisayara taşıyın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh tunel`
-4. Tema dosyası değişince dosyaları kopyalayın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh sync`
+2. Ortamı açın: `backend/identity/keycloak/themes/atonota/test/bin/theme-dev.sh up`
+3. Portları bu bilgisayara taşıyın: `backend/identity/keycloak/themes/atonota/test/bin/theme-dev.sh tunnel`
+4. Tema dosyası değişince dosyaları kopyalayın: `backend/identity/keycloak/themes/atonota/test/bin/theme-dev.sh sync`
    Yalnız bir bölümü kopyalamak için `sync login`, `sync email` ya da `sync account` yazın.
-5. İş bitince ortamı kapatın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh down`
+5. İş bitince ortamı kapatın: `backend/identity/keycloak/themes/atonota/test/bin/theme-dev.sh down`
 
 Ortamı `colima` profilinde açmak için komutun önüne `FS_COLIMA_PROFILE=default` yazın. Önce `colima ssh -- free -g` ile en az 2 GB boş bellek ölçün.
 
 Betik ilk çalışmada `test/.env` dosyasını üretir. Bu dosya Git'e girmez. Port tabanı `PANE_PORT` değişkeninden gelir. Keycloak taban portu, Mailpit ekranı bir sonraki portu kullanır. Mailpit, gönderilen e-postaları yakalayan deneme posta kutusudur.
 
-Deneme realm'inin adı `tema-deneme` olur. Tema yalnız bu realm'de seçilidir.
+Deneme realm'inin adı `theme-test` olur. Tema yalnız bu realm'de seçilidir.
 
 ## Testler
 
@@ -227,36 +227,36 @@ npx playwright test
 
 | Dosya | Sınadığı şey |
 | --- | --- |
-| `tests/yerlesim.spec.ts` | Yatay taşma, yazı boyutu, yazı tipi, dış istek, dokunma alanı ve büyük kök yazı |
-| `tests/odak.spec.ts` | Tab sırası, klavye odak kipi, odak çizgisinin biçimi ve zorlanmış renkler |
-| `tests/akis.spec.ts` | Kayıt, giriş, parola sıfırlama, TOTP ve passkey akışları |
-| `tests/dil.spec.ts` | Türkçe varsayılan dil, dil bağlantıları ve ileti anahtarları |
-| `tests/hareket.spec.ts` | Hareket eğrisi, süre, azaltılmış hareket ve stil kaynağı denetimi |
-| `tests/erisilebilirlik.spec.ts` | axe denetimi, açık ve koyu tema |
-| `tests/eposta.spec.ts` | E-posta şablonları ve Mailpit |
+| `tests/layout.spec.ts` | Yatay taşma, yazı boyutu, yazı tipi, dış istek, dokunma alanı ve büyük kök yazı |
+| `tests/focus.spec.ts` | Tab sırası, klavye odak kipi, odak çizgisinin biçimi ve zorlanmış renkler |
+| `tests/flow.spec.ts` | Kayıt, giriş, parola sıfırlama, TOTP ve passkey akışları |
+| `tests/locale.spec.ts` | Türkçe varsayılan dil, dil bağlantıları ve ileti anahtarları |
+| `tests/motion.spec.ts` | Hareket eğrisi, süre, azaltılmış hareket ve stil kaynağı denetimi |
+| `tests/accessibility.spec.ts` | axe denetimi, açık ve koyu tema |
+| `tests/email.spec.ts` | E-posta şablonları ve Mailpit |
 | `tests/account.spec.ts` | Hesap konsolu: yerleşim, odak, hareket, axe, Türkçe iletiler ve token eşliği |
 | `tests/focus-diff.ts` | Odak çizgisini ölçen ortak yardımcı |
 | `tests/delete-account.spec.ts` | Hesap silme bağlantısı: müşteri görür, çalışan görmez, adres ayardan gelir |
 | `tests/realm-settings.spec.ts` | Keycloak'ın silme eylemi yanlışlıkla açılsa da konsol onu sunmaz. Bu test realm ayarını değiştirir, bu yüzden öteki testlerden önce tek başına koşar. |
 | `tests/security.spec.ts` | Güvenlik başlıkları, XSS denemeleri, tarayıcı deposu ve kaynak denetimi |
 | `tests/brand.spec.ts` | Marka adı değişkenden gelir: giriş, e-posta, hesap konsolu ve kaynak denetimi |
-| `tests/gorsel.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi |
+| `tests/visual.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi |
 
 Yerleşim testleri yedi görünümde koşar: 320, 360, 375, 390, yatay telefon, tablet ve masaüstü. Öteki testler 320 ve masaüstü görünümünde koşar.
 
 Ekran görüntülerini şu komut üretir:
 
 ```bash
-GORSEL=1 npx playwright test gorsel --project=chromium-320 --project=webkit-masaustu
+VISUAL=1 npx playwright test visual --project=chromium-320 --project=webkit-desktop
 ```
 
 Hesap konsolu görüntülerini şu komut üretir:
 
 ```bash
-VISUAL=1 npx playwright test account -g screenshot --project=chromium-320 --project=webkit-masaustu
+VISUAL=1 npx playwright test account -g screenshot --project=chromium-320 --project=webkit-desktop
 ```
 
-Görüntüler `test/referans/` klasörüne yazılır. Bu görüntüler macOS'ta üretildi. Görüntüler otomatik karşılaştırma kapısı değildir. Görüntüyü üreten kişi kendi görüntüsünü onaylamaz.
+Görüntüler `test/reference/` klasörüne yazılır. Bu görüntüler macOS'ta üretildi. Görüntüler otomatik karşılaştırma kapısı değildir. Görüntüyü üreten kişi kendi görüntüsünü onaylamaz.
 
 ## Bilinen sınırlar
 
@@ -265,7 +265,7 @@ Görüntüler `test/referans/` klasörüne yazılır. Bu görüntüler macOS'ta 
 - Kayıt formuna seçmeli alan eklenirse Keycloak işletim sisteminin açılır listesini çizer. Bu liste markalı değildir. Realm'e seçmeli profil alanı eklemeyin.
 - Geçiş anahtarının tarihini ve bağlantı türünü Keycloak yazar. Örneğin “USB” yazısı Keycloak'tan gelir.
 - Sihirli bağlantı eklentisinin giriş ekranı iletileri çevrildi ama canlı denenmedi. Deneme ortamında eklenti kurulu değildir.
-- Sihirli bağlantı e-postası canlı denenmedi. Şablonun adı ve değişkenleri eklentinin jar dosyasından okundu. Eklentili bir Keycloak'ta `SIHIRLI_KC_URL` ve `SIHIRLI_ADMIN_TOKEN` değişkenleriyle `tests/eposta.spec.ts` testini çalıştırın.
+- Sihirli bağlantı e-postası canlı denenmedi. Şablonun adı ve değişkenleri eklentinin jar dosyasından okundu. Eklentili bir Keycloak'ta `MAGIC_LINK_KC_URL` ve `MAGIC_LINK_ADMIN_TOKEN` değişkenleriyle `tests/email.spec.ts` testini çalıştırın.
 - E-postalar gerçek e-posta programlarında denenmedi. Örneğin Gmail ve Outlook denenmedi.
 
 - Gerçek telefon ve gerçek Safari denemesi yapılmadı. WebKit öykünmesi gerçek Safari değildir.

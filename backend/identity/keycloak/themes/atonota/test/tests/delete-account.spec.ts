@@ -37,7 +37,7 @@ test('the test environment sets the address of the deletion page', () => {
   expect(ACCOUNT_DELETION_URL, 'IDENTITY_ACCOUNT_DELETION_URL is set in test/.env').toMatch(/^https?:\/\/.+/);
 });
 
-test('@matris customer: the personal info page shows a link to the account deletion page', async ({ page }) => {
+test('@matrix customer: the personal info page shows a link to the account deletion page', async ({ page }) => {
   await signIn(page, { customer: true });
   const html = await serverPage(page);
   expect(html, 'the server sends the link').toContain(`id="at-account-deletion-link" href="${ACCOUNT_DELETION_URL}"`);
@@ -109,7 +109,7 @@ test('@matris customer: the personal info page shows a link to the account delet
   expect(result.saveVisible).toBe(true);
 });
 
-test('@matris employee: the server sends no deletion link and the page has none', async ({ page }) => {
+test('@matrix employee: the server sends no deletion link and the page has none', async ({ page }) => {
   await signIn(page, { customer: false });
   const html = await serverPage(page);
   expect(html, 'server page for an employee').not.toContain('at-account-deletion');
@@ -264,7 +264,7 @@ for (const scheme of ['light', 'dark'] as const) {
     test.skip(!process.env.VISUAL, 'Screenshots are produced only with VISUAL=1');
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
     await signIn(page, { customer: true });
-    const out = `referans/${info.project.name}/`;
+    const out = `reference/${info.project.name}/`;
     await page.screenshot({ path: `${out}account-deletion-link-${scheme}.png` });
     await page.locator('#cancel-btn').focus();
     await page.keyboard.press(tabKey(browserName));

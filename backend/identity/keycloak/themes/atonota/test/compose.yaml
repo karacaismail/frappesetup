@@ -1,6 +1,6 @@
 # Tema deneme ortamı. Sahibi kimlik-tema işidir.
 # Bu dosya yalnız temayı sınar. Asıl Keycloak kurulumu kimlik-realm işindedir.
-# Portları ve sırları bin/tema-dev.sh betiği .env dosyasına yazar.
+# Portları ve sırları bin/theme-dev.sh betiği .env dosyasına yazar.
 name: fs-kimlik-tema
 services:
   keycloak:

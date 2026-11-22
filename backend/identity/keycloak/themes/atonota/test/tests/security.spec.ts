@@ -93,7 +93,7 @@ test('XSS: markup typed into the sign-in form is shown as text and never runs', 
 
 test('XSS: markup in a profile name is shown as text in the theme screens', async ({ page }) => {
   // Registration writes the name. The password reset and account screens show data of the user.
-  await screen('kayit').open(page);
+  await screen('register').open(page);
   const email = `xss-${Date.now()}@example.test`;
   const name = '<img src=x onerror="window.__xss=3">';
   // The stock labels of this form carry a required mark, so the fields are addressed by their stable ids.
@@ -150,4 +150,23 @@ test('GV-2: templates never switch off escaping for user or realm data', () => {
       });
   }
   expect(hits).toEqual([]);
+});
+
+test('file and folder names in this folder are English', () => {
+  // Project rule: new code names are English and ASCII (backend/AGENTS.md, section "Ad dili").
+  // The list holds the Turkish words that were used as names here before.
+  const turkish = /(^|[-_./])(akis|dil|eposta|erisilebilirlik|gorsel|hareket|odak|yerlesim|tema|deneme|referans|tunel|yatay|masaustu|giris|kayit|parola|hata|dogrulama|islem|kurulum|yolu)([-_./]|$)/;
+  const names: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir)) {
+      if (entry === 'node_modules' || entry === '.env' || /^(test-results|playwright-report)/.test(entry)) continue;
+      const path = join(dir, entry);
+      names.push(path.slice(themeRoot.length));
+      if (statSync(path).isDirectory()) walk(path);
+    }
+  };
+  walk(themeRoot);
+  expect(names.length).toBeGreaterThan(50);
+  expect(names.filter((name) => !/^[\x20-\x7e]+$/.test(name)), 'names with non-ASCII letters').toEqual([]);
+  expect(names.filter((name) => turkish.test(name)), 'Turkish names').toEqual([]);
 });

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, type Page } from '@playwright/test';
 
-// Ortam değerleri bin/tema-dev.sh betiğinin ürettiği .env dosyasından gelir.
+// Ortam değerleri bin/theme-dev.sh betiğinin ürettiği .env dosyasından gelir.
 const envPath = fileURLToPath(new URL('../.env', import.meta.url));
 const env = Object.fromEntries(
   readFileSync(envPath, 'utf8')
@@ -14,7 +14,7 @@ const env = Object.fromEntries(
 
 export const KC = env.KC_PUBLIC_URL;
 export const MAILPIT = `http://127.0.0.1:${env.MAILPIT_UI_PORT}`;
-export const REALM = 'tema-deneme';
+export const REALM = 'theme-test';
 /** Address of the account deletion page of the test environment. It comes from the IDENTITY_ACCOUNT_DELETION_URL variable. */
 export const ACCOUNT_DELETION_URL: string = env.IDENTITY_ACCOUNT_DELETION_URL ?? '';
 /** Brand name of the test environment. It comes from the IDENTITY_BRAND_NAME variable, never from the theme. */
@@ -178,9 +178,9 @@ export type Screen = { name: string; open: (page: Page) => Promise<void> };
 
 /** Görev kapsamındaki ekranlar: giriş, kayıt, parola sıfırlama, TOTP ve passkey. */
 export const screens: Screen[] = [
-  { name: 'giris', open: (page) => openLogin(page) },
+  { name: 'sign-in', open: (page) => openLogin(page) },
   {
-    name: 'giris-hata',
+    name: 'sign-in-error',
     open: async (page) => {
       await openLogin(page);
       await submitPassword(page, 'yok@ornek.test', 'yanlis-parola');
@@ -188,7 +188,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    name: 'kayit',
+    name: 'register',
     open: async (page) => {
       await openLogin(page);
       await page.locator('#kc-registration a').click();
@@ -196,7 +196,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    name: 'kayit-hata',
+    name: 'register-error',
     open: async (page) => {
       await openLogin(page);
       await page.locator('#kc-registration a').click();
@@ -205,7 +205,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    name: 'parola-sifirlama',
+    name: 'password-reset',
     open: async (page) => {
       await openLogin(page);
       await page.locator('a[href*="reset-credentials"]').click();
@@ -213,7 +213,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    name: 'parola-yenileme',
+    name: 'password-update',
     open: async (page) => {
       const email = await createUser({ requiredActions: ['UPDATE_PASSWORD'] });
       await openLogin(page);
@@ -222,7 +222,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    name: 'totp-kurulum',
+    name: 'totp-setup',
     open: async (page) => {
       const email = await createUser({ requiredActions: ['CONFIGURE_TOTP'] });
       await openLogin(page);
@@ -231,7 +231,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    name: 'totp-giris',
+    name: 'totp-sign-in',
     open: async (page) => {
       const email = await createUser({ totp: true });
       await openLogin(page);
@@ -240,7 +240,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    name: 'passkey-kayit',
+    name: 'passkey-register',
     open: async (page) => {
       const email = await createUser({ requiredActions: ['webauthn-register-passwordless'] });
       await openLogin(page);
@@ -249,7 +249,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    name: 'passkey-giris',
+    name: 'passkey-sign-in',
     open: async (page) => {
       await enableWebAuthnSecondFactor();
       const email = await createUser({ webauthn: true });
@@ -260,7 +260,7 @@ export const screens: Screen[] = [
   },
   {
     // Kullanıcının hem doğrulama uygulaması hem güvenlik anahtarı vardır. "Başka bir yol" seçenek listesini açar.
-    name: 'giris-yolu',
+    name: 'sign-in-method',
     open: async (page) => {
       await enableWebAuthnSecondFactor();
       const email = await createUser({ totp: true, webauthn: true });
@@ -271,7 +271,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    name: 'eposta-dogrulama',
+    name: 'email-verification',
     open: async (page) => {
       const email = await createUser({ requiredActions: ['VERIFY_EMAIL'], emailVerified: false });
       await openLogin(page);
@@ -280,7 +280,7 @@ export const screens: Screen[] = [
     },
   },
   {
-    name: 'passkey-hata',
+    name: 'passkey-error',
     open: async (page) => {
       // Tarayıcının anahtar penceresi testte açılamaz. Ret yanıtı burada taklit edilir.
       await page.addInitScript(() => {
