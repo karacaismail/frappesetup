@@ -1,6 +1,6 @@
 """Gap backlog item 6: Karar 19 session lifetimes (project record O-25).
 
-Employee (tenant clients site-kiraci1 and mobile-app): 1 hour idle, 24 hours in total. After the level of
+Employee (tenant clients site-tenant1, mobile-app and mcp-external): 1 hour idle, 24 hours in total. After the level of
 authentication is older than 1 hour, an open Keycloak cookie does not skip the login.
 Customer (press): 7 days idle, 30 days in total, from the realm settings.
 
@@ -24,7 +24,7 @@ from helpers import admin, live_available, get_environment_value, read_realm, te
 
 HOUR = 3600
 DAY = 24 * HOUR
-EMPLOYEE_CLIENTS = ("site-tenant1", "mobile-app")
+EMPLOYEE_CLIENTS = ("site-tenant1", "mobile-app", "mcp-external")
 LOA_CONFIG = "atonota-employee-loa"
 
 
@@ -54,10 +54,12 @@ class SessionLifetimeFileTest(unittest.TestCase):
 
     def test_employee_clients_request_the_employee_level(self):
         for client_id in EMPLOYEE_CLIENTS:
-            attributes = self.clients[client_id]["attributes"]
+            client = self.clients[client_id]
+            attributes = client["attributes"]
             self.assertEqual(json.loads(attributes["acr.loa.map"]), {"employee": 1}, client_id)
             self.assertEqual(attributes["default.acr.values"], "employee", client_id)
             self.assertEqual(attributes["minimum.acr.value"], "employee", client_id)
+            self.assertIn("acr", client["defaultClientScopes"], client_id)
 
     def test_browser_flow_has_the_level_condition_around_every_login_method(self):
         flows = _flows(self.realm)

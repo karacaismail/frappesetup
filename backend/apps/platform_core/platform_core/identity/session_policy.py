@@ -4,9 +4,10 @@
   Frappe reads the idle limit from System Settings `session_expiry` (frappe/sessions.py:523) and checks
   it on every resume, in the cache (frappe/sessions.py:373) and in the database fallback
   (frappe/sessions.py:499). `apply` writes the limit on install and on every migrate.
-- Idle time is measured from real user activity (review finding Ö2). Frappe renews a session on every
-  request, background polling included. `before_request` keeps its own activity key per session and per
-  user in Redis. Background requests do not renew it. A session without a live key ends with 401.
+- Idle time is measured from real user activity (important finding 2 in the review). Frappe renews
+  a session on every request, including background polling. `before_request` keeps its own activity
+  key per session and user in Redis. Site cache clears preserve those keys. Background requests do
+  not renew them.
 - A user who was idle for the limit authenticates again at Keycloak. On the tenant site this holds for
   every user, employee or customer (docs/sozlesmeler.md section 3). The open Keycloak cookie must not skip
   this step: the login restarts with `prompt=login`, and the forced attempt accepts only an `auth_time`
@@ -17,6 +18,7 @@ import re
 import time
 
 import frappe
+from frappe.utils import now_datetime, time_diff_in_seconds
 
 # System Settings validates hh:mm. Frappe's session parser expects hh:mm:ss.
 SYSTEM_SETTINGS_IDLE_TIMEOUT = "01:00"
@@ -64,7 +66,8 @@ def recently_active(user: str) -> bool:
 
 def on_session_creation(login_manager=None) -> None:
 	"""`on_session_creation` hook (frappe/auth.py:246): a new session counts as activity."""
-	mark_activity(frappe.session.sid, frappe.session.user)
+	if not frappe.flags.identity_sign_in_pending:
+		mark_activity(frappe.session.sid, frappe.session.user)
 
 
 def is_background_request(request) -> bool:
@@ -75,7 +78,7 @@ def is_background_request(request) -> bool:
 
 
 def requested_method(request) -> str:
-	"""Method name of a request in every form Frappe accepts (merge review Ö2).
+	"""Method name of a request in every form Frappe accepts (important finding 2 in the merge review).
 
 	`/api/method/<m>`, `/api/v1/method/<m>`, `/api/v2/method/<m>` and the `cmd` field in the form, the
 	query string or a JSON body.
@@ -85,8 +88,19 @@ def requested_method(request) -> str:
 	if match:
 		return match.group(1)
 	# Frappe reads `cmd` from the form, the query string and a JSON body into `form_dict`
-	# (frappe/app.py:338). Reading `form_dict` covers all three (merge review 2, Ö2).
+	# (frappe/app.py:338). Reading `form_dict` covers all three (important finding 2 in merge review 2).
 	return str(frappe.form_dict.get("cmd") or request.form.get("cmd") or request.args.get("cmd") or "")
+
+
+def _idle_limit_reached(sid: str) -> bool:
+	last_activity = frappe.cache.get_value(_session_key(sid), expires=True, use_local_cache=False)
+	if last_activity is not None:
+		return time.time() - last_activity >= IDLE_SECONDS
+
+	# An expired or missing key may belong to a session from before this hook ran.
+	# Creation is a safe baseline: Frappe updates last_updated even on background requests.
+	created_at = frappe.session.data.get("creation")
+	return not created_at or time_diff_in_seconds(now_datetime(), created_at) >= IDLE_SECONDS
 
 
 def before_request() -> None:
@@ -100,13 +114,13 @@ def before_request() -> None:
 	if request is None or session is None:
 		return
 	sid, user = session.get("sid"), session.get("user")
-	# Merge review Ö1: a cookie session is always checked, also when an Authorization header is present.
+	# Important finding 1 in the merge review: check cookie sessions even with an Authorization header.
 	# Token identities (service and mobile) carry no cookie session and have no session id here.
 	if not sid or sid == "Guest" or not user or user == "Guest":
 		return
 	if request.cookies.get("sid") != sid:
 		return
-	if frappe.cache.get_value(_session_key(sid), expires=True, use_local_cache=False) is None:
+	if _idle_limit_reached(sid):
 		from frappe.auth import clear_cookies
 		from frappe.sessions import delete_session
 
@@ -120,7 +134,7 @@ def before_request() -> None:
 
 
 def check_fresh_authentication(user: str, claims: dict, record: dict) -> str:
-	"""Decides how a sign-in continues (O-25, review finding Ö2, contract section 3).
+	"""Decides how a sign-in continues (O-25, important finding 2 in the review, contract section 3).
 
 	Every user of the tenant site gets the employee durations. Returns "ok", "force" (restart with
 	`prompt=login`) or "refuse". A user who had real activity in

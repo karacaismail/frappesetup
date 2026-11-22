@@ -173,15 +173,6 @@
   {
     "rule": "B603",
     "file": "backend/dev/security/test_review.py",
-    "code": "result = subprocess.run([bin_dir / \"security-audit\"], env={**env, \"BASE\": base},",
-    "statementSha256": "bf2ed13f54c1d849e541dc4d617f547266151c56493a32df193588dd2f6ab854",
-    "reason": "The gate path and fake executables are created by the test inside its private temporary directory.",
-    "owner": "security-tooling",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B603",
-    "file": "backend/dev/security/test_review.py",
     "code": "result = subprocess.run([script, *args], env=env, capture_output=True, text=True)",
     "statementSha256": "b1f1363de4151adcf0dd2a5f72c3b7a0e8963edd2400f77a259ff19c9e65abbc",
     "reason": "The test runs a known local security script with fixed invalid arguments and a fake Docker executable.",
@@ -396,24 +387,6 @@
     "ignoreUntil": "2027-02-22"
   },
   {
-    "rule": "B603",
-    "file": "backend/e2e/tests/test_merge_preview.py",
-    "code": "result = subprocess.run([\"bash\", str(runtime), str(worktree)], env=env, text=True, capture_output=True)",
-    "statementSha256": "8776a29ad4a138dc9b0191c76b9327c6fc107e52d1c4dced66c50eaa243f6db8",
-    "reason": "The test selects a fixed executable and creates its own isolated command arguments.",
-    "owner": "integration-e2e",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B607",
-    "file": "backend/e2e/tests/test_merge_preview.py",
-    "code": "result = subprocess.run([\"bash\", str(runtime), str(worktree)], env=env, text=True, capture_output=True)",
-    "statementSha256": "8776a29ad4a138dc9b0191c76b9327c6fc107e52d1c4dced66c50eaa243f6db8",
-    "reason": "A local test deliberately uses the test runner's Git or Bash on a temporary fixture.",
-    "owner": "integration-e2e",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
     "rule": "B110",
     "file": "backend/apps/platform_core/platform_core/model_gateway/adapters.py",
     "code": "except Exception:",
@@ -528,15 +501,6 @@
     "statementSha256": "c77f50993e558c066101ec30e951df88c6a6e6518ea77dff3d95921f2c2b0614",
     "reason": "Model cleanup test expects an absent preview token.",
     "owner": "platform-core-gecit",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/mobile/store.py",
-    "code": "\"PLT Mobile Installation\", {\"name\": [\"in\", updates]}, {\"revoked\": 1, \"notification_token\": None}",
-    "statementSha256": "f0ab2f7b7ff1c9823b377ad8cc8b6a46276ec28bd3618509206d7e0c8b5b3576",
-    "reason": "Revocation clears the stored notification token with None.",
-    "owner": "platform-core-mobil",
     "ignoreUntil": "2027-02-22"
   },
   {
@@ -1360,46 +1324,10 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/hooks.py",
-    "code": "\"frappe.core.doctype.user.user.reset_password\": \"platform_core.identity.login_policy.reset_password\",",
-    "statementSha256": "b5451596ad4ddfd10b2422adbe9387a13e1a28303211476c072324f4c9c36db7",
-    "reason": "This Frappe hook maps dotted method names; it stores no credential.",
-    "owner": "platform-core-kimlik",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/hooks.py",
-    "code": "\"frappe.core.doctype.user.user.update_password\": \"platform_core.identity.login_policy.update_password\",",
-    "statementSha256": "b5451596ad4ddfd10b2422adbe9387a13e1a28303211476c072324f4c9c36db7",
-    "reason": "This Frappe hook maps dotted method names; it stores no credential.",
-    "owner": "platform-core-kimlik",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/hooks.py",
-    "code": "\"frappe.www.login.login_via_token\": \"platform_core.identity.login_policy.login_via_token\",",
-    "statementSha256": "b5451596ad4ddfd10b2422adbe9387a13e1a28303211476c072324f4c9c36db7",
-    "reason": "This Frappe hook maps dotted method names; it stores no credential.",
-    "owner": "platform-core-kimlik",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/identity/provider_setup.py",
     "code": "\"access_token_url\": \"/protocol/openid-connect/token\",",
     "statementSha256": "0d31f3cfb950fd08afd65fc756c37a512f06a2069dc88af13391360edd9b4928",
     "reason": "This string is the OpenID Connect token endpoint path.",
-    "owner": "platform-core-kimlik",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/identity/tests/helpers.py",
-    "code": "\"keycloak_client_secret\": \"test-client-secret-fake\",",
-    "statementSha256": "40a74283499ea0c27f5b434ffe6218554749ed56086ff81e75b629e673471228",
-    "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
     "owner": "platform-core-kimlik",
     "ignoreUntil": "2027-02-22"
   },
@@ -1531,15 +1459,6 @@
     "ignoreUntil": "2027-02-22"
   },
   {
-    "rule": "B101",
-    "file": "backend/identity/keycloak/tests/test_live_keycloak.py",
-    "code": "assert yanit.durum == 200, safe_detail(yanit)",
-    "statementSha256": "a1d7d93aef76b0b2da6bfbed4c04d2b798e4401d32a032ebf6621e4fda9672c3",
-    "reason": "A live test helper checks a fixture response status; this is not a production authorization check.",
-    "owner": "kimlik-realm",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
     "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/access/tests/base.py",
     "code": "PASSWORD = \"Sahte-Parola-6150-er!\"",
@@ -1595,15 +1514,6 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/ai/tests/test_read.py",
-    "code": "manager, \"list_documents\", {\"doctype\": DOCTYPE, \"filters\": {\"access_token\": \"gizli-belirtec\"}}",
-    "statementSha256": "f8161291bb55606bf2108a27da1ddcccc06257ddcf7acd42ccb407c179a34c73",
-    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
-    "owner": "platform-core-yz",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
     "file": "backend/apps/press_tr/tests/deletion_fixture.py",
     "code": "\"press_service_client_secret\": \"press-test-fixture\",",
     "statementSha256": "04b95d1d4c0121c4eefd8f138b32665db086ec5da3697d97f1f384e7945e42c2",
@@ -1625,15 +1535,6 @@
     "file": "backend/apps/press_tr/tests/test_machine_routes.py",
     "code": "facade.request.args = {\"webhook_token\": \"invalid\"}",
     "statementSha256": "48957f84f8203f12fe057de7f86f59bc8ed73d1dbd9b68ae1b0165969a53f162",
-    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
-    "owner": "press-tr",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/apps/press_tr/tests/test_machine_routes.py",
-    "code": "json.dumps({\"token\": \"unknown-test-token:invalid\"}),",
-    "statementSha256": "1a1ae96e03e14448f30fb8fc8dad474f341fbfae69d15d3fe741ae32a4d1154b",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
     "owner": "press-tr",
     "ignoreUntil": "2027-02-22"
@@ -1731,35 +1632,8 @@
   {
     "rule": "B105",
     "file": "backend/identity/identity_sync/tests/test_config_cli.py",
-    "code": "\"IDENTITY_SYNC_CLIENT_SECRET\": \"test-client-secret\",",
-    "statementSha256": "9422ba166b1ff9eae08228253b5c827e3cfacc552e799d4c14bc7c340ec0e1bc",
-    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
-    "owner": "identity-sync",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/identity/identity_sync/tests/test_config_cli.py",
-    "code": "\"IDENTITY_SYNC_WEBHOOK_SECRET\": \"test-webhook-secret\",",
-    "statementSha256": "9422ba166b1ff9eae08228253b5c827e3cfacc552e799d4c14bc7c340ec0e1bc",
-    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
-    "owner": "identity-sync",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/identity/identity_sync/tests/test_config_cli.py",
     "code": "load_settings({**self.ENV, \"IDENTITY_SYNC_WEBHOOK_SECRET\": \"kisa-anahtar\"})",
     "statementSha256": "cd7c4754cc440a4308ad35b688638d18a46246a5211e7d7b2e612d34733dc6f0",
-    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
-    "owner": "identity-sync",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/identity/identity_sync/tests/test_mobile_client.py",
-    "code": "\"keycloak_service_client_secret\": \"made-up-site-value\",",
-    "statementSha256": "24fe3320313f81b72944b454681e14b05959583d9784218020ff50625679ba6b",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
     "owner": "identity-sync",
     "ignoreUntil": "2027-02-22"
@@ -1778,15 +1652,6 @@
     "file": "backend/identity/identity_sync/tests/test_server.py",
     "code": "EXECUTE_TOKEN = \"execute-token\"",
     "statementSha256": "6d596229995c2bffebc7981123566ba894457e78d7e12bd91fda6cfcf5a11ecb",
-    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
-    "owner": "identity-sync",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/identity/identity_sync/tests/test_server.py",
-    "code": "OTHER_SITE_TOKEN = \"other-site-token\"  # the service token of tenant tenant2",
-    "statementSha256": "2a09f9e481b05ac5e83c581d106efe1aa6cb1cfef017d8d013bb45507a41cfd7",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
     "owner": "identity-sync",
     "ignoreUntil": "2027-02-22"
@@ -1832,15 +1697,6 @@
     "file": "backend/identity/keycloak/tests/test_dev_script_secrets.py",
     "code": "FAKE_SECRET = \"fake-webhook-secret-for-the-argv-test-7f3a\"  # gitleaks:allow (synthetic test value)",
     "statementSha256": "7f70cb471c60d2c5d71384ba74072021a199e23f2a8568cf28208bab4a02c238",
-    "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
-    "owner": "kimlik-realm",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/identity/keycloak/tests/test_realm_backlog.py",
-    "code": "\"username\": \"nobody@example.test\", \"password\": \"x\"})",
-    "statementSha256": "c23015f459e9dc72f7b0f41f85151b7725f2c77da6bd40d10c1ec2b7a7110e89",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
     "owner": "kimlik-realm",
     "ignoreUntil": "2027-02-22"
@@ -1919,15 +1775,6 @@
   },
   {
     "rule": "B106",
-    "file": "backend/identity/identity_sync/tests/fakes.py",
-    "code": "client_secret=\"test-client-secret\",",
-    "statementSha256": "f287ff2a8d758737399a3daee808c87b53e4d131d2677e717c2b862361f8f691",
-    "reason": "The test supplies a synthetic credential or token through a fixture argument.",
-    "owner": "identity-sync",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B106",
     "file": "backend/identity/identity_sync/tests/test_server.py",
     "code": "self.assert_rejected(self.send(body, NOW, sign(body, NOW, secret=\"baska-anahtar\")))",
     "statementSha256": "c9980e808b7ac500baade59b261a75907a581cdde44d6edcfd3e3f87487ca41a",
@@ -1942,15 +1789,6 @@
     "statementSha256": "563a1a27e6c74ac6b418787b28c8ba20fe7d7f07d301218ec9540d4893bec5fd",
     "reason": "NamedTemporaryFile atomically creates a private file for development database options and removes it on context exit.",
     "owner": "press-tr",
-    "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B108",
-    "file": "backend/identity/identity_sync/tests/test_config_cli.py",
-    "code": "ENV = environment(\"http://identity.localhost:6110/\", \"http://press.localhost:6113\", \"http://tenant1.localhost:6111\", \"/tmp/x.sqlite3\")",
-    "statementSha256": "68c34b9c5a3bc8402d0ab5291751f725e1f8c1cfa58c490e3b74a0c8f2c2f0bb",
-    "reason": "The configuration test uses this path as a fixture string; the flagged statement opens no file.",
-    "owner": "identity-sync",
     "ignoreUntil": "2027-02-22"
   },
   {
@@ -2422,6 +2260,262 @@
     "ignoreUntil": "2027-02-22"
   },
   {
+    "rule": "B101",
+    "file": "backend/identity/keycloak/tests/test_live_keycloak.py",
+    "code": "assert response.status == 200, safe_detail(response)",
+    "statementSha256": "9060293f6e15b3063353472fa8d6ccb87a6931d2ce2713056afbbeecc437d39c",
+    "owner": "kimlik-realm",
+    "reason": "The test assertion checks a fixture HTTP status; it does not enforce production access.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/test_read.py",
+    "code": "manager, \"plt_list_documents\", {\"doctype\": DOCTYPE, \"filters\": {\"access_token\": \"gizli-belirtec\"}}",
+    "statementSha256": "904f576821f85478644a2c6d82a07f8d1b4c6396e971ea381575c54e14cebdc8",
+    "owner": "platform-core-yz",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/hooks.py",
+    "code": "\"frappe.core.doctype.user.user.reset_password\": \"platform_core.identity.login_policy.reset_password\",",
+    "statementSha256": "3b643a2d6e2ef91f0640a3a4b86289344db01f8d1adecab77a6edefa266a7b90",
+    "owner": "platform-core-kimlik",
+    "reason": "This hook maps dotted method names and stores no credential.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/hooks.py",
+    "code": "\"frappe.core.doctype.user.user.update_password\": \"platform_core.identity.login_policy.update_password\",",
+    "statementSha256": "3b643a2d6e2ef91f0640a3a4b86289344db01f8d1adecab77a6edefa266a7b90",
+    "owner": "platform-core-kimlik",
+    "reason": "This hook maps dotted method names and stores no credential.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/hooks.py",
+    "code": "\"frappe.www.login.login_via_token\": \"platform_core.identity.login_policy.login_via_token\",",
+    "statementSha256": "3b643a2d6e2ef91f0640a3a4b86289344db01f8d1adecab77a6edefa266a7b90",
+    "owner": "platform-core-kimlik",
+    "reason": "This hook maps dotted method names and stores no credential.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/helpers.py",
+    "code": "\"keycloak_client_secret\": \"test-client-secret-fake\",",
+    "statementSha256": "0cbd414775194ddefaf4f306ca1029fdde1de8471610bef89e0b813e8c1d0243",
+    "owner": "platform-core-kimlik",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/mobile/store.py",
+    "code": "\"PLT Mobile Installation\", {\"name\": [\"in\", updates]}, {\"revoked\": 1, \"notification_token\": None}",
+    "statementSha256": "874b1d71df35b85a185ce7269c094f577ce08ba56e9575822609f180d13e1bfa",
+    "owner": "platform-core-mobil",
+    "reason": "Revocation clears a notification token by assigning None.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/press_tr/tests/test_machine_routes.py",
+    "code": "json.dumps({\"token\": \"unknown-test-token:invalid\"}),",
+    "statementSha256": "e8bfa551ef51a9f49c4b82d8e0f4bf70133d189f27910b48440f971902ec59b4",
+    "owner": "press-tr",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "os.environ, {\"PTR_DB_PASSWORD\": \"db-fixture\", \"PTR_ADMIN_PASSWORD\": \"admin-fixture\"}",
+    "statementSha256": "31e2540a5fde3126c1b6cfd430e47db487d918544fa376faa85d08782a2f2e54",
+    "owner": "press-tr",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22",
+    "occurrences": 2
+  },
+  {
+    "rule": "B105",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "os.environ, {\"PTR_DB_PASSWORD\": \"db-fixture\", \"PTR_ADMIN_PASSWORD\": \"admin-fixture\"}",
+    "statementSha256": "42f5dac4bec816e3861d4415b6cdcae91b1acc50d685f756ac287d48480d7bf3",
+    "owner": "press-tr",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22",
+    "occurrences": 2
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_config_cli.py",
+    "code": "\"IDENTITY_SYNC_CLIENT_SECRET\": \"test-client-secret\",",
+    "statementSha256": "e0331e54c41eb4f91101a360d4773c7be68271f520916057c0c9d9b30c49e95a",
+    "owner": "identity-sync",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_config_cli.py",
+    "code": "\"IDENTITY_SYNC_WEBHOOK_SECRET\": \"test-webhook-secret\",",
+    "statementSha256": "e0331e54c41eb4f91101a360d4773c7be68271f520916057c0c9d9b30c49e95a",
+    "owner": "identity-sync",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_mobile_client.py",
+    "code": "\"keycloak_service_client_secret\": \"made-up-site-value\",",
+    "statementSha256": "63e87808adffb7f617c2bd44b4e37fd33d476e243d2c66199d0e29ea42381166",
+    "owner": "identity-sync",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "OPERATOR_TOKEN = \"operator-token\"",
+    "statementSha256": "5393c844d978d3f37a2835c3748fd88b39d3bfeb19def5050a8ddd7bde2a5b93",
+    "owner": "identity-sync",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/identity_sync/tests/test_server.py",
+    "code": "OTHER_SITE_TOKEN = \"other-site-token\"  # the service token of tenant kiraci2",
+    "statementSha256": "2a09f9e481b05ac5e83c581d106efe1aa6cb1cfef017d8d013bb45507a41cfd7",
+    "owner": "identity-sync",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/keycloak/tests/test_realm_backlog.py",
+    "code": "\"username\": \"nobody@example.test\", \"password\": \"x\"})",
+    "statementSha256": "f0b6e256d9361d9daeb97569f95241a66affa55e7721773ddccb561532993d5b",
+    "owner": "kimlik-realm",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/keycloak/tests/test_standards_audit.py",
+    "code": "request(\"POST\", url, form={\"client_secret\": \"dummy\"})",
+    "statementSha256": "af2f5f1c218d7fb983fe2cb2cf6a16039b5760d0999fb3d730ab2a42d0442524",
+    "owner": "kimlik-realm",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/identity/keycloak/tests/test_standards_audit.py",
+    "code": "result = request(\"POST\", f\"http://127.0.0.1:{port}/token\", form={\"client_secret\": \"dummy\"})",
+    "statementSha256": "a89d210de898202ba5c67cb88a6241cc5e5c7a24fbcb1f176903b686b683749a",
+    "owner": "kimlik-realm",
+    "reason": "The flagged value is synthetic data used only in a test fixture or a mocked request.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/dev/mobile_test_app/mobile_test_app/test_performance_server.py",
+    "code": "phone = SimpleNamespace(token=\"fixture-bench\", account=\"bench@example.test\")",
+    "statementSha256": "67f649be332eddc3ac8ceb8b5b3c9027861a492c78d70246a852cd4cf1cac20f",
+    "owner": "platform-core-mobil",
+    "reason": "The test supplies a fixed synthetic credential to its fixture.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/e2e/tests/test_preview_fixtures.py",
+    "code": "self.assertEqual(fixtures.keycloak_request(43820, \"/health\", token=\"test-only-token\"), {\"ready\": True})",
+    "statementSha256": "aa79f102039f780b383a407d724772fa42e7839a5042b7d63c79a3badaef09b2",
+    "owner": "integration-e2e",
+    "reason": "The test supplies a fixed synthetic credential to its fixture.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B106",
+    "file": "backend/identity/identity_sync/tests/fakes.py",
+    "code": "client_secret=\"test-client-secret\",",
+    "statementSha256": "cfaab6803fb3f1c23661d83f093d45256036ded04dd19479849b46a199a2cb13",
+    "owner": "identity-sync",
+    "reason": "The test supplies a fixed synthetic credential to its fixture.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B108",
+    "file": "backend/identity/identity_sync/tests/test_config_cli.py",
+    "code": "ENV = environment(\"http://identity.localhost:6110/\", \"http://press.localhost:6113\", \"http://tenant1.localhost:6111\", \"/tmp/x.sqlite3\")",
+    "statementSha256": "997bd75519af957dd62e3a46ff6d46106979d5f908dc502e4de0ef77a1943018",
+    "owner": "identity-sync",
+    "reason": "The configuration test uses a literal path as input and does not open this file.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/e2e/tests/test_preview_fixtures.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "owner": "integration-e2e",
+    "reason": "Importing subprocess does not launch a process. The call sites are checked separately.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/test_review.py",
+    "code": "result = subprocess.run([bin_dir / \"security-audit\"], env={**env, \"BASE\": base},",
+    "statementSha256": "3b9a44235c9937ae1ed727ad2cae48e8cd72f10d970b6629e08748c31bb82374",
+    "owner": "security-tooling",
+    "reason": "The regression test executes its own temporary security audit stub.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/e2e/preview/fixtures.py",
+    "code": "result = subprocess.run(",
+    "statementSha256": "f105c048aa5428aa77bedaab2ed4c348fad1fd231162814f61031bd6dbeaee90",
+    "owner": "integration-e2e",
+    "reason": "The preview passes Docker arguments directly without a host shell and sends the request as JSON on stdin.",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/e2e/tests/test_merge_preview.py",
+    "code": "result = subprocess.run([\"bash\", str(runtime), str(worktree)], env=env, text=True, capture_output=True)",
+    "statementSha256": "8776a29ad4a138dc9b0191c76b9327c6fc107e52d1c4dced66c50eaa243f6db8",
+    "owner": "integration-e2e",
+    "reason": "The test passes fixed command arguments and fixture paths without invoking a host shell.",
+    "ignoreUntil": "2027-02-22",
+    "occurrences": 2
+  },
+  {
+    "rule": "B607",
+    "file": "backend/e2e/tests/test_merge_preview.py",
+    "code": "result = subprocess.run([\"bash\", str(runtime), str(worktree)], env=env, text=True, capture_output=True)",
+    "statementSha256": "8776a29ad4a138dc9b0191c76b9327c6fc107e52d1c4dced66c50eaa243f6db8",
+    "owner": "integration-e2e",
+    "reason": "The test invokes Bash from the test runner PATH to exercise a fixture script.",
+    "ignoreUntil": "2027-02-22",
+    "occurrences": 2
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/test_semgrep_exceptions.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "1056fa27157270019254851f8cc87b58727e58ec8085bd19adcfcfe803fd8933",
+    "reason": "Executes the repository CLI with the current Python interpreter and test-owned arguments, without a shell.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
     "rule": "B404",
     "file": "backend/dev/press/ansible_test_env.py",
     "code": "import subprocess",
@@ -2474,26 +2568,6 @@
     "reason": "Runs the repository harness in isolated Python without a shell. The scenario and bridge mode come from test cases.",
     "owner": "press-tr",
     "ignoreUntil": "2027-02-22"
-  },
-  {
-    "rule": "B105",
-    "file": "backend/dev/press/test_development_contract.py",
-    "code": "os.environ, {\"PTR_DB_PASSWORD\": \"db-fixture\", \"PTR_ADMIN_PASSWORD\": \"admin-fixture\"}",
-    "statementSha256": "31e2540a5fde3126c1b6cfd430e47db487d918544fa376faa85d08782a2f2e54",
-    "reason": "The mocked site installer receives fixed synthetic fixture values. The with statement includes the test invocation, never a live credential or external service.",
-    "owner": "press-tr",
-    "ignoreUntil": "2027-02-22",
-    "occurrences": 2
-  },
-  {
-    "rule": "B105",
-    "file": "backend/dev/press/test_development_contract.py",
-    "code": "os.environ, {\"PTR_DB_PASSWORD\": \"db-fixture\", \"PTR_ADMIN_PASSWORD\": \"admin-fixture\"}",
-    "statementSha256": "42f5dac4bec816e3861d4415b6cdcae91b1acc50d685f756ac287d48480d7bf3",
-    "reason": "The mocked site installer receives fixed synthetic fixture values. The with statement includes the test invocation, never a live credential or external service.",
-    "owner": "press-tr",
-    "ignoreUntil": "2027-02-22",
-    "occurrences": 2
   },
   {
     "rule": "B603",

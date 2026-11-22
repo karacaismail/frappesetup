@@ -18,6 +18,14 @@ REPO = PRESS_DEV.parents[2]
 
 
 class ImageContractTest(unittest.TestCase):
+    def test_readme_python_matches_shared_press_image_tag(self):
+        decision = (REPO / "backend/docs/decisions/0009-naming-history-fix.md").read_text()
+        image = re.search(r"`fs-press-tr-base:py(?P<version>\d+\.\d+\.\d+)`", decision)
+        self.assertIsNotNone(image)
+        readme = (PRESS_DEV / "README.md").read_text()
+        versions = re.findall(r"(?m)^.*\bPython\b.* (\d+\.\d+\.\d+)\.$", readme)
+        self.assertEqual(versions, [image["version"]])
+
     def test_site_setup_refreshes_hooks_after_press_install(self):
         commands = (PRESS_DEV / "install.sh").read_text().splitlines()
         install = commands.index("bench --site press.localhost install-app press_tr")
@@ -151,9 +159,7 @@ class ImageContractTest(unittest.TestCase):
         utils.CallbackManager = Mock()
         with (
             patch.dict(sys.modules, {"frappe": frappe, "frappe.installer": installer, "frappe.utils": utils}),
-            patch.dict(
-                os.environ, {"PTR_DB_PASSWORD": "db-fixture", "PTR_ADMIN_PASSWORD": "admin-fixture"}
-            ),
+            patch.dict(os.environ, {"PTR_DB_PASSWORD": "db-fixture", "PTR_ADMIN_PASSWORD": "admin-fixture"}),
             patch("tempfile.NamedTemporaryFile"),
         ):
             runpy.run_path(str(PRESS_DEV / "create_site.py"), run_name="__main__")
@@ -188,9 +194,7 @@ class ImageContractTest(unittest.TestCase):
         installer._new_site = create_fixture
         with (
             patch.dict(sys.modules, {"frappe": frappe, "frappe.installer": installer, "frappe.utils": utils}),
-            patch.dict(
-                os.environ, {"PTR_DB_PASSWORD": "db-fixture", "PTR_ADMIN_PASSWORD": "admin-fixture"}
-            ),
+            patch.dict(os.environ, {"PTR_DB_PASSWORD": "db-fixture", "PTR_ADMIN_PASSWORD": "admin-fixture"}),
             patch("tempfile.NamedTemporaryFile", return_value=handle),
         ):
             runpy.run_path(str(PRESS_DEV / "create_site.py"), run_name="__main__")

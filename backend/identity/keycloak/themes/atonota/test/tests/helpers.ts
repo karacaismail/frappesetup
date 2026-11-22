@@ -164,17 +164,17 @@ export function base32Decode(text: string): Buffer {
 }
 
 /** Giriş ekranını açar. Hesap konsolu istemcisi PKCE ister, bu yüzden sabit bir sınama değeri verilir. */
-export function loginUrl(locale?: string, realm = REALM): string {
+export function loginUrl(locale?: string, realm = REALM, server = KC): string {
   const params = new URLSearchParams({
     client_id: 'account-console',
-    redirect_uri: `${KC}/realms/${realm}/account/`,
+    redirect_uri: `${server}/realms/${realm}/account/`,
     response_type: 'code',
     scope: 'openid',
     code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
     code_challenge_method: 'S256',
   });
   if (locale) params.set('ui_locales', locale);
-  return `${KC}/realms/${realm}/protocol/openid-connect/auth?${params}`;
+  return `${server}/realms/${realm}/protocol/openid-connect/auth?${params}`;
 }
 
 export async function openLogin(page: Page, locale?: string): Promise<void> {
@@ -183,8 +183,19 @@ export async function openLogin(page: Page, locale?: string): Promise<void> {
 }
 
 export async function submitPassword(page: Page, email: string, password = PASSWORD): Promise<void> {
-  await page.locator('#username').fill(email);
-  await page.locator('#password').fill(password);
+  const username = page.locator('#username');
+  const secret = page.locator('#password');
+  // While the page loads, it moves focus to the first field. Text typed in that moment can land in the
+  // wrong field. So the test waits for the "load" event and submits only when both fields hold the
+  // right text. The check never prints the values.
+  await expect(username).toBeVisible({ timeout: 20_000 });
+  await page.waitForLoadState('load');
+  await expect(async () => {
+    await username.fill(email);
+    await secret.fill(password);
+    expect((await username.inputValue()) === email, 'the email field holds the email').toBe(true);
+    expect((await secret.inputValue()) === password, 'the password field holds the password').toBe(true);
+  }).toPass({ timeout: 20_000 });
   await page.locator('#kc-login').click();
 }
 
@@ -311,6 +322,77 @@ export const screens: Screen[] = [
         if ((await errorForm.count()) === 0) await page.locator('#registerWebAuthn').click({ timeout: 2_000 }).catch(() => undefined);
         await expect(errorForm).toBeAttached({ timeout: 2_000 });
       }).toPass({ timeout: 30_000 });
+    },
+  },
+  // Screens added for the technical debt "some theme screens are not tested".
+  {
+    name: 'update-profile',
+    open: async (page) => {
+      const email = await createUser({ requiredActions: ['UPDATE_PROFILE'] });
+      await openLogin(page);
+      await submitPassword(page, email);
+      await expect(page.locator('#kc-update-profile-form')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'recovery-codes-setup',
+    open: async (page) => {
+      const email = await createUser({ requiredActions: ['CONFIGURE_RECOVERY_AUTHN_CODES'] });
+      await openLogin(page);
+      await submitPassword(page, email);
+      await expect(page.locator('#kc-recovery-codes-settings-form')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'delete-credential',
+    open: async (page) => {
+      // The account console sends the user here to remove a sign-in method. The user must prove the identity first.
+      const email = await createUser({ totp: true });
+      const [user] = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`)).json()) as { id: string }[];
+      const credentials = (await (await admin(`/users/${user.id}/credentials`)).json()) as { id: string; type: string }[];
+      const otp = credentials.find((credential) => credential.type === 'otp')!;
+      await page.goto(`${loginUrl()}&kc_action=${encodeURIComponent(`delete_credential:${otp.id}`)}`);
+      await submitPassword(page, email);
+      await expect(page.locator('#otp')).toBeVisible({ timeout: 20_000 });
+      await page.locator('#otp').fill(totp());
+      await page.locator('#kc-login').click();
+      await expect(page.locator('#kc-accept')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'sign-out-confirm',
+    open: async (page) => {
+      await page.goto(`${KC}/realms/${REALM}/protocol/openid-connect/logout`);
+      await expect(page.locator('#kc-logout')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'signed-out',
+    open: async (page) => {
+      await page.goto(`${KC}/realms/${REALM}/protocol/openid-connect/logout`);
+      await page.locator('#kc-logout').click();
+      await expect(page.locator('#kc-info-message')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'error',
+    open: async (page) => {
+      // An application that Keycloak does not know. This is what a broken sign-in link looks like.
+      await page.goto(`${KC}/realms/${REALM}/protocol/openid-connect/auth?client_id=unknown-application&response_type=code`);
+      await expect(page.locator('#kc-error-message')).toBeVisible({ timeout: 20_000 });
+    },
+  },
+  {
+    name: 'page-expired',
+    open: async (page) => {
+      const email = await createUser({ totp: true });
+      await openLogin(page);
+      const firstStep = (await page.locator('#kc-form-login').getAttribute('action'))!;
+      await submitPassword(page, email);
+      await expect(page.locator('#otp')).toBeVisible({ timeout: 20_000 });
+      // The address of the first step is now out of date. A restored tab or an old link opens it like this.
+      await page.goto(firstStep);
+      await expect(page.locator('#loginRestartLink')).toBeVisible({ timeout: 20_000 });
     },
   },
 ];

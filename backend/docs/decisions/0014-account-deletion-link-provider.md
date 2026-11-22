@@ -41,14 +41,14 @@ Eklentiyi derlemek için bir JDK imajı gerekir: `eclipse-temurin:21-jdk`. İmaj
 
 - Eclipse Temurin, GPL-2.0 lisansını Classpath istisnasıyla taşır. İmaj yalnız derlemede kullanılır, ürüne girmez.
 - Keycloak Apache-2.0 lisanslıdır. Eklenti MIT lisanslı depo kodudur.
-- Derleme adımı `themes/atonota/test/Dockerfile` dosyasının ikinci aşamasıdır.
+- Derleme adımı tek bir betiktir: `themes/atonota/account-provider/build.sh`. Deneme `Dockerfile` dosyası bu betiği çağırır.
 
 ## Riskler ve bakım
 
 - Keycloak bu eklenti noktasını “iç” sayar. Başlarken bir uyarı yazar: “This SPI is internal and may change without notice”. Keycloak sürümü değişince eklenti yeniden derlenmeli ve testler çalışmalıdır.
 - Derleme `-Xlint:all -Werror` ile yapılır. Keycloak bir sınıfın imzasını değiştirirse derleme durur. Derleme davranış değişikliğini yakalamaz. Davranışı yalnız tarayıcı testleri ölçer.
 - Keycloak `start --optimized` ile çalışıyorsa jar eklendikten sonra `kc.sh build` gerekir.
-- Derleme adımı şimdilik yalnız temanın deneme `Dockerfile` dosyasındadır. kimlik-realm işi bu adımı kendi imajına alacak. O zaman iki kopya oluşur. İki kopyayı tek betikte birleştirmek açık iştir.
+- Eklentiye ihtiyaç duyan her imaj aynı `build.sh` betiğini çağırır. Bir test, başka bir dosyanın derleme adımını yinelemesini yakalar.
 - Eklenti kurulu değilse hesap konsolu 404 yanıtı verir. Bu bilerek seçildi. Aksi hâlde görünürlük kuralı sessizce kaybolurdu.
 - Adres ve kaçış kurallarını bağımlılıksız bir Java denetimi ölçer. Denetim imaj derlenirken `java -ea` ile çalışır ve başarısız olursa derlemeyi durdurur.
 - Sayfa davranışını tarayıcı testleri ölçer: `tests/delete-account.spec.ts` ve `tests/realm-settings.spec.ts`.

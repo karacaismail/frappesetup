@@ -5,8 +5,10 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 import frappe
+from frappe.tests import IntegrationTestCase
+from frappe.utils import add_days, today
 
-from hrms_tr import leave
+from hrms_tr import leave, retention
 from hrms_tr.api import approve_leave, cancel_leave, get_leave_approver
 
 
@@ -128,3 +130,166 @@ class ApprovalEndpointTest(TestCase):
 			with self.assertRaises(frappe.ValidationError):
 				approve_leave("LEAVE-MISSING")
 		approve.assert_not_called()
+
+
+class RetentionIntegrationTest(IntegrationTestCase):
+	def test_purge_only_deletes_expired_leave_and_keeps_employee_and_allocation(self):
+		prefix = frappe.generate_hash(length=12)
+		expired = add_days(today(), -31)
+		employee = frappe.get_doc(
+			doctype="Employee", name=f"{prefix}-employee", status="Left", relieving_date=expired
+		)
+		employee.db_insert()
+		allocation = frappe.get_doc(
+			doctype="Leave Allocation", name=f"{prefix}-allocation", employee=employee.name, docstatus=1
+		)
+		allocation.db_insert()
+
+		def insert_leave(suffix, end, docstatus=0, amended_from=None):
+			doc = frappe.get_doc(
+				doctype="Leave Application",
+				name=f"{prefix}-{suffix}",
+				employee=employee.name,
+				from_date=end,
+				to_date=end,
+				docstatus=docstatus,
+				amended_from=amended_from,
+			)
+			doc.db_insert()
+			return doc.name
+
+		older = insert_leave("1-expired", expired, docstatus=2)
+		other = insert_leave("2-expired", expired)
+		submitted = insert_leave("submitted", expired, docstatus=1)
+		recent = insert_leave("recent", today(), amended_from=older)
+		with patch.dict(frappe.conf, {"hrms_tr_retention_days": 30}):
+			preview = retention.purge(limit=1)
+			self.assertEqual((preview["leaves"], preview["remaining"]), (1, 1))
+			self.assertTrue(frappe.db.exists("Leave Application", older))
+			frappe.db.savepoint("before_retention_link_check")
+			with self.assertRaises(frappe.LinkExistsError):
+				retention.purge(dry_run=False, limit=1)
+			frappe.db.rollback(save_point="before_retention_link_check")
+			self.assertTrue(frappe.db.exists("Leave Application", older))
+			frappe.db.set_value("Leave Application", recent, "amended_from", None)
+
+			purge_outcome = retention.purge(dry_run=False, limit=1)
+			self.assertEqual((purge_outcome["leaves"], purge_outcome["remaining"]), (1, 1))
+			self.assertFalse(frappe.db.exists("Leave Application", older))
+			self.assertFalse(frappe.db.exists("Deleted Document", {"deleted_name": older}))
+			self.assertTrue(frappe.db.exists("Employee", employee.name))
+			self.assertTrue(frappe.db.exists("Leave Allocation", allocation.name))
+			for name in (other, submitted, recent):
+				self.assertTrue(frappe.db.exists("Leave Application", name))
+
+
+class EmployeeAnonymizationTest(IntegrationTestCase):
+	def test_account_deletion_redacts_employee_and_keeps_leave(self):
+		suffix = frappe.generate_hash(length=12)
+		user = f"retention-{suffix}@example.test"
+		frappe.get_doc(
+			doctype="User", email=user, first_name="Synthetic", last_name="Employee", send_welcome_email=0
+		).insert()
+		issuer = "http://identity.localhost:8660/realms/platform"
+		frappe.get_doc(doctype="PLT Identity Link", issuer=issuer, subject=suffix, user=user).insert()
+		redacted_fields = {
+			"first_name": "Synthetic",
+			"middle_name": "Example",
+			"last_name": "Employee",
+			"employee_name": "Synthetic Example Employee",
+			"cell_number": "+90 200 000 00 00",
+			"emergency_phone_number": "+90 200 000 00 00",
+			"person_to_be_contacted": "Synthetic Emergency Contact",
+			"relation": "Synthetic relation",
+			"passport_number": "NOT-A-PASSPORT",
+			"place_of_issue": "Synthetic issuing place",
+			"iban": "NOT-AN-IBAN",
+			"bank_name": "Synthetic Bank",
+			"bank_ac_no": "NOT-A-BANK-ACCOUNT",
+			"health_details": "Synthetic health note",
+			"health_insurance_no": "NOT-AN-INSURANCE-NUMBER",
+			"family_background": "Synthetic family note",
+			"current_address": "Synthetic current address",
+			"permanent_address": "Synthetic permanent address",
+			"bio": "Synthetic biography",
+		}
+		email_fields = {
+			"personal_email": f"personal-{suffix}@example.test",
+			"prefered_email": f"personal-{suffix}@example.test",
+			"company_email": f"company-{suffix}@example.test",
+		}
+		cleared_fields = {
+			"date_of_birth": "1990-01-01",
+			"date_of_issue": "2010-01-01",
+			"valid_upto": "2020-01-01",
+			"blood_group": "A+",
+			"marital_status": "Single",
+			"image": "/files/synthetic-employee-image.png",
+		}
+		personal_fields = {**redacted_fields, **email_fields, **cleared_fields}
+		employee = frappe.get_doc(
+			doctype="Employee",
+			name=f"{suffix}-employee",
+			user_id=user,
+			status="Active",
+			attendance_device_id=f"SYNTHETIC-DEVICE-{suffix}",
+			**personal_fields,
+		)
+		employee.db_insert()
+		historical = frappe.get_doc(
+			doctype="Employee",
+			name=f"{suffix}-historical",
+			user_id=user,
+			status="Left",
+			attendance_device_id=f"SYNTHETIC-OLD-DEVICE-{suffix}",
+			**personal_fields,
+		)
+		historical.db_insert()
+		other = frappe.get_doc(doctype="Employee", name=f"{suffix}-other", **personal_fields)
+		other.db_insert()
+		application = frappe.get_doc(
+			doctype="Leave Application",
+			name=f"{suffix}-leave",
+			employee=employee.name,
+			employee_name=personal_fields["employee_name"],
+			from_date=today(),
+			to_date=today(),
+		)
+		application.db_insert()
+		delete_account = frappe.get_attr("platform_core.api.identity.anonymize_user")
+		with (
+			patch.dict(
+				frappe.conf,
+				{
+					"keycloak_public_url": "http://identity.localhost:8660",
+					"keycloak_realm": "platform",
+					"kimlik_deletion_hmac_key": "synthetic-anonymization-test-key",
+				},
+			),
+			patch.object(frappe.local, "identity_service_claims", {"azp": "identity-sync"}, create=True),
+			patch.object(frappe.local, "form_dict", {"issuer": issuer, "subject": suffix}, create=True),
+			# Keep the real two-stage write inside the integration test's rollback.
+			patch.object(frappe.db, "commit"),
+		):
+			deleted_account = delete_account(issuer=issuer, subject=suffix)
+		self.assertEqual(deleted_account["status"], "Anonymized")
+		employee.reload()
+		self.assertEqual(employee.user_id, deleted_account["user"])
+		for field in redacted_fields:
+			self.assertEqual(employee.get(field), "[REDACTED]", field)
+		for field in email_fields:
+			self.assertEqual(employee.get(field), deleted_account["user"], field)
+		for field in cleared_fields:
+			self.assertFalse(employee.get(field), field)
+		self.assertFalse(employee.attendance_device_id)
+		historical.reload()
+		self.assertFalse(historical.attendance_device_id)
+		self.assertEqual(historical.user_id, deleted_account["user"])
+		self.assertEqual(historical.first_name, "[REDACTED]")
+		other.reload()
+		self.assertEqual(other.employee_name, personal_fields["employee_name"])
+		self.assertEqual(other.personal_email, personal_fields["personal_email"])
+		application.reload()
+		self.assertEqual(application.employee, employee.name)
+		self.assertEqual(application.employee_name, personal_fields["employee_name"])
+		self.assertEqual(employee.status, "Active")

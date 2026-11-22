@@ -1,6 +1,6 @@
-"""Testlerin sahte HTTP sunucusu.
+"""Fake HTTP servers for the tests.
 
-Sunucu Keycloak, Press ve kiracı sitesi yerine geçer. Gelen her isteği kaydeder.
+The servers stand in for Keycloak, Press and the tenant site. They record every request.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Callable
 from urllib.parse import parse_qs, urlsplit
 
 ISSUER_REALM = "platform"
-# Keycloak realm'in iç kimliği. Addan farklıdır.
+# The internal Keycloak realm ID, distinct from its name.
 REALM_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
 SUBJECT = "11111111-1111-4111-8111-111111111111"
 ORG_ID = "22222222-2222-4222-8222-222222222222"
@@ -41,7 +41,7 @@ Route = Callable[[Recorded], Reply]
 
 @dataclass
 class FakeServer:
-    """Kayıtlı yollara yanıt veren küçük sunucu."""
+    """A small server that responds to registered routes."""
 
     routes: dict[tuple[str, str], Route] = field(default_factory=dict)
     requests: list[Recorded] = field(default_factory=list)
@@ -77,7 +77,7 @@ class FakeServer:
                     return
                 extra = reply[2] if len(reply) > 2 else {}
                 if isinstance(body, str):
-                    raw = body.encode("utf-8")  # JSON olmayan gövde
+                    raw = body.encode("utf-8")  # a non-JSON body
                 else:
                     raw = b"" if body is None else json.dumps(body).encode("utf-8")
                 self.send_response(status)
@@ -90,7 +90,7 @@ class FakeServer:
 
             do_GET = do_POST = do_PUT = do_DELETE = _serve
 
-            def log_message(self, *args: object) -> None:  # testte gürültü yapmasın
+            def log_message(self, *args: object) -> None:  # keep test output quiet
                 return
 
         self._httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -143,7 +143,7 @@ ADMIN_ROLE_PATHS = ("/users", "/organizations", "/sessions")
 
 
 class FakeKeycloak(FakeServer):
-    """Belirteç ucunu ve Admin API'nin kullanılan parçasını taklit eder.
+    """Simulate the token endpoint and the subset of the Admin API used by the service.
 
     The Admin API answers 403 unless the token was requested with ADMIN_SCOPE and the path
     is covered by the service account's roles.
@@ -343,7 +343,7 @@ def paged_identities(req: Recorded, rows: list[dict[str, object]]) -> Reply:
 class FakeTenant(FakeSite):
     """A tenant site that behaves like `contracts/platform_core-kimlik.openapi.yaml` (0.2.0).
 
-    Source of the behaviour: that contract and `platform_core/kimlik/provisioning.py`.
+    Source of the behaviour: that contract and `platform_core/identity/provisioning.py`.
     State: identity links `(issuer, subject) -> user` and users keyed by e-mail.
     """
 
@@ -577,7 +577,7 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
 
 
 class Stack:
-    """Üç sahte sunucuyu ve servisi birlikte kurar."""
+    """Set up the three fake servers and the service together."""
 
     def __init__(self, db_path: str = ":memory:", *, two_tenants: bool = False) -> None:
         from identity_sync.app import build_app

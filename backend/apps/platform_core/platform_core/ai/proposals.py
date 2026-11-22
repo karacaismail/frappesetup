@@ -240,7 +240,12 @@ def read_for_model(proposal_id: str) -> dict:
 
 
 def read_for_human(proposal_id: str) -> dict:
-	return access.human_call("call", "plt_get_proposal", lambda: public(_own(proposal_id)), proposal=proposal_id)
+	def read():
+		if proposal_id == "":
+			raise frappe.DoesNotExistError(_("Proposal not found.", context=CONTEXT))
+		return public(_own(proposal_id))
+
+	return access.human_call("call", "plt_get_proposal", read, proposal=proposal_id)
 
 
 def list_for_human(status: str | None = None, limit: int = 20, start: int = 0) -> dict:

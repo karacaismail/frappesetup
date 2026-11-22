@@ -168,7 +168,8 @@ class TestStaticRules(AiTestCase):
 		rules = {
 			r"ignore_permissions": {"store.py"},
 			r"frappe\.get_all\(|frappe\.db\.get_all\(": {"store.py"},
-			r"frappe\.db\.sql|frappe\.qb\b": {"agent_token.py"},
+			r"frappe\.db\.sql": set(),
+			r"frappe\.qb\b": {"agent_token.py", "store.py"},
 			r"frappe\.db\.(get_value|set_value|exists|delete)\(": {"store.py"},
 			r"\b(eval|exec)\(|subprocess|os\.system|safe_exec|run_server_script": set(),
 			r"frappe\.get_attr\(": {"registry.py"},
@@ -185,7 +186,8 @@ class TestStaticRules(AiTestCase):
 	def test_module_boundaries(self):
 		imports = re.compile(r"^\s*(?:from|import)\s+platform_core\.(\w+)", re.MULTILINE)
 		# `api` holds public endpoint modules. The gap analysis test checks which of them are used.
-		allowed = {"ai", "model_gateway", "access", "api"}
+		# The shared boundary gate also checks that callers use only identity's public API.
+		allowed = {"ai", "model_gateway", "access", "api", "identity"}
 		outward = {
 			f"{path.name}: {module}"
 			for path in [*python_files(LAYER, tests=True), APP_ROOT / "api" / "ai.py"]
@@ -208,14 +210,13 @@ class TestStaticRules(AiTestCase):
 		self.assertEqual(inward, [])
 
 	def test_hooks_are_registered(self):
-		self.assertIn(
-			"platform_core.ai.agent_token.authenticate_request", frappe.get_hooks("auth_hooks")
-		)
+		self.assertIn("platform_core.ai.agent_token.authenticate_request", frappe.get_hooks("auth_hooks"))
+		self.assertIn("platform_core.ai.oauth.authenticate_request", frappe.get_hooks("auth_hooks"))
 		self.assertIn("platform_core.ai.setup.disable_builtin_mcp", frappe.get_hooks("after_migrate"))
 		self.assertFalse(frappe.get_hooks("scheduler_events", app_name="platform_core"))
 
 	def test_every_field_of_the_layer_doctypes_has_a_description(self):
-		for doctype in ("PLT AI Action Log", "PLT AI Action Proposal"):
+		for doctype in ("PLT AI Action Log", "PLT AI Action Proposal", "PLT MCP Call Budget"):
 			# The AI reads the DocType's own description first (D-9, the AI readiness gate).
 			self.assertTrue((frappe.get_meta(doctype).description or "").strip(), doctype)
 			for field in frappe.get_meta(doctype).fields:

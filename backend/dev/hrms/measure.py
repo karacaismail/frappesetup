@@ -188,7 +188,9 @@ def measure(site, draft_names, employees, attendance, password):
         response, elapsed = hr.call("GET", read_name)
         operations["GET", f"{RESOURCE}/{{name}}", READ_LIMIT_MS].append(elapsed)
         version = {"name": name, "version": response.json["data"]["modified"]}
-        _response, elapsed = hr.call("GET", f"{METHOD}get_leave_approver", query={"employee": employees[ordinal]})
+        _response, elapsed = hr.call(
+            "GET", f"{METHOD}get_leave_approver", query={"employee": employees[ordinal]}
+        )
         operations["GET", f"{METHOD}get_leave_approver", READ_LIMIT_MS].append(elapsed)
         _response, elapsed = hr.call("POST", f"{METHOD}approve_leave", body=version)
         operations["POST", f"{METHOD}approve_leave", WRITE_LIMIT_MS].append(elapsed)
@@ -207,13 +209,13 @@ def measure(site, draft_names, employees, attendance, password):
 
 
 def report(revision, operations):
-    print("\n## HRMS TR O-31 ölçümü\n")
-    print(f"Git kaydı `{revision}`.")
-    print(f"Test verisi {EMPLOYEES} çalışan ve {LEAVES} izin kaydı içerir.")
-    print("Ölçüm, Frappe sunucusunun isteği işlemesi ve yanıtı üretmesi için geçen süreyi kapsar.")
-    print("İstekler sırayla gönderildi. Ağ, oturum açma ve hazırlık ölçüme girmedi.")
-    print("Engelli yollar 403 döndürdü. Bu yollar için okuma sınırı kullanıldı.\n")
-    print("| Yöntem ve yol | Çağrı | p95 (ms) | Sınır (ms) | Sonuç |")
+    print("\n## HRMS TR O-31 performance report\n")
+    print(f"Git revision `{revision}`.")
+    print(f"The test data contains {EMPLOYEES} employees and {LEAVES} leave records.")
+    print("The measurement covers the time Frappe took to process each request and produce a response.")
+    print("Requests ran sequentially. The measurement excludes network, login, and setup time.")
+    print("Blocked routes returned HTTP 403. The read budget applies to these routes.\n")
+    print("| Method and route | Calls | p95 (ms) | Budget (ms) | Result |")
     print("| --- | ---: | ---: | ---: | --- |")
     failed = False
     for (method, path, limit), samples in operations.items():

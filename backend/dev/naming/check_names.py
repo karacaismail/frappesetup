@@ -637,6 +637,16 @@ def scan_source_text(root: Path, selected: set[str] | None = None) -> list[Findi
             texts = yaml_source_text(path.read_text(encoding="utf-8"))
         elif path.suffix == ".py":
             texts = python_source_text(path.read_text(encoding="utf-8"), path)
+        elif relative.parts[:3] == ("backend", "dev", "bin") and not path.suffix:
+            source = path.read_text(encoding="utf-8")
+            shebang = source.partition("\n")[0]
+            if not re.match(r"^#!.*\bpython(?:3(?:\.\d+)?)?\b", shebang):
+                continue
+            texts = (
+                (node.lineno, "CLI text", node.value)
+                for node in ast.walk(ast.parse(source, filename=str(path)))
+                if isinstance(node, ast.Constant) and isinstance(node.value, str)
+            )
         elif path.suffix in {".js", ".jsx", ".ts", ".tsx", ".mjs"}:
             texts = js_source_text(path.read_text(encoding="utf-8"))
         else:
@@ -663,6 +673,7 @@ def main() -> int:
     )
     parser.add_argument("--map", type=Path, default=DEFAULT_MAP)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--include-source-text", action="store_true", help="Also report visible source text.")
     parser.add_argument(
         "--changed-files",
         nargs="?",
@@ -685,6 +696,8 @@ def main() -> int:
             findings = scan(
                 arguments.root, legacy=arguments.legacy, map_path=arguments.map, selected=selection
             )
+            if arguments.include_source_text:
+                findings.extend(scan_source_text(arguments.root, selection))
     except (OSError, ValueError, SyntaxError) as error:
         parser.exit(2, f"Naming check could not finish: {error}\n")
     if arguments.json:

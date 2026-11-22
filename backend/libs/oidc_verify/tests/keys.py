@@ -1,4 +1,4 @@
-"""Test anahtarları ve belirteç üretimi. Anahtarlar her çalıştırmada yerelde üretilir."""
+"""Test key and token generation. Keys are generated locally for each run."""
 
 from __future__ import annotations
 
@@ -92,9 +92,9 @@ def logout_payload(**overrides) -> dict:
 
 
 class FakeJwks:
-    """JwksCache için ağ yerine geçen sağlayıcı. Çağrı sayısını sayar.
+    """Fake fetcher for JwksCache. Tracks call count without using the network.
 
-    `hata` doluysa her çağrı o hatayı yükseltir. `ham` listesi listeye ek ham JWK kaydı ekler.
+    Each call raises `error` when set. `ham` adds extra raw JWK entries to the key set.
     """
 
     def __init__(self, *keys: Anahtar):

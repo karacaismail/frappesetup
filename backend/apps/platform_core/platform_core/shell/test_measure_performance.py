@@ -1,6 +1,9 @@
 """Check the O-31 sampling and budget without starting Frappe."""
 
+import csv
 import sys
+from pathlib import Path
+from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, patch
 
@@ -25,6 +28,31 @@ class TestPerformanceBudget(TestCase):
 
 	def test_warm_bootstrap_budget_rejects_above_two_hundred(self):
 		self.assertEqual(summarize([200.01] * SAMPLES, limit_ms=200), (200.01, False))
+
+	def test_report_translates_labels_without_changing_the_budget(self):
+		catalog = Path(benchmark.__file__).parents[1] / "translations" / "tr.csv"
+		with catalog.open(encoding="utf-8", newline="") as translation_file:
+			translations = {
+				source: translated
+				for source, translated, context in csv.reader(translation_file)
+				if context == "shell.performance"
+			}
+
+		def translate(source, *, context):
+			self.assertEqual(context, "shell.performance")
+			return translations[source]
+
+		framework = SimpleNamespace(__version__="16.56.0", _=translate)
+		app = SimpleNamespace(__version__="16.55.0")
+		rows = [(benchmark.BOOTSTRAP_LABEL, benchmark.WARM_MODE, [201.0] * SAMPLES)]
+		with patch.dict(sys.modules, {"frappe": framework, "erpnext": app, "hrms": app}):
+			report, passed = benchmark.report(rows)
+
+		self.assertFalse(passed)
+		self.assertIn("### O-31 kabuk ölçümü", report)
+		self.assertIn(
+			"| Aç\u0131l\u0131ş verisi | Önbellekli | 50 | 201.000 | 201.000 | 200 | fail |", report
+		)
 
 
 class TestPerformanceFixture(TestCase):

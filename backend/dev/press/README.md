@@ -2,7 +2,9 @@
 
 Bu kurulum ayrı bir yerel Press sitesi açar. Press, kiracı sitelerini yönetir.
 
-Frappe v16.50.0 ve Press v0.154.1 kullanılır. Python sürümü 3.14.10'dir.
+Frappe v16.50.0 ve Press v0.154.1 kullanılır.
+Paylaşılan yerel Press imajında Python sürümü 3.14.8.
+Yeni kurulumun Python yolu `install.sh` dosyasında yazılıdır.
 Uyum yamaları yalnız yerel Press denemesi içindir.
 Ansible `ansible-requirements.txt` sürümüne sabitlenir.
 Sunucu kurma akışının denemesi [kurma yolunda](provisioning-readiness.md) anlatılır.

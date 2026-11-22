@@ -103,7 +103,7 @@ class TestApprovalContract(unittest.TestCase):
 
         (declaration,) = declarations()
         tool = self.contract["x-ai-tool"]
-        self.assertEqual(tool["name"], f"hrms_tr_{declaration['name']}")
+        self.assertEqual(tool["name"], f"hrt_{declaration['name']}")
         for key in ("kind", "roles", "destructive", "versioned"):
             with self.subTest(key=key):
                 self.assertEqual(tool[key], declaration[key])
