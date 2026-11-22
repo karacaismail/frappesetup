@@ -692,7 +692,7 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": true,
+      "serviceAccountsEnabled": false,
       "frontchannelLogout": false,
       "fullScopeAllowed": false,
       "consentRequired": false,
@@ -724,6 +724,35 @@
         "roles",
         "profile",
         "email",
+        "basic"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "site-kiraci1-service",
+      "name": "Tenant service kiraci1",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${ATONOTA_SITE_KIRACI1_SERVICE_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "consentRequired": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": {
+        "use.refresh.tokens": "false",
+        "client_credentials.use_refresh_token": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false"
+      },
+      "defaultClientScopes": [
+        "roles",
+        "service_account",
         "basic"
       ],
       "optionalClientScopes": [

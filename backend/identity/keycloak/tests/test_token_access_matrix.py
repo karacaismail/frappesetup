@@ -63,7 +63,7 @@ class TokenAccessMatrixTest(unittest.TestCase):
 
     def test_service_grant_targets_scopes_and_roles(self):
         service_clients = {
-            "site-kiraci1": ("ATONOTA_SITE_KIRACI1_SECRET", {"aud-identity-sync"}),
+            "site-kiraci1-service": ("ATONOTA_SITE_KIRACI1_SERVICE_SECRET", {"aud-identity-sync"}),
             "press-service": ("ATONOTA_PRESS_SERVICE_SECRET", {"aud-site-kiraci1", "aud-identity-sync"}),
             "identity-sync": ("ATONOTA_IDENTITY_SYNC_SECRET", {"aud-site-kiraci1", "aud-press"}),
         }
@@ -95,31 +95,8 @@ class TokenAccessMatrixTest(unittest.TestCase):
                     expected_status = (200,) if roles else (401, 403)
                     self.assertIn(management_response.durum, expected_status, safe_detail(management_response))
 
-    def test_service_grants_cannot_combine_target_boundaries(self):
-        combinations = (
-            ("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "aud-site-kiraci1 aud-press"),
-            ("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "aud-site-kiraci1 admin-api kc-admin-api"),
-            ("press-service", "ATONOTA_PRESS_SERVICE_SECRET", "aud-site-kiraci1 aud-identity-sync"),
-        )
-        for client_id, secret_name, scope in combinations:
-            with self.subTest(client=client_id, scope=scope):
-                response = istemci_belirteci(client_id, ortam(secret_name), scope)
-                if response.durum != 200:
-                    self.assertEqual(safe_detail(response), "HTTP 400 invalid_scope")
-                    continue
-                claims = jwt_govdesi(response.json()["access_token"])
-                actual = audiences(claims)
-                if ADMIN_SCOPES <= set(scope.split()) and actual == self.management_audiences:
-                    self.assert_client_claims(
-                        claims, client_id, actual, scopes={"kc-admin-api"}, roles=MANAGEMENT_ROLES
-                    )
-                    continue
-                allowed = {TARGET_SCOPES[name] for name in scope.split() if name in TARGET_SCOPES}
-                self.assertTrue(len(actual) == 1 and actual <= allowed, f"HTTP 200 with audiences {sorted(actual)}")
-                self.assert_client_claims(claims, client_id, actual, scopes=set())
-
     def test_browser_only_clients_cannot_obtain_service_tokens(self):
-        for client_id in ("press", "mobile-app"):
+        for client_id in ("site-kiraci1", "press", "mobile-app"):
             _, secret = self.browser_clients()[client_id]
             for scope in (None, *TARGET_SCOPES):
                 with self.subTest(client=client_id, scope=scope):
@@ -160,8 +137,8 @@ class TokenAccessMatrixTest(unittest.TestCase):
     def test_browser_clients_reject_foreign_audience_scopes(self):
         for client_id, (callback, _) in self.browser_clients().items():
             for scope, target in TARGET_SCOPES.items():
-                if target == client_id or (client_id, target) == ("site-kiraci1", "identity-sync"):
-                    continue  # test the service-only scope at the token endpoint below
+                if target == client_id:
+                    continue
                 with self.subTest(client=client_id, target=target):
                     url, _ = self.authorize(client_id, callback, f"openid {scope}")
                     response = get_without_redirect(url)
@@ -218,9 +195,3 @@ class TokenAccessMatrixTest(unittest.TestCase):
                     scopes=set(),
                 )
                 self.assert_client_claims(jwt_govdesi(tokens["access_token"]), client_id, set(), scopes=set())
-
-    def test_tenant_browser_cannot_get_identity_sync_service_audience(self):
-        tokens = self.browser_token(self.open_tenant_session(), "site-kiraci1", "openid aud-identity-sync")
-        if tokens is not None:
-            claims = jwt_govdesi(tokens["access_token"])
-            self.assert_client_claims(claims, "site-kiraci1", set(), scopes=set())

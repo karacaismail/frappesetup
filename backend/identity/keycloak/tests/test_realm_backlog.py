@@ -17,7 +17,7 @@ PLACEHOLDER = re.compile(r"^\$\{[A-Z0-9_]+\}$")
 PRODUCTION_ENV = KLASOR / "production.env.example"
 COMPOSE = KLASOR.parents[1] / "dev" / "compose.keycloak.yaml"
 MOBILE_CLIENT = "mobile-app"
-TENANT_SERVICE_CLIENTS = {"site-kiraci1"}
+TENANT_SERVICE_CLIENTS = {"site-kiraci1-service"}
 # Contract 42f8e32: press-service may also request aud-identity-sync.
 IDENTITY_SYNC_AUDIENCE_CLIENTS = TENANT_SERVICE_CLIENTS | {"press-service"}
 
@@ -114,6 +114,18 @@ class RealmBacklogFileTest(unittest.TestCase):
         self.assertEqual(mappers[0]["config"]["id.token.claim"], "false")
         self.assertEqual(len(scope["protocolMappers"]), 1)
 
+    def test_tenant_browser_and_service_are_separate(self):
+        browser = self.clients["site-kiraci1"]
+        self.assertTrue(browser["standardFlowEnabled"])
+        self.assertFalse(browser["serviceAccountsEnabled"])
+        self.assertEqual(browser["optionalClientScopes"], [])
+        service = self.clients["site-kiraci1-service"]
+        self.assertTrue(service["serviceAccountsEnabled"])
+        self.assertFalse(service["standardFlowEnabled"])
+        self.assertEqual(service["redirectUris"], [])
+        self.assertEqual(service["optionalClientScopes"], ["aud-identity-sync"])
+        self.assertNotEqual(browser["secret"], service["secret"])
+
     def test_only_allowed_service_clients_may_request_identity_sync_audience(self):
         for client_id, client in self.clients.items():
             self.assertNotIn("aud-identity-sync", client.get("defaultClientScopes", []), client_id)
@@ -179,11 +191,11 @@ class RealmBacklogLiveTest(unittest.TestCase):
         assert_refused_without_pkce(self, _authorize("press", redirect))
 
     def test_tenant_service_client_gets_identity_sync_audience(self):
-        response = istemci_belirteci("site-kiraci1", ortam("ATONOTA_SITE_KIRACI1_SECRET"), "aud-identity-sync")
+        response = istemci_belirteci("site-kiraci1-service", ortam("ATONOTA_SITE_KIRACI1_SERVICE_SECRET"), "aud-identity-sync")
         self.assertEqual(response.durum, 200, safe_detail(response))
         claims = jwt_govdesi(response.json()["access_token"])
         self.assertEqual(claims["aud"], "identity-sync")
-        self.assertEqual(claims["azp"], "site-kiraci1")
+        self.assertEqual(claims["azp"], "site-kiraci1-service")
         self.assertNotIn("realm_access", claims)
         self.assertNotIn("resource_access", claims)
 
@@ -195,12 +207,13 @@ class RealmBacklogLiveTest(unittest.TestCase):
         self.assertEqual(claims["azp"], "press-service")
 
     def test_tenant_service_token_without_scope_has_no_identity_sync_audience(self):
-        response = istemci_belirteci("site-kiraci1", ortam("ATONOTA_SITE_KIRACI1_SECRET"))
+        response = istemci_belirteci("site-kiraci1-service", ortam("ATONOTA_SITE_KIRACI1_SERVICE_SECRET"))
         self.assertEqual(response.durum, 200, safe_detail(response))
         self.assertNotIn("identity-sync", _audiences(jwt_govdesi(response.json()["access_token"])))
 
     def test_other_clients_cannot_get_identity_sync_audience(self):
         for client_id, secret in (("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET"),
+                                  ("site-kiraci1", "ATONOTA_SITE_KIRACI1_SECRET"),
                                   ("press", "ATONOTA_PRESS_SECRET")):
             response = istemci_belirteci(client_id, ortam(secret), "aud-identity-sync")
             # identity-sync has a service account: the scope is refused. press is a browser client

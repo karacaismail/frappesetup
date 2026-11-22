@@ -72,7 +72,7 @@ Proje sahibinin kararı açıktır: sihirli bağlantı ve Apple ile giriş MVP'y
 
 ### identity-sync rolleri (sözleşme 26a274c)
 
-identity-sync davet ve kuruluş hazırlama için Keycloak'a yazar. Servis hesabı şu rolleri taşır: `view-users`, `query-users`, `manage-users`, `view-organizations`, `manage-organizations`. `manage-clients`, `manage-realm` ve `impersonation` yoktur. Roller yalnız `scope=admin-api kc-admin-api` belirtecine girer. Kiracı hedefli belirteç bu rolleri taşımaz ve Admin API'de 403 alır.
+identity-sync davet ve kuruluş hazırlama için Keycloak'a yazar. Servis hesabı şu rolleri taşır: `view-users`, `query-users`, `manage-users`, `view-organizations`, `manage-organizations`. `manage-clients`, `manage-realm` ve `impersonation` yoktur. Roller yalnız `scope=admin-api kc-admin-api` belirtecine girer. Kiracı hedefli belirteç bu rolleri taşımaz ve Admin API'de 401 ya da 403 alır.
 
 En az rol kümesi Keycloak 26.8.2 kaynağından çıkarıldı:
 

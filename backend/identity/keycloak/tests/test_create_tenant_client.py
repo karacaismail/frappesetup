@@ -46,7 +46,7 @@ class FakeKeycloak:
             client_id = body["clientId"]
             if client_id in self.clients:
                 raise HTTPError(request.full_url, 409, "Conflict", {}, BytesIO())
-            self.clients[client_id] = {**body, "id": "tenant", "secret": "preserved-test-secret"}
+            self.clients[client_id] = {**body, "id": client_id, "secret": "preserved-test-secret"}
             status, data = 201, None
         elif method == "GET" and path == "/client-scopes":
             status, data = 200, list(self.scopes.values())
@@ -133,7 +133,12 @@ class CreateTenantClientTest(unittest.TestCase):
         self.assertFalse(client["fullScopeAllowed"])
         self.assertFalse(client["directAccessGrantsEnabled"])
         self.assertEqual(client["attributes"]["pkce.code.challenge.method"], "S256")
-        self.assertEqual(client["optionalClientScopes"], ["aud-identity-sync"])
+        self.assertEqual(client["optionalClientScopes"], [])
+        self.assertFalse(client["serviceAccountsEnabled"])
+        service = server.clients["site-acme-service"]
+        self.assertTrue(service["serviceAccountsEnabled"])
+        self.assertFalse(service["standardFlowEnabled"])
+        self.assertEqual(service["optionalClientScopes"], ["aud-identity-sync"])
         self.assertEqual(
             client["redirectUris"],
             [
@@ -227,6 +232,14 @@ class CreateTenantClientTest(unittest.TestCase):
         self.assertIn("does not match the requested tenant", str(output.call_args_list))
         self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
 
+    def test_refuses_to_reuse_browser_with_default_service_audience(self):
+        server = FakeKeycloak()
+        self.assertEqual(self.run_command(server=server)[0], 0)
+        server.clients["site-acme"]["defaultClientScopes"].append("aud-identity-sync")
+        server.calls.clear()
+        self.assertEqual(self.run_command(server=server)[0], 1)
+        self.assertTrue(all(call.get_method() == "GET" for call in server.calls))
+
     def test_rejects_401_and_403_without_creating_resources(self):
         for status in (401, 403):
             with self.subTest(status=status):
@@ -243,6 +256,12 @@ class CreateTenantClientTest(unittest.TestCase):
         command = runpy.run_path(str(COMMAND))
         handler = command["NoRedirect"]()
         self.assertIsNone(handler.redirect_request(None, None, 307, "", {}, "https://other.example.test"))
+
+    def test_service_suffix_is_reserved_for_the_generated_client(self):
+        code, opener, _, prompt = self.run_command(["acme-service", *ARGS[1:], "--preview"], tty=False)
+        self.assertEqual(code, 2)
+        opener.open.assert_not_called()
+        prompt.assert_not_called()
 
     def test_invalid_origins_are_rejected_without_network_access(self):
         for invalid in (
@@ -267,6 +286,7 @@ class LiveTenantClientTest(unittest.TestCase):
         client_id = f"site-{slug}"
         client = command["tenant_client"](slug, ARGS[1])
         scope = command["tenant_scope"](client_id)
+        service = command["tenant_service_client"](slug)
         token = yonetici_belirteci()
 
         def cleanup():
@@ -277,16 +297,17 @@ class LiveTenantClientTest(unittest.TestCase):
                 if entry["name"] == scope["name"]:
                     removed = admin(f"/client-scopes/{entry['id']}", cleanup_token, yontem="DELETE")
                     self.assertEqual(removed.durum, 204, safe_detail(removed))
-            response = admin(f"/clients?clientId={client_id}", cleanup_token)
-            self.assertEqual(response.durum, 200, safe_detail(response))
-            for entry in response.json():
-                if entry["clientId"] == client_id:
-                    removed = admin(f"/clients/{entry['id']}", cleanup_token, yontem="DELETE")
-                    self.assertEqual(removed.durum, 204, safe_detail(removed))
+            for name in (client_id, service["clientId"]):
+                response = admin(f"/clients?clientId={name}", cleanup_token)
+                self.assertEqual(response.durum, 200, safe_detail(response))
+                for entry in response.json():
+                    if entry["clientId"] == name:
+                        removed = admin(f"/clients/{entry['id']}", cleanup_token, yontem="DELETE")
+                        self.assertEqual(removed.durum, 204, safe_detail(removed))
 
         self.addCleanup(cleanup)
         request = command["make_admin_request"](ortam("KC_PUBLIC_URL"), token)
-        command["provision_tenant"](request, client, scope)
+        command["provision_tenant"](request, client, scope, service)
         response = admin(f"/clients?clientId={client_id}", token)
         self.assertEqual(response.durum, 200, safe_detail(response))
         (created,) = response.json()
@@ -296,8 +317,23 @@ class LiveTenantClientTest(unittest.TestCase):
         secret_path = f"/clients/{created['id']}/client-secret"
         original_secret = request("GET", secret_path)["value"]
         self.assertTrue(bool(original_secret))
-        command["provision_tenant"](request, client, scope)
+
+        service_name = service["clientId"]
+        saved_service = command["find_client"](request, service_name)
+        service_secret_path = f"/clients/{saved_service['id']}/client-secret"
+        service_secret = request("GET", service_secret_path)["value"]
+        self.assertTrue(bool(service_secret) and service_secret != original_secret)
+        result = istemci_belirteci(service_name, service_secret, "aud-identity-sync")
+        self.assertEqual(result.durum, 200, safe_detail(result))
+        claims = jwt_govdesi(result.json()["access_token"])
+        self.assertEqual(claims["azp"], service_name)
+        self.assertEqual(claims["aud"], "identity-sync")
+        denied = istemci_belirteci(client_id, original_secret, "aud-identity-sync")
+        self.assertEqual(safe_detail(denied), "HTTP 401 unauthorized_client")
+
+        command["provision_tenant"](request, client, scope, service)
         self.assertTrue(request("GET", secret_path)["value"] == original_secret)
+        self.assertTrue(request("GET", service_secret_path)["value"] == service_secret)
 
         for name, secret_name in (
             ("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET"),

@@ -43,6 +43,15 @@ def tenant_client(slug, site_url):
     return json.loads(json.dumps(client).replace("${ATONOTA_SITE_KIRACI1_URL}", site_url))
 
 
+def tenant_service_client(slug):
+    realm = json.loads(REALM_FILE.read_text(encoding="utf-8"))
+    client = next(client for client in realm["clients"] if client["clientId"] == "site-kiraci1-service")
+    client.pop("secret")
+    client["clientId"] = f"site-{slug}-service"
+    client["name"] = f"Tenant service {slug}"
+    return client
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -106,16 +115,8 @@ def check_other_bindings(request, scope_name):
             return
 
 
-def provision_tenant(request, client, scope):
-    """Create missing resources and add only optional mappings. Never update a tenant client."""
+def ensure_client(request, client):
     client_id = client["clientId"]
-    service_paths = []
-    for name in SERVICE_CLIENTS:
-        service = find_client(request, name)
-        if service is None:
-            raise ProvisioningError(f"Required client {name} is missing.")
-        service_paths.append(f"/clients/{urllib.parse.quote(service['id'], safe='')}")
-
     existing = find_client(request, client_id)
     if existing is None:
         request("POST", "/clients", payload=client, expected=(201, 409))
@@ -130,18 +131,45 @@ def provision_tenant(request, client, scope):
         "directAccessGrantsEnabled",
         "implicitFlowEnabled",
         "fullScopeAllowed",
+        "serviceAccountsEnabled",
+        "enabled",
     )
     security_attributes = (
-        "pkce.code.challenge.method",
-        "backchannel.logout.url",
-        "backchannel.logout.session.required",
+        (
+            "pkce.code.challenge.method",
+            "backchannel.logout.url",
+            "backchannel.logout.session.required",
+        )
+        if client["standardFlowEnabled"]
+        else ()
     )
     if (
         existing is None
-        or any(existing.get(key) != client[key] for key in configuration)
-        or any(existing.get("attributes", {}).get(key) != client["attributes"][key] for key in security_attributes)
+        or any(existing.get(key) != client.get(key) for key in configuration)
+        or set(existing.get("optionalClientScopes") or []) != set(client["optionalClientScopes"])
+        or any((existing.get("attributes") or {}).get(key) != client["attributes"][key] for key in security_attributes)
     ):
         raise ProvisioningError(f"Existing client {client_id} does not match the requested tenant.")
+    default_scopes = set(existing.get("defaultClientScopes") or [])
+    if (
+        any(name.startswith("aud-") for name in default_scopes)
+        or default_scopes & {"admin-api", "kc-admin-api"}
+        or (client["standardFlowEnabled"] and "service_account" in default_scopes)
+    ):
+        raise ProvisioningError(f"Client {client_id} has an unexpected default service scope.")
+
+
+def provision_tenant(request, client, scope, service_client):
+    """Create missing resources and add only optional mappings. Never update a tenant client."""
+    service_paths = []
+    for name in SERVICE_CLIENTS:
+        service = find_client(request, name)
+        if service is None:
+            raise ProvisioningError(f"Required client {name} is missing.")
+        service_paths.append(f"/clients/{urllib.parse.quote(service['id'], safe='')}")
+
+    ensure_client(request, client)
+    ensure_client(request, service_client)
 
     scope_name = scope["name"]
     existing_scope = next((item for item in request("GET", "/client-scopes") if item["name"] == scope_name), None)
@@ -195,10 +223,24 @@ def main():
         parser.error("Use up to 63 lowercase letters, digits, and single hyphens for the tenant slug.")
 
     client_id = f"site-{args.tenant}"
+    if args.tenant.endswith("-service"):
+        parser.error("The -service suffix is reserved for service clients.")
+
     client = tenant_client(args.tenant, args.site_url)
+    service_client = tenant_service_client(args.tenant)
     scope = tenant_scope(client_id)
     print(f"Keycloak target: {args.keycloak_url}{ADMIN_PATH}")
-    print(json.dumps({"client": client, "scope": scope, "optional_scope_clients": SERVICE_CLIENTS}, indent=2))
+    print(
+        json.dumps(
+            {
+                "client": client,
+                "service_client": service_client,
+                "scope": scope,
+                "optional_scope_clients": SERVICE_CLIENTS,
+            },
+            indent=2,
+        )
+    )
     if args.preview:
         return 0
     if not (sys.stdin.isatty() and sys.stderr.isatty()):
@@ -220,14 +262,14 @@ def main():
         return 2
 
     try:
-        provision_tenant(make_admin_request(args.keycloak_url, token), client, scope)
+        provision_tenant(make_admin_request(args.keycloak_url, token), client, scope, service_client)
     except ProvisioningError as error:
         print(error, file=sys.stderr)
         return 1
     except (OSError, ValueError, KeyError, TypeError):
         print("Keycloak request failed. Check the tenant and scope before retrying.", file=sys.stderr)
         return 1
-    print(f"Ready: {client_id} and {scope['name']}.")
+    print(f"Ready: {client_id}, {service_client['clientId']} and {scope['name']}.")
     return 0
 
 

@@ -59,6 +59,43 @@ class CanliKeycloakTesti(unittest.TestCase):
             )
         self.assertEqual(yakalanan.exception.code, "wrong_azp")
 
+    def assert_combined_scope_rejected(self, client, secret, scope, targets):
+        token = belirtec_al(client, secret, scope)
+        for target in targets:
+            with self.subTest(client=client, scope=scope, target=target):
+                with self.assertRaises(TokenError) as error:
+                    verify_access_token(
+                        token,
+                        cache=self.cache,
+                        issuer=ISS,
+                        audience=target,
+                        allowed_azp={client},
+                    )
+                self.assertEqual(error.exception.code, "wrong_audience")
+
+    def test_identity_sync_combined_scope_tokens_are_refused(self):
+        self.assert_combined_scope_rejected(
+            "identity-sync",
+            SIR,
+            "aud-site-kiraci1 aud-press",
+            ("site-kiraci1", "press"),
+        )
+        self.assert_combined_scope_rejected(
+            "identity-sync",
+            SIR,
+            "aud-site-kiraci1 admin-api kc-admin-api",
+            ("site-kiraci1",),
+        )
+
+    @unittest.skipUnless(os.environ.get("ATONOTA_PRESS_SERVICE_SECRET"), "Press service secret is required")
+    def test_press_service_combined_scope_token_is_refused(self):
+        self.assert_combined_scope_rejected(
+            "press-service",
+            os.environ["ATONOTA_PRESS_SERVICE_SECRET"],
+            "aud-site-kiraci1 aud-identity-sync",
+            ("site-kiraci1", "identity-sync"),
+        )
+
     def test_gercek_belirtec_cikis_belirteci_degil(self):
         token = belirtec_al("identity-sync", SIR, "aud-site-kiraci1")
         with self.assertRaises(TokenError) as yakalanan:

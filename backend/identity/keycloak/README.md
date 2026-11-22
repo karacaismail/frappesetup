@@ -126,6 +126,7 @@ Realm dosyası sır taşımaz. Sır alanları `${ATONOTA_...}` yer tutucusudur. 
 Keycloak, her kiracı sitesini ayrı bir istemci kaydıyla tanır. İstemciyi bir Keycloak yöneticisi açar.
 
 1. Keycloak ve kiracı sitesinin HTTPS adreslerini belirleyin.
+   Kiracı adı `-service` ile bitemez.
 2. Komutu önce `--preview` ile çalıştırın. Komut Keycloak'a istek göndermez.
 
    ```bash
@@ -138,8 +139,10 @@ Keycloak, her kiracı sitesini ayrı bir istemci kaydıyla tanır. İstemciyi bi
 5. Komut sorunca `CREATE site-acme` yazın.
 6. Keycloak yönetim yetkisi olan kısa ömürlü erişim belirtecini girin.
    Yönetici tüm istemcileri görebilmeli. Komut girişi gizler.
-7. Komut “Ready” yazınca “Clients” ekranında `site-acme` kaydını açın.
-8. Keycloak'ın ürettiği istemci sırrını kiracı sitesinin gizli ayarına ekleyin.
+7. Komut “Ready” yazınca “Clients” ekranında iki istemciyi açın.
+8. `site-acme` sırrını `keycloak_client_secret` ayarına kaydedin.
+9. `site-acme-service` adını `keycloak_service_client_id` ayarına kaydedin.
+10. Servis sırrını `keycloak_service_client_secret` ayarına kaydedin.
 
 Komut, sözleşmenin 7. bölümündeki yönetim işini Keycloak'ın mevcut uçlarıyla yapar.
 `aud-site-acme` kapsamı, belirtecin hedefini `site-acme` yapar.
@@ -149,3 +152,6 @@ Servisler bu hedef için `scope=aud-site-acme` ister. İstemci açma yetkisi Key
 Kurulum yarıda kalırsa aynı komutu yeniden çalıştırın.
 Komut mevcut istemci sırrını korur ve eksik adımları tamamlar.
 Mevcut ayar şablonla çelişirse komut durur. Keycloak yöneticisi çelişen ayarı inceleyebilir.
+
+Tarayıcı istemcisinin servis hesabı kapalıdır. Servis istemcisinin tarayıcı girişi kapalıdır.
+Eski bir kayıt iki akışı birden açıyorsa komut durur. Yönetici bu kaydı önce ayırmalıdır.
