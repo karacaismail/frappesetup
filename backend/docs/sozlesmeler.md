@@ -256,9 +256,13 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Her işlem tekrar edilebilir olmalıdır. Aynı olay iki kez gelirse sonuç değişmez.
 - Başarısız olay ayrı kuyrukta bekler.
 - Mutabakat elle başlatılan bir komuttur. Komut farkları raporlar.
-- `POST /v1/sessions/revoke` ucu bir Keycloak oturumunu kapatır. Gövde `{"sid": "<oturum kimliği>"}` olur. Ucu yalnız `platform_core` servis belirteci çağırır. identity-sync, Keycloak Admin API ile o oturumu siler. Oturum silinince yenileme belirteci de geçersiz olur. Uç tekrar edilebilir: kapalı oturum için de 200 döner.
+- `POST /v1/sessions/revoke` ucu bir Keycloak oturumunu kapatır. Gövde `{"sid": "<oturum kimliği>", "subject": "<kullanıcı>"}` olur. Ucu yalnız `platform_core` servis belirteci çağırır. identity-sync önce oturumun bu kullanıcıya ait olduğunu Keycloak Admin API'den doğrular. Sonra kullanıcının çağıran kiracının kuruluşuna üye olduğunu doğrular. Kiracı, belirtecin `azp` değerinden kiracı listesiyle bulunur. Doğrulama tutmazsa uç 403 döner. identity-sync, Keycloak Admin API ile o oturumu siler. Oturum silinince yenileme belirteci de geçersiz olur. Uç tekrar edilebilir: kapalı oturum için de 200 döner.
 - Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Kurulum iptal edilince `platform_core` bu ucu çağırır. Aynı `sid` ile gelen belirteç de reddedilir (Proje kaydı O-25).
-- `POST /v1/account-deletions` ucu hesap silme isteğini kaydeder (Proje kaydı O-27). Keycloak'ın hesap silme olayı da aynı akışı başlatır. Akış sırası şudur:
+- `POST /v1/account-deletions` ucu hesap silme isteğini kaydeder (Proje kaydı O-27). Ucu yalnız Press çağırır. Belirteç `azp=press-service` ve `aud=identity-sync` taşır. Gövde `issuer`, `subject` ve `reauthenticated_at` alanlarını taşır.
+- Müşteri silme isteğini Press'te verir. Press önce kullanıcıyı Keycloak'ta yeniden doğrular (`prompt=login`, `max_age=0`). `reauthenticated_at` bu doğrulamanın zamanıdır. identity-sync 300 saniyeden eski doğrulamayı reddeder.
+- Keycloak'ın kendi `delete_account` eylemi kapalıdır. Bu eylem kullanıcıyı ilk adımda siler. Hesap ekranındaki silme bağlantısı Press'teki silme sayfasına gider.
+- Yönetici kullanıcıyı Keycloak yönetim ekranından silerse olay dinleyici olayı gönderir. identity-sync 2., 3. ve 4. adımları yine çalıştırır. Olay kaybolursa elle başlatılan mutabakat komutu silinmiş kullanıcıyı bulur.
+- Akış sırası şudur:
   1. Keycloak kullanıcısı kapanır.
   2. Press kullanıcısı kapanır ve API anahtarları geçersiz olur (`remove_team_member`, `all_organizations: true`).
   3. Kiracı sitelerindeki kullanıcı kapanır. Telefon kurulumları ve bildirim bağları silinir.
@@ -407,6 +411,11 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 | `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
 | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
 | `platform_core.api.ai.purge_logs` | POST | “System Manager” rolü | Saklama süresi dolan günlükleri elle siler. Yıkıcıdır. |
+
+- `list_proposals` yanıtı bir nesnedir: `proposals` ve `has_next_page`. İstek `start` alır. Süzme ve sayfalama veritabanında yapılır.
+- Öneri `created_at` ve `expires_at` taşır. Zaman sitenin saat dilimiyle ve farkıyla ISO 8601 biçiminde döner.
+- Okuma araçlarının sonucu `as_of`, `site` ve `source` taşır. Sonuç sınırı aşarsa `truncated: true` döner. Alt tablo en çok 200 satır, sonuç verisi en çok 262.144 bayttır.
+- Oturumsuz istek 403, süresi dolmuş oturum 401 alır.
 
 ### Genel araçlar
 
