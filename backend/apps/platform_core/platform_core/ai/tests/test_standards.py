@@ -143,7 +143,7 @@ class TestInputBounds(AiTestCase):
 	def test_long_proposal_id_and_digest_are_refused(self):
 		client = self.login(USER_A)
 
-		read = self.human(client, "GET", "plt_get_proposal", query={"proposal_id": "p" * 141})
+		read = self.human(client, "GET", "get_proposal", query={"proposal_id": "p" * 141})
 		approve = self.human(
 			client, "POST", "approve_proposal", body={"proposal_id": "p", "digest": "d" * 129}
 		)
@@ -179,7 +179,7 @@ class TestSharedRecords(AiTestCase):
 		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		other = self.login(USER_B)
 
-		read = self.human(other, "GET", "plt_get_proposal", query={"proposal_id": proposal_id})
+		read = self.human(other, "GET", "get_proposal", query={"proposal_id": proposal_id})
 		listed = self.human(other, "GET", "list_proposals").json["message"]["proposals"]
 		approve = self.human(
 			other, "POST", "approve_proposal", body={"proposal_id": proposal_id, "digest": "x"}
