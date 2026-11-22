@@ -1,6 +1,6 @@
 # Proje sahibinin kararları
 
-Bu dosya 20 Kasım 2026 Cuma ve 21 Kasım 2026 Cumartesi günlerinin kararlarını toplar.
+Bu dosya 20 Kasım 2026 Cuma, 21 Kasım 2026 Cumartesi ve 22 Kasım 2026 Pazar günlerinin kararlarını toplar.
 
 Çalışma Frappe için kod standartlarıyla başladı. Sonra mobil uygulamaya ve KVKK uyumuna genişledi.
 
@@ -60,6 +60,14 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 13. Platform genel bir SaaS çerçevesidir. Bir pazaryeri planı değildir.
 14. Düzenli silme için şimdilik cron kurulmaz.
 15. KVKK ve GDPR uyum çalışması şimdilik durdu.
+16. Backend geliştirmesi MVP seviyesinde başladı. Kod frappesetup deposundadır.
+17. Giriş Keycloak ile olur. Keycloak'ın markası Atonota'dır. Atonota ayrı alan adında durur.
+18. İlk turda Press de geliştirilir.
+19. Bütün uygulamalar Frappe 16 ile yazılır. Press de Frappe 16 üzerinde çalışır.
+20. Her şey yapay zekâyla yönetilebilir olur. Katman model sağlayıcısından bağımsızdır.
+21. Proje sahibi kararları Claude'a bıraktı. Claude açık kararları kapatır ve kayda yazar.
+22. Sisteme n tane yapay zekâ sağlayıcısı, hesabı ve API'si eklenebilir.
+23. Yeni kod İngilizce adlarla yazılır. Var olan adlar değişmez.
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -660,6 +668,168 @@ Sonuç şudur:
 - İş yalnız proje sahibi isterse yeniden başlar. Ajan bu işi kendiliğinden önermez.
 
 Karar 26'daki istek kayıtta aynen kalıyor. Proje sahibinin son sözü işi şimdilik durdurur.
+
+## 22 Kasım 2026 Pazar günü
+
+### Karar 32. Backend geliştirmesi Pane ile başlayacak
+
+Proje sahibi şunu istedi:
+
+> "frappe setup" projesini, geliştirmeye başla. tamamen pane ile, paralel agents ile, geliştir. sadece backend'i geliştir.
+
+Sonuç şudur:
+
+- Backend kodu yazılmaya başlandı. Ön yüz bu turda yoktur.
+- İşler Pane'de paralel yürür. Her iş kendi Pane'inde ve kendi dalında durur.
+- Pane oturumunun adı “frappesetup backend MVP” oldu.
+- İşçiler Claude ve Codex hesaplarıdır. Claude'un bu oturumu işleri yönetir.
+
+### Karar 33. Giriş Keycloak ile ve ayrı bir markayla olacak
+
+Proje sahibi şunu istedi:
+
+> giriş yöntemi keycloack olacak. keycloack ayrı bir domain'de barındırılacak. "facebook ile oturum aç" özelliği gibi "xxx ile oturum aç" gibi bir (ayrı) markası olacak (keycloack yeniden markalanacak).
+
+Claude markanın adını sordu. Proje sahibi şöyle cevap verdi:
+
+> atonota.net
+
+Sonuç şudur:
+
+- Kimlik markası Atonota'dır. Düğme metni “Atonota ile oturum aç” olur.
+- Claude adı alan adından türetti. Proje sahibi adın yazımını ayrıca onaylamadı.
+- Keycloak atonota.net alan adında, platformdan ayrı durur.
+- Tam sunucu adı açık karardır. Örneğin ad `atonota.net` ya da `id.atonota.net` olabilir.
+- Marka adı ve alan adı koda sabit yazılmaz. İkisi de ayardan gelir.
+
+### Karar 34. Backend'in seviyesi, yeri ve kapsamı belirlendi
+
+Claude dört soruyu tek kartta sordu. Proje sahibinin seçtiği seçenekler şunlardır:
+
+| Soru | Seçilen seçenek |
+|---|---|
+| Platform hangi olgunluk seviyesinde başlasın? | “MVP, ilk kullanılabilir sürüm” |
+| Backend kodu nerede ve hangi lisansla dursun? | “frappesetup deposunun içinde” |
+| İlk turda hangi parçalar yapılsın? | “Bunlar ve Press (press_tr)” |
+| “xxx ile oturum aç” markasının adı ne olsun? | “Adı şimdi yazacağım” |
+
+Claude MVP'yi önermemişti. Claude PoC'yi önermişti. Proje sahibi MVP'yi seçti.
+
+Sonuç şudur:
+
+- Seviye MVP'dir. Modül sınırı denetimi ve sözleşmeler baştan zorunludur.
+- Kod frappesetup deposunun `backend/` klasöründe durur. Kodun lisansı deponun kod lisansıdır, yani MIT'dir.
+- Çalışma dalının adı `backend` oldu. Dal `standartlar-ve-kararlar` dalından açıldı.
+- İlk tur şu işleri kapsar: geliştirme ortamı, Keycloak realm'i ve Atonota markası, `platform_core` içinde giriş ve ekran verisi uçları, kullanıcı eşitleme servisi ve `press_tr` içinde Press girişi.
+- Ayrıntılı kayıt `backend/PROJE-KAYDI.md` dosyasındadır. Açık kararlar ve çelişkiler de oradadır.
+
+### Karar 35. Bütün uygulamalar Frappe 16 ile yazılacak
+
+İşçiler çalışırken proje sahibi şunu yazdı:
+
+> zaten frappe press kurulmuştu  (sanırım collima altında bilgisayarda)
+> ve app frappe v16.x ile koldlansın
+
+Claude var olan kurulumu yalnız okudu. Kurulum Colima'nın varsayılan profilinde çalışıyor. Sürümler şunlardır:
+
+| Uygulama | Sürüm |
+|---|---|
+| Frappe | v16.50.0 |
+| ERPNext | v16.50.0 |
+| Press | v0.154.1 |
+| Python | 3.14.8 |
+| MariaDB | 11.8 |
+
+Sonuç şudur:
+
+- `platform_core` ve `press_tr` Frappe 16 ile yazılır.
+- Var olan Press kurulumu değiştirilmez. Onun imajı ve kurulum betikleri yeniden kullanılır.
+- Bu karar sitedeki K1 kararını değiştirir. K1, Press'i Frappe 15 üzerinde kurar.
+- Kurulumun kendi notuna göre Press bu sürümde yalnız yamalarla açılır. Sunucu kurma ve Ansible çalışmaz.
+- Üretimde Press'in hangi sürümle çalışacağı ayrı karardır. Konu `backend/PROJE-KAYDI.md` dosyasında A-11 maddesidir.
+
+### Karar 36. Her şey yapay zekâyla yönetilebilir olacak
+
+Proje sahibi şunu istedi:
+
+> bütün doctypes, bütün fields, db, backend, her bir zerresi, tamamen, ai il eetkileşime girebilir altyapıda geliştirilmesi. ai heryerde olmalı, ai provider'dan bağımsız, herşey ai ile yönetilebilmeli.
+
+Proje sahibi sonra sitedeki AI bölümünü gösterdi:
+
+> https://karacaismail.github.io/frappesetup/ai-bakis/
+>
+> şurada da ayrıca yönergeler var
+
+Sonuç şudur:
+
+- `platform_core` içinde bir yapay zekâ erişim katmanı kurulur. Modülün adı `yapay_zeka` olur.
+- Araçlar DocType tanımından çalışma anında üretilir. Böylece yeni DocType için ayrı kod gerekmez.
+- Yapay zekâ kullanıcının kimliğiyle ve aynı yetkiyle çalışır.
+- Dış arayüz MCP ve OpenAPI olur. Frappe uygulamalarında model sağlayıcısı kitaplığı ve model adı yoktur.
+- Sitenin AI bölümündeki kurallar geçerlidir. Örneğin her yazma insan onaylıdır. Gizli alan hiç okunmaz.
+- Veritabanına ham SQL aracı açılmaz. Veritabanı DocType katmanından açılır. Bu kural standartların G-5 ve G-10 kurallarından gelir.
+- Sitenin K9 kararı Claude Agent SDK'yı ve Claude modellerini adıyla seçer. Bu karar sağlayıcıdan bağımsızlıkla çelişir. Konu `backend/PROJE-KAYDI.md` dosyasında A-12 maddesidir.
+
+### Karar 37. Kararlar Claude'a bırakıldı
+
+Claude açık kalan kararları listeledi. Proje sahibi şöyle cevap verdi:
+
+> Herşeyi onaylıyorum ve izin veriyorum, karar ver soru sorma
+
+Sonuç şudur. Claude açık kararları kapattı. Kararların tam listesi `backend/PROJE-KAYDI.md` dosyasının “Orkestratörün kararları” bölümündedir. Özeti şudur:
+
+| Konu | Karar |
+|---|---|
+| Keycloak'ın sunucu adı | `id.atonota.net` |
+| Giriş teması | Keycloak'ın kendi tema yapısı. Keycloakify sonra yeniden değerlendirilir. |
+| Sihirli bağlantı ve Apple ile giriş | MVP'ye girer. Eklentinin lisansı Apache-2.0 ya da MIT olur. |
+| `press_tr` lisansı | AGPL-3.0. Press AGPL-3.0'dır. Hukuk görüşü alınmadı. |
+| Press'in üretim sürümü | Frappe 16. Sunucu kurma akışı çalışmadan üretime çıkılmaz. |
+| Model sağlayıcısı | Ajan servisi sağlayıcıdan bağımsızdır. Claude sağlayıcılardan biridir. |
+| Press dağıtımı | Her uygulama dağıtımda ayrı depoya bölünür. |
+
+İşçiler de artık proje sahibine soru sormaz. İşçi en güvenli ve en yalın seçeneği seçer ve kararı yazar. Claude kararları birleştirmede inceler.
+
+Şu sınırlar değişmedi:
+
+- Gerçek kişi verisi güvence kurulmadan Hetzner'e konmaz (Karar 27).
+- Sunucu, DNS, yasal kutu ve ödeme hesabı işleri insanda kalır.
+- Bu turda push, pull request ve canlıya yükleme yapılmaz.
+
+### Karar 38. Altyapı yapay zekâ tabanlı ve çok sağlayıcılı olacak
+
+Proje sahibi şunu istedi:
+
+> bütün doctypes, bütün fields, db, backend, her bir zerresi, tamamen, ai ile etkileşime girmelidir, ai tabanlı altyapı geliştirilmesi şarttır. ai heryerde olmalı, ai provider'dan bağımsız, herşey ai ile yönetilebilmeli.  birden fazla (n tane) ai provider eklenebilmeli, birden fazla (n tane)  her hangi bir provider'dan, ai account eklenebilmeli, n tane api eklenebilmeli. birden fazla (n tane)  her hangi bir provider'dan, ai api eklenebilmeli, n tane api eklenebilmeli.
+
+Sonuç şudur:
+
+- `platform_core` içinde ikinci bir yapay zekâ modülü kurulur. Modülün adı `model_gecidi` olur.
+- Modül sağlayıcıları, hesapları, API'leri ve modelleri kayıtta tutar. Her birinden n tane eklenebilir.
+- Model çağrısı tek bir geçitten geçer. Geçit sağlayıcıya düz HTTP ile bağlanır. Sağlayıcı kitaplığı kullanılmaz.
+- Geçit sırayla dener. Bir API sınıra takılırsa sıradaki API ya da hesap kullanılır.
+- Gizli anahtar şifreli durur. Hiçbir uç ve hiçbir yapay zekâ aracı anahtarı dönmez.
+- Her kiracı kendi sağlayıcılarını ekleyebilir. Platformun ortak hesapları sonraki turdadır.
+- Sağlık denetimi zamanlanmaz. Sağlık gerçek çağrıların sonucundan çıkar.
+- Ayrıntı `backend/docs/sozlesmeler.md` dosyasının 11. bölümündedir.
+
+### Karar 39. Yeni kod İngilizce adlarla yazılacak
+
+Proje sahibi şunu yazdı:
+
+> yeni dosya oluşturursen, türkçe değil, codebase ingilizce olsun, dosya adları ingilizce olsun
+
+Claude bu isteği var olan adlara da uyguladı ve eski adları İngilizceye çevirdi. Proje sahibi şöyle düzeltti:
+
+> bundan sonrası için öylemiştim, geçmiş için değil.
+
+Sonuç şudur:
+
+- Claude ad değişikliğini geri aldı. Var olan adlar yerinde kaldı.
+- Bundan sonra oluşturulan dosya, klasör, modül ve kod adları İngilizce olur.
+- Yeni yazılan koddaki yorumlar ve hata iletileri İngilizce olur.
+- Kullanıcıya görünen yeni metnin kaynağı İngilizcedir. Türkçesi çeviri dosyasında durur.
+- İşçilere önce ad değiştirme, sonra iptal mesajı gitti. Bir işçi dosya taşıdıysa eski adlara geri döner.
 
 ## Modellerin kararları
 

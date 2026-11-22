@@ -26,8 +26,8 @@ Zamanlanmış iş yasaktır (Proje kaydı D-6). Karar sitesi saatlik yoklama ve 
    - kendi yazdığımız Java eklentisi,
    - eklentisiz yol: Press'te ilk girişte takım açma, davette bizim çağrımız, elle mutabakat.
 4. Her eklenti için lisansı, bakımı, son sürümü ve Keycloak 26.8 uyumunu yazın. Yalnız açık kaynak lisansları kabul edin. Örneğin “Elastic License” açık kaynak değildir.
-5. Notu yazınca `blocked` raporlayın. Seçenekleri `--choices` ile verin. Bir seçeneği önerin.
-6. Cevabı beklerken 2. kontrol noktasına geçin.
+5. En yalın açık kaynak seçeneği seçin ve notta gerekçesini yazın (D-10, O-11). Soru sormayın.
+6. Commit atın ve 2. kontrol noktasına geçin.
 
 ## Kontrol noktası 2: çekirdek mantık
 
