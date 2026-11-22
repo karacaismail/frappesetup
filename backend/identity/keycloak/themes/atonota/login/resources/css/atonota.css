@@ -400,6 +400,17 @@
   padding: 0;
 }
 
+.login-pf .at-intro {
+  color: var(--at-color-ink-soft);
+  margin-block-end: var(--at-space-4);
+}
+
+/* Bazı temel şablonlarda etiket alanına değer. Etiket ile alan arasına boşluk konur. */
+.login-pf .pf-v5-c-form__group > .pf-v5-c-form__label {
+  display: block;
+  margin-block-end: var(--at-space-1);
+}
+
 /* ---------- Form alanı ---------- */
 
 .login-pf .pf-v5-c-form {

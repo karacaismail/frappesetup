@@ -52,9 +52,29 @@ Bütün renk, yazı, boşluk, köşe ve hareket değerleri `login/resources/css/
 - İletileri yalın Türkçeyle yazın. Kısa ve tam cümle kurun. “Siz” diye seslenin.
 - Marka adını iletiye yazmayın. Marka adı realm'in görünen adından gelir.
 
+## E-posta teması
+
+E-posta teması `email/` klasöründedir. Tema dört e-postayı kapsar:
+
+| E-posta | Şablon |
+| --- | --- |
+| E-posta doğrulama | `email-verification.ftl` |
+| Parola sıfırlama | `password-reset.ftl` |
+| Yöneticinin istediği işlem | `executeActions.ftl` |
+| Sihirli bağlantı | `skycloak-magic-link-email.ftl` |
+
+Sihirli bağlantı, parola yazmadan oturum açtıran e-posta bağlantısıdır. Bu e-postayı `sky-cloak/keycloak-magic-link` eklentisi gönderir. Eklentiyi kimlik-realm işi seçti.
+
+- Her e-postanın HTML ve düz metin sürümü vardır.
+- Ortak düzen `email/html/template.ftl` dosyasındadır. Renk ve yazı değerleri bu dosyanın başındadır.
+- E-posta dış betik, dış stil, dış yazı tipi ve dış görsel çağırmaz. Stil satır içidir.
+- Düğmenin altında bağlantının düz hâli de durur. Düğme çalışmazsa kullanıcı adresi kopyalar.
+- Düz adres satırı harf arasından kırılır. Bu açık bir istisnadır. Adres sözcük değildir ve 320 piksele başka yolla sığmaz.
+- Keycloak'ın öteki hazır e-postaları yeni düzeni kullanır. Metinleri Keycloak'ın kendi Türkçesidir.
+
 ## Temel temadan kopyalanan şablonlar
 
-Beş şablon Keycloak 26.8.2 kaynağından kopyalandı ve değiştirildi. Keycloak sürümü değişince bu dosyaları yeni temel şablonla karşılaştırın.
+Altı şablon Keycloak 26.8.2 kaynağından kopyalandı ve değiştirildi. Keycloak sürümü değişince bu dosyaları yeni temel şablonla karşılaştırın.
 
 | Dosya | Fark |
 | --- | --- |
@@ -62,6 +82,7 @@ Beş şablon Keycloak 26.8.2 kaynağından kopyalandı ve değiştirildi. Keyclo
 | `login/login-config-totp.ftl` | İki etiketin `for` değeri kendi giriş alanını gösterir. Temel şablonda bu değer yanlıştır. |
 | `login/select-authenticator.ftl` | Her giriş yolu gerçek bir düğmedir. Temel şablondaki satır Enter ve Space tuşuyla çalışmaz. |
 | `login/login-verify-email.ftl` | Yeniden gönderme bağlantısı tam bir cümledir. Temel şablon cümleyi parçalardan birleştirir. |
+| `login/webauthn-register.ftl` | Formun üstünde geçiş anahtarını anlatan bir açıklama vardır. |
 | `login/login-page-expired.ftl` | İki bağlantı tam birer cümledir. Bu ekran testle sınanmadı. |
 
 ## Deneme ortamı
@@ -110,10 +131,12 @@ Görüntüler `test/referans/` klasörüne yazılır. Bu görüntüler macOS'ta 
 ## Bilinen sınırlar
 
 - İletiler kullanıcı adının e-posta adresi olduğunu varsayar. Realm bu ayarı kapatırsa iletileri güncelleyin.
-- Tema 195 iletiyi yalın Türkçeyle yazar. Öteki iletiler Keycloak'ın kendi Türkçe dosyasından gelir. Örneğin kurtarma kodu, hesap bağlama ve kullanım koşulu ekranları böyledir.
+- Tema 203 iletiyi yalın Türkçeyle yazar. Öteki iletiler Keycloak'ın kendi Türkçe dosyasından gelir. Örneğin kurtarma kodu, hesap bağlama ve kullanım koşulu ekranları böyledir.
 - Kayıt formuna seçmeli alan eklenirse Keycloak işletim sisteminin açılır listesini çizer. Bu liste markalı değildir. Realm'e seçmeli profil alanı eklemeyin.
-- Geçiş anahtarı ekleme ekranında açıklama metni yoktur. Geçiş anahtarının tarihini ve bağlantı türünü Keycloak yazar.
-- Sihirli bağlantı eklentisinin giriş ekranı iletileri çevrilmedi. Deneme ortamında eklenti kurulu değildir.
+- Geçiş anahtarının tarihini ve bağlantı türünü Keycloak yazar. Örneğin “USB” yazısı Keycloak'tan gelir.
+- Sihirli bağlantı eklentisinin giriş ekranı iletileri çevrildi ama canlı denenmedi. Deneme ortamında eklenti kurulu değildir.
+- Sihirli bağlantı e-postası canlı denenmedi. Şablonun adı ve değişkenleri eklentinin jar dosyasından okundu. Eklentili bir Keycloak'ta `SIHIRLI_KC_URL` ve `SIHIRLI_ADMIN_TOKEN` değişkenleriyle `tests/eposta.spec.ts` testini çalıştırın.
+- E-postalar gerçek e-posta programlarında denenmedi. Örneğin Gmail ve Outlook denenmedi.
 
 - Gerçek telefon ve gerçek Safari denemesi yapılmadı. WebKit öykünmesi gerçek Safari değildir.
 - Passkey akışının tamamı yalnız Chromium'da sınandı. WebKit'te sanal anahtar yoktur.
