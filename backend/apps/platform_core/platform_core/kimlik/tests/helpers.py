@@ -30,6 +30,7 @@ TEST_SETTINGS = {
 	"platform_panel_url": "http://kiraci1.localhost:8661/panel",
 	"kimlik_yalniz_keycloak": 0,
 	"kimlik_servis_azp": ["identity-sync"],
+	"kimlik_deletion_hmac_key": "test-deletion-key-fake",
 }
 ISSUER = "http://kimlik.localhost:8660/realms/platform"
 LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout"

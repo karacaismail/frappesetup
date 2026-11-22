@@ -38,7 +38,7 @@ def provision(data: dict) -> dict:
 	last_name = _optional_text(data, "last_name")
 	role_profiles = _role_profiles(data.get("role_profiles"))
 
-	user = _linked_user(issuer, subject)
+	user = _locked_user(issuer, subject)
 	if user:
 		if user != email:
 			frappe.throw(
@@ -89,7 +89,7 @@ def set_enabled(data: dict) -> dict:
 	issuer = _issuer(data)
 	subject = _text(data, "subject", MAX_SUBJECT)
 	enabled = _bool(data, "enabled")
-	doc = frappe.get_doc("User", _linked_user_or_404(issuer, subject))
+	doc = frappe.get_doc("User", _locked_user_or_404(issuer, subject))
 	if bool(doc.enabled) != enabled:
 		doc.enabled = int(enabled)
 		doc.save()
@@ -100,7 +100,7 @@ def change_email(data: dict) -> dict:
 	issuer = _issuer(data)
 	subject = _text(data, "subject", MAX_SUBJECT)
 	new_email = _email(data.get("new_email"))
-	user = _linked_user_or_404(issuer, subject)
+	user = _locked_user_or_404(issuer, subject)
 	if user == new_email:
 		return {"user": user}
 	if frappe.db.exists("User", new_email):
@@ -109,6 +109,23 @@ def change_email(data: dict) -> dict:
 		)
 	rename_doc("User", user, new_email, show_alert=False)
 	return {"user": new_email}
+
+
+def _locked_user(issuer: str, subject: str) -> str | None:
+	"""Contract section 7 rule 3: check the deletion record first, under the same row locks as deletion."""
+	from platform_core.kimlik import anonymization
+
+	link = anonymization.refuse_if_deleted(issuer, subject)
+	return link.user if link else None
+
+
+def _locked_user_or_404(issuer: str, subject: str) -> str:
+	user = _locked_user(issuer, subject)
+	if not user:
+		frappe.throw(
+			_("No user is linked to this identity.", context="platform_core.kimlik"), IdentityNotFound
+		)
+	return user
 
 
 def _linked_user(issuer: str, subject: str) -> str | None:

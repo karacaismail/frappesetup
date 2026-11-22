@@ -53,6 +53,7 @@ class TestSessionPolicy(FrappeAPITestCase):
 		super().setUp()
 		h.clear_links(EMPLOYEE)
 		h.reset_rate_limits()
+		frappe.cache.delete_keys(session_policy.ACTIVITY_PREFIX)
 		self.client = h.new_client()
 
 	# --- O-25: Frappe idle timeout -------------------------------------------------------------
@@ -79,15 +80,24 @@ class TestSessionPolicy(FrappeAPITestCase):
 		self.assertEqual(data["data"]["session_expiry"], "01:00:00")
 
 	def test_idle_session_answers_401_session_expired(self):
+		# Ö2: idle time is real activity. Without a live activity key the session ends.
 		response = h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE))
 		self.assertEqual(response.status_code, 302, response.data[:300])
 		sid = self.client.get_cookie("sid").value
-		self._age_session(sid, seconds=3601)
+		frappe.cache.delete_value(session_policy._session_key(sid))
 		answer = h.request(
 			self.client.post, "/api/method/platform_core.api.auth.logout", headers=h.csrf_headers(self.client)
 		)
 		self.assertEqual(answer.status_code, 401, answer.data[:300])
 		self.assertEqual(answer.json.get("exc_type"), "SessionExpired")
+		h.refresh()
+		self.assertFalse(frappe.db.exists("Sessions", {"sid": sid}))
+		self.assertEqual(h.logged_user(self.client), "Guest")
+
+	def test_frappe_idle_limit_still_applies(self):
+		response = h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE))
+		self.assertEqual(response.status_code, 302, response.data[:300])
+		self._age_session(self.client.get_cookie("sid").value, seconds=3601)
 		self.assertEqual(h.logged_user(self.client), "Guest")
 
 	def test_active_session_within_the_hour_stays_open(self):
@@ -96,11 +106,32 @@ class TestSessionPolicy(FrappeAPITestCase):
 		self._age_session(sid, seconds=3000)
 		self.assertEqual(h.logged_user(self.client), h.AYSE)
 
-	# --- O-25: an idle employee authenticates again ---------------------------------------------
+	def test_background_request_does_not_renew_the_idle_time(self):
+		h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE))
+		key = session_policy._session_key(self.client.get_cookie("sid").value)
+		frappe.cache.set_value(key, 123, expires_in_sec=3600)
+		background = h.request(
+			self.client.get,
+			"/api/method/platform_core.api.auth.get_login_url",
+			headers={session_policy.BACKGROUND_HEADER: "1"},
+		)
+		self.assertNotEqual(background.status_code, 401, background.data[:200])
+		self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), 123)
+		polling = h.request(self.client.get, "/api/method/frappe.auth.get_logged_user")
+		self.assertEqual(polling.status_code, 200, polling.data[:200])
+		self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), 123)
+		real = h.request(
+			self.client.get, "/api/method/frappe.client.get_count", query_string={"doctype": "ToDo"}
+		)
+		self.assertNotEqual(real.status_code, 401, real.data[:200])
+		self.assertNotEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), 123)
 
-	def test_employee_with_old_authentication_is_sent_back_to_keycloak(self):
+	# --- O-25 and Ö2: an idle employee authenticates again ---------------------------------------
+
+	def test_idle_employee_is_sent_back_to_keycloak_even_with_a_fresh_keycloak_cookie(self):
+		# No real activity on this site in the last hour. Keycloak's open session does not count.
 		_started, query = h.start_login(self.client, "/app")
-		token = h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE), auth_time=int(time.time()) - 7200)
+		token = h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE), auth_time=int(time.time()) - 60)
 		response = h.finish_login(self.client, query, token)
 		self.assertEqual(response.status_code, 302, response.data[:300])
 		again = _query(response.headers["Location"])
@@ -111,41 +142,41 @@ class TestSessionPolicy(FrappeAPITestCase):
 		self.assertEqual(again.get("prompt"), "login")
 		self.assertNotEqual(again["state"], query["state"])
 		self.assertEqual(h.logged_user(self.client), "Guest")
-		# The new attempt keeps the redirect target and signs in with a fresh authentication.
 		fresh = h.id_token(again, h.userinfo("sub-calisan", EMPLOYEE))
 		done = h.finish_login(self.client, again, fresh)
 		self.assertEqual(done.status_code, 302, done.data[:300])
 		self.assertTrue(done.headers["Location"].endswith("/app"))
 		self.assertEqual(h.logged_user(self.client), EMPLOYEE)
 
-	def test_employee_without_auth_time_is_sent_back_to_keycloak(self):
+	def test_active_employee_continues_with_an_old_keycloak_authentication(self):
+		# Two hours of real work: the activity key is alive, auth_time is old. No new login is asked.
+		session_policy.mark_activity(None, EMPLOYEE)
 		_started, query = h.start_login(self.client)
-		token = h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE), auth_time=None)
-		response = h.finish_login(self.client, query, token)
-		self.assertEqual(response.status_code, 302, response.data[:300])
-		self.assertEqual(_query(response.headers["Location"]).get("prompt"), "login")
-		self.assertEqual(h.logged_user(self.client), "Guest")
-
-	def test_stale_authentication_after_forced_login_is_refused(self):
-		_started, query = h.start_login(self.client)
-		stale = int(time.time()) - 7200
-		first = h.finish_login(
-			self.client, query, h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE), auth_time=stale)
-		)
-		again = _query(first.headers["Location"])
-		second = h.finish_login(
-			self.client, again, h.id_token(again, h.userinfo("sub-calisan", EMPLOYEE), auth_time=stale)
-		)
-		self.assertEqual(second.status_code, 403, second.data[:300])
-		self.assertEqual(h.logged_user(self.client), "Guest")
-
-	def test_employee_with_recent_authentication_signs_in(self):
-		_started, query = h.start_login(self.client)
-		token = h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE), auth_time=int(time.time()) - 600)
+		token = h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE), auth_time=int(time.time()) - 7200)
 		response = h.finish_login(self.client, query, token)
 		self.assertEqual(response.status_code, 302, response.data[:300])
 		self.assertNotIn("prompt=login", response.headers["Location"])
 		self.assertEqual(h.logged_user(self.client), EMPLOYEE)
+
+	def test_forced_attempt_refuses_an_authentication_from_before_the_attempt(self):
+		_started, query = h.start_login(self.client)
+		first = h.finish_login(self.client, query, h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE)))
+		again = _query(first.headers["Location"])
+		earlier = int(time.time()) - 300
+		second = h.finish_login(
+			self.client, again, h.id_token(again, h.userinfo("sub-calisan", EMPLOYEE), auth_time=earlier)
+		)
+		self.assertEqual(second.status_code, 403, second.data[:300])
+		self.assertEqual(h.logged_user(self.client), "Guest")
+
+	def test_forced_attempt_without_auth_time_is_refused(self):
+		_started, query = h.start_login(self.client)
+		first = h.finish_login(self.client, query, h.id_token(query, h.userinfo("sub-calisan", EMPLOYEE)))
+		again = _query(first.headers["Location"])
+		second = h.finish_login(
+			self.client, again, h.id_token(again, h.userinfo("sub-calisan", EMPLOYEE), auth_time=None)
+		)
+		self.assertEqual(second.status_code, 403, second.data[:300])
 
 	def test_customer_with_old_authentication_signs_in(self):
 		# Customers keep the Keycloak 7 day idle window (O-25 table). Only the Frappe cookie is 1 hour.

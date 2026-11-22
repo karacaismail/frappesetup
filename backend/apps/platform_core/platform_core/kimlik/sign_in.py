@@ -14,6 +14,7 @@ drops the ID token, so the Keycloak session id is lost. This module
 import hmac
 import json
 import secrets
+import time
 
 import frappe
 import frappe.sessions
@@ -89,6 +90,7 @@ def build_login_url(redirect_to: str | None = None, force_login: bool = False) -
 			"nonce": nonce,
 			"redirect_to": redirect_to or "",
 			"force_login": bool(force_login),
+			"started_at": int(time.time()),
 		},
 	)
 	frappe.local.cookie_manager.set_cookie(
@@ -188,13 +190,15 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 		) from error
 
 	user = resolve_user(settings.issuer, claims)
-	if session_policy.needs_fresh_authentication(user, claims):
+	decision = session_policy.check_fresh_authentication(user, claims, record)
+	if decision == "refuse":
+		# O-25: the forced attempt must bring an authentication made during that attempt.
+		raise SignInRefused(
+			403,
+			_("The identity provider did not confirm a fresh sign-in.", context="platform_core.kimlik"),
+		)
+	if decision == "force":
 		# O-25: an employee idle for the limit authenticates again; the open Keycloak cookie does not count.
-		if record.get("force_login"):
-			raise SignInRefused(
-				403,
-				_("The identity provider did not confirm a fresh sign-in.", context="platform_core.kimlik"),
-			)
 		return build_login_url(record.get("redirect_to") or None, force_login=True)["login_url"]
 	frappe.local.login_manager.login_as(user)
 	frappe.local.session.data.update(helpers.session_claims(claims, settings.issuer))
@@ -218,6 +222,10 @@ def resolve_user(issuer: str, claims: dict) -> str:
 		)
 	subject = subject.strip()
 	email = (claims.get("email") or "").strip().lower() if isinstance(claims.get("email"), str) else ""
+	from platform_core.kimlik import anonymization
+
+	if anonymization.is_deleted(issuer, subject):
+		raise SignInRefused(403, _("This user is disabled.", context="platform_core.kimlik"))
 
 	user = frappe.db.get_value(LINK_DOCTYPE, {"issuer": issuer, "subject": subject}, "user")
 	if not user:

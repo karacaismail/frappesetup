@@ -8,7 +8,11 @@ app_license = "mit"
 # platform-core-kimlik: Keycloak sign-in, service tokens and the local sign-in gate (kimlik/README.md).
 # Other tasks append to the same list keys; do not replace them.
 before_login = ["platform_core.kimlik.login_policy.before_login"]
-before_request = ["platform_core.kimlik.login_policy.before_request"]
+before_request = [
+	"platform_core.kimlik.login_policy.before_request",
+	"platform_core.kimlik.session_policy.before_request",
+]
+on_session_creation = ["platform_core.kimlik.session_policy.on_session_creation"]
 auth_hooks = ["platform_core.kimlik.service_token.validate"]
 # AU-19: local sign-in functions are replaced by gated wrappers (kimlik/login_policy.py).
 override_whitelisted_methods = {
@@ -27,10 +31,11 @@ override_whitelisted_methods = {
 	"frappe.integrations.oauth2_logins.login_via_fairlogin": "platform_core.kimlik.login_policy.login_via_fairlogin",
 	"frappe.integrations.oauth2_logins.login_via_keycloak": "platform_core.kimlik.login_policy.login_via_keycloak",
 	"frappe.integrations.oauth2_logins.custom": "platform_core.kimlik.login_policy.custom",
+	"frappe.integrations.doctype.ldap_settings.ldap_settings.login": "platform_core.kimlik.login_policy.ldap_login",
 }
 
 # platform-core-kimlik: Frappe idle timeout of 1 hour (O-25, kimlik/session_policy.py).
 after_install = ["platform_core.kimlik.session_policy.apply"]
 after_migrate = ["platform_core.kimlik.session_policy.apply"]
 # O-28: the identity link changes only through the identity endpoints, never through generic AI writes.
-ai_write_closed_doctypes = ["Platform Identity Link"]
+ai_write_closed_doctypes = ["Platform Identity Link", "Platform Identity Deletion"]

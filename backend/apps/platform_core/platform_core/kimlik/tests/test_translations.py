@@ -18,11 +18,12 @@ from frappe.tests import IntegrationTestCase
 
 CONTEXT = "platform_core.kimlik"
 LINK = "Platform Identity Link"
+DOCTYPES = (LINK, "Platform Identity Deletion")
 APP = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PY_SOURCES = ("kimlik", "api/auth.py", "api/identity.py", "api/__init__.py", "www/login.py")
 TEMPLATE = os.path.join(APP, "www", "login.html")
-# Only the DocType name is context-free: the desk translates it without a context, and Frappe has no such string.
-CONTEXT_FREE_ALLOWED = {LINK}
+# Only the DocType names are context-free: the desk translates them without a context, and Frappe has no such string.
+CONTEXT_FREE_ALLOWED = set(DOCTYPES)
 
 
 def _python_files():
@@ -89,7 +90,8 @@ class TestTranslations(IntegrationTestCase):
 
 	def test_module_rows_are_never_context_free(self):
 		messages = {m for _p, _l, m, _c in list(_calls()) + list(_template_calls()) if m}
-		messages |= self._doctype_texts()
+		for doctype in DOCTYPES:
+			messages |= self._doctype_texts(doctype)
 		context_free = sorted(
 			row[0]
 			for row in _rows()
@@ -99,9 +101,11 @@ class TestTranslations(IntegrationTestCase):
 
 	def test_doctype_labels_and_descriptions_are_translated_with_the_doctype_context(self):
 		rows = {(row[0], row[2] if len(row) > 2 else ""): row[1] for row in _rows()}
-		missing = sorted(text for text in self._doctype_texts() if not rows.get((text, LINK), "").strip())
-		self.assertEqual(missing, [])
-		self.assertTrue(rows.get((LINK, ""), "").strip(), "DocType name")
+		for doctype in DOCTYPES:
+			texts = self._doctype_texts(doctype)
+			missing = sorted(text for text in texts if not rows.get((text, doctype), "").strip())
+			self.assertEqual(missing, [], doctype)
+			self.assertTrue(rows.get((doctype, ""), "").strip(), f"DocType name {doctype}")
 
 	def test_translation_is_used_at_runtime_and_frappe_strings_stay(self):
 		frappe.local.lang = "tr"
@@ -115,11 +119,13 @@ class TestTranslations(IntegrationTestCase):
 		frappe.local.lang = "en"
 
 	@staticmethod
-	def _doctype_texts() -> set[str]:
-		meta = frappe.get_meta(LINK)
+	def _doctype_texts(doctype: str) -> set[str]:
+		meta = frappe.get_meta(doctype)
 		texts = {meta.description} if meta.description else set()
 		for field in meta.fields:
 			texts |= {text for text in (field.label, field.description) if text}
+			if field.fieldtype == "Select" and field.options:
+				texts |= {option for option in field.options.split("\n") if option}
 		return texts
 
 

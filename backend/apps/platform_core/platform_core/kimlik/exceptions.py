@@ -69,3 +69,15 @@ class EmailInUse(frappe.ValidationError):
 
 class IdentityNotFound(frappe.DoesNotExistError):
 	http_status_code = 404
+
+
+class IdentityDeleted(frappe.ValidationError):
+	"""The identity `(iss, sub)` was deleted (O-27). It cannot be provisioned, enabled or renamed again."""
+
+	http_status_code = 410
+
+
+class DeletionKeyMissing(frappe.ValidationError):
+	"""The site setting `kimlik_deletion_hmac_key` is missing. Identity changes fail closed."""
+
+	http_status_code = 503

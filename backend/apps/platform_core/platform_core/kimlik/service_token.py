@@ -1,7 +1,8 @@
 """Service token validation (`auth_hooks`). Rules: docs/sozlesmeler.md section 3, AU-3 and AU-5.
 
 The hook runs on every request from `frappe.auth.validate_auth` (frappe/auth.py:755). A token is looked
-for only under `platform_core.api.identity.*`. Elsewhere the hook does nothing; Frappe then rejects a
+for only on the service endpoints (`SERVICE_ENDPOINTS`) and on the mobile paths. Service endpoints are
+matched first. Elsewhere the hook does nothing; Frappe then rejects a
 request that carries a Bearer header while the user stays Guest (frappe/auth.py:649).
 """
 
@@ -16,6 +17,10 @@ IDENTITY_ENDPOINTS = frozenset(
 	helpers.IDENTITY_API_PREFIX + name
 	for name in ("provision", "set_enabled", "change_email", "anonymize_user")
 )
+# Service endpoints of other modules that identity-sync calls with its service token (docs/sozlesmeler.md
+# section 7). They are checked before the mobile path rule, so a service token is never read as a phone token.
+OTHER_SERVICE_ENDPOINTS = frozenset(("/api/method/platform_core.api.mobile.revoke_user_installations",))
+SERVICE_ENDPOINTS = IDENTITY_ENDPOINTS | OTHER_SERVICE_ENDPOINTS
 CLAIMS_ATTR = "kimlik_service_claims"
 # Service operations run as the administrator. The path and azp restrictions confine the token to these endpoints.
 SERVICE_USER = "Administrator"
@@ -27,8 +32,9 @@ def validate() -> None:
 		return
 	from platform_core.kimlik import api as kimlik_api
 
-	mobile = kimlik_api.is_mobile_path(request.path)
-	if request.path not in IDENTITY_ENDPOINTS and not mobile:
+	service = request.path in SERVICE_ENDPOINTS
+	mobile = not service and kimlik_api.is_mobile_path(request.path)
+	if not service and not mobile:
 		return
 	parts = (frappe.get_request_header("Authorization") or "").split(" ", 1)
 	if len(parts) != 2 or parts[0].lower() != "bearer":

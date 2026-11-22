@@ -1,24 +1,44 @@
-"""Tests of `platform_core.api.identity.anonymize_user` (PROJE-KAYDI.md O-27, docs/sozlesmeler.md section 5).
+"""Tests of `platform_core.api.identity.anonymize_user` (PROJE-KAYDI.md O-27).
 
-Expected behaviour comes from the contract `contracts/platform_core-kimlik.openapi.yaml` (D-1):
+Expected behaviour comes from docs/sozlesmeler.md section 7, anonymization rules and the third
+review decisions E1, E2, E3 and Ö1 (D-1):
 - only an `azp=identity-sync` service token may call it,
-- the user is disabled, every session is closed and the user gets an anonymous name,
-- fields that show the person are anonymized through the `user_data_fields` hooks,
+- step 1 disables the user, revokes API keys, records the deletion and closes every session page by page;
+  step 2 anonymizes. Both steps are safe to repeat,
+- the deletion record keeps only the HMAC-SHA256 digest of `(iss, sub)`; the raw `sub` is deleted,
+- a deleted identity can never be provisioned, enabled or renamed again,
+- only rows bound to the user change. Another person with the same full name keeps their text,
 - business records stay; no e-mail goes to the user,
-- a “Personal Data Deletion Request” record ends as “Deleted” without the original e-mail,
 - the same request twice returns the same body; no link gives 404; Administrator gives 409.
 """
+
+import base64
+import hashlib
+import hmac
+import threading
+from unittest.mock import patch
 
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
-from platform_core.kimlik import provider_setup
+from platform_core.kimlik import anonymization, provider_setup
 from platform_core.kimlik.tests import helpers as h
 
 ANONYMIZE = "/api/method/platform_core.api.identity.anonymize_user"
+PROVISION = "/api/method/platform_core.api.identity.provision"
+SET_ENABLED = "/api/method/platform_core.api.identity.set_enabled"
+CHANGE_EMAIL = "/api/method/platform_core.api.identity.change_email"
 DELETED = "silinecek.musteri@example.test"
+NAMESAKE = "adas.musteri@example.test"
 SUBJECT = "sub-silinecek"
-REQUEST = "Personal Data Deletion Request"
+FULL_NAME = "Ayse Ornekoglu"
+LINK = "Platform Identity Link"
+DELETION = "Platform Identity Deletion"
+
+
+def expected_hash() -> str:
+	key = h.TEST_SETTINGS["kimlik_deletion_hmac_key"].encode()
+	return hmac.new(key, f"{h.ISSUER}\n{SUBJECT}".encode(), hashlib.sha256).hexdigest()
 
 
 class TestAnonymizeUser(FrappeAPITestCase):
@@ -36,44 +56,70 @@ class TestAnonymizeUser(FrappeAPITestCase):
 
 	def setUp(self):
 		super().setUp()
-		h.clear_links(DELETED)
+		h.clear_links(DELETED, NAMESAKE)
 		self._remove_test_people()
 		self.addCleanup(self._remove_test_people)
-		self.user = h.ensure_user(DELETED)
-		frappe.db.set_value("User", DELETED, {"first_name": "Silinecek", "last_name": "Musteri"})
+		h.ensure_user(DELETED)
+		frappe.db.set_value("User", DELETED, {"first_name": "Ayse", "last_name": "Ornekoglu"})
+		# Another person with the same full name (review finding E3).
+		h.ensure_user(NAMESAKE)
+		frappe.db.set_value("User", NAMESAKE, {"first_name": "Ayse", "last_name": "Ornekoglu"})
+		for email in (DELETED, NAMESAKE):
+			frappe.db.set_value("User", email, "full_name", FULL_NAME)
 		self.link = h.make_link(SUBJECT, DELETED)
 		# Frappe creates one Contact for a new website user (User.after_insert). The test uses that record.
-		frappe.db.set_value(
-			"Contact", {"email_id": DELETED}, {"first_name": "Silinecek", "last_name": "Musteri"}
-		)
 		self.contact = frappe.db.get_value("Contact", {"email_id": DELETED}, "name")
 		self.assertTrue(self.contact)
+		frappe.db.set_value("Contact", self.contact, {"first_name": "Ayse", "last_name": "Ornekoglu"})
 		# A business record owned by the person. It must stay after anonymization.
 		self.todo = frappe.get_doc(
 			{"doctype": "ToDo", "description": "Ornek is kaydi", "allocated_to": DELETED}
 		).insert(ignore_permissions=True)
 		frappe.db.set_value("ToDo", self.todo.name, "owner", DELETED, update_modified=False)
+		self.namesake_comment = self._comment(NAMESAKE, f"{FULL_NAME} yazdi")
+		self.own_comment = self._comment(DELETED, f"Bana {DELETED} adresinden yazin")
 		frappe.db.commit()
-		self.requests_before = frappe.db.count(REQUEST)
+
+	def _comment(self, owner: str, content: str) -> frappe._dict:
+		doc = frappe.get_doc(
+			{
+				"doctype": "Comment",
+				"comment_type": "Comment",
+				"reference_doctype": "ToDo",
+				"reference_name": self.todo.name,
+				"content": content,
+				"comment_email": owner,
+				"comment_by": FULL_NAME,
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.set_value("Comment", doc.name, "owner", owner, update_modified=False)
+		return doc
 
 	@staticmethod
 	def _remove_test_people():
-		"""Removes the sample person and what earlier runs anonymized. Only test data is touched."""
-		for name in frappe.get_all(
-			"Contact Email", filters={"email_id": DELETED}, pluck="parent"
-		) + frappe.get_all("Contact", filters={"name": ("like", "deleted-user-%")}, pluck="name"):
+		"""Removes the sample people and what earlier runs anonymized. Only test data is touched."""
+		for email in (DELETED, NAMESAKE):
+			for name in frappe.get_all("Contact Email", filters={"email_id": email}, pluck="parent"):
+				frappe.delete_doc("Contact", name, force=True, ignore_permissions=True, ignore_missing=True)
+		for name in frappe.get_all("Contact", filters={"name": ("like", "deleted-user-%")}, pluck="name"):
 			frappe.delete_doc("Contact", name, force=True, ignore_permissions=True, ignore_missing=True)
 		frappe.db.delete("ToDo", {"description": "Ornek is kaydi"})
+		frappe.db.delete("Comment", {"reference_doctype": "ToDo", "content": ("like", "%yaz%")})
+		frappe.db.delete(DELETION, {"name": expected_hash()})
+		frappe.db.delete(LINK, {"subject": SUBJECT})
 		for name in frappe.get_all("User", filters={"name": ("like", "deleted-user-%")}, pluck="name"):
-			frappe.db.delete("Platform Identity Link", {"user": name})
 			frappe.delete_doc("User", name, force=True, ignore_permissions=True, ignore_missing=True)
-		frappe.delete_doc("User", DELETED, force=True, ignore_permissions=True, ignore_missing=True)
+		for email in (DELETED, NAMESAKE):
+			frappe.delete_doc("User", email, force=True, ignore_permissions=True, ignore_missing=True)
 		frappe.db.commit()
 
-	def call(self, body, **token):
+	def call(self, path=ANONYMIZE, body=None, **token):
 		signed = self.key.sign(h.access_payload(**token))
 		return h.request(
-			h.new_client().post, ANONYMIZE, json=body, headers={"Authorization": f"Bearer {signed}"}
+			h.new_client().post,
+			path,
+			json=body if body is not None else self.body(),
+			headers={"Authorization": f"Bearer {signed}"},
 		)
 
 	def body(self, **overrides):
@@ -81,120 +127,275 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		data.update(overrides)
 		return data
 
+	# --- result, record and anonymization ----------------------------------------------------------
+
 	def test_user_is_disabled_renamed_and_anonymized(self):
 		client = h.new_client()
 		h.login_with_keycloak(client, h.userinfo(SUBJECT, DELETED))
 		self.assertEqual(h.logged_user(client), DELETED)
 
-		response = self.call(self.body())
+		response = self.call()
 		self.assertEqual(response.status_code, 200, response.data[:500])
 		result = response.json["message"]
 		self.assertEqual(set(result), {"user", "enabled", "status"})
-		self.assertTrue(result["user"].startswith("deleted-user-"), result)
-		self.assertNotIn("silinecek", result["user"])
+		self.assertRegex(result["user"], r"^deleted-user-[0-9a-f]{16}@deleted\.invalid$")
 		self.assertIs(result["enabled"], False)
-		self.assertEqual(result["status"], "Deleted")
+		self.assertEqual(result["status"], "Anonymized")
 
 		h.refresh()
 		anon = result["user"]
 		self.assertFalse(frappe.db.exists("User", DELETED))
 		user = frappe.get_doc("User", anon)
 		self.assertEqual(user.enabled, 0)
-		for field in ("first_name", "last_name", "full_name", "email"):
-			self.assertNotIn("silinecek", (user.get(field) or "").lower(), field)
-		# Sessions are closed. The old browser is a guest now.
+		for field in ("first_name", "last_name", "full_name", "email", "username"):
+			value = (user.get(field) or "").lower()
+			self.assertNotIn("ornekoglu", value, field)
+			self.assertNotIn("silinecek", value, field)
 		self.assertEqual(h.session_count(DELETED) + h.session_count(anon), 0)
 		self.assertEqual(h.logged_user(client), "Guest")
-		# The identity link follows the anonymous user and is kept for repeated requests.
-		self.assertEqual(frappe.db.get_value("Platform Identity Link", self.link.name, "user"), anon)
 
-	def test_person_fields_are_anonymized_and_business_records_stay(self):
-		response = self.call(self.body())
+	def test_deletion_record_keeps_only_the_digest_and_the_raw_sub_is_gone(self):
+		response = self.call()
 		self.assertEqual(response.status_code, 200, response.data[:500])
 		h.refresh()
-		self.assertFalse(frappe.db.exists("Contact", self.contact))
+		record = frappe.db.get_value(
+			DELETION, expected_hash(), ["identity_hash", "state", "user", "deleted_at"], as_dict=True
+		)
+		self.assertEqual(record.identity_hash, expected_hash())
+		self.assertEqual(record.state, "Anonymized")
+		self.assertEqual(record.user, response.json["message"]["user"])
+		self.assertTrue(record.deleted_at)
+		self.assertFalse(frappe.db.exists(LINK, {"subject": SUBJECT}))
+		self.assertFalse(frappe.db.exists(LINK, self.link.name))
+		for value in record.values():
+			self.assertNotIn(SUBJECT, str(value))
+
+	def test_only_rows_bound_to_the_user_change(self):
+		response = self.call()
+		self.assertEqual(response.status_code, 200, response.data[:500])
+		h.refresh()
 		self.assertFalse(frappe.db.exists("Contact Email", {"email_id": DELETED}))
-		contacts = frappe.get_all("Contact", filters={"name": response.json["message"]["user"]}, pluck="name")
-		self.assertEqual(len(contacts), 1)
-		for name in contacts:
-			contact = frappe.get_doc("Contact", name)
-			self.assertNotIn("silinecek", (contact.first_name or "").lower())
-			self.assertNotIn(DELETED, [row.email_id for row in contact.email_ids])
+		own = frappe.db.get_value(
+			"Comment", self.own_comment.name, ["content", "comment_by", "comment_email"], as_dict=True
+		)
+		self.assertNotIn(DELETED, own.content)
+		self.assertNotEqual(own.comment_email, DELETED)
+		self.assertNotEqual(own.comment_by, FULL_NAME)
+		# The namesake keeps everything (E3).
+		other = frappe.db.get_value(
+			"Comment", self.namesake_comment.name, ["content", "comment_by", "comment_email"], as_dict=True
+		)
+		self.assertEqual(other.content, f"{FULL_NAME} yazdi")
+		self.assertEqual(other.comment_by, FULL_NAME)
+		self.assertEqual(other.comment_email, NAMESAKE)
+		self.assertEqual(frappe.db.get_value("User", NAMESAKE, "full_name"), FULL_NAME)
+		self.assertTrue(frappe.db.get_value("User", NAMESAKE, "enabled"))
+		# Business records stay.
 		self.assertTrue(frappe.db.exists("ToDo", self.todo.name))
 		self.assertEqual(frappe.db.get_value("ToDo", self.todo.name, "description"), "Ornek is kaydi")
 		self.assertNotEqual(frappe.db.get_value("ToDo", self.todo.name, "allocated_to"), DELETED)
+		self.assertNotEqual(frappe.db.get_value("ToDo", self.todo.name, "owner"), DELETED)
 
-	def test_deletion_request_record_has_no_original_email_and_no_mail_is_sent(self):
-		response = self.call(self.body())
-		self.assertEqual(response.status_code, 200, response.data[:500])
+	def test_no_mail_and_no_frappe_deletion_request(self):
+		before = frappe.db.count("Personal Data Deletion Request")
+		self.assertEqual(self.call().status_code, 200)
 		h.refresh()
-		self.assertEqual(frappe.db.count(REQUEST), self.requests_before + 1)
-		anon = response.json["message"]["user"]
-		record = frappe.get_doc(REQUEST, anon)
-		self.assertEqual(record.status, "Deleted")
-		self.assertNotEqual(record.email, DELETED)
-		self.assertFalse(frappe.db.exists(REQUEST, {"email": DELETED}))
+		self.assertEqual(frappe.db.count("Personal Data Deletion Request"), before)
 		self.assertEqual(frappe.db.count("Email Queue Recipient", {"recipient": DELETED}), 0)
 
-	def test_same_request_twice_returns_the_same_body(self):
-		first = self.call(self.body())
-		self.assertEqual(first.status_code, 200, first.data[:500])
-		second = self.call(self.body())
-		self.assertEqual(second.status_code, 200, second.data[:500])
-		self.assertEqual(first.json["message"], second.json["message"])
-		h.refresh()
-		self.assertEqual(frappe.db.count(REQUEST), self.requests_before + 1)
+	def test_api_keys_are_revoked_even_if_the_account_comes_back(self):
+		# Ö1: the key and its stored secret are deleted, not only refused for a disabled account.
+		from frappe.utils.password import set_encrypted_password
 
-	def test_signed_in_after_anonymization_is_refused(self):
-		self.call(self.body())
+		secret = frappe.generate_hash(length=15)
+		frappe.db.set_value("User", DELETED, "api_key", "kimlikanahtar01")
+		set_encrypted_password("User", DELETED, secret, "api_secret")
+		frappe.db.commit()
+		token = "token kimlikanahtar01:" + secret
+		before = h.request(
+			h.new_client().get, "/api/method/frappe.auth.get_logged_user", headers={"Authorization": token}
+		)
+		self.assertEqual(before.status_code, 200, before.data[:200])
+
+		response = self.call()
+		self.assertEqual(response.status_code, 200, response.data[:500])
+		anon = response.json["message"]["user"]
+		# A mistake re-enables the account. The old key must still fail.
+		frappe.db.set_value("User", anon, "enabled", 1)
+		frappe.db.commit()
+		basic = "Basic " + base64.b64encode(f"kimlikanahtar01:{secret}".encode()).decode()
+		for header in (token, basic):
+			answer = h.request(
+				h.new_client().get,
+				"/api/method/frappe.auth.get_logged_user",
+				headers={"Authorization": header},
+			)
+			self.assertIn(answer.status_code, (401, 403), answer.data[:200])
+		self.assertFalse(frappe.db.get_value("User", anon, "api_key"))
+
+	# --- E1: a deleted identity stays deleted ------------------------------------------------------
+
+	def test_deleted_identity_cannot_be_provisioned_enabled_or_renamed(self):
+		self.assertEqual(self.call().status_code, 200)
+		provision = self.call(
+			PROVISION,
+			{
+				"issuer": h.ISSUER,
+				"subject": SUBJECT,
+				"email": DELETED,
+				"email_verified": True,
+				"first_name": "Ayse",
+				"last_name": "Ornekoglu",
+				"enabled": True,
+				"role_profiles": [],
+			},
+		)
+		self.assertEqual(provision.status_code, 410, provision.data[:300])
+		self.assertEqual(provision.json.get("exc_type"), "IdentityDeleted")
+		enable = self.call(SET_ENABLED, {"issuer": h.ISSUER, "subject": SUBJECT, "enabled": True})
+		self.assertEqual(enable.status_code, 410, enable.data[:300])
+		rename = self.call(CHANGE_EMAIL, {"issuer": h.ISSUER, "subject": SUBJECT, "new_email": DELETED})
+		self.assertEqual(rename.status_code, 410, rename.data[:300])
+		h.refresh()
+		self.assertFalse(frappe.db.exists("User", DELETED))
+		self.assertFalse(frappe.db.exists(LINK, {"subject": SUBJECT}))
+
+	def test_identity_closed_by_step_one_is_already_refused(self):
+		with patch.object(anonymization, "anonymize_step", side_effect=RuntimeError("cut")):
+			self.assertEqual(self.call().status_code, 500)
+		h.refresh()
+		self.assertEqual(frappe.db.get_value(DELETION, expected_hash(), "state"), "Disabled")
+		enable = self.call(SET_ENABLED, {"issuer": h.ISSUER, "subject": SUBJECT, "enabled": True})
+		self.assertEqual(enable.status_code, 410, enable.data[:300])
+		self.assertEqual(frappe.db.get_value("User", DELETED, "enabled"), 0)
+
+	def test_signed_in_after_deletion_is_refused(self):
+		self.call()
 		client = h.new_client()
 		response = h.login_with_keycloak(client, h.userinfo(SUBJECT, DELETED))
 		self.assertEqual(response.status_code, 403, response.data[:300])
 		self.assertEqual(h.logged_user(client), "Guest")
 
-	def test_link_and_request_are_read_with_row_locks(self):
-		# Review finding: a retry that runs while the first call is still open must wait for it. Locking reads
-		# (SELECT ... FOR UPDATE) serialize the two calls and see the committed anonymous name.
-		from unittest.mock import patch
+	# --- E2: two steps, repeatable, interrupted, concurrent ------------------------------------------
 
-		from platform_core.kimlik import anonymization
+	def test_same_request_twice_returns_the_same_body(self):
+		first = self.call()
+		self.assertEqual(first.status_code, 200, first.data[:500])
+		second = self.call()
+		self.assertEqual(second.status_code, 200, second.data[:500])
+		self.assertEqual(first.json["message"], second.json["message"])
 
-		real = frappe.db.get_value
-		calls = []
+	def test_interrupted_after_step_one_is_finished_by_the_retry(self):
+		with patch.object(anonymization, "anonymize_step", side_effect=RuntimeError("cut")):
+			cut = self.call()
+		self.assertEqual(cut.status_code, 500, cut.data[:300])
+		h.refresh()
+		# Step 1 was committed: the account is closed and the deletion is recorded.
+		self.assertEqual(frappe.db.get_value("User", DELETED, "enabled"), 0)
+		self.assertEqual(frappe.db.get_value(DELETION, expected_hash(), "state"), "Disabled")
+		self.assertTrue(frappe.db.exists(LINK, self.link.name))
+		retry = self.call()
+		self.assertEqual(retry.status_code, 200, retry.data[:500])
+		self.assertEqual(retry.json["message"]["status"], "Anonymized")
 
-		def spy(doctype, *args, **kwargs):
-			calls.append((doctype, kwargs.get("for_update")))
-			return real(doctype, *args, **kwargs)
+	def test_failure_inside_step_two_leaves_no_half_anonymized_person(self):
+		from platform_core.kimlik import anonymization_scope
 
-		with patch.object(frappe.db, "get_value", side_effect=spy):
-			anonymization.anonymize_user({"issuer": h.ISSUER, "subject": SUBJECT})
-		frappe.db.rollback()
-		self.assertIn(("Platform Identity Link", True), calls)
-		self.assertIn(("Personal Data Deletion Request", True), calls)
+		real = anonymization_scope._extra_records
+
+		def broken(*args, **kwargs):
+			real(*args, **kwargs)
+			raise RuntimeError("cut inside step 2")
+
+		with patch.object(anonymization_scope, "_extra_records", side_effect=broken):
+			cut = self.call()
+		self.assertEqual(cut.status_code, 500, cut.data[:300])
+		h.refresh()
+		self.assertEqual(frappe.db.get_value("User", DELETED, "first_name"), "Ayse")
+		self.assertTrue(frappe.db.exists("Contact Email", {"email_id": DELETED}))
+		self.assertEqual(frappe.db.get_value(DELETION, expected_hash(), "state"), "Disabled")
+		self.assertEqual(self.call().status_code, 200)
+
+	def test_many_sessions_are_closed_page_by_page(self):
+		# Frappe returns at most 100 sessions per query (frappe/sessions.py:76).
+		clients = [h.new_client() for _number in range(105)]
+		for client in clients:
+			h.login_with_keycloak(client, h.userinfo(SUBJECT, DELETED))
+			h.reset_rate_limits()
+		h.refresh()
+		self.assertGreaterEqual(h.session_count(DELETED), 101)
+		self.assertEqual(self.call().status_code, 200)
+		h.refresh()
+		self.assertEqual(h.session_count(DELETED), 0)
+
+	def test_two_concurrent_calls_on_two_connections_finish_once(self):
+		# Two database connections, as two workers would have (E2). Both calls return the same body.
+		site = frappe.local.site
+		results = {}
+		start = threading.Barrier(2)
+
+		def worker(name):
+			frappe.init(site=site)
+			frappe.connect()
+			try:
+				frappe.set_user("Administrator")
+				start.wait(timeout=30)
+				results[name] = anonymization.anonymize_user({"issuer": h.ISSUER, "subject": SUBJECT})
+				frappe.db.commit()
+			except Exception as error:
+				results[name] = repr(error)
+				frappe.db.rollback()
+			finally:
+				frappe.destroy()
+
+		threads = [threading.Thread(target=worker, args=(name,)) for name in ("a", "b")]
+		for thread in threads:
+			thread.start()
+		for thread in threads:
+			thread.join(timeout=120)
+		self.assertEqual(set(results), {"a", "b"})
+		self.assertIsInstance(results["a"], dict, results)
+		self.assertEqual(results["a"], results["b"])
+		h.refresh()
+		self.assertEqual(frappe.db.count("User", {"name": ("like", "deleted-user-%")}), 1)
+		self.assertEqual(frappe.db.get_value(DELETION, expected_hash(), "state"), "Anonymized")
+
+	# --- refusals ---------------------------------------------------------------------------------
 
 	def test_unknown_identity_gets_404(self):
-		response = self.call(self.body(subject="sub-yok"))
+		response = self.call(body=self.body(subject="sub-yok"))
 		self.assertEqual(response.status_code, 404, response.data[:300])
 		self.assertEqual(response.json.get("exc_type"), "IdentityNotFound")
 		h.refresh()
 		self.assertTrue(frappe.db.get_value("User", DELETED, "enabled"))
 
 	def test_administrator_cannot_be_anonymized(self):
-		frappe.db.set_value("Platform Identity Link", self.link.name, "user", "Administrator")
+		frappe.db.set_value(LINK, self.link.name, "user", "Administrator")
 		frappe.db.commit()
-		response = self.call(self.body())
+		response = self.call()
 		self.assertEqual(response.status_code, 409, response.data[:300])
 		self.assertEqual(response.json.get("exc_type"), "IdentityConflict")
 		h.refresh()
 		self.assertTrue(frappe.db.get_value("User", "Administrator", "enabled"))
+		self.assertFalse(frappe.db.exists(DELETION, expected_hash()))
+
+	def test_missing_deletion_key_fails_closed(self):
+		with h.SiteSettings({"kimlik_deletion_hmac_key": ""}):
+			response = self.call()
+			enable = self.call(SET_ENABLED, {"issuer": h.ISSUER, "subject": SUBJECT, "enabled": False})
+		self.assertEqual(response.status_code, 503, response.data[:300])
+		self.assertEqual(response.json.get("exc_type"), "DeletionKeyMissing")
+		self.assertEqual(enable.status_code, 503, enable.data[:300])
+		h.refresh()
+		self.assertTrue(frappe.db.get_value("User", DELETED, "enabled"))
 
 	def test_missing_subject_gets_400(self):
-		response = self.call({"issuer": h.ISSUER})
+		response = self.call(body={"issuer": h.ISSUER})
 		self.assertEqual(response.status_code, 400, response.data[:300])
 		self.assertEqual(response.json.get("exc_type"), "InvalidInput")
 
 	def test_other_service_client_is_refused(self):
-		response = self.call(self.body(), azp="press-service")
+		response = self.call(azp="press-service")
 		self.assertIn(response.status_code, (401, 403), response.data[:300])
 		h.refresh()
 		self.assertTrue(frappe.db.get_value("User", DELETED, "enabled"))
@@ -206,7 +407,6 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.assertTrue(frappe.db.exists("User", DELETED))
 
 	def test_desk_session_of_system_manager_is_refused(self):
-		# Only the service token may call the endpoint, not a person with a session (contract, security).
 		client = h.new_client()
 		password = frappe.generate_hash(length=24)
 		h.ensure_system_manager("kimlik.yonetici@example.test", password)
