@@ -24,6 +24,13 @@
   --fs-shadow-2: 0 2px 4px rgba(10, 30, 28, 0.08), 0 20px 40px -20px rgba(10, 30, 28, 0.3);
   --fs-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --fs-dur: 160ms;
+  --fs-font-body: var(--mantine-font-size-md);
+  --fs-leading-body: var(--mantine-line-height-md);
+  --fs-font-page-title: clamp(var(--mantine-h2-font-size), 1.2rem + 1.8vw, var(--mantine-h1-font-size));
+  --fs-leading-page-title: var(--mantine-h1-line-height);
+  --fs-font-section-title: clamp(1.4rem, 1.2rem + 0.8vw, 1.75rem);
+  --fs-font-card-title: 1.0625rem;
+  --fs-font-stat: 1.85rem;
   --fs-content-max: 76ch;
   --fs-gutter: 1rem;
   --fs-header-h: 60px;
@@ -33,10 +40,13 @@
   /* Başlığın kenar simge düğmelerinin görsel kutusu (önceki Mantine ActionIcon lg). Etkili alan (--fs-hit) bundan
      büyüktür; fark başlığın iç boşluğuna taşar, simgeler kenar boşluğuna göre aynı hizada kalır. */
   --fs-icon-box: 34px;
+  --fs-hero-pad: min(clamp(1.25rem, 1rem + 2vw, 2.5rem), 8vw);
   /* Düğme biçimli kontrol (indirme bağlantıları): iç boşluk, öğe arası, kenar, hover kalkışı ve ağırlık.
-     Ölçüler ana sayfanın .btn görünümüyle aynıdır; odak yalnız global :focus-visible kuralıdır. */
+     Ana sayfa düğmeleri dar alanda yatay iç boşluğu azaltır. */
   --fs-control-pad-block: 0.55rem;
   --fs-control-pad-inline: 1.1rem;
+  --fs-hero-control-pad-inline: min(var(--fs-control-pad-inline), 6cqi);
+  --fs-hero-control-pad-inline-narrow: 0.25rem;
   --fs-control-gap: 0.4rem;
   --fs-control-edge: inset 0 0 0 1px var(--fs-grid);
   --fs-control-lift: -1px;
@@ -379,8 +389,8 @@ body {
 /* Metin satır uzunluğu 76ch ile sınırlı; tablo, diyagram ve kod blokları sütunun tamamını kullanır */
 .prose {
   max-width: 100%;
-  font-size: 1.0625rem;
-  line-height: 1.65;
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
 }
 .prose > p,
 .prose > ul,
@@ -404,8 +414,8 @@ body {
 }
 .prose h2 {
   position: relative;
-  font-size: 1.5rem;
-  line-height: 1.3;
+  font-size: var(--mantine-h2-font-size);
+  line-height: var(--mantine-h2-line-height);
   letter-spacing: -0.01em;
   margin: 2.75rem 0 0.75rem;
   padding-top: 0.25rem;
@@ -413,8 +423,8 @@ body {
 }
 .prose h3 {
   position: relative;
-  font-size: 1.2rem;
-  line-height: 1.35;
+  font-size: var(--mantine-h3-font-size);
+  line-height: var(--mantine-h3-line-height);
   margin: 1.75rem 0 0.5rem;
   scroll-margin-top: calc(var(--fs-header-h) + 1rem);
 }
@@ -775,8 +785,8 @@ body {
 .req-detail,
 .req-owner {
   margin: 0;
-  font-size: var(--mantine-font-size-md);
-  line-height: var(--mantine-line-height-md);
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
 }
 .req-card-title,
 .req-title {

@@ -54,11 +54,11 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
       </p>
       <div class="actions">
         <a class="btn btn-primary" href={`${base}/kararlar/`}>
-          Kararlardan başla
+          <span>Kararlardan başla</span>
           <IconArrowRight size={18} stroke={2} aria-hidden />
         </a>
-        <a class="btn" href={`${base}/gereksinimler/`}>Gereksinim gezgini</a>
-        <a class="btn" href={`${base}/yol-haritasi/`}>Yol haritası</a>
+        <a class="btn" href={`${base}/gereksinimler/`}><span>Gereksinim gezgini</span></a>
+        <a class="btn" href={`${base}/yol-haritasi/`}><span>Yol haritası</span></a>
       </div>
     </div>
 
@@ -181,7 +181,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     isolation: isolate;
     display: grid;
     gap: 1.75rem;
-    padding: clamp(1.25rem, 1rem + 2vw, 2.5rem);
+    padding: var(--fs-hero-pad);
     margin-top: 0.25rem;
     border-radius: var(--mantine-radius-xl);
     background:
@@ -226,23 +226,23 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   .eyebrow {
     margin: 0 0 0.75rem;
     color: var(--fs-accent);
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
     font-weight: 650;
     letter-spacing: 0.02em;
     text-transform: uppercase;
   }
   h1 {
     margin: 0 0 1rem;
-    font-size: clamp(1.85rem, 1.2rem + 2.6vw, 3.1rem);
-    line-height: 1.1;
+    font-size: var(--fs-font-page-title);
+    line-height: var(--fs-leading-page-title);
     letter-spacing: -0.025em;
     text-wrap: balance;
     max-width: 22ch;
   }
   .lede {
     margin: 0 0 1.5rem;
-    font-size: 1.125rem;
-    line-height: 1.65;
+    font-size: var(--fs-font-body);
+    line-height: var(--fs-leading-body);
     color: var(--fs-quiet);
     max-width: 62ch;
     text-wrap: pretty;
@@ -255,20 +255,37 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   .btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: var(--fs-control-gap);
     min-height: var(--fs-hit);
-    padding: 0.55rem 1.1rem;
+    max-inline-size: 100%;
+    padding: var(--fs-control-pad-block) var(--fs-hero-control-pad-inline);
     border-radius: var(--mantine-radius-md);
     background: var(--fs-surface);
     box-shadow: inset 0 0 0 1px var(--fs-grid);
     color: inherit;
     text-decoration: none;
     font-weight: 600;
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
     transition:
       background-color var(--fs-dur) var(--fs-ease),
       box-shadow var(--fs-dur) var(--fs-ease),
       transform var(--fs-dur) var(--fs-ease);
+  }
+  .btn > span {
+    min-inline-size: 0;
+  }
+  .btn > svg {
+    flex: none;
+  }
+  @container (max-width: 8rem) {
+    .btn-primary {
+      display: block;
+      padding-inline: var(--fs-hero-control-pad-inline-narrow);
+    }
+    .btn-primary > svg {
+      margin-inline-start: var(--fs-control-gap);
+      vertical-align: middle;
+    }
   }
   .btn:hover {
     background: var(--fs-tint);
@@ -329,7 +346,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     color: var(--fs-chip-ink);
     font-family: var(--mantine-font-family-monospace);
     font-weight: 600;
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
   }
   .rail-body {
     display: grid;
@@ -339,11 +356,11 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .rail-name {
     font-weight: 650;
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
   }
   .rail-detail {
     color: var(--fs-quiet);
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
     line-height: 1.35;
   }
 
@@ -363,7 +380,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     gap: 0.1rem;
   }
   .stat-n {
-    font-size: 1.85rem;
+    font-size: var(--fs-font-stat);
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1.1;
@@ -372,7 +389,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .stat-l {
     color: var(--fs-quiet);
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
   }
 
   /* Bloklar */
@@ -390,14 +407,14 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   .kicker {
     margin: 0 0 0.2rem;
     color: var(--fs-accent);
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
     font-weight: 650;
     letter-spacing: 0.06em;
     text-transform: uppercase;
   }
   .block-head h2 {
     margin: 0;
-    font-size: clamp(1.4rem, 1.2rem + 0.8vw, 1.75rem);
+    font-size: var(--fs-font-section-title);
     letter-spacing: -0.015em;
   }
   .more {
@@ -449,17 +466,17 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     color: var(--fs-chip-ink);
     font-family: var(--mantine-font-family-monospace);
     font-weight: 600;
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
   }
   .decision h3 {
     margin: 0 0 0.25rem;
-    font-size: 1.125rem;
+    font-size: var(--mantine-font-size-lg);
     letter-spacing: -0.01em;
   }
   .decision p {
     margin: 0;
     color: var(--fs-quiet);
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
     line-height: 1.55;
     text-wrap: pretty;
   }
@@ -482,19 +499,19 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .phase-n {
     font-family: var(--mantine-font-family-monospace);
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
     color: var(--fs-accent);
     font-weight: 600;
     padding-top: 0.15rem;
   }
   .phase h3 {
     margin: 0 0 0.25rem;
-    font-size: 1.0625rem;
+    font-size: var(--fs-font-card-title);
   }
   .phase p {
     margin: 0;
     color: var(--fs-quiet);
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
     line-height: 1.5;
     text-wrap: pretty;
   }
@@ -505,7 +522,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
   }
   .group-label {
     margin: 0 0 0.6rem;
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
     color: var(--fs-quiet);
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -559,17 +576,17 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     align-items: baseline;
     gap: 0.5rem;
     font-weight: 650;
-    font-size: 1.0625rem;
+    font-size: var(--fs-font-card-title);
   }
   .section-order {
     font-family: var(--mantine-font-family-monospace);
     color: var(--fs-quiet);
     font-weight: 500;
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
   }
   .section-title {
     color: var(--fs-quiet);
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
     line-height: 1.45;
     text-wrap: pretty;
   }

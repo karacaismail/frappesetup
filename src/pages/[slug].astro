@@ -260,7 +260,7 @@ const embeds = EMBEDS[entry.id] ?? [];
     gap: 0.45rem;
     margin: 0 0 0.75rem;
     color: var(--fs-quiet);
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
   }
   .doc-icon {
     display: grid;
@@ -282,8 +282,8 @@ const embeds = EMBEDS[entry.id] ?? [];
   }
   .doc-header h1 {
     margin: 0;
-    font-size: clamp(1.65rem, 1.2rem + 1.8vw, 2.4rem);
-    line-height: 1.15;
+    font-size: var(--fs-font-page-title);
+    line-height: var(--fs-leading-page-title);
     letter-spacing: -0.02em;
     text-wrap: balance;
     max-width: 30ch;
@@ -291,8 +291,8 @@ const embeds = EMBEDS[entry.id] ?? [];
   .doc-summary {
     margin: 0.75rem 0 0;
     color: var(--fs-quiet);
-    font-size: 1.125rem;
-    line-height: 1.55;
+    font-size: var(--fs-font-body);
+    line-height: var(--fs-leading-body);
     max-width: 60ch;
     text-wrap: pretty;
   }
@@ -339,10 +339,10 @@ const embeds = EMBEDS[entry.id] ?? [];
     align-items: center;
     gap: 0.3rem;
     color: var(--fs-quiet);
-    font-size: 1rem;
+    font-size: var(--fs-font-body);
   }
   .pager-title {
     font-weight: 650;
-    font-size: 1.0625rem;
+    font-size: var(--fs-font-card-title);
   }
 </style>

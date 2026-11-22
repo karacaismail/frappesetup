@@ -276,6 +276,59 @@ test.describe('text scaling', () => {
     });
   }
 
+  test('semantic typography uses the shared body and page title scale', async ({ page }) => {
+    for (const width of [320, 1366]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const [path, body] of [['', '.lede'], ['kararlar/', '.prose']]) {
+        await page.goto(path);
+        await expect(page.locator(body)).toHaveCSS('font-size', '16px');
+        await expect(page.locator(body)).toHaveCSS('line-height', '24px');
+        const titleSize = parseFloat(await page.locator('h1').evaluate((title) => getComputedStyle(title).fontSize));
+        expect(titleSize).toBeGreaterThanOrEqual(24);
+        expect(titleSize).toBeLessThanOrEqual(32);
+      }
+    }
+  });
+
+  for (const width of [320, 360]) {
+    test(`@touch home action labels fit at ${width}px with 200% root font`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 640 });
+      await page.goto('');
+      await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+      await page.evaluate(() => document.fonts.ready);
+      await noHorizontalOverflow(page);
+      await expectMinFont(page, 200);
+
+      const actions = page.locator('.hero .actions a');
+      await expect(actions).toHaveCount(3);
+      for (const action of await actions.all()) {
+        await expect(action).toBeVisible();
+        await expect(action).toHaveCSS('font-size', '32px');
+        const layout = await action.evaluate((link) => {
+          const hero = link.closest('.hero')!.getBoundingClientRect();
+          const button = link.getBoundingClientRect();
+          const label = document.createRange();
+          const text = (link.querySelector('span') ?? link).firstChild!;
+          label.selectNodeContents(text);
+          const labelRects = Array.from(label.getClientRects()).filter((rect) => rect.width > 0 && rect.height > 0);
+          const fits = labelRects.length > 0 && [button, ...labelRects].every((rect) =>
+            rect.left >= Math.max(hero.left, button.left) - 0.5 &&
+            rect.right <= Math.min(hero.right, button.right) + 0.5 &&
+            rect.top >= Math.max(hero.top, button.top) - 0.5 &&
+            rect.bottom <= Math.min(hero.bottom, button.bottom) + 0.5,
+          );
+          const splitWords = [...(text.textContent ?? '').matchAll(/\S+/g)].filter((word) => {
+            label.setStart(text, word.index);
+            label.setEnd(text, word.index + word[0].length);
+            return label.getClientRects().length > 1;
+          }).map(([word]) => word);
+          return { fits, splitWords };
+        });
+        expect(layout, await action.innerText()).toEqual({ fits: true, splitWords: [] });
+      }
+    });
+  }
+
   test('reduced motion disables smooth scrolling', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('kararlar/');
