@@ -301,10 +301,18 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		self.assertEqual(status, 200)
 		self.assertEqual({row["name"] for row in json.loads(payload)["message"]["teams"]}, set(teams))
 
-	def sign_in(self, subject, email, keycloak_sid, expected_status=302, **overrides):
-		status, _, payload = self.exchange("POST", "/api/method/press_tr.api.auth.get_login_url")
+	def start_login(self):
+		status, headers, payload = self.exchange("POST", "/api/method/press_tr.api.auth.get_login_url")
 		self.assertEqual(status, 200)
 		query = parse_qs(urlsplit(json.loads(payload)["message"]["url"]).query)
+		cookies = SimpleCookie()
+		for header in headers.get_all("Set-Cookie"):
+			cookies.load(header)
+		browser = cookies["press_tr_login"].value
+		return query, {"Cookie": f"press_tr_login={browser}"}
+
+	def sign_in(self, subject, email, keycloak_sid, expected_status=302, *, other_browser=None, **overrides):
+		query, state_cookie = self.start_login()
 		state, nonce, challenge = (query[key][0] for key in ("state", "nonce", "code_challenge"))
 		code = uuid4().hex
 		self.codes[code] = (
@@ -324,7 +332,11 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		callback = "/api/method/press_tr.api.auth.keycloak_callback?" + urlencode(
 			{"state": state, "code": code}
 		)
-		state_cookie = {"Cookie": f"press_tr_login={state}"}
+		if other_browser is not None:
+			self.assertNotEqual(state_cookie, other_browser)
+			status, _, _ = self.exchange("GET", callback, other_browser)
+			self.assertEqual(status, 403)
+			self.assertIn(code, self.codes)
 		status, headers, payload = self.exchange("GET", callback, state_cookie)
 		self.assertEqual(status, expected_status, payload)
 		if expected_status != 302:
@@ -339,6 +351,11 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		self.assertEqual(status, 403)
 
 		return {"Cookie": f"sid={sid}"}
+
+	def test_callback_rejects_a_second_browser_without_consuming_the_first_login(self):
+		_, other_browser = self.start_login()
+		subject = uuid4().hex
+		self.sign_in(subject, f"{subject}@example.test", uuid4().hex, other_browser=other_browser)
 
 	def test_callback_validates_nonce_and_audience(self):
 		for claims in ({"nonce": "wrong"}, {"audience": "wrong"}):

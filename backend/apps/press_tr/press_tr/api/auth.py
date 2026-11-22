@@ -12,7 +12,7 @@ from werkzeug.exceptions import Conflict
 from press_tr.kimlik.identity import bind_identity, ensure_personal_team
 from press_tr.kimlik.oidc import callback_url, claim, client_id, issuer, reject, server_endpoint, verify
 
-STATE_TTL = 300
+STATE_TTL = 600
 STATE_COOKIE = "press_tr_login"
 
 
@@ -20,21 +20,34 @@ def state_cookie():
 	return "__Host-press_tr_login" if callback_url().startswith("https:") else STATE_COOKIE
 
 
-def state_key(state):
-	return frappe.cache.make_key(f"press_tr:login:{state}")
+def state_key(state: str, browser_digest: str) -> bytes:
+	# Only the initiating browser can address and consume this login record.
+	return frappe.cache.make_key(f"press_tr:login:{state}:{browser_digest}")
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=10, seconds=60)
 def get_login_url() -> dict[str, str]:
-	state, nonce, verifier = (secrets.token_urlsafe(32) for _ in range(3))
+	state, nonce, verifier, browser = (secrets.token_urlsafe(32) for _ in range(4))
+	browser_digest = hashlib.sha256(browser.encode("ascii")).hexdigest()
 	challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
 	redirect_uri = callback_url()
 	authorization_url = f"{issuer()}/protocol/openid-connect/auth"
 
-	frappe.cache.setex(state_key(state), STATE_TTL, json.dumps({"nonce": nonce, "verifier": verifier}))
+	login = {
+		"browser_digest": browser_digest,
+		"nonce": nonce,
+		"verifier": verifier,
+		"return_path": "/dashboard",
+	}
+	frappe.cache.setex(state_key(state, browser_digest), STATE_TTL, json.dumps(login))
 	frappe.local.cookie_manager.set_cookie(
-		state_cookie(), state, secure=redirect_uri.startswith("https:"), httponly=True, max_age=STATE_TTL
+		state_cookie(),
+		browser,
+		secure=redirect_uri.startswith("https:"),
+		httponly=True,
+		samesite="Lax",
+		max_age=STATE_TTL,
 	)
 	query = urlencode(
 		{
@@ -51,22 +64,32 @@ def get_login_url() -> dict[str, str]:
 	return {"url": f"{authorization_url}?{query}"}
 
 
-def consume_login(state):
-	cookie = frappe.request.cookies.get(state_cookie(), "")
+def consume_login(state: str | None):
+	browser = frappe.request.cookies.get(state_cookie(), "")
 	if (
 		not isinstance(state, str)
+		or len(state) != 43
+		or len(browser) != 43
 		or not state.isascii()
-		or not cookie.isascii()
-		or not secrets.compare_digest(state, cookie)
+		or not browser.isascii()
 	):
 		reject()
-	data = frappe.cache.getdel(state_key(state))
+	browser_digest = hashlib.sha256(browser.encode("ascii")).hexdigest()
+	data = frappe.cache.getdel(state_key(state, browser_digest))
 	if not data:
 		reject()
+	login = json.loads(data)
+	if not secrets.compare_digest(login["browser_digest"], browser_digest):
+		reject()
 	frappe.local.cookie_manager.set_cookie(
-		state_cookie(), "", secure=callback_url().startswith("https:"), httponly=True, max_age=0
+		state_cookie(),
+		"",
+		secure=callback_url().startswith("https:"),
+		httponly=True,
+		samesite="Lax",
+		max_age=0,
 	)
-	return json.loads(data)
+	return login
 
 
 def exchange_code(code, verifier):
@@ -132,4 +155,4 @@ def keycloak_callback(state: str | None = None, code: str | None = None) -> None
 		frappe.local.cookie_manager.cookies.pop("sid", None)
 		raise
 	frappe.local.flags.commit = True
-	frappe.local.response.update(type="redirect", location="/dashboard")
+	frappe.local.response.update(type="redirect", location=login["return_path"])

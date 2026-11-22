@@ -7,7 +7,7 @@ paths:
     post:
       operationId: getLoginUrl
       summary: Get a single-use Keycloak login URL.
-      description: Starts a rate-limited browser login and binds it to that browser.
+      description: Starts a rate-limited browser login. A separate random value in an HttpOnly SameSite=Lax cookie binds the state record to the initiating browser for 600 seconds. HTTPS uses a Secure cookie with the __Host- prefix.
       responses:
         "200":
           description: The URL contains state, nonce and a PKCE S256 challenge.
@@ -32,7 +32,7 @@ paths:
     get:
       operationId: completeLogin
       summary: Exchange the authorization code and open a Press session.
-      description: Validates browser state and Keycloak identity before opening a session. May create a local user and a team. Does not start billing.
+      description: Requires the initiating browser cookie and consumes the matching state record atomically before verifying Keycloak identity. May create a local user and a team. Does not start billing.
       parameters:
         - name: state
           in: query

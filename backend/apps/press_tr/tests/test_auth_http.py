@@ -4,6 +4,7 @@ import http.client
 import json
 import os
 import unittest
+from http.cookies import SimpleCookie
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
@@ -59,12 +60,15 @@ class AuthHttpTest(PressHttpClient, unittest.TestCase):
 		self.assertEqual(query["code_challenge_method"], ["S256"])
 		for key in ("state", "nonce", "code_challenge"):
 			self.assertGreaterEqual(len(query[key][0]), 43)
-		self.assertTrue(
-			any(
-				cookie.startswith(f"press_tr_login={query['state'][0]};")
-				for cookie in headers.get_all("Set-Cookie")
-			)
-		)
+		cookies = SimpleCookie()
+		for header in headers.get_all("Set-Cookie"):
+			cookies.load(header)
+		browser = cookies["press_tr_login"]
+		self.assertEqual(len(browser.value), 43)
+		self.assertNotEqual(browser.value, query["state"][0])
+		self.assertTrue(browser["httponly"])
+		self.assertEqual(browser["samesite"], "Lax")
+		self.assertEqual(browser["max-age"], "600")
 		status, _ = self.request(
 			"GET", f"/api/method/press_tr.api.auth.keycloak_callback?state={query['state'][0]}&code=unused"
 		)
