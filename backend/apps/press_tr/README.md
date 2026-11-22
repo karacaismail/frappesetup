@@ -19,12 +19,6 @@ Configure these site settings before starting the web process:
 Register the exact callback and logout notification addresses in the
 [OpenAPI contract](../../contracts/press_tr.openapi.yaml).
 
-## Upgrading to Press Identity
-
-On an existing site, run `bench --site <site> clear-cache` before
-`bench --site <site> migrate`. This refreshes Frappe's cached module paths.
-The migration moves the two DocType definitions to Press Identity and preserves their records.
-
 ## Organization mapping
 
 Run `bench --site <site> migrate` to add the unique `Team.keycloak_org_id` field.
@@ -67,7 +61,7 @@ From the repository root, run this command. It starts a temporary bench web proc
 runs the checks, and stops that process. It creates fictional users, teams and sessions.
 
 ```sh
-PRESS_TEST_PANEL_URL=http://tenant1.localhost:3201/panel sh backend/apps/press_tr/tests/run.sh
+PRESS_TEST_PANEL_URL=http://kiraci1.localhost:3201/panel sh backend/apps/press_tr/tests/run.sh
 ```
 
 ## License

@@ -2,7 +2,7 @@ import frappe
 from werkzeug.exceptions import Forbidden, HTTPException
 from werkzeug.utils import redirect
 
-from press_tr.press_identity.service import SERVICE_PARAMETERS
+from press_tr.kimlik.service import SERVICE_PARAMETERS
 
 SOCIAL_PREFIX = "frappe.integrations.oauth2_logins."
 SOCIAL_METHODS = {

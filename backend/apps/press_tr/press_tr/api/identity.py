@@ -1,9 +1,9 @@
 import frappe
 from frappe import _
 
-from press_tr.press_identity.identity import as_press_user, bind_identity, create_team, find_identity
-from press_tr.press_identity.oidc import claim, reject
-from press_tr.press_identity.service import require_service
+from press_tr.kimlik.identity import as_press_user, bind_identity, create_team, find_identity
+from press_tr.kimlik.oidc import claim, reject
+from press_tr.kimlik.service import require_service
 
 
 def lock_team(organization_id: str):

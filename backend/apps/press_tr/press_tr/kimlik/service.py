@@ -1,7 +1,7 @@
 import frappe
 
-from press_tr.press_identity.oidc import client_id, reject, verify
-from press_tr.press_identity.oidc import issuer as configured_issuer
+from press_tr.kimlik.oidc import client_id, reject, verify
+from press_tr.kimlik.oidc import issuer as configured_issuer
 
 SERVICE_PARAMETERS = {
 	"press_tr.api.identity.ensure_team": {

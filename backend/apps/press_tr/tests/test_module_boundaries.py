@@ -9,7 +9,7 @@ APP = Path(__file__).resolve().parents[1] / "press_tr"
 
 class ModuleBoundariesTest(unittest.TestCase):
 	def test_identity_does_not_import_api_or_other_project_apps(self):
-		for path in (APP / "press_identity").rglob("*.py"):
+		for path in (APP / "kimlik").rglob("*.py"):
 			for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
 				if isinstance(node, ast.ImportFrom):
 					names = [node.module or ""]

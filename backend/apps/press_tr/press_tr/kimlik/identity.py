@@ -5,7 +5,7 @@ from email.headerregistry import Address
 import frappe
 from press.press.doctype.team.team import Team
 
-from press_tr.press_identity.oidc import claim, reject
+from press_tr.kimlik.oidc import claim, reject
 
 IDENTITY_LINK = "Press Identity Link"
 

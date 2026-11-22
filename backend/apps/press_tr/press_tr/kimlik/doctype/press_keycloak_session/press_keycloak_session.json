@@ -1,7 +1,7 @@
 {
   "doctype": "DocType",
   "name": "Press Keycloak Session",
-  "module": "Press Identity",
+  "module": "Kimlik",
   "autoname": "hash",
   "engine": "InnoDB",
   "field_order": [
