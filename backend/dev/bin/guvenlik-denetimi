@@ -29,4 +29,5 @@ status=0
 scan_secrets || status=1
 python3 -B -m unittest discover -s backend/dev/guvenlik -p test_endpoints.py || status=1
 python3 -B backend/dev/guvenlik/endpoints.py backend || status=1
+(backend/dev/bin/ai-readiness --self-test && backend/dev/bin/ai-readiness) || status=1
 exit "$status"

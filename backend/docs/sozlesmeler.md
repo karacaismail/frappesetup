@@ -75,7 +75,7 @@ Realm politikaları G-78 ve G-144'ü uygular. Örneğin şu ayarlar vardır:
 - 300 saniyede 5 hatalı denemeden sonra kilit,
 - en az 12 karakterli parola, parola geçmişi ve yaygın parola listesi,
 - TOTP ve passkey,
-- 30 dakika boşta kalma ve 12 saat toplam oturum süresi,
+- Karar 19 oturum süreleri (Proje kaydı O-25): kiracı sitesi ve telefon istemcileri için 1 saat boşta kalma ve 24 saat toplam süre, Press için 7 gün boşta kalma ve 30 gün toplam süre,
 - 5 dakikalık erişim belirteci,
 - her kullanımda değişen yenileme belirteci,
 - kapalı “Beni hatırla” seçeneği.
@@ -116,8 +116,12 @@ Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_id
 | `site` | metin | İsteğin geldiği site |
 | `installation` | metin | Telefon kurulumunun kimliği |
 | `sid` | metin | Keycloak oturum kimliği |
+| `auth_time` | tamsayı | Belirteçteki son kimlik doğrulama zamanı (Unix saniyesi) |
 
 Kabuk ve mobil modülü bu değeri okur. Değer yoksa ya da biçimi tutmazsa istek telefon isteği sayılmaz.
+
+- Kiracı sitesinde ve telefon paketinde bütün kullanıcılar çalışan süresini alır: 1 saat boşta kalma, 24 saat toplam süre. Realm bu istemcilerde `employee` düzeyini ister. Müşteri süreleri yalnız Press'e uygulanır.
+- Sunucu boşta kalma sayacını `auth_time` değeri sayaç başlangıcından yeni olunca sıfırlar. Böylece aynı `sid` ile yeniden giriş de telefonu açar.
 
 ### Kitaplığın arayüzü
 
@@ -279,12 +283,13 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Her işlem tekrar edilebilir olmalıdır. Aynı olay iki kez gelirse sonuç değişmez.
 - Başarısız olay ayrı kuyrukta bekler.
 - Mutabakat elle başlatılan bir komuttur. Komut farkları raporlar.
-- `POST /v1/sessions/revoke` ucu bir Keycloak oturumunu kapatır. Gövde `{"sid": "<oturum kimliği>", "subject": "<kullanıcı>"}` olur. Ucu yalnız `platform_core` servis belirteci çağırır. identity-sync önce oturumun bu kullanıcıya ait olduğunu Keycloak Admin API'den doğrular. Sonra kullanıcının çağıran kiracının kuruluşuna üye olduğunu doğrular. Kiracı, belirtecin `azp` değerinden kiracı listesiyle bulunur. Doğrulama tutmazsa uç 403 döner. identity-sync, Keycloak Admin API ile o oturumu siler. Oturum silinince yenileme belirteci de geçersiz olur. Uç tekrar edilebilir: kapalı oturum için de 200 döner.
+- `POST /v1/sessions/revoke` ucu bir Keycloak oturumunu kapatır. Gövde `{"sid": "<oturum kimliği>", "subject": "<kullanıcı>"}` olur. Ucu yalnız `platform_core` servis belirteci çağırır. identity-sync önce oturumun bu kullanıcıya ait olduğunu Keycloak Admin API'den doğrular. Sonra kullanıcının çağıran kiracının kuruluşuna üye olduğunu doğrular. Kiracı, belirtecin `azp` değerinden kiracı listesiyle bulunur. Kullanıcı bu kuruluşa üye değilse uç 403 döner. Oturum bu kullanıcıya ait değilse identity-sync hiçbir oturumu silmez ve 200 döner. Telefon istemcisi `subject` değerini kendi kurulum kaydından alır. identity-sync, Keycloak Admin API ile o oturumu siler. Oturum silinince yenileme belirteci de geçersiz olur. Uç tekrar edilebilir: kapalı oturum için de 200 döner.
 - Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Kurulum iptal edilince `platform_core` bu ucu çağırır. Aynı `sid` ile gelen belirteç de reddedilir (Proje kaydı O-25).
 - `POST /v1/account-deletions` ucu hesap silme isteğini kaydeder (Proje kaydı O-27). Ucu yalnız Press çağırır. Belirteç `azp=press-service` ve `aud=identity-sync` taşır. Gövde `issuer`, `subject` ve `reauthenticated_at` alanlarını taşır.
 - Müşteri silme isteğini Press'te verir. Press önce kullanıcıyı Keycloak'ta yeniden doğrular (`prompt=login`, `max_age=0`). `reauthenticated_at` bu doğrulamanın zamanıdır. identity-sync 300 saniyeden eski doğrulamayı reddeder.
 - Keycloak'ın kendi `delete_account` eylemi kapalıdır. Bu eylem kullanıcıyı ilk adımda siler. Hesap ekranındaki silme bağlantısı Press'teki silme sayfasına gider.
-- Yönetici kullanıcıyı Keycloak yönetim ekranından silerse olay dinleyici olayı gönderir. identity-sync 2., 3. ve 4. adımları yine çalıştırır. Olay kaybolursa elle başlatılan mutabakat komutu silinmiş kullanıcıyı bulur.
+- Yönetici kullanıcıyı Keycloak yönetim ekranından silerse olay dinleyici olayı gönderir. identity-sync 2., 3. ve 4. adımları yine çalıştırır. Olay kaybolursa elle başlatılan mutabakat komutu silinmiş kullanıcıyı bulur. Komut önce önizleme gösterir. İnsan onay verirse komut kalan silme adımlarını sırayla çalıştırır. Yerel hesap önceden kapalı olsa da bu adımlar çalışır.
+- Press isteği ve Keycloak silme olayı aynı hesap işine bağlanır. İş kimliği hesabın özetidir. Tamamlanan adım yeniden çağrılmaz. Yeniden deneme yanıtı hesap kimliğini değil iş kimliğini gösterir.
 - Akış sırası şudur:
   1. Keycloak kullanıcısı kapanır.
   2. Press kullanıcısı kapanır ve API anahtarları geçersiz olur (`remove_team_member`, `all_organizations: true`).
@@ -401,6 +406,7 @@ Proje sahibinin kararı şudur: Her şey yapay zekâyla yönetilebilir olacak. K
 
 - Yazdığınız her DocType alanına `description` verin. Açıklama İngilizce yazılır. Türkçesi çeviri dosyasındadır. Yapay zekâ alanı bu açıklamadan anlar.
 - Yazdığınız her uca OpenAPI dosyasında özet ve açıklama yazın.
+- Bir Frappe adresini değiştirirseniz eski adresi hedef işlemin `x-frappe-original` alanına yazın.
 - Ucu yıkıcı ya da ücretli bir iş yapıyorsa bunu sözleşmede belirtin.
 - Elle başlatılan her komut için bir HTTP ucu da yazın. Böylece yapay zekâ da komutu başlatabilir. Örneğin mutabakat komutu böyledir.
 - `press_tr` aynı kuralları uygular. Press işlemleri için depodaki `packages/press-ai` sözleşmesi temel alınır.
