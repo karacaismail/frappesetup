@@ -210,14 +210,20 @@ class TestMergeReview(FrappeAPITestCase):
 		for header in ("token abc:def", "Bearer not-a-token", "Basic YWJjOmRlZg=="):
 			client = h.new_client()
 			h.login_with_keycloak(client, h.userinfo(FAKE_SUBJECT, FAKE_EMAIL))
-			frappe.cache.delete_value(session_policy._session_key(client.get_cookie("sid").value))
+			sid = client.get_cookie("sid").value
+			frappe.cache.set_value(
+				session_policy._session_key(sid), int(time.time()) - 3601, expires_in_sec=3600
+			)
 			answer = h.request(
 				client.get,
 				"/api/method/frappe.client.get_count",
 				query_string={"doctype": "ToDo"},
 				headers={"Authorization": header},
 			)
-			self.assertIn(answer.status_code, (401, 403), f"{header}: {answer.data[:200]}")
+			self.assertEqual(answer.status_code, 401, f"{header}: {answer.data[:200]}")
+			self.assertEqual(answer.json.get("exc_type"), "SessionExpired", header)
+			h.refresh()
+			self.assertFalse(frappe.db.exists("Sessions", {"sid": sid}), header)
 			self.assertEqual(h.logged_user(client), "Guest", header)
 			h.reset_rate_limits()
 
@@ -227,7 +233,8 @@ class TestMergeReview(FrappeAPITestCase):
 		client = h.new_client()
 		h.login_with_keycloak(client, h.userinfo(FAKE_SUBJECT, FAKE_EMAIL))
 		key = session_policy._session_key(client.get_cookie("sid").value)
-		frappe.cache.set_value(key, 123, expires_in_sec=3600)
+		last_activity = int(time.time()) - 60
+		frappe.cache.set_value(key, last_activity, expires_in_sec=3600)
 		method = "frappe.auth.get_logged_user"
 		for call in (
 			lambda: h.request(client.get, f"/api/method/{method}"),
@@ -241,7 +248,7 @@ class TestMergeReview(FrappeAPITestCase):
 			answer = call()
 			self.assertEqual(answer.status_code, 200, answer.data[:200])
 			self.assertEqual(answer.json.get("message", answer.json.get("data")), FAKE_EMAIL)
-			self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), 123)
+			self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), last_activity)
 
 	# --- Ö3 -----------------------------------------------------------------------------------------
 
