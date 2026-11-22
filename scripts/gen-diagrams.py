@@ -177,7 +177,7 @@ def rails() -> str:
     o.append("<rect x='40' y='856' width='960' height='28' rx='6' fill='var(--fs-accent-soft)' stroke='var(--fs-accent)' stroke-width='1'/>")
     o.append("<text x='520' y='875' text-anchor='middle' fill='var(--fs-ink)'>Taban bandı 1 — Ortak sözleşmeler: host'a bağlı oturum · has_permission · tasarım tokenları · audit</text>")
     o.append("<rect x='40' y='892' width='960' height='28' rx='6' fill='var(--fs-tint)' stroke='var(--fs-grid)' stroke-width='1'/>")
-    o.append("<text x='520' y='911' text-anchor='middle' fill='var(--fs-ink)'>Taban bandı 2 — Hetzner bare-metal, self-host (Hüseyin Cengiz) · DNS: GoDaddy, app. alt bölgesi Route 53</text>")
+    o.append("<text x='520' y='911' text-anchor='middle' fill='var(--fs-ink)'>Taban bandı 2 — Hetzner bare-metal, self-host (DevOps sorumlusu) · DNS: GoDaddy, app. alt bölgesi Route 53</text>")
     o.append("</svg>")
     svg = "\n".join(o)
     caption = (

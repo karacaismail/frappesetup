@@ -10,8 +10,8 @@ info:
     The engine narrows records. The role permission grants access. The permission level closes a field.
 
     There is no separate endpoint to add, change or delete a rule.
-    These jobs use Frappe's built-in endpoint: `/api/v2/document/Access Rule`.
-    The fields of the “Access Rule” record are in the `AccessRule` schema below.
+    These jobs use Frappe's built-in endpoint: `/api/v2/document/PLT Access Rule`.
+    The fields of the “PLT Access Rule” record are in the `PLTAccessRule` schema below.
 
     Identity: the Frappe session cookie. A POST request needs the `X-Frappe-CSRF-Token` header.
     A guest without a session receives 403. A missing or expired session referenced by a cookie
@@ -21,6 +21,9 @@ info:
 
     The error response has Frappe's usual format. A permission error returns 403.
     Invalid input returns 417. A record that is not found returns 404.
+    A read denial for an empty or unreadable document type uses "No permission to read this document type."
+    A search denial uses "No permission to search this document type."
+    Both messages are translated for the user's language without interpolating the document type name.
 servers:
   - url: /api/method
     description: Frappe endpoint root of the tenant site
@@ -258,7 +261,7 @@ paths:
         "417":
           description: |
             The field does not exist, the field is standard, or the level is not between 0 and 9.
-            A document type that holds the permission system also gets this response. For example “Access Rule”.
+            A document type that holds the permission system also gets this response. For example “PLT Access Rule”.
 
   /platform_core.api.access.set_level_access:
     post:
@@ -712,7 +715,7 @@ x-ai-tools:
       roles: [System Manager]
       description: |
         It lists the access rules. The inputs are `document_type`, `role` and `include_inactive`.
-        The caller must have read permission on the “Access Rule” type. At most 200 rules return.
+        The caller must have read permission on the “PLT Access Rule” type. At most 200 rules return.
     - name: explain_access
       kind: read
       description: |
@@ -873,7 +876,7 @@ components:
     PLTAccessRule:
       type: object
       description: |
-        The “Access Rule” record. The record is managed from the `/api/v2/document/Access Rule` endpoint.
+        The “PLT Access Rule” record. The record is managed from the `/api/v2/document/PLT Access Rule` endpoint.
         Only the “System Manager” role reads and writes the record.
         When a rule is saved, its effect starts on the next request.
 

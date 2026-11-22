@@ -18,7 +18,7 @@ Every way to get report data ends in `Report.execute_query_report` or
 `Report.execute_script_report` (`frappe/desk/query_report.py:93`). `GuardedReport` extends the
 Report document through the `extend_doctype_class` hook, so a request, a background export
 and code that calls Frappe directly all meet the same check.
-Decision note: `docs/kararlar/0006-erisim-kurali.md`, section 9.
+Decision note: `docs/decisions/0006-access-rule.md`, section 9.
 """
 
 import logging

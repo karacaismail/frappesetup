@@ -28,7 +28,7 @@
     "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
     "backend/libs/oidc_verify/src/oidc_verify/verification.py"
   ],
-  "sha256": "cd51da475e5f2f2bf29a23412a663cefeabed51afa13528e7ce00a7a18a34ccc",
+  "sha256": "96a1302a2043a00754e5ea4a0dd44475caf3fdfa078424c9bc8a109156f2a0e8",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
@@ -45,7 +45,7 @@
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/account.py",
-      "line": 17,
+      "line": 18,
       "reason": "Uses the current browser session, checks CSRF, and requires fresh reauthentication for deletion."
     },
     {
@@ -148,7 +148,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "8b5749df8e71db49ca50eadab81089fd82d97a28d1221791d2d6f0060a16bf86",
+      "sha256": "8b56926a17318dfd20a9ea1c9e469752faed16a2622a2aac48496da8368b9f17",
       "findings": [
         {
           "rule": "frappe-missing-permission",

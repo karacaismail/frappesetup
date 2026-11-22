@@ -10,6 +10,7 @@ SETTINGS = {
 	"identity_sync_url": "http://127.0.0.1:3205",
 	"press_service_client_secret": "press-test-fixture",
 	"max_file_size": 32768,
+	"press_deletion_request_timeout": 15,
 }
 SITE_CONFIG = Path("press.localhost/site_config.json")
 

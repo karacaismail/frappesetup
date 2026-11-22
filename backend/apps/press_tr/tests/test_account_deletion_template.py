@@ -38,3 +38,14 @@ class AccountDeletionTemplateTest(unittest.TestCase):
 				output = self.render(lambda text, **_options: text, **context)
 				self.assertNotIn("<form", output)
 				self.assertIn("Reload this page to try again.", output)
+
+	def test_refresh_renders_the_known_deletion_state(self):
+		def translate(text, **_options):
+			return text
+
+		pending = self.render(translate, deletion_csrf_token="fixture", deletion_status="pending")
+		self.assertIn('id="account-deletion-status">Account deletion is in progress.', pending)
+		self.assertIn("Last status known to Press.", pending)
+		submitted = self.render(translate, deletion_csrf_token="fixture", deletion_status="submitted")
+		self.assertIn('role="status">Your deletion request was submitted.', submitted)
+		self.assertNotIn("<form", submitted)

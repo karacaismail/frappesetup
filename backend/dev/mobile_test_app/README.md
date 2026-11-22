@@ -78,4 +78,4 @@ Hiçbir sayı sınırları karşılamazsa komut sonuçları yazar ve 1 döndür�
 
 Ölçüm örnek izin görünümünü ve yerel HTTP yolunu kullanır.
 Üretim seçimi için ters vekil, gerçek izin görünümü ve diğer yükleri de ölçün.
-Hüseyin Cengiz, üretime denk ölçümden sonra işçi sayısını seçer.
+DevOps sorumlusu, üretime denk ölçümden sonra işçi sayısını seçer.
