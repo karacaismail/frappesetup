@@ -3,6 +3,7 @@
 import time
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
+from urllib.error import HTTPError
 from uuid import uuid4
 
 import frappe
@@ -136,6 +137,34 @@ class MobileSessionTest(IntegrationTestCase):
 			from platform_core.mobil.sessions import is_session_closure_pending
 
 			self.assertFalse(is_session_closure_pending(self.sid))
+
+	def test_forbidden_remote_closure_stops_retry_and_keeps_installation_revoked(self):
+		from platform_core.api.mobile import _register, _revoke
+		from platform_core.mobil import identity_sync_client
+		from platform_core.mobil.sessions import is_session_closure_pending, is_session_revoked
+
+		_register(self.identity, self.body)
+		with (
+			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
+			patch.object(frappe.db, "commit"),
+			patch.object(identity_sync_client, "_configured_url", return_value="https://sync.example.test"),
+			patch.object(identity_sync_client, "_service_bearer", return_value="fixture-bearer"),
+			patch.object(
+				identity_sync_client._OPENER, "open", side_effect=HTTPError("", 403, "Forbidden", None, None)
+			),
+			patch.object(frappe, "logger") as logger,
+		):
+			after_commit.cut.return_value = []
+			self.assertEqual(_revoke(self.identity, self.body), {"revoked": 1})
+			self.assertTrue(is_session_closure_pending(self.sid))
+			for callback in list(after_commit.add.call_args_list):
+				callback.args[0]()
+			self.assertFalse(is_session_closure_pending(self.sid))
+			self.assertTrue(is_session_revoked(self.sid))
+			self.assertTrue(
+				frappe.db.get_value("Mobile Installation", self.body["installation_id"], "revoked")
+			)
+			logger.return_value.error.assert_called_once()
 
 	def test_manager_can_retry_remote_closure_of_an_already_revoked_installation(self):
 		from platform_core.api.mobile import _register, _revoke
