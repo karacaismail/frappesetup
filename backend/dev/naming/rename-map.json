@@ -4535,5 +4535,13 @@
     "paths": [
       "backend/apps/press_tr/press_tr/api/auth.py"
     ]
+  },
+  {
+    "old": "Kirmizi\\nMavi",
+    "new": "Red\\nBlue",
+    "type": "setting",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_admin.py"
+    ]
   }
 ]

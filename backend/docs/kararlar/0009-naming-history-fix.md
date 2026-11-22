@@ -1,6 +1,7 @@
 # Geçmiş kod adlarını değiştirme kararı
 
-D-12 yeni adları kapsar. D-14 geçmiş adları da bu görev kapsamında düzeltir.
+Karar 40, eski ve yeni kod adlarını kapsar. D-14, geçmiş adları düzeltme görevini tanımlar.
+D-15 gereği çalışma yalnız Frappe 16'yı hedefler.
 
 ## Adların seçimi
 
@@ -27,6 +28,18 @@ Kodda geçen cümlelerin çevirisi ayrı bir kontrol noktasında yapılır.
 Betik geliştirme sitesine, veritabanına veya Git geçmişine yazmaz.
 Yeni site adları ve ayar anahtarları yerel kurulumda da kullanılmalıdır.
 İkinci kontrol noktasında yerel siteyi yeniden kurma adımları belgelenir.
+
+## Kaydedilen seçenekler ve durumlar
+
+Seçim alanı, kullanıcının listedeki değerlerden birini seçmesini sağlar.
+Seçim değerleri ve iş akışı durumları veritabanına kaydedilebilir.
+Git taramasında taşınacak uygulama değeri bulunmadı.
+Türkçe seçenekler, sonunda kendi kayıtlarını silen bir testte bulundu.
+Betik bu seçenekleri `Red` ve `Blue` olarak düzeltir.
+Test verisi için taşıma yaması eklenmedi.
+Canlı bir sitede eski değer bulunursa o değeri ayrı bir Frappe yamasıyla taşıyın.
+Yama alanı ve eski değeri açıkça belirtmelidir.
+Yamayı önce eski verinin bir kopyasında sınayın.
 
 ## Dalda uygulama
 
