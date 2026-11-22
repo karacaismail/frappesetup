@@ -204,7 +204,12 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Girişte Press, kullanıcının hiç takımı yoksa takım açar. Kullanıcı başka bir takımın üyesiyse yeni takım açılmaz.
 - Takıma `free_account` bayrağı yazılmaz. Bu bayrak yalnız iç ve deneme siteleri içindir (G-24).
 - Yanıt `team` ve `created` alanlarını taşır. `team`, Press'teki takımın adıdır.
-- `remove_team_member` isteği `issuer`, `subject` ve `organization_id` alanlarını taşır.
+- `remove_team_member` isteği `issuer` ve `subject` alanlarını taşır. İstek ayrıca şu iki alandan yalnız birini taşır:
+  - `organization_id`: Press üyeyi yalnız bu kuruluşun takımından çıkarır.
+  - `all_organizations: true`: Press üyeyi `keycloak_org_id` alanı dolu olan bütün takımlardan çıkarır. Bu biçim silinen kullanıcı içindir. Silinen kullanıcının kuruluşları Keycloak'tan artık okunamaz.
+- İki alan birlikte gelirse ya da ikisi de gelmezse Press 400 döner. Boş `organization_id` değeri “bütün takımlar” anlamına gelmez, 400 döner.
+- `keycloak_org_id` alanı boş takımlara `remove_team_member` dokunmaz. Bu takımlar Keycloak dışında elle açılmıştır.
+- Aynı `remove_team_member` isteği iki kez gelirse ikinci istek de 200 döner ve bir şey değiştirmez.
 - Takım adı istekte gelmez. Takım adını Press üretir.
 
 - Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
