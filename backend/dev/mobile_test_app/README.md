@@ -27,7 +27,9 @@ Komut ölçüm sonunda oluşturduğu kayıtları tür ve ad ile siler.
 - Gönderme, ilk çekme ve etkinlik uçları 50 kez çağrılır.
 - Bir telefon 1.000 bekleyen değişikliği on sayfada çeker. Bu ölçüm beş kez yapılır.
 - Sunucu süresi kimlik denetimini, isteği ve veritabanı işlemini kapsar.
-- Mobil uçlar yalıtılmış test izin görünümünü kullanır. Canlı HRMS iş akışı çalışmaz.
+- Mobil uçlar örnek izin görünümünü kullanır. Canlı HRMS iş akışı çalışmaz.
+- `hrms_tr` izin görünümü mobil eşitlemeye bağlanınca iki O-31 ölçümünü yeniden çalıştırın.
+- Yeni ölçümlerde gerçek izin görünümünü kullanın. Sonuçları durum dosyasına kaydedin.
 
 ## Telefon sözleşmesi örnekleri
 
