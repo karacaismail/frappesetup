@@ -1,0 +1,30 @@
+{
+  "doctype": "Team",
+  "sync_on_migrate": 1,
+  "custom_fields": [
+    {
+      "doctype": "Custom Field",
+      "name": "Team-keycloak_org_id",
+      "dt": "Team",
+      "fieldname": "keycloak_org_id",
+      "fieldtype": "Data",
+      "label": "Keycloak Organization ID",
+      "description": "Unique identifier of the Keycloak organization mapped to this Press team.",
+      "insert_after": "team_title",
+      "length": 255,
+      "read_only": 1,
+      "unique": 1
+    }
+  ],
+  "property_setters": [
+    {
+      "doc_type": "Team",
+      "doctype_or_field": "DocField",
+      "field_name": "enable_performance_tuning",
+      "property": "default",
+      "property_type": "Text",
+      "value": "0"
+    }
+  ],
+  "custom_perms": []
+}

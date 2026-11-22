@@ -1,0 +1,110 @@
+Issuer,Kimlik sunucusu,Press Identity Link
+Issuer URL from the verified Keycloak token.,Bu adres doğrulanmış Keycloak kimlik bilgisinden gelir.,Press Identity Link
+Subject,Kalıcı kullanıcı kimliği,Press Identity Link
+Permanent user identifier assigned by the issuer.,Kimlik sunucusu bu kalıcı değeri kullanıcıya verir.,Press Identity Link
+User,Kullanıcı,Press Identity Link
+Press user associated with this Keycloak identity.,Bu Keycloak kimliği bu Press kullanıcısına bağlıdır.,Press Identity Link
+Identity Link,Kimlik bağı,Press Keycloak Session
+Verified identity associated with the session.,Bu oturum doğrulanmış kimlik bağına aittir.,Press Keycloak Session
+Keycloak Session ID,Keycloak oturum kimliği,Press Keycloak Session
+Keycloak session identifier used to match logout requests.,Press çıkış isteğini bu Keycloak oturumuyla eşler.,Press Keycloak Session
+Press Session ID,Press oturum kimliği,Press Keycloak Session
+Secret Press session identifier used only to revoke the session.,Press bu gizli değeri yalnızca oturumu kapatmak için kullanır.,Press Keycloak Session
+Keycloak Organization ID,Keycloak kuruluş kimliği,Team
+Unique identifier of the Keycloak organization mapped to this Press team.,Bu Press takımı bu Keycloak kuruluş kimliğine bağlıdır.,Team
+Send exactly one valid organization selector.,Bir kuruluş kimliği ya da bütün kuruluşları seçen değeri gönderin.,press_tr
+Change team ownership before removing the owner.,Takım sahibini çıkarmadan önce takımın sahipliğini devredin.,press_tr
+Keycloak identity was rejected.,Press bu Keycloak kimliğini kabul etmedi.,press_tr
+Set the Keycloak client ID for this site.,Bu site için Keycloak istemci kimliğini ayarlayın.,press_tr
+Set the Keycloak URL and realm for this site.,Bu site için Keycloak adresini ve giriş alanını ayarlayın.,press_tr
+Set the Press site address before enabling Keycloak.,Keycloak girişini açmadan önce Press site adresini ayarlayın.,press_tr
+Keycloak keys are temporarily unavailable.,Press şu anda Keycloak anahtarlarını alamıyor.,press_tr
+Concurrent account update. Start sign-in again.,Hesap şu anda güncelleniyor. Giriş işlemini yeniden başlatın.,press_tr
+Guest access is denied.,Misafirler bu işlemi yapamaz.,press_tr
+Another request is updating this organization. Try again.,Bu kuruluş şu anda güncelleniyor. Yeniden deneyin.,press_tr
+Press team invitations are disabled.,Press üzerinden takım daveti gönderilemez.,press_tr
+Links a verified Keycloak issuer and subject to a Press user account.,Doğrulanan Keycloak kimliğini Press hesabına bağlar.,Press Identity Link
+Maps a Keycloak session to a Press session so that Press can revoke it on logout.,Keycloak oturumunu Press oturumuna bağlar. Press çıkışta kendi oturumunu kapatır.,Press Keycloak Session
+Get a single-use Keycloak login URL.,Tek kullanımlık Keycloak giriş adresini alın.,press_tr.openapi
+Starts a rate-limited browser login. A separate random value in an HttpOnly SameSite=Lax cookie binds the state record to the initiating browser for 600 seconds. HTTPS uses a Secure cookie with the __Host- prefix.,"Tarayıcıdan girişi başlatır ve istek sayısını sınırlar. HttpOnly ve SameSite=Lax çerezindeki rastgele değer, giriş kaydını tarayıcıya 600 saniye bağlar. HTTPS, __Host- önekli Secure çerez kullanır.",press_tr.openapi
+"The URL contains state, nonce and a PKCE S256 challenge.","Adres, state ve nonce değerlerini ve PKCE S256 özetini taşır.",press_tr.openapi
+Login URL request limit reached.,Giriş adresi istek sınırına ulaşıldı.,press_tr.openapi
+The Keycloak client or issuer is not configured.,Keycloak istemcisi veya kimlik sunucusu ayarlanmamış.,press_tr.openapi
+Exchange the authorization code and open a Press session.,Yetki kodunu değiştirip Press oturumu açın.,press_tr.openapi
+Requires the initiating browser cookie and consumes the matching state record atomically before verifying Keycloak identity. May create a local user and a team. Does not start billing.,Girişi başlatan tarayıcının çerezini ister. Keycloak kimliğini doğrulamadan önce eşleşen kaydı tek işlemde kullanıp siler. Yerel kullanıcı ve takım açabilir. Faturalamayı başlatmaz.,press_tr.openapi
+Redirected to the Press dashboard after sign-in or to account deletion after reauthentication.,Girişten sonra Press paneli açılır. Kimlik yeniden doğrulanınca hesap silme sayfası açılır.,press_tr.openapi
+"State, token or identity binding was rejected.","Press giriş kaydını, belirteci veya kimlik bağını kabul etmedi.",press_tr.openapi
+A concurrent account update interrupted sign-in. Start a new login.,Başka bir hesap güncellemesi girişi kesti. Girişi yeniden başlatın.,press_tr.openapi
+Keycloak configuration or verification keys are unavailable.,"Press, Keycloak ayarına veya doğrulama anahtarlarına ulaşamadı.",press_tr.openapi
+Close sessions associated with a verified Keycloak logout token.,Doğrulanan Keycloak çıkış belirtecine bağlı oturumları kapatın.,press_tr.openapi
+Revokes matching Press sessions and deletes their session mappings. This is destructive and does not incur charges.,Press eşleşen oturumları kapatır ve oturum bağlarını siler. İşlem kayıt siler ve ücret oluşturmaz.,press_tr.openapi
+"Logout processed, including a repeated logout.",Press çıkış isteğini işledi. Tekrar gelen istek de aynı sonucu verir.,press_tr.openapi
+Logout token was rejected.,Press çıkış belirtecini kabul etmedi.,press_tr.openapi
+Rejected logout token limit reached. Valid logout notifications do not count.,Geçersiz çıkış isteği sınırına ulaşıldı. Geçerli istekler sınıra dahil edilmez.,press_tr.openapi
+Ensure a Press team and membership.,Press takımını ve üyeliğini hazırlayın.,press_tr.openapi
+Identity Sync sends an email it verified in Keycloak. Press creates a team for the organization or adds the user to its existing team. This operation does not start billing.,"Identity Sync, Keycloak'ta doğruladığı e-posta adresini gönderir. Press kuruluş için takım açar veya üyeyi var olan takıma ekler. İşlem faturalamayı başlatmaz.",press_tr.openapi
+Required for the first identity binding.,İlk kimlik bağı için gerekir.,press_tr.openapi
+Must be true for the first identity binding.,İlk kimlik bağı için değer doğru olmalıdır.,press_tr.openapi
+Keycloak organization identifier.,Keycloak kuruluş kimliği.,press_tr.openapi
+Display name used only when Press creates the team. The organization identifier is used if omitted.,Press bu görünen adı yalnız yeni takım açarken kullanır. Ad gelmezse kuruluş kimliğini kullanır.,press_tr.openapi
+Press team name and whether this request created the team.,Press takımın adını ve isteğin yeni takım açıp açmadığını döner.,press_tr.openapi
+True when the recorded team owner is disabled.,Takım sahibi kapalıysa değer doğrudur.,press_tr.openapi
+Service identity or user binding was rejected.,Press servis kimliğini veya kullanıcı bağını kabul etmedi.,press_tr.openapi
+Another request is updating this organization.,Başka bir istek kuruluşu güncelliyor.,press_tr.openapi
+Revoke memberships in one or all Keycloak organizations.,Bir Keycloak kuruluşundan veya tüm kuruluşlardan üyeliği kaldırın.,press_tr.openapi
+Removes the member and their team role assignments. Bulk removal affects only mapped teams and disables the linked user and API credentials. This destructive operation preserves the user and teams. Bulk removal preserves the recorded team owner while removing their membership and access. A single-team request requires ownership transfer before removing the owner.,Press üyeyi ve takım rollerini kaldırır. Toplu kaldırma yalnız eşleşen takımları etkiler. Bağlı hesabı ve anahtarlarını kapatır. Kayıtlı sahip değişmez. Tek takımdan sahibi çıkarmadan önce sahipliği devredin.,press_tr.openapi
+Remove memberships in all teams mapped to Keycloak.,Üyelikleri Keycloak ile eşlenen tüm takımlardan kaldırın.,press_tr.openapi
+"The user has no membership in the mapped team, including on retry. The team is null for bulk removal or when no mapping exists.",Kullanıcının eşleşen takımda üyeliği kalmaz. Tekrar istek de aynı sonucu verir. Toplu işlemde veya eşleşme yoksa takım değeri boş olur.,press_tr.openapi
+The request must contain exactly one valid organization selector.,İstek kuruluş seçen geçerli tek bir alan taşımalıdır.,press_tr.openapi
+Service identity or owner removal was rejected.,Press servis kimliğini veya takım sahibini çıkarma isteğini kabul etmedi.,press_tr.openapi
+Anonymize a linked Press user and revoke access.,Bağlı Press hesabını anonim yapın ve erişimi kapatın.,press_tr.openapi
+The operation completed.,Press işlemi tamamladı.,press_tr.openapi
+Service identity or issuer was rejected.,Press servis kimliğini veya kimlik sunucusunu kabul etmedi.,press_tr.openapi
+Remove expired Keycloak session mappings.,Süresi dolan Keycloak oturum bağlarını kaldırın.,press_tr.openapi
+A System Manager starts this maintenance operation. It deletes expired or orphaned session mappings and leaves active mappings in place.,Sistem Yöneticisi bu bakım işlemini başlatır. İşlem süresi dolan veya bağlı oturumu kalmayan kayıtları siler. Açık oturumların bağı korunur.,press_tr.openapi
+Number of removed session mappings in the message object.,"Yanıt, kaldırılan oturum bağı sayısını taşır.",press_tr.openapi
+The caller cannot run System Manager maintenance.,Bu işlemi yalnız Sistem Yöneticisi yapabilir.,press_tr.openapi
+An authenticated System Manager session with standard Frappe CSRF protection.,Açık Sistem Yöneticisi oturumu ve Frappe istek koruması gerekir.,press_tr.openapi
+A Keycloak access token with only press as audience and identity-sync as authorized party.,Keycloak erişim belirtecinin hedefi yalnız press olur. Yetkili istemci identity-sync olur.,press_tr.openapi
+Stripe signature verified before webhook insertion.,"Press, olay kaydını oluşturmadan önce Stripe imzasını doğrular.",press_tr.openapi
+GitHub signature verified by the webhook document controller before insertion.,GitHub olay kaydı yazılmadan önce kayıt denetimi imzayı doğrular.,press_tr.openapi
+Configured monitor token required before loading target inventory.,Hedef listesi okunmadan önce ayarlı izleme belirteci gerekir.,press_tr.openapi
+Nonempty callback token required and compared to the configured monitor server token.,Press boş olmayan istek belirtecini ayarlı izleme belirteciyle karşılaştırır.,press_tr.openapi
+Active mail subscription key required before message delivery.,İleti tesliminden önce etkin e-posta aboneliği anahtarı gerekir.,press_tr.openapi
+Snapshot request key must match the named backup.,Yedek isteğinin anahtarı adı verilen yedekle eşleşmelidir.,press_tr.openapi
+Compares the supplied access token against its stored credential and returns a boolean.,Press gönderilen erişim belirtecini kayıtlı bilgiyle karşılaştırır. Sonuç doğru veya yanlış olur.,press_tr.openapi
+Press SaaS wrapper validates a site secret or site access token before dispatch.,"Press SaaS, isteği işlemeden önce site sırrını veya erişim belirtecini doğrular.",press_tr.openapi
+Login callback request limit reached.,Giriş dönüşü istek sınırına ulaşıldı.,press_tr.openapi
+Irreversibly anonymizes a linked account after revoking access. Invoices remain unchanged. An unknown identity returns found false. A repeat of a completed request returns the same result.,Press erişimi kapatır ve hesabı geri alınamaz biçimde anonim yapar. Faturalar değişmez. Kimlik yoksa found false olur. Tamamlanan istek tekrar gelirse sonuç değişmez.,press_tr.openapi
+An account update is in progress or a database lock timed out. Retry the request.,Hesap güncelleniyor veya kilit bekleme süresi doldu. İsteği yeniden gönderin.,press_tr.openapi
+"This account is being updated. Try again.",Hesap güncelleniyor. Yeniden deneyin.,press_tr
+Anonymize account data without changing invoices or unrelated accounts.,Hesap verilerini anonim yapar. Faturalar ve ilgisiz hesaplar korunur.,press_tr.docstring
+Configure the account deletion service.,Hesap silme servisini ayarlayın.,press_tr
+Verify your identity again before deleting your account.,Hesabınızı silmeden önce kimliğinizi yeniden doğrulayın.,press_tr
+Delete your account,Hesabınızı silin,press_tr
+Deleting your account cannot be undone. Your access will end. Invoices and other business records will be kept.,Hesap silme işlemi geri alınamaz. Erişiminiz kapanır. Fatura ve diğer iş kayıtları korunur.,press_tr
+Your deletion request was submitted.,Hesap silme isteğiniz gönderildi.,press_tr
+The request could not be submitted.,İstek gönderilemedi.,press_tr
+Reload this page to try again.,Tekrar denemek için bu sayfayı yenileyin.,press_tr
+Confirm account deletion,Hesap silmeyi onaylayın,press_tr
+Verify your identity to continue.,Devam etmek için kimliğinizi doğrulayın.,press_tr
+Verify your identity,Kimliğinizi doğrulayın,press_tr
+Request deletion of your own Press account.,Kendi Press hesabınızın silinmesini isteyin.,press_tr.openapi
+Starts Keycloak reauthentication or submits an irreversible deletion request after explicit confirmation. The same browser session must have been reauthenticated within 300 seconds. The Keycloak authentication time may precede the start of reauthentication by up to five seconds. Invoices remain unchanged.,Keycloak kimliği yeniden doğrular. Kullanıcı onaylarsa Press geri alınamaz silme isteğini gönderir. Aynı oturum son 300 saniyede doğrulanmış olmalıdır. Keycloak saati en çok 5 saniye geride olabilir. Faturalar değişmez.,press_tr.openapi
+Send false to start reauthentication and true to confirm deletion.,Yeniden doğrulamayı başlatmak için false gönderin. Silmeyi onaylamak için true gönderin.,press_tr.openapi
+Returns a Keycloak login URL or confirms that Identity Sync accepted the deletion request.,Press giriş adresini döner veya Identity Sync'in isteği aldığını bildirir.,press_tr.openapi
+Frappe rejected the browser request or its CSRF token.,Frappe tarayıcı isteğini veya istek koruma belirtecini kabul etmedi.,press_tr.openapi
+A human Press session and fresh Keycloak reauthentication are required.,Press oturumu ve yakın zamanda yapılmış Keycloak doğrulaması gerekir.,press_tr.openapi
+Keycloak or Identity Sync did not accept the service request.,Keycloak veya Identity Sync servis isteğini kabul etmedi.,press_tr.openapi
+The account deletion service or Keycloak verification keys are unavailable.,Hesap silme servisine veya Keycloak doğrulama anahtarlarına ulaşılamadı.,press_tr.openapi
+A human Press browser session with a Frappe CSRF token.,Frappe istek koruma belirteci olan bir Press tarayıcı oturumu gerekir.,press_tr.openapi
+Configure a stable site key for Press anonymization.,Press hesap silme işlemi için kalıcı bir site anahtarı ayarlayın.,press_tr
+Message cleared after account anonymization.,Hesap anonim yapıldı. İleti metni silindi.,press_tr
+This Press request is not allowed.,Press bu isteğe izin vermiyor.,press_tr
+Send a valid identity page start and length.,Geçerli ilk sıra ve kayıt sayısı gönderin.,press_tr
+List Press identities for reconciliation.,Karşılaştırma için Press kimliklerini listeleyin.,press_tr.openapi
+Lists identities for the configured issuer in subject order. Anonymous deletion records are omitted.,"Liste, ayarlı kaynağın kimliklerini kullanıcı kimliğine göre sıralar. Anonim silme kayıtları listeden çıkarılır.",press_tr.openapi
+Number of matching records to skip.,Listede atlanacak kayıt sayısı.,press_tr.openapi
+An identity page and a flag that indicates whether another page exists.,Yanıt kimlikleri verir. Sonraki sayfanın var olup olmadığını da gösterir.,press_tr.openapi
+The page start or length is invalid.,İlk sıra veya kayıt sayısı geçersiz.,press_tr.openapi
+The service token or request parameters were rejected.,Press servis belirtecini veya istek alanlarını reddetti.,press_tr.openapi

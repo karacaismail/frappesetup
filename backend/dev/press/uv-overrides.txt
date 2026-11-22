@@ -1,0 +1,28 @@
+# Unsupported upstream combination: Press v0.154.1 (master) on Frappe v16.50.0 / Python 3.14.
+# Remove these once press relaxes its pins.
+#
+# Python 3.14 build failures:
+#   playwright==1.49.1 pins greenlet==3.1.1 (no 3.14 support)
+#   frappe-mcp 0.1.1 pins pydantic<2.12 -> pydantic-core 2.33.2 (no 3.14 support); Frappe v16 needs pydantic~=2.12.5
+greenlet==3.5.6
+pydantic==2.12.5
+#
+# Press pins older versions of packages Frappe v16 pins (e.g. requests<2.32, pyOpenSSL~=23.2,
+# sql_metadata==2.10.0, cryptography 41.x via transitive pins). Keep Frappe v16's versions so the
+# framework and its security fixes stay intact. Press's docker/TLS code paths are untested with these.
+beautifulsoup4==4.13.5
+cachetools==7.2.1
+click==8.4.2
+cryptography==50.0.2
+filelock==3.20.4
+oauthlib==3.3.1
+opentelemetry-api==1.45.1
+pexpect==4.9.0
+protobuf==7.36.2
+pyjwt==2.13.0
+pyopenssl==26.4.0
+pytz==2025.2
+requests==2.33.1
+sql-metadata==3.0.1
+sqlparse==0.6.0
+werkzeug==3.1.9
