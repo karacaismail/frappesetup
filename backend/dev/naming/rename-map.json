@@ -6174,5 +6174,89 @@
     "paths": [
       "backend/identity/identity_sync/tests/test_mobile_client.py"
     ]
+  },
+  {
+    "old": "tags: [arama]",
+    "new": "tags: [search]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: arama",
+    "new": "- name: search",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "calisanReddedildi:",
+    "new": "employeeDenied:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "yonetici:",
+    "new": "manager:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "maas:",
+    "new": "salary:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "ik:",
+    "new": "hr:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "ER Test Talep",
+    "new": "ER Test Request",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml",
+      "backend/apps/platform_core/platform_core/erisim/tests/*"
+    ]
+  },
+  {
+    "old": "er.calisan1@example.test",
+    "new": "er.employee1@example.test",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml",
+      "backend/apps/platform_core/platform_core/erisim/tests/*"
+    ]
+  },
+  {
+    "old": "ER IK",
+    "new": "ER HR",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml",
+      "backend/apps/platform_core/platform_core/erisim/tests/*"
+    ]
   }
 ]

@@ -573,3 +573,38 @@ class RenameTests(unittest.TestCase):
             target = target.with_name(names_after.get(target.name, target.name))
             with self.subTest(path=path):
                 self.assertEqual((self.root / target).read_text(), expected)
+
+    def test_access_contract_renames_code_examples_and_preserves_copy(self):
+        old_contract = "backend/contracts/platform_core-erisim.openapi.yaml"
+        self.write(
+            old_contract,
+            "tags:\n  - name: arama\n"
+            "paths:\n  /test:\n    post:\n      tags: [arama]\n"
+            "      description: |\n        Örnek metin: arama, maas ve ER Test Talep.\n"
+            "      examples:\n"
+            "        calisanReddedildi:\n          summary: Örnek metin: ER Test Talep\n"
+            "          value: {doctype: ER Test Talep, user: er.calisan1@example.test}\n"
+            "        yonetici:\n          value: {role: ER IK}\n"
+            "        maas:\n          value: {fieldname: salary_amount}\n"
+            "        ik:\n          value: {role: ER IK}\n",
+        )
+        other = self.write("backend/contracts/other.yaml", "tags: [arama]\n")
+        self.git("add", ".")
+        result = self.rename(None)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = (self.root / "backend/contracts/platform_core-access.openapi.yaml").read_text()
+        for item in (
+            "- name: search",
+            "tags: [search]",
+            "employeeDenied:",
+            "manager:",
+            "salary:",
+            "hr:",
+            "doctype: ER Test Request",
+            "user: er.employee1@example.test",
+            "role: ER HR",
+            "Örnek metin: arama, maas ve ER Test Talep.",
+            "summary: Örnek metin: ER Test Talep",
+        ):
+            self.assertIn(item, output)
+        self.assertEqual(other.read_text(), "tags: [arama]\n")
