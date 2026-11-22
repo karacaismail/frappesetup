@@ -189,3 +189,5 @@ Unix time used as the idle baseline for the current authenticated session.,Geçe
 "Lists installations for the signed-in account, ordered by installation ID.",Oturum açan hesabın kurulumlarını kimliğe göre sıralar.,Mobile sync API
 Revokes one owned installation and requests closure of its Keycloak session when present.,Hesabın kurulumunu iptal eder. Keycloak oturumu varsa kapatılmasını ister.,Mobile sync API
 Revokes one owned installation without signing out the current browser.,Hesabın bir kurulumunu iptal eder. Tarayıcı oturumu açık kalır.,Mobile sync API
+Keycloak user ID,Keycloak kullanıcı kimliği,Mobile Installation
+The Keycloak user identifier bound to this session.,Bu oturuma bağlı Keycloak kullanıcı kimliği.,Mobile Installation

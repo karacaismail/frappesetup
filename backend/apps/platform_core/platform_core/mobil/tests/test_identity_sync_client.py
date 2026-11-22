@@ -1,3 +1,4 @@
+import json
 from unittest import TestCase
 from unittest.mock import Mock, patch
 from urllib.error import URLError
@@ -31,7 +32,7 @@ class IdentitySyncClientTest(TestCase):
 
 	def test_fetches_service_bearer_and_posts_to_exact_endpoint(self):
 		self.open.side_effect = [self.response(b'{"access_token":"fixture-bearer"}'), self.response()]
-		self.assertEqual(client.send_session_revocations(["session-fixture", "session-fixture"]), ())
+		self.assertEqual(client.send_session_revocations([("session-fixture", "keycloak-fixture")] * 2), ())
 		token, revoke = [call.args[0] for call in self.open.call_args_list]
 		self.assertEqual(token.full_url, self.conf["mobile_identity_sync_token_url"])
 		self.assertEqual(token.get_method(), "POST")
@@ -47,7 +48,7 @@ class IdentitySyncClientTest(TestCase):
 		self.assertEqual(revoke.full_url, "https://sync.example.test/v1/sessions/revoke")
 		self.assertEqual(revoke.get_method(), "POST")
 		self.assertEqual(revoke.get_header("Authorization"), "Bearer fixture-bearer")
-		self.assertEqual(revoke.data, b'{"sid": "session-fixture"}')
+		self.assertEqual(json.loads(revoke.data), {"sid": "session-fixture", "subject": "keycloak-fixture"})
 		self.assertTrue(all(call.kwargs["timeout"] > 0 for call in self.open.call_args_list))
 		self.logger.warning.assert_not_called()
 
@@ -58,7 +59,10 @@ class IdentitySyncClientTest(TestCase):
 			self.response(),
 		]
 		self.assertEqual(
-			client.send_session_revocations(["private-session", "other-session"]), ("private-session",)
+			client.send_session_revocations(
+				[("private-session", "subject-one"), ("other-session", "subject-two")]
+			),
+			(("private-session", "subject-one"),),
 		)
 		self.assertEqual(self.open.call_count, 3)
 		self.logger.warning.assert_called_once()
@@ -74,11 +78,11 @@ class IdentitySyncClientTest(TestCase):
 			self.response(),
 		]
 		with patch.object(client, "monotonic", return_value=100) as clock:
-			self.assertEqual(client.send_session_revocations(["session-one"]), ())
+			self.assertEqual(client.send_session_revocations([("session-one", "keycloak-fixture")]), ())
 			clock.return_value = 120
-			self.assertEqual(client.send_session_revocations(["session-two"]), ())
+			self.assertEqual(client.send_session_revocations([("session-two", "keycloak-fixture")]), ())
 			clock.return_value = 161
-			self.assertEqual(client.send_session_revocations(["session-three"]), ())
+			self.assertEqual(client.send_session_revocations([("session-three", "keycloak-fixture")]), ())
 		self.assertEqual(self.open.call_count, 5)
 
 	def test_rejects_plaintext_and_credentials_in_configured_urls(self):
@@ -89,7 +93,10 @@ class IdentitySyncClientTest(TestCase):
 		):
 			with self.subTest(address=address):
 				self.conf["mobile_identity_sync_url"] = address
-				self.assertEqual(client.send_session_revocations(["session"]), ("session",))
+				self.assertEqual(
+					client.send_session_revocations([("session", "keycloak-fixture")]),
+					(("session", "keycloak-fixture"),),
+				)
 		self.open.assert_not_called()
 
 	def test_empty_batch_does_not_need_configuration(self):
@@ -107,5 +114,8 @@ class IdentitySyncClientTest(TestCase):
 
 	def test_invalid_token_avoids_dispatch(self):
 		self.open.return_value = self.response(b'{"access_token":"bearer with spaces"}')
-		self.assertEqual(client.send_session_revocations(["session"]), ("session",))
+		self.assertEqual(
+			client.send_session_revocations([("session", "keycloak-fixture")]),
+			(("session", "keycloak-fixture"),),
+		)
 		self.open.assert_called_once()

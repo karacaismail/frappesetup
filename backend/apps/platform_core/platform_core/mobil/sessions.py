@@ -11,11 +11,11 @@ from .store import _insert
 
 DELIVERY_RETRY_SECONDS = 60
 REVOKED_SESSION = "Mobile Revoked Session"
-SESSION_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}")
+KEYCLOAK_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
 
-def valid_session_id(value):
-	return isinstance(value, str) and SESSION_ID_PATTERN.fullmatch(value) is not None
+def valid_keycloak_id(value):
+	return isinstance(value, str) and KEYCLOAK_ID_PATTERN.fullmatch(value) is not None
 
 
 def _session_key(sid):
@@ -32,15 +32,17 @@ def require_active_session(sid, *, for_update=False):
 
 
 def is_session_closure_pending(sid):
-	if not valid_session_id(sid):
+	if not valid_keycloak_id(sid):
 		return False
 	return bool(frappe.db.get_value(REVOKED_SESSION, _session_key(sid), "delivery_pending"))
 
 
-def revoke_after_commit(session_ids, *, remote=True):
+def revoke_after_commit(sessions, *, remote=True):
 	pending = []
 	now = int(time.time())
-	for sid in sorted({sid for sid in session_ids if valid_session_id(sid)}):
+	targets = {(sid, subject or "") for sid, subject in sessions if valid_keycloak_id(sid)}
+	for sid, subject in sorted(targets):
+		deliver = remote and valid_keycloak_id(subject)
 		key = _session_key(sid)
 		row = frappe.db.get_value(
 			REVOKED_SESSION,
@@ -54,33 +56,33 @@ def revoke_after_commit(session_ids, *, remote=True):
 				REVOKED_SESSION,
 				session_key=key,
 				delivery_pending=int(remote),
-				last_delivery_attempt_at=str(now) if remote else None,
+				last_delivery_attempt_at=str(now) if deliver else None,
 				ignore_duplicate=True,
 			)
-			if remote:
-				pending.append(sid)
+			if deliver:
+				pending.append((sid, subject))
 		elif row.delivery_pending:
 			if not remote:
 				frappe.db.set_value(REVOKED_SESSION, key, "delivery_pending", 0)
-			elif now - int(row.last_delivery_attempt_at or 0) >= DELIVERY_RETRY_SECONDS:
+			elif deliver and now - int(row.last_delivery_attempt_at or 0) >= DELIVERY_RETRY_SECONDS:
 				frappe.db.set_value(REVOKED_SESSION, key, "last_delivery_attempt_at", str(now))
-				pending.append(sid)
+				pending.append((sid, subject))
 
 	if pending:
 		# A failed transaction or its retry cannot send the remote request.
 		request = getattr(frappe.local, "request", None)
 		queue = getattr(request, "after_response", None)
-		session_ids = tuple(pending)
+		sessions = tuple(pending)
 		if queue is None:
-			frappe.db.after_commit.add(lambda: _deliver_committed(session_ids))
+			frappe.db.after_commit.add(lambda: _deliver_committed(sessions))
 		else:
-			frappe.db.after_commit.add(lambda: queue.add(lambda: _deliver_committed(session_ids)))
+			frappe.db.after_commit.add(lambda: queue.add(lambda: _deliver_committed(sessions)))
 
 
-def _deliver_committed(session_ids):
+def _deliver_committed(sessions):
 	try:
-		failed = set(send_session_revocations(session_ids))
-		confirmed = [_session_key(sid) for sid in session_ids if sid not in failed]
+		failed = set(send_session_revocations(sessions))
+		confirmed = [_session_key(sid) for sid, subject in sessions if (sid, subject) not in failed]
 		if confirmed:
 			frappe.db.set_value(REVOKED_SESSION, {"name": ["in", confirmed]}, "delivery_pending", 0)
 			frappe.db.commit()  # nosemgrep: acknowledge after the revocation transaction committed

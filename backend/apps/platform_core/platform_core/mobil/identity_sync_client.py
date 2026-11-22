@@ -86,32 +86,32 @@ def _service_bearer():
 	return token
 
 
-def send_session_revocations(session_ids):
-	"""Send once per distinct ID and return IDs that could not be delivered."""
-	session_ids = tuple(dict.fromkeys(session_ids))
-	if not session_ids:
+def send_session_revocations(sessions):
+	"""Send each distinct session and subject pair and return failed pairs."""
+	sessions = tuple(dict.fromkeys(sessions))
+	if not sessions:
 		return ()
 
 	try:
 		endpoint = _configured_url("mobile_identity_sync_url", origin_only=True) + "/v1/sessions/revoke"
 		bearer = _service_bearer()
 	except _DELIVERY_ERRORS:
-		failed = session_ids
+		failed = sessions
 	else:
 		failed = []
-		for sid in session_ids:
+		for sid, subject in sessions:
 			req = Request(
 				endpoint,
-				data=json.dumps({"sid": sid}).encode("utf-8"),
+				data=json.dumps({"sid": sid, "subject": subject}).encode("utf-8"),
 				headers={"Content-Type": "application/json", "Authorization": f"Bearer {bearer}"},
 				method="POST",
 			)
 			try:
 				with _OPENER.open(req, timeout=_TIMEOUT_SECONDS) as response:
 					if response.status != 200:
-						failed.append(sid)
+						failed.append((sid, subject))
 			except _DELIVERY_ERRORS:
-				failed.append(sid)
+				failed.append((sid, subject))
 
 	if failed:
 		frappe.logger("mobile_sessions").warning(

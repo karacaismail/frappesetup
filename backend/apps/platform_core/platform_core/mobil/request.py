@@ -20,7 +20,8 @@ from .protocol import (
 	MobileError,
 	content_digest,
 )
-from .sessions import is_session_revoked, valid_session_id
+from .sessions import is_session_revoked, valid_keycloak_id
+from .store import identity_link as _identity_link
 
 APP_VERSION = re.compile(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}")
 CONTRACT_VERSION = re.compile(r"[1-9][0-9]{0,2}")
@@ -46,6 +47,7 @@ class Identity:
 	sid: str | None
 	installation: str | None = None
 	auth_time: int | None = None
+	subject: str | None = None
 
 
 def _unique_keys(pairs):
@@ -93,12 +95,6 @@ def _limit_and_count(principal, app_version, contract_version):
 	)
 
 
-def _identity_link(account):
-	if not frappe.db.exists("DocType", "Platform Identity Link"):
-		return None
-	return frappe.db.get_value("Platform Identity Link", {"user": account}, ["issuer", "subject"])
-
-
 def mobile_request(endpoint):
 	request = frappe.local.request
 	expected_path = f"/api/method/platform_core.api.mobile.{endpoint}"
@@ -141,7 +137,7 @@ def mobile_request(endpoint):
 	if "iat" in identity and (type(issued_at) is not int or not auth_time <= issued_at <= latest_timestamp):
 		raise MobileError("mobile_token_required", 401)
 	sid = identity.get("sid")
-	if not valid_session_id(sid):
+	if not valid_keycloak_id(sid):
 		raise MobileError("mobile_token_required", 401)
 	if is_session_revoked(sid):
 		raise MobileError("mobile_session_revoked", 401)
@@ -149,12 +145,14 @@ def mobile_request(endpoint):
 	issuer, subject = identity.get("issuer"), identity.get("subject")
 	if not issuer and not subject:
 		issuer, subject = _identity_link(account) or (None, None)
-	if not isinstance(issuer, str) or not issuer or not isinstance(subject, str) or not subject:
+	if not isinstance(issuer, str) or not issuer or not valid_keycloak_id(subject):
 		raise MobileError("mobile_token_required", 401)
 	principal = content_digest([issuer, subject])
 	mobile_identity, body = _sync_payload(
 		request,
-		Identity(frappe.local.site, account, principal, scope, issued_at, sid, installation, auth_time),
+		Identity(
+			frappe.local.site, account, principal, scope, issued_at, sid, installation, auth_time, subject
+		),
 	)
 	# Account owners may revoke a different installation from their current one.
 	if (

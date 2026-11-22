@@ -31,6 +31,7 @@ class MobileSessionTest(IntegrationTestCase):
 			principal="fixture",
 			issued_at=int(time.time()),
 			sid=self.sid,
+			subject=str(uuid4()),
 			installation=None,
 			auth_time=int(time.time()),
 		)
@@ -63,12 +64,55 @@ class MobileSessionTest(IntegrationTestCase):
 			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
 			patch("platform_core.mobil.sessions._deliver_committed") as deliver,
 		):
-			revoke_after_commit((self.sid,))
+			revoke_after_commit(((self.sid, self.identity.subject),))
 			queue.add.assert_not_called()
 			after_commit.add.call_args.args[0]()
 			deliver.assert_not_called()
 			queue.add.call_args.args[0]()
-			deliver.assert_called_once_with((self.sid,))
+			deliver.assert_called_once_with(((self.sid, self.identity.subject),))
+
+	def test_rebinding_sends_the_old_session_with_its_stored_subject(self):
+		from platform_core.api.mobile import _register
+
+		_register(self.identity, self.body)
+		new_identity = SimpleNamespace(**{**vars(self.identity), "sid": str(uuid4())})
+		with (
+			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
+			patch("platform_core.mobil.sessions._deliver_committed") as deliver,
+		):
+			_register(new_identity, self.body)
+			for callback in after_commit.add.call_args_list:
+				callback.args[0]()
+			deliver.assert_called_once_with(((self.sid, self.identity.subject),))
+
+	def test_legacy_installation_uses_only_a_matching_identity_link(self):
+		from platform_core.api.mobile import _register, _revoke
+		from platform_core.mobil import ai_tools
+		from platform_core.mobil.protocol import content_digest
+		from platform_core.mobil.sessions import is_session_closure_pending
+
+		issuer = "https://identity.example.test"
+		subject = self.identity.subject
+		self.identity.principal = content_digest([issuer, subject])
+		self.identity.subject = None
+		_register(self.identity, self.body)
+		with (
+			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
+			patch("platform_core.mobil.store.identity_link", return_value=(issuer, "wrong-subject")) as link,
+			patch("platform_core.mobil.sessions._deliver_committed") as deliver,
+		):
+			_revoke(self.identity, self.body)
+			self.assertTrue(is_session_closure_pending(self.sid))
+			for callback in after_commit.add.call_args_list:
+				callback.args[0]()
+			deliver.assert_not_called()
+			after_commit.reset_mock()
+			link.return_value = (issuer, subject)
+			plan = ai_tools.prepare_revoke_installation(self.body["installation_id"])
+			self.assertEqual(ai_tools.execute_revocation(plan)["revoked"], 0)
+			for callback in after_commit.add.call_args_list:
+				callback.args[0]()
+			deliver.assert_called_once_with(((self.sid, subject),))
 
 	def test_local_revocation_schedules_remote_close_only_after_commit(self):
 		from platform_core.api.mobile import _register, _revoke
@@ -87,7 +131,7 @@ class MobileSessionTest(IntegrationTestCase):
 			send.assert_not_called()
 			for call in list(after_commit.add.call_args_list):
 				call.args[0]()
-			send.assert_called_once_with((self.sid,))
+			send.assert_called_once_with(((self.sid, self.identity.subject),))
 			from platform_core.mobil.sessions import is_session_closure_pending
 
 			self.assertFalse(is_session_closure_pending(self.sid))
@@ -100,12 +144,15 @@ class MobileSessionTest(IntegrationTestCase):
 		_register(self.identity, self.body)
 		with (
 			patch.object(frappe.db, "after_commit", Mock()) as after_commit,
-			patch("platform_core.mobil.sessions.send_session_revocations", return_value=(self.sid,)) as send,
+			patch(
+				"platform_core.mobil.sessions.send_session_revocations",
+				return_value=((self.sid, self.identity.subject),),
+			) as send,
 		):
 			_revoke(self.identity, self.body)
 			for call in list(after_commit.add.call_args_list):
 				call.args[0]()
-			send.assert_called_once_with((self.sid,))
+			send.assert_called_once_with(((self.sid, self.identity.subject),))
 			after_commit.reset_mock()
 			plan = ai_tools.prepare_revoke_installation(self.body["installation_id"])
 			self.assertEqual(ai_tools.execute_revocation(plan)["revoked"], 0)
@@ -231,7 +278,7 @@ class MobileSessionTest(IntegrationTestCase):
 		from platform_core.mobil.sessions import _session_key, is_session_revoked, revoke_after_commit
 
 		old = str(uuid4())
-		revoke_after_commit((old, self.sid), remote=False)
+		revoke_after_commit(((old, None), (self.sid, None)), remote=False)
 		frappe.db.set_value(
 			"Mobile Revoked Session", _session_key(old), "creation", now_datetime() - timedelta(days=32)
 		)

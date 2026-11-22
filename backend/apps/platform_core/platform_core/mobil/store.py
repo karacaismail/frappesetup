@@ -24,6 +24,22 @@ INTERNAL_TYPES = frozenset(
 )
 
 
+def identity_link(account):
+	if not frappe.db.exists("DocType", "Platform Identity Link"):
+		return None
+	return frappe.db.get_value("Platform Identity Link", {"user": account}, ["issuer", "subject"])
+
+
+def _stored_session_subject(row):
+	if row.session_subject:
+		return row.session_subject
+	# Legacy rows can be matched to the identity link without trusting a caller-supplied subject.
+	link = identity_link(row.account)
+	if link and content_digest(list(link)) == row.principal:
+		return link[1]
+	return None
+
+
 def seed_sequence():
 	"""Create the lock row after Frappe has synchronized the schema."""
 	if not frappe.db.exists(SEQUENCE_DOCTYPE, SEQUENCE_NAME):
@@ -77,6 +93,7 @@ class MobileStore:
 
 	def install(self, identity, installation_id, *, check_new=None):
 		sid = getattr(identity, "sid", None)
+		subject = getattr(identity, "subject", None) if sid else None
 		# Registration and token refresh cannot move the clock past actual authentication.
 		authenticated_at = (
 			getattr(identity, "auth_time", None) if sid else getattr(identity, "issued_at", None)
@@ -92,6 +109,7 @@ class MobileStore:
 				scope=identity.scope,
 				principal=identity.principal,
 				session_id=sid,
+				session_subject=subject,
 				session_bound_at=str(authenticated_at or 0),
 			)
 		elif not self._matches(current, identity) or (current.session_id and not sid):
@@ -102,13 +120,21 @@ class MobileStore:
 			frappe.db.set_value(
 				"Mobile Installation",
 				installation_id,
-				{"session_id": sid, "session_bound_at": str(authenticated_at or 0)},
+				{
+					"session_id": sid,
+					"session_subject": subject,
+					"session_bound_at": str(authenticated_at or 0),
+				},
 			)
-			revoke_after_commit((current.session_id,))
-		elif authenticated_at and authenticated_at > int(current.session_bound_at or 0):
-			frappe.db.set_value(
-				"Mobile Installation", installation_id, "session_bound_at", str(authenticated_at)
-			)
+			revoke_after_commit(((current.session_id, current.session_subject or subject),))
+		else:
+			updates = {}
+			if subject and not current.session_subject:
+				updates["session_subject"] = subject
+			if authenticated_at and authenticated_at > int(current.session_bound_at or 0):
+				updates["session_bound_at"] = str(authenticated_at)
+			if updates:
+				frappe.db.set_value("Mobile Installation", installation_id, updates)
 		return {"installation_id": installation_id}
 
 	def _installation(self, installation_id, *, for_update=False):
@@ -121,6 +147,7 @@ class MobileStore:
 				"principal",
 				"revoked",
 				"session_id",
+				"session_subject",
 				"last_user_activity_at",
 				"session_bound_at",
 				"creation",
@@ -213,25 +240,25 @@ class MobileStore:
 		from .sessions import revoke_after_commit
 
 		count = 0
-		session_ids = set()
+		sessions = set()
 		for installation_id in installation_ids:
 			row = frappe.db.get_value(
 				"Mobile Installation",
 				installation_id,
-				["revoked", "session_id", "notification_token"],
+				["revoked", "session_id", "session_subject", "account", "principal", "notification_token"],
 				as_dict=True,
 				for_update=True,
 			)
 			if row is None:
 				continue
 			if row.session_id:
-				session_ids.add(row.session_id)
+				sessions.add((row.session_id, _stored_session_subject(row) if remote else None))
 			if not row.revoked or row.notification_token is not None:
 				frappe.db.set_value(
 					"Mobile Installation", installation_id, {"revoked": 1, "notification_token": None}
 				)
 				count += int(not row.revoked)
-		revoke_after_commit(session_ids, remote=remote)
+		revoke_after_commit(sessions, remote=remote)
 		return count
 
 	def get_operation(self, key):

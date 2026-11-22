@@ -66,6 +66,7 @@ class MobileRequestTest(unittest.TestCase):
 		)
 		self.addCleanup(patch.stopall)
 		patch.object(request, "frappe", self.frappe).start()
+		patch("platform_core.mobil.store.frappe", self.frappe).start()
 		patch.object(request, "_limit_and_count").start()
 		self.revoked = patch.object(request, "is_session_revoked", return_value=False, create=True).start()
 
@@ -82,6 +83,7 @@ class MobileRequestTest(unittest.TestCase):
 		self.request.get_data.return_value = json.dumps({"installation_id": claims["installation"]}).encode()
 		identity, _ = request.mobile_request("v1_register")
 		self.assertEqual(identity.installation, claims["installation"])
+		self.assertEqual(identity.subject, "fixture-user")
 		self.assertIsNone(identity.issued_at)
 		self.request.get_data.return_value = b'{"installation_id":"12345678-1234-4234-8234-123456789abd"}'
 		self.assert_rejected("installation_unavailable", 403)

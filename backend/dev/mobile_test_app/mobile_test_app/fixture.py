@@ -157,7 +157,7 @@ def authenticate():
 		"scope": "mobile",
 		"installation": installation,
 		"issuer": "fixture",
-		"subject": account,
+		"subject": _subject(account),
 		"iat": issued_at,
 		"auth_time": int(request.headers.get("X-Mobile-Test-Auth-Time", issued_at)),
 		"sid": request.headers.get("X-Mobile-Test-Sid") or content_digest(["fixture-session", account]),
@@ -192,8 +192,12 @@ def commit_probe():
 	return {state: _observed(record_id, state) for state in ("pending", "entered")}
 
 
+def _subject(account):
+	return content_digest(["fixture-subject", account])
+
+
 def _scope_key(account, record_id):
-	return scoped_record_key("fixture", content_digest(["fixture", account]), record_id)
+	return scoped_record_key("fixture", content_digest(["fixture", _subject(account)]), record_id)
 
 
 def _record(account, record_id, *, lock=False):
