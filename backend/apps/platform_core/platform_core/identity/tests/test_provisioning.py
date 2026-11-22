@@ -13,7 +13,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
-from platform_core.identity import anonymization, provider_setup
+from platform_core.identity import anonymization, provider_setup, provisioning
 from platform_core.identity.tests import helpers as h
 
 PROVISION = "/api/method/platform_core.api.identity.provision"
@@ -236,6 +236,26 @@ class TestIdentityEndpoints(FrappeAPITestCase):
 		self.assertFalse(frappe.db.exists("User", NEW))
 		self.assertEqual(frappe.db.get_value("User", NEW_2, "enabled"), 0)
 
+	def test_change_email_reports_failure_after_the_rename_has_committed(self):
+		created = self.call(PROVISION, provision_body())
+		self.assertEqual(created.status_code, 200, created.data[:300])
+		identity = {"issuer": h.ISSUER, "subject": "sub-new"}
+		rename_doc = provisioning.rename_doc
+
+		def fail_after_commit(*args, **kwargs):
+			rename_doc(*args, **kwargs)
+			frappe.db.commit()
+			raise frappe.QueryDeadlockError("Test conflict after the rename committed")
+
+		with patch.object(provisioning, "rename_doc", side_effect=fail_after_commit) as rename:
+			response = self.call(CHANGE_EMAIL, {**identity, "new_email": NEW_2})
+
+		rename.assert_called_once()
+		h.refresh()
+		self.assertEqual(frappe.db.get_value("PLT Identity Link", identity, "user"), NEW_2)
+		self.assertEqual(response.status_code, 500, response.data[:300])
+		self.assertEqual(response.json["exc_type"], "IdentityInternalError")
+
 	def test_change_email_uses_the_same_lock_order_as_frappe(self):
 		created = self.call(PROVISION, provision_body())
 		self.assertEqual(created.status_code, 200, created.data[:300])
@@ -311,6 +331,60 @@ class TestIdentityEndpoints(FrappeAPITestCase):
 				with patch.object(anonymization, "lock_identity", side_effect=fail_once) as locking:
 					response = self.call(endpoint, body)
 				self.assertEqual(response.status_code, 200, response.data[:200])
+				self.assertEqual(response.json["message"], expected)
+				self.assertEqual(locking.call_count, 2)
+
+	def test_identity_writes_retry_when_a_post_lock_query_hits_mariadb_conflict(self):
+		created = self.call(PROVISION, provision_body())
+		self.assertEqual(created.status_code, 200, created.data[:300])
+		probe = frappe.get_doc(doctype="ToDo", description="TEST-ONLY-LOCK-PROBE").insert()
+		self.addCleanup(frappe.delete_doc, "ToDo", probe.name, force=True, ignore_missing=True)
+		updater = h.new_client()
+		updater.set_cookie("sid", self.sid)
+		update_headers = h.csrf_headers(updater)
+
+		identity = {"issuer": h.ISSUER, "subject": "sub-new"}
+		lock_user = provisioning._locked_user
+
+		cases = (
+			(
+				PROVISION,
+				provision_body(),
+				{"user": NEW, "enabled": True, "linked": True, "user_type": "Website User"},
+			),
+			(SET_ENABLED, {**identity, "enabled": False}, {"user": NEW, "enabled": False}),
+			(CHANGE_EMAIL, {**identity, "new_email": NEW_2}, {"user": NEW_2}),
+		)
+		for index, (endpoint, body, expected) in enumerate(cases):
+			with self.subTest(endpoint=endpoint):
+				description = f"TEST-ONLY-LOCK-PROBE-{index}"
+				conflicts = []
+
+				def lock_and_read(*args, **kwargs):
+					user = lock_user(*args, **kwargs)
+					if conflicts:
+						return user
+					old_description = frappe.db.get_value("ToDo", probe.name, "description")
+					self.assertNotEqual(old_description, description)
+					updated = h.request(
+						updater.put,
+						f"/api/resource/ToDo/{probe.name}",
+						json={"description": description},
+						headers=update_headers,
+					)
+					self.assertEqual(updated.status_code, 200, updated.data[:300])
+					self.assertEqual(frappe.db.get_value("ToDo", probe.name, "description"), old_description)
+					try:
+						frappe.db.get_value("ToDo", probe.name, "description", for_update=True)
+					except frappe.QueryDeadlockError as error:
+						conflicts.append(error.args[0].args[0])
+						raise
+					self.fail("The MariaDB locking read did not report the stale snapshot.")
+
+				with patch.object(provisioning, "_locked_user", side_effect=lock_and_read) as locking:
+					response = self.call(endpoint, body)
+				self.assertEqual(conflicts, [1020])
+				self.assertEqual(response.status_code, 200, response.data[:300])
 				self.assertEqual(response.json["message"], expected)
 				self.assertEqual(locking.call_count, 2)
 

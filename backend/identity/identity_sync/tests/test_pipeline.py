@@ -942,8 +942,17 @@ class AccountDeletionTest(PipelineCase):
 
         self.assertEqual(again.status, "processed")
 
+    def test_tenant_anonymize_404_stops_deletion(self) -> None:
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, fakes.frappe_error(404, "IdentityNotFound"))
+
+        result = self.stack.app.processor.handle(self.request())
+
+        # O-43: a 404 is not a result. The job stays unknown and the Keycloak account stays.
+        self.assertEqual(result.status, "unknown")
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+
     def test_user_unknown_to_the_targets_is_not_an_error(self) -> None:
-        # Press answers found false. The tenant answers 404 IdentityNotFound. Both mean nothing to do.
+        # Both targets answer HTTP 200 with found false.
         stack = Stack()
         self.addCleanup(stack.close)
         stack.keycloak.add_user(keycloak_user(), [])

@@ -52,7 +52,11 @@ class TestPureHelpers(UnitTestCase):
 
 	def test_session_id_format(self):
 		self.assertTrue(helpers.is_session_id("11111111-1111-4111-8111-111111111111"))
-		self.assertFalse(helpers.is_session_id("a%b"))
+		self.assertTrue(helpers.is_session_id("Synthetic_-Example123456"))
+		self.assertFalse(helpers.is_session_id("long%enough"))
+		self.assertFalse(helpers.is_session_id("long-enough\n"))
+		self.assertFalse(helpers.is_session_id("long/enough"))
+		self.assertFalse(helpers.is_session_id("a" * 65))
 		self.assertFalse(helpers.is_session_id("a_b"))
 		self.assertFalse(helpers.is_session_id(""))
 		self.assertFalse(helpers.is_session_id(None))

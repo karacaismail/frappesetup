@@ -799,9 +799,9 @@ paths:
 
         The endpoint then compares the `issuer` value with the `iss` value of the site. If they differ, it returns 400.
 
-        The server makes up to three attempts to acquire the identity locks. It retries database deadlocks
-        and stale snapshots (`QueryDeadlockError`). A lock wait timeout fails immediately.
-        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
+        The server makes up to three attempts to complete the operation. It retries database deadlocks
+        and stale snapshots (`QueryDeadlockError`) before a commit. A lock wait timeout fails immediately.
+        A lock conflict after a commit or on the final attempt returns 500 `IdentityInternalError`.
 
         If the `(issuer, subject)` link exists, the user is found. The endpoint updates the first name, last name, `enabled` and
         `role_profiles` fields. If `email` differs from the user name, it returns 409.
@@ -928,9 +928,9 @@ paths:
       description: |
         The sync service calls this endpoint. The service token must carry `azp=identity-sync`.
 
-        The server makes up to three attempts to acquire the identity locks. It retries database deadlocks
-        and stale snapshots (`QueryDeadlockError`). A lock wait timeout fails immediately.
-        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
+        The server makes up to three attempts to complete the operation. It retries database deadlocks
+        and stale snapshots (`QueryDeadlockError`) before a commit. A lock wait timeout fails immediately.
+        A lock conflict after a commit or on the final attempt returns 500 `IdentityInternalError`.
 
         **This endpoint can disable the user.** When `enabled` comes as false, the user is disabled.
         A disabled user cannot sign in. When the same endpoint is called with `enabled` true, the user is enabled again.
@@ -994,9 +994,9 @@ paths:
       description: |
         The sync service calls this endpoint. The service token must carry `azp=identity-sync`.
 
-        The server makes up to three attempts to acquire the identity locks. It retries database deadlocks
-        and stale snapshots (`QueryDeadlockError`). A lock wait timeout fails immediately.
-        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
+        The server makes up to three attempts to complete the operation. It retries database deadlocks
+        and stale snapshots (`QueryDeadlockError`) before a commit. A lock wait timeout fails immediately.
+        A lock conflict after a commit or on the final attempt returns 500 `IdentityInternalError`.
 
         **This endpoint changes the user name.** In Frappe the user name is the e-mail.
         The endpoint renames the record with `rename_doc`. All records linked to the user move to the new name.
@@ -1080,8 +1080,8 @@ paths:
 
         The work has two steps. Both steps are safe to repeat.
         The server makes up to three attempts per step. It retries database deadlocks and stale snapshots
-        (`QueryDeadlockError`). A lock wait timeout fails immediately.
-        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
+        (`QueryDeadlockError`) before a commit. A lock wait timeout fails immediately.
+        A lock conflict after a commit or on the final attempt returns 500 `IdentityInternalError`.
 
         1. Step 1 locks the existing User first, then the identity link and the deletion record. It disables the user.
            It deletes the API key, the API secret and the stored password.
@@ -1108,7 +1108,9 @@ paths:
         If step 2 fails, its changes roll back. The record stays “Disabled”. A retry finishes the work.
         Two calls at the same time finish once. The second call returns the same body.
         If the request comes again after the work is done, it returns the same body.
-        If neither the `(issuer, subject)` link nor a deletion record exists, it returns 404. The sync service reads 404 as “no user on this site”.
+        A successful response includes `anonymized: true` and `found: true`.
+        If neither the `(issuer, subject)` link nor a deletion record exists, it returns HTTP 200.
+        The response then carries only `anonymized: true` and `found: false`.
         The `Administrator` and `Guest` accounts cannot be anonymized. In this case it returns 409.
         If the `kimlik_deletion_hmac_key` setting is missing, it returns 503 `DeletionKeyMissing`. Nothing changes.
         The request body is at most 16 KB.
@@ -1129,7 +1131,7 @@ paths:
                   subject: 11111111-1111-4111-8111-111111111111
       responses:
         "200":
-          description: The user is disabled and anonymized. A second request gets the same body.
+          description: The account is anonymized or the identity is unknown. A repeated request gets the same body.
           content:
             application/json:
               schema:
@@ -1144,6 +1146,11 @@ paths:
                       user: deleted-user-3f9a1c7e5b2d8f40@deleted.invalid
                       enabled: false
                       status: Anonymized
+                      anonymized: true
+                      found: true
+                unknown_identity:
+                  value:
+                    message: {anonymized: true, found: false}
         "400":
           $ref: "#/components/responses/GirdiGecersiz"
         "401":
@@ -1152,8 +1159,6 @@ paths:
           $ref: "#/components/responses/IstekSiniri"
         "403":
           $ref: "#/components/responses/ServisYetkisiYok"
-        "404":
-          $ref: "#/components/responses/BagYok"
         "409":
           description: "The linked account is `Administrator` or `Guest`. The `exc_type` value is `IdentityConflict`."
           content:
@@ -2258,7 +2263,7 @@ components:
                 exception: "platform_core.identity.exceptions.IdentityNotFound: subject"
                 _server_messages: '["{\"message\": \"No user is linked to this identity.\"}"]'
     IdentityLockRetryExhausted:
-      description: A lock conflict remained after three attempts. The `exc_type` value is `IdentityInternalError`.
+      description: The server stopped on a lock conflict. The `exc_type` value is `IdentityInternalError`.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
@@ -2470,8 +2475,26 @@ components:
         subject: {$ref: "#/components/schemas/Subject"}
 
     AnonymizeUserResult:
+      oneOf:
+        - $ref: "#/components/schemas/AnonymizedIdentity"
+        - $ref: "#/components/schemas/UnknownAnonymizeIdentity"
+
+    UnknownAnonymizeIdentity:
       type: object
-      required: [user, enabled, status]
+      description: The endpoint found neither an identity link nor a deletion record. There was nothing to anonymize.
+      required: [anonymized, found]
+      additionalProperties: false
+      properties:
+        anonymized:
+          type: boolean
+          const: true
+        found:
+          type: boolean
+          const: false
+
+    AnonymizedIdentity:
+      type: object
+      required: [user, enabled, status, anonymized, found]
       additionalProperties: false
       properties:
         user:
@@ -2486,6 +2509,14 @@ components:
           type: string
           const: Anonymized
           description: The state of the “Platform Identity Deletion” record. The response comes only after step 2.
+        anonymized:
+          type: boolean
+          const: true
+          description: The account anonymization is complete.
+        found:
+          type: boolean
+          const: true
+          description: The endpoint found an identity link or a completed deletion record.
 
     ChangeEmailResult:
       type: object

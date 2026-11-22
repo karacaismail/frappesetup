@@ -154,10 +154,12 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		response = self.call()
 		self.assertEqual(response.status_code, 200, response.data[:500])
 		result = response.json["message"]
-		self.assertEqual(set(result), {"user", "enabled", "status"})
+		self.assertEqual(set(result), {"user", "enabled", "status", "anonymized", "found"})
 		self.assertRegex(result["user"], r"^deleted-user-[0-9a-f]{16}@deleted\.invalid$")
 		self.assertIs(result["enabled"], False)
 		self.assertEqual(result["status"], "Anonymized")
+		self.assertIs(result["anonymized"], True)
+		self.assertIs(result["found"], True)
 
 		h.refresh()
 		anon = result["user"]
@@ -327,6 +329,46 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.assertTrue(frappe.db.exists("File", unrelated))
 		self.assertTrue(unrelated_path.is_file())
 
+	def test_redacted_attach_field_deletes_matching_unbound_attachment(self):
+		field = "custom_test_privacy_unbound"
+		self._custom_todo_field(field, "Attach")
+		file = self._file("test-only-unbound.txt", "ToDo", self.todo.name)
+		doc = frappe.get_doc("File", file)
+		path = Path(doc.get_full_path())
+		self.assertTrue(path.is_file())
+		frappe.db.set_value("ToDo", self.todo.name, field, doc.file_url)
+		frappe.db.commit()
+
+		with self._with_todo_data_fields(redact_fields=[field]):
+			response = self.call()
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		h.refresh()
+		self.assertFalse(frappe.db.get_value("ToDo", self.todo.name, field))
+		self.assertFalse(frappe.db.exists("File", file))
+		self.assertFalse(path.exists())
+
+	def test_redacted_attach_field_keeps_unbound_attachment_used_by_another_field(self):
+		field = "custom_test_privacy_unbound"
+		business_field = "custom_test_business_attachment"
+		self._custom_todo_field(field, "Attach")
+		self._custom_todo_field(business_field, "Attach")
+		file = self._file("test-only-unbound-shared.txt", "ToDo", self.todo.name)
+		doc = frappe.get_doc("File", file)
+		path = Path(doc.get_full_path())
+		frappe.db.set_value("ToDo", self.todo.name, {field: doc.file_url, business_field: doc.file_url})
+		frappe.db.commit()
+
+		with self._with_todo_data_fields(redact_fields=[field]):
+			response = self.call()
+
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		h.refresh()
+		self.assertFalse(frappe.db.get_value("ToDo", self.todo.name, field))
+		self.assertEqual(frappe.db.get_value("ToDo", self.todo.name, business_field), doc.file_url)
+		self.assertTrue(frappe.db.exists("File", file))
+		self.assertTrue(path.is_file())
+
 	def test_redacted_attach_field_keeps_file_and_thumbnail_shared_by_another_record(self):
 		field = "custom_test_privacy_shared_file"
 		self._custom_todo_field(field, "Attach")
@@ -402,12 +444,17 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.addCleanup(frappe.db.delete, "ToDo", {"name": another_todo.name})
 		versions = []
 		for doc in (self.todo, another_todo):
+			history = (
+				changes
+				if doc == another_todo
+				else {"changed": [*changes["changed"], ["allocated_to", None, DELETED]]}
+			)
 			version = frappe.get_doc(
 				{
 					"doctype": "Version",
 					"ref_doctype": "ToDo",
 					"docname": doc.name,
-					"data": json.dumps(changes),
+					"data": json.dumps(history),
 				}
 			).insert(ignore_permissions=True)
 			frappe.db.set_value("Version", version.name, "owner", "Administrator", update_modified=False)
@@ -415,7 +462,7 @@ class TestAnonymizeUser(FrappeAPITestCase):
 			versions.append(version.name)
 		frappe.db.commit()
 
-		with self._with_todo_data_fields(redact_fields=["description"]):
+		with self._with_todo_data_fields(filter_by="allocated_to", redact_fields=["description"]):
 			response = self.call()
 
 		self.assertEqual(response.status_code, 200, response.data[:300])
@@ -423,7 +470,8 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		target, unrelated = [frappe.db.get_value("Version", version, "data") for version in versions]
 		self.assertNotIn(old, target)
 		self.assertNotIn(new, target)
-		self.assertIn(business_change, json.loads(target)["changed"])
+		self.assertNotIn(DELETED, target)
+		self.assertEqual(json.loads(target)["changed"], [business_change])
 		self.assertEqual(json.loads(unrelated), changes)
 
 	def test_history_scrubs_version_committed_after_anonymization_snapshot(self):
@@ -927,11 +975,15 @@ class TestAnonymizeUser(FrappeAPITestCase):
 
 	# --- refusals ---------------------------------------------------------------------------------
 
-	def test_unknown_identity_gets_404(self):
+	def test_unknown_identity_gets_200_without_writes(self):
+		deletions = frappe.db.count(DELETION)
 		response = self.call(body=self.body(subject="sub-yok"))
-		self.assertEqual(response.status_code, 404, response.data[:300])
-		self.assertEqual(response.json.get("exc_type"), "IdentityNotFound")
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		self.assertEqual(response.json["message"], {"anonymized": True, "found": False})
+		self.assertIs(response.json["message"]["found"], False)
+		self.assertIs(response.json["message"]["anonymized"], True)
 		h.refresh()
+		self.assertEqual(frappe.db.count(DELETION), deletions)
 		self.assertTrue(frappe.db.get_value("User", DELETED, "enabled"))
 
 	def test_administrator_cannot_be_anonymized(self):
