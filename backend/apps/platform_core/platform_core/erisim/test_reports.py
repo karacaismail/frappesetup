@@ -2,7 +2,7 @@
 
 import frappe
 
-from platform_core.erisim.tests.base import DOCTYPE, EMPLOYEE_1, HR, MANAGER_1, NO_RULE, ErisimTestCase
+from platform_core.erisim.tests.base import ADMIN, DOCTYPE, EMPLOYEE_1, HR, MANAGER_1, NO_RULE, ErisimTestCase
 
 QUERY_REPORT = "ER Test Sorgu Raporu"
 RUN = "/api/method/frappe.desk.query_report.run"
@@ -70,8 +70,14 @@ class TestQueryReportGate(ErisimTestCase):
 		for name in self.records.values():
 			self.assertNotIn(name, response.get_data(as_text=True))
 
-	def test_user_with_unfiltered_all_rule_runs_query_report(self):
+	def test_user_who_sees_every_record_is_refused_too(self):
+		"""What the SQL of a query report reads cannot be verified. Only a System Manager runs it."""
 		response = self.run_report(self.login(HR))
+
+		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+
+	def test_system_manager_runs_query_report(self):
+		response = self.run_report(self.login(ADMIN))
 
 		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
 		body = response.get_data(as_text=True)

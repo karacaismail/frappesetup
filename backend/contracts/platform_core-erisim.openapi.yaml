@@ -325,6 +325,56 @@ paths:
             Seviye 1 ile 9 arasında değil ya da yazma okumasız istendi.
             İzin sistemini tutan kayıt türü de bu yanıtı alır.
 
+x-replaced-endpoints:
+  description: |
+    Motor Frappe'nin iki arama ucunun yerine kendi işlevini koyar.
+    Adresler değişmez. İstemci aynı adresi ve aynı girdileri kullanır.
+    Değişen davranış aşağıdadır. Bu, mevcut bir ucun davranış değişikliğidir.
+  endpoints:
+    - path: /api/method/frappe.desk.search.search_link
+      replaced_by: platform_core.erisim.link_search.search_link
+      methods: [GET, POST]
+    - path: /api/method/frappe.desk.search.search_widget
+      replaced_by: platform_core.erisim.link_search.search_widget
+      methods: [GET, POST]
+  behaviour:
+    - Çağıranın aranan kayıt türünde `select` ya da `read` izni olmalıdır. Yoksa uç 403 döner.
+    - Frappe'nin standart araması değişmez. Sonuç liste kuralından ve alan seviyesinden geçer.
+    - Kurallı kayıt türünde özel arama işlevi yalnız izin listesindeyse çalışır.
+    - Özel arama işlevi `query` girdisiyle ya da `standard_queries` kancasıyla gelir. İkisi de aynı kurala uyar.
+    - İzin listesindeki işlevin kodu her aramada denetlenir. Kod yalnız izinli okuma yolu kullanmalıdır.
+    - Kurala uymayan özel arama 403 döner. Bu ret bütün kullanıcılar içindir. Tek istisna “Administrator” kullanıcısıdır.
+    - Kuralsız kayıt türünde özel arama Frappe'nin olağan davranışıyla çalışır.
+    - Bilinmeyen girdi adı reddedilir. Sarmalayıcılar Frappe'nin belgeli girdilerini kabul eder.
+
+x-hooks:
+  description: Uygulamaların `hooks.py` dosyasında motora verdiği bildirimler.
+  hooks:
+    - name: access_rule_report_scopes
+      shape: '{"Rapor adı": {"Kayıt türü": ["alan", ...]}}'
+      description: |
+        Betik raporunun okuduğu kayıt türlerini ve alanları bildirir.
+        Bildirim boş olamaz. Her kayıt türü en az bir gerçek alan saymalıdır. `*` kabul edilmez.
+        Bildirim tek başına yetmez. Raporun kodu yalnız `frappe.get_list` ile okumalıdır.
+        Sorgu raporunu bu bildirim açmaz.
+    - name: access_rule_allowed_queries
+      shape: '["uygulama.modul.islev", ...]'
+      description: |
+        Kurallı kayıt türünde çalışabilecek özel arama işlevlerini sayar.
+        İşlevin modülü yalnız izinli okuma yolu kullanmalıdır. Motor bunu her aramada denetler.
+
+x-report-rules:
+  description: |
+    Rapor uçları Frappe'nin kendi uçlarıdır. Motor rapor kaydını genişletir.
+    Sitede en az bir kurallı kayıt türü varken şu kurallar geçerlidir.
+  rules:
+    - Liste raporu (“Report Builder”) çalışır. Veri liste kuralından ve alan seviyesinden geçer.
+    - Sorgu raporu (“Query Report”) yalnız “System Manager” rolüne çalışır. Ötekiler 403 alır.
+    - Betik raporu (“Script Report”) yalnız bildirimi ve kod denetimi geçerliyse çalışır. Yoksa herkes 403 alır.
+    - Kurallı veriye dokunan raporda hazır rapor (“Prepared Report”) kapalıdır. Oluşturma, saklı sonucu okuma, dosya ve ZIP indirme, CSV dönüştürme reddedilir.
+    - Zamanlanmış e-posta raporu (“Auto Email Report”) aynı kurallara kayıttaki kullanıcı için uyar.
+    - Sitede kurallı tür yoksa kapı yalnız raporun ana türünün alan seviyesini denetler.
+
 x-ai-tools:
   description: |
     Motor dört yapay zekâ aracını `ai_tools` kancasıyla bildirir.

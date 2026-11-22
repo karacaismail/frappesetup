@@ -2,23 +2,32 @@
 
 A link field or an app can name its own search function, and Frappe returns whatever that
 function returns (`frappe/desk/search.py:133`). Such a function may ignore record rules and
-field levels. The engine cannot inspect it, so it filters the result: only records the user may
-list are kept, and extra columns are dropped unless the user may read every field.
-`hooks.py` puts these functions in place of Frappe's two search endpoints.
+field levels, and it may pick records by a field the user cannot read.
+
+Rule (decision D of the third review): on a governed document type only Frappe's standard
+search and the search functions on the engine's allow-list run. An allow-listed function must
+itself read through permission-aware calls; its module is checked on every search. Every other
+custom search function is refused, for every user.
+
+`hooks.py` puts `search_link` and `search_widget` in place of Frappe's two search endpoints.
+Python code must use `platform_core.erisim.api`: Frappe's own functions cannot be intercepted
+from Python without changing Frappe.
 """
+
+import inspect
 
 import frappe
 from frappe import _
 from frappe.desk import search
 
-from platform_core.erisim import reports, rules
+from platform_core.erisim import code_check, rules
 
-VERIFIED_QUERIES_HOOK = "access_rule_verified_queries"
+ALLOWED_QUERIES_HOOK = "access_rule_allowed_queries"
 
 
-def verified_queries() -> set[str]:
-	"""Search functions an app vouches for: they apply record rules and field levels themselves."""
-	return set(frappe.get_hooks(VERIFIED_QUERIES_HOOK) or [])
+def allowed_queries() -> set[str]:
+	"""Search functions apps put on the allow-list in `hooks.py`."""
+	return set(frappe.get_hooks(ALLOWED_QUERIES_HOOK) or [])
 
 
 def custom_query(doctype: str, query: str | None) -> str | None:
@@ -29,27 +38,33 @@ def custom_query(doctype: str, query: str | None) -> str | None:
 	return standard[-1] if standard else None
 
 
-def needs_filter(doctype: str, query: str | None) -> bool:
+def query_source(query: str) -> str | None:
+	try:
+		return inspect.getsource(inspect.getmodule(frappe.get_attr(query)))
+	except (ImportError, AttributeError, OSError, TypeError):
+		return None
+
+
+def guard(doctype: str, query: str | None = None) -> None:
+	"""Refuse a custom search on a governed document type unless it is allow-listed and checked."""
 	used = custom_query(doctype, query)
-	if not used or used in verified_queries() or frappe.session.user == "Administrator":
-		return False
-	user = frappe.session.user
-	return not (reports.sees_every_record(doctype, user) and reports.reads_fields(doctype, ["*"], user))
-
-
-def _name_of(row):
-	if isinstance(row, dict):
-		return row.get("value") or row.get("name")
-	return row[0] if row else None
-
-
-def allowed_names(doctype: str, rows: list) -> set[str]:
-	names = [name for name in map(_name_of, rows) if name]
-	if not names:
-		return set()
-	return set(
-		frappe.get_list(doctype, filters={"name": ("in", names)}, pluck="name", limit_page_length=len(names))
-	)
+	if not used or frappe.session.user == "Administrator" or not rules.is_governed(doctype):
+		return
+	if used not in allowed_queries():
+		frappe.throw(
+			_("Search function {0} is not allowed on {1}, which is governed by Access Rules.").format(
+				frappe.bold(used), frappe.bold(doctype)
+			),
+			frappe.PermissionError,
+		)
+	found = code_check.problems(query_source(used), None)
+	if found:
+		frappe.throw(
+			_("Search function {0} does not read through permission-aware calls only: {1}").format(
+				frappe.bold(used), ", ".join(found)
+			),
+			frappe.PermissionError,
+		)
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -64,10 +79,11 @@ def search_link(
 	ignore_user_permissions: bool = False,
 	link_fieldname: str | None = None,
 ) -> list:
-	"""`frappe.desk.search.search_link` with the result limited to what the user may list."""
+	"""`frappe.desk.search.search_link` behind the link search rule."""
 	if not frappe.has_permission(doctype, "select"):
 		frappe.throw(_("No permission to search {0}.").format(doctype), frappe.PermissionError)
-	results = search.search_link(
+	guard(doctype, query)
+	return search.search_link(
 		doctype,
 		txt,
 		query,
@@ -78,10 +94,6 @@ def search_link(
 		ignore_user_permissions=ignore_user_permissions,
 		link_fieldname=link_fieldname,
 	)
-	if not results or not needs_filter(doctype, query):
-		return results
-	allowed = allowed_names(doctype, results)
-	return [{"value": row["value"], "description": ""} for row in results if row.get("value") in allowed]
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -99,10 +111,11 @@ def search_widget(
 	ignore_user_permissions: bool = False,
 	link_fieldname: str | None = None,
 ) -> list:
-	"""`frappe.desk.search.search_widget` with the result limited to what the user may list."""
+	"""`frappe.desk.search.search_widget` behind the link search rule."""
 	if not frappe.has_permission(doctype, "select"):
 		frappe.throw(_("No permission to search {0}.").format(doctype), frappe.PermissionError)
-	results = search.search_widget(
+	guard(doctype, query)
+	return search.search_widget(
 		doctype,
 		txt,
 		query,
@@ -116,8 +129,3 @@ def search_widget(
 		ignore_user_permissions=ignore_user_permissions,
 		link_fieldname=link_fieldname,
 	)
-	if not results or not needs_filter(doctype, query):
-		return results
-	allowed = allowed_names(doctype, results)
-	names = [name for name in map(_name_of, results) if name in allowed]
-	return [{"name": name} for name in names] if as_dict else [[name] for name in names]
