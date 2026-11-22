@@ -384,7 +384,7 @@ Sitede hiç kurallı tür yoksa kapı tek şeye bakar. Öznenin raporun ana tür
 | Kayıt kuralı | Muaf değil | Muaf |
 | Sorgu ve betik raporu | Muaf | Muaf |
 | Hazır rapor kapatması | Muaf değil | Muaf değil |
-| Zamanlanmış e-posta raporu | İşi yapabilir. Kayıttaki kullanıcı kuralı ve onay yine geçerli. | İşi yapabilir. Kayıttaki kullanıcı kuralı ve onay yine geçerli. |
+| Zamanlanmış e-posta raporu kapatması | Muaf değil | Muaf değil |
 | Özel bağlantı araması | Muaf değil | Muaf değil |
 
 - “System Manager” rolü sorgu ve betik raporu kuralından bilerek muaftır. Sitede bu raporları çalıştırabilen biri gerekir. Bu rol kuralları zaten yönetir.
@@ -431,71 +431,66 @@ Bu yüzden karar özelliği kapatmaktır. Kurallı veriye dokunan raporda hazır
 
 Var olan saklı sonuçlar ve dosyaları silinmez. Yalnız okunamaz. Dosyanın sahibi ve dosyanın paylaşıldığı kişi de okuyamaz. Frappe bu ikisine bağlı kayda bakmadan izin verir (`core/doctype/file/file.py:1097`). Motorun denetimi bu karardan önce çalışır.
 
-Sırada bekleyen hazır rapor da kapalıdır. Bir kayıt kural yazılmadan önce sıraya alınmış olabilir. Arka plan işi çalışırken kayıt oluşturma denetiminden geçmez (`core/doctype/prepared_report/prepared_report.py:107`). Bu yüzden rapor kapısı işin adına da bakar. İş hazır rapor işiyse ve rapor kurallı veriye dokunuyorsa kapı reddeder. İş hatayla biter. Rapor çalışmaz ve dosya yazılmaz.
+Sırada bekleyen hazır rapor da kapalıdır. Bir kayıt kural yazılmadan önce sıraya alınmış olabilir. Arka plan işi kayıt oluşturma denetiminden geçmez (`core/doctype/prepared_report/prepared_report.py:107`).
+
+Motor bu yüzden iş başında denetler. Frappe işçisi her işten önce `before_job` kancasını çağırır (`utils/background_jobs.py:269`). Motor bu kancaya bağlanır. İş hazır rapor işiyse ve rapor kurallı veriye dokunuyorsa motor işi reddeder. Frappe'nin iş işlevi hiç başlamaz. Kayıt “Error” durumuna geçer ve dosya yazılmaz.
+
+Denetim bütün rapor türleri içindir. Liste raporu “Report” kaydındaki kapıya hiç uğramaz (`desk/query_report.py:93`). Yedinci inceleme bu açığı buldu. İş başı denetimi rapor türüne bakmaz.
+
+İki ek güvence vardır. Rapor kapısı işin adına yine bakar. Kapalı hazır rapora dosya da eklenemez.
 
 Bir rapor ne zaman kurallı veriye dokunur?
 
 - Liste raporu, ana türü kurallıysa dokunur.
 - Sorgu raporu ve betik raporu, sitede kurallı tür varsa dokunuyor sayılır.
 
-#### Zamanlanmış e-posta raporu
+#### Zamanlanmış e-posta raporu kapalıdır
 
-“Auto Email Report” raporu sonradan çalıştırır ve sonucu e-postayla gönderir. Kullanıcı o sırada başında değildir. Bu, zamanlanmış bir özelliktir. Proje zamanlanmış iş kurmaz (D-6). Bu yüzden kural en dar olandır.
+“Auto Email Report” raporu sonradan çalıştırır ve sonucu e-postayla gönderir. Kullanıcı o sırada başında değildir.
 
-Kural üç parçadır.
+Karar şudur: Kurallı veriye dokunan “Auto Email Report” hiç kimse için çalışmaz. “System Manager” rolü ve “Administrator” kullanıcısı da buna dahildir.
 
-**1. Kaydı yalnız “System Manager” kullanabilir.** Kurallı veriye dokunan kayıtta şu işlerin hepsi öteki kullanıcılara reddedilir:
-
-- kaydı oluşturma,
-- kaydı değiştirme,
-- raporu indirme,
-- raporu gönderme.
-
-Kaydetme denetimi iki rapora bakar: kaydın yeni raporuna ve önceki raporuna. İkisinden biri kurallı veriye dokunuyorsa “System Manager” gerekir. Yoksa bir “Report Manager” kurallı kaydı kuralsız bir rapora çevirip kaydı ele geçirirdi. Altıncı inceleme bu açığı buldu.
-
-**2. Rapor kuralları kayıttaki kullanıcı için de sağlanmalıdır.** Örneğin sorgu raporu için kayıttaki kullanıcı da “System Manager” olmalıdır.
-
-Frappe “Report Manager” rolüne bu kaydı oluşturma izni verir. O rol kayıttaki kullanıcıyı da seçebilir. Yalnız kayıttaki kullanıcıya bakılsaydı bu rol daha yetkili bir hesabı seçerdi.
-
-**3. Kayıt yalnız onaylıyken çalışır.** “System Manager” kaydı elle kaydedince motor bir onay kaydı yazar. Onay kaydının türü “Auto Email Report Approval” olur. Kayıt şunları tutar:
-
-- onaylayan kullanıcı,
-- onay zamanı,
-- kaydın o andaki ayarlarının izi. İz bütün ayar alanlarından üretilir. Örneğin rapor, kullanıcı, alıcılar ve süzgeçler ize girer.
-
-Motor her çalıştırmada onayı denetler. İndirme, elle gönderme ve zamanlayıcı aynı denetimden geçer. Şu durumlarda çalıştırma reddedilir:
-
-- Onay kaydı yoktur.
-- Kayıt onaydan sonra değişmiştir. Motor bunu izi karşılaştırarak anlar.
-- Onaylayan kullanıcı artık “System Manager” değildir.
-
-Onayın nedeni zamanlayıcıdır. Frappe zamanlayıcısı işi “Administrator” oturumuyla çalıştırır (`utils/scheduler.py:117`). O oturum her rol denetimini geçer. Eski bir kaydı bir “Report Manager” yıllar önce bir “System Manager” adına kaydetmiş olabilir. Onay olmasaydı zamanlayıcı o kaydı çalıştırır ve raporu alıcılara gönderirdi. Altıncı inceleme bu açığı buldu.
-
-Arka plan işindeki kaydetme onay sayılmaz. Onay yalnız elle kaydetmeyle oluşur.
-
-##### Kurulumda ve migrate sırasında kapatma
-
-Motor kurulumdan ve her migrate işleminden sonra bir temizlik yapar. Kurallı veriye dokunan ve geçerli onayı olmayan bütün etkin kayıtları kapatır (`enabled = 0`). Kayıt silinmez.
-
-Kaydı yeniden açmanın tek yolu vardır: “System Manager” kaydı elle açar ve kaydeder. Bu kaydetme onayı da yazar.
-
-Burada bir yorum yaptım. Karar “bütün kayıtlar kapatılır” der. Motor geçerli onayı olan kaydı kapatmaz. Yoksa her migrate işleminden sonra yönetici bütün kayıtları yeniden açmak zorunda kalırdı. Kurulumda hiç onay olmadığı için ilk çalıştırmada bütün kayıtlar kapanır.
-
-##### Oturum ile kayıttaki kullanıcı farklıdır
-
-Motor oturumdaki kullanıcıyı değiştirmez. Bir ara rapor kayıttaki kullanıcının oturumuyla çalıştırılıyordu. Frappe'nin `set_user` işlevi oturum verisini ve istek girdilerini siler (`frappe/__init__.py:381`). O kod tümüyle kaldırıldı. Bir test motorun `set_user` çağırmadığını sınar.
-
-Bu yüzden iki kullanıcıyı ayırmak gerekir:
-
-| Rapor türü | Veri kimin adına okunur? |
+| İş | Sonuç |
 | --- | --- |
-| Liste raporu | Kayıttaki kullanıcı. Frappe bu kullanıcıyı sorguya kendisi verir. |
-| Sorgu raporu | Oturumdaki kullanıcı. Yani raporu indiren ya da gönderen “System Manager”. |
-| Betik raporu | Oturumdaki kullanıcı. Betik oturumu okursa işlemi yapan yöneticiyi görür. |
+| Böyle bir kayıt oluşturma | Reddedilir |
+| Var olan kaydı etkin yapma | Reddedilir |
+| Raporu indirme | Reddedilir |
+| Raporu elle gönderme | Reddedilir |
+| Zamanlayıcının raporu göndermesi | Reddedilir |
+| Var olan kaydı kapalı tutarak kaydetme | Yapılır |
+| Var olan kaydı silme | Yapılır |
 
-- Liste raporunda içerik kayıttaki kullanıcıyla sınırlıdır. Bir test bunu sınar.
-- Sorgu ve betik raporunda içerik kayıttaki kullanıcıya göre daralmaz. Bu yüzden 2. parça o raporlarda kayıttaki kullanıcının da “System Manager” olmasını ister.
-- “Administrator” oturumu kayıttaki kullanıcı denetimini kaldırmaz. Onay denetimini de kaldırmaz.
+Son iki satırın nedeni şudur: Kural bir kaydı etkin durumda kilitlememelidir. Yönetici kaydı kapatabilmeli ve silebilmelidir.
+
+Motor kurulumdan ve her migrate işleminden sonra bir temizlik yapar. Kurallı veriye dokunan bütün etkin kayıtları kapatır (`enabled = 0`). Kayıt silinmez.
+
+Kuralsız veriye dokunan kayıt Frappe'nin olağan davranışıyla çalışır.
+
+##### Gerekçe
+
+İki neden vardır:
+
+1. Proje zamanlanmış iş kurmaz (D-6). Bu özellik zamanlanmış bir iştir.
+2. İlk sürümün e-posta raporuna ihtiyacı yoktur.
+
+Daha ince kurallar denendi ve her biri yeni bir açık verdi:
+
+| Denenen kural | İncelemenin bulduğu açık |
+| --- | --- |
+| Rapor kuralları kayıttaki kullanıcıya uygulansın. | Rapor indiren kişinin oturumuyla çalışıyordu. |
+| Rapor kayıttaki kullanıcının oturumuyla çalışsın. | Oturum değiştirmek oturum verisini siliyordu. “Report Manager” daha yetkili bir hesabı seçebiliyordu. |
+| Kaydı yalnız “System Manager” kullansın. | Zamanlayıcı “Administrator” oturumuyla çalışıyor ve her rol denetimini geçiyordu. |
+| “System Manager” kaydı onaylasın. Motor ayarların izini tutsun. | Rapor tanımı değişince eski onay geçerli kalıyordu. İz alan sınırlarını güvenli saklamıyordu. |
+
+Her tur bir açığı kapattı ve bir yenisini gösterdi. Orkestratör bu yüzden özelliği kurallı veride tümüyle kapattı. Onay kaydı, onay izi ve onay kodu kaldırıldı.
+
+##### Zamanlayıcı hangi oturumla çalışır?
+
+Frappe zamanlayıcısı işi “Administrator” oturumuyla çalıştırır (`utils/scheduler.py:117`). Bu oturum rol denetimlerini geçer. Motorun reddi role bakmaz. Bu yüzden zamanlayıcı da reddedilir.
+
+Motor oturumdaki kullanıcıyı hiçbir yerde değiştirmez. Frappe'nin `set_user` işlevi oturum verisini ve istek girdilerini siler (`frappe/__init__.py:381`).
+
+Kuralsız veride Frappe'nin kendi davranışı geçerlidir. Frappe liste raporunu kayıttaki kullanıcı adına okur. Sorgu ve betik raporunu ise oturumdaki kullanıcı adına çalıştırır. Zamanlanmış çalışmada bu kullanıcı “Administrator” olur. Elle indirmede işlemi yapan kullanıcı olur.
 
 #### Sınıf genişletme ve `super()`
 
@@ -609,7 +604,6 @@ Motor dört aracı `ai_tools` kancasıyla bildirir (D-9). Kod `erisim/ai_tools.p
 - Araçlar yalnız yapılandırılmış alan alır. SQL metni ya da ham koşul alan girdi yoktur. Girdi modeli bilinmeyen alanı reddeder.
 - Süzgeç satırları elle yazılan kuralla aynı doğrulamadan geçer.
 - Her araç iznini kendisi denetler. Araç `ignore_permissions` kullanmaz.
-- “Auto Email Report Approval” türü de genel yazma araçlarına kapalıdır. Onayı yalnız motor yazar.
 - “Access Rule” türü genel yazma araçlarına kapalıdır (O-28). Motor türü `ai_write_closed_doctypes` kancasına yazar. Kural yalnız yukarıdaki iki yazma aracıyla değişir. O araçlar kuralı doğrular ve erişimi kaybedecek rolleri sayar.
 
 Yapay zekâ katmanı henüz `backend` dalında değildir. Testler araçları sözleşmenin anlattığı gibi çağırır: kullanıcı kimliğiyle ve doğrulanmış girdiyle. Araçlar gerçek MCP ucundan sınanmadı.
@@ -684,7 +678,7 @@ Beklenen sonuçlar bu nottan, sözleşmeden ve karar sitesinden gelir (D-1).
 | `test_ai_tools.py` | Dört yapay zekâ aracının bildirimi, izni, önizlemesi ve sürümü. | D-9, yapay zekâ sözleşmesi |
 | `test_report_rules.py` | Rapor kuralları: hazır rapor, sorgu raporu, betik raporu, zamanlanmış e-posta raporu. | R-9, kararlar A, B, C, E |
 | `test_rule_cache.py` | Kural değişen istekte kısmi ve tam geri alma. | R-9 |
-| `test_auto_email_report.py` | Zamanlanmış e-posta raporu: kimin kaydedebildiği, onay, zamanlayıcı ve migrate temizliği. | R-9, D-6 |
+| `test_auto_email_report.py` | Zamanlanmış e-posta raporu: herkese kapalı olması, zamanlayıcı ve migrate temizliği. | R-9, D-6 |
 
 Güvenlik kapısı uç testlerini modülün yanında ister. Bu yüzden iki dosya daha vardır:
 
@@ -771,9 +765,20 @@ Altıncı incelemenin düzeltmeleri de incelendi. İnceleme bir engelleyici, bir
 
 | Bulgu | Düzeltme | Test |
 | --- | --- | --- |
-| Zamanlayıcı eski kayda yönetici yetkisi veriyor. | Kayıt yalnız onaylıyken çalışıyor. Onaysız kayıtlar kurulumda ve migrate sırasında kapatılıyor. | `tests/test_auto_email_report.py` |
+| Zamanlayıcı eski kayda yönetici yetkisi veriyor. | Kayıt yalnız onaylıyken çalışıyordu. Bu çözüm sonraki incelemede kaldırıldı. | `tests/test_auto_email_report.py` |
 | Kaydetme denetimi eski rapor türüne bakmıyor. | Denetim kaydın önceki raporuna da bakıyor. | `tests/test_auto_email_report.py` |
 | Belge, betiğin hangi oturumla çalıştığını belirsiz bırakıyor. | Oturum ile kayıttaki kullanıcı farkı bu nota ve sözleşmeye yazıldı. | Belge değişikliği |
+
+### Sekizinci inceleme
+
+Yedinci incelemenin düzeltmeleri de incelendi. İnceleme bir engelleyici, iki önemli ve bir küçük bulgu verdi.
+
+| Bulgu | Düzeltme | Test |
+| --- | --- | --- |
+| Raporun tanımı değişince eski onay geçerli kalabiliyor. | Onay düzeni kaldırıldı. Kurallı veride e-posta raporu herkese kapalı. | `tests/test_auto_email_report.py` |
+| Ayar özeti alan sınırlarını güvenli saklamıyor. | Özet kodu onay düzeniyle birlikte kaldırıldı. | `tests/test_auto_email_report.py` |
+| Sıradaki liste raporu çalışma başında durmuyor. | Motor `before_job` kancasıyla iş başında reddediyor. | `tests/test_report_rules.py` |
+| Oturum tablosunda zamanlayıcı hesabı eksik. | Zamanlayıcının oturumu bu nota ve sözleşmeye yazıldı. | Belge değişikliği |
 
 ### Özne alanlarını koruyun
 

@@ -737,9 +737,9 @@ x-hooks:
   description: Hooks the engine writes in `hooks.py` for other modules.
   hooks:
     - name: ai_write_closed_doctypes
-      shape: '["Access Rule", "Auto Email Report Approval"]'
+      shape: '["Access Rule"]'
       description: |
-        The AI layer reads this hook. The engine lists the “Access Rule” and “Auto Email Report Approval” document types in it (O-28).
+        The AI layer reads this hook. The engine lists the “Access Rule” document type in it (O-28).
         The generic write tools cannot change this type. For example `create_document` and `update_document` are refused.
         A rule changes only through the engine's own tools: `propose_access_rule` and `propose_access_rule_change`.
     - name: ai_tools
@@ -766,19 +766,17 @@ x-report-rules:
     - A script report (“Script Report”) runs only for the “System Manager” role. Everyone else gets 403.
     - What the SQL of a query report or the code of a script report reads cannot be verified. No declaration opens such a report.
     - For a report that touches governed data the prepared report (“Prepared Report”) is closed. Creating one, reading a stored result, downloading its file alone or in a ZIP, and converting it to CSV are refused.
-    - A scheduled email report (“Auto Email Report”) that touches governed data is for the “System Manager” role only. Creating, changing, downloading and sending the record return 403 for everyone else. A record saved earlier follows the same rule.
-    - The report rules also apply to the user named on the “Auto Email Report” record. A query report or script report record needs a “System Manager” as that user.
-    - Saving an “Auto Email Report” checks the report the record has now and the report it had before. If either touches governed data, only a “System Manager” may save it.
-    - An “Auto Email Report” that touches governed data runs only while an approval of its current settings is on file. A “System Manager” saving the record by hand is the approval. The engine keeps who approved and when in the “Auto Email Report Approval” document type.
-    - A record changed after its approval, or saved before the rule existed, does not run. This holds for download, send now and the scheduler. The scheduler works as “Administrator”; that session does not replace the approval.
-    - After install and after migrate the engine switches off (`enabled = 0`) every “Auto Email Report” on governed data that has no valid approval.
-    - The engine does not switch the session user to run a report. The session user and the user named on the record are two different things. Frappe reads a list report (“Report Builder”) with the record's user. A query report or script report reads as the session user, that is, as the “System Manager” who downloads or sends it.
-    - A prepared report queued before a rule existed is refused when its job runs. The job ends in error, runs no report and writes no file.
+    - A prepared report queued before a rule existed is refused when its job starts, before any report code runs. This holds for list, query and script reports. The record ends in status Error and no file is written.
+    - A scheduled email report (“Auto Email Report”) that touches governed data is switched off for everyone, the “System Manager” role and the “Administrator” user included.
+    - Such a record cannot be created and an existing one cannot be enabled. Saving returns 403.
+    - Such a record cannot be downloaded or sent, by hand or by the scheduler. The scheduler works as “Administrator”; that session opens nothing here.
+    - An existing “Auto Email Report” record can still be saved while it stays switched off, and it can be deleted.
+    - After install and after migrate the engine switches off (`enabled = 0`) every enabled “Auto Email Report” that touches governed data.
+    - The engine does not switch the session user. On data that is not governed Frappe's own behaviour applies: a list report is read with the user named on the record, a query report or script report runs as the session user. In a scheduled run that session user is “Administrator”.
     - When the site has no governed document type, the gate checks only the field levels of the report's own document type.
   exemptions:
-    - The “System Manager” role is exempt from the query report and script report rule by design. A site needs someone who can run these reports, and this role already manages the rules. The role is not exempt from the prepared report closure, from the link search rule or from record rules.
-    - The exemption of a session user never removes the check on the user named on an “Auto Email Report” record. An “Administrator” session still needs that user to pass the report rules, and still needs a valid approval.
-    - The “Administrator” user is exempt from record rules and from the report gate. Frappe never asks permission hooks for this user. The user is not exempt from the prepared report closure or from the link search rule.
+    - The “System Manager” role is exempt from the query report and script report rule by design. A site needs someone who can run these reports, and this role already manages the rules. The role is not exempt from the prepared report closure, from the “Auto Email Report” closure, from the link search rule or from record rules.
+    - The “Administrator” user is exempt from record rules and from the report gate. Frappe never asks permission hooks for this user. The user is not exempt from the prepared report closure, from the “Auto Email Report” closure or from the link search rule.
 
 x-ai-tools:
   description: |
