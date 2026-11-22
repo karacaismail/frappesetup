@@ -3,11 +3,12 @@
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, BrokenBarrierError
+from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import Request
 
-from platform_core.mobil.tests.loopback_http import open_loopback
+from platform_core.mobile.tests.loopback_http import open_loopback
 
 from . import measure_performance
 
@@ -52,3 +53,27 @@ class PerformanceServerTest(unittest.TestCase):
             open_loopback(Request(url), timeout=5) as response,
         ):
             self.assertGreater(int(response.headers["X-Mobile-Test-Worker"]), 0)
+
+    def test_benchmark_defers_other_identities_to_the_real_hook(self):
+        site = "perf-mobile.localhost"
+        phone = SimpleNamespace(token="fixture-bench", account="bench@example.test")
+        local = SimpleNamespace(
+            site=site,
+            request=SimpleNamespace(headers={"Authorization": "Bearer fixture-bench"}),
+            mobile_identity=None,
+        )
+        with (
+            patch.object(measure_performance, "require_performance_site"),
+            patch.object(measure_performance.frappe, "local", local),
+            patch.object(measure_performance.service_token, "validate") as original,
+            measure_performance.benchmark_server([phone], site=site),
+        ):
+            measure_performance.service_token.validate()
+            original.assert_called_once_with()
+            original.reset_mock()
+            local.mobile_identity = {"site": site, "account": phone.account}
+            measure_performance.service_token.validate()
+            original.assert_not_called()
+            local.site = "another.localhost"
+            measure_performance.service_token.validate()
+            original.assert_called_once_with()

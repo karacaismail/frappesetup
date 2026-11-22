@@ -10,14 +10,14 @@ from __future__ import annotations
 import re
 import unittest
 
-from yardimci import KLASOR
+from helpers import DIRECTORY
 
 # An assignment of a string literal to a SECRET or PASSWORD constant, in Python or in Java.
 SECRET_LINE = re.compile(r"^\s*(?:private static final String\s+)?[A-Z_]*(?:SECRET|PASSWORD)[A-Z_]*\s*=\s*b?\"")
 TEST_FILES = [
-    KLASOR / "tests" / "test_second_factor.py",
-    KLASOR / "tests" / "test_dev_script_secrets.py",
-    *sorted((KLASOR / "event-listener" / "src" / "test").rglob("*.java")),
+    DIRECTORY / "tests" / "test_second_factor.py",
+    DIRECTORY / "tests" / "test_dev_script_secrets.py",
+    *sorted((DIRECTORY / "event-listener" / "src" / "test").rglob("*.java")),
 ]
 
 
@@ -33,8 +33,8 @@ class SyntheticSecretTest(unittest.TestCase):
         self.assertGreaterEqual(found, 5)
 
     def test_sample_totp_secret_belongs_to_the_development_users_only(self):
-        realm = (KLASOR / "realm" / "platform-realm.json").read_text(encoding="utf-8")
-        users = (KLASOR / "realm" / "dev-users" / "platform-users-0.json").read_text(encoding="utf-8")
+        realm = (DIRECTORY / "realm" / "platform-realm.json").read_text(encoding="utf-8")
+        users = (DIRECTORY / "realm" / "dev-users" / "platform-users-0.json").read_text(encoding="utf-8")
         self.assertNotIn("dev-totp-secret", realm)
         self.assertIn("dev-totp-secret-0123456789", users)
 

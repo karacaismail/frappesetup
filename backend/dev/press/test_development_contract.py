@@ -128,13 +128,13 @@ class ImageContractTest(unittest.TestCase):
         compose = (PRESS_DEV.parent / "compose.press.yaml").read_text()
         self.assertIn("MARIADB_ROOT_PASSWORD_FILE: /run/secrets/press_db_password", compose)
         self.assertNotRegex(compose, r"(?m)^ +PRESS_(?:DB|ADMIN)_PASSWORD:")
-        self.assertIn("environment: PRESS_DB_PASSWORD", compose)
+        self.assertIn("environment: PTR_DB_PASSWORD", compose)
 
     def test_bootstrap_does_not_pass_passwords_on_the_command_line(self):
         install = (PRESS_DEV / "install.sh").read_text()
         self.assertNotRegex(install, r"--(?:mariadb-root|db-root|admin)-password")
         create_site = (PRESS_DEV / "create_site.py").read_text()
-        for variable in ("PRESS_DB_PASSWORD", "PRESS_ADMIN_PASSWORD"):
+        for variable in ("PTR_DB_PASSWORD", "PTR_ADMIN_PASSWORD"):
             self.assertIn(f'read_site_password("{variable}"', create_site)
         self.assertNotRegex(create_site, r"subprocess|sys\.argv")
 
@@ -151,7 +151,7 @@ class ImageContractTest(unittest.TestCase):
         with (
             patch.dict(sys.modules, {"frappe": frappe, "frappe.installer": installer, "frappe.utils": utils}),
             patch.dict(
-                os.environ, {"PRESS_DB_PASSWORD": "db-fixture", "PRESS_ADMIN_PASSWORD": "admin-fixture"}
+                os.environ, {"PTR_DB_PASSWORD": "db-fixture", "PTR_ADMIN_PASSWORD": "admin-fixture"}
             ),
             patch("tempfile.NamedTemporaryFile"),
         ):
@@ -188,7 +188,7 @@ class ImageContractTest(unittest.TestCase):
         with (
             patch.dict(sys.modules, {"frappe": frappe, "frappe.installer": installer, "frappe.utils": utils}),
             patch.dict(
-                os.environ, {"PRESS_DB_PASSWORD": "db-fixture", "PRESS_ADMIN_PASSWORD": "admin-fixture"}
+                os.environ, {"PTR_DB_PASSWORD": "db-fixture", "PTR_ADMIN_PASSWORD": "admin-fixture"}
             ),
             patch("tempfile.NamedTemporaryFile", return_value=handle),
         ):
@@ -212,7 +212,7 @@ class ComposeContractTest(unittest.TestCase):
             tempfile.TemporaryDirectory(dir=os.environ.get("PANE_SCRATCH_DIR")) as home,
             patch.dict(os.environ, {"HOME": home, "DOCKER_CONFIG": home}),
         ):
-            self.assertEqual(self.compose_invocation(4250)["PRESS_WEB_PORT"], "4253")
+            self.assertEqual(self.compose_invocation(4250)["PTR_WEB_PORT"], "4253")
 
     def compose_invocation(self, port):
         env_file = PRESS_DEV / ".env.example"
@@ -222,8 +222,8 @@ class ComposeContractTest(unittest.TestCase):
             docker.write_text(
                 '#!/bin/sh\nexec "$PRESS_TEST_PYTHON" -c \''
                 "import json, os, sys; "
-                'print(json.dumps(dict(args=sys.argv[1:], PRESS_WEB_PORT=os.environ["PRESS_WEB_PORT"], '
-                'PRESS_SOCKET_PORT=os.environ["PRESS_SOCKET_PORT"])))'
+                'print(json.dumps(dict(args=sys.argv[1:], PTR_WEB_PORT=os.environ["PTR_WEB_PORT"], '
+                'PTR_SOCKET_PORT=os.environ["PTR_SOCKET_PORT"])))'
                 '\' "$@"\n'
             )
             docker.chmod(0o755)
@@ -234,8 +234,8 @@ class ComposeContractTest(unittest.TestCase):
                 "FS_COLIMA_PROFILE": "factory",
                 "PANE_PORT": str(port),
                 "PRESS_ENV_FILE": str(env_file),
-                "PRESS_WEB_PORT": "1",
-                "PRESS_SOCKET_PORT": "2",
+                "PTR_WEB_PORT": "1",
+                "PTR_SOCKET_PORT": "2",
             }
             result = subprocess.run(
                 ["bash", str(PRESS_DEV / "compose.sh"), "config", "--format", "json"],
@@ -269,17 +269,17 @@ class ComposeContractTest(unittest.TestCase):
         self.assertCountEqual(
             ports.group(1).splitlines(),
             [
-                '      - "127.0.0.1:${PRESS_WEB_PORT}:${PRESS_WEB_PORT}"',
-                '      - "127.0.0.1:${PRESS_SOCKET_PORT}:${PRESS_SOCKET_PORT}"',
+                '      - "127.0.0.1:${PTR_WEB_PORT}:${PTR_WEB_PORT}"',
+                '      - "127.0.0.1:${PTR_SOCKET_PORT}:${PTR_SOCKET_PORT}"',
             ],
         )
-        for variable in ("PRESS_WEB_PORT", "PRESS_SOCKET_PORT"):
+        for variable in ("PTR_WEB_PORT", "PTR_SOCKET_PORT"):
             self.assertRegex(web, rf"(?m)^      {variable}: \$\{{{variable}:\?[^}}]+\}}$")
         for port in (4250, 4310):
             with self.subTest(port=port):
                 invocation = self.compose_invocation(port)
-                self.assertEqual(invocation["PRESS_WEB_PORT"], str(port + 3))
-                self.assertEqual(invocation["PRESS_SOCKET_PORT"], str(port + 4))
+                self.assertEqual(invocation["PTR_WEB_PORT"], str(port + 3))
+                self.assertEqual(invocation["PTR_SOCKET_PORT"], str(port + 4))
 
     def test_external_images_are_pinned_and_web_uses_the_development_target(self):
         for service in ("mariadb", "redis"):

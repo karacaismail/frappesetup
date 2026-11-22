@@ -111,7 +111,7 @@ class TargetReplyTest(unittest.TestCase):
     Sources: contracts/press_tr.openapi.yaml (0.1.0) and contracts/platform_core-kimlik.openapi.yaml (0.2.0).
     """
 
-    ISSUER = "http://kimlik.localhost:6110/realms/platform"
+    ISSUER = "http://identity.localhost:6110/realms/platform"
 
     def setUp(self) -> None:
         self.press, self.tenant = fakes.FakePress(), fakes.FakeTenant()
@@ -175,7 +175,7 @@ class TargetReplyTest(unittest.TestCase):
         self.post(self.tenant, fakes.TENANT_PROVISION, self.identity(email="ayse@example.test", email_verified=True, enabled=True))
         other_email = self.identity(email="yeni@example.test", email_verified=True, enabled=True)
         self.assertEqual(self.post(self.tenant, fakes.TENANT_PROVISION, other_email), fakes.frappe_error(409, "EmailMismatch"))
-        extra_field = self.identity(enabled=False, tenant="kiraci1")
+        extra_field = self.identity(enabled=False, tenant="tenant1")
         self.assertEqual(self.post(self.tenant, fakes.TENANT_SET_ENABLED, extra_field)[0], 400)
 
     def test_unclear_replies_do_not_match_any_target_schema(self) -> None:
@@ -247,7 +247,7 @@ class ImplementationTest(ServerCase):
         for (method, path), operation in operations().items():
             with self.subTest(operation=(method, path)):
                 body = b"{}" if method == "POST" else None
-                concrete = path.replace("{tenant}", "kiraci1").replace("{operation_id}", "onay-1")
+                concrete = path.replace("{tenant}", "tenant1").replace("{operation_id}", "onay-1")
                 status, _reply = self.call(method, concrete, body)
                 if path == "/healthz":
                     self.assertEqual(status, 200)
@@ -400,7 +400,7 @@ class SchemaTest(ServerCase):
         self.stack.tenant.seed_user(issuer, "gone-1", "gone@example.test", enabled=False)
 
         preview = self.assert_response(self.post_json(path, {"dry_run": True}, PREVIEW_TOKEN), "POST", path, 200)
-        self.assertEqual([(d["target"], d["kind"]) for d in preview["differences"]], [("kiraci1", "deleted_in_keycloak")])
+        self.assertEqual([(d["target"], d["kind"]) for d in preview["differences"]], [("tenant1", "deleted_in_keycloak")])
         self.assertEqual(preview["previews"][-1]["operation"], "tenant.anonymize_user")
         execute = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-g1"}
         done = self.assert_response(self.post_json(path, execute), "POST", path, 200)
@@ -415,7 +415,7 @@ class SchemaTest(ServerCase):
         store = self.stack.app.store
         for number in range(3):
             failed = Event(id=f"e-{number}", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT)
-            store.add_dead_letter(failed, "tenant.provision kiraci1: HTTP 503")
+            store.add_dead_letter(failed, "tenant.provision tenant1: HTTP 503")
             store.operation_begin(f"o-{number}", "invite_user", ORG_ID, ["s1"])
         bearer = self.bearer(PREVIEW_TOKEN)
         for path, key in (("/v1/dead-letters", "dead_letters"), ("/v1/operations", "operations")):

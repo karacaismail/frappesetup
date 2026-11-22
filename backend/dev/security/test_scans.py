@@ -166,7 +166,7 @@ class CleanEnvironment(unittest.TestCase):
 
 
 class ContractScanTests(CleanEnvironment):
-    fixture = [str(scans.FIXTURES / "contract.yaml")]
+    fixture = [str(scans.CONTRACT_FIXTURE)]
 
     def test_external_contract_targets_are_rejected(self):
         for target in ("http://example.com", "http://10.0.0.1:8000", "http://localhost:8000"):
@@ -235,7 +235,7 @@ class ContractScanTests(CleanEnvironment):
 
 @unittest.skipUnless(shutil.which("uvx"), "uvx is required for the Schemathesis run.")
 class SchemathesisRunTests(CleanEnvironment):
-    fixture = [str(scans.FIXTURES / "contract.yaml")]
+    fixture = [str(scans.CONTRACT_FIXTURE)]
 
     def run_against(self, answer, **options):
         server, thread, handler = serve(answer)

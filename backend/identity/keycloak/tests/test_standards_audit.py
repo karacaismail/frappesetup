@@ -11,12 +11,12 @@ import re
 import unittest
 from unittest import mock
 
-from yardimci import KLASOR, ORNEK_ENV, realm_oku
+from helpers import DIRECTORY, EXAMPLE_ENV, read_realm
 
-DOCKERFILE = (KLASOR / "Dockerfile").read_text(encoding="utf-8")
-POM = (KLASOR / "event-listener" / "pom.xml").read_text(encoding="utf-8")
-SCRIPT = (KLASOR / "bin" / "kc-dev.sh").read_text(encoding="utf-8")
-README = (KLASOR / "README.md").read_text(encoding="utf-8")
+DOCKERFILE = (DIRECTORY / "Dockerfile").read_text(encoding="utf-8")
+POM = (DIRECTORY / "event-listener" / "pom.xml").read_text(encoding="utf-8")
+SCRIPT = (DIRECTORY / "bin" / "kc-dev.sh").read_text(encoding="utf-8")
+README = (DIRECTORY / "README.md").read_text(encoding="utf-8")
 # The six Turkish letters outside ASCII, lower and upper case, as escapes so this file stays ASCII.
 TURKISH_LETTERS = re.compile("[\u00e7\u011f\u0131\u00f6\u015f\u00fc\u00c7\u011e\u0130\u00d6\u015e\u00dc]")
 # Files written in this branch after D-12 (22 November 2026, 08:36). Older files keep their names until
@@ -68,7 +68,7 @@ class EnglishNamesTest(unittest.TestCase):
     """H-10, M-8 and F-4 (D-12): new names and new source text are English."""
 
     def test_new_realm_flow_names_are_english(self):
-        realm = realm_oku()
+        realm = read_realm()
         names = [f["alias"] for f in realm["authenticationFlows"]]
         names += [c["alias"] for c in realm["authenticatorConfig"]]
         names += [e.get("flowAlias", "") for f in realm["authenticationFlows"] for e in f["authenticationExecutions"]]
@@ -76,11 +76,11 @@ class EnglishNamesTest(unittest.TestCase):
             self.assertFalse([n for n in names if word in n], word)
 
     def test_realm_source_text_is_english(self):
-        found = [s for s in _strings(realm_oku()) if TURKISH_LETTERS.search(s)]
+        found = [s for s in _strings(read_realm()) if TURKISH_LETTERS.search(s)]
         self.assertEqual(found, [])
 
     def test_new_script_names_are_english(self):
-        for name in ("LIMA_VARSAYILAN", "ornek_satiri", "pid_dosyasi", "yonlendirme", "prod_etiket",
+        for name in ("LIMA_VARSAYILAN", "ornek_satiri", "pid_dosyasi", "redirect", "prod_etiket",
                      "prod_calistir", "prod_temizle", "prod_gunluk", "prod_tunel_pid", "kc_kimlik",
                      "realm-yenile", "realm-sil-yalniz"):
             self.assertNotIn(name, SCRIPT, name)
@@ -91,7 +91,7 @@ class EnglishNamesTest(unittest.TestCase):
 
     def test_new_test_files_are_english(self):
         for name in NEW_TEST_FILES:
-            text = (KLASOR / "tests" / name).read_text(encoding="utf-8")
+            text = (DIRECTORY / "tests" / name).read_text(encoding="utf-8")
             self.assertIsNone(TURKISH_LETTERS.search(text), name)
             self.assertNotRegex(text, r"\byok\b", name)
 
@@ -109,7 +109,7 @@ class PersonalDataTest(unittest.TestCase):
     """F-5 and G-15: no personal data in logs; stored events have a limit."""
 
     def test_admin_events_expire(self):
-        realm = realm_oku()
+        realm = read_realm()
         self.assertTrue(realm["adminEventsEnabled"])
         # Keycloak 26.8.2 keeps this limit as a realm attribute, not as a representation field
         # (model/jpa/.../RealmAttributes.java line 56); a top-level key stops the realm import.
@@ -120,7 +120,7 @@ class PersonalDataTest(unittest.TestCase):
 
     def test_events_are_not_written_to_the_container_log(self):
         # The jboss-logging listener writes every event, IP address and user name included, to the log.
-        self.assertNotIn("jboss-logging", realm_oku()["eventsListeners"])
+        self.assertNotIn("jboss-logging", read_realm()["eventsListeners"])
 
 
 class ShellQuotingTest(unittest.TestCase):
@@ -155,12 +155,12 @@ class DocumentationTest(unittest.TestCase):
             self.assertIn(jar.split("-1.")[0], README, jar)
 
     def test_dockerignore_comment_names_every_folder(self):
-        comment = (KLASOR / ".dockerignore").read_text(encoding="utf-8").splitlines()[0]
+        comment = (DIRECTORY / ".dockerignore").read_text(encoding="utf-8").splitlines()[0]
         for folder in ("realm", "themes", "conf", "event-listener", "event-sink"):
             self.assertIn(folder, comment, folder)
 
     def test_build_output_is_not_tracked(self):
-        self.assertIn("event-listener/target/", (KLASOR / ".gitignore").read_text(encoding="utf-8"))
+        self.assertIn("event-listener/target/", (DIRECTORY / ".gitignore").read_text(encoding="utf-8"))
 
 
 class SinkErrorTest(unittest.TestCase):
@@ -177,24 +177,70 @@ class SinkErrorTest(unittest.TestCase):
 class EnvExampleTest(unittest.TestCase):
     def test_example_file_is_valid_for_docker_env_file(self):
         # docker --env-file does not strip trailing comments, so a value must not carry one.
-        for line in ORNEK_ENV.read_text(encoding="utf-8").splitlines():
+        for line in EXAMPLE_ENV.read_text(encoding="utf-8").splitlines():
             if "=" in line and not line.startswith("#"):
                 self.assertNotIn(" #", line, line)
 
 
+class LocalRequestTest(unittest.TestCase):
+    def test_external_host_and_unexpected_port_are_refused(self):
+        from helpers import request
+
+        with mock.patch.dict(os.environ, {"KC_PORT": "5070"}, clear=True):
+            with mock.patch("http.client.HTTPConnection", side_effect=AssertionError("Unexpected network request")):
+                for url in ("http://example.test:5070/token", "http://127.0.0.1:5071/token"):
+                    with self.subTest(url=url), self.assertRaises(ValueError):
+                        request("POST", url, form={"client_secret": "dummy"})
+
+    def test_post_does_not_follow_redirect(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        from helpers import request
+
+        calls = []
+
+        class Redirect(BaseHTTPRequestHandler):
+            def do_POST(self):
+                calls.append(self.path)
+                self.send_response(303)
+                self.send_header("Location", "/redirected")
+                self.end_headers()
+
+            def do_GET(self):
+                calls.append(self.path)
+                self.send_response(200)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        with HTTPServer(("127.0.0.1", 0), Redirect) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            port = server.server_address[1]
+            try:
+                with mock.patch.dict(os.environ, {"KC_PORT": str(port)}, clear=True):
+                    result = request("POST", f"http://127.0.0.1:{port}/token", form={"client_secret": "dummy"})
+                self.assertEqual(result.status, 303)
+                self.assertEqual(calls, ["/token"])
+            finally:
+                server.shutdown()
+                thread.join()
+
+
 class ResponseCleanupTest(unittest.TestCase):
-    def test_http_error_response_body_is_closed_after_reading(self):
-        import io
-        import urllib.error
+    def test_http_error_response_and_connection_are_closed(self):
+        from helpers import request
 
-        from yardimci import istek
-
-        url = "https://example.test/"
-        body = io.BytesIO(b"error")
-        error = urllib.error.HTTPError(url, 404, "Not Found", {}, body)
-        with mock.patch("urllib.request.urlopen", side_effect=error):
-            self.assertEqual(istek("GET", url).durum, 404)
-        self.assertTrue(body.closed)
+        with mock.patch.dict(os.environ, {"KC_PORT": "5070"}, clear=True):
+            with mock.patch("http.client.HTTPConnection") as make_connection:
+                connection = make_connection.return_value
+                response = connection.getresponse.return_value
+                response.__enter__.return_value.status = 404
+                self.assertEqual(request("GET", "http://localhost:5070/").status, 404)
+                response.__exit__.assert_called_once()
+                connection.close.assert_called_once()
 
 
 class NoRawResponseInMessagesTest(unittest.TestCase):
@@ -202,33 +248,33 @@ class NoRawResponseInMessagesTest(unittest.TestCase):
     that wrongly accepts a request returns tokens in that body."""
 
     def test_tests_never_slice_a_raw_body_into_a_message(self):
-        for path in sorted((KLASOR / "tests").glob("*.py")):
+        for path in sorted((DIRECTORY / "tests").glob("*.py")):
             text = path.read_text(encoding="utf-8")
             # A slice of a response object's raw body; a local dict of decoded claims is fine.
             self.assertIsNone(re.search(r"\.govde\[", text), path.name)
 
     def test_unexpected_redirect_reports_only_status(self):
-        from yardimci import HttpYanit, assert_refused_without_pkce
+        from helpers import HttpResponse, assert_refused_without_pkce
 
-        response = HttpYanit(302, b"", {"Location": "https://example.test/?code=dummy-code"})
+        response = HttpResponse(302, b"", {"Location": "https://example.test/?code=dummy-code"})
         with self.assertRaisesRegex(AssertionError, r"^True is not false : HTTP 302$"):
             assert_refused_without_pkce(self, response)
 
     def test_unreadable_json_reports_only_status(self):
-        from yardimci import HttpYanit
+        from helpers import HttpResponse
 
         with self.assertRaisesRegex(ValueError, r"^HTTP 502$"):
-            HttpYanit(502, b"\xff", {}).json()
+            HttpResponse(502, b"\xff", {}).json()
 
     def test_safe_detail_keeps_status_and_error_code_only(self):
-        from yardimci import HttpYanit, safe_detail
+        from helpers import HttpResponse, safe_detail
 
         token_body = b'{"access_token":"eyJhbGciOiJSUzI1NiJ9.secret","error":"invalid_grant"}'  # gitleaks:allow (synthetic token)
-        detail = safe_detail(HttpYanit(400, token_body, {}))
+        detail = safe_detail(HttpResponse(400, token_body, {}))
         self.assertEqual(detail, "HTTP 400 invalid_grant")
-        self.assertEqual(safe_detail(HttpYanit(200, b'{"access_token":"eyJ.x.y"}', {})), "HTTP 200")
-        self.assertEqual(safe_detail(HttpYanit(502, b"<html>bad gateway</html>", {})), "HTTP 502")
-        self.assertEqual(safe_detail(HttpYanit(400, b'{"error":"opaque_secret"}', {})), "HTTP 400")
+        self.assertEqual(safe_detail(HttpResponse(200, b'{"access_token":"eyJ.x.y"}', {})), "HTTP 200")
+        self.assertEqual(safe_detail(HttpResponse(502, b"<html>bad gateway</html>", {})), "HTTP 502")
+        self.assertEqual(safe_detail(HttpResponse(400, b'{"error":"opaque_secret"}', {})), "HTTP 400")
 
 
 if __name__ == "__main__":

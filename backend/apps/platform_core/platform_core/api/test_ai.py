@@ -7,10 +7,10 @@ Requests go through Frappe's WSGI application, so authentication runs on the rea
 
 import frappe
 
-from platform_core.yapay_zeka.tests.base import DOCTYPE, USER_A, USER_B, YzTestCase
+from platform_core.ai.tests.base import DOCTYPE, USER_A, USER_B, AiTestCase
 
 
-class TestAiEndpoints(YzTestCase):
+class TestAiEndpoints(AiTestCase):
 	def guest(self, method: str, endpoint: str, body=None, query=None):
 		"""Send the request without credentials and return the status code."""
 		return self.human(self.anonymous(), method, endpoint, body=body, query=query).status_code
@@ -23,7 +23,7 @@ class TestAiEndpoints(YzTestCase):
 		return name, proposal_id, self.digest_of(client, proposal_id)
 
 	def status_of(self, proposal_id: str) -> tuple:
-		return tuple(frappe.db.get_value("AI Action Proposal", proposal_id, ["status", "result"]))
+		return tuple(frappe.db.get_value("PLT AI Action Proposal", proposal_id, ["status", "result"]))
 
 	# --- mcp ---
 
@@ -36,7 +36,7 @@ class TestAiEndpoints(YzTestCase):
 	def test_mcp_foreign_data_denied(self):
 		name = self.make_record(USER_A, title="Private to A")
 
-		result = self.call_tool(self.login(USER_B), "get_document", {"doctype": DOCTYPE, "name": name})
+		result = self.call_tool(self.login(USER_B), "plt_get_document", {"doctype": DOCTYPE, "name": name})
 
 		self.assert_denied(result, "permission")
 		self.assertNotIn("Private to A", result["content"][0]["text"])
@@ -51,7 +51,7 @@ class TestAiEndpoints(YzTestCase):
 		token = self.issue_token(self.login(USER_B))
 
 		result = self.call_tool(
-			self.anonymous(), "get_document", {"doctype": DOCTYPE, "name": name}, token=token
+			self.anonymous(), "plt_get_document", {"doctype": DOCTYPE, "name": name}, token=token
 		)
 
 		self.assert_denied(result, "permission")
@@ -126,7 +126,7 @@ class TestAiEndpoints(YzTestCase):
 
 	def unknown_proposal_of_a(self) -> str:
 		_name, proposal_id, _digest = self.proposal_of_a()
-		frappe.db.set_value("AI Action Proposal", proposal_id, {"status": "consumed", "result": "unknown"})
+		frappe.db.set_value("PLT AI Action Proposal", proposal_id, {"status": "consumed", "result": "unknown"})
 		return proposal_id
 
 	def test_resolve_proposal_guest_denied(self):
@@ -151,17 +151,17 @@ class TestAiEndpoints(YzTestCase):
 	# --- purge_logs ---
 
 	def test_purge_logs_guest_denied(self):
-		before = frappe.db.count("AI Action Log")
+		before = frappe.db.count("PLT AI Action Log")
 
 		self.assertEqual(self.guest("POST", "purge_logs", body={"dry_run": False}), 403)
-		self.assertEqual(frappe.db.count("AI Action Log"), before)
+		self.assertEqual(frappe.db.count("PLT AI Action Log"), before)
 
 	def test_purge_logs_foreign_data_denied(self):
 		"""The log holds every user's actions. A user without the admin role cannot delete or count it."""
-		before = frappe.db.count("AI Action Log")
+		before = frappe.db.count("PLT AI Action Log")
 
 		response = self.human(self.login(USER_A), "POST", "purge_logs", body={"dry_run": False})
 
 		self.assertEqual(response.status_code, 403)
 		self.assertNotIn("logs", response.get_data(as_text=True))
-		self.assertGreaterEqual(frappe.db.count("AI Action Log"), before)
+		self.assertGreaterEqual(frappe.db.count("PLT AI Action Log"), before)

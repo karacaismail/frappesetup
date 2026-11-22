@@ -88,8 +88,8 @@ raise SystemExit(1)
         )
         human = self.scan()
         self.assertLess(human.stdout.index("first-owner"), human.stdout.index("second-owner"))
-        self.write("docs/kararlar/0001-first.md", "# First")
-        self.write("docs/kararlar/0001-second.md", "# Second")
+        self.write("docs/decisions/0001-first.md", "# First")
+        self.write("docs/decisions/0001-second.md", "# Second")
         self.assertEqual(self.scan("--json").returncode, 1)
 
     def test_unavailable_image_is_not_run(self):

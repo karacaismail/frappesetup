@@ -6,9 +6,9 @@ from frappe.sessions import delete_session
 from packaging.version import Version
 from werkzeug.exceptions import ServiceUnavailable
 
-from press_tr.kimlik.identity import find_identity
-from press_tr.kimlik.oidc import claim, client_id, reject, verify
-from press_tr.kimlik.sessions import SESSION_MAPPING_DOCTYPE, read_press_session_id, session_mapping_pages
+from press_tr.press_identity.identity import find_identity
+from press_tr.press_identity.oidc import claim, client_id, reject, verify
+from press_tr.press_identity.sessions import SESSION_MAPPING_DOCTYPE, read_press_session_id, session_mapping_pages
 
 MAX_LOGOUT_TOKEN_LENGTH = 8192
 

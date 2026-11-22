@@ -264,16 +264,16 @@ required_apps = ["press"]
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
-before_request = ["press_tr.kimlik.request_policy.before_request"]
+before_request = ["press_tr.press_identity.request_policy.before_request"]
 
 auth_hooks = [
-	"press_tr.kimlik.service.authorize_identity_sync",
-	"press_tr.kimlik.request_policy.enforce_guest_allowlist",
+	"press_tr.press_identity.service.authorize_identity_sync",
+	"press_tr.press_identity.request_policy.enforce_guest_allowlist",
 ]
 
-before_login = "press_tr.kimlik.request_policy.block_native_login"
-on_logout = "press_tr.kimlik.sessions.remove_mapping"
-doc_events = {"User": {"on_update": "press_tr.kimlik.accounts.revoke_disabled_user_keys"}}
-extend_doctype_class = {"Account Request": ["press_tr.kimlik.accounts.AccountRequestPolicy"]}
+before_login = "press_tr.press_identity.request_policy.block_native_login"
+on_logout = "press_tr.press_identity.sessions.remove_mapping"
+doc_events = {"User": {"on_update": "press_tr.press_identity.accounts.revoke_disabled_user_keys"}}
+extend_doctype_class = {"Account Request": ["press_tr.press_identity.accounts.AccountRequestPolicy"]}
 
-ai_write_closed_doctypes = ["Press Identity Link", "Press Keycloak Session"]
+ai_write_closed_doctypes = ["PTR Identity Link", "PTR Keycloak Session"]

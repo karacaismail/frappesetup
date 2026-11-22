@@ -32,7 +32,7 @@ from source import (
 )
 from translations import translation_checks
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "guvenlik"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "security"))
 # Reuse the sibling endpoint checker after adding its directory for direct CLI execution.
 from endpoints import definitions, frappe_names, is_whitelist  # noqa: E402
 
@@ -303,7 +303,7 @@ def boundary_policy(root):
     """Resolve the owner of the public AI and MCP endpoints from repository policy."""
     dev = root / "dev"
     current = dev / "module-boundaries.json"
-    policy = current if current.exists() else dev / "modul-sinirlari.json"
+    policy = current if current.exists() else dev / "module-boundaries.json"
     if not policy.exists() and not (root / "apps/platform_core").exists():
         return policy, {}, set()
     data = json.loads(policy.read_text(encoding="utf-8"))
@@ -751,7 +751,7 @@ def manager_guard(fn, module, sources):
         if not isinstance(item, ast.Call):
             continue
         called = qualified(item.func, aliases)
-        if called == "platform_core.mobil.request.identity_sync_response":
+        if called == "platform_core.mobile.request.identity_sync_response":
             return True
         if called == "frappe.only_for":
             role = (
@@ -762,7 +762,7 @@ def manager_guard(fn, module, sources):
             role = resolve(role, bindings)
             roles = role.elts if isinstance(role, (ast.List, ast.Tuple, ast.Set)) else [role]
             if roles and all(
-                string(value, bindings) in ("Administrator", "System Manager", "AI Manager")
+                string(value, bindings) in ("Administrator", "System Manager", "PLT AI Manager")
                 for value in roles
             ):
                 return True
@@ -867,7 +867,7 @@ def scan(root, commit_base=None, frappe_root=None):
     def emit(path, line, rule, message):
         findings.add(Finding(path.relative_to(root).as_posix(), line, rule, message))
 
-    decision_number_checks(root / "docs/kararlar", emit)
+    decision_number_checks(root / "docs/decisions", emit)
     try:
         policy, ai_paths, additional = boundary_policy(root)
         providers = providers | additional

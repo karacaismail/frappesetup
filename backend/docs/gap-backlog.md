@@ -25,12 +25,12 @@ Kurallar şunlardır:
 
 ## platform-core-kimlik
 
-1. Telefon belirteci için `auth_hooks` kancası.
-2. Frappe'nin `/login` sayfası Atonota girişine gitsin. Giriş başlatan GET ucu sözleşmeye yazılsın.
-3. Frappe oturum süresi 1 saat boşta kalma olsun (O-25).
-4. Kimlik bağı DocType'ı `ai_write_closed_doctypes` kancasına girsin (O-28).
-5. Sözleşmedeki insan uçlarına 401 yanıtı eklensin (SZ-8).
-6. `oidc_verify` bağımlılığı `pyproject.toml` dosyasında yazılsın.
+1. Kapandı. `auth_hooks` telefon belirtecini doğrular. `test_mobile_identity.py` geçerli ve geçersiz belirteçleri sınar.
+2. Kapandı. `/login` sayfası Atonota girişini gösterir. `start_login` GET ucu OpenAPI sözleşmesinde ve `test_login_page.py` testinde yer alır.
+3. Kapandı. Frappe oturumu bir saat boşta kalınca sona erer. `test_session_policy.py` süreyi ve sona eren oturumu sınar.
+4. Kapandı. `ai_write_closed_doctypes` listesi `Platform Identity Link` kaydını içerir. `test_identity_link_is_closed_to_ai_writes` bu kuralı sınar.
+5. Kapandı. OpenAPI, `logout` ve `setup_keycloak_login` için 401 yanıtını tanımlar. `test_idle_session_answers_401_session_expired` oturum reddini sınar.
+6. Kapandı. `pyproject.toml` bağımlılığı `oidc_verify==0.1.0` olarak sabitler. Kitaplık bu sürümle depoda yer alır.
 
 ## identity-sync
 
@@ -48,6 +48,7 @@ Kurallar şunlardır:
 5. `patch-py314.sh` yalnız geliştirme imajında çalışsın (O-18). Üretim imajında çalışmadığını bir testle gösterin.
 6. Press giriş akışı PKCE S256 kullansın.
 7. Press kimlik bağı DocType'ı `ai_write_closed_doctypes` kancasına girsin.
+8. Press, `anonymize_user` ucunda kullanıcıyı kapatsın. API anahtarlarını iptal etsin, kişi alanlarını anonim yapsın ve iş kayıtlarını korusun (sözleşme 6. bölüm).
 
 ## platform-core-kabuk
 

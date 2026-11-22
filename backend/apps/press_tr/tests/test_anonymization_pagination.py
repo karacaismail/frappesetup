@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
-from press_tr.kimlik import anonymization
+from press_tr.press_identity import anonymization
 
 
 class AnonymizationPaginationTest(TestCase):

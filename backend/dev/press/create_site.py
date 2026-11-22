@@ -50,8 +50,8 @@ def read_site_password(environment: str, secret_name: str) -> str:
 
 def main() -> None:
     site = "press.localhost"
-    database_password = read_site_password("PRESS_DB_PASSWORD", "press_db_password")
-    administrator_password = read_site_password("PRESS_ADMIN_PASSWORD", "press_admin_password")
+    database_password = read_site_password("PTR_DB_PASSWORD", "press_db_password")
+    administrator_password = read_site_password("PTR_ADMIN_PASSWORD", "press_admin_password")
     if not database_password or not administrator_password:
         raise SystemExit("Both Press development passwords are required.")
 

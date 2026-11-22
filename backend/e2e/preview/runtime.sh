@@ -36,7 +36,7 @@ printf 'Default Colima available memory: %s GiB\n' "$available"
 
 dev_dir="$worktree/backend/dev"
 identity_dir="$worktree/backend/identity"
-tenant="$PREVIEW_PROJECT-kiraci-web-1"
+tenant="$PREVIEW_PROJECT-tenant-web-1"
 press="$PREVIEW_PROJECT-web-1"
 sync="$PREVIEW_PROJECT-identity"
 sync_host=event-sink.localhost
@@ -44,17 +44,17 @@ provider="$PREVIEW_PROJECT-provider"
 network="${PREVIEW_PROJECT}_default"
 builder="$PREVIEW_PROJECT-builder"
 sidecar_label=com.frappesetup.preview
-export KIRACI_WEB_PORT="$((PANE_PORT + 1))"
-export KIRACI_SOCKET_PORT="$((PANE_PORT + 2))"
-export PRESS_WEB_PORT="$((PANE_PORT + 3))"
-export PRESS_SOCKET_PORT="$((PANE_PORT + 4))"
+export FS_TENANT_WEB_PORT="$((PANE_PORT + 1))"
+export FS_TENANT_SOCKET_PORT="$((PANE_PORT + 2))"
+export PTR_WEB_PORT="$((PANE_PORT + 3))"
+export PTR_SOCKET_PORT="$((PANE_PORT + 4))"
 sync_port="$((PANE_PORT + 5))"
 export MAILPIT_UI_PORT="$((PANE_PORT + 6))"
 provider_port="$((PANE_PORT + 7))"
 export KC_PORT="$PANE_PORT"
-export KC_PUBLIC_URL="http://kimlik.localhost:$KC_PORT"
-export ATONOTA_SITE_KIRACI1_URL="http://kiraci1.localhost:$KIRACI_WEB_PORT"
-export ATONOTA_PRESS_URL="http://press.localhost:$PRESS_WEB_PORT"
+export KC_PUBLIC_URL="http://identity.localhost:$KC_PORT"
+export ATONOTA_SITE_TENANT1_URL="http://tenant1.localhost:$FS_TENANT_WEB_PORT"
+export ATONOTA_PRESS_URL="http://press.localhost:$PTR_WEB_PORT"
 export IDENTITY_SYNC_EVENTS_URL="http://$sync_host:$sync_port/v1/events"
 export DEV_ENV_FILE="$PREVIEW_DIR/tenant.env"
 keycloak_env="$PREVIEW_DIR/keycloak.env"
@@ -62,7 +62,7 @@ press_env="$PREVIEW_DIR/press.env"
 sync_env="$PREVIEW_DIR/sync.env"
 tunnel_state="$PREVIEW_DIR/tunnel"
 docker_config="$PREVIEW_DIR/docker-config"
-for port in "$KC_PORT" "$KIRACI_WEB_PORT" "$KIRACI_SOCKET_PORT" "$PRESS_WEB_PORT" "$PRESS_SOCKET_PORT" "$sync_port" "$MAILPIT_UI_PORT" "$provider_port"; do
+for port in "$KC_PORT" "$FS_TENANT_WEB_PORT" "$FS_TENANT_SOCKET_PORT" "$PTR_WEB_PORT" "$PTR_SOCKET_PORT" "$sync_port" "$MAILPIT_UI_PORT" "$provider_port"; do
     if nc -z 127.0.0.1 "$port" 2>/dev/null; then
         printf 'The preview port is already in use: %s\n' "$port" >&2
         exit 1
@@ -120,7 +120,7 @@ PYTHON
         docker_default buildx rm "$builder" >> "$PREVIEW_DIR/cleanup.log" 2>&1 || cleanup_failed=1
     fi
     if [[ -d "$tunnel_state" ]]; then
-        PANE_SCRATCH_DIR="$tunnel_state" "$dev_dir/bin/tunel" kapat >> "$PREVIEW_DIR/cleanup.log" 2>&1 || cleanup_failed=1
+        PANE_SCRATCH_DIR="$tunnel_state" "$dev_dir/bin/tunnel" close >> "$PREVIEW_DIR/cleanup.log" 2>&1 || cleanup_failed=1
     fi
     rm -f -- "$DEV_ENV_FILE" "$keycloak_env" "$press_env" "$sync_env" "$PREVIEW_DIR/fixtures.json"
     rm -rf -- "$PREVIEW_DIR/browser" "$PREVIEW_DIR/api" "$PREVIEW_DIR/lifecycle" "$tunnel_state" "$docker_config"
@@ -163,23 +163,23 @@ defaults = {}
 for line in source.read_text().splitlines():
     if line and not line.startswith("#") and "=" in line:
         key, _, value = line.partition("=")
-        if key != "ATONOTA_SITE_KIRACI1_SERVICE_SECRET":
+        if key != "ATONOTA_SITE_TENANT1_SERVICE_SECRET":
             defaults[key] = token_urlsafe(32) if value.startswith("degistir-") else value
 defaults.setdefault("IDENTITY_SYNC_WEBHOOK_SECRET", token_urlsafe(32))
 keycloak.write_text("".join(f"{key}={value}\n" for key, value in defaults.items()))
-press.write_text("".join(f"{key}={token_urlsafe(32)}\n" for key in ("PRESS_DB_PASSWORD", "PRESS_ADMIN_PASSWORD")))
+press.write_text("".join(f"{key}={token_urlsafe(32)}\n" for key in ("PTR_DB_PASSWORD", "PTR_ADMIN_PASSWORD")))
 PY
 
 setting() { awk -F= -v name="$1" '$1 == name { sub(/^[^=]*=/, ""); print; exit }' "$2"; }
 E2E_ADMIN_PASSWORD="$(setting ADMIN_PASSWORD "$DEV_ENV_FILE")"
 E2E_KEYCLOAK_ADMIN_USER="$(setting KC_BOOTSTRAP_ADMIN_USERNAME "$keycloak_env")"
 E2E_KEYCLOAK_ADMIN_PASSWORD="$(setting KC_BOOTSTRAP_ADMIN_PASSWORD "$keycloak_env")"
-E2E_KEYCLOAK_CLIENT_SECRET="$(setting ATONOTA_SITE_KIRACI1_SECRET "$keycloak_env")"
-ATONOTA_SITE_KIRACI1_SERVICE_SECRET="$(python3 -c 'from secrets import token_urlsafe; print(token_urlsafe(32))')"
-export ATONOTA_SITE_KIRACI1_SERVICE_SECRET
-E2E_KEYCLOAK_SERVICE_CLIENT_SECRET="$ATONOTA_SITE_KIRACI1_SERVICE_SECRET"
+E2E_KEYCLOAK_CLIENT_SECRET="$(setting ATONOTA_SITE_TENANT1_SECRET "$keycloak_env")"
+ATONOTA_SITE_TENANT1_SERVICE_SECRET="$(python3 -c 'from secrets import token_urlsafe; print(token_urlsafe(32))')"
+export ATONOTA_SITE_TENANT1_SERVICE_SECRET
+E2E_KEYCLOAK_SERVICE_CLIENT_SECRET="$ATONOTA_SITE_TENANT1_SERVICE_SECRET"
 E2E_PRESS_CLIENT_SECRET="$(setting ATONOTA_PRESS_SECRET "$keycloak_env")"
-E2E_PRESS_ADMIN_PASSWORD="$(setting PRESS_ADMIN_PASSWORD "$press_env")"
+E2E_PRESS_ADMIN_PASSWORD="$(setting PTR_ADMIN_PASSWORD "$press_env")"
 E2E_IDENTITY_SYNC_WEBHOOK_SECRET="$(setting IDENTITY_SYNC_WEBHOOK_SECRET "$keycloak_env")"
 export E2E_ADMIN_PASSWORD E2E_KEYCLOAK_ADMIN_USER E2E_KEYCLOAK_ADMIN_PASSWORD E2E_KEYCLOAK_CLIENT_SECRET
 export E2E_KEYCLOAK_SERVICE_CLIENT_SECRET E2E_PRESS_CLIENT_SECRET E2E_PRESS_ADMIN_PASSWORD E2E_IDENTITY_SYNC_WEBHOOK_SECRET
@@ -196,15 +196,15 @@ dev, scratch = map(Path, sys.argv[1:3])
 project, image = sys.argv[3:]
 overrides = {
     "kiraci": {
-        "kiraci-db": {"mem_limit": "512m"},
-        "kiraci-redis": {"mem_limit": "128m"},
-        "kiraci-web": {"image": image, "pull_policy": "never", "command": ["sleep", "infinity"], "mem_limit": "1024m"},
-        "kiraci-socket": {"image": image, "pull_policy": "never", "mem_limit": "128m"},
+        "tenant-db": {"mem_limit": "512m"},
+        "tenant-redis": {"mem_limit": "128m"},
+        "tenant-web": {"image": image, "pull_policy": "never", "command": ["sleep", "infinity"], "mem_limit": "1024m"},
+        "tenant-socket": {"image": image, "pull_policy": "never", "mem_limit": "128m"},
     },
     "keycloak": {
         "keycloak": {
             "image": f"{project}-keycloak", "pull_policy": "never", "mem_limit": "1100m",
-            "environment": {"ATONOTA_SITE_KIRACI1_SERVICE_SECRET": "${ATONOTA_SITE_KIRACI1_SERVICE_SECRET:?}"},
+            "environment": {"ATONOTA_SITE_TENANT1_SERVICE_SECRET": "${ATONOTA_SITE_TENANT1_SERVICE_SECRET:?}"},
         },
         "keycloak-db": {"mem_limit": "256m"},
         "mailpit": {"mem_limit": "64m"},
@@ -240,8 +240,8 @@ BASH
     docker_default exec -u root "$press" bash -c "chown -R \"\$(id -u frappe):\$(id -g frappe)\" /home/frappe/benches/source/press_tr"
     docker_default exec -i -e GOMAXPROCS=2 -e NODE_OPTIONS=--max-old-space-size=2048 -e SENTRY_TELEMETRY=false "$press" bash -s < "$dev_dir/press/install.sh"
 
-    "${compose[@]}" up --no-build -d --wait --wait-timeout 120 kiraci-db kiraci-redis keycloak-db mailpit
-    "${compose[@]}" up --no-build -d kiraci-web keycloak
+    "${compose[@]}" up --no-build -d --wait --wait-timeout 120 tenant-db tenant-redis keycloak-db mailpit
+    "${compose[@]}" up --no-build -d tenant-web keycloak
     docker_default cp "$worktree/backend/apps/platform_core" "$tenant:/tmp/platform_core"
     docker_default cp "$worktree/backend/libs/oidc_verify" "$tenant:/tmp/oidc_verify"
     docker_default cp "$dev_dir/bootstrap.py" "$tenant:/tmp/preview-bootstrap.py"
@@ -251,20 +251,20 @@ mv /tmp/platform_core apps/platform_core
 chown -R "$(id -u frappe):$(id -g frappe)" apps/platform_core /tmp/oidc_verify
 BASH
     docker_default exec "$tenant" uv pip install --python env/bin/python --no-deps /tmp/oidc_verify -e apps/platform_core
-    docker_default exec "$tenant" env/bin/python /tmp/preview-bootstrap.py kiraci1.localhost --app erpnext --app platform_core
-    "${compose[@]}" up --no-build -d kiraci-socket
+    docker_default exec "$tenant" env/bin/python /tmp/preview-bootstrap.py tenant1.localhost --app erpnext --app platform_core
+    "${compose[@]}" up --no-build -d tenant-socket
 
     {
         printf 'IDENTITY_SYNC_KEYCLOAK_PUBLIC_URL=%s\n' "$KC_PUBLIC_URL"
         printf 'IDENTITY_SYNC_KEYCLOAK_INTERNAL_URL=%s\n' "$KC_PUBLIC_URL"
         printf 'IDENTITY_SYNC_PRESS_URL=%s\n' "$ATONOTA_PRESS_URL"
-        printf 'IDENTITY_SYNC_TENANTS=[{"name":"kiraci1","base_url":"%s","organization":"kiraci1"}]\n' "$ATONOTA_SITE_KIRACI1_URL"
+        printf 'IDENTITY_SYNC_TENANTS=[{"name":"kiraci1","base_url":"%s","organization":"kiraci1"}]\n' "$ATONOTA_SITE_TENANT1_URL"
         printf 'IDENTITY_SYNC_CLIENT_SECRET=%s\n' "$(setting ATONOTA_IDENTITY_SYNC_SECRET "$keycloak_env")"
         printf 'IDENTITY_SYNC_WEBHOOK_SECRET=%s\n' "$E2E_IDENTITY_SYNC_WEBHOOK_SECRET"
         printf 'IDENTITY_SYNC_DIGEST_KEY=%s\n' "$(python3 -c 'import secrets; print(secrets.token_urlsafe(36))')"
         printf 'IDENTITY_SYNC_PORT=%s\n' "$sync_port"
         printf '%s\n' 'IDENTITY_SYNC_HOST=0.0.0.0' 'IDENTITY_SYNC_REALM=platform' 'IDENTITY_SYNC_CLIENT_ID=identity-sync' \
-            'IDENTITY_SYNC_ADMIN_SCOPE=admin-api kc-admin-api' 'IDENTITY_SYNC_DB=/tmp/e2e-sync.sqlite' 'IDENTITY_SYNC_SESSION_AZP=site-kiraci1-service' 'IDENTITY_SYNC_EXECUTE_AZP=site-kiraci1-service'
+            'IDENTITY_SYNC_ADMIN_SCOPE=admin-api kc-admin-api' 'IDENTITY_SYNC_DB=/tmp/e2e-sync.sqlite' 'IDENTITY_SYNC_SESSION_AZP=site-tenant1-service' 'IDENTITY_SYNC_EXECUTE_AZP=site-tenant1-service'
     } > "$sync_env"
     docker_default create --label "$sidecar_label=$PREVIEW_PROJECT" --name "$sync" --network "$network" --network-alias "$sync_host" --memory 128m \
         --env-file "$sync_env" -e PYTHONPATH=/tmp --publish "127.0.0.1:$sync_port:$sync_port" \
@@ -281,11 +281,11 @@ BASH
 export E2E_PROVIDER_IP
 E2E_PROVIDER_IP="$(docker_default inspect --format "{{(index .NetworkSettings.Networks \"$network\").IPAddress}}" "$provider")"
 ports=()
-for port in "$KC_PORT" "$KIRACI_WEB_PORT" "$PRESS_WEB_PORT" "$sync_port" "$MAILPIT_UI_PORT" "$provider_port"; do
+for port in "$KC_PORT" "$FS_TENANT_WEB_PORT" "$PTR_WEB_PORT" "$sync_port" "$MAILPIT_UI_PORT" "$provider_port"; do
     if ! nc -z 127.0.0.1 "$port" 2>/dev/null; then ports+=("$port"); fi
 done
 if [[ -n "${ports[0]-}" ]]; then
-    PANE_SCRATCH_DIR="$tunnel_state" "$dev_dir/bin/tunel" ac "${ports[@]}"
+    PANE_SCRATCH_DIR="$tunnel_state" "$dev_dir/bin/tunnel" open "${ports[@]}"
 fi
 
 wait_http() {
@@ -305,8 +305,8 @@ wait_http "http://127.0.0.1:$provider_port/attempts"
 E2E_TENANT_MODULE_DIR="$(docker_default exec "$tenant" env/bin/python -c 'import tempfile; print(tempfile.mkdtemp(prefix="e2e-tenant-"))')"
 docker_default cp "$suite_dir/preview/preview_site_config.py" "$tenant:$E2E_TENANT_MODULE_DIR/preview_site_config.py"
 E2E_TENANT_MODULE_DIR="$E2E_TENANT_MODULE_DIR" python3 "$suite_dir/preview/fixtures.py" prepare
-docker_default exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c "exec bench serve --port \"\$PRESS_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
-docker_default exec -d -e PYTHONPATH="$E2E_TENANT_MODULE_DIR" -e E2E_KEYCLOAK_SERVICE_CLIENT_SECRET "$tenant" bash -c "exec bench serve --port \"\$KIRACI_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
-wait_http "$ATONOTA_SITE_KIRACI1_URL/api/method/ping"
+docker_default exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c "exec bench serve --port \"\$PTR_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
+docker_default exec -d -e PYTHONPATH="$E2E_TENANT_MODULE_DIR" -e E2E_KEYCLOAK_SERVICE_CLIENT_SECRET "$tenant" bash -c "exec bench serve --port \"\$FS_TENANT_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
+wait_http "$ATONOTA_SITE_TENANT1_URL/api/method/ping"
 wait_http "$ATONOTA_PRESS_URL/api/method/ping"
 node "$suite_dir/preview/run-tests.mjs" "$worktree"

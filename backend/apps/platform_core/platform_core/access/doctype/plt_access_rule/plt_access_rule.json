@@ -1,0 +1,191 @@
+{
+ "actions": [],
+ "autoname": "AR-.#####",
+ "creation": "2026-11-22 12:00:00.000000",
+ "description": "A rule that narrows which records of a document type a role may read or change. Role permissions grant access; Access Rules only narrow it.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "is_active",
+  "document_type",
+  "role",
+  "scope_column",
+  "scope",
+  "match_field",
+  "priority",
+  "operations_section",
+  "allow_read",
+  "allow_write",
+  "allow_create",
+  "operations_column",
+  "allow_delete",
+  "allow_submit",
+  "allow_cancel",
+  "filters_section",
+  "filters",
+  "description"
+ ],
+ "fields": [
+  {
+   "description": "Short name of the rule. Shown when a permission is explained.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Only active rules are applied. An inactive rule does not govern its document type.",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Active"
+  },
+  {
+   "description": "Document type whose records this rule narrows. Child tables, single and virtual document types and the document types of the permission system are not accepted.",
+   "fieldname": "document_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Document Type",
+   "options": "DocType",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Role the rule applies to. A user is covered when they hold this role.",
+   "fieldname": "role",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Role",
+   "options": "Role",
+   "reqd": 1
+  },
+  {
+   "fieldname": "scope_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Which records the rule selects relative to the user: own (the user's records), team (the user and everyone reporting to them through Employee.reports_to), department (the user's department and its sub-departments), company (the user's company) or all (every record).",
+   "fieldname": "scope",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Scope",
+   "options": "own\nteam\ndepartment\ncompany\nall",
+   "reqd": 1
+  },
+  {
+   "description": "Field of the document type that ties a record to a user, employee, department or company, for example employee or owner. Required unless the scope is all. Use name when the record itself is the employee, department or company.",
+   "fieldname": "match_field",
+   "fieldtype": "Data",
+   "label": "Match Field"
+  },
+  {
+   "default": "0",
+   "description": "Order in which rules are listed when a permission is explained. Lower numbers come first. It never changes the decision.",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "label": "Priority"
+  },
+  {
+   "fieldname": "operations_section",
+   "fieldtype": "Section Break",
+   "label": "Operations"
+  },
+  {
+   "default": "0",
+   "description": "The rule covers reading, listing, printing, emailing, exporting, reporting and sharing.",
+   "fieldname": "allow_read",
+   "fieldtype": "Check",
+   "label": "Allow Read"
+  },
+  {
+   "default": "0",
+   "description": "The rule covers changing a saved record.",
+   "fieldname": "allow_write",
+   "fieldtype": "Check",
+   "label": "Allow Write"
+  },
+  {
+   "default": "0",
+   "description": "The rule covers creating and amending a record. The new values must satisfy the rule.",
+   "fieldname": "allow_create",
+   "fieldtype": "Check",
+   "label": "Allow Create"
+  },
+  {
+   "fieldname": "operations_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "The rule covers deleting a record.",
+   "fieldname": "allow_delete",
+   "fieldtype": "Check",
+   "label": "Allow Delete"
+  },
+  {
+   "default": "0",
+   "description": "The rule covers submitting a record.",
+   "fieldname": "allow_submit",
+   "fieldtype": "Check",
+   "label": "Allow Submit"
+  },
+  {
+   "default": "0",
+   "description": "The rule covers cancelling a submitted record.",
+   "fieldname": "allow_cancel",
+   "fieldtype": "Check",
+   "label": "Allow Cancel"
+  },
+  {
+   "fieldname": "filters_section",
+   "fieldtype": "Section Break",
+   "label": "Conditions"
+  },
+  {
+   "description": "Extra conditions as a JSON list of [field, operator, value] rows. All rows must hold. Operators: =, !=, in, not in. A value may be a constant or one of $user, $user.employee, $user.department, $user.company.",
+   "fieldname": "filters",
+   "fieldtype": "Code",
+   "label": "Filters",
+   "options": "JSON"
+  },
+  {
+   "description": "Why this rule exists. Free text for administrators and assistants.",
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-11-22 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Access",
+ "name": "PLT Access Rule",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

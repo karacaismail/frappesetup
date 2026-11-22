@@ -24,8 +24,8 @@ Yeni ortam gerekiyorsa aşağıdaki adımları izleyin.
 2. Depo kökünden mevcut imajları kullanın. Eksik imajı varsayılan profilde derleyin.
 
    ```sh
-   docker --context colima image inspect fs-kiraci-dev:v16.55.0 >/dev/null 2>&1 ||
-     docker --context colima build -t fs-kiraci-dev:v16.55.0 -f backend/dev/Dockerfile.kiraci backend
+   docker --context colima image inspect fs-tenant-dev:v16.55.0 >/dev/null 2>&1 ||
+     docker --context colima build -t fs-tenant-dev:v16.55.0 -f backend/dev/Dockerfile.tenant backend
    docker --context colima image inspect fs-ilk-dikey-dilim:hrms_tr >/dev/null 2>&1 ||
      docker --context colima build -t fs-ilk-dikey-dilim:hrms_tr -f backend/dev/hrms/Dockerfile backend
    ```
@@ -35,7 +35,7 @@ Yeni ortam gerekiyorsa aşağıdaki adımları izleyin.
 4. Veritabanını ve Redis hizmetini başlatın. Ardından test sitesini kurun.
 
    ```sh
-   backend/dev/hrms/compose up -d --no-build kiraci-db kiraci-redis
+   backend/dev/hrms/compose up -d --no-build tenant-db tenant-redis
    backend/dev/hrms/compose run --rm web env/bin/python /workspace/dev/bootstrap.py \
      test-hrms-tr.localhost --app hrms --app platform_core --app hrms_tr
    backend/dev/hrms/compose up -d --no-build web

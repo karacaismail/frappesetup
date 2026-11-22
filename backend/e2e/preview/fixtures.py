@@ -49,7 +49,7 @@ def check_tenant_clients(port):
         raise RuntimeError("The preview requires two distinct tenant client secrets.")
 
     browser = {
-        "grant_type": "client_credentials", "client_id": "site-kiraci1",
+        "grant_type": "client_credentials", "client_id": "site-tenant1",
         "client_secret": browser_secret,
     }
     for scope in ({}, {"scope": "aud-identity-sync"}):
@@ -57,7 +57,7 @@ def check_tenant_clients(port):
         if not isinstance(response, dict) or response.get("error") not in {"unauthorized_client", "invalid_scope"}:
             raise RuntimeError("The tenant browser client did not refuse the service token request as expected.")
 
-    service_client = "site-kiraci1-service"
+    service_client = "site-tenant1-service"
     response = keycloak_request(port, path, form=True, data={
         "grant_type": "client_credentials", "client_id": service_client,
         "client_secret": service_secret, "scope": "aud-identity-sync",
@@ -121,7 +121,7 @@ def seed_keycloak(port, password):
     subject = subjects[SYNC_EMAIL]
     location = keycloak_request(
         port, realm + "/organizations", token=token,
-        data={"name": "Preview Integration Tenant", "alias": "kiraci1", "enabled": True},
+        data={"name": "Preview Integration Tenant", "alias": "tenant1", "enabled": True},
     )
     organization = created_identifier(location, "organization")
     for member in (subject, lifecycle["delete"]["subject"], lifecycle["revoke"]["subject"]):
@@ -185,7 +185,7 @@ def main():
         "E2E_PRESS_SERVICE_SECRET": press_service_secret,
         "E2E_PREVIEW_SYNC_ORIGIN": os.environ["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],
     })
-    fixture = seed_site(project, "kiraci-web", BENCH, {
+    fixture = seed_site(project, "tenant-web", BENCH, {
         **common,
         "E2E_PROVIDER_IP": str(address),
         "PYTHONPATH": os.environ["E2E_TENANT_MODULE_DIR"],

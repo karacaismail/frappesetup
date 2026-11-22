@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
+rules=backend/dev/security/fixtures
+source backend/dev/security/container-settings
+semgrep=(uvx --python 3.12 --exclude-newer "$TOOL_CUTOFF" "semgrep@$SEMGREP_VERSION")
+export SEMGREP_ENABLE_VERSION_CHECK=0
+if [[ -z "${SSL_CERT_FILE:-}" && -r /etc/ssl/cert.pem ]]; then
+    export SSL_CERT_FILE=/etc/ssl/cert.pem
+fi
+
+scan_secrets() {
+    # Colima cannot mount this checkout. Transfer a read-only source snapshot.
+    git ls-files -z --cached --others --deduplicate --exclude-standard -- backend |
+        while IFS= read -r -d '' file; do
+            if [[ -f "$file" && ! -L "$file" ]]; then
+                printf '%s\0' "$file"
+            fi
+        done |
+        tar --null -T - -cf - |
+        "${docker_command[@]}" run "${container_flags[@]}" "$gitleaks_image" -ec 'mkdir /tmp/scan
+                tar -xf - -C /tmp/scan
+                exec gitleaks dir --redact=100 /tmp/scan/backend'
+}
+
+scan_rules() (
+    local report before scan_status=0
+    report="$(mktemp "${PANE_SCRATCH_DIR:-${TMPDIR:-/tmp}}/semgrep-review.XXXXXX")" || exit 1
+    trap 'rm -f -- "$report"' EXIT
+    before="$(python3 -B backend/dev/security/semgrep_exceptions.py --snapshot)" || exit 1
+    "${semgrep[@]}" scan --error --strict --metrics=off --json \
+        --config "$rules" \
+        --exclude 'backend/dev/security/fixtures/' backend \
+        > "$report" || scan_status=$?
+    python3 -B backend/dev/security/semgrep_exceptions.py "$report" "$scan_status" "$before"
+)
+
+status=0
+"${semgrep[@]}" --test --strict --metrics=off "$rules" || status=1
+scan_rules || status=1
+python3 -B -m unittest discover -s backend/dev/security -p test_semgrep_exceptions.py || status=1
+if backend/dev/security/history-scan --self-test; then
+    scan_secrets || status=1
+else
+    status=1
+fi
+python3 -B -m unittest discover -s backend/dev/security -p test_endpoints.py || status=1
+python3 -B backend/dev/security/endpoints.py backend || status=1
+backend/dev/bin/ai-readiness --self-test || status=1
+if commit_base="$(git merge-base HEAD refs/heads/backend)"; then
+    backend/dev/bin/ai-readiness --commit-base "$commit_base" || status=1
+else
+    printf '%s\n' 'Cannot find the common ancestor of HEAD and refs/heads/backend.' >&2
+    status=1
+fi
+exit "$status"

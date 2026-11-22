@@ -2,7 +2,7 @@
 
 from frappe.tests.test_api import FrappeAPITestCase
 
-from platform_core.kimlik.tests import helpers as h
+from platform_core.identity.tests import helpers as h
 
 ENDPOINT = "/api/method/platform_core.api.keycloak_backchannel_logout"
 

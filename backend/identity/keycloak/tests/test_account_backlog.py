@@ -13,10 +13,10 @@ import unittest
 import urllib.parse
 import uuid
 
-from test_eklentiler import _ac, _cerezli_acici, _form_hedefi
+from test_extensions import _open, _cookie_opener, _form_hedefi
 from test_second_factor import TOTP_PASSWORD, TOTP_USER, fresh_totp_code
-from yardimci import (admin, canli_var_mi, istek, ortam, realm_oku, tenant_authorize_url, tenant_authorize_with_pkce,
-                      tenant_callback_url, yonetici_belirteci, safe_detail)
+from helpers import (admin, live_available, request, get_environment_value, read_realm, tenant_authorize_url, tenant_authorize_with_pkce,
+                      tenant_callback_url, admin_token, safe_detail)
 
 REQUIRED_ON = {"CONFIGURE_TOTP", "UPDATE_PASSWORD", "VERIFY_EMAIL", "webauthn-register",
                "webauthn-register-passwordless"}
@@ -25,7 +25,7 @@ REQUIRED_ON = {"CONFIGURE_TOTP", "UPDATE_PASSWORD", "VERIFY_EMAIL", "webauthn-re
 class AccountBacklogFileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.realm = realm_oku()
+        cls.realm = read_realm()
         cls.actions = {a["alias"]: a for a in cls.realm.get("requiredActions", [])}
 
     def test_required_actions_are_listed_and_enabled(self):
@@ -70,54 +70,54 @@ def _pause():
 
 def _login(authorize_url: str):
     """Logs the TOTP sample user in and returns (opener, final headers)."""
-    opener = _cerezli_acici()
-    _, _, html = _ac(opener, authorize_url)
+    opener = _cookie_opener()
+    _, _, html = _open(opener, authorize_url)
     form = urllib.parse.urlencode({"username": TOTP_USER, "password": TOTP_PASSWORD, "credentialId": ""}).encode()
-    _, _, html = _ac(opener, _form_hedefi(html), form)
+    _, _, html = _open(opener, _form_hedefi(html), form)
     _pause()
-    status, headers, html = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+    status, headers, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
     if status == 200 and 'name="otp"' in html:
         # Keycloak refused a code that an earlier run had already used. Wait for the next period once.
         time.sleep(30 - time.time() % 30 + 1)
-        status, headers, html = _ac(opener, _form_hedefi(html),
+        status, headers, html = _open(opener, _form_hedefi(html),
                                     urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
     return opener, status, headers, html
 
 
-@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
+@unittest.skipUnless(live_available(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
 class AccountBacklogLiveTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.kc = ortam("KC_PUBLIC_URL")
-        cls.admin_token = yonetici_belirteci()
+        cls.kc = get_environment_value("KC_PUBLIC_URL")
+        cls.admin_token = admin_token()
         cls.token_url = f"{cls.kc}/realms/platform/protocol/openid-connect/token"
 
     def setUp(self):
-        self.admin_token = yonetici_belirteci()  # the master admin token lives 60 seconds
+        self.admin_token = admin_token()  # the master admin token lives 60 seconds
         user = admin(f"/users?email={TOTP_USER}&exact=true", self.admin_token).json()[0]
-        admin(f"/attack-detection/brute-force/users/{user['id']}", self.admin_token, yontem="DELETE")
+        admin(f"/attack-detection/brute-force/users/{user['id']}", self.admin_token, method="DELETE")
 
     def _refresh(self, refresh_token: str):
-        return istek("POST", self.token_url, form={
-            "grant_type": "refresh_token", "client_id": "site-kiraci1",
-            "client_secret": ortam("ATONOTA_SITE_KIRACI1_SECRET"), "refresh_token": refresh_token})
+        return request("POST", self.token_url, form={
+            "grant_type": "refresh_token", "client_id": "site-tenant1",
+            "client_secret": get_environment_value("ATONOTA_SITE_TENANT1_SECRET"), "refresh_token": refresh_token})
 
     def test_old_refresh_token_is_refused(self):
         url, verifier = tenant_authorize_with_pkce()
         _, status, headers, _ = _login(url)
         self.assertEqual(status, 302)
         code = urllib.parse.parse_qs(urllib.parse.urlsplit(headers["Location"]).query)["code"][0]
-        tokens = istek("POST", self.token_url, form={
-            "grant_type": "authorization_code", "client_id": "site-kiraci1",
-            "client_secret": ortam("ATONOTA_SITE_KIRACI1_SECRET"), "redirect_uri": tenant_callback_url(),
+        tokens = request("POST", self.token_url, form={
+            "grant_type": "authorization_code", "client_id": "site-tenant1",
+            "client_secret": get_environment_value("ATONOTA_SITE_TENANT1_SECRET"), "redirect_uri": tenant_callback_url(),
             "code": code, "code_verifier": verifier}).json()
         first = tokens["refresh_token"]
         second = self._refresh(first)
-        self.assertEqual(second.durum, 200, safe_detail(second))
+        self.assertEqual(second.status, 200, safe_detail(second))
         second_refresh = second.json().get("refresh_token")
         self.assertTrue(bool(second_refresh) and second_refresh != first, safe_detail(second))
         reused = self._refresh(first)
-        self.assertEqual(reused.durum, 400, safe_detail(reused))
+        self.assertEqual(reused.status, 400, safe_detail(reused))
         self.assertTrue(reused.json().get("error") == "invalid_grant", safe_detail(reused))
 
     def test_passkey_registration_step_is_enabled(self):
@@ -126,7 +126,7 @@ class AccountBacklogLiveTest(unittest.TestCase):
             self.assertTrue(actions[alias]["enabled"], alias)
 
     def test_disabled_providers_are_not_on_the_login_page(self):
-        status, _, html = _ac(_cerezli_acici(), tenant_authorize_url())
+        status, _, html = _open(_cookie_opener(), tenant_authorize_url())
         for alias in ("google", "apple"):
             self.assertFalse(f"/broker/{alias}/login" in html, f"HTTP {status}")
             self.assertFalse(f'id="social-{alias}"' in html, f"HTTP {status}")
@@ -135,8 +135,8 @@ class AccountBacklogLiveTest(unittest.TestCase):
         username = f"customer-{uuid.uuid4().hex[:10]}"
         created = admin("/users", self.admin_token, "POST",
                         {"username": username, "email": f"{username}@example.test", "enabled": True})
-        self.assertEqual(created.durum, 201, safe_detail(created))
-        user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
+        self.assertEqual(created.status, 201, safe_detail(created))
+        user_id = created.headers["Location"].rstrip("/").rsplit("/", 1)[1]
         self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
         account = admin("/clients?clientId=account", self.admin_token).json()[0]["id"]
         roles = {r["name"] for r in admin(
@@ -158,20 +158,20 @@ class AccountBacklogLiveTest(unittest.TestCase):
             "username": username, "email": f"{username}@example.test", "emailVerified": True,
             "firstName": "Deneme", "lastName": "Musteri", "enabled": True,
             "credentials": [{"type": "password", "value": password, "temporary": False}]})
-        self.assertEqual(created.durum, 201, safe_detail(created))
-        user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
+        self.assertEqual(created.status, 201, safe_detail(created))
+        user_id = created.headers["Location"].rstrip("/").rsplit("/", 1)[1]
         self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
 
-        opener = _cerezli_acici()
-        _, _, html = _ac(opener, tenant_authorize_url() + "&kc_action=delete_account")
+        opener = _cookie_opener()
+        _, _, html = _open(opener, tenant_authorize_url() + "&kc_action=delete_account")
         form = urllib.parse.urlencode({"username": f"{username}@example.test", "password": password,
                                        "credentialId": ""}).encode()
-        status, headers, html = _ac(opener, _form_hedefi(html), form)
+        status, headers, html = _open(opener, _form_hedefi(html), form)
         location = headers.get("Location", "")
         if status in (302, 303) and location.startswith(self.kc):
-            status, headers, html = _ac(opener, location)
+            status, headers, html = _open(opener, location)
         self.assertFalse('id="kc-deleteaccount-form"' in html, f"HTTP {status}")
-        self.assertEqual(admin(f"/users/{user_id}", yonetici_belirteci()).durum, 200, "the user must still exist")
+        self.assertEqual(admin(f"/users/{user_id}", admin_token()).status, 200, "the user must still exist")
 
 
 if __name__ == "__main__":

@@ -19,12 +19,12 @@ import unittest
 import urllib.parse
 
 from test_account_backlog import _login, _pause
-from test_eklentiler import _ac
-from yardimci import admin, canli_var_mi, ortam, realm_oku, tenant_authorize_url, yonetici_belirteci
+from test_extensions import _open
+from helpers import admin, live_available, get_environment_value, read_realm, tenant_authorize_url, admin_token
 
 HOUR = 3600
 DAY = 24 * HOUR
-EMPLOYEE_CLIENTS = ("site-kiraci1", "mobile-app")
+EMPLOYEE_CLIENTS = ("site-tenant1", "mobile-app")
 LOA_CONFIG = "atonota-employee-loa"
 
 
@@ -35,7 +35,7 @@ def _flows(realm: dict) -> dict:
 class SessionLifetimeFileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.realm = realm_oku()
+        cls.realm = read_realm()
         cls.clients = {c["clientId"]: c for c in cls.realm["clients"]}
 
     def test_customer_lifetimes_are_the_realm_lifetimes(self):
@@ -81,43 +81,43 @@ class SessionLifetimeFileTest(unittest.TestCase):
         self.assertEqual(top[0]["authenticator"], "auth-cookie")
 
 
-@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
+@unittest.skipUnless(live_available(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
 class SessionLifetimeLiveTest(unittest.TestCase):
     """Shortens the level's max age to 5 seconds for the test and puts 3600 back afterwards."""
 
     SHORT = 5
 
     def setUp(self):
-        self.admin_token = yonetici_belirteci()
+        self.admin_token = admin_token()
         executions = admin("/authentication/flows/atonota-browser-giris/executions", self.admin_token).json()
         condition = next(e for e in executions if e.get("providerId") == "conditional-level-of-authentication")
         self.config_id = condition["authenticationConfig"]
         config = admin(f"/authentication/config/{self.config_id}", self.admin_token).json()
         self.original = dict(config)
         config["config"] = {**config["config"], "loa-max-age": str(self.SHORT)}
-        self.assertEqual(admin(f"/authentication/config/{self.config_id}", self.admin_token, "PUT", config).durum, 204)
+        self.assertEqual(admin(f"/authentication/config/{self.config_id}", self.admin_token, "PUT", config).status, 204)
         self.addCleanup(self._restore)
         user = admin("/users?email=totp.ornek@example.test&exact=true", self.admin_token).json()[0]
-        admin(f"/attack-detection/brute-force/users/{user['id']}", self.admin_token, yontem="DELETE")
+        admin(f"/attack-detection/brute-force/users/{user['id']}", self.admin_token, method="DELETE")
 
     def _restore(self):
-        token = yonetici_belirteci()
+        token = admin_token()
         admin(f"/authentication/config/{self.config_id}", token, "PUT", self.original)
 
     def _press_authorize_url(self, **extra) -> str:
-        from yardimci import pkce_pair
+        from helpers import pkce_pair
         _, challenge = pkce_pair()
         query = urllib.parse.urlencode({**extra,
             "client_id": "press", "response_type": "code", "scope": "openid", "state": "s", "nonce": "n",
-            "redirect_uri": f"{ortam('ATONOTA_PRESS_URL')}/api/method/press_tr.api.auth.keycloak_callback",
+            "redirect_uri": f"{get_environment_value('ATONOTA_PRESS_URL')}/api/method/press_tr.api.auth.keycloak_callback",
             "code_challenge": challenge, "code_challenge_method": "S256"})
-        return f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{query}"
+        return f"{get_environment_value('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{query}"
 
     def test_cookie_finishes_the_login_while_the_level_is_valid(self):
         opener, status, headers, _ = _login(tenant_authorize_url())
         self.assertEqual(status, 302)
         self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
-        status, headers, _ = _ac(opener, tenant_authorize_url())
+        status, headers, _ = _open(opener, tenant_authorize_url())
         self.assertEqual(status, 302, "a valid level lets the cookie finish the login")
         self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
 
@@ -125,7 +125,7 @@ class SessionLifetimeLiveTest(unittest.TestCase):
         opener, status, headers, _ = _login(tenant_authorize_url())
         self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
         time.sleep(self.SHORT + 2)
-        status, headers, html = _ac(opener, tenant_authorize_url())
+        status, headers, html = _open(opener, tenant_authorize_url())
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertEqual(status, 200)
         self.assertTrue('name="password"' in html, f"HTTP {status}")
@@ -137,7 +137,7 @@ class SessionLifetimeLiveTest(unittest.TestCase):
         time.sleep(self.SHORT + 2)
         for extra in ("&acr_values=0", "&acr_values=unknown"):
             with self.subTest(extra=extra):
-                status, headers, html = _ac(opener, tenant_authorize_url() + extra)
+                status, headers, html = _open(opener, tenant_authorize_url() + extra)
                 self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
 
     def test_customer_cookie_is_not_affected(self):
@@ -145,7 +145,7 @@ class SessionLifetimeLiveTest(unittest.TestCase):
         self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
         time.sleep(self.SHORT + 2)
         _pause()
-        status, headers, _ = _ac(opener, self._press_authorize_url())
+        status, headers, _ = _open(opener, self._press_authorize_url())
         self.assertEqual(status, 302, "the customer client requests no level, so the 7 day cookie is enough")
         self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
 
@@ -155,7 +155,7 @@ class SessionLifetimeLiveTest(unittest.TestCase):
         # (prompt=login, max_age=0). The open cookie must not answer either request.
         opener, status, headers, _ = _login(tenant_authorize_url())
         self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
-        status, headers, _ = _ac(opener, self._press_authorize_url())
+        status, headers, _ = _open(opener, self._press_authorize_url())
         self.assertTrue("code=" in headers.get("Location", ""), f"HTTP {status}")
         # OIDCLoginProtocol.requireReauthentication (26.8.2, line 570) asks again only when
         # auth_time + max_age < now, counted in whole seconds. A max_age=0 request in the same second as the
@@ -163,7 +163,7 @@ class SessionLifetimeLiveTest(unittest.TestCase):
         time.sleep(2)
         for extra in ({"prompt": "login"}, {"max_age": "0"}, {"prompt": "login", "max_age": "0"}):
             with self.subTest(**extra):
-                status, headers, html = _ac(opener, self._press_authorize_url(**extra))
+                status, headers, html = _open(opener, self._press_authorize_url(**extra))
                 self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
                 self.assertEqual(status, 200)
                 self.assertTrue('name="password"' in html, f"HTTP {status}")

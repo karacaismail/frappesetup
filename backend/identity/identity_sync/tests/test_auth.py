@@ -115,8 +115,8 @@ class RealVerificationTest(unittest.TestCase):
         claims: dict[str, object] = {
             "iss": self.stack.issuer,
             "aud": "identity-sync",
-            "azp": "site-kiraci1-service",
-            "sub": "service-account-site-kiraci1-service",
+            "azp": "site-tenant1-service",
+            "sub": "service-account-site-tenant1-service",
             "iat": now,
             "exp": now + 300,
         }
@@ -141,7 +141,7 @@ class RealVerificationTest(unittest.TestCase):
         self.assertEqual(self.status(self.token(key=self.other_key)), 401)
 
     def test_wrong_audience_is_rejected(self) -> None:
-        self.assertEqual(self.status(self.token(aud="site-kiraci1")), 401)
+        self.assertEqual(self.status(self.token(aud="site-tenant1")), 401)
 
     def test_multiple_audiences_are_rejected(self) -> None:
         # Servis belirteci yalnız bir `aud` değeri taşır.
@@ -174,7 +174,7 @@ class RealVerificationTest(unittest.TestCase):
     def test_symmetric_algorithm_is_rejected(self) -> None:
         # Yalnız RS256 kabul edilir.
         forged = jwt.encode(
-            {"iss": self.stack.issuer, "aud": "identity-sync", "azp": "site-kiraci1-service", "exp": int(time.time()) + 300},
+            {"iss": self.stack.issuer, "aud": "identity-sync", "azp": "site-tenant1-service", "exp": int(time.time()) + 300},
             "x" * 64,
             algorithm="HS256",
             headers={"kid": "k1"},
