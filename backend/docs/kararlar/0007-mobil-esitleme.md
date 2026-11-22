@@ -267,6 +267,9 @@ Liste, kurulum kimliğini ve iptal durumunu gösterir.
 Yapay zekâ tek kurulumu veya bütün kurulumları iptal etmek için öneri açar.
 Kullanıcı öneriyi onaylayana kadar sunucu hiçbir kurulumu iptal etmez.
 Onaydan önce kurulumlar değişirse sunucu yeni bir önizleme ister.
+Kurulum iptali tek başına Keycloak oturumunu kapatmaz.
+Kimlik servisi oturumu kapatana kadar yenileme belirteci geçerli kalabilir.
+Bu sırada yönetici oturumu kimlik tarafında ayrıca kapatır.
 
 Yapay zekâ temizlik denemesini de öneri olarak açar.
 Önizleme süresi dolan kayıtların sayısını gösterir.
