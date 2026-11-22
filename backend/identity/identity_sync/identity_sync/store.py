@@ -215,6 +215,14 @@ class Store:
             self._db.execute("BEGIN IMMEDIATE")
             try:
                 yield
+                if limited:
+                    # Starting the write used part of the time. Measure again, so the wait to
+                    # commit ends at the same deadline. Without time left the write is rolled
+                    # back (inceleme 21).
+                    left = measure(_SQLITE_TIMEOUT_SECONDS)
+                    if left <= 0:
+                        raise Busy
+                    self._db.execute(f"PRAGMA busy_timeout = {max(1, int(left * 1000))}")
                 self._db.execute("COMMIT")
             except BaseException:
                 if self._db.in_transaction:

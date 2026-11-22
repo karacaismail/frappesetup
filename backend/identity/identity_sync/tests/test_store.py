@@ -426,3 +426,61 @@ class TwoLockDeadlineTest(unittest.TestCase):
 
     def test_the_queue_query(self) -> None:
         self.assert_within(lambda: self.store.repeatable_jobs(limit=3, max_attempts=5, min_interval=30.0))
+
+
+class CommitDeadlineTest(unittest.TestCase):
+    """Inceleme 21: the wait to start a write and the wait to commit it share one deadline."""
+
+    def setUp(self) -> None:
+        import sqlite3
+        import threading
+
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.path = os.path.join(self.dir.name, "identity_sync.sqlite3")
+        self.store = Store(self.path)
+        self.addCleanup(self.store.close)
+        release = threading.Event()
+        writer_held, reader_held = threading.Event(), threading.Event()
+
+        def hold_writer() -> None:
+            # A writer holds the file for 0.25 seconds, so starting the write must wait.
+            other = sqlite3.connect(self.path, isolation_level=None)
+            other.execute("BEGIN IMMEDIATE")
+            writer_held.set()
+            time.sleep(0.25)
+            other.execute("ROLLBACK")
+            other.close()
+
+        def hold_reader() -> None:
+            # A reader keeps a shared lock the whole test, so committing the write must wait.
+            other = sqlite3.connect(self.path, isolation_level=None)
+            other.execute("BEGIN")
+            other.execute("SELECT count(*) FROM dead_letters").fetchone()
+            reader_held.set()
+            release.wait(10)
+            other.execute("ROLLBACK")
+            other.close()
+
+        threads = [threading.Thread(target=hold_writer), threading.Thread(target=hold_reader)]
+        for thread in threads:
+            thread.start()
+            self.addCleanup(thread.join, 10)
+        self.addCleanup(release.set)  # runs first: the reader lets go before the threads are joined
+        self.assertTrue(writer_held.wait(5) and reader_held.wait(5))
+
+    def assert_rolled_back_within(self, call, limit: float = 0.4) -> None:
+        from identity_sync.deadline import deadline
+
+        started = time.monotonic()
+        with deadline(limit, grace=0.0), self.assertRaises(Busy):
+            call()
+        self.assertLess(time.monotonic() - started, limit + 0.08)
+        # The write was rolled back: nothing of it is in the store.
+        self.assertIsNone(self.store.dead_letter_state(EVENT.id))
+
+    def test_a_write_before_a_target_call(self) -> None:
+        self.assert_rolled_back_within(lambda: self.store.begin(EVENT))
+
+    def test_an_outcome_record(self) -> None:
+        self.assert_rolled_back_within(lambda: self.store.add_dead_letter(EVENT, "failed"))

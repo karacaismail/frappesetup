@@ -141,7 +141,8 @@ info:
     A deletion request carries one deadline, `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` after it starts.
     Name lookups, connections and TLS handshakes end at that deadline.
     So do the wait for the work lock, every database wait, every network read and every retry pause.
-    A database wait has two parts: the shared connection and the database file. Together they end at the deadline.
+    A database wait has three parts: the shared connection, the start of the write and its commit.
+    Together they end at the deadline. Without time left the write is rolled back.
     The outcome records share one later end, 5 seconds after the deadline. All of them together stay within it.
     So the service answers within `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 5 seconds: 35 seconds by default, 85 at most.
     Press waits at most 90 seconds. When Press stops waiting, it tells the customer that the deletion is in progress.
