@@ -152,22 +152,16 @@ def sql_calls(nodes, aliases):
             yield item.lineno
 
 
-def declaration_targets(fn, module_names, method_pattern):
+def tool_declarations(fn, module_names):
     body = list(scope_nodes(fn.body))
     names = stable_bindings(fn.body, module_names)
-    for statement in body:
-        if not isinstance(statement, ast.Return):
-            continue
+    returns = [item for item in body if isinstance(item, ast.Return)]
+    if not returns:
+        yield fn.lineno, None, names
+    for statement in returns:
         result = resolve(statement.value, names)
-        declarations = result.elts if isinstance(result, (ast.List, ast.Tuple)) and result.elts else [result]
-        for declaration in declarations:
-            entries = mapping(declaration, names)
-            if not entries or "handler" not in entries:
-                yield statement.lineno, None
-                continue
-            for key in ("handler", "preview", "prepare"):
-                if key in entries:
-                    target = string(entries[key], names)
-                    yield entries[key].lineno, target if target and method_pattern.fullmatch(target) else None
-    if not any(isinstance(item, ast.Return) for item in body):
-        yield fn.lineno, None
+        if not isinstance(result, (ast.List, ast.Tuple)) or not result.elts:
+            yield statement.lineno, None, names
+            continue
+        for declaration in result.elts:
+            yield declaration.lineno, mapping(declaration, names), names

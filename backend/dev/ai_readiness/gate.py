@@ -15,10 +15,10 @@ from contracts import METHOD_PATH, operations
 from dependencies import FRAPPE_VERSION, dependency_checks
 from forbidden_name import find_path_code, match_lines, redact_path, require_git_executable, tracked_findings
 from hook_validation import HOOK_RULES, invalid_hook_uses, node_names, opaque_hook_lines
+from shellcheck_step import run_shellcheck
 from source import (
     FUNCTIONS,
     assignments,
-    declaration_targets,
     imports,
     mapping,
     qualified,
@@ -27,6 +27,7 @@ from source import (
     sql_calls,
     stable_bindings,
     string,
+    tool_declarations,
     walk,
 )
 from translations import translation_checks
@@ -87,6 +88,7 @@ class Finding:
     rule: str
     message: str
     severity: str = "error"
+    owner: str | None = None
 
 
 def has_text(value):
@@ -520,6 +522,114 @@ def tool_helper_names(body, module, package, inherited_aliases):
             yield name
 
 
+TOOL_FIELDS = {
+    "name",
+    "description",
+    "arguments",
+    "kind",
+    "roles",
+    "destructive",
+    "billable",
+    "handler",
+    "preview",
+    "prepare",
+    "versioned",
+}
+
+
+def tool_function(name, functions, sources, reexports):
+    target = resolve_app_export(name, functions, reexports)
+    if target is None:
+        return None
+    module, fn = functions[target]
+    _, _, tree, _, _, _ = sources[module]
+    if fn not in tree.body or target != f"{module}.{fn.name}":
+        return None
+    index = tree.body.index(fn)
+    return None if binding_changes(tree.body[index + 1 :], fn.name) else target
+
+
+def preview_uses_execution(callbacks, functions, sources, reexports):
+    preview = callbacks.get("preview")
+    handler = callbacks.get("handler")
+    if preview is None or handler is None:
+        return False
+    module, fn = functions[preview]
+    _, _, tree, _, _, package = sources[module]
+    aliases = imported_aliases(tree.body, package)
+    return any(
+        resolve_app_export(name, functions, reexports) == handler
+        for name in tool_helper_names(fn.body, module, package, aliases)
+    )
+
+
+def tool_registration_checks(registered, functions, sources, reexports, endpoints, emit):
+    targets = {}
+    for name, (hook, line) in registered.items():
+        function = tool_function(name, functions, sources, reexports)
+        if function is None:
+            emit(hook, line, "ai-tool", f"No callable registration function for {name}.")
+            continue
+        targets[function] = hook, line
+        module, fn = functions[function]
+        path, _, tree, _, _, _ = sources[module]
+        if not has_text(ast.get_docstring(fn)):
+            emit(path, fn.lineno, "ai-tool", f"Registration function {name} needs a docstring.")
+        for entry_line, entry, names in tool_declarations(fn, stable_bindings(tree.body)):
+            if not entry or "handler" not in entry:
+                emit(path, entry_line, "ai-tool", "Cannot resolve AI tool declaration and handler.")
+                continue
+            if entry.keys() - TOOL_FIELDS:
+                emit(path, entry_line, "ai-tool", "AI tool declaration contains unsupported fields.")
+            if not has_text(string(entry.get("description"), names)):
+                emit(path, entry_line, "ai-tool", "AI tool needs a non-empty description.")
+            kind = string(entry.get("kind"), names)
+            if kind not in {"read", "write"}:
+                emit(path, entry_line, "ai-tool", "AI tool kind must be read or write.")
+            callbacks = {}
+            for key in ("handler", "preview", "prepare"):
+                if key not in entry:
+                    continue
+                value = string(entry[key], names)
+                callback = (
+                    tool_function(value, functions, sources, reexports)
+                    if value and METHOD_PATH.fullmatch(value)
+                    else None
+                )
+                if callback is None:
+                    emit(
+                        path,
+                        entry[key].lineno,
+                        "ai-tool",
+                        f"AI tool {key} must point to an existing function.",
+                    )
+                else:
+                    callbacks[key] = callback
+                    targets[callback] = path, entry[key].lineno
+            if kind != "write":
+                continue
+            if "preview" not in entry or (
+                "preview" in callbacks and callbacks["preview"] == callbacks.get("handler")
+            ):
+                emit(path, entry_line, "ai-tool", "Write tool needs a separate preview function.")
+            elif preview_uses_execution(callbacks, functions, sources, reexports):
+                emit(
+                    path,
+                    entry["preview"].lineno,
+                    "ai-tool",
+                    "Write tool preview must not call its write handler.",
+                )
+            for key in ("handler", "prepare"):
+                if callbacks.get(key) in endpoints:
+                    emit(
+                        path,
+                        entry[key].lineno,
+                        "ai-tool",
+                        f"Write tool {key} must run through shared approval.",
+                    )
+    return targets
+
+
 def tool_sql_checks(targets, functions, sources, reexports, emit):
     pending = []
     for target, (hook, line) in targets.items():
@@ -666,7 +776,7 @@ def binding_changes(nodes, name):
     )
 
 
-def stable_website_reexports(sources):
+def stable_package_reexports(sources):
     return {
         f"{module}.{alias}": target
         for module, (path, _, tree, _, _, package) in sources.items()
@@ -718,6 +828,26 @@ def website_method_checks(entries, endpoints, functions, sources, reexports, ove
             if endpoint is None or not current_website_endpoint(endpoint, endpoints, sources):
                 emit(path, line, "website-user", f"No whitelisted Website User method for {target}.")
                 break
+
+
+def shellcheck_checks(root, excluded_roots, findings):
+    diagnostics = run_shellcheck(root, source_files(root, lambda *_: None, exclude=excluded_roots))
+    if diagnostics is None:
+        return "not_run"
+    if not diagnostics:
+        return "pass"
+
+    from interfaces import folder_owner, folder_owners
+
+    try:
+        apps = {path.name for path in (root / "apps").iterdir()} if (root / "apps").is_dir() else set()
+        owners = folder_owners(root / "AGENTS.md", apps)
+    except (OSError, UnicodeError):
+        owners = {}
+    for path, line, rule, message in diagnostics:
+        relative = path.relative_to(root).as_posix()
+        findings.add(Finding(relative, line, rule, message, "warning", folder_owner(relative, owners)))
+    return "warn"
 
 
 def scan(root, commit_base=None, frappe_root=None):
@@ -819,28 +949,17 @@ def scan(root, commit_base=None, frappe_root=None):
         if path.stem == "__init__"
         for alias, name in imported_aliases(tree.body, package).items()
     }
+    stable_reexports = stable_package_reexports(sources)
     website_method_checks(
         website_entries,
         endpoints,
         functions,
         sources,
-        stable_website_reexports(sources),
+        stable_reexports,
         override_candidates,
         emit,
     )
-    targets = dict(registered)
-    for name, (hook, line) in registered.items():
-        function = resolve_app_export(name, functions, reexports)
-        if function is None:
-            continue
-        module, fn = functions[function]
-        path, _, tree, _, _, _ = sources[module]
-        module_names = stable_bindings(tree.body)
-        for target_line, target in declaration_targets(fn, module_names, METHOD_PATH):
-            if target is None:
-                emit(path, target_line, "sql", "Cannot resolve AI tool declaration target.")
-            else:
-                targets[target] = hook, line
+    targets = tool_registration_checks(registered, functions, sources, stable_reexports, endpoints, emit)
 
     referenced.update(tool_sql_checks(targets, functions, sources, reexports, emit))
 
@@ -906,7 +1025,8 @@ def scan(root, commit_base=None, frappe_root=None):
     checks = naming_checks(root, findings)
     checks["translation_core"] = translation_checks(translation_paths, frappe_package, emit)
     checks.update(dependency_checks(app_manifests, frappe_manifest, frappe_package, root, emit))
-    return sorted(findings), checks
+    checks["shellcheck"] = shellcheck_checks(root, excluded_roots, findings)
+    return sorted(findings, key=lambda item: (item.owner is not None, item.owner or "", item)), checks
 
 
 def supports_python():
@@ -967,11 +1087,16 @@ def main():
             finding.rule if next(match_lines([finding.rule]), None) is None else "redacted",
             finding.message if next(match_lines([finding.message]), None) is None else "Details redacted.",
             finding.severity,
+            redact_path(finding.owner) if finding.owner is not None else None,
         )
         for finding in raw_findings
     ]
     if args.json:
-        print(json.dumps({"findings": [asdict(finding) for finding in findings], "checks": checks}))
+        records = [
+            {key: value for key, value in asdict(finding).items() if value is not None}
+            for finding in findings
+        ]
+        print(json.dumps({"findings": records, "checks": checks}))
     else:
         if checks["naming"] == "not_run":
             print("naming: not_run (checker unavailable)", file=sys.stderr)
@@ -981,7 +1106,13 @@ def main():
             print("translation_core: not_run (Frappe core catalog unavailable)", file=sys.stderr)
         if checks["dependency_core"] == "not_run":
             print(f"dependency_core: not_run (Frappe {FRAPPE_VERSION} manifest unavailable)", file=sys.stderr)
+        if checks["shellcheck"] == "not_run":
+            print("shellcheck: not_run (pinned container unavailable or no shell scripts)", file=sys.stderr)
+        owner = None
         for finding in findings:
+            if finding.owner is not None and finding.owner != owner:
+                owner = finding.owner
+                print(f"ShellCheck [{owner}]")
             prefix = "Warning: " if finding.severity == "warning" else ""
             print(f"{prefix}{finding.path}:{finding.line} [{finding.rule}] {finding.message}")
     return int(any(finding.severity == "error" for finding in findings))
