@@ -218,20 +218,20 @@
         <#if auth?has_content && auth.showTryAnotherWayLink()>
           <form id="kc-select-try-another-way-form" action="${url.loginAction}" method="post" novalidate="novalidate">
               <input type="hidden" name="tryAnotherWay" value="on"/>
-              <a id="try-another-way" href="javascript:document.forms['kc-select-try-another-way-form'].requestSubmit()"
+              <button id="try-another-way" type="submit"
                   class="${properties.kcButtonSecondaryClass} ${properties.kcButtonBlockClass} ${properties.kcMarginTopClass}">
                     ${msg("doTryAnotherWay")}
-              </a>
+              </button>
           </form>
         </#if>
 
         <#if switchOrganizationEnabled?? && switchOrganizationEnabled>
           <form id="kc-switch-organization-form" action="${url.loginAction}" method="post" novalidate="novalidate">
               <input type="hidden" name="switchOrganization" value="true"/>
-              <a id="switch-organization" href="javascript:document.forms['kc-switch-organization-form'].requestSubmit()"
+              <button id="switch-organization" type="submit"
                   class="${properties.kcButtonSecondaryClass} ${properties.kcButtonBlockClass} ${properties.kcMarginTopClass}">
                     ${msg("doSwitchOrganization")}
-              </a>
+              </button>
           </form>
         </#if>
 

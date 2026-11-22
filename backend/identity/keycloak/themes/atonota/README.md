@@ -256,6 +256,12 @@ Hesap konsolu görüntülerini şu komut üretir:
 VISUAL=1 npx playwright test account -g screenshot --project=chromium-320 --project=webkit-desktop
 ```
 
+Tür denetimi için `test/tsconfig.json` dosyası vardır. Depoda TypeScript paketi kurulu değildir. Bu bilgisayarda kurulu bir `tsc` ile şu komut çalışır:
+
+```bash
+tsc -p backend/identity/keycloak/themes/atonota/test/tsconfig.json
+```
+
 Görüntüler `test/reference/` klasörüne yazılır. Bu görüntüler macOS'ta üretildi. Görüntüler otomatik karşılaştırma kapısı değildir. Görüntüyü üreten kişi kendi görüntüsünü onaylamaz.
 
 ## Bilinen sınırlar

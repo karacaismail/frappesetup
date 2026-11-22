@@ -127,3 +127,16 @@ test('passkey hatası: yalın bir ileti ve yeniden deneme düğmesi görünür',
   await expect(page.getByRole('button', { name: 'Yeniden deneyin', exact: true })).toBeVisible();
   await expect(page.locator('.pf-v5-c-alert')).toContainText('Geçiş anahtarı');
 });
+
+test('TOTP setup: a wrong code is announced with the field it belongs to', async ({ page }) => {
+  await screen('totp-setup').open(page);
+  await page.locator('#totp').fill('000000');
+  await page.locator('#saveTOTPBtn').click();
+  const error = page.locator('#input-error-otp-code');
+  await expect(error).toBeVisible();
+  // A screen reader reads the error together with the field only when the field points at it.
+  await expect(page.locator('#totp')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('#totp')).toHaveAttribute('aria-describedby', 'input-error-otp-code');
+  // A field without an error points at nothing.
+  await expect(page.locator('#userLabel')).not.toHaveAttribute('aria-describedby', /.+/);
+});

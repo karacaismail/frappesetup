@@ -70,6 +70,7 @@
                 <div class="${properties.kcInputClass!} <#if messagesPerField.existsError('totp')>pf-m-error</#if>">
                     <input type="text" required id="totp" name="totp" autocomplete="one-time-code"
                            aria-invalid="<#if messagesPerField.existsError('totp')>true</#if>"
+                           <#if messagesPerField.existsError('totp')>aria-describedby="input-error-otp-code"</#if>
                            inputmode="numeric"
                     />
 
@@ -93,6 +94,7 @@
                 <div class="${properties.kcInputClass!} <#if messagesPerField.existsError('userLabel')>pf-m-error</#if>">
                     <input type="text" id="userLabel" name="userLabel" autocomplete="off"
                            aria-invalid="<#if messagesPerField.existsError('userLabel')>true</#if>"
+                           <#if messagesPerField.existsError('userLabel')>aria-describedby="input-error-otp-label"</#if>
                     />
 
                     <@field.errorIcon error=messagesPerField.get('userLabel')/>

@@ -233,6 +233,7 @@
   justify-content: flex-start;
   gap: var(--at-space-2);
   padding: 0 var(--at-space-1);
+  /* !important: without it the base theme colours the brand name and the contrast test fails. */
   color: var(--at-color-ink) !important;
   font-size: var(--at-text-brand);
   font-weight: var(--at-weight-bold);
@@ -309,6 +310,7 @@
 }
 
 .login-pf .pf-v5-u-color-200 {
+  /* !important: the base theme sets this with a utility class that uses !important. */
   color: var(--at-color-ink-soft) !important;
 }
 
@@ -391,6 +393,7 @@
 
 /* Temel tema bu boşluğu yalnız geniş ekranda verir. Dar ekranda da bölümler ayrı durur. */
 .login-pf .pf-v5-u-mb-md-on-md {
+  /* !important: the base theme sets this with a utility class that uses !important. */
   margin-block-end: var(--at-space-4) !important;
 }
 
@@ -740,7 +743,7 @@
 .login-pf .pf-v5-c-data-list__cell.pf-m-no-fill {
   flex: 1 1 8rem;
   min-inline-size: 0;
-  padding-block: var(--at-space-2) !important;
+  padding-block: var(--at-space-2);
 }
 
 .login-pf .pf-v5-c-data-list__item-action:empty {
@@ -797,6 +800,7 @@
 
 .login-pf .pf-v5-u-mt-md-on-md,
 .login-pf #authenticateWebAuthnButton {
+  /* !important: the base theme sets this with a utility class that uses !important. */
   margin-block-start: var(--at-space-3) !important;
 }
 
@@ -897,6 +901,7 @@
   .login-pf *,
   .login-pf *::before,
   .login-pf *::after {
+    /* !important: reduced motion must win over every transition in the base theme. */
     transition-duration: var(--at-motion-none) !important;
     animation-duration: var(--at-motion-none) !important;
   }

@@ -18,10 +18,10 @@ env_file="$here/.env"
 # FS_COLIMA_PROFILE=default starts the environment in the "colima" profile instead.
 if [[ "${FS_COLIMA_PROFILE:-factory}" == "default" ]]; then
   export DOCKER_CONTEXT="${DOCKER_CONTEXT:-colima}"
-  lima_name="${COLIMA_LIMA_AD:-colima}"
+  lima_name="${COLIMA_LIMA_NAME:-colima}"
 else
   export DOCKER_CONTEXT="${DOCKER_CONTEXT:-colima-factory}"
-  lima_name="${COLIMA_LIMA_AD:-colima-factory}"
+  lima_name="${COLIMA_LIMA_NAME:-colima-factory}"
 fi
 
 # Prints the value of one variable from the .env file.
@@ -71,11 +71,11 @@ tunnel_open() {
   KC_PUBLIC_URL="$(env_value KC_PUBLIC_URL)"
   local ssh_conf="$HOME/.colima/_lima/$lima_name/ssh.config"
   if [[ ! -f "$ssh_conf" ]]; then
-    echo "Colima ssh ayarı yok: $ssh_conf" >&2
+    echo "Colima ssh config is missing: $ssh_conf" >&2
     exit 1
   fi
   if [[ -f "$tunnel_pid" ]] && kill -0 "$(cat "$tunnel_pid")" 2>/dev/null; then
-    echo "Tünel zaten açık."
+    echo "The tunnel is already open."
     return
   fi
   local port key
@@ -90,10 +90,10 @@ tunnel_open() {
   sleep 2
   if ! kill -0 "$(cat "$tunnel_pid")" 2>/dev/null; then
     rm -f "$tunnel_pid"
-    echo "Tünel açılamadı." >&2
+    echo "The tunnel could not be opened." >&2
     exit 1
   fi
-  echo "Tünel açık: $KC_PUBLIC_URL ve http://127.0.0.1:$MAILPIT_UI_PORT"
+  echo "The tunnel is open: $KC_PUBLIC_URL and http://127.0.0.1:$MAILPIT_UI_PORT"
 }
 
 tunnel_close() {
@@ -129,11 +129,13 @@ case "${1:-}" in
     case "${2:-}" in
       "" | login | email | account) ;;
       *)
-        echo "Yalnız login, email ya da account kopyalanır." >&2
+        echo "Only login, email or account can be copied." >&2
         exit 2
         ;;
     esac
-    for part in ${2:-login email account}; do
+    parts=(login email account)
+    if [[ -n "${2:-}" ]]; then parts=("$2"); fi
+    for part in "${parts[@]}"; do
       docker exec -u 0 "$cid" rm -rf "/opt/keycloak/themes/atonota/$part"
       docker cp "$theme/$part" "$cid:/opt/keycloak/themes/atonota/$part"
     done
@@ -151,7 +153,7 @@ case "${1:-}" in
     compose down
     ;;
   *)
-    echo "Kullanım: theme-dev.sh up | build | sync | tunnel | tunnel-close | down | env" >&2
+    echo "Usage: theme-dev.sh up | build | sync | tunnel | tunnel-close | down | env" >&2
     exit 2
     ;;
 esac

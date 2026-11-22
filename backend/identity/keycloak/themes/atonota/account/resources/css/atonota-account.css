@@ -1010,6 +1010,7 @@ body[data-page-id="account"] *::after {
   body[data-page-id="account"] *,
   body[data-page-id="account"] *::before,
   body[data-page-id="account"] *::after {
+    /* !important: reduced motion must win over every transition in the base theme. */
     transition-duration: var(--at-motion-none) !important;
     animation-duration: var(--at-motion-none) !important;
   }

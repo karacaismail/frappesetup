@@ -470,3 +470,27 @@ test.describe('sihirli bağlantı e-postası', () => {
     });
   }
 });
+
+test('email colours are the light design tokens of the login theme', () => {
+  // An email cannot read CSS variables, so the template repeats the values. This test keeps the copy equal.
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  const css = readFileSync(`${root}login/resources/css/atonota.css`, 'utf8');
+  const lightBlock = css.slice(css.indexOf('/* tokens:start */'), css.indexOf('@media (prefers-color-scheme: dark)'));
+  const token = (name: string) => new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,8})`).exec(lightBlock)?.[1].toLowerCase();
+  const template = readFileSync(`${root}email/html/template.ftl`, 'utf8');
+  const value = (name: string) => new RegExp(`${name} = "(#[0-9a-fA-F]{3,8})"`).exec(template)?.[1].toLowerCase();
+  const pairs: Record<string, string> = {
+    pageBg: '--at-color-page',
+    cardBg: '--at-color-surface',
+    ink: '--at-color-ink',
+    quiet: '--at-color-ink-soft',
+    buttonBg: '--at-color-action',
+    buttonInk: '--at-color-on-action',
+    linkInk: '--at-color-link',
+    brandDot: '--at-color-seal',
+  };
+  for (const [emailName, tokenName] of Object.entries(pairs)) {
+    expect(token(tokenName), `${tokenName} exists in the login theme`).toBeTruthy();
+    expect(value(emailName), `${emailName} equals ${tokenName}`).toBe(token(tokenName));
+  }
+});

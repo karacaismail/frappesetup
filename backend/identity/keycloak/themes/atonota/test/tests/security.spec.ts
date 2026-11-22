@@ -137,7 +137,7 @@ test('GV-1, GV-2, GV-7: theme scripts hold no secret, no HTML injection and no c
 });
 
 test('GV-2: templates never switch off escaping for user or realm data', () => {
-  const allowed = new Set([
+  const allowed = new Set<string>([
     // Stock markup of Keycloak 26.8.2 template.ftl. The theme copy does not use it any more.
   ]);
   const hits: string[] = [];
@@ -169,4 +169,44 @@ test('file and folder names in this folder are English', () => {
   expect(names.length).toBeGreaterThan(50);
   expect(names.filter((name) => !/^[\x20-\x7e]+$/.test(name)), 'names with non-ASCII letters').toEqual([]);
   expect(names.filter((name) => turkish.test(name)), 'Turkish names').toEqual([]);
+});
+
+test('templates do not use "javascript:" links', () => {
+  // An action that sends a form is a button. A "javascript:" link also stops working under a strict content security policy.
+  const hits: string[] = [];
+  for (const file of sourceFiles(/\.ftl$/)) {
+    readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
+      if (/href\s*=\s*["']\s*javascript:/i.test(line)) hits.push(`${file.replace(themeRoot, '')}:${index + 1}`);
+    });
+  }
+  expect(hits).toEqual([]);
+});
+
+test('every "!important" in the styles has its reason written next to it', () => {
+  // Project rule C-4: "!important" needs a reason. The reason is a comment that holds the word "important"
+  // and sits inside the same rule or directly above it.
+  const hits: string[] = [];
+  for (const file of sourceFiles(/\.css$/)) {
+    const lines = readFileSync(file, 'utf8').split('\n');
+    lines.forEach((line, index) => {
+      // A comment line that names "!important" is the reason itself, not a use.
+      if (!line.includes('!important') || line.trim().startsWith('/*')) return;
+      let start = index;
+      while (start > 0 && !lines[start].includes('{')) start -= 1;
+      while (start > 0 && !/^\s*$|\}\s*$/.test(lines[start - 1])) start -= 1;
+      const block = lines.slice(start, index).join('\n');
+      if (!/\/\*[^]*important[^]*\*\//i.test(block)) hits.push(`${file.replace(themeRoot, '')}:${index + 1}`);
+    });
+  }
+  expect(hits).toEqual([]);
+});
+
+test('the shell script uses English names and messages', () => {
+  const script = readFileSync(join(themeRoot, 'test', 'bin', 'theme-dev.sh'), 'utf8');
+  expect(script).not.toMatch(/COLIMA_LIMA_AD/);
+  const messages = script.split('\n').filter((line) => /^\s*echo\s+"/.test(line));
+  expect(messages.length).toBeGreaterThan(3);
+  expect(messages.filter((line) => /[çğıöşüÇĞİÖŞÜ]|Kullanım|Yalnız/.test(line))).toEqual([]);
+  // A list of words is an array, not an unquoted expansion.
+  expect(script).not.toMatch(/for \w+ in \$\{/);
 });
