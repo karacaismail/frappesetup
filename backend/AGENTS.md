@@ -8,6 +8,8 @@ Bu klasör platformun sunucu kodunu tutar. Deponun kökündeki `AGENTS.md` karar
 2. [Proje kaydını](PROJE-KAYDI.md) okuyun. Seviye MVP'dir.
 3. [Sözleşmeleri](docs/sozlesmeler.md) okuyun. Bileşenler bu adlarla konuşur.
 4. Kod standartlarını okuyun. Standartlar `docs/standartlar/` klasöründedir.
+   - Bu dosyalar proje sahibinin son kararıdır (D-15). Yalnız Frappe 16.x kullanın. Dosyalardaki Frappe 15 notlarını uygulamayın. Frappe 16'nın hazır özelliklerini tercih edin.
+   - Telefon eşitlemesi ve giriş işinde `mobile.md` dosyasını da okuyun.
    - Python kodunda `frappe-python-standartlari.md` dosyasını uygulayın.
    - Öteki dosyalarda `frappe-python-disi-standartlari.md` dosyasını uygulayın.
    - Giriş temasında `headless-frontend-standartlari.md` dosyasının güvenlik ve erişilebilirlik kurallarını da uygulayın.
@@ -85,12 +87,11 @@ Karar sitesi bazı yerlerde saatlik ya da gecelik iş anar. Bu işleri elle baş
 
 ### Ad dili
 
-Yeni kod İngilizce adlarla yazılır (D-12). Kural yalnız bundan sonrası içindir.
+Bütün kod adları İngilizce ve yalnız ASCII olur (D-12, proje sahibinin Karar 40'ı). Ayrıntı `docs/standartlar/` içindeki M-8, H-10, F-4, TS-9 ve IC-1 kurallarıdır.
 
-- Yeni dosya, klasör, modül, DocType, işlev ve değişken adını İngilizce verin.
-- Yeni yazdığınız koddaki yorumu, hata iletisini ve günlük metnini İngilizce yazın.
-- Var olan dosya, klasör ve modüllerin adını değiştirmeyin.
-- Var olan bir klasöre yeni dosya eklerseniz yalnız yeni dosyanın adını İngilizce verin.
+- Yeni dosya, klasör, modül, DocType, alan, Select seçeneği, işlev ve değişken adını İngilizce verin.
+- Görünen metni İngilizce yazın. Python'da `frappe._`, JavaScript'te `__()` kullanın. DocType JSON etiketleri de İngilizce olur. Türkçesi çeviri dosyasına girer.
+- Var olan adları elle değiştirmeyin. Eski adları naming-history-fix işinin ortak betiği değiştirir. Orkestratör betiği kendi dalınızda çalıştırmanızı isteyecek.
 - Proje sahibi bir ürün adını bu depoda yasakladı (D-13). Ad bu projeyle ilgili değildir. Adı hiçbir dosyaya, commit mesajına, imaj ya da container adına yazmayın.
 - İK uygulamasının teknik adı `hrms_tr` olur. Görünen adı “HRMS TR” olur. Yapay zekâ uygunluk kapısı yasaklı adı yakalar.
 
