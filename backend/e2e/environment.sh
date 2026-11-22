@@ -15,25 +15,34 @@ project="fs-integration-e2e-$PANE_PORT"
 provider_port="$((PANE_PORT + 7))"
 tenant_image="fs-kiraci-dev:$PANE_PORT"
 colima_bin="${COLIMA_BIN:-$HOME/.local/bin/colima}"
-context=colima-factory
+press=false
 if [[ "${1:-}" == --press ]]; then
-    context=colima
+    press=true
+    export FS_COLIMA_PROFILE=default
     shift
 fi
+export FS_COLIMA_PROFILE="${FS_COLIMA_PROFILE:-factory}"
+case "$FS_COLIMA_PROFILE" in
+    factory) context=colima-factory; other_context=colima ;;
+    default) context=colima; other_context=colima-factory ;;
+    *) printf '%s\n' 'FS_COLIMA_PROFILE must be factory or default.' >&2; exit 2 ;;
+esac
 engine=(docker --context "$context")
 compose=("${engine[@]}" compose --project-name "$project"
     --env-file "$DEV_ENV_FILE" --file "$dev_dir/compose.yaml")
 
-if [[ "$context" == colima ]]; then
-    if [[ "${1:-}" == up ]]; then
-        memory="$("$colima_bin" ssh -- free -g)"
-        available="$(awk '$1 == "Mem:" { print $7 }' <<< "$memory")"
-        if [[ ! "$available" =~ ^[0-9]+$ ]] || (( available < 3 )); then
-            printf '%s\n' 'The default Colima profile needs at least 3 GB of available memory.' >&2
-            exit 1
-        fi
-        printf 'Default Colima available memory: %s GB\n' "$available"
+if [[ "$context" == colima && "${1:-}" == up ]]; then
+    minimum_memory=2
+    if "$press"; then minimum_memory=3; fi
+    memory="$("$colima_bin" ssh -- free -g)"
+    available="$(awk '$1 == "Mem:" { print $7 }' <<< "$memory")"
+    if [[ ! "$available" =~ ^[0-9]+$ ]] || (( available < minimum_memory )); then
+        printf 'The default Colima profile needs at least %s GB of available memory.\n' "$minimum_memory" >&2
+        exit 1
     fi
+    printf 'Default Colima available memory: %s GB\n' "$available"
+fi
+if "$press"; then
     printf '%s\n' 'Press integration is pending on the backend branch.' >&2
     exit 2
 fi
@@ -41,23 +50,38 @@ fi
 case "${1:-}" in
     up)
         trap 'printf "%s\n" "Startup stopped. Run environment.sh down to close this test environment." >&2' ERR
-        disk="$("$colima_bin" ssh -p factory -- df -Pk /var/lib/docker)"
-        available="$(awk 'NR == 2 { print $4 }' <<< "$disk")"
-        if [[ ! "$available" =~ ^[0-9]+$ ]] || (( available < 5 * 1024 * 1024 )); then
-            printf '%s\n' 'The factory Colima profile needs at least 5 GiB of free disk space.' >&2
+        if running="$(docker --context "$other_context" ps -q --filter "label=com.docker.compose.project=$project" 2>/dev/null)" && [[ -n "$running" ]]; then
+            printf '%s\n' 'Close this integration environment in the other Colima profile first.' >&2
             exit 1
         fi
-        python3 "$dev_dir/init_env.py"
-        "${compose[@]}" config --quiet
-        if "${engine[@]}" image inspect "$tenant_image" >/dev/null 2>&1; then
+        if [[ "$context" == colima-factory ]]; then
+            disk="$("$colima_bin" ssh -p factory -- df -Pk /var/lib/docker)"
+            available="$(awk 'NR == 2 { print $4 }' <<< "$disk")"
+            if [[ ! "$available" =~ ^[0-9]+$ ]] || (( available < 5 * 1024 * 1024 )); then
+                printf '%s\n' 'The factory Colima profile needs at least 5 GiB of free disk space.' >&2
+                exit 1
+            fi
+            if [[ ! -f "$DEV_ENV_FILE" ]] || ! "${engine[@]}" image inspect "$tenant_image" >/dev/null 2>&1 \
+                || ! "${engine[@]}" volume inspect "${project}_kiraci-db" "${project}_kiraci-sites" "${project}_kiraci-logs" >/dev/null 2>&1; then
+                printf '%s\n' 'Factory can only reuse an existing environment. Use FS_COLIMA_PROFILE=default for a new site.' >&2
+                exit 2
+            fi
             printf 'Reusing tenant image: %s\n' "$tenant_image"
+            "${compose[@]}" up --no-build --pull never -d --wait --wait-timeout 90 kiraci-db kiraci-redis
+            "${compose[@]}" up --no-build --pull never -d kiraci-web kiraci-socket
         else
-            "${compose[@]}" build kiraci-web
+            python3 "$dev_dir/init_env.py"
+            "${compose[@]}" config --quiet
+            if "${engine[@]}" image inspect "$tenant_image" >/dev/null 2>&1; then
+                printf 'Reusing tenant image: %s\n' "$tenant_image"
+            else
+                "${compose[@]}" build kiraci-web
+            fi
+            "${compose[@]}" up --no-build -d --wait --wait-timeout 90 kiraci-db kiraci-redis
+            "${compose[@]}" run --rm --no-deps kiraci-web \
+                env/bin/python /workspace/dev/bootstrap.py kiraci1.localhost --app erpnext --app platform_core
+            "${compose[@]}" up --no-build -d kiraci-web kiraci-socket
         fi
-        "${compose[@]}" up --no-build -d --wait --wait-timeout 90 kiraci-db kiraci-redis
-        "${compose[@]}" run --rm --no-deps kiraci-web \
-            env/bin/python /workspace/dev/bootstrap.py kiraci1.localhost --app erpnext --app platform_core
-        "${compose[@]}" up --no-build -d kiraci-web kiraci-socket
         "$dev_dir/bin/tunel" kapat
         "$dev_dir/bin/tunel" ac "$KIRACI_WEB_PORT" "$KIRACI_SOCKET_PORT" "$provider_port"
         printf 'Tenant URL: http://kiraci1.localhost:%s\n' "$KIRACI_WEB_PORT"
@@ -70,11 +94,15 @@ case "${1:-}" in
         if "${engine[@]}" container inspect "$project-provider" >/dev/null 2>&1; then
             "${engine[@]}" stop "$project-provider"
         fi
-        "${compose[@]}" down
+        if [[ "$context" == colima ]]; then
+            "${compose[@]}" down --volumes
+        else
+            "${compose[@]}" down
+        fi
         "$dev_dir/bin/tunel" kapat
         ;;
     provider)
-        "${engine[@]}" run --detach --rm --name "$project-provider" \
+        "${engine[@]}" run --pull never --detach --rm --name "$project-provider" \
             --network "${project}_default" --network-alias e2e-provider \
             --publish "127.0.0.1:$provider_port:$provider_port" --env PANE_PORT \
             --env E2E_PROVIDER_BIND=0.0.0.0 \

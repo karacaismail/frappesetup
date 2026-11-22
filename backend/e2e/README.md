@@ -37,20 +37,23 @@ Pane, `PANE_PORT` değişkeniyle bu çalışma alanına port ayırır.
 
 ### Colima profilleri
 
-- **Press gerekmiyorsa** `colima-factory` kullanın. `up`, mevcut kiracı imajını yeniden kullanır. İmaj yoksa betik imajı derler. Factory diskinde 5 GiB boş alan yoksa betik ortamı açmaz.
-- **Press gerekiyorsa** tüm ortam `docker --context colima` ile açılır. `environment.sh --press up`, belleği `colima ssh -- free -g` komutuyla ölçer. Alt sınır 3 GB'tır. Press ve Keycloak birleşene kadar betik ölçümden sonra durur.
+- **Mevcut Factory ortamı.** Betik yalnız mevcut imajı ve siteyi yeniden kullanır. Factory diskinde en az 5 GiB boş alan gerekir.
+- **Yeni ortam.** `FS_COLIMA_PROFILE=default` kullanın. Betik açmadan önce `colima ssh -- free -g` ile belleği ölçer. Alt sınır 2 GB'tır.
+- **Press ortamı.** `FS_COLIMA_PROFILE=default` ile `environment.sh --press up` komutunu kullanın. Alt bellek sınırı 3 GB'tır. Press ve Keycloak birleşene kadar betik ölçümden sonra durur.
 
 Mevcut kiracı imajı, son derlemede alınan kodu taşır.
 Kiracı kodu değişirse imajı güncelleyin ve sonra testleri çalıştırın.
 
 ### Press gerektirmeyen testler
 
-1. Kiracıyı `backend/e2e/environment.sh up` komutuyla açın.
+1. Yeni kiracı için `FS_COLIMA_PROFILE=default backend/e2e/environment.sh up` çalıştırın.
 2. Aşağıdaki örnek veriyi hazırlayın.
 3. İlgili test grubunu çalıştırın.
-4. Ortamı `backend/e2e/environment.sh down` komutuyla kapatın.
+4. `FS_COLIMA_PROFILE=default backend/e2e/environment.sh down` komutuyla ortamı kapatın.
 
-`down` veritabanı birimlerini korur. Yalnız bu Pane'in ortamını kapatır.
+Varsayılan profilde `down`, bu test ortamının geçici birimlerini siler.
+Factory'de `down`, yeniden kullanılan mevcut veri birimlerini korur.
+Aynı Pane için bir seferde tek ortam açın.
 
 ```sh
 npx --no-install playwright test -c backend/e2e/playwright.config.ts --list
