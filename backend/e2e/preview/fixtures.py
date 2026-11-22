@@ -201,6 +201,7 @@ def main():
     password = "Aa9!" + secrets.token_urlsafe(24)
     subject, lifecycle = seed_keycloak(port, password)
     common = {
+        "E2E_PREVIEW_SYNC_ORIGIN": os.environ["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],
         "PANE_PORT": str(port), "E2E_PREVIEW_LOGIN_EMAIL": LOGIN_EMAIL,
         "E2E_LIFECYCLE_IDENTITIES": json.dumps({
             key: {field: item[field] for field in ("email", "subject")}
@@ -217,7 +218,6 @@ def main():
     press_fixture = seed_site(project, "web", PRESS_BENCH, {
         **common, "E2E_PRESS_CLIENT_SECRET": os.environ["E2E_PRESS_CLIENT_SECRET"],
         "E2E_PRESS_SERVICE_SECRET": press_service_secret,
-        "E2E_PREVIEW_SYNC_ORIGIN": os.environ["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],
     })
     fixture = seed_site(project, "tenant-web", BENCH, {
         **common,

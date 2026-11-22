@@ -2514,5 +2514,131 @@
     "reason": "Executes the repository CLI with the current Python interpreter and test-owned arguments, without a shell.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/ansible_test_env.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Imports subprocess to inspect the operator-selected test interpreter.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/ansible_test_env.py",
+    "code": "completed_process = subprocess.run(",
+    "statementSha256": "e23e5ba153aa77684b82ca78a0596c0d791d9c34d34a9ec203bc8d5f6eac58f8",
+    "reason": "Uses the trusted test interpreter with a fixed Python expression and no shell to verify runtime versions.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/test_ansible_playbook_syntax.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Imports subprocess for the syntax-only Ansible regression test.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_ansible_playbook_syntax.py",
+    "code": "completed_process = subprocess.run(",
+    "statementSha256": "5b89eac4938c6852f5adcbd49510389d0c90d902196dc5b70e8b02018562f159",
+    "reason": "Runs syntax checks without a shell against two fixed playbook names and a localhost inventory.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/test_ansible_runner.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Imports subprocess to isolate the local Ansible harness.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_ansible_runner.py",
+    "code": "completed_process = subprocess.run(",
+    "statementSha256": "9418ce90faafa0ae02d4b3f77f59d5bd8de0448cdf11e4c2e9e9008aaf55dbdf",
+    "reason": "Runs the repository harness in isolated Python without a shell. The scenario and bridge mode come from test cases.",
+    "owner": "press-tr",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_development_contract.py",
+    "code": "shell=False,",
+    "statementSha256": "8584fc0a123180db8cac56f8312a9ee432d31f6d56e31021769c4a805d8f269e",
+    "reason": "The local contract test resolves Docker with shutil.which and renders the fixed Compose file using separate arguments and shell=False. Compose config starts no container and pulls no image. The test runner controls PATH.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import for local acceptance tests. Each subprocess call has a separate statement-scoped review.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "shell=False,",
+    "statementSha256": "1ec3ad575e54a73f054d9e1039d03ff59189f06e4734b66e43ffa05bc4f6efa6",
+    "reason": "The local probe uses the operator-selected Bench Python by absolute path with separate arguments and shell=False. Code comes from fixed test expressions or the pinned upstream source, not an application request.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "[git_executable, \"-C\", str(self.source), \"rev-parse\", \"HEAD\"], text=True, shell=False",
+    "statementSha256": "3ef78b586922de079b92dd6488429cf701670f72beedd398df4a5bad150d230f",
+    "reason": "The local test resolves Git with shutil.which and an absolute path, then reads the selected checkout revision with fixed arguments and shell=False. The test runner controls PATH.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "shell=False,",
+    "statementSha256": "25dbe862461cdbe8028dc570fc44ec6a2a571886cf5e25f3e50dea72725418cc",
+    "reason": "The local test resolves Git to an absolute executable, then checks the checkout diff with fixed arguments and shell=False. The test runner controls PATH and the checkout path.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "shell=False,",
+    "statementSha256": "66bcd35d4bb14b4683394cd03736b52546c830dff0a0d7f40ddbdfabdbce4372",
+    "reason": "The local test resolves Git to an absolute executable and lists untracked source files with fixed arguments and shell=False. The test runner controls PATH and the checkout path.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "shell=False,",
+    "statementSha256": "1d6a2ed0731f2d4a7b469d582f634d9b5380a761a360ec697a4c013c6eefe0d3",
+    "reason": "The local test resolves uv to an absolute executable and checks installed dependencies with fixed arguments and shell=False. It does not install packages. The test runner controls PATH.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/press/test_unpatched_runtime.py",
+    "code": "shell=False,",
+    "statementSha256": "8866f924fc3c581601dde6adc34f1774b9bbd93bdf2c056370d58b4fef9b410e",
+    "reason": "The local test invokes the selected Bench Ansible executable by absolute path, with a repository-owned local-only playbook and shell=False. No application request supplies arguments.",
+    "owner": "press-py314",
+    "ignoreUntil": "2027-02-22"
   }
 ]

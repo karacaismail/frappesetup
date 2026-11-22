@@ -264,7 +264,11 @@ required_apps = ["press"]
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
-before_request = ["press_tr.press_identity.request_policy.before_request"]
+before_request = [
+	"press_tr.ansible_bridge.activate",
+	"press_tr.press_identity.request_policy.before_request",
+]
+before_job = ["press_tr.ansible_bridge.activate"]
 
 auth_hooks = [
 	"press_tr.press_identity.service.authorize_identity_sync",

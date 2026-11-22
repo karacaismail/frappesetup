@@ -57,7 +57,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 
 | Kapsam | Eklediği `aud` | Kullanan |
 | --- | --- | --- |
-| `aud-site-tenant1` | `site-tenant1` | `identity-sync`, `press-service` |
+| `aud-site-tenant1` | `site-tenant1` | `identity-sync`, `press-service`, `mobile-app` |
 | `aud-press` | `press` | `identity-sync` |
 | `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri ve `press-service`. Örnek: `site-tenant1-service` |
 
@@ -71,6 +71,13 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - Sihirli bağlantı eklentisinin bağlantı üreten yönetim ucu kapalıdır. Bu uç, belirteçteki rolü değil hesabın kayıtlı rolünü denetliyordu. Kapalı olduğu canlı testle (404) gösterilir.
 
 ### Politikalar
+
+Keycloak giriş sayfası çerçeve içinde açılamaz. Yanıt `frame-ancestors 'none'` ve
+`X-Frame-Options: DENY` taşır. Keycloak yalnız kendi üç oturum denetimi belgesini çerçevede açar.
+
+Keycloak giriş sayfası kendi satır içi betiklerini kullanır. Giriş formu, kullanıcıyı
+doğrulanmış istemci adresine yönlendirir. O-40'ın kiracıya özgü betik ve form kuralları
+Frappe giriş ve panel sayfalarında uygulanır.
 
 Realm politikaları G-78 ve G-144'ü uygular. Örneğin şu ayarlar vardır:
 
@@ -109,6 +116,9 @@ Keycloak çıkışta `logout_token` gönderir. Doğrulamada şunları denetleyin
 - `nonce` alanının yokluğu.
 
 ### Telefon kimliği
+
+Telefon uygulaması giriş isteğinde `scope=openid aud-site-tenant1 mobile` gönderir.
+Keycloak, erişim belirtecine `aud=site-tenant1` ve `scope` alanına `mobile` ekler.
 
 Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_identity` değerini yazar. Değer şu alanları taşıyan bir sözlüktür:
 
@@ -332,11 +342,16 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
 4. Kapsam Frappe'nin `user_data_fields` kancasından türer. Ek olarak şunlar temizlenir ya da anonim yapılır:
    - kullanıcıya bağlı “Contact” ve adres kayıtları,
    - “Activity Log” kayıtlarındaki ad ve IP adresi,
-   - “Version” kayıtlarındaki eski kişisel değerler,
-   - profil fotoğrafı ve kullanıcının yüklediği kişisel dosyalar,
+   - kiracıda “User” ve kişiye ait “Contact” geçmişi ile kullanıcının yazdığı “Version” kayıtlarındaki ad ve e-posta,
+   - profil fotoğrafı ve kişiye ait “User” veya “Contact” kayıtlarına bağlı dosyalar,
    - “Communication” ve e-posta kuyruğundaki adresler,
    - iki adımlı doğrulama anahtarları, varsayılan değer satırları, sosyal giriş ve ek e-posta satırları,
    - Press'te takımın fatura adı ve telefonu, SSH anahtarları ve sertifikaları.
+
+   Kiracıda `clear_fields` içindeki zorunlu olmayan alan boşaltılır. Zorunlu alan bu listeye yazılamaz.
+   Bu seçenek yalnız `redact_fields` içinde bulunan alanlar için geçerlidir.
+   Kod, listeye yazılmış zorunlu alanda olağan anonim değeri kullanır.
+
 5. Frappe'nin tam adı bütün satırlarda arayan değiştirmesi kullanılmaz. Yalnız kullanıcıya bağlı alanlar değişir. Böylece aynı adı taşıyan başka bir kişinin verisi değişmez.
 6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
 7. Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
@@ -365,6 +380,7 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `keycloak_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
 | `keycloak_service_client_id` | `site-tenant1-service` ya da `press-service` | Servis belirteci için |
 | `keycloak_service_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
+| `mobile_allow_development_http` | Kapalı | Yalnız geliştirmede açılır. `developer_mode` da açık olmalıdır. Mobil iptal isteği yalnız yerel kimlik servisine HTTP ile gider. Keycloak belirteç adresi HTTPS kalır. |
 | `kimlik_marka_adi` | `Atonota` | Düğme metni bundan üretilir |
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 | `hrms_tr_retention_days` | Ayar verilmez | Hukuk sorumlusu süreyi gün olarak belirler. |
@@ -375,7 +391,8 @@ Aşağıdaki tablo, HRMS TR kayıtlarında kişisel verinin nasıl silindiğini 
 
 | Kişisel veri | Silme yolu |
 | --- | --- |
-| HRMS TR çalışan ve izin kayıtları | Hesap silme, `user_data_fields` kancasıyla kullanıcıya bağlı çalışan kaydını seçer. Ad, soyad, kişisel ve tercih edilen e-posta, cep telefonu ve doğum tarihi anonimleşir. Çalışan ve iş kayıtları kalır. `hrms_tr.retention.purge` süresi dolan izin kayıtlarını O-39 kapsamında siler. |
+| HRMS TR çalışan kartı | `user_data_fields` kancası kartı `user_id` ile bulur. Adlar, e-posta, telefon, acil durum kişisi, yakınlık, adresler ve biyografi anonimleşir. Pasaport numarası ve düzenlenme yeri anonimleşir. Banka adı, hesap numarası, IBAN, sağlık notu, sigorta numarası ve aile bilgisi anonimleşir. Doğum tarihi, pasaport tarihleri, devam cihazı kimliği, kan grubu ve medeni durum alanları boşalır. Fotoğraf alanı boşalır. Karta yüklenen fotoğraf dosyası şimdilik kalır. Çalışan kartının değişiklik geçmişi eski değerleri şimdilik tutar. Eğitim ve önceki iş alt tabloları kalır (O-41). |
+| HRMS TR iş kayıtları | Hesap silme kayıtları korur. İzin, devam ve bordrodaki çalışan adı kopyaları değişmez (O-41). `hrms_tr.retention.purge` yalnız süresi dolan taslak ve iptal edilmiş izinleri siler (O-39). |
 
 ## 9. Geliştirme ortamı
 
