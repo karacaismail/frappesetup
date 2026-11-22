@@ -288,7 +288,7 @@ test.describe('Employee idle session', () => {
     const email = fixtureEmail('E2E_EMPLOYEE_EMAIL', 'employee');
     const password = required('E2E_EMPLOYEE_PASSWORD');
     await signIn(page, email, password);
-    expect(await loggedUser(page.request)).toBe(email);
+    await expect.poll(() => loggedUser(page.request)).toBe(email);
     const started = Date.now();
     await new Promise((resolve) => setTimeout(resolve, 55 * 60 * 1000));
     expect(await keycloakStillSignedIn(page)).toBe(true);

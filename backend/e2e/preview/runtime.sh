@@ -332,7 +332,11 @@ E2E_TENANT_MODULE_DIR="$(docker_preview exec "$tenant" env/bin/python -c 'import
 docker_preview cp "$suite_dir/preview/preview_site_config.py" "$tenant:$E2E_TENANT_MODULE_DIR/preview_site_config.py"
 E2E_TENANT_MODULE_DIR="$E2E_TENANT_MODULE_DIR" python3 "$suite_dir/preview/fixtures.py" prepare
 docker_preview exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c "exec bench serve --port \"\$PTR_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
-docker_preview exec -d -e PYTHONPATH="$E2E_TENANT_MODULE_DIR" -e E2E_KEYCLOAK_SERVICE_CLIENT_SECRET "$tenant" bash -c "exec bench serve --port \"\$FS_TENANT_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
+tenant_web_options=(-e PYTHONPATH="$E2E_TENANT_MODULE_DIR" -e E2E_KEYCLOAK_SERVICE_CLIENT_SECRET)
+if [[ "${E2E_FULL_BROWSER_FIXTURES:-0}" == 1 ]]; then
+    tenant_web_options+=(-e REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt)
+fi
+docker_preview exec -d "${tenant_web_options[@]}" "$tenant" bash -c "exec bench serve --port \"\$FS_TENANT_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
 wait_http "$ATONOTA_SITE_TENANT1_URL/api/method/ping" tenant-web
 wait_http "$ATONOTA_PRESS_URL/api/method/ping" web
 if [[ "${E2E_BROWSER_RUNTIME:-host}" == container ]]; then

@@ -124,3 +124,10 @@ test('factory mode probes the factory Docker context before creating resources',
     rmSync(root, { recursive: true });
   }
 });
+
+
+test('the HTTPS-enabled tenant uses the preview trust store for Python requests', () => {
+  const script = readFileSync(runtime, 'utf8');
+  assert.match(script, /tenant_web_options\+=\(-e REQUESTS_CA_BUNDLE=\/etc\/ssl\/certs\/ca-certificates\.crt\)/);
+  assert.ok(script.includes('"${tenant_web_options[@]}" "$tenant" bash -c'));
+});
