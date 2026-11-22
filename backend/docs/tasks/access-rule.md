@@ -5,18 +5,18 @@ Bu iş `platform_core` içinde erişim kuralı motorunu kurar. Karar sitesinin K
 Önce şu dosyaları okuyun:
 
 1. `backend/AGENTS.md`
-2. `backend/PROJE-KAYDI.md`
-3. `backend/docs/sozlesmeler.md`
+2. `backend/PROJECT-RECORD.md`
+3. `backend/docs/contracts.md`
 4. Karar sitesinde `kararlar.md` (K8), `rail-2-gelistirme.md`, `rail-2-yapilandirma.md` ve `yol-haritasi.md`. G-60, G-61, G-62, G-104 ve G-121 maddelerini bulun.
 5. `docs/standartlar/frappe-python-standartlari.md`, özellikle G-2, G-3 ve G-12
 
 ## Sahip olduğunuz yerler
 
-- `backend/apps/platform_core/platform_core/erisim/`
+- `backend/apps/platform_core/platform_core/access/`
 - `backend/apps/platform_core/platform_core/api/access.py`
-- `backend/contracts/platform_core-erisim.openapi.yaml`
-- `backend/docs/kararlar/0006-erisim-kurali.md`
-- `modules.txt` dosyasında yalnız `Erisim` satırı
+- `backend/contracts/platform_core-access.openapi.yaml`
+- `backend/docs/decisions/0006-access-rule.md`
+- `modules.txt` dosyasında yalnız `Access` satırı
 - `hooks.py` içinde yalnız bu işin satırları
 
 ## Kontrol noktası 1: tasarım notu

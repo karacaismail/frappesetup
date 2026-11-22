@@ -5,17 +5,17 @@ Bu iş telefon uygulamasının sunucu tarafını kurar. Telefon uygulaması inte
 Önce şu dosyaları okuyun:
 
 1. `backend/AGENTS.md`
-2. `backend/PROJE-KAYDI.md`
-3. `backend/docs/sozlesmeler.md`
+2. `backend/PROJECT-RECORD.md`
+3. `backend/docs/contracts.md`
 4. `docs/standartlar/mobile.md`. Özellikle 7. bölüm (eşitleme) ve 13. bölüm (sunucu önlemleri) önemlidir. Ek B'deki Frappe davranışlarını da okuyun.
 
 ## Sahip olduğunuz yerler
 
-- `backend/apps/platform_core/platform_core/mobil/`
+- `backend/apps/platform_core/platform_core/mobile/`
 - `backend/apps/platform_core/platform_core/api/mobile.py`
-- `backend/contracts/platform_core-mobil.openapi.yaml`
-- `backend/docs/kararlar/0007-mobil-esitleme.md`
-- `modules.txt` dosyasında yalnız `Mobil` satırı
+- `backend/contracts/platform_core-mobile.openapi.yaml`
+- `backend/docs/decisions/0007-mobile-sync.md`
+- `modules.txt` dosyasında yalnız `Mobile` satırı
 - `hooks.py` içinde yalnız bu işin satırları
 
 ## Bağlı işler

@@ -5,8 +5,8 @@ Bu klasör platformun sunucu kodunu tutar. Deponun kökündeki `AGENTS.md` karar
 ## Okuma sırası
 
 1. Bu dosyayı okuyun.
-2. [Proje kaydını](PROJE-KAYDI.md) okuyun. Seviye MVP'dir.
-3. [Sözleşmeleri](docs/sozlesmeler.md) okuyun. Bileşenler bu adlarla konuşur.
+2. [Proje kaydını](PROJECT-RECORD.md) okuyun. Seviye MVP'dir.
+3. [Sözleşmeleri](docs/contracts.md) okuyun. Bileşenler bu adlarla konuşur.
 4. Kod standartlarını okuyun. Standartlar `docs/standartlar/` klasöründedir.
    - Python kodunda `frappe-python-standartlari.md` dosyasını uygulayın.
    - Öteki dosyalarda `frappe-python-disi-standartlari.md` dosyasını uygulayın.
@@ -29,23 +29,23 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `dev/compose.keycloak.yaml` | Keycloak ve onun veritabanı | kimlik-realm |
 | `dev/compose.press.yaml` | Press bench'i | press-tr |
 | `apps/platform_core/` iskeleti | `hooks.py`, `pyproject.toml`, `modules.txt` | dev-ortam |
-| `apps/platform_core/platform_core/kimlik/` | Giriş, çıkış, kimlik bağı, servis belirteci | platform-core-kimlik |
+| `apps/platform_core/platform_core/identity/` | Giriş, çıkış, kimlik bağı, servis belirteci | platform-core-kimlik |
 | `platform_core/api/__init__.py`, `api/auth.py`, `api/identity.py` | Kimlik uçları | platform-core-kimlik |
-| `apps/platform_core/platform_core/kabuk/` | Açılış verisi ve DocType tanımı | platform-core-kabuk |
+| `apps/platform_core/platform_core/shell/` | Açılış verisi ve DocType tanımı | platform-core-kabuk |
 | `platform_core/api/shell.py`, `api/meta.py`, `www/panel.*` | Kabuk uçları ve `/panel` sayfası | platform-core-kabuk |
-| `apps/platform_core/platform_core/yapay_zeka/` | Yapay zekâ erişim katmanı | platform-core-yz |
-| `apps/platform_core/platform_core/model_gecidi/`, `api/model.py` | Sağlayıcı kaydı ve model geçidi | platform-core-gecit |
+| `apps/platform_core/platform_core/ai/` | Yapay zekâ erişim katmanı | platform-core-yz |
+| `apps/platform_core/platform_core/model_gateway/`, `api/model.py` | Sağlayıcı kaydı ve model geçidi | platform-core-gecit |
 | `apps/press_tr/` | Press'in Türkiye uygulaması | press-tr |
 | `identity/keycloak/realm/` | Realm tanımı | kimlik-realm |
 | `identity/keycloak/themes/atonota/` | Atonota giriş teması | kimlik-tema |
 | `identity/identity_sync/` | Kullanıcı eşitleme servisi | identity-sync |
 | `libs/oidc_verify/` | Ortak belirteç doğrulama kitaplığı | kimlik-realm |
-| `apps/platform_core/platform_core/erisim/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
-| `dev/guvenlik/`, `dev/bin/guvenlik-denetimi` | Güvenlik kapısı | guvenlik-kapisi |
-| `apps/platform_core/platform_core/mobil/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
+| `apps/platform_core/platform_core/access/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
+| `dev/security/`, `dev/bin/security-check` | Güvenlik kapısı | guvenlik-kapisi |
+| `apps/platform_core/platform_core/mobile/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
 | `apps/cronhr/`, `dev/hrms/` | CronHR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
 | `contracts/` | Uçların OpenAPI sözleşmeleri | Her uç kendi sahibinde |
-| `docs/`, `AGENTS.md`, `PROJE-KAYDI.md` | Talimat, kayıt ve sözleşme | Orkestratör |
+| `docs/`, `AGENTS.md`, `PROJECT-RECORD.md` | Talimat, kayıt ve sözleşme | Orkestratör |
 
 `hooks.py` ortak bir dosyadır. Yalnız kendi işinizin satırlarını ekleyin. Var olan satırları değiştirmeyin.
 
@@ -77,6 +77,16 @@ Proje sahibi `cron` kurulumunu istemedi. Bu yüzden şunları kurmayın:
 - gece mutabakatı ya da saatlik yedek iş.
 
 Karar sitesi bazı yerlerde saatlik ya da gecelik iş anar. Bu işleri elle başlatılan komut olarak yazın.
+
+### Ad dili
+
+Kod tabanı İngilizcedir (D-12).
+
+- Yeni dosya, klasör, modül, DocType, işlev ve değişken adını İngilizce verin.
+- Koddaki yorumu, açıklama satırını, hata iletisini, günlük metnini ve commit mesajını İngilizce yazın.
+- Kullanıcıya görünen metni İngilizce yazın. Türkçesini çeviri dosyasına koyun.
+- Belgenin içeriği Türkçe olabilir. Belge dosyasının adı İngilizce olur.
+- Eski Türkçe adlar için proje kaydındaki ad eşleşme tablosunu kullanın.
 
 ### Yapay zekâ erişimi
 
@@ -129,7 +139,7 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
 
 - `--no-verify` kullanmayın. Yazar korumasını ve `core.hooksPath` ayarını değiştirmeyin.
 - Push yapmayın. Pull request açmayın. Dalları orkestratör birleştirir.
-- Commit mesajını yalın Türkçe yazın. Yapay zekâ imzası ve ortak yazar satırı eklemeyin.
+- Commit mesajını kısa ve açık İngilizceyle yazın (D-12). Yapay zekâ imzası ve ortak yazar satırı eklemeyin.
 
 ### Alt ajanlar
 
@@ -144,7 +154,7 @@ Proje sahibi çok sayıda paralel ajan istedi. Bu yüzden alt ajan kullanabilirs
 ### Yeni paket ve araç
 
 - Önce Frappe'nin ve kurulu paketlerin hazır yolunu arayın (A-1, T-1).
-- Yeni paket gerekiyorsa T-2 karar notu yazın. Not `docs/kararlar/` klasörüne girer.
+- Yeni paket gerekiyorsa T-2 karar notu yazın. Not `docs/decisions/` klasörüne girer.
 - Notta ihtiyacı, seçenekleri, lisansı, bakımı ve geri dönüşü yazın.
 - Paket açık kaynak lisanslıysa ve gerekçe yazılıysa ekleyebilirsiniz (D-10). AGPL lisanslı paketi `platform_core` içine almayın (O-12).
 
@@ -169,7 +179,7 @@ runpane report --state <ready|blocked|failed|done> --summary-file <durum dosyas�
 - Bütün kontrol noktaları bitince `done` raporlayın. Orkestratör size yeni iş verir.
 - Bir önkoşul henüz gelmediyse onu beklemeyin. O işe bağlı olmayan bölümü yapın. Örneğin testleri ve sözleşmeyi önce yazın.
 - Proje sahibi kararları ajana bıraktı (D-10). Proje sahibine soru sormayın.
-- Karar gerekiyorsa en güvenli ve en yalın seçeneği seçin. Kararı gerekçesiyle durum dosyasına ve gerekiyorsa `docs/kararlar/` notuna yazın. Sonra işe devam edin.
+- Karar gerekiyorsa en güvenli ve en yalın seçeneği seçin. Kararı gerekçesiyle durum dosyasına ve gerekiyorsa `docs/decisions/` notuna yazın. Sonra işe devam edin.
 - Orkestratör kararı birleştirmede inceler. Gerekirse değiştirir.
 - Yalnız şu durumda `blocked` raporlayın: iş ilerleyemiyor ve seçim geri alınamaz bir sonuç doğuruyor. Örneğin veri silme ya da dış servise yazma böyledir. Soruyu ve seçenekleri şöyle verin:
 
