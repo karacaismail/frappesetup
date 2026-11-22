@@ -29,32 +29,64 @@ env_value() {
   sed -n "s/^$1=//p" "$env_file" | head -n 1
 }
 
-# Adds a variable to an existing .env file when an older file does not have it yet.
-ensure_env() {
-  if ! grep -q "^$1=" "$env_file"; then
-    echo "$1=$2" >> "$env_file"
+# Creates one random value. Stops the script when the generator fails or prints nothing usable.
+# The value goes into the named variable. It is never printed.
+random_value() {
+  local __target="$1" __value
+  if ! __value="$(openssl rand -hex 16)" || [[ ! "$__value" =~ ^[0-9a-f]{32}$ ]]; then
+    echo "Could not create a random test value. The settings file was not changed." >&2
+    exit 1
+  fi
+  printf -v "$__target" '%s' "$__value"
+}
+
+# Replaces the .env file in one step. The new content is complete before the old file is touched.
+replace_env() {
+  local tmp
+  umask 077
+  tmp="$(mktemp "$here/.env.XXXXXX")"
+  if ! printf '%s\n' "$1" > "$tmp" || ! mv -f "$tmp" "$env_file"; then
+    rm -f "$tmp"
+    echo "Could not write the settings file." >&2
+    exit 1
   fi
 }
 
+# Writes the .env file. Every start of the environment gets new secrets for the made-up test users.
+# All random values are created and checked first. The file changes only when every value exists.
 write_env() {
+  local test_password test_totp_secret admin_password content
+  random_value test_password
+  random_value test_totp_secret
   if [[ -f "$env_file" ]]; then
-    ensure_env IDENTITY_BRAND_NAME "Sample Brand"
-    ensure_env IDENTITY_ACCOUNT_DELETION_URL "http://press.localhost:$(( $(env_value KC_PORT) + 3 ))/account/delete"
-    return
+    content="$(grep -v -E '^IDENTITY_TEST_(PASSWORD|TOTP_SECRET)=' "$env_file" || true)"
+    if ! grep -q '^IDENTITY_BRAND_NAME=' <<< "$content"; then
+      content+=$'\n'"IDENTITY_BRAND_NAME=Sample Brand"
+    fi
+    if ! grep -q '^IDENTITY_ACCOUNT_DELETION_URL=' <<< "$content"; then
+      content+=$'\n'"IDENTITY_ACCOUNT_DELETION_URL=http://press.localhost:$(( $(env_value KC_PORT) + 3 ))/account/delete"
+    fi
+  else
+    local base="${PANE_PORT:-3950}"
+    random_value admin_password
+    content="KC_PORT=$base
+KC_PUBLIC_URL=http://localhost:$base
+MAILPIT_UI_PORT=$((base + 1))
+KC_BOOTSTRAP_ADMIN_USERNAME=tema-admin
+KC_BOOTSTRAP_ADMIN_PASSWORD=$admin_password
+IDENTITY_BRAND_NAME=Sample Brand
+IDENTITY_ACCOUNT_DELETION_URL=http://press.localhost:$((base + 3))/account/delete"
   fi
-  local base="${PANE_PORT:-3950}"
-  umask 077
-  {
-    echo "KC_PORT=$base"
-    echo "KC_PUBLIC_URL=http://localhost:$base"
-    echo "MAILPIT_UI_PORT=$((base + 1))"
-    echo "KC_BOOTSTRAP_ADMIN_USERNAME=tema-admin"
-    echo "KC_BOOTSTRAP_ADMIN_PASSWORD=$(openssl rand -hex 16)"
-    # The brand name shown by the themes. The test value differs from the theme name on purpose.
-    echo "IDENTITY_BRAND_NAME=Sample Brand"
-    # The deletion page belongs to Press. In this environment the address is only a link target.
-    echo "IDENTITY_ACCOUNT_DELETION_URL=http://press.localhost:$((base + 3))/account/delete"
-  } > "$env_file"
+  content+=$'\n'"IDENTITY_TEST_PASSWORD=$test_password"
+  content+=$'\n'"IDENTITY_TEST_TOTP_SECRET=$test_totp_secret"
+  replace_env "$content"
+}
+
+# Makes sure the .env file exists without changing the secrets of a running environment.
+ensure_env_file() {
+  if [[ ! -f "$env_file" ]]; then
+    write_env
+  fi
 }
 
 compose() { docker compose --env-file "$env_file" -f "$here/compose.yaml" "$@"; }
@@ -110,20 +142,21 @@ tunnel_close() {
 
 case "${1:-}" in
   env)
-    write_env
+    ensure_env_file
     echo "$env_file"
     ;;
   up)
+    # A start writes new secrets for the made-up test users.
     write_env
     # The image is reused when it exists. Building needs disk space, so it is a separate, explicit command.
     compose up -d --no-build --wait
     ;;
   build)
-    write_env
+    ensure_env_file
     compose build
     ;;
   sync)
-    write_env
+    ensure_env_file
     cid="$(compose ps -q keycloak)"
     # İkinci değer yalnız bir bölümü kopyalar: sync login ya da sync email.
     case "${2:-}" in
@@ -141,14 +174,14 @@ case "${1:-}" in
     done
     ;;
   tunnel)
-    write_env
+    ensure_env_file
     tunnel_open
     ;;
   tunnel-close)
     tunnel_close
     ;;
   down)
-    write_env
+    ensure_env_file
     tunnel_close
     compose down
     ;;

@@ -6,7 +6,7 @@ CI sistemi değişiklikleri birleştirmeden önce denetimleri çalıştırır.
 | İş | Çalışma klasörü | Komut |
 | --- | --- | --- |
 | Güvenlik araçlarının birim testleri | Depo kökü | `uv run --no-project --offline --python 3.12 python -B -m unittest discover -s backend/dev/security -v` |
-| Kaynak, Git geçmişi ve bağımlılık taraması | Depo kökü | `FS_COLIMA_PROFILE=ci backend/dev/bin/security-full --ci` |
+| Kaynak, Git geçmişi, bağımlılık ve sözleşme taraması | Depo kökü | `FS_COLIMA_PROFILE=ci backend/dev/bin/security-full --ci --api-target "http://kiraci1.localhost:$((PANE_PORT + 1))"` |
 | Yerel yanıtın güvenlik başlığı ve pasif ZAP taraması | Depo kökü | `FS_COLIMA_PROFILE=ci backend/dev/bin/dast-scan --ci "http://kiraci1.localhost:$((PANE_PORT + 1))"` |
 | Son taramaların raporu | Depo kökü | `backend/dev/bin/release-report` |
 
@@ -46,6 +46,7 @@ Python kaynak listeleri değişince `backend/dev/security/compile-lock` çalış
 Oluşan `backend/dev/security/requirements.txt` dosyasını commit edin.
 Kilit, Git kayıtlı backend projelerinin zorunlu Python paketlerini kapsar.
 CI kipi kilidi bellekte yeniden üretir. Dosyadaki içerik farklıysa tarama durur.
+OSV, Git üzerinden alınan Python paketlerini denetlemez. Rapor bu paketleri `not_run` olarak gösterir.
 Bir Frappe imajının kurulu paketlerini ayrı listelemek için `--runtime-image IMAGE_ID` kullanın.
 `docker image inspect` çıktısındaki yerel imaj kimliğini verin.
 
@@ -54,10 +55,35 @@ Bir Frappe imajının kurulu paketlerini ayrı listelemek için `--runtime-image
 Kendi sitenizi hazırlayın. Sitenin web portu `PANE_PORT + 1` olur.
 Gerekirse `FS_COLIMA_PROFILE=default backend/dev/bin/tunel ac` komutuyla tüneli açın.
 Site kurulumu için gereken sırlar `MARIADB_ROOT_PASSWORD` ve `ADMIN_PASSWORD` değerleridir.
+Sözleşme denetimi için gereken sır `FS_API_TEST_PASSWORD` değeridir.
+
+### Sözleşme denetiminin ayarları
+
+Sözleşme denetimi Schemathesis aracıyla yapılır. Araç, `backend/contracts/` dosyalarını çalışan siteye karşı dener.
+
+1. Hedefi `--api-target` seçeneğiyle verin.
+2. Hedef yalnız CI işinin içinde açılan yerel geçici site olur.
+3. Adres `http://kiraci1.localhost:<port>` biçiminde olur. Port, sitenin web portudur.
+4. Komut `127.0.0.1` ve `*.localhost` dışındaki adresleri reddeder.
+5. Seçenek verilmezse komut önce `FS_API_TARGET` değişkenini okur. Bu değişken yoksa `PANE_PORT + 1` portunu kullanır.
+
+Oturum gereken uçlar için bir test hesabı verin:
+
+1. Geçici sitede uydurma bir test hesabı açın. Örneğin `contract.tester@example.com` adını kullanın.
+2. Hesabın adını `FS_API_TEST_USER` değişkenine yazın.
+3. Hesabın parolasını `FS_API_TEST_PASSWORD` değişkenine verin. Bu değer CI gizli değişkeninden gelir.
+4. Parolayı CI dosyasına ve komut satırına yazmayın.
+
+Komut "Administrator" ve "Guest" hesaplarını reddeder. Gerçek kişi hesabı kullanmayın. İki değişken de boşsa denetim oturumsuz çalışır.
+
+Komut, oturum kimliğini araca ortam değişkeniyle verir. Test hesabının adı ve parolası araca aktarılmaz.
+
+Yazan istekler varsayılan olarak gönderilmez. `--allow-writes` seçeneği bu istekleri açar. CI işinde bu seçeneği kullanmayın.
 
 Başarısız tarama birleştirmeyi durdurur.
 CI kipinde zorunlu adım çalışmazsa komut 1 ile çıkar.
 ZAP, yerel siteden alınan ilk yanıtı pasif olarak inceler. Yanıt yeniden gönderilmez.
+Komut her uyarı için kimliği, risk düzeyini ve yerel adresi gösterir.
 Yerel hedef yoksa sözleşme adımı `not_run` döner.
 Sözleşme denetimi varsayılan olarak GET işlemlerini kapsar.
 Özet, sınanan işlem sayısını gösterir. Erişim izni ayrı rol testiyle doğrulanır.
