@@ -1,0 +1,11 @@
+# The build context is the backend folder. Only two folders are needed.
+*
+!libs/oidc_verify
+!identity/identity_sync
+**/.env
+**/*.sqlite3
+**/*.sqlite3.lock
+**/tests
+**/__pycache__
+**/*.egg-info
+**/.git

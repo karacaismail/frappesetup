@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""List local fs- development resources without changing Docker state."""
+
+import http.client
+import json
+import os
+import re
+import shutil
+import socket
+import subprocess
+from collections import defaultdict
+
+CONTEXTS = ("colima-factory", "colima")
+PROJECT_LABEL = "com.docker.compose.project"
+DF_ROUTE = "/v1.47/system/df?type=container&type=volume&type=image"
+ACTIVE_STATES = {"running", "paused", "restarting"}
+UNKNOWN = "Unknown"
+IN_USE = "In use"
+
+
+class UnixConnection(http.client.HTTPConnection):
+    """Connect to the local Engine socket selected by the named Docker context."""
+
+    def __init__(self, path):
+        super().__init__("localhost", timeout=30)
+        self.path = path
+
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.settimeout(self.timeout)
+        self.sock.connect(self.path)
+
+
+def context_socket(docker, context):
+    result = subprocess.run(
+        [docker, "context", "inspect", "--format", '{{ (index .Endpoints "docker").Host }}', context],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    scheme, _, path = result.stdout.strip().partition("://")
+    if scheme != "unix" or not os.path.isabs(path):
+        raise ValueError("Expected a local Docker Engine socket.")
+    return path
+
+
+def read_engine(socket_path, route):
+    connection = UnixConnection(socket_path)
+    try:
+        connection.request("GET", route)
+        response = connection.getresponse()
+        if response.status != 200:
+            raise OSError("Docker Engine request failed.")
+        data = json.load(response)
+        if not isinstance(data, dict):
+            raise ValueError("Expected Docker Engine JSON object.")
+        return data
+    finally:
+        connection.close()
+
+
+def project_label(record):
+    return (record.get("Labels") or {}).get(PROJECT_LABEL, "")
+
+
+def fs_name(name):
+    return isinstance(name, str) and name.startswith("fs-")
+
+
+def in_scope(name, project):
+    return fs_name(name) and (not project or fs_name(project))
+
+
+def size_text(size):
+    return f"{size} bytes" if type(size) is int and size >= 0 else UNKNOWN
+
+
+def container_usage(socket_path, container):
+    if container.get("State") in ACTIVE_STATES:
+        return IN_USE
+    identity = container.get("Id", "")
+    if not isinstance(identity, str) or not re.fullmatch(r"[a-f0-9]+", identity):
+        return UNKNOWN
+    try:
+        data = read_engine(socket_path, f"/v1.47/containers/{identity}/json")
+    except (OSError, ValueError, http.client.HTTPException):
+        return UNKNOWN
+    timestamp = (data.get("State") or {}).get("FinishedAt", "")
+    if isinstance(timestamp, str) and re.fullmatch(
+        r"[1-9]\d{3}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z", timestamp
+    ):
+        return timestamp
+    return UNKNOWN
+
+
+def latest_usage(references):
+    times = {used for _, used in references}
+    if IN_USE in times:
+        return IN_USE
+    return max(times - {UNKNOWN}, key=lambda time: time.removesuffix("Z"), default=UNKNOWN)
+
+
+def resource_project(label, references):
+    projects = {project for project, _ in references if project}
+    if label:
+        return label
+    if len(projects) == 1:
+        return projects.pop()
+    return UNKNOWN
+
+
+def inventory(socket_path):
+    data = read_engine(socket_path, DF_ROUTE)
+    containers = data["Containers"] or []
+    volumes = data["Volumes"] or []
+    images = data["Images"] or []
+    names = {volume["Name"] for volume in volumes if in_scope(volume["Name"], project_label(volume))}
+    image_ids = {
+        image["Id"]
+        for image in images
+        if any(in_scope(tag, project_label(image)) for tag in image.get("RepoTags") or [])
+    }
+    running_projects = set()
+    volume_uses = defaultdict(list)
+    image_uses = defaultdict(list)
+    rows = set()
+
+    for container in containers:
+        project = project_label(container)
+        if project and not fs_name(project):
+            continue
+        listed = {
+            name
+            for raw in container.get("Names") or []
+            if "/" not in (name := raw.removeprefix("/")) and fs_name(name)
+        }
+        if not project and not listed:
+            continue
+        if project and container.get("State") in ACTIVE_STATES:
+            running_projects.add(project)
+        mounted = {
+            mount.get("Name")
+            for mount in container.get("Mounts") or []
+            if mount.get("Type") == "volume" and mount.get("Name") in names
+        }
+        image_id = container.get("ImageID")
+        if not listed and not mounted and image_id not in image_ids:
+            continue
+        used = container_usage(socket_path, container)
+        for name in listed:
+            rows.add(("Container", name, size_text(container.get("SizeRw")), project or UNKNOWN, used, ""))
+        for name in mounted:
+            volume_uses[name].append((project, used))
+        if image_id in image_ids:
+            image_uses[image_id].append((project, used))
+
+    for volume in volumes:
+        name = volume["Name"]
+        if name not in names:
+            continue
+        references = volume_uses[name]
+        project = resource_project(project_label(volume), references)
+        status = "Orphaned" if fs_name(project) and project not in running_projects else ""
+        size = (volume.get("UsageData") or {}).get("Size")
+        rows.add(("Volume", name, size_text(size), project, latest_usage(references), status))
+
+    for image in images:
+        references = image_uses[image["Id"]]
+        label = project_label(image)
+        project = resource_project(label, references)
+        for tag in image.get("RepoTags") or []:
+            if in_scope(tag, label):
+                rows.add(("Image", tag, size_text(image.get("Size")), project, latest_usage(references), ""))
+    return sorted(rows)
+
+
+def main():
+    docker = shutil.which("docker")
+    print("| Context | Type | Name | Size | Compose project | Last used (UTC) | Status |")
+    print("| --- | --- | --- | --- | --- | --- | --- |")
+    unavailable = []
+    for context in CONTEXTS:
+        try:
+            if docker is None or not os.path.isabs(docker):
+                raise OSError("Docker executable unavailable.")
+            rows = inventory(context_socket(docker, context))
+        except (
+            OSError,
+            subprocess.SubprocessError,
+            http.client.HTTPException,
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
+            unavailable.append(context)
+            continue
+        for row in rows:
+            cells = [
+                value.replace("|", r"\|").replace("\n", " ").replace("\r", " ") for value in (context, *row)
+            ]
+            print("| " + " | ".join(cells) + " |")
+    for context in unavailable:
+        print(f"\n{context}: not_run")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

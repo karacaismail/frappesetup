@@ -1,0 +1,656 @@
+{
+  "Field": {
+    "type": "object",
+    "description": "Effective DocField properties from get_meta, including Custom Field and Property Setter. Only readable permission levels remain.",
+    "required": [
+      "fieldname",
+      "fieldtype",
+      "read_only",
+      "component",
+      "sensitivity"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "fieldname": {
+        "type": "string",
+        "description": "Field name."
+      },
+      "fieldtype": {
+        "type": "string",
+        "description": "Native Frappe field type."
+      },
+      "read_only": {
+        "type": "boolean",
+        "description": "True when the field is intrinsically read-only or the current user cannot write it."
+      },
+      "label": {
+        "description": "Display label.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "description": {
+        "description": "Field help text.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "options": {
+        "description": "Native field options. Dynamic Link options are omitted when their target-type field is unreadable. Unapproved fields do not carry options or defaults.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "default": {
+        "description": "Configured default. Password defaults are omitted.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "reqd": {
+        "description": "Whether the field is required.",
+        "type": "boolean"
+      },
+      "hidden": {
+        "description": "Native hidden UI setting, independent from authorization.",
+        "type": "boolean"
+      },
+      "permlevel": {
+        "description": "Permission level.",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "depends_on": {
+        "$ref": "#/components/schemas/FieldCondition"
+      },
+      "mandatory_depends_on": {
+        "$ref": "#/components/schemas/FieldCondition"
+      },
+      "read_only_depends_on": {
+        "$ref": "#/components/schemas/FieldCondition"
+      },
+      "fetch_from": {
+        "description": "Native source field path. Omitted when the local source link field is unreadable.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "fetch_if_empty": {
+        "description": "Fetch only when empty.",
+        "type": "boolean"
+      },
+      "set_only_once": {
+        "description": "Native one-time assignment setting.",
+        "type": "boolean"
+      },
+      "unique": {
+        "description": "Native uniqueness setting.",
+        "type": "boolean"
+      },
+      "in_list_view": {
+        "description": "List display hint.",
+        "type": "boolean"
+      },
+      "in_standard_filter": {
+        "description": "Standard filter hint.",
+        "type": "boolean"
+      },
+      "precision": {
+        "description": "Configured numeric precision.",
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "length": {
+        "description": "Configured length.",
+        "type": [
+          "integer",
+          "null"
+        ]
+      },
+      "non_negative": {
+        "description": "Reject negative values.",
+        "type": "boolean"
+      },
+      "collapsible": {
+        "description": "Layout collapse setting.",
+        "type": "boolean"
+      },
+      "collapsible_depends_on": {
+        "$ref": "#/components/schemas/FieldCondition"
+      },
+      "unsupported_conditions": {
+        "type": "array",
+        "uniqueItems": true,
+        "description": "Condition properties omitted because they are unsupported or refer to unreadable fields. Source expressions are never returned. If read_only_depends_on is unsupported, read_only is true and clients must not enable editing. For other unsupported conditions, keep the ordinary field state and rely on server validation.",
+        "items": {
+          "type": "string",
+          "enum": [
+            "depends_on",
+            "mandatory_depends_on",
+            "read_only_depends_on",
+            "collapsible_depends_on"
+          ]
+        }
+      },
+      "component": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Approved renderer key, or null for an unsupported field type."
+      },
+      "sensitivity": {
+        "$ref": "#/components/schemas/Sensitivity"
+      },
+      "choices": {
+        "type": "array",
+        "description": "Select options with original values and translated labels.",
+        "items": {
+          "$ref": "#/components/schemas/SelectChoice"
+        }
+      }
+    }
+  },
+  "SidebarData": {
+    "type": "object",
+    "description": "Navigation returned by the native Frappe Sidebar resolver.",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Sidebar identity."
+      },
+      "module": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Module that owns the sidebar."
+      },
+      "label": {
+        "type": "string",
+        "description": "Displayed sidebar label."
+      },
+      "app": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Installed application that owns the sidebar."
+      },
+      "header_icon": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Icon displayed beside the sidebar label."
+      },
+      "module_onboarding": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Onboarding reference when the user can open it."
+      },
+      "customized": {
+        "type": [
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "description": "Whether a site or user customization was applied."
+      },
+      "computed": {
+        "type": [
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "description": "Whether Frappe derived the items from module contents."
+      },
+      "workspaces": {
+        "type": "array",
+        "description": "Workspace names the user can open.",
+        "items": {
+          "type": "string"
+        }
+      },
+      "items": {
+        "type": "array",
+        "description": "Navigation rows in display order.",
+        "items": {
+          "$ref": "#/components/schemas/SidebarItem"
+        }
+      }
+    },
+    "additionalProperties": false
+  },
+  "SidebarItem": {
+    "type": "object",
+    "description": "A permitted navigation row or a visual divider.",
+    "properties": {
+      "key": {
+        "type": "string",
+        "description": "Stable sidebar row identity."
+      },
+      "label": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Translated text displayed for this row."
+      },
+      "link_to": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Name of the linked target."
+      },
+      "link_type": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Target kind such as Workspace, DocType, Report or URL."
+      },
+      "type": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Row kind such as Link, Section Break or Spacer."
+      },
+      "icon": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Icon displayed for this row."
+      },
+      "child": {
+        "type": [
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "description": "Whether this row belongs to a section."
+      },
+      "collapsible": {
+        "type": [
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "description": "Whether the section can be collapsed."
+      },
+      "indent": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "description": "Nesting depth for this row."
+      },
+      "keep_closed": {
+        "type": [
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "description": "Whether the section starts collapsed."
+      },
+      "url": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Same-origin path or URL whose hostname is in the site allowlist. HTTP is allowed only in developer mode. Unsafe values are removed from all row kinds."
+      },
+      "show_arrow": {
+        "type": [
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "description": "Whether the row displays a navigation arrow."
+      },
+      "filters": {
+        "type": [
+          "string",
+          "array",
+          "object",
+          "null"
+        ],
+        "description": "Native filters for the destination."
+      },
+      "route_options": {
+        "type": [
+          "string",
+          "array",
+          "object",
+          "null"
+        ],
+        "description": "Native options for the destination route."
+      },
+      "tab": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Tab to open at the destination."
+      },
+      "open_in_new_tab": {
+        "type": [
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "description": "Whether the destination should open in a new tab."
+      },
+      "is_default_module": {
+        "type": [
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "description": "Whether this row points to the default module."
+      },
+      "hidden": {
+        "type": [
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "description": "Native visibility setting if present."
+      },
+      "derived": {
+        "type": [
+          "integer",
+          "boolean",
+          "null"
+        ],
+        "description": "Whether Frappe added this row from a Workspace record."
+      },
+      "report": {
+        "type": "object",
+        "description": "Route details for an enabled report.",
+        "properties": {
+          "report_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Frappe report kind."
+          },
+          "ref_doctype": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "DocType the report reads."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "additionalProperties": false
+  },
+  "FieldCondition": {
+    "type": "object",
+    "description": "Declarative rule for an approved renderer. Never contains executable source.",
+    "required": [
+      "scope",
+      "field",
+      "op"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "scope": {
+        "type": "string",
+        "enum": [
+          "doc",
+          "parent"
+        ],
+        "description": "Document that owns the field."
+      },
+      "field": {
+        "type": "string",
+        "description": "Readable field name."
+      },
+      "op": {
+        "type": "string",
+        "enum": [
+          "truthy",
+          "falsy",
+          "eq",
+          "ne",
+          "gt",
+          "gte",
+          "lt",
+          "lte"
+        ],
+        "description": "Approved operator. Equality and inequality use strict scalar comparison."
+      },
+      "value": {
+        "type": [
+          "string",
+          "number",
+          "boolean",
+          "null"
+        ],
+        "description": "Scalar comparison value. Omitted for truth tests."
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "op": {
+              "enum": [
+                "truthy",
+                "falsy"
+              ]
+            }
+          },
+          "required": [
+            "op"
+          ]
+        },
+        "then": {
+          "not": {
+            "required": [
+              "value"
+            ]
+          }
+        },
+        "else": {
+          "required": [
+            "value"
+          ]
+        }
+      }
+    ]
+  },
+  "SelectChoice": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "value",
+      "label"
+    ],
+    "properties": {
+      "value": {
+        "type": "string",
+        "description": "Unchanged stored value."
+      },
+      "label": {
+        "type": "string",
+        "description": "Translated option label."
+      }
+    }
+  },
+  "Sensitivity": {
+    "type": "string",
+    "enum": [
+      "standard",
+      "restricted"
+    ],
+    "description": "High privacy marker. Restricted fields are omitted for users without desktop access and for all mobile responses."
+  },
+  "DocType": {
+    "type": "object",
+    "description": "Effective schema projection. Raw permission rows, scripts, actions and audit metadata are excluded.",
+    "required": [
+      "name",
+      "module",
+      "fields",
+      "title_field",
+      "search_fields",
+      "sort_field",
+      "sensitivity"
+    ],
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "DocType name."
+      },
+      "module": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Owning module."
+      },
+      "fields": {
+        "type": "array",
+        "description": "Readable fields and layout entries in source order.",
+        "items": {
+          "$ref": "#/components/schemas/Field"
+        }
+      },
+      "title_field": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Readable title field, otherwise null."
+      },
+      "search_fields": {
+        "type": "string",
+        "description": "Comma-separated readable search fields."
+      },
+      "sort_field": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "description": "Readable sort field, otherwise null."
+      },
+      "sensitivity": {
+        "$ref": "#/components/schemas/Sensitivity"
+      }
+    },
+    "additionalProperties": false
+  },
+  "Meta": {
+    "type": "object",
+    "description": "Effective metadata. Keep permission tokens in memory. A verified mobile response may permit offline storage of its non-sensitive definitions.",
+    "if": {
+      "required": [
+        "truncated"
+      ]
+    },
+    "then": {
+      "properties": {
+        "child_tables": {
+          "maxProperties": 0
+        },
+        "mobile_cache_allowed": {
+          "const": false
+        },
+        "schema": {
+          "properties": {
+            "fields": {
+              "maxItems": 0
+            },
+            "title_field": {
+              "const": null
+            },
+            "search_fields": {
+              "const": ""
+            },
+            "sort_field": {
+              "const": null
+            }
+          }
+        }
+      }
+    },
+    "required": [
+      "schema",
+      "meta_hash",
+      "perm_version",
+      "child_tables",
+      "catalog_version",
+      "mobile_cache_allowed"
+    ],
+    "properties": {
+      "schema": {
+        "$ref": "#/components/schemas/DocType"
+      },
+      "meta_hash": {
+        "type": "string",
+        "description": "SHA-256 of the permission-filtered parent and child schemas in this response."
+      },
+      "perm_version": {
+        "type": "string",
+        "description": "Permission generation scoped to the current user roles."
+      },
+      "child_tables": {
+        "type": "object",
+        "description": "Child DocType schemas keyed by name. Only readable parent table fields contribute entries. Child fields inherit parent permission levels.",
+        "additionalProperties": {
+          "$ref": "#/components/schemas/DocType"
+        }
+      },
+      "catalog_version": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Version of the approved component catalog."
+      },
+      "mobile_cache_allowed": {
+        "type": "boolean",
+        "description": "Only a verified mobile response can be true. The approved non-sensitive schema and child definitions may be stored in authorized mobile offline storage. Never persist permission tokens or restricted definitions. Purge on scope change, logout or revocation."
+      },
+      "truncated": {
+        "type": "boolean",
+        "const": true,
+        "description": "Present only when the full response exceeds the byte budget. The summary retains DocType identity and version tokens, omits field and child definitions, clears field references and disables mobile caching."
+      }
+    },
+    "additionalProperties": false
+  },
+  "Error": {
+    "type": "object",
+    "description": "Native Frappe error envelope. Developer mode may add diagnostics.",
+    "properties": {
+      "exc_type": {
+        "type": "string",
+        "description": "Frappe exception type."
+      },
+      "_server_messages": {
+        "type": "string",
+        "description": "Native serialized error messages."
+      }
+    },
+    "additionalProperties": true
+  }
+}

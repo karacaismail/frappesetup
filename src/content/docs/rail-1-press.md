@@ -99,21 +99,21 @@ Entegratör seçimi ve yükümlülük takvimi P2 başında ürün sahibi ve mali
 
 | Bileşen | Press doctype / ayar | Sahip |
 | --- | --- | --- |
-| Press host (Frappe v15, Python 3.11, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); `panel.` Press'in kendi alan adı, `allow_cors` yok (G-119) | Hüseyin Cengiz |
-| n1 proxy (nginx, proxysql, wireguard, ssh\_proxy) | Proxy Server | Hüseyin Cengiz |
-| f1 app + build (x86\_64) | Server use\_for\_new\_sites=1, use\_for\_build=1 | Hüseyin Cengiz |
-| m1 veritabanı | Database Server (binlog, audit log, replika — G-55) | Hüseyin Cengiz |
-| r1 registry | Registry Server + Press Settings docker\_registry\_\* | Hüseyin Cengiz |
-| İzleme / log | Monitor Server (Prometheus/Grafana/Alertmanager), Log Server (ES/Kibana), Incident Settings, Telegram + e-posta | Hüseyin Cengiz |
-| Yedek | Backup Bucket endpoint `https://fsn1.your-objectstorage.com`, GFS rotasyonu, fsn1→nbg1 `rclone sync --immutable`, Agent endpoint\_url yaması (upstream PR), RPO ≤ 24 s, aylık Backup Restoration Test | Hüseyin Cengiz |
-| Cluster | 'hetzner-fsn1' cloud\_provider='Generic' (bare metal); Hetzner Cloud VM'ler 'Hetzner' | Hüseyin Cengiz |
-| DNS / TLS | Route 53 hosted zone + sınırlı IAM; Root Domain dns\_provider='AWS Route 53'; wildcard certbot `--dns-route53` | Hüseyin Cengiz (Route 53/IAM, sonuç doğrulama) |
-| NS delegasyonu | `app.<marka>.com.tr` NS kayıtları GoDaddy'de Route 53'e; kiracılar `<kiracı>.app.<marka>.com.tr`, sabit host'lar GoDaddy'de (K-2) | Asistan Hüseyin (uygular), Hüseyin Cengiz (değer, doğrulama) |
-| Operasyon sitesi (Rail 6) | Kendi Team'inde Release Group 'ops'; `ops.<marka>.com.tr`; P2 finans çekirdeği, P6 CRM/Helpdesk (SA-17) | Hüseyin Cengiz; DNS Asistan Hüseyin |
-| Operatör modu ve `ops-bff` (Rail 6) | `operator.<marka>.com.tr`: aynı SPA'nın operatör modu ve BFF'i, ters vekil arkasında; yalnız Tailscale/özel ağ, `press.` ile aynı sınır, Press Desk'ten ayrı origin (G-119, K-16) | Hüseyin Cengiz (kayıt değeri, erişim sınırı, TLS); DNS kaydını Asistan Hüseyin GoDaddy'de uygular |
-| Hocuspocus (Rail 6 destek oturumu) | Ayrı Node servisi + Redis, reverse proxy TLS (SA-29) | Hüseyin Cengiz |
-| Sürüm takibi | v0.155.x+ staging Press'te `bench migrate` + press\_tr testleri + aktivasyon E2E, sonra prod bakım penceresi | Hüseyin Cengiz |
-| Trace / Analytics (SHOULD) | Trace Server (GlitchTip), Analytics Server (Plausible; birinci taraf ürün analitiği adayı, rıza kapısı ve yüzey kuralları G-134) | Hüseyin Cengiz |
-| Güvenlik danışmanlığı | Danışmanlık izleme ve karar kaydı; acil yama rutin takvimi beklemez (G-142, K-26) | Hüseyin Cengiz |
+| Press host (Frappe v15, Python 3.11, MariaDB, Redis, certbot, docker CLI) | Press Settings (G-4); `panel.` Press'in kendi alan adı, `allow_cors` yok (G-119) | DevOps sorumlusu |
+| n1 proxy (nginx, proxysql, wireguard, ssh\_proxy) | Proxy Server | DevOps sorumlusu |
+| f1 app + build (x86\_64) | Server use\_for\_new\_sites=1, use\_for\_build=1 | DevOps sorumlusu |
+| m1 veritabanı | Database Server (binlog, audit log, replika — G-55) | DevOps sorumlusu |
+| r1 registry | Registry Server + Press Settings docker\_registry\_\* | DevOps sorumlusu |
+| İzleme / log | Monitor Server (Prometheus/Grafana/Alertmanager), Log Server (ES/Kibana), Incident Settings, Telegram + e-posta | DevOps sorumlusu |
+| Yedek | Backup Bucket endpoint `https://fsn1.your-objectstorage.com`, GFS rotasyonu, fsn1→nbg1 `rclone sync --immutable`, Agent endpoint\_url yaması (upstream PR), RPO ≤ 24 s, aylık Backup Restoration Test | DevOps sorumlusu |
+| Cluster | 'hetzner-fsn1' cloud\_provider='Generic' (bare metal); Hetzner Cloud VM'ler 'Hetzner' | DevOps sorumlusu |
+| DNS / TLS | Route 53 hosted zone + sınırlı IAM; Root Domain dns\_provider='AWS Route 53'; wildcard certbot `--dns-route53` | DevOps sorumlusu (Route 53/IAM, sonuç doğrulama) |
+| NS delegasyonu | `app.<marka>.com.tr` NS kayıtları GoDaddy'de Route 53'e; kiracılar `<kiracı>.app.<marka>.com.tr`, sabit host'lar GoDaddy'de (K-2) | Alan adı sorumlusu (uygular), DevOps sorumlusu (değer, doğrulama) |
+| Operasyon sitesi (Rail 6) | Kendi Team'inde Release Group 'ops'; `ops.<marka>.com.tr`; P2 finans çekirdeği, P6 CRM/Helpdesk (SA-17) | DevOps sorumlusu; DNS alan adı sorumlusu |
+| Operatör modu ve `ops-bff` (Rail 6) | `operator.<marka>.com.tr`: aynı SPA'nın operatör modu ve BFF'i, ters vekil arkasında; yalnız Tailscale/özel ağ, `press.` ile aynı sınır, Press Desk'ten ayrı origin (G-119, K-16) | DevOps sorumlusu (kayıt değeri, erişim sınırı, TLS); DNS kaydını alan adı sorumlusu GoDaddy'de uygular |
+| Hocuspocus (Rail 6 destek oturumu) | Ayrı Node servisi + Redis, reverse proxy TLS (SA-29) | DevOps sorumlusu |
+| Sürüm takibi | v0.155.x+ staging Press'te `bench migrate` + press\_tr testleri + aktivasyon E2E, sonra prod bakım penceresi | DevOps sorumlusu |
+| Trace / Analytics (SHOULD) | Trace Server (GlitchTip), Analytics Server (Plausible; birinci taraf ürün analitiği adayı, rıza kapısı ve yüzey kuralları G-134) | DevOps sorumlusu |
+| Güvenlik danışmanlığı | Danışmanlık izleme ve karar kaydı; acil yama rutin takvimi beklemez (G-142, K-26) | DevOps sorumlusu |
 
 Kabul (P0): `dig NS` Route 53 sunucularını döner, wildcard TLS Certificate Active, test sitesi Active, offsite yedek bucket'ta listelenir ve geri yüklenir, Grafana/Kibana uyarıları Telegram'a düşer.

@@ -1,0 +1,11 @@
+kimlik-realm
+platform-core-kimlik
+identity-sync
+press-tr
+platform-core-kabuk
+platform-core-yz
+platform-core-gecit
+erisim-kurali
+platform-core-mobil
+ilk-dikey-dilim
+kimlik-tema

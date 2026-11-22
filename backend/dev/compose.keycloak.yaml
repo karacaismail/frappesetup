@@ -1,0 +1,118 @@
+# Keycloak geliştirme ortamı. Sahibi kimlik-realm işidir.
+# Keycloak, PostgreSQL, Mailpit ve olay testlerinin kayıt servisini kurar.
+# Gerekli ortam değişkenleri ../identity/keycloak/.env.example dosyasındadır.
+# Portları PANE_PORT değişkeninden ../identity/keycloak/bin/kc-dev.sh betiği üretir.
+# Keycloak container içinde de ana bilgisayardaki portu dinler. Böylece tarayıcı ve
+# container'lar aynı adresi kullanır ve belirteçteki iss değeri tutar (sözleşme 9. bölüm).
+# Realm dosyaları imaja derleme sırasında kopyalanır (../identity/keycloak/Dockerfile).
+# Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzden bind mount kullanılmaz.
+# İmaj varsa `kc-dev.sh up` onu yeniden kullanır. Realm dosyası değişince `kc-dev.sh build` çalıştırın.
+services:
+  keycloak:
+    # The shared stack supplies its worktree namespace; standalone runs keep their port tag.
+    image: fs-keycloak-atonota:dev-${FS_STACK_IMAGE_TAG:-${KC_PORT:?}}
+    build:
+      context: ../identity/keycloak
+      dockerfile: Dockerfile
+      target: dev
+    pull_policy: missing
+    command: ["start", "--import-realm"]
+    environment:
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: ${KC_PORT:?}
+      KC_HOSTNAME: ${KC_PUBLIC_URL:?}
+      KC_HEALTH_ENABLED: "true"
+      # Magic link side doors are off by the image's conf/keycloak.conf (merge review E1).
+      # Event listener (event-listener/NOTICE). The secret is shared with identity-sync.
+      KC_SPI_EVENTS_LISTENER__WEBHOOK__URL: ${IDENTITY_SYNC_EVENTS_URL:?}
+      KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET: ${IDENTITY_SYNC_WEBHOOK_SECRET:?}
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_URL_PORT: "5432"
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
+      # Realm dosyasındaki ${...} yer tutucuları. Keycloak bunları içe alırken ortamdan okur.
+      ATONOTA_SITE_TENANT1_URL: ${ATONOTA_SITE_TENANT1_URL:?}
+      ATONOTA_SITE_TENANT1_SECRET: ${ATONOTA_SITE_TENANT1_SECRET:?}
+      ATONOTA_SITE_TENANT1_SERVICE_SECRET: ${ATONOTA_SITE_TENANT1_SERVICE_SECRET:?}
+      ATONOTA_PRESS_URL: ${ATONOTA_PRESS_URL:?}
+      ATONOTA_PRESS_SECRET: ${ATONOTA_PRESS_SECRET:?}
+      ATONOTA_IDENTITY_SYNC_SECRET: ${ATONOTA_IDENTITY_SYNC_SECRET:?}
+      ATONOTA_PRESS_SERVICE_SECRET: ${ATONOTA_PRESS_SERVICE_SECRET:?}
+      ATONOTA_GOOGLE_CLIENT_ID: ${ATONOTA_GOOGLE_CLIENT_ID:?}
+      ATONOTA_GOOGLE_CLIENT_SECRET: ${ATONOTA_GOOGLE_CLIENT_SECRET:?}
+      ATONOTA_APPLE_CLIENT_ID: ${ATONOTA_APPLE_CLIENT_ID:?}
+      ATONOTA_APPLE_TEAM_ID: ${ATONOTA_APPLE_TEAM_ID:?}
+      ATONOTA_APPLE_KEY_ID: ${ATONOTA_APPLE_KEY_ID:?}
+      ATONOTA_APPLE_P8_KEY: ${ATONOTA_APPLE_P8_KEY:-}
+      ATONOTA_SMTP_HOST: ${ATONOTA_SMTP_HOST:?}
+      ATONOTA_SMTP_PORT: ${ATONOTA_SMTP_PORT:?}
+      ATONOTA_SMTP_FROM: ${ATONOTA_SMTP_FROM:?}
+      ATONOTA_SMTP_AUTH: ${ATONOTA_SMTP_AUTH:?}
+      ATONOTA_SMTP_SSL: ${ATONOTA_SMTP_SSL:?}
+      ATONOTA_SMTP_STARTTLS: ${ATONOTA_SMTP_STARTTLS:?}
+      ATONOTA_SMTP_USER: ${ATONOTA_SMTP_USER:?}
+      ATONOTA_SMTP_PASSWORD: ${ATONOTA_SMTP_PASSWORD:?}
+      IDENTITY_BRAND_NAME: ${IDENTITY_BRAND_NAME:?}
+      ATONOTA_SSL_REQUIRED: ${ATONOTA_SSL_REQUIRED:?}
+      ATONOTA_MOBILE_REDIRECT_URI: ${ATONOTA_MOBILE_REDIRECT_URI:?}
+      ATONOTA_MCP_REDIRECT_URI: ${ATONOTA_MCP_REDIRECT_URI:?}
+      ATONOTA_MCP_RESOURCE_URL: ${ATONOTA_MCP_RESOURCE_URL:?}
+      ATONOTA_MCP_INTROSPECTION_SECRET: ${ATONOTA_MCP_INTROSPECTION_SECRET:?}
+    ports:
+      - "127.0.0.1:${KC_PORT:?}:${KC_PORT:?}"
+    networks:
+      default:
+        aliases:
+          - identity.localhost
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      # Keycloak imajında curl yok. Resmî belge bash'in /dev/tcp yolunu önerir.
+      test:
+        - CMD-SHELL
+        - "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'HEAD /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 'HTTP/1.0 200' <&3"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  keycloak-db:
+    image: postgres:17.12-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:?}
+    volumes:
+      - keycloak-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Development-only receiver for the event listener tests. It has no host port.
+  event-sink:
+    image: fs-kimlik-realm-event-sink:${FS_STACK_IMAGE_TAG:-dev}
+    build:
+      context: ../identity/keycloak
+      dockerfile: Dockerfile
+      target: event-sink
+    pull_policy: missing
+    networks:
+      default:
+        # Plain http is allowed only for a development address (event-listener WebhookUrls).
+        aliases:
+          - event-sink.localhost
+
+  mailpit:
+    image: axllent/mailpit:v1.34.0
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:?}:8025"
+
+volumes:
+  keycloak-db: {}

@@ -1,0 +1,941 @@
+/*
+ * Atonota giriş teması.
+ * Atonota bir kimlik ve güven markasıdır. Görsel dil sakin bir kâğıt zemine,
+ * koyu mürekkep rengine ve küçük bir mühür noktasına dayanır.
+ *
+ * Bu dosya temel temanın (keycloak.v2, PatternFly 5) üzerine yüklenir.
+ * Bütün renk, yazı, boşluk, köşe ve hareket değerleri aşağıdaki --at-* değişkenlerindedir.
+ * Kuralların içinde sabit değer yazılmaz.
+ */
+
+/* tokens:start */
+/* ---------- Yazı tipi: Outfit kendi sunucumuzdan gelir (SIL OFL 1.1, fonts/OFL.txt) ---------- */
+
+@font-face {
+  font-family: "Outfit Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../fonts/outfit-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Outfit Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("../fonts/outfit-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ---------- Tokenlar ---------- */
+
+:root {
+  /* Renk: açık tema */
+  --at-color-page: #f3f1ec;
+  --at-color-surface: #ffffff;
+  --at-color-surface-sunken: #eef0f5;
+  --at-color-surface-sunken-hover: #e1e5ee;
+  --at-color-ink: #161d33;
+  --at-color-ink-soft: #4a5268;
+  --at-color-line: #7d8496;
+  --at-color-line-strong: #4a5268;
+  --at-color-action: #1f2f63;
+  --at-color-action-hover: #16224a;
+  --at-color-action-active: #0f1836;
+  --at-color-on-action: #ffffff;
+  --at-color-link: #24397d;
+  --at-color-link-hover: #131f4a;
+  --at-color-seal: #c2452d;
+  --at-color-danger: #a8261b;
+  --at-color-danger-surface: #fbecea;
+  --at-color-warning-surface: #fbf1dc;
+  --at-color-success-surface: #e6f3ec;
+  --at-color-info-surface: #e9edf8;
+  --at-color-focus: #161d33;
+  --at-color-masthead: #161d33;
+  --at-color-on-masthead: #ffffff;
+  --at-shadow-card: 0 1px 2px rgb(22 29 51 / 0.06), 0 12px 32px rgb(22 29 51 / 0.1);
+
+  /* Yazı */
+  --at-font-text: "Outfit Variable", "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --at-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --at-text-sm: 0.875rem;
+  --at-text-md: 1rem;
+  --at-text-lg: 1.125rem;
+  --at-text-title: 1.5rem;
+  --at-text-brand: 1.375rem;
+  --at-leading: 1.5;
+  --at-leading-tight: 1.25;
+  --at-weight-regular: 400;
+  --at-weight-medium: 500;
+  --at-weight-bold: 600;
+
+  /* Boşluk */
+  --at-space-1: 0.25rem;
+  --at-space-2: 0.5rem;
+  --at-space-3: 0.75rem;
+  --at-space-4: 1rem;
+  --at-space-5: 1.5rem;
+  --at-space-6: 2rem;
+  --at-page-gutter: 0.75rem;
+  --at-card-padding: 1.25rem;
+  --at-card-width: 27rem;
+
+  /* Köşe ve kenarlık */
+  --at-radius-card: 1rem;
+  --at-radius-control: 0.625rem;
+  --at-border-control: 1px;
+
+  /* Etkili dokunma alanı. Görünen boyuttan ayrı bir tokendır. */
+  --at-hit: 2.75rem;
+
+  /* Odak göstergesi: öğenin altında düz ve kısa bir çizgi */
+  --at-focus-thickness: 3px;
+  --at-focus-gap: 2px;
+  --at-focus-underline-offset: 4px;
+  --at-link-underline-offset: 3px;
+  --at-brand-mark-size: 2rem;
+  --at-focus-bar:
+    0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-surface),
+    0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-focus);
+
+  /* Hareket */
+  --at-motion-duration: 160ms;
+  --at-motion-ease: cubic-bezier(.65, 0, .35, 1);
+  --at-motion-none: 0s;
+}
+
+:root.pf-v5-theme-dark {
+  --at-color-page: #0e1322;
+  --at-color-surface: #1a2036;
+  --at-color-surface-sunken: #262d47;
+  --at-color-surface-sunken-hover: #323a58;
+  --at-color-ink: #eef0f6;
+  --at-color-ink-soft: #b9bfd0;
+  --at-color-line: #8089a1;
+  --at-color-line-strong: #b9bfd0;
+  --at-color-action: #c9d3ff;
+  --at-color-action-hover: #dde3ff;
+  --at-color-action-active: #ffffff;
+  --at-color-on-action: #10172e;
+  --at-color-link: #bcc8ff;
+  --at-color-link-hover: #e0e6ff;
+  --at-color-seal: #ff8a6b;
+  --at-color-danger: #ffa799;
+  --at-color-danger-surface: #43201f;
+  --at-color-warning-surface: #3d3219;
+  --at-color-success-surface: #1b3a2c;
+  --at-color-info-surface: #252e52;
+  --at-color-focus: #ffffff;
+  --at-color-masthead: #1a2036;
+  --at-color-on-masthead: #eef0f6;
+  --at-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+@media (min-width: 30rem) {
+  :root {
+    --at-page-gutter: 1.5rem;
+    --at-card-padding: 2rem;
+    --at-text-title: 1.75rem;
+  }
+}
+
+@media (any-pointer: coarse) {
+  :root {
+    --at-hit: 3rem;
+  }
+}
+
+/* tokens:end */
+
+/* Login-only layout tokens. */
+:root {
+  --at-recovery-code-column: 16ch;
+  --at-checkbox-box: 1.25rem;
+}
+
+/* PatternFly değişkenleri Atonota tokenlarına bağlanır. Böylece temel bileşenler de aynı kimliği taşır. */
+:root,
+:root.pf-v5-theme-dark {
+  --pf-v5-global--FontFamily--text: var(--at-font-text);
+  --pf-v5-global--FontFamily--heading: var(--at-font-text);
+  --pf-v5-global--FontFamily--text--vf: var(--at-font-text);
+  --pf-v5-global--FontFamily--heading--vf: var(--at-font-text);
+  --pf-v5-global--FontFamily--monospace: var(--at-font-mono);
+  --pf-v5-global--FontFamily--monospace--vf: var(--at-font-mono);
+  --pf-v5-global--FontSize--xs: var(--at-text-sm);
+  --pf-v5-global--FontSize--sm: var(--at-text-sm);
+  --pf-v5-global--FontSize--md: var(--at-text-md);
+  --pf-v5-global--Color--100: var(--at-color-ink);
+  --pf-v5-global--Color--200: var(--at-color-ink-soft);
+  --pf-v5-global--BackgroundColor--100: var(--at-color-surface);
+  --pf-v5-global--BackgroundColor--200: var(--at-color-surface-sunken);
+  --pf-v5-global--BorderColor--100: var(--at-color-line);
+  --pf-v5-global--BorderColor--200: var(--at-color-line);
+  --pf-v5-global--BorderColor--300: var(--at-color-line);
+  --pf-v5-global--primary-color--100: var(--at-color-action);
+  --pf-v5-global--primary-color--200: var(--at-color-action-hover);
+  --pf-v5-global--link--Color: var(--at-color-link);
+  --pf-v5-global--link--Color--hover: var(--at-color-link-hover);
+  --pf-v5-global--danger-color--100: var(--at-color-danger);
+  --pf-v5-global--danger-color--200: var(--at-color-danger);
+  --pf-v5-global--BorderRadius--sm: var(--at-radius-control);
+  /* Temel temanın "transition: all" ve 250 ms değeri merkezi tokenlara bağlanır. */
+  --pf-v5-global--TransitionDuration: var(--at-motion-duration);
+  --pf-v5-global--TimingFunction: var(--at-motion-ease);
+  --pf-v5-global--Transition: background-color var(--at-motion-duration) var(--at-motion-ease);
+}
+
+/* ---------- Sayfa ve kart ---------- */
+
+.login-pf body {
+  background: var(--at-color-page);
+  color: var(--at-color-ink);
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-md);
+  line-height: var(--at-leading);
+  min-height: 100dvh;
+  height: auto;
+  overflow-wrap: break-word;
+}
+
+.pf-v5-c-login {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100dvh;
+  padding: var(--at-space-5) var(--at-page-gutter) var(--at-space-6);
+  padding-inline: max(var(--at-page-gutter), env(safe-area-inset-left)) max(var(--at-page-gutter), env(safe-area-inset-right));
+}
+
+.pf-v5-c-login__container {
+  display: block;
+  width: 100%;
+  max-width: var(--at-card-width);
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 30rem) and (min-height: 40rem) {
+  .pf-v5-c-login {
+    align-items: center;
+  }
+}
+
+.pf-v5-c-login__header {
+  padding: 0;
+  margin: 0 0 var(--at-space-4);
+}
+
+.at-brand,
+#kc-header-wrapper.at-brand {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--at-space-2);
+  padding: 0 var(--at-space-1);
+  /* !important: without it the base theme colours the brand name and the contrast test fails. */
+  color: var(--at-color-ink) !important;
+  font-size: var(--at-text-brand);
+  font-weight: var(--at-weight-bold);
+  letter-spacing: 0;
+  line-height: var(--at-leading-tight);
+  text-align: start;
+  text-transform: none;
+}
+
+.at-brand__mark {
+  flex: none;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+}
+
+.at-brand__ring {
+  stroke: var(--at-color-ink);
+}
+
+.at-brand__dot {
+  fill: var(--at-color-seal);
+}
+
+.pf-v5-c-login__main {
+  background: var(--at-color-surface);
+  border-radius: var(--at-radius-card);
+  box-shadow: var(--at-shadow-card);
+  margin: 0;
+}
+
+.pf-v5-c-login__main-header {
+  display: block;
+  border: 0;
+  padding: var(--at-card-padding) var(--at-card-padding) var(--at-space-4);
+}
+
+.pf-v5-c-login__main-header .pf-v5-c-title {
+  color: var(--at-color-ink);
+  font-size: var(--at-text-title);
+  font-weight: var(--at-weight-bold);
+  line-height: var(--at-leading-tight);
+}
+
+.pf-v5-c-login__main-body {
+  padding: 0 var(--at-card-padding) var(--at-card-padding);
+}
+
+.pf-v5-c-login__main-footer {
+  padding: 0;
+  margin: 0;
+}
+
+.pf-v5-c-login__main-footer-band {
+  background: transparent;
+  border: 0;
+  padding: var(--at-space-4) 0 0;
+  text-align: start;
+}
+
+.pf-v5-c-login__main-footer-band:first-child {
+  margin-block-start: var(--at-space-2);
+}
+
+.pf-v5-c-login__main-footer-band-item {
+  padding: 0;
+}
+
+/* ---------- Metin ve bağlantı ---------- */
+
+.login-pf .pf-v5-u-font-size-sm,
+.login-pf .pf-v5-c-helper-text__item-text,
+.login-pf .pf-v5-c-form__label {
+  font-size: var(--at-text-sm);
+}
+
+.login-pf .pf-v5-u-color-200 {
+  /* !important: the base theme sets this with a utility class that uses !important. */
+  color: var(--at-color-ink-soft) !important;
+}
+
+.login-pf .pf-v5-c-form__label-text {
+  color: var(--at-color-ink);
+  font-weight: var(--at-weight-medium);
+}
+
+.login-pf a:not([class*="c-button"]) {
+  color: var(--at-color-link);
+  font-weight: var(--at-weight-medium);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: var(--at-link-underline-offset);
+  transition: color var(--at-motion-duration) var(--at-motion-ease);
+}
+
+.login-pf a:not([class*="c-button"]):hover {
+  color: var(--at-color-link-hover);
+}
+
+/* Tek başına duran bağlantılar dokunma alanını doldurur. */
+.login-pf .pf-v5-c-helper-text a,
+.login-pf #kc-registration a,
+.at-locale__link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--at-hit);
+}
+
+.login-pf #kc-registration {
+  color: var(--at-color-ink-soft);
+}
+
+.login-pf .pf-v5-c-list {
+  padding-inline-start: var(--at-space-5);
+}
+
+#kc-totp-secret-key {
+  font-family: var(--at-font-mono);
+  font-size: var(--at-text-md);
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Girişi başlatan adres ---------- */
+
+.at-attempted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--at-space-4);
+  background: var(--at-color-surface-sunken);
+  border-radius: var(--at-radius-control);
+  padding: var(--at-space-2) var(--at-space-3);
+}
+
+.at-attempted__text {
+  display: grid;
+  min-inline-size: 0;
+}
+
+.at-attempted__label {
+  color: var(--at-color-ink-soft);
+  font-size: var(--at-text-sm);
+}
+
+.at-attempted__value {
+  color: var(--at-color-ink);
+  font-weight: var(--at-weight-medium);
+  min-inline-size: 0;
+}
+
+.login-pf a.at-attempted__restart {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--at-hit);
+  font-size: var(--at-text-sm);
+}
+
+/* Temel tema bu boşluğu yalnız geniş ekranda verir. Dar ekranda da bölümler ayrı durur. */
+.login-pf .pf-v5-u-mb-md-on-md {
+  /* !important: the base theme sets this with a utility class that uses !important. */
+  margin-block-end: var(--at-space-4) !important;
+}
+
+/* Parola sıfırlamada açıklama formun üstünde görünür. Açıklamada odaklanan öğe yoktur. */
+[data-page-id="login-login-reset-password"] .pf-v5-c-login__main-body {
+  display: flex;
+  flex-direction: column;
+}
+
+[data-page-id="login-login-reset-password"] .pf-v5-c-login__main-body > .pf-v5-c-login__main-footer {
+  order: -1;
+  margin-block-end: var(--at-space-4);
+}
+
+[data-page-id="login-login-reset-password"] .pf-v5-c-login__main-footer-band {
+  margin: 0;
+  padding: 0;
+}
+
+.login-pf .at-intro {
+  color: var(--at-color-ink-soft);
+  margin-block-end: var(--at-space-4);
+}
+
+/* Bazı temel şablonlarda etiket alanına değer. Etiket ile alan arasına boşluk konur. */
+.login-pf .pf-v5-c-form__group > .pf-v5-c-form__label {
+  display: block;
+  margin-block-end: var(--at-space-1);
+}
+
+/* ---------- Form alanı ---------- */
+
+.login-pf .pf-v5-c-form {
+  gap: var(--at-space-4);
+}
+
+/* Izgara ve esnek kutu öğeleri içeriğinden dar olabilir. Böylece büyük yazıda sayfa taşmaz. */
+.login-pf .pf-v5-c-form > *,
+.login-pf .pf-v5-c-form__group > *,
+.login-pf .pf-v5-c-check__label,
+.login-pf .pf-v5-c-list > li,
+.login-pf .kc-qr-code > * {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.login-pf .pf-v5-c-form-control {
+  --pf-v5-c-form-control--FontSize: var(--at-text-md);
+  background: var(--at-color-surface);
+  border: var(--at-border-control) solid var(--at-color-line);
+  border-radius: var(--at-radius-control);
+  color: var(--at-color-ink);
+  min-block-size: var(--at-hit);
+  transition: border-color var(--at-motion-duration) var(--at-motion-ease);
+}
+
+/* Temel tema kenarlığı sözde öğelerle çizer ve odakta alt çizgiyi kalınlaştırır. Bu çizim kapatılır. */
+.login-pf .pf-v5-c-form-control::before,
+.login-pf .pf-v5-c-form-control::after {
+  content: none;
+}
+
+.login-pf .pf-v5-c-form-control:hover {
+  border-color: var(--at-color-line-strong);
+}
+
+/* Hata sınırı dört kenardadır. Kayıt formundaki alanlar hatayı yalnız aria-invalid ile bildirir. */
+.login-pf .pf-v5-c-form-control.pf-m-error,
+.login-pf .pf-v5-c-form-control:has(> input[aria-invalid="true"]) {
+  border-color: var(--at-color-danger);
+}
+
+/* Kayıt formunda giriş alanı da aynı sınıfı taşır. İç alan ikinci bir çerçeve çizmez. */
+.login-pf .pf-v5-c-form-control > input.pf-v5-c-form-control {
+  background: transparent;
+  border: 0;
+}
+
+.login-pf .pf-v5-c-form-control.pf-m-readonly {
+  background: var(--at-color-surface-sunken);
+}
+
+.login-pf .pf-v5-c-form-control > input {
+  border-radius: var(--at-radius-control);
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-md);
+  min-block-size: var(--at-hit);
+  padding-inline: var(--at-space-3);
+}
+
+.login-pf .pf-v5-c-form-control__icon.pf-m-status {
+  color: var(--at-color-danger);
+}
+
+.login-pf .pf-v5-c-helper-text__item.pf-m-error .pf-v5-c-helper-text__item-text,
+.login-pf .kc-feedback-text.pf-m-error {
+  color: var(--at-color-danger);
+  font-weight: var(--at-weight-medium);
+}
+
+.login-pf label.pf-v5-c-check {
+  align-content: center;
+  align-items: center;
+  min-block-size: var(--at-hit);
+}
+
+.login-pf .pf-v5-c-check__input {
+  accent-color: var(--at-color-action);
+  inline-size: var(--at-checkbox-box);
+  block-size: var(--at-checkbox-box);
+}
+
+.login-pf .pf-v5-c-input-group {
+  gap: var(--at-space-2);
+}
+
+/* ---------- Düğme ---------- */
+
+.login-pf .pf-v5-c-button {
+  border: var(--at-border-control) solid transparent;
+  border-radius: var(--at-radius-control);
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-md);
+  font-weight: var(--at-weight-bold);
+  line-height: var(--at-leading-tight);
+  min-block-size: var(--at-hit);
+  min-inline-size: var(--at-hit);
+  max-inline-size: 100%;
+  padding-inline: var(--at-space-3);
+  white-space: normal;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    background-color var(--at-motion-duration) var(--at-motion-ease),
+    border-color var(--at-motion-duration) var(--at-motion-ease),
+    color var(--at-motion-duration) var(--at-motion-ease);
+}
+
+.login-pf .pf-v5-c-button.pf-m-block {
+  display: flex;
+  inline-size: 100%;
+}
+
+/* Temel tema düğme kenarlığını sözde öğeyle çizer ve odakta kalınlaştırır. Bu çizim kapatılır. */
+.login-pf .pf-v5-c-button::after {
+  content: none;
+}
+
+.login-pf .pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--at-color-action);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--at-color-action-hover);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--at-color-action);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--at-color-action-active);
+  --pf-v5-c-button--m-primary--Color: var(--at-color-on-action);
+  --pf-v5-c-button--m-primary--hover--Color: var(--at-color-on-action);
+  --pf-v5-c-button--m-primary--focus--Color: var(--at-color-on-action);
+  --pf-v5-c-button--m-primary--active--Color: var(--at-color-on-action);
+}
+
+.login-pf .pf-v5-c-button.pf-m-primary:focus:hover {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--at-color-action-hover);
+}
+
+.login-pf .pf-v5-c-button.pf-m-secondary,
+.login-pf .pf-v5-c-button.pf-m-tertiary {
+  background: transparent;
+  border-color: var(--at-color-line);
+  color: var(--at-color-ink);
+}
+
+.login-pf .pf-v5-c-button.pf-m-secondary:hover,
+.login-pf .pf-v5-c-button.pf-m-tertiary:hover {
+  background: var(--at-color-surface-sunken);
+  border-color: var(--at-color-line-strong);
+  color: var(--at-color-ink);
+}
+
+/* Make room for an entire recovery code before adding another column. */
+.login-pf #kc-recovery-codes-list {
+  column-count: auto;
+  column-width: var(--at-recovery-code-column);
+  column-gap: var(--at-space-5);
+}
+
+.login-pf #kc-recovery-codes-list > li {
+  break-inside: avoid;
+}
+
+/*
+ * Link-style button, for example the print, download and copy actions of the recovery codes screen.
+ * The base theme gives it its own blue and changes colour and background on plain focus.
+ * Here it uses the link tokens. Focus alone changes nothing. The shared focus line shows keyboard focus.
+ */
+.login-pf .pf-v5-c-button.pf-m-link {
+  --pf-v5-c-button--m-link--Color: var(--at-color-link);
+  --pf-v5-c-button--m-link--BackgroundColor: transparent;
+  --pf-v5-c-button--m-link--focus--Color: var(--at-color-link);
+  --pf-v5-c-button--m-link--focus--BackgroundColor: transparent;
+  --pf-v5-c-button--m-link--hover--Color: var(--at-color-link-hover);
+  --pf-v5-c-button--m-link--hover--BackgroundColor: var(--at-color-surface-sunken);
+  --pf-v5-c-button--m-link--active--Color: var(--at-color-link-hover);
+  --pf-v5-c-button--m-link--active--BackgroundColor: var(--at-color-surface-sunken-hover);
+}
+
+.login-pf .pf-v5-c-button.pf-m-control {
+  background: var(--at-color-surface-sunken);
+  color: var(--at-color-ink);
+}
+
+.login-pf .pf-v5-c-button.pf-m-control:hover {
+  background: var(--at-color-surface-sunken-hover);
+}
+
+.login-pf .pf-v5-c-button:disabled,
+.login-pf .pf-v5-c-button.pf-m-aria-disabled {
+  background: var(--at-color-surface-sunken);
+  border-color: transparent;
+  color: var(--at-color-ink-soft);
+}
+
+.login-pf .pf-v5-c-form__actions {
+  gap: var(--at-space-3);
+  margin: 0;
+}
+
+.login-pf .pf-v5-c-form__actions > * {
+  margin: 0;
+}
+
+/* ---------- İleti kutusu ---------- */
+
+.login-pf .pf-v5-c-alert {
+  --pf-v5-c-alert--BoxShadow: none;
+  background: var(--at-color-info-surface);
+  border: 0;
+  border-radius: var(--at-radius-control);
+  box-shadow: none;
+  color: var(--at-color-ink);
+  padding: var(--at-space-3) var(--at-space-4);
+}
+
+.login-pf .pf-v5-c-alert.pf-m-danger {
+  background: var(--at-color-danger-surface);
+}
+
+.login-pf .pf-v5-c-alert.pf-m-warning {
+  background: var(--at-color-warning-surface);
+}
+
+.login-pf .pf-v5-c-alert.pf-m-success {
+  background: var(--at-color-success-surface);
+}
+
+.login-pf .pf-v5-c-alert__icon,
+.login-pf .pf-v5-c-alert__title {
+  color: var(--at-color-ink);
+  font-size: var(--at-text-md);
+  font-weight: var(--at-weight-medium);
+}
+
+.login-pf .pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__icon {
+  color: var(--at-color-danger);
+}
+
+/* ---------- Giriş yolu seçenekleri ve bağlantı listesi ---------- */
+
+.at-choice-list,
+.at-link-list {
+  display: grid;
+  gap: var(--at-space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.at-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--at-space-3);
+  inline-size: 100%;
+  min-block-size: var(--at-hit);
+  padding: var(--at-space-3);
+  background: var(--at-color-surface-sunken);
+  border: 0;
+  border-radius: var(--at-radius-control);
+  color: var(--at-color-ink);
+  cursor: pointer;
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-md);
+  text-align: start;
+  transition: background-color var(--at-motion-duration) var(--at-motion-ease);
+}
+
+.at-choice:hover {
+  background: var(--at-color-surface-sunken-hover);
+}
+
+.at-choice__text {
+  display: grid;
+  gap: var(--at-space-1);
+}
+
+.at-choice__title {
+  font-weight: var(--at-weight-bold);
+}
+
+.at-choice__help {
+  color: var(--at-color-ink-soft);
+  font-size: var(--at-text-sm);
+}
+
+.at-choice__icon {
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  font-size: var(--at-text-lg);
+}
+
+.at-link-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--at-space-2);
+}
+
+.login-pf .at-link-line a,
+.login-pf .at-link-list a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--at-hit);
+}
+
+/* ---------- Kayıtlı geçiş anahtarı listesi ---------- */
+
+.login-pf .pf-v5-c-data-list {
+  /* Temel tema üstüne gelinen satırın komşusuna tek kenar çizgisi ekler. Bu çizgi kapatılır. */
+  --pf-v5-c-data-list__item--BorderBottomWidth: 0;
+  --pf-v5-c-data-list__item--m-clickable--hover--item--BorderTopWidth: 0;
+  --pf-v5-c-data-list__item--before--BackgroundColor: transparent;
+  border: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--at-space-2);
+}
+
+.login-pf .pf-v5-c-data-list__item {
+  background: var(--at-color-surface-sunken);
+  border: 0;
+  border-radius: var(--at-radius-control);
+  box-shadow: none;
+}
+
+.login-pf .pf-v5-c-data-list__item::before {
+  content: none;
+}
+
+.login-pf .pf-v5-c-data-list__item-row {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--at-space-3);
+  inline-size: 100%;
+  padding: var(--at-space-2) var(--at-space-3);
+}
+
+.login-pf .pf-v5-c-data-list__cell {
+  margin: 0;
+  padding: 0;
+}
+
+.login-pf .pf-v5-c-data-list__cell.pf-m-no-fill {
+  flex: 1 1 8rem;
+  min-inline-size: 0;
+  padding-block: var(--at-space-2);
+}
+
+.login-pf .pf-v5-c-data-list__item-action:empty {
+  display: none;
+}
+
+.login-pf .pf-v5-c-data-list__cell.pf-m-icon .pf-v5-c-icon {
+  color: var(--at-color-ink);
+}
+
+.login-pf .select-auth-box-headline {
+  font-weight: var(--at-weight-bold);
+}
+
+/* ---------- Ayırıcı, QR kodu, ipucu ---------- */
+
+.kc-login-divider {
+  color: var(--at-color-ink-soft);
+  font-size: var(--at-text-sm);
+}
+
+.kc-qr-code img {
+  border: var(--at-border-control) solid var(--at-color-line);
+  border-radius: var(--at-radius-control);
+  box-shadow: none;
+  max-inline-size: 100%;
+  block-size: auto;
+}
+
+/* İpucu düğmenin üstünde açılır. Böylece sayfayı yana taşırmaz. */
+.kc-login-tooltip .kc-tooltip-text {
+  inset: auto 0 calc(100% + var(--at-space-1)) auto;
+  border-radius: var(--at-radius-control);
+  font-size: var(--at-text-sm);
+  padding: var(--at-space-1) var(--at-space-2);
+  transition: opacity var(--at-motion-duration) var(--at-motion-ease);
+}
+
+.kc-login-tooltip .kc-tooltip-text::after {
+  content: none;
+}
+
+/* ---------- Dil seçimi ---------- */
+
+.login-pf .pf-v5-c-login__main > .at-locale {
+  padding: 0 var(--at-card-padding) var(--at-space-3);
+}
+
+/* Boş alt bölüm yer tutmaz. */
+.pf-v5-c-login__main-footer:empty,
+.pf-v5-c-login__main-footer:not(:has(*)) {
+  display: none;
+}
+
+.login-pf .pf-v5-u-mt-md-on-md,
+.login-pf #authenticateWebAuthnButton {
+  /* !important: the base theme sets this with a utility class that uses !important. */
+  margin-block-start: var(--at-space-3) !important;
+}
+
+.at-locale__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--at-space-1) var(--at-space-5);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.login-pf a.at-locale__link {
+  color: var(--at-color-ink-soft);
+  font-size: var(--at-text-sm);
+  text-decoration: none;
+}
+
+/* Seçili dil renkle değil, kalın yazı ve onay işaretiyle ayrılır. */
+.login-pf a.at-locale__link[aria-current="true"] {
+  color: var(--at-color-ink);
+  font-weight: var(--at-weight-bold);
+}
+
+.at-locale__link[aria-current="true"]::before {
+  content: "✓";
+  margin-inline-end: var(--at-space-1);
+}
+
+/* ---------- Odak ---------- */
+
+/*
+ * Çevreleyen odak halkası yoktur. Tarayıcının ve temel temanın halkası kapatılır.
+ * Yerine tek bir gösterge gelir: öğenin altında, köşelere değmeyen düz bir çizgi.
+ * Gösterge yalnız klavye kipi açıkken ve :focus-visible iken görünür.
+ * Betik yüklenmezse (data-at-js yoksa) gösterge :focus-visible ile yine görünür.
+ */
+.login-pf :is(a, button, input, select, textarea, summary, [tabindex]):focus,
+.login-pf :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 0;
+}
+
+/* Kutu biçimli kontroller: düğme, seçenek ve kendi başına duran alan */
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])).login-pf
+  :is(button, [class*="c-button"], [role="button"], summary, [tabindex]:not(a, input, select, textarea)):focus-visible,
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])).login-pf
+  :is(input:not([type="checkbox"], [type="radio"]), select, textarea):not(.pf-v5-c-form-control > *):focus-visible {
+  box-shadow: var(--at-focus-bar);
+}
+
+/* Sarmalayıcı içindeki alan: çizgi sarmalayıcının altına gelir. Kural ayrıdır, çünkü :has() her tarayıcıda yoktur. */
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])).login-pf
+  .pf-v5-c-form-control:has(> :is(input, select, textarea):focus-visible) {
+  box-shadow: var(--at-focus-bar);
+}
+
+/*
+ * Onay kutusu ve seçenek düğmesi: etiket metninin altında kalın çizgi.
+ * WebKit yerel onay kutusuna gölge çizmez. Bu yüzden gösterge etikettedir.
+ * İlk kural kutuyu saran etiketi, ikinci kural kutudan sonra gelen etiketi kapsar.
+ */
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])).login-pf
+  label:has(input:is([type="checkbox"], [type="radio"]):focus-visible),
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])).login-pf
+  input:is([type="checkbox"], [type="radio"]):focus-visible + label {
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--at-focus-thickness);
+  text-decoration-color: var(--at-color-focus);
+  text-underline-offset: var(--at-focus-underline-offset);
+}
+
+/* Metin bağlantıları: kalın alt çizgi */
+:is(html[data-at-focus="keyboard"], html:not([data-at-js])).login-pf a:not([class*="c-button"]):focus-visible {
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--at-focus-thickness);
+  text-decoration-color: var(--at-color-focus);
+  text-underline-offset: var(--at-focus-underline-offset);
+}
+
+@media (forced-colors: active) {
+  :is(html[data-at-focus="keyboard"], html:not([data-at-js])).login-pf
+    :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid CanvasText;
+  }
+}
+
+/* ---------- Hareket ---------- */
+
+/* Temel temadan gelen bütün geçişler de onaylı eğriyi kullanır. */
+.login-pf *,
+.login-pf *::before,
+.login-pf *::after {
+  transition-timing-function: var(--at-motion-ease);
+  animation-timing-function: var(--at-motion-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-pf *,
+  .login-pf *::before,
+  .login-pf *::after {
+    /* !important: reduced motion must win over every transition in the base theme. */
+    transition-duration: var(--at-motion-none) !important;
+    animation-duration: var(--at-motion-none) !important;
+  }
+}

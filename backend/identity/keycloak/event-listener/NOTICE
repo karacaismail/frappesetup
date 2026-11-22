@@ -1,0 +1,15 @@
+Keycloak webhook event listener, identity-sync fork
+
+This folder is a modified copy of sashyo/keycloak-webhook-listener.
+Source: https://github.com/sashyo/keycloak-webhook-listener
+Commit: 5f23e5530db15c9042d8977c46a19758aa0ede97 (23 October 2026)
+The upstream project has no NOTICE file. Its license is the Apache License, Version 2.0.
+The license text is in the LICENSE file next to this one.
+
+Changes made by this project:
+- The request is signed as the identity-sync contract asks: headers X-Identity-Sync-Timestamp and
+  X-Identity-Sync-Signature, HMAC-SHA256 over "<timestamp>.<mode>.<raw body>" (WebhookSigner).
+- The body is Keycloak's own event format with realmId. Only the event types identity-sync
+  processes are sent. IP address, details and representation are not sent (EventPayloads).
+- A failed delivery is retried at most three times. Each attempt has a new timestamp (WebhookSender).
+- Keycloak 26.8.2 and Java 21. JUnit tests were added.
