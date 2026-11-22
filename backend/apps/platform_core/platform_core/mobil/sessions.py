@@ -95,6 +95,10 @@ def revoke_after_commit(sessions, *, remote=True):
 			REVOKED_SESSION, {"name": ["in", retry_keys]}, "last_delivery_attempt_at", str(now)
 		)
 
+	if remote and any(not valid_keycloak_id(subject) for _unused, subject in targets):
+		frappe.logger("mobile_sessions").warning(
+			"Mobile session closure is pending because the Keycloak subject is unavailable."
+		)
 	if pending:
 		# A failed transaction or its retry cannot send the remote request.
 		request = getattr(frappe.local, "request", None)

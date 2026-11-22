@@ -30,6 +30,16 @@ class SessionDeliveryTest(TestCase):
 		)
 		self.send = self.enterContext(patch.object(sessions, "send_session_revocations", return_value=()))
 
+	def test_missing_remote_subject_logs_only_fixed_text(self):
+		self.db.get_values.return_value = []
+		with patch.object(sessions, "insert_metadata") as insert:
+			sessions.revoke_after_commit([("private-session", None)])
+		self.logger.return_value.warning.assert_called_once_with(
+			"Mobile session closure is pending because the Keycloak subject is unavailable."
+		)
+		self.assertEqual(insert.call_args.kwargs["delivery_pending"], 1)
+		self.send.assert_not_called()
+
 	def test_transient_acknowledgment_errors_roll_back_the_acknowledgment(self):
 		for method, error in (
 			(self.db.set_value, frappe.QueryDeadlockError),
