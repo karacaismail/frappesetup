@@ -51,6 +51,17 @@ Her senaryo için önce testi yazın. Parçası birleşmemiş senaryonun sonucu 
 
 Gerçek sağlayıcıya, gerçek Google'a ve gerçek Apple'a istek atmayın. Sahte servis kullanın.
 
+### Telefonun yeniden giriş denemesi
+
+1. Kiracıya bir Website User hesabıyla bağlanın.
+2. Telefon kurulumunu gerçek Keycloak belirteciyle kaydedin.
+3. Yalıtılmış test sitesinde boşta kalma sınırını doldurun.
+4. Çekme ve gönderme uçlarında 401 ve `reauthentication_required` kodunu doğrulayın.
+5. Aynı Keycloak oturumunda yeniden giriş yapın.
+6. Yeni belirteçte aynı `sid` ve daha yeni `auth_time` değerini doğrulayın.
+7. Aynı kurulumu yeniden kaydedin.
+8. Çekme ve gönderme işlemlerinin yeniden çalıştığını doğrulayın.
+
 ## Kontrol noktası 3: rapor
 
 1. Senaryoların sonucunu `backend/e2e/README.md` dosyasına tablo olarak yazın. Sonuçlar `pass`, `fail`, `not_run` ya da `not_applicable` olur.
