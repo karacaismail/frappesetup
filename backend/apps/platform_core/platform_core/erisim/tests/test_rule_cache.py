@@ -27,8 +27,8 @@ class TestRuleCacheWithinARequest(ErisimTestCase):
 	def drop_request_cache(self) -> None:
 		frappe.set_user("Administrator")
 		frappe.db.rollback()
-		if hasattr(frappe.local, "request_cache"):
-			del frappe.local.request_cache
+		# A new request starts with an empty cache. The cache itself stays, for the tests that follow.
+		frappe.local.request_cache = defaultdict(dict)
 
 	def employee_reads_other_record(self) -> bool:
 		return frappe.has_permission(DOCTYPE, "read", doc=self.records[EMPLOYEE_2], user=EMPLOYEE_1)

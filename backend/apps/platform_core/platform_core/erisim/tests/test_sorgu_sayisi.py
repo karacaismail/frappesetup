@@ -34,8 +34,8 @@ class TestQueryCount(ErisimTestCase):
 		return len(queries), len(rows)
 
 	def drop_request_cache(self) -> None:
-		if hasattr(frappe.local, "request_cache"):
-			del frappe.local.request_cache
+		# A new request starts with an empty cache. The cache itself stays, for the tests that follow.
+		frappe.local.request_cache = defaultdict(dict)
 
 	def test_list_query_count_does_not_grow_with_record_count(self):
 		before, visible_before = self.count_list_queries(MANAGER_1)

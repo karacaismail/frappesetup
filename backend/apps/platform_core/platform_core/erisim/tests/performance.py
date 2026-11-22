@@ -7,8 +7,17 @@ write endpoint. Sample data: 200 employees and 2,000 records. Every endpoint is 
 Start it by hand on a development or test site with `bench --site <site> execute`, followed by
 the dotted path of this module and `.measure`. `COMMAND` below holds the full line.
 
-It refuses to run unless the site has `allow_tests` set, because it writes sample data. There
-is no HTTP endpoint for it for the same reason.
+It follows rule O-35 of the project record:
+
+- It runs only on a site made for measuring: the site name starts with `perf-` and ends with
+  `.localhost`, and the site configuration has `allow_performance_fixture` set to 1. On any
+  other site it stops before it creates anything. There is no HTTP endpoint for it.
+- It stops before it creates anything when a background job is waiting. It never runs the
+  queue: a waiting job belongs to other work.
+- It deletes only what it created, chosen by document type and name together.
+
+Such a site can be thrown away after the run. The jobs that the run's own requests queue stay
+in the queue of that site.
 
 Everything it works on is its own and lives for one run only: a document type, three roles,
 four users, a company, the employees, the records and the rules. Their names carry the mark of
@@ -22,12 +31,14 @@ not part of it. All people and records are made up.
 """
 
 import json
+import re
 import statistics
 import time
 
 import frappe
 from frappe.tests.test_api import make_request
-from frappe.utils import get_test_client, now
+from frappe.utils import cint, get_test_client, now
+from frappe.utils.background_jobs import get_queues
 from frappe.utils.password import update_password
 
 from platform_core.erisim import rules
@@ -44,6 +55,29 @@ LIST_FIELDS = ["name", "title", "employee", "status"]
 METHOD = "/api/method/"
 PASSWORD = "Made-Up-Measure-6150!"
 PEOPLE = ("employee", "manager", "hr", "admin")
+SITE_NAME = re.compile(r"perf-[a-z0-9][a-z0-9-]*\.localhost")
+SITE_FLAG = "allow_performance_fixture"
+
+
+class NotAllowedHere(RuntimeError):
+	"""The site is not a measuring site (O-35)."""
+
+
+class QueueNotEmpty(RuntimeError):
+	"""A background job is waiting. The measurement does not start and does not run it (O-35)."""
+
+
+def site_name() -> str:
+	return frappe.local.site
+
+
+def site_allowed(name: str, conf) -> bool:
+	"""Rule O-35: a `perf-*.localhost` site whose configuration switches the fixture on."""
+	return bool(SITE_NAME.fullmatch(name or "")) and cint(conf.get(SITE_FLAG)) == 1
+
+
+def waiting_jobs() -> int:
+	return sum(queue.count for queue in get_queues())
 
 
 def p95(samples: list[float]) -> float:
@@ -209,43 +243,60 @@ def seed(sample: dict, employees: int, records: int) -> None:
 	sample["employee_name"] = owners[1]
 
 
-def clean_traces(sample: dict, employees: list[str]) -> None:
-	"""Remove the log rows Frappe wrote about the run's own documents and users.
+LOG_TABLES = (
+	# log table, field with the document type, field with the name
+	("Deleted Document", "deleted_doctype", "deleted_name"),
+	("Version", "ref_doctype", "docname"),
+	("Comment", "reference_doctype", "reference_name"),
+	("Activity Log", "reference_doctype", "reference_name"),
+)
+OWNED_LOG_TABLES = (
+	"Deleted Document",
+	"Version",
+	"Comment",
+	"Activity Log",
+	"Access Log",
+	"Route History",
+	"Notification Settings",
+)
 
-	Only rows written since the run started are removed. A name such as an employee number is
-	given out again after a delete, so an older log row can carry the same name.
+
+def delete_rows(table: str, filters: dict) -> None:
+	"""Find log rows with the given filters, then delete each one by its own type and name."""
+	# The clean-up's own search for rows this run wrote; the filters name the run's documents.
+	for name in frappe.get_all(table, filters=filters, pluck="name", limit=0):
+		frappe.db.delete(table, {"name": name})
+
+
+def clean_traces(sample: dict, made: list[tuple[str, str]]) -> None:
+	"""Remove the log rows Frappe wrote about the run's own documents and by the run's own users.
+
+	`made` holds every document of the run as a pair of type and name. A log row is removed only
+	when both its type and its name match a pair. A record of another type with the same name
+	keeps its log rows.
+
+	Only rows written since the run started are removed: a name such as an employee number is
+	given out again after a delete, so an older row can carry the same pair.
 	"""
-	doctype, users = sample["doctype"], list(sample["users"].values())
-	names = [*sample["rules"], *sample["roles"].values(), *users, *employees]
-	names += [doctype, sample["company"], sample["gender"]]
 	recent = {"creation": (">=", sample["started"])}
-	frappe.db.delete("Deleted Document", {**recent, "owner": ("in", users)})
-	frappe.db.delete("Deleted Document", {**recent, "deleted_doctype": doctype})
-	frappe.db.delete("Deleted Document", {**recent, "deleted_name": ("in", names)})
-	for table, type_field, name_field in (
-		("Version", "ref_doctype", "docname"),
-		("Comment", "reference_doctype", "reference_name"),
-		("Activity Log", "reference_doctype", "reference_name"),
-	):
-		frappe.db.delete(table, {**recent, type_field: doctype})
-		frappe.db.delete(table, {**recent, name_field: ("in", names)})
-	for table in (
-		"Version",
-		"Comment",
-		"Activity Log",
-		"Access Log",
-		"Route History",
-		"Notification Settings",
-	):
-		frappe.db.delete(table, {**recent, "owner": ("in", users)})
-	frappe.db.delete("Activity Log", {**recent, "user": ("in", users)})
-	# Frappe notes every deletion in a comment whose subject is the type and the name.
-	subjects = [f"{base.RULE_DOCTYPE} {name}" for name in sample["rules"]]
-	subjects += [f"Employee {name}" for name in employees]
-	deleted = {**recent, "comment_type": "Deleted"}
-	frappe.db.delete("Comment", {**deleted, "subject": ("in", subjects)})
-	frappe.db.delete("Comment", {**deleted, "subject": ("like", f"%{sample['prefix']}%")})
-	frappe.db.delete("Comment", {**deleted, "subject": ("like", f"%ar.measure.{sample['run']}.%")})
+	by_type: dict[str, list[str]] = {}
+	for doctype, name in made:
+		by_type.setdefault(doctype, []).append(name)
+	for doctype, names in by_type.items():
+		for table, type_field, name_field in LOG_TABLES:
+			delete_rows(table, {**recent, type_field: doctype, name_field: ("in", names)})
+		# Frappe notes a deletion in a comment that names the type and the name in its subject.
+		subjects = [f"{doctype} {name}" for name in names]
+		filters = {"comment_type": "Deleted", "reference_doctype": doctype, "subject": ("in", subjects)}
+		delete_rows("Comment", {**recent, **filters})
+	# The records of the run's own type: every name of that type belongs to the run.
+	for table, type_field, _name_field in LOG_TABLES:
+		delete_rows(table, {**recent, type_field: sample["doctype"]})
+	# Rows written by the run's own users, for example about a permission row a request deleted.
+	users = list(sample["users"].values())
+	for table in OWNED_LOG_TABLES:
+		delete_rows(table, {**recent, "owner": ("in", users)})
+	delete_rows("Activity Log", {**recent, "user": ("in", users)})
 
 
 def clean(sample: dict) -> None:
@@ -261,9 +312,11 @@ def clean(sample: dict) -> None:
 	)
 	for name in members:
 		frappe.delete_doc("Employee", name, force=True, delete_permanently=True)
+	contacts: list[str] = []
 	for email in sample["users"].values():
 		# Frappe makes a contact for every new user and keeps it when the user is deleted.
 		for contact in frappe.get_all("Contact", filters={"user": email}, pluck="name", limit=0):
+			contacts.append(contact)
 			frappe.delete_doc("Contact", contact, force=True, delete_permanently=True)
 		if frappe.db.exists("User", email):
 			frappe.delete_doc("User", email, force=True, delete_permanently=True)
@@ -275,7 +328,15 @@ def clean(sample: dict) -> None:
 	for role in sample["roles"].values():
 		if frappe.db.exists("Role", role):
 			frappe.delete_doc("Role", role, force=True, delete_permanently=True)
-	clean_traces(sample, members)
+	made = [(base.RULE_DOCTYPE, name) for name in sample["rules"]]
+	made += [("Employee", name) for name in members]
+	made += [("User", email) for email in sample["users"].values()]
+	# Frappe keeps one settings record for each user and deletes it with the user.
+	made += [("Notification Settings", email) for email in sample["users"].values()]
+	made += [("Contact", name) for name in contacts]
+	made += [("Role", role) for role in sample["roles"].values()]
+	made += [("DocType", doctype), ("Company", sample["company"]), ("Gender", sample["gender"])]
+	clean_traces(sample, made)
 	frappe.db.delete("Company", {"name": sample["company"]})
 	frappe.db.delete("Gender", {"name": sample["gender"]})
 	# Committed on purpose: the sample must be gone for every connection.
@@ -490,11 +551,14 @@ def as_markdown(report: dict) -> str:
 
 def measure(calls: int = 50, keep: int = 0, employees: int = EMPLOYEES, records: int = RECORDS) -> dict:
 	"""Seed the sample, measure every endpoint and the rule cost, print the result and clean up."""
-	if not frappe.conf.allow_tests:
-		raise RuntimeError("The measurement writes sample data. Run it on a site with allow_tests set.")
+	if not site_allowed(site_name(), frappe.conf):
+		raise NotAllowedHere(
+			f"The measurement runs only on a perf-*.localhost site with {SITE_FLAG} set to 1 (O-35)."
+		)
+	waiting = waiting_jobs()
+	if waiting:
+		raise QueueNotEmpty(f"{waiting} background job(s) are waiting. Nothing was created (O-35).")
 	calls = max(int(calls), 50)
-	# A full queue slows every write and fails deletes. Start with room in it.
-	base.run_queued_jobs()
 	sample = new_sample()
 	try:
 		seed(sample, int(employees), int(records))

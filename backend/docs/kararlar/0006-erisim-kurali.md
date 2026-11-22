@@ -874,9 +874,17 @@ bench --site <site> execute platform_core.erisim.tests.performance.measure
 ```
 
 - Komut 200 çalışan ve 2.000 kayıt kurar. Sonra her ucu 50 kez çağırır. Sonunda örnek veriyi siler.
-- Komut yalnız `allow_tests` ayarı açık sitede çalışır. Örnek veri yazdığı için HTTP ucu yoktur.
 - İstekler Frappe'nin WSGI uygulamasından geçer. Süre isteğin tamamıdır. Ağ süresi sayılmaz.
 - HRMS TR'nin izin kaydı türü başka işin klasöründedir. Bu yüzden ölçüm o türle yapılmadı.
+
+Komut proje kaydının O-35 kuralına uyar:
+
+1. Komut yalnız ayrı bir deneme sitesinde çalışır. Sitenin adı `perf-` ile başlar ve `.localhost` ile biter. Site ayarında `allow_performance_fixture` değeri 1 olmalıdır. Başka sitede komut veri oluşturmadan durur.
+2. Komut başlamadan önce iş kuyruğuna bakar. Kuyrukta iş varsa komut veri oluşturmadan durur. Komut kuyruğu çalıştırmaz, çünkü bekleyen iş başka işe ait olabilir.
+3. Komut yalnız kendi oluşturduğu kayıtları siler. Kayıtları tür ve ad çiftiyle seçer. Başka türde aynı adı taşıyan bir kaydın iz satırları yerinde kalır.
+4. Komutun HTTP ucu yoktur.
+
+Deneme sitesi şöyle kurulur. Yönetici `perf-access.localhost` gibi bir site açar ve ERPNext ile `platform_core` uygulamalarını yükler. Sonra `bench --site <site> set-config allow_performance_fixture 1` komutunu çalıştırır. Ölçüm bitince site silinebilir. Komutun kendi isteklerinin kuyruğa bıraktığı işler o sitenin kuyruğunda kalır.
 
 Komut yalnız kendi geçici verisiyle çalışır. Her çalışma şunları kurar ve sonunda siler:
 
@@ -890,29 +898,29 @@ Bunların adları çalışmanın işaretini taşır. Temizlik işarete göre sil
 
 Komut sitede önceden var olan hiçbir şeye dokunmaz. Kullanıcı, rol, izin satırı, kullanıcı izni (“User Permission”), kural ve kayıt aynı kalır. Komut testlerin ortak hazırlığını çağırmaz. O hazırlık kullanıcı izinlerini siler ve test türlerine izin satırı ekler.
 
-Yedi test bunu sınar. Testler ölçümden önce ve sonra 21 tabloyu karşılaştırır. Tablolar izinleri, kişileri, kuralları, kayıt türlerini ve Frappe'nin iz kayıtlarını tutar. Testler önce sitede eski bir kural, bir düzey izni, bir kullanıcı izni ve portal izni olmayan eski bir tür bırakır.
+On dört test bunu sınar. Testler ölçümden önce ve sonra 22 tabloyu karşılaştırır. Tablolar izinleri, kişileri, kuralları, kayıt türlerini ve Frappe'nin iz kayıtlarını tutar. Testler önce sitede eski bir kural, bir düzey izni, bir kullanıcı izni ve portal izni olmayan eski bir tür bırakır.
 
-Temizlik Frappe'nin yazdığı iz kayıtlarını da siler. Yalnız çalışmanın başından sonra yazılanları siler. Çalışan numarası gibi adlar silmeden sonra yeniden verilir. Eski bir iz kaydı aynı adı taşıyabilir.
+Temizlik Frappe'nin yazdığı iz kayıtlarını da siler. İz kaydını tür ve ad çiftiyle seçer. Yalnız çalışmanın başından sonra yazılanları siler. Çalışan numarası gibi adlar silmeden sonra yeniden verilir. Eski bir iz kaydı aynı adı taşıyabilir.
 
-Ölçüm 22 Kasım 2026 Pazar günü geliştirme sitesinde yapıldı.
+Ölçüm 22 Kasım 2026 Pazar günü `perf-access.localhost` adlı ayrı deneme sitesinde yapıldı. Site ölçümden sonra silindi.
 
 | Tür | Uç | Ortanca (ms) | p95 (ms) | Sınır (ms) | Sonuç |
 | --- | --- | --- | --- | --- | --- |
-| Okuma | Liste, `own` kapsamı | 10,3 | 15,7 | 500 | `pass` |
-| Okuma | Liste, `team` kapsamı | 11,5 | 33,1 | 500 | `pass` |
-| Okuma | Liste, `all` kapsamı | 10,8 | 16,2 | 500 | `pass` |
-| Okuma | Tek kayıt | 10,9 | 14,6 | 500 | `pass` |
-| Okuma | Sayım, `team` kapsamı | 12,1 | 32,2 | 500 | `pass` |
-| Okuma | Rapor görünümü, `team` kapsamı | 10,3 | 14,0 | 500 | `pass` |
-| Okuma | Bağlantı araması | 10,2 | 14,3 | 500 | `pass` |
-| Okuma | Bağlantı doğrulama | 11,1 | 18,1 | 500 | `pass` |
-| Okuma | `explain_permission` | 11,6 | 18,4 | 500 | `pass` |
-| Okuma | `get_access_summary` | 5,4 | 8,6 | 500 | `pass` |
-| Yazma | Kayıt oluşturma | 15,1 | 26,1 | 1.000 | `pass` |
-| Yazma | Kayıt güncelleme | 14,8 | 18,8 | 1.000 | `pass` |
-| Yazma | Kayıt silme | 51,5 | 63,5 | 1.000 | `pass` |
-| Yazma | “Access Rule” değiştirme | 16,1 | 19,8 | 1.000 | `pass` |
-| Yazma | `set_level_access` | 269,5 | 383,2 | 1.000 | `pass` |
+| Okuma | Liste, `own` kapsamı | 5,2 | 6,4 | 500 | `pass` |
+| Okuma | Liste, `team` kapsamı | 5,3 | 6,2 | 500 | `pass` |
+| Okuma | Liste, `all` kapsamı | 3,3 | 5,0 | 500 | `pass` |
+| Okuma | Tek kayıt | 3,4 | 3,9 | 500 | `pass` |
+| Okuma | Sayım, `team` kapsamı | 4,4 | 6,0 | 500 | `pass` |
+| Okuma | Rapor görünümü, `team` kapsamı | 4,3 | 5,5 | 500 | `pass` |
+| Okuma | Bağlantı araması | 4,7 | 7,6 | 500 | `pass` |
+| Okuma | Bağlantı doğrulama | 3,7 | 5,1 | 500 | `pass` |
+| Okuma | `explain_permission` | 4,6 | 6,3 | 500 | `pass` |
+| Okuma | `get_access_summary` | 2,9 | 3,5 | 500 | `pass` |
+| Yazma | Kayıt oluşturma | 5,9 | 7,8 | 1.000 | `pass` |
+| Yazma | Kayıt güncelleme | 7,2 | 9,4 | 1.000 | `pass` |
+| Yazma | Kayıt silme | 24,7 | 28,1 | 1.000 | `pass` |
+| Yazma | “Access Rule” değiştirme | 6,7 | 9,3 | 1.000 | `pass` |
+| Yazma | `set_level_access` | 147,7 | 215,9 | 1.000 | `pass` |
 
 ### Kuralın liste sorgusuna eklediği süre
 
@@ -920,12 +928,12 @@ Komut aynı liste okumasını iki kez ölçer: kurallar açıkken ve kurallar ka
 
 | Kapsam | Sayfa | Kurallı ortanca (ms) | Kuralsız ortanca (ms) | Eklenen (ms) | Kurallı p95 (ms) |
 | --- | --- | --- | --- | --- | --- |
-| `own` | 20 | 3,85 | 0,77 | 3,08 | 4,59 |
-| `team` | 20 | 3,12 | 0,91 | 2,22 | 4,30 |
-| `all` | 20 | 2,76 | 1,17 | 1,59 | 3,98 |
-| `own` | 500 | 3,96 | 1,84 | 2,13 | 5,26 |
-| `team` | 500 | 5,64 | 1,88 | 3,75 | 6,58 |
-| `all` | 500 | 3,19 | 1,91 | 1,28 | 3,91 |
+| `own` | 20 | 1,90 | 0,46 | 1,44 | 2,00 |
+| `team` | 20 | 1,43 | 0,45 | 0,98 | 1,51 |
+| `all` | 20 | 1,10 | 0,52 | 0,58 | 1,58 |
+| `own` | 500 | 1,95 | 1,03 | 0,91 | 2,16 |
+| `team` | 500 | 3,32 | 0,91 | 2,41 | 3,84 |
+| `all` | 500 | 1,73 | 0,97 | 0,76 | 2,28 |
 
 Kural bir liste okumasına birkaç milisaniye ekler. Beş ölçümde eklenen ortanca süre 4 milisaniyeyi geçmedi.
 
