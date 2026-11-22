@@ -29,7 +29,7 @@ case "$FS_COLIMA_PROFILE" in
 esac
 engine=(docker --context "$context")
 compose=("${engine[@]}" compose --project-name "$project"
-    --env-file "$DEV_ENV_FILE" --file "$dev_dir/compose.yaml")
+    --env-file "$DEV_ENV_FILE" --file "$dev_dir/compose.tenant.yaml")
 
 if [[ "$context" == colima && "${1:-}" == up ]]; then
     minimum_memory=2

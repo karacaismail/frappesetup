@@ -5,8 +5,10 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 import frappe
+from frappe.tests import IntegrationTestCase
+from frappe.utils import add_days, today
 
-from hrms_tr import leave
+from hrms_tr import leave, retention
 from hrms_tr.api import approve_leave, cancel_leave, get_leave_approver
 
 
@@ -128,3 +130,54 @@ class ApprovalEndpointTest(TestCase):
 			with self.assertRaises(frappe.ValidationError):
 				approve_leave("LEAVE-MISSING")
 		approve.assert_not_called()
+
+
+class RetentionIntegrationTest(IntegrationTestCase):
+	def test_purge_only_deletes_expired_leave_and_keeps_employee_and_allocation(self):
+		prefix = frappe.generate_hash(length=12)
+		expired = add_days(today(), -31)
+		employee = frappe.get_doc(
+			doctype="Employee", name=f"{prefix}-employee", status="Left", relieving_date=expired
+		)
+		employee.db_insert()
+		allocation = frappe.get_doc(
+			doctype="Leave Allocation", name=f"{prefix}-allocation", employee=employee.name, docstatus=1
+		)
+		allocation.db_insert()
+
+		def insert_leave(suffix, end, docstatus=0, amended_from=None):
+			doc = frappe.get_doc(
+				doctype="Leave Application",
+				name=f"{prefix}-{suffix}",
+				employee=employee.name,
+				from_date=end,
+				to_date=end,
+				docstatus=docstatus,
+				amended_from=amended_from,
+			)
+			doc.db_insert()
+			return doc.name
+
+		older = insert_leave("1-expired", expired, docstatus=2)
+		other = insert_leave("2-expired", expired)
+		submitted = insert_leave("submitted", expired, docstatus=1)
+		recent = insert_leave("recent", today(), amended_from=older)
+		with patch.dict(frappe.conf, {"hrms_tr_retention_days": 30}):
+			preview = retention.purge(limit=1)
+			self.assertEqual((preview["leaves"], preview["remaining"]), (1, 1))
+			self.assertTrue(frappe.db.exists("Leave Application", older))
+			frappe.db.savepoint("before_retention_link_check")
+			with self.assertRaises(frappe.LinkExistsError):
+				retention.purge(dry_run=False, limit=1)
+			frappe.db.rollback(save_point="before_retention_link_check")
+			self.assertTrue(frappe.db.exists("Leave Application", older))
+			frappe.db.set_value("Leave Application", recent, "amended_from", None)
+
+			purge_outcome = retention.purge(dry_run=False, limit=1)
+			self.assertEqual((purge_outcome["leaves"], purge_outcome["remaining"]), (1, 1))
+			self.assertFalse(frappe.db.exists("Leave Application", older))
+			self.assertFalse(frappe.db.exists("Deleted Document", {"deleted_name": older}))
+			self.assertTrue(frappe.db.exists("Employee", employee.name))
+			self.assertTrue(frappe.db.exists("Leave Allocation", allocation.name))
+			for name in (other, submitted, recent):
+				self.assertTrue(frappe.db.exists("Leave Application", name))
