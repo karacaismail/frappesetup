@@ -35,7 +35,7 @@ frappe/skills: LICENSE yok) metin kopyalanmaz; yol + commit ile atıf yapılır.
   `press.api.client.run_doc_method` yalnız `@dashboard_whitelist` metotlarını çalıştırır.
 - `operator`: Press sitesinde System User (kılavuzdaki Desk yolu). Frappe Desk API: `frappe.client.get`, `frappe.client.get_list`,
   `POST /api/method/run_doc_method {dt, dn, method, args}` (yalnız `@frappe.whitelist()` doc metotları, doc izniyle).
-- `infrastructure_owner` (Hüseyin Cengiz), `dns_owner` (GoDaddy: Hüseyin Cengiz kaydı hazırlar ve doğrular, Asistan Hüseyin uygular),
+- `infrastructure_owner` (DevOps sorumlusu), `dns_owner` (GoDaddy: DevOps sorumlusu kaydı hazırlar ve doğrular, alan adı sorumlusu uygular),
   `account_holder` (yasal kutu, ödeme), `app_developer` (yerel bench komutları): MCP bunları yürütmez; kontrat devri yazar.
 - Bu paketin MCP'si (`press-ai`) kullanıcının kendi Press yetkisiyle HTTPS konuşur; shell, SSH, Server Script, ham SQL, ham Python yoktur.
   Eski özel SSH MCP'si (stdio, 5 araç, SSH ControlMaster üzerinden root; `--full-admin` keyfi komut) ayrıdır; bu paket onu çağırmaz,
@@ -110,7 +110,7 @@ OPERATION alanlarının hepsi bulunur; uygulanamayan alan `null` veya `[]` olur:
   alan listeli `frappe.client.get_list` (alt tablolar `parent` ile) kullanır; kontrattaki `api[].transport` buna göre
   `get_list` yazılır.
 - `source.source_id` yalnız `contracts/sources.json` kimliklerinden; `lines` gerçek satır aralığı `[ilk, son]`.
-- `owner_handoff`: `{"role": "...", "person": "Hüseyin Cengiz | Asistan Hüseyin | null", "steps": ["..."], "acceptance": "..."}`.
+- `owner_handoff`: `{"role": "...", "person": "DevOps sorumlusu | Alan adı sorumlusu | null", "steps": ["..."], "acceptance": "..."}`.
 - `params`: MCP'ye açılan girdinin JSON Schema'sı; `implemented` işlemlerde zorunlu ve `additionalProperties: false`, diğerlerinde `null`.
 - `implemented` statüsünü yalnız aşağıdaki uygulanan küme taşır; runtime'daki kod izin listesiyle test edilir. Kontrat düzenlemesi
   tek başına yeni bir çağrıyı yürütülebilir yapmaz.

@@ -36,14 +36,14 @@ Bu sayfa tasarım sözleşmesidir; önizleme ucu, URL kuralları ve paylaşım h
 | Yanıt yalnız oturuma göre seçilir, User-Agent'a göre değişmez; içerik ürün genelindeki rota kaydından üretilir, kayıt ve kiracının kurulu uygulamaları okunmaz | MUST | Platform ekibi | Farklı User-Agent'larda ve uygulaması kurulu olan/olmayan kiracıda gövde aynı |
 | Yoldaki kimlik yalnız kaçışlanarak `og:url` ve canonical'a yansır; ikisi mutlak, slug'sız ve sorgusuzdur, liste rotasında da: oturumsuz yanıt sorgu değerini yansıtmaz. Oturumlu SPA'daki liste canonical'ı ise tanınan filtreleri taşır (aşağıda, G-132) ([OGP](https://ogp.me/)) | MUST | Frontend ekibi | Slug'lı, `?utm_source=x` ve `?durum=acik` taşıyan istekte `og:url` sorgusuz; gövdede kayıt başlığı ve alan değeri yok |
 | `og:image` ekran türüne ait statik, oturumsuz erişilebilir HTTPS görseldir; öneri 1200×600 PNG/JPEG; Meta görseli URL'ye göre önbelleklediği için URL içerik özeti taşır ([Meta](https://developers.facebook.com/docs/sharing/webmasters/)) | MUST (WhatsApp sınırları), SHOULD (öneri) | Frontend ekibi | CI görselin boyutunu, oranını ve ağırlığını denetler |
-| Başlıklar: `X-Robots-Tag: noindex, nofollow`, `Cache-Control: private, no-store`, `Vary: Cookie`; robots.txt panel yollarını engellemez | MUST | Platform ekibi + Hüseyin Cengiz (nginx) | Başlık testi; oturumlu yanıt hiçbir katmanda oturumsuz isteğe dönmez |
+| Başlıklar: `X-Robots-Tag: noindex, nofollow`, `Cache-Control: private, no-store`, `Vary: Cookie`; robots.txt panel yollarını engellemez | MUST | Platform ekibi + DevOps sorumlusu (nginx) | Başlık testi; oturumlu yanıt hiçbir katmanda oturumsuz isteğe dönmez |
 | Kiracı adı ve logosu yalnız kiracı ayarı açıksa görünür; varsayılan ürün markasıdır | MUST | Ürün sahibi + Frontend ekibi | Ayarı kapalı kiracıda host adı dışında kiracı izi yok |
 | Önizleme API çağırmaz, satıcı betiği yüklemez, `page_view` üretmez; SPA kabuğu HTML'i de kayıt verisi gömmez | MUST | Frontend ekibi | Ağ kaydı ve kabuk HTML denetimi |
 | Dönüş adresi aynı host'ta, `/` ile başlayan, `//`, şema ve ters bölü içermeyen, rota kaydındaki bir yoldur; değilse panel ana sayfası ([OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html)); Frappe'nin kendi denetimi (doğrulanacak) | MUST | Platform ekibi | `//kotu.example`, `https://kotu.example`, `/\kotu.example` reddedilir |
 
 ## URL sözleşmesi (G-132)
 
-Sahip: Frontend ekibi (rota kaydı, SPA), Platform ekibi (çözümleme, yönlendirme), Hüseyin Cengiz (nginx başlıkları). Yollar panel kökü `/panel` altındadır (G-75).
+Sahip: Frontend ekibi (rota kaydı, SPA), Platform ekibi (çözümleme, yönlendirme), DevOps sorumlusu (nginx başlıkları). Yollar panel kökü `/panel` altındadır (G-75).
 
 | Öğe | Kural | Örnek | Düzey |
 | --- | --- | --- | --- |
