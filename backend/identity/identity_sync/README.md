@@ -18,7 +18,7 @@ Servis eylemi olayın içeriğinden seçmez. Kullanıcının güncel durumundan 
 
 | Kullanıcının durumu | Servisin yaptığı iş |
 | --- | --- |
-| Kullanıcı silindi ya da kapatıldı. | Servis kullanıcıyı bütün kiracılarda kapatır. Servis Press üyeliğini kaldırır. |
+| Kullanıcı silindi ya da kapatıldı. | Servis kullanıcıyı bütün kiracılarda kapatır. Servis Press'e tek bir `all_organizations` isteği gönderir. Press kullanıcıyı bütün takımlardan çıkarır, kapatır ve API anahtarlarını geçersiz yapar. |
 | Kullanıcının e-postası doğrulanmadı. | Servis iş yapmaz. İlk bağ yalnız doğrulanmış e-postayla kurulur. |
 | Kullanıcı kendi kaydoldu ve Organization üyesi değil. | Servis bir Organization açar ve kullanıcıyı ekler. Sonra Press'te takımı hazırlar. |
 | Kullanıcı Organization üyesi. | Servis Press'te takımı hazırlar. Servis kullanıcıyı ilgili kiracıda açar ya da günceller. Sonra kiracıda `change_email` ucunu çağırır. |

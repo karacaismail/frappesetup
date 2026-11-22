@@ -117,8 +117,9 @@ class PressEnsureTeam:
 class PressRemoveTeamMember:
     """Remove the user from a Press team.
 
-    `organization_id` set: only that organization's team. `organization_id` None: every team,
-    sent as `all_organizations: true`. That form is for a deleted user.
+    `organization_id` set: only that organization's team. The user stays enabled on Press.
+    `organization_id` None: every team, sent as `all_organizations: true`. That form is for a
+    deleted or disabled user. Press then also disables the user and revokes the API keys.
     """
 
     issuer: str
@@ -126,11 +127,14 @@ class PressRemoveTeamMember:
     organization_id: str | None
 
     def preview(self) -> Preview:
-        scope = f"organization {self.organization_id}" if self.organization_id else "every team"
+        if self.organization_id:
+            summary = f"Remove user {self.subject} from organization {self.organization_id} on Press."
+        else:
+            summary = f"Remove user {self.subject} from every team on Press, disable the user and revoke the API keys."
         return Preview(
             operation="press.remove_team_member",
             target="press",
-            summary=f"Remove user {self.subject} from {scope} on Press.",
+            summary=summary,
             destructive=True,
         )
 
@@ -211,17 +215,11 @@ def plan_actions(
     subject = event.user_id
 
     if snapshot is None or not snapshot.enabled:
-        # Silme ve kapatma: bütün sitelerde kullanıcı kapanır, Press üyeliği kalkar (X-11).
-        if snapshot is None:
-            # Silinen kullanıcının kuruluşları artık okunamaz. Üyelik kuruluş belirtilmeden kalkar.
-            removals = [PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=None)]
-        else:
-            removals = [
-                PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=org.id)
-                for org in snapshot.organizations
-            ]
+        # Deleted or disabled: the user is disabled on every tenant and leaves every Press team (X-11).
+        # One all_organizations request covers both cases. Press also disables the user and revokes
+        # the API keys when it gets that request (docs/sozlesmeler.md, section 6).
         return (
-            *removals,
+            PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=None),
             *(TenantSetEnabled(tenant=t.name, issuer=issuer, subject=subject, enabled=False) for t in tenants),
         )
 

@@ -160,13 +160,27 @@ class ProvisionTest(PipelineCase):
         (removed,) = self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)
         self.assertEqual(removed.json()["organization_id"], ORG_ID)
 
-    def test_disabled_member_leaves_team_by_organization_id(self) -> None:
+    def test_disabled_member_is_removed_with_all_organizations(self) -> None:
+        # Source: docs/sozlesmeler.md, section 6. Press disables the user and revokes the API keys
+        # when it gets all_organizations. A disabled user gets one request, like a deleted user.
         self.add_member(enabled=False)
 
         self.stack.app.processor.handle(event("USER_UPDATE", "admin"))
 
         (removed,) = self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)
-        # A request for one organization never carries all_organizations.
+        self.assertEqual(
+            removed.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "all_organizations": True}
+        )
+
+    def test_removed_membership_names_one_organization(self) -> None:
+        # The user is still enabled and only left one organization. This request never
+        # carries all_organizations, so Press does not disable the user.
+        self.stack.keycloak.add_user(keycloak_user(), [])
+        self.stack.keycloak.add_organization(ORG_ID, "kiraci1")
+
+        self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
+
+        (removed,) = self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)
         self.assertEqual(removed.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "organization_id": ORG_ID})
 
     def test_empty_organization_id_is_never_sent(self) -> None:

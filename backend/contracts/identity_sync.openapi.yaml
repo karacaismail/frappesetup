@@ -667,6 +667,8 @@ components:
           description: |
             İş yıkıcıysa doğrudur.
             `press.remove_team_member` her zaman yıkıcıdır.
+            Silinen ya da kapatılan kullanıcı için bu iş bütün takımları kapsar.
+            Press o zaman kullanıcıyı da kapatır ve API anahtarlarını geçersiz yapar.
             `tenant.set_enabled` kullanıcıyı kapatıyorsa yıkıcıdır.
     PreviewDigest:
       type: string

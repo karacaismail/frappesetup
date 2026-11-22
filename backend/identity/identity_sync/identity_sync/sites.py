@@ -139,7 +139,7 @@ class PressClient:
         """
         body: dict[str, object] = {"issuer": action.issuer, "subject": action.subject}
         if action.organization_id is None:
-            # Deleted user: the organizations can no longer be read from Keycloak.
+            # Deleted or disabled user. Press also disables the user and revokes the API keys.
             body["all_organizations"] = True
         elif action.organization_id:
             body["organization_id"] = action.organization_id

@@ -75,12 +75,8 @@ PROVISION = TenantProvision(
     enabled=True,
 )
 CHANGE_EMAIL = TenantChangeEmail(tenant="kiraci1", issuer=ISSUER, subject=SUB, new_email="ayse@example.test")
-DISABLED_MEMBER = (
-    PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=ORG.id),
-    TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject=SUB, enabled=False),
-    TenantSetEnabled(tenant="kiraci2", issuer=ISSUER, subject=SUB, enabled=False),
-)
-# Silinen kullanıcının kuruluşları artık okunamaz. Üyelik kuruluş belirtilmeden kalkar.
+# Source: docs/sozlesmeler.md, section 6. Press disables the user and revokes the API keys
+# when it gets all_organizations. So a deleted user and a disabled user get the same single request.
 DEPROVISION_EVERYWHERE = (
     PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=None),
     TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject=SUB, enabled=False),
@@ -132,17 +128,26 @@ class RemovalTest(unittest.TestCase):
         self.assertEqual(plan(event("admin", "USER_DELETE"), None), DEPROVISION_EVERYWHERE)
 
     def test_disabled_user_is_disabled_everywhere(self) -> None:
-        # Kapatılan kullanıcının kuruluşları bilinir. Üyelik her kuruluş için ayrı kalkar.
-        self.assertEqual(plan(event("admin", "USER_UPDATE"), user(enabled=False)), DISABLED_MEMBER)
+        self.assertEqual(plan(event("admin", "USER_UPDATE"), user(enabled=False)), DEPROVISION_EVERYWHERE)
 
-    def test_disabled_user_in_two_organizations_leaves_both_teams(self) -> None:
+    def test_disabled_user_in_two_organizations_gets_one_request_for_all(self) -> None:
+        # One all_organizations request, not one request per organization.
         actions = plan(event("admin", "USER_UPDATE"), user(enabled=False, orgs=(ORG, OTHER_ORG)))
-        removed = [a.organization_id for a in actions if isinstance(a, PressRemoveTeamMember)]
-        self.assertEqual(removed, [ORG.id, OTHER_ORG.id])
+        removals = [a for a in actions if isinstance(a, PressRemoveTeamMember)]
+        self.assertEqual(removals, [PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=None)])
+
+    def test_disabled_user_without_organization_is_still_disabled_on_press(self) -> None:
+        # Press must disable the user and revoke the API keys even if no membership is left.
+        actions = plan(event("admin", "USER_UPDATE"), user(enabled=False, orgs=()))
+        self.assertEqual(actions, DEPROVISION_EVERYWHERE)
 
     def test_disabled_state_wins_over_event_type(self) -> None:
-        # Eylemi olayın adı değil kullanıcının güncel durumu belirler.
-        self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user(enabled=False)), DISABLED_MEMBER)
+        # The user's current state decides the action, not the event name.
+        self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user(enabled=False)), DEPROVISION_EVERYWHERE)
+
+    def test_membership_event_of_disabled_user_sends_all_organizations(self) -> None:
+        ev = event("admin", "ORGANIZATION_MEMBERSHIP_DELETE", ORG.id)
+        self.assertEqual(plan(ev, user(enabled=False), ORG), DEPROVISION_EVERYWHERE)
 
 
 class AdminUpdateTest(unittest.TestCase):
@@ -219,6 +224,16 @@ class PreviewTest(unittest.TestCase):
         preview = PROVISION.preview()
         self.assertFalse(preview.destructive)
         self.assertNotIn("ayse@example.test", preview.summary)
+
+    def test_preview_tells_the_human_that_press_disables_the_user(self) -> None:
+        # The approver must see the full effect: Press disables the user and revokes the API keys.
+        everywhere = PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=None).preview()
+        one_team = PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=ORG.id).preview()
+
+        self.assertIn("disable the user", everywhere.summary)
+        self.assertIn("revoke the API keys", everywhere.summary)
+        self.assertNotIn("disable", one_team.summary)
+        self.assertIn(ORG.id, one_team.summary)
 
     def test_remove_team_member_is_destructive(self) -> None:
         self.assertTrue(PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=None).preview().destructive)
