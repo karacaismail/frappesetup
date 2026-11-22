@@ -1440,8 +1440,44 @@ class RequestLogTest(ServerCase):
         status, log = self.logged("POST", "/v1/operations/onay-gizli-17/resolve", b'{"resolution": "abandoned"}', self.bearer())
 
         self.assertEqual(status, 404)
-        self.assertNotIn("onay-gizli-17", log.replace("operation_id=onay-gizli-17", ""))
+        self.assertNotIn("onay-gizli-17", log)
         self.assertIn("/v1/operations/{operation_id}/resolve 404", log)
+
+    def test_refused_caller_leaves_nothing_it_sent_in_the_log(self) -> None:
+        # A preview client may not resolve an operation. It sends a customer number where the
+        # operation id belongs. The refusal is logged, the value it sent is not.
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            reply = self.call(
+                "POST", "/v1/operations/musteri-48213/resolve", b'{"resolution": "abandoned"}', self.bearer(PREVIEW_TOKEN)
+            )
+
+        self.assertEqual(reply, (403, {"error": "forbidden"}))
+        # The whole log output of the request: one audit line and one request line.
+        self.assertEqual(
+            logs.output,
+            [
+                "WARNING:identity_sync:execute operation=resolve_operation azp=ai-agent outcome=forbidden",
+                "INFO:identity_sync:/v1/operations/{operation_id}/resolve 403",
+            ],
+        )
+
+    def test_no_refusal_logs_a_value_from_the_request(self) -> None:
+        # Every endpoint, called by a listed client without the right, with made-up personal
+        # values in the body. None of them may reach the log.
+        marker = "musteri-48213"
+        bodies = (
+            ("/v1/reconcile", {"dry_run": False, "preview_digest": "0" * 64, "approval_id": marker}, PREVIEW_TOKEN),
+            ("/v1/dead-letters/replay", {"dry_run": False, "preview_digest": "0" * 64, "approval_id": marker}, PREVIEW_TOKEN),
+            ("/v1/invitations", {"email": f"{marker}@example.test", "organization_id": marker, "dry_run": True}, PRESS_TOKEN),
+            ("/v1/sessions/revoke", {"sid": marker, "subject": marker}, PREVIEW_TOKEN),
+            ("/v1/account-deletions", {"issuer": self.stack.issuer, "subject": marker, "reauthenticated_at": NOW}, PREVIEW_TOKEN),
+            (f"/v1/operations/{marker}/resolve", {"resolution": "abandoned"}, PREVIEW_TOKEN),
+        )
+        for path, body, token in bodies:
+            with self.subTest(path=path), self.assertLogs("identity_sync", level="INFO") as logs:
+                status, _reply = self.post_json(path, body, token)
+                self.assertEqual(status, 403)
+            self.assertNotIn(marker, "\n".join(logs.output))
 
     def test_known_routes_are_logged_by_name_and_status(self) -> None:
         self.assertIn("/healthz 200", self.logged("GET", "/healthz")[1])

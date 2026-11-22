@@ -487,7 +487,9 @@ class _Api:
         """
         payload = _json_object(body)
         if azp not in self._settings.execute_azp:
-            _LOG.warning("execute operation=resolve_operation azp=%s operation_id=%s outcome=forbidden", azp, operation_id)
+            # A refused caller is not trusted with anything. The id it sent is not logged:
+            # it may be any text, for example a customer number put there by mistake.
+            _LOG.warning("execute operation=resolve_operation azp=%s outcome=forbidden", azp)
             raise _Forbidden
         resolution = _text(payload, "resolution", required=True, max_length=20)
         if resolution not in RESOLUTIONS:

@@ -432,24 +432,21 @@ python3 -m tests.measure
 ```
 
 - Komut zamanlanmaz. Yalnız siz başlatınca çalışır.
-- Komut gerçek HTTP sunucusunu sahte Keycloak, Press ve kiracıyla açar. Ağa çıkmaz.
-- Örnek veri 200 uydurma kullanıcıdır.
-- Komut her ucu 50 kez sırayla, sonra 20 kez aynı anda çağırır.
+- Bu servis bir Frappe sitesi değildir. Geliştirme kurulumu, gerçek HTTP sunucusu ile sahte Keycloak, Press ve kiracıdır. Komut bu kurulumu açar. Ağa çıkmaz.
+- Örnek veri 200 uydurma kullanıcıdır. Liste uçları için kuyrukta 50 olay ve günlükte 50 açık işlem vardır.
+- Komut sözleşmedeki her ucu ölçer. Her ucu 50 kez sırayla, sonra 20 kez aynı anda çağırır.
+- Önizleme ve yürütme biçimi olan uç iki biçimde de ölçülür. Önizleme okuma, yürütme yazma sayılır.
 - Komut sonucu JSON olarak yazar. Bir sınır aşılırsa ya da bir istek hata verirse 1 koduyla çıkar.
 - Sayıları `--samples`, `--concurrency` ve `--users` seçenekleri değiştirir.
+- Tam ölçüm dakikada 600 istekten fazlasını gönderir. Komut bu yüzden istek sınırını ölçüm süresince yükseltir. Rapor bunu `rate_limit_raised` alanında yazar.
 
-Ölçülen uçlar şunlardır:
-
-| Uç | Tür | Sınır |
-| --- | --- | --- |
-| `POST /v1/sessions/revoke` | Yazma | 1.000 ms |
-| `POST /v1/account-deletions` | Yazma | 1.000 ms |
-| `POST /v1/reconcile`, önizleme | Okuma | 500 ms |
+Bir test, komutun sözleşmedeki bütün uçları ölçtüğünü denetler. Yeni bir uç eklenip ölçüme eklenmezse test başarısız olur.
 
 Sonucu okurken şunları bilin:
 
 - Süre istemcide ölçülür. Yani sunucu süresine yerel ağ gidiş dönüşü eklenir.
 - Sahte hedefler hemen yanıt verir. Sayılar bu servisin maliyetini gösterir. Keycloak, Press ve kiracı sitesinin süresini göstermez.
+- Mutabakat ve yeniden işletme uçları aynı anda tek onaylı planı yürütür. Aynı önizleme için verilen 20 onaydan biri çalışır. Ötekiler 409 alır ve hiçbir şey yazmaz. Rapor bunları hata saymaz, `concurrent_conflicts` alanında verir.
 - Sunucu istekleri tek tek işler. 20 istek aynı anda gelirse sonuncusu öncekileri bekler. Rapor bu bekleme süresini `concurrent_wait_p95_ms` alanında verir. Bu alan sınırla karşılaştırılmaz.
 
 ## Bilinen eksikler
