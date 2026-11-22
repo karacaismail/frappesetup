@@ -18,14 +18,9 @@ def register() -> Callable[[], None]:
 	"""Whitelists the stub for this test process only. Returns the function that removes it again."""
 	if not frappe.in_test:
 		raise RuntimeError("The mobile stub is only for tests.")
-	import sys
-
-	module = sys.modules[__name__]
-	original = module.v1_whoami
-	# `frappe.whitelist` returns a type-checking wrapper (frappe/__init__.py:462). The wrapper is the
-	# whitelisted object, so the module attribute must point to it while the test runs.
-	wrapped = frappe.whitelist(methods=["POST"])(original)
-	module.v1_whoami = wrapped
+	function = v1_whoami
+	frappe.whitelisted.add(function)
+	frappe.allowed_http_methods_for_whitelisted_func[function] = ["POST"]
 	# Mobile calls run as the Website User. The shell's method allow list (docs/sozlesmeler.md) must
 	# list the stub while the test runs, as the mobile module lists its real endpoints.
 	real_get_hooks = frappe.get_hooks
@@ -39,9 +34,8 @@ def register() -> Callable[[], None]:
 	frappe.get_hooks = get_hooks
 
 	def unregister() -> None:
-		frappe.whitelisted.discard(wrapped)
-		frappe.allowed_http_methods_for_whitelisted_func.pop(wrapped, None)
-		module.v1_whoami = original
+		frappe.whitelisted.discard(function)
+		frappe.allowed_http_methods_for_whitelisted_func.pop(function, None)
 		frappe.get_hooks = real_get_hooks
 
 	return unregister
