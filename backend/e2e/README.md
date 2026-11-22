@@ -37,6 +37,16 @@ Kiracı ağı da sahte sağlayıcıya ulaştı.
 Komutları depo kökünden ve kendi Pane ortamınızda çalıştırın.
 Pane, `PANE_PORT` değişkeniyle bu çalışma alanına port ayırır.
 
+### Colima profilleri
+
+- **Press gerekmiyorsa** `colima-factory` kullanın. `up`, mevcut kiracı imajını yeniden kullanır. İmaj yoksa betik imajı derler. Factory diskinde 5 GiB boş alan yoksa betik ortamı açmaz.
+- **Press gerekiyorsa** tüm ortam `docker --context colima` ile açılır. `environment.sh --press up`, belleği `colima ssh -- free -g` komutuyla ölçer. Alt sınır 3 GB'tır. Press ve Keycloak birleşene kadar betik ölçümden sonra durur.
+
+Mevcut kiracı imajı, son derlemede alınan kodu taşır.
+Kiracı kodu değişirse imajı güncelleyin ve sonra testleri çalıştırın.
+
+### Press gerektirmeyen testler
+
 1. Kiracıyı `backend/e2e/environment.sh up` komutuyla açın.
 2. Aşağıdaki örnek veriyi hazırlayın.
 3. İlgili test grubunu çalıştırın.
@@ -56,7 +66,7 @@ Yalnız yerel test ortamını kullanın. Gerçek hesap veya veri kullanmayın.
 Parolaları, oturum çerezlerini ve anahtarları yalnız yerel ortam değişkenlerine koyun.
 
 - **Tarayıcı.** Keycloak'a doğrulanmış `e2e-user@example.test` hesabını ekleyin. Parolasını `E2E_KEYCLOAK_PASSWORD` değişkenine verin. Kiracı ile Keycloak'ı kendi yerel adreslerinde bağlayın.
-- **Kullanıcı eşitleme.** Keycloak'a her koşu için yeni ve doğrulanmış bir örnek hesap ekleyin. Örneğin `e2e-sync-02@example.test` kullanın. Hesabı `E2E_SYNC_EMAIL` değişkenine verin. Kullanıcı kimliğini `E2E_SYNC_SUBJECT` değişkenine verin. Servis ile teste aynı `IDENTITY_SYNC_WEBHOOK_SECRET` değerini verin. Bu hesap deneme öncesinde kiracıda bulunmamalı.
+- **Kullanıcı eşitleme.** Her koşu için Keycloak'a yeni bir örnek hesap ekleyin. Örneğin `e2e-sync-02@example.test` kullanın. Hesabı Keycloak'ta doğrulanmış olarak işaretleyin. Hesabı `E2E_SYNC_EMAIL` değişkenine verin. Kullanıcı kimliğini `E2E_SYNC_SUBJECT` değişkenine verin. Servis ile teste aynı `IDENTITY_SYNC_WEBHOOK_SECRET` değerini verin. Bu hesap deneme öncesinde kiracıda bulunmamalı.
 - **Yetki ve onay.** Örnek kayıt türünü `E2E_DOCTYPE` değişkenine verin. Örnek kayıt adlarını `E2E_VISIBLE_RECORD` ve `E2E_HIDDEN_RECORD` değişkenlerine verin. Okuyucu yalnız ilk kayda erişebilmeli. Yetkili test hesabı iki kaydı da okuyabilmeli. Bu hesap ilk kaydı değiştirebilmeli. Yazılabilir metin alanının adını `E2E_UPDATE_FIELD` değişkenine verin.
 - **Oturumlar.** Okuyucu için `E2E_READER_COOKIE` ve `E2E_READER_CSRF` kullanın. Yetkili hesap için `E2E_OPERATOR_COOKIE` ve `E2E_OPERATOR_CSRF` kullanın. CSRF değeri, sitenin yazma isteğini doğruladığı oturum anahtarıdır.
 - **Model geçidi.** `backend/e2e/environment.sh provider` komutuyla sahte sağlayıcıyı açın. `e2e-local-only` yoluna iki kimliksiz Ollama uyumlu adres ekleyin. İlk adres `http://e2e-provider:<PANE_PORT+7>/limited` olur. İkinci adres `http://e2e-provider:<PANE_PORT+7>/fallback` olur. İkinci API kaydının adını `E2E_FALLBACK_API` değişkenine verin. Bu yola gerçek sağlayıcı eklemeyin. Tekrar öncesi ilk adresin bekleme süresi dolmalı.
