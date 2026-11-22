@@ -1,0 +1,71 @@
+{
+  "realm": "platform",
+  "users": [
+    {
+      "username": "ayse.ornek@example.test",
+      "email": "ayse.ornek@example.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Ayşe",
+      "lastName": "Örnek",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Ornek-Parola-Ayse-2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "mehmet.ornek@example.test",
+      "email": "mehmet.ornek@example.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Mehmet",
+      "lastName": "Örnek",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Ornek-Parola-Mehmet-2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "dogrulanmamis@example.test",
+      "email": "dogrulanmamis@example.test",
+      "emailVerified": false,
+      "enabled": true,
+      "firstName": "Doğrulanmamış",
+      "lastName": "Örnek",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Ornek-Parola-Dogrulanmamis-2026",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "totp.ornek@example.test",
+      "email": "totp.ornek@example.test",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Totp",
+      "lastName": "Örnek",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Ornek-Parola-Totp-2026",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "dev-totp",
+          "secretData": "{\"value\":\"dev-totp-secret-0123456789\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\"}"
+        }
+      ]
+    }
+  ]
+}

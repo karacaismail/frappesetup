@@ -39,15 +39,16 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 | İstemci | Tür | Akış | Dönüş adresi | Çıkış bildirimi |
 | --- | --- | --- | --- | --- |
 | `site-kiraci1` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<kiracı adresi>/api/method/platform_core.api.auth.keycloak_callback` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
-| `press` | Gizli sırlı | Yetkilendirme kodu | `<Press adresi>/api/method/press_tr.api.auth.keycloak_callback` | `<Press adresi>/api/method/press_tr.api.keycloak_backchannel_logout` |
+| `press` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<Press adresi>/api/method/press_tr.api.auth.keycloak_callback` | `<Press adresi>/api/method/press_tr.api.keycloak_backchannel_logout` |
 | `site-kiraci1-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
+| `mobile-app` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | `ATONOTA_MOBILE_REDIRECT_URI` | Yok |
 
 - Dönüş adresini tam adresle kaydedin. Joker karakter kullanmayın.
 - Çıkış bildiriminde “oturum gerekli” ayarını açın.
 - Yeni kiracı için aynı biçimi kullanın. Örneğin `site-kiraci2` yazın.
-- Her kiracının iki istemcisi vardır. `site-<kiracı>` yalnız tarayıcı girişi içindir. Servis hesabı kapalıdır ve isteğe bağlı servis kapsamı taşımaz. `site-<kiracı>-service` yalnız servis hesabıdır. Tarayıcı akışı kapalıdır. `aud-identity-sync` kapsamını yalnız bu istemci isteyebilir. Böylece tarayıcı girişi servis hedefli belirteç alamaz. Press'teki `press` ve `press-service` ayrımı da böyledir.
+- Her kiracının iki istemcisi vardır. `site-<kiracı>` yalnız tarayıcı girişi içindir. Servis hesabı kapalıdır ve isteğe bağlı servis kapsamı taşımaz. `site-<kiracı>-service` yalnız servis hesabıdır. Tarayıcı akışı kapalıdır. Kiracının iki istemcisi içinde `aud-identity-sync` kapsamını yalnız servis istemcisi isteyebilir. Böylece tarayıcı girişi servis hedefli belirteç alamaz. Press'teki `press` ve `press-service` ayrımı da böyledir.
 - `agent-service`, `ops-bff` ve `site-ops` bu turda yoktur.
 
 ### Hedef kapsamları
@@ -58,10 +59,10 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 | --- | --- | --- |
 | `aud-site-kiraci1` | `site-kiraci1` | `identity-sync`, `press-service` |
 | `aud-press` | `press` | `identity-sync` |
-| `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri. Örnek: `site-kiraci1-service` |
+| `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri ve `press-service`. Örnek: `site-kiraci1-service` |
 
 - Bu kapsamlar varsayılan değildir. İstekte `scope` ile istenir.
-- Servis belirteci yalnız bir `aud` değeri taşır.
+- Servisler her uygulama isteği için tek hedef kapsamı ister. Keycloak birleşik kapsam isteğinde birden çok hedef verebilir. Alıcı, birden çok hedef taşıyan belirteci `wrong_audience` ile reddeder. Ayrı yönetim belirteci aşağıdaki kurala uyar.
 - Admin API yetkileri kiracıya giden belirtece girmez.
 - `identity-sync` Admin API belirtecini ayrı ister. İstekte `scope=admin-api kc-admin-api` olur. Bu belirtecin `aud` değeri `realm-management` ve Admin API adresidir. Keycloak 26.8 Admin API'si bu kapsamı ister.
 - `press-service` istemcisi `aud-press` kapsamını isteyemez. Keycloak bu isteği `invalid_scope` ile reddeder.
@@ -155,6 +156,7 @@ claims = verify_logout_token(token, cache=cache, issuer=iss, client_id="press", 
 - Her işlev geçerli belirtecin alanlarını sözlük olarak döner.
 - Geçersiz belirteçte `TokenError` yükseltir. Hatanın `code` alanı nedeni söyler.
 - `code` değerleri şunlardır: `malformed`, `invalid_signature`, `unknown_kid`, `wrong_issuer`, `wrong_audience`, `wrong_azp`, `expired`, `not_yet_valid`, `wrong_nonce`, `not_logout_token`.
+- Anahtar listesi alınamazsa ve önbellekte güvenilir anahtar kalmadıysa kitaplık `JwksUnavailable` yükseltir. Bu hata `TokenError` değildir. Geçici bir hizmet sorunudur. Çağıran uç bu hatayı 503 gibi açık bir geçici hata olarak döner. Belirteci geçersiz saymaz.
 - Kitaplık kimlik doğrulama sonucunu günlüğe yazmaz. Belirteci hiçbir yere yazmaz.
 
 ## 4. Kimlik bağı
