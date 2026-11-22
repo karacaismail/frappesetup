@@ -11,5 +11,5 @@ COPY --chown=frappe:frappe apps/hrms_tr apps/hrms_tr
 COPY --chown=frappe:frappe dev/hrms/seed.py dev/hrms/test_http.py dev/hrms/measure.py /workspace/hrms/
 COPY --chown=frappe:frappe contracts/hrms_tr.openapi.yaml /workspace/hrms/
 RUN uv pip install --python env/bin/python --no-deps -e apps/hrms_tr \
-    && uv pip install --python env/bin/python PyYAML==6.0.3 jsonschema==4.26.0 \
+    && uv pip install --python env/bin/python PyYAML==6.0.3 jsonschema==4.26.0 Werkzeug==3.1.9 \
     && printf '\nhrms_tr\n' >> sites/apps.txt
