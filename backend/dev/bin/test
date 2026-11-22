@@ -11,8 +11,14 @@ SITE="test-${APP//_/-}.localhost"
 # Apps the tests of an app need on the test site, installed before the app itself.
 # The access rule tests of platform_core use ERPNext's Employee and Department trees.
 REQUIRED_APPS=()
-if [[ "$APP" == "platform_core" ]]; then
+# Extra options for the test run. The shell tests read the shell contract.
+test_options=()
+if [[ "$APP" == platform_core ]]; then
     REQUIRED_APPS=(--app erpnext)
+    test_options=(
+        -v "$DEV_DIR/../contracts/platform_core-kabuk.openapi.yaml:/workspace/shell.openapi.yaml:ro"
+        -e SHELL_TEST_OPENAPI=/workspace/shell.openapi.yaml
+    )
 fi
 python3 "$DEV_DIR/init_env.py"
 "$DEV_DIR/bin/compose" config --quiet
@@ -22,5 +28,5 @@ python3 "$DEV_DIR/init_env.py"
     env/bin/python /workspace/dev/bootstrap.py "$SITE" ${REQUIRED_APPS[@]+"${REQUIRED_APPS[@]}"} --app "$APP"
 "$DEV_DIR/bin/compose" run --rm --no-deps kiraci-web \
     bench --site "$SITE" migrate --skip-search-index
-"$DEV_DIR/bin/compose" run --rm --no-deps kiraci-web \
+"$DEV_DIR/bin/compose" run --rm --no-deps "${test_options[@]}" kiraci-web \
     bench --site "$SITE" run-tests --app "$APP" "$@"
