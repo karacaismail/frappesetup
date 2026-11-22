@@ -147,6 +147,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/FrappeError"
+  /method/hrms_tr.hrms_endpoints.deny_legacy_leave_query:
+    get:
+      operationId: denyLegacyLeaveQueryGet
+      summary: Deny access to an unsupported legacy leave endpoint.
+      description: Denies the request without reading leave data.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      operationId: denyLegacyLeaveQueryPost
+      summary: Deny access to an unsupported legacy leave endpoint.
+      description: Denies the request without reading leave data.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /{rpcNamespace}/{legacyLeaveMethod}:
+    description: HRMS TR routes these upstream method aliases to its denial handler.
+    parameters:
+      - in: path
+        name: rpcNamespace
+        required: true
+        schema: {type: string, const: method}
+      - in: path
+        name: legacyLeaveMethod
+        required: true
+        schema:
+          type: string
+          enum:
+            - hrms.www.hrms.get_context_for_dev
+            - hrms.hr.doctype.leave_application.leave_application.get_leave_details
+            - hrms.hr.doctype.leave_application.leave_application.get_leave_balance_on
+            - hrms.api.get_leave_balance_map
+            - hrms.api.get_leave_types
+            - hrms.payroll.doctype.salary_slip.salary_slip.make_salary_slip_from_timesheet
+            - hrms.payroll.doctype.salary_structure.salary_structure.make_salary_slip
+            - hrms.hr.doctype.leave_application.leave_application.get_events
+    get:
+      description: Denies the request without reading leave data.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      description: Denies the request without reading leave data.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+  /v2/document/Attendance%20Request/{name}/method/get_attendance_warnings/:
+    parameters:
+      - in: path
+        name: name
+        required: true
+        schema: {type: string}
+        description: Attendance request record name.
+    get:
+      summary: Deny requests for legacy attendance warnings.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
+    post:
+      summary: Deny requests for legacy attendance warnings.
+      responses:
+        "403":
+          $ref: "#/components/responses/PermissionDenied"
 x-ai-tool:
   name: hrms_tr_approve_leave
   destructive: true
