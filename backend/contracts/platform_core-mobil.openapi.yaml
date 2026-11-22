@@ -14,6 +14,7 @@ security:
 paths:
   /platform_core.api.mobile.v1_register:
     post:
+      summary: Telefon kurulumunu kaydet
       operationId: mobileV1Register
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
@@ -35,6 +36,7 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_revoke:
     post:
+      summary: Telefon kurulumunu iptal et
       operationId: mobileV1Revoke
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
@@ -64,6 +66,7 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_push:
     post:
+      summary: Telefondaki değişiklikleri sunucuya gönder
       operationId: mobileV1Push
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
@@ -96,6 +99,7 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_pull:
     post:
+      summary: Kayıtları sunucudan telefona al
       operationId: mobileV1Pull
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
@@ -123,6 +127,7 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_cleanup:
     post:
+      summary: Süresi dolan eşitleme kayıtlarını temizle
       operationId: mobileV1Cleanup
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
@@ -146,6 +151,7 @@ paths:
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.revoke_user_installations:
     post:
+      summary: Kullanıcının tüm telefon kurulumlarını iptal et
       operationId: mobileRevokeUserInstallations
       security:
         - identitySyncBearer: []
