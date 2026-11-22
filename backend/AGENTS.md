@@ -43,13 +43,16 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `apps/platform_core/platform_core/erisim/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
 | `dev/guvenlik/`, `dev/bin/guvenlik-denetimi` | Güvenlik kapısı | guvenlik-kapisi |
 | `apps/platform_core/platform_core/mobil/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
-| `apps/cronhr/`, `dev/hrms/` | CronHR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
+| `apps/hrms_tr/`, `dev/hrms/` | HRMS TR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
 | `e2e/` | Uçtan uca entegrasyon testleri | integration-e2e |
 | `dev/naming/` | Geçmiş adların düzeltilmesi | naming-history-fix |
+| `dev/ai_readiness/`, `dev/bin/ai-readiness` | Yapay zekâ uygunluk kapısı | ai-readiness-gate |
 | `contracts/` | Uçların OpenAPI sözleşmeleri | Her uç kendi sahibinde |
 | `docs/`, `AGENTS.md`, `PROJE-KAYDI.md` | Talimat, kayıt ve sözleşme | Orkestratör |
 
 `hooks.py` ortak bir dosyadır. Yalnız kendi işinizin satırlarını ekleyin. Var olan satırları değiştirmeyin.
+
+`platform_core/translations/tr.csv` de ortak bir dosyadır. Kullanıcıya görünen metnin kaynağı İngilizcedir. Türkçesini bu dosyaya ekleyin. Yalnız kendi satırlarınızı ekleyin. Çakışmayı orkestratör birleştirmede çözer.
 
 ## Zorunlu çalışma kuralları
 
@@ -88,6 +91,8 @@ Yeni kod İngilizce adlarla yazılır (D-12). Kural yalnız bundan sonrası içi
 - Yeni yazdığınız koddaki yorumu, hata iletisini ve günlük metnini İngilizce yazın.
 - Var olan dosya, klasör ve modüllerin adını değiştirmeyin.
 - Var olan bir klasöre yeni dosya eklerseniz yalnız yeni dosyanın adını İngilizce verin.
+- Proje sahibi bir ürün adını bu depoda yasakladı (D-13). Ad bu projeyle ilgili değildir. Adı hiçbir dosyaya, commit mesajına, imaj ya da container adına yazmayın.
+- İK uygulamasının teknik adı `hrms_tr` olur. Görünen adı “HRMS TR” olur. Yapay zekâ uygunluk kapısı yasaklı adı yakalar.
 
 ### Yapay zekâ erişimi
 
@@ -121,6 +126,9 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
    - Frappe için yeni temel imaj üretmeyin. `frappe/erpnext:v16.55.0` ve `press-local-bench:latest` imajlarını temel alın.
    - Kendi eski `fs-*` imajlarınızı ve derleme önbelleğinizi silin. Başka projenin imajına dokunmayın.
    - Boş yer 5 GB'ın altına inerse raporlayın. Gerekirse `colima` profili kullanılır. O profilde 64 GB boş disk ama 8 GB bellek var.
+   - 22 Kasım 2026 Pazar günü orkestratör ölü imaj ve birimleri sildi. Boş yer 5,7 GB oldu.
+   - Her `up` imajı yeniden derlemesin. İmaj varsa yeniden kullanın.
+   - Press gereken ağır ortamı `colima` profilinde açın. Önce `colima ssh -- free -g` ile en az 3 GB boş bellek ölçün.
 5. **Colima'yı yeniden başlatmayın.** Kalıcı çözüm `colima restart factory` ister. Bu komut başka projelerin container'larını yeniden başlatır.
 
 
