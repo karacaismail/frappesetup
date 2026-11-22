@@ -63,15 +63,15 @@ class Row:
 
 
 ROWS = (
-    Row("reconcile preview", "POST", "/v1/reconcile", {"dry_run": True}, AGENT, 200, PRESS),
+    Row("reconcile preview", "POST", "/v1/reconcile", {"dry_run": True}, OPERATOR, 200, AGENT),
     Row("reconcile execute", "POST", "/v1/reconcile", STALE, OPERATOR, 409, AGENT),
-    Row("dead-letters list", "GET", "/v1/dead-letters", None, AGENT, 200, PRESS),
-    Row("replay preview", "POST", "/v1/dead-letters/replay", {"dry_run": True}, AGENT, 200, PRESS),
+    Row("dead-letters list", "GET", "/v1/dead-letters", None, OPERATOR, 200, AGENT),
+    Row("replay preview", "POST", "/v1/dead-letters/replay", {"dry_run": True}, OPERATOR, 200, AGENT),
     Row("replay execute", "POST", "/v1/dead-letters/replay", STALE, OPERATOR, 409, AGENT),
-    Row("operations list", "GET", "/v1/operations", None, AGENT, 200, PRESS),
-    Row("operation resolve", "POST", "/v1/operations/o-1/resolve", {"resolution": "abandoned"}, OPERATOR, 404, AGENT),
-    Row("invitation preview", "POST", "/v1/invitations", {**INVITATION, "dry_run": True}, OPERATOR, 200, PRESS, 403),
-    Row("invitation execute", "POST", "/v1/invitations", {**INVITATION, **STALE}, OPERATOR, 409, AGENT, 403),
+    Row("operations list", "GET", "/v1/operations", None, OPERATOR, 200, AGENT),
+    Row("operation resolve", "POST", "/v1/operations/o-1/resolve", {"resolution": "abandoned"}, SITE, 200, AGENT),
+    Row("invitation preview", "POST", "/v1/invitations", {**INVITATION, "dry_run": True}, SITE, 200, PRESS, 403),
+    Row("invitation execute", "POST", "/v1/invitations", {**INVITATION, **STALE}, SITE, 409, AGENT, 403),
     Row("session revoke", "POST", "/v1/sessions/revoke", {"sid": SID, "subject": SUBJECT}, SITE, 200, AGENT, 403),
     Row("account deletion", "POST", "/v1/account-deletions", None, PRESS, 200, SITE, 403),
 )
@@ -84,14 +84,16 @@ class MatrixCase(unittest.TestCase):
         self.stack = Stack(two_tenants=True)
         self.addCleanup(self.stack.close)
         sites = frozenset({SITE, OTHER_SITE})
-        # The handoff separates platform operators from tenant session clients.
+        # docs/sozlesmeler.md, section 7: the tenant site clients execute and end sessions.
         self.stack.app.settings = dataclasses.replace(
             self.stack.app.settings,
             preview_azp=frozenset({AGENT}),
-            execute_azp=frozenset({OPERATOR}),
+            operator_azp=frozenset({OPERATOR}),
+            execute_azp=sites,
             session_azp=sites,
             deletion_azp=frozenset({PRESS}),
         )
+        self.stack.app.store.operation_begin("o-1", "invite_user", ORG_ID, ["create_user"])
         keycloak = self.stack.keycloak
         org = keycloak.add_organization(ORG_ID, "kiraci1")
         keycloak.add_user(keycloak_user(), [org])
@@ -180,20 +182,24 @@ class MatrixCase(unittest.TestCase):
         self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [SID])
         self.assertEqual(self.send(row, self.credential(SITE)), 200)
 
-    def test_tenant_cannot_gain_platform_rights_through_misconfiguration(self) -> None:
+    def test_listed_client_without_a_tenant_cannot_execute_anything(self) -> None:
+        # Defence in depth. The settings refuse such a list. If a list held a client that is
+        # bound to no configured tenant, the service would still refuse to execute for it:
+        # it could not tell whose organization the work belongs to.
         if type(self) is MatrixCase:
             self.skipTest("the shared base has no verifier; the two subclasses run this test")
+        unbound = "approval-service"
         settings = self.stack.app.settings
         self.stack.app.settings = dataclasses.replace(
-            settings, execute_azp=settings.execute_azp | {SITE}, preview_azp=settings.preview_azp | {SITE}
+            settings, execute_azp=settings.execute_azp | {unbound}, session_azp=settings.session_azp | {unbound}
         )
         self.serve_again()
         before = self.writes()
         for row in ROWS:
-            if row.right not in (OPERATOR, AGENT):
+            if row.right != SITE:
                 continue
             with self.subTest(row=row.name):
-                self.assertEqual(self.send(row, self.credential(SITE)), 403)
+                self.assertEqual(self.send(row, self.credential(unbound)), 403)
         self.assertEqual(self.writes(), before)
         self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [SID])
 
@@ -232,7 +238,7 @@ class AccessMatrixTest(MatrixCase):
         self.run_common_columns()
 
     def test_health_check_needs_no_credential(self) -> None:
-        health = Row("health", "GET", "/healthz", None, AGENT, 200, PRESS)
+        health = Row("health", "GET", "/healthz", None, OPERATOR, 200, AGENT)
         for authorization in (None, self.credential("stranger"), self.credential(AGENT)):
             self.assertEqual(self.send(health, authorization), 200)
 

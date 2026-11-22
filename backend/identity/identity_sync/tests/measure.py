@@ -80,7 +80,8 @@ class _Bench:
         self.stack.app.settings = dataclasses.replace(
             settings,
             preview_azp=frozenset({AGENT}),
-            execute_azp=frozenset({OPERATOR}),
+            operator_azp=frozenset({OPERATOR}),
+            execute_azp=sites,
             session_azp=sites,
             deletion_azp=frozenset({PRESS}),
             rate_limit=max(settings.rate_limit, requests_needed),
@@ -206,14 +207,14 @@ class _Bench:
         return self.call("POST", "/v1/account-deletions", body, PRESS)
 
     def preview_reconcile(self) -> Callable[[], int]:
-        return self.call("POST", "/v1/reconcile", {"dry_run": True}, AGENT)
+        return self.call("POST", "/v1/reconcile", {"dry_run": True}, OPERATOR)
 
     def execute_reconcile(self) -> Callable[[], int]:
         # One drift per call: a member of Keycloak who has no record on the tenant yet.
         subject = self.fresh("drift")
         self.keycloak.add_user(keycloak_user(subject=subject, email=f"{subject}@example.test"), [self.org])
         self.serve_users()
-        _status, preview = self.request("POST", "/v1/reconcile", {"dry_run": True}, AGENT)
+        _status, preview = self.request("POST", "/v1/reconcile", {"dry_run": True}, OPERATOR)
         body = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": self.fresh("onay")}
         return self.call("POST", "/v1/reconcile", body, OPERATOR)
 
@@ -223,14 +224,14 @@ class _Bench:
         self.stack.app.store.add_dead_letter(failed, "tenant.provision kiraci1: HTTP 503")
 
     def list_dead_letters(self) -> Callable[[], int]:
-        return self.call("GET", "/v1/dead-letters", None, AGENT)
+        return self.call("GET", "/v1/dead-letters", None, OPERATOR)
 
     def preview_replay(self) -> Callable[[], int]:
-        return self.call("POST", "/v1/dead-letters/replay", {"dry_run": True}, AGENT)
+        return self.call("POST", "/v1/dead-letters/replay", {"dry_run": True}, OPERATOR)
 
     def execute_replay(self) -> Callable[[], int]:
         self.queue_event()
-        _status, preview = self.request("POST", "/v1/dead-letters/replay", {"dry_run": True}, AGENT)
+        _status, preview = self.request("POST", "/v1/dead-letters/replay", {"dry_run": True}, OPERATOR)
         body = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": self.fresh("onay")}
         return self.call("POST", "/v1/dead-letters/replay", body, OPERATOR)
 
@@ -240,22 +241,22 @@ class _Bench:
         return operation_id
 
     def list_operations(self) -> Callable[[], int]:
-        return self.call("GET", "/v1/operations", None, AGENT)
+        return self.call("GET", "/v1/operations", None, OPERATOR)
 
     def resolve_operation(self) -> Callable[[], int]:
-        return self.call("POST", f"/v1/operations/{self.open_operation()}/resolve", {"resolution": "abandoned"}, OPERATOR)
+        return self.call("POST", f"/v1/operations/{self.open_operation()}/resolve", {"resolution": "abandoned"}, SITE)
 
     def invitation(self) -> dict[str, object]:
         return {"email": f"{self.fresh('invite')}@example.test", "organization_id": ORG_ID}
 
     def preview_invitation(self) -> Callable[[], int]:
-        return self.call("POST", "/v1/invitations", {**self.invitation(), "dry_run": True}, OPERATOR)
+        return self.call("POST", "/v1/invitations", {**self.invitation(), "dry_run": True}, SITE)
 
     def execute_invitation(self) -> Callable[[], int]:
         invitation = self.invitation()
-        _status, preview = self.request("POST", "/v1/invitations", {**invitation, "dry_run": True}, OPERATOR)
+        _status, preview = self.request("POST", "/v1/invitations", {**invitation, "dry_run": True}, SITE)
         body = {**invitation, "dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": self.fresh("onay")}
-        return self.call("POST", "/v1/invitations", body, OPERATOR)
+        return self.call("POST", "/v1/invitations", body, SITE)
 
     def serve_invitations(self) -> None:
         """Keycloak answers for an invitation: create the user, add the member, send the e-mail."""

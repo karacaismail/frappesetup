@@ -18,7 +18,7 @@ import sqlite3
 
 from . import fakes
 from .fakes import ORG_ID, SUBJECT, keycloak_user
-from .test_server import NOW, PRESS_TOKEN, PREVIEW_TOKEN, ServerCase
+from .test_server import NOW, PRESS_TOKEN, OPERATOR_TOKEN, ServerCase
 
 CLOSE = ["press.remove_team_member", "tenant.set_enabled", "tenant.revoke_user_installations"]
 ANONYMIZE = ["press.anonymize_user", "tenant.anonymize_user"]
@@ -88,10 +88,10 @@ class DeletionPathsTest(ServerCase):
         return self.seen(self.post_event({**DELETE_EVENT, "id": event_id}))
 
     def queue_listing(self) -> dict:
-        return self.seen(self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN)))
+        return self.seen(self.call("GET", "/v1/dead-letters", None, self.bearer(OPERATOR_TOKEN)))
 
     def replay_preview(self) -> dict:
-        return self.seen(self.post_json("/v1/dead-letters/replay", {"dry_run": True}, PREVIEW_TOKEN))
+        return self.seen(self.post_json("/v1/dead-letters/replay", {"dry_run": True}, OPERATOR_TOKEN))
 
     def replay(self, preview: dict, approval: str = "onay-p1") -> tuple[int, dict]:
         body = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": approval}
@@ -294,7 +294,7 @@ class DeletionPathsTest(ServerCase):
     def test_row_17_reconcile_finishes_a_missed_delete(self) -> None:
         self.stack.keycloak.remove_user(SUBJECT)
         self.stack.keycloak.serve_directory()
-        status, preview = self.post_json("/v1/reconcile", {"dry_run": True}, PREVIEW_TOKEN)
+        status, preview = self.post_json("/v1/reconcile", {"dry_run": True}, OPERATOR_TOKEN)
         self.assertEqual([p["operation"] for p in preview["previews"]], [*CLOSE, *ANONYMIZE])
         self.assertEqual({(d["kind"], d["job_id"]) for d in preview["differences"]}, {("deleted_in_keycloak", self.job_id)})
         self.seen((status, preview))
@@ -329,7 +329,7 @@ class DeletionPathsTest(ServerCase):
         self.assertEqual(reply["status"], "processed")
         self.assertNotIn(SUBJECT, self.stored_text())
         self.assertEqual(self.record(), {"job_done": True, "event_done": False, "queue": []})
-        self.seen(self.call("GET", "/v1/operations", None, self.bearer(PREVIEW_TOKEN)))
+        self.seen(self.call("GET", "/v1/operations", None, self.bearer(OPERATOR_TOKEN)))
 
     def test_row_19_finished_record_and_cleanup_are_one_transaction(self) -> None:
         # The storage fails exactly when the id is cleaned up. Then the job must not count as

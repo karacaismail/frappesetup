@@ -355,12 +355,14 @@ The roles are `view-users`, `query-users`, `manage-users` and the minimum role n
 The token that goes to the tenant and to Press does not carry these roles.
 The service verifies the token with the shared `oidc_verify` library.
 The `aud` value of the token must be only `identity-sync`.
-The `azp` value of the token must be in one of four lists.
-The `IDENTITY_SYNC_PREVIEW_AZP` list gives permission to read and to preview.
-The `IDENTITY_SYNC_EXECUTE_AZP` list also gives permission to execute.
+The `azp` value of the token must be in one of five lists.
+The `IDENTITY_SYNC_PREVIEW_AZP` list gives permission to preview invitations.
+The `IDENTITY_SYNC_EXECUTE_AZP` list gives permission to execute within the caller tenant organization.
 The `IDENTITY_SYNC_SESSION_AZP` list opens only the `/v1/sessions/revoke` endpoint.
-A client can be in only one of these lists.
-If all lists are empty, the service rejects every request.
+The OPERATOR list alone opens platform reconciliation, replay and queue lists.
+The DELETION list opens only global account deletion for Press.
+EXECUTE and SESSION contain the same tenant clients. All other lists are disjoint.
+If all lists are empty, the service rejects every token request.
 If the library is not installed, the service also rejects every request.
 If the request also carries a cookie, the service rejects the request.
 ","Keycloak servis belirteci. Kurallar ortak sözleşmenin 3. bölümündedir.
@@ -372,12 +374,14 @@ Roller `view-users`, `query-users`, `manage-users` ve kuruluş için gereken en 
 Kiracıya ve Press'e giden belirteç bu rolleri taşımaz.
 Servis belirteci ortak `oidc_verify` kitaplığıyla doğrular.
 Belirtecin `aud` değeri yalnız `identity-sync` olmalıdır.
-Belirtecin `azp` değeri dört listeden birinde olmalıdır.
-`IDENTITY_SYNC_PREVIEW_AZP` listesi okuma ve önizleme izni verir.
-`IDENTITY_SYNC_EXECUTE_AZP` listesi ayrıca yürütme izni verir.
+Belirtecin `azp` değeri beş listeden birinde olmalıdır.
+`IDENTITY_SYNC_PREVIEW_AZP` listesi davet önizleme izni verir.
+`IDENTITY_SYNC_EXECUTE_AZP` listesi yalnız çağıran kiracının kuruluşunda yürütme izni verir.
 `IDENTITY_SYNC_SESSION_AZP` listesi yalnız `/v1/sessions/revoke` ucunu açar.
-Bir istemci bu listelerden yalnız birinde durabilir.
-Bütün listeler boşsa servis her isteği reddeder.
+OPERATOR listesi platform mutabakatını, yeniden işletmeyi ve kuyruk listelerini açar.
+DELETION listesi Press için genel hesap silmeyi açar.
+EXECUTE ve SESSION aynı kiracı istemcilerini taşır. Diğer listeler birbirinden ayrıdır.
+Bütün listeler boşsa servis belirteçli istekleri reddeder.
 Kitaplık kurulu değilse servis yine her isteği reddeder.
 İstek çerez de taşıyorsa servis isteği reddeder.
 ",identity_sync.openapi.yaml: components.securitySchemes.serviceToken.description
@@ -434,7 +438,8 @@ The rules are in section 10 of `docs/sozlesmeler.md`.
 
 AI cannot execute the write endpoints of this service directly.
 The AI agent only reads and asks for a preview. A preview changes no record.
-Real execution comes only from the approval layer inside `platform_core`.
+Tenant execution comes from its approval layer inside `platform_core`.
+Platform reconciliation and replay instead require a separate operator approval client (O-38).
 The approval layer calls with its own service token after a human approves.
 
 The flow is as follows.
@@ -462,15 +467,19 @@ One request can cover more than one event. If the plan of any event changed, the
 The service writes no event in that request.
 The service computes the plan once more at execution time. If the plan is not exactly the same, the operation does not run.
 
-The service keeps four client lists.
-A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
-A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute approved platform operations.
-It is a separate trusted operator client, for example `identity-sync-operator`.
-Tenant service clients cannot read, preview or execute platform operations, even when misconfigured in those lists.
-A client in the `IDENTITY_SYNC_SESSION_AZP` list can end sessions of its own tenant members.
-Every session client must be the service client of a configured tenant.
-The four lists must be disjoint. Site clients cannot hold operator, preview or global deletion rights.
-Invitations, reconcile, replay and operation endpoints are platform operations.
+The service keeps five client lists (O-38).
+`IDENTITY_SYNC_EXECUTE_AZP` and `IDENTITY_SYNC_SESSION_AZP` hold the same configured tenant service clients.
+A tenant client executes approved invitations and resolves operations only for its own organization.
+It can also revoke sessions of its own members. Another organization's invitation or operation returns 403.
+`_require_own_organization` checks the organization against the tenant selected by the verified `azp`.
+For operation resolution, the organization comes from the stored operation, never from the request body.
+Only `IDENTITY_SYNC_OPERATOR_AZP` clients can use POST /v1/reconcile, POST /v1/dead-letters/replay,
+GET /v1/dead-letters and GET /v1/operations, including their preview modes. Tenant clients get 403.
+Operator execution still requires the human approval id and the matching preview digest.
+`IDENTITY_SYNC_PREVIEW_AZP` clients may preview invitations but cannot execute or access platform queues.
+Operator, preview and deletion lists must be disjoint from each other and from the tenant lists.
+These three lists cannot contain a client starting with `site-`, including an unregistered site.
+Invalid settings prevent startup. An empty operator list disables platform endpoints.
 This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
 A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
 Only a trusted service client goes into the execute list.
@@ -618,7 +627,8 @@ Kurallar `docs/sozlesmeler.md` dosyasının 10. bölümündedir.
 
 Yapay zekâ bu servisin yazma uçlarını doğrudan yürütemez.
 Yapay zekâ aracısı yalnız okur ve önizleme ister. Önizleme hiçbir kaydı değiştirmez.
-Gerçek yürütme yalnız `platform_core` içindeki onay katmanından gelir.
+Kiracı işlemini `platform_core` içindeki onay katmanı başlatır.
+Platform mutabakatı ve kuyruk işlemleri ayrı operatör onayı ister.
 Onay katmanı insan onayladıktan sonra kendi servis belirteciyle çağırır.
 
 Akış şudur:
@@ -646,15 +656,19 @@ Bir istek birden çok olay kapsayabilir. Herhangi bir olayın planı değiştiys
 Servis o istekte hiçbir olayı yazmaz.
 Servis yürütme anında planı bir kez daha hesaplar. Plan birebir aynı değilse iş yürümez.
 
-Servis dört istemci listesi tutar.
-`IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
-`IDENTITY_SYNC_EXECUTE_AZP` listesi ayrı yönetim istemcisini taşır. Örnek: `identity-sync-operator`.
-Kiracı istemcileri yönetim uçlarını okuyamaz, önizleyemez veya yürütemez. Yanlış ayar da bu yasağı kaldırmaz.
-`IDENTITY_SYNC_SESSION_AZP` listesi kiracıların servis istemcilerini taşır.
-Bu istemciler yalnız kendi kiracılarının üyelerine ait oturumları kapatabilir.
-Her oturum istemcisi kayıtlı bir kiracıya bağlı olmalıdır.
-Dört liste birbirinden ayrıdır. Kiracı istemcileri yönetim, önizleme veya genel silme yetkisi alamaz.
-Davet, mutabakat, yeniden işletme ve işlem uçları bütün platformda çalışır.
+Servis beş istemci listesi tutar (O-38).
+`IDENTITY_SYNC_EXECUTE_AZP` ve `IDENTITY_SYNC_SESSION_AZP` aynı kayıtlı kiracı istemcilerini taşır.
+Kiracı istemcisi kendi kuruluşuna onaylı davet gönderir. Yalnız kendi kuruluşunun işlemini sonuçlandırır.
+Kendi üyelerinin oturumlarını da kapatabilir. Başka kuruluş için yanıt 403 olur.
+`_require_own_organization` kuruluşu doğrular. Kiracı, doğrulanmış belirtecin `azp` değerinden bulunur.
+İşlem sonuçlandırılırken kuruluş işlem kaydından alınır. İstek gövdesi bu kuruluşu seçemez.
+Platform mutabakatı, yeniden işletme ve kuyruk listeleri yalnız `IDENTITY_SYNC_OPERATOR_AZP` istemcilerine açıktır.
+Bu kural önizlemeleri de kapsar. Kiracı istemcisi 403 alır.
+Operatörün yürütme isteği insan onayını ve eşleşen önizleme özetini taşımalıdır.
+`IDENTITY_SYNC_PREVIEW_AZP` istemcileri davetleri önizleyebilir. İş yürütemez ve platform kuyruklarına erişemez.
+Operatör, önizleme ve silme listeleri birbirinden ve kiracı listelerinden ayrıdır.
+Bu üç listede `site-` ile başlayan istemci bulunamaz. Kayıtsız kiracı adları da yasaktır.
+Hatalı ayarla servis açılmaz. Operatör listesi boşsa platform uçları kapalıdır.
 Bu servis Keycloak'ta istemci açmaz. Yeni kiracının istemcisini kimlik-realm işi açar. O komutu insan başlatır.
 `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
 Yürütme listesine yalnız güvenilir servis istemcisi girer.
@@ -830,11 +844,11 @@ Press o zaman müşteriyi yeniden doğrular ve yeni istek gönderir.
 Requests the deletion of one account and executes the flow.,Bir hesabın silinmesini ister ve akışı yürütür.,identity_sync.openapi.yaml: paths./v1/account-deletions.post.summary
 "This endpoint is the HTTP counterpart of the `dead-letters` command.
 The endpoint only reads. The records carry no email.
-Clients in the preview list and in the execute list can call this endpoint.
+Only clients in IDENTITY_SYNC_OPERATOR_AZP can call this endpoint. Tenant and preview clients get 403.
 The list is cut at the `limit` value. If more records exist, the response carries `next_offset`.
 ","Bu uç `dead-letters` komutunun HTTP karşılığıdır.
 Uç yalnız okur. Kayıtlar e-posta taşımaz.
-Önizleme listesindeki ve yürütme listesindeki istemciler bu ucu çağırabilir.
+Yalnız `IDENTITY_SYNC_OPERATOR_AZP` listesindeki istemciler bu ucu çağırabilir. Kiracı ve önizleme istemcileri 403 alır.
 Liste `limit` değerinde kesilir. Başka kayıt varsa yanıt `next_offset` taşır.
 ",identity_sync.openapi.yaml: paths./v1/dead-letters.get.description
 The waiting events. The oldest event comes first.,Bekleyen olaylar. En eski olay ilk sıradadır.,identity_sync.openapi.yaml: paths./v1/dead-letters.get.responses.200.description
@@ -842,7 +856,7 @@ Lists the events in the dead-letter queue.,Bekleme kuyruğundaki olayları liste
 "This endpoint is the HTTP counterpart of the `replay-dead-letters` command.
 This endpoint can do destructive work. A waiting event can disable a user.
 
-The preview is open to both lists. A client in either list can send the `dry_run: true` request.
+Only IDENTITY_SYNC_OPERATOR_AZP clients may preview or execute this queue operation.
 Only the approval layer starts the real execution.
 The execute request must carry the `preview_digest` and `approval_id` fields.
 If the plan changed after the preview, the service returns 409 and processes no event.
@@ -861,7 +875,7 @@ The service skips an event in the `unknown` state. The reason is that no blind r
 ","Bu uç `replay-dead-letters` komutunun HTTP karşılığıdır.
 Bu uç yıkıcı iş yapabilir. Bekleyen olay bir kullanıcıyı kapatabilir.
 
-Önizleme herkese açıktır: `dry_run: true` isteğini iki listedeki istemci de gönderebilir.
+Bu kuyruk işlemini yalnız `IDENTITY_SYNC_OPERATOR_AZP` istemcileri önizleyebilir ve yürütebilir.
 Gerçek yürütmeyi yalnız onay katmanı başlatır.
 Yürütme isteği `preview_digest` ve `approval_id` alanlarını taşımalıdır.
 Plan önizlemeden sonra değiştiyse servis 409 döner ve hiçbir olayı işlemez.
@@ -1006,14 +1020,14 @@ An invitation writes to Keycloak in three steps. It creates the user, makes the 
 The service records every step before it writes it. When the step is done, it updates the record.
 If the process stops midway, the record shows which step stayed uncertain.
 Finished operations do not appear in the list. The record carries no email.
-Clients in the preview list and in the execute list can call this endpoint.
+Only clients in IDENTITY_SYNC_OPERATOR_AZP can call this endpoint. Tenant and preview clients get 403.
 The list is cut at the `limit` value. If more records exist, the response carries `next_offset`.
 ","Bu uç `operations` komutunun HTTP karşılığıdır. Uç yalnız okur.
 Davet Keycloak'a üç adımda yazar: kullanıcıyı açar, üye yapar ve e-posta gönderir.
 Servis her adımı yazmadan önce kaydeder. Adım bitince kaydı günceller.
 Süreç yarıda durursa kayıt hangi adımın belirsiz kaldığını gösterir.
 Biten işler listede görünmez. Kayıt e-posta taşımaz.
-Önizleme listesindeki ve yürütme listesindeki istemciler bu ucu çağırabilir.
+Yalnız `IDENTITY_SYNC_OPERATOR_AZP` listesindeki istemciler bu ucu çağırabilir. Kiracı ve önizleme istemcileri 403 alır.
 Liste `limit` değerinde kesilir. Başka kayıt varsa yanıt `next_offset` taşır.
 ",identity_sync.openapi.yaml: paths./v1/operations.get.description
 The interrupted operations. The oldest operation comes first.,Yarıda kalan işler. En eski iş ilk sıradadır.,identity_sync.openapi.yaml: paths./v1/operations.get.responses.200.description
@@ -1023,13 +1037,17 @@ A human checks the target first. For example, the human looks whether the user w
 Then the human closes the operation with the `completed` or the `abandoned` resolution.
 `completed` means the operation was completed at the target. `abandoned` means the operation was given up.
 This endpoint changes only the service's own record. It does not write to the target.
-Only the approval layer can call this endpoint. The service writes the caller and the result to the log.
+Only a tenant execute client can resolve an operation recorded for its own organization.
+The stored organization is checked before any update. Another organization returns 403.
+The service writes the caller and the result to the log.
 ","Bu uç `resolve-operation` komutunun HTTP karşılığıdır.
 İnsan önce hedefi denetler. Örneğin Keycloak'ta kullanıcının açılıp açılmadığına bakar.
 Sonra işi `completed` ya da `abandoned` sonucuyla kapatır.
 `completed` değeri işin hedefte tamamlandığını söyler. `abandoned` değeri işten vazgeçildiğini söyler.
 Bu uç yalnız servisin kendi kaydını değiştirir. Hedefe yazmaz.
-Bu ucu yalnız onay katmanı çağırabilir. Servis çağıranı ve sonucu günlüğe yazar.
+Kiracı istemcisi yalnız kendi kuruluşunun işlemini sonuçlandırabilir.
+Servis yazmadan önce kaydın kuruluşunu denetler. Başka kuruluş için yanıt 403 olur.
+Servis çağıranı ve sonucu günlüğe yazar.
 ",identity_sync.openapi.yaml: paths./v1/operations/{operation_id}/resolve.post.description
 The id of the operation. This value is the `approval_id` value of the approval that started the operation.,İşin kimliği. Bu değer işi başlatan onayın `approval_id` değeridir.,identity_sync.openapi.yaml: paths./v1/operations/{operation_id}/resolve.post.parameters[0].description
 The operation is closed.,İş kapandı.,identity_sync.openapi.yaml: paths./v1/operations/{operation_id}/resolve.post.responses.200.description
@@ -1043,7 +1061,7 @@ Keycloak is the source of truth.
 A preview request carries `dry_run: true`. The service only reads.
 The response carries the differences, the preview of the repair operations and the `preview_digest` value.
 The response carries no email. It refers to the user by the `sub` id.
-Clients in the preview list and in the execute list can ask for a preview.
+Only clients in IDENTITY_SYNC_OPERATOR_AZP can preview or execute this platform operation.
 
 A repair request carries `dry_run: false`. Only the approval layer starts the repair.
 The request must carry the `preview_digest` and `approval_id` fields.
@@ -1070,7 +1088,7 @@ Keycloak doğruluk kaynağıdır.
 Önizleme isteği `dry_run: true` taşır. Servis yalnız okur.
 Yanıt farkları, düzeltme işlerinin önizlemesini ve `preview_digest` değerini taşır.
 Yanıt e-posta taşımaz. Kullanıcıyı `sub` kimliğiyle anar.
-Önizleme listesindeki ve yürütme listesindeki istemciler önizleme isteyebilir.
+Bu platform işlemini yalnız `IDENTITY_SYNC_OPERATOR_AZP` istemcileri önizleyebilir ve yürütebilir.
 
 Düzeltme isteği `dry_run: false` taşır. Düzeltmeyi yalnız onay katmanı başlatır.
 İstek `preview_digest` ve `approval_id` alanlarını taşımalıdır.

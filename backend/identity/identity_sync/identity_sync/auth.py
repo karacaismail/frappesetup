@@ -3,14 +3,18 @@
 Doğrulamayı ortak `oidc_verify` kitaplığı yapar (`docs/sozlesmeler.md`, 3. bölüm).
 Servis kendi doğrulama kodunu yazmaz. Kitaplık yoksa bütün istekler reddedilir.
 
-There are four disjoint client lists:
+There are five client lists (O-38):
 
-- `preview_azp` permits platform reads and previews.
-- `execute_azp` permits platform execution by a trusted operator approval service.
-- `session_azp` permits tenant clients to end sessions of their own members.
+- `execute_azp` and `session_azp` contain the same configured tenant service clients.
+  They execute approved invitations and resolve operations only in their own organization.
+  They may also revoke sessions of their own members.
+- `operator_azp` alone grants access to platform reconciliation, replay and queue lists.
+- `preview_azp` permits invitation previews, never platform queue access or execution.
 - `deletion_azp` permits Press to request global account deletion.
 
-Tenant clients cannot hold platform preview, execution or global deletion rights.
+Operator, preview and deletion lists are disjoint from each other and from tenant lists.
+They must not contain any client whose name starts with `site-`.
+
 The server enforces the split. The verifier accepts the union of the four lists.
 """
 

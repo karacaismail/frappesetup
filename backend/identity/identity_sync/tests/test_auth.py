@@ -58,7 +58,7 @@ class FailClosedTest(unittest.TestCase):
 
         empty = frozenset()
         settings = dataclasses.replace(
-            self.stack.settings, execute_azp=empty, preview_azp=empty, session_azp=empty, deletion_azp=empty
+            self.stack.settings, operator_azp=empty, execute_azp=empty, preview_azp=empty, session_azp=empty, deletion_azp=empty
         )
 
         self.assertIs(build_verifier(settings), reject_all)
@@ -189,11 +189,11 @@ class RealVerificationTest(unittest.TestCase):
 
         self.assertEqual(self.status(self.token()), 401)
 
-    def test_agent_token_previews_but_cannot_execute(self) -> None:
+    def test_agent_token_cannot_preview_or_execute_platform_replay(self) -> None:
         agent = self.token(azp="ai-agent")
         execute = json.dumps({"dry_run": False, "preview_digest": "0" * 64, "approval_id": "onay-1"}).encode()
 
-        self.assertEqual(self.status(agent, "POST", "/v1/dead-letters/replay", b'{"dry_run": true}'), 200)
+        self.assertEqual(self.status(agent, "POST", "/v1/dead-letters/replay", b'{"dry_run": true}'), 403)
         self.assertEqual(self.status(agent, "POST", "/v1/dead-letters/replay", execute), 403)
 
     def test_approval_layer_token_may_execute(self) -> None:

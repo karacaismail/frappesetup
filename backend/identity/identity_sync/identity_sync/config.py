@@ -61,6 +61,9 @@ class Settings:
     # Clients that may request an account deletion. Only Press does (docs/sozlesmeler.md, section 7).
     deletion_azp: frozenset[str] = frozenset()
 
+    # Trusted clients for platform-wide reconciliation and queue operations.
+    operator_azp: frozenset[str] = frozenset()
+
     @property
     def staff_azp(self) -> frozenset[str]:
         """Clients of the preview and approval flow."""
@@ -68,7 +71,7 @@ class Settings:
 
     @property
     def known_azp(self) -> frozenset[str]:
-        return self.execute_azp | self.preview_azp | self.session_azp | self.deletion_azp
+        return self.execute_azp | self.preview_azp | self.session_azp | self.deletion_azp | self.operator_azp
 
     @property
     def issuer(self) -> str:
@@ -146,25 +149,40 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT, {PREFIX}LOCK_TIMEOUT or {PREFIX}RATE_LIMIT is out of range")
     execute_azp, preview_azp = _names(get("EXECUTE_AZP")), _names(get("PREVIEW_AZP"))
     session_azp = _names(get("SESSION_AZP"))
+    operator_azp = _names(get("OPERATOR_AZP"))
     deletion_azp = _names(get("DELETION_AZP", DEFAULT_DELETION_AZP))
-    # Platform operators and tenant service clients are separate trust domains.
+    # Each list grants a different right. One overlap is intended: a tenant site client both
+    # executes approved work and ends sessions (docs/sozlesmeler.md, section 7). A preview
+    # client must never execute, and the Press client only requests deletions.
     tenants = _tenants(get("TENANTS"))
-    listed = execute_azp | preview_azp | session_azp | deletion_azp
+    listed = execute_azp | preview_azp | session_azp | deletion_azp | operator_azp
     for tenant in tenants:
+        # `site-<tenant>` is the browser login client. It has no service account, so a token
+        # with that `azp` is a user's login token. It must never be accepted as a service caller.
         if browser_client_id(tenant.name) in listed:
             raise ConfigError(
                 f"{browser_client_id(tenant.name)} is a browser client and cannot be in a client list; "
                 f"use {service_client_id(tenant.name)}"
             )
+    # docs/sozlesmeler.md, section 7: the execute list and the session list carry the same
+    # clients, the service clients of the tenant sites. A client bound to no configured tenant
+    # could execute without the service knowing whose organization the work belongs to.
+    if execute_azp != session_azp:
+        raise ConfigError(f"{PREFIX}EXECUTE_AZP and {PREFIX}SESSION_AZP must hold the same clients")
+    tenant_clients = execute_azp | session_azp
     known_tenant_clients = {service_client_id(tenant.name) for tenant in tenants}
-    for client in sorted(session_azp - known_tenant_clients):
-        raise ConfigError(f"{client} is not the service client of a configured tenant")
-    # Reserve the entire site namespace, including sites not configured here yet.
-    if any(client.startswith("site-") for client in execute_azp | preview_azp | deletion_azp):
-        raise ConfigError("tenant clients cannot hold platform operator, preview or global deletion rights")
-    groups = (execute_azp, preview_azp, session_azp, deletion_azp)
-    if any(left & right for index, left in enumerate(groups) for right in groups[index + 1:]):
-        raise ConfigError("client permission lists must be disjoint")
+    for client in sorted(tenant_clients - known_tenant_clients):
+        raise ConfigError(
+            f"{client} is not the service client of a configured tenant; "
+            f"a tenant named in {PREFIX}TENANTS has the client site-<tenant>-service"
+        )
+    platform_groups = (operator_azp, preview_azp, deletion_azp)
+    if any(client.startswith("site-") for group in platform_groups for client in group):
+        raise ConfigError("operator, preview and deletion lists cannot contain site- clients")
+    if any(group & tenant_clients for group in platform_groups) or any(
+        left & right for index, left in enumerate(platform_groups) for right in platform_groups[index + 1:]
+    ):
+        raise ConfigError("operator, preview and deletion lists must be disjoint from each other and tenant clients")
     if len(get("WEBHOOK_SECRET")) < MIN_WEBHOOK_SECRET_LENGTH:
         raise ConfigError(f"{PREFIX}WEBHOOK_SECRET must be at least {MIN_WEBHOOK_SECRET_LENGTH} characters long")
     if len(get("DIGEST_KEY")) < MIN_DIGEST_KEY_LENGTH:
@@ -187,6 +205,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         port=port,
         service_audience=get("AUDIENCE", "identity-sync"),
         realm_id=get("REALM_ID"),
+        operator_azp=operator_azp,
         execute_azp=execute_azp,
         preview_azp=preview_azp,
         session_azp=session_azp,

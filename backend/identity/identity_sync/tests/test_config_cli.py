@@ -26,7 +26,7 @@ def environment(keycloak: str, press: str, tenant: str, db: str) -> dict[str, st
         "IDENTITY_SYNC_DB": db,
         "IDENTITY_SYNC_DIGEST_KEY": fakes.DIGEST_KEY,
         "IDENTITY_SYNC_REALM_ID": fakes.REALM_ID,
-        "IDENTITY_SYNC_EXECUTE_AZP": "identity-sync-operator",
+        "IDENTITY_SYNC_EXECUTE_AZP": "site-kiraci1-service",
         "IDENTITY_SYNC_PREVIEW_AZP": "ai-agent, ops-bff",
         "IDENTITY_SYNC_SESSION_AZP": "site-kiraci1-service",
     }
@@ -49,7 +49,7 @@ class ConfigTest(unittest.TestCase):
     def test_execute_and_preview_clients_are_separate_lists(self) -> None:
         settings = load_settings(self.ENV)
 
-        self.assertEqual(settings.execute_azp, frozenset({"identity-sync-operator"}))
+        self.assertEqual(settings.execute_azp, frozenset({"site-kiraci1-service"}))
         self.assertEqual(settings.preview_azp, frozenset({"ai-agent", "ops-bff"}))
 
     def test_admin_scope_defaults_to_the_contract_value(self) -> None:
@@ -91,25 +91,55 @@ class ConfigTest(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load_settings({**self.ENV, "IDENTITY_SYNC_PREVIEW_AZP": "site-kiraci1-service"})
 
-    def test_tenant_site_client_cannot_execute_platform_operations(self) -> None:
-        with self.assertRaises(ConfigError):
-            load_settings({**self.ENV, "IDENTITY_SYNC_EXECUTE_AZP": "site-kiraci1-service"})
+    def test_tenant_site_client_may_execute_and_revoke_sessions(self) -> None:
+        # docs/sozlesmeler.md, section 7: the approval is given on the tenant site, so the execute
+        # list holds the tenant service clients. It carries the same clients as the session list.
+        both = {
+            **self.ENV,
+            "IDENTITY_SYNC_EXECUTE_AZP": "site-kiraci1-service",
+            "IDENTITY_SYNC_SESSION_AZP": "site-kiraci1-service",
+        }
+
+        settings = load_settings(both)
+
+        self.assertEqual((settings.execute_azp, settings.session_azp), (frozenset({"site-kiraci1-service"}),) * 2)
 
     def lists(self, execute: str, session: str) -> dict[str, str]:
         return {**self.ENV, "IDENTITY_SYNC_EXECUTE_AZP": execute, "IDENTITY_SYNC_SESSION_AZP": session}
 
-    def test_operator_and_session_lists_are_independent(self) -> None:
-        for execute, session in (("identity-sync-operator", "site-kiraci1-service"),
-                                 ("identity-sync-operator", ""), ("", "site-kiraci1-service")):
-            with self.subTest(execute=execute, session=session):
-                settings = load_settings(self.lists(execute, session))
-                self.assertFalse(settings.execute_azp & settings.session_azp)
+    def test_execute_and_session_lists_must_be_equal(self) -> None:
+        # docs/sozlesmeler.md, section 7: the execute list carries the same clients as the session list.
+        two = json.dumps(
+            [
+                {"name": "kiraci1", "base_url": "http://kiraci1.localhost:6111", "organization": "kiraci1"},
+                {"name": "kiraci2", "base_url": "http://kiraci2.localhost:6112", "organization": "kiraci2"},
+            ]
+        )
+        both = "site-kiraci1-service, site-kiraci2-service"
+        equal = load_settings({**self.lists(both, both), "IDENTITY_SYNC_TENANTS": two})
+        self.assertEqual(equal.execute_azp, equal.session_azp)
+        for execute, session in (
+            ("site-kiraci1-service", both),
+            (both, "site-kiraci1-service"),
+            ("site-kiraci1-service", "site-kiraci2-service"),
+            ("site-kiraci1-service", ""),
+            ("", "site-kiraci1-service"),
+        ):
+            with self.subTest(execute=execute, session=session), self.assertRaises(ConfigError) as caught:
+                load_settings({**self.lists(execute, session), "IDENTITY_SYNC_TENANTS": two})
+            self.assertIn("must hold the same clients", str(caught.exception))
 
-    def test_every_session_client_must_belong_to_a_configured_tenant(self) -> None:
+    def test_every_tenant_client_must_belong_to_a_configured_tenant(self) -> None:
+        # Only kiraci1 is configured. A client of a tenant that is not, or a client that is not a
+        # tenant service client at all, would execute without being bound to any tenant.
         for client in ("site-kiraci2-service", "approval-service", "site-kiraci1-service, site-kiraci2-service"):
             with self.subTest(client=client), self.assertRaises(ConfigError) as caught:
-                load_settings(self.lists("identity-sync-operator", client))
+                load_settings(self.lists(client, client))
             self.assertIn("is not the service client of a configured tenant", str(caught.exception))
+        self.assertEqual(
+            load_settings(self.lists("site-kiraci1-service", "site-kiraci1-service")).execute_azp,
+            frozenset({"site-kiraci1-service"}),
+        )
 
     def test_both_lists_may_be_empty(self) -> None:
         # A service that only takes events and previews needs no tenant client.
