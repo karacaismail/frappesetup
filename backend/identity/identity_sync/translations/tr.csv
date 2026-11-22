@@ -467,6 +467,8 @@ A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
 A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute. This list holds the service clients of the tenant sites.
 The human gives the approval in the AI layer of the tenant site. So the tenant site calls the execution.
 A client in the `IDENTITY_SYNC_SESSION_AZP` list can end a session. This list holds the same tenant site clients.
+The two lists must be equal. Every client in them must be the service client of a tenant in the tenant list.
+If not, the service does not start. A client that is bound to no tenant gets 403 when it asks for execution.
 A client in the preview list or in the deletion list cannot be in another list.
 A tenant site client can invite a user only into the organization of its own tenant.
 The service finds the tenant from the `azp` value of the token. The body cannot choose the tenant.
@@ -651,6 +653,8 @@ Servis dört istemci listesi tutar.
 `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır.
 İnsan onayı kiracı sitesindeki yapay zekâ katmanında verir. Bu yüzden yürütmeyi kiracı sitesi çağırır.
 `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
+İki liste eşit olmalıdır. Listelerdeki her istemci, kiracı listesindeki bir kiracının servis istemcisi olmalıdır.
+Değilse servis açılmaz. Hiçbir kiracıya bağlı olmayan istemci yürütme isterse 403 alır.
 Önizleme listesindeki ya da silme listesindeki istemci başka bir listede olamaz.
 Kiracı sitesinin istemcisi yalnız kendi kiracısının kuruluşuna kullanıcı davet edebilir.
 Servis kiracıyı belirtecin `azp` değerinden bulur. Gövde kiracıyı seçemez.

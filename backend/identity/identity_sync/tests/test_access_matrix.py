@@ -179,6 +179,27 @@ class MatrixCase(unittest.TestCase):
         self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [SID])
         self.assertEqual(self.send(row, self.credential(SITE)), 200)
 
+    def test_listed_client_without_a_tenant_cannot_execute_anything(self) -> None:
+        # Defence in depth. The settings refuse such a list. If a list held a client that is
+        # bound to no configured tenant, the service would still refuse to execute for it:
+        # it could not tell whose organization the work belongs to.
+        if type(self) is MatrixCase:
+            self.skipTest("the shared base has no verifier; the two subclasses run this test")
+        unbound = "approval-service"
+        settings = self.stack.app.settings
+        self.stack.app.settings = dataclasses.replace(
+            settings, execute_azp=settings.execute_azp | {unbound}, session_azp=settings.session_azp | {unbound}
+        )
+        self.serve_again()
+        before = self.writes()
+        for row in ROWS:
+            if row.right != SITE:
+                continue
+            with self.subTest(row=row.name):
+                self.assertEqual(self.send(row, self.credential(unbound)), 403)
+        self.assertEqual(self.writes(), before)
+        self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [SID])
+
     def test_matrix_covers_every_token_endpoint_of_the_contract(self) -> None:
         from .test_contract import CONTRACT
 

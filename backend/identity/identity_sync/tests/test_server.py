@@ -24,8 +24,10 @@ from .fakes import DONE, ORG_ID, REALM_ID, SUBJECT, WEBHOOK_SECRET, Stack, keycl
 
 NOW = 1_795_000_000
 PREVIEW_TOKEN = "preview-token"  # yapay zekâ aracısının belirteci: yalnız okur ve önizler
-EXECUTE_TOKEN = "execute-token"  # onay katmanının belirteci: yürütebilir
-SESSION_TOKEN = "session-token"  # the service token of tenant kiraci1: may only revoke sessions
+# The service token of tenant kiraci1. The human approves on the tenant site, so this client
+# executes approved work. The same client ends sessions. The two names keep the tests readable.
+EXECUTE_TOKEN = "execute-token"
+SESSION_TOKEN = "session-token"
 OTHER_SITE_TOKEN = "other-site-token"  # the service token of tenant kiraci2
 PRESS_TOKEN = "press-token"  # the Press service token: may only request an account deletion
 EVENT = {"id": "e-1", "kind": "user", "type": "VERIFY_EMAIL", "realm": "platform", "time": 1, "user_id": SUBJECT}
@@ -35,7 +37,7 @@ ALL_ACTIONS = ["press.ensure_team", "tenant.change_email", "tenant.provision"]
 def fake_verifier(token: str) -> dict[str, object]:
     azp = {
         PREVIEW_TOKEN: "ai-agent",
-        EXECUTE_TOKEN: "approval-service",
+        EXECUTE_TOKEN: "site-kiraci1-service",
         SESSION_TOKEN: "site-kiraci1-service",
         OTHER_SITE_TOKEN: "site-kiraci2-service",
         PRESS_TOKEN: "press-service",
@@ -60,7 +62,9 @@ class ServerCase(unittest.TestCase):
         self.addCleanup(self.stack.close)
         self.now = float(NOW)
         self.start_server(fake_verifier)
-        self.stack.keycloak.add_user(keycloak_user(), [{"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}])
+        # The organization of tenant kiraci1. An execute client may only invite into its own organization.
+        organization = self.stack.keycloak.add_organization(ORG_ID, "kiraci1")
+        self.stack.keycloak.add_user(keycloak_user(), [organization])
         self._next_timestamp = NOW - 100
 
     def start_server(self, verifier) -> None:
@@ -556,7 +560,7 @@ class ApprovalLayerTest(ServerCase):
         # İşlem günlüğü çağıranı, onay kimliğini, önizleme özetini ve sonucu taşır.
         audit = "\n".join(logs.output)
         self.assertIn("replay_dead_letters", audit)
-        self.assertIn("approval-service", audit)
+        self.assertIn("site-kiraci1-service", audit)
         self.assertIn("onay-1", audit)
         self.assertIn(digest, audit)
         self.assertIn("outcome=executed", audit)
@@ -705,15 +709,31 @@ class ApprovalLayerTest(ServerCase):
         self.assertEqual(len(self.keycloak_writes()), 3)
 
     def test_invitation_digest_is_bound_to_the_request(self) -> None:
-        # Bir davetin onayı başka kuruluşa davet için kullanılamaz.
+        # The approval of one invitation cannot be used for another person.
         kc = self.stack.keycloak
         kc.on("GET", f"{kc.admin}/users", (200, []))
         invitation = {"email": "davetli@example.test", "organization_id": ORG_ID}
         _status, preview = self.post_json("/v1/invitations", {**invitation, "dry_run": True})
-        other = {**invitation, "organization_id": "baska-kurulus", "dry_run": False}
+        other = {**invitation, "email": "baskasi@example.test", "dry_run": False}
         other.update(preview_digest=preview["preview_digest"], approval_id="onay-3")
 
         self.assertEqual(self.post_json("/v1/invitations", other), (409, {"error": "preview_changed"}))
+        self.assertEqual(self.keycloak_writes(), [])
+
+    def test_invitation_into_another_organization_is_refused_before_the_digest(self) -> None:
+        # The tenant client asks for an organization that is not its own. The answer is 403,
+        # whatever the digest says, and Keycloak is not written.
+        kc = self.stack.keycloak
+        kc.on("GET", f"{kc.admin}/users", (200, []))
+        kc.add_organization("baska-kurulus", "kiraci2")
+        invitation = {"email": "davetli@example.test", "organization_id": ORG_ID}
+        _status, preview = self.post_json("/v1/invitations", {**invitation, "dry_run": True})
+        other = {**invitation, "organization_id": "baska-kurulus", "dry_run": False}
+        other.update(preview_digest=preview["preview_digest"], approval_id="onay-4")
+
+        self.assertEqual(self.post_json("/v1/invitations", other), (403, {"error": "forbidden"}))
+        preview_request = {"email": "x@example.test", "organization_id": "baska-kurulus", "dry_run": True}
+        self.assertEqual(self.post_json("/v1/invitations", preview_request), (403, {"error": "forbidden"}))
         self.assertEqual(self.keycloak_writes(), [])
 
     def test_invitation_input_is_validated(self) -> None:
@@ -807,17 +827,18 @@ class SessionRevokeTest(ServerCase):
         self.assertEqual(self.stack.keycloak.sessions[self.OTHER_USER], [self.OTHER_SID])
 
     def test_only_a_site_client_may_call(self) -> None:
-        for token in (PREVIEW_TOKEN, EXECUTE_TOKEN, PRESS_TOKEN, "stranger-token"):
+        for token in (PREVIEW_TOKEN, PRESS_TOKEN, "stranger-token"):
             with self.subTest(token=token):
                 self.assertEqual(self.revoke(token=token), (403, {"error": "forbidden"}))
         self.assertEqual(self.call("POST", self.PATH, b'{"sid": "x", "subject": "y"}')[0], 401)
         self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [self.SID])
 
-    def test_site_client_cannot_use_the_other_endpoints(self) -> None:
-        for method, path, body in ServiceTokenTest.PROTECTED:
-            with self.subTest(path=path):
-                status, _reply = self.call(method, path, body, self.bearer(SESSION_TOKEN))
-                self.assertEqual(status, 403)
+    def test_execute_and_session_tokens_are_the_same_tenant_client(self) -> None:
+        # docs/sozlesmeler.md, section 7: the execute list and the session list hold the same
+        # clients. So the client that ends a session is also the one that executes approved work.
+        settings = self.stack.app.settings
+        self.assertEqual(settings.execute_azp, settings.session_azp)
+        self.assertEqual(fake_verifier(SESSION_TOKEN), fake_verifier(EXECUTE_TOKEN))
 
     def test_bad_request_bodies(self) -> None:
         good = {"sid": self.SID, "subject": SUBJECT}

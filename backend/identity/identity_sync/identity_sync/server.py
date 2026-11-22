@@ -242,7 +242,9 @@ class _Api:
 
     def _approved_digest(self, operation: str, payload: Mapping[str, object], azp: str) -> str:
         """Check who asks and the shape of the approval. Consumes nothing."""
-        if azp not in self._settings.execute_azp:
+        if azp not in self._settings.execute_azp or self._tenant_of(azp) is None:
+            # An execute client is the service client of a configured tenant. The settings
+            # check that at start. A client bound to no tenant is refused here as well.
             _LOG.warning("execute operation=%s azp=%s outcome=forbidden", operation, azp)
             raise _Forbidden
         digest = _text(payload, "preview_digest", required=True, max_length=64)
@@ -465,7 +467,11 @@ class _Api:
         """
         tenant = self._tenant_of(azp)
         if tenant is None:
-            return
+            if azp in self._settings.execute_azp:
+                # Listed to execute but bound to no tenant: nobody's organization is its own.
+                _LOG.warning("execute operation=invite_user azp=%s outcome=forbidden", azp)
+                raise _Forbidden
+            return  # a preview client reads for the whole platform
         organization = self._app.keycloak.get_organization(organization_id)
         if organization is None or organization.alias != tenant.organization:
             _LOG.warning("execute operation=invite_user azp=%s outcome=forbidden", azp)
@@ -489,7 +495,7 @@ class _Api:
         This changes only the local journal. Only the approval layer may call it.
         """
         payload = _json_object(body)
-        if azp not in self._settings.execute_azp:
+        if azp not in self._settings.execute_azp or self._tenant_of(azp) is None:
             # A refused caller is not trusted with anything. The id it sent is not logged:
             # it may be any text, for example a customer number put there by mistake.
             _LOG.warning("execute operation=resolve_operation azp=%s outcome=forbidden", azp)

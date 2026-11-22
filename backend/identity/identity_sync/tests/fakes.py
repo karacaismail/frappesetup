@@ -564,9 +564,10 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
         digest_key="test-digest-key-0123456789",
         http_timeout=5.0,
         realm_id=REALM_ID,
-        execute_azp=frozenset({"approval-service"}),
+        # docs/sozlesmeler.md, section 7: both lists hold the service clients of the configured tenants.
+        execute_azp=frozenset(f"site-{item.name}-service" for item in tenants),
         preview_azp=frozenset({"ai-agent"}),
-        session_azp=frozenset({"site-kiraci1-service", "site-kiraci2-service"}),
+        session_azp=frozenset(f"site-{item.name}-service" for item in tenants),
         deletion_azp=frozenset({"press-service"}),
     )
 

@@ -160,7 +160,18 @@ def load_settings(env: Mapping[str, str]) -> Settings:
                 f"{browser_client_id(tenant.name)} is a browser client and cannot be in a client list; "
                 f"use {service_client_id(tenant.name)}"
             )
+    # docs/sozlesmeler.md, section 7: the execute list and the session list carry the same
+    # clients, the service clients of the tenant sites. A client bound to no configured tenant
+    # could execute without the service knowing whose organization the work belongs to.
+    if execute_azp != session_azp:
+        raise ConfigError(f"{PREFIX}EXECUTE_AZP and {PREFIX}SESSION_AZP must hold the same clients")
     tenant_clients = execute_azp | session_azp
+    known_tenant_clients = {service_client_id(tenant.name) for tenant in tenants}
+    for client in sorted(tenant_clients - known_tenant_clients):
+        raise ConfigError(
+            f"{client} is not the service client of a configured tenant; "
+            f"a tenant named in {PREFIX}TENANTS has the client site-<tenant>-service"
+        )
     if preview_azp & tenant_clients or deletion_azp & (preview_azp | tenant_clients):
         raise ConfigError(
             f"a client in {PREFIX}PREVIEW_AZP or {PREFIX}DELETION_AZP cannot be in another list; "

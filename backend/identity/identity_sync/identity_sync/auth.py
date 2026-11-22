@@ -12,7 +12,8 @@ There are four client lists. Each one grants a different right:
   A new tenant's client must be added to both lists, or it cannot execute or end a session.
 - `deletion_azp` may only call `/v1/account-deletions`. It holds the Press service client.
 
-The execute list and the session list may carry the same client. A client in the preview
+The execute list and the session list must carry the same clients, and each one must be the
+service client of a configured tenant (`site-<tenant>-service`). A client in the preview
 list or in the deletion list cannot be in any other list (`config.load_settings` refuses it).
 
 The server enforces the split. The verifier accepts the union of the four lists.
