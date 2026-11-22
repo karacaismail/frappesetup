@@ -800,3 +800,9 @@ Server timing starts when the server receives the request and ends when response
 The benchmark cleared the Frappe site and process caches before each cold-cache request.,"Ölçüm, her önbelleksiz istekten önce Frappe site ve işlem önbelleklerini temizledi.",shell.performance
 The benchmark kept the database and operating system caches intact.,"Ölçüm, veritabanı ve işletim sistemi önbelleklerini korudu.",shell.performance
 | Endpoint | Cache | Requests | p50 (ms) | p95 (ms) | Limit (ms) | Result |,| Uç | Durum | İstek | p50 (ms) | p95 (ms) | Sınır (ms) | Sonuç |,shell.performance
+MCP token rejected.,MCP belirteci reddedildi.,platform_core.identity
+MCP identity provider unavailable.,Kimlik sunucusuna ulaşılamıyor.,platform_core.identity
+Send either a session cookie or a bearer token.,Oturum çerezi veya belirteç gönderin.,platform_core.ai
+MCP call counters are internal.,MCP çağrı sayacını yalnız sistem değiştirebilir.,platform_core.ai
+Authentication required,Kimlik doğrulaması gerekli.,platform_core.ai
+MCP call allowance unavailable.,MCP çağrı sınırı denetlenemiyor.,platform_core.ai

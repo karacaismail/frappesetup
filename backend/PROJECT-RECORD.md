@@ -230,7 +230,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-37. Birleştirmede ortak dosya ve bağımlılık kuralları.** 22 Kasım 2026 Pazar günü bütün backend dalları birleşti. Kurallar şunlardır:
   - `oidc_verify` kitaplığı iki uygulamada da `oidc_verify==0.1.0` kuralıyla istenir. Kitaplık depodadır ve sürüm paketiyle birlikte kurulur. Kural değişince güvenlik kilidi `backend/dev/security/compile-lock` ile yeniden üretilir.
   - `hooks.py` içinde her kanca bir kez atanır. Örneğin `override_whitelisted_methods` sözlüğü hem kimlik giriş kapılarını hem erişim kuralının bağlantı aramasını taşır. İkinci atama birinciyi sileceği için yazılmaz.
-  - `auth_hooks` sırası şudur: kimlik servis belirteci, yapay zekâ ajan belirteci, kabuk meta veri kapısı. Belirteç kancaları kapıdan önce çalışır.
+  - `auth_hooks` sırası şudur: kimlik servis belirteci, yapay zekâ ajan belirteci, MCP OAuth, kabuk meta veri kapısı. Belirteç kancaları kapıdan önce çalışır.
   - Press çıkış bildirim ucunda imzası doğrulanan bildirim sayaca girmez. Reddedilen bildirim dakikada 120 ile sınırlıdır. Sözleşme bu kuralı yazar. Uç denetimi bu ucu kodla eşleşen istisnayla kabul eder.
   - Semgrep istisna özeti yalnız Git'in izlediği ve yok saymadığı dosyalardan hesaplanır. Böylece geliştiricinin ön bellek klasörü özeti değiştirmez.
   - Bandit istisna listeleri birleşirken iki taraf korunur. Kod imzası artık eşleşmeyen kayıtları güvenlik işi sonraki taramada temizler.
@@ -291,7 +291,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
-| `BORC(mvp)`: Dış MCP istemcileri OAuth 2.1 ile giremez | Dış yapay zekâ istemcisi yalnız oturum ya da API anahtarıyla bağlanır | platform-core-yz | MCP ucu OAuth 2.1 yetkilendirmesini Keycloak üzerinden destekler |
+| `BORC(mvp)`: Dış MCP istemcileri OAuth 2.1 ile giremez | Özellik varsayılan olarak kapalı. Yerel testler dönüş adresini, kaynak alanını ve 3 saniyelik süre sınırını doğruladı. | platform-core-yz | Tam realm, `resource-indicators` özelliğiyle hazırlanır. Hazır bir MCP istemcisiyle uçtan uca OAuth akışı doğrulanır. |
 | `BORC(mvp)`: Üretim işçi sayısı ölçülmedi | 50 eşzamanlı telefonda 4 Gunicorn işçisiyle istemci p95 1 saniyeyi aştı. Sunucu süresi sınırın altında kaldı | DevOps sorumlusu | Üretim kapasite ölçümü yapılır ve işçi sayısı ölçümle seçilir |
 | `BORC(mvp)`: identity-sync canlı Keycloak, Press ve kiracı ile denenmedi | Sahte hedeflerin kaçırdığı uyumsuzluk üretimde çıkabilir | integration-e2e | Uçtan uca test gerçek servislerle geçer |
 | `BORC(mvp)`: identity-sync testleri CI'da koşmaz | Bozulma yalnız elle çalışan testte görülür | DevOps sorumlusu | CI bu klasörün testlerini her değişiklikte koşar |
