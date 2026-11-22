@@ -55,8 +55,12 @@ info:
     Bu hatalar her uçta ayrıca yazılmadı.
     Bilinmeyen yol 404 ve `not_found` döner.
     Yanlış yöntem 405 ve `method_not_allowed` döner.
-    65.536 bayttan büyük ya da uzunluğu belirsiz gövde 413 ve `too_large` döner.
+    65.536 bayttan büyük gövde 413 ve `too_large` döner.
+    Geçersiz `Content-Length` başlığı da 413 döner. Servis parçalı gövdeyi desteklemez.
     Kayıt dosyası hatası 500 ve `storage_failed` döner.
+    Başka bir süreç bir olayı işliyorsa servis en çok 10 saniye bekler.
+    Süre dolarsa servis 503 ve `busy` döner. Çağıran isteği yeniden göndermelidir.
+    Olay ucunda yeniden gönderim yeni zaman damgası ve yeni imza ister.
     Başlığını ve gövdesini 10 saniyede tamamlamayan isteğin bağlantısı kapanır.
 
     ## Hedef uçların kesin başarı yanıtı
@@ -71,7 +75,11 @@ info:
     202, boş gövde ya da başka `status` değeri başarı değildir.
     Servis böyle bir olayı `unknown` durumuyla bekleme kuyruğuna yazar.
     Servis bu olayı işlenmiş saymaz ve kendiliğinden yeniden denemez.
+    Aynı olay yeniden gelirse servis yazmayı tekrarlamaz ve yine `unknown` döner.
     İnsan hedefi denetler. Sonra olayı `include_unknown` seçeneğiyle yeniden işletir.
+    İstek hedefe gitti ama yanıt okunamadıysa sonuç yine `unknown` olur.
+    502 ve 504 yanıtları da `unknown` sayılır. Çünkü aradaki sunucu isteği iletmiş olabilir.
+    Bağlantı hiç kurulamadıysa sonuç `unknown` değildir. Servis bu durumda yeniden dener.
   license:
     name: MIT
     identifier: MIT
@@ -157,7 +165,7 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
+              anyOf:
                 - $ref: "#/components/schemas/Event"
                 - $ref: "#/components/schemas/KeycloakUserEvent"
                 - $ref: "#/components/schemas/KeycloakAdminEvent"
@@ -293,6 +301,13 @@ paths:
         Yürütme isteği `preview_digest` ve `approval_id` alanlarını taşımalıdır.
         Plan önizlemeden sonra değiştiyse servis 409 döner ve hiçbir olayı işlemez.
 
+        Servis her olayı yalnız onaylanan planıyla yürütür.
+        Servis her olaydan hemen önce planı yeniden hesaplar.
+        Bir olayın planı arada değiştiyse o olay `preview_changed` sonucunu alır ve yürütülmez.
+        Önizlemesi üretilemeyen olay da yürütülmez. Bu olayın sonucu `failed` olur.
+        Bir olay Organization açtıysa sonraki işler yeni bir önizleme ve yeni bir onay ister.
+        O olay kuyrukta kalır.
+
         Başarılı olay kuyruktan çıkar. Yine başarısız olan olay kuyrukta kalır.
         Servis `unknown` durumundaki olayı atlar. Çünkü aynı hedefe kör tekrar yapılmaz.
         `include_unknown: true` bu olayları da işletir. Önce hedefi denetleyin.
@@ -389,7 +404,11 @@ paths:
         Yürütme isteği `preview_digest` ve `approval_id` alanlarını taşımalıdır.
         Özet isteğin alanlarını da kapsar. Bir davetin onayı başka davette geçmez.
 
-        Uç tekrar edilebilir. İkinci çağrı ikinci kullanıcı açmaz. Ama e-postayı yeniden gönderir.
+        Servis yalnız onaylanan planı yürütür. Plan arada değiştiyse servis 409 döner.
+        Örneğin kullanıcı önizlemeden sonra açıldıysa plan değişmiştir.
+        İkinci davet ikinci kullanıcı açmaz. Ama yeni önizleme ve yeni onay ister.
+        İkinci davet e-postayı yeniden gönderir.
+        Davet yarıda kesilirse yeni önizleme kalan işleri gösterir.
       x-durum: uygulandi
       x-yikici: false
       x-yurutme: yalniz-onay-katmani
@@ -592,7 +611,7 @@ components:
       properties:
         status:
           type: string
-          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed]
+          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed, preview_changed]
           description: |
             `processed` değeri bütün eylemlerin kesin başarıyla bittiğini gösterir.
             `duplicate` değeri olayın daha önce işlendiğini gösterir.
@@ -605,6 +624,8 @@ components:
             Yeniden işleme yanıtında `unknown` değeri olayın atlandığını gösterir.
             `preview` değeri yalnız önizleme üretildiğini gösterir.
             `failed` değeri önizlemenin üretilemediğini gösterir. Örneğin Keycloak yanıt vermedi.
+            `preview_changed` değeri yalnız onaylı yeniden işlemede döner.
+            Olayın planı onaydan sonra değişmiştir. Servis olayı yürütmedi.
         actions:
           type: array
           description: Kesin başarıyla biten eylemlerin adları.
@@ -694,17 +715,34 @@ components:
           items:
             $ref: "#/components/schemas/DeadLetter"
     ReplayRequest:
+      description: Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.
+      oneOf:
+        - $ref: "#/components/schemas/ReplayPreviewRequest"
+        - $ref: "#/components/schemas/ReplayExecuteRequest"
+    ReplayPreviewRequest:
       type: object
+      description: Önizleme isteği. Servis hiçbir kaydı değiştirmez.
       required: [dry_run]
       properties:
         dry_run:
           type: boolean
-          description: Doğruysa servis yalnız önizleme üretir. Çağıran bu alanı açıkça yazmalıdır.
+          const: true
         include_unknown:
           type: boolean
           description: |
-            Doğruysa servis `unknown` durumundaki olayları da işler.
+            Doğruysa servis `unknown` durumundaki olayları da plana katar.
             Varsayılan değer yanlıştır.
+    ReplayExecuteRequest:
+      type: object
+      description: Yürütme isteği. Yalnız onay katmanı gönderebilir.
+      required: [dry_run, preview_digest, approval_id]
+      properties:
+        dry_run:
+          type: boolean
+          const: false
+        include_unknown:
+          type: boolean
+          description: Önizlemedeki değerle aynı olmalıdır. Yoksa özet tutmaz.
         preview_digest:
           $ref: "#/components/schemas/PreviewDigest"
         approval_id:
@@ -727,7 +765,7 @@ components:
           type: string
         status:
           type: string
-          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed]
+          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed, preview_changed]
         actions:
           type: array
           items:
@@ -737,13 +775,17 @@ components:
           items:
             $ref: "#/components/schemas/Preview"
     InvitationRequest:
+      description: Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.
+      oneOf:
+        - $ref: "#/components/schemas/InvitationPreviewRequest"
+        - $ref: "#/components/schemas/InvitationExecuteRequest"
+    InvitationPreviewRequest:
       type: object
+      description: Önizleme isteği. Servis yalnız okur.
       required: [email, organization_id, dry_run]
       properties:
         email:
-          type: string
-          maxLength: 254
-          pattern: "^[^@\\s]{1,64}@[^@\\s]{1,189}$"
+          $ref: "#/components/schemas/Email"
         first_name:
           type: string
           maxLength: 150
@@ -754,11 +796,35 @@ components:
           $ref: "#/components/schemas/ResourceId"
         dry_run:
           type: boolean
-          description: Doğruysa servis yalnız önizleme üretir. Çağıran bu alanı açıkça yazmalıdır.
+          const: true
+    InvitationExecuteRequest:
+      type: object
+      description: |
+        Yürütme isteği. Yalnız onay katmanı gönderebilir.
+        Davet alanları önizlemedeki alanlarla aynı olmalıdır. Yoksa özet tutmaz.
+      required: [email, organization_id, dry_run, preview_digest, approval_id]
+      properties:
+        email:
+          $ref: "#/components/schemas/Email"
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        organization_id:
+          $ref: "#/components/schemas/ResourceId"
+        dry_run:
+          type: boolean
+          const: false
         preview_digest:
           $ref: "#/components/schemas/PreviewDigest"
         approval_id:
           $ref: "#/components/schemas/ApprovalId"
+    Email:
+      type: string
+      maxLength: 254
+      pattern: "^[^@\\s]{1,64}@[^@\\s]{1,189}$"
     InvitationResult:
       type: object
       required: [subject, previews]
@@ -851,6 +917,7 @@ components:
             - forbidden
             - preview_changed
             - too_large
+            - busy
             - not_found
             - method_not_allowed
             - storage_failed

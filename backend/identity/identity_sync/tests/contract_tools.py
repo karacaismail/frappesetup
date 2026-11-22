@@ -186,7 +186,7 @@ def schema_errors(value: object, schema: dict, root: dict, path: str = "$") -> l
     """
     known = {
         "$ref", "type", "required", "properties", "additionalProperties", "enum", "const", "pattern",
-        "minLength", "maxLength", "items", "oneOf", "description", "examples",
+        "minLength", "maxLength", "items", "oneOf", "anyOf", "description", "examples",
     }
     unknown = set(schema) - known
     if unknown:
@@ -201,6 +201,8 @@ def schema_errors(value: object, schema: dict, root: dict, path: str = "$") -> l
         matches = sum(1 for option in schema["oneOf"] if not schema_errors(value, option, root, path))
         if matches != 1:
             errors.append(f"{path}: matches {matches} of oneOf")
+    if "anyOf" in schema and all(schema_errors(value, option, root, path) for option in schema["anyOf"]):
+        errors.append(f"{path}: matches none of anyOf")
     if "type" in schema:
         names = schema["type"] if isinstance(schema["type"], list) else [schema["type"]]
         if not any(_is_type(value, name) for name in names):

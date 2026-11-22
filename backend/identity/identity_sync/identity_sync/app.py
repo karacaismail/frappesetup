@@ -52,7 +52,7 @@ def build_app(settings: Settings, *, sleep: Callable[[float], object] = time.sle
     tokens = TokenProvider(
         settings.token_url, settings.client_id, settings.client_secret, timeout=settings.http_timeout
     )
-    store = Store(settings.db_path)
+    store = Store(settings.db_path, lock_timeout=settings.lock_timeout)
     keycloak = KeycloakAdmin(
         settings.keycloak_base_url,
         settings.realm,

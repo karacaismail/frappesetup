@@ -70,7 +70,10 @@ Yapay zekâ bu servisin yazma uçlarını doğrudan yürütemez. Kural ortak sö
 4. İnsan onaylar. Onay katmanı ucu `dry_run: false` ile çağırır.
 5. İstek `preview_digest` ve `approval_id` alanlarını taşır.
 6. Servis planı yeniden hesaplar. Plan değiştiyse servis 409 döner ve iş yapmaz.
-7. Servis çağıranı, onay kimliğini ve özeti günlüğe yazar. Sonra işi yürütür.
+7. Servis yalnız onaylanan planı yürütür. Servis her olaydan hemen önce planı bir kez daha denetler.
+8. Servis çağıranı, onay kimliğini, özeti ve sonucu günlüğe yazar.
+
+`serve` komutu günlüğü standart hata akışına yazar. İşlem günlüğü satırı `execute operation=` ile başlar.
 
 Servis iki istemci listesi tutar:
 
@@ -87,16 +90,21 @@ Servis hedefin yalnız kesin başarı yanıtını başarı sayar. Yanıtların b
 
 - Hedef 202 dönerse iş bitmemiş olabilir. Boş yanıt da aynı durumdadır.
 - Servis böyle bir olayı `unknown` durumuyla bekleme kuyruğuna yazar.
+- İstek gitti ama yanıt okunamadıysa sonuç yine bilinmez. 502 ve 504 yanıtları da böyledir.
 - Servis bu olayı işlenmiş saymaz. Servis olayı kendiliğinden yeniden denemez.
+- Aynı olay yeniden gelirse servis yazmayı tekrarlamaz.
 - İnsan hedefi denetler. Sonra olayı `--include-unknown` seçeneğiyle yeniden işletir.
 
 ## Süreçler arası sıra
 
 Sunucu ve `replay-dead-letters` komutu ayrı süreçlerdir. İkisi aynı kayıt dosyasını açar.
 
-- Servis bir olayın bütün işini kayıt dosyasının kilidi altında yürütür.
-- İkinci süreç ilk süreç bitene kadar bekler. Bekleme en çok 60 saniyedir.
+- Servis her olayın işini bir iş kilidi altında yürütür. Kilit bir kilit dosyasındadır.
+- İkinci süreç ilk süreç o olayı bitirene kadar bekler. Bekleme en çok 10 saniyedir.
+- Süre dolarsa komut 2 koduyla biter. HTTP ucu 503 ve `busy` döner.
 - Böylece aynı olay iki kez çalışmaz. Aynı kullanıcının iki olayı da sıraya girer.
+- Servis her kaydı hemen kalıcı yazar. Yeniden işleme yarıda kesilirse biten olaylar kaybolmaz.
+- Süreç ölürse kilit kendiliğinden açılır.
 
 ## Ayarlar
 

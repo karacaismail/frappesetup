@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 from identity_sync.events import Event
-from identity_sync.store import Store
+from identity_sync.store import Busy, Store
 
 EVENT = Event(id="e-1", kind="admin", type="ORGANIZATION_MEMBERSHIP_DELETE", realm="platform", time=7, user_id="u-1", organization_id="o-1")
 
@@ -77,27 +77,79 @@ class StoreTest(unittest.TestCase):
         # Süresi dolan kayıt silindi. Zaman penceresi bu imzayı artık zaten reddeder.
         self.assertTrue(store.claim_signature("abc", now=1301.0, expires_at=1601.0))
 
-    def test_exclusive_blocks_a_second_connection(self) -> None:
+    def test_work_lock_blocks_a_second_connection(self) -> None:
+        first = self.open()
+        second = Store(self.path, lock_timeout=0.2)
+        self.addCleanup(second.close)
+        with first.work_lock():
+            with self.assertRaises(Busy):
+                with second.work_lock():
+                    pass
+        with second.work_lock():
+            pass
+
+    def test_work_lock_blocks_another_process(self) -> None:
+        import subprocess
+        import sys
+
+        child = (
+            "import sys\n"
+            "from identity_sync.store import Busy, Store\n"
+            "store = Store(sys.argv[1], lock_timeout=0.2)\n"
+            "try:\n"
+            "    with store.work_lock():\n"
+            "        sys.exit(0)\n"
+            "except Busy:\n"
+            "    sys.exit(3)\n"
+        )
+        package_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        def run_child() -> int:
+            return subprocess.run([sys.executable, "-c", child, self.path], cwd=package_root, timeout=30).returncode
+
+        with self.open().work_lock():
+            self.assertEqual(run_child(), 3)
+        self.assertEqual(run_child(), 0)
+
+    def test_records_written_under_the_work_lock_survive_an_interrupted_run(self) -> None:
+        # Yeniden işleme yarıda kesilirse biten olayların kaydı kaybolmaz.
+        store = self.open()
+        with self.assertRaises(KeyboardInterrupt):
+            with store.work_lock():
+                store.mark_processed("e-1", "processed")
+                store.add_dead_letter(EVENT, "x", state="unknown")
+                raise KeyboardInterrupt
+        store.close()
+
+        reopened = self.open()
+        self.assertTrue(reopened.is_processed("e-1"))
+        self.assertEqual(reopened.dead_letters()[0].state, "unknown")
+
+    def test_other_connection_can_write_records_while_work_lock_is_held(self) -> None:
+        # İmza kaydı uzun süren bir işi beklemez.
+        first, second = self.open(), Store(self.path, lock_timeout=0.2)
+        self.addCleanup(second.close)
+        with first.work_lock():
+            self.assertTrue(second.claim_signature("abc", now=1.0, expires_at=301.0))
+            self.assertEqual(second.dead_letters(), [])
+
+    def test_old_database_file_gets_the_state_column(self) -> None:
         import sqlite3
 
-        first = self.open()
-        second = Store(self.path, busy_timeout=0.2)
-        self.addCleanup(second.close)
-        with first.exclusive():
-            first.mark_processed("e-1", "processed")
-            with self.assertRaises(sqlite3.OperationalError):
-                with second.exclusive():
-                    pass
-        with second.exclusive():
-            self.assertTrue(second.is_processed("e-1"))
+        old = sqlite3.connect(self.path)
+        old.executescript(
+            "CREATE TABLE dead_letters (event_id TEXT PRIMARY KEY, event TEXT NOT NULL, error TEXT NOT NULL,"
+            " attempts INTEGER NOT NULL, first_failed_at REAL NOT NULL, last_failed_at REAL NOT NULL);"
+        )
+        old.execute(
+            "INSERT INTO dead_letters VALUES (?, ?, 'eski', 1, 1.0, 1.0)",
+            ("e-1", '{"id": "e-1", "kind": "user", "type": "REGISTER", "realm": "platform", "time": 1, "user_id": "u"}'),
+        )
+        old.commit()
+        old.close()
 
-    def test_exclusive_rolls_back_on_error(self) -> None:
-        store = self.open()
-        with self.assertRaises(RuntimeError):
-            with store.exclusive():
-                store.mark_processed("e-1", "processed")
-                raise RuntimeError("boom")
-        self.assertFalse(store.is_processed("e-1"))
+        (letter,) = self.open().dead_letters()
+        self.assertEqual((letter.error, letter.state), ("eski", "failed"))
 
     def test_remove_dead_letter(self) -> None:
         store = self.open()

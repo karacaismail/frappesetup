@@ -209,6 +209,32 @@ class InviteTest(AdminCase):
         self.assertEqual(lookup.query["email"], ["davetli@example.test"])
         self.assertEqual(lookup.query["exact"], ["true"])
 
+    def test_invite_refuses_when_plan_differs_from_the_approved_one(self) -> None:
+        # Onay "yeni kullanıcı aç" planını gösterdi. Kullanıcı arada açıldı. Plan artık farklıdır.
+        from identity_sync.keycloak_admin import PlanChanged
+
+        self.kc.on("GET", f"{self.base}/users", (200, []))
+        approved = self.admin.invite_user("davetli@example.test", "Deniz", "Örnek", ORG_ID, dry_run=True).previews
+        self.kc.on("GET", f"{self.base}/users", (200, [keycloak_user(email="davetli@example.test")]))
+
+        with self.assertRaises(PlanChanged):
+            self.admin.invite_user("davetli@example.test", "Deniz", "Örnek", ORG_ID, expected_previews=approved)
+        self.assertEqual(self.writes(), [])
+
+    def test_unexpected_success_codes_are_not_accepted(self) -> None:
+        from identity_sync.httpjson import TransportError
+
+        self.kc.on("POST", f"{self.base}/organizations/{ORG_ID}/members", (202, None))
+        self.kc.on("PUT", f"{self.base}/users/{SUBJECT}/execute-actions-email", (202, None))
+        self.kc.on("POST", f"{self.base}/organizations", (200, None, {"Location": f"{self.kc.url}{self.base}/organizations/x"}))
+
+        with self.assertRaises(TransportError):
+            self.admin.add_organization_member(ORG_ID, SUBJECT)
+        with self.assertRaises(TransportError):
+            self.admin.send_execute_actions_email(SUBJECT, ("UPDATE_PASSWORD",))
+        with self.assertRaises(TransportError):
+            self.admin.create_organization("kiraci2", "Kiracı 2")
+
     def test_invite_dry_run_only_reads(self) -> None:
         self.kc.on("GET", f"{self.base}/users", (200, []))
 

@@ -3,13 +3,18 @@
 Kayıt SQLite dosyasında durur. SQLite Python'un kendi kitaplığındadır.
 Kayıt kişisel veri taşımaz. Olayın yalnız kimlik alanları saklanır.
 
-Sunucu ve `replay-dead-letters` komutu ayrı süreçlerdir ve aynı dosyayı açar.
-`exclusive()` bu süreçleri sıraya koyar. SQLite `BEGIN IMMEDIATE` ile dosyada
-tek yazara izin verir. İkinci süreç ilk süreç bitene kadar bekler.
+İki ayrı koruma vardır:
+
+- Her kayıt yazısı kısa bir veritabanı işlemidir ve hemen kalıcı olur.
+  Süreç yarıda durursa biten işlerin kaydı kaybolmaz.
+- `work_lock()` bir olayın işini sıraya koyar. Sunucu ve `replay-dead-letters` komutu
+  ayrı süreçlerdir. Kilit bir kilit dosyasındadır (`flock`). Süreç ölürse kilit kendiliğinden açılır.
+  Kilit veritabanını kilitlemez. Bu yüzden imza kaydı ve okuma uzun süren işi beklemez.
 """
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import sqlite3
@@ -43,6 +48,12 @@ CREATE TABLE IF NOT EXISTS used_signatures (
 """
 
 STATES = ("failed", "unknown")
+_LOCK_POLL_SECONDS = 0.02
+_SQLITE_TIMEOUT_SECONDS = 5.0
+
+
+class Busy(Exception):
+    """Başka bir süreç iş kilidini tutuyor ve bekleme süresi doldu."""
 
 
 @dataclass(frozen=True)
@@ -71,48 +82,89 @@ class DeadLetter:
 
 
 class Store:
-    def __init__(self, path: str, *, clock: Callable[[], float] = time.time, busy_timeout: float = 60.0) -> None:
-        """`busy_timeout`, başka sürecin kilidini beklemenin en uzun süresidir. Birim saniyedir."""
+    def __init__(self, path: str, *, clock: Callable[[], float] = time.time, lock_timeout: float = 10.0) -> None:
+        """`lock_timeout`, iş kilidini beklemenin en uzun süresidir. Birim saniyedir."""
         self._clock = clock
+        self._lock_timeout = lock_timeout
+        self._lock_fd: int | None = None
         if path != ":memory:":
-            # Dosyayı yalnız servisin kullanıcısı okuyabilsin.
+            # Dosyaları yalnız servisin kullanıcısı okuyabilsin.
             os.close(os.open(path, os.O_CREAT | os.O_WRONLY, 0o600))
             os.chmod(path, 0o600)
-        # İşlem sınırlarını bu sınıf yönetir (`isolation_level=None`).
-        self._db = sqlite3.connect(path, timeout=busy_timeout, isolation_level=None, check_same_thread=False)
-        # Aynı bağlantıyı iki iş parçacığı kullanırsa işlemler karışmasın.
-        self._thread_lock = threading.RLock()
+            self._lock_fd = os.open(f"{path}.lock", os.O_CREAT | os.O_RDWR, 0o600)
+        # Her yazı kendi kısa işlemindedir (`isolation_level=None`: işlemi bu sınıf yönetir).
+        self._db = sqlite3.connect(
+            path, timeout=_SQLITE_TIMEOUT_SECONDS, isolation_level=None, check_same_thread=False
+        )
+        self._thread_lock = threading.Lock()
         self._db.executescript(_SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Eski sürümün kayıt dosyasına eksik sütunu ekler."""
+        columns = {row[1] for row in self._db.execute("PRAGMA table_info(dead_letters)")}
+        if "state" not in columns:
+            with self._transaction():
+                self._db.execute("ALTER TABLE dead_letters ADD COLUMN state TEXT NOT NULL DEFAULT 'failed'")
 
     def close(self) -> None:
         self._db.close()
+        if self._lock_fd is not None:
+            os.close(self._lock_fd)
+            self._lock_fd = None
 
     @contextmanager
-    def exclusive(self) -> Iterator[None]:
-        """Kayıt dosyasında tek yazar olur. Öteki süreçler ve bağlantılar bekler.
+    def work_lock(self) -> Iterator[None]:
+        """Bir olayın işini sıraya koyar. Öteki süreçler ve bağlantılar bekler.
 
-        Blok hatayla biterse yazılar geri alınır. İç içe çağrı aynı işlemi kullanır.
-        Bekleme `busy_timeout` süresini aşarsa `sqlite3.OperationalError` yükselir.
+        Bekleme `lock_timeout` süresini aşarsa `Busy` yükselir. Kilit kayıtları geri almaz.
+        Kilit altında yazılan her kayıt hemen kalıcıdır.
         """
-        with self._thread_lock:
-            if self._db.in_transaction:
-                yield
-                return
-            self._db.execute("BEGIN IMMEDIATE")
+        deadline = time.monotonic() + self._lock_timeout
+        if not self._thread_lock.acquire(timeout=self._lock_timeout):
+            raise Busy
+        try:
+            if self._lock_fd is not None:
+                while True:
+                    try:
+                        fcntl.flock(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        if time.monotonic() >= deadline:
+                            raise Busy from None
+                        time.sleep(_LOCK_POLL_SECONDS)
             try:
                 yield
-            except BaseException:
-                self._db.execute("ROLLBACK")
-                raise
+            finally:
+                if self._lock_fd is not None:
+                    fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
+        finally:
+            self._thread_lock.release()
+
+    @contextmanager
+    def _transaction(self) -> Iterator[None]:
+        """Kısa bir yazma işlemi. Hata olursa yazılar geri alınır. İşlem açık kalmaz."""
+        self._db.execute("BEGIN IMMEDIATE")
+        try:
+            yield
             self._db.execute("COMMIT")
+        except BaseException:
+            if self._db.in_transaction:
+                self._db.execute("ROLLBACK")
+            raise
 
     def is_processed(self, event_id: str) -> bool:
         row = self._db.execute("SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)).fetchone()
         return row is not None
 
+    def dead_letter_state(self, event_id: str) -> str | None:
+        """Olay bekleme kuyruğundaysa durumunu döner. Değilse `None` döner."""
+        row = self._db.execute("SELECT state FROM dead_letters WHERE event_id = ?", (event_id,)).fetchone()
+        return row[0] if row else None
+
     def mark_processed(self, event_id: str, status: str) -> None:
         """Olayı işlenmiş sayar ve bekleme kuyruğundan çıkarır. İki yazı tek işlemdedir."""
-        with self.exclusive():
+        with self._transaction():
             self._db.execute(
                 "INSERT OR IGNORE INTO processed_events (event_id, status, processed_at) VALUES (?, ?, ?)",
                 (event_id, status, self._clock()),
@@ -124,7 +176,7 @@ class Store:
         if state not in STATES:
             raise ValueError("invalid dead letter state")
         now = self._clock()
-        with self.exclusive():
+        with self._transaction():
             self._db.execute(
                 """
                 INSERT INTO dead_letters (event_id, event, error, state, attempts, first_failed_at, last_failed_at)
@@ -139,7 +191,7 @@ class Store:
             )
 
     def remove_dead_letter(self, event_id: str) -> None:
-        with self.exclusive():
+        with self._transaction():
             self._db.execute("DELETE FROM dead_letters WHERE event_id = ?", (event_id,))
 
     def dead_letters(self) -> list[DeadLetter]:
@@ -165,7 +217,7 @@ class Store:
         `now`, zaman penceresini denetleyen saatin değeridir. Süresi dolan kayıtlar bu
         çağrıda silinir. Zaman penceresi o imzaları zaten reddeder.
         """
-        with self.exclusive():
+        with self._transaction():
             self._db.execute("DELETE FROM used_signatures WHERE expires_at < ?", (now,))
             cursor = self._db.execute(
                 "INSERT OR IGNORE INTO used_signatures (signature, expires_at) VALUES (?, ?)", (signature, expires_at)

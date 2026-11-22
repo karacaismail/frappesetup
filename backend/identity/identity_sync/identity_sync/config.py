@@ -36,6 +36,8 @@ class Settings:
     host: str = "127.0.0.1"
     port: int = 8085
     service_audience: str = "identity-sync"
+    # İş kilidini beklemenin en uzun süresi. Birim saniyedir.
+    lock_timeout: float = 10.0
     # Keycloak realm'in iç kimliği. Keycloak olaylarındaki `realmId` bu değerdir, realm adı değildir.
     realm_id: str = ""
     # Yürütebilen istemciler: yalnız insan onayını denetleyen güvenilir servisler.
@@ -107,10 +109,15 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     try:
         port = int(get("PORT", "8085"))
         timeout = float(get("HTTP_TIMEOUT", "10"))
+        lock_timeout = float(get("LOCK_TIMEOUT", "10"))
     except ValueError:
-        raise ConfigError(f"{PREFIX}PORT and {PREFIX}HTTP_TIMEOUT must be numbers") from None
-    if not 0 < port < 65536 or timeout <= 0:
-        raise ConfigError(f"{PREFIX}PORT or {PREFIX}HTTP_TIMEOUT is out of range")
+        raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT and {PREFIX}LOCK_TIMEOUT must be numbers") from None
+    if not 0 < port < 65536 or timeout <= 0 or lock_timeout <= 0:
+        raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT or {PREFIX}LOCK_TIMEOUT is out of range")
+    execute_azp, preview_azp = _names(get("EXECUTE_AZP")), _names(get("PREVIEW_AZP"))
+    if execute_azp & preview_azp:
+        # Önizleme listesi yürütme izni vermez. İki listede birden duran istemci bu ayrımı bozar.
+        raise ConfigError(f"a client cannot be in both {PREFIX}EXECUTE_AZP and {PREFIX}PREVIEW_AZP")
     internal = get("KEYCLOAK_INTERNAL_URL")
     return Settings(
         keycloak_public_url=_url(f"{PREFIX}KEYCLOAK_PUBLIC_URL", get("KEYCLOAK_PUBLIC_URL")),
@@ -128,6 +135,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         port=port,
         service_audience=get("AUDIENCE", "identity-sync"),
         realm_id=get("REALM_ID"),
-        execute_azp=_names(get("EXECUTE_AZP")),
-        preview_azp=_names(get("PREVIEW_AZP")),
+        execute_azp=execute_azp,
+        preview_azp=preview_azp,
+        lock_timeout=lock_timeout,
     )

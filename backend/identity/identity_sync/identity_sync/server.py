@@ -30,8 +30,10 @@ from identity_sync.app import App
 from identity_sync.auth import TokenRejected, Verifier
 from identity_sync.events import RESOURCE_ID, EventError, from_keycloak, looks_like_keycloak, parse_event
 from identity_sync.httpjson import HttpError, TransportError
+from identity_sync.keycloak_admin import PlanChanged
 from identity_sync.mapping import digest_of
 from identity_sync.pipeline import PreviewChanged, replay_report
+from identity_sync.store import Busy
 
 __all__ = ["TokenRejected", "make_server"]
 
@@ -43,6 +45,7 @@ SIGNATURE_WINDOW_SECONDS = 300
 _EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,189}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _TIMESTAMP = re.compile(r"^[0-9]{1,12}$")
+_CONTENT_LENGTH = re.compile(r"^[0-9]{1,12}$")
 _LOG = logging.getLogger("identity_sync")
 
 Reply = tuple[int, object]
@@ -83,7 +86,7 @@ class _DeadlineReader(io.RawIOBase):
 def _json_object(body: bytes) -> dict[str, object]:
     try:
         payload = json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         raise _BadRequest from None
     if not isinstance(payload, dict):
         raise _BadRequest
@@ -157,14 +160,25 @@ class _Api:
         ve önizleme özetini taşır. Servis çağıranı, onayı ve özeti günlüğe yazar.
         """
         if azp not in self._settings.execute_azp:
-            _LOG.warning("refused execute operation=%s azp=%s", operation, azp)
+            _LOG.warning("execute operation=%s azp=%s outcome=forbidden", operation, azp)
             raise _Forbidden
         digest = _text(payload, "preview_digest", required=True, max_length=64)
         approval_id = _text(payload, "approval_id", required=True, max_length=128)
         if not _DIGEST.fullmatch(digest) or not RESOURCE_ID.fullmatch(approval_id):
             raise _BadRequest
-        _LOG.info("execute operation=%s azp=%s approval_id=%s preview_digest=%s", operation, azp, approval_id, digest)
         return digest
+
+    @staticmethod
+    def _audit(operation: str, payload: Mapping[str, object], azp: str, outcome: str) -> None:
+        """İşlem günlüğü: kim, hangi onayla, hangi planı istedi ve sonuç ne oldu."""
+        _LOG.info(
+            "execute operation=%s azp=%s approval_id=%s preview_digest=%s outcome=%s",
+            operation,
+            azp,
+            payload.get("approval_id"),
+            payload.get("preview_digest"),
+            outcome,
+        )
 
     def post_replay(self, body: bytes, azp: str) -> Reply:
         payload = _json_object(body)
@@ -177,7 +191,9 @@ class _Api:
         try:
             results = self._app.processor.replay_dead_letters(include_unknown=include_unknown, expected_digest=digest)
         except PreviewChanged:
+            self._audit("replay_dead_letters", payload, azp, "preview_changed")
             return 409, {"error": "preview_changed"}
+        self._audit("replay_dead_letters", payload, azp, "executed")
         return 200, {"results": replay_report(results)}
 
     def post_invitation(self, body: bytes, azp: str) -> Reply:
@@ -205,8 +221,20 @@ class _Api:
         if dry_run:
             return 200, {"subject": preview.subject, "previews": previews, "preview_digest": current}
         if digest != current:
+            self._audit("invite_user", payload, azp, "preview_changed")
             return 409, {"error": "preview_changed"}
-        result = keycloak.invite_user(email, first_name, last_name, organization_id)
+        try:
+            # Servis yalnız onaylanan planı yürütür. Plan arada değiştiyse hiçbir şey yazmaz.
+            result = keycloak.invite_user(
+                email, first_name, last_name, organization_id, expected_previews=preview.previews
+            )
+        except PlanChanged:
+            self._audit("invite_user", payload, azp, "preview_changed")
+            return 409, {"error": "preview_changed"}
+        except (HttpError, TransportError):
+            self._audit("invite_user", payload, azp, "upstream_failed")
+            raise
+        self._audit("invite_user", payload, azp, "executed")
         return 200, {"subject": result.subject, "previews": [item.to_dict() for item in result.previews]}
 
 
@@ -271,6 +299,9 @@ def make_server(
                 return 400, {"error": "bad_request"}
             except _Forbidden:
                 return 403, {"error": "forbidden"}
+            except Busy:
+                # Başka bir süreç bir olayı işliyor. Çağıran yeniden denemelidir.
+                return 503, {"error": "busy"}
             except sqlite3.Error:
                 _LOG.error("storage failed on %s", parts.path[:200])
                 return 500, {"error": "storage_failed"}
@@ -305,10 +336,11 @@ def make_server(
             return token_routes[path][1](body, azp)
 
         def _read_body(self) -> bytes | None:
-            try:
-                length = int(self.headers.get("Content-Length") or 0)
-            except ValueError:
-                length = -1
+            raw_length = self.headers.get("Content-Length")
+            if raw_length is None:
+                length = 0
+            else:
+                length = int(raw_length) if _CONTENT_LENGTH.fullmatch(raw_length.strip()) else -1
             if 0 <= length <= MAX_BODY_BYTES:
                 body = self.rfile.read(length)
                 if len(body) != length:

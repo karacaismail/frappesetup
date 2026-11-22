@@ -7,15 +7,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 from collections.abc import Mapping, Sequence
+from typing import TextIO
 
 from identity_sync.app import App, build_app
 from identity_sync.auth import build_verifier, reject_all
 from identity_sync.config import ConfigError, load_settings
 from identity_sync.httpjson import HttpError, TransportError
 from identity_sync.pipeline import replay_report
+from identity_sync.store import Busy
 
 EXIT_OK, EXIT_FOUND, EXIT_ERROR = 0, 1, 2
 
@@ -41,9 +44,23 @@ def _print(body: object) -> None:
     sys.stdout.write("\n")
 
 
+def configure_logging(stream: TextIO | None = None) -> None:
+    """Servisin günlüğünü açar. İşlem günlüğü INFO düzeyindedir.
+
+    Ayar yapılmazsa Python yalnız uyarıları yazar ve işlem günlüğü kaybolur.
+    """
+    logger = logging.getLogger("identity_sync")
+    handler = logging.StreamHandler(stream or sys.stderr)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    logger.handlers = [handler]
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+
 def _serve(app: App) -> int:
     from identity_sync.server import make_server
 
+    configure_logging()
     verifier = build_verifier(app.settings)
     if verifier is reject_all:
         print("warning: service tokens cannot be verified; protected endpoints reject every request", file=sys.stderr)
@@ -85,6 +102,9 @@ def main(argv: Sequence[str] | None = None, *, env: Mapping[str, str] | None = N
         return _run(args.command, getattr(args, "dry_run", False), getattr(args, "include_unknown", False), app)
     except (HttpError, TransportError) as error:
         print(f"upstream error: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    except Busy:
+        print("busy: another process is working on an event; try again", file=sys.stderr)
         return EXIT_ERROR
     finally:
         app.close()

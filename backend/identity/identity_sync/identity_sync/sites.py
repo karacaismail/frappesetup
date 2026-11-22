@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict
 
-from identity_sync.httpjson import TransportError, UnknownOutcome, request_json
+from identity_sync.httpjson import ConnectFailed, HttpError, Response, TransportError, UnknownOutcome, request_json
 from identity_sync.mapping import (
     PressEnsureTeam,
     PressRemoveTeamMember,
@@ -25,6 +25,7 @@ from identity_sync.reconcile import Identity
 from identity_sync.tokens import TokenProvider
 
 PRESS_SCOPE = "aud-press"
+_AMBIGUOUS_GATEWAY_STATUSES = (502, 504)
 
 
 def tenant_scope(tenant: str) -> str:
@@ -42,16 +43,30 @@ def _call_method(
     is_success: Callable[[int, object], bool] | None = None,
 ) -> object:
     """Frappe ucunu çağırır ve yanıttaki `message` değerini döner."""
-    response = tokens.with_token(
-        scope,
-        lambda token: request_json(
-            "GET" if body is None else "POST",
-            f"{base_url.rstrip('/')}/api/method/{method_path}",
-            timeout=timeout,
-            headers={"Authorization": f"Bearer {token}"},
-            json_body=body,
-        ),
-    )
+
+    def send(token: str) -> Response:
+        try:
+            return request_json(
+                "GET" if body is None else "POST",
+                f"{base_url.rstrip('/')}/api/method/{method_path}",
+                timeout=timeout,
+                headers={"Authorization": f"Bearer {token}"},
+                json_body=body,
+            )
+        except ConnectFailed:
+            raise  # istek gitmedi: belirsizlik yok
+        except TransportError:
+            if body is None:
+                raise
+            # Yazma isteği gitti ama yanıt okunamadı. İşin bitip bitmediği bilinmiyor.
+            raise UnknownOutcome from None
+        except HttpError as error:
+            # Aradaki vekil sunucu hata verdi. Hedef işi yapmış olabilir.
+            if body is not None and error.status in _AMBIGUOUS_GATEWAY_STATUSES:
+                raise UnknownOutcome from None
+            raise
+
+    response = tokens.with_token(scope, send)
     message = response.body.get("message") if isinstance(response.body, Mapping) else None
     if body is not None and not (is_success or _is_done)(response.status, message):
         # Yazma işinin kesin başarı yanıtı gelmedi. Kuyruğa alınma başarı sayılmaz.

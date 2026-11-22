@@ -63,11 +63,14 @@ class DocumentationTest(unittest.TestCase):
             if operation.get("x-durum") != "uygulandi" or operation["x-yurutme"] != "yalniz-onay-katmani":
                 continue
             with self.subTest(operation=key):
-                schema = request_schema(*key)
-                schema = CONTRACT["components"]["schemas"][schema["$ref"].rsplit("/", 1)[-1]]
-                self.assertIn("dry_run", schema["required"])
-                self.assertIn("preview_digest", schema["properties"])
-                self.assertIn("approval_id", schema["properties"])
+                schemas = CONTRACT["components"]["schemas"]
+                request = schemas[request_schema(*key)["$ref"].rsplit("/", 1)[-1]]
+                preview, execute = (schemas[option["$ref"].rsplit("/", 1)[-1]] for option in request["oneOf"])
+                # Çağıran seçimi açıkça yazar. Yürütme onay alanlarını zorunlu tutar.
+                self.assertIs(preview["properties"]["dry_run"]["const"], True)
+                self.assertIs(execute["properties"]["dry_run"]["const"], False)
+                for name in ("dry_run", "preview_digest", "approval_id"):
+                    self.assertIn(name, execute["required"])
                 self.assertIn("403", operation["responses"])
                 self.assertIn("409", operation["responses"])
 
@@ -197,6 +200,11 @@ class SchemaTest(ServerCase):
         self.assert_response(self.post_json(path, {**execute_request, "preview_digest": "0" * 64}), "POST", path, 409)
         self.assert_response(self.post_json(path, execute_request, EXECUTE_TOKEN), "POST", path, 200)
         self.assert_response(self.post_json(path, {}), "POST", path, 400)
+        # Sunucunun reddettiği gövde şemaya da uymaz.
+        for rejected in ({}, {"dry_run": False}, {"dry_run": False, "approval_id": "onay-1"}, {"dry_run": "true"}):
+            with self.subTest(rejected=rejected):
+                self.assertNotEqual(schema_errors(rejected, request_schema("POST", path), CONTRACT), [])
+                self.assertEqual(self.post_json(path, rejected)[0], 400)
         self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
 
     def test_invitation(self) -> None:
@@ -206,8 +214,15 @@ class SchemaTest(ServerCase):
         request = {"email": "davetli@example.test", "organization_id": ORG_ID, "dry_run": True}
 
         self.assert_request(request, "POST", path)
-        self.assert_response(self.post_json(path, request, PREVIEW_TOKEN), "POST", path, 200)
+        preview = self.assert_response(self.post_json(path, request, PREVIEW_TOKEN), "POST", path, 200)
         self.assert_response(self.post_json(path, {"email": "x"}), "POST", path, 400)
+        execute = {**request, "dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-1"}
+        self.assert_request(execute, "POST", path)
+        self.assert_response(self.post_json(path, execute, PREVIEW_TOKEN), "POST", path, 403)
+        self.assert_response(self.post_json(path, {**execute, "preview_digest": "0" * 64}), "POST", path, 409)
+        without_approval = {**request, "dry_run": False}
+        self.assertNotEqual(schema_errors(without_approval, request_schema("POST", path), CONTRACT), [])
+        self.assertEqual(self.post_json(path, without_approval)[0], 400)
         kc.on("GET", f"{kc.admin}/users", (500, None))
         self.assert_response(self.post_json(path, request), "POST", path, 502)
 

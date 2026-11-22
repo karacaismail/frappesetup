@@ -50,6 +50,10 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.execute_azp, frozenset({"approval-service"}))
         self.assertEqual(settings.preview_azp, frozenset({"ai-agent", "ops-bff"}))
 
+    def test_client_cannot_be_in_both_lists(self) -> None:
+        with self.assertRaises(ConfigError):
+            load_settings({**self.ENV, "IDENTITY_SYNC_PREVIEW_AZP": "ai-agent, approval-service"})
+
     def test_client_lists_default_to_empty(self) -> None:
         env = {k: v for k, v in self.ENV.items() if not k.endswith("_AZP")}
         settings = load_settings(env)
@@ -89,6 +93,23 @@ class ConfigTest(unittest.TestCase):
         for change in bad_values:
             with self.subTest(change=change), self.assertRaises(ConfigError):
                 load_settings({**self.ENV, **change})
+
+
+class LoggingTest(unittest.TestCase):
+    def test_serve_logging_keeps_info_records(self) -> None:
+        # İşlem günlüğü INFO düzeyindedir. Ayar yapılmazsa Python bu kayıtları atar.
+        import logging
+
+        stream = io.StringIO()
+        logger = logging.getLogger("identity_sync")
+        before = (logger.level, list(logger.handlers), logger.propagate)
+        self.addCleanup(lambda: (logger.setLevel(before[0]), setattr(logger, "handlers", before[1]), setattr(logger, "propagate", before[2])))
+
+        cli.configure_logging(stream)
+        logger.info("execute operation=%s", "deneme")
+
+        self.assertIn("execute operation=deneme", stream.getvalue())
+        self.assertIn("INFO", stream.getvalue())
 
 
 class CliTest(unittest.TestCase):

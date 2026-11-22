@@ -63,8 +63,15 @@ class FakeServer:
                 route = owner.routes.get((self.command, parts.path))
                 reply = route(recorded) if route else (404, {"error": "no route"})
                 status, body = reply[0], reply[1]
+                if status == 0:
+                    self.close_connection = True
+                    self.connection.close()
+                    return
                 extra = reply[2] if len(reply) > 2 else {}
-                raw = b"" if body is None else json.dumps(body).encode("utf-8")
+                if isinstance(body, str):
+                    raw = body.encode("utf-8")  # JSON olmayan gövde
+                else:
+                    raw = b"" if body is None else json.dumps(body).encode("utf-8")
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(raw)))
@@ -180,6 +187,8 @@ WEBHOOK_SECRET = "test-webhook-secret"
 DONE = (200, {"message": {"status": "done"}})
 # `ensure_team` yanıtı (`docs/sozlesmeler.md`, "Kuruluş ile takım eşlemesi").
 TEAM_READY = (200, {"message": {"team": "team-0001", "created": True}})
+# Sunucu isteği okur, sonra yanıt vermeden bağlantıyı kapatır.
+DROP = (0, None)
 
 
 class FakeSite(FakeServer):

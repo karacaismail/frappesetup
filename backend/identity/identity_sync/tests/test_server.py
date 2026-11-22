@@ -94,6 +94,11 @@ class ServerCase(unittest.TestCase):
         target = path or ("/v1/events?dry_run=true" if dry_run else "/v1/events")
         return self.call("POST", target, body, headers)
 
+    def post_event_raw(self, body: bytes) -> tuple[int, object]:
+        timestamp = self.timestamp()
+        headers = {"X-Identity-Sync-Timestamp": str(timestamp), "X-Identity-Sync-Signature": sign(body, timestamp)}
+        return self.call("POST", "/v1/events", body, headers)
+
     def bearer(self, token: str = EXECUTE_TOKEN) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
@@ -376,8 +381,12 @@ class RawSocketTest(ServerCase):
     def test_slow_body_hits_the_total_deadline(self) -> None:
         self.assert_health_answers_despite(b"POST /v1/events HTTP/1.1\r\nContent-Length: 200\r\n\r\n" + b"x" * 200)
 
+    def test_deeply_nested_body_is_a_bad_request(self) -> None:
+        self.assertEqual(self.post_event_raw(b"[" * 100000 + b"]" * 100000)[0], 413)
+        self.assertEqual(self.post_event_raw(b"[" * 30000 + b"]" * 30000), (400, {"error": "bad_request"}))
+
     def test_bad_content_length_is_rejected(self) -> None:
-        for value in (b"-1", b"abc", b"99999999"):
+        for value in (b"-1", b"abc", b"99999999", b"+5", b"1_0"):
             with self.subTest(value=value):
                 reply = self.raw(b"POST /v1/events HTTP/1.1\r\nContent-Length: " + value + b"\r\n\r\n")
                 self.assertIn(b" 413 ", reply.split(b"\r\n", 1)[0])
@@ -479,12 +488,38 @@ class ApprovalLayerTest(ServerCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["results"][0]["status"], "processed")
         self.assertEqual(self.stack.app.store.dead_letters(), [])
-        # İşlem günlüğü çağıranı, onay kimliğini ve önizleme özetini taşır.
+        # İşlem günlüğü çağıranı, onay kimliğini, önizleme özetini ve sonucu taşır.
         audit = "\n".join(logs.output)
         self.assertIn("replay_dead_letters", audit)
         self.assertIn("approval-service", audit)
         self.assertIn("onay-1", audit)
         self.assertIn(digest, audit)
+        self.assertIn("outcome=executed", audit)
+
+    def test_refused_execution_is_logged_as_refused(self) -> None:
+        self.fail_once()
+        digest = self.preview_replay()["preview_digest"]
+        self.stack.keycloak.add_user(keycloak_user(enabled=False), [])
+
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            self.execute_replay(digest)
+            self.execute_replay(digest, token=PREVIEW_TOKEN)
+
+        audit = "\n".join(logs.output)
+        self.assertIn("outcome=preview_changed", audit)
+        self.assertIn("outcome=forbidden", audit)
+        self.assertNotIn("outcome=executed", audit)
+
+    def test_redelivered_unknown_event_is_not_executed_again(self) -> None:
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (202, {"message": {"status": "queued"}}))
+        self.post_event()
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, DONE)
+        writes = len(self.downstream_writes())
+
+        status, body = self.post_event()
+
+        self.assertEqual((status, body["status"]), (202, "unknown"))
+        self.assertEqual(len(self.downstream_writes()), writes)
 
     def test_execution_without_digest_or_approval_is_bad_request(self) -> None:
         self.fail_once()

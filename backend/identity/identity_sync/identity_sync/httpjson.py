@@ -8,6 +8,7 @@ Hata metni yanıt gövdesini taşımaz. Gövde kişisel veri içerebilir.
 from __future__ import annotations
 
 import json
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -40,6 +41,10 @@ class TransportError(Exception):
     """İstek sunucuya ulaşmadı ya da yanıt okunamadı."""
 
     transient = True
+
+
+class ConnectFailed(TransportError):
+    """Bağlantı hiç kurulamadı. İstek sunucuya gitmedi."""
 
 
 @dataclass(frozen=True)
@@ -93,7 +98,12 @@ def request_json(
     except urllib.error.HTTPError as error:
         error.close()
         raise HttpError(error.code) from None
-    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as error:
+    except urllib.error.URLError as error:
+        if isinstance(error.reason, (ConnectionRefusedError, socket.gaierror)):
+            raise ConnectFailed("connection failed") from None
+        raise TransportError(type(error.reason).__name__) from None
+    except (TimeoutError, ConnectionError, OSError) as error:
+        # İstek gitmiş olabilir. Yanıt okunamadı.
         raise TransportError(type(error).__name__) from None
     if len(payload) > _MAX_RESPONSE_BYTES:
         raise TransportError("response too large")

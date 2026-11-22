@@ -69,6 +69,17 @@ def _id_from_location(response: Response) -> str:
     return urllib.parse.unquote(new_id)
 
 
+class PlanChanged(Exception):
+    """Güncel plan onaylanan plandan farklı. Hiçbir şey yazılmadı."""
+
+
+def _expect(response: Response, *statuses: int) -> Response:
+    """Keycloak'ın yazma yanıtını denetler. Beklenmeyen durum kodu başarı sayılmaz."""
+    if response.status not in statuses:
+        raise TransportError("unexpected Keycloak response")
+    return response
+
+
 class KeycloakAdmin:
     def __init__(
         self, base_url: str, realm: str, tokens: TokenProvider, *, admin_scope: str = "", timeout: float = 10.0
@@ -218,7 +229,7 @@ class KeycloakAdmin:
         if dry_run:
             return Outcome(preview, executed=False)
         response = self._call("POST", "/organizations", json_body={"name": name, "alias": alias, "enabled": True})
-        return Outcome(preview, executed=True, value=_id_from_location(response))
+        return Outcome(preview, executed=True, value=_id_from_location(_expect(response, 201)))
 
     def add_organization_member(self, organization_id: str, subject: str, *, dry_run: bool = False) -> Outcome:
         """Kullanıcıyı Organization'a üye yapar. Kullanıcı zaten üyeyse iş yapmaz."""
@@ -231,7 +242,7 @@ class KeycloakAdmin:
         if dry_run:
             return Outcome(preview, executed=False)
         try:
-            self._call("POST", f"/organizations/{_quote(organization_id)}/members", json_body=subject)
+            _expect(self._call("POST", f"/organizations/{_quote(organization_id)}/members", json_body=subject), 201, 204)
         except HttpError as error:
             if error.status != 409:  # 409: kullanıcı zaten üye
                 raise
@@ -255,7 +266,8 @@ class KeycloakAdmin:
             "enabled": True,
             "emailVerified": False,
         }
-        return Outcome(preview, executed=True, value=_id_from_location(self._call("POST", "/users", json_body=body)))
+        response = _expect(self._call("POST", "/users", json_body=body), 201)
+        return Outcome(preview, executed=True, value=_id_from_location(response))
 
     def send_execute_actions_email(
         self,
@@ -276,12 +288,13 @@ class KeycloakAdmin:
         )
         if dry_run:
             return Outcome(preview, executed=False)
-        self._call(
+        response = self._call(
             "PUT",
             f"/users/{_quote(subject)}/execute-actions-email",
             query={"client_id": client_id, "redirect_uri": redirect_uri, "lifespan": lifespan},
             json_body=list(actions),
         )
+        _expect(response, 200, 204)
         return Outcome(preview, executed=True)
 
     def create_site_client(self, tenant: str, base_url: str, *, dry_run: bool = False) -> Outcome:
@@ -314,7 +327,8 @@ class KeycloakAdmin:
                 "backchannel.logout.session.required": "true",
             },
         }
-        return Outcome(preview, executed=True, value=_id_from_location(self._call("POST", "/clients", json_body=body)))
+        response = _expect(self._call("POST", "/clients", json_body=body), 201)
+        return Outcome(preview, executed=True, value=_id_from_location(response))
 
     # --- birleşik işler: tekrar edilebilir ---
 
@@ -333,25 +347,39 @@ class KeycloakAdmin:
         return SiteClient(client_id=client_id, client_secret=self.get_client_secret(client_uuid))
 
     def invite_user(
-        self, email: str, first_name: str, last_name: str, organization_id: str, *, dry_run: bool = False
+        self,
+        email: str,
+        first_name: str,
+        last_name: str,
+        organization_id: str,
+        *,
+        dry_run: bool = False,
+        expected_previews: Sequence[Preview] | None = None,
     ) -> InviteResult:
         """Kullanıcıyı davet eder (G-16, G-79).
 
         Kullanıcı yoksa açar. Sonra Organization'a ekler ve davet e-postasını gönderir.
         `dry_run` doğruysa yalnız okur ve yapılacak işleri döner.
+        `expected_previews` onaylanan plandır. Güncel plan farklıysa `PlanChanged`
+        yükselir ve hiçbir şey yazılmaz.
         """
         existing = self.find_user_by_email(email)
         subject = str(existing["id"]) if existing else None
-        previews: list[Preview] = []
-        if subject is None:
-            created = self.create_user(email, first_name, last_name, dry_run=dry_run)
-            previews.append(created.preview)
-            subject = str(created.value) if created.executed else None
         shown = subject or "(new user)"
-        previews.append(self.add_organization_member(organization_id, shown, dry_run=dry_run or subject is None).preview)
-        previews.append(self.send_execute_actions_email(shown, INVITE_ACTIONS, dry_run=dry_run or subject is None).preview)
-        return InviteResult(subject=None if dry_run and existing is None else subject, previews=tuple(previews))
-
+        plan: list[Preview] = []
+        if subject is None:
+            plan.append(self.create_user(email, first_name, last_name, dry_run=True).preview)
+        plan.append(self.add_organization_member(organization_id, shown, dry_run=True).preview)
+        plan.append(self.send_execute_actions_email(shown, INVITE_ACTIONS, dry_run=True).preview)
+        if expected_previews is not None and tuple(plan) != tuple(expected_previews):
+            raise PlanChanged
+        if dry_run:
+            return InviteResult(subject=subject, previews=tuple(plan))
+        if subject is None:
+            subject = str(self.create_user(email, first_name, last_name).value)
+        self.add_organization_member(organization_id, subject)
+        self.send_execute_actions_email(subject, INVITE_ACTIONS)
+        return InviteResult(subject=subject, previews=tuple(plan))
 
 def _organization(row: Mapping[str, object]) -> Organization:
     return Organization(id=str(row.get("id", "")), alias=str(row.get("alias", "")), name=str(row.get("name") or ""))
