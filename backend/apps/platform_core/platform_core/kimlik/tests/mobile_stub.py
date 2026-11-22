@@ -11,7 +11,7 @@ import frappe
 
 def v1_whoami() -> dict:
 	identity = getattr(frappe.local, "mobile_identity", None) or {}
-	return {"user": frappe.session.user, "identity": {k: v for k, v in identity.items() if k != "scope"}}
+	return {"user": frappe.session.user, "site": frappe.local.site, "identity": dict(identity)}
 
 
 def register() -> Callable[[], None]:

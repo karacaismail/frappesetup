@@ -43,7 +43,7 @@ class TestContractGate(IntegrationTestCase):
 	def test_http_methods_of_each_wrapper_match_the_contract(self):
 		paths = _paths()
 		problems = []
-		for original, (name, methods) in login_policy.GATED_FUNCTIONS.items():
+		for name, methods in login_policy.GATED_FUNCTIONS.values():
 			verbs = sorted(paths.get(f"/{PREFIX}{name}", {}))
 			if verbs != sorted(m.lower() for m in methods):
 				problems.append(f"{name}: code {methods}, contract {verbs}")

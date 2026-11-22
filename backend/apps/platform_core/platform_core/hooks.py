@@ -39,3 +39,5 @@ after_install = ["platform_core.kimlik.session_policy.apply"]
 after_migrate = ["platform_core.kimlik.session_policy.apply"]
 # O-28: the identity link changes only through the identity endpoints, never through generic AI writes.
 ai_write_closed_doctypes = ["Platform Identity Link", "Platform Identity Deletion"]
+# Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
+website_user_allowed_methods = ["platform_core.api.auth.logout"]

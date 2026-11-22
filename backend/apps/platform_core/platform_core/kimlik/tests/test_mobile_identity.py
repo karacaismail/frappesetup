@@ -53,9 +53,11 @@ class TestMobileIdentity(FrappeAPITestCase):
 		h.clear_links()
 		h.make_link("sub-ayse", h.AYSE)
 
-	def call(self, token=None, client=None, path=STUB, **extra):
+	def call(self, token=None, client=None, path=STUB, headers=None, **extra):
 		client = client or h.new_client()
-		headers = {"Authorization": f"Bearer {token}"} if token else {}
+		headers = dict(headers or {})
+		if token:
+			headers["Authorization"] = f"Bearer {token}"
 		headers.update(h.csrf_headers(client))
 		return h.request(client.post, path, json={}, headers=headers, **extra)
 
@@ -64,11 +66,34 @@ class TestMobileIdentity(FrappeAPITestCase):
 		self.assertEqual(response.status_code, 200, response.data[:300])
 		body = response.json["message"]
 		self.assertEqual(body["user"], h.AYSE)
-		self.assertEqual(body["identity"]["user"], h.AYSE)
-		self.assertEqual(body["identity"]["issuer"], h.ISSUER)
-		self.assertEqual(body["identity"]["subject"], "sub-ayse")
-		self.assertEqual(body["identity"]["sid"], "11111111-1111-4111-8111-111111111111")
-		self.assertEqual(body["identity"]["azp"], "mobile")
+		identity = body["identity"]
+		self.assertEqual(identity["account"], h.AYSE)
+		self.assertEqual(identity["issuer"], h.ISSUER)
+		self.assertEqual(identity["subject"], "sub-ayse")
+		self.assertEqual(identity["sid"], "11111111-1111-4111-8111-111111111111")
+
+	def test_mobile_identity_matches_the_contract(self):
+		# docs/sozlesmeler.md section 3, "Telefon kimliği": account, scope, site, installation and sid are text.
+		# scope is always the text "mobile". site is the site of the request.
+		token = self.key.sign(mobile_payload())
+		response = self.call(token, headers={"X-Platform-Installation": "inst-0001_ab"})
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		body = response.json["message"]
+		identity = body["identity"]
+		for field in ("account", "scope", "site", "installation", "sid"):
+			self.assertIsInstance(identity.get(field), str, field)
+		self.assertEqual(identity["scope"], "mobile")
+		self.assertEqual(identity["site"], body["site"])
+		self.assertEqual(identity["installation"], "inst-0001_ab")
+		self.assertNotIn("user", identity)
+		# Fields that the mobile module reads in addition (mobil/request.py): issuer, subject and iat.
+		self.assertIsInstance(identity["iat"], int)
+
+	def test_bad_installation_header_gives_an_empty_installation(self):
+		for value in ("", "a" * 129, "bad value", "<x>"):
+			response = self.call(self.key.sign(mobile_payload()), headers={"X-Platform-Installation": value})
+			self.assertEqual(response.status_code, 200, response.data[:300])
+			self.assertEqual(response.json["message"]["identity"]["installation"], "", value)
 
 	def test_bad_mobile_tokens_get_401(self):
 		now = mobile_payload()["iat"]

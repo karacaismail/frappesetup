@@ -188,6 +188,22 @@ class TestSessionPolicy(FrappeAPITestCase):
 
 	# --- O-28: AI write closure -----------------------------------------------------------------
 
+	def test_website_user_allow_list_has_only_the_identity_methods_a_portal_user_calls(self):
+		# docs/sozlesmeler.md "Website User için yöntem izin listesi": each app adds only its own methods.
+		# Guest endpoints (start_login and the others) and service endpoints stay out of the list.
+		allowed = set(frappe.get_hooks("website_user_allowed_methods"))
+		self.assertIn("platform_core.api.auth.logout", allowed)
+		for method in (
+			"platform_core.api.auth.get_login_url",
+			"platform_core.api.auth.start_login",
+			"platform_core.api.auth.keycloak_callback",
+			"platform_core.api.auth.setup_keycloak_login",
+			"platform_core.api.keycloak_backchannel_logout",
+			"platform_core.api.identity.provision",
+			"platform_core.api.identity.anonymize_user",
+		):
+			self.assertNotIn(method, allowed)
+
 	def test_identity_link_is_closed_to_ai_writes(self):
 		closed = frappe.get_hooks("ai_write_closed_doctypes")
 		self.assertIn("Platform Identity Link", closed)

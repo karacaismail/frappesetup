@@ -5,6 +5,8 @@ The `auth_hooks` entry `service_token.validate` calls `authenticate_mobile_reque
 `MOBILE_PATH_PREFIX`; on success `frappe.local.mobile_identity` describes the caller (AU-3, AU-4, AU-5).
 """
 
+import re
+
 import frappe
 from frappe import _
 
@@ -15,6 +17,8 @@ LEEWAY = 30
 MOBILE_SCOPE = "mobile"
 LINK = "Platform Identity Link"
 DEFAULT_MOBILE_AZP = ("mobile",)
+INSTALLATION_HEADER = "X-Platform-Installation"
+INSTALLATION_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
 
 def mobile_azp() -> frozenset[str]:
@@ -69,23 +73,39 @@ def verify_mobile_token(token: str) -> dict:
 		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("unknown_identity"))
 	if not frappe.db.get_value("User", user, "enabled"):
 		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("user_disabled"))
-	sid = claims.get("sid") if helpers.is_session_id(claims.get("sid")) else None
+	sid = claims.get("sid") if helpers.is_session_id(claims.get("sid")) else ""
+	issued_at = claims.get("iat")
+	# docs/sozlesmeler.md section 3, "Telefon kimliği": account, scope, site, installation and sid are text.
+	# issuer, subject and iat are read in addition by the mobile module (mobil/request.py).
 	return {
-		"user": user,
+		"account": user,
+		"scope": MOBILE_SCOPE,
+		"site": frappe.local.site,
+		"installation": _installation(),
+		"sid": sid,
 		"issuer": settings.issuer,
 		"subject": subject.strip(),
-		"sid": sid,
+		"iat": issued_at if type(issued_at) is int else 0,
 		"azp": claims.get("azp"),
-		"scope": scopes,
 		"expires_at": claims.get("exp"),
 	}
+
+
+def _installation() -> str:
+	"""Installation id from the `X-Platform-Installation` header. Text in a fixed shape, otherwise empty.
+
+	The contract names the field but not its source. The header is the smallest safe choice: it carries no
+	authority, the mobile module checks the installation against its own records.
+	"""
+	value = frappe.get_request_header(INSTALLATION_HEADER) or ""
+	return value if INSTALLATION_PATTERN.fullmatch(value) else ""
 
 
 def authenticate_mobile_request(token: str) -> None:
 	"""Sets the request user from a mobile token and records `frappe.local.mobile_identity`."""
 	identity = verify_mobile_token(token)
 	form_dict = frappe.local.form_dict
-	frappe.set_user(identity["user"])
+	frappe.set_user(identity["account"])
 	frappe.local.form_dict = form_dict
 	frappe.local.mobile_identity = identity
 
