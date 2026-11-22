@@ -189,31 +189,35 @@ const embeds = EMBEDS[entry.id] ?? [];
   };
   const markScrollingCode = () => {
     const codes = Array.from(document.querySelectorAll<HTMLElement>(CODE)).filter((c) => c.getClientRects().length > 0);
-    const boxes = codes.map(lineBox);
-    const unique = Array.from(new Set(boxes));
+    const byParent = new Map<HTMLElement, HTMLElement>();
+    const boxes = codes.map((code) => {
+      const parent = code.parentElement!;
+      const measured = byParent.get(parent) ?? lineBox(code);
+      byParent.set(parent, measured);
+      return measured;
+    });
+    const unique = new Set(boxes);
     const scrolled = codes.map((c) => c.scrollLeft);
     const was = codes.map((c) => c.getAttribute('data-scroll'));
     const focused = document.activeElement;
     for (const c of codes) c.removeAttribute('data-scroll');
-    for (const b of unique) b.style.setProperty('overflow-wrap', 'normal');
+    document.documentElement.setAttribute('data-code-measuring', '');
     // Satır kutusunun içerik kenarından taşan parçalar (yalnız sığmayan kesintisiz dizilerin satırları).
     const overflowing = new Map<HTMLElement, DOMRect[]>();
+    const range = document.createRange();
     for (const b of unique) {
+      if (b.scrollWidth <= b.clientWidth) continue;
       const cs = getComputedStyle(b);
       const right = b.getBoundingClientRect().right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
-      const range = document.createRange();
       range.selectNodeContents(b);
       overflowing.set(b, Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.right > right + 0.05));
     }
     const long = codes.map((c, i) => {
-      const lines = overflowing.get(boxes[i])!;
-      if (lines.length === 0) return false;
+      const lines = overflowing.get(boxes[i]);
+      if (!lines?.length) return false;
       return Array.from(c.getClientRects()).some((q) => lines.some((o) => o.top < q.bottom - 1 && q.top < o.bottom - 1));
     });
-    for (const b of unique) {
-      b.style.removeProperty('overflow-wrap');
-      if (!b.getAttribute('style')) b.removeAttribute('style');
-    }
+    document.documentElement.removeAttribute('data-code-measuring');
     codes.forEach((c, i) => {
       if (c === focused && was[i] !== null) c.setAttribute('data-scroll', was[i]);
       else if (long[i]) c.setAttribute('data-scroll', '');
@@ -228,7 +232,7 @@ const embeds = EMBEDS[entry.id] ?? [];
         c.setAttribute('data-scroll', 'single-line');
         c.setAttribute('tabindex', '0');
         c.setAttribute('role', 'group');
-        c.setAttribute('aria-label', `Kaydırılabilir kod: ${c.textContent?.trim().replace(/\s+/g, ' ')}`);
+        c.setAttribute('aria-label', 'Kaydırılabilir kod');
         c.scrollLeft = scrolled[i];
       } else {
         c.removeAttribute('tabindex');
@@ -245,7 +249,19 @@ const embeds = EMBEDS[entry.id] ?? [];
   // Ölçüm başlayınca satır içi kodda break-word ağı kapanır (global.css); betik yoksa ağ yerinde kalır.
   document.documentElement.setAttribute('data-code-measured', '');
   markScrollingCode();
-  new ResizeObserver(schedule).observe(document.body);
+  const content = document.getElementById('icerik');
+  if (content) {
+    let previousWidth = 0;
+    let previousFontSize = '';
+    new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      const fontSize = getComputedStyle(document.documentElement).fontSize;
+      if (width === previousWidth && fontSize === previousFontSize) return;
+      previousWidth = width;
+      previousFontSize = fontSize;
+      schedule();
+    }).observe(content);
+  }
   document.fonts.addEventListener('loadingdone', schedule);
   document.fonts.ready.then(schedule);
   const explorer = document.querySelector('.explorer');

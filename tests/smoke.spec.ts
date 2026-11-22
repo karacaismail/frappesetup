@@ -574,6 +574,7 @@ test.describe('focus', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('gereksinimler/');
     await waitForHydration(page);
+    await expect(page.getByTestId('req-table')).toBeVisible();
     await page.mouse.move(1, 1);
     const tab = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
     const seen = new Set<string>();
@@ -743,6 +744,46 @@ test.describe('touch targets', () => {
 });
 
 test.describe('requirements explorer', () => {
+  test('desktop table waits for idle and an unread card list', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.addInitScript(() => {
+      const callbacks = new Map<number, IdleRequestCallback>();
+      let next = 0;
+      window.requestIdleCallback = (callback) => {
+        callbacks.set(++next, callback);
+        return next;
+      };
+      window.cancelIdleCallback = (id) => { callbacks.delete(id); };
+      Object.assign(window, {
+        runIdleWork: () => {
+          const pending = [...callbacks.values()];
+          callbacks.clear();
+          for (const callback of pending) callback({ didTimeout: false, timeRemaining: () => 50 });
+        },
+      });
+    });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    const table = page.getByTestId('req-table');
+    const runIdle = () => page.evaluate(() => {
+      (window as Window & { runIdleWork: () => void }).runIdleWork();
+    });
+    await expect(table).toHaveCount(0);
+    const card = page.locator('.req-card').nth(12);
+    await card.scrollIntoViewIfNeeded();
+    const top = (await card.boundingBox())!.y;
+    await runIdle();
+    await expect(card).toBeInViewport();
+    expect(Math.abs((await card.boundingBox())!.y - top)).toBeLessThanOrEqual(1);
+    await expect(table).toHaveCount(0);
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    await expect.poll(async () => {
+      await runIdle();
+      return table.count();
+    }).toBe(1);
+    await expect(table).toBeVisible();
+  });
+
   test('server sends one readable requirements view without JavaScript @touch', async ({ browser, baseURL }) => {
     const page = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 1366, height: 900 }, baseURL });
     try {
@@ -822,6 +863,7 @@ test.describe('requirements explorer', () => {
       await page.setViewportSize({ width: v.width, height: 900 });
       await page.goto('gereksinimler/');
       await waitForHydration(page);
+      await expect(page.locator(v.title)).toHaveCount(requirements.length);
       const got = await page.evaluate(
         ({ t, d }) => ({
           titles: Array.from(document.querySelectorAll(t)).map((el) => el.textContent ?? ''),
@@ -861,7 +903,7 @@ test.describe('requirements explorer', () => {
     const cards = page.locator('.req-cards .req-card');
     await expect(cards.first()).toBeVisible();
     await expect(cards).toHaveCount(requirements.length);
-    await expect(page.getByTestId('req-table')).toBeHidden();
+    await expect(page.getByTestId('req-table')).toHaveCount(0);
     await page.getByRole('button', { name: new RegExp(`^MAY · ${mayCount}$`) }).click();
     await expect(cards).toHaveCount(mayCount);
     await noHorizontalOverflow(page);
@@ -953,6 +995,18 @@ test.describe('requirements explorer', () => {
     }
   });
 
+  test('focus returns to search when resizing a focused desktop table', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    const table = page.getByRole('region', { name: /Gereksinim tablosu/ });
+    await table.focus();
+    await expect(table).toBeFocused();
+    await page.setViewportSize({ width: 320, height: 640 });
+    await expect(page.getByTestId('req-table')).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Ara' })).toBeFocused();
+  });
+
   test('search text and focus survive orientation change', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('gereksinimler/');
@@ -1010,17 +1064,13 @@ test.describe('long inline code', () => {
     await page.evaluate(() => document.fonts.ready);
     const codes = page.locator('.req-cards .req-card-detail > code');
     const stops = codes.and(page.locator('[tabindex="0"]'));
-    const namedStops = stops.and(page.getByRole('group', { name: /^Kaydırılabilir kod: .+/ }));
+    const namedStops = stops.and(page.getByRole('group', { name: 'Kaydırılabilir kod', exact: true }));
     await expect.poll(() => stops.count()).toBeGreaterThan(0);
     const count = await stops.count();
     console.log(`[kod durakları] ${test.info().project.name}: ${count}`);
-    expect(count, '320 px kod durakları').toBeLessThanOrEqual(194);
+    expect(count, '320 px kod durakları').toBeLessThanOrEqual(186);
     await expect(namedStops).toHaveCount(count);
-    expect(await namedStops.evaluateAll((elements) =>
-      elements.every((element) =>
-        element.getAttribute('aria-label') === `Kaydırılabilir kod: ${element.textContent?.trim().replace(/\s+/g, ' ')}`,
-      ),
-    )).toBe(true);
+    expect(await namedStops.evaluateAll((elements) => elements.every((element) => element.textContent?.trim()))).toBe(true);
     await expect(codes.and(page.locator('[role="group"]:not([tabindex="0"])'))).toHaveCount(0);
   });
 

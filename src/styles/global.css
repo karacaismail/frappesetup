@@ -489,6 +489,9 @@ body {
    girer (WebKit taşan kutuyu kendiliğinden odaklamaz). Betik çalışmadan önce ya da hiç çalışmazsa `.page`'in break-word
    ağı uzun kodu satır sonunda kırar, sayfa taşmaz. Tablo hücresindeki kod sarılmaz (sütun genişler, tablo kendi
    kapsayıcısında kayar); bağlantı içindeki kod satır içi kalır. */
+[data-code-measuring] .page {
+  overflow-wrap: normal;
+}
 [data-code-measured] .prose code,
 [data-code-measured] :is(.req-card-detail, .req-detail) > code {
   /* Betik ölçtükten sonra ağ satır içi kodda kapanır: Gecko ağ açıkken kodun bitiş dolgusunu sığma hesabına katıp
