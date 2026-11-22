@@ -173,8 +173,8 @@ class RetentionIntegrationTest(IntegrationTestCase):
 			self.assertTrue(frappe.db.exists("Leave Application", older))
 			frappe.db.set_value("Leave Application", recent, "amended_from", None)
 
-			result = retention.purge(dry_run=False, limit=1)
-			self.assertEqual((result["leaves"], result["remaining"]), (1, 1))
+			purge_outcome = retention.purge(dry_run=False, limit=1)
+			self.assertEqual((purge_outcome["leaves"], purge_outcome["remaining"]), (1, 1))
 			self.assertFalse(frappe.db.exists("Leave Application", older))
 			self.assertFalse(frappe.db.exists("Deleted Document", {"deleted_name": older}))
 			self.assertTrue(frappe.db.exists("Employee", employee.name))

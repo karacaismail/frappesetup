@@ -46,4 +46,9 @@ def purge(*, dry_run: bool = True, limit: int = 500) -> dict[str, bool | int | s
 		for (name,) in batch:
 			frappe.delete_doc("Leave Application", name, delete_permanently=True)
 		processed = len(batch)
-	return {"dry_run": dry_run, "cutoff": cutoff.isoformat(), "leaves": processed, "remaining": total - processed}
+	return {
+		"dry_run": dry_run,
+		"cutoff": cutoff.isoformat(),
+		"leaves": processed,
+		"remaining": total - processed,
+	}

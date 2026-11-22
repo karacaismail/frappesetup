@@ -6,7 +6,6 @@ from unittest.mock import call, patch
 import frappe
 from pypika import Table
 
-
 from hrms_tr import retention
 
 
@@ -53,8 +52,8 @@ class TestRetention(TestCase):
 			query.select.return_value.run.return_value = [(2,)]
 			batch = query.select.return_value.orderby.return_value.limit
 			batch.return_value.for_update.return_value.run.return_value = [("LEAVE-1",)]
-			result = retention.purge(dry_run=False, limit=1)
-			self.assertEqual((result["leaves"], result["remaining"]), (1, 1))
+			purge_outcome = retention.purge(dry_run=False, limit=1)
+			self.assertEqual((purge_outcome["leaves"], purge_outcome["remaining"]), (1, 1))
 			batch.assert_called_once_with(1)
 			framework.only_for.assert_called_once_with("System Manager")
 			self.assertEqual(
