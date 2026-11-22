@@ -75,6 +75,9 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
       headings={headings}
       asOf={AS_OF}
     >
+      <noscript>
+        <a class="footer-link mantine-hidden-from-md" href={`${BASE}/#sections-h`}>Doküman bölümlerini aç</a>
+      </noscript>
       <slot />
     </Shell>
   </body>

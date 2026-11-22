@@ -19,14 +19,14 @@ const sa = requirements.filter((r) => r.id.startsWith('SA-')).length;
 
 const decisions = [
   { id: 'K1', title: 'Kontrol düzlemi', text: "Press v0.154.x + Frappe 16 + Python 3.14. Press bu sürümde yama dizisiyle açılır (O-52)." },
-  { id: 'K2', title: 'Müşteri siteleri', text: "ERPNext 16.50 ve Frappe 16. Müşteri başına bir Frappe sitesi, Press'in kurduğu bench'lerde." },
+  { id: 'K2', title: 'Müşteri siteleri', text: "Müşteri siteleri ERPNext 16.50 ve Frappe 16 kullanır. Press, kurduğu bench ortamlarında her müşteriye bir Frappe sitesi açar." },
   { id: 'K3', title: 'Altyapı', text: "Ekip sistemi Hetzner fiziksel sunucularında kendi kurar ve işletir. KVKK için veri AB içinde kalır. Sunucuları DevOps sorumlusu yönetir." },
   { id: 'K4', title: 'Frontend', text: '%100 headless React SPA; Ant Design tek tasarım sistemi, @ant-design/x AI arayüzlerinde birinci sınıf, TanStack veri katmanı.' },
   { id: 'K5', title: 'Metadata-driven', text: "DocType meta çalışma zamanında API'den okunur; alan tipi → bileşen eşleme motoru + doctype bazlı override." },
   { id: 'K6', title: 'Navigasyon', text: 'Sidebar Workspace + kurulu app + izin verisinden türer; hiçbir menü elle kodlanmaz.' },
   { id: 'K7', title: 'Kimlik', text: 'Keycloak tüm uygulamalar için tek giriş/kayıt sağlayıcısı; Frappe ve Press OIDC ile bağlanır.' },
   { id: 'K8', title: 'Erişim', text: 'Zoho/Odoo düzeyinde yetki: ReBAC/ABAC kayıt kuralları, hiyerarşi ve alan düzeyi — platform_core Access Rule motoru.' },
-  { id: 'K9', title: 'AI-first', text: "Press ve siteler MCP ile yönetilir. Ajan servisi ve model geçidi sağlayıcıdan bağımsızdır. AI eylemleri aynı sunucu izinlerinden geçer. Yazma eylemleri önizleme ve onay gerektirir. Sistem her eylemi denetim kaydına yazar. KVKK uyumu zorunlu." },
+  { id: 'K9', title: 'AI-first', text: "Press ve siteler MCP ile yönetilir. Ajan servisi ve model geçidi sağlayıcıdan bağımsızdır. AI eylemleri aynı sunucu izinlerinden geçer. Yazma eylemleri önizleme ve onay gerektirir. Sistem her eylemi denetim kaydına yazar. KVKK uyumu zorunludur." },
   { id: 'K10', title: 'Ürünler', text: "Ayrı Frappe app'leri: HRMS TR → CRM → Webshop; ortak admin shell; etkinleştirme Press Marketplace / App Plan üzerinden." },
 ];
 

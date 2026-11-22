@@ -589,6 +589,13 @@ test.describe('documents without JavaScript', () => {
     await expect(page.getByTestId('color-scheme-toggle')).toBeDisabled();
     await expect(page.getByTestId('nav-wrapper-ai')).toBeDisabled();
   });
+
+  test('mobile readers can reach the section list without JavaScript @touch', async ({ page }) => {
+    await page.goto('kararlar/');
+    await page.getByRole('link', { name: 'Doküman bölümlerini aç' }).click();
+    await expect(page).toHaveURL(/\/#sections-h$/);
+    await expect(page.getByRole('heading', { name: 'Doküman bölümleri' })).toBeVisible();
+  });
 });
 
 test.describe('AI nav group', () => {

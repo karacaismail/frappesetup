@@ -118,17 +118,17 @@ function CollapsibleGroup({
   label,
   icon,
   defaultOpened,
+  ready,
   children,
 }: {
   id: string;
   label: string;
   icon: string;
   defaultOpened: boolean;
+  ready: boolean;
   children: ReactNode;
 }) {
   const [opened, setOpened] = useState(defaultOpened);
-  const [ready, setReady] = useState(false);
-  useEffect(() => setReady(true), []);
   const GroupIcon = sectionIcon(icon);
   const panelId = `nav-group-${id}`;
   return (
@@ -261,6 +261,7 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
                     label={group}
                     icon={wrapperIcon}
                     defaultOpened={items.some((item) => item.href === current)}
+                    ready={ready}
                   >
                     {items.map(renderLink)}
                   </CollapsibleGroup>

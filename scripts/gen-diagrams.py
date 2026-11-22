@@ -166,14 +166,14 @@ def rails() -> str:
     o = [
         f"<svg viewBox='0 0 {W} 940' role='img' aria-labelledby='rails-title rails-desc' font-size='16' {FONT}>",
         "<title id='rails-title'>Altı mimari ray ve iki taban bandı</title>",
-        "<desc id='rails-desc'>Üstte Rail 3 headless panel; ortada Rail 5 AI agent servisi ve Rail 4 Keycloak; altta Rail 1 "
-        "Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext 16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden "
-        "Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 "
-        "ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, "
-        "kiracıya site aracı belirteciyle Kiracı MCP; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm "
-        "rolleri. Yatay sözleşmeler: Press→Kiracı site_config sk_app ve Agent Job; Press→Ops create-fc-invoice (press_tr_finance), "
-        "delete-fc-team, press_ops_bridge; Ops→Press press_tr.api.ops. Taban bantları: ortak sözleşmeler (host'a bağlı oturum, "
-        "has_permission, tasarım tokenları, audit) ve Hetzner bare-metal self-host altyapısı.</desc>",
+        "<desc id='rails-desc'>Üst sırada Rail 3 headless panel yer alır. Ortada Rail 5 ajan servisi ve model geçidi ile Rail 4 Keycloak yer alır. Alt sırada Rail 1 "
+        "Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext 16 siteleri ve Rail 6 operasyon sitesi yer alır. Panel, "
+        "Press'e panel adresindeki press.api ve realtime üzerinden ulaşır. Kiracıya aynı kaynaktan /api/v2 ve bootstrap/meta ile ulaşır. Operasyon sitesine customer_360 "
+        "ve HD Ticket ile ulaşır. Ajan servisine SSE ile bağlanır. Panel, Keycloak'a OIDC ile yönlendirir. Kod sunucuda değiştirilir. Ajan servisi Press'e press.mcp ile bağlanır. Ajan servisi "
+        "kiracıya site aracı belirteciyle Kiracı MCP üzerinden bağlanır. Keycloak, Press ve kiracıya Social Login Key sağlar. Operasyon sitesi operatör realm "
+        "rollerini kullanır. Press ile kiracı arasında site_config sk_app ve Agent Job kullanılır. Press, operasyon sitesine create-fc-invoice (press_tr_finance), "
+        "delete-fc-team ve press_ops_bridge ile ulaşır. Operasyon sitesi Press'e press_tr.api.ops ile ulaşır. Taban bantları ortak sözleşmeleri (host'a bağlı oturum, "
+        "has_permission, tasarım tokenları, audit) ve DevOps sorumlusunun yönettiği Hetzner sunucularını gösterir.</desc>",
         "<defs><marker id='arr' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='8' markerHeight='8' orient='auto-start-reverse'>"
         "<path d='M0 0L10 5L0 10z' fill='var(--fs-line)'/></marker></defs>",
         "<text x='24' y='34' font-size='20' font-weight='650' fill='var(--fs-ink)'>Altı ray, iki taban bandı: her ray kendi alanının tek doğruluk kaynağı</text>",
