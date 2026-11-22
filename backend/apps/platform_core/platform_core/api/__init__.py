@@ -3,8 +3,8 @@
 import frappe
 from frappe.rate_limiter import rate_limit
 
-from platform_core.kimlik import sign_out
-from platform_core.kimlik.safe_errors import safe_errors
+from platform_core.identity import sign_out
+from platform_core.identity.safe_errors import safe_errors
 
 
 # The signed logout token authorizes only the session claims it carries.

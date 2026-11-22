@@ -9,9 +9,9 @@ from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlsplit
 from unittest.mock import MagicMock, patch
 
-from yardimci import KLASOR, admin, canli_var_mi, istemci_belirteci, jwt_govdesi, ortam, safe_detail, yonetici_belirteci
+from helpers import DIRECTORY, admin, live_available, client_token, jwt_payload, get_environment_value, safe_detail, admin_token
 
-COMMAND = KLASOR / "bin" / "create-tenant-client.py"
+COMMAND = DIRECTORY / "bin" / "create-tenant-client.py"
 ARGS = ["acme", "https://tenant.example.test", "https://identity.example.test"]
 
 
@@ -278,7 +278,7 @@ class CreateTenantClientTest(unittest.TestCase):
                 prompt.assert_not_called()
 
 
-@unittest.skipUnless(canli_var_mi(), "Keycloak development environment is required")
+@unittest.skipUnless(live_available(), "Keycloak development environment is required")
 class LiveTenantClientTest(unittest.TestCase):
     def test_keycloak_creates_the_client_with_a_secret_and_tenant_scopes(self):
         command = runpy.run_path(str(COMMAND))
@@ -287,29 +287,29 @@ class LiveTenantClientTest(unittest.TestCase):
         client = command["tenant_client"](slug, ARGS[1])
         scope = command["tenant_scope"](client_id)
         service = command["tenant_service_client"](slug)
-        token = yonetici_belirteci()
+        token = admin_token()
 
         def cleanup():
-            cleanup_token = yonetici_belirteci()
+            cleanup_token = admin_token()
             response = admin("/client-scopes", cleanup_token)
-            self.assertEqual(response.durum, 200, safe_detail(response))
+            self.assertEqual(response.status, 200, safe_detail(response))
             for entry in response.json():
                 if entry["name"] == scope["name"]:
-                    removed = admin(f"/client-scopes/{entry['id']}", cleanup_token, yontem="DELETE")
-                    self.assertEqual(removed.durum, 204, safe_detail(removed))
+                    removed = admin(f"/client-scopes/{entry['id']}", cleanup_token, method="DELETE")
+                    self.assertEqual(removed.status, 204, safe_detail(removed))
             for name in (client_id, service["clientId"]):
                 response = admin(f"/clients?clientId={name}", cleanup_token)
-                self.assertEqual(response.durum, 200, safe_detail(response))
+                self.assertEqual(response.status, 200, safe_detail(response))
                 for entry in response.json():
                     if entry["clientId"] == name:
-                        removed = admin(f"/clients/{entry['id']}", cleanup_token, yontem="DELETE")
-                        self.assertEqual(removed.durum, 204, safe_detail(removed))
+                        removed = admin(f"/clients/{entry['id']}", cleanup_token, method="DELETE")
+                        self.assertEqual(removed.status, 204, safe_detail(removed))
 
         self.addCleanup(cleanup)
-        request = command["make_admin_request"](ortam("KC_PUBLIC_URL"), token)
+        request = command["make_admin_request"](get_environment_value("KC_PUBLIC_URL"), token)
         command["provision_tenant"](request, client, scope, service)
         response = admin(f"/clients?clientId={client_id}", token)
-        self.assertEqual(response.durum, 200, safe_detail(response))
+        self.assertEqual(response.status, 200, safe_detail(response))
         (created,) = response.json()
         self.assertEqual(created["clientId"], client_id)
         self.assertFalse(created["publicClient"])
@@ -323,12 +323,12 @@ class LiveTenantClientTest(unittest.TestCase):
         service_secret_path = f"/clients/{saved_service['id']}/client-secret"
         service_secret = request("GET", service_secret_path)["value"]
         self.assertTrue(bool(service_secret) and service_secret != original_secret)
-        result = istemci_belirteci(service_name, service_secret, "aud-identity-sync")
-        self.assertEqual(result.durum, 200, safe_detail(result))
-        claims = jwt_govdesi(result.json()["access_token"])
+        result = client_token(service_name, service_secret, "aud-identity-sync")
+        self.assertEqual(result.status, 200, safe_detail(result))
+        claims = jwt_payload(result.json()["access_token"])
         self.assertEqual(claims["azp"], service_name)
         self.assertEqual(claims["aud"], "identity-sync")
-        denied = istemci_belirteci(client_id, original_secret, "aud-identity-sync")
+        denied = client_token(client_id, original_secret, "aud-identity-sync")
         self.assertEqual(safe_detail(denied), "HTTP 401 unauthorized_client")
 
         command["provision_tenant"](request, client, scope, service)
@@ -340,12 +340,12 @@ class LiveTenantClientTest(unittest.TestCase):
             ("press-service", "ATONOTA_PRESS_SERVICE_SECRET"),
         ):
             with self.subTest(client=name):
-                response = istemci_belirteci(name, ortam(secret_name), scope["name"])
-                self.assertEqual(response.durum, 200, safe_detail(response))
-                claims = jwt_govdesi(response.json()["access_token"])
+                response = client_token(name, get_environment_value(secret_name), scope["name"])
+                self.assertEqual(response.status, 200, safe_detail(response))
+                claims = jwt_payload(response.json()["access_token"])
                 self.assertEqual(claims["azp"], name)
                 self.assertTrue(claims.get("aud") in (client_id, [client_id]))
-                default = istemci_belirteci(name, ortam(secret_name))
-                self.assertEqual(default.durum, 200, safe_detail(default))
-                default_audience = jwt_govdesi(default.json()["access_token"]).get("aud", [])
+                default = client_token(name, get_environment_value(secret_name))
+                self.assertEqual(default.status, 200, safe_detail(default))
+                default_audience = jwt_payload(default.json()["access_token"]).get("aud", [])
                 self.assertFalse(client_id in default_audience)

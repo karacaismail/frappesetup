@@ -141,7 +141,7 @@ class RealVerificationTest(unittest.TestCase):
         self.assertEqual(self.status(self.token(key=self.other_key)), 401)
 
     def test_wrong_audience_is_rejected(self) -> None:
-        self.assertEqual(self.status(self.token(aud="site-kiraci1")), 401)
+        self.assertEqual(self.status(self.token(aud="site-tenant1")), 401)
 
     def test_multiple_audiences_are_rejected(self) -> None:
         # Servis belirteci yalnız bir `aud` değeri taşır.

@@ -6,8 +6,8 @@ import frappe
 from frappe.sessions import delete_session
 from frappe.utils.password import remove_encrypted_password
 
-from platform_core.kabuk.bootstrap import get_bootstrap, safe_url
-from platform_core.kabuk.test_panel import PanelMetadata
+from platform_core.shell.bootstrap import get_bootstrap, safe_url
+from platform_core.shell.test_panel import PanelMetadata
 from platform_core.tests.shell_http_fixture import DESK, DOCTYPE, PRIVILEGED, READER, ShellHTTPFixture
 
 
@@ -193,7 +193,7 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 		self.assertEqual(formatting["currency"], frappe.get_system_settings("currency") or None)
 
 	def test_sidebar_drops_unknown_fields(self):
-		from platform_core.kabuk.bootstrap import project_sidebar
+		from platform_core.shell.bootstrap import project_sidebar
 
 		data = project_sidebar(
 			{

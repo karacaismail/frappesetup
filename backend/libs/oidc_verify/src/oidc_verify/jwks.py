@@ -38,7 +38,7 @@ from collections.abc import Callable
 
 import jwt
 
-from oidc_verify.hatalar import JwksUnavailable, TokenError
+from oidc_verify.errors import JwksUnavailable, TokenError
 
 Fetcher = Callable[[], dict]
 
@@ -48,7 +48,7 @@ DEFAULT_TOTAL_TIMEOUT = 10.0
 _READ_CHUNK = 16_384
 
 # PyJWT 2.13 bozuk JWK için ValueError ya da TypeError verir. PyJWT 2.15 bunları InvalidKeyError içine sarar.
-_JWK_HATALARI = (jwt.exceptions.PyJWTError, ValueError, TypeError)
+_JWK_ERRORS = (jwt.exceptions.PyJWTError, ValueError, TypeError)
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -294,7 +294,7 @@ def _anahtarlari_ayikla(veri: object) -> dict[str, object]:
     """Listeden RS256 imza anahtarlarını çıkarır. Bozuk kayıt atlanır. Bozuk liste hata verir."""
     if not isinstance(veri, dict) or not isinstance(veri.get("keys"), list):
         raise ValueError("JWKS gövdesi beklenen biçimde değil")
-    anahtarlar: dict[str, object] = {}
+    keys: dict[str, object] = {}
     for jwk in veri["keys"]:
         if not isinstance(jwk, dict):
             continue
@@ -306,11 +306,11 @@ def _anahtarlari_ayikla(veri: object) -> dict[str, object]:
         if not kid or not isinstance(kid, str):
             continue
         try:
-            anahtarlar[kid] = jwt.PyJWK(jwk, algorithm="RS256").key
-        except _JWK_HATALARI:
+            keys[kid] = jwt.PyJWK(jwk, algorithm="RS256").key
+        except _JWK_ERRORS:
             # Tek bozuk kayıt bütün listeyi düşürmez.
             continue
-    return anahtarlar
+    return keys
 
 
 class JwksCache:
@@ -409,7 +409,7 @@ class JwksCache:
                 if forced:
                     self._forced_at = self._clock()
             try:
-                anahtarlar = _anahtarlari_ayikla(self._fetch())
+                keys = _anahtarlari_ayikla(self._fetch())
             except Exception:
                 # Sağlayıcı dışarıdan verilebilir. Hangi hatayı verirse versin eski anahtarlar korunur.
                 with self._state_lock:
@@ -417,7 +417,7 @@ class JwksCache:
                     self._generation += 1
                 return True
             with self._state_lock:
-                self._keys = anahtarlar
+                self._keys = keys
                 self._loaded_at = self._clock()
                 self._failed_at = None
                 self._generation += 1

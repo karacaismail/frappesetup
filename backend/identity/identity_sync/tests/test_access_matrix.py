@@ -35,10 +35,10 @@ from .fakes import ORG_ID, SUBJECT, Stack, keycloak_user
 from .test_auth import CERTS_PATH, HAVE_LIBRARY
 from .test_server import NOW, sign
 
-SITE, OTHER_SITE, AGENT, PRESS = "site-kiraci1-service", "site-kiraci2-service", "ai-agent", "press-service"
+SITE, OTHER_SITE, AGENT, PRESS = "site-tenant1-service", "site-tenant2-service", "ai-agent", "press-service"
 # The browser login client of the same tenant. It has no service account (docs/sozlesmeler.md, section 2).
 OPERATOR = "identity-sync-operator"
-BROWSER = "site-kiraci1"
+BROWSER = "site-tenant1"
 SID = "55555555-5555-4555-8555-555555555555"
 STALE = {"dry_run": False, "preview_digest": "0" * 64, "approval_id": "onay-x1"}
 INVITATION = {"email": "davetli@example.test", "organization_id": ORG_ID}
@@ -95,7 +95,7 @@ class MatrixCase(unittest.TestCase):
         )
         self.stack.app.store.operation_begin("o-1", "invite_user", ORG_ID, ["create_user"])
         keycloak = self.stack.keycloak
-        org = keycloak.add_organization(ORG_ID, "kiraci1")
+        org = keycloak.add_organization(ORG_ID, "tenant1")
         keycloak.add_user(keycloak_user(), [org])
         keycloak.add_session(SUBJECT, SID)
         keycloak.serve_directory()
@@ -302,7 +302,7 @@ class RealTokenMatrixTest(MatrixCase):
         now = int(time.time())
         columns = {
             "wrong aud": {"aud": "press"},
-            "aud of a tenant site": {"aud": "site-kiraci1"},
+            "aud of a tenant site": {"aud": "site-tenant1"},
             "two audiences": {"aud": ["identity-sync", "press"]},
             "expired": {"iat": now - 600, "exp": now - 300},
             "wrong issuer": {"iss": "http://baska.example.test/realms/platform"},

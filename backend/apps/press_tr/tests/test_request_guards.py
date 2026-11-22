@@ -9,13 +9,13 @@ from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
 from press_tr import api, hooks
 from press_tr.api import auth, identity, maintenance
-from press_tr.kimlik import oidc, request_policy, service, sessions
+from press_tr.press_identity import oidc, request_policy, service, sessions
 
 
 class RequestGuardsTest(unittest.TestCase):
 	def test_identity_link_is_closed_to_generic_ai_writes(self):
-		self.assertIn("Press Identity Link", getattr(hooks, "ai_write_closed_doctypes", []))
-		self.assertIn("Press Keycloak Session", getattr(hooks, "ai_write_closed_doctypes", []))
+		self.assertIn("PTR Identity Link", getattr(hooks, "ai_write_closed_doctypes", []))
+		self.assertIn("PTR Keycloak Session", getattr(hooks, "ai_write_closed_doctypes", []))
 		frappe.init("press.localhost")
 		frappe.connect()
 		try:
@@ -50,7 +50,7 @@ class RequestGuardsTest(unittest.TestCase):
 		self.assertIs(throw.call_args.args[1], frappe.PermissionError)
 
 	def test_record_ownership_redaction_preserves_invoice_children(self):
-		from press_tr.kimlik.anonymization import redact_record_ownership
+		from press_tr.press_identity.anonymization import redact_record_ownership
 
 		frappe.init("press.localhost")
 		frappe.connect()
@@ -79,7 +79,7 @@ class RequestGuardsTest(unittest.TestCase):
 			frappe.destroy()
 
 	def test_anonymization_selects_only_the_accounts_files(self):
-		from press_tr.kimlik.anonymization import get_personal_files
+		from press_tr.press_identity.anonymization import get_personal_files
 
 		frappe.init("press.localhost")
 		frappe.connect()
@@ -103,7 +103,7 @@ class RequestGuardsTest(unittest.TestCase):
 			frappe.destroy()
 
 	def test_anonymization_suspends_only_the_sole_members_sites(self):
-		from press_tr.kimlik import anonymization
+		from press_tr.press_identity import anonymization
 
 		user = "old@example.test"
 		with patch.object(anonymization, "frappe") as framework:
@@ -142,7 +142,7 @@ class RequestGuardsTest(unittest.TestCase):
 				identity.anonymize_user("issuer", "subject")
 
 	def test_account_deletion_reauthentication_expires_after_300_seconds(self):
-		from press_tr.kimlik import deletion
+		from press_tr.press_identity import deletion
 
 		with (
 			patch.object(deletion, "frappe") as facade,
@@ -154,7 +154,7 @@ class RequestGuardsTest(unittest.TestCase):
 					self.assertEqual(deletion.fresh_reauthentication(), result)
 
 	def test_account_deletion_reauthentication_is_bound_to_the_press_session(self):
-		from press_tr.kimlik import deletion
+		from press_tr.press_identity import deletion
 
 		with patch.object(deletion, "frappe") as facade, patch.object(deletion, "human_identity") as human:
 			human.return_value = SimpleNamespace(issuer="issuer", subject="subject")
@@ -167,7 +167,7 @@ class RequestGuardsTest(unittest.TestCase):
 			facade.db.after_commit.add.assert_not_called()
 
 	def test_account_deletion_accepts_five_seconds_of_clock_skew(self):
-		from press_tr.kimlik import deletion
+		from press_tr.press_identity import deletion
 
 		attempt = {"sid": "session", "subject": "subject", "started_at": 990}
 		with (
@@ -212,13 +212,13 @@ class RequestGuardsTest(unittest.TestCase):
 		with patch.object(identity, "frappe") as facade:
 			facade.db.transaction_writes = 0
 			facade.db.get_value.return_value = "team"
-			facade.get_doc.return_value.keycloak_org_id = "organization"
+			facade.get_doc.return_value.custom_ptr_keycloak_org_id = "organization"
 			self.assertIs(identity.lock_team("organization"), facade.get_doc.return_value)
 			self.assertEqual(
 				facade.mock_calls[:5],
 				[
 					call.db.rollback(),
-					call.db.get_value("Team", {"keycloak_org_id": "organization"}, "name"),
+					call.db.get_value("Team", {"custom_ptr_keycloak_org_id": "organization"}, "name"),
 					call.db.rollback(),
 					call.db.get_value("Team", "team", "name", for_update=True),
 					call.get_doc("Team", "team", for_update=True),
@@ -256,7 +256,7 @@ class RequestGuardsTest(unittest.TestCase):
 			facade.get_all.return_value = ["old", "current"]
 			sessions.remove_mapping()
 			facade.delete_doc.assert_called_once_with(
-				"Press Keycloak Session", "current", ignore_permissions=True
+				"PTR Keycloak Session", "current", ignore_permissions=True
 			)
 
 	def test_callback_redacts_fields_before_rate_limiting(self):

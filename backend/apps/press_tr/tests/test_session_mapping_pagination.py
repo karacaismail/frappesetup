@@ -4,7 +4,7 @@ import unittest
 from contextlib import ExitStack
 from unittest.mock import patch
 
-from press_tr.kimlik import sessions
+from press_tr.press_identity import sessions
 
 
 class SessionMappingPaginationTest(unittest.TestCase):
@@ -30,7 +30,7 @@ class SessionMappingPaginationTest(unittest.TestCase):
 			self.assertEqual(second["filters"], {"identity_link": "identity-link", "name": [">", names[99]]})
 			framework.get_doc.assert_not_called()
 			framework.delete_doc.assert_called_once_with(
-				"Press Keycloak Session", names[-1], ignore_permissions=True
+				"PTR Keycloak Session", names[-1], ignore_permissions=True
 			)
 			self.assertEqual(decrypt.call_count, 101)
 

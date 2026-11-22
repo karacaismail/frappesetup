@@ -17,7 +17,7 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-from anahtarlar import Anahtar, SahteJwks
+from keys import Anahtar, FakeJwks
 
 from oidc_verify import JwksCache, JwksUnavailable
 from oidc_verify.jwks import _Deadline, _http_fetcher
@@ -266,7 +266,7 @@ class _RacingLock:
 class ConcurrentStartTest(unittest.TestCase):
     def test_caller_with_a_usable_cached_key_does_not_wait_for_the_lock(self):
         key = Anahtar("kid-1")
-        inner = SahteJwks(key)
+        inner = FakeJwks(key)
         in_fetch = threading.Event()
         release = threading.Event()
         now = [1000.0]
@@ -307,7 +307,7 @@ class ConcurrentStartTest(unittest.TestCase):
 class RotatedKeyTest(unittest.TestCase):
     def test_key_removed_by_the_refresh_is_not_served(self):
         old, new = Anahtar("kid-old"), Anahtar("kid-new")
-        provider = SahteJwks(old)
+        provider = FakeJwks(old)
         now = [1000.0]
         cache = JwksCache(
             "https://idp.example.test/certs",
@@ -317,7 +317,7 @@ class RotatedKeyTest(unittest.TestCase):
             min_refresh_seconds=0,
         )
         cache.get_signing_key("kid-old")
-        provider.anahtarlar = [new]  # the identity server rotated the old key out
+        provider.keys = [new]  # the identity server rotated the old key out
         now[0] += 601
         from oidc_verify import TokenError
 

@@ -41,7 +41,7 @@ from .test_server import sign
 READ_LIMIT_MS, WRITE_LIMIT_MS = 500, 1000
 DEFAULT_SAMPLES, DEFAULT_CONCURRENCY, DEFAULT_USERS = 50, 20, 200
 OPERATOR = "identity-sync-operator"
-SITE, AGENT, PRESS = "site-kiraci1-service", "ai-agent", "press-service"
+SITE, AGENT, PRESS = "site-tenant1-service", "ai-agent", "press-service"
 
 
 def percentile(values: Sequence[float], rank: int) -> float:
@@ -87,7 +87,7 @@ class _Bench:
             rate_limit=max(settings.rate_limit, requests_needed),
         )
         self.keycloak, self.issuer = self.stack.keycloak, self.stack.issuer
-        self.org = self.keycloak.add_organization(ORG_ID, "kiraci1")
+        self.org = self.keycloak.add_organization(ORG_ID, "tenant1")
         self.subjects = [f"u-{number:04d}" for number in range(users)]
         for subject in self.subjects:
             self.add_account(subject)
@@ -221,7 +221,7 @@ class _Bench:
     def queue_event(self) -> None:
         subject = self.subjects[self.counter % len(self.subjects)]
         failed = Event(id=self.fresh("q"), kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=subject)
-        self.stack.app.store.add_dead_letter(failed, "tenant.provision kiraci1: HTTP 503")
+        self.stack.app.store.add_dead_letter(failed, "tenant.provision tenant1: HTTP 503")
 
     def list_dead_letters(self) -> Callable[[], int]:
         return self.call("GET", "/v1/dead-letters", None, OPERATOR)

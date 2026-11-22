@@ -3,11 +3,11 @@
 import frappe
 from frappe.rate_limiter import rate_limit
 
-from platform_core.kabuk.http import conditional_response, require_session
-from platform_core.kabuk.metadata import compact_metadata
-from platform_core.kabuk.metadata import get_doctype as read_doctype
-from platform_core.kabuk.metadata_policy import validate_mobile_policy as check_mobile_policy
-from platform_core.kabuk.request_policy import BootstrapQuery, MetadataQuery, validate_query
+from platform_core.shell.http import conditional_response, require_session
+from platform_core.shell.metadata import compact_metadata
+from platform_core.shell.metadata import get_doctype as read_doctype
+from platform_core.shell.metadata_policy import validate_mobile_policy as check_mobile_policy
+from platform_core.shell.request_policy import BootstrapQuery, MetadataQuery, validate_query
 
 
 # The shared metadata function authorizes the DocType for HTTP and in-process callers.

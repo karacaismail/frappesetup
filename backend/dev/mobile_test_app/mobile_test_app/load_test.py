@@ -9,7 +9,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request
 from uuid import uuid4
 
-from platform_core.mobil.tests.loopback_http import open_loopback
+from platform_core.mobile.tests.loopback_http import open_loopback
 
 from .load_accounts import LOAD_ACCOUNTS
 

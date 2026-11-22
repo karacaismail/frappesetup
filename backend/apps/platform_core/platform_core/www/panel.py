@@ -3,7 +3,7 @@
 import frappe
 from frappe.sessions import get_csrf_token
 
-from platform_core.kabuk.http import has_session_cookie
+from platform_core.shell.http import has_session_cookie
 
 no_cache = 1
 sitemap = 0

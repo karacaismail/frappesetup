@@ -6,8 +6,8 @@ from urllib.parse import quote, urlencode
 import frappe
 from werkzeug.wrappers import Request
 
-from platform_core.kabuk.metadata import get_doctype
-from platform_core.kabuk.serialization import digest
+from platform_core.shell.metadata import get_doctype
+from platform_core.shell.serialization import digest
 from platform_core.tests.shell_http_fixture import (
 	CHILD_DOCTYPE,
 	DESK,

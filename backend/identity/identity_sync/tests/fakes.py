@@ -270,7 +270,7 @@ class FakeKeycloak(FakeServer):
         return org
 
 
-TENANT = "kiraci1"
+TENANT = "tenant1"
 PRESS_ENSURE_TEAM = "/api/method/press_tr.api.identity.ensure_team"
 PRESS_REMOVE_MEMBER = "/api/method/press_tr.api.identity.remove_team_member"
 PRESS_LIST = "/api/method/press_tr.api.identity.list_identities"
@@ -553,7 +553,7 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
 
     tenants = [Tenant(name=TENANT, base_url=tenant.url, organization=TENANT)]
     if tenant2 is not None:
-        tenants.append(Tenant(name="kiraci2", base_url=tenant2.url, organization="kiraci2"))
+        tenants.append(Tenant(name="tenant2", base_url=tenant2.url, organization="tenant2"))
     return Settings(
         keycloak_public_url=keycloak.url,
         realm=ISSUER_REALM,

@@ -1,10 +1,10 @@
 [
   {
-    "doctype": "Access Rule",
-    "name": "HRMS TR Employee Leave Application",
+    "doctype": "PLT Access Rule",
+    "name": "HRT Employee Leave Application",
     "title": "HRMS TR Employee Leave Application",
     "document_type": "Leave Application",
-    "role": "HRMS TR Employee",
+    "role": "HRT Employee",
     "scope": "own",
     "is_active": 1,
     "match_field": "employee",
@@ -16,11 +16,11 @@
     "allow_cancel": 0
   },
   {
-    "doctype": "Access Rule",
-    "name": "HRMS TR Manager Leave Application",
+    "doctype": "PLT Access Rule",
+    "name": "HRT Manager Leave Application",
     "title": "HRMS TR Manager Leave Application",
     "document_type": "Leave Application",
-    "role": "HRMS TR Manager",
+    "role": "HRT Manager",
     "scope": "team",
     "is_active": 1,
     "match_field": "employee",
@@ -32,11 +32,11 @@
     "allow_cancel": 0
   },
   {
-    "doctype": "Access Rule",
-    "name": "HRMS TR Admin Leave Application",
+    "doctype": "PLT Access Rule",
+    "name": "HRT Admin Leave Application",
     "title": "HRMS TR Admin Leave Application",
     "document_type": "Leave Application",
-    "role": "HRMS TR Admin",
+    "role": "HRT Admin",
     "scope": "all",
     "is_active": 1,
     "allow_read": 1,
@@ -47,7 +47,7 @@
     "allow_cancel": 1
   },
   {
-    "doctype": "Access Rule",
+    "doctype": "PLT Access Rule",
     "name": "HRMS TR System Manager Leave Application",
     "title": "HRMS TR System Manager Leave Application",
     "document_type": "Leave Application",
@@ -62,7 +62,7 @@
     "description": "Preserve operations access to leave applications on this site."
   },
   {
-    "doctype": "Access Rule",
+    "doctype": "PLT Access Rule",
     "name": "HRMS TR HR Manager Leave Application",
     "title": "HRMS TR HR Manager Leave Application",
     "document_type": "Leave Application",

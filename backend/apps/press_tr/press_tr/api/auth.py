@@ -12,9 +12,17 @@ from frappe.rate_limiter import rate_limit
 from werkzeug.exceptions import Conflict
 
 from press_tr.api import rate_limit_namespace
-from press_tr.kimlik.deletion import ACCOUNT_DELETION_PAGE, record_reauthentication
-from press_tr.kimlik.identity import bind_identity, ensure_personal_team, remember_press_session
-from press_tr.kimlik.oidc import callback_url, claim, client_id, issuer, reject, server_endpoint, verify
+from press_tr.press_identity.deletion import ACCOUNT_DELETION_PAGE, record_reauthentication
+from press_tr.press_identity.identity import bind_identity, ensure_personal_team, remember_press_session
+from press_tr.press_identity.oidc import (
+	callback_url,
+	claim,
+	client_id,
+	issuer,
+	reject,
+	server_endpoint,
+	verify,
+)
 
 STATE_TTL = 600
 STATE_COOKIE = "press_tr_login"

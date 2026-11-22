@@ -31,8 +31,8 @@ services:
         condition: service_started
     environment:
       CI: "Yes"
-      PRESS_WEB_PORT: ${PRESS_WEB_PORT:?Set to PANE_PORT plus 3}
-      PRESS_SOCKET_PORT: ${PRESS_SOCKET_PORT:?Set to PANE_PORT plus 4}
+      PTR_WEB_PORT: ${PTR_WEB_PORT:?Set to PANE_PORT plus 3}
+      PTR_SOCKET_PORT: ${PTR_SOCKET_PORT:?Set to PANE_PORT plus 4}
     secrets:
       - press_db_password
       - press_admin_password
@@ -41,8 +41,8 @@ services:
         aliases:
           - press.localhost
     ports:
-      - "127.0.0.1:${PRESS_WEB_PORT}:${PRESS_WEB_PORT}"
-      - "127.0.0.1:${PRESS_SOCKET_PORT}:${PRESS_SOCKET_PORT}"
+      - "127.0.0.1:${PTR_WEB_PORT}:${PTR_WEB_PORT}"
+      - "127.0.0.1:${PTR_SOCKET_PORT}:${PTR_SOCKET_PORT}"
     volumes:
       - bench:/home/frappe/benches
 
@@ -52,6 +52,6 @@ volumes:
 
 secrets:
   press_db_password:
-    environment: PRESS_DB_PASSWORD
+    environment: PTR_DB_PASSWORD
   press_admin_password:
-    environment: PRESS_ADMIN_PASSWORD
+    environment: PTR_ADMIN_PASSWORD

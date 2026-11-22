@@ -725,7 +725,7 @@ class LeaveHttpTest(unittest.TestCase):
     def test_missing_access_rules_close_list_and_document(self):
         admin = Client(self, "Administrator", password=os.environ["ADMIN_PASSWORD"])
         client = self.login("employee")
-        path = "/api/resource/Access%20Rule"
+        path = "/api/resource/PLT%20Access%20Rule"
         query = urlencode(
             {
                 "filters": json.dumps({"document_type": "Leave Application", "is_active": 1}),
@@ -738,9 +738,9 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertEqual(
             {row["role"] for row in payload["data"]},
             {
-                "HRMS TR Employee",
-                "HRMS TR Manager",
-                "HRMS TR Admin",
+                "HRT Employee",
+                "HRT Manager",
+                "HRT Admin",
                 "System Manager",
                 "HR Manager",
             },
@@ -855,7 +855,7 @@ class LeaveHttpTest(unittest.TestCase):
             with self.subTest(body=invalid_body):
                 status, result = manager.send(endpoint, invalid_body)
                 self.assertEqual(status, 417, result.get("exc_type"))
-        status, _ = employee.send(endpoint, {**body, "role": "HRMS TR Admin"})
+        status, _ = employee.send(endpoint, {**body, "role": "HRT Admin"})
         self.assertIn(status, (403, 417))
         self.assertEqual(self.document(manager, "employee"), before)
 
@@ -947,7 +947,7 @@ class LeaveHttpTest(unittest.TestCase):
                 "id": 1,
                 "method": "tools/call",
                 "params": {
-                    "name": "hrms_tr_approve_leave",
+                    "name": "hrt_approve_leave",
                     "arguments": {"name": name},
                 },
             },
@@ -1097,7 +1097,7 @@ if __name__ == "__main__":
     LeaveHttpTest.base = args.url.rstrip("/")
     LeaveHttpTest.site = args.site
     LeaveHttpTest.data = json.loads(args.manifest.read_text())
-    LeaveHttpTest.password = os.environ["HRMS_TR_TEST_PASSWORD"]
+    LeaveHttpTest.password = os.environ["HRT_TEST_PASSWORD"]
     LeaveHttpTest.with_ai = args.with_ai
     LeaveHttpTest.contract_validators = load_contract_validators(args.contract)
     unittest.main(argv=[__file__, *args.tests], verbosity=2)

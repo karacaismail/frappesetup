@@ -173,7 +173,7 @@
   {
     "rule": "B603",
     "file": "backend/dev/security/test_review.py",
-    "code": "result = subprocess.run([bin_dir / \"guvenlik-denetimi\"], env={**env, \"BASE\": base},",
+    "code": "result = subprocess.run([bin_dir / \"security-audit\"], env={**env, \"BASE\": base},",
     "statementSha256": "bf2ed13f54c1d849e541dc4d617f547266151c56493a32df193588dd2f6ab854",
     "reason": "The gate path and fake executables are created by the test inside its private temporary directory.",
     "owner": "security-tooling",
@@ -415,7 +415,7 @@
   },
   {
     "rule": "B110",
-    "file": "backend/apps/platform_core/platform_core/model_gecidi/adapters.py",
+    "file": "backend/apps/platform_core/platform_core/model_gateway/adapters.py",
     "code": "except Exception:",
     "statementSha256": "d8166582d6287a2c272014cf09dce29945e0cf6d1de8b0ce231b2a285f6c3324",
     "reason": "The handler preserves a sanitized error code, logs it below, and raises a GatewayError.",
@@ -424,7 +424,7 @@
   },
   {
     "rule": "B311",
-    "file": "backend/apps/platform_core/platform_core/model_gecidi/routing.py",
+    "file": "backend/apps/platform_core/platform_core/model_gateway/routing.py",
     "code": "random = Random(seed)",
     "statementSha256": "4a02b650d7084a76575e3e8156e17ed05d3e5355b5c96adc9bd0d9aadfcc78df",
     "reason": "Seeded randomness orders weighted routing candidates and is not used for security.",
@@ -433,7 +433,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/model_gecidi/tests/test_gateway.py",
+    "file": "backend/apps/platform_core/platform_core/model_gateway/tests/test_gateway.py",
     "code": "SECRET = \"fixture-key\"",
     "statementSha256": "91e8308216eb96db3d662fa59b6c836bbb496602fbbb3a3700f8345526a5905f",
     "reason": "This fixed value belongs to a test fixture and is not a real credential.",
@@ -442,7 +442,7 @@
   },
   {
     "rule": "B104",
-    "file": "backend/apps/platform_core/platform_core/model_gecidi/tests/test_gateway.py",
+    "file": "backend/apps/platform_core/platform_core/model_gateway/tests/test_gateway.py",
     "code": "\"0.0.0.0\",",
     "statementSha256": "0f378c2657b553fb910bf27adf0ce610e71ddf607be4009ee8724b91ce3e7193",
     "reason": "This address is input to an address-rejection test and is never used to bind a socket.",
@@ -451,7 +451,7 @@
   },
   {
     "rule": "B106",
-    "file": "backend/apps/platform_core/platform_core/model_gecidi/tests/test_gateway.py",
+    "file": "backend/apps/platform_core/platform_core/model_gateway/tests/test_gateway.py",
     "code": "token_url=\"https://127.0.0.1\",",
     "statementSha256": "4b67622c11b2b63270d9ede8cf6f0de0ff4c388a922fdf15771eeec658ffd8f9",
     "reason": "The loopback token URL is an intentionally rejected fixture input.",
@@ -460,7 +460,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kabuk/catalog.py",
+    "file": "backend/apps/platform_core/platform_core/shell/catalog.py",
     "code": "\"Password\": \"password\",",
     "statementSha256": "127ca0cef2971536bb0cd291bf039d1ab18ccca3c1f3be4835373ac9de957ac0",
     "reason": "The string is a field-type label, not a credential.",
@@ -487,7 +487,7 @@
   },
   {
     "rule": "B311",
-    "file": "backend/apps/platform_core/platform_core/mobil/request.py",
+    "file": "backend/apps/platform_core/platform_core/mobile/request.py",
     "code": "time.sleep(random.uniform(0.03, 0.12) * 2**attempt)",
     "statementSha256": "8307f898f633820544e12713af66e587860d57417e1adcdc2a6e78559448b16f",
     "reason": "Randomness only distributes the delay between database retries.",
@@ -496,7 +496,7 @@
   },
   {
     "rule": "B106",
-    "file": "backend/apps/platform_core/platform_core/mobil/tests/test_request.py",
+    "file": "backend/apps/platform_core/platform_core/mobile/tests/test_request.py",
     "code": "self.frappe.session.data = SimpleNamespace(csrf_token=\"csrf-token\", creation=\"2026-11-22 07:00:00\")",
     "statementSha256": "523919980ca538e5e6ac9dda0111f22ba1e610e869702f9685aeae84ba871a3d",
     "reason": "The literal is a fake test token or a fake session field, not a live credential.",
@@ -532,8 +532,8 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/mobil/store.py",
-    "code": "\"Mobile Installation\", {\"name\": [\"in\", updates]}, {\"revoked\": 1, \"notification_token\": None}",
+    "file": "backend/apps/platform_core/platform_core/mobile/store.py",
+    "code": "\"PLT Mobile Installation\", {\"name\": [\"in\", updates]}, {\"revoked\": 1, \"notification_token\": None}",
     "statementSha256": "f0ab2f7b7ff1c9823b377ad8cc8b6a46276ec28bd3618509206d7e0c8b5b3576",
     "reason": "Revocation clears the stored notification token with None.",
     "owner": "platform-core-mobil",
@@ -604,7 +604,7 @@
   },
   {
     "rule": "B106",
-    "file": "backend/apps/platform_core/platform_core/kabuk/test_panel_template.py",
+    "file": "backend/apps/platform_core/platform_core/shell/test_panel_template.py",
     "code": "panel = self.render_panel(panel_language=\"tr\", panel_csrf_token=\"test-token\")",
     "statementSha256": "8cfd03ce51bb75f1c7d30ae6b781176946f41ce4a4e2b47d2e86c2eeebcce02d",
     "reason": "The template test renders a synthetic CSRF token.",
@@ -613,7 +613,7 @@
   },
   {
     "rule": "B106",
-    "file": "backend/apps/platform_core/platform_core/kabuk/test_panel_template.py",
+    "file": "backend/apps/platform_core/platform_core/shell/test_panel_template.py",
     "code": "panel = self.render_panel(panel_language=\"tr\", panel_csrf_token='test\"&token')",
     "statementSha256": "331ab7475467618362c4ca5cf74295f6afe2a639ad7fbaa4655f3102809ab500",
     "reason": "The template test renders a synthetic CSRF token to check HTML escaping.",
@@ -658,7 +658,7 @@
   },
   {
     "rule": "B404",
-    "file": "backend/apps/platform_core/platform_core/kabuk/contract_tests/test_generate_snapshot.py",
+    "file": "backend/apps/platform_core/platform_core/shell/contract_tests/test_generate_snapshot.py",
     "code": "import subprocess",
     "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
     "reason": "The import alone starts no process; Bandit checks the call sites separately.",
@@ -820,7 +820,7 @@
   },
   {
     "rule": "B603",
-    "file": "backend/apps/platform_core/platform_core/kabuk/contract_tests/test_generate_snapshot.py",
+    "file": "backend/apps/platform_core/platform_core/shell/contract_tests/test_generate_snapshot.py",
     "code": "result = subprocess.run(",
     "statementSha256": "dd33b56afe70125eca8b17a6d95c2497f7a36873aabbcf7b3eb9de435873b49c",
     "reason": "The snapshot test calls an identified repository script with the current interpreter and a fixed check flag.",
@@ -1324,7 +1324,7 @@
   },
   {
     "rule": "B404",
-    "file": "backend/dev/guvenlik/semgrep_exceptions.py",
+    "file": "backend/dev/security/semgrep_exceptions.py",
     "code": "import subprocess",
     "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
     "reason": "The import alone starts no process; the Git call is reviewed separately.",
@@ -1333,7 +1333,7 @@
   },
   {
     "rule": "B404",
-    "file": "backend/dev/guvenlik/test_semgrep_exceptions.py",
+    "file": "backend/dev/security/test_semgrep_exceptions.py",
     "code": "import subprocess",
     "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
     "reason": "The import alone starts no process; the fixture Git call is reviewed separately.",
@@ -1342,7 +1342,7 @@
   },
   {
     "rule": "B603",
-    "file": "backend/dev/guvenlik/semgrep_exceptions.py",
+    "file": "backend/dev/security/semgrep_exceptions.py",
     "code": "listing = subprocess.run(",
     "statementSha256": "21caf1cad401f2bdf4b597eeb30e928055b0fc391631cb7106487ec2e2fea9bf",
     "reason": "Executes absolute Git without a shell and limits file listing to a literal path after the argument separator.",
@@ -1351,7 +1351,7 @@
   },
   {
     "rule": "B603",
-    "file": "backend/dev/guvenlik/test_semgrep_exceptions.py",
+    "file": "backend/dev/security/test_semgrep_exceptions.py",
     "code": "subprocess.run([shutil.which(\"git\"), \"-C\", str(root), *arguments], check=True)",
     "statementSha256": "74a564fec9d36ba6f0e296315d8225a73e618c5ac26896c1a1b2576f31fe14ed",
     "reason": "Executes Git without a shell to initialize and stage files in a temporary test repository.",
@@ -1361,7 +1361,7 @@
   {
     "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/hooks.py",
-    "code": "\"frappe.core.doctype.user.user.reset_password\": \"platform_core.kimlik.login_policy.reset_password\",",
+    "code": "\"frappe.core.doctype.user.user.reset_password\": \"platform_core.identity.login_policy.reset_password\",",
     "statementSha256": "b5451596ad4ddfd10b2422adbe9387a13e1a28303211476c072324f4c9c36db7",
     "reason": "This Frappe hook maps dotted method names; it stores no credential.",
     "owner": "platform-core-kimlik",
@@ -1370,7 +1370,7 @@
   {
     "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/hooks.py",
-    "code": "\"frappe.core.doctype.user.user.update_password\": \"platform_core.kimlik.login_policy.update_password\",",
+    "code": "\"frappe.core.doctype.user.user.update_password\": \"platform_core.identity.login_policy.update_password\",",
     "statementSha256": "b5451596ad4ddfd10b2422adbe9387a13e1a28303211476c072324f4c9c36db7",
     "reason": "This Frappe hook maps dotted method names; it stores no credential.",
     "owner": "platform-core-kimlik",
@@ -1379,7 +1379,7 @@
   {
     "rule": "B105",
     "file": "backend/apps/platform_core/platform_core/hooks.py",
-    "code": "\"frappe.www.login.login_via_token\": \"platform_core.kimlik.login_policy.login_via_token\",",
+    "code": "\"frappe.www.login.login_via_token\": \"platform_core.identity.login_policy.login_via_token\",",
     "statementSha256": "b5451596ad4ddfd10b2422adbe9387a13e1a28303211476c072324f4c9c36db7",
     "reason": "This Frappe hook maps dotted method names; it stores no credential.",
     "owner": "platform-core-kimlik",
@@ -1387,7 +1387,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/provider_setup.py",
+    "file": "backend/apps/platform_core/platform_core/identity/provider_setup.py",
     "code": "\"access_token_url\": \"/protocol/openid-connect/token\",",
     "statementSha256": "0d31f3cfb950fd08afd65fc756c37a512f06a2069dc88af13391360edd9b4928",
     "reason": "This string is the OpenID Connect token endpoint path.",
@@ -1396,7 +1396,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/tests/helpers.py",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/helpers.py",
     "code": "\"keycloak_client_secret\": \"test-client-secret-fake\",",
     "statementSha256": "40a74283499ea0c27f5b434ffe6218554749ed56086ff81e75b629e673471228",
     "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
@@ -1405,7 +1405,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/tests/helpers.py",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/helpers.py",
     "code": "\"access_token\": \"fake-access-token\",",
     "statementSha256": "bca83bdab72b5b668d049ddd3cb5af8890b5b95fa4fefa9c942abe3214f19a01",
     "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
@@ -1414,7 +1414,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/tests/helpers.py",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/helpers.py",
     "code": "\"token_type\": \"Bearer\",",
     "statementSha256": "bca83bdab72b5b668d049ddd3cb5af8890b5b95fa4fefa9c942abe3214f19a01",
     "reason": "This OAuth response type names the Bearer scheme in a mocked token response.",
@@ -1423,7 +1423,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_login_page.py",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/test_login_page.py",
     "code": "with h.SiteSettings({\"keycloak_client_secret\": \"\"}):",
     "statementSha256": "f72fed1c2a146f789b8538a7ebb69738e251bd9cb1d8f5028a93ae03f0b53f0c",
     "reason": "This test supplies an empty site setting to check the missing-setting response.",
@@ -1432,7 +1432,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_login_policy.py",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/test_login_policy.py",
     "code": "{\"key\": \"x\", \"new_password\": \"A-long-password-123\"},",
     "statementSha256": "612110415db2bced86a7be2fa7d159bd13fca6b6b6a1a29e8833652f15e70c0f",
     "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
@@ -1441,7 +1441,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_login_policy.py",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/test_login_policy.py",
     "code": "(\"get\", \"/api/method/frappe.www.login.login_via_token\", {\"login_token\": \"x\"}),",
     "statementSha256": "612110415db2bced86a7be2fa7d159bd13fca6b6b6a1a29e8833652f15e70c0f",
     "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
@@ -1450,7 +1450,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_provider_setup.py",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/test_provider_setup.py",
     "code": "\"access_token_url\": \"y\",",
     "statementSha256": "b975091ecf75035ee90b56bf8a463eea3d7ff04d75151ea416a28ce21369cc95",
     "reason": "This placeholder endpoint path is used only to construct a test record.",
@@ -1459,7 +1459,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_provider_setup.py",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/test_provider_setup.py",
     "code": "with h.SiteSettings({\"keycloak_client_secret\": \"\"}), self.assertRaises(KeycloakSettingsMissing):",
     "statementSha256": "01076d46c6e9d690fb54ada5f93ff3d666d9e7e6db80d2bda10dbd8a4b07f9c1",
     "reason": "This test supplies an empty site setting to check the missing-setting response.",
@@ -1468,7 +1468,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_sign_in.py",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/test_sign_in.py",
     "code": "with h.SiteSettings({\"keycloak_client_secret\": \"\"}):",
     "statementSha256": "af2d11d147b8b7b3f526387ada4f1a89a2bd61e358af911824017e4fc444ad37",
     "reason": "This test supplies an empty site setting to check the missing-setting response.",
@@ -1477,7 +1477,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_sign_out.py",
+    "file": "backend/apps/platform_core/platform_core/identity/tests/test_sign_out.py",
     "code": "data={\"logout_token\": \"x\", \"padding\": \"p\" * 20000},",
     "statementSha256": "19c3dde4994a5839a40904931fed8a2a9795c85d5f875c900139363c1b819ba9",
     "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
@@ -1486,7 +1486,7 @@
   },
   {
     "rule": "B101",
-    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_backlog.py",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/test_backlog.py",
     "code": "assert parsed.tzinfo is not None, f\"{value!r} carries no UTC offset\"",
     "statementSha256": "6e8d970dbbcecc16cf0bc52662b1741dcff9aa2d218dee18135981d0214a79f8",
     "reason": "Test helper checks the UTC offset of a fixture timestamp.",
@@ -1532,7 +1532,7 @@
   },
   {
     "rule": "B101",
-    "file": "backend/identity/keycloak/tests/test_keycloak_canli.py",
+    "file": "backend/identity/keycloak/tests/test_live_keycloak.py",
     "code": "assert yanit.durum == 200, safe_detail(yanit)",
     "statementSha256": "a1d7d93aef76b0b2da6bfbed4c04d2b798e4401d32a032ebf6621e4fda9672c3",
     "reason": "A live test helper checks a fixture response status; this is not a production authorization check.",
@@ -1541,7 +1541,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/base.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/base.py",
     "code": "PASSWORD = \"Sahte-Parola-6150-er!\"",
     "statementSha256": "07a0f291f4b579bc4d1c199407bd29c5c745ca7ecf6742ddcfdb15351ef8cbc9",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
@@ -1550,7 +1550,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/performance.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/performance.py",
     "code": "PASSWORD = \"Made-Up-Measure-6150!\"",
     "statementSha256": "48956959a14bcba563e7addf2c488558e5db7e6267d385944a5a3d93f79dbbfe",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
@@ -1568,7 +1568,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/base.py",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/base.py",
     "code": "PASSWORD = \"Sahte-Parola-7391-yz!\"",
     "statementSha256": "7c15a0b4a5419b810b2786763f2712a0197b0bdb6f67e293c468dec4c5d7872e",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
@@ -1577,7 +1577,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_approval.py",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/test_approval.py",
     "code": "client.csrf_token = \"yanlis\"",
     "statementSha256": "5c953d0fc8808627a2304dd395052341372fd50f1a5f7568e27dc650fd65c56e",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
@@ -1586,7 +1586,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_codex.py",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/test_codex.py",
     "code": "client.csrf_token = \"yanlis\"",
     "statementSha256": "40beaa5a99e9313312496584e3ec7d260aff375a28ba8861c678c32d09f2df93",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
@@ -1595,7 +1595,7 @@
   },
   {
     "rule": "B105",
-    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_read.py",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/test_read.py",
     "code": "manager, \"list_documents\", {\"doctype\": DOCTYPE, \"filters\": {\"access_token\": \"gizli-belirtec\"}}",
     "statementSha256": "f8161291bb55606bf2108a27da1ddcccc06257ddcf7acd42ccb407c179a34c73",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
@@ -1650,7 +1650,7 @@
   {
     "rule": "B105",
     "file": "backend/dev/press/test_development_contract.py",
-    "code": "os.environ, {\"PRESS_DB_PASSWORD\": \"db-fixture\", \"PRESS_ADMIN_PASSWORD\": \"admin-fixture\"}",
+    "code": "os.environ, {\"PTR_DB_PASSWORD\": \"db-fixture\", \"PTR_ADMIN_PASSWORD\": \"admin-fixture\"}",
     "statementSha256": "5cbddb3a719365af494daae6367646d9d8faa820227421a5c20376f0dde025a9",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
     "owner": "press-tr",
@@ -1660,7 +1660,7 @@
   {
     "rule": "B105",
     "file": "backend/dev/press/test_development_contract.py",
-    "code": "os.environ, {\"PRESS_DB_PASSWORD\": \"db-fixture\", \"PRESS_ADMIN_PASSWORD\": \"admin-fixture\"}",
+    "code": "os.environ, {\"PTR_DB_PASSWORD\": \"db-fixture\", \"PTR_ADMIN_PASSWORD\": \"admin-fixture\"}",
     "statementSha256": "ddb18b2e2a9af2c7b279b78f60db826bd622f4bd7296e9e343500c682908b7a9",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
     "owner": "press-tr",
@@ -1805,7 +1805,7 @@
   {
     "rule": "B105",
     "file": "backend/identity/identity_sync/tests/test_server.py",
-    "code": "OTHER_SITE_TOKEN = \"other-site-token\"  # the service token of tenant kiraci2",
+    "code": "OTHER_SITE_TOKEN = \"other-site-token\"  # the service token of tenant tenant2",
     "statementSha256": "2a09f9e481b05ac5e83c581d106efe1aa6cb1cfef017d8d013bb45507a41cfd7",
     "reason": "The test uses a synthetic credential or token in a fixture or mocked response.",
     "owner": "identity-sync",
@@ -1876,7 +1876,7 @@
   },
   {
     "rule": "B106",
-    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_backlog.py",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/test_backlog.py",
     "code": "self.make_record(USER_A, title=f\"{index:02d} {big}\"[:140], access_token=\"\") for index in range(6)",
     "statementSha256": "492cab7c95a8f3b3d03cca5fbbe9569ff387b25e237f7f0bc3f42ddd05d4c41c",
     "reason": "The test supplies a synthetic credential or token through a fixture argument.",
@@ -1885,7 +1885,7 @@
   },
   {
     "rule": "B106",
-    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_identity.py",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/test_identity.py",
     "code": "response = self.rpc(self.anonymous(), \"tools/list\", token=\"fsat_bilinmeyen\")",
     "statementSha256": "71980568f8684eda2a37d5c11a434e98ee41aada802906a76ac27e7938ac1c86",
     "reason": "The test supplies a synthetic credential or token through a fixture argument.",
@@ -1894,7 +1894,7 @@
   },
   {
     "rule": "B106",
-    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_purge_confirmation.py",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/test_purge_confirmation.py",
     "code": "made_up = self.post(manager, dry_run=False, confirmation_token=\"made-up-token\")",
     "statementSha256": "bebecbca1f55d85d959247677ad374f4bd7d18021a55a56c0a64361577f5b948",
     "reason": "The test supplies a synthetic credential or token through a fixture argument.",
@@ -1903,7 +1903,7 @@
   },
   {
     "rule": "B106",
-    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_read.py",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/test_read.py",
     "code": "name = self.make_record(USER_A, vault_code=\"cok-gizli-deger\", access_token=\"gizli-belirtec\")",
     "statementSha256": "155c87a88ce5edef14ae1e83a322b992df08a15cebc2f60a2cba763ebe870bb2",
     "reason": "The test supplies a synthetic credential or token through a fixture argument.",
@@ -1912,7 +1912,7 @@
   },
   {
     "rule": "B106",
-    "file": "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_result_boundary.py",
+    "file": "backend/apps/platform_core/platform_core/ai/tests/test_result_boundary.py",
     "code": "self.rpc(self.anonymous(), \"tools/list\", token=\"fsat_unknown\")",
     "statementSha256": "2f0f81ad9f674178c1ded4498e6a9ee5f552a1c7ccf96f49dc69c7681b317980",
     "reason": "The test supplies a synthetic credential or token through a fixture argument.",
@@ -1967,7 +1967,7 @@
   {
     "rule": "B108",
     "file": "backend/identity/identity_sync/tests/test_config_cli.py",
-    "code": "ENV = environment(\"http://kimlik.localhost:6110/\", \"http://press.localhost:6113\", \"http://kiraci1.localhost:6111\", \"/tmp/x.sqlite3\")",
+    "code": "ENV = environment(\"http://identity.localhost:6110/\", \"http://press.localhost:6113\", \"http://tenant1.localhost:6111\", \"/tmp/x.sqlite3\")",
     "statementSha256": "68c34b9c5a3bc8402d0ab5291751f725e1f8c1cfa58c490e3b74a0c8f2c2f0bb",
     "reason": "The configuration test uses this path as a fixture string; the flagged statement opens no file.",
     "owner": "identity-sync",
@@ -2074,7 +2074,7 @@
   },
   {
     "rule": "B404",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/base.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/base.py",
     "code": "import subprocess",
     "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
     "reason": "The import alone starts no subprocess; call sites are reviewed separately.",
@@ -2137,7 +2137,7 @@
   },
   {
     "rule": "B603",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/base.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/base.py",
     "code": "subprocess.run(",
     "statementSha256": "70c887d9a95e15d92699fdb2315df107db68d518ebcfd40b6df38a109c3ef350",
     "reason": "A test starts a bench worker with fixed argument tokens and a controlled fixture working directory.",
@@ -2272,7 +2272,7 @@
   },
   {
     "rule": "B607",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/base.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/base.py",
     "code": "subprocess.run(",
     "statementSha256": "70c887d9a95e15d92699fdb2315df107db68d518ebcfd40b6df38a109c3ef350",
     "reason": "The developer test runner supplies the executable PATH for this fixture command.",
@@ -2371,7 +2371,7 @@
   },
   {
     "rule": "B608",
-    "file": "backend/apps/platform_core/platform_core/erisim/test_reports.py",
+    "file": "backend/apps/platform_core/platform_core/access/test_reports.py",
     "code": "query=f\"select name as `Name:Data:200`, title as `Title:Data:200` from `tab{DOCTYPE}`\",",
     "statementSha256": "3ba5bbc1c851f99d3f7b5753911bf3eca210a92c21c7fa0850498e7c903be61b",
     "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
@@ -2380,7 +2380,7 @@
   },
   {
     "rule": "B608",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_inceleme.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/test_review.py",
     "code": "query=f\"select name as `Name:Data:200`, title as `Title:Data:200` from `tab{DOCTYPE}`\",",
     "statementSha256": "25abe3d07b911275db7455ae301149c19534a2e2cc84ca069a7c8f894c43970f",
     "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
@@ -2389,7 +2389,7 @@
   },
   {
     "rule": "B608",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_report_rules.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/test_report_rules.py",
     "code": "ensure_report(CROSS_REPORT, FREE_DOCTYPE, query=f\"select {columns} from `tab{DOCTYPE}`\")",
     "statementSha256": "806595dc46401c480c16d1731a05ffc8f9fe34c0b3e7d5ba6fed0b8933fcbedc",
     "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
@@ -2398,7 +2398,7 @@
   },
   {
     "rule": "B608",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_report_rules.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/test_report_rules.py",
     "code": "ensure_report(FREE_REPORT, FREE_DOCTYPE, query=f\"select {columns} from `tab{FREE_DOCTYPE}`\")",
     "statementSha256": "6b86a496ed1b7b1b27c43333276b93498415e56c083e4ab6eee16f131105642c",
     "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
@@ -2407,7 +2407,7 @@
   },
   {
     "rule": "B608",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_report_rules.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/test_report_rules.py",
     "code": "ensure_report(NAME_REPORT, DOCTYPE, query=f\"select {columns} from `tab{DOCTYPE}`\")",
     "statementSha256": "db07109397d3168be482bbcef5992790639a70bff344948d534852152e5c88eb",
     "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
@@ -2416,7 +2416,7 @@
   },
   {
     "rule": "B608",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_report_rules.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/test_report_rules.py",
     "code": "query = f\"select name as `Name:Data:200`, title as `Title:Data:200` from `tab{DOCTYPE}`\"",
     "statementSha256": "7f5e8111eb8f69b4ac7751619b2ce1ac82dc530c1af8c51722ef4719f22a5a2f",
     "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",
@@ -2425,7 +2425,7 @@
   },
   {
     "rule": "B608",
-    "file": "backend/apps/platform_core/platform_core/erisim/tests/test_report_rules.py",
+    "file": "backend/apps/platform_core/platform_core/access/tests/test_report_rules.py",
     "code": "query=f\"select name as `Name:Data:200`, salary_amount as `Salary:Currency:120` from `tab{DOCTYPE}`\",",
     "statementSha256": "7d0013ee9d5fc4d6be99581924ce80815e7f11ef105a921f1bff56149e6d569f",
     "reason": "The report test constructs fixture SQL from test-defined constants, without request input.",

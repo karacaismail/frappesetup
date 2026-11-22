@@ -2,8 +2,8 @@
 
 from frappe.tests.test_api import FrappeAPITestCase
 
-from platform_core.kimlik import provider_setup
-from platform_core.kimlik.tests import helpers as h
+from platform_core.identity import provider_setup
+from platform_core.identity.tests import helpers as h
 
 PREFIX = "/api/method/platform_core.api.auth."
 

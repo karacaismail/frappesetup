@@ -26,7 +26,7 @@ Zamanlanmış tarama kurulmaz (D-6). Asıl dosya bazı taramaları her gece ya d
 | Her rolün izinli ve yasak işlemleri yazılır. Kullanıcı kendini yönetici yapamaz. | erisim-kurali, platform-core-kimlik | Rol kaynağı Keycloak'tır. |
 | Kullanıcı isteğe fazladan alan ekleyerek rolünü değiştiremez. | Her uç sahibi | Tür ipuçlu whitelist ve `extra=forbid` kullanılır. |
 | Bir müşteri başka müşterinin verisini göremez. Bunu veritabanı engeller. | Press ve kiracı yapısı | Her kiracının ayrı veritabanı vardır. |
-| Ortak güvenlik kapısı her uca uygulanır. Kapı varsayılan olarak açıktır. | security-tooling | Uç denetimi `dev/guvenlik/endpoints.py` dosyasındadır. |
+| Ortak güvenlik kapısı her uca uygulanır. Kapı varsayılan olarak açıktır. | security-tooling | Uç denetimi `dev/security/endpoints.py` dosyasındadır. |
 | Her işe başlamadan üç soru cevaplanır: kim yapabilir, veri kimin, girişsiz biri ne görür. | Her iş | Cevap görev dosyasına ya da karar notuna yazılır. |
 
 ## İşlem güvenliği
@@ -58,7 +58,7 @@ Zamanlanmış tarama kurulmaz (D-6). Asıl dosya bazı taramaları her gece ya d
 | Bulunan her açık bir teste dönüşür. | Her iş | Önce test yazılır. |
 | Korumayı silip test koşulur. Test kırmızı vermiyorsa yeniden yazılır. | Her iş | Kırmızı kanıtı durum dosyasına yazılır. |
 | Her uçta iki zorunlu test vardır: girişsiz çağrı reddedilir, yabancı hesabın verisi görünmez. | Her uç sahibi | |
-| Kötüye kullanım senaryoları işten önce yazılır. | Her iş | Örnek kart `dev/guvenlik/kotuye-kullanim-karti.md` dosyasındadır. |
+| Kötüye kullanım senaryoları işten önce yazılır. | Her iş | Örnek kart `dev/security/abuse-case-card.md` dosyasındadır. |
 | Dağıtımdan önce dışarıya açılan uçların listesi çıkar. | security-tooling | `release-report` komutu |
 | Dağıtımdan sonra canlıda kısa saldırı seti koşar. | DevOps sorumlusu | Canlı ortam kurulunca başlar. |
 | Güvenlik sayıları düzenli raporlanır. | security-tooling | Elle başlatılan karne komutu. Zamanlanmış iş yoktur. |

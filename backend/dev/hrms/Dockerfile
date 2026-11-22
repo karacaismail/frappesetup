@@ -1,4 +1,4 @@
-ARG KIRACI_IMAGE=fs-kiraci-dev:v16.55.0
+ARG KIRACI_IMAGE=fs-tenant-dev:v16.55.0
 FROM ${KIRACI_IMAGE} AS hrms
 
 RUN git clone --depth 1 --branch v16.54.1 https://github.com/frappe/hrms.git apps/hrms \

@@ -9,8 +9,8 @@ const IDLE_MS = 60 * 60 * 1000;
 
 function sites() {
   return {
-    tenant: localUrl('kiraci1.localhost', 1),
-    identity: localUrl('kimlik.localhost', 0),
+    tenant: localUrl('tenant1.localhost', 1),
+    identity: localUrl('identity.localhost', 0),
     press: localUrl('press.localhost', 3),
   };
 }
@@ -216,7 +216,7 @@ test('administrator revocation also terminates the Keycloak mobile session', asy
   const proposal = await request.post(method + 'mcp', {
     headers, maxRedirects: 0, data: {
       jsonrpc: '2.0', id: randomUUID(), method: 'tools/call',
-      params: { name: 'platform_core_revoke_mobile_installation', arguments: { installation_id: installation } },
+      params: { name: 'plt_revoke_mobile_installation', arguments: { installation_id: installation } },
     },
   });
   expect(proposal.status()).toBe(200);
@@ -247,7 +247,7 @@ async function keycloakStillSignedIn(page: Page) {
   const challenge = createHash('sha256').update(randomBytes(32).toString('base64url')).digest('base64url');
   const url = new URL(identity + '/realms/platform/protocol/openid-connect/auth');
   url.search = new URLSearchParams({
-    client_id: 'site-kiraci1', response_type: 'code', scope: 'openid', state, prompt: 'none',
+    client_id: 'site-tenant1', response_type: 'code', scope: 'openid', state, prompt: 'none',
     redirect_uri: tenant + CALLBACK, code_challenge: challenge, code_challenge_method: 'S256',
   }).toString();
   const response = await page.request.get(url.href, { maxRedirects: 0 });
