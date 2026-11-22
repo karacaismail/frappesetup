@@ -452,7 +452,7 @@ test.describe('sihirli bağlantı e-postası', () => {
       await alternative.evaluate((form: HTMLFormElement) => form.requestSubmit());
       const signInOption = {
         tr: 'E-posta bağlantısı E-postanıza gelen bağlantıyla oturum açın.',
-        en: 'Magic link Sign in with a link sent to your email.',
+        en: 'Email link Sign in with a link sent to your email.',
       };
       await page.getByRole('button', { name: signInOption[lang], exact: true }).click();
       const username = page.locator('input[name="username"]:visible');

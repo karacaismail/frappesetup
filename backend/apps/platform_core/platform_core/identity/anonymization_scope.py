@@ -4,6 +4,7 @@ The scope comes from the `user_data_fields` hooks of every installed app, plus t
 the contract. Only rows bound to the user change:
 
 - an entry with `redact_fields` changes those fields in rows where `filter_by` (default `owner`) is the user,
+- `clear_fields` can opt named, non-required scalar fields in `redact_fields` out of replacement and clear them,
 - an entry without `redact_fields` replaces the user's e-mail and full name in the text fields of rows
   where `filter_by` is the user. Frappe's “strict” mode would scan every row of the table for the full
   name (personal_data_deletion_request.py:317), which can change another person with the same name.
@@ -198,7 +199,13 @@ def _redact_fields(ref: dict, user: str, anon: str, owned: frappe._dict) -> None
 	fields = [f for f in ref["redact_fields"] if meta.get_field(f)]
 	if not fields:
 		return
-	values = {f: _value_for(meta.get_field(f), anon) for f in fields}
+	clear_fields = set(ref.get("clear_fields") or ())
+	values = {}
+	for field in fields:
+		definition = meta.get_field(field)
+		values[field] = (
+			None if field in clear_fields and not definition.reqd else _value_for(definition, anon)
+		)
 	filter_by = ref.get("filter_by", "owner")
 	rows = [
 		row for row in _bound_rows(doctype, filter_by, user, []) if not _shared(owned, doctype, row["name"])

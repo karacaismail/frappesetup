@@ -342,11 +342,16 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
 4. Kapsam Frappe'nin `user_data_fields` kancasından türer. Ek olarak şunlar temizlenir ya da anonim yapılır:
    - kullanıcıya bağlı “Contact” ve adres kayıtları,
    - “Activity Log” kayıtlarındaki ad ve IP adresi,
-   - “Version” kayıtlarındaki eski kişisel değerler,
-   - profil fotoğrafı ve kullanıcının yüklediği kişisel dosyalar,
+   - kiracıda “User” ve kişiye ait “Contact” geçmişi ile kullanıcının yazdığı “Version” kayıtlarındaki ad ve e-posta,
+   - profil fotoğrafı ve kişiye ait “User” veya “Contact” kayıtlarına bağlı dosyalar,
    - “Communication” ve e-posta kuyruğundaki adresler,
    - iki adımlı doğrulama anahtarları, varsayılan değer satırları, sosyal giriş ve ek e-posta satırları,
    - Press'te takımın fatura adı ve telefonu, SSH anahtarları ve sertifikaları.
+
+   Kiracıda `clear_fields` içindeki zorunlu olmayan alan boşaltılır. Zorunlu alan bu listeye yazılamaz.
+   Bu seçenek yalnız `redact_fields` içinde bulunan alanlar için geçerlidir.
+   Kod, listeye yazılmış zorunlu alanda olağan anonim değeri kullanır.
+
 5. Frappe'nin tam adı bütün satırlarda arayan değiştirmesi kullanılmaz. Yalnız kullanıcıya bağlı alanlar değişir. Böylece aynı adı taşıyan başka bir kişinin verisi değişmez.
 6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
 7. Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
@@ -385,7 +390,8 @@ Aşağıdaki tablo, HRMS TR kayıtlarında kişisel verinin nasıl silindiğini 
 
 | Kişisel veri | Silme yolu |
 | --- | --- |
-| HRMS TR çalışan ve izin kayıtları | Hesap silme, `user_data_fields` kancasıyla kullanıcıya bağlı çalışan kaydını seçer. Ad, soyad, kişisel ve tercih edilen e-posta, cep telefonu ve doğum tarihi anonimleşir. Çalışan ve iş kayıtları kalır. `hrms_tr.retention.purge` süresi dolan izin kayıtlarını O-39 kapsamında siler. |
+| HRMS TR çalışan kartı | `user_data_fields` kancası kartı `user_id` ile bulur. Adlar, e-posta, telefon, acil durum kişisi, yakınlık, adresler ve biyografi anonimleşir. Pasaport numarası ve düzenlenme yeri anonimleşir. Banka adı, hesap numarası, IBAN, sağlık notu, sigorta numarası ve aile bilgisi anonimleşir. Doğum tarihi, pasaport tarihleri, devam cihazı kimliği, kan grubu ve medeni durum alanları boşalır. Fotoğraf alanı boşalır. Karta yüklenen fotoğraf dosyası şimdilik kalır. Çalışan kartının değişiklik geçmişi eski değerleri şimdilik tutar. Eğitim ve önceki iş alt tabloları kalır (O-41). |
+| HRMS TR iş kayıtları | Hesap silme kayıtları korur. İzin, devam ve bordrodaki çalışan adı kopyaları değişmez (O-41). `hrms_tr.retention.purge` yalnız süresi dolan taslak ve iptal edilmiş izinleri siler (O-39). |
 
 ## 9. Geliştirme ortamı
 
