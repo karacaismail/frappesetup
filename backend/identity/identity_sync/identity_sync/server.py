@@ -204,7 +204,23 @@ class _Api:
         except EventError:
             raise _BadRequest from None
         result = self._app.processor.handle(event, dry_run=dry_run)
+        if not dry_run:
+            self._settle_unknown_jobs()
         return (200 if dry_run else 202), result.to_dict()
+
+    def _settle_unknown_jobs(self) -> None:
+        """Settle account jobs with an unknown outcome while an event is handled (H-5).
+
+        The event is already handled. A failure here must not change its reply: the job stays
+        unknown and the next request or event tries again.
+        """
+        try:
+            results = self._app.processor.settle_unknown_jobs()
+        except (Busy, sqlite3.Error):
+            _LOG.warning("unknown jobs were not settled; the next event tries again")
+            return
+        for job_id, result in results:
+            _LOG.info("settle job=%s outcome=%s", job_id, result.status)
 
     # --- read endpoints ---
 

@@ -199,6 +199,10 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Silinen kimliğin ham değeri saklanmaz. Yeniden açmayı engellemek için yalnız kimliğin HMAC özeti tutulur.
   - Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
   - Ayrıntılı kurallar sözleşmenin 7. bölümündedir.
+  - Anonim yapma çağrısının kendi bekleme süresi vardır (H-5). Ayarın adı `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` olur. Varsayılan değer 30 saniyedir.
+  - Bu değer 22 Kasım 2026 Pazar günü ölçüldü. Boş kiracıda iş en çok 2,5 saniye sürdü. Son MVP testinde yük altında yaklaşık 12 saniye sürdü.
+  - Zaman aşımında adımın sonucu bilinmez. identity-sync çağrıyı yinelemez. Bir sonraki istekte ya da olayda hedefin kimlik listesini okur.
+  - Kimlik listede yoksa adım bitmiş sayılır. İş sürer ve Keycloak kullanıcısı silinir. Zamanlanmış iş kurulmaz.
 - **O-28. Yapay zekâ katmanı genel Frappe erişimi değildir.** D-9 her şeyin yapay zekâyla yönetilmesini ister. AX-2 modele genel Frappe erişimi vermeyi yasaklar. İki kural şöyle birleşir:
   - Model yalnız kayıtlı araçları çağırır. Her araç kullanıcının yetkisiyle çalışır.
   - Yazma önce öneri olur. İnsan ayrı uçtan onay verir.

@@ -15,6 +15,8 @@ from identity_sync.mapping import Tenant, browser_client_id, service_client_id
 PREFIX = "IDENTITY_SYNC_"
 DEFAULT_ADMIN_SCOPE = "admin-api kc-admin-api"
 DEFAULT_DELETION_AZP = "press-service"
+DEFAULT_ANONYMIZE_TIMEOUT = 30.0
+MAX_ANONYMIZE_TIMEOUT = 600.0
 MIN_DIGEST_KEY_LENGTH = 16
 # The Keycloak event listener refuses a shorter secret too.
 MIN_WEBHOOK_SECRET_LENGTH = 16
@@ -42,6 +44,9 @@ class Settings:
     # an e-mail guess offline.
     digest_key: str = field(default="", repr=False)
     http_timeout: float = 10.0
+    # Wait for one anonymize call, in seconds (H-5). The tenant renames the user and closes every
+    # session, so this call takes longer than the others. The default is measured: see README.md.
+    anonymize_timeout: float = DEFAULT_ANONYMIZE_TIMEOUT
     keycloak_internal_url: str = ""
     host: str = "127.0.0.1"
     port: int = 8085
@@ -142,11 +147,18 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         port = int(get("PORT", "6115"))
         timeout = float(get("HTTP_TIMEOUT", "10"))
         lock_timeout = float(get("LOCK_TIMEOUT", "10"))
+        anonymize_timeout = float(get("ANONYMIZE_TIMEOUT", str(DEFAULT_ANONYMIZE_TIMEOUT)))
         rate_limit = int(get("RATE_LIMIT", "600"))
     except ValueError:
-        raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT, {PREFIX}LOCK_TIMEOUT and {PREFIX}RATE_LIMIT must be numbers") from None
+        raise ConfigError(
+            f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT, {PREFIX}ANONYMIZE_TIMEOUT, {PREFIX}LOCK_TIMEOUT "
+            f"and {PREFIX}RATE_LIMIT must be numbers"
+        ) from None
     if not 0 < port < 65536 or timeout <= 0 or lock_timeout <= 0 or not 0 < rate_limit <= 100_000:
         raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT, {PREFIX}LOCK_TIMEOUT or {PREFIX}RATE_LIMIT is out of range")
+    # A NaN or infinite value would wait forever. The cap keeps one call shorter than ten minutes.
+    if not 0 < anonymize_timeout <= MAX_ANONYMIZE_TIMEOUT:
+        raise ConfigError(f"{PREFIX}ANONYMIZE_TIMEOUT must be more than 0 and at most {MAX_ANONYMIZE_TIMEOUT:g} seconds")
     execute_azp, preview_azp = _names(get("EXECUTE_AZP")), _names(get("PREVIEW_AZP"))
     session_azp = _names(get("SESSION_AZP"))
     operator_azp = _names(get("OPERATOR_AZP"))
@@ -201,6 +213,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         webhook_secret=get("WEBHOOK_SECRET"),
         db_path=get("DB"),
         http_timeout=timeout,
+        anonymize_timeout=anonymize_timeout,
         host=get("HOST", "127.0.0.1"),
         port=port,
         service_audience=get("AUDIENCE", "identity-sync"),

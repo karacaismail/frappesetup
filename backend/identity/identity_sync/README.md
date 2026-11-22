@@ -153,6 +153,7 @@ Servis yanıttaki son durumu istediği durumla da karşılaştırır. Örneğin 
 - Servis böyle bir olayı `unknown` durumuyla bekleme kuyruğuna yazar.
 - İstek gitti ama yanıt okunamadıysa sonuç yine bilinmez. 502 ve 504 yanıtları da böyledir.
 - Servis bu olayı işlenmiş saymaz. Servis olayı kendiliğinden yeniden denemez.
+- Hesap silme işinde tek istisna vardır. Servis anonim yapma adımının durumunu hedefe sorar. Ayrıntı "Silme işinde zaman aşımı" bölümündedir.
 - Aynı olay yeniden gelirse servis yazmayı tekrarlamaz.
 - İnsan hedefi denetler. Sonra olayı `--include-unknown` seçeneğiyle yeniden işletir.
 
@@ -238,6 +239,38 @@ Akış beş adımdır ve sırası sabittir:
 - Servis e-postayı hiç saklamaz. İş bitince kayıtta yalnız isteğin kimliği kalır.
 - Hedef `anonymize_user` ucu 409 dönerse servis isteği yeniden dener.
 - Keycloak'ın kendi `delete_account` eylemi kapalıdır. O eylem kullanıcıyı ilk adımda siler.
+
+### Silme işinde zaman aşımı
+
+Anonim yapma çağrısı öteki çağrılardan uzun sürer. Kiracı kullanıcının adını değiştirir ve bütün oturumlarını kapatır.
+
+- Bu çağrının bekleme süresi `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` ayarındadır.
+- Varsayılan değer 30 saniyedir. En büyük değer 600 saniyedir.
+- Öteki çağrılar `IDENTITY_SYNC_HTTP_TIMEOUT` ayarını kullanır. Bu ayarın varsayılanı 10 saniyedir.
+
+Varsayılan değeri ölçüm belirledi:
+
+- 22 Kasım 2026 Pazar günü boş bir kiracı sitesinde ölçüm yapıldı. Sitede ERPNext ve `platform_core` kuruluydu.
+- 15 örnek kullanıcı tek tek anonim yapıldı. Her kullanıcının 5 iş kaydı vardı.
+- Kiracının kendi işi ortanca 1,8 saniye sürdü. En uzun iş 2,5 saniye sürdü.
+- Son MVP testinde makine çok yüklüydü. Aynı iş orada yaklaşık 12 saniye sürdü.
+- 30 saniye bu en kötü ölçümün iki buçuk katıdır.
+
+Zaman aşımı yine olabilir. O zaman adımın sonucu bilinmez:
+
+1. Servis işi `unknown` durumuyla bekleme kuyruğuna yazar.
+2. Servis anonim yapma çağrısını körü körüne yinelemez.
+3. Bir sonraki istekte ya da olayda servis hedefe durum sorar.
+4. Durum sorgusu `list_identities` ucudur. Bu uç yalnız okur.
+5. Anonim yapılan kimlik bu listede yer almaz. Kimlik listede yoksa servis adımı bitmiş sayar.
+6. Servis sonra işi sonraki adımdan sürdürür. Son adımda Keycloak kullanıcısını siler.
+
+Bu uzlaşma iki yerde çalışır:
+
+- Press aynı silme isteğini yeniden gönderdiğinde.
+- Servis `/v1/events` ucunda bir olay işlediğinde. Olay başka bir kullanıcıya ait olabilir.
+
+Servis zamanlanmış iş kurmaz. Kimlik listede duruyorsa iş `unknown` kalır. Örneğin kiracı işi yarıda bırakmış olabilir. Liste okunamazsa da iş `unknown` kalır. Bu durumda insan hedefi denetler. Sonra işi `--include-unknown` ile yeniden işletir.
 
 Yönetici bir kullanıcıyı Keycloak yönetim ekranından silebilir. Olay dinleyici o zaman olayı gönderir. Servis 2., 3. ve 4. adımı yürütür.
 

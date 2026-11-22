@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.13.0
+  version: 0.14.0
   summary: Endpoints of the user sync service
   description: |
     This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
@@ -131,6 +131,22 @@ info:
     The shared contract defines the response of the two anonymize endpoints: 200 with the `anonymized` and `found` fields.
     These endpoints return 409 for a lock conflict or a timeout. The service then tries the request again.
     The responses the service expects are in the `Target` schemas at the end of this file.
+
+    ### Timeout of an anonymize call (H-5)
+
+    An anonymize call takes longer than the other calls. The tenant renames the user and closes every session.
+    The `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` setting is the wait for this call. The default is 30 seconds, at most 600.
+    The other calls use `IDENTITY_SYNC_HTTP_TIMEOUT`, 10 seconds by default.
+    If the call still times out, the result of step 4 is unknown. The job waits in the queue in the `unknown` state.
+    The service does not repeat the anonymize call. It asks the target for the state instead.
+    The state query is the target's `list_identities` endpoint. It only reads.
+    The tenant deletes the identity link when it anonymizes. Press leaves anonymous deletion records out of the list.
+    So an identity that is missing from the list is anonymized, and the service records the step as finished.
+    Then the job goes on from the next step. Step 5 deletes the Keycloak user.
+    The state query runs on the next `POST /v1/account-deletions` request for the account.
+    It also runs after every event handled by `POST /v1/events`, for every account job in the `unknown` state.
+    There is no scheduled job. If the identity is still listed or the list cannot be read, the job stays `unknown`.
+    A human then checks the target and replays the job with `include_unknown`.
 
     ## Common errors of all endpoints
 
@@ -669,6 +685,8 @@ paths:
         If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`. No later step is executed.
         The request is then in the dead-letter queue. A human replays the request with `POST /v1/dead-letters/replay`.
         Press can also send the same request again. The service continues from the first step that is not finished.
+        If the job is `unknown` because an anonymize call timed out, that request first asks the target for the state.
+        The rules are in the section "Timeout of an anonymize call" at the start of this file.
       x-durum: uygulandi
       x-yikici: true
       x-yurutme: press-only

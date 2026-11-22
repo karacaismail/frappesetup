@@ -58,9 +58,11 @@ def sign(body: bytes, timestamp: int, mode: str = "execute", secret: str = WEBHO
 class ServerCase(unittest.TestCase):
     request_timeout = 0.5
     two_tenants = False
+    # Settings that replace the test defaults for one test class.
+    stack_settings: dict[str, object] = {}
 
     def setUp(self) -> None:
-        self.stack = Stack(two_tenants=self.two_tenants)
+        self.stack = Stack(two_tenants=self.two_tenants, **self.stack_settings)
         self.addCleanup(self.stack.close)
         self.now = float(NOW)
         self.start_server(fake_verifier)

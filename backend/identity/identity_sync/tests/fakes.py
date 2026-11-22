@@ -85,8 +85,11 @@ class FakeServer:
                 self.send_header("Content-Length", str(len(raw)))
                 for name, value in extra.items():
                     self.send_header(name, value)
-                self.end_headers()
-                self.wfile.write(raw)
+                try:
+                    self.end_headers()
+                    self.wfile.write(raw)
+                except (BrokenPipeError, ConnectionResetError):
+                    return  # the client gave up waiting, for example after its timeout
 
             do_GET = do_POST = do_PUT = do_DELETE = _serve
 
@@ -579,14 +582,17 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
 class Stack:
     """Set up the three fake servers and the service together."""
 
-    def __init__(self, db_path: str = ":memory:", *, two_tenants: bool = False) -> None:
+    def __init__(self, db_path: str = ":memory:", *, two_tenants: bool = False, **settings: object) -> None:
+        """`settings`: values that replace the test defaults, for example `anonymize_timeout`."""
+        from dataclasses import replace
+
         from identity_sync.app import build_app
 
         self.keycloak = FakeKeycloak()
         self.press = FakePress()
         self.tenant = FakeTenant()
         self.tenant2 = FakeTenant() if two_tenants else None
-        self.settings = make_settings(self.keycloak, self.press, self.tenant, db_path, self.tenant2)
+        self.settings = replace(make_settings(self.keycloak, self.press, self.tenant, db_path, self.tenant2), **settings)
         self.sleeps: list[float] = []
         self.app = build_app(self.settings, sleep=self.sleeps.append)
 

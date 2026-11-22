@@ -15,6 +15,7 @@ one, nothing is written.
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, replace
@@ -55,6 +56,7 @@ from identity_sync.sites import PressClient, TenantClient
 from identity_sync.store import DeadLetter, Store
 
 T = TypeVar("T")
+_LOG = logging.getLogger("identity_sync")
 
 # After an organization was created, the state is read once more and the plan is renewed.
 _MAX_PASSES = 2
@@ -351,9 +353,9 @@ class Processor:
             return EventResult("duplicate")
         if not allow_unknown and self._store.dead_letter_state(event.id) == "unknown":
             # The event came again but its earlier outcome is unknown. No blind repeat.
-            # One case is certain: every step of an account job is recorded as finished and only
-            # the final record is missing. Nothing will be written to a target, so it may finish.
-            if event.type not in JOB_TYPES or self._pending(event, self._plan(event)):
+            # An account job asks the target for the state of the unknown step first (H-5).
+            # When the target confirms it, the job goes on from the next step.
+            if event.type not in JOB_TYPES or not self._settle(event):
                 return EventResult("unknown")
         # Keep the accepted event on record before any work. A crash must not lose it.
         self._store.begin(event)
@@ -369,6 +371,45 @@ class Processor:
         forget = event.user_id if event.type in JOB_TYPES else None
         self._store.mark_processed(event.id, "processed", forget_subject=forget)
         return EventResult("processed", actions=tuple(names))
+
+    def _settle(self, job: Event) -> bool:
+        """Settle the unknown step of an account job by a state query. Reads only. The caller holds the work lock.
+
+        An ordered plan stops at the first step that is not done, so the unknown step is the first
+        pending one. True means the step is confirmed and recorded as finished, or no step is left.
+        False means the state is still unknown: the target still lists the identity, the step has
+        no state query, or the read failed. Nothing is written to a target here.
+        """
+        pending = self._pending(job, self._plan(job))
+        if not pending:
+            return True
+        step = pending[0]
+        try:
+            if isinstance(step, TenantAnonymizeUser):
+                confirmed = self._tenant_client.is_anonymized(step)
+            elif isinstance(step, PressAnonymizeUser):
+                confirmed = self._press.is_anonymized(step)
+            else:
+                return False  # no read shows this step's outcome; a human decides
+        except (HttpError, TransportError) as error:
+            _LOG.warning("state query failed for job %s: %s", job.id, error)
+            return False
+        if confirmed:
+            self._store.add_progress(job.id, self._step_key(step))
+        return confirmed
+
+    def settle_unknown_jobs(self) -> list[tuple[str, EventResult]]:
+        """Try every account job whose outcome is unknown once (H-5). Runs while an event is handled.
+
+        Each job first asks the target for the state of its unknown step. A job whose step is still
+        unknown stays as it is. A confirmed job runs its remaining steps. No scheduler is involved.
+        """
+        with self._store.work_lock():
+            letters = [
+                letter for letter in self._store.dead_letters()
+                if letter.state == "unknown" and letter.event.type in JOB_TYPES
+            ]
+            return [(letter.event.id, self._handle_job(letter.event, False, None)) for letter in letters]
 
     def replay_dead_letters(
         self, *, dry_run: bool = False, include_unknown: bool = False, expected_digest: str | None = None

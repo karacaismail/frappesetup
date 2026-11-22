@@ -143,6 +143,10 @@ def _is_removed(message: object) -> bool:
     return isinstance(message, Mapping) and message.get("member") is False and "team" in message
 
 
+def _listed(identities: Sequence[Identity], issuer: str, subject: str) -> bool:
+    return any(identity.issuer == issuer and identity.subject == subject for identity in identities)
+
+
 def _organization_ids(value: object) -> tuple[str, ...]:
     """Team memberships of a Press identity, one Keycloak organization id each. Tenants send none."""
     if value is None:
@@ -202,10 +206,13 @@ def _identities(message: object) -> list[Identity]:
 
 
 class PressClient:
-    def __init__(self, base_url: str, tokens: TokenProvider, *, timeout: float) -> None:
+    def __init__(
+        self, base_url: str, tokens: TokenProvider, *, timeout: float, anonymize_timeout: float | None = None
+    ) -> None:
         self._base_url = base_url
         self._tokens = tokens
         self._timeout = timeout
+        self._anonymize_timeout = anonymize_timeout or timeout
 
     def _call(
         self,
@@ -214,13 +221,14 @@ class PressClient:
         is_success: Success | None = None,
         retry_statuses: tuple[int, ...] = (),
         query: Mapping[str, object] | None = None,
+        timeout: float | None = None,
     ) -> object:
         return _call_method(
             self._base_url,
             method_path,
             self._tokens,
             PRESS_SCOPE,
-            timeout=self._timeout,
+            timeout=timeout or self._timeout,
             body=body,
             is_success=is_success,
             retry_statuses=retry_statuses,
@@ -233,7 +241,21 @@ class PressClient:
         Press answers `found: false` for an identity it does not know. That counts as done.
         """
         body = {"issuer": action.issuer, "subject": action.subject}
-        self._call("press_tr.api.identity.anonymize_user", body, _is_anonymized, ANONYMIZE_RETRY_STATUSES)
+        self._call(
+            "press_tr.api.identity.anonymize_user",
+            body,
+            _is_anonymized,
+            ANONYMIZE_RETRY_STATUSES,
+            timeout=self._anonymize_timeout,
+        )
+
+    def is_anonymized(self, action: PressAnonymizeUser) -> bool:
+        """State query for an anonymize call with an unknown outcome. Reads only.
+
+        Press leaves anonymous deletion records out of `list_identities` (contracts/press_tr.openapi.yaml).
+        So an identity that is missing from the list is anonymized, or Press never had it.
+        """
+        return not _listed(self.list_identities(), action.issuer, action.subject)
 
     def ensure_team(self, action: PressEnsureTeam) -> None:
         body = asdict(action)
@@ -265,10 +287,13 @@ class PressClient:
 class TenantClient:
     """Calls the tenant identity endpoints (contracts/platform_core-kimlik.openapi.yaml)."""
 
-    def __init__(self, tenants: Sequence[Tenant], tokens: TokenProvider, *, timeout: float) -> None:
+    def __init__(
+        self, tenants: Sequence[Tenant], tokens: TokenProvider, *, timeout: float, anonymize_timeout: float | None = None
+    ) -> None:
         self._tenants = {tenant.name: tenant for tenant in tenants}
         self._tokens = tokens
         self._timeout = timeout
+        self._anonymize_timeout = anonymize_timeout or timeout
 
     def _call(
         self,
@@ -279,6 +304,7 @@ class TenantClient:
         missing_identity_is_success: bool = False,
         retry_statuses: tuple[int, ...] = (),
         query: Mapping[str, object] | None = None,
+        timeout: float | None = None,
     ) -> object:
         # The target address comes only from the configured tenant list (G-13).
         return _call_method(
@@ -286,7 +312,7 @@ class TenantClient:
             method_path,
             self._tokens,
             tenant_scope(tenant),
-            timeout=self._timeout,
+            timeout=timeout or self._timeout,
             body=body,
             is_success=is_success,
             missing_identity_is_success=missing_identity_is_success,
@@ -362,7 +388,18 @@ class TenantClient:
             _is_anonymized,
             missing_identity_is_success=True,
             retry_statuses=ANONYMIZE_RETRY_STATUSES,
+            timeout=self._anonymize_timeout,
         )
+
+    def is_anonymized(self, action: TenantAnonymizeUser) -> bool:
+        """State query for an anonymize call with an unknown outcome. Reads only.
+
+        Step 2 of the tenant's anonymize work deletes the identity link
+        (contracts/platform_core-identity.openapi.yaml). Only linked identities are listed.
+        So an identity that is missing from the list is anonymized, or the tenant never had it.
+        After step 1 alone the link is still there: the identity is listed and the state stays unknown.
+        """
+        return not _listed(self.list_identities(action.tenant), action.issuer, action.subject)
 
     def list_identities(self, tenant: str) -> list[Identity]:
         method = "platform_core.api.identity.list_identities"

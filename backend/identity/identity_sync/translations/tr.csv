@@ -540,6 +540,22 @@ The shared contract defines the response of the two anonymize endpoints: 200 wit
 These endpoints return 409 for a lock conflict or a timeout. The service then tries the request again.
 The responses the service expects are in the `Target` schemas at the end of this file.
 
+### Timeout of an anonymize call (H-5)
+
+An anonymize call takes longer than the other calls. The tenant renames the user and closes every session.
+The `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` setting is the wait for this call. The default is 30 seconds, at most 600.
+The other calls use `IDENTITY_SYNC_HTTP_TIMEOUT`, 10 seconds by default.
+If the call still times out, the result of step 4 is unknown. The job waits in the queue in the `unknown` state.
+The service does not repeat the anonymize call. It asks the target for the state instead.
+The state query is the target's `list_identities` endpoint. It only reads.
+The tenant deletes the identity link when it anonymizes. Press leaves anonymous deletion records out of the list.
+So an identity that is missing from the list is anonymized, and the service records the step as finished.
+Then the job goes on from the next step. Step 5 deletes the Keycloak user.
+The state query runs on the next `POST /v1/account-deletions` request for the account.
+It also runs after every event handled by `POST /v1/events`, for every account job in the `unknown` state.
+There is no scheduled job. If the identity is still listed or the list cannot be read, the job stays `unknown`.
+A human then checks the target and replays the job with `include_unknown`.
+
 ## Common errors of all endpoints
 
 These errors are not written separately on every endpoint.
@@ -729,6 +745,22 @@ Ortak sözleşme iki anonim yapma ucunun yanıtını tanımlar: 200 ile `anonymi
 Bu uçlar kilit çakışmasında ya da zaman aşımında 409 döner. Servis o zaman isteği yeniden dener.
 Servisin beklediği yanıtlar bu dosyanın sonundaki `Target` şemalarındadır.
 
+### Anonim yapma çağrısında zaman aşımı (H-5)
+
+Anonim yapma çağrısı öteki çağrılardan uzun sürer. Kiracı kullanıcının adını değiştirir ve bütün oturumlarını kapatır.
+Bu çağrının bekleme süresi `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` ayarındadır. Varsayılan değer 30 saniyedir, en çok 600 saniyedir.
+Öteki çağrılar `IDENTITY_SYNC_HTTP_TIMEOUT` ayarını kullanır. Bu ayarın varsayılanı 10 saniyedir.
+Çağrı yine zaman aşımına uğrarsa 4. adımın sonucu bilinmez. İş `unknown` durumuyla bekleme kuyruğunda bekler.
+Servis anonim yapma çağrısını yinelemez. Bunun yerine hedefe durum sorar.
+Durum sorgusu hedefin `list_identities` ucudur. Bu uç yalnız okur.
+Kiracı anonim yaparken kimlik bağını siler. Press anonim silme kayıtlarını listeye koymaz.
+Bu yüzden listede olmayan kimlik anonim yapılmıştır. Servis adımı bitmiş olarak kaydeder.
+Sonra iş sonraki adımdan sürer. 5. adım Keycloak kullanıcısını siler.
+Durum sorgusu hesabın bir sonraki `POST /v1/account-deletions` isteğinde çalışır.
+`POST /v1/events` ucunun işlediği her olaydan sonra da çalışır. Bu sorgu `unknown` durumundaki bütün hesap işlerine yapılır.
+Zamanlanmış iş yoktur. Kimlik listede duruyorsa ya da liste okunamazsa iş `unknown` kalır.
+İnsan o zaman hedefi denetler. Sonra işi `include_unknown` ile yeniden işletir.
+
 ## Bütün uçların ortak hataları
 
 Bu hatalar her uçta ayrıca yazılmadı.
@@ -813,6 +845,8 @@ The service records the request before it starts the work. The id of the request
 If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`. No later step is executed.
 The request is then in the dead-letter queue. A human replays the request with `POST /v1/dead-letters/replay`.
 Press can also send the same request again. The service continues from the first step that is not finished.
+If the job is `unknown` because an anonymize call timed out, that request first asks the target for the state.
+The rules are in the section ""Timeout of an anonymize call"" at the start of this file.
 ","Kaynak ortak sözleşmenin 7. bölümü ve proje kaydının O-27 kararıdır.
 Müşteri kendi hesabının silinmesini Press'te ister. Press o zaman bu ucu çağırır.
 Servis isteği kaydeder ve beş adımı sırayla yürütür.
@@ -831,6 +865,8 @@ Servis isteği işe başlamadan önce kaydeder. İsteğin kimliği hesabın anah
 Bir adım başarısız olursa yanıt yine 200 olur ve durum `dead_lettered` ya da `unknown` olur. Sonraki adımlar yürümez.
 İstek o zaman bekleme kuyruğundadır. İnsan isteği `POST /v1/dead-letters/replay` ile yeniden işletir.
 Press de aynı isteği yeniden gönderebilir. Servis bitmemiş ilk adımdan sürdürür.
+İş anonim yapma çağrısının zaman aşımı yüzünden `unknown` ise bu istek önce hedefe durum sorar.
+Kurallar bu dosyanın başındaki ""Anonim yapma çağrısında zaman aşımı"" bölümündedir.
 ",identity_sync.openapi.yaml: paths./v1/account-deletions.post.description
 "The result of the request. The status is `processed`, `dead_lettered`, `unknown` or `duplicate`.","İsteğin sonucu. Durum `processed`, `dead_lettered`, `unknown` ya da `duplicate` olur.",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.200.description
 "The body is invalid. For example, a field is missing, the body carries another field or `issuer` is not the issuer of the realm.","Gövde geçersiz. Örneğin bir alan eksiktir, gövde başka bir alan taşır ya da `issuer` realm'in yayıncı adresi değildir.",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.400.description
