@@ -116,9 +116,7 @@ def clear_links(*extra_users: str):
 
 
 def make_link(subject: str, user: str, issuer: str = ISSUER):
-	doc = frappe.get_doc(
-		{"doctype": "PLT Identity Link", "issuer": issuer, "subject": subject, "user": user}
-	)
+	doc = frappe.get_doc({"doctype": "PLT Identity Link", "issuer": issuer, "subject": subject, "user": user})
 	doc.insert(ignore_permissions=True)
 	refresh()
 	return doc
@@ -384,7 +382,7 @@ def ensure_system_manager(email: str, password: str) -> str:
 	return user.name
 
 
-class single_value:
+class SingleValue:
 	"""Temporarily sets one field of a Single DocType without validating the whole document."""
 
 	def __init__(self, doctype: str, field: str, value):

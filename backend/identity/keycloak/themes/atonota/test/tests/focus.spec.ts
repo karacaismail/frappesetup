@@ -87,6 +87,11 @@ const focusCases = [
   { name: 'passkey-register', scheme: 'light' },
   { name: 'sign-in-method', scheme: 'light' },
   { name: 'email-verification', scheme: 'dark' },
+  { name: 'update-profile', scheme: 'light' },
+  { name: 'recovery-codes-setup', scheme: 'dark' },
+  { name: 'delete-credential', scheme: 'light' },
+  { name: 'sign-out-confirm', scheme: 'dark' },
+  { name: 'page-expired', scheme: 'light' },
 ] as const;
 
 // Her ekranda en az bu kadar kontrol ölçülmelidir. Döngü erken durursa test başarısız olur.
@@ -98,6 +103,11 @@ const minimumChecked: Record<string, number> = {
   'passkey-register': 4,
   'sign-in-method': 4,
   'email-verification': 3,
+  'update-profile': 3,
+  'recovery-codes-setup': 4,
+  'delete-credential': 2,
+  'sign-out-confirm': 1,
+  'page-expired': 2,
 };
 
 for (const { name, scheme } of focusCases) {
@@ -118,7 +128,10 @@ for (const { name, scheme } of focusCases) {
       await focused.evaluate((element) => element.scrollIntoView({ block: 'center' }));
       // Onay kutusunun göstergesi etiket metnindedir. Ölçüm etiketin tamamında yapılır.
       const isCheck = await focused.evaluate((element) => element.matches('input[type=checkbox], input[type=radio]'));
-      const target = isCheck ? focused.locator('xpath=ancestor::label[1]') : focused;
+      // The label either wraps the box or stands next to it and points at it with "for".
+      const wrapped = isCheck && (await focused.evaluate((element) => Boolean(element.closest('label'))));
+      const checkId = isCheck ? await focused.getAttribute('id') : null;
+      const target = !isCheck ? focused : wrapped ? focused.locator('xpath=ancestor::label[1]') : page.locator(`label[for="${checkId}"]`);
 
       // Çevreleyen çizgi kaynakları: outline ve odakta değişen kenarlık ya da gölge halkası.
       const style = await focused.evaluate((element) => {

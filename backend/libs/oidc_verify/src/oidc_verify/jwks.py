@@ -1,11 +1,11 @@
-"""Anahtar listesi önbelleği.
+"""JSON Web Key Set cache.
 
-Liste `ttl_seconds` süresince saklanır. Bilinmeyen `kid` gelince liste bir kez yenilenir.
-Art arda gelen bilinmeyen `kid` istekleri listeyi en çok `min_refresh_seconds` aralığıyla yeniletir.
+The cache keeps the key set for `ttl_seconds`. An unknown `kid` triggers one refresh.
+Consecutive requests with unknown key IDs trigger at most one refresh every `min_refresh_seconds`.
 
-Çekim başarısız olursa önbellekteki eski anahtarlar kullanılmaya devam eder.
-Başarısız denemeden sonra yeni deneme en erken `min_refresh_seconds` sonra yapılır.
-Önbellekte hiç anahtar yoksa `JwksUnavailable` yükselir.
+If the fetch fails, the cache continues to serve stale keys within the stale window.
+The cache retries a failed fetch after at least `min_refresh_seconds`.
+An empty cache raises `JwksUnavailable`.
 
 Stale keys are served for at most `ttl_seconds + max_stale_seconds` after the last successful load.
 Past that window every lookup raises `JwksUnavailable` until a fetch succeeds again.
@@ -47,7 +47,7 @@ DEFAULT_TOTAL_TIMEOUT = 10.0
 # Read the body in pieces so the deadline is checked between socket reads.
 _READ_CHUNK = 16_384
 
-# PyJWT 2.13 bozuk JWK için ValueError ya da TypeError verir. PyJWT 2.15 bunları InvalidKeyError içine sarar.
+# PyJWT 2.13 raises ValueError or TypeError for malformed JWKs. PyJWT 2.15 wraps both in InvalidKeyError.
 _JWK_ERRORS = (jwt.exceptions.PyJWTError, ValueError, TypeError)
 
 
@@ -291,9 +291,9 @@ def _http_fetcher(
 
 
 def _anahtarlari_ayikla(jwks_payload: object) -> dict[str, object]:
-    """Listeden RS256 imza anahtarlarını çıkarır. Bozuk kayıt atlanır. Bozuk liste hata verir."""
+    """Extract RS256 signing keys. Skip malformed entries and reject a malformed key set."""
     if not isinstance(jwks_payload, dict) or not isinstance(jwks_payload.get("keys"), list):
-        raise ValueError("JWKS gövdesi beklenen biçimde değil")
+        raise ValueError("Unexpected JWKS body format")
     keys: dict[str, object] = {}
     for jwk in jwks_payload["keys"]:
         if not isinstance(jwk, dict):
@@ -308,7 +308,7 @@ def _anahtarlari_ayikla(jwks_payload: object) -> dict[str, object]:
         try:
             keys[kid] = jwt.PyJWK(jwk, algorithm="RS256").key
         except _JWK_ERRORS:
-            # Tek bozuk kayıt bütün listeyi düşürmez.
+            # A malformed entry does not invalidate the entire key set.
             continue
     return keys
 
@@ -411,7 +411,7 @@ class JwksCache:
             try:
                 keys = _anahtarlari_ayikla(self._fetch())
             except Exception:
-                # Sağlayıcı dışarıdan verilebilir. Hangi hatayı verirse versin eski anahtarlar korunur.
+                # Callers may supply a fetcher. Keep cached keys regardless of which error it raises.
                 with self._state_lock:
                     self._failed_at = self._clock()
                     self._generation += 1
@@ -431,7 +431,7 @@ class JwksCache:
             generation = self._generation
         self._attempt_refresh(generation, forced=False)
         if not self._usable():
-            raise JwksUnavailable("Anahtar listesi alınamadı")
+            raise JwksUnavailable("Could not fetch the key set")
 
     def get_signing_key(self, kid: str):
         """Returns the public key for `kid`. Refreshes the list once when the `kid` is unknown."""
@@ -449,18 +449,18 @@ class JwksCache:
             else:
                 attempted = self._attempt_refresh(generation, forced=False)
             if not self._usable():
-                raise JwksUnavailable("Anahtar listesi alınamadı")
+                raise JwksUnavailable("Could not fetch the key set")
             key, _, generation = self._lookup(kid)
             if key is not None:
                 return key
             if attempted is None:
                 # Waited `wait_timeout` for another thread's fetch and the kid is still not cached.
-                raise JwksUnavailable("Anahtar listesi alınamadı")
+                raise JwksUnavailable("Could not fetch the key set")
         if not attempted:
             attempted = self._attempt_refresh(generation, forced=True)
             key = self._lookup(kid)[0]
             if key is not None:
                 return key
             if attempted is None:
-                raise JwksUnavailable("Anahtar listesi alınamadı")
+                raise JwksUnavailable("Could not fetch the key set")
         raise TokenError("unknown_kid")

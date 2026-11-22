@@ -1,4 +1,4 @@
-"""Hata türleri. `TokenError.code` alanı nedeni söyler."""
+"""Error types. `TokenError.code` identifies the cause."""
 
 from __future__ import annotations
 
@@ -19,17 +19,17 @@ KODLAR = frozenset(
 
 
 class TokenError(Exception):
-    """Geçersiz belirteç. `code` sözleşmedeki kodlardan biridir."""
+    """Invalid token. `code` is one of the error codes defined by the contract."""
 
     def __init__(self, code: str, message: str | None = None):
         if code not in KODLAR:
-            raise ValueError(f"Bilinmeyen hata kodu: {code}")
+            raise ValueError(f"Unknown error code: {code}")
         self.code = code
         super().__init__(message or code)
 
 
 class JwksUnavailable(Exception):
-    """Anahtar listesi alınamadı ve önbellekte anahtar yok.
+    """The key set could not be fetched and the cache has no usable keys.
 
-    Bu hata belirtecin geçersiz olduğunu söylemez. Çağıran uç bu hatayı 503 benzeri yanıtla karşılar.
+    Token validity remains unknown. The calling endpoint returns an error such as HTTP 503.
     """

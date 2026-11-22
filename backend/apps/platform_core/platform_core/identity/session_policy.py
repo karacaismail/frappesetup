@@ -66,7 +66,8 @@ def recently_active(user: str) -> bool:
 
 def on_session_creation(login_manager=None) -> None:
 	"""`on_session_creation` hook (frappe/auth.py:246): a new session counts as activity."""
-	mark_activity(frappe.session.sid, frappe.session.user)
+	if not frappe.flags.identity_sign_in_pending:
+		mark_activity(frappe.session.sid, frappe.session.user)
 
 
 def is_background_request(request) -> bool:

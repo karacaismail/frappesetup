@@ -863,7 +863,7 @@ class IdentityHttpTest(
 					)
 				)
 				self.assertFalse(frappe.db.exists("Comment", attachment_note.name))
-			with self.subTest(finding="Ö-2 queue"):
+			with self.subTest(finding="Email queue redaction"):
 				self.assertFalse(frappe.db.get_value("Email Queue", queue.name, "message"))
 				self.assertEqual(
 					frappe.db.get_value("Email Queue", queue.name, ["show_as_cc", "status"]),
@@ -875,7 +875,7 @@ class IdentityHttpTest(
 				self.assertEqual(
 					frappe.db.get_value("Email Queue", other_queue.name, "message"), "Unrelated message"
 				)
-			with self.subTest(finding="Ö-2 communication"):
+			with self.subTest(finding="Communication redaction"):
 				self.assertEqual(
 					frappe.db.get_value(
 						"Communication", communication.name, ["cc", "bcc", "content", "text_content"]

@@ -1,7 +1,7 @@
 # Real event receiver for the shared development stack.
 services:
   identity-sync:
-    image: fs-e2e-identity-sync:${PANE_PORT:?}
+    image: fs-e2e-identity-sync:${FS_STACK_IMAGE_TAG:?Use e2e/stack}
     build:
       context: ..
       dockerfile: identity/identity_sync/Dockerfile
