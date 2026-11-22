@@ -22,7 +22,7 @@ class TestFieldLevel(ErisimTestCase):
 		response = self.rest_get(client, self.records[EMPLOYEE_1])
 
 		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
-		self.assertNotIn("salary_amount", response.json["data"])
+		self.assert_hidden(response.json["data"], "salary_amount")
 		self.assertNotIn(str(SALARY), response.get_data(as_text=True))
 
 	def test_restricted_field_is_not_returned_on_list(self):
@@ -79,7 +79,7 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 		admin = self.login(ADMIN)
 		employee = self.login(EMPLOYEE_1)
 		target = self.records[EMPLOYEE_1]
-		self.assertIn("status", self.rest_get(employee, target).json["data"])
+		self.assertEqual(self.rest_get(employee, target).json["data"]["status"], "Open")
 
 		response = self.api(
 			admin, "POST", "set_field_level", body={"doctype": DOCTYPE, "fieldname": "status", "permlevel": 1}
@@ -90,7 +90,7 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 			response.json["message"],
 			{"doctype": DOCTYPE, "fieldname": "status", "permlevel": 1, "previous_permlevel": 0},
 		)
-		self.assertNotIn("status", self.rest_get(employee, target).json["data"])
+		self.assert_hidden(self.rest_get(employee, target).json["data"], "status")
 
 	def test_admin_lowers_field_level_back(self):
 		admin = self.login(ADMIN)
@@ -101,7 +101,7 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 		response = self.api(admin, "POST", "set_field_level", body={**body, "permlevel": 0})
 
 		self.assertEqual(response.json["message"]["previous_permlevel"], 1)
-		self.assertIn("status", self.rest_get(employee, self.records[EMPLOYEE_1]).json["data"])
+		self.assertEqual(self.rest_get(employee, self.records[EMPLOYEE_1]).json["data"]["status"], "Open")
 
 	def test_non_admin_cannot_change_field_level(self):
 		employee = self.login(EMPLOYEE_1)
@@ -142,7 +142,7 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 		manager = self.login(MANAGER_1)
 		target = self.records[MANAGER_1]
 		body = {"doctype": DOCTYPE, "role": ROLE_MANAGER, "permlevel": 1, "read": True, "write": False}
-		self.assertNotIn("salary_amount", self.rest_get(manager, target).json["data"])
+		self.assert_hidden(self.rest_get(manager, target).json["data"], "salary_amount")
 
 		granted = self.api(admin, "POST", "set_level_access", body=body)
 
@@ -153,7 +153,7 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 		revoked = self.api(admin, "POST", "set_level_access", body={**body, "read": False})
 
 		self.assertEqual(revoked.status_code, 200, revoked.get_data(as_text=True))
-		self.assertNotIn("salary_amount", self.rest_get(manager, target).json["data"])
+		self.assert_hidden(self.rest_get(manager, target).json["data"], "salary_amount")
 
 	def test_level_access_keeps_other_roles_permissions(self):
 		"""İlk değişiklik “Custom DocPerm” kopyası açar. Öteki rollerin izni kaybolmamalıdır."""
@@ -200,4 +200,4 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 		)
 
 		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
-		self.assertNotIn("salary_amount", self.rest_get(employee, self.records[EMPLOYEE_1]).json["data"])
+		self.assert_hidden(self.rest_get(employee, self.records[EMPLOYEE_1]).json["data"], "salary_amount")

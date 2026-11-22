@@ -273,7 +273,20 @@ Motor öznenin çalışan kaydını `user_id` alanından bulur. Motor şu değer
 - Özne için istek başına en çok 2 sorgu açılır. Biri çalışan, biri bölüm içindir.
 - Tek kayıt denetimi kayıt başına 1 sorgu açar. Yazmada 1 sorgu daha açılır.
 
-Bu sayılar tasarım hedefidir. Ölçüm 2. kontrol noktasında yapılır.
+### Ölçüm
+
+Ölçüm 22 Kasım 2026 Pazar günü test sitesinde yapıldı. Sitede 60 kayıt ve 3 kural vardı. Kullanıcı yönetici rolündeydi.
+
+| İşlem | Kuralsız | Kurallı | Fark nereden gelir |
+| --- | --- | --- | --- |
+| Liste | 1 sorgu | 3 sorgu | Özne için 1 sorgu. Frappe'nin paylaşım sorgusu için 1 sorgu. |
+| Liste, kural önbelleği boşken | 1 sorgu | 4 sorgu | Kural listesi için 1 sorgu daha. |
+| Tek kayıt denetimi | 1 sorgu | 3 sorgu | Özne için 1 sorgu. Saklı kayıt sınaması için 1 sorgu. |
+| 10 kayıt denetimi | 10 sorgu | 21 sorgu | Kayıt başına 1 sorgu. Özne için toplam 1 sorgu. |
+
+- Listenin sorgu sayısı kayıt sayısıyla artmaz. Test 40 kayıt ekler ve sayının aynı kaldığını görür.
+- Paylaşım sorgusunu Frappe açar. Frappe bu sorguyu her koşullu listede açar (`database/query.py:1681`).
+- Tek kayıt denetimi kayıt başına 1 sorgu ekler. Bu yüzden kendi kodumuzda kayıtları döngüde tek tek denetlemeyin. Listeyi `frappe.get_list` ile okuyun.
 
 ## 8. Alan düzeyi nasıl çalışır?
 
@@ -293,6 +306,8 @@ Bir örnek verelim. Maaş alanının seviyesi 1 olur. Çalışan rolünün seviy
 | Listede izinsiz alanla süzme de aynı denetimden geçer. | `database/query.py:1018` |
 | Yazmada izinsiz alanın değeri eski değere döner. | `model/document.py:1288`, `model/document.py:1300` |
 | Sorgu raporunda alan seviyesi uygulanmaz. Yalnız maskeli alanlar maskelenir. | `desk/query_report.py:980` |
+
+Frappe izinsiz alanı yanıttan her zaman çıkarmaz. Bazı yanıtlarda alan adı kalır ama değeri boş gelir. Örneğin para alanı 0 döner. Gerçek değer hiçbir durumda dönmez. Testler bunu sınar.
 
 ### Motorun eklediği iki uç
 
@@ -377,6 +392,16 @@ Sahipliğin zorunlu olduğu bir kayıt türü olabilir. Bu durumda uygulama sahi
 
 Karar sitesi paylaşım ilişkilerini G-122 maddesine bırakır. O madde P5 fazındadır. Bu not o maddeyi kapsamaz.
 
+### ERPNext'in çalışan izni
+
+ERPNext çalışana kullanıcı bağlanınca bir “User Permission” kaydı açabilir. Bunu “Employee” türündeki `create_user_permission` alanı belirler (`erpnext/setup/doctype/employee/employee.py:232`). Bu kayıt da kayıtları daraltır. Kullanıcı yalnız kendi çalışan kaydına bağlı kayıtları görür.
+
+Bu katman motordan bağımsızdır. İki katman birlikte uygulanır. Bir kayıt ikisinden de geçmelidir.
+
+Bunun bir sonucu vardır. Yöneticiye `all` kuralı yazılsa bile “User Permission” kaydı yöneticiyi daraltır. Kiracı yöneticisi iki katmandan birini seçmelidir. Bu motoru kullanan uygulama çalışanı `create_user_permission` kapalı açmalıdır. Testler de çalışanları böyle açar.
+
+Açıklama ucu bu durumu `user_permission` nedeniyle gösterir.
+
 ## 11. Yapay zekâ katmanı aynı sonucu nasıl alır?
 
 Yapay zekâ katmanı ayrı bir yetki yolu kurmaz. Katman kullanıcının kimliğiyle Frappe'nin aynı işlevlerini çağırır. Kancalar o işlevlerin içindedir.
@@ -392,7 +417,8 @@ Yapay zekâ katmanı ayrı bir yetki yolu kurmaz. Katman kullanıcının kimliğ
 
 - `erisim` modülü `yapay_zeka` modülünü içe aktarmaz. `yapay_zeka` da `erisim` modülünü içe aktarmaz. İki modül yalnız Frappe'nin kancalarında buluşur.
 - Yapay zekâ kuralları genel kayıt araçlarıyla yönetir. “Access Rule” olağan bir kayıt türüdür. Yazma yine öneri ve insan onayı ister.
-- Açıklama ucu yapay zekâya da açılır. Uç `ai_tools` kancasıyla salt okunur araç olarak bildirilir. Bildirim 2. kontrol noktasında yazılır.
+- Yapay zekâ alan seviyesini `yapay_zeka` modülünün yönetim araçlarıyla değiştirir. O dalda `set_field_property` ve `set_role_permission` araçları vardır.
+- Açıklama ucu henüz yapay zekâ aracı değildir. `ai_tools` kancasının biçimi `backend` dalına girince araç bildirilir. Uç o zamana kadar HTTP ile çağrılır.
 
 ## 12. Önbellek
 
@@ -407,7 +433,7 @@ Bu yüzden etkin kurallar önbellekte tutulur. Önbellek, sık istenen sonucu ge
 
 Kural değişince sonuç sonraki istekte değişir. Bu davranış testle sınanır.
 
-P-5 kuralı önbelleği ölçümle gerekçelendirmeyi ister. Ölçüm 2. kontrol noktasında yapılır. Ölçüm kazanç göstermezse önbellek kaldırılır.
+P-5 kuralı önbelleği ölçümle gerekçelendirmeyi ister. Ölçüm 7. bölümdedir. Önbellek her istekte 1 sorgu kazandırır. Kazanç kuralsız kayıt türlerinde de geçerlidir. Önbellek olmasa motor her izin denetiminde kural tablosunu okurdu.
 
 ## 13. Uçlar
 
@@ -426,6 +452,7 @@ Kural ekleme, değiştirme ve silme için ayrı uç yazılmadı. Frappe'nin haz�
 
 Açıklama ucu kayıt varlığını ele verebilir. Bu yüzden yanıt çağırana göre değişir.
 
+- Çağıranın kayıt türünde okuma izni olmalıdır. İzin yoksa uç 403 döner. Kayıt türü yoksa da 403 döner.
 - Olağan kullanıcı yalnız kendi iznini sorabilir. Ret nedeni tek değerdir: `not_permitted_or_missing`. Kayıt yoksa da aynı değer döner.
 - “System Manager” başka kullanıcıyı da sorabilir. Yanıt kuralları tek tek sayar.
 
@@ -446,7 +473,12 @@ Beklenen sonuçlar bu nottan, sözleşmeden ve karar sitesinden gelir (D-1).
 | `test_uclar.py` | Dört ucun izni, girdisi ve çıktısı. | Sözleşme |
 | `test_sorgu_sayisi.py` | Liste sorgu sayısı kayıt sayısıyla artmaz. | P-1 |
 
-Testler 1. kontrol noktasında çalıştırılamadı. `platform_core` iskeleti henüz `backend` dalında yok. Testlerin beklenen nedenle başarısız olduğu 2. kontrol noktasının başında kaydedilir (D-2).
+Güvenlik kapısı uç testlerini modülün yanında ister. Bu yüzden iki dosya daha vardır:
+
+- `api/test_access.py` dört ucun misafir ve yabancı veri reddini sınar.
+- `erisim/test_reports.py` sorgu raporu kapısını sınar.
+
+Testler önce kancalar kapalıyken çalıştırıldı. 83 testten 80'i beklenen nedenle başarısız oldu (D-2). Örneğin çalışan bütün kayıtları gördü ve başkasının kaydı 200 döndü. Kancalar açılınca testler geçti.
 
 ## 15. Bağımlılık ve sınırlar
 

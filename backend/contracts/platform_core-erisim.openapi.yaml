@@ -45,6 +45,12 @@ paths:
         “System Manager” rolü başka kullanıcıyı da sorabilir.
         Bu rol kuralları tek tek görür. Kayıt yoksa 404 alır.
 
+        Uç önce çağıranın kayıt türündeki okuma iznine bakar. İzin yoksa 403 döner.
+        Kayıt türü yoksa da 403 döner.
+
+        Olağan kullanıcıya ret yanıtında `layers.access_rule` ve `layers.share`
+        yanlış döner. Bu iki değer yalnız “System Manager” rolüne gerçek haliyle döner.
+
         `allowed` değeri Frappe'nin son kararıdır. Rol izni, kullanıcı izni,
         erişim kuralı ve paylaşım bu karara birlikte girer.
       security:
@@ -102,6 +108,7 @@ paths:
         "403":
           description: |
             Misafir isteği. Ya da olağan kullanıcı başka kullanıcıyı sordu.
+            Ya da çağıranın kayıt türünde okuma izni yok.
         "404":
           description: Kayıt yok. Yalnız “System Manager” rolüne döner.
         "417":
@@ -124,7 +131,8 @@ paths:
         O durumda rol izni tek başına geçerlidir.
         Kayıt türü kurallıysa boş liste o işlemde erişim olmadığını gösterir.
 
-        Kullanıcının kayıt türünde okuma rol izni yoksa uç 403 döner.
+        Kullanıcının kayıt türünde okuma izni yoksa uç 403 döner.
+        Kayıt türü yoksa da 403 döner. Böylece uç tür varlığını ele vermez.
       security:
         - oturum: []
       parameters:
@@ -158,9 +166,7 @@ paths:
                         submit: []
                         cancel: []
         "403":
-          description: Misafir isteği ya da kayıt türünde okuma rol izni yok.
-        "404":
-          description: Kayıt türü yok.
+          description: Misafir isteği, kayıt türünde okuma izni yok ya da kayıt türü yok.
 
   /platform_core.api.access.set_field_level:
     post:
@@ -179,6 +185,7 @@ paths:
         Yanıttaki `previous_permlevel` eski seviyeyi verir.
 
         Uç yalnız “System Manager” rolüne açıktır.
+        Çağıranın “Property Setter” kaydı açma izni de olmalıdır.
         Uç standart alanlara dokunmaz. Örneğin `name` ve `owner` değişmez.
         Uç ücretli bir iş başlatmaz.
       security:
@@ -250,6 +257,7 @@ paths:
 
         İşlem geri alınabilir. Aynı uç eski değerlerle yeniden çağrılır.
         Uç yalnız “System Manager” rolüne açıktır.
+        Çağıranın “Custom DocPerm” kaydı yazma izni de olmalıdır.
         Uç ücretli bir iş başlatmaz.
       security:
         - oturum: []

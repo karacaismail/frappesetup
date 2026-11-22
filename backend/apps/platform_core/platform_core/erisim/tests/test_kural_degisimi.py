@@ -123,7 +123,9 @@ class TestRuleChange(ErisimTestCase):
 		employee = self.login(EMPLOYEE_1)
 
 		listed = self.rest_list(employee, RULE_DOCTYPE)
-		changed = self.send(employee, "PUT", self.rule_path(OWN_RULE), body={"scope": "all", "match_field": ""})
+		changed = self.send(
+			employee, "PUT", self.rule_path(OWN_RULE), body={"scope": "all", "match_field": ""}
+		)
 
 		self.assertEqual(listed.status_code, 403, listed.get_data(as_text=True))
 		self.assertEqual(changed.status_code, 403, changed.get_data(as_text=True))

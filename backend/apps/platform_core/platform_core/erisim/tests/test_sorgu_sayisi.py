@@ -2,6 +2,7 @@
 
 import frappe
 
+from platform_core.erisim.rules import CACHE_KEY
 from platform_core.erisim.tests.base import DOCTYPE, EMPLOYEE_2, MANAGER_1, ErisimTestCase
 
 EXTRA_RECORDS = 40
@@ -18,9 +19,10 @@ class TestQueryCount(ErisimTestCase):
 			return original(*args, **kwargs)
 
 		frappe.set_user(user)
-		# Ölçüm soğuk başlar: istek boyu saklanan özne değerleri ve kural önbelleği silinir.
-		frappe.local.cache = {}
-		frappe.cache.delete_keys("platform_core:erisim")
+		# İlk okuma kayıt türü tanımını ve rolleri önbelleğe alır. Ölçüm ikinci okumadır.
+		frappe.get_list(DOCTYPE, fields=["name", "title"], limit=1000)
+		# Kural önbelleği silinir. Böylece motorun kendi sorguları ölçüme girer.
+		frappe.cache.delete_value(CACHE_KEY)
 		frappe.db.__class__.sql = counting_sql
 		try:
 			rows = frappe.get_list(DOCTYPE, fields=["name", "title"], limit=1000)
@@ -43,8 +45,8 @@ class TestQueryCount(ErisimTestCase):
 		"""Karar notu 7. bölüm: özne için en çok 2 sorgu, kural listesi için en çok 1 sorgu."""
 		with_rules, _visible = self.count_list_queries(MANAGER_1)
 		frappe.db.set_value("Access Rule", {"document_type": DOCTYPE}, "is_active", 0)
-		frappe.cache.delete_keys("platform_core:erisim")
 
 		without_rules, _all = self.count_list_queries(MANAGER_1)
 
+		self.assertGreater(with_rules, without_rules - 1)
 		self.assertLessEqual(with_rules - without_rules, 3)

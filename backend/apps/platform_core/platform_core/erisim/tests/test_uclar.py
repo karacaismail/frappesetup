@@ -17,7 +17,9 @@ OPERATIONS = ("read", "write", "create", "delete", "submit", "cancel")
 
 class TestExplainPermission(ErisimTestCase):
 	def explain(self, client, name: str, **query):
-		return self.api(client, "GET", "explain_permission", query={"doctype": DOCTYPE, "name": name, **query})
+		return self.api(
+			client, "GET", "explain_permission", query={"doctype": DOCTYPE, "name": name, **query}
+		)
 
 	def test_user_gets_allowed_for_own_record(self):
 		response = self.explain(self.login(EMPLOYEE_1), self.records[EMPLOYEE_1])
@@ -97,9 +99,7 @@ class TestExplainPermission(ErisimTestCase):
 
 	def test_ptype_selects_the_rule_flag(self):
 		"""Yönetici ekibinin kaydını okur ama yazamaz."""
-		response = self.explain(
-			self.login(ADMIN), self.records[EMPLOYEE_2], user=MANAGER_1, ptype="write"
-		)
+		response = self.explain(self.login(ADMIN), self.records[EMPLOYEE_2], user=MANAGER_1, ptype="write")
 
 		message = response.json["message"]
 		self.assertFalse(message["allowed"])
@@ -189,10 +189,11 @@ class TestAccessSummary(ErisimTestCase):
 
 		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
 
-	def test_unknown_doctype_is_not_found(self):
+	def test_unknown_doctype_is_denied_like_an_unreadable_one(self):
+		"""Sözleşme: uç kayıt türünün varlığını ele vermez. Olmayan tür de 403 döner."""
 		response = self.summary(self.login(EMPLOYEE_1), "ER Olmayan Tur")
 
-		self.assertEqual(response.status_code, 404, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
 
 	def test_guest_is_rejected(self):
 		response = self.summary(self.anonymous())

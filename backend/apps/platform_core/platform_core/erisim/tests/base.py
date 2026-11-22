@@ -27,6 +27,7 @@ DOCTYPE = "ER Test Talep"
 FREE_DOCTYPE = "ER Test Serbest"
 RULE_DOCTYPE = "Access Rule"
 COMPANY = "ER Test Sirket"
+GENDER = "Other"
 PASSWORD = "Sahte-Parola-6150-er!"
 
 ROLE_EMPLOYEE = "ER Calisan"
@@ -148,14 +149,16 @@ def ensure_doctypes() -> None:
 
 
 def ensure_company() -> None:
+	if not frappe.db.exists("Gender", GENDER):
+		frappe.get_doc(doctype="Gender", gender=GENDER).insert()
 	if not frappe.db.exists("Company", COMPANY):
-		frappe.get_doc(
-			doctype="Company",
-			company_name=COMPANY,
-			abbr="ERT",
-			default_currency="TRY",
-			country="Turkey",
-		).insert()
+		# Şirket satırı doğrudan yazılır. ERPNext'in şirket kurulumu hesap planı ve depo açar.
+		# O kurulum boş test sitesinde çalışmaz ve bu testlerin konusu değildir.
+		company = frappe.get_doc(
+			doctype="Company", company_name=COMPANY, abbr="ERT", default_currency="TRY", country="Türkiye"
+		)
+		company.name = COMPANY
+		company.db_insert()
 
 
 def employee_of(user: str) -> str | None:
@@ -181,12 +184,17 @@ def ensure_people() -> None:
 			first_name=email.split("@")[0],
 			company=COMPANY,
 			status="Active",
-			gender=frappe.db.get_value("Gender", {}, "name"),
+			gender=GENDER,
 			date_of_birth="1990-01-01",
 			date_of_joining="2020-01-01",
 			user_id=email,
+			# ERPNext çalışana kendi “User Permission” kaydını açabilir. O kayıt da kayıtları daraltır.
+			# Testler motoru tek başına sınar. Bu yüzden o kayıt açılmaz.
+			create_user_permission=0,
 			reports_to=employee_of(manager) if manager else None,
 		).insert()
+	frappe.db.delete("User Permission", {"user": ("in", [email for email, _roles, _manager in PEOPLE])})
+	frappe.clear_cache()
 
 
 def ensure_fixtures() -> None:
@@ -356,6 +364,10 @@ class ErisimTestCase(IntegrationTestCase):
 
 	def names_of(self, owners) -> set[str]:
 		return {self.records[owner] for owner in owners}
+
+	def assert_hidden(self, data: dict, fieldname: str) -> None:
+		"""Frappe izinsiz alanın değerini siler. Yanıtta alan ya yoktur ya da boştur."""
+		self.assertFalse(data.get(fieldname), data)
 
 	def stored(self, name: str, fieldname: str):
 		return frappe.db.get_value(DOCTYPE, name, fieldname)
