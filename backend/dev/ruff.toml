@@ -2,4 +2,4 @@ target-version = "py39"
 line-length = 110
 
 [lint]
-select = ["E", "F", "I", "B", "UP"]
+select = ["E", "F", "I", "B", "UP", "N", "A", "PLC2401", "PLC2403"]
