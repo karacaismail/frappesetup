@@ -62,9 +62,10 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual((settings.http_timeout, settings.anonymize_timeout), (10.0, 30.0))
         changed = load_settings({**self.ENV, "IDENTITY_SYNC_ANONYMIZE_TIMEOUT": "45"})
         self.assertEqual((changed.http_timeout, changed.anonymize_timeout), (10.0, 45.0))
-        # The upper limit itself is allowed. One second more is not.
-        self.assertEqual(load_settings({**self.ENV, "IDENTITY_SYNC_ANONYMIZE_TIMEOUT": "600"}).anonymize_timeout, 600.0)
-        for value in ("0", "-1", "601", "nan", "inf", "on"):
+        # The upper limit itself is allowed. One second more is not. Press waits at most 90 seconds,
+        # and a deletion request answers within the timeout plus 5 seconds.
+        self.assertEqual(load_settings({**self.ENV, "IDENTITY_SYNC_ANONYMIZE_TIMEOUT": "80"}).anonymize_timeout, 80.0)
+        for value in ("0", "-1", "81", "601", "nan", "inf", "on"):
             with self.subTest(value=value), self.assertRaises(ConfigError) as caught:
                 load_settings({**self.ENV, "IDENTITY_SYNC_ANONYMIZE_TIMEOUT": value})
             self.assertIn("IDENTITY_SYNC_ANONYMIZE_TIMEOUT", str(caught.exception))

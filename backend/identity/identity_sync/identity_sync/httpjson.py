@@ -7,16 +7,17 @@ Error messages omit response bodies, which may contain personal data.
 
 from __future__ import annotations
 
+import http.client
+import io
 import json
 import socket
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Iterator, Mapping
-from contextlib import contextmanager
-from contextvars import ContextVar
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+
+from identity_sync.deadline import deadline, remaining
 
 _MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
@@ -102,33 +103,87 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_OPENER = urllib.request.build_opener(_NoRedirect)
+class _DeadlineSocket:
+    """A connected socket whose every send and receive waits at most the time left (inceleme 18).
 
-# The latest moment, on the monotonic clock, at which a request of this thread may still wait.
-_DEADLINE: ContextVar[float | None] = ContextVar("identity_sync_deadline", default=None)
-
-
-@contextmanager
-def deadline(seconds: float) -> Iterator[None]:
-    """Bound the total wait of every request made inside the block (H-5).
-
-    Each request waits at most its own timeout and at most the time left. When no time is left,
-    the request is not sent and `ConnectFailed` is raised. A nested block never extends an outer one.
+    The socket timeout of Python counts each receive on its own. A target that sends its reply in
+    small pieces could then keep one request open far past the end. Here each call first shortens
+    the timeout to the time left, and fails at once when no time is left.
     """
-    end = time.monotonic() + seconds
-    outer = _DEADLINE.get()
-    token = _DEADLINE.set(end if outer is None else min(outer, end))
-    try:
-        yield
-    finally:
-        _DEADLINE.reset(token)
+
+    def __init__(self, sock: socket.socket) -> None:
+        self._sock = sock
+        self._timeout = sock.gettimeout()
+
+    def _arm(self) -> None:
+        left = remaining()
+        if left is None:
+            return
+        if left <= 0:
+            raise TimeoutError("deadline passed")
+        self._sock.settimeout(left if self._timeout is None else min(self._timeout, left))
+
+    def recv_into(self, buffer: memoryview, nbytes: int = 0) -> int:
+        self._arm()
+        return self._sock.recv_into(buffer, nbytes)
+
+    def recv(self, size: int) -> bytes:
+        self._arm()
+        return self._sock.recv(size)
+
+    def sendall(self, data: bytes) -> None:
+        self._arm()
+        self._sock.sendall(data)
+
+    def makefile(self, mode: str = "r", *args: object, **kwargs: object) -> io.BufferedReader:
+        # Reads must come back through `recv_into` above, so the file is built on this object.
+        self._sock._io_refs += 1
+        return io.BufferedReader(socket.SocketIO(self, "rb"))
+
+    def _decref_socketios(self) -> None:
+        self._sock._decref_socketios()
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._sock, name)
+
+
+class _DeadlineHTTPConnection(http.client.HTTPConnection):
+    def connect(self) -> None:
+        super().connect()
+        if remaining() is not None:
+            self.sock = _DeadlineSocket(self.sock)
+
+
+class _DeadlineHTTPSConnection(http.client.HTTPSConnection):
+    def connect(self) -> None:
+        super().connect()
+        if remaining() is not None:
+            self.sock = _DeadlineSocket(self.sock)
+
+
+class _DeadlineHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(_DeadlineHTTPConnection, req)
+
+
+class _DeadlineHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        options: dict[str, object] = {"context": self._context}
+        if hasattr(self, "_check_hostname"):  # Python 3.11 still passes this option
+            options["check_hostname"] = self._check_hostname
+        return self.do_open(_DeadlineHTTPSConnection, req, **options)
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect, _DeadlineHTTPHandler, _DeadlineHTTPSHandler)
+
+# `deadline` lives in its own module because the store and the pipeline use it too.
+__all__ = ["deadline"]
 
 
 def _bounded(timeout: float) -> float:
-    end = _DEADLINE.get()
-    if end is None:
+    left = remaining()
+    if left is None:
         return timeout
-    left = end - time.monotonic()
     if left <= 0:
         raise ConnectFailed("deadline passed")
     return min(timeout, left)

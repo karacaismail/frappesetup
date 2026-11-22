@@ -312,3 +312,60 @@ class StoreTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RepeatClaimTest(unittest.TestCase):
+    """Inceleme 18: the claim of a job repeat and the completion check are one database step."""
+
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.path = os.path.join(self.dir.name, "identity_sync.sqlite3")
+        self.now = 100.0
+
+    def open(self) -> Store:
+        store = Store(self.path, clock=lambda: self.now)
+        self.addCleanup(store.close)
+        return store
+
+    def test_claim_sees_a_job_another_connection_finished(self) -> None:
+        first, second = self.open(), self.open()
+        # The first connection read the job as unfinished. The second one finishes it meanwhile.
+        self.assertFalse(first.is_processed("del-1"))
+        second.mark_processed("del-1", "processed")
+
+        self.assertEqual(first.claim_repeat("del-1", hold=10.0), "done")
+        self.assertFalse(first.repeat_claimed("del-1"))
+
+    def test_claim_is_exclusive_across_connections(self) -> None:
+        first, second = self.open(), self.open()
+        self.assertEqual(first.claim_repeat("del-1", hold=10.0), "claimed")
+        self.assertEqual(second.claim_repeat("del-1", hold=10.0), "busy")
+        self.now += 11.0  # the hold ran out, for example after a crash
+        self.assertEqual(second.claim_repeat("del-1", hold=10.0), "claimed")
+
+    def test_limits_refuse_a_claim_too_soon_or_too_often(self) -> None:
+        store = self.open()
+        self.assertEqual(store.claim_repeat("del-1", hold=1.0, max_attempts=2, min_interval=30.0), "claimed")
+        store.release_repeat("del-1")
+        self.assertEqual(store.claim_repeat("del-1", hold=1.0, max_attempts=2, min_interval=30.0), "limited")
+        self.now += 30.0
+        self.assertEqual(store.claim_repeat("del-1", hold=1.0, max_attempts=2, min_interval=30.0), "claimed")
+        store.release_repeat("del-1")
+        self.now += 30.0
+        self.assertEqual(store.claim_repeat("del-1", hold=1.0, max_attempts=2, min_interval=30.0), "limited")
+
+    def test_repeatable_jobs_reads_only_jobs_that_may_be_tried_now(self) -> None:
+        store = self.open()
+        for number in range(3000):
+            store.add_dead_letter(Event(id=f"e-{number:04d}", kind="user", type="UPDATE_EMAIL", realm="platform",
+                                        time=1, user_id=f"u-{number}"), "failed")
+        jobs = [Event(id=f"del-{n}", kind="request", type="ACCOUNT_DELETION", realm="platform", time=1,
+                      user_id=f"s-{n}") for n in range(5)]
+        for job in jobs:
+            store.add_dead_letter(job, "unknown", state="unknown")
+        self.assertEqual(store.claim_repeat("del-0", hold=60.0), "claimed")  # busy now
+
+        found = store.repeatable_jobs(limit=3, max_attempts=5, min_interval=30.0)
+
+        self.assertEqual([letter.event.id for letter in found], ["del-1", "del-2", "del-3"])

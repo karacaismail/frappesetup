@@ -21,11 +21,16 @@ keep the same order with shorter times, so the run stays short.
 
 from __future__ import annotations
 
+import os
+import tempfile
 import threading
 import time
 from unittest import mock
 
 from identity_sync import pipeline
+from identity_sync.events import Event
+from identity_sync.httpjson import TransportError, deadline
+from identity_sync.store import Store
 
 from . import fakes
 from .fakes import ORG_ID, SUBJECT, keycloak_user
@@ -46,10 +51,12 @@ class UnknownDeletionCase(ServerCase):
         self.seed(SUBJECT)
         self.job_id = self.job_of(SUBJECT)
         self.finished = threading.Event()
-        # The tests start with no spacing between repeats. One test checks the spacing itself.
-        patcher = mock.patch.object(pipeline, "SETTLE_INTERVAL_SECONDS", 0.0)
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        # The tests start with no spacing between repeats and a claim that lasts only the timeout.
+        # Some tests check the spacing and the longer claim themselves.
+        for name, value in (("SETTLE_INTERVAL_SECONDS", 0.0), ("REPEAT_HOLD_MARGIN_SECONDS", 0.0)):
+            patcher = mock.patch.object(pipeline, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def seed(self, subject: str) -> None:
         """A sample account on Keycloak, Press and the tenant. ServerCase already added SUBJECT to Keycloak."""
@@ -226,6 +233,8 @@ class ConcurrencyTest(UnknownDeletionCase):
         # The first answer has no definite result, so the job is `unknown` at once.
         tenant.on("POST", fakes.TENANT_ANONYMIZE, (200, {"message": {}}))
         self.assertEqual(self.press_request()["status"], "unknown")
+        # The fake tenant has answered, so no call is open. End the claim the unknown outcome kept.
+        self.stack.app.store.release_repeat(self.job_id)
         self.gate, self.waiting = threading.Event(), threading.Event()
         work = tenant._defaults[("POST", fakes.TENANT_ANONYMIZE)]
 
@@ -289,3 +298,164 @@ class DeadlineTest(UnknownDeletionCase):
         self.post_event(OTHER_EVENT)
         self.assertNotIn(SUBJECT, self.stack.keycloak.users)
         self.assertTrue(self.done(self.job_id))
+
+
+class NotFoundTest(UnknownDeletionCase):
+    def test_404_from_the_tenant_anonymize_call_keeps_the_job_unknown(self) -> None:
+        # O-43: only 200 with both fields is a result. An old tenant may answer 404 after it removed
+        # the link while the anonymization is still unfinished.
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, fakes.frappe_error(404, "IdentityNotFound"))
+
+        reply = self.press_request()
+
+        self.assertEqual(reply["status"], "unknown")
+        self.assertEqual(self.stack.app.store.dead_letter_state(self.job_id), "unknown")
+        deletes = [r for r in self.stack.keycloak.requests if r.method == "DELETE" and r.path.endswith(f"/users/{SUBJECT}")]
+        self.assertEqual(deletes, [])
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+
+    def test_unknown_identity_is_200_with_found_false(self) -> None:
+        # The tenant has no link for this account: 200 with `found` false finishes the step.
+        self.stack.tenant.links.clear()
+
+        reply = self.press_request()
+
+        self.assertEqual(reply["status"], "processed")
+        self.assertNotIn(SUBJECT, self.stack.keycloak.users)
+
+
+class OpenTargetCallTest(UnknownDeletionCase):
+    def test_second_press_request_does_not_call_while_the_first_call_may_still_run(self) -> None:
+        self.slow(self.stack.tenant, fakes.TENANT_ANONYMIZE, LATE, times=1)
+        with mock.patch.object(pipeline, "REPEAT_HOLD_MARGIN_SECONDS", 30.0):
+            self.assertEqual(self.press_request()["status"], "unknown")
+            # The tenant still works on the first call. A new request must not send a second one.
+            reply = self.press_request()
+
+        self.assertEqual(reply["status"], "unknown")
+        self.assertEqual(self.tenant_anonymize_calls(), 1)
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+
+    def test_press_path_keeps_the_attempt_and_spacing_limits(self) -> None:
+        self.slow(self.stack.tenant, fakes.TENANT_ANONYMIZE, LATE, times=1)
+        self.first_request_times_out()
+        # From now on the tenant answers without a result.
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (200, {"message": {}}))
+
+        with mock.patch.object(pipeline, "SETTLE_INTERVAL_SECONDS", 60.0):
+            self.assertEqual(self.press_request()["status"], "unknown")
+        self.assertEqual(self.tenant_anonymize_calls(), 1)  # too soon: nothing was sent
+
+        with mock.patch.object(pipeline, "SETTLE_MAX_ATTEMPTS", 2):
+            self.press_request()
+            self.press_request()
+        self.assertEqual(self.tenant_anonymize_calls(), 2)  # attempt 2 was the last one
+
+
+class BudgetTest(UnknownDeletionCase):
+    def test_a_reply_sent_in_small_pieces_cannot_stretch_the_event_budget(self) -> None:
+        self.slow(self.stack.tenant, fakes.TENANT_ANONYMIZE, LATE, times=1)
+        self.first_request_times_out()
+        # Each piece comes before the per-read timeout, but the whole body takes about 5 seconds.
+        body = fakes.Trickle({"message": {"anonymized": True, "found": True}}, piece=2, pause=0.2)
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (200, body))
+
+        with mock.patch.object(pipeline, "SETTLE_BUDGET_SECONDS", 1.0):
+            started = time.monotonic()
+            status, _reply = self.post_event(OTHER_EVENT)
+            spent = time.monotonic() - started
+
+        self.assertEqual(status, 202)
+        self.assertLess(spent, 1.0 + 1.0)
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+        self.assertFalse(self.done(self.job_id))
+
+    def test_a_large_queue_is_not_read_in_full(self) -> None:
+        self.slow(self.stack.tenant, fakes.TENANT_ANONYMIZE, LATE, times=1)
+        self.first_request_times_out()
+        store = self.stack.app.store
+        for number in range(3000):
+            store.add_dead_letter(
+                Event(id=f"e-big-{number:04d}", kind="user", type="UPDATE_EMAIL", realm="platform", time=1,
+                      user_id=f"u-{number}"),
+                "failed",
+            )
+        full_reads = []
+        read = store.dead_letters
+
+        def counted(**kwargs):
+            if kwargs.get("limit") is None:
+                full_reads.append(kwargs)
+            return read(**kwargs)
+
+        with mock.patch.object(store, "dead_letters", counted):
+            started = time.monotonic()
+            self.post_event(OTHER_EVENT)
+            spent = time.monotonic() - started
+
+        self.assertEqual(full_reads, [])
+        self.assertLess(spent, 2.0)
+        self.assertTrue(self.done(self.job_id))
+
+    def test_deletion_request_does_not_wait_for_the_work_lock_past_its_deadline(self) -> None:
+        store = self.stack.app.store
+        held, release = threading.Event(), threading.Event()
+
+        def hold() -> None:
+            with store.work_lock():
+                held.set()
+                release.wait(10)
+
+        thread = threading.Thread(target=hold)
+        thread.start()
+        self.addCleanup(thread.join, 10)
+        self.addCleanup(release.set)
+        self.assertTrue(held.wait(5))
+
+        body = {"issuer": self.stack.issuer, "subject": SUBJECT, "reauthenticated_at": int(self.now) - 10}
+        started = time.monotonic()
+        status, reply = self.post_json("/v1/account-deletions", body, PRESS_TOKEN)
+        spent = time.monotonic() - started
+
+        self.assertEqual((status, reply), (503, {"error": "busy"}))
+        self.assertLess(spent, TIMEOUT + 1.0)
+
+    def test_retry_pauses_stop_at_the_deadline(self) -> None:
+        processor = self.stack.app.processor
+        self.stack.sleeps.clear()
+
+        def fail() -> None:
+            raise TransportError("network error")
+
+        with deadline(0.05), self.assertRaises(pipeline._Failed):
+            processor._retry("tenant.anonymize_user tenant1", fail)
+
+        self.assertEqual(self.stack.sleeps, [])
+
+
+class FinishedMeanwhileTest(UnknownDeletionCase):
+    def setUp(self) -> None:
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.db_path = os.path.join(folder.name, "identity_sync.sqlite3")
+        self.stack_settings = {**self.stack_settings, "db_path": self.db_path}
+        super().setUp()
+
+    def test_a_job_finished_by_another_connection_is_not_run_again(self) -> None:
+        # Two connections to one database file. The second one finishes the job while the first
+        # still reads it as unfinished.
+        path = self.db_path
+        other = Store(path)
+        self.addCleanup(other.close)
+        processor = self.stack.app.processor
+        job = processor.account_job(SUBJECT, time=1)
+        other.mark_processed(job.id, "processed")
+        writes = len(self.downstream_writes())
+
+        with mock.patch.object(self.stack.app.store, "is_processed", return_value=False):
+            with self.stack.app.store.work_lock():
+                result = processor._handle_job(job, False, None)
+
+        self.assertEqual(result.status, "duplicate")
+        self.assertEqual(len(self.downstream_writes()), writes)
+        self.assertIn(SUBJECT, self.stack.keycloak.users)

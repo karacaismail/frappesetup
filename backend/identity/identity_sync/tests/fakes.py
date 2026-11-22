@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import secrets
 import threading
+import time
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
@@ -37,6 +38,15 @@ class Recorded:
 
 Reply = tuple[int, object]
 Route = Callable[[Recorded], Reply]
+
+
+@dataclass(frozen=True)
+class Trickle:
+    """A reply body sent in small pieces with a pause after each piece, like a slow target."""
+
+    body: object
+    piece: int = 4
+    pause: float = 0.1
 
 
 @dataclass
@@ -76,6 +86,9 @@ class FakeServer:
                     self.connection.close()
                     return
                 extra = reply[2] if len(reply) > 2 else {}
+                trickle = body if isinstance(body, Trickle) else None
+                if trickle is not None:
+                    body = trickle.body
                 if isinstance(body, str):
                     raw = body.encode("utf-8")  # a non-JSON body
                 else:
@@ -87,7 +100,12 @@ class FakeServer:
                     self.send_header(name, value)
                 try:
                     self.end_headers()
-                    self.wfile.write(raw)
+                    if trickle is None:
+                        self.wfile.write(raw)
+                    for start in range(0, len(raw), trickle.piece) if trickle else ():
+                        self.wfile.write(raw[start:start + trickle.piece])
+                        self.wfile.flush()
+                        time.sleep(trickle.pause)
                 except (BrokenPipeError, ConnectionResetError):
                     return  # the client gave up waiting, for example after its timeout
 
@@ -381,6 +399,9 @@ class FakeTenant(FakeSite):
     def _anonymize(self, req: Recorded) -> Reply:
         key, error = self._identity(req)
         if error:
+            if error[0] == 404:
+                # O-43: an identity the tenant does not know gets 200 with `found` false, never 404.
+                return 200, {"message": {"anonymized": True, "found": False}}
             return error
         # Personal fields are blanked. The record itself stays: business records are not deleted.
         self.users[self.links[key]].update(first_name="", last_name="", anonymized=True, enabled=False)

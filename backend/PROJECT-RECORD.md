@@ -203,11 +203,17 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Ayrıntılı kurallar sözleşmenin 7. bölümündedir.
   - Anonim yapma çağrısının kendi bekleme süresi vardır (H-5). Ayarın adı `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` olur. Varsayılan değer 30 saniyedir.
   - Bu değer 22 Kasım 2026 Pazar günü ölçüldü. Boş kiracıda iş en çok 2,5 saniye sürdü. Son MVP testinde yük altında yaklaşık 12 saniye sürdü.
-  - Silme isteği en geç 45 saniyede cevap alır. Bu süre iş kilidi, anonim yapma süresi ve 5 saniyelik paydan oluşur. Press bu süreden uzun bekler. Press zaman aşımında müşteriye "silme sürüyor" der.
+  - Silme isteği tek bir son an taşır. Son an `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` sonra gelir. Kilit beklemesi, ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
+  - Servis en geç anonim yapma süresi artı 5 saniyede cevap verir. Varsayılan ayarla bu süre 35 saniyedir. Ayarın en büyük değeri 80 saniyedir.
+  - Press en çok 90 saniye bekler. Press zaman aşımında müşteriye "silme sürüyor" der.
   - Silme işinin her adımı tekrar edilebilir. Yarım kalan adımı identity-sync yeniden çağırır. Kimlik listesinden sonuç çıkarılmaz.
-  - Adım yalnız kesin başarı cevabıyla biter. Örneğin `anonymized` doğru olmalıdır. Alanı eksik ya da türü yanlış cevap işi `unknown` bırakır.
-  - İş bir sonraki silme isteğinde ya da bir sonraki olayda sürer. Bir olay en çok 3 işi sürdürür ve en çok 5 saniye harcar.
-  - Olay yolu bir işi en çok 5 kez dener. İki deneme arasında en az 30 saniye geçer. Aynı iş için iki deneme aynı anda çalışmaz.
+  - Anonim yapma adımı yalnız HTTP 200 cevabı ve iki zorunlu alanla biter (O-43). Alanı eksik ya da türü yanlış cevap işi `unknown` bırakır.
+  - İş bir sonraki silme isteğinde ya da bir sonraki olayda sürer.
+  - Sonuç belirsiz kaldıysa iki yolda da sınır vardır. Bir iş en çok 5 kez denenir. İki deneme arasında en az 30 saniye geçer.
+  - Kesin hatadan sonra hedefte açık çağrı kalmaz. Press isteği işi o zaman hemen sürdürür.
+  - Bir olay en çok 3 iş seçer. Kuyruk okuması, ağ okumaları ve yeniden deneme araları 5 saniyelik tek son anı aşmaz.
+  - Her deneme işi önce kendine ayırır. Ayırma ve tamamlanma denetimi aynı veritabanı adımındadır. Aynı iş için iki deneme aynı anda çalışmaz.
+  - Sonuç belirsizse ayırma hemen kalkmaz. Ayırma anonim yapma süresi artı 30 saniye sürer. Hedef ilk çağrı üzerinde hâlâ çalışıyor olabilir.
   - Hedef çağrılırken iş kilidi tutulmaz. Zamanlanmış iş kurulmaz. Denemeler biterse işi insan yeniden işletir.
 - **O-28. Yapay zekâ katmanı genel Frappe erişimi değildir.** D-9 her şeyin yapay zekâyla yönetilmesini ister. AX-2 modele genel Frappe erişimi vermeyi yasaklar. İki kural şöyle birleşir:
   - Model yalnız kayıtlı araçları çağırır. Her araç kullanıcının yetkisiyle çalışır.
@@ -215,7 +221,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Hassas DocType'lar genel yazma araçlarına kapalıdır. Bunlar kimlik bağı, erişim kuralı, AI API, AI Account ve telefon kurulumudur. Her sahip kendi DocType'ını `ai_write_closed_doctypes` kancasına ekler. Bu kayıtlar yalnız kendi özel araçlarıyla değişir.
 - **O-29. Güvenlik taramaları elle başlatılan komutlardır.** Zamanlanmış tarama kurulmaz (D-6). Komutları security-tooling işi yazar. Bandit, gizli bilgi taraması, sözleşme tabanlı API testi ve yerel DAST taraması bu kapsamdadır. CI kurulumunun teknik sahibi DevOps sorumlusudur. Ajanlar CI dosyasını değiştirmez, devir notu yazar.
 - **O-30. Ad denetimi geçiş süresinde uyarı verir.** Ad denetim betiği birleşince kapı bütün dallarda 389 ad bulgusu verdi. Eski adlar ancak ad değiştirme betiği bütün dallarda çalışınca kalkar. Bu yüzden kapı ad bulgularını şimdilik yalnız yazar ve başarısız olmaz. Kip `backend/dev/naming/enforcement.json` dosyasındaki `mode` alanında durur. Değer `advisory` ya da `enforce` olur. Başlangıç değeri `advisory` olur. Ad değiştirme bütün dallarda bitince orkestratör değeri `enforce` yapar. `enforce` kipinde `legacy-name`, `turkish-name`, `module-name` ve `translation-binding` bulguları kapıyı durdurur. Öteki ad bulguları yine yalnız uyarıdır. Kip dosyası yoksa kapı `advisory` kabul eder ve bunu çıktısına yazar.
-- **O-31. MVP performans sınırı.** Sunucu süresi okuma uçlarında p95 500 milisaniyeyi, yazma uçlarında p95 1 saniyeyi geçmez. Ölçüm geliştirme sitesinde örnek veriyle yapılır. Örnek veri 200 çalışan ve 2.000 izin kaydıdır. Her uç en az 50 kez çağrılır. Ölçümü elle başlatılan bir komut yapar ve sonucu durum dosyasına yazar. Frappe dışındaki servisler, örneğin identity-sync, kendi geliştirme kurulumunda sahte hedeflerle ölçülür. Bu ölçüm O-31 için geçerlidir, çünkü servis süresi hedef servisten ayrı ölçülür. identity-sync'te bir olay kuyruktaki silme işlerini de sürdürebilir (O-27). Bu ek iş olay başına en çok 3 iş ve 5 saniyedir. Kuyruk boşken olay yanıtı bu işten etkilenmez. Sınır p95 ölçümüne değil, en kötü duruma konur. Grafana ve gerçek kullanıcı ölçümü P1 işidir (G-149). Bu yüzden teknik borç tablosuna yazıldı.
+- **O-31. MVP performans sınırı.** Sunucu süresi okuma uçlarında p95 500 milisaniyeyi, yazma uçlarında p95 1 saniyeyi geçmez. Ölçüm geliştirme sitesinde örnek veriyle yapılır. Örnek veri 200 çalışan ve 2.000 izin kaydıdır. Her uç en az 50 kez çağrılır. Ölçümü elle başlatılan bir komut yapar ve sonucu durum dosyasına yazar. Frappe dışındaki servisler, örneğin identity-sync, kendi geliştirme kurulumunda sahte hedeflerle ölçülür. Bu ölçüm O-31 için geçerlidir, çünkü servis süresi hedef servisten ayrı ölçülür. identity-sync'te bir olay kuyruktaki silme işlerini de sürdürebilir (O-27). Bu ek iş olay başına en çok 3 iştir. Kuyruk okuması, ağ okumaları ve yeniden deneme araları birlikte en çok 5 saniye sürer. Sonucu kayda yazmak bu sürenin dışındadır. Kuyruk boşken olay yanıtı bu işten etkilenmez. 5 saniye p95 sınırı değildir. Bu süre en kötü durumun sınırıdır. Grafana ve gerçek kullanıcı ölçümü P1 işidir (G-149). Bu yüzden teknik borç tablosuna yazıldı.
 - **O-32. Saklama temizliği kopya bırakmaz.** Saklama süresi dolan kayıt kalıcı silinir. Kod `frappe.delete_doc` çağrısına `delete_permanently=True` verir. Böylece “Deleted Document” tablosunda kopya kalmaz. Geri dönüş yolu veritabanı yedeğidir. V-10 kuralının geri yükleme kopyası yalnız yöneticinin iş kaydını elle silmesi için geçerlidir. Bu kural bütün modüllerin saklama temizliğine uygulanır. Örneğin model geçidi ve yapay zekâ katmanının günlük temizliği böyledir.
 - **O-33. Bağımsız dal sırayı beklemez.** O-19 sırası bağımlılık içindir. Bağımsız inceleme `pass` veren ve başka dala bağlı olmayan dal hemen birleşir. Bağımlı dal bağlı olduğu daldan sonra birleşir. Örneğin press-tr ve identity-sync dalları kimlik-realm dalından sonra birleşir, çünkü ikisi de `oidc_verify` kitaplığını kullanır. ilk-dikey-dilim dalı platform-core-yz ve erisim-kurali dallarından sonra birleşir. Her birleşmeden sonra orkestratör kapıları, modül sınırını ve ortak dosya denetimlerini çalıştırır.
 - **O-34. Yasaklı adı taşıyan commit mesajı yayımlanmaz.** Yasaklı ürün adı (D-13) yerel geçmişte sekiz commit mesajında kaldı. Biri `backend` dalındaki `58e8dbc` kaydıdır. Yedisi `ilk-dikey-dilim` dalının ilk kayıtlarıdır. Bu kayıtlar hiçbir uzak depoya gönderilmedi. Geçmişi yeniden yazmak öteki dalların ortak atasını bozar. Bu yüzden şu kurallar uygulanır:
@@ -275,6 +281,13 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Dosya listesi `backend/dev/security/README.md` içindedir.
   - Kapsamdaki bir dosya değişirse kapı bu onayları yeniden ister.
   - Onay kapsamları çakışırsa kapı hata verir.
+- **O-43. Anonim yapma adımında 404 sonuç sayılmaz.** Karar 22 Kasım 2026 Pazar günü inceleme 18 ile alındı.
+  - Eski bir kiracı kimlik bağını sildikten sonra 404 dönebilir. Anonim yapma o sırada yarım kalmış olabilir.
+  - Bu yüzden adım yalnız HTTP 200 cevabıyla biter. Cevap `anonymized` ve `found` alanlarını mantıksal değer olarak taşır.
+  - Kimliği bilmeyen kiracı ve Press 200 ile `found: false` döner.
+  - identity-sync 404 cevabında işi `unknown` bırakır. Keycloak kullanıcısını silmez.
+  - Kapatma ve e-posta değiştirme adımlarında `404 IdentityNotFound` yine başarı sayılır. Bağ yoksa kapatılacak kayıt yoktur.
+  - Kiracı yanıtını platform-core-kimlik işi düzeltir.
 
 ## Karar sitesine işlenecek farklar
 

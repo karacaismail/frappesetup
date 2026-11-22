@@ -9,7 +9,8 @@ The `list_identities` endpoints and their paging are defined in the shared contr
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict
 
 from identity_sync.httpjson import ConnectFailed, HttpError, Response, TransportError, UnknownOutcome, request_json
@@ -117,6 +118,17 @@ def _is_team(message: object) -> bool:
 
 # anonymize_user answers 409 on a lock conflict or timeout. The caller retries (docs/sozlesmeler.md, section 6).
 ANONYMIZE_RETRY_STATUSES = (409,)
+
+
+@contextmanager
+def _not_found_is_unknown() -> Iterator[None]:
+    """A 404 from an anonymize call leaves the outcome unknown (O-43). It is not a result."""
+    try:
+        yield
+    except HttpError as error:
+        if error.status == 404:
+            raise UnknownOutcome from None
+        raise
 
 
 def _is_anonymized(message: object) -> bool:
@@ -237,13 +249,14 @@ class PressClient:
         Press answers `found: false` for an identity it does not know. That counts as done.
         """
         body = {"issuer": action.issuer, "subject": action.subject}
-        self._call(
-            "press_tr.api.identity.anonymize_user",
-            body,
-            _is_anonymized,
-            ANONYMIZE_RETRY_STATUSES,
-            timeout=self._anonymize_timeout,
-        )
+        with _not_found_is_unknown():  # O-43, as for the tenant
+            self._call(
+                "press_tr.api.identity.anonymize_user",
+                body,
+                _is_anonymized,
+                ANONYMIZE_RETRY_STATUSES,
+                timeout=self._anonymize_timeout,
+            )
 
     def ensure_team(self, action: PressEnsureTeam) -> None:
         body = asdict(action)
@@ -368,16 +381,21 @@ class TenantClient:
         )
 
     def anonymize_user(self, action: TenantAnonymizeUser) -> None:
-        """Close the tenant user and anonymize the personal fields. No link: nothing to anonymize."""
-        self._call(
-            action.tenant,
-            "platform_core.api.identity.anonymize_user",
-            self._body(action),
-            _is_anonymized,
-            missing_identity_is_success=True,
-            retry_statuses=ANONYMIZE_RETRY_STATUSES,
-            timeout=self._anonymize_timeout,
-        )
+        """Close the tenant user and anonymize the personal fields.
+
+        O-43: only 200 with `anonymized` and `found` is a result. An unknown identity gets 200 with
+        `found` false. A 404 proves nothing: an old tenant may answer it after it removed the link,
+        while the anonymization is still unfinished. So a 404 leaves the outcome unknown.
+        """
+        with _not_found_is_unknown():
+            self._call(
+                action.tenant,
+                "platform_core.api.identity.anonymize_user",
+                self._body(action),
+                _is_anonymized,
+                retry_statuses=ANONYMIZE_RETRY_STATUSES,
+                timeout=self._anonymize_timeout,
+            )
 
     def list_identities(self, tenant: str) -> list[Identity]:
         method = "platform_core.api.identity.list_identities"
