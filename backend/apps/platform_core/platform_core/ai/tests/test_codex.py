@@ -239,7 +239,7 @@ class TestResultState(AiTestCase):
 
 		def fails_after_writing(*args, **kwargs):
 			original(*args, **kwargs)
-			raise RuntimeError("yazdiktan sonra hata")
+			raise RuntimeError("Failure after writing")
 
 		proposal = self.call_tool(manager, "plt_add_custom_field", arguments)["structuredContent"]
 		second = self.call_tool(manager, "plt_add_custom_field", {**arguments, "label": "Ikinci"})[

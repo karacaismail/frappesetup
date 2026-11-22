@@ -2,7 +2,8 @@
 
 The hook runs on every request from `frappe.auth.validate_auth` (frappe/auth.py:755). A token is looked
 for only on the service endpoints (`SERVICE_ENDPOINTS`) and on the mobile paths. Service endpoints are
-matched first. Elsewhere the hook does nothing; Frappe then rejects a
+matched first. A request already authenticated for the same route by an earlier hook is left alone.
+Elsewhere the hook does nothing; Frappe then rejects a
 request that carries a Bearer header while the user stays Guest (frappe/auth.py:649).
 """
 
@@ -46,6 +47,17 @@ def validate() -> None:
 	if frappe.form_dict.get("cmd"):
 		_refuse(_("Service requests must not carry a cmd field.", context="platform_core.identity"))
 	if frappe.session.user not in ("", "Guest"):
+		# An earlier hook can authenticate this request without creating a browser session.
+		# Only a server-side marker for this route can distinguish it from another login.
+		login_manager = getattr(frappe.local, "login_manager", None)
+		has_browser_session = request.cookies.get("sid") not in (None, "", "Guest") and getattr(
+			login_manager, "user", "Guest"
+		) not in (None, "", "Guest")
+		if not has_browser_session and (
+			(mobile and getattr(frappe.local, "mobile_identity", None))
+			or (service and frappe.session.user == SERVICE_USER and getattr(frappe.local, CLAIMS_ATTR, None))
+		):
+			return
 		_refuse(_("Service requests must not carry a session cookie.", context="platform_core.identity"))
 
 	if mobile:

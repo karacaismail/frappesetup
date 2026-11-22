@@ -1,7 +1,7 @@
-"""Keycloak belirteçlerini doğrulayan ortak kitaplık.
+"""Shared library for verifying Keycloak tokens.
 
-Arayüz docs/sozlesmeler.md 3. bölümünde sabitlendi. Kitaplık Frappe'ye bağlı değildir.
-Kitaplık belirteci günlüğe yazmaz. Hata mesajları belirteç içeriği taşımaz.
+Section 3 of docs/contracts.md defines the interface. The library is independent of Frappe.
+The library keeps tokens out of logs and error messages.
 """
 
 from oidc_verify.errors import JwksUnavailable, TokenError

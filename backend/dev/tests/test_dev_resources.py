@@ -135,16 +135,16 @@ class DevResourcesTests(unittest.TestCase):
         self.assertTrue(all(method == "GET" for _, method, _ in requests))
         self.assertEqual({path for _, _, path in requests}, {DF, "/v1.47/containers/bb/json"})
         self.assertIn(
-            "| colima-factory | Container | fs-live-web | 200 bayt | fs-live | Kullanımda |", output
+            "| colima-factory | Container | fs-live-web | 200 bytes | fs-live | In use |", output
         )
         self.assertIn(
-            f"| colima-factory | Birim | fs-old_data | 500 bayt | fs-old | {FINISHED} | sahipsiz |", output
+            f"| colima-factory | Volume | fs-old_data | 500 bytes | fs-old | {FINISHED} | Orphaned |", output
         )
         self.assertIn(
-            "| colima-factory | Birim | fs-custom_data | Bilinmiyor | fs-custom | Bilinmiyor |  |", output
+            "| colima-factory | Volume | fs-custom_data | Unknown | fs-custom | Unknown |  |", output
         )
-        self.assertIn("| colima | Birim | fs-live_data | 42 bayt | fs-live | Bilinmiyor | sahipsiz |", output)
-        self.assertIn(f"| colima-factory | İmaj | fs-old:latest | 120 bayt | fs-old | {FINISHED} |", output)
+        self.assertIn("| colima | Volume | fs-live_data | 42 bytes | fs-live | Unknown | Orphaned |", output)
+        self.assertIn(f"| colima-factory | Image | fs-old:latest | 120 bytes | fs-old | {FINISHED} |", output)
         for value in ("other-web", "other_data", "fs-lookalike", "unrelated:latest", "custom-name", "SECRET"):
             self.assertNotIn(value, output)
 
@@ -174,5 +174,5 @@ class DevResourcesTests(unittest.TestCase):
             "/v1.47/containers/aa/json": {"State": {"FinishedAt": None}},
         }
         output, _, _ = self.run_command({"colima-factory": data})
-        self.assertIn("| colima-factory | Container | fs-new | 0 bayt | Bilinmiyor | Bilinmiyor |", output)
+        self.assertIn("| colima-factory | Container | fs-new | 0 bytes | Unknown | Unknown |", output)
         self.assertNotIn("colima-factory: not_run", output)

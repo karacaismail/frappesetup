@@ -46,6 +46,31 @@ export async function diffBox(page: Page, before: Buffer, after: Buffer) {
 
 export const PAD = 14;
 
+type Clip = { x: number; y: number; width: number; height: number };
+
+/**
+ * Waits until the page has finished drawing and returns a screenshot of the area.
+ * A measurement compares two screenshots, so both must show a settled page. On a busy machine a font,
+ * an image or a late layout step can still arrive between two shots and would count as a difference.
+ * The wait ends when fonts and images are loaded and two shots in a row are identical.
+ * This only changes when the picture is taken. The limits of the measurement stay the same.
+ */
+export async function settledShot(page: Page, clip: Clip): Promise<Buffer> {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all([...document.images].filter((image) => !image.complete).map((image) => image.decode().catch(() => undefined)));
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(null))));
+  });
+  let shot = await page.screenshot({ clip, scale: 'css' });
+  await expect(async () => {
+    const next = await page.screenshot({ clip, scale: 'css' });
+    const same = next.equals(shot);
+    shot = next;
+    expect(same, 'the page is still drawing').toBe(true);
+  }).toPass({ timeout: 15_000, intervals: [0, 50, 100, 250, 500] });
+  return shot;
+}
+
 /** Captures the area around the focused element with keyboard mode off and on, and returns the difference. */
 export async function focusDiff(page: Page, target: Locator) {
   const box = (await target.boundingBox())!;
@@ -60,9 +85,9 @@ export async function focusDiff(page: Page, target: Locator) {
   clip.height = Math.min(viewport.height, Math.ceil(box.y + box.height + PAD)) - clip.y;
   await page.mouse.move(0, 0);
   await page.evaluate(() => document.documentElement.removeAttribute('data-at-focus'));
-  const off = await page.screenshot({ clip, scale: 'css' });
+  const off = await settledShot(page, clip);
   await page.evaluate(() => (document.documentElement.dataset.atFocus = 'keyboard'));
-  const on = await page.screenshot({ clip, scale: 'css' });
+  const on = await settledShot(page, clip);
   const diff = await diffBox(page, off, on);
   return { diff, rect: { left: box.x - clip.x, top: box.y - clip.y, width: box.width, height: box.height } };
 }
@@ -85,7 +110,7 @@ async function shotAround(page: Page, target: ElementHandle<Element>): Promise<B
     document.documentElement.removeAttribute('data-at-focus');
     return previous;
   });
-  const shot = await page.screenshot({ clip, scale: 'css' });
+  const shot = await settledShot(page, clip);
   await page.evaluate((previous) => {
     if (previous) document.documentElement.dataset.atFocus = previous;
   }, mode);

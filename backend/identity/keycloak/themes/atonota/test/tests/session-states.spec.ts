@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Response } from '@playwright/test';
 import { ACCOUNT_DELETION_URL, admin, BRAND, createUser, endSessions, KC, loginUrl, openLogin, REALM, submitPassword } from './helpers';
 
-// Access is tested on the real sign-in path, and the refusal is tested too (backend/AGENTS.md, D-6).
+// Access is tested on the real sign-in path, and the refusal is tested too (backend/AGENTS.md:69).
 // Three states of the visitor: guest, signed in, and a session that ended on the server while the
 // browser still holds its cookies. Three screens: sign-in, account console, account deletion link.
 

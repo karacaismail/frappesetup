@@ -61,6 +61,17 @@ class RealmBacklogFileTest(unittest.TestCase):
     def test_press_client_requires_pkce(self):
         self.assertEqual(self.clients["press"]["attributes"]["pkce.code.challenge.method"], "S256")
 
+    def test_compose_passes_mcp_environment_settings_into_keycloak(self):
+        for name in (
+            "ATONOTA_MCP_REDIRECT_URI",
+            "ATONOTA_MCP_RESOURCE_URL",
+            "ATONOTA_MCP_INTROSPECTION_SECRET",
+        ):
+            with self.subTest(name=name):
+                self.assertIn(name, self.dev_env)
+                self.assertIn(name, self.prod_env)
+                self.assertIn(f"{name}: ${{{name}:?}}", self.compose)
+
     # Item 4: every SMTP setting comes from the environment; production has TLS and authentication on.
     def test_smtp_settings_come_from_the_environment(self):
         smtp = self.realm["smtpServer"]

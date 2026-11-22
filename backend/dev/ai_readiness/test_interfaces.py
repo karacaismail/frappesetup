@@ -69,6 +69,8 @@ class InterfaceInventoryTests(unittest.TestCase):
         )
         first = self.inventory()
         self.assertEqual(first, self.inventory())
+        self.assertTrue(first.startswith("# Module interfaces\n"))
+        self.assertIn("| Type | Interface | Source | Owner |", first)
         self.assertIn("## `sample_app.cards`", first)
         for name in (
             "sample_app.api.cards.read",
@@ -76,7 +78,9 @@ class InterfaceInventoryTests(unittest.TestCase):
             "sample_app.cards.events.update",
         ):
             self.assertTrue(any(name in row and "cards-owner" in row for row in first.splitlines()), first)
-        self.assertIn("clear_cache", first)
+        self.assertIn("| Whitelisted method |", first)
+        self.assertIn("| Hook | clear_cache", first)
+        self.assertIn("| Document event |", first)
         self.assertIn("Contact", first)
         self.assertIn("on_update", first)
         self.assertIn('fixtures[filters] = ["name", "=", "AI Manager"]', first)
@@ -96,7 +100,7 @@ class InterfaceInventoryTests(unittest.TestCase):
                 return ops.cleanup()
             """,
         )
-        report, warnings = self.inventory().split("## İç işlev içe aktarma uyarıları")
+        report, warnings = self.inventory().split("## Internal function import warnings")
         self.assertIn("sample_app.cards.api.read", report)
         self.assertIn("requests/service.py:1", report)
         self.assertNotIn("sample_app.cards.api.read", warnings)
@@ -110,7 +114,7 @@ class InterfaceInventoryTests(unittest.TestCase):
         self.write(f"{APP}/cards/internal.py", "def read(): pass")
         self.write(f"{APP}/cards/api.py", "from .internal import read as read_card")
         self.write(f"{APP}/requests/service.py", "from ..cards.api import read_card")
-        report, warnings = self.inventory().split("## İç işlev içe aktarma uyarıları")
+        report, warnings = self.inventory().split("## Internal function import warnings")
         self.assertIn("sample_app.cards.api.read_card", report)
         self.assertIn("requests/service.py:1", report)
         self.assertNotIn("sample_app.cards.api.read_card", warnings)
