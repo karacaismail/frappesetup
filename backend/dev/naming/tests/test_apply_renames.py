@@ -156,6 +156,31 @@ class RenameTests(unittest.TestCase):
         result = self.rename(None, "--check-modules")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_mobile_client_inline_module_reference_is_renamed(self):
+        path = "backend/identity/identity_sync/tests/test_mobile_client.py"
+        original = (
+            '"""The client lives in another job\'s folder '
+            "(`apps/platform_core/.../mobil/identity_sync_client.py`).\n"
+            'This sentence keeps its mobil wording.\n"""\n'
+            'client = ROOT / "mobil" / "identity_sync_client.py"\n'
+        )
+        source = self.write(path, original)
+        unrelated = self.write(
+            "backend/unrelated.py", '"""See `apps/platform_core/.../mobil/identity_sync_client.py`. """\n'
+        )
+        self.git("add", ".")
+        baseline = self.rename(None, "--check-modules")
+        self.assertIn(f"{path}:1: mobil", baseline.stdout)
+        renamed = self.rename(None)
+        self.assertEqual(renamed.returncode, 0, renamed.stderr)
+        self.assertIn("`apps/platform_core/.../mobile/identity_sync_client.py`", source.read_text())
+        self.assertIn('ROOT / "mobile" / "identity_sync_client.py"', source.read_text())
+        self.assertIn("This sentence keeps its mobil wording.", source.read_text())
+        self.assertIn("/mobil/", unrelated.read_text())
+        check = self.rename(None, "--check-modules")
+        self.assertNotIn(path, check.stdout)
+        self.assertIn("backend/unrelated.py", check.stdout)
+
     def test_non_utf8_source_stops_before_any_changes(self):
         source = self.write("backend/sample.txt", "legacy\n")
         invalid = self.write("backend/unreadable.txt", "")

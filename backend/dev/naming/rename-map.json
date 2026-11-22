@@ -6166,5 +6166,13 @@
     "paths": [
       "backend/identity/keycloak/tests/test_eklentiler.py"
     ]
+  },
+  {
+    "old": "`apps/platform_core/.../mobil/identity_sync_client.py`",
+    "new": "`apps/platform_core/.../mobile/identity_sync_client.py`",
+    "type": "module",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_mobile_client.py"
+    ]
   }
 ]

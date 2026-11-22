@@ -164,6 +164,15 @@ def rewrite_source(source: str, rules: tuple[Rule, ...], path: str) -> str:
     bare_modules = {rule.old for rule in rules if bare_module(rule)} - identifier_names
     exact_fstrings = {rule.old for rule in rules if rule.paths and ('f"' in rule.old or "f'" in rule.old)}
     suffix = PurePosixPath(path).suffix
+    inline_module_paths = {
+        rule.old
+        for rule in rules
+        if rule.type == "module"
+        and rule.paths
+        and "/" in rule.old
+        and re.fullmatch(r"`[\w./-]+`", rule.old)
+        and re.fullmatch(r"`[\w./-]+`", rule.new)
+    }
     spans = []
     if suffix == ".py":
         spans = python_spans(source)
@@ -223,6 +232,8 @@ def rewrite_source(source: str, rules: tuple[Rule, ...], path: str) -> str:
                     continue
                 return old
             if match.start() >= start and match.end() <= end:
+                if suffix == ".py" and old in inline_module_paths:
+                    return new
                 if old == value:
                     matched_literal = True
                 if match.span() == (start, end) or (
@@ -235,8 +246,8 @@ def rewrite_source(source: str, rules: tuple[Rule, ...], path: str) -> str:
         if old in bare_modules and not (path_segment or matched_literal):
             if path.endswith("/modules.txt"):
                 prefix = source[: match.start()].rpartition("\n")[2]
-                suffix = source[match.end() :].partition("\n")[0]
-                if not (prefix.strip() or suffix.strip()):
+                line_suffix = source[match.end() :].partition("\n")[0]
+                if not (prefix.strip() or line_suffix.strip()):
                     return new
             if re.fullmatch(rf"""["']{re.escape(old)}["']""", source[match.start() - 1 : match.end() + 1]):
                 return new
