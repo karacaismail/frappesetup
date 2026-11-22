@@ -54,6 +54,8 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 
 `hooks.py` ortak bir dosyadır. Yalnız kendi işinizin satırlarını ekleyin. Var olan satırları değiştirmeyin.
 
+Her liste kancası dosyada yalnız bir kez atanır. Örneğin `auth_hooks` ya da `ai_write_closed_doctypes` böyledir. Kanca dosyada varsa kendi değerinizi o listeye ekleyin. Yeni bir atama satırı yazmayın. Python'da son atama öncekileri siler ve Git bunu çakışma saymaz. Birleştirme önizlemesi aynı adın iki kez atanmasını yakalar.
+
 `platform_core/translations/tr.csv` de ortak bir dosyadır. Kullanıcıya görünen metnin kaynağı İngilizcedir. Türkçesini bu dosyaya ekleyin. Yalnız kendi satırlarınızı ekleyin. Çakışmayı orkestratör birleştirmede çözer.
 
 ## Zorunlu çalışma kuralları
@@ -130,8 +132,10 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
    - 22 Kasım 2026 Pazar günü orkestratör ölü imaj ve birimleri sildi. Boş yer 5,7 GB oldu.
    - Aynı gün boş yer 2,3 GB'a düştü. Orkestratör geçici birimleri ve kullanılmayan önbelleği sildi. Boş yer 4,2 GB oldu. Geçici site için rastgele adlı birim açmayın. Bir deneme bitince kendi geçici birimini silin.
    - Aynı gün saat 10:15'te boş yer 718 MB'a düştü. Disk öteki projelerle ortaktır. Dolarsa öteki projelerin container'ları da bozulur.
-   - Bu yüzden `colima-factory` profilinde yeni imaj derlemeyin ve yeni site açmayın. Var olan imajı ve sitenizi yeniden kullanın.
-   - Yeni ortamı `colima` (default) profilinde açın. Bu profilde 57 GB boş disk ve yaklaşık 5 GB boş bellek var. `frappe/erpnext:v16.55.0` imajı orada da var.
+   - Aynı gün proje sahibi `factory` profilindeki eski uygulamaları sildi. Boş yer 61 GB oldu. Derleme önbelleği de boşaldı. İlk derleme bu yüzden uzun sürer.
+   - `colima-factory` profilinde yeniden imaj derleyebilir ve site açabilirsiniz. Önce boş yeri ölçün. Boş yer 10 GB'ın altına inerse yeni ortamı `colima` profilinde açın.
+   - Port başına ayrı imaj etiketi biriktirmeyin. Örneğin `fs-kiraci-dev:3820` gibi etiketler birikiyordu. İşiniz bitince kendi etiketinizi silin.
+   - `colima` (default) profilinde 57 GB boş disk ve yaklaşık 5 GB boş bellek var. `frappe/erpnext:v16.55.0` imajı orada da var.
    - Profili `FS_COLIMA_PROFILE=default` değişkeni seçer. `dev/bin/compose` ve `dev/bin/tunel` bu değişkeni okur. Kendi betiğinizde `docker --context colima` kullanın.
    - `colima` profilinde başlatmadan önce `colima ssh -- free -g` ile en az 2 GB boş bellek ölçün. Bellek yoksa bekleyin ve başka bölümü yapın.
    - Bir deneme bitince kendi geçici sitesini ve birimlerini silin. Bir işin en çok bir sitesi açık kalır.
