@@ -16,7 +16,7 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-:root {
+html:where(.platform-shell-panel):root {
   --panel-font: Outfit, system-ui, sans-serif;
   --panel-body-size: 1rem;
   --panel-title-size: 2rem;
@@ -35,29 +35,30 @@
   --panel-underline-offset: 0.2em;
 }
 
-body {
+html:where(.platform-shell-panel) body {
   margin: 0;
   color: var(--panel-ink);
   background: var(--panel-surface);
   font: var(--panel-body-size)/var(--panel-leading) var(--panel-font);
 }
 
-main {
+html:where(.platform-shell-panel) main {
   box-sizing: border-box;
   max-inline-size: var(--panel-content-width);
   margin-inline: auto;
   padding: var(--panel-top) var(--panel-gutter);
 }
 
-h1, p {
+html:where(.platform-shell-panel) h1,
+html:where(.platform-shell-panel) p {
   margin: 0 0 var(--panel-gap);
 }
 
-h1 {
+html:where(.platform-shell-panel) h1 {
   font-size: var(--panel-title-size);
 }
 
-a {
+html:where(.platform-shell-panel) a {
   display: inline-flex;
   align-items: center;
   min-block-size: var(--panel-target-height);
@@ -66,7 +67,7 @@ a {
   text-underline-offset: var(--panel-underline-offset);
 }
 
-.skip-link {
+html:where(.platform-shell-panel) .skip-link {
   position: absolute;
   inset-block-start: 0;
   inset-inline-start: var(--panel-gutter);
@@ -74,32 +75,32 @@ a {
   clip-path: inset(50%);
 }
 
-.skip-link:focus-visible {
+html:where(.platform-shell-panel) .skip-link:focus-visible {
   clip-path: none;
 }
 
 /* The underline marks the focused link without surrounding it. */
-:where(a, main):focus-visible {
+html:where(.platform-shell-panel) :where(a, main):focus-visible {
   outline: none;
 }
 
-html[data-keyboard-focus] a:focus-visible,
-html[data-keyboard-focus] main:focus-visible h1 {
+html:where(.platform-shell-panel)[data-keyboard-focus] a:focus-visible,
+html:where(.platform-shell-panel)[data-keyboard-focus] main:focus-visible h1 {
   text-decoration: underline var(--panel-focus) var(--panel-focus-width);
   text-underline-offset: var(--panel-underline-offset);
 }
 
 @media (forced-colors: active) {
-  html[data-keyboard-focus] :where(a, main):focus-visible {
+  html:where(.platform-shell-panel)[data-keyboard-focus] :where(a, main):focus-visible {
     outline: 2px solid CanvasText;
   }
 
-  html[data-keyboard-focus] a:focus-visible {
+  html:where(.platform-shell-panel)[data-keyboard-focus] a:focus-visible {
     text-decoration-color: currentColor;
     text-decoration-thickness: var(--panel-link-underline-width);
   }
 
-  html[data-keyboard-focus] main:focus-visible h1 {
+  html:where(.platform-shell-panel)[data-keyboard-focus] main:focus-visible h1 {
     text-decoration: none;
   }
 }
