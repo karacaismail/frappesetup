@@ -36,24 +36,51 @@ O-20 yalnız gerçek veri içermeyen geliştirme siteleri için geçerlidir.
 Bu geçişte veri yaması ve `frappe.rename_doc` kullanılmaz.
 Eski siteye `bench migrate` uygulamak eski tabloyu yeni ada taşımaz.
 
-1. Orkestratör geçişi başlatınca eski Compose proje adını doğrulayın.
-2. Kendi geliştirme projenizi eski Compose adıyla kapatın.
-3. Ad değiştirme betiğini çalıştırın.
-4. Yeni örnek dosyadan yerel ortam ayarlarını hazırlayın.
-5. Kiracı ve Press test sitelerini yeni adlarla yeniden kurun.
-6. Keycloak test alanını yeni istemci adlarıyla yeniden kurun.
-7. İlgili işin test komutlarını yeniden çalıştırın.
+1. Geçişten önce eski Compose proje adınızı doğrulayın.
+2. Kendi geliştirme projenizi eski komutla kapatın.
+3. Yalnız yeniden kurulacak test ortamının birimlerini silin.
+4. Ad geçişini “Dalda uygulama” bölümündeki sırayla yapın.
+5. Yeni örnek dosyadan yerel ortam ayarlarını hazırlayın.
+6. Kiracı ve Press test sitelerini yeniden kurun.
+7. Keycloak test alanını yeni istemci adlarıyla kurun.
+8. İlgili işin testlerini yeniden çalıştırın.
 
-Örneğin eski proje adı `fs-kiraci-dev` ise kapatma komutu şöyledir.
+Kiracı projesi `fs-dev-ortam-${PANE_PORT}` adını kullanır.
+İşçi kapatırken siteyi açtığı Pane portunu ve Colima profilini kullanır.
 
 ```sh
-docker --context colima-factory compose -p fs-kiraci-dev -f backend/dev/compose.kiraci.yaml down
+backend/dev/bin/compose down --remove-orphans
 ```
+
+Keycloak projesinin varsayılan adı `fs-kimlik-realm` olur.
+Farklı adla açtıysanız aynı `COMPOSE_PROJECT_NAME` değerini kullanın.
+Press projesi `compose.press.yaml` dosyasında `fs-press-tr` adını kullanır.
+İlgili dalda kendi projenizi şu komutla kapatın.
+
+```sh
+backend/identity/keycloak/bin/kc-dev.sh down --remove-orphans
+backend/dev/press/compose.sh down --remove-orphans
+```
+
+O-20, yeniden kurulacak geçici sitenin birimlerini silmeye izin verir.
+Kapatma komutu bu birimleri silmez. Siteyi açan işçi sahipliği doğrular.
+Silme kapsamı aşağıdaki adlarla sınırlıdır.
+
+| Ortam | Geçici birimler | Yerel imaj etiketi |
+| --- | --- | --- |
+| Kiracı | `fs-dev-ortam-${PANE_PORT}_kiraci-db`, `fs-dev-ortam-${PANE_PORT}_kiraci-sites`, `fs-dev-ortam-${PANE_PORT}_kiraci-logs` | `fs-kiraci-dev:${PANE_PORT}` |
+| Keycloak | `fs-kimlik-realm_keycloak-db` | `fs-keycloak-atonota:dev-${KC_PORT}` |
+| Press | `fs-press-tr_db`, `fs-press-tr_bench` | Paylaşılan `fs-press-tr-base:py3.14.8` korunur |
+
+Ayrı Keycloak proje adı kullandıysanız birim de o ön eki taşır.
+Keycloak olay kutusu `fs-kimlik-realm-event-sink:dev` etiketini kullanır.
+Bu etiketi yalnız kendi geçici derlemenize aitse silin.
+Paylaşılan imajları ve başka işlerin birimlerini koruyun.
 
 Aşağıdaki denetim eski ayar anahtarlarını gösterir. Ayar değerlerini yazdırmaz.
 
 ```sh
-python3 backend/dev/naming/apply_renames.py --check-settings backend/dev/.env /path/to/site_config.json
+python3.14 backend/dev/naming/apply_renames.py --check-settings backend/dev/.env /path/to/site_config.json
 ```
 
 ## Kaydedilen seçenekler ve durumlar
@@ -70,30 +97,45 @@ Yamayı önce eski verinin bir kopyasında sınayın.
 
 ## Dalda uygulama
 
-1. Betiği `--dry-run` ile çalıştırın.
-2. Listelenen dosyaları ve ad çakışmalarını inceleyin.
-3. Aynı dosyalarda çalışan işlemleri bitirin.
-4. Orkestratör geçişi başlatınca betiği kendi dalınızda çalıştırın.
-5. Git farkını inceleyin ve ilgili testleri çalıştırın.
+1. Orkestratör önce `backend` dalında ad geçişini tamamlar.
+2. İşçi temiz çalışma ağacında `backend` dalını birleştirir.
+3. İşçi birleşen dalın betiğiyle önizleme yapar.
+4. İşçi önizlemede dosyaları ve çakışmaları inceler.
+5. İşçi uygulama komutunu kendi dalında çalıştırır.
+
+Geçiş için Python 3.14 kullanın. Betik Python 3.12 öncesinde durur.
+Aşağıdaki komutları kendi Git çalışma alanınızın kökünde çalıştırın.
 
 ```sh
-python3 backend/dev/naming/apply_renames.py --dry-run
+env -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL git merge refs/heads/backend
+python3.14 backend/dev/naming/apply_renames.py --repo "$PWD" --dry-run
+PYTHON=python3.14 backend/dev/naming/apply-to-branch -- \
+  python3.14 -B -m unittest discover -s backend/dev/tests
 ```
 
-Betik taşınacak dosyaları önce denetler. Hedef doluysa betik durur.
-İş yarıda kesilirse Git farkını inceleyin. Sorunu giderince betiği yeniden çalıştırın.
-Betik yalnız Git'in izlediği dosyaları taşır.
-Betik ilgili uygulama varsa ortak sözlüğü uygulamanın köküne ekler.
-
-Orkestratör geçişi başlatınca komutu kendi iş dalınızda çalıştırın.
-Komuta dalınızın Python testini verin. Aşağıdaki örnek geliştirme testlerini çalıştırır.
-
-```sh
-backend/dev/naming/apply-to-branch -- python3 -B -m unittest discover -s backend/dev/tests
-```
-
-Komut temiz çalışma ağacı ister. Önce yerel `backend` dalının birleştiğini denetler.
+Geçiş komutuna kendi işinizin Python testlerini verin.
+Komut temiz çalışma ağacı ister. Komut yerel `backend` dalının birleştiğini denetler.
 Komut adları uygular. Sonra modül adlarını, ad kurallarını ve verilen testi denetler.
-Tüm denetimler geçerse komut tek Git kaydı oluşturur.
+Tüm denetimler geçerse komut değişiklikleri tek Git kaydına alır.
 Denetim durursa değişiklikler inceleme için çalışma ağacında kalır.
 Yeni değişiklik yoksa komut yeni Git kaydı oluşturmaz.
+
+İş yarıda kesilirse önce `git status` ve `git diff HEAD` çalıştırın.
+Yalnız geçişe ait kaydedilmemiş değişiklikler varsa bunları geri alabilirsiniz.
+`git reset --hard HEAD` izlenen dosyalardaki kaydedilmemiş değişiklikleri siler.
+Kendi düzenlemeniz varsa bu komutu çalıştırmayın.
+`git status` altında kalan izlenmeyen dosyaları tek tek inceleyin.
+Çalışma ağacı temiz olunca uygulama komutunu tekrar çalıştırın.
+
+## Belgelerdeki eski kod adları
+
+Orkestratör, belgelerde kalan eski kod adlarının listesini yönetir.
+Aşağıdaki komut listeyi dosya ve satır bilgisiyle verir.
+Komut Markdown dosyalarını değiştirmez.
+
+```sh
+python3.14 backend/dev/naming/apply_renames.py --repo "$PWD" --report-docs
+```
+
+Bir dal eski proje kaydına ya da sözleşmeye satır eklediyse çakışma çıkabilir.
+İşçi eklediği satırı yeni dosyaya taşır. Eski yoldaki bağlantıyı korur.
