@@ -8,7 +8,7 @@ app_license = "mit"
 # Access rule engine (erisim-kurali task). Decision note: docs/kararlar/0006-erisim-kurali.md
 permission_query_conditions = {"*": "platform_core.erisim.hooks.query_conditions"}
 has_permission = {"*": "platform_core.erisim.hooks.has_permission"}
-# Custom link searches on governed types run only when allow-listed and checked.
+# On a document type with Access Rules every custom link search is refused. There is no allow-list.
 override_whitelisted_methods = {
 	"frappe.desk.search.search_link": "platform_core.erisim.link_search.search_link",
 	"frappe.desk.search.search_widget": "platform_core.erisim.link_search.search_widget",

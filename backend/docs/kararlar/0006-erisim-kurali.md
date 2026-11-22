@@ -363,6 +363,10 @@ Motor “Report” kayıt türünü Frappe'nin `extend_doctype_class` kancasıyl
 
 Arka plan işi veriyi okurken kapıdan yeniden geçer. Yetki sıraya alma ile çalışma arasında düşerse iş reddedilir.
 
+Kapı Frappe'nin gerçekten çalıştırdığı rapora bakar. Frappe başvuru alanını (`reference_report`) yalnız “Custom Report” türünde izler (`desk/query_report.py:240`). Motor da öyle yapar. Türü değişmiş bir raporda eski başvuru kalabilir. Frappe o raporun kendisini çalıştırır ve kapı da onun türüne bakar.
+
+Başvuru bulunamazsa ya da başvurular döngü kurarsa kapı raporu reddeder. Hazır rapor ve e-posta raporu kapıları da aynı çözümlemeyi kullanır.
+
 Başka modüller kapıyı `platform_core.erisim.api.report_guard` işleviyle de sorabilir. Yapay zekâ katmanı raporu çalıştırmadan önce bu işlevi çağırır. Bu erken bir cevaptır. Asıl denetim rapor çalışırken yine yapılır.
 
 #### Kurallar
@@ -389,7 +393,7 @@ Sitede hiç kurallı tür yoksa kapı tek şeye bakar. Öznenin raporun ana tür
 
 - “System Manager” rolü sorgu ve betik raporu kuralından bilerek muaftır. Sitede bu raporları çalıştırabilen biri gerekir. Bu rol kuralları zaten yönetir.
 - “Administrator” kayıt kuralından muaftır. Frappe bu kullanıcı için izin kancasını hiç çağırmaz (`permissions.py:108`).
-- Özel aramada muafiyet yoktur. Frappe özel arama işlevini “Administrator” için de çalıştırırdı. Beşinci inceleme bu erken dönüşü buldu ve dönüş kaldırıldı.
+- Özel aramada muafiyet yoktur. Frappe özel arama işlevini “Administrator” için de çalıştırırdı. Bu yüzden motor bu kullanıcıyı da reddeder.
 
 #### Sorgu ve betik raporu neden kapalı?
 
@@ -397,22 +401,15 @@ Sorgu raporu yöneticinin yazdığı SQL'i çalıştırır. Betik raporu uygulam
 
 Sonucu şudur: Sitede bir kural varsa bütün sorgu ve betik raporları kapanır. Yalnız “System Manager” rolü çalıştırabilir. Raporun ana türü kuralsız olsa da kapanır. Bu, standart ERPNext raporlarını da kapsar.
 
-#### Bildirim ve kod denetimi denendi ve kaldırıldı
+#### Bildirim ve kod denetimi yoktur
 
-Bir ara betik raporu için başka bir yol vardı. Uygulama raporun okuduğu türleri `access_rule_report_scopes` kancasıyla bildiriyordu. Motor rapor kodunu durağan olarak okuyordu. Kod yalnız `frappe.get_list` kullanıyorsa rapor daraltılmış kullanıcıya da açılıyordu.
+Bir uygulama raporunu bildirerek ya da kodunu denetleterek bu kuralı açamaz. Motor rapor kodunu okuyup güvenli saymaz. Kodu okuyarak güvenli saymak eksiksiz yapılamaz. Yetki kodunda “büyük olasılıkla güvenli” yetmez.
 
-Dördüncü inceleme bu denetimin iki atlatma yolunu buldu:
-
-1. Kod `import frappe as f` yazıp `f.get_all` çağırabiliyordu. Denetim takma adı izlemiyordu.
-2. Kod `frappe.get_list(..., user="Administrator")` yazabiliyordu. Çağrı izinli görünüyordu ama başka kullanıcı adına okuyordu. Aynı girdi sırayla da verilebiliyordu.
-
-Bu iki yol kapatılabilirdi. Ama sorun kökte duruyor: Kodu okuyarak güvenli saymak eksiksiz yapılamaz. Her kapatılan yolun yanında bulunmamış bir yol kalabilir. Yetki kodunda “büyük olasılıkla güvenli” yetmez.
-
-Bu yüzden orkestratör MVP kuralını sadeleştirdi. Bildirim kancası ve kod denetimi kaldırıldı. Hiçbir uygulama bu kancayı kullanmıyordu. Kancayı yazmanın artık etkisi yoktur. Aynı karar bağlantı aramasındaki izin listesini de kaldırdı.
-
-Eski atlatma yolları artık ret testleridir. Takma adlı kod, kullanıcı girdili kod ve sıralı girdili kod kısıtlı kullanıcıda çalışmaz. Test raporun kodunun hiç çalışmadığını da sınar.
+`access_rule_report_scopes` ve `access_rule_aware_reports` kancalarının etkisi yoktur. Testler bu kancaları yazılmış gibi gösterir ve raporun yine reddedildiğini sınar.
 
 Bedeli şudur: Daraltılmış kullanıcı için tek rapor yolu liste raporudur. Uygulamaya özel bir rapor gerekebilir. O rapor liste raporu ya da ayrı bir uç olarak yazılmalıdır. Uç veriyi `frappe.get_list` ile okur.
+
+Bu kararın geçmişi 15. bölümdedir.
 
 #### Hazır rapor kapalıdır
 
@@ -435,7 +432,7 @@ Sırada bekleyen hazır rapor da kapalıdır. Bir kayıt kural yazılmadan önce
 
 Motor bu yüzden iş başında denetler. Frappe işçisi her işten önce `before_job` kancasını çağırır (`utils/background_jobs.py:269`). Motor bu kancaya bağlanır. İş hazır rapor işiyse ve rapor kurallı veriye dokunuyorsa motor işi reddeder. Frappe'nin iş işlevi hiç başlamaz. Kayıt “Error” durumuna geçer ve dosya yazılmaz.
 
-Denetim bütün rapor türleri içindir. Liste raporu “Report” kaydındaki kapıya hiç uğramaz (`desk/query_report.py:93`). Yedinci inceleme bu açığı buldu. İş başı denetimi rapor türüne bakmaz.
+Denetim bütün rapor türleri içindir. Liste raporu “Report” kaydındaki kapıya hiç uğramaz (`desk/query_report.py:93`). İş başı denetimi rapor türüne bakmaz.
 
 İki ek güvence vardır. Rapor kapısı işin adına yine bakar. Kapalı hazır rapora dosya da eklenemez.
 
@@ -473,16 +470,7 @@ Kuralsız veriye dokunan kayıt Frappe'nin olağan davranışıyla çalışır.
 1. Proje zamanlanmış iş kurmaz (D-6). Bu özellik zamanlanmış bir iştir.
 2. İlk sürümün e-posta raporuna ihtiyacı yoktur.
 
-Daha ince kurallar denendi ve her biri yeni bir açık verdi:
-
-| Denenen kural | İncelemenin bulduğu açık |
-| --- | --- |
-| Rapor kuralları kayıttaki kullanıcıya uygulansın. | Rapor indiren kişinin oturumuyla çalışıyordu. |
-| Rapor kayıttaki kullanıcının oturumuyla çalışsın. | Oturum değiştirmek oturum verisini siliyordu. “Report Manager” daha yetkili bir hesabı seçebiliyordu. |
-| Kaydı yalnız “System Manager” kullansın. | Zamanlayıcı “Administrator” oturumuyla çalışıyor ve her rol denetimini geçiyordu. |
-| “System Manager” kaydı onaylasın. Motor ayarların izini tutsun. | Rapor tanımı değişince eski onay geçerli kalıyordu. İz alan sınırlarını güvenli saklamıyordu. |
-
-Her tur bir açığı kapattı ve bir yenisini gösterdi. Orkestratör bu yüzden özelliği kurallı veride tümüyle kapattı. Onay kaydı, onay izi ve onay kodu kaldırıldı.
+Daha ince kurallar denendi ve her biri yeni bir açık verdi. Onay kaydı ve kullanıcı değiştirme bunlardandır. Hiçbiri geçerli değildir. Geçmişi 15. bölümdedir.
 
 ##### Zamanlayıcı hangi oturumla çalışır?
 
@@ -508,7 +496,7 @@ Bu yüzden kural şudur. Kurallı kayıt türünde yalnız Frappe'nin standart a
 
 Bütün özel arama işlevleri kurallı türde reddedilir. Ret bütün kullanıcılar içindir. “Administrator” için de geçerlidir. Kullanıcının bütün kayıtları görmesi sonucu değiştirmez. Kuralsız türde özel arama Frappe'nin olağan davranışıyla çalışır.
 
-İzin listesi yoktur. Bir ara `access_rule_allowed_queries` kancası vardı. Listedeki işlevin kodu durağan olarak denetleniyordu. Bu denetim rapor kodundaki denetimle aynıydı ve aynı nedenle kaldırıldı.
+İzin listesi yoktur. `access_rule_allowed_queries` kancasının etkisi yoktur. Bir test bunu sınar.
 
 Sonucu şudur: Bir kayıt türüne kural yazılınca o türün ERPNext'teki özel araması kapanır. Arama alanı standart aramaya dönmelidir.
 
@@ -583,7 +571,7 @@ Yapay zekâ katmanı ayrı bir yetki yolu kurmaz. Katman kullanıcının kimliğ
 | `run_report` | `frappe.desk.query_report.run`, Python'dan | Rapor kapısı çalışır. Kapı “Report” kaydının içindedir. Katman önce `erisim.api.report_guard` işlevini de çağırır. |
 
 - `erisim` modülü `yapay_zeka` modülünü içe aktarmaz. `yapay_zeka` da `erisim` modülünü içe aktarmaz. İki modül yalnız Frappe'nin kancalarında buluşur.
-- Yapay zekâ kuralları genel kayıt araçlarıyla yönetir. “Access Rule” olağan bir kayıt türüdür. Yazma yine öneri ve insan onayı ister.
+- Yapay zekâ kuralları yalnız motorun kendi araçlarıyla değiştirir. Araçlar aşağıdaki tablodadır. Genel yazma araçları “Access Rule” türüne kapalıdır (O-28). Yazma yine öneri ve insan onayı ister.
 - Yapay zekâ alan seviyesini `yapay_zeka` modülünün yönetim araçlarıyla değiştirir. O dalda `set_field_property` ve `set_role_permission` araçları vardır.
 ### Motorun kendi araçları
 
@@ -612,14 +600,14 @@ Yapay zekâ katmanı henüz `backend` dalında değildir. Testler araçları sö
 
 Kanca her izin denetiminde çalışır. Motor kural listesini istek başına bir kez okur. Liste yalnız o istek boyunca saklanır.
 
-İstekler arasında ortak önbellek yoktur. İlk tasarımda vardı. İkinci bağımsız inceleme şu yarışı gösterdi ve bir test onu doğruladı:
+İstekler arasında ortak önbellek yoktur. Ortak önbellek şu yarışa açıktır ve bir test bunu doğrular:
 
 1. Birinci istek eski, geniş kuralı okur.
 2. Yönetici ikinci istekte kuralı daraltır. Değişiklik kesinleşir ve önbellek silinir.
 3. Birinci istek eski kuralı ortak önbelleğe geri yazar.
 4. Sonraki istekler kaldırılmış yetkiyle çalışır.
 
-Ortak önbellek kaldırılınca bu yol kapandı. Bedeli istek başına 1 sorgudur. Ölçüm 7. bölümdedir.
+Ortak önbellek olmadığı için bu yol kapalıdır. Bedeli istek başına 1 sorgudur. Ölçüm 7. bölümdedir.
 
 - Kural değişince sonuç sonraki istekte değişir. Bu davranış testle sınanır.
 - Kuralı değiştiren istek kendi sakladığı listeyi de siler.
@@ -632,7 +620,7 @@ Bir istek kuralı değiştirirse motor o isteğin kalanında kural listesini sak
 
 Nedeni kısmi geri almadır. Kod bir geri dönüş noktası açabilir ve yalnız oraya dönebilir. Frappe bu durumda geri alma olayını çalıştırmaz (`database/database.py:1212`). Motor geri almayı öğrenemez. Saklanan liste geri alınmış geniş kuralı taşımaya devam ederdi.
 
-Dördüncü inceleme bu açığı buldu. İki test onu sınar. Biri kısmi geri almayı, öteki tam geri almayı sınar. İkisinde de dar kural geri gelir.
+İki test bunu sınar. Biri kısmi geri almayı, öteki tam geri almayı sınar. İkisinde de dar kural geri gelir.
 
 Bedeli şudur: Kural değiştiren istek her izin denetiminde 1 sorgu daha açar. Kural değiştirmeyen istek etkilenmez.
 
@@ -690,95 +678,42 @@ Testler önce kancalar kapalıyken çalıştırıldı. 83 testten 80'i beklenen 
 
 ## 15. Bağımsız inceleme
 
-Motor yetki kodudur. Bu yüzden kod bağımsız bir incelemeden geçti (R-9). İnceleyen yalnız okudu. Her bulgu için önce test yazıldı.
+Motor yetki kodudur. Bu yüzden kod art arda bağımsız incelemelerden geçti (R-9). İnceleyenler yalnız okudu. Her bulgu için önce başarısız test yazıldı, sonra kod düzeltildi.
 
-| Bulgu | Sonuç |
+Bu bölüm kural anlatmaz. Geçerli kurallar 3. ile 13. bölümler arasındadır. Burada yalnız incelemelerin neyi değiştirdiği yazılıdır.
+
+### İncelemelerin kapattığı açıklar
+
+| Açık | Bugünkü durum | Kural nerede |
+| --- | --- | --- |
+| Hazır rapor yolu kapıyı atlıyordu. | Kurallı veride hazır rapor herkese kapalı. | 9. bölüm |
+| Sıradaki hazır rapor işi çalışabiliyordu. | İş başında reddediliyor. | 9. bölüm |
+| Süzgeçsiz `all` kuralı gizli alanı raporda açıyordu. | Sorgu ve betik raporu yalnız “System Manager” rolüne açık. | 9. bölüm |
+| Rapor kapısı çalışan raporu yanlış belirliyordu. | Kapı başvuruyu yalnız “Custom Report” türünde izliyor. | 9. bölüm |
+| E-posta raporu başkasının yetkisiyle çalışabiliyordu. | Kurallı veride e-posta raporu herkese kapalı. | 9. bölüm |
+| Özel arama işlevi kuralı atlayabiliyordu. | Kurallı türde yalnız standart arama çalışıyor. | 9. bölüm |
+| Test yardımcısı uç olarak açıktı. | Yardımcılar uç değil. Bir test bunu denetliyor. | 14. bölüm |
+| Eski kural istekler arası önbellekte kalabiliyordu. | İstekler arası önbellek yok. | 12. bölüm |
+| Kısmi geri alma istek içindeki listeyi temizlemiyordu. | Kural değişen istekte liste saklanmıyor. | 12. bölüm |
+| Sayı değeri kuralı geçiyordu. Liste değeri sunucu hatası veriyordu. | Yeni değer metne çevriliyor. Liste boş sayılıyor. | 6. bölüm |
+| Sonsuz sayı süzgeç değeri olarak kabul ediliyordu. | Kural kaydedilirken reddediliyor. | 3. bölüm |
+| Açıklama ucu olağan kullanıcıya iki ret nedeni dönüyordu. | Tek neden dönüyor. | 13. bölüm |
+| Alan düzeyi uçları korumalı türleri ayırmıyordu. | Korumalı türler reddediliyor. | 8. bölüm |
+
+Bir bulgu doğrulanmadı. İstemci kaydın adını değiştirerek başkasının kaydına ulaşamıyor. Üç test bu yolu gerçek istekle sınar. Testler kalıcıdır.
+
+### Denenen ve bırakılan çözümler
+
+Aşağıdaki çözümler bir süre kodda kaldı ve sonra kaldırıldı. Hiçbiri geçerli kural değildir.
+
+| Bırakılan çözüm | Neden bırakıldı |
 | --- | --- |
-| İstemci kaydın adını değiştirerek başkasının kaydına ulaşabilir. | Doğrulanmadı. Üç test bu yolu gerçek istekle sınar ve yol kapalıdır. Testler kalıcıdır. |
-| Hazır rapor yolu kapıyı atlar. | Doğrulandı ve kapatıldı. |
-| Eski kural önbellekte süresiz kalabilir. | Önce 60 saniye süre verildi. İkinci inceleme bunu yetersiz buldu. Ortak önbellek kaldırıldı. |
-| Sayı değeri kuralı geçer. Liste değeri sunucu hatası verir. | Doğrulandı ve kapatıldı. |
-| Sonsuz sayı süzgeç değeri olarak kabul edilir. | Doğrulandı ve kapatıldı. |
-| Açıklama ucu olağan kullanıcıya iki ret nedeni döner. | Kapatıldı. Tek neden döner. |
-| Alan düzeyi uçları korumalı türleri ayırmaz. | Doğrulandı ve kapatıldı. |
-| Çalışan kendi bölüm ya da şirket alanını değiştirip kapsamını genişletebilir. | Aşağıdaki koşul yazıldı. |
-
-### İkinci inceleme
-
-Orkestratör ikinci bir bağımsız inceleme yaptırdı. İnceleme üç engelleyici bulgu verdi. Üçü de testle doğrulandı ve kapatıldı. Testler `tests/test_second_review.py` dosyasındadır.
-
-| Bulgu | Düzeltme |
-| --- | --- |
-| Hazır raporun indirme yolu kuralı aşıyor. | Kapı “Prepared Report” kaydı okunurken de çalışıyor. |
-| `all` kuralı gizli alanı raporda açıyor. | Kapı alan seviyesini de denetliyor. |
-| Eşzamanlı istek kaldırılmış yetkiyi önbelleğe geri koyuyor. | Ortak önbellek kaldırıldı. |
-
-İnceleme dört uçta istek sayısı sınırı olmadığını da yazdı. Uçlar oturum ister ve misafire kapalıdır. Sınır bu turda eklenmedi.
-
-### Üçüncü inceleme
-
-İkinci incelemenin düzeltmeleri yeniden incelendi. Orkestratör altı karar verdi. Bu turda kapı “Report” kaydının içine taşındı. Varsayılan test komutu ERPNext'i de kurar oldu. Bu iki değişiklik kalıcıdır.
-
-Öteki dört kararın ilk çözümü bildirime ve sonuç süzmeye dayanıyordu. Dördüncü inceleme bunları yetersiz buldu. Yerlerine aşağıdaki kesin kurallar geldi.
-
-### Dördüncü inceleme ve kesin kurallar
-
-Üçüncü incelemenin düzeltmeleri de yeniden incelendi. İnceleme bildirime dayanan kapıyı yetersiz buldu. Bildirim raporun gerçekte ne okuduğunu sınırlamıyordu. Orkestratör MVP için daha basit ve kesin kurallar koydu. Kurallar 9. bölümdedir.
-
-| Karar | Kural | Test |
-| --- | --- | --- |
-| A | Kurallı veriye dokunan hazır rapor tümüyle kapalıdır. | `tests/test_report_rules.py` |
-| B | Sorgu raporu yalnız “System Manager” rolüne çalışır. | `tests/test_report_rules.py` |
-| C | Betik raporu yalnız bildirim ve kod denetimiyle çalışır. Bu kural sonra sadeleşti: betik raporu yalnız “System Manager” rolüne çalışır. | `tests/test_report_rules.py` |
-| D | Kurallı türde yalnız standart arama ve izin listesindeki arama çalışır. Bu kural sonra sadeleşti: yalnız standart arama çalışır. | `test_link_search.py` |
-| E | Zamanlanmış e-posta raporu A, B ve C kurallarına uyar. | `tests/test_report_rules.py` |
-
-Aynı turda bir açık daha kapatıldı. Arama testlerinin iki yardımcı işlevi uç olarak açıktı. İşlevler test dosyasındaydı ama test dosyası da pakete girer. Giriş yapmış kullanıcı işlevi çağırıp kayıt kurallarını atlayabilirdi. İşlevlerden uç süslemesi kaldırıldı. Testler işlevi yalnız test sürerken Frappe'ye kaydeder. Bir test pakette uç bildiren test dosyası arar. Bulursa başarısız olur.
-
-### Beşinci inceleme ve sadeleşen kural
-
-Dördüncü incelemenin düzeltmeleri de incelendi. İnceleme üç engelleyici ve bir önemli bulgu verdi.
-
-| Bulgu | Düzeltme | Test |
-| --- | --- | --- |
-| E-posta raporu kayıttaki kullanıcının kimliğiyle çalışmıyor. | Motor oturumu kayıttaki kullanıcıya çeviriyordu. Bu çözüm sonraki incelemede kaldırıldı. | `tests/test_report_rules.py` |
-| Takma ad kullanan kod kod denetimini atlıyor. | Kod denetimi ve bildirim kaldırıldı. Betik raporu yalnız “System Manager” rolüne çalışıyor. | `tests/test_report_rules.py` |
-| `user` girdisi alan sorgu başka kullanıcı adına okuyor. | Aynı düzeltme. Arama izin listesi de kaldırıldı. | `tests/test_report_rules.py`, `test_link_search.py` |
-| Kısmi geri alma istek içindeki kural listesini temizlemiyor. | Kural değişen istekte liste saklanmıyor. | `tests/test_rule_cache.py` |
-
-İkinci ve üçüncü bulgunun kökü aynıdır. Gerekçe 9. bölümdedir.
-
-### Altıncı inceleme
-
-Beşinci incelemenin düzeltmeleri de incelendi. İnceleme bir engelleyici ve üç önemli bulgu verdi.
-
-| Bulgu | Düzeltme | Test |
-| --- | --- | --- |
-| E-posta raporunda yetki seçilen hesaba göre açılıyor. | Kurallı veride kaydı yalnız “System Manager” kullanabilir. | `tests/test_report_rules.py` |
-| E-posta raporu oturum bilgilerini siliyor. | Kullanıcı değiştirme kodu tümüyle kaldırıldı. | `tests/test_report_rules.py` |
-| Özel arama yasağı “Administrator” için uygulanmıyor. | Erken dönüş kaldırıldı. Muafiyetler bu notta ve sözleşmede tablo olarak yazıldı. | `test_link_search.py` |
-| Önceden sıraya alınan hazır rapor çalışabiliyor. | Kapı arka plan işinin adına bakıyor ve işi reddediyor. | `tests/test_report_rules.py` |
-
-### Yedinci inceleme
-
-Altıncı incelemenin düzeltmeleri de incelendi. İnceleme bir engelleyici, bir önemli ve bir küçük bulgu verdi.
-
-| Bulgu | Düzeltme | Test |
-| --- | --- | --- |
-| Zamanlayıcı eski kayda yönetici yetkisi veriyor. | Kayıt yalnız onaylıyken çalışıyordu. Bu çözüm sonraki incelemede kaldırıldı. | `tests/test_auto_email_report.py` |
-| Kaydetme denetimi eski rapor türüne bakmıyor. | Denetim kaydın önceki raporuna da bakıyor. | `tests/test_auto_email_report.py` |
-| Belge, betiğin hangi oturumla çalıştığını belirsiz bırakıyor. | Oturum ile kayıttaki kullanıcı farkı bu nota ve sözleşmeye yazıldı. | Belge değişikliği |
-
-### Sekizinci inceleme
-
-Yedinci incelemenin düzeltmeleri de incelendi. İnceleme bir engelleyici, iki önemli ve bir küçük bulgu verdi.
-
-| Bulgu | Düzeltme | Test |
-| --- | --- | --- |
-| Raporun tanımı değişince eski onay geçerli kalabiliyor. | Onay düzeni kaldırıldı. Kurallı veride e-posta raporu herkese kapalı. | `tests/test_auto_email_report.py` |
-| Ayar özeti alan sınırlarını güvenli saklamıyor. | Özet kodu onay düzeniyle birlikte kaldırıldı. | `tests/test_auto_email_report.py` |
-| Sıradaki liste raporu çalışma başında durmuyor. | Motor `before_job` kancasıyla iş başında reddediyor. | `tests/test_report_rules.py` |
-| Oturum tablosunda zamanlayıcı hesabı eksik. | Zamanlayıcının oturumu bu nota ve sözleşmeye yazıldı. | Belge değişikliği |
+| İstekler arası kural önbelleği | Eski görüntülü bir istek kaldırılmış yetkiyi geri yazabiliyordu. |
+| Betik raporu için bildirim ve kod denetimi | Takma ad ve `user` girdisi denetimi atlatıyordu. Böyle bir denetim eksiksiz olamaz. |
+| Özel arama için izin listesi | Aynı kod denetimine dayanıyordu. |
+| Özel arama sonucunu süzme | İşlev kayıtları gizli bir alana göre seçebilir. Süzme bunu düzeltmez. |
+| E-posta raporunu kayıttaki kullanıcının oturumuyla çalıştırma | Oturum değiştirmek oturum verisini siliyordu. |
+| E-posta raporu için “System Manager” onayı ve ayar izi | Rapor tanımı değişince eski onay geçerli kalıyordu. |
 
 ### Özne alanlarını koruyun
 

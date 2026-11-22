@@ -37,12 +37,30 @@ def any_governed() -> bool:
 	return bool(rules.active_rules())
 
 
-def report_record(report_name: str):
-	"""The Report row that decides. A custom report uses the data of the report it refers to."""
-	record = frappe.db.get_value("Report", report_name, REPORT_FIELDS, as_dict=True)
-	if record and record.reference_report and record.reference_report != report_name:
-		return report_record(record.reference_report)
-	return record
+CUSTOM_REPORT = "Custom Report"
+
+
+def report_record(report_name: str | None):
+	"""The Report row Frappe will really run, and whether it could be found.
+
+	Frappe follows `reference_report` only for a report of type "Custom Report"
+	(`frappe/desk/query_report.py:240`). A report of another type runs itself, also when the
+	field still holds an old value. Returns `(row, True)` for the report that runs,
+	`(None, True)` when the named report does not exist, and `(None, False)` when a custom
+	report refers to a missing report or the references form a loop.
+	"""
+	seen: set[str] = set()
+	name = report_name
+	while name and name not in seen:
+		seen.add(name)
+		record = frappe.db.get_value("Report", name, REPORT_FIELDS, as_dict=True)
+		if not record:
+			# The first name being unknown is Frappe's business. A broken reference is ours.
+			return None, len(seen) == 1
+		if record.report_type != CUSTOM_REPORT:
+			return record, True
+		name = record.reference_report
+	return None, not seen
 
 
 def touches_governed(report_name: str | None, governed: set[str] | None = None) -> bool:
@@ -52,8 +70,13 @@ def touches_governed(report_name: str | None, governed: set[str] | None = None) 
 	the engine does not read rules on its own while a site is being migrated.
 	"""
 	governed = set(rules.active_rules()) if governed is None else governed
-	record = report_record(report_name) if report_name else None
-	if not record or not governed:
+	record, resolved = report_record(report_name)
+	if not governed:
+		return False
+	if not resolved:
+		# Nobody can tell what would run. Assume the worst.
+		return True
+	if not record:
 		return False
 	if record.report_type == "Report Builder":
 		return record.ref_doctype in governed
@@ -76,7 +99,9 @@ def denial(report_name: str | None, user: str | None = None) -> str | None:
 	user = user or frappe.session.user
 	if user == "Administrator" or not report_name:
 		return None
-	record = report_record(report_name)
+	record, resolved = report_record(report_name)
+	if not resolved:
+		return _("Report {0} refers to a report that cannot be found.").format(frappe.bold(report_name))
 	if not record or record.report_type == "Report Builder":
 		return None
 

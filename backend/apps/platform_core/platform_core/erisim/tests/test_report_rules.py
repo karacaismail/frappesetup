@@ -188,6 +188,135 @@ class TestQueryReportRule(ReportRulesTestCase):
 			self.assertIsNone(parameters[1].default)
 
 
+class TestWhichReportRuns(ReportRulesTestCase):
+	"""The gate must decide on the report Frappe really runs.
+
+	Frappe follows `reference_report` only for a report of type "Custom Report"
+	(`frappe/desk/query_report.py:232`). A report whose type was changed can keep an old value
+	in that field. Frappe then runs the report itself, and so must the gate.
+	"""
+
+	STALE = "AR Test Stale Reference Report"
+	CUSTOM = "AR Test Custom Report"
+	CUSTOM_OF_CUSTOM = "AR Test Custom Of Custom Report"
+	BROKEN = "AR Test Broken Custom Report"
+	LOOP_A = "AR Test Loop A Report"
+	LOOP_B = "AR Test Loop B Report"
+	ALL = (STALE, CUSTOM, CUSTOM_OF_CUSTOM, BROKEN, LOOP_A, LOOP_B)
+
+	@classmethod
+	def setUpClass(cls):
+		super().setUpClass()
+		query = f"select name as `Name:Data:200`, title as `Title:Data:200` from `tab{DOCTYPE}`"
+		# A query report that was once a custom report of an ungoverned list report.
+		ensure_report(cls.STALE, FREE_DOCTYPE, query=query)
+		for name in (cls.CUSTOM, cls.CUSTOM_OF_CUSTOM, cls.BROKEN, cls.LOOP_A, cls.LOOP_B):
+			ensure_report(name, FREE_DOCTYPE, "Custom Report", reference_report=NAME_REPORT)
+		# Frappe checks links on save, so the odd states are written straight to the table.
+		for name, reference in (
+			(cls.STALE, FREE_BUILDER_REPORT),
+			(cls.CUSTOM, NAME_REPORT),
+			(cls.CUSTOM_OF_CUSTOM, cls.CUSTOM),
+			(cls.BROKEN, "AR Test Report That Does Not Exist"),
+			(cls.LOOP_A, cls.LOOP_B),
+			(cls.LOOP_B, cls.LOOP_A),
+		):
+			frappe.db.set_value("Report", name, "reference_report", reference)
+		frappe.db.commit()  # nosemgrep: the request uses another connection
+
+	def setUp(self):
+		super().setUp()
+		self.addCleanup(self.cleanup)
+
+	def cleanup(self) -> None:
+		frappe.set_user("Administrator")
+		frappe.db.rollback()
+		frappe.db.delete("Auto Email Report")
+		frappe.db.delete("Prepared Report")
+		frappe.db.commit()  # nosemgrep
+
+	def test_stale_reference_does_not_hide_a_query_report(self):
+		"""Frappe runs the query. The leftover reference to a harmless list report means nothing."""
+		for user in (EMPLOYEE_1, HR, NO_RULE):
+			with self.subTest(user=user):
+				self.assert_refused(self.run_report(self.login(user), self.STALE))
+		self.assertTrue(reports.touches_governed(self.STALE))
+
+	def test_system_manager_still_runs_the_report_with_a_stale_reference(self):
+		response = self.run_report(self.login(ADMIN), self.STALE)
+
+		self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+		self.assertIn(self.records[EMPLOYEE_1], response.get_data(as_text=True))
+
+	def test_export_follows_the_same_decision(self):
+		body = {"report_name": self.STALE, "file_format_type": "CSV", "filters": "{}"}
+
+		self.assert_refused(self.send(self.login(HR), "POST", EXPORT, body=body))
+
+	def test_custom_report_is_decided_by_the_report_it_refers_to(self):
+		for report in (self.CUSTOM, self.CUSTOM_OF_CUSTOM):
+			with self.subTest(report=report):
+				self.assert_refused(self.run_report(self.login(HR), report))
+				allowed = self.run_report(self.login(ADMIN), report)
+				self.assertEqual(allowed.status_code, 200, allowed.get_data(as_text=True)[:300])
+
+	def test_missing_reference_is_refused(self):
+		for user in (EMPLOYEE_1, HR, ADMIN):
+			with self.subTest(user=user):
+				self.assertTrue(self.denied(self.BROKEN, user))
+		response = self.run_report(self.login(HR), self.BROKEN)
+		self.assertNotEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+		self.assert_refused(response, (403, 404, 417))
+		self.assertTrue(reports.touches_governed(self.BROKEN))
+
+	def test_reference_loop_is_refused_without_hanging(self):
+		for report in (self.LOOP_A, self.LOOP_B):
+			for user in (HR, ADMIN):
+				with self.subTest(report=report, user=user):
+					self.assertTrue(self.denied(report, user))
+			self.assertTrue(reports.touches_governed(report))
+
+	def test_prepared_report_gate_uses_the_report_that_runs(self):
+		for report in (self.STALE, self.CUSTOM, self.BROKEN, self.LOOP_A):
+			with self.subTest(report=report):
+				frappe.set_user(ADMIN)
+				doc = frappe.get_doc({"doctype": "Prepared Report", "report_name": report})
+				self.assertRaises(frappe.PermissionError, doc.insert, ignore_permissions=True)
+				frappe.set_user("Administrator")
+		response = self.send(
+			self.login(ADMIN), "POST", PREPARED + "make_prepared_report", body={"report_name": self.STALE}
+		)
+		self.assert_refused(response)
+		self.assertFalse(frappe.db.count("Prepared Report"))
+
+	def test_auto_email_report_gate_uses_the_report_that_runs(self):
+		for report in (self.STALE, self.CUSTOM, self.BROKEN, self.LOOP_A):
+			with self.subTest(report=report):
+				doc = frappe.get_doc(
+					{
+						"doctype": "Auto Email Report",
+						"report": report,
+						"report_type": "Query Report",
+						"user": ADMIN,
+						"enabled": 1,
+						"email_to": "ar.reader@example.test",
+						"format": "CSV",
+						"frequency": "Daily",
+					}
+				)
+				frappe.set_user(ADMIN)
+				self.assertRaises(frappe.PermissionError, doc.validate)
+				self.assertRaises(frappe.PermissionError, doc.get_report_content)
+				frappe.set_user("Administrator")
+		client = self.login(ADMIN)
+		body = {"report": self.STALE, "user": ADMIN, "email_to": "ar.reader@example.test", "format": "CSV"}
+		response = self.send(
+			client, "POST", "/api/v2/document/Auto Email Report", body={**body, "frequency": "Daily"}
+		)
+		self.assertEqual(response.status_code, 403, response.get_data(as_text=True)[:300])
+		self.assertFalse(frappe.db.count("Auto Email Report"))
+
+
 class TestReportsWithoutRules(ReportRulesTestCase):
 	"""With no governed document type the gate only keeps the field level of the report's own type."""
 

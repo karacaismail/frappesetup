@@ -79,3 +79,4 @@ Propose a new Access Rule from structured fields. The first rule on a document t
 "Propose a change to a saved Access Rule, including switching it off. Narrowing a rule removes access. This only opens a proposal. A human must approve it before anything changes.",Kayıtlı bir erişim kuralında değişiklik önerir. Kuralı kapatmak da buna dahildir. Kuralı daraltmak erişimi kaldırır. Bu araç yalnız bir öneri açar. Bir insan onaylamadan hiçbir şey değişmez.,
 Report {0} reads data with its own code. Only a System Manager may run it while Access Rules exist.,{0} raporu veriyi kendi koduyla okuyor. Erişim kuralı varken bu raporu yalnız System Manager çalıştırabilir.,
 Auto Email Report is switched off for {0}: the report reads data governed by Access Rules.,{0} için zamanlanmış e-posta raporu kapalıdır. Rapor erişim kuralı olan veriyi okuyor.,
+Report {0} refers to a report that cannot be found.,{0} raporu bulunamayan bir rapora başvuruyor.,

@@ -765,6 +765,8 @@ x-report-rules:
     - A query report (“Query Report”) runs only for the “System Manager” role. Everyone else gets 403.
     - A script report (“Script Report”) runs only for the “System Manager” role. Everyone else gets 403.
     - What the SQL of a query report or the code of a script report reads cannot be verified. No declaration opens such a report.
+    - The gate decides on the report Frappe really runs. Frappe follows `reference_report` only for a report of type “Custom Report”, and so does the gate. A report of another type is judged by its own type, also when that field still holds an old value.
+    - A custom report whose reference cannot be found, or whose references form a loop, is refused. On a site with a governed document type it also counts as touching governed data.
     - For a report that touches governed data the prepared report (“Prepared Report”) is closed. Creating one, reading a stored result, downloading its file alone or in a ZIP, and converting it to CSV are refused.
     - A prepared report queued before a rule existed is refused when its job starts, before any report code runs. This holds for list, query and script reports. The record ends in status Error and no file is written.
     - A scheduled email report (“Auto Email Report”) that touches governed data is switched off for everyone, the “System Manager” role and the “Administrator” user included.
