@@ -161,7 +161,7 @@ Rol bir gruptan ya da bileşik bir rolden de gelebilir. Çalışanı bu rolü ta
 
 Eklentiyi Keycloak'a kurmak için kimlik-realm işi şunları yapmalıdır:
 
-1. Eklentiyi derleyin. Derleme adımı `test/Dockerfile` dosyasının ikinci aşamasındadır. Adım yalnız `javac` kullanır. Aynı aşama Java denetimini de çalıştırır.
+1. Eklentiyi `account-provider/build.sh` betiğiyle derleyin. Betik yalnız JDK 21 ister. Betik Java denetimini de çalıştırır. Derleme adımını başka bir dosyaya kopyalamayın. Örnek kullanım `test/Dockerfile` dosyasındadır.
 2. Çıkan `account-deletion-link-provider.jar` dosyasını `/opt/keycloak/providers/` klasörüne koyun.
    Keycloak `start --optimized` ile çalışıyorsa jar eklendikten sonra `kc.sh build` komutunu çalıştırın. Yoksa eklenti kaydolmaz.
 3. Keycloak container'ına `IDENTITY_ACCOUNT_DELETION_URL` değişkenini verin.

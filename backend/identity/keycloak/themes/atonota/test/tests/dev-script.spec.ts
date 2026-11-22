@@ -111,3 +111,30 @@ test.describe('theme-dev.sh and the test secrets', () => {
     expect(dockerCalled(box)).toBe(false);
   });
 });
+
+test('the account provider is built in one place only', () => {
+  // Project record, technical debt: the build step must not exist as two copies that can drift apart.
+  // Every image that needs the provider calls account-provider/build.sh. No other tracked file compiles it.
+  const repo = fileURLToPath(new URL('../../../../../../../', import.meta.url));
+  const single = 'backend/identity/keycloak/themes/atonota/account-provider/build.sh';
+  const tracked = execFileSync('git', ['-C', repo, 'ls-files', '-z', '--', 'backend'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    .split('\0')
+    .filter((file) => file && !/\.(png|woff2|jar|ico|svg|md)$/.test(file) && !file.endsWith('dev-script.spec.ts'));
+  expect(tracked).toContain(single);
+  const copies: string[] = [];
+  for (const file of tracked) {
+    if (file === single) continue;
+    let text = '';
+    try {
+      text = readFileSync(join(repo, file), 'utf8');
+    } catch {
+      continue;
+    }
+    // Compiling Java or packing the provider jar anywhere else is a second copy of the build step.
+    if (/\bjavac\b/.test(text) || /jar\s+(--create|-?cf)\b[^\n]*account-deletion-link/.test(text)) copies.push(file);
+  }
+  expect(copies, 'files that repeat the build step').toEqual([]);
+  // The test image uses the shared script.
+  const dockerfile = readFileSync(join(repo, 'backend/identity/keycloak/themes/atonota/test/Dockerfile'), 'utf8');
+  expect(dockerfile).toMatch(/RUN \S*build\.sh /);
+});
