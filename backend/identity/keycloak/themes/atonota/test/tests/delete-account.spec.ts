@@ -28,6 +28,9 @@ async function signIn(page: Page, options: { customer: boolean }): Promise<strin
 /** Returns the account console page exactly as the server sends it to this browser session, before any script runs. */
 const serverPage = async (page: Page) => (await page.request.get(`${KC}/realms/${REALM}/account/`)).text();
 
+/** Returns the caching header of the account console page. The page differs per user, so no cache may keep it. */
+const serverCacheControl = async (page: Page) => (await page.request.get(`${KC}/realms/${REALM}/account/`)).headers()['cache-control'] ?? '';
+
 const tabKey = (browserName: string) => (browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
 
 test('the test environment sets the address of the deletion page', () => {
@@ -38,6 +41,8 @@ test('@matris customer: the personal info page shows a link to the account delet
   await signIn(page, { customer: true });
   const html = await serverPage(page);
   expect(html, 'the server sends the link').toContain(`id="at-account-deletion-link" href="${ACCOUNT_DELETION_URL}"`);
+  // The page carries user-specific markup. A shared cache must never store it.
+  expect(await serverCacheControl(page), 'the page is not cacheable').toMatch(/no-store|no-cache/);
 
   const section = page.locator(SECTION);
   const link = page.locator(LINK);
@@ -66,6 +71,16 @@ test('@matris customer: the personal info page shows a link to the account delet
       saveVisible: document.querySelector('#save-btn')!.getBoundingClientRect().height > 0,
     };
   });
+  // The section takes a row at the bottom. On a short screen the form must still be reachable by scrolling:
+  // the save button can be brought fully into the area above the section.
+  await page.locator('#save-btn').scrollIntoViewIfNeeded();
+  const reach = await page.evaluate(() => {
+    const save = document.querySelector('#save-btn')!.getBoundingClientRect();
+    const section = document.querySelector('#at-account-deletion')!.getBoundingClientRect();
+    return { saveBottom: save.bottom, saveTop: save.top, sectionTop: section.top };
+  });
+  expect(reach.saveBottom, 'the save button is not covered by the section').toBeLessThanOrEqual(reach.sectionTop + 1);
+  expect(reach.saveTop, 'the save button is on screen').toBeGreaterThanOrEqual(0);
   expect(result.scroll, 'horizontal overflow').toBeLessThanOrEqual(result.client);
   expect(result.left, 'inside the viewport').toBeGreaterThanOrEqual(0);
   expect(result.right, 'inside the viewport').toBeLessThanOrEqual(result.client + 1);
@@ -105,9 +120,51 @@ test('the link shows on the personal info page only', async ({ page }) => {
     await expect(page.locator('.pf-v5-c-page__main-section').first()).toBeVisible({ timeout: 20_000 });
     await expect(page.locator(SECTION), path).toBeHidden();
   }
-  // Moving inside the console without a page load keeps the rule.
   await page.goto(`${KC}/realms/${REALM}/account/`);
   await expect(page.locator(SECTION)).toBeVisible();
+});
+
+test('the link follows the page when the console changes pages without a page load', async ({ page }) => {
+  await signIn(page, { customer: true });
+  await expect(page.locator(SECTION)).toBeVisible();
+  let loads = 0;
+  page.on('load', () => (loads += 1));
+  // The sidebar is collapsed on a narrow screen. The toggle opens it.
+  const nav = page.getByRole('link', { name: 'Uygulamalar', exact: true });
+  if (!(await nav.isVisible())) await page.locator('#nav-toggle').click();
+  await nav.click();
+  await expect(page).toHaveURL(/\/account\/applications/);
+  await expect(page.locator(SECTION)).toBeHidden();
+  const back = page.getByRole('link', { name: 'Kişisel bilgiler', exact: true });
+  if (!(await back.isVisible())) await page.locator('#nav-toggle').click();
+  await back.click();
+  await expect(page.locator('#save-btn')).toBeVisible();
+  await expect(page.locator(SECTION)).toBeVisible();
+  expect(loads, 'the console changed pages without a page load').toBe(0);
+});
+
+test('an open menu does not change the page layout', async ({ page }) => {
+  await signIn(page, { customer: true });
+  const measure = () =>
+    page.evaluate(() => ({
+      app: Math.round(document.querySelector('#app')!.getBoundingClientRect().height),
+      section: Math.round(document.querySelector('#at-account-deletion')!.getBoundingClientRect().top),
+      scroll: document.documentElement.scrollHeight,
+    }));
+  const before = await measure();
+  await page.locator('[id="attributes.locale"]').click();
+  await expect(page.locator('.pf-v5-c-menu:visible').first()).toBeVisible();
+  expect(await measure(), 'layout with an open menu').toEqual(before);
+});
+
+test('customer with English as the language reads the link in English', async ({ page }) => {
+  const email = await createUser({ canDeleteAccount: true, locale: 'en' });
+  await ensureKeycloakDeleteActionOff();
+  await page.goto(`${KC}/realms/${REALM}/account/`);
+  await submitPassword(page, email);
+  await expect(page.locator('#save-btn')).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(SECTION)).toContainText('Do you want to delete your account?');
+  await expect(page.locator(LINK)).toHaveText('Go to the account deletion page');
 });
 
 test('customer: the link is reached with the keyboard and shows the focus line', async ({ page, browserName }) => {

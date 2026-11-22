@@ -146,23 +146,29 @@ Eklenti şu durumlarda bağlantıyı eklemez:
 - kullanıcı oturum açmamışsa,
 - kullanıcının `request-account-deletion` rolü yoksa,
 - adres boşsa,
-- adres `http` ya da `https` ile başlamıyorsa. Örneğin `javascript:` adresi reddedilir.
+- adres `https` ile başlamıyorsa. Örneğin `javascript:` adresi reddedilir. Düz `http` adresi yalnız `localhost` için kabul edilir.
+- adres sunucu adı taşımıyorsa ya da kullanıcı bilgisi taşıyorsa. Örneğin `https://kullanici@site` reddedilir.
+- bağlantının iki metninden biri ileti dosyasında yoksa.
 - adresin sunucu adında alt çizgi ya da Türkçe harf varsa. Böyle bir adı ASCII biçimiyle yazın.
 
 Müşteri bağlantıyı alamazsa eklenti Keycloak günlüğüne bir uyarı yazar. Uyarı “Account deletion link is not shown” diye başlar. Beklenmedik bir hata hesap konsolunu bozmaz: eklenti hatayı günlüğe yazar ve sayfayı bağlantısız gönderir.
 
 Adres ve kaçış kurallarını küçük bir Java denetimi ölçer: `account-provider/src/test/java/.../AccountDeletionLinkConsoleCheck.java`. Denetim imaj derlenirken çalışır. Denetim başarısız olursa imaj derlenmez.
 
-Bağlantı bir yetki denetimi değildir. Silme sayfası kullanıcıyı yeniden doğrular.
+Bağlantı bir yetki denetimi değildir. Proje kaydına göre silme sayfası kullanıcıyı yeniden doğrular (O-27). Bu davranış Press'e aittir ve burada sınanmadı.
+
+Rol bir gruptan ya da bileşik bir rolden de gelebilir. Çalışanı bu rolü taşıyan bir gruba eklemeyin. Yoksa çalışan da bağlantıyı görür.
 
 Eklentiyi Keycloak'a kurmak için kimlik-realm işi şunları yapmalıdır:
 
 1. Eklentiyi derleyin. Derleme adımı `test/Dockerfile` dosyasının ikinci aşamasındadır. Adım yalnız `javac` kullanır. Aynı aşama Java denetimini de çalıştırır.
 2. Çıkan `account-deletion-link-provider.jar` dosyasını `/opt/keycloak/providers/` klasörüne koyun.
+   Keycloak `start --optimized` ile çalışıyorsa jar eklendikten sonra `kc.sh build` komutunu çalıştırın. Yoksa eklenti kaydolmaz.
 3. Keycloak container'ına `IDENTITY_ACCOUNT_DELETION_URL` değişkenini verin.
 4. Realm'de `request-account-deletion` adlı bir realm rolü açın. Rolü müşterilere verin, çalışanlara vermeyin.
 5. `delete_account` gerekli işlemini kapalı tutun. `delete-account` rolünü kimseye vermeyin.
 6. Kurulumdan sonra deneyin: müşteri hesabıyla girin ve bağlantıyı görün. Çalışan hesabıyla girin ve bağlantının olmadığını görün.
+7. Hesap konsolu 404 veriyorsa eklenti kurulu değildir. Bu durumu sınayan otomatik test yoktur, elle deneyin.
 
 Eklenti kurulu değilse hesap konsolu 404 yanıtı verir. Bu, bilerek seçilmiş güvenli davranıştır: tema eklentisiz çalışırsa görünürlük kuralı sessizce kaybolurdu.
 

@@ -50,12 +50,16 @@ const repair = (names) => {
   }
 };
 
-const response = await fetch(messagesUrl, { credentials: 'same-origin' });
-if (response.ok) {
-  const names = Object.fromEntries((await response.json()).map((entry) => [entry.key, entry.value]));
-  if (names.atAccountMenu && names.atMoreActions) {
-    repair(names);
-    // The console draws its pages after this script runs and redraws them on navigation.
-    new MutationObserver(() => repair(names)).observe(document.body, { childList: true, subtree: true });
+try {
+  const response = await fetch(messagesUrl, { credentials: 'same-origin' });
+  if (response.ok) {
+    const names = Object.fromEntries((await response.json()).map((entry) => [entry.key, entry.value]));
+    if (names.atAccountMenu && names.atMoreActions) {
+      repair(names);
+      // The console draws its pages after this script runs and redraws them on navigation.
+      new MutationObserver(() => repair(names)).observe(document.body, { childList: true, subtree: true });
+    }
   }
+} catch {
+  // Without the names the toggles stay as the stock console draws them. Nothing else depends on this request.
 }

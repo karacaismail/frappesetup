@@ -96,7 +96,7 @@ public class AccountDeletionLinkConsole extends AccountConsole {
             // customers would lose their way to delete the account, so it is written to the log.
             String address = safeAddress(accountTheme.getProperties().getProperty(URL_PROPERTY));
             if (address == null) {
-                LOG.warnf("Account deletion link is not shown: theme property '%s' is empty or not an absolute http(s) address",
+                LOG.warnf("Account deletion link is not shown: theme property '%s' is empty or not an absolute https address",
                         URL_PROPERTY);
                 return null;
             }
@@ -132,7 +132,8 @@ public class AccountDeletionLinkConsole extends AccountConsole {
     }
 
     /**
-     * Accepts only an absolute http or https address with a host. Returns null for anything else,
+     * Accepts only an absolute https address with a host. Plain http is accepted for a local development
+     * host only ("localhost" or a name that ends with ".localhost"). Returns null for anything else,
      * for example an empty value, a relative path or a "javascript:" address.
      */
     static String safeAddress(String value) {
@@ -142,14 +143,24 @@ public class AccountDeletionLinkConsole extends AccountConsole {
         try {
             URI uri = new URI(value.trim());
             String scheme = uri.getScheme();
-            boolean web = "https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme);
-            if (!web || isBlank(uri.getHost()) || uri.getUserInfo() != null) {
+            String host = uri.getHost();
+            if (isBlank(host) || uri.getUserInfo() != null) {
+                return null;
+            }
+            boolean secure = "https".equalsIgnoreCase(scheme);
+            boolean localDevelopment = "http".equalsIgnoreCase(scheme) && isLocalHost(host);
+            if (!secure && !localDevelopment) {
                 return null;
             }
             return uri.toASCIIString();
         } catch (URISyntaxException e) {
             return null;
         }
+    }
+
+    private static boolean isLocalHost(String host) {
+        String name = host.toLowerCase(Locale.ROOT);
+        return name.equals("localhost") || name.endsWith(".localhost");
     }
 
     private static boolean isBlank(String value) {

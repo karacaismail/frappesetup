@@ -21,6 +21,20 @@ const sourceFiles = (pattern: RegExp): string[] => {
   return files;
 };
 
+/** Java sources of the account console provider. */
+const providerSources = (): string[] => {
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir)) {
+      const path = join(dir, entry);
+      if (statSync(path).isDirectory()) walk(path);
+      else if (/\.java$/.test(entry)) files.push(path);
+    }
+  };
+  walk(join(themeRoot, 'account-provider', 'src', 'main'));
+  return files;
+};
+
 /** Collects console errors and CSP violations while a page is used. */
 function watch(page: Page): string[] {
   const problems: string[] = [];
@@ -115,7 +129,7 @@ test('GV-1, GV-2, GV-7: theme scripts hold no secret, no HTML injection and no c
     expect(code, `${file}: network`).not.toMatch(/XMLHttpRequest|sendBeacon|WebSocket|import\(/);
     if (requests.length > 0) expect(code, `${file}: the bundle address is built from the server page data`).toContain('const messagesUrl = `${environment.serverBaseUrl}/resources/${environment.realm}/account/${environment.locale}`;');
   }
-  for (const file of sourceFiles(/\.(ftl|properties|css|js|svg)$/)) {
+  for (const file of [...sourceFiles(/\.(ftl|properties|css|js|svg)$/), ...providerSources()]) {
     const text = readFileSync(file, 'utf8');
     expect(text, `${file}: secret-like value`).not.toMatch(/(api[_-]?key|secret|token|password)\s*[=:]\s*["']?[A-Za-z0-9+/_-]{16,}/i);
     expect(text, `${file}: external address`).not.toMatch(/(src|href|url\()\s*=?\s*["'(]?\s*(https?:)?\/\/(?!www\.w3\.org)/i);

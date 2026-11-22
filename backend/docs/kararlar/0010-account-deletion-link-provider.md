@@ -31,7 +31,7 @@ Eklenti iki küçük Java sınıfıdır. Kaynak `backend/identity/keycloak/theme
 - `AccountDeletionLinkConsoleFactory` eklentiyi `account-deletion-link` adıyla kaydeder.
 - Müşteri, `request-account-deletion` adlı realm rolünü taşıyan kullanıcıdır. Bu rol Keycloak'ın `delete-account` rolünden ayrıdır. `delete-account` rolü Keycloak'ın kendi silme eylemine yetki verir. Müşteriye o rol verilseydi, eylem yanlışlıkla açıldığında müşteri hesabını Press'i atlayarak silebilirdi.
 - Sözleşme müşteri ayrımını ve rolün adını yazmıyor. Orkestratörden bu rolü sözleşmeye yazmasını istiyorum.
-- Adres `IDENTITY_ACCOUNT_DELETION_URL` ortam değişkeninden gelir. Eklenti yalnız `http` ve `https` adresini kabul eder.
+- Adres `IDENTITY_ACCOUNT_DELETION_URL` ortam değişkeninden gelir. Eklenti yalnız `https` adresini kabul eder. Düz `http` adresi yalnız `localhost` için geçerlidir.
 
 Eklenti yeni bir bağımlılık getirmez. Yalnız Keycloak'ın kendi sınıflarını kullanır.
 
@@ -46,7 +46,9 @@ Eklentiyi derlemek için bir JDK imajı gerekir: `eclipse-temurin:21-jdk`. İmaj
 ## Riskler ve bakım
 
 - Keycloak bu eklenti noktasını “iç” sayar. Başlarken bir uyarı yazar: “This SPI is internal and may change without notice”. Keycloak sürümü değişince eklenti yeniden derlenmeli ve testler çalışmalıdır.
-- Derleme `-Xlint:all -Werror` ile yapılır. Keycloak bir sınıfı değiştirirse derleme durur.
+- Derleme `-Xlint:all -Werror` ile yapılır. Keycloak bir sınıfın imzasını değiştirirse derleme durur. Derleme davranış değişikliğini yakalamaz. Davranışı yalnız tarayıcı testleri ölçer.
+- Keycloak `start --optimized` ile çalışıyorsa jar eklendikten sonra `kc.sh build` gerekir.
+- Derleme adımı şimdilik yalnız temanın deneme `Dockerfile` dosyasındadır. kimlik-realm işi bu adımı kendi imajına alacak. O zaman iki kopya oluşur. İki kopyayı tek betikte birleştirmek açık iştir.
 - Eklenti kurulu değilse hesap konsolu 404 yanıtı verir. Bu bilerek seçildi. Aksi hâlde görünürlük kuralı sessizce kaybolurdu.
 - Adres ve kaçış kurallarını bağımlılıksız bir Java denetimi ölçer. Denetim imaj derlenirken `java -ea` ile çalışır ve başarısız olursa derlemeyi durdurur.
 - Sayfa davranışını tarayıcı testleri ölçer: `tests/delete-account.spec.ts` ve `tests/realm-settings.spec.ts`.
@@ -58,6 +60,11 @@ Eklentiyi derlemek için bir JDK imajı gerekir: `eclipse-temurin:21-jdk`. İmaj
 2. Jar dosyasını Keycloak'tan kaldırın.
 
 Bu durumda hesap konsolu Keycloak'ın hazır hâline döner ve bağlantı görünmez. Veri değişmez.
+
+Geri dönüşte iki şeye dikkat edin:
+
+- `delete_account` gerekli işlemi kapalı kalmalıdır. Hazır konsol, işlem açıksa silme bölümünü herkese gösterir.
+- Müşteriler `request-account-deletion` rolünü taşımaya devam eder. Bu rol Keycloak'ta hiçbir yetki vermez.
 
 ## Kimlik-realm işinden istenenler
 

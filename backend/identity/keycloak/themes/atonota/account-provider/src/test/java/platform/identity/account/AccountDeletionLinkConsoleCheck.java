@@ -21,6 +21,8 @@ public final class AccountDeletionLinkConsoleCheck {
         // Addresses that must be accepted, with the exact value that is written into the page.
         accepts("https://press.example/account/delete", "https://press.example/account/delete");
         accepts("http://press.localhost:3953/account/delete", "http://press.localhost:3953/account/delete");
+        accepts("http://localhost:8000/delete", "http://localhost:8000/delete");
+        accepts("http://LOCALHOST/delete", "http://LOCALHOST/delete");
         accepts("  https://press.example/delete  ", "https://press.example/delete");
         accepts("HTTPS://Press.Example/delete", "HTTPS://Press.Example/delete");
         accepts("https://press.example/delete?next=a&lang=tr", "https://press.example/delete?next=a&lang=tr");
@@ -46,6 +48,11 @@ public final class AccountDeletionLinkConsoleCheck {
         refuses("https://press.example/\r\nSet-Cookie: x=1");
         refuses("https://press.example/\"onmouseover=\"alert(1)");
         refuses("https://press.example/<script>");
+        // Plain http is accepted only for a local development host. Everything else must use https.
+        refuses("http://press.example/account/delete");
+        refuses("http://localhost.evil.example/delete");
+        refuses("http://notlocalhost/delete");
+        refuses("http://127.0.0.1/delete");
         refuses("ftp://press.example/delete");
         refuses("file:///etc/passwd");
         // A host with an underscore or a non-ASCII letter is refused. Such a name must be written in its ASCII form.
