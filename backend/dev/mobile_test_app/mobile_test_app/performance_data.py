@@ -12,8 +12,9 @@ from uuid import uuid4
 import frappe
 from frappe.utils import now_datetime
 from frappe.utils.background_jobs import get_queues
+from platform_core.mobil.metadata import insert_metadata
 from platform_core.mobil.protocol import operation_key
-from platform_core.mobil.store import SEQUENCE_DOCTYPE, SEQUENCE_NAME, MobileStore, seed_sequence
+from platform_core.mobil.store import SEQUENCE_DOCTYPE, SEQUENCE_NAME, MobileStore
 
 from . import fixture
 
@@ -236,7 +237,7 @@ def seed_site(site, samples, created):
         )
 
         if not frappe.db.exists(SEQUENCE_DOCTYPE, SEQUENCE_NAME):
-            seed_sequence()
+            insert_metadata(SEQUENCE_DOCTYPE, sequence_key=SEQUENCE_NAME)
             created.append((SEQUENCE_DOCTYPE, SEQUENCE_NAME))
         store = MobileStore()
         started = int(time())

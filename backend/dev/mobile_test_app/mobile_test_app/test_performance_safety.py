@@ -58,13 +58,30 @@ class PerformanceSafetyTest(unittest.TestCase):
                 patch.object(data, "get_queues", return_value=[]),
                 patch.object(data, "EMPLOYEES", 0),
                 patch.object(data, "now_datetime", return_value="fixture-time"),
-
-                patch.object(data, "seed_sequence") as seed,
+                patch.object(data, "insert_metadata") as seed,
                 patch.object(data, "MobileStore"),
             ):
                 data.seed_site("perf-mobile.localhost", 0, created)
             self.assertEqual(seed.call_count, int(not already_exists))
             self.assertEqual(("Mobile Sequence", "site") in created, not already_exists)
+
+    def test_seed_does_not_claim_a_counter_when_insert_fails(self):
+        frappe = Mock()
+        frappe.get_file_json.return_value = {"allow_performance_fixture": 1}
+        frappe.get_installed_apps.return_value = ["erpnext", "hrms", "platform_core", "mobile_test_app"]
+        frappe.db.count.return_value = 0
+        frappe.db.exists.return_value = False
+        created = []
+        with (
+            patch.object(data, "frappe", frappe),
+            patch.object(data, "get_queues", return_value=[]),
+            patch.object(data, "EMPLOYEES", 0),
+            patch.object(data, "now_datetime", return_value="fixture-time"),
+            patch.object(data, "insert_metadata", side_effect=RuntimeError("Duplicate counter")),
+            self.assertRaisesRegex(RuntimeError, "Duplicate counter"),
+        ):
+            data.seed_site("perf-mobile.localhost", 0, created)
+        self.assertNotIn(("Mobile Sequence", "site"), created)
 
     def test_cleanup_selects_the_doctype_and_name_together(self):
         frappe = Mock()
