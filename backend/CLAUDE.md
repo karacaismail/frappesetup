@@ -51,6 +51,8 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 
 `hooks.py` ortak bir dosyadır. Yalnız kendi işinizin satırlarını ekleyin. Var olan satırları değiştirmeyin.
 
+`platform_core/translations/tr.csv` de ortak bir dosyadır. Kullanıcıya görünen metnin kaynağı İngilizcedir. Türkçesini bu dosyaya ekleyin. Yalnız kendi satırlarınızı ekleyin. Çakışmayı orkestratör birleştirmede çözer.
+
 ## Zorunlu çalışma kuralları
 
 ### Seviye ve test
