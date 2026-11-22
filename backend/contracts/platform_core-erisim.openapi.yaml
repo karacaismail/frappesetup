@@ -328,6 +328,7 @@ paths:
 
   /platform_core.erisim.link_search.search_link:
     get:
+      x-frappe-original: [frappe.desk.search.search_link]
       tags: [arama]
       operationId: searchLink
       summary: Link search behind the link search rule.
@@ -419,6 +420,7 @@ paths:
 
   /platform_core.erisim.link_search.search_widget:
     get:
+      x-frappe-original: [frappe.desk.search.search_widget]
       tags: [arama]
       operationId: searchWidget
       summary: Raw link search behind the link search rule.
@@ -517,7 +519,8 @@ paths:
           description: Invalid input.
 
   # The two Frappe addresses the engine answers. Clients call these addresses.
-  # Each one repeats the operation of the engine function that replaces it.
+  # The rule of record is `x-frappe-original` on the engine operations above.
+  # These two copies stay only until the AI readiness gate reads that field.
   /frappe.desk.search.search_link:
     get:
       tags: [arama]
