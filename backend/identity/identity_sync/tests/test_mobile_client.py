@@ -1,6 +1,6 @@
 """The platform_core mobile client against this service, over real HTTP.
 
-The client lives in another job's folder (`apps/platform_core/.../mobil/identity_sync_client.py`).
+The client lives in another job's folder (`apps/platform_core/.../mobile/identity_sync_client.py`).
 It gets its service token from `kimlik/service_client.py`. This test loads both files read-only
 and lets them call the real server of this service. Only two things are replaced: the `frappe`
 module (the client reads settings and a logger from it) and the two "https only" address checks,
@@ -26,10 +26,10 @@ CLIENT = (
     / "apps"
     / "platform_core"
     / "platform_core"
-    / "mobil"
+    / "mobile"
     / "identity_sync_client.py"
 )
-SERVICE_CLIENT = CLIENT.parents[1] / "kimlik" / "service_client.py"
+SERVICE_CLIENT = CLIENT.parents[1] / "identity" / "service_client.py"
 SID = "55555555-5555-4555-8555-555555555555"
 OTHER_USER = "99999999-9999-4999-8999-999999999999"
 OTHER_SID = "66666666-6666-4666-8666-666666666666"
@@ -44,7 +44,7 @@ class MobileClientTest(ServerCase):
     def setUp(self) -> None:
         super().setUp()
         keycloak = self.stack.keycloak
-        other_org = {"id": "o-kiraci2", "name": "kiraci2", "alias": "kiraci2"}
+        other_org = {"id": "o-kiraci2", "name": "tenant2", "alias": "tenant2"}
         keycloak.add_user(keycloak_user(subject=OTHER_USER, email="ikinci@example.test"), [other_org])
         keycloak.add_session(SUBJECT, SID)
         keycloak.add_session(OTHER_USER, OTHER_SID)
@@ -53,7 +53,7 @@ class MobileClientTest(ServerCase):
 
         def token(req: fakes.Recorded) -> fakes.Reply:
             form = req.form()
-            if form.get("client_id") != ["site-kiraci1-service"]:
+            if form.get("client_id") != ["site-tenant1-service"]:
                 return keycloak._token(req)  # the service's own admin token
             self.token_forms.append(form)
             return 200, {"access_token": SESSION_TOKEN, "expires_in": 300, "token_type": "Bearer"}
@@ -66,8 +66,8 @@ class MobileClientTest(ServerCase):
                 "mobile_identity_sync_url": f"http://127.0.0.1:{self.httpd.server_address[1]}",
                 "test_token_url": keycloak.url + token_path,
                 # docs/sozlesmeler.md, section 8: the site's browser client and its service client.
-                "keycloak_client_id": "site-kiraci1",
-                "keycloak_service_client_id": "site-kiraci1-service",
+                "keycloak_client_id": "site-tenant1",
+                "keycloak_service_client_id": "site-tenant1-service",
                 "keycloak_service_client_secret": "made-up-site-value",
             }
         )
@@ -81,14 +81,14 @@ class MobileClientTest(ServerCase):
         frappe = types.ModuleType("frappe")
         frappe.conf = conf
         frappe.logger = lambda _name: types.SimpleNamespace(warning=self.warnings.append, error=self.errors.append)
-        names = ("frappe", "platform_core", "platform_core.kimlik", "platform_core.kimlik.service_client")
+        names = ("frappe", "platform_core", "platform_core.identity", "platform_core.identity.service_client")
         previous = {name: sys.modules.get(name) for name in names}
         sys.modules["frappe"] = frappe
         sys.modules["platform_core"] = types.ModuleType("platform_core")
-        sys.modules["platform_core.kimlik"] = types.ModuleType("platform_core.kimlik")
+        sys.modules["platform_core.identity"] = types.ModuleType("platform_core.identity")
         try:
-            tokens = self.load_file("platform_core.kimlik.service_client", SERVICE_CLIENT)
-            sys.modules["platform_core.kimlik.service_client"] = tokens
+            tokens = self.load_file("platform_core.identity.service_client", SERVICE_CLIENT)
+            sys.modules["platform_core.identity.service_client"] = tokens
             module = self.load_file("mobile_identity_sync_client_under_test", CLIENT)
         finally:
             for name, value in previous.items():

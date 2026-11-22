@@ -8,17 +8,17 @@ from uuid import uuid4
 
 import frappe
 from frappe.utils import now_datetime
-from platform_core.mobil.store import MobileStore
+from platform_core.mobile.store import MobileStore
 
-AI_LAYER_AVAILABLE = find_spec("platform_core.yapay_zeka.registry") is not None
+AI_LAYER_AVAILABLE = find_spec("platform_core.ai.registry") is not None
 if AI_LAYER_AVAILABLE:
-	from platform_core.yapay_zeka.tests.base import MANAGER, USER_A, YzTestCase
+	from platform_core.ai.tests.base import MANAGER, USER_A, AiTestCase
 else:
-	YzTestCase = TestCase
+	AiTestCase = TestCase
 
 
 @skipUnless(AI_LAYER_AVAILABLE, "The shared AI approval layer is not available")
-class MobileApprovalTest(YzTestCase):
+class MobileApprovalTest(AiTestCase):
 	def install(self, account):
 		name = str(uuid4())
 		MobileStore().install(SimpleNamespace(account=account, scope="mobile", principal="fixture"), name)
@@ -31,13 +31,13 @@ class MobileApprovalTest(YzTestCase):
 		token = self.issue_token(client)
 		result = self.call_tool(
 			self.anonymous(),
-			"platform_core_revoke_mobile_installation",
+			"plt_revoke_mobile_installation",
 			{"installation_id": first},
 			token=token,
 		)
 		proposal = result["structuredContent"]
 		self.assertIn("proposal_id", proposal, result)
-		self.assertFalse(frappe.db.get_value("Mobile Installation", first, "revoked"))
+		self.assertFalse(frappe.db.get_value("PLT Mobile Installation", first, "revoked"))
 		denied = self.send(
 			self.anonymous(),
 			"POST",
@@ -46,31 +46,31 @@ class MobileApprovalTest(YzTestCase):
 			headers={"Authorization": f"Bearer {token}"},
 		)
 		self.assertIn(denied.status_code, (401, 403))
-		self.assertFalse(frappe.db.get_value("Mobile Installation", first, "revoked"))
+		self.assertFalse(frappe.db.get_value("PLT Mobile Installation", first, "revoked"))
 		outcome = self.approve(client, proposal["proposal_id"]).json["message"]
 		self.assertTrue(outcome["executed"], outcome)
-		self.assertTrue(frappe.db.get_value("Mobile Installation", first, "revoked"))
-		self.assertFalse(frappe.db.get_value("Mobile Installation", other, "revoked"))
+		self.assertTrue(frappe.db.get_value("PLT Mobile Installation", first, "revoked"))
+		self.assertFalse(frappe.db.get_value("PLT Mobile Installation", other, "revoked"))
 
 	def test_mobile_scope_change_rejects_stale_approval(self):
 		self.install(USER_A)
 		client = self.login(MANAGER)
-		result = self.call_tool(client, "platform_core_revoke_all_mobile_installations", {"account": USER_A})
+		result = self.call_tool(client, "plt_revoke_all_mobile_installations", {"account": USER_A})
 		proposal_id = result["structuredContent"]["proposal_id"]
 		new_installation = self.install(USER_A)
 		response = self.approve(client, proposal_id)
 		outcome = response.json["message"]
 		self.assertEqual((outcome["executed"], outcome["deny_reason"]), (False, "document_changed"))
-		self.assertFalse(frappe.db.get_value("Mobile Installation", new_installation, "revoked"))
+		self.assertFalse(frappe.db.get_value("PLT Mobile Installation", new_installation, "revoked"))
 
 	def test_cleanup_read_tool_leaves_expired_rows_untouched(self):
 		key = uuid4().hex
 		MobileStore().remember_operation(key, "a" * 64, {"status": "applied"})
-		frappe.db.set_value("Mobile Operation", key, "creation", now_datetime() - timedelta(days=40))
+		frappe.db.set_value("PLT Mobile Operation", key, "creation", now_datetime() - timedelta(days=40))
 		client = self.login(MANAGER)
-		result = self.call_tool(client, "platform_core_preview_mobile_cleanup", {})
+		result = self.call_tool(client, "plt_preview_mobile_cleanup", {})
 		outcome = result["structuredContent"]
 		self.assertNotIn("proposal_id", outcome)
 		self.assertTrue(outcome["dry_run"])
 		self.assertEqual(outcome["removed"], 0)
-		self.assertTrue(frappe.db.exists("Mobile Operation", key))
+		self.assertTrue(frappe.db.exists("PLT Mobile Operation", key))

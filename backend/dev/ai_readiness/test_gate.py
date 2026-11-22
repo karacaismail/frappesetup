@@ -188,7 +188,7 @@ class GateTests(unittest.TestCase):
     def test_sql_scope_follows_module_policy_through_rename(self):
         sql = 'import frappe\n\nfrappe.db.sql("SELECT 1")\n'
         for module, policy in (
-            ("yapay_zeka", "modul-sinirlari.json"),
+            ("ai", "module-boundaries.json"),
             ("ai", "module-boundaries.json"),
         ):
             with self.subTest(module=module):
@@ -212,13 +212,13 @@ class GateTests(unittest.TestCase):
                     (self.root / "dev" / policy).unlink()
 
     def test_duplicate_decision_number_reports_later_note(self):
-        self.write("docs/kararlar/0010-one.md", "# One")
-        self.write("docs/kararlar/0010-two.MD", "# Two")
-        self.write("docs/kararlar/00101-three.md", "# Three")
-        self.write("docs/kararlar/0011-four.md", "# Four")
+        self.write("docs/decisions/0010-one.md", "# One")
+        self.write("docs/decisions/0010-two.MD", "# Two")
+        self.write("docs/decisions/00101-three.md", "# Three")
+        self.write("docs/decisions/0011-four.md", "# Four")
         self.write("docs/elsewhere/0010-other.md", "# Elsewhere")
         (finding,) = self.scan("decision-number")
-        self.assertEqual(finding["path"], "docs/kararlar/0010-two.MD")
+        self.assertEqual(finding["path"], "docs/decisions/0010-two.MD")
         self.assertIn("0010-one.md", finding["message"])
 
     def test_website_user_methods_require_real_same_app_whitelisted_functions(self):
@@ -423,8 +423,8 @@ class GateTests(unittest.TestCase):
             [(finding["rule"], finding["severity"]) for finding in payload["findings"]],
             [("naming.legacy-name", "warning"), ("naming.source-text", "warning")],
         )
-        self.write("docs/kararlar/0010-first.md", "# First")
-        self.write("docs/kararlar/0010-second.md", "# Second")
+        self.write("docs/decisions/0010-first.md", "# First")
+        self.write("docs/decisions/0010-second.md", "# Second")
         self.assertEqual(self.run_gate("--json").returncode, 1)
 
     def test_naming_enforce_blocks_only_four_rule_codes(self):

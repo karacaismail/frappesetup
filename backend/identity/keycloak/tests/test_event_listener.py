@@ -17,11 +17,11 @@ import time
 import unittest
 import uuid
 
-from yardimci import KLASOR, ORNEK_ENV, admin, canli_var_mi, istek, ortam, realm_oku, yonetici_belirteci, safe_detail
+from helpers import DIRECTORY, EXAMPLE_ENV, admin, live_available, request, get_environment_value, read_realm, admin_token, safe_detail
 
-LISTENER = KLASOR / "event-listener"
-DOCKERFILE = KLASOR / "Dockerfile"
-COMPOSE = KLASOR.parents[1] / "dev" / "compose.keycloak.yaml"
+LISTENER = DIRECTORY / "event-listener"
+DOCKERFILE = DIRECTORY / "Dockerfile"
+COMPOSE = DIRECTORY.parents[1] / "dev" / "compose.keycloak.yaml"
 UPSTREAM_COMMIT = "5f23e5530db15c9042d8977c46a19758aa0ede97"
 SIGNATURE_WINDOW_SECONDS = 300
 
@@ -52,7 +52,7 @@ class EventListenerFileTest(unittest.TestCase):
         self.assertRegex(dockerfile, r"COPY --from=event-listener-build --chown=1000:0 \S+ /opt/keycloak/providers/")
 
     def test_realm_sends_events_to_the_webhook_listener(self):
-        realm = realm_oku()
+        realm = read_realm()
         self.assertIn("webhook", realm["eventsListeners"])
         self.assertTrue(realm["eventsEnabled"])
         self.assertTrue(realm["adminEventsEnabled"])
@@ -63,7 +63,7 @@ class EventListenerFileTest(unittest.TestCase):
         compose = COMPOSE.read_text(encoding="utf-8")
         self.assertIn("KC_SPI_EVENTS_LISTENER__WEBHOOK__URL: ${IDENTITY_SYNC_EVENTS_URL:?}", compose)
         self.assertIn("KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET: ${IDENTITY_SYNC_WEBHOOK_SECRET:?}", compose)
-        example = ORNEK_ENV.read_text(encoding="utf-8")
+        example = EXAMPLE_ENV.read_text(encoding="utf-8")
         self.assertRegex(example, r"(?m)^IDENTITY_SYNC_WEBHOOK_SECRET=degistir-")
         self.assertRegex(example, r"(?m)^IDENTITY_SYNC_EVENTS_URL=http://event-sink.localhost:8080/v1/events$")
 
@@ -91,13 +91,13 @@ def _contract_signature(secret: str, timestamp: str, mode: str, body: bytes) -> 
     return "sha256=" + hmac.new(secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
 
 
-@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
+@unittest.skipUnless(live_available(), "KC_PUBLIC_URL is not set; live Keycloak test skipped")
 class EventListenerLiveTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.kc = ortam("KC_PUBLIC_URL")
-        cls.secret = ortam("IDENTITY_SYNC_WEBHOOK_SECRET")
-        cls.admin_token = yonetici_belirteci()
+        cls.kc = get_environment_value("KC_PUBLIC_URL")
+        cls.secret = get_environment_value("IDENTITY_SYNC_WEBHOOK_SECRET")
+        cls.admin_token = admin_token()
         cls.realm_id = admin("", cls.admin_token).json()["id"]
 
     def _wait_for(self, predicate, seconds: float = 20.0) -> list:
@@ -110,15 +110,15 @@ class EventListenerLiveTest(unittest.TestCase):
         return []
 
     def test_listener_is_loaded(self):
-        info = istek("GET", f"{self.kc}/admin/serverinfo", belirtec=self.admin_token).json()
+        info = request("GET", f"{self.kc}/admin/serverinfo", token=self.admin_token).json()
         self.assertIn("webhook", info["providers"]["eventsListener"]["providers"])
 
     def test_user_creation_is_sent_signed_with_realm_id(self):
         username = f"event-{uuid.uuid4().hex[:10]}"
         created = admin("/users", self.admin_token, "POST", {
             "username": username, "email": f"{username}@example.test", "enabled": True})
-        self.assertEqual(created.durum, 201, safe_detail(created))
-        user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
+        self.assertEqual(created.status, 201, safe_detail(created))
+        user_id = created.headers["Location"].rstrip("/").rsplit("/", 1)[1]
         self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
         sent_after = int(time.time()) - 5
 
@@ -150,8 +150,8 @@ class EventListenerLiveTest(unittest.TestCase):
     def test_events_the_service_ignores_are_not_sent(self):
         group = f"event-group-{uuid.uuid4().hex[:8]}"
         created = admin("/groups", self.admin_token, "POST", {"name": group})
-        self.assertEqual(created.durum, 201, safe_detail(created))
-        group_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
+        self.assertEqual(created.status, 201, safe_detail(created))
+        group_id = created.headers["Location"].rstrip("/").rsplit("/", 1)[1]
         self.addCleanup(admin, f"/groups/{group_id}", self.admin_token, "DELETE")
         time.sleep(3)
         groups = [r for r in _sink_requests()

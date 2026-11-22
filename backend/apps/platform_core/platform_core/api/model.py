@@ -6,7 +6,7 @@ from typing import Literal, NotRequired, TypedDict
 
 import frappe
 
-from platform_core.model_gecidi import api, gateway, maintenance, policy
+from platform_core.model_gateway import api, gateway, maintenance, policy
 
 
 class CompletionMessage(TypedDict):

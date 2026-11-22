@@ -7,43 +7,43 @@ app_license = "mit"
 
 # platform-core-kimlik: Keycloak sign-in, service tokens and the local sign-in gate (kimlik/README.md).
 # Other tasks append to the same list keys; do not replace them.
-before_login = ["platform_core.kimlik.login_policy.before_login"]
+before_login = ["platform_core.identity.login_policy.before_login"]
 before_request = [
-	"platform_core.kimlik.login_policy.before_request",
-	"platform_core.kimlik.session_policy.before_request",
-	"platform_core.kabuk.native_metadata.guard_website_rpc_before_request",
+	"platform_core.identity.login_policy.before_request",
+	"platform_core.identity.session_policy.before_request",
+	"platform_core.shell.native_metadata.guard_website_rpc_before_request",
 ]
-on_session_creation = ["platform_core.kimlik.session_policy.on_session_creation"]
+on_session_creation = ["platform_core.identity.session_policy.on_session_creation"]
 # Keep a single list assignment. Credential hooks must precede the metadata guard (platform-core-kabuk).
 auth_hooks = [
-	"platform_core.kimlik.service_token.validate",
-	"platform_core.yapay_zeka.agent_token.authenticate_request",
-	"platform_core.kabuk.native_metadata.guard_native_metadata",
+	"platform_core.identity.service_token.validate",
+	"platform_core.ai.agent_token.authenticate_request",
+	"platform_core.shell.native_metadata.guard_native_metadata",
 ]
 # AU-19: local sign-in functions are replaced by gated wrappers (kimlik/login_policy.py).
 override_whitelisted_methods = {
-	"frappe.core.doctype.user.user.reset_password": "platform_core.kimlik.login_policy.reset_password",
-	"frappe.core.doctype.user.user.update_password": "platform_core.kimlik.login_policy.update_password",
-	"frappe.core.doctype.user.user.sign_up": "platform_core.kimlik.login_policy.sign_up",
-	"frappe.www.login.send_login_link": "platform_core.kimlik.login_policy.send_login_link",
-	"frappe.www.login.login_via_key": "platform_core.kimlik.login_policy.login_via_key",
-	"frappe.www.login.login_via_token": "platform_core.kimlik.login_policy.login_via_token",
-	"frappe.integrations.oauth2_logins.login_via_google": "platform_core.kimlik.login_policy.login_via_google",
-	"frappe.integrations.oauth2_logins.login_via_github": "platform_core.kimlik.login_policy.login_via_github",
-	"frappe.integrations.oauth2_logins.login_via_facebook": "platform_core.kimlik.login_policy.login_via_facebook",
-	"frappe.integrations.oauth2_logins.login_via_frappe": "platform_core.kimlik.login_policy.login_via_frappe",
-	"frappe.integrations.oauth2_logins.login_via_office365": "platform_core.kimlik.login_policy.login_via_office365",
-	"frappe.integrations.oauth2_logins.login_via_salesforce": "platform_core.kimlik.login_policy.login_via_salesforce",
-	"frappe.integrations.oauth2_logins.login_via_fairlogin": "platform_core.kimlik.login_policy.login_via_fairlogin",
-	"frappe.integrations.oauth2_logins.login_via_keycloak": "platform_core.kimlik.login_policy.login_via_keycloak",
-	"frappe.integrations.oauth2_logins.custom": "platform_core.kimlik.login_policy.custom",
-	"frappe.integrations.doctype.ldap_settings.ldap_settings.login": "platform_core.kimlik.login_policy.ldap_login",
+	"frappe.core.doctype.user.user.reset_password": "platform_core.identity.login_policy.reset_password",
+	"frappe.core.doctype.user.user.update_password": "platform_core.identity.login_policy.update_password",
+	"frappe.core.doctype.user.user.sign_up": "platform_core.identity.login_policy.sign_up",
+	"frappe.www.login.send_login_link": "platform_core.identity.login_policy.send_login_link",
+	"frappe.www.login.login_via_key": "platform_core.identity.login_policy.login_via_key",
+	"frappe.www.login.login_via_token": "platform_core.identity.login_policy.login_via_token",
+	"frappe.integrations.oauth2_logins.login_via_google": "platform_core.identity.login_policy.login_via_google",
+	"frappe.integrations.oauth2_logins.login_via_github": "platform_core.identity.login_policy.login_via_github",
+	"frappe.integrations.oauth2_logins.login_via_facebook": "platform_core.identity.login_policy.login_via_facebook",
+	"frappe.integrations.oauth2_logins.login_via_frappe": "platform_core.identity.login_policy.login_via_frappe",
+	"frappe.integrations.oauth2_logins.login_via_office365": "platform_core.identity.login_policy.login_via_office365",
+	"frappe.integrations.oauth2_logins.login_via_salesforce": "platform_core.identity.login_policy.login_via_salesforce",
+	"frappe.integrations.oauth2_logins.login_via_fairlogin": "platform_core.identity.login_policy.login_via_fairlogin",
+	"frappe.integrations.oauth2_logins.login_via_keycloak": "platform_core.identity.login_policy.login_via_keycloak",
+	"frappe.integrations.oauth2_logins.custom": "platform_core.identity.login_policy.custom",
+	"frappe.integrations.doctype.ldap_settings.ldap_settings.login": "platform_core.identity.login_policy.ldap_login",
 	# Access rule engine: on a document type with Access Rules every custom link search is refused.
 	# There is no allow-list.
-	"frappe.desk.search.search_link": "platform_core.erisim.link_search.search_link",
-	"frappe.desk.search.search_widget": "platform_core.erisim.link_search.search_widget",
+	"frappe.desk.search.search_link": "platform_core.access.link_search.search_link",
+	"frappe.desk.search.search_widget": "platform_core.access.link_search.search_widget",
 	# Link validation hands a search function from the request to the same search.
-	"frappe.client.validate_link_and_fetch": "platform_core.erisim.link_search.validate_link_and_fetch",
+	"frappe.client.validate_link_and_fetch": "platform_core.access.link_search.validate_link_and_fetch",
 }
 
 # platform-core-kimlik: Frappe idle timeout of 1 hour (O-25, kimlik/session_policy.py).
@@ -51,31 +51,31 @@ override_whitelisted_methods = {
 # The access rule engine switches off Auto Email Reports on governed data in the same two hooks.
 # The AI access layer turns off Frappe's built-in MCP endpoint.
 after_install = [
-	"platform_core.kimlik.session_policy.apply",
-	"platform_core.mobil.store.seed_sequence",
-	"platform_core.erisim.reports.switch_off_governed_auto_email_reports",
-	"platform_core.yapay_zeka.setup.disable_builtin_mcp",
+	"platform_core.identity.session_policy.apply",
+	"platform_core.mobile.store.seed_sequence",
+	"platform_core.access.reports.switch_off_governed_auto_email_reports",
+	"platform_core.ai.setup.disable_builtin_mcp",
 ]
 after_migrate = [
-	"platform_core.kimlik.session_policy.apply",
-	"platform_core.mobil.store.seed_sequence",
-	"platform_core.erisim.reports.switch_off_governed_auto_email_reports",
-	"platform_core.yapay_zeka.setup.disable_builtin_mcp",
+	"platform_core.identity.session_policy.apply",
+	"platform_core.mobile.store.seed_sequence",
+	"platform_core.access.reports.switch_off_governed_auto_email_reports",
+	"platform_core.ai.setup.disable_builtin_mcp",
 ]
 
-fixtures = [{"dt": "Role", "filters": [["name", "=", "AI Manager"]]}]
+fixtures = [{"dt": "Role", "filters": [["name", "=", "PLT AI Manager"]]}]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
 # O-28: the identity link changes only through the identity endpoints, never through generic AI writes.
 ai_write_closed_doctypes = [
-	"Platform Identity Link",
+	"PLT Identity Link",
 	"Platform Identity Deletion",
-	"AI API",
-	"AI Account",
-	"Mobile Revoked Session",
-	"Mobile Installation",
-	"Mobile Account State",
-	"Access Rule",
+	"PLT AI API",
+	"PLT AI Account",
+	"PLT Mobile Revoked Session",
+	"PLT Mobile Installation",
+	"PLT Mobile Account State",
+	"PLT Access Rule",
 ]
 # Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
 website_user_allowed_methods = [
@@ -114,143 +114,143 @@ website_user_allowed_methods = [
 
 
 ai_tools = [
-	"platform_core.model_gecidi.management_tools.declare",
-	"platform_core.mobil.ai_tools.declarations",
+	"platform_core.model_gateway.management_tools.declare",
+	"platform_core.mobile.ai_tools.declarations",
 	# AI tools of the access rule engine (D-9).
-	"platform_core.erisim.ai_tools.declare",
+	"platform_core.access.ai_tools.declare",
 ]
 
 # Shell permission generations. Keep other modules' hook entries alongside these.
-clear_cache = ["platform_core.kabuk.cache.clear_cache"]
+clear_cache = ["platform_core.shell.cache.clear_cache"]
 
 doc_events = {
 	"User": {
-		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
 		"on_trash": [
-			"platform_core.kabuk.cache.invalidate_permissions",
-			"platform_core.mobil.store.delete_user_state",
+			"platform_core.shell.cache.invalidate_permissions",
+			"platform_core.mobile.store.delete_user_state",
 		],
 	},
 	"Role": {
-		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
 		"on_trash": [
-			"platform_core.kabuk.cache.invalidate_permissions",
-			"platform_core.erisim.rules.clear_cache",
+			"platform_core.shell.cache.invalidate_permissions",
+			"platform_core.access.rules.clear_cache",
 		],
 		# The access rule engine forgets the rules it read in this request.
-		"after_rename": ["platform_core.erisim.rules.clear_cache"],
+		"after_rename": ["platform_core.access.rules.clear_cache"],
 	},
 	"Role Profile": {
-		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"User Permission": {
-		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Custom DocPerm": {
-		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"DocType": {
-		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
 		"on_trash": [
-			"platform_core.kabuk.cache.invalidate_permissions",
-			"platform_core.erisim.rules.clear_cache",
+			"platform_core.shell.cache.invalidate_permissions",
+			"platform_core.access.rules.clear_cache",
 		],
-		"after_rename": ["platform_core.erisim.rules.clear_cache"],
+		"after_rename": ["platform_core.access.rules.clear_cache"],
 	},
 	"Custom Field": {
-		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Property Setter": {
-		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	# This DocType is installed with the access-rule module. Keep shell validators fresh after rule changes.
-	"Access Rule": {
-		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+	"PLT Access Rule": {
+		"on_update": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"DocShare": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Custom Role": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Workspace": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Custom Workspace": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Sidebar": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Custom Sidebar": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Page": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Report": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Dashboard": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Dashboard Chart": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Number Card": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Module Onboarding": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Module Def": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"System Settings": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Domain Settings": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 	"Translation": {
-		"on_change": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_change": ["platform_core.shell.cache.invalidate_permissions"],
+		"on_trash": ["platform_core.shell.cache.invalidate_permissions"],
 	},
 }
 
-after_request = ["platform_core.kabuk.headers.add_security_headers"]
+after_request = ["platform_core.shell.headers.add_security_headers"]
 
-after_build = ["platform_core.kabuk.assets.remove_panel_source_maps"]
+after_build = ["platform_core.shell.assets.remove_panel_source_maps"]
 
 # Access rule engine (erisim-kurali task). Decision note: docs/kararlar/0006-erisim-kurali.md
-permission_query_conditions = {"*": "platform_core.erisim.hooks.query_conditions"}
-has_permission = {"*": "platform_core.erisim.hooks.has_permission"}
+permission_query_conditions = {"*": "platform_core.access.hooks.query_conditions"}
+has_permission = {"*": "platform_core.access.hooks.has_permission"}
 # The access rule engine's link search overrides are in override_whitelisted_methods above.
 # The report gate. Each extension class calls super(), so extensions of other apps keep running.
 extend_doctype_class = {
-	"Report": ["platform_core.erisim.reports.GuardedReport"],
-	"Prepared Report": ["platform_core.erisim.reports.GuardedPreparedReport"],
-	"Auto Email Report": ["platform_core.erisim.reports.GuardedAutoEmailReport"],
-	"File": ["platform_core.erisim.reports.GuardedFile"],
+	"Report": ["platform_core.access.reports.GuardedReport"],
+	"Prepared Report": ["platform_core.access.reports.GuardedPreparedReport"],
+	"Auto Email Report": ["platform_core.access.reports.GuardedAutoEmailReport"],
+	"File": ["platform_core.access.reports.GuardedFile"],
 }
 # A Prepared Report queued before a rule existed is refused when its job starts.
-before_job = ["platform_core.erisim.reports.refuse_prepared_report_job"]
+before_job = ["platform_core.access.reports.refuse_prepared_report_job"]

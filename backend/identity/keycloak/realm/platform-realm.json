@@ -33,7 +33,7 @@
   "maxFailureWaitSeconds": 900,
   "quickLoginCheckMilliSeconds": 1000,
   "minimumQuickLoginWaitSeconds": 60,
-  "passwordPolicy": "length(12) and passwordHistory(5) and passwordBlacklist(yaygin-parolalar.txt) and notUsername and notEmail",
+  "passwordPolicy": "length(12) and passwordHistory(5) and passwordBlacklist(common-passwords.txt) and notUsername and notEmail",
   "defaultSignatureAlgorithm": "RS256",
   "ssoSessionIdleTimeout": 604800,
   "ssoSessionMaxLifespan": 2592000,
@@ -563,8 +563,8 @@
       ]
     },
     {
-      "name": "aud-site-kiraci1",
-      "description": "Adds only the site-kiraci1 audience to the token. Not a default scope; request it with scope.",
+      "name": "aud-site-tenant1",
+      "description": "Adds only the site-tenant1 audience to the token. Not a default scope; request it with scope.",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -572,12 +572,12 @@
       },
       "protocolMappers": [
         {
-          "name": "aud-site-kiraci1",
+          "name": "aud-site-tenant1",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
           "consentRequired": false,
           "config": {
-            "included.client.audience": "site-kiraci1",
+            "included.client.audience": "site-tenant1",
             "id.token.claim": "false",
             "access.token.claim": "true",
             "introspection.token.claim": "true",
@@ -682,13 +682,13 @@
   },
   "clients": [
     {
-      "clientId": "site-kiraci1",
-      "name": "Tenant site kiraci1",
+      "clientId": "site-tenant1",
+      "name": "Tenant site tenant1",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "${ATONOTA_SITE_KIRACI1_SECRET}",
+      "secret": "${ATONOTA_SITE_TENANT1_SECRET}",
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
@@ -696,17 +696,17 @@
       "frontchannelLogout": false,
       "fullScopeAllowed": false,
       "consentRequired": false,
-      "rootUrl": "${ATONOTA_SITE_KIRACI1_URL}",
-      "baseUrl": "${ATONOTA_SITE_KIRACI1_URL}/panel",
+      "rootUrl": "${ATONOTA_SITE_TENANT1_URL}",
+      "baseUrl": "${ATONOTA_SITE_TENANT1_URL}/panel",
       "redirectUris": [
-        "${ATONOTA_SITE_KIRACI1_URL}/api/method/platform_core.api.auth.keycloak_callback"
+        "${ATONOTA_SITE_TENANT1_URL}/api/method/platform_core.api.auth.keycloak_callback"
       ],
       "webOrigins": [],
       "attributes": {
-        "backchannel.logout.url": "${ATONOTA_SITE_KIRACI1_URL}/api/method/platform_core.api.keycloak_backchannel_logout",
+        "backchannel.logout.url": "${ATONOTA_SITE_TENANT1_URL}/api/method/platform_core.api.keycloak_backchannel_logout",
         "backchannel.logout.session.required": "true",
         "backchannel.logout.revoke.offline.tokens": "false",
-        "post.logout.redirect.uris": "${ATONOTA_SITE_KIRACI1_URL}/panel",
+        "post.logout.redirect.uris": "${ATONOTA_SITE_TENANT1_URL}/panel",
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
         "use.refresh.tokens": "true",
@@ -729,13 +729,13 @@
       "optionalClientScopes": []
     },
     {
-      "clientId": "site-kiraci1-service",
-      "name": "Tenant service kiraci1",
+      "clientId": "site-tenant1-service",
+      "name": "Tenant service tenant1",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "${ATONOTA_SITE_KIRACI1_SERVICE_SECRET}",
+      "secret": "${ATONOTA_SITE_TENANT1_SERVICE_SECRET}",
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
@@ -829,7 +829,7 @@
         "basic"
       ],
       "optionalClientScopes": [
-        "aud-site-kiraci1",
+        "aud-site-tenant1",
         "aud-press",
         "admin-api",
         "kc-admin-api"
@@ -863,7 +863,7 @@
         "basic"
       ],
       "optionalClientScopes": [
-        "aud-site-kiraci1",
+        "aud-site-tenant1",
         "aud-identity-sync"
       ]
     },

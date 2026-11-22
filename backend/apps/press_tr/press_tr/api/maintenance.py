@@ -11,11 +11,11 @@ def cleanup_expired_sessions() -> dict[str, int]:
 	page_size = 100
 	filters = {}
 	while names := frappe.get_all(
-		"Press Keycloak Session", filters=filters, pluck="name", order_by="name asc", limit=page_size
+		"PTR Keycloak Session", filters=filters, pluck="name", order_by="name asc", limit=page_size
 	):
 		for name in names:
 			try:
-				record = frappe.get_doc("Press Keycloak Session", name, for_update=True)
+				record = frappe.get_doc("PTR Keycloak Session", name, for_update=True)
 			except frappe.DoesNotExistError:
 				continue
 			sid = record.get_password("press_sid")

@@ -1,6 +1,6 @@
-Kimlik
-Kabuk
-Yapay Zeka
-Model Gecidi
-Mobil
-Erisim
+Identity
+Shell
+AI
+Model Gateway
+Mobile
+Access

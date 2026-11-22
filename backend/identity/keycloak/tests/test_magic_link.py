@@ -15,9 +15,9 @@ import time
 import unittest
 import urllib.parse
 
-from test_eklentiler import AKIS, _ac, _cerezli_acici, _form_hedefi, _keycloak_icinde_izle
+from test_extensions import AKIS, _open, _cookie_opener, _form_hedefi, _keycloak_icinde_izle
 from test_second_factor import TOTP_USER, fresh_totp_code
-from yardimci import KLASOR, admin, canli_var_mi, istek, ortam, realm_oku, tenant_authorize_url, yonetici_belirteci
+from helpers import DIRECTORY, admin, live_available, request, get_environment_value, read_realm, tenant_authorize_url, admin_token
 
 MAGIC_LINK = "magiclink"
 MAGIC_LINK_CONTINUATION = "magiclink-continuation"
@@ -32,9 +32,9 @@ OTHER_USER = "mehmet.ornek@example.test"
 class MagicLinkFileTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.realm = realm_oku()
-        cls.dockerfile = (KLASOR / "Dockerfile").read_text(encoding="utf-8")
-        cls.compose = (KLASOR.parents[1] / "dev" / "compose.keycloak.yaml").read_text(encoding="utf-8")
+        cls.realm = read_realm()
+        cls.dockerfile = (DIRECTORY / "Dockerfile").read_text(encoding="utf-8")
+        cls.compose = (DIRECTORY.parents[1] / "dev" / "compose.keycloak.yaml").read_text(encoding="utf-8")
         cls.flows = {f["alias"]: f for f in cls.realm["authenticationFlows"]}
         cls.executions = [e for f in cls.realm["authenticationFlows"] for e in f["authenticationExecutions"]]
 
@@ -65,7 +65,7 @@ class MagicLinkFileTest(unittest.TestCase):
 
     def test_rest_resource_and_continuation_are_disabled_by_the_image(self):
         # Merge review E1: the setting lives in the image's conf/keycloak.conf (test_production_image).
-        conf = (KLASOR / "conf" / "keycloak.conf").read_text(encoding="utf-8")
+        conf = (DIRECTORY / "conf" / "keycloak.conf").read_text(encoding="utf-8")
         self.assertIn("spi-realm-restapi-extension--magiclink-login--enabled=false", conf)
         self.assertIn("spi-authenticator--magiclink-continuation--enabled=false", conf)
 
@@ -80,14 +80,14 @@ class Mailpit:
         self.base = base
 
     def clear(self):
-        istek("DELETE", f"{self.base}/api/v1/messages")
+        request("DELETE", f"{self.base}/api/v1/messages")
 
     def latest_link(self, recipient: str, wait_seconds: int = 20) -> str:
         deadline = time.time() + wait_seconds
         while time.time() < deadline:
-            for message in istek("GET", f"{self.base}/api/v1/messages").json().get("messages", []):
+            for message in request("GET", f"{self.base}/api/v1/messages").json().get("messages", []):
                 if any(a.get("Address") == recipient for a in message.get("To", [])):
-                    detail = istek("GET", f"{self.base}/api/v1/message/{message['ID']}").json()
+                    detail = request("GET", f"{self.base}/api/v1/message/{message['ID']}").json()
                     text = (detail.get("Text") or "") + " " + (detail.get("HTML") or "")
                     found = re.search(r"https?://[^\s\"'<>]+login-actions/authenticate[^\s\"'<>]+magickey=[^\s\"'<>]+", text)
                     if found:
@@ -96,41 +96,41 @@ class Mailpit:
         raise AssertionError(f"no magic link mail for {recipient}")
 
 
-@unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL missing, live Keycloak test skipped")
+@unittest.skipUnless(live_available(), "KC_PUBLIC_URL missing, live Keycloak test skipped")
 class MagicLinkLiveTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.kc = ortam("KC_PUBLIC_URL")
-        cls.admin_token = yonetici_belirteci()
-        cls.mailpit = Mailpit(f"http://127.0.0.1:{ortam('MAILPIT_UI_PORT')}")
+        cls.kc = get_environment_value("KC_PUBLIC_URL")
+        cls.admin_token = admin_token()
+        cls.mailpit = Mailpit(f"http://127.0.0.1:{get_environment_value('MAILPIT_UI_PORT')}")
         cls.execution_id = _magic_link_execution_id(cls.admin_token)
 
     def _request_link(self, email: str):
         """Opens the login page, switches to the magic link step and submits the e-mail address."""
         self.mailpit.clear()
-        opener = _cerezli_acici()
-        status, _, html = _ac(opener, tenant_authorize_url())
+        opener = _cookie_opener()
+        status, _, html = _open(opener, tenant_authorize_url())
         self.assertEqual(status, 200)
         self.assertTrue("tryAnotherWay" in html, "login page must offer another way")
-        status, _, html = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"tryAnotherWay": "on"}).encode())
-        status, _, html = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"authenticationExecution": self.execution_id}).encode())
+        status, _, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"tryAnotherWay": "on"}).encode())
+        status, _, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"authenticationExecution": self.execution_id}).encode())
         self.assertEqual(status, 200)
         self.assertTrue('name="username"' in html and 'name="password"' not in html, "e-mail form expected")
-        status, _, html = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"username": email}).encode())
+        status, _, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"username": email}).encode())
         self.assertEqual(status, 200)
         return opener, self.mailpit.latest_link(email)
 
     def test_link_logs_in_only_in_the_requesting_browser_and_only_once(self):
         opener, link = self._request_link(PLAIN_USER)
         # MT-7: a preview or scanner without the browser session must not consume the link.
-        stranger = _cerezli_acici()
+        stranger = _cookie_opener()
         status, headers, _ = _keycloak_icinde_izle(stranger, link, self.kc)
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         # The requesting browser still completes the login.
         status, headers, _ = _keycloak_icinde_izle(opener, link, self.kc)
         location = headers.get("Location", "")
         self.assertEqual(status, 302, "first click in the requesting browser must finish the login")
-        self.assertTrue(location.startswith(ortam("ATONOTA_SITE_KIRACI1_URL")), f"HTTP {status}")
+        self.assertTrue(location.startswith(get_environment_value("ATONOTA_SITE_TENANT1_URL")), f"HTTP {status}")
         self.assertTrue("code=" in location, f"HTTP {status}")
         # Single use: the same link does not work twice.
         status, headers, _ = _keycloak_icinde_izle(opener, link, self.kc)
@@ -142,11 +142,11 @@ class MagicLinkLiveTest(unittest.TestCase):
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "the OTP form must follow the magic link")
         time.sleep(1.2)
-        status, headers, html = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": "000000"}).encode())
+        status, headers, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": "000000"}).encode())
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "wrong code must keep the OTP form")
         time.sleep(1.2)
-        status, headers, _ = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+        status, headers, _ = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         self.assertEqual(status, 302)
         self.assertTrue("code=" in headers.get("Location", ""), f"HTTP {status}")
 
@@ -159,18 +159,18 @@ class MagicLinkLiveTest(unittest.TestCase):
     def test_rest_resource_answers_404(self):
         # Condition 4: the extension's REST resource is disabled by SPI configuration.
         sample = "00000000-0000-4000-8000-000000000000"
-        response = istek("GET", f"{self.kc}/realms/platform/{MAGIC_LINK_REST_PATH}?id={sample}&magicKey={sample}")
-        self.assertEqual(response.durum, 404)
+        response = request("GET", f"{self.kc}/realms/platform/{MAGIC_LINK_REST_PATH}?id={sample}&magicKey={sample}")
+        self.assertEqual(response.status, 404)
 
     def test_continuation_authenticator_is_not_available(self):
-        providers = istek("GET", f"{self.kc}/admin/serverinfo", belirtec=self.admin_token).json()["providers"]
+        providers = request("GET", f"{self.kc}/admin/serverinfo", token=self.admin_token).json()["providers"]
         self.assertIn(MAGIC_LINK, providers["authenticator"]["providers"])
         self.assertNotIn(MAGIC_LINK_CONTINUATION, providers["authenticator"]["providers"])
 
     def test_other_user_cannot_use_a_link_meant_for_someone_else(self):
         # The link is bound to the login request; the browser that started it is the only consumer.
         opener, link = self._request_link(OTHER_USER)
-        other = _cerezli_acici()
-        _ac(other, tenant_authorize_url())
+        other = _cookie_opener()
+        _open(other, tenant_authorize_url())
         status, headers, _ = _keycloak_icinde_izle(other, link, self.kc)
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")

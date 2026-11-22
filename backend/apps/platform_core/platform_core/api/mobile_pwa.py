@@ -2,7 +2,7 @@
 
 import frappe
 
-from platform_core.mobil.request import pwa_endpoint_response
+from platform_core.mobile.request import pwa_endpoint_response
 
 from .mobile import _activity, _list_installations, _pull, _push, _register, _revoke, _revoke_installation
 

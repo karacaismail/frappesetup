@@ -22,12 +22,12 @@ bench set-config -g db_host mariadb
 bench set-config -g redis_cache redis://redis:6379/0
 bench set-config -g redis_queue redis://redis:6379/1
 bench set-config -g redis_socketio redis://redis:6379/2
-bench set-config -gp webserver_port "$PRESS_WEB_PORT"
-bench set-config -gp socketio_port "$PRESS_SOCKET_PORT"
+bench set-config -gp webserver_port "$PTR_WEB_PORT"
+bench set-config -gp socketio_port "$PTR_SOCKET_PORT"
 
 # Redis is external and this environment has no scheduler.
 sed -i '/^redis_/d; /^schedule:/d' Procfile
-sed -i -E "s/(bench serve[[:space:]]+--port )[0-9]+/\1$PRESS_WEB_PORT/" Procfile
+sed -i -E "s/(bench serve[[:space:]]+--port )[0-9]+/\1$PTR_WEB_PORT/" Procfile
 
 if [ ! -d apps/press ]; then
 	bench get-app --skip-assets --branch v0.154.1 press https://github.com/frappe/press

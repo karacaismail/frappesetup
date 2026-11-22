@@ -201,7 +201,7 @@ def scan_bandit():
             raise ValueError("Invalid or duplicate Bandit exception signature.")
         files = [path for path in git("ls-files", "-z", "--", "backend").split("\0")
                  if path.endswith(".py") and not path.startswith(
-                     ("backend/dev/guvenlik/fixtures/", f"{FIXTURES}/"))
+                     ("backend/dev/security/fixtures/", f"{FIXTURES}/"))
                  and (ROOT / path).is_file() and not (ROOT / path).is_symlink()]
         if not files:
             raise ValueError("No tracked Python files to scan.")
@@ -587,7 +587,7 @@ def scan_full(requirements, *, ci=False, runtime_image=None, api_target=None, al
         run("Security tool tests", "Python", [sys.executable, "-B", "-m", "unittest", "discover",
                                                "-s", str(SECURITY)]),
         run("Backend gate", f"Semgrep {VERSIONS['SEMGREP_VERSION']} / Gitleaks {VERSIONS['GITLEAKS_VERSION']}",
-            ["backend/dev/bin/guvenlik-denetimi"]),
+            ["backend/dev/bin/security-audit"]),
         scan_bandit(),
         run("Gitleaks", VERSIONS["GITLEAKS_VERSION"], [str(SECURITY / "history-scan")]),
         scan_dependencies(requirements, reproduce=ci),

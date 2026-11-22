@@ -316,7 +316,7 @@ class DeletionPathsTest(ServerCase):
         self.store.operation_begin("o-old", "invite_user", ORG_ID, ["s1"])
         self.store.operation_subject("o-old", SUBJECT)
         old = Event(id="e-old", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT)
-        self.store.add_dead_letter(old, "tenant.provision kiraci1: HTTP 503")
+        self.store.add_dead_letter(old, "tenant.provision tenant1: HTTP 503")
 
     def stored_text(self) -> str:
         return "\n".join(self.store._db.iterdump())

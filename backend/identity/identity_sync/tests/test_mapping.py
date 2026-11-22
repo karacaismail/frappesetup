@@ -28,13 +28,13 @@ from identity_sync.mapping import (
     plan_actions,
 )
 
-ISSUER = "http://kimlik.localhost:6110/realms/platform"
+ISSUER = "http://identity.localhost:6110/realms/platform"
 SUB = "11111111-1111-4111-8111-111111111111"
-ORG = Organization(id="22222222-2222-4222-8222-222222222222", alias="kiraci1", name="Kiracı 1")
+ORG = Organization(id="22222222-2222-4222-8222-222222222222", alias="tenant1", name="Kiracı 1")
 OTHER_ORG = Organization(id="33333333-3333-4333-8333-333333333333", alias="baska")
 TENANTS = (
-    Tenant(name="kiraci1", base_url="http://kiraci1.localhost:6111", organization="kiraci1"),
-    Tenant(name="kiraci2", base_url="http://kiraci2.localhost:6111", organization="kiraci2"),
+    Tenant(name="tenant1", base_url="http://tenant1.localhost:6111", organization="tenant1"),
+    Tenant(name="tenant2", base_url="http://tenant2.localhost:6111", organization="tenant2"),
 )
 
 
@@ -77,7 +77,7 @@ TEAM = PressEnsureTeam(
     organization_name="Kiracı 1",
 )
 PROVISION = TenantProvision(
-    tenant="kiraci1",
+    tenant="tenant1",
     issuer=ISSUER,
     subject=SUB,
     email="ayse@example.test",
@@ -86,7 +86,7 @@ PROVISION = TenantProvision(
     last_name="Örnek",
     enabled=True,
 )
-CHANGE_EMAIL = TenantChangeEmail(tenant="kiraci1", issuer=ISSUER, subject=SUB, new_email="ayse@example.test")
+CHANGE_EMAIL = TenantChangeEmail(tenant="tenant1", issuer=ISSUER, subject=SUB, new_email="ayse@example.test")
 # Source: docs/sozlesmeler.md, section 6. Press disables the user and revokes the API keys
 # when it gets all_organizations. So a deleted user and a disabled user get the same single request.
 def close_on(tenant: str) -> tuple:
@@ -99,18 +99,18 @@ def close_on(tenant: str) -> tuple:
 
 DEPROVISION_EVERYWHERE = (
     PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=None),
-    *close_on("kiraci1"),
-    *close_on("kiraci2"),
+    *close_on("tenant1"),
+    *close_on("tenant2"),
 )
 # Source: docs/sozlesmeler.md, section 7, and PROJE-KAYDI.md, O-27. The order is fixed.
 ACCOUNT_DELETION = (
     KeycloakDisableUser(subject=SUB),
     PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=None),
-    *close_on("kiraci1"),
-    *close_on("kiraci2"),
+    *close_on("tenant1"),
+    *close_on("tenant2"),
     PressAnonymizeUser(issuer=ISSUER, subject=SUB),
-    TenantAnonymizeUser(tenant="kiraci1", issuer=ISSUER, subject=SUB),
-    TenantAnonymizeUser(tenant="kiraci2", issuer=ISSUER, subject=SUB),
+    TenantAnonymizeUser(tenant="tenant1", issuer=ISSUER, subject=SUB),
+    TenantAnonymizeUser(tenant="tenant2", issuer=ISSUER, subject=SUB),
     KeycloakDeleteUser(subject=SUB),
 )
 
@@ -254,7 +254,7 @@ class MembershipTest(unittest.TestCase):
             plan(ev, user(orgs=(OTHER_ORG,)), ORG),
             (
                 PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=ORG.id),
-                *close_on("kiraci1"),
+                *close_on("tenant1"),
             ),
         )
 
@@ -266,12 +266,12 @@ class MembershipTest(unittest.TestCase):
     def test_membership_of_deleted_organization_disables_non_member_tenants(self) -> None:
         # Organization silindi. Takma adı bilinmez. Kullanıcı üyesi olmadığı her kiracıda kapanır.
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_DELETE", ORG.id)
-        kiraci2 = Organization(id="o-2", alias="kiraci2")
+        tenant2 = Organization(id="o-2", alias="tenant2")
         self.assertEqual(
-            plan(ev, user(orgs=(kiraci2,)), None),
+            plan(ev, user(orgs=(tenant2,)), None),
             (
                 PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=ORG.id),
-                *close_on("kiraci1"),
+                *close_on("tenant1"),
             ),
         )
 
@@ -306,10 +306,10 @@ class OtherEventsTest(unittest.TestCase):
 
 class PreviewTest(unittest.TestCase):
     def test_disable_is_marked_destructive(self) -> None:
-        preview = TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject=SUB, enabled=False).preview()
+        preview = TenantSetEnabled(tenant="tenant1", issuer=ISSUER, subject=SUB, enabled=False).preview()
         self.assertTrue(preview.destructive)
         self.assertEqual(preview.operation, "tenant.set_enabled")
-        self.assertEqual(preview.target, "kiraci1")
+        self.assertEqual(preview.target, "tenant1")
 
     def test_provision_is_not_destructive_and_hides_email(self) -> None:
         preview = PROVISION.preview()

@@ -20,9 +20,9 @@ import frappe
 from frappe.app import application
 from frappe.database.database import Database
 from platform_core.api import mobile
-from platform_core.kimlik import service_token
-from platform_core.mobil.protocol import PAGE_SIZE
-from platform_core.mobil.tests.loopback_http import open_loopback
+from platform_core.identity import service_token
+from platform_core.mobile.protocol import PAGE_SIZE
+from platform_core.mobile.tests.loopback_http import open_loopback
 from werkzeug.serving import make_server
 
 from . import fixture
@@ -52,11 +52,11 @@ def capture_db_failures(sql):
                 original = error.__cause__ or error.__context__ or error
                 code = original.args[0] if original.args and isinstance(original.args[0], int) else 0
                 tables = (
-                    "Mobile Sequence",
-                    "Mobile Operation",
-                    "Mobile Delivery",
-                    "Mobile Change",
-                    "Mobile Installation",
+                    "PLT Mobile Sequence",
+                    "PLT Mobile Operation",
+                    "PLT Mobile Delivery",
+                    "PLT Mobile Change",
+                    "PLT Mobile Installation",
                     "User",
                 )
                 table = next((name for name in tables if f"tab{name}`" in str(query)), "other")
