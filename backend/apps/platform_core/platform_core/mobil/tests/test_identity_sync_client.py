@@ -12,11 +12,16 @@ from platform_core.mobil import identity_sync_client as client
 class IdentitySyncClientTest(TestCase):
 	def setUp(self):
 		self.addCleanup(patch.stopall)
+		service_credential = "fixture-secret"
+		browser_credential = "browser-fixture"
+		issuer_endpoint = "https://id.example.test/realms/platform/protocol/openid-connect/token"
 		self.conf = {
 			"mobile_identity_sync_url": "https://sync.example.test/",
-			"mobile_identity_sync_token_url": "https://id.example.test/realms/platform/protocol/openid-connect/token",
-			"mobile_identity_sync_client_id": "platform-core-fixture",
-			"mobile_identity_sync_client_secret": "fixture-secret",
+			"mobile_identity_sync_token_url": issuer_endpoint,
+			"keycloak_client_id": "site-fixture",
+			"keycloak_client_secret": browser_credential,
+			"keycloak_service_client_id": "site-fixture-service",
+			"keycloak_service_client_secret": service_credential,
 		}
 		patch.object(client.frappe, "conf", self.conf).start()
 		if hasattr(client, "_cached_bearer"):
@@ -42,7 +47,7 @@ class IdentitySyncClientTest(TestCase):
 			parse_qs(token.data.decode()),
 			{
 				"grant_type": ["client_credentials"],
-				"client_id": ["platform-core-fixture"],
+				"client_id": ["site-fixture-service"],
 				"client_secret": ["fixture-secret"],
 				"scope": ["aud-identity-sync"],
 			},
@@ -53,6 +58,18 @@ class IdentitySyncClientTest(TestCase):
 		self.assertEqual(json.loads(revoke.data), {"sid": "session-fixture", "subject": "keycloak-fixture"})
 		self.assertTrue(all(call.kwargs["timeout"] > 0 for call in self.open.call_args_list))
 		self.logger.warning.assert_not_called()
+
+	def test_service_credentials_cannot_fall_back_to_the_browser(self):
+		pair = ("session-fixture", "subject-fixture")
+		del self.conf["keycloak_service_client_secret"]
+		self.assertEqual(client.send_session_revocations([pair]), (pair,))
+		self.open.assert_not_called()
+
+	def test_browser_client_id_is_refused_for_service_requests(self):
+		pair = ("session-fixture", "subject-fixture")
+		self.conf["keycloak_service_client_id"] = self.conf["keycloak_client_id"]
+		self.assertEqual(client.send_session_revocations([pair]), (pair,))
+		self.open.assert_not_called()
 
 	def test_one_failure_does_not_stop_the_batch_or_log_sensitive_values(self):
 		self.open.side_effect = [

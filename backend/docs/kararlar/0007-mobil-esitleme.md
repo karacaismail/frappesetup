@@ -295,7 +295,8 @@ Oturuma bağlanmamış eski kurulum için yönetici kimlik tarafını kullanır.
 
 Servis adresi `mobile_identity_sync_url` ayarında bulunur.
 Belirteç adresi `mobile_identity_sync_token_url` ayarından okunur.
-Servis hesabı `mobile_identity_sync_client_id` ve `mobile_identity_sync_client_secret` kullanır.
+Servis hesabı `keycloak_service_client_id` ve `keycloak_service_client_secret` kullanır.
+Tarayıcı girişi `keycloak_client_id` ile devam eder.
 Kiracı servis hesabı belirteci `aud-identity-sync` kapsamıyla ister.
 Sunucu bu ayarları güvenli site yapılandırmasından okur.
 Canlı servis için kimlik ekibi servis hesabını ve kapsamı tanımlar.

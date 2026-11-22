@@ -83,6 +83,16 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		self.assertIn("SameSite=Lax", cookie)
 		self.assertIn("Max-Age=600", cookie)
 
+	def test_browser_authorization_does_not_request_the_service_scope(self):
+		with h.SiteSettings({"keycloak_service_client_id": "site-kiraci1-service"}):
+			response, query = h.start_login(self.client)
+			self.assertEqual(response.status_code, 200)
+			callback = h.finish_login(self.client, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE)))
+		self.assertEqual(query["client_id"], "site-kiraci1")
+		self.assertEqual(query["scope"], "openid")
+		self.assertEqual(callback.status_code, 302)
+		self.assertEqual(h.exchange_calls[-1]["client_id"], "site-kiraci1")
+
 	def test_right_user_signs_in_and_link_is_created(self):
 		_started, query = h.start_login(self.client, "/panel")
 		response = h.finish_login(

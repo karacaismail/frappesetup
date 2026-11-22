@@ -49,7 +49,9 @@ Ayarlar `site_config.json` dosyasında durur. Sır depoya girmez.
 | `keycloak_internal_url` | Hayır | Sunucunun ulaştığı adres. Boşsa genel adres kullanılır. |
 | `keycloak_realm` | Hayır | Varsayılan `platform` |
 | `keycloak_client_id` | Evet | Bu sitenin istemcisi, örneğin `site-kiraci1` |
-| `keycloak_client_secret` | Evet | İstemci sırrı |
+| `keycloak_client_secret` | Evet | Tarayıcı istemcisinin sırrı |
+| `keycloak_service_client_id` | Servis çağrısında | Servis istemcisi. Örnek `site-kiraci1-service`. |
+| `keycloak_service_client_secret` | Servis çağrısında | Servis istemcisinin sırrı |
 | `kimlik_marka_adi` | Evet | Düğme metni bundan üretilir, örneğin `Atonota` |
 | `platform_panel_url` | Evet | Girişten ve çıkıştan sonra dönülen adres |
 | `kimlik_yalniz_keycloak` | Hayır | `1` ise Frappe'nin yerel giriş yolları kapanır |

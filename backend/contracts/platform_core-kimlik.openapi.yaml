@@ -114,11 +114,19 @@ x-site-settings:
     - key: keycloak_client_id
       example: site-kiraci1
       required: true
-      note: The Keycloak client of this site. In the service token, `aud` is this value.
+      note: The browser sign-in client. Incoming identity-sync tokens for this site also use this audience.
     - key: keycloak_client_secret
       example: "(secret, not written in this file)"
       required: true
       note: It lives only in the site setting and in the `.env` file.
+    - key: keycloak_service_client_id
+      example: site-kiraci1-service
+      required: false
+      note: Required for outgoing service token requests with the `aud-identity-sync` scope.
+    - key: keycloak_service_client_secret
+      example: "(secret, not written in this file)"
+      required: false
+      note: Required for outgoing service token requests. Store it only in the site setting and in the `.env` file.
     - key: kimlik_marka_adi
       example: Atonota
       required: true
