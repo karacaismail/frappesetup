@@ -28,6 +28,7 @@ paths:
         '200': { $ref: '#/components/responses/DeviceSuccess' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_revoke:
     post:
@@ -52,6 +53,7 @@ paths:
         '200': { $ref: '#/components/responses/RevokedSuccess' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_push:
     post:
@@ -82,6 +84,7 @@ paths:
         '409': { $ref: '#/components/responses/Error', description: İşlem içeriği değişti veya kayıt sürümü eski. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_pull:
     post:
@@ -107,6 +110,7 @@ paths:
         '410': { $ref: '#/components/responses/Error', description: İmleç geçersiz veya süresi doldu. Tam kopya alın. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_cleanup:
     post:
@@ -114,16 +118,21 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
-      description: Site yöneticisi, süresi dolmuş kaldırma işaretlerini elle temizler.
+      description: Site yöneticisi süresi dolmuş olayları ve işlem kayıtlarını elle temizler. Önizleme kayıt silmez.
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, additionalProperties: false }
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                dry_run: { type: boolean, default: false }
       responses:
         '200': { $ref: '#/components/responses/CleanupResultSuccess' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
         default: { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
@@ -191,16 +200,57 @@ components:
               status: { const: applied }
     CleanupResult:
       type: object
-      required: [removed]
+      required: [dry_run, removed, operations_removed, eligible_changes, eligible_operations]
       properties:
-        removed: { type: integer, minimum: 0, maximum: 1000 }
+        dry_run: { type: boolean }
+        removed: { type: integer, minimum: 0, maximum: 2000 }
+        operations_removed: { type: integer, minimum: 0, maximum: 1000 }
+        eligible_changes: { type: integer, minimum: 0, maximum: 2000 }
+        eligible_operations: { type: integer, minimum: 0, maximum: 1000 }
     Error:
       type: object
       anyOf:
         - required: [code]
         - required: [exc_type]
       properties:
-        code: { type: string, description: Mobil ucun verdiği hata kodu. }
+        code:
+          type: string
+          description: Mobil ucun verdiği hata kodu.
+          enum:
+            - body_too_large
+            - cleanup_forbidden
+            - command_disabled
+            - cursor_key_unavailable
+            - installation_limit
+            - installation_unavailable
+            - invalid_batch_size
+            - invalid_client_version
+            - invalid_command
+            - invalid_cursor
+            - invalid_fields
+            - invalid_json
+            - invalid_mobile_route
+            - invalid_mobile_settings
+            - invalid_operation
+            - invalid_page_size
+            - invalid_request
+            - invalid_retention_setting
+            - invalid_uuid
+            - json_required
+            - mixed_authentication
+            - mobile_busy
+            - mobile_schema_unavailable
+            - mobile_sequence_exhausted
+            - mobile_token_required
+            - mobile_token_revoked
+            - operation_conflict
+            - rate_limit
+            - record_not_found
+            - unexpected_version
+            - unknown_command
+            - unsupported_contract_version
+            - version_conflict
+            - version_required
         exc_type: { type: string, description: Frappe isteği uca ulaşmadan reddederse gelen hata türü. }
         current: { $ref: '#/components/schemas/Change', description: Kullanıcının görebildiği güncel kayıt. }
   responses:
@@ -268,3 +318,12 @@ components:
       headers:
         Retry-After:
           schema: { type: integer, minimum: 1 }
+    Unavailable:
+      description: Sunucu şu anda işlemi tamamlayamadı.
+      headers:
+        Retry-After:
+          description: Yeni denemeden önce beklenecek saniye.
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

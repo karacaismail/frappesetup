@@ -1,4 +1,6 @@
-"""Business commands run inside the caller's locked site transaction."""
+"""Process authorized mobile commands and assemble bounded sync pages."""
+
+from itertools import islice
 
 from .protocol import (
 	BATCH_SIZE,
@@ -9,6 +11,7 @@ from .protocol import (
 	decode_cursor,
 	encode_cursor,
 	operation_key,
+	unavailable_record,
 	validate_operation,
 )
 
@@ -16,7 +19,7 @@ from .protocol import (
 COMMANDS = {}
 
 
-def push(store, commands, site, account, operations, *, principal):
+def push(store, commands, site, account, operations, *, principal, disabled_commands=()):
 	"""Apply the batch atomically. The caller owns commit and rollback."""
 	if not isinstance(operations, list) or not 1 <= len(operations) <= BATCH_SIZE:
 		raise MobileError("invalid_batch_size")
@@ -41,13 +44,16 @@ def push(store, commands, site, account, operations, *, principal):
 			continue
 
 		command = validate_operation(operation, declarations)
-		handler = commands[operation["command"]]
+		name = operation["command"]
+		if name in disabled_commands:
+			raise MobileError("command_disabled", 403)
+		handler = commands[name]
 		record_id = operation["record_id"]
 		handler.authorize(account, record_id)
 		if command.action != "create":
 			current = handler.read_locked(account, record_id)
 			if current is None:
-				raise MobileError("record_not_found", 404)
+				raise unavailable_record()
 			check_version(operation["version"], current)
 
 		handler.apply(account, record_id, operation.get("fields", {}))
@@ -62,16 +68,49 @@ def push(store, commands, site, account, operations, *, principal):
 	return {"operations": results}
 
 
-def pull(store, projections, secret, scope, cursor, limit, *, account, now):
-	"""Read a bounded page using only committed sequence positions."""
+def _snapshot_candidates(inventories, account, position, limit):
+	"""Each scanner reads at most the requested IDs in ascending UUID order."""
+	previous_type, previous_id = position or ("", None)
+	candidates = []
+	for record_type, scan in sorted(inventories.items()):
+		if record_type < previous_type:
+			continue
+		after = previous_id if record_type == previous_type else None
+		remaining = limit - len(candidates)
+		candidates.extend(
+			(record_type, record_id) for record_id in islice(scan(account, after, remaining), remaining)
+		)
+		if len(candidates) >= limit:
+			break
+	return candidates
+
+
+def _pull_changes(store, projections, installation, account, candidates, *, snapshot):
+	changes = []
+	for record_type, record_id in candidates:
+		identity = {"record_type": record_type, "record_id": record_id}
+		projection = projections.get(record_type)
+		current = projection(account, record_id) if projection else None
+		if current is not None:
+			store.record_delivery(installation, record_type, record_id)
+			changes.append(
+				{"kind": "upsert", **identity, "version": current["version"], "fields": current["fields"]}
+			)
+		elif not snapshot and store.may_have_delivered(installation, record_type, record_id):
+			changes.append({"kind": "remove", **identity})
+	return changes
+
+
+def pull(store, projections, secret, scope, cursor, limit, *, account, now, inventories=None):
+	"""Read the current inventory first, then consume committed change events."""
 	if type(limit) is not int or not 1 <= limit <= PAGE_SIZE:
 		raise MobileError("invalid_page_size")
 
 	_, _, installation, _ = scope
 	if cursor is None:
-		after, ceiling, snapshot, delivery_after = 0, store.sequence, True, None
+		after, ceiling, snapshot, delivery_after, snapshot_after = 0, store.sequence, True, None, None
 	else:
-		after, ceiling, snapshot, delivery_after = decode_cursor(
+		after, ceiling, snapshot, delivery_after, snapshot_after = decode_cursor(
 			secret,
 			scope,
 			cursor,
@@ -79,36 +118,39 @@ def pull(store, projections, secret, scope, cursor, limit, *, account, now):
 			floor=store.retention_floor,
 		)
 
-	if not snapshot and (after == ceiling or delivery_after is not None):
-		delivery_after = store.reconcile_deliveries(projections, installation, account, delivery_after)
-		ceiling = store.sequence
+	if snapshot:
+		candidates = _snapshot_candidates(inventories or {}, account, snapshot_after, limit + 1)
+		has_more = len(candidates) > limit
+		snapshot_after = candidates[limit - 1] if has_more else None
+		position = after if has_more else ceiling
+	else:
+		if delivery_after is not None or (after == ceiling and store.audit_due(installation, now)):
+			delivery_after = store.reconcile_deliveries(projections, installation, account, delivery_after)
+			if delivery_after is None:
+				store.finish_audit(installation, now)
+		if after == ceiling:
+			ceiling = store.sequence
+		events = store.read_events(installation, after, ceiling, limit + 1)
+		candidates = [(event.record_type, event.record_id) for event in events]
+		more_events = len(events) > limit
+		position = events[limit - 1].sequence if more_events else ceiling
+		has_more = (
+			more_events or delivery_after is not None or position < store.sequence or store.pending_events
+		)
 
-	events = store.read_events(installation, after, ceiling, limit + 1)
-	more_events = len(events) > limit
-	changes = []
-	for event in events[:limit]:
-		identity = {"record_type": event.record_type, "record_id": event.record_id}
-		projection = projections.get(event.record_type)
-		current = projection(account, event.record_id) if projection else None
-		if current is not None:
-			store.record_delivery(installation, event.record_type, event.record_id)
-			changes.append(
-				{"kind": "upsert", **identity, "version": current["version"], "fields": current["fields"]}
-			)
-		elif store.may_have_delivered(installation, event.record_type, event.record_id):
-			changes.append({"kind": "remove", **identity})
-
-	position = events[limit - 1].sequence if more_events else ceiling
 	return {
-		"changes": changes,
+		"changes": _pull_changes(
+			store, projections, installation, account, candidates[:limit], snapshot=snapshot
+		),
 		"cursor": encode_cursor(
 			secret,
 			scope,
 			after=position,
 			ceiling=ceiling,
 			now=now,
-			snapshot=snapshot and more_events,
+			snapshot=snapshot and has_more,
 			delivery_after=delivery_after,
+			snapshot_after=snapshot_after,
 		),
-		"has_more": more_events or delivery_after is not None,
+		"has_more": has_more,
 	}

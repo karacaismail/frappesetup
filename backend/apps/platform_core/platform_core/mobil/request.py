@@ -11,6 +11,16 @@ from .protocol import BODY_BYTES, REQUESTS_PER_MINUTE, MobileError, content_dige
 
 APP_VERSION = re.compile(r"[0-9]{1,5}\.[0-9]{1,5}\.[0-9]{1,5}")
 CONTRACT_VERSION = re.compile(r"[1-9][0-9]{0,2}")
+MAX_VERSION_BUCKETS = 256
+VERSION_COUNTER = """
+local bucket = ARGV[1]
+if redis.call('HEXISTS', KEYS[1], bucket) == 0
+    and redis.call('HLEN', KEYS[1]) >= tonumber(ARGV[2]) then
+    bucket = 'other'
+end
+redis.call('HINCRBY', KEYS[1], bucket, 1)
+redis.call('EXPIRE', KEYS[1], ARGV[3])
+"""
 
 
 @dataclass(frozen=True)
@@ -19,6 +29,7 @@ class Identity:
 	account: str
 	principal: str
 	scope: str
+	issued_at: int
 
 
 def _unique_keys(pairs):
@@ -61,10 +72,9 @@ def _limit_and_count(principal, app_version, contract_version):
 
 	day = now // 86400
 	metrics_key = frappe.cache.make_key(f"mobile-versions:{day}")
-	with frappe.cache.pipeline() as pipe:
-		pipe.hincrby(metrics_key, f"{contract_version}:{app_version}", 1)
-		pipe.expire(metrics_key, 7 * 86400)
-		pipe.execute()
+	frappe.cache.eval(
+		VERSION_COUNTER, 1, metrics_key, f"{contract_version}:{app_version}", MAX_VERSION_BUCKETS, 7 * 86400
+	)
 
 
 def mobile_request(endpoint):
@@ -75,6 +85,12 @@ def mobile_request(endpoint):
 	authorization = request.headers.get("Authorization", "").split()
 	if len(authorization) != 2 or authorization[0].lower() != "bearer":
 		raise MobileError("mobile_token_required", 401)
+
+	login_manager = getattr(frappe.local, "login_manager", None)
+	if request.cookies.get("sid") not in (None, "", "Guest") and getattr(
+		login_manager, "user", "Guest"
+	) not in (None, "Guest"):
+		raise MobileError("mixed_authentication")
 
 	# Set only by the identity hook after it verifies the token, site, client,
 	# scopes and absence of a live Frappe cookie session.
@@ -90,6 +106,9 @@ def mobile_request(endpoint):
 	subject = identity.get("subject")
 	if not isinstance(issuer, str) or not issuer or not isinstance(subject, str) or not subject:
 		raise MobileError("mobile_token_required", 401)
+	issued_at = identity.get("iat")
+	if type(issued_at) is not int or not 0 < issued_at <= int(time.time()):
+		raise MobileError("mobile_token_required", 401)
 	principal = content_digest([issuer, subject])
 
 	app_version = request.headers.get("X-Mobile-App-Version", "")
@@ -102,13 +121,15 @@ def mobile_request(endpoint):
 	body = _read_json(request)
 	if "cmd" in body:
 		raise MobileError("invalid_mobile_route")
-	return Identity(frappe.local.site, account, principal, scope), body
+	return Identity(frappe.local.site, account, principal, scope, issued_at), body
 
 
 def _error_response(error):
 	frappe.db.rollback()
 	frappe.local.response["http_status_code"] = error.status
 	frappe.local.response["code"] = error.code
+	if error.status == 503:
+		frappe.local.response_headers.setdefault("Retry-After", "1")
 	if error.current is not None:
 		frappe.local.response["current"] = error.current
 	return None
@@ -127,8 +148,9 @@ def endpoint_response(endpoint, action):
 			return action(identity, body)
 		except MobileError as error:
 			return _error_response(error)
+		except frappe.QueryTimeoutError:
+			break
 		except frappe.QueryDeadlockError:
 			frappe.db.rollback()
 
-	frappe.local.response_headers["Retry-After"] = "1"
 	return _error_response(MobileError("mobile_busy", 503))

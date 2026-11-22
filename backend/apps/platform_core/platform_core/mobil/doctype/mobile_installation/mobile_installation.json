@@ -9,7 +9,8 @@
   "account",
   "principal",
   "scope",
-  "revoked"
+  "revoked",
+  "last_audit_at"
  ],
  "fields": [
   {
@@ -51,6 +52,12 @@
    "fieldname": "revoked",
    "fieldtype": "Check",
    "label": "İptal edildi"
+  },
+  {
+   "description": "The UTC time when the installation last completed its delivery audit.",
+   "fieldname": "last_audit_at",
+   "fieldtype": "Datetime",
+   "label": "Last Audit At"
   }
  ],
  "links": [],

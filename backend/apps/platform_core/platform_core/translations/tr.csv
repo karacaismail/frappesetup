@@ -1,0 +1,8 @@
+Mobile Account State,Mobil Hesap Durumu
+Stores the token cutoff for mobile installation registration.,Yeni telefon kurulumunda geçerli belirteç zamanını tutar.
+The account that owns this revocation state.,Bu hesap iptal kaydının sahibidir.
+Revoked through,İptal zamanı
+Registration rejects tokens issued at or before this Unix timestamp.,"Kurulum, bu zamana kadar verilen belirteçleri reddeder."
+Account,Hesap
+Last Audit At,Son denetim zamanı
+The UTC time when the installation last completed its delivery audit.,Kurulumun son teslim denetimini bitirdiği UTC zamanıdır.

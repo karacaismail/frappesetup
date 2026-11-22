@@ -1,3 +1,4 @@
+import base64
 import unittest
 
 from platform_core.mobil import protocol
@@ -41,7 +42,7 @@ class ProtocolTest(unittest.TestCase):
 		scope = ("site", "account", INSTALLATION)
 		token = protocol.encode_cursor(SECRET, scope, after=42, ceiling=60, now=100)
 		self.assertEqual(
-			protocol.decode_cursor(SECRET, scope, token, now=101, floor=42), (42, 60, False, None)
+			protocol.decode_cursor(SECRET, scope, token, now=101, floor=42), (42, 60, False, None, None)
 		)
 		for other_scope, other_token, now, floor in (
 			(("other", *scope[1:]), token, 101, 0),
@@ -55,6 +56,23 @@ class ProtocolTest(unittest.TestCase):
 				with self.assertRaises(protocol.MobileError) as error:
 					protocol.decode_cursor(SECRET, other_scope, other_token, now=now, floor=floor)
 				self.assertEqual(error.exception.status, 410)
+
+	def test_cursor_ciphertext_is_random_and_hides_sequence(self):
+		scope = ("site", "account", INSTALLATION)
+		args = {"after": 123456789, "ceiling": 987654321, "now": 100}
+		first = protocol.encode_cursor(SECRET, scope, **args)
+		second = protocol.encode_cursor(SECRET, scope, **args)
+		self.assertNotEqual(first, second)
+		body = first.split(".")[-1]
+		raw = base64.urlsafe_b64decode(body + "=" * (-len(body) % 4))
+		self.assertNotIn(b"987654321", raw)
+
+	def test_record_identifiers_are_scoped_to_principal_and_type(self):
+		key = protocol.scoped_record_key("sample", "principal", RECORD)
+		self.assertNotEqual(key, protocol.scoped_record_key("other", "principal", RECORD))
+		self.assertNotEqual(key, protocol.scoped_record_key("sample", "other", RECORD))
+		with self.assertRaises(protocol.MobileError):
+			protocol.scoped_record_key("sample", "principal", "invalid")
 
 	def test_allowlist_rejects_unregistered_command(self):
 		operation = {"operation_id": OPERATION, "command": "anything", "record_id": RECORD}

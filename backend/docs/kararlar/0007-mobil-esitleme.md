@@ -22,10 +22,19 @@ Bu uçlar, kimlik sunucusunun doğruladığı sonucu arar.
 Yalnız Frappe kullanıcı adının dolu olması yeterli olmaz.
 Kanca izinli adres listesini tam adresle eşler.
 Kanca doğrulamadan sonra `frappe.local.mobile_identity` alanını doldurur.
-Bu alan `site`, `account`, `issuer`, `subject` ve `scope` değerlerini taşır.
+Bu alan `site`, `account`, `issuer`, `subject`, `scope` ve `iat` değerlerini taşır.
+`iat`, belirtecin verildiği anı saniye olarak gösterir.
 `account`, Frappe kullanıcısıdır. `scope` bu uçlarda `mobile` olur.
 Sistem hesap anahtarını sabit veren ve kullanıcı kimliğinden üretir.
 E-posta değişse de bu anahtar aynı kalır.
+Sunucu bir kurulumu iptal edince iptal anını hesapta saklar.
+Sunucu kurulum ve iptal işlemlerini aynı mobil hesap kaydıyla sıraya alır.
+İlk mobil hesap kaydı açılırken sunucu kullanıcı satırını kilitler.
+Bu denetim, silinmiş hesabın eski okuma bilgisiyle yeniden açılmasını önler.
+Sonraki eşitlemeler mobil hesap kaydındaki kilidi kullanır.
+Bütün kurulumları iptal eden istek de bu anı saklar.
+Yeni kurulum, iptal anından sonra verilen belirteci ister.
+Aynı saniyede verilen belirteç de reddedilir.
 Sistem `cmd` alanını, boş bile olsa, gövdede ve adres parametrelerinde reddeder.
 Sistem etkin oturum çereziyle belirteç birlikte gelirse isteği reddeder.
 Misafir çerezi etkin oturum sayılmaz.
@@ -95,7 +104,9 @@ UUID, ayraçlı ve küçük harfli biçimde yazılan tekil kimliktir.
 Telefon yeni iş kaydı için ayrı bir UUID üretir.
 Sunucu kayıt kimliğinin site, hesap ve izinli tür kapsamını denetler.
 Sunucunun adlandırma kuralı kayıt adını ve iş numarasını belirler.
-Telefonun kayıt UUID'si ayrı bir tekil alanda kalır (AU-9).
+Telefonun kayıt UUID'si ayrı bir alanda kalır (AU-9).
+Sunucu UUID, hesap ve kayıt türünden tekil arama anahtarı üretir.
+Kayıt yoksa veya başka hesaba aitse sunucu aynı yanıtı verir.
 
 Veri tabanı site, hesap ve işlem kimliği birleşimini tekil tutar (AU-7).
 Sunucu normalleştirilmiş isteğin SHA-256 özetini alır.
@@ -128,20 +139,23 @@ Telefon saatine göre karar verilmez.
 
 İmleç, telefonun nerede kaldığını gösteren sunucu kodudur.
 Telefon imleci açmadan saklar ve sonraki istekte aynen gönderir.
-Sunucu imleci imzalar.
-İmza, kullanıcının imleci değiştirmesini engeller.
+Sunucu imleci AES-GCM ile şifreler.
+Şifreli imleç sıra numaralarını gizler ve değişikliği algılar.
+Eski biçimdeki imleç `410` döner. Telefon yeni bir ilk kopya alır.
 İmleç biçimi siteye, hesaba, kuruluma, kapsama ve sözleşme sürümüne bağlıdır.
 Sunucu başka bir bağ için üretilen veya süresi dolan imleci reddeder.
 Telefon bu durumda ilk kopyayı yeniden alır.
 Telefon bu sırada gönderilmemiş işleri korur.
 
 İlk kopya başlarken son kesinleşen sıra numarası alınır.
-Sunucu kopyanın sayfalarını sabit sırada verir.
+Sunucu ilk kopyayı değişiklik geçmişinden oluşturmaz.
+Sunucu kayıt tablolarını kayıt türü ve UUID sırasına göre sayfalar.
 Her sayfada kayıtların güncel okuma izni denetlenir.
 İlk kopyadan sonra değişiklikler başlangıçtaki sıra numarasından okunur.
 Yeni kayıt ilk kopya sınırını aşarsa sonraki değişiklik sayfasında gelir.
 
-İzinli kaydı değiştiren işlem tek site sıra satırını kilitler.
+Sunucu sıra numarası üretirken site sıra satırını kilitler.
+Salt okuma site sıra satırını kilitlemez.
 İşlem bu kilidi kesinleşene kadar tutar.
 Sistem sıra numarasını değişiklik kaydıyla aynı işlemde yazar (AU-10).
 Sonraki yazma ilk yazma kesinleşene kadar yeni sıra numarası alamaz.
@@ -150,7 +164,8 @@ Telefon bu yüzden geç kesinleşen 8 numaralı kaydı atlamaz.
 Geri alınan yazma kayıt ve sıra ilerlemesini birlikte geri alır.
 MariaDB eski okuma görünümünden yeni bir satır kilidine geçişi reddedebilir.
 Sunucu bu hatada işlemi geri alır ve en çok üç kez dener.
-Üç deneme de başarısız olursa sunucu `503` ile yeniden deneme süresini döner.
+Üç deneme başarısız olursa sunucu `503` ve `Retry-After` döner.
+Kilit bekleme süresi dolarsa sunucu hemen aynı yanıtı döner.
 Bu deneme, veritabanı dışında etkisi olan komutu çalıştırmaz.
 Aynı kayıt türünü değiştiren bütün onaylı yollar bu sıraya katılır.
 Bu şart sağlanana kadar tür eşitlemeye açılmaz.
@@ -166,6 +181,9 @@ Telefon en son uyguladığı sayfanın imlecini geri gönderir.
 Sunucu silme işaretini geçerli bir imleç yeniden isteyebildiği sürece korur.
 Sistem, telefonun daha önce alabildiği kayıtlar için güncel izni yeniden denetler.
 Bu denetim, iş kaydı değişmemiş olsa bile çalışır.
+Sunucu bir denetim bitince yenisini en erken 300 saniye sonra başlatır.
+Yarım kalan denetim bir sonraki sayfada sürer.
+Kayıt yeniden telefona giderse sunucu görünürlük kaydını günceller.
 Sunucu her istekte en çok 100 eski teslimi denetler.
 Telefon, denetim sürüyorsa `has_more` değeriyle sonraki sayfayı ister.
 Yeni bir okuma izni, kayıt değişmese bile bir değişiklik olayı üretmelidir.
@@ -175,17 +193,26 @@ Bu olay üretimi sınanmadan kayıt türü eşitlemeye açılmaz.
 İzin kaybı bildirimi iş kaydının içeriğini taşımaz.
 Frappe'nin yönetici kurtarma kayıtları telefona açılmaz.
 
-Sunucu kaldırma işaretlerini 30 gün saklar.
+Sunucu, işlem sonuçlarını ve değişiklik olaylarını varsayılan 30 gün saklar.
+Site bu süreleri ayrı ayrı değiştirebilir.
+
+- `mobile_operation_retention_days` işlem sonuçlarının süresidir.
+- `mobile_upsert_retention_days` yeni ve güncel kayıt olaylarının süresidir.
+- `mobile_removal_retention_days` kaldırma işaretlerinin süresidir.
+
+Sunucu teslim kayıtlarını kurulum silinene kadar saklar.
+Kullanıcı silinince sunucu kurulumları, teslimleri ve hedefli olayları temizler.
 Bir yanıt kaybolursa telefon aynı imleçle kaldırma işaretini yeniden alabilir.
 İşaretin yeniden alınması eski iş kaydını geri getirmez.
 İmleç en çok 7 gün geçerlidir.
-Temizlik, geçerli imlecin ihtiyaç duyduğu değişikliği silmez.
+Temizlikten sonra sunucu eksik değişiklik içeren eski imleçleri reddeder.
 Eski imlece dayanan güvenli bir değişiklik listesi kalmazsa ilk kopya istenir.
 Yetkili görevli temizliği elle başlatır.
 Görevli komut satırında `bench --site <site> execute platform_core.mobil.store.cleanup` komutunu çalıştırır.
 Görevli HTTP üzerinden `v1_cleanup` ucunu çağırır.
 HTTP ucu Frappe içindeki `System Manager` rolünü arar.
 Komut ve HTTP ucu aynı temizlik işlevini kullanır.
+`dry_run: true` kaç kayıt silinebileceğini gösterir. Kayıt silmez.
 Zamanlanmış bir temizlik işi kurulmaz.
 
 ## İstek sınırları ve sürümler
@@ -194,10 +221,13 @@ Zamanlanmış bir temizlik işi kurulmaz.
 - Bir yazma grubu en çok 20 işlem taşır.
 - Bir JSON istek gövdesi en çok 256 KiB olabilir.
 - Sistem hesap başına dakikada 60 istek kabul eder.
+- Sistem hesap başına en çok 20 etkin kuruluma izin verir.
 - İlk sürüm ek kabul etmez. Ek sınırı 0 bayttır.
 
 Gövde sınırı aşılırsa sunucu `413` döner.
-Ters vekil büyük gövdeyi Frappe okumadan önce durdurur.
+Gövde sınırı mobil işlevde de denetlenir.
+Frappe, gövdeyi mobil işlevden önce okur.
+Ters vekilde mobil adresler için 256 KiB sınırı ayrıca gerekir.
 Sıklık sınırı geçilirse sistem `429` ve `Retry-After` başlığını döner.
 Ters vekil, tarayıcının bu başlığı okuyabilmesini sağlar.
 Ek daha sonra açılırsa sunucu boyutu, gerçek içeriği ve kayıt iznini denetler.
@@ -207,7 +237,10 @@ Telefon sürümleri `X-Mobile-App-Version` ve `X-Mobile-Contract-Version` başl�
 İlk sözleşme sürümünün değeri `1` olur.
 Sunucu geçerli sürüm başlıklarına göre istek sayılarını tutar.
 Ölçüm yalnız sürümleri ve sayıyı taşır.
-Güvenlik engeli yalnız etkilenen komutu kapatır (AU-16).
+Sistem her gün en çok 256 ayrı sürüm birleşimi sayar.
+Yeni birleşimler bu sınırdan sonra ortak sayaçta toplanır.
+Site, kapatılacak komutları `mobile_disabled_commands` listesine yazar.
+Daha önce tamamlanmış işin sonucu yeniden alınabilir (AU-16).
 Yayımlanan alanın adı, anlamı ve türü korunur.
 Uyumu bozan değişiklik yeni uç sürümünde yapılır.
 Eski uç proje kararıyla kapanana kadar bekleyen eski işlemleri kabul eder (AU-15).

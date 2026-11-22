@@ -6,5 +6,7 @@ app_email = "noreply@example.test"
 app_license = "mit"
 
 # Mobile sync tables must exist before the sequence row is created.
-after_install = "platform_core.mobil.store.seed_sequence"
-after_migrate = "platform_core.mobil.store.seed_sequence"
+after_install = ["platform_core.mobil.store.seed_sequence"]
+after_migrate = ["platform_core.mobil.store.seed_sequence"]
+
+doc_events = {"User": {"on_trash": "platform_core.mobil.store.delete_user_state"}}

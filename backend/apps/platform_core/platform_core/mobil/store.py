@@ -1,17 +1,24 @@
 """Frappe storage for internal mobile metadata."""
 
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import frappe
-from frappe.utils import now_datetime
 
-from .protocol import DELIVERY_AUDIT_SIZE, RETENTION_DAYS, MobileError, content_digest
+from .protocol import DELIVERY_AUDIT_SIZE, MobileError, content_digest
 
 SEQUENCE_DOCTYPE = "Mobile Sequence"
 SEQUENCE_NAME = "site"
+DELIVERY_AUDIT_INTERVAL = timedelta(minutes=5)
 INTERNAL_TYPES = frozenset(
-	{SEQUENCE_DOCTYPE, "Mobile Installation", "Mobile Operation", "Mobile Change", "Mobile Delivery"}
+	{
+		SEQUENCE_DOCTYPE,
+		"Mobile Account State",
+		"Mobile Installation",
+		"Mobile Operation",
+		"Mobile Change",
+		"Mobile Delivery",
+	}
 )
 
 
@@ -28,43 +35,49 @@ def _insert(doctype, *, ignore_duplicate=False, **fields):
 	previous = doc.flags.ignore_permissions
 	try:
 		# The approved operation creates server-owned metadata, never a business record.
-		return doc.insert(
+		return doc.insert(  # nosemgrep: frappe-ignore-permissions
 			ignore_permissions=True, ignore_if_duplicate=ignore_duplicate
-		)  # nosemgrep: frappe-ignore-permissions
+		)
 	finally:
 		doc.flags.ignore_permissions = previous
 
 
-def _select(doctype, fields, filters, *, limit=None, order_by=None):
+def _select(doctype, fields, filters, *, limit=None, order_by=None, for_update=False):
 	return frappe.qb.get_query(
 		doctype,
 		fields=fields,
 		filters=filters,
 		limit=limit,
 		order_by=order_by,
-		for_update=True,
+		for_update=for_update,
 	).run(as_dict=True)
+
+
+def _sequence_row(*, for_update=False):
+	row = frappe.db.get_value(
+		SEQUENCE_DOCTYPE,
+		SEQUENCE_NAME,
+		["sequence", "retention_floor"],
+		as_dict=True,
+		for_update=for_update,
+	)
+	if row is None:
+		raise MobileError("mobile_schema_unavailable", 503)
+	return row
 
 
 class MobileStore:
 	def __init__(self):
-		# Obtain the site lock before reading device, delivery or operation state.
-		# No request may commit before its event and operation result are durable.
-		row = frappe.db.get_value(
-			SEQUENCE_DOCTYPE,
-			SEQUENCE_NAME,
-			["sequence", "retention_floor"],
-			as_dict=True,
-			for_update=True,
-		)
-		if row is None:
-			raise MobileError("mobile_schema_unavailable", 503)
+		row = _sequence_row()
 		self.sequence = row.sequence
 		self.retention_floor = row.retention_floor
+		self.pending_events = False
 
-	def install(self, identity, installation_id):
-		current = self._installation(installation_id)
+	def install(self, identity, installation_id, *, check_new=None):
+		current = self._installation(installation_id, for_update=True)
 		if current is None:
+			if check_new is not None:
+				check_new(identity)
 			_insert(
 				"Mobile Installation",
 				installation_id=installation_id,
@@ -76,13 +89,13 @@ class MobileStore:
 			raise MobileError("installation_unavailable", 403)
 		return {"installation_id": installation_id}
 
-	def _installation(self, installation_id):
+	def _installation(self, installation_id, *, for_update=False):
 		return frappe.db.get_value(
 			"Mobile Installation",
 			installation_id,
 			["account", "scope", "principal", "revoked"],
 			as_dict=True,
-			for_update=True,
+			for_update=for_update,
 		)
 
 	def _matches(self, row, identity):
@@ -94,8 +107,8 @@ class MobileStore:
 			and row.principal == identity.principal
 		)
 
-	def require_installation(self, identity, installation_id):
-		if not self._matches(self._installation(installation_id), identity):
+	def require_installation(self, identity, installation_id, *, for_update=False):
+		if not self._matches(self._installation(installation_id, for_update=for_update), identity):
 			raise MobileError("installation_unavailable", 403)
 
 	def revoke(self, identity, installation_id):
@@ -107,7 +120,7 @@ class MobileStore:
 		}
 		if installation_id is not None:
 			filters["name"] = installation_id
-		rows = _select("Mobile Installation", ["name"], filters)
+		rows = _select("Mobile Installation", ["name"], filters, for_update=True)
 		for row in rows:
 			frappe.db.set_value("Mobile Installation", row.name, "revoked", 1)
 		return {"revoked": len(rows)}
@@ -129,18 +142,27 @@ class MobileStore:
 		_insert("Mobile Operation", operation_key=key, content_digest=digest, result=result)
 
 	def append_change(self, record_type, record_id, kind, *, target_installation=None):
-		if self.sequence == 2_147_483_647:
+		# Keep allocation and insertion under the same transaction lock.
+		current = _sequence_row(for_update=True).sequence
+		if current == 2_147_483_647:
 			raise MobileError("mobile_sequence_exhausted", 503)
-		self.sequence += 1
+		sequence = current + 1
 		_insert(
 			"Mobile Change",
-			sequence=self.sequence,
+			sequence=sequence,
 			record_type=record_type,
 			record_id=record_id,
 			kind=kind,
 			target_installation=target_installation,
 		)
-		frappe.db.set_value(SEQUENCE_DOCTYPE, SEQUENCE_NAME, "sequence", self.sequence)
+		frappe.db.set_value(SEQUENCE_DOCTYPE, SEQUENCE_NAME, "sequence", sequence)
+		# A locking read can see commits outside the caller's read snapshot.
+		# Keep the cursor below any events the snapshot cannot yet read.
+		if current == self.sequence:
+			self.sequence = sequence
+		else:
+			self.pending_events = True
+		return sequence
 
 	def read_events(self, installation, after, ceiling, limit):
 		event = frappe.qb.DocType("Mobile Change")
@@ -155,7 +177,6 @@ class MobileStore:
 			)
 			.orderby(event.sequence)
 			.limit(limit)
-			.for_update()
 			.run(as_dict=True)
 		)
 
@@ -169,6 +190,7 @@ class MobileStore:
 			filters,
 			limit=DELIVERY_AUDIT_SIZE + 1,
 			order_by="name asc",
+			for_update=True,
 		)
 		for row in rows[:DELIVERY_AUDIT_SIZE]:
 			projection = projections.get(row.record_type)
@@ -184,12 +206,15 @@ class MobileStore:
 
 	def may_have_delivered(self, installation, record_type, record_id):
 		key = content_digest([installation, record_type, record_id])
-		return frappe.db.get_value("Mobile Delivery", key, "name", for_update=True) is not None
+		return frappe.db.get_value("Mobile Delivery", key, "name") is not None
 
 	def record_delivery(self, installation, record_type, record_id):
-		if self.may_have_delivered(installation, record_type, record_id):
-			return
 		key = content_digest([installation, record_type, record_id])
+		row = frappe.db.get_value("Mobile Delivery", key, ["name", "visible"], as_dict=True, for_update=True)
+		if row is not None:
+			if not row.visible:
+				frappe.db.set_value("Mobile Delivery", row.name, "visible", 1)
+			return
 		_insert(
 			"Mobile Delivery",
 			delivery_key=key,
@@ -198,19 +223,29 @@ class MobileStore:
 			record_id=record_id,
 		)
 
-	def cleanup(self):
-		cutoff = now_datetime() - timedelta(days=RETENTION_DAYS)
-		filters = {"kind": "remove", "creation": ["<", cutoff]}
-		# Bound the transaction. Staff may invoke the command again to finish.
-		rows = _select("Mobile Change", ["name", "sequence"], filters, limit=1000)
-		if rows:
-			names = [row.name for row in rows]
-			new_floor = max(self.retention_floor, *(row.sequence for row in rows))
-			frappe.db.delete("Mobile Change", {"name": ["in", names]})
-			frappe.db.set_value(SEQUENCE_DOCTYPE, SEQUENCE_NAME, "retention_floor", new_floor)
-		return {"removed": len(rows)}
+	def audit_due(self, installation, now):
+		last_audit = frappe.db.get_value("Mobile Installation", installation, "last_audit_at")
+		at = datetime.fromtimestamp(now, UTC).replace(tzinfo=None)
+		return last_audit is None or at - last_audit >= DELIVERY_AUDIT_INTERVAL
+
+	def finish_audit(self, installation, now):
+		at = datetime.fromtimestamp(now, UTC).replace(tzinfo=None)
+		frappe.db.set_value("Mobile Installation", installation, "last_audit_at", at)
 
 
-def cleanup():
-	"""Manual bench command; HTTP performs its separate site-role check first."""
-	return MobileStore().cleanup()
+def delete_user_state(user, method=None):
+	"""Remove installation metadata before Frappe checks links to the user."""
+	frappe.db.delete("Mobile Account State", {"account": user.name})
+	rows = _select("Mobile Installation", ["name"], {"account": user.name}, for_update=True)
+	if rows:
+		installations = ["in", [row.name for row in rows]]
+		frappe.db.delete("Mobile Change", {"target_installation": installations})
+		frappe.db.delete("Mobile Delivery", {"installation_id": installations})
+		frappe.db.delete("Mobile Installation", {"name": installations})
+
+
+def cleanup(dry_run=False):
+	"""Preserve the original operator command path."""
+	from .retention import cleanup as cleanup_retention
+
+	return cleanup_retention(dry_run=dry_run)

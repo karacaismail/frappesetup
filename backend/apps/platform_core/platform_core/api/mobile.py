@@ -5,15 +5,24 @@ import time
 
 import frappe
 
+from platform_core.mobil.lifecycle import check_new_installation, lock_account, record_revocation
 from platform_core.mobil.protocol import PAGE_SIZE, MobileError, uuid4_id
 from platform_core.mobil.request import endpoint_response
+from platform_core.mobil.retention import cleanup
 from platform_core.mobil.service import COMMANDS, pull, push
-from platform_core.mobil.store import MobileStore, cleanup
+from platform_core.mobil.store import MobileStore
 
 # The shared request guard and each action check the installation, record or
 # administrator permission. The static rule cannot follow endpoint_response.
 # Populate only when a record type and its server-defined projection are approved.
 PROJECTIONS = {}
+INVENTORIES = {}
+
+
+def _registry(name, approved):
+	if frappe.conf.get("allow_tests"):
+		return getattr(frappe.local, name, approved)
+	return approved
 
 
 def _keys(body, required, optional=()):
@@ -23,22 +32,41 @@ def _keys(body, required, optional=()):
 
 def _register(identity, body):
 	_keys(body, {"installation_id"})
-	return MobileStore().install(identity, uuid4_id(body["installation_id"]))
+	installation = uuid4_id(body["installation_id"])
+	lock_account(identity)
+	return MobileStore().install(identity, installation, check_new=check_new_installation)
 
 
 def _revoke(identity, body):
-	if body.keys() == {"all"} and body["all"] is True:
-		return MobileStore().revoke(identity, None)
-	_keys(body, {"installation_id"})
-	return MobileStore().revoke(identity, uuid4_id(body["installation_id"]))
+	revoke_all = body.keys() == {"all"} and body["all"] is True
+	installation = None
+	if not revoke_all:
+		_keys(body, {"installation_id"})
+		installation = uuid4_id(body["installation_id"])
+
+	lock_account(identity)
+	result = MobileStore().revoke(identity, installation)
+	if revoke_all or result["revoked"]:
+		record_revocation(identity.account)
+	return result
 
 
 def _push(identity, body):
 	_keys(body, {"installation_id", "operations"})
+	lock_account(identity)
 	store = MobileStore()
-	store.require_installation(identity, uuid4_id(body["installation_id"]))
+	store.require_installation(identity, uuid4_id(body["installation_id"]), for_update=True)
+	disabled = frappe.conf.get("mobile_disabled_commands", [])
+	if not isinstance(disabled, list) or any(not isinstance(name, str) for name in disabled):
+		raise MobileError("invalid_mobile_settings", 503)
 	return push(
-		store, COMMANDS, identity.site, identity.account, body["operations"], principal=identity.principal
+		store,
+		_registry("mobile_commands", COMMANDS),
+		identity.site,
+		identity.account,
+		body["operations"],
+		principal=identity.principal,
+		disabled_commands=disabled,
 	)
 
 
@@ -55,21 +83,22 @@ def _pull(identity, body):
 		raise MobileError("invalid_cursor", 410)
 	return pull(
 		store,
-		PROJECTIONS,
+		_registry("mobile_projections", PROJECTIONS),
 		secret,
 		(identity.site, identity.principal, installation, identity.scope),
 		body.get("cursor"),
 		body.get("limit", PAGE_SIZE),
 		account=identity.account,
 		now=int(time.time()),
+		inventories=_registry("mobile_inventories", INVENTORIES),
 	)
 
 
 def _cleanup(identity, body):
-	_keys(body, set())
+	_keys(body, set(), {"dry_run"})
 	if "System Manager" not in frappe.get_roles(identity.account):
 		raise MobileError("cleanup_forbidden", 403)
-	return cleanup()
+	return cleanup(dry_run=body.get("dry_run", False))
 
 
 @frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission

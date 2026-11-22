@@ -1,5 +1,6 @@
 import unittest
 from dataclasses import dataclass
+from unittest.mock import Mock
 
 from platform_core.mobil.service import pull
 
@@ -16,7 +17,7 @@ class Event:
 
 class Store:
 	retention_floor = 0
-	audit_size = 100
+	pending_events = False
 
 	def __init__(self):
 		self.events = [Event(i, "sample", str(i)) for i in range(1, 4)]
@@ -24,25 +25,18 @@ class Store:
 			event.record_id: {"version": "v1", "fields": {"title": "Example"}} for event in self.events
 		}
 		self.deliveries = {}
+		self.last_audit = None
+		self.reconcile_deliveries = Mock(return_value=None)
 
 	@property
 	def sequence(self):
-		return len(self.events)
+		return self.events[-1].sequence if self.events else self.retention_floor
 
-	def reconcile_deliveries(self, projections, installation, account, after):
-		from platform_core.mobil.protocol import content_digest
+	def audit_due(self, installation, now):
+		return self.last_audit is None or now - self.last_audit >= 300
 
-		rows = sorted((content_digest(key), key) for key in self.deliveries)
-		remaining = [row for row in rows if after is None or row[0] > after]
-		for _, (record_type, record_id) in remaining[: self.audit_size]:
-			key = (record_type, record_id)
-			visible = record_type in projections and projections[record_type](account, record_id) is not None
-			if self.deliveries[key] != visible:
-				self.events.append(Event(self.sequence + 1, record_type, record_id))
-				self.deliveries[key] = visible
-		if len(remaining) > self.audit_size:
-			return remaining[self.audit_size - 1][0]
-		return None
+	def finish_audit(self, installation, now):
+		self.last_audit = now
 
 	def read_events(self, installation, after, ceiling, limit):
 		return [event for event in self.events if after < event.sequence <= ceiling][:limit]
@@ -59,32 +53,48 @@ class PullTest(unittest.TestCase):
 		self.store = Store()
 		self.projections = {"sample": lambda account, record_id: self.store.records.get(record_id)}
 
-	def page(self, cursor=None, limit=100):
-		return pull(self.store, self.projections, SECRET, SCOPE, cursor, limit, account="account", now=100)
+	def scan(self, account, after, limit):
+		return sorted(record_id for record_id in self.store.records if after is None or record_id > after)[
+			:limit
+		]
+
+	def page(self, cursor=None, limit=100, now=100):
+		return pull(
+			self.store,
+			self.projections,
+			SECRET,
+			SCOPE,
+			cursor,
+			limit,
+			account="account",
+			now=now,
+			inventories={"sample": self.scan},
+		)
 
 	def test_first_copy_finishes_before_subsequent_changes(self):
 		first = self.page(limit=2)
 		self.assertTrue(first["has_more"])
-		self.store.records["4"] = {"version": "v1", "fields": {}}
-		self.store.events.append(Event(4, "sample", "4"))
+		self.store.records["0"] = {"version": "v1", "fields": {}}
+		self.store.events.append(Event(4, "sample", "0"))
 		last = self.page(first["cursor"], limit=2)
 		self.assertEqual([change["record_id"] for change in last["changes"]], ["3"])
 		next_page = self.page(last["cursor"])
-		self.assertEqual([change["record_id"] for change in next_page["changes"]], ["4"])
+		self.assertEqual([change["record_id"] for change in next_page["changes"]], ["0"])
 
 	def test_permission_loss_is_retryable_and_does_not_expose_record_fields(self):
 		first = self.page()
 		del self.store.records["1"]
+		self.store.events.append(Event(4, "sample", "1"))
 		lost = self.page(first["cursor"])
 		self.assertEqual(lost["changes"], [{"record_type": "sample", "record_id": "1", "kind": "remove"}])
-		self.assertEqual(self.page(first["cursor"]), lost)
+		self.assertEqual(self.page(first["cursor"])["changes"], lost["changes"])
 
 	def test_undelivered_record_does_not_expose_existence(self):
 		del self.store.records["1"]
 		self.assertEqual([change["record_id"] for change in self.page()["changes"]], ["2", "3"])
 
 	def test_empty_filtered_page_still_advances_cursor(self):
-		self.store.records.clear()
+		self.projections["sample"] = lambda account, record_id: None
 		first = self.page(limit=1)
 		self.assertEqual(first["changes"], [])
 		self.assertTrue(first["has_more"])
@@ -92,19 +102,29 @@ class PullTest(unittest.TestCase):
 		self.assertFalse(last["has_more"])
 		self.assertNotEqual(first["cursor"], last["cursor"])
 
-	def test_delivery_audit_is_bounded_and_eventually_reports_every_removal(self):
-		self.store.audit_size = 1
+	def test_delivery_audit_continues_and_waits_to_restart(self):
 		initial = self.page()
-		self.store.records.clear()
+		checkpoint = "a" * 64
+		self.store.reconcile_deliveries.side_effect = [checkpoint, None, None]
 		page = self.page(initial["cursor"])
-		removed = [change["record_id"] for change in page["changes"]]
 		self.assertTrue(page["has_more"])
-		self.assertEqual(len(removed), 1)
-		for _ in range(2):
-			page = self.page(page["cursor"])
-			removed.extend(change["record_id"] for change in page["changes"])
+		page = self.page(page["cursor"])
 		self.assertFalse(page["has_more"])
-		self.assertCountEqual(removed, ["1", "2", "3"])
+		self.store.reconcile_deliveries.assert_called_with(
+			self.projections, "installation", "account", checkpoint
+		)
+		page = self.page(page["cursor"], now=399)
+		self.assertFalse(page["has_more"])
+		self.assertEqual(self.store.reconcile_deliveries.call_count, 2)
+		self.page(page["cursor"], now=400)
+		self.assertEqual(self.store.reconcile_deliveries.call_count, 3)
+
+	def test_full_copy_works_after_history_is_pruned(self):
+		self.store.events.clear()
+		self.store.retention_floor = 3
+		page = self.page()
+		self.assertEqual([change["record_id"] for change in page["changes"]], ["1", "2", "3"])
+		self.assertEqual(self.page(page["cursor"])["changes"], [])
 
 	def test_a_visibility_grant_event_delivers_a_previously_unseen_record(self):
 		previously_hidden = self.store.records.pop("1")

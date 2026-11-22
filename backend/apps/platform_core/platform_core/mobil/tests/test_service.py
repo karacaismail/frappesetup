@@ -60,7 +60,7 @@ class PushTest(unittest.TestCase):
 			"fields": {"title": "Sample"},
 		}
 
-	def submit(self, operation=None):
+	def submit(self, operation=None, *, disabled_commands=()):
 		return push(
 			self.store,
 			{"sample.update": self.command},
@@ -68,6 +68,7 @@ class PushTest(unittest.TestCase):
 			"account",
 			[operation or self.operation],
 			principal="principal",
+			disabled_commands=disabled_commands,
 		)
 
 	def test_retry_returns_first_result_and_does_not_write_again(self):
@@ -108,3 +109,12 @@ class PushTest(unittest.TestCase):
 				principal="principal",
 			)
 		self.assertEqual(self.command.effects, 0)
+
+	def test_disabled_command_rejects_new_work_and_keeps_retries_idempotent(self):
+		with self.assertRaises(MobileError) as error:
+			self.submit(disabled_commands={"sample.update"})
+		self.assertEqual((error.exception.code, error.exception.status), ("command_disabled", 403))
+		self.assertEqual(self.command.effects, 0)
+		result = self.submit()
+		self.assertEqual(self.submit(disabled_commands={"sample.update"}), result)
+		self.assertEqual(self.command.effects, 1)
