@@ -5,6 +5,7 @@ import json
 import os
 import unittest
 from urllib.parse import parse_qs, urlsplit
+from uuid import uuid4
 
 ACCOUNT_METHODS = (
 	"signup",
@@ -24,12 +25,19 @@ CLOSED_METHODS = (
 
 
 class PressHttpClient:
+	def setUp(self):
+		octets = uuid4().bytes
+		self.request_ip = f"198.18.{octets[0]}.{octets[1]}"
+
 	def exchange(self, method, path, headers=None, body=None):
 		port = int(os.environ["PANE_PORT"]) + 3
 		connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
 		try:
 			connection.request(
-				method, path, body=body, headers={"Host": "press.localhost", **(headers or {})}
+				method,
+				path,
+				body=body,
+				headers={"Host": "press.localhost", "X-Forwarded-For": self.request_ip, **(headers or {})},
 			)
 			response = connection.getresponse()
 			return response.status, response.headers, response.read()
@@ -67,6 +75,30 @@ class AuthHttpTest(PressHttpClient, unittest.TestCase):
 			with self.subTest(command=command):
 				status, _ = self.request("POST", f"/api/method/{command}")
 				self.assertEqual(status, 403)
+
+	def test_canonical_rpc_versions_block_legacy_identity(self):
+		for prefix in ("/api/method/", "/api/v1/method/", "/api/v2/method/"):
+			for command in (
+				*CLOSED_METHODS,
+				"login",
+				"frappe.integrations.oauth2_logins.login_via_google",
+				"frappe.core.doctype.user.user.reset_password",
+				"frappe.core.doctype.user.user.update_password",
+				"frappe.www.login.login_via_token",
+				"frappe.www.login.login_via_key",
+				"frappe.www.login.send_login_link",
+				"press.api.account.setup_account",
+				"press.api.oauth.google_login",
+			):
+				with self.subTest(prefix=prefix, command=command):
+					status, _ = self.request("POST", prefix + command)
+					self.assertEqual(status, 403)
+
+	def test_login_url_rate_limit(self):
+		path = "/api/method/press_tr.api.auth.get_login_url"
+		for _ in range(10):
+			self.assertEqual(self.request("POST", path)[0], 200)
+		self.assertEqual(self.request("POST", path)[0], 429)
 
 	def test_legacy_pages_redirect_to_panel(self):
 		for path in ("/login", "/signup", "/dashboard/login"):

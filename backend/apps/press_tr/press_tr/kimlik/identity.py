@@ -53,6 +53,7 @@ def bind_identity(claims):
 		validate_local_user(user)
 
 	link = frappe.get_doc({"doctype": IDENTITY_LINK, "issuer": issuer, "subject": subject, "user": user})
+	# Only a verified identity flow can write this internal binding.
 	link.insert(ignore_permissions=True)
 	return frappe._dict(name=link.name, user=user)
 
@@ -82,9 +83,7 @@ def as_press_user(user):
 def ensure_personal_team(user):
 	# Lock the owner before checking for an existing personal team.
 	frappe.db.get_value("User", user, "name", for_update=True)
-	team = frappe.db.get_value(
-		"Team", {"user": user, "parent_team": ["is", "not set"]}, "name", for_update=True
-	)
+	team = frappe.db.get_value("Team Member", {"user": user}, "parent", for_update=True)
 	if team:
 		return team
 	return create_team(user, "Parent Team")
@@ -99,10 +98,10 @@ def create_team(user: str, title: str, organization_id: str | None = None) -> st
 			"team_title": title,
 			"keycloak_org_id": organization_id,
 			"enabled": 1,
-			"free_account": 1,
 			"team_members": [{"user": user}],
 		}
 	)
 	with as_press_user(user):
+		# Only authorized provisioning creates this team and its initial owner.
 		doc.insert(ignore_permissions=True)
 	return doc.name

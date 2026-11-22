@@ -1,13 +1,14 @@
 import frappe
 
+from press_tr.kimlik.oidc import client_id, reject, verify
 from press_tr.kimlik.oidc import issuer as configured_issuer
-from press_tr.kimlik.oidc import reject, verify
 
 SERVICE_PARAMETERS = {
 	"press_tr.api.identity.ensure_team": {
 		"issuer",
 		"subject",
 		"email",
+		"email_verified",
 		"organization_id",
 		"organization_name",
 	},
@@ -21,7 +22,10 @@ def authorize_identity_sync() -> None:
 		return
 	if frappe.request.method != "POST":
 		return
-	if frappe.form_dict.keys() - SERVICE_PARAMETERS[method] or "sid" in frappe.request.cookies:
+	session = getattr(frappe.local, "session_obj", None)
+	cookie_sid = frappe.request.cookies.get("sid")
+	has_user_session = bool(cookie_sid and session and session.sid == cookie_sid and session.user != "Guest")
+	if frappe.form_dict.keys() - SERVICE_PARAMETERS[method] or has_user_session:
 		reject()
 
 	scheme, _, token = frappe.get_request_header("Authorization", "").partition(" ")
@@ -30,7 +34,7 @@ def authorize_identity_sync() -> None:
 
 	from oidc_verify import verify_access_token
 
-	verify(verify_access_token, token, audience="press", allowed_azp={"identity-sync"})
+	verify(verify_access_token, token, audience=client_id(), allowed_azp={"identity-sync"})
 	service_user = frappe.conf.press_identity_sync_user
 	if not service_user or service_user in {"Guest", "Administrator"}:
 		reject()

@@ -3,24 +3,33 @@ from urllib.parse import urlsplit
 
 import frappe
 from frappe import _
+from werkzeug.exceptions import ServiceUnavailable
 
 
 def reject():
 	frappe.throw(_("Keycloak identity was rejected."), frappe.PermissionError)
 
 
+def client_id():
+	value = frappe.conf.keycloak_client_id
+	if not value:
+		raise ServiceUnavailable(_("Set the Keycloak client ID for this site."))
+	return value
+
+
 def issuer():
 	public = frappe.conf.keycloak_public_url
 	realm = frappe.conf.keycloak_realm
 	if not public or not realm:
-		reject()
+		raise ServiceUnavailable(_("Set the Keycloak URL and realm for this site."))
 	return f"{public.rstrip('/')}/realms/{realm}"
 
 
 def server_endpoint(endpoint):
+	configured_issuer = issuer()
 	public = frappe.conf.keycloak_public_url.rstrip("/")
 	internal = (frappe.conf.keycloak_internal_url or public).rstrip("/")
-	return issuer().replace(public, internal, 1) + f"/protocol/openid-connect/{endpoint}"
+	return configured_issuer.replace(public, internal, 1) + f"/protocol/openid-connect/{endpoint}"
 
 
 def callback_url():
@@ -38,7 +47,7 @@ def jwks_cache(url):
 
 
 def verify(verifier, token, **options):
-	from oidc_verify import TokenError
+	from oidc_verify import JwksUnavailable, TokenError
 
 	try:
 		return verifier(
@@ -48,6 +57,8 @@ def verify(verifier, token, **options):
 			leeway=30,
 			**options,
 		)
+	except JwksUnavailable:
+		raise ServiceUnavailable(_("Keycloak keys are temporarily unavailable."))
 	except TokenError:
 		reject()
 

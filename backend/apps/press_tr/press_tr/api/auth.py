@@ -7,12 +7,17 @@ from urllib.parse import urlencode
 import frappe
 import requests
 from frappe.rate_limiter import rate_limit
+from werkzeug.exceptions import Conflict
 
 from press_tr.kimlik.identity import bind_identity, ensure_personal_team
-from press_tr.kimlik.oidc import callback_url, claim, issuer, reject, server_endpoint, verify
+from press_tr.kimlik.oidc import callback_url, claim, client_id, issuer, reject, server_endpoint, verify
 
 STATE_TTL = 300
 STATE_COOKIE = "press_tr_login"
+
+
+def state_cookie():
+	return "__Host-press_tr_login" if callback_url().startswith("https:") else STATE_COOKIE
 
 
 def state_key(state):
@@ -29,11 +34,11 @@ def get_login_url() -> dict[str, str]:
 
 	frappe.cache.setex(state_key(state), STATE_TTL, json.dumps({"nonce": nonce, "verifier": verifier}))
 	frappe.local.cookie_manager.set_cookie(
-		STATE_COOKIE, state, secure=redirect_uri.startswith("https:"), httponly=True, max_age=STATE_TTL
+		state_cookie(), state, secure=redirect_uri.startswith("https:"), httponly=True, max_age=STATE_TTL
 	)
 	query = urlencode(
 		{
-			"client_id": "press",
+			"client_id": client_id(),
 			"redirect_uri": redirect_uri,
 			"response_type": "code",
 			"scope": "openid email profile",
@@ -47,7 +52,7 @@ def get_login_url() -> dict[str, str]:
 
 
 def consume_login(state):
-	cookie = frappe.request.cookies.get(STATE_COOKIE, "")
+	cookie = frappe.request.cookies.get(state_cookie(), "")
 	if (
 		not isinstance(state, str)
 		or not state.isascii()
@@ -58,7 +63,9 @@ def consume_login(state):
 	data = frappe.cache.getdel(state_key(state))
 	if not data:
 		reject()
-	frappe.local.cookie_manager.delete_cookie(STATE_COOKIE)
+	frappe.local.cookie_manager.set_cookie(
+		state_cookie(), "", secure=callback_url().startswith("https:"), httponly=True, max_age=0
+	)
 	return json.loads(data)
 
 
@@ -72,7 +79,7 @@ def exchange_code(code, verifier):
 				"redirect_uri": callback_url(),
 				"code_verifier": verifier,
 			},
-			auth=("press", frappe.conf.keycloak_client_secret),
+			auth=(client_id(), frappe.conf.keycloak_client_secret),
 			timeout=10,
 			allow_redirects=False,
 		)
@@ -98,16 +105,19 @@ def keycloak_callback(state: str | None = None, code: str | None = None) -> None
 	from oidc_verify import verify_id_token
 
 	token = exchange_code(code, login["verifier"])
-	claims = verify(verify_id_token, token, client_id="press", nonce=login["nonce"])
+	claims = verify(verify_id_token, token, client_id=client_id(), nonce=login["nonce"])
 	keycloak_sid = claim(claims, "sid")
 	try:
 		link = bind_identity(claims)
 		ensure_personal_team(link.user)
+	except frappe.QueryDeadlockError:
+		raise Conflict("Concurrent account update. Start sign-in again.")
 	except frappe.DuplicateEntryError, frappe.UniqueValidationError:
 		reject()
 
 	try:
 		frappe.local.login_manager.login_as(link.user)
+		# The OIDC callback is the only writer of this internal session mapping.
 		frappe.get_doc(
 			{
 				"doctype": "Press Keycloak Session",

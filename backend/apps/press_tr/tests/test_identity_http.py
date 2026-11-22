@@ -77,7 +77,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			"exp": int(time.time()) + 120,
 		}
 		return jwt.encode(
-			{**fields, **claims},
+			{name: value for name, value in (fields | claims).items() if value is not None},
 			self.key,
 			algorithm="RS256",
 			headers={"kid": KID},
@@ -98,7 +98,6 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 				(None, {}),
 				(self.token(audience="site-kiraci1"), {}),
 				(self.token(authorized_party="press-service"), {}),
-				(self.token(), {"Cookie": "sid=Guest"}),
 			):
 				with self.subTest(method=method, headers=headers):
 					status, _ = self.call(
@@ -114,6 +113,51 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 					status, _ = self.call(method, body, self.token())
 					self.assertEqual(status, 403)
 
+	def test_first_binding_requires_verified_email_and_rejects_conflicts(self):
+		subject = uuid4().hex
+		body = {
+			"issuer": ISSUER,
+			"subject": subject,
+			"email": f"{subject}@example.test",
+			"organization_id": uuid4().hex,
+			"email_verified": False,
+		}
+		token = self.token()
+		self.assertEqual(self.call("ensure_team", body, token)[0], 403)
+		verified = {**body, "email_verified": True}
+		self.assertEqual(self.call("ensure_team", verified, token)[0], 200)
+		self.assertEqual(self.call("ensure_team", {**verified, "subject": uuid4().hex}, token)[0], 403)
+
+	def test_system_user_email_is_not_bound(self):
+		subject = uuid4().hex
+		body = {
+			"issuer": ISSUER,
+			"subject": subject,
+			"email": "desk-user@example.test",
+			"organization_id": uuid4().hex,
+			"email_verified": True,
+		}
+		self.assertEqual(self.call("ensure_team", body, self.token())[0], 403)
+
+	def test_rejects_expired_and_unsigned_service_tokens(self):
+		body = {"issuer": ISSUER, "subject": "example", "organization_id": "example"}
+		expired = self.token(exp=int(time.time()) - 120)
+		unsigned = jwt.encode({"iss": ISSUER, "aud": "press", "azp": "identity-sync"}, None, algorithm="none")
+		for token in (expired, unsigned):
+			self.assertEqual(self.call("remove_team_member", body, token)[0], 403)
+
+	def test_verified_service_request_with_guest_cookie(self):
+		subject = uuid4().hex
+		payload = {
+			"issuer": ISSUER,
+			"subject": subject,
+			"email": f"{subject}@example.test",
+			"organization_id": uuid4().hex,
+			"email_verified": True,
+		}
+		status, result = self.call("ensure_team", payload, self.token(), {"Cookie": "sid=Guest"})
+		self.assertEqual(status, 200, result)
+
 	def test_team_and_membership_requests_are_repeatable(self):
 		token = self.token()
 		owner = uuid4().hex
@@ -128,6 +172,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 					"subject": subject,
 					"email": f"{subject}@example.test",
 					"organization_id": organization_id,
+					"email_verified": True,
 					**options,
 				},
 				token,
@@ -153,9 +198,15 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		owner_cookie = self.sign_in(owner, f"{owner}@example.test", uuid4().hex)
 		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, owner_cookie)
 		self.assertEqual(status, 200)
-		self.assertEqual(json.loads(payload)["message"]["team"]["team_title"], "Example Organization")
+		team_data = json.loads(payload)["message"]["team"]
+		self.assertEqual(team_data["team_title"], "Example Organization")
+		self.assertFalse(team_data["free_account"])
 		stored_members = {user["email"] for user in json.loads(payload)["message"]["team_members"]}
 		self.assertEqual(stored_members, {f"{subject}@example.test" for subject in [owner, *members]})
+		first_member = self.sign_in(members[0], f"{members[0]}@example.test", uuid4().hex)
+		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, first_member)
+		self.assertEqual(status, 200)
+		self.assertEqual([row["name"] for row in json.loads(payload)["message"]["teams"]], [team])
 		for member, membership in zip(members, memberships, strict=True):
 			self.assertEqual(ensure(member), membership)
 			body = {"issuer": ISSUER, "subject": member, "organization_id": organization_id}
@@ -163,13 +214,13 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 				status, result = self.call("remove_team_member", body, token)
 				self.assertEqual(status, 200, result)
 				self.assertEqual(result["message"], {"team": team, "member": False})
-		member = members[0]
+		member = members[1]
 		member_cookie = self.sign_in(member, f"{member}@example.test", uuid4().hex)
 		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, member_cookie)
 		self.assertEqual(status, 200)
 		self.assertNotIn(team, {row["name"] for row in json.loads(payload)["message"]["teams"]})
 
-	def sign_in(self, subject, email, keycloak_sid):
+	def sign_in(self, subject, email, keycloak_sid, expected_status=302, **overrides):
 		status, _, payload = self.exchange("POST", "/api/method/press_tr.api.auth.get_login_url")
 		self.assertEqual(status, 200)
 		query = parse_qs(urlsplit(json.loads(payload)["message"]["url"]).query)
@@ -179,11 +230,14 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			challenge,
 			self.token(
 				authorized_party="press",
-				sub=subject,
-				email=email,
-				email_verified=True,
-				sid=keycloak_sid,
-				nonce=nonce,
+				**{
+					"sub": subject,
+					"email": email,
+					"email_verified": True,
+					"sid": keycloak_sid,
+					"nonce": nonce,
+					**overrides,
+				},
 			),
 		)
 		callback = "/api/method/press_tr.api.auth.keycloak_callback?" + urlencode(
@@ -191,7 +245,9 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		)
 		state_cookie = {"Cookie": f"press_tr_login={state}"}
 		status, headers, payload = self.exchange("GET", callback, state_cookie)
-		self.assertEqual(status, 302, payload)
+		self.assertEqual(status, expected_status, payload)
+		if expected_status != 302:
+			return None
 		self.assertEqual(headers["Location"], "/dashboard")
 		cookies = SimpleCookie()
 		for value in headers.get_all("Set-Cookie"):
@@ -202,6 +258,46 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		self.assertEqual(status, 403)
 
 		return {"Cookie": f"sid={sid}"}
+
+	def test_callback_validates_nonce_and_audience(self):
+		for claims in ({"nonce": "wrong"}, {"audience": "wrong"}):
+			subject = uuid4().hex
+			self.sign_in(subject, f"{subject}@example.test", uuid4().hex, 403, **claims)
+
+	def post_logout(self, token):
+		return self.exchange(
+			"POST",
+			"/api/method/press_tr.api.keycloak_backchannel_logout",
+			{"Content-Type": "application/x-www-form-urlencoded"},
+			urlencode({"logout_token": token}),
+		)[0]
+
+	def test_logout_token_requires_events_and_accepts_both_selectors(self):
+		event = {"http://schemas.openid.net/event/backchannel-logout": {}}
+		subject, keycloak_sid = uuid4().hex, uuid4().hex
+		common = {"sub": subject, "sid": keycloak_sid, "events": event}
+		self.assertEqual(
+			self.post_logout(self.token(authorized_party="press", **common, nonce="unexpected")), 403
+		)
+		self.assertEqual(
+			self.post_logout(self.token(authorized_party="press", sub=subject, sid=keycloak_sid)), 403
+		)
+		for claims in ({"sid": keycloak_sid, "sub": None}, {"sub": subject}):
+			session = self.sign_in(subject, f"{subject}@example.test", keycloak_sid)
+			token = self.token(authorized_party="press", **claims, events=event)
+			self.assertEqual(self.post_logout(token), 200)
+			self.assertIn(self.exchange("GET", ACCOUNT_ROUTE, session)[0], {401, 403})
+
+	def test_logout_rate_limit(self):
+		token = self.token(
+			authorized_party="press",
+			sub=None,
+			sid=uuid4().hex,
+			events={"http://schemas.openid.net/event/backchannel-logout": {}},
+		)
+		for _ in range(120):
+			self.assertEqual(self.post_logout(token), 200)
+		self.assertEqual(self.post_logout(token), 429)
 
 	def test_callback_and_backchannel_logout(self):
 		subject = uuid4().hex

@@ -7,15 +7,17 @@ from press_tr.kimlik.service import require_service
 
 
 def lock_team(organization_id: str):
+	# Authentication opens a read snapshot before the Team lock.
+	frappe.db.rollback()
 	name = frappe.db.get_value("Team", {"keycloak_org_id": organization_id}, "name")
 	if not name:
 		return None
-	try:
-		doc = frappe.get_doc("Team", name, for_update=True)
-	except frappe.QueryDeadlockError:
-		# Team lookup precedes domain writes, so refreshing the snapshot is safe.
-		frappe.db.rollback()
-		doc = frappe.get_doc("Team", name, for_update=True)
+	# The name lookup uses a snapshot too. Start the write transaction with
+	# the parent row lock, before controller code can read a consistent snapshot.
+	frappe.db.rollback()
+	if not frappe.db.get_value("Team", name, "name", for_update=True):
+		return None
+	doc = frappe.get_doc("Team", name, for_update=True)
 	if doc.keycloak_org_id != organization_id:
 		reject()
 	return doc
@@ -23,7 +25,12 @@ def lock_team(organization_id: str):
 
 @frappe.whitelist(methods=["POST"])
 def ensure_team(
-	issuer: str, subject: str, email: str, organization_id: str, organization_name: str | None = None
+	issuer: str,
+	subject: str,
+	email: str,
+	email_verified: bool,
+	organization_id: str,
+	organization_name: str | None = None,
 ) -> dict[str, str | bool]:
 	require_service(issuer)
 	organization_id = claim({"organization_id": organization_id}, "organization_id")
@@ -31,20 +38,21 @@ def ensure_team(
 	title = claim({"organization_name": title}, "organization_name")
 	email = claim({"email": email}, "email")
 	try:
-		return provision_team(issuer, subject, email, organization_id, title)
+		return provision_team(issuer, subject, email, email_verified, organization_id, title)
 	except frappe.DuplicateEntryError, frappe.UniqueValidationError, frappe.QueryDeadlockError:
 		# A competing first request may have created the identity and team.
 		frappe.db.rollback()
 		try:
-			return provision_team(issuer, subject, email, organization_id, title)
+			return provision_team(issuer, subject, email, email_verified, organization_id, title)
 		except frappe.DuplicateEntryError, frappe.UniqueValidationError:
 			reject()
 
 
-def provision_team(issuer: str, subject: str, email: str, organization_id: str, title: str):
+def provision_team(
+	issuer: str, subject: str, email: str, email_verified: bool, organization_id: str, title: str
+):
 	doc = lock_team(organization_id)
-	# The authorized Identity Sync client sends emails from verified Keycloak users.
-	link = bind_identity({"iss": issuer, "sub": subject, "email": email, "email_verified": True})
+	link = bind_identity({"iss": issuer, "sub": subject, "email": email, "email_verified": email_verified})
 	if doc is None:
 		return {"team": create_team(link.user, title, organization_id), "created": True}
 	if not any(member.user == link.user for member in doc.team_members):

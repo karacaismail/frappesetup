@@ -26,6 +26,8 @@ paths:
                         format: uri
         "429":
           description: Login URL request limit reached.
+        "503":
+          description: The Keycloak client or issuer is not configured.
   /api/method/press_tr.api.auth.keycloak_callback:
     get:
       operationId: completeLogin
@@ -52,6 +54,10 @@ paths:
                 const: /dashboard
         "403":
           description: State, token or identity binding was rejected.
+        "409":
+          description: A concurrent account update interrupted sign-in. Start a new login.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
   /api/method/press_tr.api.keycloak_backchannel_logout:
     post:
       operationId: closeSessions
@@ -72,6 +78,10 @@ paths:
           description: Logout processed, including a repeated logout.
         "403":
           description: Logout token was rejected.
+        "429":
+          description: Logout request limit reached.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
   /api/method/press_tr.api.identity.ensure_team:
     post:
       operationId: ensureTeam
@@ -86,7 +96,7 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [issuer, subject, email, organization_id]
+              required: [issuer, subject, email, email_verified, organization_id]
               properties:
                 issuer:
                   type: string
@@ -97,6 +107,9 @@ paths:
                   type: string
                   format: email
                   description: Required for the first identity binding.
+                email_verified:
+                  type: boolean
+                  description: Must be true for the first identity binding.
                 organization_id:
                   type: string
                   description: Keycloak organization identifier.
@@ -122,6 +135,8 @@ paths:
                         type: boolean
         "403":
           description: Service identity or user binding was rejected.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
   /api/method/press_tr.api.identity.remove_team_member:
     post:
       operationId: removeTeamMember
@@ -165,6 +180,8 @@ paths:
                         const: false
         "403":
           description: Service identity or owner removal was rejected.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
 components:
   securitySchemes:
     identitySync:

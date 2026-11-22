@@ -3,7 +3,7 @@ app_title = "Press TR"
 app_publisher = "Platform"
 app_description = "Keycloak identity integration for Press"
 app_email = "noreply@example.test"
-app_license = "mit"
+app_license = "AGPL-3.0"
 
 # Apps
 # ------------------
@@ -267,3 +267,13 @@ required_apps = ["press"]
 before_request = ["press_tr.kimlik.request_policy.before_request"]
 
 auth_hooks = ["press_tr.kimlik.service.authorize_identity_sync"]
+
+
+from press_tr.kimlik import request_policy
+
+before_login = "press_tr.kimlik.request_policy.block_native_login"
+on_logout = "press_tr.kimlik.sessions.remove_mapping"
+override_whitelisted_methods = dict.fromkeys(
+	request_policy.CLOSED_METHODS | request_policy.SOCIAL_METHODS,
+	"press_tr.kimlik.request_policy.deny_legacy_method",
+)
