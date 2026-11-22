@@ -26,9 +26,9 @@ paths:
         '400':
           $ref: '#/components/responses/Error'
         '401':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/AuthenticationError'
         '403':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/PermissionError'
         '409':
           $ref: '#/components/responses/Error'
         '429':
@@ -67,9 +67,9 @@ paths:
         '400':
           $ref: '#/components/responses/Error'
         '401':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/AuthenticationError'
         '403':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/PermissionError'
         '409':
           $ref: '#/components/responses/Error'
         '429':
@@ -79,7 +79,7 @@ paths:
   /api/method/platform_core.api.model.resolve_usage:
     post:
       summary: Resolve an unsettled attempt
-      description: A manager records the verified charge in the attempt currency and can add a short note. The original result is retained.
+      description: A manager records the verified charge as decimal text with the attempt currency and can add a short note. The original result is retained. The amount must be exact to at most nine fractional digits. The gateway does not round it.
       operationId: resolve_usage
       security:
         - session: []
@@ -90,10 +90,13 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [log, cost]
+              required: [log, cost, currency]
               properties:
                 log: {type: string, minLength: 1, maxLength: 140}
-                cost: {type: number, minimum: 0, exclusiveMaximum: 1000000000000, multipleOf: 0.000000001}
+                cost:
+                  $ref: '#/components/schemas/DecimalCost'
+                currency:
+                  $ref: '#/components/schemas/CurrencyCode'
                 note:
                   type: string
                   maxLength: 240
@@ -101,12 +104,30 @@ paths:
       responses:
         '200':
           description: Reconciled usage record
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [name, result, cost, currency]
+                    properties:
+                      name: {type: string}
+                      result: {const: resolved}
+                      cost:
+                        $ref: '#/components/schemas/DecimalCost'
+                      currency:
+                        $ref: '#/components/schemas/CurrencyCode'
+              example:
+                message: {name: fixture-attempt, result: resolved, cost: '0.125000001', currency: USD}
         '400':
           $ref: '#/components/responses/Error'
         '401':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/AuthenticationError'
         '403':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/PermissionError'
         '409':
           $ref: '#/components/responses/Error'
         '417':
@@ -134,12 +155,27 @@ paths:
       responses:
         '200':
           description: Eligible and deleted counts
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [eligible, deleted, dry_run]
+                    properties:
+                      eligible: {type: integer, minimum: 0}
+                      deleted: {type: integer, minimum: 0, maximum: 500}
+                      dry_run: {type: boolean}
+              example:
+                message: {eligible: 3, deleted: 0, dry_run: true}
         '400':
           $ref: '#/components/responses/Error'
         '401':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/AuthenticationError'
         '403':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/PermissionError'
         '409':
           $ref: '#/components/responses/Error'
         '417':
@@ -168,12 +204,26 @@ paths:
       responses:
         '200':
           description: Credential cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [name, cleared]
+                    properties:
+                      name: {type: string}
+                      cleared: {const: true}
+              example:
+                message: {name: fixture-api, cleared: true}
         '400':
           $ref: '#/components/responses/Error'
         '401':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/AuthenticationError'
         '403':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/PermissionError'
         '409':
           $ref: '#/components/responses/Error'
         '417':
@@ -200,25 +250,23 @@ components:
       content:
         application/json:
           schema:
-            oneOf:
-              - type: object
-                required: [message]
-                properties:
-                  message:
-                    type: object
-                    required: [error]
-                    properties:
-                      error:
-                        type: string
-                        enum: [invalid_request, invalid_route, invalid_target, invalid_cost, invalid_note, output_limit_exceeds_deadline,
-                          authentication_required, permission_denied, data_policy_denied,
-                          transaction_active, attempt_in_progress, attempt_already_settled,
-                          quota_exceeded, gateway_busy, endpoint_unavailable, gateway_unavailable,
-                          provider_unavailable, invalid_retention]
-              - type: object
-                required: [exc_type]
-                properties:
-                  exc_type: {type: string}
+            $ref: '#/components/schemas/Error'
+    AuthenticationError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: authentication_required}
+    PermissionError:
+      description: Permission denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: permission_denied}
     Result:
       description: Normalized Frappe RPC response
       content:
@@ -229,7 +277,43 @@ components:
             properties:
               message:
                 $ref: '#/components/schemas/Result'
+          example:
+            message:
+              text: Fixture response.
+              tool_calls: []
+              usage: {input: 4, output: 3}
+              api: fixture-api
+              model: fixture-model
   schemas:
+    DecimalCost:
+      type: string
+      pattern: '^(?:0|[1-9][0-9]{0,11})(?:[.][0-9]{1,9})?(?![\s\S])'
+      description: Nonnegative decimal text with at most 12 whole digits and nine fractional digits. No rounding or exponent notation.
+    CurrencyCode:
+      type: string
+      minLength: 3
+      maxLength: 3
+      pattern: '^[A-Z]{3}$'
+      description: Three-letter uppercase currency code matching the usage record.
+    Error:
+      oneOf:
+        - type: object
+          required: [message]
+          properties:
+            message:
+              type: object
+              required: [error]
+              properties:
+                error:
+                  type: string
+                  enum: [invalid_request, invalid_route, invalid_target, invalid_cost, invalid_currency, currency_mismatch,
+                    invalid_note, output_limit_exceeds_deadline, authentication_required, permission_denied, data_policy_denied,
+                    transaction_active, attempt_in_progress, attempt_already_settled, quota_exceeded, gateway_busy,
+                    endpoint_unavailable, gateway_unavailable, provider_unavailable, invalid_retention]
+        - type: object
+          required: [exc_type]
+          properties:
+            exc_type: {type: string}
     Completion:
       type: object
       additionalProperties: false

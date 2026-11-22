@@ -29,9 +29,9 @@ def test_api(api, model):
 
 
 @frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
-def resolve_usage(log, cost, note=None):
+def resolve_usage(log, cost, currency=None, note=None):
 	"""Reconcile a model attempt with its verified cost."""
-	return _respond(maintenance.resolve_usage, log, cost, note)
+	return _respond(maintenance.resolve_usage, log, cost, currency, note)
 
 
 @frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission

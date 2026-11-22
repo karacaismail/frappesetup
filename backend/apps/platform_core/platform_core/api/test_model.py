@@ -161,7 +161,7 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertEqual(identity.json()["message"], self.fixture["users"]["manager"])
 		checks = {
 			"test_api": {"api": self.fixture["second_api"], "model": self.fixture["model"]},
-			"resolve_usage": {"log": "missing-fixture-log", "cost": 0},
+			"resolve_usage": {"log": "missing-fixture-log", "cost": "0", "currency": "USD"},
 			"purge_usage": {"dry_run": True},
 			"clear_api_credential": {"api": self.fixture["clearable_api"]},
 		}
@@ -347,11 +347,15 @@ class TestModelHTTP(unittest.TestCase):
 		return self.request(actor, "POST", f"/api/method/platform_core.api.model.{endpoint}", json=payload)
 
 	def test_resolve_usage_guest_denied(self):
-		response = self._maintenance("guest", "resolve_usage", {"log": "missing", "cost": "0"})
+		response = self._maintenance(
+			"guest", "resolve_usage", {"log": "missing", "cost": "0", "currency": "USD"}
+		)
 		self.assertEqual(response.status_code, 403)
 
 	def test_resolve_usage_foreign_data_denied(self):
-		response = self._maintenance("regular", "resolve_usage", {"log": "missing", "cost": "0"})
+		response = self._maintenance(
+			"regular", "resolve_usage", {"log": "missing", "cost": "0", "currency": "USD"}
+		)
 		self.assertEqual(response.status_code, 403)
 
 	def test_purge_usage_guest_denied(self):
@@ -396,13 +400,29 @@ class TestModelHTTP(unittest.TestCase):
 		frappe.db.set_value("AI Usage Log", log, {"result": "unknown", "cost_known": 0})
 		frappe.db.commit()
 		note = "Verified using a fixture invoice."
-		response = self._maintenance("manager", "resolve_usage", {"log": log, "cost": 0.125, "note": note})
+		request = {"log": log, "cost": "0.125000001", "currency": "USD", "note": note}
+		for changes, error in (
+			({"cost": 0.125}, "invalid_cost"),
+			({"cost": "1e-3"}, "invalid_cost"),
+			({"cost": "0.0000000001"}, "invalid_cost"),
+			({"currency": "usd"}, "invalid_currency"),
+			({"currency": "EUR"}, "currency_mismatch"),
+		):
+			with self.subTest(error=error, changes=changes):
+				response = self._maintenance("manager", "resolve_usage", {**request, **changes})
+				self.assertEqual(response.status_code, 400)
+				self.assertEqual(response.json()["message"]["error"], error)
+		response = self._maintenance("manager", "resolve_usage", request)
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
+		self.assertEqual(
+			response.json()["message"],
+			{"name": log, "result": "resolved", "cost": "0.125000001", "currency": "USD"},
+		)
 		frappe.db.rollback()
 		record = frappe.get_doc("AI Usage Log", log)
 		self.assertEqual(record.result, "resolved")
 		self.assertEqual(record.cost_known, 1)
-		self.assertAlmostEqual(record.cost, 0.125)
+		self.assertEqual(str(record.cost), "0.125000001")
 		self.assertEqual(record.resolved_by, self.fixture["users"]["manager"])
 		self.assertTrue(record.resolved_at)
 		self.assertEqual(record.resolution_note, note)

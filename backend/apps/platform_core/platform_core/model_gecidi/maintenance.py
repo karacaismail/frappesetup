@@ -1,7 +1,8 @@
 """Human-operated usage reconciliation and retention."""
 
+import re
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from uuid import uuid4
 
 import frappe
@@ -15,13 +16,9 @@ DELETE_BATCH_SIZE = 500
 
 
 def _cost(value):
-	try:
-		cost = Decimal(str(value))
-		if not cost.is_finite() or not 0 <= cost < 10**12 or cost != cost.quantize(Decimal("0.000000001")):
-			raise InvalidOperation
-	except (InvalidOperation, ValueError):
-		raise policy.Denied(400, "invalid_cost") from None
-	return cost
+	if not isinstance(value, str) or not re.fullmatch(r"(?:0|[1-9][0-9]{0,11})(?:[.][0-9]{1,9})?", value):
+		raise policy.Denied(400, "invalid_cost")
+	return Decimal(value)
 
 
 def _usage_log(name, *, for_update=False):
@@ -33,9 +30,11 @@ def _usage_log(name, *, for_update=False):
 		raise policy.Denied(403, "permission_denied") from None
 
 
-def resolve_usage(log, cost, note=None):
+def resolve_usage(log, cost, currency, note=None):
 	policy.require_user(managers_only=True)
 	verified_cost = _cost(cost)
+	if not isinstance(currency, str) or not re.fullmatch(r"[A-Z]{3}", currency):
+		raise policy.Denied(400, "invalid_currency")
 	if note is None:
 		note = ""
 	if not isinstance(note, str) or len(note) > 240 or (note and not note.isprintable()):
@@ -46,6 +45,8 @@ def resolve_usage(log, cost, note=None):
 		frappe.db.commit()  # nosemgrep
 		gateway.lock_row("AI Account", initial.account, ("name",))
 		current = _usage_log(log, for_update=True)
+		if currency != current.currency:
+			raise policy.Denied(400, "currency_mismatch")
 		if current.result == "pending":
 			# A live attempt may still settle. Reconcile only after its lease is stale.
 			if current.attempted_at > now_datetime() - timedelta(seconds=gateway.STALE_ATTEMPT_SECONDS):
@@ -67,7 +68,7 @@ def resolve_usage(log, cost, note=None):
 		)
 		# Commit before releasing the account lock so a new reservation sees the cost.
 		frappe.db.commit()  # nosemgrep
-	return {"name": log, "result": "resolved"}
+	return {"name": log, "result": "resolved", "cost": format(verified_cost, "f"), "currency": currency}
 
 
 def purge_usage(dry_run=True):
