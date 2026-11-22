@@ -638,7 +638,9 @@ Motor dört aracı `ai_tools` kancasıyla bildirir (D-9). Kod `erisim/ai_tools.p
 - Araçlar yalnız yapılandırılmış alan alır. SQL metni ya da ham koşul alan girdi yoktur. Girdi modeli bilinmeyen alanı reddeder.
 - Süzgeç satırları elle yazılan kuralla aynı doğrulamadan geçer.
 - Her araç iznini kendisi denetler. Araç `ignore_permissions` kullanmaz.
-- “Access Rule” türü genel yazma araçlarına kapalıdır (O-28). Motor türü `ai_write_closed_doctypes` kancasına yazar. Kural yalnız yukarıdaki iki yazma aracıyla değişir. O araçlar kuralı doğrular ve erişimi kaybedecek rolleri sayar.
+- “PLT Access Rule” türü genel yazma araçlarına kapalıdır (O-28). Motor türü `ai_write_closed_doctypes` kancasına yazar. Kural yalnız yukarıdaki iki yazma aracıyla değişir. O araçlar kuralı doğrular ve erişimi kaybedecek rolleri sayar.
+
+`access/tests/test_ai_tools.py` içindeki `TestGenericWriteToolsAreClosed` bu kancayı doğrular. Test ayrıca motorun kendi yazma araçlarının açık kaldığını denetler. Kanca sözleşmesi `backend/contracts/platform_core-access.openapi.yaml` dosyasının `x-hooks` bölümündedir.
 
 Yapay zekâ katmanı henüz `backend` dalında değildir. Testler araçları sözleşmenin anlattığı gibi çağırır: kullanıcı kimliğiyle ve doğrulanmış girdiyle. Araçlar gerçek MCP ucundan sınanmadı.
 
@@ -982,17 +984,19 @@ Bu ölçüm tek istekle ve küçük bir sitede yapıldı. Eşzamanlı yük ve ge
 
 ## 21. Modül arayüzü
 
-Bu bölüm motorun öteki modüllere ve Frappe'ye açtığı her bağı sayar (B-3). Orkestratör bu tabloyu proje kaydının ortak listesine taşır.
+Bu bölüm motorun öteki modüllere ve Frappe'ye açtığı bağları listeler (B-3). Orkestratör bu tabloyu proje kaydının ortak listesine taşır.
 
 ### Öteki modüllerin çağırdığı işlevler
 
-Öteki modüller yalnız `platform_core.erisim.api` modülünü içe aktarır.
+Öteki modüller yalnız `platform_core.access.api` modülünü içe aktarır.
 
 | İşlev | Ne yapar | Kim çağırır |
 | --- | --- | --- |
-| `report_guard(report_name, user=None)` | Rapor çalışamazsa izin hatası verir. | Rapor çalıştıran modüller. Örneğin yapay zekâ katmanı. |
-| `link_search_guard(doctype, query=None)` | Özel arama işlevi kurallı türde izin hatası verir. | Özel arama işlevi çalıştıracak kod. |
-| `search_link(doctype, txt, query=None, ...)` | Bağlantı aramasını kapıdan geçirerek yapar. | Python'dan bağlantı araması yapan kod. |
+| `report_guard(report_name, user=None)` | Rapor çalışamazsa izin hatası verir. | `ai/tools/read.py` içindeki `_report_guard`. |
+| `link_search_guard(doctype, query=None)` | Özel arama işlevi kurallı türde izin hatası verir. | Üretim kodunda başka modülün çağrısı yok. |
+| `search_link(doctype, txt, query=None, ...)` | Bağlantı aramasını kapıdan geçirerek yapar. | Üretim kodunda başka modülün çağrısı yok. |
+
+İşlevler `access/api.py` dosyasında tanımlıdır. Modül sınırı kapısı içe aktarma yolunu denetler. `access/tests/test_report_rules.py` rapor kapısını sınar. `access/test_link_search.py` iki arama işlevini sınar.
 
 ### HTTP uçları
 
@@ -1016,35 +1020,37 @@ Karar: Website User için `validate_link_and_fetch` ucu kapalı kalır. Portal f
 | `frappe.client.validate_link_and_fetch` | Kapalı | Portal formları kendi uçlarını kullanır. |
 | `set_field_level`, `set_level_access` | Kapalı | Yalnız “System Manager” çağırır. |
 
-Giriş matrisi testi bu tabloyu gerçek istekle sınar (`erisim/tests/test_entry_matrix.py`).
+Giriş matrisi testi bu tabloyu gerçek istekle sınar (`access/tests/test_entry_matrix.py`).
 
 ### Frappe kancaları
 
 | Kanca | Motorun değeri | Etkisi |
 | --- | --- | --- |
-| `permission_query_conditions` | `erisim.hooks.query_conditions`, bütün türler için | Liste sorgusuna kural koşulunu ekler. |
-| `has_permission` | `erisim.hooks.has_permission`, bütün türler için | Tek kayıtta kuralı uygular. |
+| `permission_query_conditions` | `platform_core.access.hooks.query_conditions`, bütün türler için | Liste sorgusuna kural koşulunu ekler. |
+| `has_permission` | `platform_core.access.hooks.has_permission`, bütün türler için | Tek kayıtta kuralı uygular. |
 | `override_whitelisted_methods` | `frappe.desk.search.search_link`, `frappe.desk.search.search_widget`, `frappe.client.validate_link_and_fetch` | Üç Frappe ucunun yerine motorun sarmalayıcısı çalışır. |
-| `extend_doctype_class` | “Report”, “Prepared Report”, “Auto Email Report”, “File” | Rapor kapısını kayıt sınıflarına ekler. Her yöntem `super()` çağırır. |
-| `doc_events` | “Role” ve “DocType” için `on_trash` ve `after_rename` | İstekte okunan kural listesini unutur. |
-| `after_install`, `after_migrate` | `erisim.reports.switch_off_governed_auto_email_reports` | Kurallı veriye dokunan e-posta raporlarını kapatır. |
-| `before_job` | `erisim.reports.refuse_prepared_report_job` | Sıradaki hazır rapor işini reddeder. |
+| `extend_doctype_class` | `access.reports.GuardedReport`, `GuardedPreparedReport`, `GuardedAutoEmailReport`, `GuardedFile` | Sırasıyla “Report”, “Prepared Report”, “Auto Email Report”, “File” türlerini genişletir. |
+| `doc_events` | `platform_core.access.rules.clear_cache` | “Role” ve “DocType” olaylarında kural listesini unutur. Olaylar `on_trash` ve `after_rename` olur. |
+| `after_install`, `after_migrate` | `platform_core.access.reports.switch_off_governed_auto_email_reports` | Kurallı veriye dokunan e-posta raporlarını kapatır. |
+| `before_job` | `platform_core.access.reports.refuse_prepared_report_job` | Sıradaki hazır rapor işini reddeder. |
 | `website_user_allowed_methods` | `platform_core.api.access.get_access_summary` | Website User özet ucunu çağırabilir. |
+
+Tam bağlar `platform_core/hooks.py` dosyasındadır. Kısa sınıf adlarının modülü `platform_core.access.reports` olur. Sınıf eklerinin yöntemleri `super()` çağrısını korur. Üç uç sarmalayıcısı `platform_core.access.link_search` modülündedir. Sarmalayıcı adları Frappe uçlarının son adıyla aynıdır.
 
 ### Platform kancaları
 
 | Kanca | Motorun değeri | Kim okur |
 | --- | --- | --- |
-| `ai_tools` | `erisim.ai_tools.declare` | Yapay zekâ katmanı. Dört aracı bildirir. |
-| `ai_write_closed_doctypes` | “Access Rule” | Yapay zekâ katmanı. Genel yazma araçlarını bu türe kapatır. |
+| `ai_tools` | `platform_core.access.ai_tools.declare` | Yapay zekâ katmanı. Dört aracı bildirir. |
+| `ai_write_closed_doctypes` | “PLT Access Rule” | Yapay zekâ katmanı. Genel yazma araçlarını bu türe kapatır. |
 
-### Motorun dinlediği başka modül
+### Motorun olaylarını dinleyen modül
 
-Kabuk modülü “Access Rule” kaydının `on_update` ve `on_trash` olaylarını dinler. Böylece kural değişince kabuğun izin sürümü yenilenir. Bu satırların sahibi kabuk işidir.
+Shell modülü “PLT Access Rule” kaydının `on_update` ve `on_trash` olaylarını dinler. İki olay da `platform_core.shell.cache.invalidate_permissions` işlevini çağırır. Böylece kural değişince kabuğun izin sürümü yenilenir. Bu satırların sahibi shell işidir.
 
 ### Kayıt türü
 
-Motorun tek kayıt türü “Access Rule” türüdür. Alanları 3. bölümdedir. Türü yalnız “System Manager” okur ve yazar.
+Motorun tek kayıt türü “PLT Access Rule” türüdür. Alanları 3. bölümdedir. Türü yalnız “System Manager” okur ve yazar.
 
 ### Paket
 
