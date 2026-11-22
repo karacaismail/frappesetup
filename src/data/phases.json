@@ -37,11 +37,11 @@
  },
  {
   "id": "P4",
-  "title": "P4 İlk app (CronHR)",
+  "title": "P4 İlk app (HRMS TR)",
   "start": 18,
   "end": 30,
-  "goal": "App çerçevesinin (backend iskelet, frontend modül, yetki/AI/abonelik sözleşmeleri, uygulama durum modeli, yardım ve tur içeriği) CronHR ile ilk kez uygulanması; Marketplace App, App Plan, Product Trial, aktivasyon UX, paylaşım bağlantıları ve güvenli bağlantı önizlemesi.",
-  "exit": "Yeni müşteri Keycloak ile kayıt → 14 günlük deneme sitesi → 'Etkinleştir' → Agent Job → sidebar'da CronHR başlığı akışı E2E testte ve ilk ödeyen müşteride çalışıyor; CronHR TR bordro kabul senaryoları geçiyor; subscription info ile özellik kapıları ve uygulama durumları doğrulanmış; paylaşılan kayıt bağlantısının oturumsuz önizlemesi kayıt verisi içermiyor; ilk ziyaret turu girdi kaybı olmadan çalışıyor.",
+  "goal": "App çerçevesinin (backend iskelet, frontend modül, yetki/AI/abonelik sözleşmeleri, uygulama durum modeli, yardım ve tur içeriği) HRMS TR ile ilk kez uygulanması; Marketplace App, App Plan, Product Trial, aktivasyon UX, paylaşım bağlantıları ve güvenli bağlantı önizlemesi.",
+  "exit": "Yeni müşteri Keycloak ile kayıt → 14 günlük deneme sitesi → 'Etkinleştir' → Agent Job → sidebar'da HRMS TR başlığı akışı E2E testte ve ilk ödeyen müşteride çalışıyor; HRMS TR bordro kabul senaryoları geçiyor; subscription info ile özellik kapıları ve uygulama durumları doğrulanmış; paylaşılan kayıt bağlantısının oturumsuz önizlemesi kayıt verisi içermiyor; ilk ziyaret turu girdi kaybı olmadan çalışıyor.",
   "owner": "Platform ekibi + App ekibi + Frontend ekibi; ürün sahibi (plan/fiyat, K-29, K-35); mali müşavir (bordro parametreleri)"
  },
  {

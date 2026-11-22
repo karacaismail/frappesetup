@@ -28,6 +28,12 @@ Kapı yalnız Python standart kitaplığıyla yazılır. Kapı `backend/apps/` a
 4. **Kodda model adı yok.** Kodda bilinen model adı kalıbı geçmemeli. Model adları yalnız kayıtta durur (O-13). Test dosyalarındaki uydurma adlar bu kurala girmez.
 5. **Zamanlanmış iş yok.** `hooks.py` içinde `scheduler_events` olmamalı. Proje sahibi `cron` istemedi.
 6. **Ham SQL yolu yok.** Yapay zekâ araçlarında `frappe.db.sql` çağrısı olmamalı. Kapsam `yapay_zeka` modülü ve `ai_tools` kancasıyla bildirilen araçlardır.
+7. **Yasaklı ad yok (D-13).** Bu denetim `backend/` ile sınırlı değildir. Depodaki bütün izlenen dosyaları tarar (`git ls-files`). Dosya ve klasör adlarını da tarar.
+   - Adın kendisi kapıya yazılmaz. Kapı yalnız şu SHA-256 özetini taşır: `17618b2344e07d3418e161912308ad63a118158bf4e3f1307329b5543b5fd743`.
+   - Kapı metni küçük harfe çevirir. Sonra harf ve rakam dışındaki işaretleri siler. Böylece boşluk, alt çizgi, tire ve nokta ile yazılan biçimler de yakalanır.
+   - Kapı kalan metinde 6 harflik her pencerenin özetini alır. Özet eşleşirse ihlal yazar.
+   - Test, adı doğrudan yazmasın. Test adı karakter kodlarından ya da ters çevrilmiş bir metinden üretsin. Parçaları yan yana yazmayın. Kapı işaretleri sildiği için yan yana parçaları da yakalar.
+   - Yanlış alarm çıkarsa durum dosyasına yazın. Orkestratör karar verir.
 
 Her denetim ihlali dosya ve satırla yazar. Çıkış kodu ihlal varsa 1, yoksa 0 olur.
 

@@ -53,5 +53,5 @@ Bu bölüm `platform_core` iskeletini ister. Orkestratör iskeleti `backend` dal
 
 ## Kapsam dışı
 
-- Uygulamaya özel kural şablonları, örneğin CronHR, sonraki turdadır.
+- Uygulamaya özel kural şablonları, örneğin HRMS TR, sonraki turdadır.
 - Ekran yoktur. Kurallar API ve yapay zekâ araçlarıyla yönetilir.
