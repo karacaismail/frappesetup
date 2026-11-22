@@ -17,6 +17,7 @@ from platform_core.model_gecidi.policy import Denied
 
 COOLDOWN = 60
 MAX_ROUTE_SECONDS = 60
+FINALIZATION_SECONDS = 0.5
 LOCK_SECONDS = 10
 STALE_ATTEMPT_SECONDS = 135
 RESPONSE_OVERHEAD_SECONDS = 8
@@ -202,7 +203,7 @@ def _choose(targets, route, request):
 
 def read_timeout(limit, output_tokens_per_second):
 	seconds = RESPONSE_OVERHEAD_SECONDS + ceil(limit / output_tokens_per_second)
-	if seconds > MAX_ROUTE_SECONDS - CONNECT_SECONDS:
+	if seconds > MAX_ROUTE_SECONDS - CONNECT_SECONDS - FINALIZATION_SECONDS:
 		raise Denied(400, "output_limit_exceeds_deadline")
 	return seconds
 
@@ -270,6 +271,8 @@ def _attempt(candidate, target, request, timeout, deadline, log):
 			_set_health(target.api.name, "unhealthy")
 			frappe.cache.set(_cache_key(target.api.name), decision.candidate.cooldown_until, ex=COOLDOWN)
 		retry = retry_allowed(code, capped=target.account.has_monthly_budget)
+		if code == "timeout" and not retry:
+			raise Denied(503, "provider_timeout") from None
 		return None, retry and decision.try_next
 	finally:
 		ledger.finish(
@@ -365,6 +368,8 @@ def _reserve(route, target, request):
 
 
 def _dispatch(route, targets, request, deadline):
+	# Leave time for the usage write and the HTTP response after provider I/O.
+	provider_deadline = deadline - FINALIZATION_SECONDS
 	failed_apis = set()
 	last_denial = None
 	for candidate, target in _choose(targets, route, request):
@@ -381,14 +386,14 @@ def _dispatch(route, targets, request, deadline):
 				continue
 			candidate, current = choices[0]
 			timeout = read_timeout(request.limit, current.model.output_tokens_per_second or 30)
-			if timeout > deadline - monotonic() - CONNECT_SECONDS:
+			if timeout > provider_deadline - monotonic() - CONNECT_SECONDS:
 				last_denial = Denied(503, "provider_unavailable")
 				continue
 			outbound = policy.outbound(current.base_url, current.oauth_url, route, request)
 			log = _reserve(route, current, outbound)
-			result, retry = _attempt(candidate, current, outbound, timeout, deadline, log)
+			result, retry = _attempt(candidate, current, outbound, timeout, provider_deadline, log)
 		except Denied as failure:
-			if failure.code == "gateway_unavailable":
+			if failure.code in {"gateway_unavailable", "provider_timeout"}:
 				raise
 			last_denial = failure
 			continue

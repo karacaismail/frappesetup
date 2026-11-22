@@ -370,7 +370,7 @@ components:
                   enum: [invalid_request, invalid_route, invalid_target, invalid_cost, invalid_currency, currency_mismatch,
                     invalid_note, output_limit_exceeds_deadline, authentication_required, data_policy_denied,
                     transaction_active, attempt_in_progress, attempt_already_settled, quota_exceeded, gateway_busy,
-                    endpoint_unavailable, gateway_unavailable, provider_unavailable, invalid_retention, preview_required, preview_invalid]
+                    endpoint_unavailable, gateway_unavailable, provider_unavailable, provider_timeout, invalid_retention, preview_required, preview_invalid]
         - type: object
           required: [exc_type]
           properties:
