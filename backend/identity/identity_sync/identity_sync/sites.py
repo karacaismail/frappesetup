@@ -9,7 +9,8 @@ The `list_identities` endpoints and their paging are defined in the shared contr
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict
 
 from identity_sync.httpjson import ConnectFailed, HttpError, Response, TransportError, UnknownOutcome, request_json
@@ -119,6 +120,17 @@ def _is_team(message: object) -> bool:
 ANONYMIZE_RETRY_STATUSES = (409,)
 
 
+@contextmanager
+def _not_found_is_unknown() -> Iterator[None]:
+    """A 404 from an anonymize call leaves the outcome unknown (O-43). It is not a result."""
+    try:
+        yield
+    except HttpError as error:
+        if error.status == 404:
+            raise UnknownOutcome from None
+        raise
+
+
 def _is_anonymized(message: object) -> bool:
     """anonymize_user (docs/sozlesmeler.md, section 6): the body carries `anonymized` and `found`.
 
@@ -202,10 +214,13 @@ def _identities(message: object) -> list[Identity]:
 
 
 class PressClient:
-    def __init__(self, base_url: str, tokens: TokenProvider, *, timeout: float) -> None:
+    def __init__(
+        self, base_url: str, tokens: TokenProvider, *, timeout: float, anonymize_timeout: float | None = None
+    ) -> None:
         self._base_url = base_url
         self._tokens = tokens
         self._timeout = timeout
+        self._anonymize_timeout = anonymize_timeout or timeout
 
     def _call(
         self,
@@ -214,13 +229,14 @@ class PressClient:
         is_success: Success | None = None,
         retry_statuses: tuple[int, ...] = (),
         query: Mapping[str, object] | None = None,
+        timeout: float | None = None,
     ) -> object:
         return _call_method(
             self._base_url,
             method_path,
             self._tokens,
             PRESS_SCOPE,
-            timeout=self._timeout,
+            timeout=timeout or self._timeout,
             body=body,
             is_success=is_success,
             retry_statuses=retry_statuses,
@@ -233,7 +249,14 @@ class PressClient:
         Press answers `found: false` for an identity it does not know. That counts as done.
         """
         body = {"issuer": action.issuer, "subject": action.subject}
-        self._call("press_tr.api.identity.anonymize_user", body, _is_anonymized, ANONYMIZE_RETRY_STATUSES)
+        with _not_found_is_unknown():  # O-43, as for the tenant
+            self._call(
+                "press_tr.api.identity.anonymize_user",
+                body,
+                _is_anonymized,
+                ANONYMIZE_RETRY_STATUSES,
+                timeout=self._anonymize_timeout,
+            )
 
     def ensure_team(self, action: PressEnsureTeam) -> None:
         body = asdict(action)
@@ -265,10 +288,13 @@ class PressClient:
 class TenantClient:
     """Calls the tenant identity endpoints (contracts/platform_core-kimlik.openapi.yaml)."""
 
-    def __init__(self, tenants: Sequence[Tenant], tokens: TokenProvider, *, timeout: float) -> None:
+    def __init__(
+        self, tenants: Sequence[Tenant], tokens: TokenProvider, *, timeout: float, anonymize_timeout: float | None = None
+    ) -> None:
         self._tenants = {tenant.name: tenant for tenant in tenants}
         self._tokens = tokens
         self._timeout = timeout
+        self._anonymize_timeout = anonymize_timeout or timeout
 
     def _call(
         self,
@@ -279,6 +305,7 @@ class TenantClient:
         missing_identity_is_success: bool = False,
         retry_statuses: tuple[int, ...] = (),
         query: Mapping[str, object] | None = None,
+        timeout: float | None = None,
     ) -> object:
         # The target address comes only from the configured tenant list (G-13).
         return _call_method(
@@ -286,7 +313,7 @@ class TenantClient:
             method_path,
             self._tokens,
             tenant_scope(tenant),
-            timeout=self._timeout,
+            timeout=timeout or self._timeout,
             body=body,
             is_success=is_success,
             missing_identity_is_success=missing_identity_is_success,
@@ -354,14 +381,21 @@ class TenantClient:
         )
 
     def anonymize_user(self, action: TenantAnonymizeUser) -> None:
-        """Close the tenant user and anonymize the personal fields. No link: nothing to anonymize."""
-        self._call(
-            action.tenant,
-            "platform_core.api.identity.anonymize_user",
-            self._body(action),
-            _is_anonymized,
-            retry_statuses=ANONYMIZE_RETRY_STATUSES,
-        )
+        """Close the tenant user and anonymize the personal fields.
+
+        O-43: only 200 with `anonymized` and `found` is a result. An unknown identity gets 200 with
+        `found` false. A 404 proves nothing: an old tenant may answer it after it removed the link,
+        while the anonymization is still unfinished. So a 404 leaves the outcome unknown.
+        """
+        with _not_found_is_unknown():
+            self._call(
+                action.tenant,
+                "platform_core.api.identity.anonymize_user",
+                self._body(action),
+                _is_anonymized,
+                retry_statuses=ANONYMIZE_RETRY_STATUSES,
+                timeout=self._anonymize_timeout,
+            )
 
     def list_identities(self, tenant: str) -> list[Identity]:
         method = "platform_core.api.identity.list_identities"

@@ -58,9 +58,11 @@ def sign(body: bytes, timestamp: int, mode: str = "execute", secret: str = WEBHO
 class ServerCase(unittest.TestCase):
     request_timeout = 0.5
     two_tenants = False
+    # Settings that replace the test defaults for one test class.
+    stack_settings: dict[str, object] = {}
 
     def setUp(self) -> None:
-        self.stack = Stack(two_tenants=self.two_tenants)
+        self.stack = Stack(two_tenants=self.two_tenants, **self.stack_settings)
         self.addCleanup(self.stack.close)
         self.now = float(NOW)
         self.start_server(fake_verifier)
@@ -877,6 +879,7 @@ class AccountDeletionEndpointTest(ServerCase):
 
     def setUp(self) -> None:
         super().setUp()
+        fakes.without_repeat_spacing(self)
         issuer = self.stack.issuer
         self.stack.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID, api_keys=1)
         self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")

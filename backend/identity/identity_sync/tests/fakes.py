@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import secrets
 import threading
+import time
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Callable
@@ -37,6 +38,15 @@ class Recorded:
 
 Reply = tuple[int, object]
 Route = Callable[[Recorded], Reply]
+
+
+@dataclass(frozen=True)
+class Trickle:
+    """A reply body sent in small pieces with a pause after each piece, like a slow target."""
+
+    body: object
+    piece: int = 4
+    pause: float = 0.1
 
 
 @dataclass
@@ -76,6 +86,9 @@ class FakeServer:
                     self.connection.close()
                     return
                 extra = reply[2] if len(reply) > 2 else {}
+                trickle = body if isinstance(body, Trickle) else None
+                if trickle is not None:
+                    body = trickle.body
                 if isinstance(body, str):
                     raw = body.encode("utf-8")  # a non-JSON body
                 else:
@@ -85,8 +98,16 @@ class FakeServer:
                 self.send_header("Content-Length", str(len(raw)))
                 for name, value in extra.items():
                     self.send_header(name, value)
-                self.end_headers()
-                self.wfile.write(raw)
+                try:
+                    self.end_headers()
+                    if trickle is None:
+                        self.wfile.write(raw)
+                    for start in range(0, len(raw), trickle.piece) if trickle else ():
+                        self.wfile.write(raw[start:start + trickle.piece])
+                        self.wfile.flush()
+                        time.sleep(trickle.pause)
+                except (BrokenPipeError, ConnectionResetError):
+                    return  # the client gave up waiting, for example after its timeout
 
             do_GET = do_POST = do_PUT = do_DELETE = _serve
 
@@ -379,6 +400,7 @@ class FakeTenant(FakeSite):
         key, error = self._identity(req)
         if error:
             if error[0] == 404:
+                # O-43: an identity the tenant does not know gets 200 with `found` false, never 404.
                 return 200, {"message": {"anonymized": True, "found": False}}
             return error
         # Personal fields are blanked. The record itself stays: business records are not deleted.
@@ -578,17 +600,35 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
     )
 
 
+def without_repeat_spacing(case) -> None:
+    """Let a test resend a deletion job at once.
+
+    A resend of a queued job waits `SETTLE_INTERVAL_SECONDS` (inceleme 19). Tests of the resume
+    logic resend right away. The spacing itself is checked in tests/test_unknown_deletion.py.
+    """
+    from unittest import mock
+
+    from identity_sync import pipeline
+
+    patcher = mock.patch.object(pipeline, "SETTLE_INTERVAL_SECONDS", 0.0)
+    patcher.start()
+    case.addCleanup(patcher.stop)
+
+
 class Stack:
     """Set up the three fake servers and the service together."""
 
-    def __init__(self, db_path: str = ":memory:", *, two_tenants: bool = False) -> None:
+    def __init__(self, db_path: str = ":memory:", *, two_tenants: bool = False, **settings: object) -> None:
+        """`settings`: values that replace the test defaults, for example `anonymize_timeout`."""
+        from dataclasses import replace
+
         from identity_sync.app import build_app
 
         self.keycloak = FakeKeycloak()
         self.press = FakePress()
         self.tenant = FakeTenant()
         self.tenant2 = FakeTenant() if two_tenants else None
-        self.settings = make_settings(self.keycloak, self.press, self.tenant, db_path, self.tenant2)
+        self.settings = replace(make_settings(self.keycloak, self.press, self.tenant, db_path, self.tenant2), **settings)
         self.sleeps: list[float] = []
         self.app = build_app(self.settings, sleep=self.sleeps.append)
 

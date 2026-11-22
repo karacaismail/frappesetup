@@ -153,6 +153,7 @@ Servis yanıttaki son durumu istediği durumla da karşılaştırır. Örneğin 
 - Servis böyle bir olayı `unknown` durumuyla bekleme kuyruğuna yazar.
 - İstek gitti ama yanıt okunamadıysa sonuç yine bilinmez. 502 ve 504 yanıtları da böyledir.
 - Servis bu olayı işlenmiş saymaz. Servis olayı kendiliğinden yeniden denemez.
+- Hesap silme işinde tek istisna vardır. Silme işinin her adımı tekrar edilebilir. Servis yarım kalan adımı yeniden çağırır. Ayrıntı "Silme işinde zaman aşımı" bölümündedir.
 - Aynı olay yeniden gelirse servis yazmayı tekrarlamaz.
 - İnsan hedefi denetler. Sonra olayı `--include-unknown` seçeneğiyle yeniden işletir.
 
@@ -239,23 +240,81 @@ Akış beş adımdır ve sırası sabittir:
 - Hedef `anonymize_user` ucu 409 dönerse servis isteği yeniden dener.
 - Keycloak'ın kendi `delete_account` eylemi kapalıdır. O eylem kullanıcıyı ilk adımda siler.
 
-Yönetici bir kullanıcıyı Keycloak yönetim ekranından silebilir. Olay dinleyici o zaman olayı gönderir. Servis 2., 3. ve 4. adımı yürütür.
+### Silme işinde zaman aşımı
 
-Press isteği ve Keycloak silme olayı bir hesap için tek iştir:
+Anonim yapma çağrısı öteki çağrılardan uzun sürer. Kiracı kullanıcının adını değiştirir ve bütün oturumlarını kapatır.
 
-- İşin kimliği hesabın anahtarlı özetidir. Kimlik `del-` ile başlar.
-- 5. adım Keycloak kullanıcısını siler. Olay dinleyici bu silmeyi de bildirir. O olay bitmiş işi bulur ve hiçbir iş başlatmaz.
-- Press isteği bir adımda durduysa silme olayı aynı işi sürdürür. Servis bitmiş adımı yeniden çağırmaz.
-- Önizleme ve bekleme kuyruğu listesi işin kimliğini gösterir. Hesabın kimliğini göstermez.
+- Bu çağrının bekleme süresi `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` ayarındadır.
+- Varsayılan değer 30 saniyedir. En büyük değer 80 saniyedir.
+- Öteki çağrılar `IDENTITY_SYNC_HTTP_TIMEOUT` ayarını kullanır. Bu ayarın varsayılanı 10 saniyedir.
 
-Silme olayı kaybolabilir. O zaman `reconcile` komutu silinen kullanıcıyı bulur:
+Varsayılan değeri ölçüm belirledi:
 
-1. Komut farkı `deleted_in_keycloak` türüyle raporlar.
-2. Önizleme işin kalan adımlarını gösterir.
-3. İnsan onay verir.
-4. Komut kalan adımları sırayla yürütür. Yerel hesap önceden kapalı olsa da adımlar çalışır.
+- 22 Kasım 2026 Pazar günü boş bir kiracı sitesinde ölçüm yapıldı. Sitede ERPNext ve `platform_core` kuruluydu.
+- 15 örnek kullanıcı tek tek anonim yapıldı. Her kullanıcının 5 iş kaydı vardı.
+- Kiracının kendi işi ortanca 1,8 saniye sürdü. En uzun iş 2,5 saniye sürdü.
+- Son MVP testinde makine çok yüklüydü. Aynı iş orada yaklaşık 12 saniye sürdü.
+- 30 saniye bu en kötü ölçümün iki buçuk katıdır.
 
-Keycloak'ta kapatılan kullanıcının telefon kurulumları da iptal edilir. Bu iş kapatma planının parçasıdır.
+Silme isteğinin toplam süresi de sınırlıdır:
+
+- İstek tek bir son an taşır. Son an `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` sonra gelir.
+- Adres çözümü, bağlantı kurulumu ve TLS kurulumu bu son anı aşmaz.
+- İş kilidi beklemesi, veritabanı beklemesi, ağ okumaları ve yeniden deneme araları da bu son anı aşmaz.
+- Veritabanı beklemesi üç parçadan oluşur: ortak bağlantı, yazmanın başlaması ve yazmanın kaydı. Üç bekleme birlikte bu son anı aşmaz.
+- Kayıt için süre kalmadıysa servis yazmayı geri alır.
+- Sonuç kayıtları ortak bir son an kullanır. Bu son an ilk son andan 5 saniye sonra gelir. Bütün kayıtlar birlikte bu süreyi aşmaz.
+- Varsayılan ayarlarla servis en geç 35 saniyede cevap verir. En büyük ayarla bu süre 85 saniyedir.
+- Press en çok 90 saniye bekler. Press zaman aşımında müşteriye "silme sürüyor" der.
+- İş kilidi zamanında boşalmazsa servis 503 ve `busy` döner. Bu durumda iş başlamaz.
+
+Bir adım yarıda kalabilir. Örneğin hedefin cevabı gecikir. O zaman servis şunu yapar:
+
+1. Servis işi bekleme kuyruğuna yazar. Sonuç belli değilse durum `unknown` olur.
+2. Silme işinin her adımı tekrar edilebilir. Aynı kimlik için yinelenen çağrı aynı cevabı alır.
+3. Servis bu yüzden yarım kalan adımı yeniden çağırır. Servis kimlik listesinden sonuç çıkarmaz.
+4. Anonim yapma adımı yalnız HTTP 200 cevabıyla biter. Cevapta `anonymized` ve `found` mantıksal değer olmalıdır.
+5. Kimliği bilmeyen hedef 200 ile `found: false` döner. 404 cevabı sonuç sayılmaz ve iş `unknown` kalır (O-43).
+6. Cevapta alan eksikse ya da alanın türü yanlışsa da iş `unknown` kalır.
+7. Adım bitince iş sonraki adımdan sürer. Son adımda Keycloak kullanıcısı silinir.
+
+Servis işi iki yerde sürdürür:
+
+- Press aynı silme isteğini yeniden gönderdiğinde.
+- Servis `/v1/events` ucunda bir olay işlediğinde. Olay başka bir kullanıcıya ait olabilir.
+
+Her yeniden deneme için sayı ve ara sınırı vardır. Bu sınırlar iki yolda da geçerlidir:
+
+- Servis bir işi en çok 5 kez dener. Önceki zaman aşımı da bir deneme sayılır.
+- İki deneme arasında en az 30 saniye geçer.
+- Sınırlar kesin bir hatadan sonra da geçerlidir.
+- Sınır dolarsa servis hedefi çağırmaz. Cevap işin kuyruktaki durumunu verir: `dead_lettered` ya da `unknown`.
+- İnsan işi `--include-unknown` ile işletirse sınırlar uygulanmaz. Onaylı mutabakat da insan kararıdır ve sınırları uygulamaz.
+- Bütün adımlar bitmiş ve yalnız son kayıt eksikse sınır yoktur. Bu durumda hedefe çağrı gitmez.
+
+Olay yolunun ek sınırları şunlardır:
+
+- Olay yolu tek bir son an taşır. Son an olay işlendikten 5 saniye sonra gelir.
+- Kuyruk okuması, iş ayırma, bağlantılar, ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
+- Sonuç kayıtları silme isteğindeki gibi ortak bir son an kullanır.
+- Veritabanı yalnız şu anda denenebilecek işleri seçer. Bir olay en çok 3 iş okur. Uzun kuyruk baştan sona okunmaz.
+- Kuyruk sorgusu da son anda durur. Uygun iş bulamasa bile süreyi aşmaz.
+- Servis hedefi çağırırken iş kilidini tutmaz. Böylece elle çalışan komutlar beklemez.
+- Servis HTTP isteklerini sırayla işler. Bu yüzden 5 saniyelik sınır öteki istekleri de korur.
+
+Aynı iş için iki çağrı aynı anda çalışmaz:
+
+- Servis her denemeden önce işi kendine ayırır.
+- Ayırma ve tamamlanma denetimi aynı veritabanı adımındadır. Başka bir süreç işi bitirdiyse servis işi yeniden çalıştırmaz.
+- İşi başka bir süreç ayırdıysa servis o işe dokunmaz. Cevap işin kuyruktaki durumunu verir.
+- Servis her dış yazmadan önce ayırmayı uzatır. Ayırma o andan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 30 saniye sürer.
+- Bir adımın her yeniden denemesi de yeni bir yazmadır. Örneğin 409 cevabından sonraki deneme ayırmayı yeniden uzatır.
+- Böylece ayırma geç başlayan son çağrıyı da kapsar.
+- Sonuç belirsizse ayırma hemen kalkmaz. Hedef son çağrı üzerinde hâlâ çalışıyor olabilir. Bu sürede ikinci çağrı gitmez.
+- Ayırma bu sürenin sonunda kendiliğinden biter. Böylece çöken bir süreç işi kilitli bırakmaz.
+- Hedef bu süreden de uzun çalışırsa nadiren ikinci bir çağrı gidebilir. Bu çağrı veriyi bozmaz. Hedef aynı kimlik için aynı sonucu verir ve satır kilidi alır.
+
+Servis zamanlanmış iş kurmaz. Denemeler biterse iş kuyrukta kalır. İnsan o zaman hedefi denetler. Sonra işi `--include-unknown` ile yeniden işletir.
 
 ## Hesap silme yolları
 
