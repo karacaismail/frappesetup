@@ -234,6 +234,10 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Press çıkış bildirim ucunda imzası doğrulanan bildirim sayaca girmez. Reddedilen bildirim dakikada 120 ile sınırlıdır. Sözleşme bu kuralı yazar. Uç denetimi bu ucu kodla eşleşen istisnayla kabul eder.
   - Semgrep istisna özeti yalnız Git'in izlediği ve yok saymadığı dosyalardan hesaplanır. Böylece geliştiricinin ön bellek klasörü özeti değiştirmez.
   - Bandit istisna listeleri birleşirken iki taraf korunur. Kod imzası artık eşleşmeyen kayıtları güvenlik işi sonraki taramada temizler.
+- **O-38. identity-sync'te kiracı ve platform yetkisi ayrıdır.** Bir kiracının servis istemcisi bütün platformun kuyruğunu yeniden oynatabiliyordu. Bu açık şöyle kapanır:
+  - Kiracı servis istemcisi yürütme yetkisini korur. Yetki yalnız kendi kuruluşu içindir. Örneğin kendi kuruluşuna kullanıcı davet eder.
+  - Mutabakat, kuyruk yeniden oynatma ve platform listeleri yeni `IDENTITY_SYNC_OPERATOR_AZP` listesindeki istemcinindir.
+  - Operatör, önizleme ve silme listelerinde `site-` ile başlayan istemci olmaz. Ayrıntı sözleşmenin 7. bölümündedir.
 
 ## Karar sitesine işlenecek farklar
 
@@ -281,7 +285,6 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Dış MCP istemcileri OAuth 2.1 ile giremez | Dış yapay zekâ istemcisi yalnız oturum ya da API anahtarıyla bağlanır | platform-core-yz | MCP ucu OAuth 2.1 yetkilendirmesini Keycloak üzerinden destekler |
 | `BORC(mvp)`: Üretim işçi sayısı ölçülmedi | 50 eşzamanlı telefonda 4 Gunicorn işçisiyle istemci p95 1 saniyeyi aştı. Sunucu süresi sınırın altında kaldı | DevOps sorumlusu | Üretim kapasite ölçümü yapılır ve işçi sayısı ölçümle seçilir |
 | `BORC(mvp)`: identity-sync canlı Keycloak, Press ve kiracı ile denenmedi | Sahte hedeflerin kaçırdığı uyumsuzluk üretimde çıkabilir | integration-e2e | Uçtan uca test gerçek servislerle geçer |
-| `BORC(mvp)`: `list_identities` uçları yok | Mutabakat gerçek hedeflerde çalışmaz | press-tr ve platform-core-kimlik | İki uç sözleşmeye uygun yazılır ve sayfalı yanıt verir |
 | `BORC(mvp)`: Yeni kiracının Keycloak istemcisini açan komut yok | Yeni kiracı istemcisi elle açılır | kimlik-realm | Elle başlatılan, insan onaylı komut yazılır |
 | `BORC(mvp)`: identity-sync container dosyası yok | Servis ortak geliştirme ortamında başlamaz | identity-sync | Container dosyası yazılır ve servis `oidc_verify` ile açılır |
 | `BORC(mvp)`: identity-sync testleri CI'da koşmaz | Bozulma yalnız elle çalışan testte görülür | DevOps sorumlusu | CI bu klasörün testlerini her değişiklikte koşar |
@@ -295,3 +298,9 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
 | Bandit istisnaları 22 Şubat 2027 Pazartesi günü sona erer | Süresi dolan istisna taramayı durdurur | dev-ortam ve security-tooling | Sahipler her istisnayı yeniden inceler |
 | `BORC(mvp)`: Telefon paketi yok (O-26) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |
+
+### Kapanan teknik borç
+
+- `list_identities` uçları tamamlandı. Kiracı ve Press uçları aynı sayfalama sözleşmesini kullanır.
+- Kiracı HTTP testleri ikinci sayfayı ve yetkisiz istek reddini doğruladı.
+- Press ucu ve sayfalama testleri `f4cb09f` birleşme kaydında yer alır.
