@@ -147,7 +147,7 @@
     "rule": "B108",
     "file": "backend/dev/security/scans.py",
     "code": "{\"type\": \"import\", \"parameters\": {\"type\": \"har\", \"fileName\": \"/tmp/scan/response.har\",",
-    "statementSha256": "2a73011ec4862483d8e22f66cdccb633a4fa57707aae084d4aa6f9d48ceb2b36",
+    "statementSha256": "b1f0612631aa1753bd8263b05f8ab8dbca4d4cb105960a68d1489522bfd9e93a",
     "reason": "The path is inside a new network-isolated container and is populated from stdin.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
@@ -591,6 +591,24 @@
     "statementSha256": "523919980ca538e5e6ac9dda0111f22ba1e610e869702f9685aeae84ba871a3d",
     "reason": "The literal is a fake test token or a fake session field, not a live credential.",
     "owner": "platform-core-mobil",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B108",
+    "file": "backend/dev/security/scans.py",
+    "code": "{\"type\": \"report\", \"parameters\": {\"template\": \"traditional-json\", \"reportDir\": \"/tmp/scan\",",
+    "statementSha256": "b1f0612631aa1753bd8263b05f8ab8dbca4d4cb105960a68d1489522bfd9e93a",
+    "reason": "Temporary report paths exist only inside the disposable network-isolated ZAP container.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/scans.py",
+    "code": "process = subprocess.run(command, cwd=ROOT, check=False, input=payload.getvalue(),",
+    "statementSha256": "e9c6b2d463ca5d7f4f5ac9f1d1122f49ac6f92126994b917e6c833ff0f2061e6",
+    "reason": "The command runs the pinned ZAP image with networking disabled and structured local input.",
+    "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
   }
 ]
