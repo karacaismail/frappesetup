@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -17,14 +17,15 @@ test('preview webhook uses the Keycloak development hostname and its network ali
     const bin = join(root, 'bin');
     for (const path of [join(dev, 'press'), keycloak, bin]) mkdirSync(path, { recursive: true });
     writeFileSync(join(dev, 'press', 'install.sh'), '');
-    writeFileSync(join(dev, 'init_env.py'), '');
+    copyFileSync(fileURLToPath(new URL('../../dev/init_env.py', import.meta.url)), join(dev, 'init_env.py'));
     writeFileSync(join(keycloak, '.env.example'), '');
     const stubs = {
       nc: 'exit 1',
-      colima: 'echo "Mem: 7 2 2 0 3 5"',
+      colima: 'exit 17',
       docker: `
         if [[ "$1" == --context ]]; then shift 2; fi
         case "$1 $2" in
+          "run --rm") printf '%s\\n' "$*" > "$PREVIEW_DIR/memory-probe"; echo "MemAvailable: 5242880 kB" ;;
           "context inspect") echo unix:///test.sock ;;
           "image inspect") [[ "$3" == frappe/erpnext:v16.55.0 ]] ;;
           "container inspect") echo other-project ;;
@@ -53,6 +54,7 @@ test('preview webhook uses the Keycloak development hostname and its network ali
       encoding: 'utf8',
     });
     assert.equal(result.status, 42, result.stderr);
+    assert.match(readFileSync(join(root, 'memory-probe'), 'utf8'), /--pull never --network none --read-only/);
     const webhook = new URL(readFileSync(join(root, 'webhook'), 'utf8').trim());
     assert.equal(webhook.protocol, 'http:');
     assert.match(webhook.hostname, /\.localhost$/);

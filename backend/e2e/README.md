@@ -18,7 +18,8 @@ Birleşen `hooks.py` dosyasında aynı üst düzey ad yeniden atanırsa komut du
 Rapor, Git çakışması olmasa bile adı ve satırları gösterir.
 
 Canlı koşu, `PANE_PORT`, kurulu Playwright ve varsayılan Colima'yı ister.
-Ağır ortam için en az 3 GB kullanılabilir bellek gerekir.
+Ağır ortam için en az 3 GiB kullanılabilir bellek gerekir.
+Komut belleği varsayılan Colima’nın Docker bağlamında ölçer.
 Komut varsayılan Colima'da örnek ortamı açar ve senaryoları koşar.
 Model sağlayıcısı yalnız kendi sabit yerel adres listesiyle kaydedilir.
 Testten sonra geçici birimler, imajlar, derleme alanı ve worktree kaldırılır.
