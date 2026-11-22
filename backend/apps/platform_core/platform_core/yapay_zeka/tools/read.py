@@ -1,6 +1,7 @@
 """Okuma araçları. Kullanıcının kimliğiyle ve Frappe'nin izin yollarıyla çalışır (G-85)."""
 
 import re
+from itertools import islice
 from typing import Any
 
 import frappe
@@ -112,7 +113,11 @@ def run_report(report: str, filters: dict[str, Any] | None = None, limit: int = 
 			_("Reports are closed until the access engine's report gate is installed."),
 		)
 	guard(report)
-	data = run(report_name=report, filters=filters or {}, ignore_prepared_report=True)
+	if report_doc.prepared_report:
+		# Frappe prepares such a report in the background because its result is large. The report
+		# function returns the whole result at once, so the layer cannot cap it inside the request.
+		raise ToolDenied("report_too_large", _("Report {0} is prepared in the background.").format(report))
+	data = run(report_name=report, filters=filters or {})
 	source = field_rules.get_meta(report_doc.ref_doctype)
 	columns, keep = [], []
 	for index, column in enumerate(data.get("columns") or []):
@@ -121,25 +126,31 @@ def run_report(report: str, filters: dict[str, Any] | None = None, limit: int = 
 			keep.append((index, fieldname))
 			columns.append(column)
 
-	rows = []
-	for row in (data.get("result") or [])[:limit]:
+	# Only `limit` rows are read and copied. One more row is read to learn whether more exist.
+	rows, truncated = [], False
+	for row in islice(data.get("result") or [], limit + 1):
+		if len(rows) == limit:
+			truncated = True
+			break
 		if isinstance(row, dict):
 			rows.append({name: row.get(name) for _index, name in keep if name in row})
 		elif isinstance(row, list | tuple):
 			rows.append([row[index] for index, _name in keep if index < len(row)])
-	return {"columns": columns, "rows": rows, "truncated": len(data.get("result") or []) > limit}
+	return {"columns": columns, "rows": rows, "truncated": truncated}
 
 
 def _report_guard():
-	"""Return `platform_core.erisim.reports.guard`, or None while that module is not installed.
+	"""Return the access engine's report gate, or None while it is not installed.
 
-	The report tool stays closed without the gate. That is the safe default.
+	The gate is `platform_core.erisim.api.report_guard`, the public path of that module.
+	The report tool stays closed without it. That is the safe default.
 	"""
 	try:
-		from platform_core.erisim.reports import guard
+		from platform_core.erisim.api import report_guard
 	except ImportError:
+		# Either the module or the function is not there yet.
 		return None
-	return guard
+	return report_guard
 
 
 def _column(column: Any) -> tuple[str, str, str]:

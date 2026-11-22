@@ -220,7 +220,7 @@ class TestResultState(YzTestCase):
 		frappe.db.rollback()
 		for name in frappe.get_all("Custom Field", filters={"dt": DOCTYPE}, pluck="name"):
 			frappe.delete_doc("Custom Field", name, force=True)
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		super().tearDown()
 
 	def test_failure_after_a_commit_stays_unknown_and_blocks_the_target(self):
@@ -299,7 +299,7 @@ class TestAdminVersion(YzTestCase):
 		frappe.permissions.reset_perms(DOCTYPE)
 		frappe.get_doc("User", USER_B).remove_roles("YZ Ek Rol")
 		frappe.clear_cache()
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		super().tearDown()
 
 	def approve_with_rival(self, client, proposal_id: str, function_name: str, rival) -> dict:
@@ -310,7 +310,7 @@ class TestAdminVersion(YzTestCase):
 
 		def raced(*args, **kwargs):
 			rival()
-			frappe.db.commit()  # nosemgrep: rakip istek kesinleşmiş sayılır
+			frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 			return original(*args, **kwargs)
 
 		digest = self.digest_of(client, proposal_id)
@@ -397,7 +397,7 @@ class TestAdminVersion(YzTestCase):
 			doc.title = "Rakip"
 			doc.save()
 			frappe.set_user(USER_A)
-			frappe.db.commit()  # nosemgrep: rakip istek kesinleşmiş sayılır
+			frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 			return original(*args, **kwargs)
 
 		with patch.object(write, "prepare_update", raced):
@@ -456,7 +456,7 @@ class TestSessionBoundToken(YzTestCase):
 		session["data"]["last_updated"] = str(long_ago)
 		frappe.cache.hset("session", sid, session)
 		frappe.db.sql("update `tabSessions` set lastupdate=%s where sid=%s", (long_ago, sid))
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 
 		still_there = frappe.db.sql("select count(*) from `tabSessions` where sid=%s", sid)[0][0]
 		response = self.rpc(self.anonymous(), "tools/list", token=token)

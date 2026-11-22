@@ -110,9 +110,5 @@ def spend_call() -> bool:
 
 
 def _log_denied(record: dict, reason: str) -> None:
-	access.record(
-		"auth", decision="denied", deny_reason=reason, user=record["user"], principal_type=access.AGENT
-	)
-	# İstek 401 ile biter ve işlem geri alınır. Ret kaydı için burada kesinleştirilir.
-	# Kanca isteğin başında çalışır, bu yüzden başka yazı yoktur.
-	frappe.db.commit()  # nosemgrep
+	"""Log a refusal of a known token. The hook runs before anything else in the request."""
+	access.record_denial("auth", reason, user=record["user"], principal_type=access.AGENT)

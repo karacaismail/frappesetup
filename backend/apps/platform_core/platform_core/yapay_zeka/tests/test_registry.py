@@ -201,7 +201,8 @@ class TestStaticRules(YzTestCase):
 			str(path)
 			for path in python_files(APP_ROOT, tests=True)
 			if LAYER not in path.parents
-			and path != APP_ROOT / "api" / "ai.py"
+			# `api/ai.py` and its test file belong to this layer (see `path_owners` in the boundary file).
+			and path not in (APP_ROOT / "api" / "ai.py", APP_ROOT / "api" / "test_ai.py")
 			and re.search(r"platform_core\.yapay_zeka|from platform_core import yapay_zeka", path.read_text())
 			and path.name != "hooks.py"
 		]

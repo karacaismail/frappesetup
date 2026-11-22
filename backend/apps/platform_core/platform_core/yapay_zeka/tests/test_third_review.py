@@ -124,7 +124,7 @@ class TestEarlyMcpRefusalsAreLogged(YzTestCase):
 
 	def test_forbidden_origin_of_an_api_key_user_is_logged(self):
 		keys = generate_keys(MANAGER)
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		headers = {"Authorization": f"token {keys['api_key']}:{keys['api_secret']}", "Origin": FOREIGN_ORIGIN}
 
 		response = self.rpc(self.anonymous(), "tools/list", headers=headers)

@@ -38,13 +38,15 @@ class DocumentTargetArguments(ToolArguments):
 
 def writable_meta(doctype: str):
 	"""DocType genel yazma araçlarına açıksa tanımını döner."""
-	meta = fields.get_meta(doctype)
+	# The name lists are checked before the definition is loaded. A closed DocType answers the
+	# same way whether or not it is installed on this site.
 	if doctype in policy.WRITE_BLOCKED:
 		raise ToolDenied("blocked_doctype", _("DocType {0} is closed to AI write tools.").format(doctype))
 	if doctype in policy.ADMIN_DOCTYPES:
 		raise ToolDenied("admin_only", _("DocType {0} changes only through admin tools.").format(doctype))
 	if policy.is_closed_by_app(doctype):
 		raise ToolDenied("blocked_doctype", _("DocType {0} is closed to AI write tools.").format(doctype))
+	meta = fields.get_meta(doctype)
 	if policy.is_framework_doctype(meta):
 		raise ToolDenied(
 			"blocked_doctype", _("Framework DocType {0} is closed to AI write tools.").format(doctype)

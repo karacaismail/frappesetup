@@ -89,8 +89,13 @@ ADMIN_DOCTYPES = frozenset(
 		"System Settings",
 		"OAuth Settings",
 		"OAuth Provider Settings",
+		# Decides which records a user may see. It changes only through admin tools.
+		"Access Rule",
 	}
 )
+
+# Records that bind a person to an account. AI tools never write them, admin tools included.
+IDENTITY_DOCTYPES = frozenset({"Platform Identity Link"})
 
 # Katmanın kendi kayıtları. Yapay zekâ yoluyla değişmez.
 LAYER_DOCTYPES = frozenset({"AI Action Log", "AI Action Proposal"})
@@ -101,7 +106,9 @@ FRAMEWORK_OPEN = frozenset({"ToDo", "Note", "Event", "Contact", "Address"})
 
 # Model önerileri yalnız `get_proposal` aracıyla okur. Böylece onay özetine ulaşamaz.
 READ_BLOCKED = CREDENTIAL_DOCTYPES | LAYER_DOCTYPES
-WRITE_BLOCKED = CREDENTIAL_DOCTYPES | CODE_DOCTYPES | LAYER_DOCTYPES
+WRITE_BLOCKED = CREDENTIAL_DOCTYPES | CODE_DOCTYPES | LAYER_DOCTYPES | IDENTITY_DOCTYPES
+# No admin tool may touch these: no custom field, no field property, no role permission.
+ADMIN_TOOL_BLOCKED = CREDENTIAL_DOCTYPES | LAYER_DOCTYPES | IDENTITY_DOCTYPES
 
 # Yapay zekâ yoluyla verilmeyen ve alınmayan roller.
 PROTECTED_ROLES = frozenset(

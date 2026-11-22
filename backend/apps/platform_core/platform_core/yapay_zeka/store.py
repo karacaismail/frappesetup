@@ -6,6 +6,9 @@ türlere izni yoktur. Hedef kaydı kullanıcı seçmez. Kullanıcıya dönen sat
 `user` alanıyla süzülür. Bir test bu istisnanın başka dosyaya taşmadığını denetler.
 """
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 import frappe
 from frappe.model.document import Document
 from frappe.utils import add_days, now_datetime
@@ -14,12 +17,31 @@ LOG = "AI Action Log"
 PROPOSAL = "AI Action Proposal"
 
 
+@contextmanager
+def _as_system(doc: Document) -> Iterator[Document]:
+	"""Write one of the layer's own records without the user's permission, for this write only.
+
+	The flag stays on the document object otherwise and would skip later permission checks (G-4).
+	It is put back in `finally`, also when the write fails.
+	"""
+	previous = doc.flags.ignore_permissions
+	doc.flags.ignore_permissions = True  # nosemgrep: frappe-ignore-permissions
+	try:
+		yield doc
+	finally:
+		doc.flags.ignore_permissions = previous
+
+
 def insert_log(values: dict) -> str:
-	return frappe.get_doc({"doctype": LOG, **values}).insert(ignore_permissions=True).name
+	with _as_system(frappe.get_doc({"doctype": LOG, **values})) as doc:
+		doc.insert()
+	return doc.name
 
 
 def insert_proposal(values: dict) -> Document:
-	return frappe.get_doc({"doctype": PROPOSAL, **values}).insert(ignore_permissions=True)
+	with _as_system(frappe.get_doc({"doctype": PROPOSAL, **values})) as doc:
+		doc.insert()
+	return doc
 
 
 def load_proposal(name: str, *, for_update: bool = False) -> Document | None:
@@ -29,14 +51,50 @@ def load_proposal(name: str, *, for_update: bool = False) -> Document | None:
 
 
 def save_proposal(doc: Document) -> None:
-	doc.save(ignore_permissions=True)
+	with _as_system(doc):
+		doc.save()
 
 
-def proposals_of(user: str, statuses: tuple[str, ...] | None, limit: int) -> list[str]:
-	filters = {"user": user}
-	if statuses:
-		filters["status"] = ("in", statuses)
-	return frappe.get_all(PROPOSAL, filters=filters, pluck="name", order_by="creation desc", limit=limit)
+PROPOSAL_LIST_FIELDS = (
+	"name",
+	"status",
+	"result",
+	"tool",
+	"target_doctype",
+	"target_name",
+	"destructive",
+	"billable",
+	"preview_json",
+	"digest",
+	"expires_at",
+	"result_document",
+	"error",
+)
+
+
+def proposals_of(user: str, status: str | None, limit: int) -> list[dict]:
+	"""Return the user's proposals in one bounded query, newest first.
+
+	A pending proposal past its time counts as expired, so the time is part of the query.
+	"""
+	filters: dict = {"user": user}
+	or_filters = None
+	now = now_datetime()
+	if status == "pending":
+		filters.update(status="pending", expires_at=(">=", now))
+	elif status == "expired":
+		filters["status"] = ("in", ("pending", "expired"))
+		or_filters = [["status", "=", "expired"], ["expires_at", "<", now]]
+	elif status:
+		filters["status"] = status
+	return frappe.get_all(
+		PROPOSAL,
+		filters=filters,
+		or_filters=or_filters,
+		fields=list(PROPOSAL_LIST_FIELDS),
+		order_by="creation desc",
+		limit=limit,
+	)
 
 
 def unresolved_unknown_exists(target_key: str, *, exclude: str | None = None) -> bool:

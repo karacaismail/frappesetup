@@ -10,7 +10,7 @@ from platform_core.yapay_zeka.tests.base import DOCTYPE, MANAGER, USER_A, YzTest
 
 HOOK = "platform_core.yapay_zeka.tests.sample_tools.declare_more"
 REPORT = "Permitted Documents For User"
-GUARD_MODULE = "platform_core.erisim.reports"
+GUARD_MODULE = "platform_core.erisim.api"
 
 
 def with_more_tools():
@@ -27,14 +27,14 @@ def with_report_guard(guard):
 	module = None
 	if guard is not None:
 		module = ModuleType(GUARD_MODULE)
-		module.guard = guard
+		module.report_guard = guard
 	return patch.dict(sys.modules, {GUARD_MODULE: module})
 
 
 class TestAppToolValidation(YzTestCase):
 	def freeze(self, name: str) -> None:
 		frappe.db.set_value(DOCTYPE, name, "amount", 99, update_modified=False)
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 
 	def test_validation_error_in_preview_is_a_logged_denial(self):
 		name = self.make_record(USER_A, title="Old")

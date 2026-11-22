@@ -39,9 +39,7 @@ def handle() -> Response:
 		if not getattr(error, "logged", False) and access.principal() != access.GUEST:
 			reason = getattr(error, "deny_reason", "protocol_error")
 			stage = "auth" if reason == "origin_not_allowed" else "call"
-			frappe.db.rollback()
-			access.record(stage, decision="denied", deny_reason=reason)
-			frappe.db.commit()  # nosemgrep
+			access.record_denial(stage, reason)
 		raise
 
 
@@ -93,8 +91,7 @@ def _check_principal() -> None:
 		# API anahtarı ve OAuth belirteci uzun ömürlüdür ve G-148 sınırlarını taşımaz.
 		# The user is known here, so the denial is logged. The 403 response rolls the request
 		# back, so the log row is committed first. Nothing else has been written yet.
-		access.record("auth", decision="denied", deny_reason="credential_not_accepted")
-		frappe.db.commit()  # nosemgrep
+		access.record_denial("auth", "credential_not_accepted")
 		raise _logged(
 			McpError(
 				protocol.INVALID_REQUEST,
@@ -161,19 +158,11 @@ def call_tool(params: dict) -> dict:
 	name = params.get("name")
 	# Çağrı hakkı araç aranmadan önce düşer. Bilinmeyen araç adı da hak harcar.
 	if not agent_token.spend_call():
-		access.record(
-			"call", decision="denied", deny_reason="token_call_limit", tool=str(name)[:140], started=started
-		)
-		# 401 yanıtı işlemi geri alır. Ret kaydı için burada kesinleştirilir.
-		frappe.db.commit()  # nosemgrep
+		access.record_denial("call", "token_call_limit", tool=str(name)[:140], started=started)
 		raise _logged(McpError(protocol.INVALID_REQUEST, "The agent token has no calls left", status=401))
 	tool = registry.find(name) if isinstance(name, str) else None
 	if tool is None:
-		access.record(
-			"call", decision="denied", deny_reason="unknown_tool", tool=str(name)[:140], started=started
-		)
-		# 404 yanıtı işlemi geri alır. Ret kaydı için burada kesinleştirilir.
-		frappe.db.commit()  # nosemgrep
+		access.record_denial("call", "unknown_tool", tool=str(name)[:140], started=started)
 		raise _logged(McpError(METHOD_NOT_FOUND, f"Unknown MCP tool: {name}", status=404))
 
 	raw = params.get("arguments", {})

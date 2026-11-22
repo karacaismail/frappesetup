@@ -70,7 +70,7 @@ class TestResultBoundary(YzTestCase):
 
 		def writes_then_denies(prepared):
 			original(prepared)
-			frappe.db.commit()  # nosemgrep: the write is permanent before the error
+			frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 			raise ToolDenied("document_changed", "raised after the write")
 
 		with patch.object(write, "write_update", writes_then_denies):
@@ -140,7 +140,7 @@ class TestResultBoundary(YzTestCase):
 class TestKnownIdentityDenials(YzTestCase):
 	def test_api_key_denial_on_mcp_is_logged(self):
 		keys = generate_keys(MANAGER)
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 
 		response = self.rpc(
 			self.anonymous(),

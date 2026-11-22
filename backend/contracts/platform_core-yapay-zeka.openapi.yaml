@@ -415,6 +415,9 @@ components:
         - invalid_preview
         - origin_not_allowed
         - protocol_error
+        - desk_role_for_end_user
+        - report_too_large
+        - transaction_active
         - token_call_limit
         - unknown_tool
         - not_owner
@@ -891,9 +894,11 @@ x-child-table-rules:
 
 # `run_report` aracı raporu çalıştırmadan önce erişim motorunun rapor kapısını çağırır.
 x-report-gate:
-  - Kapı `platform_core.erisim.reports.guard(report_name)` işlevidir.
+  - Kapı `platform_core.erisim.api.report_guard(report_name)` işlevidir. Bu, erişim modülünün açık yoludur.
   - Kapı kullanıcıyı reddederse araç `permission` döner ve rapor çalışmaz.
   - Kapı kurulu değilse araç `report_gate_unavailable` döner. Rapor aracı kapalı kalır.
+  - Arka planda hazırlanan rapor istek içinde çalıştırılmaz. Araç `report_too_large` döner.
+  - Araç en çok `limit` kadar satır okur ve kopyalar.
 
 # Rapor sütunu şu durumlarda `run_report` yanıtından çıkar.
 x-report-secret-rules:

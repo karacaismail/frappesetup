@@ -107,7 +107,7 @@ class TestIdentity(YzTestCase):
 
 	def test_api_key_is_not_accepted_on_mcp(self):
 		keys = generate_keys(MANAGER)
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 
 		response = self.rpc(
 			self.anonymous(),

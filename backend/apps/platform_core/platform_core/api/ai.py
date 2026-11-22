@@ -1,6 +1,11 @@
 """Yapay zekâ erişim katmanının uçları. İş kuralı `platform_core.yapay_zeka` modülündedir.
 
 Sözleşme: contracts/platform_core-yapay-zeka.openapi.yaml
+
+The endpoints stay thin, so the permission checks live in the module, not in these functions.
+The security gate's `frappe-missing-permission` rule looks for a check inside the function body.
+Each suppression below names the function that does the check. `api/test_ai.py` proves every
+endpoint refuses a guest and refuses another user's data.
 """
 
 import frappe
@@ -10,49 +15,57 @@ from platform_core.yapay_zeka import access, agent_token, proposals, retention
 from platform_core.yapay_zeka import mcp as mcp_endpoint
 
 
-@frappe.whitelist(methods=["POST"])
+# Checked in `mcp._check_principal` (identity type) and, per tool, by the tool's own permission check.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def mcp() -> Response:
 	"""MCP ucu. İnsan oturumu ya da aracı belirteci ister."""
 	return mcp_endpoint.handle()
 
 
-@frappe.whitelist(methods=["POST"])
+# Checked in `access.require_human`: a human session with a CSRF token. The token acts only as that user.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def issue_agent_token() -> dict:
 	"""İnsan oturumundan kısa ömürlü aracı belirteci üretir."""
 	return agent_token.issue()
 
 
-@frappe.whitelist(methods=["GET"])
+# Checked in `access.human_call`. The query in `store.proposals_of` is limited to the session user.
+@frappe.whitelist(methods=["GET"])  # nosemgrep: frappe-missing-permission
 def list_proposals(status: str | None = None, limit: int = 20) -> list[dict]:
 	"""Oturumdaki kullanıcının yazma önerilerini listeler."""
 	return proposals.list_for_human(status, limit)
 
 
-@frappe.whitelist(methods=["GET"])
+# Checked in `proposals._own`: the proposal must belong to the session user.
+@frappe.whitelist(methods=["GET"])  # nosemgrep: frappe-missing-permission
 def get_proposal(proposal_id: str) -> dict:
 	"""Bir önerinin önizlemesini, özetini ve durumunu döner."""
 	return proposals.read_for_human(proposal_id)
 
 
-@frappe.whitelist(methods=["POST"])
+# Checked in `proposals.approve`: human session, owner, digest, then the tool's permission again.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def approve_proposal(proposal_id: str, digest: str) -> dict:
 	"""Öneriyi onaylar ve işi bu istekte yürütür. Yıkıcı olabilir."""
 	return proposals.approve(proposal_id, digest)
 
 
-@frappe.whitelist(methods=["POST"])
+# Checked in `proposals._own`: the proposal must belong to the session user.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def reject_proposal(proposal_id: str) -> dict:
 	"""Bekleyen öneriyi reddeder."""
 	return proposals.reject(proposal_id)
 
 
-@frappe.whitelist(methods=["POST"])
+# Checked in `proposals._own`: the proposal must belong to the session user.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def resolve_proposal(proposal_id: str, outcome: str) -> dict:
 	"""Sonucu bilinmeyen öneriyi insan kararıyla kapatır."""
 	return proposals.resolve(proposal_id, outcome)
 
 
-@frappe.whitelist(methods=["POST"])
+# Checked in `retention.purge`: `frappe.only_for("System Manager")`.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def purge_logs(older_than_days: int = retention.MIN_DAYS, dry_run: bool = True) -> dict:
 	"""Saklama süresi dolan günlük ve öneri kayıtlarını siler. Yıkıcıdır. Varsayılan yalnız sayar."""
 	return access.human_call("call", "purge_logs", lambda: retention.purge(older_than_days, dry_run=dry_run))

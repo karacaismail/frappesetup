@@ -495,6 +495,25 @@ Aynı turda araçların sonuç şeması sözleşmeye yazıldı (D-1). Şema `x-m
 
 Proje sahibi yalnız Frappe 16'yı hedefledi (D-15). Bu katman baştan beri yalnız Frappe 16 ile yazıldı. Katman Frappe 16'nın hazır MCP protokol modüllerini ve izin yöneticisi işlevlerini kullanır.
 
+### Beşinci tur: boşluk analizi ve gerçek MCP istemcisi
+
+Bağımsız boşluk analizi şu konuları getirdi. Hepsi testle kapatıldı:
+
+- `assign_role` aracı, son kullanıcıya masaüstü rolü önermez. Frappe 16 böyle bir kullanıcıyı “System User” yapar (`frappe/core/doctype/user/user.py:445`).
+- “Platform Identity Link” yapay zekâ yazmasına tümüyle kapalıdır. Yönetim araçları da ona dokunamaz.
+- “Access Rule” yönetim sınıfındadır. Genel yazma araçları ona yazamaz.
+- Katmanın istek içindeki tek kesinleştirme satırı `access.commit_own_writes` işlevindedir. Ret kaydından önce bekleyen yazılar geri alınır. Onay, bekleyen yazı taşıyan işlemde çalışmaz.
+- İnsanın öneri listesi tek ve sınırlı sorguyla okunur.
+- Katmanın kendi kayıtlarını yazarken açtığı izin bayrağı `finally` içinde geri döner.
+- Rapor aracı en çok `limit` kadar satır okur. Arka planda hazırlanan raporu istek içinde çalıştırmaz.
+- Rapor kapısı erişim modülünün açık yolundan çağrılır: `platform_core.erisim.api.report_guard`.
+
+Masaüstü rolü kuralı kimlik modülündeki kuralla aynı sonucu verir, ama ortak bir işlev kullanmaz. Kimlik modülünün açık yolunda böyle bir işlev henüz yoktur. Ortak işlev açılınca iki yer ona bağlanmalıdır.
+
+Rapor için bir sınır kalır. Frappe'nin rapor işlevi sonucun tamamını kendisi üretir. Katman rapor işlevinin içini sınırlayamaz. Katman yalnız kendi okuduğu ve kopyaladığı satırı sınırlar.
+
+Resmî Python MCP istemcisiyle (sürüm 2.3.0) gerçek oturum açıldı. İstemci `2025-11-25` ve `2026-07-28` sürümleriyle bağlandı. Araç listesi, okuma aracı, öneri ve insan onayı çalıştı. Belirteçsiz istek, süresi dolmuş belirteç ve çerezle birlikte belirteç reddedildi. Oturum bir sözleşme hatası gösterdi: kimliksiz istek 401 değil 403 alıyor. Sözleşme düzeltildi.
+
 ## 13. Karar sitesiyle çelişkiler
 
 | Konu | Karar sitesi | Bu karar | Neden |

@@ -127,10 +127,9 @@ _UNCHECKED = object()
 def _admin_meta(doctype: str):
 	"""Yönetici denetimini yapar ve yapısı değişebilen DocType'ın tanımını döner."""
 	frappe.only_for(ADMIN_ROLE)
-	meta = fields.get_meta(doctype)
-	if doctype in policy.CREDENTIAL_DOCTYPES or doctype in policy.LAYER_DOCTYPES:
+	if doctype in policy.ADMIN_TOOL_BLOCKED:
 		raise ToolDenied("blocked_doctype", _("DocType {0} is closed to AI tools.").format(doctype))
-	return meta
+	return fields.get_meta(doctype)
 
 
 def _spec(summary: str, doctype: str, name: str, version: str | None, changes: list) -> dict:
@@ -154,6 +153,12 @@ def _verify(spec: dict, expected_version) -> None:
 		return
 	if versioning.token(spec["target_version"]) != expected_version:
 		raise ToolDenied("document_changed", _("The target changed after the preview."))
+
+
+def _grants_desk_access(role: str) -> bool:
+	"""Does the role open the desk? The admin reads the role with their own permission."""
+	filters = {"name": role, "desk_access": 1}
+	return bool(frappe.get_list("Role", filters=filters, pluck="name", limit_page_length=1))
 
 
 def _role_exists(role: str) -> bool:
@@ -311,8 +316,11 @@ def _permission_row(doctype: str, role: str, permlevel: int) -> dict | None:
 def preview_role_permission(
 	doctype: str, role: str, permissions: dict[str, bool], permlevel: int = 0
 ) -> dict:
-	_admin_meta(doctype)
-	if doctype in policy.CODE_DOCTYPES or doctype in policy.ADMIN_DOCTYPES:
+	if (
+		doctype in policy.ADMIN_TOOL_BLOCKED
+		or doctype in policy.CODE_DOCTYPES
+		or doctype in policy.ADMIN_DOCTYPES
+	):
 		# Bu türlerde izin vermek, kod çalıştırma ya da yetki yükseltme yolu açar.
 		raise ToolDenied(
 			"blocked_doctype", _("Permissions of DocType {0} do not change through AI.").format(doctype)
@@ -321,6 +329,7 @@ def preview_role_permission(
 		raise ToolDenied(
 			"protected_role", _("Permissions of role {0} do not change through AI.").format(role)
 		)
+	_admin_meta(doctype)
 	if not _role_exists(role):
 		raise ToolDenied("invalid_arguments", _("Unknown role: {0}").format(role))
 	if not permissions or set(permissions) - set(PERMISSION_TYPES):
@@ -394,6 +403,13 @@ def _user_for_role_change(user: str, role: str, *, adding: bool, lock: bool = Fa
 		raise ToolDenied("invalid_arguments", _("Unknown role: {0}").format(role))
 	doc = frappe.get_doc("User", user, for_update=lock)
 	doc.check_permission("write")
+	if adding and doc.user_type == "Website User" and _grants_desk_access(role):
+		# G-16: an end user never gets a role with `desk_access`. Frappe would make the user a
+		# System User on save (`frappe/core/doctype/user/user.py`, `set_system_user`).
+		raise ToolDenied(
+			"desk_role_for_end_user",
+			_("Role {0} gives desk access. An end user cannot have it.").format(role),
+		)
 	has_role = role in {row.role for row in doc.roles}
 	if adding == has_role:
 		message = _("The user already has this role.") if adding else _("The user does not have this role.")

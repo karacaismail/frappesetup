@@ -134,7 +134,7 @@ def ensure_fixtures() -> None:
 				roles=[{"role": role} for role in roles],
 			).insert()
 			update_password(email, PASSWORD)
-	frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+	frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 
 
 class YzTestCase(IntegrationTestCase):
@@ -157,7 +157,7 @@ class YzTestCase(IntegrationTestCase):
 		frappe.db.rollback()
 		# Sonucu bilinmeyen öneri sonraki testin aynı hedefini kilitler. Test verisi temizlenir.
 		frappe.db.delete("AI Action Proposal", {"result": "unknown"})
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		super().tearDown()
 
 	# --- istek yardımcıları ---
@@ -173,7 +173,7 @@ class YzTestCase(IntegrationTestCase):
 		if query:
 			kwargs["query_string"] = query
 		request_headers.update(headers or {})
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		try:
 			return make_request(client.open, args=(), kwargs=kwargs, site=self.site)
 		finally:
@@ -230,15 +230,15 @@ class YzTestCase(IntegrationTestCase):
 	def open_report_gate(self) -> None:
 		"""Install a report gate that allows every report, for tests about other report rules.
 
-		The real gate is `platform_core.erisim.reports.guard`. Without it the report tool is closed.
+		The real gate is `platform_core.erisim.api.report_guard`. Without it the report tool is closed.
 		"""
 		import sys
 		from types import ModuleType
 		from unittest.mock import patch
 
-		module = ModuleType("platform_core.erisim.reports")
-		module.guard = lambda report_name, user=None: None
-		patcher = patch.dict(sys.modules, {"platform_core.erisim.reports": module})
+		module = ModuleType("platform_core.erisim.api")
+		module.report_guard = lambda report_name, user=None: None
+		patcher = patch.dict(sys.modules, {"platform_core.erisim.api": module})
 		patcher.start()
 		self.addCleanup(patcher.stop)
 
@@ -253,7 +253,7 @@ class YzTestCase(IntegrationTestCase):
 			frappe.connect()
 			try:
 				action()
-				frappe.db.commit()  # nosemgrep
+				frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 			finally:
 				frappe.destroy()
 
@@ -269,7 +269,7 @@ class YzTestCase(IntegrationTestCase):
 			doc = frappe.get_doc({"doctype": DOCTYPE, "title": "Ornek", "amount": 10, **values}).insert()
 		finally:
 			frappe.set_user("Administrator")
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		self.addCleanup(self.drop_record, doc.name)
 		return doc.name
 
@@ -279,7 +279,7 @@ class YzTestCase(IntegrationTestCase):
 			if frappe.db.get_value(DOCTYPE, name, "docstatus") == 1:
 				frappe.get_doc(DOCTYPE, name).cancel()
 			frappe.delete_doc(DOCTYPE, name, force=True)
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 
 	def last_log(self, **filters) -> dict | None:
 		"""Return the newest log row this test wrote that matches the filters."""

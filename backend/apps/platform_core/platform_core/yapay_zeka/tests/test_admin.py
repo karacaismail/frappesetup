@@ -23,7 +23,7 @@ class TestAdminTools(YzTestCase):
 		super().setUpClass()
 		if not frappe.db.exists("Role", EXTRA_ROLE):
 			frappe.get_doc(doctype="Role", role_name=EXTRA_ROLE, desk_access=0).insert()
-			frappe.db.commit()  # nosemgrep
+			frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -36,7 +36,7 @@ class TestAdminTools(YzTestCase):
 		user = frappe.get_doc("User", USER_B)
 		user.remove_roles(EXTRA_ROLE)
 		frappe.clear_cache(doctype=DOCTYPE)
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		super().tearDown()
 
 	def tools(self, client) -> set[str]:
@@ -257,7 +257,7 @@ class TestAdminTools(YzTestCase):
 		frappe.db.set_value(
 			"AI Action Log", name, "creation", add_days(now_datetime(), -days), update_modified=False
 		)
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		return name
 
 	def test_purge_tool_deletes_only_old_logs_after_approval(self):

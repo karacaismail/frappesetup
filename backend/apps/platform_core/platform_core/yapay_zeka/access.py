@@ -37,11 +37,39 @@ def require_human(stage: str, *, tool: str | None = None) -> None:
 	"""İstek insan oturumundan gelmediyse reddi günlüğe yazar ve 403 verir."""
 	if principal() == HUMAN and _csrf_checked():
 		return
-	record(stage, tool=tool, decision="denied", deny_reason="not_human_session")
-	# Hata yanıtı işlemi geri alır. Ret kaydı kaybolmasın diye burada kesinleştirilir.
-	# Bu noktaya kadar istekte başka yazı yoktur.
-	frappe.db.commit()  # nosemgrep
+	record_denial(stage, "not_human_session", tool=tool)
 	raise frappe.PermissionError(_("This action needs a human session."))
+
+
+class TransactionActive(frappe.ValidationError):
+	"""The request already holds writes that are not the layer's own."""
+
+
+def require_clean_transaction() -> None:
+	"""Refuse to start work that must commit while the transaction holds earlier writes.
+
+	The layer commits inside the request in a few places. Such a commit must never make
+	another caller's pending writes permanent.
+	"""
+	if frappe.db.transaction_writes:
+		frappe.throw(_("This action cannot run inside a transaction with pending writes."), TransactionActive)
+
+
+def commit_own_writes() -> None:
+	"""The only explicit commit of the layer. Callers make sure the writes are their own."""
+	frappe.db.commit()  # nosemgrep: frappe-request-commit
+
+
+def record_denial(stage: str, deny_reason: str, **fields) -> str:
+	"""Write a denial to the log so that it outlives the error response.
+
+	An error response rolls the request back. The pending writes are dropped first, so the
+	commit carries the log row and nothing else.
+	"""
+	frappe.db.rollback()
+	name = record(stage, decision="denied", deny_reason=deny_reason, **fields)
+	commit_own_writes()
+	return name
 
 
 def _csrf_checked() -> bool:
@@ -78,15 +106,17 @@ def human_call(stage: str, tool: str, action, *, proposal: str | None = None, lo
 	try:
 		result = action()
 	except tuple(kind for kind, _code in codes) as error:
-		frappe.db.rollback()
 		code = next(code for kind, code in codes if isinstance(error, kind))
-		record(stage, decision="denied", deny_reason=code, tool=tool, proposal=_existing(proposal))
-		frappe.db.commit()  # nosemgrep
+		record_denial(stage, code, tool=tool, proposal=_existing(proposal))
 		raise
+	if frappe.request.method == "GET":
+		# Frappe rolls a GET request back. A read has no writes of its own to keep, so the
+		# transaction is emptied first and the commit carries only the log row.
+		frappe.db.rollback()
 	if log_success:
 		record(stage, decision="allowed", tool=tool, proposal=_existing(proposal))
 	if frappe.request.method == "GET":
-		frappe.db.commit()  # nosemgrep: GET isteği yazıları geri alır
+		commit_own_writes()
 	return result
 
 
@@ -141,7 +171,7 @@ def record(
 			"approval_state": approval_state,
 			"result": result,
 			"version": version,
-			"ip": frappe.local.request_ip,
+			"ip": getattr(frappe.local, "request_ip", None),
 			"duration_ms": int((time.monotonic() - started) * 1000) if started else None,
 		}
 	)

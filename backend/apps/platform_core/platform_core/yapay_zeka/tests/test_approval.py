@@ -30,7 +30,7 @@ class TestApproval(YzTestCase):
 
 	def race(self, calls: list[tuple]) -> list[dict]:
 		"""Onay isteklerini aynı anda gönderir ve yanıtları döner."""
-		frappe.db.commit()  # nosemgrep: istekler ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		threads = []
 		for client, proposal_id, digest in calls:
 			kwargs = {
@@ -182,7 +182,7 @@ class TestApproval(YzTestCase):
 		proposal_id = self.propose_update(client, name, title="Yeni")["proposal_id"]
 		digest = self.digest_of(client, proposal_id)
 		keys = generate_keys(USER_A)
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 
 		response = self.send(
 			self.anonymous(),
@@ -381,7 +381,7 @@ class TestApproval(YzTestCase):
 	def clear_reqd(self):
 		frappe.db.set_value("DocField", {"parent": DOCTYPE, "fieldname": "access_token"}, "reqd", 0)
 		frappe.clear_cache(doctype=DOCTYPE)
-		frappe.db.commit()  # nosemgrep
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 
 	def test_create_submit_cancel_and_delete_flow(self):
 		client = self.login(USER_A)

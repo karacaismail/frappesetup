@@ -173,10 +173,7 @@ def list_for_human(status: str | None = None, limit: int = 20) -> list[dict]:
 		if status and status not in STATUS_FILTERS:
 			frappe.throw(_("Unknown status."), frappe.ValidationError)
 		count = min(max(int(limit), 1), 100)
-		# Süresi dolan bekleyen öneri okuma anında `expired` görünür. Bu yüzden süzme iki adımlıdır.
-		names = store.proposals_of(frappe.session.user, STATUS_FILTERS.get(status), 500)
-		found = (public(store.load_proposal(name)) for name in names)
-		return [row for row in found if not status or row["status"] == status][:count]
+		return [public(row) for row in store.proposals_of(frappe.session.user, status or None, count)]
 
 	return access.human_call("call", "list_proposals", rows)
 
@@ -215,9 +212,12 @@ def approve(proposal_id: str, digest: str) -> dict:
 	güncel veriyle yeniden yapılır. Kilit alınmadan önce hiçbir şey yazılmamıştır.
 	"""
 	access.require_human("approve")
+	if frappe.db.transaction_writes:
+		# Approval commits inside the request. It must not make foreign pending writes permanent.
+		access.record_denial("approve", "transaction_active", tool="approve_proposal")
+		access.require_clean_transaction()
 	if store.load_proposal(proposal_id) is None:
-		access.record("approve", decision="denied", deny_reason="not_found", tool="approve_proposal")
-		frappe.db.commit()  # nosemgrep: 404 yanıtı işlemi geri alır, ret kaydı kalmalı
+		access.record_denial("approve", "not_found", tool="approve_proposal")
 		raise frappe.DoesNotExistError(_("Proposal not found."))
 	for _attempt in range(APPROVE_ATTEMPTS - 1):
 		try:
@@ -234,8 +234,9 @@ def _approve(proposal_id: str, digest: str) -> dict:
 		raise frappe.DoesNotExistError(_("Proposal not found."))
 	if doc.user != frappe.session.user:
 		# Başkasının önerisi yanıtta dönmez. Önizleme o kullanıcının verisini taşır.
+		frappe.db.rollback()
 		_log("approve", doc, decision="denied", deny_reason="not_owner")
-		frappe.db.commit()  # nosemgrep: 403 yanıtı işlemi geri alır, ret kaydı kalmalı
+		access.commit_own_writes()
 		raise frappe.PermissionError(_("This proposal belongs to another user."))
 
 	# Kilit sırası her istekte aynıdır: önce hedefin bütün önerileri, sonra bu öneri.
@@ -283,7 +284,7 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 	doc.status, doc.result, doc.decided_at = "consumed", "unknown", now_datetime()
 	store.save_proposal(doc)
 	_log("approve", doc, decision="allowed")
-	frappe.db.commit()  # nosemgrep
+	access.commit_own_writes()
 
 	committed = []
 	frappe.db.after_commit.add(lambda: committed.append(True))
@@ -322,7 +323,7 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 		decision="allowed",
 		version=store.latest_version(doc.target_doctype, doc.result_document),
 	)
-	frappe.db.commit()  # nosemgrep: sonuç kalıcı olmalı
+	access.commit_own_writes()
 	return {"executed": True, "deny_reason": None, "proposal": public(doc)}
 
 
@@ -354,7 +355,7 @@ def _execution_error(doc, tool: registry.AiTool, error: Exception, *, result: st
 	doc.error = _error_text(tool, error)
 	store.save_proposal(doc)
 	_log("execute", doc, decision="error", deny_reason="execution_failed")
-	frappe.db.commit()  # nosemgrep: the result must outlive the error response
+	access.commit_own_writes()
 	return {"executed": False, "deny_reason": "execution_failed", "proposal": public(doc)}
 
 
