@@ -63,14 +63,14 @@ class MobileApprovalTest(YzTestCase):
 		self.assertEqual((outcome["executed"], outcome["deny_reason"]), (False, "document_changed"))
 		self.assertFalse(frappe.db.get_value("Mobile Installation", new_installation, "revoked"))
 
-	def test_cleanup_proposal_leaves_expired_rows_untouched_after_approval(self):
+	def test_cleanup_read_tool_leaves_expired_rows_untouched(self):
 		key = uuid4().hex
 		MobileStore().remember_operation(key, "a" * 64, {"status": "applied"})
 		frappe.db.set_value("Mobile Operation", key, "creation", now_datetime() - timedelta(days=40))
 		client = self.login(MANAGER)
 		result = self.call_tool(client, "platform_core_preview_mobile_cleanup", {})
-		proposal_id = result["structuredContent"]["proposal_id"]
-		self.assertTrue(frappe.db.exists("Mobile Operation", key))
-		outcome = self.approve(client, proposal_id).json["message"]
-		self.assertTrue(outcome["executed"], outcome)
+		outcome = result["structuredContent"]
+		self.assertNotIn("proposal_id", outcome)
+		self.assertTrue(outcome["dry_run"])
+		self.assertEqual(outcome["removed"], 0)
 		self.assertTrue(frappe.db.exists("Mobile Operation", key))

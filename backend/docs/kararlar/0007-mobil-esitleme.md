@@ -73,6 +73,7 @@ Sunucu tek bir komut izin listesi tutar (AU-2).
 Liste bir komuta izinli kayıt türünü, alanları ve varsa ekleri bağlar.
 Oluşturma, güncelleme ve silme ayrı komutlardır.
 Her komut ayrıca kullanıcının kayıt ve alan izinlerini denetler.
+`apply` yalnız işlem içi veritabanı yazısı yapar.
 Telefonun ekran tanımı ve veri alanları izin listesini genişletemez.
 
 Başlangıçta gerçek iş kaydı listesi boş kalır.

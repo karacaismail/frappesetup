@@ -44,7 +44,6 @@ class CleanupArguments(BaseModel):
 class RevocationPlan:
 	account: str
 	installation_ids: tuple[str, ...]
-	name: str
 	target: str
 	version: str
 
@@ -91,14 +90,11 @@ def declarations():
 		},
 		{
 			"name": "preview_mobile_cleanup",
-			"description": "Request approval to run mobile cleanup in dry-run mode.",
-			"kind": "write",
+			"description": "Count expired mobile records without deleting them.",
+			"kind": "read",
 			"roles": [ADMIN_ROLE],
-			"destructive": True,
 			"arguments": f"{TOOL_PATH}.CleanupArguments",
-			"handler": f"{TOOL_PATH}.execute_cleanup",
-			"preview": f"{TOOL_PATH}.preview_cleanup",
-			"prepare": f"{TOOL_PATH}.prepare_cleanup",
+			"handler": f"{TOOL_PATH}.preview_cleanup",
 		},
 	]
 
@@ -137,7 +133,6 @@ def _plan_revocation(account, installation_id=None):
 	return RevocationPlan(
 		account,
 		installation_ids,
-		installation_id or account,
 		target,
 		content_digest([account, created_at, cutoff, targets]),
 	)
@@ -186,27 +181,15 @@ def execute_revocation(plan):
 	_require_manager()
 	if not isinstance(plan, RevocationPlan):
 		raise frappe.ValidationError(_("A prepared mobile revocation is required."))
-	count = MobileStore().revoke_targets(plan.installation_ids)
-	record_revocation(plan.account)
-	return {"name": plan.name, "revoked": count}
+	try:
+		count = MobileStore().revoke_targets(plan.installation_ids)
+		record_revocation(plan.account)
+	except MobileError as error:
+		raise frappe.ValidationError(_("The mobile account is unavailable.")) from error
+	return {"name": plan.target, "revoked": count}
 
 
 def preview_cleanup(dry_run=True):
 	_require_manager()
 	CleanupArguments(dry_run=dry_run)
-	return {
-		"summary": _("Count expired mobile records without deleting them."),
-		"details": cleanup(dry_run=True),
-	}
-
-
-def prepare_cleanup(dry_run=True):
-	_require_manager()
-	return CleanupArguments(dry_run=dry_run)
-
-
-def execute_cleanup(plan):
-	_require_manager()
-	if not isinstance(plan, CleanupArguments):
-		raise frappe.ValidationError(_("A prepared mobile cleanup preview is required."))
-	return {"name": "site", **cleanup(dry_run=True)}
+	return cleanup(dry_run=True)

@@ -58,8 +58,10 @@ class MobileAiToolsTest(IntegrationTestCase):
 			self.assertEqual(model.model_config["extra"], "forbid")
 			self.assertFalse({"confirm", "approved", "force"} & set(model.model_fields))
 			self.assertEqual(tool["roles"], ["System Manager"])
-			if name == "list_mobile_installations":
+			if name in {"list_mobile_installations", "preview_mobile_cleanup"}:
 				self.assertEqual(tool["kind"], "read")
+				self.assertFalse(tool.get("destructive", False))
+				self.assertNotIn("prepare", tool)
 			else:
 				self.assertEqual(tool["kind"], "write")
 				self.assertIs(tool["destructive"], True)
@@ -81,7 +83,7 @@ class MobileAiToolsTest(IntegrationTestCase):
 		self.assertFalse(frappe.db.get_value("Mobile Installation", self.installation, "revoked"))
 		plan = ai_tools.prepare_revoke_installation(installation_id=self.installation)
 		result = ai_tools.execute_revocation(plan)
-		self.assertEqual(result, {"name": self.installation, "revoked": 1})
+		self.assertEqual(result, {"name": preview["target_name"], "revoked": 1})
 		self.assertTrue(frappe.db.get_value("Mobile Installation", self.installation, "revoked"))
 		self.assertFalse(frappe.db.get_value("Mobile Installation", self.other_installation, "revoked"))
 		cutoff = frappe.db.get_value("Mobile Account State", {"account": self.account}, "revoked_through")
@@ -114,6 +116,15 @@ class MobileAiToolsTest(IntegrationTestCase):
 		last = ai_tools.preview_revoke_all(account)
 		self.assertNotEqual(first["target_version"], last["target_version"])
 
+	def test_revocation_converts_mobile_error_to_validation_error(self):
+		from platform_core.mobil import ai_tools
+		from platform_core.mobil.protocol import MobileError
+
+		plan = ai_tools.prepare_revoke_installation(self.installation)
+		with patch.object(ai_tools.MobileStore, "revoke_targets", side_effect=MobileError("test", 409)):
+			with self.assertRaises(frappe.ValidationError):
+				ai_tools.execute_revocation(plan)
+
 	def test_cleanup_never_executes_a_delete_or_accepts_write_override(self):
 		from platform_core.mobil import ai_tools
 
@@ -121,8 +132,8 @@ class MobileAiToolsTest(IntegrationTestCase):
 			ai_tools.CleanupArguments.model_validate({"dry_run": False})
 		preview_counts = {"dry_run": True, "removed": 0, "eligible_changes": 1}
 		with patch.object(ai_tools, "cleanup", return_value=preview_counts) as cleanup:
-			self.assertEqual(ai_tools.preview_cleanup()["details"], preview_counts)
-			result = ai_tools.execute_cleanup(ai_tools.prepare_cleanup())
+			tool = next(tool for tool in ai_tools.declarations() if tool["name"] == "preview_mobile_cleanup")
+			result = frappe.get_attr(tool["handler"])(dry_run=True)
 		self.assertEqual(result["removed"], 0)
 		self.assertTrue(result["dry_run"])
 		self.assertTrue(all(call.kwargs == {"dry_run": True} for call in cleanup.call_args_list))
@@ -131,7 +142,6 @@ class MobileAiToolsTest(IntegrationTestCase):
 		from platform_core.mobil import ai_tools
 
 		plan = ai_tools.prepare_revoke_installation(self.installation)
-		cleanup_plan = ai_tools.prepare_cleanup()
 		try:
 			frappe.set_user(self.other_account)
 			for action, arguments in (
@@ -140,7 +150,6 @@ class MobileAiToolsTest(IntegrationTestCase):
 				(ai_tools.prepare_revoke_all, (self.account,)),
 				(ai_tools.execute_revocation, (plan,)),
 				(ai_tools.preview_cleanup, ()),
-				(ai_tools.execute_cleanup, (cleanup_plan,)),
 			):
 				with self.subTest(action=action.__name__), self.assertRaises(frappe.PermissionError):
 					action(*arguments)
