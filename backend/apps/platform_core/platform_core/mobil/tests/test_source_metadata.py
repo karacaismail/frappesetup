@@ -22,7 +22,11 @@ class MobileSourceMetadataTest(unittest.TestCase):
 
 	def test_doctype_field_text_uses_supported_translation_context(self):
 		with (APP / "translations" / "tr.csv").open(encoding="utf-8", newline="") as source:
-			translations = {(row[0], row[2] if len(row) == 3 else "") for row in csv.reader(source)}
+			rows = csv.reader(source, strict=True)
+			translations = set()
+			for row in rows:
+				self.assertEqual(len(row), 3, f"tr.csv line {rows.line_num}: expected three columns")
+				translations.add((row[0], row[2]))
 		for path in DEFINITIONS:
 			definition = json.loads(path.read_text(encoding="utf-8"))
 			name = definition["name"]
