@@ -79,7 +79,7 @@
       "path": "outputs/press-mcp/server.py",
       "commit": null,
       "sha256": "7fce56cc8b08e21c10f97d43cfc3a271d9445752703a184413fe422290143e7f",
-      "ref": "yerel dosya; proje sahibinin bilgisayarında, depoda değil",
+      "ref": "Yerel dosya. Dosya depoda değil, proje sahibinin bilgisayarında. İncelemeci dosyanın kopyasını proje sahibinden ister. Kopyayı sha256 özetiyle doğrular.",
       "date": "2026-10-07",
       "license": "Lisans dosyası yok (yerel, yayımlanmamış)",
       "use": "Eski özel SSH MCP'si (stdio, SSH ControlMaster, --full-admin keyfi komut). Bu paket onu çağırmaz, değiştirmez ve yerine geçmez; hedef sunucu bilgisi yazılmadı."

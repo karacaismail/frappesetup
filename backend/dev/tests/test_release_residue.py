@@ -1,8 +1,14 @@
 """Release gate: the public repository must not carry personal or real-looking data.
 
-The repository is published. Every file Git publishes is scanned for
+The repository is published. Every file in the Git snapshot is scanned for
 home-folder paths, the full names of real people, personal e-mail addresses,
 real-looking Turkish phone numbers and common secret formats.
+
+Content comes from Git objects, never from the working folder. The default
+snapshot is HEAD. Set RELEASE_REV to another commit, or to ":" to scan the
+staged content before a commit:
+
+    RELEASE_REV=: python3 -B -m unittest backend/dev/tests/test_release_residue.py
 
 Real names are never written in this file. Only SHA-256 digests of the
 normalised two-word name are stored, the same way the naming gate stores the
@@ -10,12 +16,15 @@ forbidden product name (D-13).
 """
 
 import hashlib
+import os
 import re
 import subprocess
 import tempfile
 import unicodedata
 import unittest
 from pathlib import Path
+
+STAGED = ":"
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -24,10 +33,6 @@ NAME_DIGESTS = {
     "9ff91a1103d734d04908c5432c53ab346e9d02bd367f00cc16177584e2b6135e",
     "8c16cba08149fcf9930855858704966ea3429ca407ba99b0564942b1dfd777aa",
 }
-
-# Temporary: paradev/press-provision replaces the names in this file.
-# Delete this entry once that branch is merged into backend.
-NAME_EXEMPT = {"backend/dev/press/provisioning-readiness.md"}
 
 # Temporary: site-kisi-adlari birleşince silinecek.
 # paradev/site-kisi-adlari replaces the names in exactly these site files.
@@ -90,16 +95,23 @@ def normalise(text):
     return "".join(ch for ch in unicodedata.normalize("NFKD", text) if not unicodedata.combining(ch))
 
 
-def tracked_files(root=REPO):
-    """Yield (path, text) for every text file Git publishes from root.
+def tracked_files(root=REPO, rev=None):
+    """Yield (path, text) for every text file stored in one Git snapshot.
+
+    Content is read from Git objects, never from the working folder. rev is a
+    commit or tree (default HEAD, or RELEASE_REV from the environment). Pass
+    STAGED (":") to read the index, the content the next commit will carry.
 
     root must be the Git top level itself. An archive opened inside another
     repository would otherwise list that outer repository, or nothing at all.
     """
     root = Path(root).resolve()
+    rev = rev or os.environ.get("RELEASE_REV") or "HEAD"
 
-    def run(*args):
-        return subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True).stdout
+    def run(*args, data=None):
+        return subprocess.run(
+            ["git", "-C", str(root), *args], input=data, check=True, capture_output=True
+        ).stdout
 
     try:
         top = Path(run("rev-parse", "--show-toplevel").decode().strip()).resolve()
@@ -107,15 +119,38 @@ def tracked_files(root=REPO):
         raise RuntimeError(f"{root} is not a Git root") from error
     if top != root:
         raise RuntimeError(f"Git root is {top}, expected {root}")
-    out = run("ls-files", "-z", "--cached", "--others", "--exclude-standard")
-    names = sorted({name for name in out.decode().split("\0") if name})
-    if not names:
-        raise RuntimeError(f"Git lists no files under {root}")
+
+    blobs = {}
+    if rev == STAGED:
+        for entry in run("ls-files", "-z", "--stage").decode().split("\0"):
+            if entry:
+                meta, name = entry.split("\t", 1)
+                mode, oid, _stage = meta.split()
+                blobs[name] = (mode, oid)
+    else:
+        try:
+            tree = run("rev-parse", "--verify", "--quiet", f"{rev}^{{tree}}").decode().strip()
+        except subprocess.CalledProcessError as error:
+            raise RuntimeError(f"Git has no commit or tree {rev!r} under {root}") from error
+        for entry in run("ls-tree", "-r", "-z", tree).decode().split("\0"):
+            if entry:
+                meta, name = entry.split("\t", 1)
+                mode, kind, oid = meta.split()
+                if kind == "blob":
+                    blobs[name] = (mode, oid)
+    if not blobs:
+        raise RuntimeError(f"Git lists no files under {root} at {rev!r}")
+
+    # Regular files only: symbolic links and submodules carry no file content.
+    names = sorted(name for name, (mode, _) in blobs.items() if mode in {"100644", "100755"})
+    request = "".join(f"{blobs[name][1]}\n" for name in names).encode()
+    out = run("cat-file", "--batch", data=request)
+    position = 0
     for name in names:
-        path = root / name
-        if not path.is_file():
-            continue
-        data = path.read_bytes()
+        header_end = out.index(b"\n", position)
+        size = int(out[position:header_end].split()[2])
+        data = out[header_end + 1 : header_end + 1 + size]
+        position = header_end + 1 + size + 1
         if b"\0" in data[:8192]:
             continue
         yield name, data.decode("utf-8", "replace")
@@ -127,7 +162,7 @@ def scan_text(name, text):
     for number, line in enumerate(text.splitlines(), 1):
         if HOME_PATH.search(line):
             findings.append(("home-path", number))
-        if name not in NAME_EXEMPT | SITE_NAME_EXEMPT:
+        if name not in SITE_NAME_EXEMPT:
             words = re.findall(r"\w+", normalise(line))
             pairs = (f"{a} {b}" for a, b in zip(words, words[1:]))
             if any(hashlib.sha256(pair.encode()).hexdigest() in NAME_DIGESTS for pair in pairs):
@@ -184,17 +219,48 @@ class FileListTest(unittest.TestCase):
         self.root = Path(self.temp.name).resolve()
         git(self.root, "init", "-q")
 
+    def snapshot(self):
+        """Record the working files as a Git tree. No commit, so no author is needed."""
+        git(self.root, "add", "-A")
+        return subprocess.run(
+            ["git", "-C", str(self.root), "write-tree"], check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    def write(self, name, text):
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
     def test_scan_reaches_files_outside_backend(self):
-        page = self.root / "src" / "page.md"
-        page.parent.mkdir()
-        page.write_text("Path: /" + "Users/someone/notes\n", encoding="utf-8")
-        files = dict(tracked_files(self.root))
+        self.write("src/page.md", "Path: /" + "Users/someone/notes\n")
+        files = dict(tracked_files(self.root, self.snapshot()))
         self.assertIn("src/page.md", files)
         self.assertEqual(scan_text("src/page.md", files["src/page.md"]), [("home-path", 1)])
 
+    def test_commit_content_is_read_not_the_working_copy(self):
+        self.write("page.md", "Path: /" + "Users/someone/notes\n")
+        tree = self.snapshot()
+        self.write("page.md", "clean\n")
+        git(self.root, "add", "page.md")
+        self.write("new.md", "Path: /" + "Users/someone/untracked\n")
+        files = dict(tracked_files(self.root, tree))
+        self.assertEqual(sorted(files), ["page.md"])
+        self.assertEqual(scan_text("page.md", files["page.md"]), [("home-path", 1)])
+
+    def test_staged_content_is_read_not_the_working_copy(self):
+        self.write("page.md", "Path: /" + "Users/someone/notes\n")
+        git(self.root, "add", "page.md")
+        self.write("page.md", "clean\n")
+        files = dict(tracked_files(self.root, STAGED))
+        self.assertEqual(scan_text("page.md", files["page.md"]), [("home-path", 1)])
+
+    def test_missing_commit_fails(self):
+        with self.assertRaisesRegex(RuntimeError, "no commit"):
+            list(tracked_files(self.root, "HEAD"))
+
     def test_empty_file_list_fails(self):
         with self.assertRaisesRegex(RuntimeError, "no files"):
-            list(tracked_files(self.root))
+            list(tracked_files(self.root, STAGED))
 
     def test_folder_inside_another_repository_fails(self):
         inner = self.root / "archive"
@@ -207,12 +273,12 @@ class FileListTest(unittest.TestCase):
 class ExemptionTest(unittest.TestCase):
     def test_exempt_files_still_get_every_other_check(self):
         sample = "/" + "Users/someone/x kisi@" + "gercek-alan.com.tr +90 " + "532 481 27 36 AKIA" + "B" * 16
-        for name in sorted(NAME_EXEMPT | SITE_NAME_EXEMPT):
+        for name in sorted(SITE_NAME_EXEMPT):
             kinds = {kind for kind, _ in scan_text(name, sample)}
             self.assertEqual(kinds, {"home-path", "email", "phone", "secret"}, name)
 
     def test_exempt_entries_are_real_files(self):
-        for name in sorted(NAME_EXEMPT | SITE_NAME_EXEMPT):
+        for name in sorted(SITE_NAME_EXEMPT):
             self.assertTrue((REPO / name).is_file(), name)
 
 
