@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type ElementHandle, type Locator, type Page } from '@playwright/test';
 
 // Shared pixel-difference helpers for the focus indicator tests.
 
@@ -65,4 +65,73 @@ export async function focusDiff(page: Page, target: Locator) {
   const on = await page.screenshot({ clip, scale: 'css' });
   const diff = await diffBox(page, off, on);
   return { diff, rect: { left: box.x - clip.x, top: box.y - clip.y, width: box.width, height: box.height } };
+}
+
+/** Screenshots the padded area around an element with the keyboard mode switched off. */
+async function shotAround(page: Page, target: ElementHandle<Element>): Promise<Buffer> {
+  const box = (await target.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  const x = Math.max(0, Math.floor(box.x - PAD));
+  const y = Math.max(0, Math.floor(box.y - PAD));
+  const clip = {
+    x,
+    y,
+    width: Math.min(viewport.width, Math.ceil(box.x + box.width + PAD)) - x,
+    height: Math.min(viewport.height, Math.ceil(box.y + box.height + PAD)) - y,
+  };
+  await page.mouse.move(0, 0);
+  const mode = await page.evaluate(() => {
+    const previous = document.documentElement.dataset.atFocus ?? '';
+    document.documentElement.removeAttribute('data-at-focus');
+    return previous;
+  });
+  const shot = await page.screenshot({ clip, scale: 'css' });
+  await page.evaluate((previous) => {
+    if (previous) document.documentElement.dataset.atFocus = previous;
+  }, mode);
+  return shot;
+}
+
+/**
+ * Counts the pixels that change when the element loses focus while the keyboard mode is off.
+ * With the mode off, focus must change nothing on screen. A stock indicator drawn with plain
+ * :focus or :focus-within would show up here.
+ * Focus is moved on with `forward` and brought back with `backward`.
+ * Returns null when focus could not be moved away from the element.
+ */
+export async function strayFocusDiff(page: Page, focused: Locator, forward: string, backward: string): Promise<number | null> {
+  const handle = (await focused.elementHandle())!;
+  const focusedShot = await shotAround(page, handle);
+  // Moving focus may scroll the page. Which element scrolls differs between engines, so every ancestor is recorded.
+  const scroll = await handle.evaluate((element) => {
+    const tops: number[] = [];
+    for (let node = element.parentElement; node; node = node.parentElement) tops.push(node.scrollTop);
+    return { tops, window: window.scrollY, y: element.getBoundingClientRect().y };
+  });
+  const restore = () =>
+    handle.evaluate((element, saved) => {
+      let index = 0;
+      for (let node = element.parentElement; node; node = node.parentElement) {
+        node.scrollTop = saved.tops[index];
+        index += 1;
+      }
+      window.scrollTo(0, saved.window);
+      return element.getBoundingClientRect().y;
+    }, scroll);
+  await page.keyboard.press(forward);
+  const moved = await handle.evaluate((element) => document.activeElement !== element);
+  if (!moved) return null;
+  // WebKit may finish its own focus scroll a moment later, so the position is restored until it holds
+  // across two animation frames. No fixed waiting time is used.
+  await expect(async () => {
+    const y = await restore();
+    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(null)))));
+    expect(await handle.evaluate((element) => element.getBoundingClientRect().y)).toBe(y);
+    expect(y).toBe(scroll.y);
+  }).toPass({ timeout: 3000 });
+  const idleShot = await shotAround(page, handle);
+  const stray = await diffBox(page, idleShot, focusedShot);
+  await page.keyboard.press(backward);
+  await restore();
+  return stray.count;
 }

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { diffBox, focusDiff, PAD } from './focus-diff';
+import { diffBox, focusDiff, PAD, strayFocusDiff } from './focus-diff';
 import { openLogin, screen } from './helpers';
 
 // WebKit bağlantıları Tab sırasına almaz. Safari'deki Option+Tab karşılığı kullanılır.
@@ -106,7 +106,7 @@ for (const { name, scheme } of focusCases) {
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
     await screen(name).open(page);
     if (scheme === 'dark') await expect(page.locator('html')).toHaveClass(/pf-v5-theme-dark/);
-    await page.addStyleTag({ content: '* { caret-color: transparent !important; }' });
+    await page.addStyleTag({ content: '* { caret-color: transparent !important; } ::selection { background: transparent !important; color: inherit !important; }' });
     const checked: string[] = [];
     const first = await activeName(page);
     for (let step = 0; step < 14; step += 1) {
@@ -137,6 +137,11 @@ for (const { name, scheme } of focusCases) {
       expect(diff.minX, `${current}: sol kenarda çizgi yok`).toBeGreaterThanOrEqual(Math.floor(rect.left));
       expect(diff.maxX, `${current}: sağ kenarda çizgi yok`).toBeLessThanOrEqual(Math.ceil(rect.left + rect.width));
       if (!isCheck) expect(diff.maxY - diff.minY, `${current}: gösterge düz bir çizgidir`).toBeLessThanOrEqual(6);
+
+      // New check (English by the naming rule for new code): with the keyboard mode off,
+      // focus must change nothing on screen. A stock :focus style would show up here.
+      const stray = await strayFocusDiff(page, focused, tab, browserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab');
+      if (stray !== null) expect(stray, `${current}: focus changes nothing while the keyboard mode is off`).toBe(0);
     }
     expect(checked.length, `${first} sonrası ölçülen öğe sayısı: ${checked.join(', ')}`).toBeGreaterThanOrEqual(minimumChecked[name]);
   });

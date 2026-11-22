@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type ElementHandle, type Page } from '@playwright/test';
-import { diffBox, focusDiff, PAD } from './focus-diff';
+import { expect, test, type Page } from '@playwright/test';
+import { focusDiff, strayFocusDiff } from './focus-diff';
 import { createUser, KC, REALM, submitPassword } from './helpers';
 
 // Tests of the Atonota account console theme.
@@ -151,6 +151,28 @@ test('account console speaks plain Turkish by default', async ({ page }) => {
   await expect(page.locator('body')).not.toContainText(/şifre/i);
 });
 
+test('IC-3: the Turkish bundle has the same keys and placeholders as the English source', async ({ request }) => {
+  type Entry = { key: string; value: string };
+  const load = async (locale: string) => new Map(((await (await request.get(`${KC}/resources/${REALM}/account/${locale}`)).json()) as Entry[]).map((entry) => [entry.key, entry.value]));
+  const en = await load('en');
+  const tr = await load('tr');
+  const own = readFileSync(fileURLToPath(new URL('../../account/messages/messages_tr.properties', import.meta.url)), 'utf8')
+    .split('\n')
+    .filter((line) => line.includes('=') && !line.startsWith('#'))
+    .map((line) => line.slice(0, line.indexOf('=')).trim());
+  expect(own.length).toBeGreaterThan(200);
+  const holders = (value: string) => [...value.matchAll(/\{\{[^}]*\}\}|<\/?\d+>/g)].map((match) => match[0]).sort().join(' ');
+  const problems: string[] = [];
+  for (const key of own) {
+    if (!en.has(key)) problems.push(`${key}: not in the English source`);
+    else if (!tr.get(key)?.trim()) problems.push(`${key}: empty Turkish value`);
+    else if (holders(tr.get(key)!) !== holders(en.get(key)!)) problems.push(`${key}: placeholders differ`);
+  }
+  expect(problems).toEqual([]);
+  // A key that the theme does not translate falls back to the stock Turkish bundle, so no key is missing at run time.
+  expect([...en.keys()].filter((key) => !tr.has(key))).toEqual([]);
+});
+
 test('saving personal info still works with the theme', async ({ page }) => {
   await openAccount(page, byName('personal-info'));
   await page.locator('#firstName').fill('Örnek');
@@ -184,31 +206,6 @@ const focusCases = [
   { name: 'device-activity', scheme: 'dark', required: ['#refresh-page'] },
   { name: 'applications', scheme: 'light', required: ['[id^="toggle-"]'] },
 ] as const;
-
-/** Screenshots the padded area around an element with the keyboard mode switched off. */
-async function shotAround(page: Page, target: ElementHandle<Element>) {
-  const box = (await target.boundingBox())!;
-  const viewport = page.viewportSize()!;
-  const x = Math.max(0, Math.floor(box.x - PAD));
-  const y = Math.max(0, Math.floor(box.y - PAD));
-  const clip = {
-    x,
-    y,
-    width: Math.min(viewport.width, Math.ceil(box.x + box.width + PAD)) - x,
-    height: Math.min(viewport.height, Math.ceil(box.y + box.height + PAD)) - y,
-  };
-  await page.mouse.move(0, 0);
-  const mode = await page.evaluate(() => {
-    const previous = document.documentElement.dataset.atFocus ?? '';
-    document.documentElement.removeAttribute('data-at-focus');
-    return previous;
-  });
-  const shot = await page.screenshot({ clip, scale: 'css' });
-  await page.evaluate((previous) => {
-    if (previous) document.documentElement.dataset.atFocus = previous;
-  }, mode);
-  return shot;
-}
 
 for (const { name, scheme, required } of focusCases) {
   test(`account ${name} (${scheme}): focus indicator is visible and does not surround the element`, async ({ page, browserName }) => {
@@ -259,43 +256,8 @@ for (const { name, scheme, required } of focusCases) {
       expect(diff.maxY - diff.minY, `${current}: the indicator is one straight line`).toBeLessThanOrEqual(6);
 
       // A stock indicator drawn with plain :focus or :focus-within would not depend on the keyboard mode.
-      // So the focused element (mode off) is also compared with the same element after focus has moved on.
-      // With the mode off, focus must change nothing on screen.
-      const handle = (await focused.elementHandle())!;
-      const focusedShot = await shotAround(page, handle);
-      // Moving focus may scroll the page. The exact scroll position is restored, so both images show the same pixels.
-      // Which element scrolls differs between engines, so every ancestor is recorded.
-      const scroll = await handle.evaluate((element) => {
-        const tops: number[] = [];
-        for (let node = element.parentElement; node; node = node.parentElement) tops.push(node.scrollTop);
-        return { tops, window: window.scrollY, y: element.getBoundingClientRect().y };
-      });
-      await page.keyboard.press(tabKey(browserName));
-      const moved = await handle.evaluate((element) => document.activeElement !== element);
-      if (moved) {
-        // WebKit may finish its own focus scroll a moment later, so the position is restored until it holds.
-        await expect(async () => {
-          const y = await handle.evaluate((element, saved) => {
-            let index = 0;
-            for (let node = element.parentElement; node; node = node.parentElement) {
-              node.scrollTop = saved.tops[index];
-              index += 1;
-            }
-            window.scrollTo(0, saved.window);
-            return element.getBoundingClientRect().y;
-          }, scroll);
-          await page.waitForTimeout(50);
-          expect(await handle.evaluate((element) => element.getBoundingClientRect().y)).toBe(y);
-          expect(y).toBe(scroll.y);
-        }).toPass({ timeout: 3000 });
-        const idleShot = await shotAround(page, handle);
-        if (idleShot.length > 0 && focusedShot.length > 0) {
-          const stray = await diffBox(page, idleShot, focusedShot);
-          expect(stray.count, `${current}: focus changes nothing while the keyboard mode is off`).toBe(0);
-        }
-        await page.keyboard.press(browserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab');
-        await handle.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-      }
+      const stray = await strayFocusDiff(page, focused, tabKey(browserName), browserName === 'webkit' ? 'Alt+Shift+Tab' : 'Shift+Tab');
+      if (stray !== null) expect(stray, `${current}: focus changes nothing while the keyboard mode is off`).toBe(0);
     }
     expect(checked.length, `measured elements: ${checked.join(', ')}`).toBeGreaterThanOrEqual(4);
     expect([...reached].sort(), `required elements reached, measured: ${checked.join(', ')}`).toEqual([...required].sort());

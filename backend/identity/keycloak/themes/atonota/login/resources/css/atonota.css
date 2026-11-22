@@ -557,6 +557,21 @@
   --pf-v5-c-button--m-primary--BackgroundColor: var(--at-color-action-hover);
 }
 
+/*
+ * Hesap silme onayı: silen düğme tehlike rengini taşır. Güvenli ana düğme gibi görünmez.
+ * Temel şablon bu düğmeyi ana düğme sınıfıyla çizer.
+ */
+[data-page-id="login-delete-account-confirm"] #kc-submit.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--at-color-danger);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--at-color-danger);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--at-color-danger);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--at-color-danger);
+  --pf-v5-c-button--m-primary--Color: var(--at-color-surface);
+  --pf-v5-c-button--m-primary--hover--Color: var(--at-color-surface);
+  --pf-v5-c-button--m-primary--focus--Color: var(--at-color-surface);
+  --pf-v5-c-button--m-primary--active--Color: var(--at-color-surface);
+}
+
 .login-pf .pf-v5-c-button.pf-m-secondary,
 .login-pf .pf-v5-c-button.pf-m-tertiary {
   background: transparent;

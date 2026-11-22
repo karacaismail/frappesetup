@@ -143,6 +143,25 @@ test('@matris delete confirmation screen: plain Turkish, no overflow, readable t
   await expect(page.locator('#kc-deleteaccount-form')).toContainText('İş kayıtlarınız silinmez.');
   await expect(page.locator('#kc-submit')).toHaveText('Silmeyi onaylayın');
   await expect(page.locator('#kc-cancel')).toHaveText('Vazgeçin');
+  // The deleting button uses the danger colour, like the delete button in the console.
+  // It must not look like the safe primary action.
+  const colours = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    document.body.append(probe);
+    const resolve = (token: string) => {
+      probe.style.backgroundColor = `var(${token})`;
+      return getComputedStyle(probe).backgroundColor;
+    };
+    const result = {
+      submit: getComputedStyle(document.querySelector('#kc-submit')!).backgroundColor,
+      danger: resolve('--at-color-danger'),
+      action: resolve('--at-color-action'),
+    };
+    probe.remove();
+    return result;
+  });
+  expect(colours.submit, 'the deleting button has the danger colour').toBe(colours.danger);
+  expect(colours.submit).not.toBe(colours.action);
   const size = await page.evaluate(() => ({
     scroll: document.documentElement.scrollWidth,
     client: document.documentElement.clientWidth,
