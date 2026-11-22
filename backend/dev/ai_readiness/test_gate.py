@@ -1,13 +1,16 @@
 """Exercise the gate through its public command with isolated fake apps."""
 
 import json
+import os
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 
 COMMAND = Path(__file__).resolve().parents[1] / "bin" / "ai-readiness"
+GATE = COMMAND.parents[1] / "ai_readiness" / "gate.py"
 SCRATCH = COMMAND.parents[3] / ".pane" / "scratch"
 APP = "apps/sample_app/sample_app"
 DOCTYPE = f"{APP}/records/doctype/contact_card/contact_card.json"
@@ -31,19 +34,21 @@ class GateTests(unittest.TestCase):
 
     def scan(self, *rules):
         result = subprocess.run(
-            [str(COMMAND), "--root", str(self.root), "--json"],
+            [sys.executable, "-B", str(GATE), "--root", str(self.root), "--json"],
             check=False,
             capture_output=True,
             text=True,
         )
         self.assertEqual(result.returncode, int(bool(rules)), result.stderr)
         self.assertTrue(result.stdout, result.stderr)
-        violations = json.loads(result.stdout)
+        violations = json.loads(result.stdout)["findings"]
         self.assertCountEqual([item["rule"] for item in violations], rules)
         for item in violations:
             self.assertTrue(item["message"])
             self.assertFalse(Path(item["path"]).is_absolute())
             file = self.root / item["path"]
+            if item["rule"] == "input":
+                continue
             self.assertTrue(file.is_file(), item)
             self.assertLessEqual(1, item["line"], item)
             self.assertLessEqual(item["line"], len(file.read_text().splitlines()), item)
@@ -135,7 +140,10 @@ class GateTests(unittest.TestCase):
         self.scan("provider", "provider")
 
     def test_model_names_in_code_and_fixtures(self):
-        self.write(f"{APP}/tests/test_provider.py", 'MODEL = "gpt-4o-synthetic"\n')
+        self.write(
+            f"{APP}/tests/test_provider.py",
+            'from unittest import TestCase\nclass Sample(TestCase):\n    MODEL = "gpt-4o-synthetic"\n',
+        )
         self.write(f"{APP}/provider.py", 'PROVIDER_ID = "provider-id"\n')
         self.scan()
         self.write(f"{APP}/provider.py", 'MODEL = "gpt-4o"\n')
@@ -160,7 +168,7 @@ class GateTests(unittest.TestCase):
         self.scan()
         subprocess.run(["git", "add", "--", tracked, nested], cwd=self.repository, check=True)
         result = subprocess.run(
-            [str(COMMAND), "--root", str(self.root), "--json"],
+            [sys.executable, "-B", str(GATE), "--root", str(self.root), "--json"],
             check=False,
             capture_output=True,
             text=True,
@@ -168,7 +176,7 @@ class GateTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertNotIn(name, result.stdout.lower())
         self.assertNotIn(spelling, result.stdout)
-        findings = json.loads(result.stdout)
+        findings = json.loads(result.stdout)["findings"]
         self.assertEqual([finding["rule"] for finding in findings], ["forbidden-name"] * 2)
         self.assertIn(("guide.txt", 2), {(finding["path"], finding["line"]) for finding in findings})
 
@@ -183,7 +191,12 @@ class GateTests(unittest.TestCase):
                     f"dev/{policy}",
                     json.dumps({"path_owners": {"sample_app.api.ai": f"sample_app.{module}"}}),
                 )
-                self.write(f"{APP}/{module}/tests/test_setup.py", sql)
+                self.write(
+                    f"{APP}/{module}/tests/test_setup.py",
+                    "from unittest import TestCase\nimport frappe\n"
+                    "class Setup(TestCase):\n    def test_setup(self):\n"
+                    "        frappe.db.sql('SELECT 1')\n",
+                )
                 path = f"{APP}/{module}/read_card.py"
                 self.write(path, sql)
                 try:
@@ -194,10 +207,12 @@ class GateTests(unittest.TestCase):
                     (self.root / "dev" / policy).unlink()
 
     def test_missing_naming_checker_reports_not_run(self):
-        result = subprocess.run([COMMAND, "--root", self.root, "--json"], capture_output=True, text=True)
+        result = subprocess.run(
+            [sys.executable, "-B", GATE, "--root", self.root, "--json"], capture_output=True, text=True
+        )
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(json.loads(result.stdout), [])
-        self.assertIn("naming: not_run", result.stderr)
+        self.assertEqual(json.loads(result.stdout), {"findings": [], "checks": {"naming": "not_run"}})
+        self.assertEqual(result.stderr, "")
 
     def test_naming_checker_reports_findings_and_execution_errors(self):
         checker = "dev/naming/check_names.py"
@@ -273,8 +288,8 @@ class GateTests(unittest.TestCase):
             whoami = frappe.whitelist()(whoami)
             """,
         )
-        findings = self.scan("test-endpoint")
-        self.assertEqual(findings[0]["line"], 6)
+        findings = self.scan("endpoint", "test-endpoint")
+        self.assertEqual({finding["line"] for finding in findings}, {6})
 
     def test_test_only_registration_does_not_expose_an_endpoint_on_import(self):
         self.write(
@@ -312,6 +327,240 @@ class GateTests(unittest.TestCase):
         self.scan()
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.declarations.tools"]\n')
         self.scan("sql")
+
+    def test_computed_tool_declarations(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            import frappe
+            PATH = "sample_app.tools."
+            BASE = {"handler": PATH + "run"}
+
+            def declare():
+                return [{**BASE, "prepare": f"{PATH}prepare"}]
+
+            def run():
+                frappe.db.sql("SELECT 1")
+
+            def prepare():
+                frappe.db.sql("SELECT 1")
+            """,
+        )
+        self.scan("sql", "sql")
+
+    def test_unresolved_and_empty_tool_declarations(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        for result in ('[{"handler": build_path()}]', '[{"name": "read"}]', "[]"):
+            with self.subTest(result=result):
+                self.write(f"{APP}/tools.py", f"def declare():\n    return {result}\n")
+                self.scan("sql")
+
+    def test_nested_whitelist_and_external_overrides(self):
+        self.write(
+            f"{APP}/api.py",
+            """
+            import frappe
+            def factory():
+                @frappe.whitelist(allow_guest=True)
+                def wrapper():
+                    pass
+                return wrapper
+            run = factory()
+            """,
+        )
+        self.scan("endpoint")
+        self.write(
+            f"{APP}/hooks.py", 'override_whitelisted_methods = {"frappe.example.run": "sample_app.api.run"}'
+        )
+        self.scan("endpoint", "endpoint")
+        self.write_contract()
+        contract = self.root / CONTRACT
+        contract.write_text(
+            contract.read_text()
+            + """
+  /api/method/frappe.example.run:
+    post:
+      summary: Run.
+      description: Run a card.
+"""
+        )
+        self.scan()
+
+    def test_sql_public_paths_and_database_aliases(self):
+        self.write(
+            "dev/module-boundaries.json", json.dumps({"path_owners": {"sample_app.api.ai": "sample_app.ai"}})
+        )
+        self.write(f"{APP}/ai/__init__.py", "")
+        self.write(
+            f"{APP}/api/ai.py",
+            """
+            import frappe
+            db = frappe.db
+            frappe.local.db.sql("SELECT 1")
+            db.sql_list("SELECT 1")
+            db.multisql({})
+            frappe.db.sql_ddl("SELECT 1")
+            getattr(frappe.db, "sql")("SELECT 1")
+            """,
+        )
+        self.scan(*(["sql"] * 5))
+
+    def test_boundary_owner_requires_python_source(self):
+        self.write(
+            "dev/module-boundaries.json",
+            json.dumps({"path_owners": {"sample_app.api.ai": "sample_app.absent"}}),
+        )
+        self.scan("input")
+
+    def test_production_references_disable_test_exemption(self):
+        self.write(
+            "dev/module-boundaries.json", json.dumps({"path_owners": {"sample_app.api.ai": "sample_app.ai"}})
+        )
+        self.write(
+            f"{APP}/ai/tests/test_helper.py",
+            """
+            from unittest import TestCase
+            import frappe
+            class Helper(TestCase):
+                def test_run(self):
+                    frappe.db.sql("SELECT 1")
+            """,
+        )
+        self.scan()
+        self.write(f"{APP}/ai/service.py", "from .tests.test_helper import Helper")
+        self.scan("sql")
+        (self.root / f"{APP}/ai/service.py").unlink()
+        self.write(f"{APP}/hooks.py", 'after_install = "sample_app.ai.tests.test_helper.Helper.test_run"')
+        self.scan("sql")
+
+    def test_provider_families_and_dynamic_imports(self):
+        self.write(
+            "dev/module-boundaries.json",
+            json.dumps({"path_owners": {}, "forbidden_imports": ["example_provider"]}),
+        )
+        self.write(
+            f"{APP}/api.py",
+            """
+            from langchain_openai import Chat
+            from llama_index.core import Index
+            import example_provider_plugin
+            from importlib import import_module as load
+            load("openai")
+            """,
+        )
+        self.scan(*(["provider"] * 4))
+
+    def test_model_names_in_assets_and_comments(self):
+        self.write(f"{APP}/fixtures/examples.json", '{"model": "llama3.1:8b"}')
+        self.write(f"{APP}/public/examples.js", 'export const model = "qwen2.5:7b";')
+        self.write(f"{APP}/api.py", "# mistral-large-latest gemini-flash-latest command-r-plus")
+        self.scan("model", "model", "model")
+
+    def test_model_scan_accepts_review_item_label(self):
+        self.write(f"{APP}/api.py", "# See O3 in the security review.")
+        self.scan()
+        self.write(f"{APP}/api.py", 'MODEL = "o3"')
+        self.scan("model")
+
+    def test_path_code_locates_tracked_entry_without_printing_name(self):
+        name = "".join(map(chr, (99, 114, 111, 110, 104, 114)))
+        path = self.repository / (name + ".txt")
+        path.write_text("Sample")
+        subprocess.run(["git", "add", "--", path], cwd=self.repository, check=True)
+        from forbidden_name import redact_path
+
+        code = redact_path(path.name).split()[-1].removesuffix("]")
+        result = subprocess.run(
+            [sys.executable, "-B", GATE, "--root", self.root, "--path-code", code],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), {"index": 1, "repository": "."})
+        self.assertNotIn(name, result.stdout)
+
+    def test_unicode_and_commit_messages(self):
+        from forbidden_name import match_lines
+
+        spelling = "".join(map(chr, (99, 114, 111, 110, 104, 114)))
+        for variation in (
+            "".join(chr(ord(char) + 0xFEE0) for char in spelling),
+            spelling.replace("c", "ć"),
+            spelling.replace("c", chr(0x441)),
+        ):
+            with self.subTest(variation=variation):
+                self.assertEqual(list(match_lines([variation])), [1])
+        from unittest.mock import patch
+
+        from forbidden_name import commit_findings
+
+        with patch(
+            "forbidden_name.git_output",
+            side_effect=[b"revision", b"a" * 40 + b"\0" + spelling.encode() + b"\0"],
+        ):
+            self.assertEqual(
+                list(commit_findings(self.repository, None)),
+                [("git:aaaaaaaaaaaa", 1, "Forbidden product name in a commit message.")],
+            )
+        result = subprocess.run(
+            [sys.executable, "-B", GATE, "--root", self.root, "--json"],
+            capture_output=True,
+            text=True,
+            env=dict(os.environ, GIT_DIR=str(self.repository / "absent")),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_symlinks_excluded_directories_and_nul(self):
+        self.write(f"{APP}/.hidden/broken.py", "!")
+        self.write(f"{APP}/node_modules/broken.py", "!")
+        self.scan()
+        (self.root / f"{APP}/linked.py").symlink_to("missing.py")
+        self.write(f"{APP}/broken.py", chr(0))
+        self.scan("input", "input")
+
+    def test_supported_python_version(self):
+        from unittest.mock import patch
+
+        from gate import supports_python
+
+        with patch("sys.version_info", (3, 13)):
+            self.assertFalse(supports_python())
+        with patch("sys.version_info", (3, 14)):
+            self.assertTrue(supports_python())
+
+    def test_security_gate_runs_readiness_tests(self):
+        source = (COMMAND.parent / "guvenlik-denetimi").read_text()
+        self.assertIn("backend/dev/bin/ai-readiness --self-test", source)
+        self.assertIn("unittest discover", COMMAND.read_text())
+
+    def test_only_documented_layout_fields_are_exempt(self):
+        self.write(
+            DOCTYPE,
+            json.dumps(
+                {
+                    "doctype": "DocType",
+                    "description": "A record.",
+                    "fields": [{"fieldtype": "HTML", "fieldname": "banner"}],
+                }
+            ),
+        )
+        self.scan("doctype")
+
+    def test_yaml_accepts_indentless_sequence(self):
+        self.write_contract()
+        path = self.root / CONTRACT
+        path.write_text("tags:\n- name: Cards\n" + path.read_text())
+        self.write(f"{APP}/api.py", "import frappe\n@frappe.whitelist()\ndef run(): pass\n")
+        self.scan()
+
+    def test_imported_scheduler_and_server_script_fixture(self):
+        self.write(f"{APP}/hooks.py", "from .jobs import scheduler_events")
+        self.write(
+            f"{APP}/fixtures/server_script.json",
+            json.dumps([{"doctype": "Server Script", "script_type": "Scheduler Event"}]),
+        )
+        self.scan("scheduler", "scheduler")
 
 
 if __name__ == "__main__":

@@ -33,9 +33,9 @@ def method_path(route: str, line: int) -> str:
             target = route[len(prefix) :]
             if not METHOD_PATH.fullmatch(target):
                 raise ContractError(line, "Invalid dotted Frappe method path.")
-            return "" if target.startswith("frappe.") else target
+            return target
     target = route.removeprefix("/")
-    if METHOD_PATH.fullmatch(target) and not target.startswith("frappe."):
+    if METHOD_PATH.fullmatch(target):
         return target
     return ""
 
@@ -106,7 +106,14 @@ def yaml_entries(lines: list[tuple[int, str]]) -> Iterator[tuple[str, str, int, 
             key = key[1:-1].replace("''", "'")
         offset += 1
         end = offset
-        while end < len(lines) and lines[end][1].startswith(" " * (indent + 1)):
+        while end < len(lines) and (
+            lines[end][1].startswith(" " * (indent + 1))
+            or (
+                not value
+                and lines[end][1][indent:].startswith("- ")
+                and lines[end][1][:indent] == " " * indent
+            )
+        ):
             end += 1
         yield key, value, line, lines[offset:end]
         offset = end

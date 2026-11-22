@@ -2,4 +2,15 @@
 set -euo pipefail
 
 dev_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-exec python3 -B "$dev_dir/ai_readiness/gate.py" "$@"
+python=python3
+if command -v python3.14 >/dev/null 2>&1; then
+    python=python3.14
+fi
+if [[ "${1:-}" == --self-test ]]; then
+    "$python" -I -B -c 'import sys; sys.exit(sys.version_info < (3, 14))' || {
+        echo 'ai-readiness requires Python 3.14 or newer.' >&2
+        exit 2
+    }
+    exec "$python" -B -m unittest discover -s "$dev_dir/ai_readiness"
+fi
+exec "$python" -B "$dev_dir/ai_readiness/gate.py" "$@"

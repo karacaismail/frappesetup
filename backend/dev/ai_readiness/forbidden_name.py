@@ -3,12 +3,29 @@
 import hashlib
 import os
 import subprocess
+import unicodedata
 from collections import deque
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 NAME_DIGEST = bytes.fromhex("17618b2344e07d3418e161912308ad63a118158bf4e3f1307329b5543b5fd743")
 WINDOW_LENGTH = 6
+CONFUSABLES = str.maketrans(
+    {
+        "с": "c",
+        "г": "r",
+        "о": "o",
+        "ո": "n",
+        "һ": "h",
+        "а": "a",
+        "е": "e",
+        "і": "i",
+        "к": "k",
+        "р": "p",
+        "х": "x",
+        "у": "y",
+    }
+)
 
 
 def match_lines(lines: Iterable[str]) -> Iterator[int]:
@@ -17,7 +34,7 @@ def match_lines(lines: Iterable[str]) -> Iterator[int]:
     positions = deque(maxlen=WINDOW_LENGTH)
     previous = 0
     for line, text in enumerate(lines, 1):
-        for char in text.lower():
+        for char in unicodedata.normalize("NFKD", text).casefold().translate(CONFUSABLES):
             if not char.isalnum():
                 continue
             window.append(char)
@@ -36,36 +53,118 @@ def redact_path(path: str) -> str:
 
 
 def git_output(directory: Path, *arguments: str) -> bytes:
+    local_variables = subprocess.run(
+        ["git", "rev-parse", "--local-env-vars"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    environment = {key: value for key, value in os.environ.items() if key not in local_variables}
     return subprocess.run(
         ["git", "-C", str(directory), *arguments],
         check=True,
         capture_output=True,
+        env=environment,
     ).stdout
 
 
-def tracked_findings(backend: Path) -> Iterator[tuple[str, int, str]]:
+def commit_findings(root, commit_base):
     try:
-        root = Path(os.fsdecode(git_output(backend, "rev-parse", "--show-toplevel").removesuffix(b"\n")))
-        paths = git_output(root, "ls-files", "-z", "--cached", "--deduplicate").split(b"\0")
-    except (OSError, subprocess.CalledProcessError):
-        yield ".", 1, "Could not list tracked repository files."
-        return
+        git_output(root, "rev-parse", "--verify", "HEAD")
+    except subprocess.CalledProcessError:
+        if commit_base is None:
+            return
+        raise
+    revision = "HEAD"
+    if commit_base is not None:
+        base = git_output(root, "rev-parse", "--verify", "--end-of-options", f"{commit_base}^{{commit}}")
+        revision = f"{base.decode('ascii').strip()}..HEAD"
+    messages = git_output(
+        root,
+        "log",
+        "-z",
+        "--format=%H%x00%B",
+        revision,
+        "--max-count=1" if commit_base is None else "--full-history",
+        "--",
+    )
+    fields = messages.decode("utf-8", errors="replace").split("\0")
+    for commit, message in zip(fields[::2], fields[1::2]):
+        for line in match_lines(message.splitlines()):
+            yield f"git:{commit[:12]}", line, "Forbidden product name in a commit message."
 
-    for entry in paths:
+
+def repository_root(backend):
+    return Path(os.fsdecode(git_output(backend, "rev-parse", "--show-toplevel").removesuffix(b"\n")))
+
+
+def stage_entries(root):
+    seen = set()
+    entries = git_output(root, "ls-files", "-z", "--stage")
+    for entry in entries.split(b"\0"):
         if not entry:
             continue
-        relative = os.fsdecode(entry)
+        metadata, relative_bytes = entry.split(b"\t", 1)
+        relative = os.fsdecode(relative_bytes)
+        if relative not in seen:
+            seen.add(relative)
+            yield relative, metadata.startswith(b"160000 ")
+
+
+def find_path_code(backend, code):
+    label = f"[redacted path {code}]"
+
+    def lookup(root, prefix):
+        for index, (relative, gitlink) in enumerate(stage_entries(root), 1):
+            path = prefix / relative
+            if redact_path(path.as_posix()) == label:
+                return {"index": index, "repository": redact_path(prefix.as_posix())}
+            if (
+                gitlink
+                and (root / relative / ".git").exists()
+                and (root / relative).resolve() == root / relative
+            ):
+                match = lookup(root / relative, path)
+                if match is not None:
+                    return match
+        return None
+
+    return lookup(repository_root(backend), Path("."))
+
+
+def tracked_findings(backend: Path, commit_base=None) -> Iterator[tuple[str, int, str]]:
+    try:
+        root = repository_root(backend)
+        yield from commit_findings(root, commit_base)
+    except (OSError, subprocess.CalledProcessError):
+        yield ".", 1, "Could not inspect repository or commit range."
+        return
+    yield from tracked_files(root)
+
+
+def tracked_files(root, prefix=Path(".")):
+    try:
+        entries = list(stage_entries(root))
+    except (OSError, subprocess.CalledProcessError):
+        yield redact_path(prefix.as_posix()), 1, "Could not list tracked repository files."
+        return
+    for relative, gitlink in entries:
         path = root / relative
-        label = redact_path(relative)
-        if label != relative:
+        display_path = (prefix / relative).as_posix()
+        label = redact_path(display_path)
+        if label != display_path:
             yield label, 1, "Forbidden product name in a tracked path."
         try:
             if path.parent.resolve() != path.parent:
                 yield label, 1, "Could not scan a tracked file through a symbolic link."
                 continue
-            if path.is_symlink():
-                lines = match_lines([os.readlink(path)])
-                for line in lines:
+            if gitlink:
+                if path.is_symlink() or not (path / ".git").exists():
+                    yield label, 1, "Could not scan uninitialized submodule."
+                else:
+                    yield from tracked_files(path, prefix / relative)
+            elif path.is_symlink():
+                for line in match_lines([os.readlink(path)]):
                     yield label, line, "Forbidden product name in tracked content."
             elif path.is_file():
                 with path.open(encoding="utf-8", errors="surrogateescape") as source:

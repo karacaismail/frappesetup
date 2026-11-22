@@ -4,66 +4,80 @@ Proje kaydındaki D-9, arka uç işlemlerinin yapay zekâyla yönetilebilmesini 
 O-13, model adlarını kayıtta tutar ve sağlayıcı kitaplıklarını yasaklar.
 
 Depo kökünde `backend/dev/bin/ai-readiness` komutunu çalıştırın.
-Arka uç kodunu tararken `python3` komutu Python 3.14'ü çalıştırmalı.
+Kapı Python 3.14 veya üstünü ister.
+Komut önce `python3.14` adını arar. Bu ad yoksa `python3` kullanır.
 Komut her bulguda dosyayı ve satırı gösterir.
-Bir bulgu varsa komut 1, bulgu yoksa 0 döndürür.
+Bir bulgu varsa komut 1 döndürür. Bulgu yoksa 0 döndürür.
+Python sürümü yetersizse komut 2 döndürür.
+
 Başka bir arka uç klasörünü taramak için `--root` kullanın.
 Programın okuyacağı çıktı için `--json` ekleyin.
+JSON çıktısında `findings` bulguları, `checks.naming` ad denetiminin durumunu içerir.
+Testleri çalıştırmak için `backend/dev/bin/ai-readiness --self-test` kullanın.
+Güvenlik komutu da bu testleri çalıştırır.
 
 ## Kapsam
 
-- Kapı uygulamalardaki DocType tanımlarını okur. DocType, bir kayıt türünün tanımıdır.
-- Kapı kayıt türünün ve veri alanlarının açıklamalarını arar.
-  Bölüm, sütun ve sekme gibi yerleşim alanlarını atlar.
+- Kapı DocType tanımlarını okur. DocType, bir kayıt türünün tanımıdır.
+- Kapı kayıt türünün ve alanlarının açıklamalarını arar.
+  `Section Break`, `Column Break` ve `Tab Break` alanları açıklama istemez.
 - Kapı dışarıya açılan Python işlevlerini OpenAPI sözleşmesiyle iki yönde karşılaştırır.
   OpenAPI, bir ağ işleminin adresini ve nasıl çağrıldığını tarif eder.
-  Kapı Frappe'nin kendi uçlarını, kayıt adreslerini ve ayrı servis adreslerini atlar.
-  Böylece örneğin kimlik eşitleme servisinin sağlık adresi yanlış bulgu üretmez.
-- Kapı Python'da bilinen sağlayıcı kitaplıklarının içe aktarımını arar.
-  Kapı ayrıca bilinen model adlarını metin değerlerinde arar.
-  Kapı model adı denetiminde test dosyalarını atlar.
+  Kapı işlev üreten kodu inceler ve dışarıya açılan adları arar.
+  İçteki açık işlevin dış adını bulamazsa bulgu yazar.
+  Kapı `override_whitelisted_methods` kaydındaki açık adresi yeni işlevle eşleştirir.
+  Kapı bu kayıtla değiştirilmemiş hazır Frappe adreslerini atlar.
+- Kapı sağlayıcı kitaplıklarını sınır dosyasındaki listeyle birlikte denetler.
+  Kapı paket ailesini ve metinle yazılan içe aktarma çağrılarını da arar.
+  Örneğin `langchain_openai`, `langchain` ailesine girer.
+- Kapı Python kodunda, yorumlarda ve uygulamanın metin dosyalarında model adı arar.
+  Örneğin JavaScript ve JSON dosyalarını da okur.
 - Kapı `hooks.py` dosyasında zamanlanmış iş kaydını arar.
+  Kapı içe aktarılan iş kaydını ve zamanlanmış Server Script kayıtlarını da arar.
 - Kapı ham SQL çağrılarını yapay zekâ modülünde ve kayıtlı araç işlevlerinde arar.
   Ham SQL, veritabanına doğrudan gönderilen sorgudur.
-  Kapı sabit araç bildirimlerindeki iş ve önizleme işlevlerine de bakar.
-  Kapı araç olarak bildirilmemiş test kodundaki sorguları dışarıda bırakır.
-  Örneğin testte oturumu süresi geçmiş duruma getiren sorguyu araç saymaz.
+  Kapı sınır dosyasında yapay zekâ ve MCP yollarını bulur.
+  Kapı bu yolları ve sorumlu modülleri denetler.
+  Sorumlu modülde Python dosyası yoksa kapı bulgu yazar.
+- Kapı araç bildiriminde `handler`, `preview` ve `prepare` değerlerini çözer.
+  Kapı düz metni, birleştirilen metni ve f-string biçimini tanır.
+  Kapı sabit bir sözlükten kopyalanan değerleri de inceler.
+  Kapı bir değeri çözemezse veya bildirim işlev vermiyorsa bulgu yazar.
+- Kapı test sınıflarındaki örnek model adlarını ve SQL çağrılarını atlayabilir.
+  Bu istisna yalnız test modülündeki test sınıflarına uygulanır.
+  Kapı dışarıya açılan veya bir kancaya bağlanan test modülünü bütünüyle denetler.
+  Uygulama kodu test modülünü içe aktarırsa kapı yine modülün tamamını denetler.
 
 Kapı uygulama kodunu çalıştırmaz ve dosyaları değiştirmez.
 Kapı düz YAML eşlemelerini ve JSON biçimindeki OpenAPI dosyalarını okur.
-İşlem tanımında bağlantı veya kısaltılmış eşleme görürse bulgu yazar.
-Kapı çalışırken kurulan içe aktarımları ve araç çağrı zincirlerini çözmez.
-Yeni model aileleri çıktığında model adı kalıplarını gözden geçirin.
+Kapı girintisiz YAML listelerini de kabul eder.
+Kapı işlem tanımında desteklenmeyen bir biçim görürse bulgu yazar.
+Kapı çalışma anında hesaplanan adreslerin tümünü çözemez.
+Kapı araç işlevinden çağrılan başka işlevleri SQL için izlemez.
 
 ## Yasaklı ad
 
-D-13 için kapı bütün izlenen dosyaları ve yolları tarar.
-İzlenen dosya, Git'in listesine alınmış dosyadır.
+D-13 için kapı Git'in izlediği dosyaları ve yolları tarar.
+Kapı hazır alt depoların izlenen dosyalarını da tarar.
+Bir alt depo hazır değilse kapı bulgu yazar.
+Kapı son Git kaydının mesajını denetler.
+`--commit-base` ile bir kayıt verin. Kapı o kayıttan sonraki mesajları tarar.
+
 Bu denetim depo köküne göre dosya yolu verir.
 Diğer denetimler arka uç klasörüne göre dosya yolu verir.
-
 Kapı yalnız SHA-256 özetini saklar. Özet, metinden hesaplanan bir sayı dizisidir.
-Kapı metni küçük harfe çevirir ve harf ile rakam dışındaki işaretleri atar.
-Kapı kalan metindeki her altı karakterin özetini karşılaştırır.
-Yolda eşleşme varsa kapı, yol yerine o yola ait kısa bir kod gösterir.
-Kapı eşleşen metni çıktıya yazmaz.
+Kapı harfleri ortak biçime çevirir. Kapı bilinen benzer harfleri de eşler.
+Kapı küçük harfleri ve rakamları altı karakterlik parçalar hâlinde karşılaştırır.
 
-## Modül değişikliği ve ad denetimi
+Yolda eşleşme varsa kapı, yol yerine kısa bir kod gösterir.
+`--path-code` ile bu kodu verin.
+Kapı ilgili dosyanın Git listesindeki sırasını ve alt depo bilgisini verir.
+Sıra 1'den başlar. Listeyi `git ls-files --cached --deduplicate` ile görebilirsiniz.
+Kapı eşleşen adı çıktıya yazmaz.
 
-Kapı, yapay zekâ ve MCP uçlarının modülünü sınır dosyasından bulur.
-Modül adı değişince kapı güncel sınır dosyasını okur.
-Araç kancasıyla bildirilen işlevler ayrıca denetlenir.
+## Ad denetimi
 
-Sekizinci denetim, varsa `dev/naming/check_names.py` betiğini çağırır.
-Betik yoksa kapı hata akışına `naming: not_run` yazar.
-JSON bulgu listesi ve çıkış kodu bu durumda değişmez.
-Betik çalışamazsa kapı bunu bulgu sayar.
-
-## Test uçları
-
-Dokuzuncu denetim uygulama paketindeki `tests` klasörünü tarar.
-Adı `test_` ile başlayan modül ve paketleri de tarar.
-Kapı, dış çağrıya açılan test işlevini dosya ve satırla bildirir.
-Uç için OpenAPI açıklaması olsa bile kapı bulgu verir.
-Kapı, dosya yüklenirken doğrudan atanan açık işlevi de yakalar.
-Yalnız test çalışırken bir işlev içinden yapılan geçici kayıt bu denetimin dışındadır.
+Kapı, varsa `dev/naming/check_names.py` betiğini ayrı bir Python sürecinde çalıştırır.
+Betik yoksa kapı `not_run` durumunu bildirir.
+Bu durumda diğer bulgular ve çıkış kodu aynen kalır.
+Betik çalışamazsa kapı bulgu yazar.
