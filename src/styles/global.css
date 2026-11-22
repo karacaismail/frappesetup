@@ -27,7 +27,7 @@
   --fs-font-body: var(--mantine-font-size-md);
   --fs-font-brand-name: var(--mantine-font-size-lg);
   --fs-leading-body: var(--mantine-line-height-md);
-  --fs-font-page-title: clamp(var(--mantine-h2-font-size), 1.2rem + 1.8vw, var(--mantine-h1-font-size));
+  --fs-font-page-title: clamp(1.75rem, 1.2rem + 1.8vw, var(--mantine-h1-font-size));
   --fs-leading-page-title: var(--mantine-h1-line-height);
   --fs-font-section-title: clamp(1.4rem, 1.2rem + 0.8vw, 1.75rem);
   --fs-font-card-title: 1.0625rem;
@@ -233,7 +233,7 @@ body {
   color: var(--mantine-color-text);
   text-decoration: none;
   font-size: var(--fs-font-body);
-  line-height: 1.6;
+  line-height: var(--fs-leading-body);
   transition:
     background-color var(--fs-dur) var(--fs-ease),
     color var(--fs-dur) var(--fs-ease);
@@ -502,7 +502,7 @@ body {
   overflow: auto hidden;
   overflow-wrap: normal;
   vertical-align: bottom;
-  line-height: 1.5;
+  line-height: var(--fs-leading-body);
   scrollbar-width: thin;
 }
 .prose pre {
@@ -511,7 +511,7 @@ body {
   border-radius: var(--mantine-radius-md);
   overflow-x: auto;
   font-size: var(--fs-font-body);
-  line-height: 1.55;
+  line-height: var(--fs-leading-body);
   background: var(--fs-surface-2);
 }
 .prose pre code {
@@ -567,7 +567,7 @@ body {
   border-spacing: 0;
   margin: 0;
   font-size: var(--fs-font-body);
-  line-height: 1.5;
+  line-height: var(--fs-leading-body);
 }
 .prose thead th {
   text-align: left;

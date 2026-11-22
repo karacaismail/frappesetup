@@ -278,7 +278,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     flex: none;
   }
   /* Kök yazı %200 iken 320 ve 360 px ekranda iç alan 8rem altına iner.
-     Bu genişlikte ok, etiketle aynı satır akışına girer. */
+     Bu genişlikte ok simgesi etiketle aynı satıra girer. */
   @container (max-width: 8rem) {
     .btn-primary {
       display: block;
@@ -479,7 +479,7 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
     margin: 0;
     color: var(--fs-quiet);
     font-size: var(--fs-font-body);
-    line-height: 1.55;
+    line-height: var(--fs-leading-body);
     text-wrap: pretty;
   }
 

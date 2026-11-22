@@ -118,7 +118,7 @@ Durumlar: pass, fail, not\_run. Her satır kontrolün koşulduğu commit'i yazar
 | Satır kırılımı | Satırına sığan sözcük, başlık, kimlik ve model adı iki harf arasından bölünmez; zorlayıcı kural (`overflow-wrap: anywhere`, `word-break: break-all`) yoktur; satırdan uzun düz metin dizgisi yalnız satır sonunda kırılır | pass (yerel, üç motor, 837f2e4) |
 | Uzun satır içi kod | Bölünmez; satırdan uzunsa kendi kutusunda kayar, tüm karakterler korunur; yalnız taşan kutu Tab sırasındadır ve ok tuşuyla kayar | pass (yerel, üç motor; 837f2e4 ve bu commit'in test dosyası) |
 | WCAG 2.2 | Standart WCAG 2.2 AA. axe-core 4.13.0'da 2.2'ye özgü otomatik kural yalnız `target-size` (wcag22aa); 2.4.11 odak örtülmemesi, 2.5.7, 3.2.6, 3.3.7 ve 3.3.8 elle denetlenir | otomatik kısım axe satırında; elle denetim not\_run |
-| Yazı boyutları ve yazı tipi | Okunabilir metin en az 1rem olur. Site önce Outfit yazı tipini dener. | Playwright, alt sınırı ve ortak ölçüleri denetler. Chromium, Türkçe harfleri ve kullanılan yazı kalınlıklarını Outfit ile gösterdi. Yedek yazı tipleri, WCAG metin aralığı (1.4.12) ve gerçek cihazlar denenmedi. |
+| Yazı boyutları ve yazı tipi | Okunabilir metin en az 1rem olur. Site önce Outfit yazı tipini dener. | pass (Linux, Chromium ve WebKit, `5dbf79e`). Playwright alt sınırı ve ortak ölçüleri doğruladı. Chromium, Türkçe harfleri ve kullanılan yazı kalınlıklarını Outfit ile gösterdi. Yedek yazı tipleri, WCAG metin aralığı (1.4.12) ve gerçek cihazlar `not_run`. |
 | Tema | İşletim sistemi koyu, kayıtlı tercih yokken düğme "Açık temaya geç" der ve tek tıklama açığa geçirir; kayıtlı tercih hidrasyondan önce uygulanır | pass (yerel, üç motor, 3bcc006) |
 | Tutarlılık | Gereksinim kimlikleri, G/SA/K atıfları, iç bağlantılar ve derlenmiş HTML'deki çapalar, faz sırası ve zaman çizelgesi, paragrafa dönüşen tablo satırı, eski adlar (kaçışlı yazımlar dahil), README sayıları | pass (Chromium, 837f2e4) |
 | Yazı ölçeği | Kök yazı %100, %125 (320 px) ve %200 (390 ve 1366 px): kök boyut beklenen değerde, taşma yok, metin ≥ 1rem, başlık düğmeleri görünür; Mermaid hata çıktısı yok | pass (yerel, üç motor, 837f2e4) |
@@ -131,8 +131,8 @@ Durumlar: pass, fail, not\_run. Her satır kontrolün koşulduğu commit'i yazar
 
 | İş | Durum | Sonuç |
 | --- | --- | --- |
-| Yazı boyutları | Sürüyor: görsel referans onayı bekliyor | Gövde 1rem. Satır yüksekliği yazı boyutunun 1,5 katı. Sayfa başlığı 1,5 ile 2rem arasında. |
-| Dar ekranda büyük yazı | Sürüyor: görsel referans onayı bekliyor | Ana sayfa düğmelerinin metni 320 ve 360 pikselde tam görünür. Kök yazı %200 iken sayfa yatay taşmaz. |
+| Yazı boyutları | Sürüyor. Görsel referans onayı bekliyor. | Gövde 1rem. Satır yüksekliği yazı boyutunun 1,5 katı. Sayfa başlığı 1,75 ile 2rem arasında. |
+| Dar ekranda büyük yazı | Sürüyor. Görsel referans onayı bekliyor. | Ana sayfa düğmelerinin metni 320 ve 360 pikselde tam görünür. Kök yazı %200 iken sayfa yatay taşmaz. |
 
 ## Açık işler
 

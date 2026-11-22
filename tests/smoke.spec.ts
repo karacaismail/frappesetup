@@ -290,13 +290,25 @@ test.describe('text scaling', () => {
     }
   });
 
+  test('@touch page and section headings stay distinct at 320px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    for (const [path, section] of [['', '.block-head h2'], ['kararlar/', '.prose h2']]) {
+      await page.goto(path);
+      await expectMinFont(page);
+      await noHorizontalOverflow(page);
+      const titleSize = await page.locator('h1').evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      const sectionSize = await page.locator(section).first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      expect.soft(titleSize - sectionSize, `başlık boyutu farkı: /${path}`).toBeGreaterThanOrEqual(4);
+    }
+  });
+
   test('card headings share a size and supporting copy uses body leading', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('');
     const phaseTitle = page.locator('.phase h3').first();
     const cardTitleSize = await phaseTitle.evaluate((title) => getComputedStyle(title).fontSize);
     await expect.soft(page.locator('.decision h3').first()).toHaveCSS('font-size', cardTitleSize, { timeout: 1000 });
-    for (const selector of ['.rail-detail', '.section-title']) {
+    for (const selector of ['.rail-detail', '.section-title', '.decision p']) {
       await expect.soft(page.locator(selector).first()).toHaveCSS('line-height', '24px', { timeout: 1000 });
     }
     await page.goto('gereksinimler/');
