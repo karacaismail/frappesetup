@@ -57,7 +57,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 
 | Kapsam | Eklediği `aud` | Kullanan |
 | --- | --- | --- |
-| `aud-site-tenant1` | `site-tenant1` | `identity-sync`, `press-service` |
+| `aud-site-tenant1` | `site-tenant1` | `identity-sync`, `press-service`, `mobile-app` |
 | `aud-press` | `press` | `identity-sync` |
 | `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri ve `press-service`. Örnek: `site-tenant1-service` |
 
@@ -71,6 +71,13 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - Sihirli bağlantı eklentisinin bağlantı üreten yönetim ucu kapalıdır. Bu uç, belirteçteki rolü değil hesabın kayıtlı rolünü denetliyordu. Kapalı olduğu canlı testle (404) gösterilir.
 
 ### Politikalar
+
+Keycloak giriş sayfası çerçeve içinde açılamaz. Yanıt `frame-ancestors 'none'` ve
+`X-Frame-Options: DENY` taşır. Keycloak yalnız kendi üç oturum denetimi belgesini çerçevede açar.
+
+Keycloak giriş sayfası kendi satır içi betiklerini kullanır. Giriş formu, kullanıcıyı
+doğrulanmış istemci adresine yönlendirir. O-40'ın kiracıya özgü betik ve form kuralları
+Frappe giriş ve panel sayfalarında uygulanır.
 
 Realm politikaları G-78 ve G-144'ü uygular. Örneğin şu ayarlar vardır:
 
@@ -109,6 +116,9 @@ Keycloak çıkışta `logout_token` gönderir. Doğrulamada şunları denetleyin
 - `nonce` alanının yokluğu.
 
 ### Telefon kimliği
+
+Telefon uygulaması giriş isteğinde `scope=openid aud-site-tenant1 mobile` gönderir.
+Keycloak, erişim belirtecine `aud=site-tenant1` ve `scope` alanına `mobile` ekler.
 
 Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_identity` değerini yazar. Değer şu alanları taşıyan bir sözlüktür:
 
