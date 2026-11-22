@@ -177,9 +177,13 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-26. Telefon paketi bu turda yazılmaz.** Sunucu tarafı MVP düzeyinde kurulur. Paket işi açılınca `mobile.md` MVP koşulları o işe yazılır. Mağaza hesapları proje sahibindedir.
 - **O-27. Müşteri kendi hesabını açabilir. Bu yüzden hesap silme yolu MVP'dedir.** Deneme akışı Keycloak kayıt sayfasıyla başlar (G-79). Kuralın dayanağı karar dosyasındaki hesap silme kuralı ve CK-6'dır.
   - Çalışan kendi hesabını açamaz. Çalışan yalnız davetle gelir.
-  - Kullanıcı silme isteğini Keycloak hesap ekranından ya da bir web adresinden verir.
+  - Müşteri silme isteğini Press'te verir. Press kullanıcıyı önce Keycloak'ta yeniden doğrular. Keycloak'ın kendi hesap silme eylemi kapalıdır, çünkü bu eylem kullanıcıyı ilk adımda siler. Hesap ekranındaki bağlantı Press'teki silme sayfasına gider.
   - identity-sync isteği kaydeder. Sonra Keycloak kullanıcısını kapatır ve siler. Press kullanıcısını kapatır ve API anahtarlarını geçersiz kılar. Kiracı sitelerindeki kullanıcıyı kapatır. Telefon kurulumlarını ve bildirim bağlarını siler (CK-7).
   - İş kayıtları silinmez. Kişiyi gösteren alanlar anonim yapılır. Örneğin izin talebi kalır, çalışanın adı silinir. Proje sahibi bu varsayılanı değiştirebilir.
+  - Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır.
+  - Silinen kimliğin ham değeri saklanmaz. Yeniden açmayı engellemek için yalnız kimliğin HMAC özeti tutulur.
+  - Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
+  - Ayrıntılı kurallar sözleşmenin 7. bölümündedir.
 - **O-28. Yapay zekâ katmanı genel Frappe erişimi değildir.** D-9 her şeyin yapay zekâyla yönetilmesini ister. AX-2 modele genel Frappe erişimi vermeyi yasaklar. İki kural şöyle birleşir:
   - Model yalnız kayıtlı araçları çağırır. Her araç kullanıcının yetkisiyle çalışır.
   - Yazma önce öneri olur. İnsan ayrı uçtan onay verir.
