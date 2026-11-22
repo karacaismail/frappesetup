@@ -73,16 +73,18 @@ test.describe("tenant /login with the Keycloak-only gate on", () => {
 		const afterTab = await button.evaluate((el) => {
 			const s = getComputedStyle(el);
 			return {
-			outline: s.outlineStyle,
-			shadow: s.boxShadow,
-			background: s.backgroundColor,
-			kbd: document.documentElement.hasAttribute("data-kbd"),
-		};
+				outline: s.outlineStyle,
+				shadow: s.boxShadow,
+				background: s.backgroundColor,
+				kbd: document.documentElement.hasAttribute("data-kbd"),
+			};
 		});
 		expect(afterTab.kbd).toBeTruthy();
 		expect(afterTab.outline, "no outline ring").toBe("none");
-		expect(afterTab.shadow, "a visible non-surrounding indicator").not.toBe("none");
-	expect(afterTab.shadow, "the indicator differs from the button fill").not.toContain(afterTab.background);
+		expect(afterTab.shadow, "a single inset line along the bottom edge").toMatch(
+			/^rgb\(\d+, \d+, \d+\) 0px -[1-9]\d*(?:\.\d+)?px 0px 0px inset$/,
+		);
+		expect(afterTab.shadow, "the indicator differs from the button fill").not.toContain(afterTab.background);
 	});
 
 	test("forced colours use the single allowed outline", async ({ page, browserName }) => {
