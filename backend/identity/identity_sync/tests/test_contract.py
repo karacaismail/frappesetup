@@ -1,6 +1,6 @@
-"""Sözleşme ile sunucunun birbirini tuttuğunu denetler (SZ-3).
+"""Check that the contract and server agree (SZ-3).
 
-Testler gerçek istekleri ve gerçek yanıtları OpenAPI dosyasındaki şemalara karşı denetler.
+The tests validate real requests and responses against the schemas in the OpenAPI file.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ class DocumentationTest(unittest.TestCase):
         self.assertEqual(len(operations()), 10)
 
     def test_every_operation_is_documented(self) -> None:
-        # Her uç özet, açıklama ve yıkıcılık bilgisi taşır (`docs/sozlesmeler.md`, 10. bölüm).
+        # Every endpoint has a summary, description and destructive-action flag (`docs/sozlesmeler.md`, section 10).
         for key, operation in operations().items():
             with self.subTest(operation=key):
                 self.assertTrue(operation.get("summary"))
@@ -60,7 +60,7 @@ class DocumentationTest(unittest.TestCase):
                 )
 
     def test_write_operations_are_reserved_for_the_approval_layer(self) -> None:
-        # İnsanın başlattığı her yazma ucu onay alanlarını ister ve işaretlidir.
+        # Every human-initiated write endpoint requires approval fields and is marked accordingly.
         for key, operation in operations().items():
             if operation.get("x-durum") != "uygulandi" or operation["x-yurutme"] != "yalniz-onay-katmani":
                 continue
@@ -74,7 +74,7 @@ class DocumentationTest(unittest.TestCase):
                     self.assertIn("403", operation["responses"])
                     continue
                 preview, execute = (schemas[option["$ref"].rsplit("/", 1)[-1]] for option in request["oneOf"])
-                # Çağıran seçimi açıkça yazar. Yürütme onay alanlarını zorunlu tutar.
+                # The caller explicitly selects the mode. Execution requires approval fields.
                 self.assertIs(preview["properties"]["dry_run"]["const"], True)
                 self.assertIs(execute["properties"]["dry_run"]["const"], False)
                 for name in ("dry_run", "preview_digest", "approval_id"):
@@ -252,14 +252,14 @@ class ImplementationTest(ServerCase):
                 if path == "/healthz":
                     self.assertEqual(status, 200)
                 elif operation["x-durum"] == "uygulandi":
-                    # Kimliksiz istek her korumalı uçta 401 alır.
+                    # An unauthenticated request gets 401 at every protected endpoint.
                     self.assertEqual(status, 401)
                 else:
                     self.assertEqual(status, 404)
 
 
 class SchemaTest(ServerCase):
-    """Gerçek istekler ve yanıtlar şemalara uyar."""
+    """Real requests and responses conform to the schemas."""
 
     def assert_response(self, reply: tuple[int, object], method: str, path: str, expected_status: int) -> object:
         status, body = reply
@@ -336,7 +336,7 @@ class SchemaTest(ServerCase):
         used = self.assert_response(self.post_json(path, execute_request, OPERATOR_TOKEN), "POST", path, 409)
         self.assertEqual(used, {"error": "approval_used"})
         self.assert_response(self.post_json(path, {}), "POST", path, 400)
-        # Sunucunun reddettiği gövde şemaya da uymaz.
+        # The body rejected by the server also fails schema validation.
         for rejected in ({}, {"dry_run": False}, {"dry_run": False, "approval_id": "onay-1"}, {"dry_run": "true"}):
             with self.subTest(rejected=rejected):
                 self.assertNotEqual(schema_errors(rejected, request_schema("POST", path), CONTRACT), [])
@@ -578,7 +578,7 @@ class SchemaTest(ServerCase):
 
 
 class ContractToolsTest(unittest.TestCase):
-    """Küçük YAML okuyucunun kendi testleri."""
+    """Tests for the small YAML reader itself."""
 
     def test_reads_the_constructs_the_contract_uses(self) -> None:
         text = (

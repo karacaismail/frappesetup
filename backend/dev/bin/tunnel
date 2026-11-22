@@ -18,7 +18,7 @@ case "${FS_COLIMA_PROFILE:-factory}" in
     *) printf '%s\n' 'FS_COLIMA_PROFILE must be factory or default.' >&2; exit 2 ;;
 esac
 CONFIG="$HOME/.colima/_lima/$LIMA_NAME/ssh.config"
-ACTION="${1:-ac}"
+ACTION="${1:-}"
 shift || true
 if [[ ! -f "$CONFIG" ]]; then
     printf '%s\n' "Colima $LIMA_NAME SSH configuration is missing." >&2
@@ -55,5 +55,5 @@ case "$ACTION" in
         rm -f -- "$PORTS_FILE"
         ;;
     status) "${SSH[@]}" -O check "lima-$LIMA_NAME" ;;
-    *) printf '%s\n' 'Usage: tunel <ac|kapat|durum> [ports]' >&2; exit 2 ;;
+    *) printf '%s\n' 'Usage: tunnel <open|close|status> [ports]' >&2; exit 2 ;;
 esac

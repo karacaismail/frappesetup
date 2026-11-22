@@ -789,3 +789,14 @@ The delete failed and was rolled back. Nothing was deleted.,Silme hata verdi ve 
 Field {0} must be an integer from {1} to {2}.,{0} alanına {1} ile {2} arasında bir tam sayı yazın.,platform_core.identity
 The identity link changed. Try again.,Kimlik bağı değişti. Yeniden deneyin.,platform_core.identity
 You do not have permission to read identity links.,Kimlik bağlarını okuma izniniz yok.,platform_core.identity
+Bootstrap data,Açılış verisi,shell.performance
+DocType metadata,DocType tanımı,shell.performance
+Warm cache,Önbellekli,shell.performance
+Cold cache,Önbelleksiz,shell.performance
+O-31 shell benchmark,O-31 kabuk ölçümü,shell.performance
+Sample data contains {0} employees and {1} leave records.,Örnek veri {0} çalışan ve {1} izin kaydı içerir.,shell.performance
+Requests ran sequentially over local HTTP. The account had the HR User role.,İstekler yerel HTTP üzerinden sırayla gitti. Hesapta HR User rolü vardı.,shell.performance
+Server timing starts when the server receives the request and ends when response headers are ready.,"Süre, isteğin sunucuya ulaştığı anda başlar. Yanıt başlıkları hazır olunca biter.",shell.performance
+The benchmark cleared the Frappe site and process caches before each cold-cache request.,"Ölçüm, her önbelleksiz istekten önce Frappe site ve işlem önbelleklerini temizledi.",shell.performance
+The benchmark kept the database and operating system caches intact.,"Ölçüm, veritabanı ve işletim sistemi önbelleklerini korudu.",shell.performance
+| Endpoint | Cache | Requests | p50 (ms) | p95 (ms) | Limit (ms) | Result |,| Uç | Durum | İstek | p50 (ms) | p95 (ms) | Sınır (ms) | Sonuç |,shell.performance

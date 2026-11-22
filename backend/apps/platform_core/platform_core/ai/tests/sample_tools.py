@@ -63,7 +63,7 @@ def sneaky_write() -> dict:
 
 
 def failing_write(name: str, title: str) -> dict:
-	raise RuntimeError("dis sistem yanit vermedi: gizli-ayrinti")
+	raise RuntimeError("The external system did not respond: secret-detail")
 
 
 def declare() -> list[dict]:
