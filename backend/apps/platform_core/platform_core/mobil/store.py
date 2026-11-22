@@ -178,7 +178,7 @@ class MobileStore:
 			row = frappe.db.get_value(
 				"Mobile Installation",
 				installation_id,
-				["revoked", "session_id"],
+				["revoked", "session_id", "notification_token"],
 				as_dict=True,
 				for_update=True,
 			)
@@ -186,9 +186,11 @@ class MobileStore:
 				continue
 			if row.session_id:
 				session_ids.add(row.session_id)
-			if not row.revoked:
-				frappe.db.set_value("Mobile Installation", installation_id, "revoked", 1)
-				count += 1
+			if not row.revoked or row.notification_token is not None:
+				frappe.db.set_value(
+					"Mobile Installation", installation_id, {"revoked": 1, "notification_token": None}
+				)
+				count += int(not row.revoked)
 		revoke_after_commit(session_ids)
 		return count
 

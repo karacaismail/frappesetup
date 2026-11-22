@@ -113,3 +113,21 @@ class MobileSessionTest(IntegrationTestCase):
 		with patch("platform_core.api.mobile.push", return_value={}):
 			_push(self.identity, {**self.body, "operations": []})
 		self.assertEqual(frappe.db.get_value(state, self.account, "last_user_activity_at"), "1700000000")
+
+	def test_device_revocation_clears_only_its_notification_binding(self):
+		from platform_core.api.mobile import _register, _revoke
+
+		other = {"installation_id": str(uuid4())}
+		for body in (self.body, other):
+			_register(self.identity, body)
+			frappe.db.set_value(
+				"Mobile Installation", body["installation_id"], "notification_token", "fixture"
+			)
+		_revoke(self.identity, self.body)
+		self.assertIsNone(
+			frappe.db.get_value("Mobile Installation", self.body["installation_id"], "notification_token")
+		)
+		self.assertEqual(
+			frappe.db.get_value("Mobile Installation", other["installation_id"], "notification_token"),
+			"fixture",
+		)
