@@ -1,3 +1,5 @@
+from functools import wraps
+
 import frappe
 from frappe.rate_limiter import rate_limit
 from frappe.sessions import delete_session
@@ -11,10 +13,33 @@ from press_tr.kimlik.sessions import SESSION_MAPPING_DOCTYPE, read_press_session
 MAX_LOGOUT_TOKEN_LENGTH = 8192
 
 
+def prepare_logout_request(handler):
+	@wraps(handler)
+	def prepared():
+		frappe.flags.press_logout_token = frappe.form_dict.pop("logout_token", None)
+		# Frappe 16.50 uses cmd as the counter namespace, even on routes without cmd.
+		legacy_limiter = Version(frappe.__version__) < Version("16.56.0")
+		command = frappe.form_dict.get("cmd")
+		if legacy_limiter:
+			frappe.form_dict["cmd"] = "press_tr.api.keycloak_backchannel_logout"
+		try:
+			return handler()
+		finally:
+			frappe.flags.pop("press_logout_token", None)
+			if legacy_limiter:
+				if command is None:
+					frappe.form_dict.pop("cmd", None)
+				else:
+					frappe.form_dict["cmd"] = command
+
+	return prepared
+
+
 @frappe.whitelist(allow_guest=True, methods=["POST"])
-def keycloak_backchannel_logout(logout_token: str | None = None) -> None:
-	frappe.form_dict.pop("logout_token", None)
-	_revoke_keycloak_sessions(logout_token)
+@prepare_logout_request
+@rate_limit(limit=1200, seconds=60)
+def keycloak_backchannel_logout() -> None:
+	_revoke_keycloak_sessions(frappe.flags.pop("press_logout_token", None))
 
 
 @rate_limit(limit=120, seconds=60)

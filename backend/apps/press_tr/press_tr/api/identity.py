@@ -69,7 +69,7 @@ def ensure_team(
 
 	try:
 		result = provision_team(issuer, subject, email, email_verified, organization_id, title)
-	except frappe.QueryDeadlockError, frappe.QueryTimeoutError:
+	except (frappe.QueryDeadlockError, frappe.QueryTimeoutError):
 		release_lock()
 		raise Conflict(_("Another request is updating this organization. Try again.", context="press_tr"))
 	except Exception:
@@ -188,7 +188,7 @@ def anonymize_user(issuer: str, subject: str) -> dict[str, bool]:
 	reset_read_snapshot()
 	try:
 		found = anonymize_linked_user(issuer, subject)
-	except frappe.QueryDeadlockError, frappe.QueryTimeoutError:
+	except (frappe.QueryDeadlockError, frappe.QueryTimeoutError):
 		raise Conflict(_("This account is being updated. Try again.", context="press_tr"))
 	return {"anonymized": True, "found": found}
 

@@ -32,6 +32,8 @@ def state_key(state: str, browser_digest: str) -> bytes:
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=10, seconds=60)
 def get_login_url() -> dict[str, str]:
+	if set(frappe.form_dict) - {"cmd"}:
+		reject()
 	return start_login()
 
 
@@ -121,7 +123,7 @@ def exchange_code(code, verifier):
 			token = payload.get("id_token") if isinstance(payload, dict) else None
 			if isinstance(token, str) and token:
 				return token
-	except requests.RequestException, ValueError:
+	except (requests.RequestException, ValueError):
 		pass
 	reject()
 
@@ -157,14 +159,13 @@ def keycloak_callback(state: str | None = None, code: str | None = None) -> None
 	try:
 		link = bind_identity(claims)
 		ensure_personal_team(link.user)
-	except frappe.QueryDeadlockError, frappe.QueryTimeoutError:
+	except (frappe.QueryDeadlockError, frappe.QueryTimeoutError):
 		raise Conflict(_("Concurrent account update. Start sign-in again.", context="press_tr"))
-	except frappe.DuplicateEntryError, frappe.UniqueValidationError:
+	except (frappe.DuplicateEntryError, frappe.UniqueValidationError):
 		reject()
 
 	try:
 		frappe.local.login_manager.login_as(link.user)
-		# The OIDC callback is the only writer of this internal session mapping.
 		remember_press_session(link.name, keycloak_sid)
 	except Exception:
 		if sid := getattr(getattr(frappe.local, "session_obj", None), "sid", None):

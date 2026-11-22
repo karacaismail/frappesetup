@@ -105,7 +105,7 @@ def send_deletion_request(link, authenticated_at: int) -> None:
 			timeout=10,
 			allow_redirects=False,
 		)
-	except requests.RequestException, ValueError, AttributeError:
+	except (requests.RequestException, ValueError, AttributeError):
 		raise BadGateway() from None
 	if response.status_code not in {200, 201, 202}:
 		raise BadGateway()

@@ -4,6 +4,7 @@ from unittest.mock import Mock, call, patch
 from uuid import uuid4
 
 import frappe
+from frappe import rate_limiter
 from oidc_verify import JwksUnavailable
 from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
@@ -13,6 +14,28 @@ from press_tr.kimlik import oidc, request_policy, service, sessions
 
 
 class RequestGuardsTest(unittest.TestCase):
+	def test_backchannel_logout_redacts_token_before_rate_limit_failure(self):
+		token = "fake-token"
+		flags = frappe._dict()
+
+		def reject_rate_limited_request():
+			self.assertNotIn("logout_token", form)
+			self.assertEqual(flags.press_logout_token, token)
+			self.assertEqual(form["cmd"], "press_tr.api.keycloak_backchannel_logout")
+			raise frappe.RateLimitExceededError
+
+		for original in ({}, {"cmd": "alternate.rpc.name"}):
+			form = {**original, "logout_token": token}
+			framework = SimpleNamespace(form_dict=form, flags=flags, __version__="16.50.0")
+			with (
+				self.subTest(original=original),
+				patch.object(api, "frappe", framework),
+				self.assertRaises(frappe.RateLimitExceededError),
+			):
+				api.prepare_logout_request(reject_rate_limited_request)()
+			self.assertEqual(form, original)
+			self.assertEqual(flags, {})
+
 	def test_identity_link_is_closed_to_generic_ai_writes(self):
 		self.assertIn("Press Identity Link", getattr(hooks, "ai_write_closed_doctypes", []))
 		self.assertIn("Press Keycloak Session", getattr(hooks, "ai_write_closed_doctypes", []))
@@ -256,8 +279,10 @@ class RequestGuardsTest(unittest.TestCase):
 
 	def test_logout_redacts_token_before_verification(self):
 		form = {"logout_token": "fixture"}
+		flags = frappe._dict()
 		with (
-			patch.object(api, "frappe", SimpleNamespace(form_dict=form)),
+			patch.object(api, "frappe", SimpleNamespace(form_dict=form, flags=flags, __version__="16.56.0")),
+			patch.object(rate_limiter, "frappe", SimpleNamespace(request=None)),
 			patch.object(api, "_revoke_keycloak_sessions") as revoke,
 		):
 
@@ -266,7 +291,7 @@ class RequestGuardsTest(unittest.TestCase):
 				self.assertEqual(token, "fixture")
 
 			revoke.side_effect = observe
-			api.keycloak_backchannel_logout("fixture")
+			api.keycloak_backchannel_logout()
 			revoke.assert_called_once()
 
 	def test_service_guard_rejects_a_resumed_user_session(self):

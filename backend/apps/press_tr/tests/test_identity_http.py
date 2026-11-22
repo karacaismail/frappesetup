@@ -19,6 +19,12 @@ import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 from test_auth_http import PressHttpClient
 
+from press_tr.api.test___init__ import LogoutAccessTests
+from press_tr.api.test_account import AccountAccessTests
+from press_tr.api.test_auth import AuthAccessTests
+from press_tr.api.test_identity import IdentityAccessTests
+from press_tr.api.test_maintenance import MaintenanceAccessTests
+
 ISSUER = "http://keycloak.example.test/realms/platform"
 KID = uuid4().hex
 ACCOUNT_ROUTE = "/api/method/press.api.account.get"
@@ -26,7 +32,17 @@ DELETION_ROUTE = "/api/method/press_tr.api.account.request_deletion"
 IDENTITY_INVENTORY_ROUTE = "/api/method/press_tr.api.identity.list_identities"
 
 
-class IdentityHttpTest(PressHttpClient, unittest.TestCase):
+class IdentityHttpTest(
+	LogoutAccessTests,
+	AccountAccessTests,
+	AuthAccessTests,
+	IdentityAccessTests,
+	MaintenanceAccessTests,
+	PressHttpClient,
+	unittest.TestCase,
+):
+	token_issuer = ISSUER
+
 	@classmethod
 	def setUpClass(cls):
 		cls.key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -1071,11 +1087,6 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		self.assertEqual(status, 403)
 
 		return {"Cookie": f"sid={sid}"}
-
-	def test_callback_rejects_a_second_browser_without_consuming_the_first_login(self):
-		_, other_browser = self.start_login()
-		subject = uuid4().hex
-		self.sign_in(subject, f"{subject}@example.test", uuid4().hex, other_browser=other_browser)
 
 	def test_callback_validates_nonce_and_audience(self):
 		for claims in ({"nonce": "wrong"}, {"audience": "wrong"}):

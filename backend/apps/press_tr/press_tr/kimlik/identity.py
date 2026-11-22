@@ -42,7 +42,9 @@ def find_identity(issuer, subject, *, for_update=False):
 
 
 def remember_press_session(identity_link: str, keycloak_sid: str) -> None:
-	sid = frappe.session.sid
+	user, sid = frappe.session.user, frappe.session.sid
+	if user == "Guest" or not frappe.db.exists(IDENTITY_LINK, {"name": identity_link, "user": user}):
+		reject()
 	for names in session_mapping_pages({"identity_link": identity_link, "keycloak_sid": keycloak_sid}):
 		if any(read_press_session_id(name) == sid for name in names):
 			return
@@ -71,7 +73,7 @@ def bind_identity(claims):
 	email = claim(claims, "email").lower()
 	try:
 		address = Address(addr_spec=email)
-	except ValueError, HeaderParseError:
+	except (ValueError, HeaderParseError):
 		reject()
 	if len(email) > 140 or address.addr_spec != email:
 		reject()

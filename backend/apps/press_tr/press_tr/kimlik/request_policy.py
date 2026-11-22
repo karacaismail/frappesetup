@@ -104,7 +104,7 @@ def request_target():
 		if frappe.request.path == "/api/v2/method/run_doc_method":
 			return v2.run_doc_method, arguments
 		return endpoint, arguments
-	except HTTPException, ImportError, frappe.DoesNotExistError, frappe.PermissionError:
+	except (HTTPException, ImportError, frappe.DoesNotExistError, frappe.PermissionError):
 		return None, {}
 
 
