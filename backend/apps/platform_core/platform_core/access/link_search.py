@@ -67,7 +67,11 @@ def search_link(
 	link_fieldname: str | None = None,
 ) -> list:
 	"""`frappe.desk.search.search_link` behind the link search rule."""
-	if not frappe.has_permission(doctype, "select"):
+	if (
+		not doctype
+		or not frappe.db.exists("DocType", doctype)
+		or not frappe.has_permission(doctype, "select")
+	):
 		frappe.throw(_("No permission to search {0}.").format(doctype), frappe.PermissionError)
 	guard(doctype, query)
 	return search.search_link(
@@ -101,7 +105,11 @@ def search_widget(
 	query_filters_as_dict: bool = False,
 ) -> list:
 	"""`frappe.desk.search.search_widget` behind the link search rule."""
-	if not frappe.has_permission(doctype, "select"):
+	if (
+		not doctype
+		or not frappe.db.exists("DocType", doctype)
+		or not frappe.has_permission(doctype, "select")
+	):
 		frappe.throw(_("No permission to search {0}.").format(doctype), frappe.PermissionError)
 	guard(doctype, query)
 	return search.search_widget(
@@ -140,7 +148,11 @@ def validate_link_and_fetch(
 	Frappe's function hands `query` to its search from Python, past the two endpoints above.
 	A careless search function would then confirm that a record the user cannot see exists.
 	"""
-	if not frappe.has_permission(doctype, "select"):
+	if (
+		not doctype
+		or not frappe.db.exists("DocType", doctype)
+		or not frappe.has_permission(doctype, "select")
+	):
 		frappe.throw(_("No permission to search {0}.").format(doctype), frappe.PermissionError)
 	guard(doctype, query)
 	return client.validate_link_and_fetch(
