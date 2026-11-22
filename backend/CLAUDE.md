@@ -40,6 +40,10 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `identity/keycloak/themes/atonota/` | Atonota giriş teması | kimlik-tema |
 | `identity/identity_sync/` | Kullanıcı eşitleme servisi | identity-sync |
 | `libs/oidc_verify/` | Ortak belirteç doğrulama kitaplığı | kimlik-realm |
+| `apps/platform_core/platform_core/erisim/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
+| `dev/guvenlik/`, `dev/bin/guvenlik-denetimi` | Güvenlik kapısı | guvenlik-kapisi |
+| `apps/platform_core/platform_core/mobil/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
+| `apps/cronhr/`, `dev/hrms/` | CronHR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
 | `contracts/` | Uçların OpenAPI sözleşmeleri | Her uç kendi sahibinde |
 | `docs/`, `AGENTS.md`, `PROJE-KAYDI.md` | Talimat, kayıt ve sözleşme | Orkestratör |
 
@@ -74,6 +78,15 @@ Proje sahibi `cron` kurulumunu istemedi. Bu yüzden şunları kurmayın:
 
 Karar sitesi bazı yerlerde saatlik ya da gecelik iş anar. Bu işleri elle başlatılan komut olarak yazın.
 
+### Ad dili
+
+Yeni kod İngilizce adlarla yazılır (D-12). Kural yalnız bundan sonrası içindir.
+
+- Yeni dosya, klasör, modül, DocType, işlev ve değişken adını İngilizce verin.
+- Yeni yazdığınız koddaki yorumu, hata iletisini ve günlük metnini İngilizce yazın.
+- Var olan dosya, klasör ve modüllerin adını değiştirmeyin.
+- Var olan bir klasöre yeni dosya eklerseniz yalnız yeni dosyanın adını İngilizce verin.
+
 ### Yapay zekâ erişimi
 
 Proje sahibi her şeyin yapay zekâyla yönetilebilir olmasını istedi (D-9). Ayrıntı sözleşmenin 10. bölümündedir.
@@ -94,6 +107,21 @@ Proje sahibi her şeyin yapay zekâyla yönetilebilir olmasını istedi (D-9). A
 - Port tabanını `PANE_PORT` değişkeninden alın. Her Pane'in kendi 10 portluk aralığı vardır.
 - İşiniz bitince kendi container'larınızı `docker compose down` ile kapatın. Birimleri silmeyin.
 
+### Bilinen ortam sorunları
+
+kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler öteki projelere dokunmaz.
+
+1. **Klasör bağlama çalışmaz.** `colima-factory` profili yalnız `/Users/w6x/Developer/software-factory` klasörünü görür. Depo klasörünü bağlarsanız container'da boş klasör görünür. Kodu imaja `COPY` ile koyun ya da `docker cp` ile kopyalayın. Örnek: `backend/identity/keycloak/Dockerfile`.
+2. **Yeni portlar bilgisayara açılmaz.** Profilin port yönlendirmesi bozuk. Portu bilgisayara ayrı bir ssh tüneliyle taşıyın. Örnek: `backend/identity/keycloak/bin/kc-dev.sh tunel`.
+3. **`docker pull` hata verebilir.** Docker ayarındaki şifre yardımcısı eksik. İmajı boş bir `DOCKER_CONFIG` klasörüyle çekin. Kullanıcının Docker ayarını değiştirmeyin.
+4. **Disk dar.** `colima-factory` profilinin Docker diski 22 Kasım 2026 Pazar günü %99 doldu. Kullanılmayan derleme önbelleği silindi. Boş yer yaklaşık 8 GB'tır.
+   - Büyük imaj kurmadan önce `colima ssh -p factory -- df -h /var/lib/docker` ile boş yeri ölçün.
+   - Frappe için yeni temel imaj üretmeyin. `frappe/erpnext:v16.55.0` ve `press-local-bench:latest` imajlarını temel alın.
+   - Kendi eski `fs-*` imajlarınızı ve derleme önbelleğinizi silin. Başka projenin imajına dokunmayın.
+   - Boş yer 5 GB'ın altına inerse raporlayın. Gerekirse `colima` profili kullanılır. O profilde 64 GB boş disk ama 8 GB bellek var.
+5. **Colima'yı yeniden başlatmayın.** Kalıcı çözüm `colima restart factory` ister. Bu komut başka projelerin container'larını yeniden başlatır.
+
+
 ### Tarayıcı testi
 
 - Firefox testi çalıştırmayın. Proje sahibinin kalıcı kuralı bunu yasaklar.
@@ -111,6 +139,16 @@ Proje sahibi her şeyin yapay zekâyla yönetilebilir olmasını istedi (D-9). A
 - `--no-verify` kullanmayın. Yazar korumasını ve `core.hooksPath` ayarını değiştirmeyin.
 - Push yapmayın. Pull request açmayın. Dalları orkestratör birleştirir.
 - Commit mesajını yalın Türkçe yazın. Yapay zekâ imzası ve ortak yazar satırı eklemeyin.
+
+### Alt ajanlar
+
+Proje sahibi çok sayıda paralel ajan istedi. Bu yüzden alt ajan kullanabilirsiniz. Alt ajan, sizin başlattığınız yardımcı ajandır.
+
+- Birbirine bağlı olmayan işleri alt ajanlara bölün. Örneğin araştırma, test yazma ve bağımsız inceleme böyledir.
+- İki alt ajana aynı dosyayı yazdırmayın.
+- Alt ajanın sonucunu kendiniz doğrulayın. Testleri kendiniz çalıştırın.
+- Alt ajan da bu dosyadaki kurallara uyar.
+- Alt ajan sizin hesabınızın kullanım hakkını harcar. Gereksiz alt ajan açmayın.
 
 ### Yeni paket ve araç
 
