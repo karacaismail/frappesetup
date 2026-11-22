@@ -199,7 +199,7 @@ class EmployeeAnonymizationTest(IntegrationTestCase):
 			"employee_name": "Synthetic Example Employee",
 			"personal_email": f"personal-{suffix}@example.test",
 			"prefered_email": f"personal-{suffix}@example.test",
-			"cell_number": "+905550101010",
+			"cell_number": "+90 200 000 00 00",
 			"date_of_birth": "1990-01-01",
 		}
 		employee = frappe.get_doc(
