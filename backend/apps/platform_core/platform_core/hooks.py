@@ -20,6 +20,7 @@ persistent_cache_keys = ["kimlik_activity:"]
 auth_hooks = [
 	"platform_core.identity.service_token.validate",
 	"platform_core.ai.agent_token.authenticate_request",
+	"platform_core.ai.oauth.authenticate_request",
 	"platform_core.shell.native_metadata.guard_native_metadata",
 ]
 # AU-19: local sign-in functions are replaced by gated wrappers (identity/login_policy.py).
@@ -90,6 +91,7 @@ website_user_allowed_methods = [
 	# AI access layer: an end user talks to the layer and decides on their own proposals.
 	# `purge_logs` is for the System Manager role and stays off this list.
 	"platform_core.api.ai.mcp",
+	"platform_core.api.ai.mcp_resource_metadata",
 	"platform_core.api.ai.issue_agent_token",
 	"platform_core.api.ai.list_proposals",
 	"platform_core.api.ai.get_proposal",

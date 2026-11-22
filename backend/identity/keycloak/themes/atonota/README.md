@@ -91,9 +91,9 @@ E-posta teması `email/` klasöründedir. Tema dört e-postayı kapsar:
 | E-posta doğrulama | `email-verification.ftl` |
 | Parola sıfırlama | `password-reset.ftl` |
 | Yöneticinin istediği işlem | `executeActions.ftl` |
-| Sihirli bağlantı | `skycloak-magic-link-email.ftl` |
+| Sihirli bağlantı | `magiclink-email.ftl` |
 
-Sihirli bağlantı, parola yazmadan oturum açtıran e-posta bağlantısıdır. Bu e-postayı `sky-cloak/keycloak-magic-link` eklentisi gönderir. Eklentiyi kimlik-realm işi seçti.
+Sihirli bağlantı, parola yazmadan oturum açtıran e-posta bağlantısıdır. Bu e-postayı `cloudflightio/keycloak-magic-link` eklentisi gönderir. Eklentiyi kimlik-realm işi seçti.
 
 - Her e-postanın HTML ve düz metin sürümü vardır.
 - Ortak düzen `email/html/template.ftl` dosyasındadır. Renk ve yazı değerleri bu dosyanın başındadır.
@@ -161,7 +161,7 @@ Rol bir gruptan ya da bileşik bir rolden de gelebilir. Çalışanı bu rolü ta
 
 Eklentiyi Keycloak'a kurmak için kimlik-realm işi şunları yapmalıdır:
 
-1. Eklentiyi derleyin. Derleme adımı `test/Dockerfile` dosyasının ikinci aşamasındadır. Adım yalnız `javac` kullanır. Aynı aşama Java denetimini de çalıştırır.
+1. Eklentiyi `account-provider/build.sh` betiğiyle derleyin. Betik yalnız JDK 21 ister. Betik Java denetimini de çalıştırır. Derleme adımını başka bir dosyaya kopyalamayın. Örnek kullanım `test/Dockerfile` dosyasındadır.
 2. Çıkan `account-deletion-link-provider.jar` dosyasını `/opt/keycloak/providers/` klasörüne koyun.
    Keycloak `start --optimized` ile çalışıyorsa jar eklendikten sonra `kc.sh build` komutunu çalıştırın. Yoksa eklenti kaydolmaz.
 3. Keycloak container'ına `IDENTITY_ACCOUNT_DELETION_URL` değişkenini verin.
@@ -187,7 +187,7 @@ Hesap konsolunun bilinen sınırları şunlardır:
 
 ## Temel temadan kopyalanan şablonlar
 
-Altı şablon Keycloak 26.8.2 kaynağından kopyalandı ve değiştirildi. Keycloak sürümü değişince bu dosyaları yeni temel şablonla karşılaştırın.
+Tema, Keycloak 26.8.2 kaynağındaki sekiz şablonun değiştirilmiş kopyasını kullanır. Keycloak sürümü değişince bu dosyaları yeni temel şablonla karşılaştırın.
 
 | Dosya | Fark |
 | --- | --- |
@@ -196,7 +196,9 @@ Altı şablon Keycloak 26.8.2 kaynağından kopyalandı ve değiştirildi. Keycl
 | `login/select-authenticator.ftl` | Her giriş yolu gerçek bir düğmedir. Temel şablondaki satır Enter ve Space tuşuyla çalışmaz. |
 | `login/login-verify-email.ftl` | Yeniden gönderme bağlantısı tam bir cümledir. Temel şablon cümleyi parçalardan birleştirir. |
 | `login/webauthn-register.ftl` | Formun üstünde geçiş anahtarını anlatan bir açıklama vardır. |
-| `login/login-page-expired.ftl` | İki bağlantı tam birer cümledir. Bu ekran testle sınanmadı. |
+| `login/login-page-expired.ftl` | İki bağlantı tam birer cümledir. |
+| `login/login-recovery-authn-code-config.ftl` | Uyarı çevrilir. Başlık sırası düzeltilir. Dosya ve çıktı tarihi ekranın dilini kullanır. |
+| `login/logout-confirm.ftl` | Onay düğmesi doğal Tab sırasını izler. |
 
 ## Deneme ortamı
 
@@ -231,7 +233,9 @@ npx playwright test
 | --- | --- |
 | `tests/layout.spec.ts` | Yatay taşma, yazı boyutu, yazı tipi, dış istek, dokunma alanı ve büyük kök yazı |
 | `tests/focus.spec.ts` | Tab sırası, klavye odak kipi, odak çizgisinin biçimi ve zorlanmış renkler |
-| `tests/flow.spec.ts` | Kayıt, giriş, parola sıfırlama, TOTP ve passkey akışları |
+| `tests/flow.spec.ts` | Kayıt, giriş, parola sıfırlama, doğrulama kodu ve geçiş anahtarı |
+| `tests/flow.spec.ts` | Kurtarma kodu kurulumu, oturum kapatma ve giriş yöntemi silme |
+| `tests/screens-text.spec.ts` | Yedi ekranda Türkçe metin, düğme adları ve bağlantı adları |
 | `tests/locale.spec.ts` | Türkçe varsayılan dil, dil bağlantıları ve ileti anahtarları |
 | `tests/motion.spec.ts` | Hareket eğrisi, süre, azaltılmış hareket ve stil kaynağı denetimi |
 | `tests/accessibility.spec.ts` | axe denetimi, açık ve koyu tema |
@@ -271,11 +275,15 @@ Görüntüler `test/reference/` klasörüne yazılır. Bu görüntüler macOS'ta
 ## Bilinen sınırlar
 
 - İletiler kullanıcı adının e-posta adresi olduğunu varsayar. Realm bu ayarı kapatırsa iletileri güncelleyin.
-- Tema 203 iletiyi yalın Türkçeyle yazar. Öteki iletiler Keycloak'ın kendi Türkçe dosyasından gelir. Örneğin kurtarma kodu, hesap bağlama ve kullanım koşulu ekranları böyledir.
+- Tema, kendi çevirisi yoksa Keycloak’ın Türkçe metnini kullanır. Hesap bağlama ve kullanım koşulu ekranları bu metni kullanır.
 - Kayıt formuna seçmeli alan eklenirse Keycloak işletim sisteminin açılır listesini çizer. Bu liste markalı değildir. Realm'e seçmeli profil alanı eklemeyin.
 - Geçiş anahtarının tarihini ve bağlantı türünü Keycloak yazar. Örneğin “USB” yazısı Keycloak'tan gelir.
-- Sihirli bağlantı eklentisinin giriş ekranı iletileri çevrildi ama canlı denenmedi. Deneme ortamında eklenti kurulu değildir.
-- Sihirli bağlantı e-postası canlı denenmedi. Şablonun adı ve değişkenleri eklentinin jar dosyasından okundu. Eklentili bir Keycloak'ta `MAGIC_LINK_KC_URL` ve `MAGIC_LINK_ADMIN_TOKEN` değişkenleriyle `tests/email.spec.ts` testini çalıştırın.
+- Tema deneme imajı e-posta bağlantısı eklentisini içermez. Giriş seçeneğini eklentili Keycloak imajında sınayın.
+- E-posta testi, eklenti arşivindeki şablon adlarını ve konu anahtarını temayla karşılaştırır.
+- Test giriş iletilerini de iki dilde denetler. İleti anahtarları `magiclink-display-name`, `magiclink-help-text` ve `magiclink-emailSentText` değerleridir. Test boş e-posta hatasının `Email cannot be empty` anahtarını da arar.
+- Eklenti kaynağı `cloudflightio/keycloak-magic-link` deposundaki `7b4ee949a39a7ee953987162479ae1da2c57c3cb` kaydıdır. [Keycloak Dockerfile](../../Dockerfile) eklentiyi Keycloak 26.8.2 için derler.
+- `MAGIC_LINK_PROVIDER_JAR` için ürün imajındaki `/opt/keycloak/providers/keycloak-magic-link-7b4ee94.jar` dosyasını kullanın. `docker cp` ile arşivi kendi deneme klasörünüze alın.
+- Eklentili Keycloak adresini `MAGIC_LINK_KC_URL` ile verin. Deneme hesabı açmak için `MAGIC_LINK_ADMIN_TOKEN` gerekir. Canlı test bağlantıyı giriş ekranından ister.
 - E-postalar gerçek e-posta programlarında denenmedi. Örneğin Gmail ve Outlook denenmedi.
 
 - Gerçek telefon ve gerçek Safari denemesi yapılmadı. WebKit öykünmesi gerçek Safari değildir.

@@ -97,6 +97,7 @@ def setup():
             "ATONOTA_PRESS_URL": f"http://press.localhost:{port + 3}",
         }
     )
+    environment["FS_STACK_IMAGE_TAG"] = project_name(environment)
     # Domain separation keeps preview digests distinct from event signatures.
     environment["IDENTITY_SYNC_DIGEST_KEY"] = hmac.new(
         environment["IDENTITY_SYNC_WEBHOOK_SECRET"].encode(),

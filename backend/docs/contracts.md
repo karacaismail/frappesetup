@@ -369,9 +369,13 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 | `hrms_tr_retention_days` | Ayar verilmez | Hukuk sorumlusu süreyi gün olarak belirler. |
 
+### Kişisel veri silme yolları
+
+Aşağıdaki tablo, HRMS TR kayıtlarında kişisel verinin nasıl silindiğini gösterir.
+
 | Kişisel veri | Silme yolu |
 | --- | --- |
-| HRMS TR çalışan ve izin kayıtları | Hesap silme, çalışanın kişisel alanlarını anonim yapar. `hrms_tr.retention.purge` süresi dolan izin kayıtlarını O-39 kapsamında siler. |
+| HRMS TR çalışan ve izin kayıtları | Hesap silme, `user_data_fields` kancasıyla kullanıcıya bağlı çalışan kaydını seçer. Ad, soyad, kişisel ve tercih edilen e-posta, cep telefonu ve doğum tarihi anonimleşir. Çalışan ve iş kayıtları kalır. `hrms_tr.retention.purge` süresi dolan izin kayıtlarını O-39 kapsamında siler. |
 
 ## 9. Geliştirme ortamı
 
@@ -472,7 +476,8 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 | Yol | Yöntem | Kimlik | İşi |
 | --- | --- | --- | --- |
-| `platform_core.api.ai.mcp` | POST | İnsan oturumu ya da aracı belirteci | MCP ucu: araç listesi ve araç çağrısı |
+| `platform_core.api.ai.mcp` | POST | İnsan oturumu, aracı belirteci veya açıkken OAuth | Araçları listeler ve çağırır. |
+| `platform_core.api.ai.mcp_resource_metadata` | GET | Herkese açık | OAuth açıkken Keycloak adresini ve kapsamı bildirir. |
 | `platform_core.api.ai.issue_agent_token` | POST | İnsan oturumu | 300 saniyelik, 20 çağrılık aracı belirteci üretir. |
 | `platform_core.api.ai.list_proposals` | GET | İnsan oturumu | Kullanıcının önerilerini listeler. |
 | `platform_core.api.ai.get_proposal` | GET | İnsan oturumu | Önerinin önizlemesini ve özetini döner. |
@@ -484,7 +489,27 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 - `list_proposals` yanıtı bir nesnedir: `proposals` ve `has_next_page`. İstek `start` alır. Süzme ve sayfalama veritabanında yapılır.
 - Öneri `created_at` ve `expires_at` taşır. Zaman sitenin saat dilimiyle ve farkıyla ISO 8601 biçiminde döner.
 - Okuma araçlarının sonucu `as_of`, `site` ve `source` taşır. Sonuç sınırı aşarsa `truncated: true` döner. Alt tablo en çok 200 satır, sonuç verisi en çok 262.144 bayttır.
-- Oturumsuz istek 403, süresi dolmuş oturum 401 alır.
+- OAuth kapalıyken kimliksiz MCP isteği 403 alır. Süresi dolmuş oturum 401 alır.
+- OAuth varsayılan olarak kapalıdır. Açıkken kimliksiz MCP isteği 401 alır.
+- Sunucu 401 yanıtında keşif adresini `WWW-Authenticate` başlığına yazar.
+- Keşif ucu yanıtı doğrudan JSON olarak döner.
+- Keşif ucu, bir IP adresinden dakikada en çok 60 istek kabul eder.
+- MCP ucu, kullanıcı başına dakikada en çok 120 istek kabul eder.
+- MCP ucu, misafirler için bu sınırı IP adresine uygular.
+- Sunucu, Keycloak sorgusundan önce IP adresi başına dakikada 120 istek sınırı uygular.
+- Kiracı ara sunucusu, `X-Forwarded-For` başlığını doğruladığı istemci adresiyle değiştirmelidir.
+- İstemci Keycloak'ta yetki kodu akışını ve PKCE S256 yöntemini kullanır.
+- Sunucu `mcp` kapsamını ve tek hedef olarak sitenin tam MCP adresini ister.
+- Sunucu her istekte imzalı `mcp_resource` alanını da tam MCP adresiyle karşılaştırır.
+- Keycloak dönüş adresini tam eşleşmeyle denetler. Joker, parça işareti ve kullanıcı bilgisi reddedilir.
+- Sunucu her çağrıda Keycloak oturumunun açık olduğunu denetler.
+- Oturum sorgusu 3 saniyeyi aşarsa sunucu 503 döner.
+- Belirteç en çok 300 saniye geçerlidir. Bir belirteç en çok 20 araç çağrısı yapabilir.
+- Sayaç veritabanında kalır. Önceki kullanımı gösteren kayıt Redis'te kalır.
+- Bu iki kayıt, tek kayıp durumunda belirtecin yeniden hak almasını önler.
+- İki kayıt deposu birlikte geri yüklenirse OAuth desteğini 300 saniye kapalı tutun.
+- İstemci belirteci yalnız `Authorization` başlığında gönderir.
+- OAuth ile yazma aracı öneri açar. İnsan ayrı oturumda onay verir.
 
 #### Kullanım günlüğü temizliğinin modül arayüzü
 

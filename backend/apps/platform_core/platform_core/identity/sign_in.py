@@ -38,7 +38,7 @@ EXCHANGE_TIMEOUT = 10
 LEEWAY = 30
 
 
-class SignInRefused(Exception):
+class SignInRefusedError(Exception):
 	"""Stops the browser flow with an HTTP status and a message safe to show."""
 
 	def __init__(self, status: int, message: str):
@@ -47,7 +47,7 @@ class SignInRefused(Exception):
 		self.message = message
 
 
-class ExchangeFailed(Exception):
+class ExchangeFailedError(Exception):
 	"""The token endpoint did not return a token. The response body is never logged."""
 
 
@@ -113,20 +113,25 @@ def build_login_url(redirect_to: str | None = None, force_login: bool = False) -
 
 
 def complete_callback(code: str | None, state: str | None, error: str | None = None) -> str:
-	"""Finishes the sign-in. Returns the redirect target. Raises `SignInRefused` on any refusal."""
+	"""Finishes the sign-in. Returns the redirect target. Raises `SignInRefusedError` on any refusal."""
 	guard_guest_request()
 	if error:
-		raise SignInRefused(
-			400, _("The identity provider refused or cancelled the sign-in.", context="platform_core.identity")
+		raise SignInRefusedError(
+			400,
+			_("The identity provider refused or cancelled the sign-in.", context="platform_core.identity"),
 		)
 	if not isinstance(state, str) or not state or not isinstance(code, str) or not code:
-		raise SignInRefused(400, _("The sign-in response is incomplete.", context="platform_core.identity"))
+		raise SignInRefusedError(
+			400, _("The sign-in response is incomplete.", context="platform_core.identity")
+		)
 	if len(state) > helpers.MAX_STATE_LENGTH or len(code) > helpers.MAX_CODE_LENGTH:
-		raise SignInRefused(400, _("The sign-in response is incomplete.", context="platform_core.identity"))
+		raise SignInRefusedError(
+			400, _("The sign-in response is incomplete.", context="platform_core.identity")
+		)
 
 	record = _pop_state(state)
 	if record is None:
-		raise SignInRefused(
+		raise SignInRefusedError(
 			400,
 			_(
 				"This sign-in attempt is unknown, expired or already used. Please try again.",
@@ -135,7 +140,7 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 		)
 	browser_token = frappe.request.cookies.get(_cookie_name()) if frappe.request else None
 	if not browser_token:
-		raise SignInRefused(
+		raise SignInRefusedError(
 			400,
 			_(
 				"The sign-in cookie is missing. Please start again in this browser.",
@@ -143,27 +148,28 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 			),
 		)
 	if not hmac.compare_digest(helpers.sha256_hex(browser_token), record.get("browser", "")):
-		raise SignInRefused(
+		raise SignInRefusedError(
 			403, _("This sign-in was started in a different browser.", context="platform_core.identity")
 		)
 
 	try:
 		settings = site_settings.get()
 	except KeycloakSettingsMissing as error:
-		raise SignInRefused(
+		raise SignInRefusedError(
 			503, _("Sign in with the identity provider is not configured.", context="platform_core.identity")
 		) from error
 
 	try:
 		tokens = exchange_code(settings, code, record["verifier"], callback_url())
-	except ExchangeFailed as error:
-		raise SignInRefused(
+	except ExchangeFailedError as error:
+		raise SignInRefusedError(
 			503, _("The identity provider could not be reached.", context="platform_core.identity")
 		) from error
 	id_token = tokens.get("id_token") if isinstance(tokens, dict) else None
 	if not isinstance(id_token, str) or not id_token:
-		raise SignInRefused(
-			400, _("The identity provider did not return an identity token.", context="platform_core.identity")
+		raise SignInRefusedError(
+			400,
+			_("The identity provider did not return an identity token.", context="platform_core.identity"),
 		)
 
 	from oidc_verify import TokenError, verify_id_token
@@ -178,14 +184,14 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 			leeway=LEEWAY,
 		)
 	except TokenError as error:
-		raise SignInRefused(
+		raise SignInRefusedError(
 			400,
 			_("The identity token is not valid ({0}).", context="platform_core.identity").format(error.code),
 		) from error
 	except Exception as error:
 		if not jwks.is_keys_unavailable(error):
 			raise
-		raise SignInRefused(
+		raise SignInRefusedError(
 			503, _("The identity provider keys are not available.", context="platform_core.identity")
 		) from error
 
@@ -193,7 +199,7 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 	decision = session_policy.check_fresh_authentication(user, claims, record)
 	if decision == "refuse":
 		# O-25: the forced attempt must bring an authentication made during that attempt.
-		raise SignInRefused(
+		raise SignInRefusedError(
 			403,
 			_("The identity provider did not confirm a fresh sign-in.", context="platform_core.identity"),
 		)
@@ -201,7 +207,12 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 		# O-25: an employee idle for the limit authenticates again; the open Keycloak cookie does not count.
 		return build_login_url(record.get("redirect_to") or None, force_login=True)["login_url"]
 	_lock_identity_for_sign_in(settings.issuer, claims, user)
-	frappe.local.login_manager.login_as(user)
+	# Frappe opens the session before the account is rechecked. Defer both activity markers.
+	frappe.flags.identity_sign_in_pending = True
+	try:
+		frappe.local.login_manager.login_as(user)
+	finally:
+		frappe.flags.pop("identity_sign_in_pending", None)
 	# Frappe commits right after it inserts the session row (frappe/sessions.py:301), which ends the lock.
 	# Take it again and check once more: a deletion that ran in between has closed this session too.
 	try:
@@ -220,6 +231,7 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 	frappe.local.session_obj.update(force=True)
 	# V-2: the callback is a GET request, and Frappe does not commit GET requests on its own.
 	frappe.db.commit()
+	session_policy.mark_activity(frappe.session.sid, user)
 	frappe.local.cookie_manager.delete_cookie(_cookie_name())
 	return record.get("redirect_to") or settings.panel_url
 
@@ -234,28 +246,36 @@ def _lock_identity_for_sign_in(issuer: str, claims: dict, user: str) -> None:
 	from platform_core.identity import anonymization
 
 	frappe.db.commit()
-	link, record = anonymization.lock_identity(issuer, claims["sub"].strip(), require_key=False)
+	link, record = anonymization._lock_identity_with_retry(issuer, claims["sub"].strip(), require_key=False)
 	refused = record or not link or link.user != user
 	if not refused and not frappe.db.get_value("User", user, "enabled", for_update=True):
 		refused = True
 	if refused:
-		raise SignInRefused(403, _("This user is disabled.", context="platform_core.identity"))
+		raise SignInRefusedError(403, _("This user is disabled.", context="platform_core.identity"))
 
 
 def _close_new_session() -> None:
+	from frappe.auth import clear_cookies
 	from frappe.sessions import delete_session
 
-	sid = getattr(frappe.session, "sid", None)
-	frappe.local.cookie_manager.delete_cookie("sid")
+	sid = frappe.session.sid
+	# Frappe stages these fields before the final identity check.
+	for field in ("message", "home_page", "full_name"):
+		frappe.local.response.pop(field, None)
+	frappe.local.cookie_manager.cookies.clear()
+	clear_cookies()
+	frappe.local.cookie_manager.delete_cookie(_cookie_name())
 	if sid and sid != "Guest":
+		frappe.cache.delete_value(session_policy._session_key(sid))
 		delete_session(sid, reason="Sign-in identity recheck failed")
+	frappe.set_user("Guest")
 
 
 def resolve_user(issuer: str, claims: dict) -> str:
 	"""Finds the Frappe user for `(iss, sub)`. Creates the first link only with a verified e-mail."""
 	subject = claims.get("sub")
 	if not isinstance(subject, str) or not subject.strip():
-		raise SignInRefused(
+		raise SignInRefusedError(
 			400, _("The identity provider did not send a subject.", context="platform_core.identity")
 		)
 	subject = subject.strip()
@@ -263,12 +283,12 @@ def resolve_user(issuer: str, claims: dict) -> str:
 	from platform_core.identity import anonymization
 
 	if anonymization.is_deleted(issuer, subject):
-		raise SignInRefused(403, _("This user is disabled.", context="platform_core.identity"))
+		raise SignInRefusedError(403, _("This user is disabled.", context="platform_core.identity"))
 
 	user = frappe.db.get_value(LINK_DOCTYPE, {"issuer": issuer, "subject": subject}, "user")
 	if not user:
 		if not email or not frappe.db.exists("User", email):
-			raise SignInRefused(
+			raise SignInRefusedError(
 				403,
 				_(
 					"There is no account for this e-mail address. Sign-up is closed.",
@@ -276,11 +296,12 @@ def resolve_user(issuer: str, claims: dict) -> str:
 				),
 			)
 		if frappe.db.exists(LINK_DOCTYPE, {"issuer": issuer, "user": email}):
-			raise SignInRefused(
-				403, _("This user is already linked to a different identity.", context="platform_core.identity")
+			raise SignInRefusedError(
+				403,
+				_("This user is already linked to a different identity.", context="platform_core.identity"),
 			)
 		if not helpers.email_verified(claims):
-			raise SignInRefused(
+			raise SignInRefusedError(
 				403,
 				_(
 					"The e-mail address is not verified by the identity provider.",
@@ -288,17 +309,17 @@ def resolve_user(issuer: str, claims: dict) -> str:
 				),
 			)
 		if not frappe.db.get_value("User", email, "enabled"):
-			raise SignInRefused(403, _("This user is disabled.", context="platform_core.identity"))
+			raise SignInRefusedError(403, _("This user is disabled.", context="platform_core.identity"))
 		create_link(issuer, subject, email)
 		return email
 
 	if email and email != user.lower():
 		# The identity is linked, but the provider now reports another user's address (AU-4: refuse on mismatch).
-		raise SignInRefused(
+		raise SignInRefusedError(
 			403, _("This identity is linked to a different user.", context="platform_core.identity")
 		)
 	if not frappe.db.get_value("User", user, "enabled"):
-		raise SignInRefused(403, _("This user is disabled.", context="platform_core.identity"))
+		raise SignInRefusedError(403, _("This user is disabled.", context="platform_core.identity"))
 	return user
 
 
@@ -325,8 +346,10 @@ def create_link(issuer: str, subject: str, user: str) -> str:
 	if existing and existing.user == user:
 		return existing.name
 	if not existing:
-		raise SignInRefused(403, _("The identity link changed. Try again.", context="platform_core.identity"))
-	raise SignInRefused(
+		raise SignInRefusedError(
+			403, _("The identity link changed. Try again.", context="platform_core.identity")
+		)
+	raise SignInRefusedError(
 		403, _("This identity is linked to a different user.", context="platform_core.identity")
 	)
 
@@ -351,13 +374,13 @@ def exchange_code(settings, code: str, code_verifier: str, redirect_uri: str) ->
 			timeout=EXCHANGE_TIMEOUT,
 		)
 	except requests.RequestException as error:
-		raise ExchangeFailed("request failed") from error
+		raise ExchangeFailedError("request failed") from error
 	if response.status_code != 200:
-		raise ExchangeFailed(f"status {response.status_code}")
+		raise ExchangeFailedError(f"status {response.status_code}")
 	try:
 		return response.json()
 	except ValueError as error:
-		raise ExchangeFailed("invalid json") from error
+		raise ExchangeFailedError("invalid json") from error
 
 
 def callback_url() -> str:
