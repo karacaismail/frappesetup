@@ -214,6 +214,8 @@ Ortamı `colima` profilinde açmak için komutun önüne `FS_COLIMA_PROFILE=defa
 
 Betik ilk çalışmada `test/.env` dosyasını üretir. Bu dosya Git'e girmez. Port tabanı `PANE_PORT` değişkeninden gelir. Keycloak taban portu, Mailpit ekranı bir sonraki portu kullanır. Mailpit, gönderilen e-postaları yakalayan deneme posta kutusudur.
 
+Depoda sabit deneme parolası ve TOTP gizli değeri yoktur. Betik `up` komutunda iki rastgele değer üretir ve `test/.env` dosyasına yazar. Değer üretilemezse betik hata koduyla durur ve var olan dosyaya dokunmaz. Değişkenlerin adı `IDENTITY_TEST_PASSWORD` ve `IDENTITY_TEST_TOTP_SECRET` olur. Değer yoksa testler açık bir hatayla durur.
+
 Deneme realm'inin adı `theme-test` olur. Tema yalnız bu realm'de seçilidir.
 
 ## Testler
@@ -237,6 +239,8 @@ npx playwright test
 | `tests/account.spec.ts` | Hesap konsolu: yerleşim, odak, hareket, axe, Türkçe iletiler ve token eşliği |
 | `tests/focus-diff.ts` | Odak çizgisini ölçen ortak yardımcı |
 | `tests/delete-account.spec.ts` | Hesap silme bağlantısı: müşteri görür, çalışan görmez, adres ayardan gelir |
+| `tests/session-states.spec.ts` | Misafir, oturumlu kullanıcı ve sunucuda biten oturum: giriş, hesap konsolu ve silme bağlantısı doğru davranır |
+| `tests/dev-script.spec.ts` | Deneme betiği rastgele değerleri güvenle yazar. Üretim başarısızsa dolu ayar dosyası değişmez. |
 | `tests/realm-settings.spec.ts` | Keycloak'ın silme eylemi yanlışlıkla açılsa da konsol onu sunmaz. Test bu yanlış ayarı ayrı bir realm'de kurar. Adı `theme-test-delete-action-on` olur. Asıl deneme realm'inin ayarını hiçbir test değiştirmez. |
 | `tests/security.spec.ts` | Güvenlik başlıkları, XSS denemeleri, tarayıcı deposu ve kaynak denetimi |
 | `tests/brand.spec.ts` | Marka adı değişkenden gelir: giriş, e-posta, hesap konsolu ve kaynak denetimi |

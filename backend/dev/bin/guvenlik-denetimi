@@ -24,7 +24,7 @@ scan_secrets() {
 status=0
 "${semgrep[@]}" --test --strict --metrics=off "$rules" || status=1
 "${semgrep[@]}" scan --error --strict --metrics=off \
-    --config "$rules/rules.yaml" --config "$rules/jinja.yaml" \
+    --config "$rules" \
     --exclude 'backend/dev/guvenlik/fixtures/' --exclude 'backend/dev/security/fixtures/' backend || status=1
 if backend/dev/security/history-scan --self-test; then
     scan_secrets || status=1

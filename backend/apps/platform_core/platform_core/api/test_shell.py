@@ -50,6 +50,31 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 		self.assertIn("Kabuk Reader Private", targets)
 		self.assertNotIn("Kabuk Other Private", targets)
 
+	def test_sidebar_commit_invalidates_cached_bootstrap(self):
+		path = "/api/method/platform_core.api.shell.get_bootstrap"
+		sidebar_name = "Shell Review Links"
+
+		def change_link(url):
+			sidebar = frappe.get_doc("Sidebar", sidebar_name)
+			link = next(item for item in sidebar.items if item.label == "Shell Safe Link")
+			link.url = url
+			sidebar.save()
+			frappe.db.commit()
+
+		status, headers, body = self.request(path, self.reader_sid)
+		self.assertEqual(status, 200)
+		self.assertIn(b'"/panel"', body)
+		try:
+			change_link("/shell-updated")
+			status, updated_headers, body = self.request(
+				path, self.reader_sid, headers={"If-None-Match": headers["ETag"]}
+			)
+			self.assertEqual(status, 200)
+			self.assertNotEqual(updated_headers["ETag"], headers["ETag"])
+			self.assertIn(b'"/shell-updated"', body)
+		finally:
+			change_link("/panel")
+
 	def issue_reader_api_keys(self):
 		"""Use the HTTP worker that caches the site's encryption settings."""
 		sid = None

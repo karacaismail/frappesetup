@@ -13,17 +13,38 @@ from frappe.utils import now_datetime
 
 from platform_core import hooks
 from platform_core.api import model
-from platform_core.model_gecidi import gateway, ledger, maintenance, management_tools, policy
+from platform_core.model_gecidi import api, gateway, ledger, maintenance, management_tools, policy
 
 
 class PreviewRequiredTests(unittest.TestCase):
+	def test_public_purge_previews_without_writes(self):
+		with (
+			patch.object(maintenance, "frappe") as framework,
+			patch.object(policy, "require_user"),
+			patch.object(maintenance, "now_datetime", return_value=datetime(2026, 1, 1)),
+		):
+			framework.get_roles.return_value = ["System Manager"]
+			framework.db.count.return_value = 3
+			self.assertEqual(api.purge_usage_logs(dry_run=True), {"eligible": 3, "deleted": 0})
+			framework.delete_doc.assert_not_called()
+			framework.get_doc.assert_not_called()
+			self.assertEqual(framework.cache.mock_calls, [])
+
+	def test_public_purge_rejects_an_ai_manager(self):
+		with (
+			patch.object(policy, "require_user"),
+			patch.object(frappe, "get_roles", return_value=["AI Manager"]),
+		):
+			with self.assertRaises(frappe.PermissionError):
+				api.purge_usage_logs()
+
 	def test_delete_rejects_missing_preview_before_querying_records(self):
 		with (
 			patch.object(maintenance, "frappe") as framework,
 			patch.object(policy, "require_user"),
 			patch.object(maintenance, "now_datetime", return_value=datetime(2026, 1, 1)),
 		):
-			framework.conf.get.return_value = 365
+			framework.get_roles.return_value = ["System Manager"]
 			with self.assertRaises(policy.Denied) as caught:
 				maintenance.purge_usage(dry_run=False)
 			self.assertEqual((caught.exception.status, caught.exception.code), (400, "preview_required"))
@@ -54,7 +75,8 @@ class PreviewRequiredTests(unittest.TestCase):
 			patch.object(maintenance, "now_datetime", return_value=now),
 		):
 			framework.session.user = "Manager A"
-			framework.conf.get.return_value = 365
+			framework.get_roles.return_value = ["System Manager"]
+			framework.db.count.return_value = 0
 			framework.cache.get_value.return_value = {
 				"user": "Manager A",
 				"days": 365,
@@ -70,6 +92,7 @@ class PreviewRequiredTests(unittest.TestCase):
 	def test_foreign_preview_rejects_before_querying_records(self):
 		with patch.object(maintenance, "frappe") as framework, patch.object(policy, "require_user"):
 			framework.session.user = "Manager B"
+			framework.get_roles.return_value = ["System Manager"]
 			framework.cache.get_value.return_value = {"user": "Manager A"}
 			with self.assertRaises(policy.Denied) as caught:
 				maintenance.purge_usage(dry_run=False, preview_token="a" * 64)
@@ -84,7 +107,7 @@ class PreviewRequiredTests(unittest.TestCase):
 			patch.object(maintenance, "now_datetime", return_value=now),
 		):
 			framework.session.user = "Manager A"
-			framework.conf.get.return_value = 365
+			framework.get_roles.return_value = ["System Manager"]
 			framework.cache.get_value.return_value = {
 				"user": "Manager A",
 				"days": 365,
@@ -122,6 +145,25 @@ class PreviewRequiredTests(unittest.TestCase):
 
 
 class TestUsageMaintenance(IntegrationTestCase):
+	def test_public_purge_uses_fixed_retention_and_returns_counts(self):
+		now = now_datetime()
+		old = self._usage("success", now - timedelta(days=366))
+		recent = self._usage("success", now - timedelta(days=364))
+		pending = self._usage("pending", now - timedelta(days=366))
+		with patch.dict(frappe.conf, {"model_gateway_usage_retention_days": 36500}):
+			self.assertEqual(api.purge_usage_logs(dry_run=True), {"eligible": 1, "deleted": 0})
+			self.assertTrue(frappe.db.exists("AI Usage Log", old.name))
+			self.assertEqual(api.purge_usage_logs(), {"eligible": 1, "deleted": 1})
+		self.assertFalse(frappe.db.exists("AI Usage Log", old.name))
+		self.assertTrue(frappe.db.exists("AI Usage Log", recent.name))
+		self.assertTrue(frappe.db.exists("AI Usage Log", pending.name))
+		self.assertFalse(
+			frappe.db.exists(
+				"Deleted Document",
+				{"deleted_doctype": "AI Usage Log", "deleted_name": old.name},
+			)
+		)
+
 	def _usage(self, outcome, attempted_at):
 		suffix = uuid4().hex
 		provider = frappe.get_doc(
@@ -166,11 +208,10 @@ class TestUsageMaintenance(IntegrationTestCase):
 	def test_confirmed_purge_leaves_no_deleted_document_copy(self):
 		old = now_datetime() - timedelta(days=366)
 		log = self._usage("success", old)
-		with patch.dict(frappe.conf, {"model_gateway_usage_retention_days": 365}):
-			preview = maintenance.purge_usage()
-			self.assertIn(log.name, preview["targets"])
-			self.assertTrue(frappe.db.exists("AI Usage Log", log.name))
-			execution = maintenance.purge_usage(dry_run=False, preview_token=preview["preview_token"])
+		preview = maintenance.purge_usage()
+		self.assertIn(log.name, preview["targets"])
+		self.assertTrue(frappe.db.exists("AI Usage Log", log.name))
+		execution = maintenance.purge_usage(dry_run=False, preview_token=preview["preview_token"])
 		self.assertIn(log.name, execution["targets"])
 		self.assertFalse(frappe.db.exists("AI Usage Log", log.name))
 		deleted = frappe.db.get_value(
@@ -183,12 +224,11 @@ class TestUsageMaintenance(IntegrationTestCase):
 
 	def test_purge_rejects_a_changed_batch_without_deleting_other_rows(self):
 		old = now_datetime() - timedelta(days=366)
-		changed, other = [self._usage("success", old) for _ in range(2)]
-		with patch.dict(frappe.conf, {"model_gateway_usage_retention_days": 365}):
-			preview = maintenance.purge_usage()
-			frappe.db.set_value("AI Usage Log", changed.name, "result", "unknown")
-			with self.assertRaises(policy.Denied) as caught:
-				maintenance.purge_usage(dry_run=False, preview_token=preview["preview_token"])
+		changed, other = [self._usage("success", old) for _sample_index in range(2)]
+		preview = maintenance.purge_usage()
+		frappe.db.set_value("AI Usage Log", changed.name, "result", "unknown")
+		with self.assertRaises(policy.Denied) as caught:
+			maintenance.purge_usage(dry_run=False, preview_token=preview["preview_token"])
 		self.assertEqual(caught.exception.code, "preview_invalid")
 		self.assertTrue(frappe.db.exists("AI Usage Log", other.name))
 
@@ -208,7 +248,7 @@ class TestUsageMaintenance(IntegrationTestCase):
 
 	def test_ai_recovery_changes_only_the_named_reservation(self):
 		attempted = now_datetime() - timedelta(seconds=gateway.STALE_ATTEMPT_SECONDS + 5)
-		first, second = [self._usage("pending", attempted) for _ in range(2)]
+		first, second = [self._usage("pending", attempted) for _sample_index in range(2)]
 		preview = management_tools.preview_reconcile_pending(name=first.name)
 		self.assertEqual(preview["target_name"], first.name)
 		self.assertEqual(preview["target_version"], str(first.modified))
