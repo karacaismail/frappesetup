@@ -1,4 +1,6 @@
 {
+ "actions": [],
+ "creation": "2026-11-22 19:02:41.000000",
  "description": "Internal durable limit on tool calls made with an external MCP token. The row name is a digest of the client ID and token.",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -23,7 +25,14 @@
    "search_index": 1
   }
  ],
+ "links": [],
+ "modified": "2026-11-22 19:53:09.000000",
+ "modified_by": "Administrator",
  "module": "AI",
  "name": "PLT MCP Call Budget",
- "permissions": []
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
 }

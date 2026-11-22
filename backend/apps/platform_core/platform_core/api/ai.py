@@ -1,14 +1,15 @@
 """Endpoints of the AI access layer. The business rules live in the `platform_core.ai` module.
 
-Contract: contracts/platform_core-yapay-zeka.openapi.yaml
+Contract: contracts/platform_core-ai.openapi.yaml
 
 The endpoints stay thin, so the permission checks live in the module, not in these functions.
 The security gate's `frappe-missing-permission` rule looks for a check inside the function body.
 Each suppression below names the function that does the check. `api/test_ai.py` proves every
-endpoint refuses a guest and refuses another user's data.
+protected endpoint refuses guests and that discovery exposes only public metadata.
 """
 
 import frappe
+from frappe.rate_limiter import rate_limit
 from werkzeug.wrappers import Response
 
 from platform_core.ai import access, agent_token, oauth, proposals, retention
@@ -17,6 +18,7 @@ from platform_core.ai import mcp as mcp_endpoint
 
 # Checked in `mcp._check_principal` (identity type) and, per tool, by the tool's own permission check.
 @frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: frappe-missing-permission
+@rate_limit(limit=120, seconds=60, user_based=True)
 def mcp() -> Response:
 	"""MCP endpoint. Requires an accepted session or bearer credential."""
 	return mcp_endpoint.handle()
@@ -24,6 +26,7 @@ def mcp() -> Response:
 
 # This public document discloses only validated discovery settings when OAuth is enabled.
 @frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: frappe-missing-permission
+@rate_limit(limit=60, seconds=60)
 def mcp_resource_metadata() -> Response:
 	"""Return the OAuth protected resource metadata as bare JSON."""
 	return oauth.resource_metadata()

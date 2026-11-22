@@ -484,6 +484,11 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 - OAuth varsayılan olarak kapalıdır. Açıkken kimliksiz MCP isteği 401 alır.
 - Sunucu 401 yanıtında keşif adresini `WWW-Authenticate` başlığına yazar.
 - Keşif ucu yanıtı doğrudan JSON olarak döner.
+- Keşif ucu, bir IP adresinden dakikada en çok 60 istek kabul eder.
+- MCP ucu, kullanıcı başına dakikada en çok 120 istek kabul eder.
+- MCP ucu, misafirler için bu sınırı IP adresine uygular.
+- Sunucu, Keycloak sorgusundan önce IP adresi başına dakikada 120 istek sınırı uygular.
+- Kiracı ara sunucusu, `X-Forwarded-For` başlığını doğruladığı istemci adresiyle değiştirmelidir.
 - İstemci Keycloak'ta yetki kodu akışını ve PKCE S256 yöntemini kullanır.
 - Sunucu `mcp` kapsamını ve tek hedef olarak sitenin tam MCP adresini ister.
 - Sunucu her istekte imzalı `mcp_resource` alanını da tam MCP adresiyle karşılaştırır.

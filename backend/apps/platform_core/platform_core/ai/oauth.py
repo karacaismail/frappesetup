@@ -4,6 +4,7 @@ import hashlib
 
 import frappe
 from frappe import _
+from frappe.rate_limiter import rate_limit
 from redis.exceptions import RedisError
 from werkzeug.wrappers import Response
 
@@ -59,7 +60,7 @@ def authenticate_request() -> None:
 		raise frappe.PermissionError(_("Send either a session cookie or a bearer token.", context=CONTEXT))
 
 	try:
-		identity = identity_api.verify_mcp_token(token)
+		identity = _verify_bearer(token)
 	except identity_api.ServiceTokenRejected as error:
 		add_challenge(config)
 		if getattr(error, "reason", None) == "expired":
@@ -73,6 +74,12 @@ def authenticate_request() -> None:
 		"budget": hashlib.sha256(f"{identity['client_id']}\0{token}".encode()).hexdigest(),
 		"expires_at": identity["expires_at"],
 	}
+
+
+# Frappe authenticates before dispatch, so the endpoint's limiter cannot protect Keycloak.
+@rate_limit(limit=120, seconds=60)
+def _verify_bearer(token: str) -> dict:
+	return identity_api.verify_mcp_token(token)
 
 
 class CallBudgetUnavailable(frappe.ValidationError):

@@ -114,6 +114,7 @@ paths:
         "404": {description: Unknown method or unknown tool.}
         "406": {description: "The `Accept` header does not allow the value `application/json`."}
         "415": {description: "The `Content-Type` value is not `application/json`."}
+        "429": {description: MCP allows 120 requests per minute per signed-in account or guest IP. External OAuth verification also allows 120 requests per minute per IP before contacting Keycloak.}
         "503": {description: The OAuth identity provider or call allowance store is unavailable.}
 
   /platform_core.api.ai.mcp_resource_metadata:
@@ -130,6 +131,7 @@ paths:
             application/json:
               schema: {$ref: "#/components/schemas/McpResourceMetadata"}
         "404": {description: OAuth metadata is unavailable on this site.}
+        "429": {description: Discovery allows 60 requests per minute per IP.}
 
   /platform_core.api.ai.issue_agent_token:
     post:
@@ -651,6 +653,7 @@ x-mcp-oauth:
   registration: administrator
   grantType: authorization_code
   pkce: S256
+  userConsentRequired: true
   redirectUriMatching: exact
   scope: mcp
   audience: exact MCP resource URL
@@ -661,6 +664,7 @@ x-mcp-oauth:
   maxToolCallsPerToken: 20
   liveSessionRequired: true
   sessionCheckDeadlineSeconds: 3
+  sessionCheckResponseLimitBytes: 8192
   humanApprovalGranted: false
 
 x-mcp-tools:

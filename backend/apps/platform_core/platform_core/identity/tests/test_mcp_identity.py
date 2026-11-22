@@ -126,7 +126,6 @@ class TestMcpIdentity(TestCase):
 		)
 		self.set_user.assert_not_called()
 		self.assertEqual(self.transport.call_args.args[0], INTROSPECTION_URL)
-		self.assertEqual(self.transport.call_args.kwargs["max_bytes"], 64 * 1024)
 		self.assertEqual(
 			self.db.get_value.call_args_list[0].args,
 			("PLT Identity Link", {"issuer": ISSUER, "subject": SUBJECT}, "user"),
@@ -308,17 +307,23 @@ class TestMcpIntrospectionDeadline(TestCase):
 			self.assertFalse(received.is_set())
 			self.assertTrue(self.worker_finished())
 
-	def test_trusted_provider_returns_complete_json(self):
-		with self.tls_server("valid") as (url, closed, received):
-			mcp_tokens._verify_live_session(
-				"synthetic",
-				replace(self.settings, introspection_url=url),
-				subject=SUBJECT,
-				session_id=SID,
-				client_id=CLIENT,
-			)
-			self.assertTrue(closed.wait(1))
-			self.assertTrue(received.is_set())
+	def test_trusted_provider_body_size_limit(self):
+		for framing in ("content-length", "chunked", "close"):
+			for size in (8192, 8193):
+				with (
+					self.subTest(framing=framing, size=size),
+					self.tls_server("valid", size=size, framing=framing) as (url, _closed, received),
+				):
+					settings = replace(self.settings, introspection_url=url)
+					identity = {"subject": SUBJECT, "session_id": SID, "client_id": CLIENT}
+					if size == 8192:
+						mcp_tokens._verify_live_session("synthetic", settings, **identity)
+					else:
+						with self.assertRaises(KeycloakKeysUnavailable) as unavailable:
+							mcp_tokens._verify_live_session("synthetic", settings, **identity)
+						self.assertEqual(unavailable.exception.http_status_code, 503)
+						self.assertEqual(str(unavailable.exception), "MCP identity provider unavailable.")
+					self.assertTrue(received.is_set())
 
 	def test_redirect_is_refused_before_creating_another_connection(self):
 		connect = socket.socket.connect
@@ -345,7 +350,7 @@ class TestMcpIntrospectionDeadline(TestCase):
 			self.assertEqual(len(addresses), 1)
 
 	@contextmanager
-	def tls_server(self, stage, *, trust=True):
+	def tls_server(self, stage, *, trust=True, size=8192, framing="content-length"):
 		closed = Event()
 		received = Event()
 		with TemporaryDirectory() as directory:
@@ -382,7 +387,7 @@ class TestMcpIntrospectionDeadline(TestCase):
 				listener.settimeout(1)
 				worker = Thread(
 					target=self.serve_tls,
-					args=(listener, server_context, stage, closed, received),
+					args=(listener, server_context, stage, closed, received, size, framing),
 					daemon=True,
 				)
 				port = listener.getsockname()[1]
@@ -398,7 +403,7 @@ class TestMcpIntrospectionDeadline(TestCase):
 				finally:
 					worker.join(2)
 
-	def serve_tls(self, listener, context, stage, closed, received):
+	def serve_tls(self, listener, context, stage, closed, received, size, framing):
 		try:
 			client, _address = listener.accept()
 			if stage == "handshake":
@@ -425,7 +430,15 @@ class TestMcpIntrospectionDeadline(TestCase):
 							"username": "sample-user",
 						}
 					).encode()
-					secure.sendall(f"HTTP/1.1 200 OK\r\nContent-Length: {len(body)}\r\n\r\n".encode() + body)
+					body = body.ljust(size)
+					if framing == "content-length":
+						headers = f"Content-Length: {len(body)}\r\n".encode()
+					elif framing == "chunked":
+						headers = b"Transfer-Encoding: chunked\r\n"
+						body = f"{len(body):x}\r\n".encode() + body + b"\r\n0\r\n\r\n"
+					else:
+						headers = b"Connection: close\r\n"
+					secure.sendall(b"HTTP/1.1 200 OK\r\n" + headers + b"\r\n" + body)
 					closed.set()
 					return
 				if stage == "redirect":

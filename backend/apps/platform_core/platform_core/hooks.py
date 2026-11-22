@@ -89,6 +89,7 @@ website_user_allowed_methods = [
 	# AI access layer: an end user talks to the layer and decides on their own proposals.
 	# `purge_logs` is for the System Manager role and stays off this list.
 	"platform_core.api.ai.mcp",
+	"platform_core.api.ai.mcp_resource_metadata",
 	"platform_core.api.ai.issue_agent_token",
 	"platform_core.api.ai.list_proposals",
 	"platform_core.api.ai.get_proposal",

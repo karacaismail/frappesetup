@@ -74,6 +74,10 @@ Testlerin lint denetimi `uvx ruff check tests` komutudur. Ayar `ruff.toml` dosya
 MCP, yapay zekâ istemcisinin araç çağırdığı yöntemdir.
 Realm şablonu MCP istemcilerini kapalı tutar. Kabul testleri bitene kadar kapalı bırakın.
 Keycloak 26.8.2, kaynak adresini denetlemek için `resource-indicators` özelliğini ister. [Keycloak kılavuzu](https://www.keycloak.org/securing-apps/mcp-authz-server)
+İstemci, kiracı çalışanı için 1 saat boşta kalma sınırı uygular.
+Çalışan oturumu en çok 24 saat sürer.
+Keycloak ilk izin sırasında dış istemcinin adını ve kapsamı gösterir.
+Kullanıcı onay verirse Keycloak erişim kodunu üretir.
 Dönüş adresini `ATONOTA_MCP_REDIRECT_URI` değerinde tam olarak belirtin.
 Keycloak, istekteki adresi kayıtlı adresle birebir karşılaştırır.
 Keycloak, adresi kayıtta ve izin isteğinde denetler.
@@ -88,13 +92,17 @@ Keycloak, belirteç isteğinde adres eksik veya farklıysa isteği reddeder.
 Platform, oturumun açık olduğunu Keycloak'a sorar.
 Bu sorguda istemci adı olarak tam MCP adresini kullanır.
 Sorgu, `ATONOTA_MCP_INTROSPECTION_SECRET` değerini parola olarak kullanır.
+Geliştirme betiği eksik MCP ayarlarını ekler ve rastgele parola üretir.
+Realm'i doğrudan içe aktarırsanız üç `ATONOTA_MCP_*` değerini önceden verin.
 
 Yeni MCP istemcisini kaydederken `mcp.external-client` değerini `true` yapın.
 `mcp.expected-resource` değerine sitenin tam MCP adresini yazın.
 İstemciye `mcp` kapsamını ekleyin. Bu kapsam MCP araçlarına erişim isteğini bildirir.
 
 Canlı realm testleri için ayrı bir yerel Keycloak kullanın.
-Şablondaki üç MCP istemcisini ve `basic` ile `mcp` kapsamlarını yükleyin.
+Şablondaki üç MCP istemcisini yükleyin.
+`acr`, `basic` ve `mcp` kapsamlarını da yükleyin.
+Çalışan doğrulama düzeyini uygulayan giriş akışını yükleyin.
 Şablondaki istemci kurallarını ve eklentiyi de yükleyin.
 MCP istemcilerini yalnız bu test ortamında açın. Örnek bir kullanıcı oluşturun.
 Örnek kullanıcıya ad, soyad ve e-posta adresi verin.

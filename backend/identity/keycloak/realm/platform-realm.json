@@ -774,6 +774,7 @@
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "fullScopeAllowed": false,
+      "consentRequired": true,
       "redirectUris": ["${ATONOTA_MCP_REDIRECT_URI:https://mcp-client.example.test/callback}"],
       "webOrigins": [],
       "attributes": {
@@ -783,9 +784,14 @@
         "pkce.code.challenge.method": "S256",
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
-        "use.refresh.tokens": "true"
+        "use.refresh.tokens": "true",
+        "client.session.idle.timeout": "3600",
+        "client.session.max.lifespan": "86400",
+        "acr.loa.map": "{\"employee\": 1}",
+        "default.acr.values": "employee",
+        "minimum.acr.value": "employee"
       },
-      "defaultClientScopes": ["basic"],
+      "defaultClientScopes": ["acr", "basic"],
       "optionalClientScopes": ["mcp"]
     },
     {

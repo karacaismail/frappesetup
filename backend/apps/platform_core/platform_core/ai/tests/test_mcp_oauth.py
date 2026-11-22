@@ -17,6 +17,7 @@ RESOURCE = "https://tenant.example.test/api/method/platform_core.api.ai.mcp"
 ISSUER = "https://identity.example.test/realms/platform"
 METADATA = "/api/method/platform_core.api.ai.mcp_resource_metadata"
 CONFIG = {"resource": RESOURCE, "issuer": ISSUER}
+CHALLENGE = f'Bearer resource_metadata="https://tenant.example.test{METADATA}", scope="mcp"'
 
 
 class TestMcpOAuth(AiTestCase):
@@ -45,10 +46,7 @@ class TestMcpOAuth(AiTestCase):
 	def test_discovery_and_unwrapped_metadata(self):
 		response = self.rpc(self.anonymous(), "tools/list")
 		self.assertEqual(response.status_code, 401)
-		self.assertEqual(
-			response.headers["WWW-Authenticate"],
-			f'Bearer resource_metadata="https://tenant.example.test{METADATA}", scope="mcp"',
-		)
+		self.assertEqual(response.headers["WWW-Authenticate"], CHALLENGE)
 		metadata = self.send(self.anonymous(), "GET", METADATA, headers={"X-Forwarded-Host": "wrong.test"})
 		self.assertEqual(metadata.status_code, 200)
 		self.assertEqual(
@@ -61,6 +59,40 @@ class TestMcpOAuth(AiTestCase):
 			},
 		)
 		self.verify.assert_not_called()
+
+	def test_public_routes_rate_limit_the_client(self):
+		for endpoint, limit, path in (
+			("platform_core.api.ai.mcp", 120, MCP_PATH),
+			("platform_core.api.ai.mcp_resource_metadata", 60, METADATA),
+		):
+			with self.subTest(endpoint=endpoint):
+				ip = "192.0.2.41"
+				key = frappe.cache.make_key(f"rl:{endpoint}:{ip}:60")
+				frappe.cache.setex(key, 60, limit)
+				self.addCleanup(frappe.cache.delete, key)
+				headers = {"X-Forwarded-For": ip}
+				if path == MCP_PATH:
+					response = self.rpc(self.anonymous(), "ping", headers=headers)
+				else:
+					response = self.send(self.anonymous(), "GET", path, headers=headers)
+				self.assertEqual(response.status_code, 429)
+
+	def test_mcp_limits_oauth_before_contacting_the_provider(self):
+		ip = "192.0.2.42"
+		key = frappe.cache.make_key(f"rl:platform_core.ai.oauth._verify_bearer:{ip}:60")
+		frappe.cache.setex(key, 60, 120)
+		self.addCleanup(frappe.cache.delete, key)
+		response = self.rpc(self.anonymous(), "ping", token=self.bearer, headers={"X-Forwarded-For": ip})
+		self.assertEqual(response.status_code, 429)
+		self.verify.assert_not_called()
+
+	def test_mcp_rate_limits_an_authenticated_account(self):
+		key = frappe.cache.make_key(f"rl:platform_core.api.ai.mcp:{USER_A}:60")
+		client = self.login(USER_A)
+		frappe.cache.setex(key, 60, 120)
+		self.addCleanup(frappe.cache.delete, key)
+		response = self.rpc(client, "ping", headers={"X-Forwarded-For": "192.0.2.43"})
+		self.assertEqual(response.status_code, 429)
 
 	def test_disabled_keeps_guest_refusal_and_hides_metadata(self):
 		with patch("platform_core.identity.api.mcp_oauth_config", return_value=None):
@@ -130,6 +162,7 @@ class TestMcpOAuth(AiTestCase):
 		with patch("platform_core.ai.oauth.frappe.logger") as logger:
 			response = self.rpc(self.anonymous(), "tools/list", token=self.bearer)
 			self.assertEqual(response.status_code, 401)
+			self.assertEqual(response.headers.get("WWW-Authenticate"), CHALLENGE)
 			logger.return_value.warning.assert_called_once_with("token_expired")
 		self.verify.side_effect = None
 		for _iteration in range(20):
@@ -138,6 +171,7 @@ class TestMcpOAuth(AiTestCase):
 			self.anonymous(), "tools/call", {"name": "plt_search_doctypes"}, token=self.bearer
 		)
 		self.assertEqual(response.status_code, 401)
+		self.assertEqual(response.headers.get("WWW-Authenticate"), CHALLENGE)
 		self.assertEqual(self.last_log(deny_reason="token_call_limit").user, USER_A)
 
 	def test_parallel_first_calls_and_cache_loss_keep_the_same_budget(self):

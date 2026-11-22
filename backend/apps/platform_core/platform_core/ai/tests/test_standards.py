@@ -259,10 +259,14 @@ class TestStaticStandards(AiTestCase):
 
 	def test_doctype_files_have_the_generated_key_order(self):
 		"""H-3: a DocType file is in Frappe's export format: sorted keys, one space of indent."""
-		for doctype in ("plt_ai_action_log", "plt_ai_action_proposal"):
-			path = LAYER / "doctype" / doctype / f"{doctype}.json"
-			text = path.read_text()
-			self.assertEqual(text, json.dumps(json.loads(text), indent=1, sort_keys=True) + "\n", doctype)
+		export_fields = {"creation", "modified", "modified_by", "owner", "sort_field", "sort_order"}
+		for doctype in ("plt_ai_action_log", "plt_ai_action_proposal", "plt_mcp_call_budget"):
+			with self.subTest(doctype=doctype):
+				path = LAYER / "doctype" / doctype / f"{doctype}.json"
+				text = path.read_text()
+				definition = json.loads(text)
+				self.assertEqual(text, json.dumps(definition, indent=1, sort_keys=True) + "\n")
+				self.assertEqual(export_fields - definition.keys(), set())
 
 	def test_contract_identifiers_are_english(self):
 		"""H-10: tag and security scheme names of the contract are English."""
@@ -272,7 +276,7 @@ class TestStaticStandards(AiTestCase):
 		contract = yaml.safe_load(CONTRACT.read_text())
 
 		self.assertEqual([tag["name"] for tag in contract["tags"]], ["mcp", "token", "proposal", "admin"])
-		self.assertEqual(sorted(contract["components"]["securitySchemes"]), ["agentToken", "humanSession"])
+		self.assertEqual(sorted(contract["components"]["securitySchemes"]), ["agentToken", "humanSession", "mcpOAuth"])
 
 	def test_every_fixed_user_text_of_the_endpoint_is_translatable(self):
 		"""M-8: a text the user reads goes through the translation function."""

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import os
 import unittest
-from urllib.parse import parse_qs, urlencode, urlsplit
+from html.parser import HTMLParser
+from urllib.parse import parse_qs, urlencode, urljoin, urlsplit
 
 from helpers import (
     HttpResponse,
+    admin,
+    admin_token,
     get_environment_value,
     jwt_payload,
     local_test_authority,
@@ -24,6 +27,22 @@ RESOURCE_CLIENT = "mcp-resource"
 RESOURCE_SETTING = "${ATONOTA_MCP_RESOURCE_URL:https://tenant.example.test/api/method/platform_core.api.ai.mcp}"
 REDIRECT_SETTING = "${ATONOTA_MCP_REDIRECT_URI:https://mcp-client.example.test/callback}"
 INTROSPECTION_SECRET_SETTING = "${ATONOTA_MCP_INTROSPECTION_SECRET}"
+
+
+class ConsentForm(HTMLParser):
+    def __init__(self, body):
+        super().__init__()
+        self.action = None
+        self.code = None
+        self.feed(body.decode())
+
+    def handle_starttag(self, tag, attributes):
+        attributes = dict(attributes)
+        action = attributes.get("action") or ""
+        if tag == "form" and "/login-actions/consent" in action:
+            self.action = action
+        if self.action and tag == "input" and attributes.get("name") == "code":
+            self.code = attributes.get("value")
 
 
 class McpRealmTest(unittest.TestCase):
@@ -43,6 +62,11 @@ class McpRealmTest(unittest.TestCase):
         self.assertEqual(client["redirectUris"], [REDIRECT_SETTING])
         self.assertTrue(self.realm["revokeRefreshToken"])
         self.assertEqual(self.realm["refreshTokenMaxReuse"], 0)
+
+    def test_external_client_requires_user_consent_for_mcp_scope(self):
+        scopes = {scope["name"]: scope for scope in self.realm["clientScopes"]}
+        self.assertIs(self.clients[CLIENT].get("consentRequired"), True)
+        self.assertEqual(scopes["mcp"]["attributes"]["display.on.consent.screen"], "true")
 
     def test_audience_is_bound_to_the_resource_and_scope(self):
         self.assertIn(RESOURCE_CLIENT, self.clients)
@@ -64,7 +88,7 @@ class McpRealmTest(unittest.TestCase):
         scopes = {scope["name"]: scope for scope in self.realm["clientScopes"]}
         self.assertIn("mcp", scopes)
         self.assertEqual(self.clients[CLIENT]["optionalClientScopes"], ["mcp"])
-        self.assertEqual(self.clients[CLIENT]["defaultClientScopes"], ["basic"])
+        self.assertEqual(self.clients[CLIENT]["defaultClientScopes"], ["acr", "basic"])
         mappers = scopes["mcp"]["protocolMappers"]
         by_type = {mapper["protocolMapper"]: mapper for mapper in mappers}
         self.assertEqual(by_type["oidc-audience-mapper"]["config"]["included.client.audience"], RESOURCE_CLIENT)
@@ -100,8 +124,8 @@ class McpKeycloakTest(unittest.TestCase):
         params = urlencode({key: value for key, value in query.items() if value is not None}, doseq=True)
         return self.browse(f"{self.issuer}/protocol/openid-connect/auth?{params}")
 
-    def login(self, response):
-        if response.status == 200:
+    def authenticate(self, response):
+        if response.status == 200 and not ConsentForm(response.body).action:
             action = _form_action(response.body.decode())
             form = urlencode(
                 {
@@ -110,8 +134,58 @@ class McpKeycloakTest(unittest.TestCase):
                 }
             )
             response = self.browse(action, form.encode("ascii"))
+        return self.follow_login_redirects(response)
+
+    def follow_login_redirects(self, response):
+        for _ in range(5):
+            location = response.headers.get("Location", "")
+            if response.status not in (302, 303) or not location.startswith(self.issuer + "/login-actions/"):
+                break
+            response = self.browse(location)
+        return response
+
+    def submit_consent(self, response, choice):
+        consent = ConsentForm(response.body)
+        self.assertTrue(consent.action and consent.code, "Expected Keycloak consent form")
+        data = urlencode({"code": consent.code, choice: "true"}).encode("ascii")
+        action = urljoin(self.issuer + "/", consent.action)
+        return self.follow_login_redirects(self.browse(action, data))
+
+    def login(self, response):
+        response = self.authenticate(response)
+        if response.status == 200 and ConsentForm(response.body).action:
+            response = self.submit_consent(response, "accept")
+        return self.callback(response)
+
+    def callback(self, response):
         self.assertEqual(response.status, 302, safe_detail(response))
         return parse_qs(urlsplit(response.headers.get("Location", "")).query)
+
+    def test_user_grants_or_denies_consent_before_mcp_code_is_issued(self):
+        # A new browser does not erase the fixture user's grant from earlier tests.
+        token = admin_token()
+        query = urlencode({"username": get_environment_value("KC_MCP_TEST_USER"), "exact": "true"})
+        users = admin(f"/users?{query}", token)
+        self.assertEqual(users.status, 200, safe_detail(users))
+        matches = users.json()
+        self.assertEqual(len(matches), 1)
+        reset = admin(f"/users/{matches[0]['id']}/consents/{CLIENT}", token, method="DELETE")
+        self.assertIn(reset.status, (204, 404), safe_detail(reset))
+
+        pending = self.authenticate(self.authorize())
+        self.assertEqual(pending.status, 200, safe_detail(pending))
+        self.assertIn(b"External MCP client", pending.body)
+        declined = self.callback(self.submit_consent(pending, "cancel"))
+        self.assertEqual(declined.get("error"), ["access_denied"])
+        self.assertNotIn("code", declined.keys())
+
+        pending = self.authenticate(self.authorize())
+        self.assertEqual(pending.status, 200, safe_detail(pending))
+        approved = self.callback(self.submit_consent(pending, "accept"))
+        self.assertIn("code", approved.keys())
+        response = self.exchange(approved["code"][0])
+        self.assertEqual(response.status, 200, safe_detail(response))
+        self.assertEqual(jwt_payload(response.json()["access_token"]).get("acr"), "employee")
 
     def code(self, **overrides):
         callback = self.login(self.authorize(**overrides))

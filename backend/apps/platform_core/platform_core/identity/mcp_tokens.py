@@ -17,7 +17,7 @@ from platform_core.identity.mcp_introspection import fetch_introspection
 MCP_PATH = "/api/method/platform_core.api.ai.mcp"
 MCP_SCOPE = "mcp"
 MAX_LIFETIME_SECONDS = 300
-_MAX_RESPONSE_BYTES = 64 * 1024
+_MAX_RESPONSE_BYTES = 8 * 1024
 _INTROSPECTION_TIMEOUT = 3.0
 _CLIENT_ID = re.compile(r"[A-Za-z0-9._~-]{1,128}")
 _REALM = re.compile(r"[A-Za-z0-9_-]+")
