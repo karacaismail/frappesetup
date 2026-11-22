@@ -95,7 +95,7 @@ Request deletion of your own Press account.,Kendi Press hesabınızın silinmesi
 Starts Keycloak reauthentication or submits an irreversible deletion request after explicit confirmation. The same browser session must have been reauthenticated within 300 seconds. The Keycloak authentication time may precede the start of reauthentication by up to five seconds. Invoices remain unchanged.,Keycloak kimliği yeniden doğrular. Kullanıcı onaylarsa Press geri alınamaz silme isteğini gönderir. Aynı oturum son 300 saniyede doğrulanmış olmalıdır. Keycloak saati en çok 5 saniye geride olabilir. Faturalar değişmez.,press_tr.openapi
 Send false to start reauthentication and true to confirm deletion.,Yeniden doğrulamayı başlatmak için false gönderin. Silmeyi onaylamak için true gönderin.,press_tr.openapi
 Returns a Keycloak login URL or the latest known deletion request state.,Keycloak giriş adresini veya silme isteğinin bilinen son durumunu döndürür.,press_tr.openapi
-Press timed out waiting for Identity Sync. The same account can be retried safely.,Press bekleme süresini doldurdu. Aynı hesap için istek tekrar gönderilebilir.,press_tr.openapi
+Press timed out reading the Identity Sync response. The same account can be retried safely.,Press yanıtı beklerken süre doldu. Aynı hesap için istek tekrar gönderilebilir.,press_tr.openapi
 Frappe rejected the browser request or its CSRF token.,Frappe tarayıcı isteğini veya istek koruma belirtecini kabul etmedi.,press_tr.openapi
 A human Press session and fresh Keycloak reauthentication are required.,Press oturumu ve yakın zamanda yapılmış Keycloak doğrulaması gerekir.,press_tr.openapi
 Keycloak or Identity Sync did not accept the service request.,Keycloak veya Identity Sync servis isteğini kabul etmedi.,press_tr.openapi

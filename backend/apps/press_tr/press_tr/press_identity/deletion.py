@@ -1,5 +1,6 @@
 """Authorize deletion requests using a freshly verified Press browser session."""
 
+import logging
 import time
 
 import frappe
@@ -14,6 +15,8 @@ ACCOUNT_DELETION_PAGE = "/account-deletion"
 REAUTHENTICATION_TTL = 300
 REAUTHENTICATION_CLOCK_SKEW = 5
 DEFAULT_DELETION_TIMEOUT = 45
+MAX_DELETION_TIMEOUT = 90
+DELETION_CONNECT_TIMEOUT = 10
 
 
 def human_identity(*, for_update=False):
@@ -98,6 +101,14 @@ def send_deletion_request(link, authenticated_at: int) -> bool:
 	if not service_url or not service_secret:
 		raise ServiceUnavailable(_("Configure the account deletion service.", context="press_tr"))
 
+	timeout = frappe.conf.get("press_deletion_request_timeout", DEFAULT_DELETION_TIMEOUT)
+	if type(timeout) not in (int, float) or not 0 < timeout <= MAX_DELETION_TIMEOUT:
+		logging.getLogger("press_tr").warning(
+			"press_deletion_request_timeout must be a positive number no greater than %s seconds.",
+			MAX_DELETION_TIMEOUT,
+		)
+		raise ServiceUnavailable(_("Configure the account deletion service.", context="press_tr"))
+
 	try:
 		response = requests.post(
 			server_endpoint("token"),
@@ -115,19 +126,16 @@ def send_deletion_request(link, authenticated_at: int) -> bool:
 	except (requests.RequestException, ValueError, AttributeError):
 		raise BadGateway() from None
 
-	timeout = frappe.conf.get("press_deletion_request_timeout", DEFAULT_DELETION_TIMEOUT)
-	if type(timeout) is not int or timeout <= 0:
-		timeout = DEFAULT_DELETION_TIMEOUT
 	try:
 		response = requests.post(
 			f"{service_url.rstrip('/')}/v1/account-deletions",
 			headers={"Authorization": f"Bearer {token}"},
 			json={"issuer": link.issuer, "subject": link.subject, "reauthenticated_at": authenticated_at},
-			timeout=timeout,
+			timeout=(DELETION_CONNECT_TIMEOUT, timeout),
 			allow_redirects=False,
 			stream=True,
 		)
-	except requests.Timeout:
+	except requests.ReadTimeout:
 		return False
 	except requests.RequestException:
 		raise BadGateway() from None

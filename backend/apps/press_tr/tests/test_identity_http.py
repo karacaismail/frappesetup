@@ -54,6 +54,7 @@ class IdentityHttpTest(
 		cls.service_tokens = {}
 		cls.deletion_requests = []
 		cls.deletion_delays = {}
+		cls.deletion_statuses = {}
 
 		class IssuerHandler(BaseHTTPRequestHandler):
 			def do_GET(self):
@@ -72,7 +73,11 @@ class IdentityHttpTest(
 					request = json.loads(body)
 					cls.deletion_requests.append(request)
 					time.sleep(cls.deletion_delays.get(request["subject"], 0))
-					self.send_json(b'{"status":"accepted"}')
+					try:
+						status = cls.deletion_statuses.get(request["subject"], "accepted")
+						self.send_json(json.dumps({"status": status}).encode())
+					except BrokenPipeError:
+						pass  # Press may have stopped waiting for the delayed response.
 					return
 				if self.path != "/realms/platform/protocol/openid-connect/token":
 					self.send_error(404)
@@ -163,7 +168,7 @@ class IdentityHttpTest(
 		self.assertEqual(query["max_age"], ["0"])
 		self.assertEqual(query["code_challenge_method"], ["S256"])
 
-	def test_account_deletion_waits_for_slow_service_and_sends_only_verified_identity(self):
+	def reauthenticate_deletion(self):
 		subject = uuid4().hex
 		email = f"{subject}@example.test"
 		session = self.sign_in(subject, email, uuid4().hex)
@@ -208,6 +213,10 @@ class IdentityHttpTest(
 
 		service_token = self.token(audience="identity-sync", authorized_party="press-service")
 		self.service_tokens[service_token] = True
+		return subject, session, headers, auth_time
+
+	def test_account_deletion_waits_for_slow_service_and_sends_only_verified_identity(self):
+		subject, _, headers, auth_time = self.reauthenticate_deletion()
 		self.deletion_delays[subject] = 11
 		status, _headers, payload = self.exchange(
 			"POST", DELETION_ROUTE, headers, '{"confirm": true}', timeout=20
@@ -223,6 +232,31 @@ class IdentityHttpTest(
 			},
 		)
 		self.assertEqual(self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')[0], 403)
+
+	def test_account_deletion_timeout_refresh_and_retry(self):
+		subject, session, headers, _ = self.reauthenticate_deletion()
+		self.deletion_delays[subject] = 16
+		status, _, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}', timeout=25)
+		self.assertEqual(status, 200)
+		self.assertEqual(json.loads(payload)["message"], {"pending": True})
+
+		status, _, page = self.exchange("GET", "/account-deletion", session)
+		self.assertEqual(status, 200)
+		self.assertIn(b'id="account-deletion-status">Account deletion is in progress.', page)
+		self.assertEqual(sum(request["subject"] == subject for request in self.deletion_requests), 1)
+
+		self.deletion_delays[subject] = 0
+		self.deletion_statuses[subject] = "unknown"
+		status, _, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
+		self.assertEqual(status, 200)
+		self.assertEqual(json.loads(payload)["message"], {"submitted": True})
+		requests = [request for request in self.deletion_requests if request["subject"] == subject]
+		self.assertEqual(len(requests), 2)
+		self.assertEqual(requests[0], requests[1])
+
+		status, _, page = self.exchange("GET", "/account-deletion", session)
+		self.assertEqual(status, 200)
+		self.assertIn(b'role="status">Your deletion request was submitted.', page)
 
 	def test_reauthentication_links_the_new_keycloak_session(self):
 		subject = uuid4().hex

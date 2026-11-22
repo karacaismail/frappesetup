@@ -29,16 +29,36 @@ class RequestGuardsTest(unittest.TestCase):
 			patch.object(deletion, "verify"),
 			patch.object(deletion.requests, "post") as post,
 		):
-			post.side_effect = [token_response, requests.ReadTimeout()]
-			self.assertFalse(deletion.send_deletion_request(link, 1))
-			self.assertEqual(post.call_args.kwargs["timeout"], 45)
-			config.press_deletion_request_timeout = 60
-			post.side_effect = [token_response, Mock(status_code=200)]
-			self.assertTrue(deletion.send_deletion_request(link, 1))
-			self.assertEqual(post.call_args.kwargs["timeout"], 60)
+			with self.subTest(timeout="default"):
+				post.side_effect = [token_response, requests.ReadTimeout()]
+				self.assertFalse(deletion.send_deletion_request(link, 1))
+				self.assertEqual(post.call_args.kwargs["timeout"], (10, 45))
+			for valid in (60.5, 90):
+				with self.subTest(timeout=valid):
+					config.press_deletion_request_timeout = valid
+					post.side_effect = [token_response, Mock(status_code=200)]
+					self.assertTrue(deletion.send_deletion_request(link, 1))
+					self.assertEqual(post.call_args.kwargs["timeout"], (10, valid))
 			post.side_effect = requests.ReadTimeout()
 			with self.assertRaises(deletion.BadGateway):
 				deletion.send_deletion_request(link, 1)
+
+			for error in (requests.ConnectTimeout(), requests.ConnectionError()):
+				post.side_effect = [token_response, error]
+				with self.subTest(error=type(error).__name__), self.assertRaises(deletion.BadGateway):
+					deletion.send_deletion_request(link, 1)
+
+			for invalid in (90.1, float("nan"), float("inf"), 0, -1, True, "60", None):
+				config.press_deletion_request_timeout = invalid
+				post.reset_mock(side_effect=True)
+				post.side_effect = [token_response, Mock(status_code=200)]
+				with (
+					self.subTest(timeout=invalid),
+					self.assertLogs("press_tr", level="WARNING"),
+					self.assertRaises(deletion.ServiceUnavailable),
+				):
+					deletion.send_deletion_request(link, 1)
+				post.assert_not_called()
 
 	def test_identity_link_is_closed_to_generic_ai_writes(self):
 		self.assertIn("PTR Identity Link", getattr(hooks, "ai_write_closed_doctypes", []))

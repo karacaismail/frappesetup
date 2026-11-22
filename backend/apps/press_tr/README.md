@@ -109,10 +109,14 @@ AGPL-3.0. See [license.txt](license.txt).
 Identity Sync, silme uç noktasını servis belirteciyle çağırır.
 Press, Identity Sync yanıtını varsayılan olarak 45 saniye bekler.
 `press_deletion_request_timeout` site ayarı bu süreyi saniye olarak değiştirir.
+Bu ayar ondalıklı sayı kabul eder. Değer 0'dan büyük ve en çok 90 olmalıdır.
+Geçersiz ayar isteği durdurur. Press günlüğe bir uyarı yazar.
 Süreyi Identity Sync'in anonim yapma bekleme süresinden uzun tutun.
-Süre dolarsa sayfa silme işleminin sürdüğünü gösterir.
+Press bağlantı için en çok 10 saniye bekler. Bağlantı kurulamazsa sayfa hata gösterir.
+Yanıtı okuma süresi dolarsa sayfa silme işleminin sürdüğünü gösterir.
 Oturum açıkken sayfayı yenileyerek Press'in son bildiği durumu görün.
 Press bu bilgiyi aynı oturumda beş dakika saklar.
+İsteğin gönderilmesi, silmenin tamamlandığını göstermez.
 Tekrar gönderim aynı hesap için yeni bir silme işi açmaz.
 Silme kaydı, Keycloak kimliği yerine gizli anahtarla üretilen bir özet tutar.
 `press_anonymization_hmac_key` için sabit bir site sırrı kullanın.

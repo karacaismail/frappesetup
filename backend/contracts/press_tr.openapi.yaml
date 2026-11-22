@@ -362,7 +362,7 @@ paths:
                         properties:
                           pending:
                             const: true
-                            description: Press timed out waiting for Identity Sync. The same account can be retried safely.
+                            description: Press timed out reading the Identity Sync response. The same account can be retried safely.
         "400":
           description: Frappe rejected the browser request or its CSRF token.
         "403":

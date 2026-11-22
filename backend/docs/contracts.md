@@ -311,8 +311,12 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Kurulum iptal edilince `platform_core` bu ucu çağırır. Aynı `sid` ile gelen belirteç de reddedilir (Proje kaydı O-25).
 - `POST /v1/account-deletions` ucu hesap silme isteğini kaydeder (Proje kaydı O-27). Ucu yalnız Press çağırır. Belirteç `azp=press-service` ve `aud=identity-sync` taşır. Gövde `issuer`, `subject` ve `reauthenticated_at` alanlarını taşır.
 - Müşteri silme isteğini Press'te verir. Press önce kullanıcıyı Keycloak'ta yeniden doğrular (`prompt=login`, `max_age=0`). `reauthenticated_at` bu doğrulamanın zamanıdır. identity-sync 300 saniyeden eski doğrulamayı reddeder.
-- Press, silme yanıtını varsayılan olarak 45 saniye bekler. `press_deletion_request_timeout` bu süreyi değiştirir.
-- Bu süre dolarsa Press `pending: true` döndürür. Press son bildiği durumu aynı oturumda beş dakika saklar.
+- Press bağlantıyı 10 saniye, yanıtı varsayılan olarak 45 saniye bekler.
+- `press_deletion_request_timeout` yanıt süresini değiştirir. Sayı 0'dan büyük ve en çok 90 olmalıdır.
+- Ayar ondalıklı değer kabul eder. Geçersiz ayar isteği durdurur ve günlüğe uyarı yazılır.
+- Yalnız okuma süresi dolarsa Press `pending: true` döndürür. Bağlantı hatasında Press 502 döndürür.
+- Press son bildiği durumu aynı oturumda beş dakika saklar. Yenileme Identity Sync'e durum sormaz.
+- Press'in gönderildi yanıtı, işin tamamlandığını doğrulamaz.
 - Tekrar gönderim aynı hesap için yeni bir silme işi açmaz.
 - Keycloak'ın kendi `delete_account` eylemi kapalıdır. Bu eylem kullanıcıyı ilk adımda siler. Hesap ekranındaki silme bağlantısı Press'teki silme sayfasına gider.
 - Yönetici kullanıcıyı Keycloak yönetim ekranından silerse olay dinleyici olayı gönderir. identity-sync 2., 3. ve 4. adımları yine çalıştırır. Olay kaybolursa elle başlatılan mutabakat komutu silinmiş kullanıcıyı bulur. Komut önce önizleme gösterir. İnsan onay verirse komut kalan silme adımlarını sırayla çalıştırır. Yerel hesap önceden kapalı olsa da bu adımlar çalışır.
