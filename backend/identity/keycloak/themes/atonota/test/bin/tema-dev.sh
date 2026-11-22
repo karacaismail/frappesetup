@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tema deneme ortamını yönetir. Sahibi kimlik-tema işidir.
-# Kullanım: tema-dev.sh up | sync | tunel | tunel-kapat | down | env
-#   up    İmajı derler ve container'ları açar. Keycloak hazır olana kadar bekler.
+# Kullanım: tema-dev.sh up | build | sync | tunel | tunel-kapat | down | env
+#   up    Container'ları var olan imajla açar. Keycloak hazır olana kadar bekler.
+#   build İmajı derler. Disk dar olduğu için yalnız imaj yokken çalıştırın.
 #   sync  Tema dosyalarını çalışan container'a kopyalar. Yeniden derleme gerekmez.
 #         "sync login", "sync email" ya da "sync account" yalnız o bölümü kopyalar.
 #   tunel Keycloak ve Mailpit portlarını ssh tüneliyle bu bilgisayara taşır.
@@ -13,10 +14,33 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")/.." && pwd)"
 theme="$(cd "$here/.." && pwd)"
 env_file="$here/.env"
-export DOCKER_CONTEXT="${DOCKER_CONTEXT:-colima-factory}"
+# The shared "factory" disk is nearly full (backend/AGENTS.md, "Disk dar").
+# FS_COLIMA_PROFILE=default starts the environment in the "colima" profile instead.
+if [[ "${FS_COLIMA_PROFILE:-factory}" == "default" ]]; then
+  export DOCKER_CONTEXT="${DOCKER_CONTEXT:-colima}"
+  lima_name="${COLIMA_LIMA_AD:-colima}"
+else
+  export DOCKER_CONTEXT="${DOCKER_CONTEXT:-colima-factory}"
+  lima_name="${COLIMA_LIMA_AD:-colima-factory}"
+fi
+
+# Prints the value of one variable from the .env file.
+env_value() {
+  sed -n "s/^$1=//p" "$env_file" | head -n 1
+}
+
+# Adds a variable to an existing .env file when an older file does not have it yet.
+ensure_env() {
+  if ! grep -q "^$1=" "$env_file"; then
+    echo "$1=$2" >> "$env_file"
+  fi
+}
 
 write_env() {
-  if [[ -f "$env_file" ]]; then return; fi
+  if [[ -f "$env_file" ]]; then
+    ensure_env IDENTITY_BRAND_NAME "Sample Brand"
+    return
+  fi
   local base="${PANE_PORT:-3950}"
   umask 077
   {
@@ -25,6 +49,8 @@ write_env() {
     echo "MAILPIT_UI_PORT=$((base + 1))"
     echo "KC_BOOTSTRAP_ADMIN_USERNAME=tema-admin"
     echo "KC_BOOTSTRAP_ADMIN_PASSWORD=$(openssl rand -hex 16)"
+    # The brand name shown by the themes. The test value differs from the theme name on purpose.
+    echo "IDENTITY_BRAND_NAME=Sample Brand"
   } > "$env_file"
 }
 
@@ -35,9 +61,12 @@ tunnel_pid="$here/.tunel.pid"
 tunnel_open() {
   # colima-factory profilinin port yönlendirmesi bozuk. Yeni portlar bu bilgisayara açılmaz.
   # Bu işlev sanal makineye ayrı bir ssh bağlantısı açar. Colima'nın kendi bağlantısına dokunmaz.
-  # shellcheck disable=SC1090
-  . "$env_file"
-  local ssh_conf="$HOME/.colima/_lima/${COLIMA_LIMA_AD:-colima-factory}/ssh.config"
+  # The .env file is read value by value. It is not sourced, because a value may contain spaces.
+  local KC_PORT MAILPIT_UI_PORT KC_PUBLIC_URL
+  KC_PORT="$(env_value KC_PORT)"
+  MAILPIT_UI_PORT="$(env_value MAILPIT_UI_PORT)"
+  KC_PUBLIC_URL="$(env_value KC_PUBLIC_URL)"
+  local ssh_conf="$HOME/.colima/_lima/$lima_name/ssh.config"
   if [[ ! -f "$ssh_conf" ]]; then
     echo "Colima ssh ayarı yok: $ssh_conf" >&2
     exit 1
@@ -83,7 +112,12 @@ case "${1:-}" in
     ;;
   up)
     write_env
-    compose up -d --build --wait
+    # The image is reused when it exists. Building needs disk space, so it is a separate, explicit command.
+    compose up -d --no-build --wait
+    ;;
+  build)
+    write_env
+    compose build
     ;;
   sync)
     write_env
@@ -114,7 +148,7 @@ case "${1:-}" in
     compose down
     ;;
   *)
-    echo "Kullanım: tema-dev.sh up | sync | tunel | tunel-kapat | down | env" >&2
+    echo "Kullanım: tema-dev.sh up | build | sync | tunel | tunel-kapat | down | env" >&2
     exit 2
     ;;
 esac

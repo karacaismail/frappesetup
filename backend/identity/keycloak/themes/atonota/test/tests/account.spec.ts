@@ -28,7 +28,8 @@ async function openAccount(page: Page, target: AccountPage): Promise<string> {
   const email = await createUser();
   await page.goto(`${KC}/realms/${REALM}/account/${target.path}`);
   await submitPassword(page, email);
-  await expect(page.locator(target.ready).first()).toBeVisible();
+  // The console loads its page chunk after sign-in. Under a full parallel run this can take longer than the default.
+  await expect(page.locator(target.ready).first()).toBeVisible({ timeout: 20_000 });
   await page.evaluate(() => document.fonts.ready);
   return email;
 }

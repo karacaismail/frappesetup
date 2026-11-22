@@ -21,9 +21,36 @@ TOTP, telefondaki doğrulama uygulamasının ürettiği tek kullanımlık koddur
 2. Realm'de giriş temasını `atonota` yapın.
 3. Realm'de e-posta temasını `atonota` yapın.
 4. Realm'de hesap konsolu temasını `atonota` yapın.
-5. Realm'in görünen adını yazın. Giriş teması marka adını bu ayardan okur.
+5. Marka adını `IDENTITY_BRAND_NAME` değişkeniyle verin. Ayrıntı “Marka adı” bölümündedir.
 
 Realm dosyası kimlik-realm işinindir. Bu klasör realm dosyasını değiştirmez.
+
+## Marka adı
+
+Marka adı temaya yazılmaz. Marka adı tek bir değişkenden gelir: `IDENTITY_BRAND_NAME`.
+
+| Tema | Marka adını nereden okur |
+| --- | --- |
+| Giriş teması | Realm'in görünen adından (`displayName`) |
+| E-posta teması | Realm'in görünen adından (`realmName`) |
+| Hesap konsolu teması | `title` tema ayarından |
+
+Değişkeni iki yere bağlayın:
+
+1. Realm dosyasında görünen adı değişkenden okuyun: `"displayName": "${IDENTITY_BRAND_NAME}"`. Keycloak bu değeri realm'i içe alırken ortamdan okur.
+2. Keycloak sunucusuna aynı ortam değişkenini verin. Hesap konsolu teması `title=${env.IDENTITY_BRAND_NAME:Account}` satırıyla bu değişkeni okur.
+
+Değişken yoksa hesap konsolu “Account” yazar. Bu söz marka adı değildir, yansız bir yedektir.
+
+Hesap konsolu Keycloak'ın kendi uygulamasıdır ve yalnız bir logo resmi gösterir. Tema uygulamanın HTML'ini değiştirmez. Bu yüzden ad şöyle çizilir:
+
+1. Keycloak `title` ayarını sayfa başlığına yazar.
+2. `account/resources/js/atonota-focus.js` betiği başlığı `--at-brand-name` CSS değişkenine kopyalar.
+3. Stil dosyası adı marka işaretinin yanına çizer.
+
+Uzun marka adı dar ekranda üç noktayla kesilir. On harfli ad 320 pikselde kesilmeden sığar. Bunu bir test ölçer.
+
+Deneme ortamı marka adını bilerek “Sample Brand” yapar. Böylece temaya sabit yazılmış bir ad testlerde hemen görünür.
 
 ## Görsel kimlik
 
@@ -115,10 +142,10 @@ Hesap konsolunun bilinen sınırları şunlardır:
 - Hesap silme uyarısının başlığı `h4` öğesidir ve `h1` başlığından hemen sonra gelir. Tema bu sırayı değiştiremez. axe testi bu bölümde `heading-order` kuralını muaf tutar.
 - Keycloak bazı “daha fazla” düğmelerine erişilebilir ad vermez. Tema uygulamanın HTML'ini değiştiremez. axe testi bu düğmeleri bilerek dışarıda bırakır.
 - Yükleme yazısı İngilizcedir. Bu metin Keycloak'ın şablonunda sabit durur.
-- Sayfa başlığı İngilizcedir. Başlık `title` ayarıyla değişir ama tek dilli kalır. Bu yüzden başlık değiştirilmedi.
+- Sayfa başlığı marka adıdır. Başlık bütün dillerde aynıdır.
 - Yazarak aranan seçim alanının odak çizgisi için kural yazıldı ama sınanmadı. Deneme realm'inde böyle bir alan yok.
 - Etiketsiz onay kutusunun odak göstergesi yok. Konsolun böyle bir kutu kullandığı doğrulanmadı.
-- Başlıkta marka adı yazmaz, yalnız marka işareti durur. Konsol logoyu resim olarak alır.
+- Betik çalışmazsa başlıkta marka adı görünmez, yalnız marka işareti durur.
 - Seyrek koşularda tarayıcı Keycloak'ın bir yazı tipi dosyasını aynı sunucudan istedi. Nedeni doğrulanmadı. Test bu dosyaya adıyla izin verir, başka yazı tipi isteğini reddeder. Ekrandaki metin Outfit ile çizilir.
 - Bağlı hesaplar, gruplar ve kuruluşlar sayfaları testle sınanmadı. Deneme realm'inde bu özellikler kapalıdır.
 
@@ -139,11 +166,15 @@ Altı şablon Keycloak 26.8.2 kaynağından kopyalandı ve değiştirildi. Keycl
 
 Komutları deponun kökünden çalıştırın. Container ortamı Colima'dır ve bağlam `colima-factory` olur.
 
-1. Ortamı açın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh up`
-2. Portları bu bilgisayara taşıyın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh tunel`
-3. Tema dosyası değişince dosyaları kopyalayın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh sync`
+1. İmaj yoksa önce derleyin: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh build`
+   `colima-factory` diski dardır. İmaj varsa yeniden derlemeyin. Tema değişince `sync` komutunu kullanın.
+2. Ortamı açın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh up`
+3. Portları bu bilgisayara taşıyın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh tunel`
+4. Tema dosyası değişince dosyaları kopyalayın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh sync`
    Yalnız bir bölümü kopyalamak için `sync login`, `sync email` ya da `sync account` yazın.
-4. İş bitince ortamı kapatın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh down`
+5. İş bitince ortamı kapatın: `backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh down`
+
+Ortamı `colima` profilinde açmak için komutun önüne `FS_COLIMA_PROFILE=default` yazın. Önce `colima ssh -- free -g` ile en az 2 GB boş bellek ölçün.
 
 Betik ilk çalışmada `test/.env` dosyasını üretir. Bu dosya Git'e girmez. Port tabanı `PANE_PORT` değişkeninden gelir. Keycloak taban portu, Mailpit ekranı bir sonraki portu kullanır. Mailpit, gönderilen e-postaları yakalayan deneme posta kutusudur.
 
@@ -170,6 +201,7 @@ npx playwright test
 | `tests/account.spec.ts` | Hesap konsolu: yerleşim, odak, hareket, axe, Türkçe iletiler ve token eşliği |
 | `tests/focus-diff.ts` | Odak çizgisini ölçen ortak yardımcı |
 | `tests/delete-account.spec.ts` | Hesap silme bölümü, onay ekranı ve silme akışı |
+| `tests/brand.spec.ts` | Marka adı değişkenden gelir: giriş, e-posta, hesap konsolu ve kaynak denetimi |
 | `tests/gorsel.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi |
 
 Yerleşim testleri yedi görünümde koşar: 320, 360, 375, 390, yatay telefon, tablet ve masaüstü. Öteki testler 320 ve masaüstü görünümünde koşar.

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
-import { openLogin } from './helpers';
+import { BRAND, openLogin } from './helpers';
 
 const read = (locale: string) => {
   const path = fileURLToPath(new URL(`../../login/messages/messages_${locale}.properties`, import.meta.url));
@@ -41,7 +41,7 @@ test('varsayılan dil Türkçedir ve dil bağlantısı İngilizceye geçirir', a
   await expect(page.locator('html')).toHaveAttribute('lang', 'tr');
   await expect(page.locator('#kc-page-title')).toHaveText('Oturum açın');
   await expect(page.locator('#kc-login')).toHaveText('Oturum açın');
-  await expect(page.locator('#kc-header-wrapper')).toContainText('Atonota');
+  await expect(page.locator('#kc-header-wrapper')).toContainText(BRAND);
   await expect(page.locator('#at-locale-tr')).toHaveAttribute('aria-current', 'true');
 
   await page.locator('#at-locale-en').click();

@@ -1,6 +1,6 @@
 {
   "realm": "tema-deneme",
-  "displayName": "Atonota",
+  "displayName": "${IDENTITY_BRAND_NAME}",
   "enabled": true,
   "registrationAllowed": true,
   "registrationEmailAsUsername": true,
@@ -22,6 +22,6 @@
     "host": "mailpit",
     "port": "1025",
     "from": "kimlik@ornek.test",
-    "fromDisplayName": "Atonota"
+    "fromDisplayName": "${IDENTITY_BRAND_NAME}"
   }
 }

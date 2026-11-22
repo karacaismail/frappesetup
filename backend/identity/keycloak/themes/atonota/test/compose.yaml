@@ -8,7 +8,6 @@ services:
     build:
       context: ..
       dockerfile: test/Dockerfile
-    pull_policy: build
     # start-dev tema önbelleğini kapatır. Veritabanı container içindeki H2 dosyasıdır.
     command: ["start-dev", "--import-realm"]
     environment:
@@ -17,6 +16,8 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
+      # Brand name. The realm display name and the account console title read this variable.
+      IDENTITY_BRAND_NAME: ${IDENTITY_BRAND_NAME:?}
     ports:
       - "127.0.0.1:${KC_PORT:?}:${KC_PORT:?}"
     healthcheck:

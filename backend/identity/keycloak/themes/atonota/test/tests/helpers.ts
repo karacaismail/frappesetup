@@ -15,6 +15,8 @@ const env = Object.fromEntries(
 export const KC = env.KC_PUBLIC_URL;
 export const MAILPIT = `http://127.0.0.1:${env.MAILPIT_UI_PORT}`;
 export const REALM = 'tema-deneme';
+/** Brand name of the test environment. It comes from the IDENTITY_BRAND_NAME variable, never from the theme. */
+export const BRAND: string = env.IDENTITY_BRAND_NAME ?? '';
 // Uydurma deneme parolası. Gerçek hesapta kullanılmaz.
 export const PASSWORD = 'uzun-deneme-parolasi-1';
 export const TOTP_SECRET = 'atonota-deneme-anahtar';

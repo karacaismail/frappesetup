@@ -19,3 +19,9 @@ const pointerMode = () => root.removeAttribute('data-at-focus');
 
 document.addEventListener('pointerdown', pointerMode, true);
 document.addEventListener('touchstart', pointerMode, { capture: true, passive: true });
+
+// Brand name. The stock console shows only a logo image. The page title holds the brand name
+// (theme property "title", filled from the IDENTITY_BRAND_NAME variable).
+// The name is handed to the stylesheet as a custom property and drawn there as a pseudo-element,
+// so the console markup stays untouched and React re-renders cannot remove it.
+root.style.setProperty('--at-brand-name', JSON.stringify(document.title));

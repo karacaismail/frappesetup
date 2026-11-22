@@ -266,7 +266,12 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-masthead__main {
-  flex: 0 0 auto;
+  /*
+   * The brand takes the space that is left. Its base size is zero, so a long brand name
+   * is cut with an ellipsis and never pushes the controls onto a second row.
+   */
+  flex: 1 1 0;
+  min-inline-size: var(--at-hit);
   min-block-size: 0;
   padding: 0;
   border: 0;
@@ -277,7 +282,7 @@ body[data-page-id="account"] {
 }
 
 [data-page-id="account"] .pf-v5-c-masthead__content {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-inline-size: 0;
   margin: 0;
   padding: 0;
@@ -285,10 +290,36 @@ body[data-page-id="account"] {
   order: 0;
 }
 
-/* The stock toolbar paints its own dark surface inside the masthead. */
+/* The stock toolbar paints its own dark surface inside the masthead and adds its own side padding. */
 [data-page-id="account"] .pf-v5-c-masthead .pf-v5-c-toolbar {
   --pf-v5-c-toolbar--BackgroundColor: transparent;
+  --pf-v5-c-toolbar__content--PaddingLeft: 0;
+  --pf-v5-c-toolbar__content--PaddingRight: 0;
   background: transparent;
+  padding-block: 0;
+}
+
+/* On a narrow screen the side padding is smaller, so the brand name keeps its room. */
+@media (max-width: 29.99rem) {
+  [data-page-id="account"] .pf-v5-c-masthead {
+    --pf-v5-c-masthead--PaddingLeft: var(--at-space-2);
+    --pf-v5-c-masthead--PaddingRight: var(--at-space-2);
+    gap: var(--at-space-1);
+  }
+
+  /* The stock toggle pulls itself into the side padding with a negative margin. */
+  [data-page-id="account"] .pf-v5-c-masthead__toggle {
+    margin-inline-start: 0;
+  }
+
+  /* The body prefix lets these two rules win over the general brand rules further down. */
+  body[data-page-id="account"] .pf-v5-c-masthead__brand {
+    gap: var(--at-space-1);
+  }
+
+  body[data-page-id="account"] .pf-v5-c-masthead__brand::after {
+    font-size: var(--at-text-md);
+  }
 }
 
 [data-page-id="account"] .pf-v5-c-masthead__brand {
@@ -296,14 +327,45 @@ body[data-page-id="account"] {
   position: relative;
   z-index: 1;
   /* The link is as wide as the mark, so the focus line stays under the mark. */
-  inline-size: fit-content;
-  flex: none;
-  justify-content: center;
+  /*
+   * The brand link is a direct child of the masthead. It takes the space that is left.
+   * Its base size is zero, so a long brand name is cut with an ellipsis
+   * and never pushes the controls onto a second row.
+   */
+  max-inline-size: 100%;
+  min-inline-size: var(--at-hit);
+  flex: 1 1 0;
+  justify-content: flex-start;
   display: inline-flex;
   align-items: center;
   min-block-size: var(--at-hit);
   min-inline-size: var(--at-hit);
   border-radius: var(--at-radius-control);
+}
+
+/* The brand name next to the mark. The script fills --at-brand-name from the page title. */
+[data-page-id="account"] .pf-v5-c-masthead__brand {
+  gap: var(--at-space-2);
+  color: var(--at-color-on-masthead);
+  text-decoration: none;
+}
+
+[data-page-id="account"] .pf-v5-c-masthead__brand::after {
+  content: var(--at-brand-name, "");
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-lg);
+  font-weight: var(--at-weight-bold);
+  line-height: var(--at-leading-tight);
+  min-inline-size: 0;
+  /* The box clips a long name. The padding keeps room for the focus underline inside the clip area. */
+  padding-block: var(--at-space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-page-id="account"] .pf-v5-c-masthead__brand img {
+  flex: none;
 }
 
 [data-page-id="account"] .pf-v5-c-masthead__brand img {
@@ -758,11 +820,29 @@ body[data-page-id="account"] {
  * The last selector is the fallback for anything else that can take focus, such as a scroll container.
  */
 :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
-  :is(button:not(.pf-m-inline, .pf-v5-c-menu__item, .pf-v5-c-nav__link), a[class*="c-button"]:not(.pf-m-inline), a.pf-v5-c-masthead__brand, [role="button"], summary):focus-visible,
+  :is(button:not(.pf-m-inline, .pf-v5-c-menu__item, .pf-v5-c-nav__link), a[class*="c-button"]:not(.pf-m-inline), [role="button"], summary):focus-visible,
 :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
   :is(input:not([type="checkbox"], [type="radio"]), select, textarea):not(.pf-v5-c-form-control > *, .pf-v5-c-text-input-group *):focus-visible,
 :is(html[data-at-focus="keyboard"], html:not([data-at-js])) [data-page-id="account"]
   :focus-visible:not(a, button, input, select, textarea, summary, [role="button"]) {
+  box-shadow:
+    0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-gap-local, var(--at-color-surface)),
+    0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-local, var(--at-color-focus));
+}
+
+/*
+ * Brand link: the brand name gets a thick underline. The link itself stretches across the free space,
+ * so a line under the whole link would look like a divider.
+ * Without the script there is no brand name, so the link falls back to the line under the box.
+ */
+html[data-at-focus="keyboard"] [data-page-id="account"] a.pf-v5-c-masthead__brand:focus-visible::after {
+  text-decoration-line: underline;
+  text-decoration-thickness: var(--at-focus-thickness);
+  text-decoration-color: var(--at-focus-local, var(--at-color-focus));
+  text-underline-offset: var(--at-focus-underline-offset);
+}
+
+html:not([data-at-js]) [data-page-id="account"] a.pf-v5-c-masthead__brand:focus-visible {
   box-shadow:
     0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-gap-local, var(--at-color-surface)),
     0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-focus-local, var(--at-color-focus));
