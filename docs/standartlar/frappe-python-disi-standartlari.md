@@ -67,7 +67,7 @@ MVC yaklaşımı veri, ekran ve işlem görevlerini ayırır. Tanım dosyası ve
 
 **H-9 (ZORUNLU).** Sıralı adımlar yeterliyse düz işlev kullanın. Küçük işlevleri birlikte kullanmayı deneyin. Sınıf veya katman için somut gerekçe yazın.
 
-**ÖNERİLİR.** DocType ve modül adını ASCII harfle seçin. Frappe klasör adını bu addan üretir. Türkçe DocType ve modül adını çeviri dosyasında verin.
+**H-10 (ZORUNLU).** Kod adlarını İngilizce ve ASCII yazın. Değişken, sabit, `class` ve `id` adı da dahildir. DocType, modül, alan, Select seçeneği ve dosya adı da dahildir. Frappe klasör adını DocType ve modül adından üretir. Görünen adların Türkçesini çeviri dosyasında verin.
 
 ### Olgunluk seviyesi
 
@@ -92,7 +92,7 @@ Seviye koşulu olmayan kural her seviyede geçerlidir.
 
 **F-3 (ZORUNLU).** Büyük dosyayı elle baştan yazmayın. Hedefli düzenleme yapın. Sonra satır veya kayıt sayısını öncekiyle karşılaştırın.
 
-**F-4 (ZORUNLU).** Koddaki görünen metni uygun çeviri işleviyle sarın. Kaynak metni projenin kaynak dilinde yazın. Türkçe metni yalın Türkçe kurallarına göre yazın. Cümleyi parçalardan birleştirmeyin.
+**F-4 (ZORUNLU).** Koddaki görünen metni uygun çeviri işleviyle sarın. Kodda ve tanım dosyalarında kaynak metni İngilizce yazın. Türkçe metni yalın Türkçe kurallarına göre yazın. Cümleyi parçalardan birleştirmeyin.
 
 **F-5 (ZORUNLU).** Parolayı, anahtarı ve kişisel veriyi depoya koymayın. Ölçümden ve günlükten de çıkarın. Örnek dosyada sahte değer kullanın. Python belgesindeki G-9 ve G-15 kurallarını uygulayın.
 

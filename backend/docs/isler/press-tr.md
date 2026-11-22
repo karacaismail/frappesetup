@@ -12,7 +12,7 @@ Proje sahibi iki karar verdi. Bu bölüm aşağıdaki Frappe 15 bilgilerinin yer
 2. Bu Mac'te bir Press deneme kurulumu var (D-8). Sürümleri Frappe v16.50.0, ERPNext v16.50.0, Press v0.154.1, Python 3.14.8 ve MariaDB 11.8'dir.
 3. Var olan kurulumu değiştirmeyin. Onun container'larını durdurmayın ve içine uygulama kurmayın.
 4. Kurulumun imajını ve betiklerini yeniden kullanın. Betikleri `backend/dev/press/` altına alın. Sır taşıyan `.env` dosyasını almayın.
-5. Press bu sürümde yalnız yamalarla açılır. Ansible ve sunucu kurma çalışmaz. Bu tur için bu kabul edilir (A-11).
+5. Press bu sürümde yalnız yamalarla açılır. Ansible ve sunucu kurma çalışmaz. Bu tur için bu kabul edilir (O-9).
 6. Frappe 16'da `on_social_login` kancası var olabilir. Kaynakta doğrulayın. Kanca ya da kendi dönüş ucunuz arasında seçim yapın. Seçimi kontrol noktası 2'den önce raporlayın.
 
 ## Sahip olduğunuz yerler
