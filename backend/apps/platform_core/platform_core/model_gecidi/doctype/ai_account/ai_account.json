@@ -1,0 +1,106 @@
+{
+ "actions": [],
+ "autoname": "UUID",
+ "description": "Stores a provider account and its optional monthly spending limit.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "provider",
+  "account_name",
+  "organization_id",
+  "project_id",
+  "has_monthly_budget",
+  "monthly_budget",
+  "currency",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "description": "Provider that owns this account.",
+   "fieldname": "provider",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Provider",
+   "options": "AI Provider",
+   "reqd": 1
+  },
+  {
+   "description": "Display name of the account.",
+   "fieldname": "account_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Account Name",
+   "reqd": 1
+  },
+  {
+   "description": "Optional organization identifier at the provider.",
+   "fieldname": "organization_id",
+   "fieldtype": "Data",
+   "label": "Organization ID"
+  },
+  {
+   "description": "Optional project identifier at the provider.",
+   "fieldname": "project_id",
+   "fieldtype": "Data",
+   "label": "Project ID"
+  },
+  {
+   "default": "0",
+   "description": "Apply the monthly spending cap to the account.",
+   "fieldname": "has_monthly_budget",
+   "fieldtype": "Check",
+   "label": "Limit Monthly Spend"
+  },
+  {
+   "default": "0",
+   "description": "Maximum calendar-month spend when the cap is enabled.",
+   "fieldname": "monthly_budget",
+   "fieldtype": "Currency",
+   "label": "Monthly Budget",
+   "non_negative": 1,
+   "options": "currency",
+   "precision": "9"
+  },
+  {
+   "default": "USD",
+   "description": "Currency of the monthly cap.",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Account Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Allow the gateway to use this record.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  }
+ ],
+ "links": [],
+ "module": "Model Gecidi",
+ "name": "AI Account",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "AI Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "account_name"
+}

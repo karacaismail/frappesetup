@@ -70,6 +70,17 @@ class BoundaryTests(unittest.TestCase):
         self.write("yapay_zeka/tools.py", "from platform_core.kimlik.api import resolve")
         self.assertEqual(self.errors(), [])
 
+    def test_ai_calls_public_model_gateway_completion(self):
+        self.write("yapay_zeka/tools.py", "from platform_core.model_gecidi.api import complete")
+        self.assertEqual(self.errors(), [])
+        self.assertTrue(
+            (DEV.parent / "apps/platform_core/platform_core/model_gecidi/api.py").is_file()
+        )
+
+    def test_ai_cannot_import_the_internal_model_gateway(self):
+        self.write("yapay_zeka/tools.py", "from platform_core.model_gecidi.gateway import complete")
+        self.assertTrue(any("PUBLIC" in error for error in self.errors()))
+
     def test_ai_cannot_call_private_function_or_internal_module(self):
         for code in [
             "from platform_core.kimlik.api import _resolve",

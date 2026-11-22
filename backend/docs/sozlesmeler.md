@@ -410,6 +410,7 @@ Proje sahibinin kararı şudur: Her şey yapay zekâyla yönetilebilir olacak. K
 
 - Yazdığınız her DocType alanına `description` verin. Açıklama İngilizce yazılır. Türkçesi çeviri dosyasındadır. Yapay zekâ alanı bu açıklamadan anlar.
 - Yazdığınız her uca OpenAPI dosyasında özet ve açıklama yazın.
+- Bir Frappe adresini değiştirirseniz eski adresi hedef işlemin `x-frappe-original` alanına yazın.
 - Ucu yıkıcı ya da ücretli bir iş yapıyorsa bunu sözleşmede belirtin.
 - Elle başlatılan her komut için bir HTTP ucu da yazın. Böylece yapay zekâ da komutu başlatabilir. Örneğin mutabakat komutu böyledir.
 - `press_tr` aynı kuralları uygular. Press işlemleri için depodaki `packages/press-ai` sözleşmesi temel alınır.

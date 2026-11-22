@@ -1,0 +1,169 @@
+{
+ "actions": [],
+ "autoname": "UUID",
+ "description": "Stores a provider connection, its authentication settings, and its usage limits.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "account",
+  "api_name",
+  "base_url",
+  "auth_type",
+  "api_key",
+  "oauth_token_url",
+  "oauth_client_id",
+  "allowed_models",
+  "requests_per_minute",
+  "tokens_per_minute",
+  "priority",
+  "weight",
+  "health_status",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "description": "Account that owns this API connection.",
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Account",
+   "options": "AI Account",
+   "reqd": 1
+  },
+  {
+   "description": "Display name of the API connection.",
+   "fieldname": "api_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "API Name",
+   "reqd": 1
+  },
+  {
+   "description": "Optional base URL overriding the provider default.",
+   "fieldname": "base_url",
+   "fieldtype": "Data",
+   "label": "Base URL"
+  },
+  {
+   "default": "none",
+   "description": "Method used to authenticate the API request.",
+   "fieldname": "auth_type",
+   "fieldtype": "Select",
+   "label": "Authentication Type",
+   "options": "none\napi_key\nbearer\noauth_client_credentials",
+   "reqd": 1
+  },
+  {
+   "description": "Write-only API key, bearer token, or OAuth client secret.",
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "label": "API Credential",
+   "no_copy": 1,
+   "permlevel": 1,
+   "print_hide": 1
+  },
+  {
+   "description": "Token endpoint used by OAuth client credentials.",
+   "fieldname": "oauth_token_url",
+   "fieldtype": "Data",
+   "label": "OAuth Token URL"
+  },
+  {
+   "description": "Client identifier used during the OAuth exchange.",
+   "fieldname": "oauth_client_id",
+   "fieldtype": "Data",
+   "label": "OAuth Client ID"
+  },
+  {
+   "default": "[]",
+   "description": "JSON array of provider model IDs.",
+   "fieldname": "allowed_models",
+   "fieldtype": "JSON",
+   "label": "Allowed Models"
+  },
+  {
+   "default": "0",
+   "description": "Maximum requests in a minute. Zero removes this limit.",
+   "fieldname": "requests_per_minute",
+   "fieldtype": "Int",
+   "label": "Requests Per Minute",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "description": "Maximum tokens in a minute. Zero removes this limit.",
+   "fieldname": "tokens_per_minute",
+   "fieldtype": "Int",
+   "label": "Tokens Per Minute",
+   "non_negative": 1
+  },
+  {
+   "default": "0",
+   "description": "Smaller values are tried first in priority mode.",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "label": "Priority",
+   "non_negative": 1
+  },
+  {
+   "default": "1",
+   "description": "Larger values make selection more likely in weighted mode.",
+   "fieldname": "weight",
+   "fieldtype": "Int",
+   "label": "Weight",
+   "non_negative": 1
+  },
+  {
+   "default": "healthy",
+   "description": "Latest recorded gateway health status.",
+   "fieldname": "health_status",
+   "fieldtype": "Select",
+   "label": "Health Status",
+   "options": "healthy\nunhealthy\nauth_failed",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Allow the gateway to use this record.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  }
+ ],
+ "links": [],
+ "module": "Model Gecidi",
+ "name": "AI API",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "AI Manager",
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "role": "AI Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "api_name"
+}
