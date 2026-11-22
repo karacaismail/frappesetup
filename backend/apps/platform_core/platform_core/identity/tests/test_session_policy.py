@@ -85,12 +85,33 @@ class TestSessionPolicy(FrappeAPITestCase):
 		data = frappe.cache.hget("session", sid)
 		self.assertEqual(data["data"]["session_expiry"], "01:00:00")
 
-	def test_idle_session_answers_401_session_expired(self):
-		# Ö2: idle time is real activity. Without a live activity key the session ends.
+	def test_clearing_site_cache_keeps_an_active_session(self):
 		response = h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE))
 		self.assertEqual(response.status_code, 302, response.data[:300])
 		sid = self.client.get_cookie("sid").value
-		frappe.cache.delete_value(session_policy._session_key(sid))
+
+		frappe.clear_cache()
+
+		self.assertEqual(h.logged_user(self.client), h.AYSE)
+		self.assertEqual(self.client.get_cookie("sid").value, sid)
+
+	def test_missing_marker_uses_the_original_session_start(self):
+		response = h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE))
+		self.assertEqual(response.status_code, 302, response.data[:300])
+		sid = self.client.get_cookie("sid").value
+		key = session_policy._session_key(sid)
+		frappe.cache.delete_value(key)
+
+		self.assertEqual(h.logged_user(self.client), h.AYSE)
+		self.assertIsNone(frappe.cache.get_value(key, expires=True, use_local_cache=False))
+
+	def test_idle_session_answers_401_session_expired(self):
+		# Frappe's own activity is recent, but the last real request was over an hour ago.
+		response = h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE))
+		self.assertEqual(response.status_code, 302, response.data[:300])
+		sid = self.client.get_cookie("sid").value
+		frappe.cache.set_value(session_policy._session_key(sid), int(time.time()) - 3601, expires_in_sec=3600)
+		frappe.clear_cache()
 		answer = h.request(
 			self.client.post, "/api/method/platform_core.api.auth.logout", headers=h.csrf_headers(self.client)
 		)
@@ -115,22 +136,23 @@ class TestSessionPolicy(FrappeAPITestCase):
 	def test_background_request_does_not_renew_the_idle_time(self):
 		h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE))
 		key = session_policy._session_key(self.client.get_cookie("sid").value)
-		frappe.cache.set_value(key, 123, expires_in_sec=3600)
+		last_activity = int(time.time()) - 60
+		frappe.cache.set_value(key, last_activity, expires_in_sec=3600)
 		background = h.request(
 			self.client.get,
 			"/api/method/platform_core.api.auth.get_login_url",
 			headers={session_policy.BACKGROUND_HEADER: "1"},
 		)
 		self.assertNotEqual(background.status_code, 401, background.data[:200])
-		self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), 123)
+		self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), last_activity)
 		polling = h.request(self.client.get, "/api/method/frappe.auth.get_logged_user")
 		self.assertEqual(polling.status_code, 200, polling.data[:200])
-		self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), 123)
+		self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), last_activity)
 		real = h.request(
 			self.client.get, "/api/method/frappe.client.get_count", query_string={"doctype": "ToDo"}
 		)
 		self.assertNotEqual(real.status_code, 401, real.data[:200])
-		self.assertNotEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), 123)
+		self.assertNotEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), last_activity)
 
 	# --- O-25 and Ö2: an idle employee authenticates again ---------------------------------------
 
