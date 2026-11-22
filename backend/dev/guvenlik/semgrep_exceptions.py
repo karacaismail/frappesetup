@@ -2,6 +2,8 @@
 
 import hashlib
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -13,14 +15,25 @@ GUEST_LIMIT = "frappe-guest-without-limit"
 
 
 def source_digest(root, scope):
+    root = root.resolve()
     directory = root / scope
-    if not directory.is_dir() or directory.is_symlink() or not directory.resolve().is_relative_to(root.resolve()):
+    if not directory.is_dir() or directory.is_symlink() or not directory.resolve().is_relative_to(root):
         return None
     digest = hashlib.sha256(hashlib.sha256((root / RULES).read_bytes()).digest())
-    for path in sorted(directory.rglob("*")):
-        if "__pycache__" in path.parts:
-            continue
-        if path.is_symlink():
+    git = shutil.which("git")
+    if not git or not Path(git).is_absolute():
+        return None
+    # Match the source list used by the Gitleaks step in guvenlik-denetimi.
+    listing = subprocess.run(
+        [git, "--literal-pathspecs", "ls-files", "-z", "--cached", "--others",
+         "--deduplicate", "--exclude-standard", "--", scope],
+        cwd=root, capture_output=True, check=False,
+    )
+    if listing.returncode:
+        return None
+    paths = (root / name for name in listing.stdout.decode("utf-8").split("\0") if name)
+    for path in sorted(paths):
+        if path.is_symlink() or path.resolve() != path:
             return None
         if path.is_file():
             name = path.relative_to(root).as_posix()
