@@ -8,7 +8,8 @@
  "description": "Stores the token cutoff for mobile installation registration.",
  "field_order": [
   "account",
-  "revoked_through"
+  "revoked_through",
+  "last_user_activity_at"
  ],
  "fields": [
   {
@@ -27,6 +28,13 @@
    "length": 16,
    "reqd": 1,
    "description": "Registration rejects tokens issued at or before this Unix timestamp."
+  },
+  {
+   "fieldname": "last_user_activity_at",
+   "fieldtype": "Data",
+   "label": "Last user activity time",
+   "length": 16,
+   "description": "Unix timestamp of the latest reported interactive action."
   }
  ]
 }

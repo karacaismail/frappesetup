@@ -97,3 +97,19 @@ class MobileSessionTest(IntegrationTestCase):
 		self.assertEqual(
 			frappe.db.get_value("Mobile Installation", self.body["installation_id"], "session_id"), self.sid
 		)
+
+	def test_only_explicit_activity_updates_last_user_activity(self):
+		from platform_core.api.mobile import _activity, _push, _register
+
+		_register(self.identity, self.body)
+		state = "Mobile Account State"
+		self.assertIsNone(frappe.db.get_value(state, self.account, "last_user_activity_at"))
+		with patch("platform_core.api.mobile.push", return_value={}):
+			_push(self.identity, {**self.body, "operations": []})
+		self.assertIsNone(frappe.db.get_value(state, self.account, "last_user_activity_at"))
+		with patch("platform_core.api.mobile.time.time", return_value=1700000000):
+			_activity(self.identity, self.body)
+		self.assertEqual(frappe.db.get_value(state, self.account, "last_user_activity_at"), "1700000000")
+		with patch("platform_core.api.mobile.push", return_value={}):
+			_push(self.identity, {**self.body, "operations": []})
+		self.assertEqual(frappe.db.get_value(state, self.account, "last_user_activity_at"), "1700000000")

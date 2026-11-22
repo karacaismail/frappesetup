@@ -65,6 +65,15 @@ def _revoke(identity, body):
 	return result
 
 
+def _activity(identity, body):
+	_keys(body, {"installation_id"})
+	_lock_mobile_account(identity)
+	MobileStore().require_installation(identity, uuid4_id(body["installation_id"]), for_update=True)
+	activity_at = int(time.time())
+	frappe.db.set_value("Mobile Account State", identity.account, "last_user_activity_at", str(activity_at))
+	return {"last_user_activity_at": activity_at}
+
+
 def _push(identity, body):
 	_keys(body, {"installation_id", "operations"})
 	_lock_mobile_account(identity)
@@ -146,6 +155,11 @@ def v1_register():
 @frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def v1_revoke():
 	return endpoint_response("v1_revoke", _revoke)
+
+
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
+def v1_activity():
+	return endpoint_response("v1_activity", _activity)
 
 
 @frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission

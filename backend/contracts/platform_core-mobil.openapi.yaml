@@ -64,6 +64,40 @@ paths:
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
         default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.v1_activity:
+    post:
+      summary: Kullanıcının son işlem saatini kaydet
+      operationId: mobileV1Activity
+      description: |
+        İstemci bu ucu yalnız kullanıcı işlem yaptığında çağırır.
+        Sunucu kendi saatini kaydeder. Arka plan eşitlemesi bu saati değiştirmez.
+      parameters:
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200':
+          description: Sunucu son işlem saatini Unix saniyesi olarak döndürür.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [last_user_activity_at]
+                    properties:
+                      last_user_activity_at: { type: integer }
+        '401': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_push:
     post:
       summary: Telefondaki değişiklikleri sunucuya gönder
