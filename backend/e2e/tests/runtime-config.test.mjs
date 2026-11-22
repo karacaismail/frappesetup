@@ -86,7 +86,7 @@ test('preview webhook uses the Keycloak development hostname and its network ali
     assert.match(readFileSync(join(root, 'memory-probe'), 'utf8'), /--pull never --network none --read-only/);
     const webhook = new URL(readFileSync(join(root, 'webhook'), 'utf8').trim());
     assert.equal(webhook.protocol, 'http:');
-    assert.equal(webhook.hostname, 'event-sink.localhost');
+    assert.equal(webhook.hostname, 'identity-sync.localhost');
     assert.equal(webhook.pathname, '/v1/events');
     assert.match(readFileSync(join(root, 'sync-create'), 'utf8'), /--network-alias identity-sync(?: |\n)/);
     assert.equal(readFileSync(join(root, 'alias'), 'utf8').trim(), webhook.hostname);

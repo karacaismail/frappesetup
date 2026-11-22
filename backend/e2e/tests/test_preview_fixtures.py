@@ -4,11 +4,13 @@ import base64
 import importlib.util
 import json
 import os
+import re
+import runpy
 import subprocess
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 PREVIEW = Path(__file__).resolve().parents[1] / "preview"
 
@@ -32,6 +34,36 @@ fixtures = load_fixtures()
 
 
 class PreviewFixturesTest(unittest.TestCase):
+    def test_seeded_http_origin_passes_mobile_client_policy(self):
+        runtime = (PREVIEW / "runtime.sh").read_text()
+        sync_host = re.search(r"^sync_host=([a-z.-]+)$", runtime, re.MULTILINE).group(1)
+        source = PREVIEW / "site-seed.py"
+        frappe = Mock()
+        frappe.init.side_effect = StopIteration
+        settings = {
+            "PANE_PORT": "43820",
+            "E2E_LIFECYCLE_IDENTITIES": "{}",
+            "E2E_FULL_BROWSER_FIXTURES": "0",
+            "E2E_KEYCLOAK_CLIENT_SECRET": "synthetic-client",
+            "E2E_PROVIDER_IP": "192.0.2.1",
+            "E2E_PREVIEW_SYNC_ORIGIN": f"http://{sync_host}:43825",
+        }
+        client = PREVIEW.parents[1] / "apps/platform_core/platform_core/mobile/identity_sync_client.py"
+        service_client = "platform_core.identity.service_client"
+        with patch.dict(sys.modules, {"frappe": frappe, service_client: Mock()}):
+            with (
+                patch.dict(os.environ, settings, clear=True),
+                patch.object(sys, "argv", [str(source), "tenant-web"]),
+                patch.object(os, "chdir"),
+                patch.object(Path, "read_text", return_value='{"developer_mode": true}'),
+                patch.object(Path, "write_text") as write,
+                self.assertRaises(StopIteration),
+            ):
+                runpy.run_path(str(source), run_name="__main__")
+            frappe.conf = json.loads(write.call_args.args[0])
+            mobile_origin = runpy.run_path(str(client))["_identity_sync_origin"]
+            self.assertEqual(mobile_origin(), "http://identity-sync.localhost:43825")
+
     def test_resolves_docker_once_for_both_fixture_commands(self):
         with patch("shutil.which", return_value="/tools/docker") as which:
             preview = load_fixtures()
