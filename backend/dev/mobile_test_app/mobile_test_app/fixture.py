@@ -21,6 +21,7 @@ from .load_accounts import LOAD_ACCOUNTS
 
 SITE = "test-mobile.localhost"
 WEBSITE = "mobile-website@example.test"
+SERVICE_TARGET = "mobile-service-target@example.test"
 FIRST = "mobile-first@example.test"
 SECOND = "mobile-second@example.test"
 RATE = "mobile-rate@example.test"
@@ -77,6 +78,7 @@ def setup():
 		).insert()
 	for user, name in (
 		(FIRST, "First Test"),
+		(SERVICE_TARGET, "Mobile Service Target"),
 		(SECOND, "Second Test"),
 		(RATE, "Rate Test"),
 		(REVOKE, "Revocation Test"),
@@ -144,6 +146,11 @@ def authenticate():
 	if frappe.session.user != "Guest" or any(request.args.getlist("cmd")) or frappe.form_dict.get("cmd"):
 		return
 	header = request.headers.get("Authorization")
+	expires_at = request.headers.get("X-Mobile-Test-Expires")
+	if expires_at is not None and (
+		not expires_at.isascii() or not expires_at.isdecimal() or int(expires_at) <= time.time()
+	):
+		raise frappe.AuthenticationError
 	if request.path == PROBE_PATH and header == "Bearer fixture-control":
 		frappe.set_user(FIRST)
 		return
@@ -151,6 +158,8 @@ def authenticate():
 		"Bearer fixture-service",
 		"Bearer fixture-service-other",
 	):
+		if request.headers.get("X-Mobile-Test-Identity-Mismatch") == "site":
+			raise frappe.AuthenticationError
 		frappe.set_user("Administrator")
 		frappe.local.kimlik_service_claims = {
 			"iss": "fixture",
@@ -160,6 +169,8 @@ def authenticate():
 	if request.path not in MOBILE_PATHS:
 		return
 	account = TOKENS.get(header)
+	if header == "Bearer fixture-cleanup" and request.path.endswith(".v1_cleanup"):
+		account = "Administrator"
 	if not account:
 		return
 
