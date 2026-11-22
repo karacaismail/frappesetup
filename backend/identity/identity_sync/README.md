@@ -405,6 +405,12 @@ Güncel otomatik kontroller `tests/test_server.py` dosyasındadır:
 
 Bu testler canlı ortam denemesinin yerine geçmez. Canlı ortam bu çalışma sırasında yeniden açılmadı.
 
+### Oturum kapatma
+
+`POST /v1/sessions/revoke` ucu uygulanmıştır. Sözleşme `contracts/identity_sync.openapi.yaml` dosyasındadır.
+`tests.test_server.SessionRevokeTest` sınıfı kendi üyeliğini, başka kiracıyı ve başka kullanıcının oturumunu sınar.
+Kapalı oturum için tekrar istek 200 alır. Başka kiracıya ait kullanıcı için istek 403 alır.
+
 ## Testler
 
 Testleri `backend/identity/identity_sync` klasöründe çalıştırın:
