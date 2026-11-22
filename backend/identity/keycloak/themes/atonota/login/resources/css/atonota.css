@@ -84,7 +84,6 @@
   --at-page-gutter: 0.75rem;
   --at-card-padding: 1.25rem;
   --at-card-width: 27rem;
-  --at-recovery-code-column: 16ch;
 
   /* Köşe ve kenarlık */
   --at-radius-card: 1rem;
@@ -152,6 +151,11 @@
 }
 
 /* tokens:end */
+
+/* Login-only layout tokens. */
+:root {
+  --at-recovery-code-column: 16ch;
+}
 
 /* PatternFly değişkenleri Atonota tokenlarına bağlanır. Böylece temel bileşenler de aynı kimliği taşır. */
 :root,
