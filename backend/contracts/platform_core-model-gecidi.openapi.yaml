@@ -8,7 +8,8 @@ paths:
       summary: Generate a model response
       description: >
         Selects an eligible API for the active tenant and route. Checks permissions, quota,
-        and the route data policy before dispatch. Attempts may incur provider charges.
+        and the route data policy before dispatch. External dispatch requires an approved
+        masked payload. Attempts may incur provider charges.
         Tool calls are returned as data for the caller to authorize and execute.
       operationId: complete
       security:
@@ -28,9 +29,9 @@ paths:
         '401':
           description: Authentication required
         '403':
-          description: Route or operation denied
+          description: Route, operation, or outbound data policy denied
         '429':
-          description: Quota exceeded
+          description: Request quota exceeded or site gateway busy
         '503':
           description: No eligible API or provider available
   /api/method/platform_core.api.model.test_api:
@@ -69,7 +70,7 @@ paths:
         '403':
           description: Manager role required
         '429':
-          description: Quota exceeded
+          description: Request quota exceeded or site gateway busy
         '503':
           description: Test connection unavailable
 components:
@@ -139,6 +140,7 @@ components:
           type: integer
           minimum: 1
           maximum: 16384
+          default: 1024
           description: Maximum output tokens
     Result:
       type: object

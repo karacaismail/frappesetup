@@ -4,8 +4,8 @@ import unittest
 from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from model_gecidi.adapters import Endpoint, GatewayError, complete
-from model_gecidi.routing import Candidate, candidates, on_failure
+from platform_core.model_gecidi.adapters import Endpoint, GatewayError, complete
+from platform_core.model_gecidi.routing import Candidate, candidates, on_failure
 
 SECRET = "fixture-key"
 
@@ -151,6 +151,29 @@ class AdapterTests(unittest.TestCase):
 				self.assertIn("lookup", json.dumps(self.server.body[tools_key]))
 				self.assertIn("result", json.dumps(self.server.body[schema_key]))
 
+	def test_lost_reservation_stops_http_dispatch(self):
+		with self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"):
+			with self.assertRaises(GatewayError) as failure:
+				complete(
+					Endpoint("fixture", "ollama", self.url),
+					"fake",
+					[],
+					20,
+					before_post=lambda: False,
+				)
+		self.assertEqual(failure.exception.code, "reservation_lost")
+		self.assertFalse(hasattr(self.server, "path"))
+
+	def test_provider_cannot_echo_a_credential_in_success(self):
+		Handler.status = 200
+		Handler.response = {"choices": [{"message": {"content": SECRET}}]}
+		endpoint = Endpoint("fixture", "openai", self.url, "api_key", SECRET)
+		with self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING") as logs:
+			with self.assertRaises(GatewayError) as failure:
+				complete(endpoint, "fake", [], 20, allow_test_http=True)
+		self.assertEqual(failure.exception.code, "invalid_response")
+		self.assertNotIn(SECRET, str(logs.output))
+
 	def test_oauth_exchanges_credentials_for_a_bearer_token(self):
 		Handler.status = 200
 		Handler.response = {"choices": [{"message": {"content": "hello"}}]}
@@ -172,7 +195,7 @@ class AdapterTests(unittest.TestCase):
 
 	def test_rejects_http_for_credentialed_upstream(self):
 		endpoint = Endpoint("fixture", "openai", self.url, "api_key", SECRET)
-		with self.assertLogs("model_gecidi.adapters", level="WARNING"):
+		with self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"):
 			with self.assertRaises(GatewayError) as failure:
 				complete(endpoint, "fake", [], 20)
 		self.assertEqual(failure.exception.code, "configuration")
@@ -183,7 +206,7 @@ class AdapterTests(unittest.TestCase):
 		for status, code in ((429, "rate_limit"), (503, "upstream")):
 			with self.subTest(status=status):
 				Handler.status = status
-				with self.assertLogs("model_gecidi.adapters", level="WARNING"):
+				with self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"):
 					with self.assertRaises(GatewayError) as failure:
 						complete(Endpoint("first", "openai", self.url), "fake", [], 20, allow_test_http=True)
 				self.assertEqual(failure.exception.code, code)
@@ -193,7 +216,7 @@ class AdapterTests(unittest.TestCase):
 		Handler.status = 401
 		Handler.response = {"error": SECRET}
 		endpoint = Endpoint("fixture", "openai", self.url, "api_key", SECRET)
-		with self.assertLogs("model_gecidi.adapters", level="WARNING") as logs:
+		with self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING") as logs:
 			with self.assertRaises(GatewayError) as failure:
 				complete(endpoint, "fake", [{"role": "user", "content": "test"}], 20, allow_test_http=True)
 		self.assertEqual(self.server.headers["Authorization"], f"Bearer {SECRET}")

@@ -1,0 +1,107 @@
+{
+ "actions": [],
+ "autoname": "UUID",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "route_name",
+  "required_capabilities",
+  "selection_mode",
+  "cost_currency",
+  "targets",
+  "data_policy",
+  "required_role",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "description": "Display name of the task route.",
+   "fieldname": "route_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Route Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "[]",
+   "description": "JSON array of capabilities each eligible model must support.",
+   "fieldname": "required_capabilities",
+   "fieldtype": "JSON",
+   "label": "Required Capabilities"
+  },
+  {
+   "default": "priority",
+   "description": "How the gateway ranks eligible API and model pairs.",
+   "fieldname": "selection_mode",
+   "fieldtype": "Select",
+   "label": "Selection Mode",
+   "options": "priority\nweighted\ncost",
+   "reqd": 1
+  },
+  {
+   "default": "USD",
+   "description": "Currency used to compare prices in cost mode.",
+   "fieldname": "cost_currency",
+   "fieldtype": "Link",
+   "label": "Route Cost Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "description": "Ordered JSON array of objects with model and api document names.",
+   "fieldname": "targets",
+   "fieldtype": "JSON",
+   "label": "Targets",
+   "reqd": 1
+  },
+  {
+   "default": "masked",
+   "description": "Controls whether the route sends masked data or uses only local models.",
+   "fieldname": "data_policy",
+   "fieldtype": "Select",
+   "label": "Data Policy",
+   "options": "masked\nlocal_only",
+   "reqd": 1
+  },
+  {
+   "description": "Optional caller role. A blank value restricts the route to gateway managers.",
+   "fieldname": "required_role",
+   "fieldtype": "Link",
+   "label": "Required Role",
+   "options": "Role"
+  },
+  {
+   "default": "1",
+   "description": "Allow the gateway to use this record.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  }
+ ],
+ "links": [],
+ "module": "Model Gecidi",
+ "name": "AI Route",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "AI Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "route_name"
+}

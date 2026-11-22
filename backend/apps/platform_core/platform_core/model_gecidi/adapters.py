@@ -3,9 +3,11 @@
 import json
 import logging
 from dataclasses import dataclass, field
-from urllib.parse import quote, urlsplit
+from time import monotonic
+from urllib.parse import quote, quote_plus, urlsplit
 
 import requests
+from urllib3.exceptions import HTTPError, ReadTimeoutError
 
 LOGGER = logging.getLogger(__name__)
 PATHS = {
@@ -46,7 +48,37 @@ def _url(value, *, secure):
 	return value
 
 
-def _headers(endpoint, session, timeout, *, allow_test_http):
+def _post_json(session, url, *, timeout, max_bytes, before_post, **kwargs):
+	if before_post is not None and not before_post():
+		raise GatewayError("reservation_lost")
+	deadline = monotonic() + timeout
+	with session.post(url, timeout=timeout, allow_redirects=False, stream=True, **kwargs) as response:
+		if response.status_code != 200:
+			return response.status_code, None
+		body = bytearray()
+		while chunk := response.raw.read1(8192, decode_content=True):
+			if monotonic() > deadline:
+				raise GatewayError("timeout")
+			body.extend(chunk)
+			if len(body) > max_bytes:
+				raise GatewayError("invalid_response")
+		try:
+			return response.status_code, json.loads(body)
+		except (ValueError, RecursionError):
+			raise GatewayError("invalid_response") from None
+
+
+def _contains_secret(value, secrets):
+	if isinstance(value, str):
+		return any(secret and secret in value for secret in secrets)
+	if isinstance(value, dict):
+		return any(_contains_secret(item, secrets) for item in (*value, *value.values()))
+	if isinstance(value, list):
+		return any(_contains_secret(item, secrets) for item in value)
+	return False
+
+
+def _headers(endpoint, session, timeout, *, allow_test_http, before_post):
 	headers = {}
 	if endpoint.adapter == "anthropic":
 		headers["anthropic-version"] = "2023-06-01"
@@ -62,17 +94,19 @@ def _headers(endpoint, session, timeout, *, allow_test_http):
 	elif endpoint.auth == "oauth_client_credentials":
 		if not endpoint.client_id or not endpoint.secret:
 			raise GatewayError("configuration")
-		token_response = session.post(
+		status, token_body = _post_json(
+			session,
 			_url(endpoint.token_url, secure=not allow_test_http),
 			data={"grant_type": "client_credentials"},
-			auth=(endpoint.client_id, endpoint.secret),
+			auth=(quote_plus(endpoint.client_id), quote_plus(endpoint.secret)),
 			timeout=timeout,
-			allow_redirects=False,
+			max_bytes=65536,
+			before_post=before_post,
 		)
-		if token_response.status_code != 200:
-			code = _status_code(token_response.status_code)
+		if status != 200:
+			code = _status_code(status)
 			raise GatewayError("authentication" if code == "rejected" else code)
-		token = token_response.json().get("access_token")
+		token = token_body.get("access_token") if isinstance(token_body, dict) else None
 		if not isinstance(token, str) or not token:
 			raise GatewayError("invalid_response")
 		headers["Authorization"] = f"Bearer {token}"
@@ -207,7 +241,18 @@ def _status_code(status):
 	return "rejected"
 
 
-def complete(endpoint, model, messages, limit, *, tools=(), schema=None, timeout=30, allow_test_http=False):
+def complete(
+	endpoint,
+	model,
+	messages,
+	limit,
+	*,
+	tools=(),
+	schema=None,
+	timeout=30,
+	allow_test_http=False,
+	before_post=None,
+):
 	"""Make one synchronous attempt. Exceptions and logs carry only fixed codes."""
 	error = "configuration"
 	try:
@@ -221,17 +266,21 @@ def complete(endpoint, model, messages, limit, *, tools=(), schema=None, timeout
 		payload = _payload(endpoint.adapter, model, messages, limit, tools, schema)
 		with requests.Session() as session:
 			session.trust_env = False
-			response = session.post(
+			headers = _headers(
+				endpoint, session, timeout, allow_test_http=allow_test_http, before_post=before_post
+			)
+			status, body = _post_json(
+				session,
 				base.rstrip("/") + path,
-				headers=_headers(endpoint, session, timeout, allow_test_http=allow_test_http),
+				headers=headers,
 				json=payload,
 				timeout=timeout,
-				allow_redirects=False,
+				max_bytes=2 * 1024 * 1024,
+				before_post=before_post,
 			)
-		if response.status_code != 200:
-			raise GatewayError(_status_code(response.status_code))
+		if status != 200:
+			raise GatewayError(_status_code(status))
 		error = "invalid_response"
-		body = response.json()
 		if body.get("error") or body.get("promptFeedback", {}).get("blockReason"):
 			raise GatewayError("rejected")
 		text, calls, input_tokens, output_tokens = _normalize(endpoint.adapter, body)
@@ -240,6 +289,9 @@ def complete(endpoint, model, messages, limit, *, tools=(), schema=None, timeout
 			for count in (input_tokens, output_tokens)
 		):
 			raise GatewayError(error)
+		bearer = headers.get("Authorization", "").removeprefix("Bearer ")
+		if _contains_secret([text, calls], (endpoint.secret, bearer)):
+			raise GatewayError("invalid_response")
 		return {
 			"api": endpoint.api,
 			"model": model,
@@ -247,17 +299,15 @@ def complete(endpoint, model, messages, limit, *, tools=(), schema=None, timeout
 			"tool_calls": calls,
 			"usage": {"input": input_tokens, "output": output_tokens},
 		}
-	except requests.Timeout:
+	except (requests.Timeout, ReadTimeoutError):
 		error = "timeout"
-	except requests.exceptions.JSONDecodeError:
-		error = "invalid_response"
-	except requests.ConnectionError:
+	except (requests.ConnectionError, HTTPError):
 		error = "upstream"
 	except requests.RequestException:
 		error = "rejected"
 	except GatewayError as failure:
 		error = failure.code
-	except KeyError, IndexError, ValueError, TypeError, AttributeError:
+	except (KeyError, IndexError, ValueError, TypeError, AttributeError, RecursionError):
 		pass
 	LOGGER.warning("Model gateway attempt failed: %s", error)
 	raise GatewayError(error)

@@ -58,3 +58,39 @@ Geçit her sonucu hesaba bağlı API kaydı üzerinden değerlendirir.
 Aynı API'deki başka bir model, dinlenme süresinde seçilmez.
 Bütçe sınırı varsa geçit çağrının üst maliyetini önceden hesaplar.
 Maliyeti hesaplanamayan çağrı bütçeli hesaba gitmez.
+
+## Frappe uygulaması
+
+Geçit, her sağlayıcı denemesinden önce kullanım kaydı açar.
+Kayıt, çağrının sonucunu ve ölçülen kullanımı tutar.
+Geçit mesaj metnini, anahtarı ve araç girdisini kayda yazmaz.
+Maliyeti bilinmeyen ücretli deneme, sınırlı hesabı tekrar kullanıma kapatır.
+Sınır takvim ayı değişince yeni ay için hesaplanır.
+Geçit, aynı sitede aynı anda bir ücretli çağrı başlatır.
+
+Yönetici, `model_gateway_endpoints` ayarına tam bağlantı adresini ekler.
+Adresin değeri yerel ağ için `local`, dış hizmet için `external` olur.
+Geçit, OAuth adresini de aynı listeye göre denetler.
+Dış hizmet bağlantısı HTTPS ister.
+`local_only` yolu yalnız yerel ağa çağrı yapar.
+
+`masked` yolu, yaygın kimlik ve ödeme bilgilerini kalıpla örter.
+Geçit, dış çağrıdan önce örtülmüş isteğin parmak izini hesaplar.
+Parmak izi, içeriği temsil eden sabit uzunlukta bir özettir.
+Yönetici onaylı özetleri `model_gateway_external_payloads` ayarına ekler.
+Ayar, yol kimliğini onaylı özet listesine bağlar.
+Özet mesajı, araç listesini, çıktı şemasını ve çıktı sınırını kapsar.
+Geçit onaysız içeriği dış hizmete göndermez.
+Bağlantı denemesi yalnız sunucudaki sabit ve açık metni gönderir.
+
+İki HTTP ucu izin denetimini ortak geçit işlevlerine bırakır.
+Statik tarama bu işlevleri izleyemediği için iki uçta dar istisna vardır.
+HTTP testleri hem misafir hem yetkisiz kullanıcı erişimini sınar.
+Kullanım günlüğüne yazan iç işlev yalnız sunucunun seçtiği alanları alır.
+İşlev, sağlayıcı çağrısından önce deneme kaydını veritabanına yazar.
+Bu kayıt, istek yarıda kalırsa bütçe denetiminde korunur.
+
+Model çağrısı, yapay zekâ erişim katmanının süreli belirtecini de kabul eder.
+Geçit belirteci yalnız model çağrısı yolunda tanır.
+Geçit oturum sahibini ve kalan çağrı sayısını denetler.
+Yapay zekâ katmanı ile birleştirmede ortak kanca listesi iki girişi korumalıdır.
