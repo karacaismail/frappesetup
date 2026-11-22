@@ -5,6 +5,7 @@ import json
 import os
 import re
 import unittest
+from datetime import date, timedelta
 from http.cookiejar import CookieJar
 from pathlib import Path
 from urllib.error import HTTPError
@@ -86,6 +87,23 @@ class LeaveHttpTest(unittest.TestCase):
                 {"name": self.data["leaves"]["employee"]},
             )[0],
             403,
+        )
+
+    def test_z_employee_can_create_draft_with_team_approver(self):
+        client = self.login("employee")
+        own = self.document(client, "employee")
+        day = (date.fromisoformat(own["from_date"]) + timedelta(days=8)).isoformat()
+        draft = {key: own[key] for key in ("employee", "company", "leave_type")}
+        draft.update(
+            from_date=day,
+            to_date=day,
+            status="Open",
+            leave_approver=self.data["users"]["manager"],
+        )
+        code, result = client.send(LEAVE_PATH, draft, csrf_token=client.csrf_token())
+        self.assertEqual(code, 200, result.get("exception"))
+        self.assertEqual(
+            result["data"]["leave_approver"], self.data["users"]["manager"]
         )
 
     def test_manager_can_only_approve_team_leave(self):
