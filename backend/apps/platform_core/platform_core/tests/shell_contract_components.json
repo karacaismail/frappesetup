@@ -563,6 +563,37 @@
   "Meta": {
     "type": "object",
     "description": "Effective metadata. Keep permission tokens in memory. A verified mobile response may permit offline storage of its non-sensitive definitions.",
+    "if": {
+      "required": [
+        "truncated"
+      ]
+    },
+    "then": {
+      "properties": {
+        "child_tables": {
+          "maxProperties": 0
+        },
+        "mobile_cache_allowed": {
+          "const": false
+        },
+        "schema": {
+          "properties": {
+            "fields": {
+              "maxItems": 0
+            },
+            "title_field": {
+              "const": null
+            },
+            "search_fields": {
+              "const": ""
+            },
+            "sort_field": {
+              "const": null
+            }
+          }
+        }
+      }
+    },
     "required": [
       "schema",
       "meta_hash",
@@ -598,6 +629,11 @@
       "mobile_cache_allowed": {
         "type": "boolean",
         "description": "Only a verified mobile response can be true. The approved non-sensitive schema and child definitions may be stored in authorized mobile offline storage. Never persist permission tokens or restricted definitions. Purge on scope change, logout or revocation."
+      },
+      "truncated": {
+        "type": "boolean",
+        "const": true,
+        "description": "Present only when the full response exceeds the byte budget. The summary retains DocType identity and version tokens, omits field and child definitions, clears field references and disables mobile caching."
       }
     },
     "additionalProperties": false
