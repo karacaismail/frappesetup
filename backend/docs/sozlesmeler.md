@@ -98,7 +98,7 @@ Keycloak çıkışta `logout_token` gönderir. Doğrulamada şunları denetleyin
 
 ### Kitaplığın arayüzü
 
-`press_tr` ve `platform_core` kitaplığı aynı anda kullanacak. Bu yüzden arayüz önceden belirlendi. Kitaplık Python 3.11 ve sonrasında çalışır. Frappe'ye bağlı değildir.
+`press_tr` ve `platform_core` kitaplığı aynı anda kullanacak. Bu yüzden arayüz önceden belirlendi. Kitaplık Python 3.11 ve sonrasında çalışır. Frappe 16 Python 3.14 kullanır. Kitaplık Frappe'ye bağlı değildir.
 
 ```python
 from oidc_verify import (
@@ -179,7 +179,7 @@ Açılan kullanıcının türü “Website User” olur (Proje kaydı D-5).
 | `press_tr.api.identity.ensure_team` | POST | Servis belirteci, `azp=identity-sync` | Takımı ve üyeliği hazırlar. Aynı istek iki kez gelirse aynı sonucu döner. |
 | `press_tr.api.identity.remove_team_member` | POST | Servis belirteci, `azp=identity-sync` | Üyeliği kaldırır. |
 
-- Press, Frappe 15 üzerinde çalışır. Frappe 15'te `on_social_login` kancası yoktur. Bu yüzden Press kendi dönüş ucunu kullanır (AU-4). press-tr işi bunu kaynak kodda doğrular.
+- Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
 - G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
 
 ## 7. `identity_sync`

@@ -1,6 +1,6 @@
 # Proje sahibinin kararları
 
-Bu dosya 20 Kasım 2026 Cuma ve 21 Kasım 2026 Cumartesi günlerinin kararlarını toplar.
+Bu dosya 20 Kasım 2026 Cuma, 21 Kasım 2026 Cumartesi ve 22 Kasım 2026 Pazar günlerinin kararlarını toplar.
 
 Çalışma Frappe için kod standartlarıyla başladı. Sonra mobil uygulamaya ve KVKK uyumuna genişledi.
 
@@ -60,6 +60,10 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 13. Platform genel bir SaaS çerçevesidir. Bir pazaryeri planı değildir.
 14. Düzenli silme için şimdilik cron kurulmaz.
 15. KVKK ve GDPR uyum çalışması şimdilik durdu.
+16. Backend geliştirmesi MVP seviyesinde başladı. Kod frappesetup deposundadır.
+17. Giriş Keycloak ile olur. Keycloak'ın markası Atonota'dır. Atonota ayrı alan adında durur.
+18. İlk turda Press de geliştirilir.
+19. Bütün uygulamalar Frappe 16 ile yazılır. Press de Frappe 16 üzerinde çalışır.
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -660,6 +664,85 @@ Sonuç şudur:
 - İş yalnız proje sahibi isterse yeniden başlar. Ajan bu işi kendiliğinden önermez.
 
 Karar 26'daki istek kayıtta aynen kalıyor. Proje sahibinin son sözü işi şimdilik durdurur.
+
+## 22 Kasım 2026 Pazar günü
+
+### Karar 32. Backend geliştirmesi Pane ile başlayacak
+
+Proje sahibi şunu istedi:
+
+> "frappe setup" projesini, geliştirmeye başla. tamamen pane ile, paralel agents ile, geliştir. sadece backend'i geliştir.
+
+Sonuç şudur:
+
+- Backend kodu yazılmaya başlandı. Ön yüz bu turda yoktur.
+- İşler Pane'de paralel yürür. Her iş kendi Pane'inde ve kendi dalında durur.
+- Pane oturumunun adı “frappesetup backend MVP” oldu.
+- İşçiler Claude ve Codex hesaplarıdır. Claude'un bu oturumu işleri yönetir.
+
+### Karar 33. Giriş Keycloak ile ve ayrı bir markayla olacak
+
+Proje sahibi şunu istedi:
+
+> giriş yöntemi keycloack olacak. keycloack ayrı bir domain'de barındırılacak. "facebook ile oturum aç" özelliği gibi "xxx ile oturum aç" gibi bir (ayrı) markası olacak (keycloack yeniden markalanacak).
+
+Claude markanın adını sordu. Proje sahibi şöyle cevap verdi:
+
+> atonota.net
+
+Sonuç şudur:
+
+- Kimlik markası Atonota'dır. Düğme metni “Atonota ile oturum aç” olur.
+- Claude adı alan adından türetti. Proje sahibi adın yazımını ayrıca onaylamadı.
+- Keycloak atonota.net alan adında, platformdan ayrı durur.
+- Tam sunucu adı açık karardır. Örneğin ad `atonota.net` ya da `id.atonota.net` olabilir.
+- Marka adı ve alan adı koda sabit yazılmaz. İkisi de ayardan gelir.
+
+### Karar 34. Backend'in seviyesi, yeri ve kapsamı belirlendi
+
+Claude dört soruyu tek kartta sordu. Proje sahibinin seçtiği seçenekler şunlardır:
+
+| Soru | Seçilen seçenek |
+|---|---|
+| Platform hangi olgunluk seviyesinde başlasın? | “MVP, ilk kullanılabilir sürüm” |
+| Backend kodu nerede ve hangi lisansla dursun? | “frappesetup deposunun içinde” |
+| İlk turda hangi parçalar yapılsın? | “Bunlar ve Press (press_tr)” |
+| “xxx ile oturum aç” markasının adı ne olsun? | “Adı şimdi yazacağım” |
+
+Claude MVP'yi önermemişti. Claude PoC'yi önermişti. Proje sahibi MVP'yi seçti.
+
+Sonuç şudur:
+
+- Seviye MVP'dir. Modül sınırı denetimi ve sözleşmeler baştan zorunludur.
+- Kod frappesetup deposunun `backend/` klasöründe durur. Kodun lisansı deponun kod lisansıdır, yani MIT'dir.
+- Çalışma dalının adı `backend` oldu. Dal `standartlar-ve-kararlar` dalından açıldı.
+- İlk tur şu işleri kapsar: geliştirme ortamı, Keycloak realm'i ve Atonota markası, `platform_core` içinde giriş ve ekran verisi uçları, kullanıcı eşitleme servisi ve `press_tr` içinde Press girişi.
+- Ayrıntılı kayıt `backend/PROJE-KAYDI.md` dosyasındadır. Açık kararlar ve çelişkiler de oradadır.
+
+### Karar 35. Bütün uygulamalar Frappe 16 ile yazılacak
+
+İşçiler çalışırken proje sahibi şunu yazdı:
+
+> zaten frappe press kurulmuştu  (sanırım collima altında bilgisayarda)
+> ve app frappe v16.x ile koldlansın
+
+Claude var olan kurulumu yalnız okudu. Kurulum Colima'nın varsayılan profilinde çalışıyor. Sürümler şunlardır:
+
+| Uygulama | Sürüm |
+|---|---|
+| Frappe | v16.50.0 |
+| ERPNext | v16.50.0 |
+| Press | v0.154.1 |
+| Python | 3.14.8 |
+| MariaDB | 11.8 |
+
+Sonuç şudur:
+
+- `platform_core` ve `press_tr` Frappe 16 ile yazılır.
+- Var olan Press kurulumu değiştirilmez. Onun imajı ve kurulum betikleri yeniden kullanılır.
+- Bu karar sitedeki K1 kararını değiştirir. K1, Press'i Frappe 15 üzerinde kurar.
+- Kurulumun kendi notuna göre Press bu sürümde yalnız yamalarla açılır. Sunucu kurma ve Ansible çalışmaz.
+- Üretimde Press'in hangi sürümle çalışacağı ayrı karardır. Konu `backend/PROJE-KAYDI.md` dosyasında A-11 maddesidir.
 
 ## Modellerin kararları
 

@@ -13,7 +13,7 @@ Bu dosya backend'in seviyesini, sürümlerini ve kararlarını tutar. Kod standa
 | Bileşen | Hedef | Durum |
 | --- | --- | --- |
 | Kiracı sitesi | Frappe 16 ve ERPNext 16 | Yerelde `frappe/erpnext:v16.55.0` imajı var. Çalışan sürümü dev-ortam işi doğrular. |
-| Press sitesi | Frappe 15, Press v0.154 ve Python 3.11 | Çalışan sürümü press-tr işi doğrular. |
+| Press sitesi | Frappe 16, Press v0.154.1 ve Python 3.14 | Bu Mac'teki deneme kurulumunda bu sürümler çalışıyor. Press bu sürümde yalnız yamalarla açılır (A-11). |
 | Keycloak | 26.8 serisi | Son sürümü kimlik-realm işi resmî kaynaktan doğrular. |
 | Container | Colima, `colima-factory` profili | Docker Desktop kullanılmaz. |
 
@@ -62,6 +62,8 @@ Kararlar 22 Kasım 2026 Pazar günü Pane kartıyla alındı.
   - Marka adı ve alan adı ayardan gelir. Kodda sabit yazılmaz.
 - **D-5. Son kullanıcı yalnız ayrı arayüzü görür.** Son kullanıcının türü “Website User” olur (Karar 10, G-16).
 - **D-6. Zamanlanmış iş kurulmaz.** Proje sahibi `cron` kurulumunu istemedi (V-9).
+- **D-7. Bütün uygulamalar Frappe 16 ile yazılır.** `press_tr` de Frappe 16 üzerinde çalışır. Proje sahibi bunu şöyle yazdı: “app frappe v16.x ile koldlansın”.
+- **D-8. Var olan Press kurulumu kullanılır.** Bu Mac'te Colima'da bir Press deneme kurulumu var. Kurulum değiştirilmez. İmajı ve kurulum betikleri yeniden kullanılır.
 
 ## Orkestratörün seçtiği varsayılanlar
 
@@ -86,6 +88,7 @@ Ajan bu maddeleri kendiliğinden kapatmaz. Etkilenen işi raporda yazar.
 - **A-7. Press'te uygulama kaynağı.** Press uygulamayı deponun kökünde bekleyebilir. Bu bilgi doğrulanmadı. Doğruysa `backend/apps/` yapısı dağıtımda ayrı depo ister.
 - **A-8. `press_tr` lisansı.** Press AGPL-3.0 lisanslıdır. `press_tr` Press'i kullanır. Lisans etkisini hukuk değerlendirir (K-1).
 - **A-9. Gerçek veri.** Türkiye'deki kişilerin verisi güvence kurulmadan Hetzner'e konmaz (Karar 27). Bu tur yalnız yerel ortamda ve örnek veriyle yürür.
+- **A-11. Press'in Frappe 16 desteği.** Karar sitesinin K1 kararı Press'i Frappe 15 üzerinde kurar. D-7 bunu değiştirir. Press v0.154.1 Frappe 16 ve Python 3.14 üzerinde yalnız yamalarla açılır. Ansible ve sunucu kurma bu sürümde çalışmaz. Üretimde Press'in hangi sürümle çalışacağı ayrı karardır.
 - **A-10. Eşitleme olaylarının kaynağı.** Zamanlanmış yoklama yasaktır (D-6). Keycloak olay eklentisi T-2 değerlendirmesi ister.
 
 ## Kişisel veri
