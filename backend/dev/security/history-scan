@@ -3,6 +3,10 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 security_dir=backend/dev/security
+if [[ $# -gt 1 || ( $# -eq 1 && "$1" != --self-test ) ]]; then
+    printf '%s\n' 'Usage: history-scan [--self-test]' >&2
+    exit 2
+fi
 source "$security_dir/container-settings"
 
 self_test() {

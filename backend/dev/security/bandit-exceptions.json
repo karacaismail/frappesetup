@@ -150,5 +150,13 @@
     "reason": "The gate path and fake executables are created by the test inside its private temporary directory.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/test_review.py",
+    "line": 196,
+    "reason": "The test runs a known local security script with fixed invalid arguments and a fake Docker executable.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
   }
 ]

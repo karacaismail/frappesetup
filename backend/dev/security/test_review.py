@@ -173,3 +173,27 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual([job["type"] for job in plan["jobs"]], ["import", "passiveScan-wait", "exitStatus"])
         self.assertIs(plan["jobs"][0]["parameters"]["sendRequests"], False)
         self.assertEqual(har["log"]["entries"][0]["request"]["url"], "http://dev.localhost:8080/")
+
+    def test_runtime_inventory_requires_exactly_one_image_id(self):
+        image = "sha256:" + "1" * 64
+        self.assert_script_rejects("runtime-packages", ([], ["latest"], [image, "extra"]),
+                                   1, "Use the exact local image ID")
+
+    def test_history_scan_rejects_unknown_or_extra_arguments(self):
+        self.assert_script_rejects("history-scan", (["--unknown"], ["--self-test", "extra"]),
+                                   2, "Usage: history-scan [--self-test]")
+
+    def assert_script_rejects(self, name, cases, exit_code, message):
+        script = scans.ROOT / scans.SECURITY / name
+        with tempfile.TemporaryDirectory() as directory:
+            tools = Path(directory)
+            docker = tools / "docker"
+            docker.write_text("#!/bin/sh\nprintf 'unexpected docker call\\n'\nexit 42\n")
+            docker.chmod(0o755)
+            env = {**os.environ, "PATH": f"{tools}:{os.environ['PATH']}", "FS_COLIMA_PROFILE": "ci"}
+            for args in cases:
+                with self.subTest(args=args):
+                    result = subprocess.run([script, *args], env=env, capture_output=True, text=True)
+                    self.assertEqual(result.returncode, exit_code)
+                    self.assertIn(message, result.stderr)
+                    self.assertEqual(result.stdout, "")

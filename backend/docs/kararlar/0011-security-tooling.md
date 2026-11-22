@@ -5,6 +5,9 @@ Araçlar uygulama sunucusundan ayrı çalışır.
 
 ## Araç seçimi
 
+Frappe 16’nın testleri uygulama davranışını sınar.
+Git geçmişi ve bağımlılık kilitleri ayrı araç ister.
+
 - Bandit 1.9.4, Python kaynak kodunu inceler. Lisansı Apache 2.0'dır.
 - Gitleaks 8.30.1, yerelde erişilebilen Git geçmişini inceler. Lisansı MIT'dir.
 - OSV-Scanner 2.7.1, sabit sürümlü bağımlılık listesini inceler. Lisansı Apache 2.0'dır.
@@ -17,7 +20,19 @@ Bu nedenle ağ üzerinden sorgu yapan pip-audit seçeneğini kullanmadık.
 Bandit, var olan Semgrep kurallarına ek Python denetimleri sağlar. Python denetimini bunun için ayrı tuttuk.
 Çalışan site kontrolü, yerel bir adresten tek HTTP yanıtı alır.
 Komut `X-Content-Type-Options: nosniff` başlığını denetler. Yönlendirmeyi izlemez.
-ZAP 2.17.0 bu yanıtı ağ erişimi kapalı bir ortamda inceler.
+Başlık denetimi yalnız bir başlığı inceler.
+ZAP aynı yanıtta başka güvenlik uyarıları da arar.
+ZAP 2.17.0, yanıtı ağ erişimi kapalı bir ortamda inceler.
+ZAP, Apache 2.0 lisansı kullanır. DevOps sorumlusu yeni sürümde imaj özetini günceller.
+[ZAP sürüm kaydı](https://github.com/zaproxy/zaproxy/releases/tag/v2.17.0)
+[ZAP lisansı](https://github.com/zaproxy/zaproxy/blob/v2.17.0/LICENSE)
+
+22 Kasım 2026 Pazar günü ZAP deposunda yayımlanmış güvenlik bildirimi görünmüyordu.
+Bu denetim imajdaki paketleri kapsamadı.
+[ZAP güvenlik bildirimleri](https://github.com/zaproxy/zaproxy/security/advisories)
+
+Nuclei yerine ZAP seçildi. ZAP kaydedilen yanıtı yeni istek göndermeden inceler.
+Tarayıcıya paket eklenmez. ZAP, yerel denetimde ayrı imaj olarak çalışır.
 Canlı Schemathesis adımı açıktır. `security-full --ci` bu adımı geçirmez.
 
 ## Bakım ve geri dönüş
@@ -29,7 +44,8 @@ Bandit istisnaları `backend/dev/security/bandit-exceptions.json` dosyasındadı
 Gitleaks istisnaları `backend/dev/security/.gitleaksignore` dosyasındadır.
 Yalnız incelemesi tamamlanan bulguları istisna sayın.
 
-Yeni komutlar geri alınırsa mevcut `guvenlik-denetimi` komutu çalışmaya devam eder.
+Geri dönüş için bu araçların eklendiği değişikliği geri alın.
+Mevcut `guvenlik-denetimi` komutu tek başına çalışır.
 
 ## Tarama ve istisna kapsamı
 

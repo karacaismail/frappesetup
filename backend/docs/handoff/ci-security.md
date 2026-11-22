@@ -59,9 +59,11 @@ ZAP, yerel siteden alınan ilk yanıtı pasif olarak inceler. Yanıt yeniden gö
 Canlı Schemathesis adımı `not_run` döner. `security-full --ci` bu adımda geçmez.
 Rapor kendi başına birleştirme kararı vermez.
 
-CodeQL Python işi için şu adımları kullanın.
+CodeQL Python işi için aşağıdaki ayarları kullanın.
+İş 15 dakikada bitmezse GitHub işi durdurur.
 
 ```yaml
+timeout-minutes: 15
 permissions:
   contents: read
   security-events: write
@@ -86,4 +88,4 @@ Komut son denetim sonuçlarını sayar.
 Açık bulgu sayısını inceleme kaydından alın. Sayıyı `--open-findings` ile girin.
 Paket açığı sayısını tarama çıktısından alın. Sayıyı `--package-vulnerabilities` ile girin.
 Reddedilen istek sayısını test kaydından alın. Sayıyı `--rejected-requests` ile girin.
-Bir sayıyı girmediğinizde karne “Ölçülmedi” yazar.
+Bir sayıyı girmediğinizde karne “Not measured” yazar.

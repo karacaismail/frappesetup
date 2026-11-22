@@ -6,7 +6,7 @@ if [[ "${FS_COLIMA_PROFILE:-factory}" == factory ]]; then
     printf '%s\n' 'List runtime packages in the default or CI profile.' >&2
     exit 1
 fi
-if [[ ! "$1" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+if [[ $# -ne 1 || ! "$1" =~ ^sha256:[0-9a-f]{64}$ ]]; then
     printf '%s\n' 'Use the exact local image ID from docker image inspect.' >&2
     exit 1
 fi
