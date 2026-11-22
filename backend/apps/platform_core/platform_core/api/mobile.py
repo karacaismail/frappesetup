@@ -9,10 +9,11 @@ from platform_core.mobil.lifecycle import (
 	_require_enabled_user,
 	check_new_installation,
 	lock_account,
+	lock_revocation_scope,
 	record_revocation,
 )
 from platform_core.mobil.protocol import PAGE_SIZE, MobileError, uuid4_id
-from platform_core.mobil.request import endpoint_response
+from platform_core.mobil.request import endpoint_response, identity_sync_response
 from platform_core.mobil.retention import cleanup
 from platform_core.mobil.service import COMMANDS, pull, push
 from platform_core.mobil.sessions import require_active_session
@@ -115,6 +116,28 @@ def _cleanup(identity, body):
 	return cleanup(dry_run=body.get("dry_run", False))
 
 
+def _linked_account(issuer, subject):
+	if not frappe.db.exists("DocType", "Platform Identity Link"):
+		raise MobileError("mobile_schema_unavailable", 503)
+	return frappe.db.get_value("Platform Identity Link", {"issuer": issuer, "subject": subject}, "user")
+
+
+def _revoke_user_installations(body):
+	account = _linked_account(body["issuer"], body["subject"])
+	if not account:
+		raise MobileError("IdentityNotFound", 404)
+	try:
+		_, cutoff, _ = lock_revocation_scope(account)
+	except MobileError as error:
+		if error.code == "account_unavailable":
+			raise MobileError("IdentityNotFound", 404) from error
+		raise
+	count, newly_revoked = MobileStore().revoke_account_installations(account)
+	if newly_revoked or int(cutoff) == 0:
+		record_revocation(account)
+	return {"revoked": count}
+
+
 @frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def v1_register():
 	return endpoint_response("v1_register", _register)
@@ -138,3 +161,8 @@ def v1_pull():
 @frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 def v1_cleanup():
 	return endpoint_response("v1_cleanup", _cleanup)
+
+
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
+def revoke_user_installations():
+	return identity_sync_response(_revoke_user_installations)

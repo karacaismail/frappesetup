@@ -26,3 +26,5 @@ Keycloak session ID,Keycloak oturum kimliği
 The verified Keycloak session that registered this installation.,Kurulumu açan doğrulanmış Keycloak oturumu.
 Closure pending,Kapatma bekliyor
 Identity-sync has not confirmed closure of this Keycloak session.,Kimlik servisi bu Keycloak oturumunun kapandığını henüz doğrulamadı.
+Notification token,Bildirim belirteci
+The private notification binding for this installation.,Bu kuruluma ait özel bildirim bağı.

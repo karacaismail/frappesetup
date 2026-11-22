@@ -132,10 +132,47 @@ def mobile_request(endpoint):
 	return Identity(frappe.local.site, account, principal, scope, issued_at, sid), body
 
 
+def identity_sync_request():
+	request = frappe.local.request
+	if (
+		request.path != "/api/method/platform_core.api.mobile.revoke_user_installations"
+		or "cmd" in request.args
+	):
+		raise MobileError("invalid_mobile_route")
+	auth = request.headers.get("Authorization", "").split()
+	if len(auth) != 2 or auth[0].lower() != "bearer":
+		raise MobileError("service_token_required", 403)
+	login_manager = getattr(frappe.local, "login_manager", None)
+	if request.cookies.get("sid") not in (None, "", "Guest") and getattr(
+		login_manager, "user", "Guest"
+	) not in (None, "Guest"):
+		raise MobileError("service_token_required", 403)
+
+	# Only the identity auth hook may set these verified claims.
+	claims = getattr(frappe.local, "kimlik_service_claims", None)
+	if not isinstance(claims, dict) or claims.get("azp") != "identity-sync":
+		raise MobileError("service_token_required", 403)
+	body = _read_json(request)
+	if "cmd" in body:
+		raise MobileError("invalid_mobile_route")
+	if body.keys() != {"issuer", "subject"} or any(
+		not isinstance(body[field], str)
+		or not 1 <= len(body[field]) <= limit
+		or body[field] != body[field].strip()
+		for field, limit in (("issuer", 512), ("subject", 255))
+	):
+		raise MobileError("invalid_request")
+	if body["issuer"] != claims.get("iss"):
+		raise MobileError("service_token_required", 403)
+	return body
+
+
 def _error_response(error):
 	frappe.db.rollback()
 	frappe.local.response["http_status_code"] = error.status
 	frappe.local.response["code"] = error.code
+	if error.code == "IdentityNotFound":
+		frappe.local.response["exc_type"] = error.code
 	if error.status == 503:
 		frappe.local.response_headers.setdefault("Retry-After", "1")
 	if error.current is not None:
@@ -149,11 +186,23 @@ def endpoint_response(endpoint, action):
 	except MobileError as error:
 		return _error_response(error)
 
+	return run_transaction(action, identity, body)
+
+
+def identity_sync_response(action):
+	try:
+		body = identity_sync_request()
+	except MobileError as error:
+		return _error_response(error)
+	return run_transaction(action, body)
+
+
+def run_transaction(action, *args):
 	# MariaDB can reject a locking read when auth opened an older snapshot.
 	# Roll back the entire attempt before rerunning database-only commands.
 	for attempt in range(3):
 		try:
-			return action(identity, body)
+			return action(*args)
 		except MobileError as error:
 			return _error_response(error)
 		except frappe.QueryTimeoutError:

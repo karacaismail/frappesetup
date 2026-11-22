@@ -10,6 +10,7 @@ from .protocol import DELIVERY_AUDIT_SIZE, MobileError, content_digest
 SEQUENCE_DOCTYPE = "Mobile Sequence"
 SEQUENCE_NAME = "site"
 DELIVERY_AUDIT_INTERVAL = timedelta(minutes=5)
+SERVICE_SESSION_BATCH_SIZE = 20
 INTERNAL_TYPES = frozenset(
 	{
 		SEQUENCE_DOCTYPE,
@@ -126,6 +127,27 @@ class MobileStore:
 			include_revoked=installation_id is not None,
 		)
 		return {"revoked": self.revoke_targets(row.name for row in rows)}
+
+	def revoke_account_installations(self, account):
+		from .sessions import is_session_closure_pending
+
+		rows = self.revocation_targets(account, include_revoked=True)
+		targets = [row.name for row in rows if not row.revoked]
+		for row in rows:
+			if len(targets) >= SERVICE_SESSION_BATCH_SIZE:
+				break
+			if row.revoked and is_session_closure_pending(row.session_id):
+				targets.append(row.name)
+		changed = self.revoke_targets(targets)
+
+		# Update only rows with a binding so a repeated call does not change them.
+		frappe.db.set_value(
+			"Mobile Installation",
+			{"account": account, "notification_token": ["is", "set"]},
+			"notification_token",
+			None,
+		)
+		return len(rows), changed
 
 	def revocation_targets(
 		self, account, installation_id=None, *, scope=None, principal=None, include_revoked=False

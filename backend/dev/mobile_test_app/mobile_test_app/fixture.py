@@ -112,6 +112,14 @@ def authenticate():
 	if request.path == PROBE_PATH and header == "Bearer fixture-control":
 		frappe.set_user(FIRST)
 		return
+	if request.path == "/api/method/platform_core.api.mobile.revoke_user_installations" and header in (
+		"Bearer fixture-service", "Bearer fixture-service-other",
+	):
+		frappe.set_user("Administrator")
+		frappe.local.kimlik_service_claims = {
+			"iss": "fixture", "azp": "identity-sync" if header == "Bearer fixture-service" else "different-service",
+		}
+		return
 	if request.path not in MOBILE_PATHS:
 		return
 	account = TOKENS.get(header)

@@ -14,7 +14,6 @@ class IdentitySyncClientTest(TestCase):
 			"mobile_identity_sync_token_url": "https://id.example.test/realms/platform/protocol/openid-connect/token",
 			"mobile_identity_sync_client_id": "platform-core-fixture",
 			"mobile_identity_sync_client_secret": "fixture-secret",
-			"mobile_identity_sync_scope": "aud-identity-sync",
 		}
 		patch.object(client.frappe, "conf", self.conf).start()
 		self.logger = patch.object(client.frappe, "logger").start().return_value

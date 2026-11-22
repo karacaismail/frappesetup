@@ -290,7 +290,7 @@ Oturuma bağlanmamış eski kurulum için yönetici kimlik tarafını kullanır.
 Servis adresi `mobile_identity_sync_url` ayarında bulunur.
 Belirteç adresi `mobile_identity_sync_token_url` ayarından okunur.
 Servis hesabı `mobile_identity_sync_client_id` ve `mobile_identity_sync_client_secret` kullanır.
-Gerekirse kapsam `mobile_identity_sync_scope` ayarına yazılır.
+Kiracı servis hesabı belirteci `aud-identity-sync` kapsamıyla ister.
 Sunucu bu ayarları güvenli site yapılandırmasından okur.
 Canlı servis için kimlik ekibi servis hesabını ve kapsamı tanımlar.
 
@@ -302,6 +302,14 @@ Bu oturum sürelerini kimlik tarafı uygular.
 
 O-27 uyarınca hesap silme akışını kimlik servisi başlatır.
 Kullanıcı silinince mobil kurulumlar ve bağlı teslim kayıtları temizlenir.
+Kimlik servisi hesabı kapatırken `revoke_user_installations` ucunu çağırır.
+Uç yalnız kimlik kancasının doğruladığı `identity-sync` belirtecini kabul eder.
+Uç bütün kurulumları iptal eder ve özel bildirim bağlarını kaldırır.
+Aynı istek, kurulum listesi değişmedikçe aynı iptal sayısını verir.
+Kimlik kancası bu adresi kesin servis adresleri listesine almalıdır.
+Kanca bu yolu mobil belirteç yolundan önce ayırmalıdır.
+Tekrar çağrısı, bekleyen kapanmaları sınırlı sayıda yeniden dener.
+Daha önce doğrulanan kapanmalar yeniden gönderilmez.
 İş kayıtlarının anonim yapılması hesap silme akışının ayrı adımıdır.
 
 Yapay zekâ temizlik denemesini de öneri olarak açar.

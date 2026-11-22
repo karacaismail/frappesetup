@@ -381,3 +381,17 @@ class MobileHTTPTest(unittest.TestCase):
 				return
 			self.assertEqual(status, 200, result)
 		self.fail("Rate limit was not applied")
+
+	@unittest.skipUnless(FIXTURE, "Synthetic service markers are required")
+	def test_revoke_user_installations_guest_denied(self):
+		status, _, _ = self.post("revoke_user_installations", {}, token=None)
+		self.assertIn(status, {401, 403})
+
+	@unittest.skipUnless(FIXTURE, "Synthetic service markers are required")
+	def test_revoke_user_installations_foreign_data_denied(self):
+		status, _, _ = self.post(
+			"revoke_user_installations",
+			{"issuer": "fixture", "subject": "missing"},
+			token="fixture-service-other",
+		)
+		self.assertEqual(status, 403)

@@ -144,8 +144,51 @@ paths:
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
         default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile.revoke_user_installations:
+    post:
+      operationId: mobileRevokeUserInstallations
+      security:
+        - identitySyncBearer: []
+      description: |
+        Kimlik servisi kullanıcının bütün telefon kurulumlarını iptal eder.
+        Sunucu bildirim bağlarını siler. Aynı istek aynı durumu ve sayıyı döndürür.
+        Sunucu kullanıcıyı veren ve konu kimliğiyle bulur.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [issuer, subject]
+              properties:
+                issuer: { type: string, minLength: 1, maxLength: 512 }
+                subject: { type: string, minLength: 1, maxLength: 255 }
+      responses:
+        '200':
+          description: Kullanıcının iptal edilmiş kurulum sayısı.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { $ref: '#/components/schemas/Revoked' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404':
+          description: Kimlik bağı bulunamadı. exc_type alanı IdentityNotFound döner.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503': { $ref: '#/components/responses/Unavailable' }
 components:
   securitySchemes:
+    identitySyncBearer:
+      type: http
+      scheme: bearer
+      description: Kimlik kancasının doğruladığı ve azp değeri identity-sync olan servis belirteci.
     mobileBearer: { type: http, scheme: bearer }
   parameters:
     AppVersion:
@@ -229,6 +272,7 @@ components:
           type: string
           description: Mobil ucun verdiği hata kodu.
           enum:
+            - IdentityNotFound
             - body_too_large
             - cleanup_forbidden
             - command_disabled
@@ -257,6 +301,7 @@ components:
             - mobile_token_required
             - mobile_token_revoked
             - operation_conflict
+            - service_token_required
             - rate_limit
             - record_not_found
             - unexpected_version

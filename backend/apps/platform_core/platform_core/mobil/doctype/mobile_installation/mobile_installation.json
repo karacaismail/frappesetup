@@ -11,7 +11,8 @@
   "scope",
   "revoked",
   "last_audit_at",
-  "session_id"
+  "session_id",
+  "notification_token"
  ],
  "fields": [
   {
@@ -67,6 +68,13 @@
    "length": 140,
    "description": "The verified Keycloak session that registered this installation.",
    "hidden": 1
+  },
+  {
+   "fieldname": "notification_token",
+   "fieldtype": "Small Text",
+   "label": "Notification token",
+   "hidden": 1,
+   "description": "The private notification binding for this installation."
   }
  ],
  "links": [],

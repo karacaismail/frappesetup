@@ -47,12 +47,12 @@ def _service_bearer():
 	if not all(isinstance(value, str) and value for value in (client_id, client_secret)):
 		raise ValueError("Missing identity-sync service credentials")
 
-	form = {"grant_type": "client_credentials", "client_id": client_id, "client_secret": client_secret}
-	scope = frappe.conf.get("mobile_identity_sync_scope")
-	if scope:
-		if not isinstance(scope, str):
-			raise ValueError("Invalid identity-sync service scope")
-		form["scope"] = scope
+	form = {
+		"grant_type": "client_credentials",
+		"client_id": client_id,
+		"client_secret": client_secret,
+		"scope": "aud-identity-sync",
+	}
 	req = Request(
 		url,
 		data=urlencode(form).encode("ascii"),
