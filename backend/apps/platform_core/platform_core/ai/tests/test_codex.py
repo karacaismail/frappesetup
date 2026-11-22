@@ -491,7 +491,7 @@ class TestHumanCallLog(AiTestCase):
 		client = self.login(USER_A)
 		proposal_id = self.propose_update(client, name, title="Yeni")["proposal_id"]
 
-		self.human(client, "GET", "plt_get_proposal", query={"proposal_id": proposal_id})
+		self.human(client, "GET", "get_proposal", query={"proposal_id": proposal_id})
 		self.human(client, "GET", "list_proposals")
 
 		self.assertIsNone(self.last_log(tool="plt_get_proposal", user=USER_A))
@@ -503,12 +503,12 @@ class TestHumanCallLog(AiTestCase):
 		client_b = self.login(USER_B)
 		proposal_id = self.propose_update(client_a, name, title="Yeni")["proposal_id"]
 
-		read = self.human(client_b, "GET", "plt_get_proposal", query={"proposal_id": proposal_id})
+		read = self.human(client_b, "GET", "get_proposal", query={"proposal_id": proposal_id})
 		reject = self.human(client_b, "POST", "reject_proposal", body={"proposal_id": proposal_id})
 		resolve = self.human(
 			client_b, "POST", "resolve_proposal", body={"proposal_id": proposal_id, "outcome": "failed"}
 		)
-		missing = self.human(client_b, "GET", "plt_get_proposal", query={"proposal_id": "olmayan"})
+		missing = self.human(client_b, "GET", "get_proposal", query={"proposal_id": "olmayan"})
 
 		self.assertEqual((read.status_code, reject.status_code, resolve.status_code), (403, 403, 403))
 		for tool in ("plt_get_proposal", "reject_proposal", "resolve_proposal"):
