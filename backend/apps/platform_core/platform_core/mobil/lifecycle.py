@@ -4,8 +4,8 @@ import time
 
 import frappe
 
+from .metadata import insert_metadata
 from .protocol import TOKEN_CLOCK_SKEW_SECONDS, MobileError
-from .store import _insert
 
 ACCOUNT_STATE = "Mobile Account State"
 MAX_ACTIVE_INSTALLATIONS = 20
@@ -19,7 +19,7 @@ def lock_account(identity):
 	if _account_state(identity.account) is None:
 		# A deletion may have committed after the request opened its read snapshot.
 		_require_enabled_user(identity.account, for_update=True)
-		_insert(ACCOUNT_STATE, account=identity.account, revoked_through="0", ignore_duplicate=True)
+		insert_metadata(ACCOUNT_STATE, account=identity.account, revoked_through="0", ignore_duplicate=True)
 		_account_state(identity.account)
 
 
@@ -58,7 +58,7 @@ def record_revocation(account):
 	state = _account_state(account)
 	cutoff = int(time.time()) + TOKEN_CLOCK_SKEW_SECONDS
 	if state is None:
-		_insert(ACCOUNT_STATE, account=account, revoked_through=str(cutoff))
+		insert_metadata(ACCOUNT_STATE, account=account, revoked_through=str(cutoff))
 	elif cutoff > int(state.revoked_through):
 		frappe.db.set_value(ACCOUNT_STATE, state.name, "revoked_through", str(cutoff))
 

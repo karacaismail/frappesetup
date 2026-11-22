@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "hash",
+ "creation": "2026-11-22 10:34:50.000000",
  "description": "Records a change for mobile sync.",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -52,9 +53,13 @@
   }
  ],
  "links": [],
+ "modified": "2026-11-22 10:34:50.000000",
+ "modified_by": "Administrator",
  "module": "Mobil",
  "name": "Mobile Change",
+ "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "sequence",
  "sort_order": "DESC",
  "states": []

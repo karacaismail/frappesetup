@@ -56,6 +56,7 @@ Ortam komutları Pane'in verdiği `PANE_PORT` değerini kullanır.
 | Python kod ve biçim denetimi | `backend/dev/bin/ruff` | Depo kökü |
 | Modül sınırları | `backend/dev/bin/modul-sinirlari` | Depo kökü |
 | Ortam betiklerinin Python testleri | `python3 -m unittest discover -s backend/dev/tests` | Depo kökü |
+| Atonota giriş teması | Komut ve dosya listesi `backend/identity/keycloak/themes/atonota/README.md` dosyasındadır. Her sayfaya yüklenen stil ve betik ile ileti dosyalarının yolu da oradadır. | Depo kökü |
 
 ## Proje sahibinin kararları
 
@@ -192,6 +193,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-29. Güvenlik taramaları elle başlatılan komutlardır.** Zamanlanmış tarama kurulmaz (D-6). Komutları security-tooling işi yazar. Bandit, gizli bilgi taraması, sözleşme tabanlı API testi ve yerel DAST taraması bu kapsamdadır. CI kurulumunun teknik sahibi DevOps sorumlusudur. Ajanlar CI dosyasını değiştirmez, devir notu yazar.
 - **O-30. Ad denetimi geçiş süresinde uyarı verir.** Ad denetim betiği birleşince kapı bütün dallarda 389 ad bulgusu verdi. Eski adlar ancak ad değiştirme betiği bütün dallarda çalışınca kalkar. Bu yüzden kapı ad bulgularını şimdilik yalnız yazar ve başarısız olmaz. Kip `backend/dev/naming/enforcement.json` dosyasındaki `mode` alanında durur. Değer `advisory` ya da `enforce` olur. Başlangıç değeri `advisory` olur. Ad değiştirme bütün dallarda bitince orkestratör değeri `enforce` yapar. `enforce` kipinde `legacy-name`, `turkish-name`, `module-name` ve `translation-binding` bulguları kapıyı durdurur. Öteki ad bulguları yine yalnız uyarıdır. Kip dosyası yoksa kapı `advisory` kabul eder ve bunu çıktısına yazar.
 - **O-31. MVP performans sınırı.** Sunucu süresi okuma uçlarında p95 500 milisaniyeyi, yazma uçlarında p95 1 saniyeyi geçmez. Ölçüm geliştirme sitesinde örnek veriyle yapılır. Örnek veri 200 çalışan ve 2.000 izin kaydıdır. Her uç en az 50 kez çağrılır. Ölçümü elle başlatılan bir komut yapar ve sonucu durum dosyasına yazar. Grafana ve gerçek kullanıcı ölçümü P1 işidir (G-149). Bu yüzden teknik borç tablosuna yazıldı.
+- **O-32. Saklama temizliği kopya bırakmaz.** Saklama süresi dolan kayıt kalıcı silinir. Kod `frappe.delete_doc` çağrısına `delete_permanently=True` verir. Böylece “Deleted Document” tablosunda kopya kalmaz. Geri dönüş yolu veritabanı yedeğidir. V-10 kuralının geri yükleme kopyası yalnız yöneticinin iş kaydını elle silmesi için geçerlidir. Bu kural bütün modüllerin saklama temizliğine uygulanır. Örneğin model geçidi ve yapay zekâ katmanının günlük temizliği böyledir.
 
 
 ## Karar sitesine işlenecek farklar
@@ -236,6 +238,9 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
+| `BORC(mvp)`: Tema derleme adımının iki kopyası var | Bir kopya değişince öteki eski kalabilir | kimlik-tema | Derleme adımı tek yerde durur ve test bunu denetler |
+| `BORC(mvp)`: Bazı tema ekranları sınanmadı | Görünüm hatası fark edilmeyebilir | kimlik-tema | Sınanmamış ekranların listesi boşalır |
+| `BORC(mvp)`: Geçiş anahtarı testleri yük altında zaman aşımına uğruyor | Test sonucu güvenilmez olur | kimlik-tema | Testler yük altında da kararlı geçer |
 | `BORC(mvp)`: Performans ölçümü yalnız elle yapılır (O-31) | Canlı darboğaz görülmez | DevOps sorumlusu | P1'de Grafana ve gerçek kullanıcı ölçümü kurulur (G-149) |
 | `BORC(mvp)`: HRMS TR kayıtlarının yasal saklama süresi yok | Silme zamanı belli değil | Hukuk sorumlusu | Süre proje kaydına yazılır ve silme komutu bu süreyi uygular |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
