@@ -162,6 +162,16 @@ def purge_from_web(
 		frappe.clear_messages()
 		log_tool_error("purge_logs", error)
 		raise refusal from None
+	except Exception as error:
+		# The gateway or a delete broke off for an unplanned reason, perhaps after it had deleted
+		# something. Everything is rolled back. The answer and the action log carry no text of
+		# the error. The server log gets the error type.
+		frappe.db.rollback()
+		frappe.clear_messages()
+		log_tool_error("purge_logs", error)
+		raise access.DeleteFailed(
+			_("The delete failed and was rolled back. Nothing was deleted.", context=CONTEXT)
+		) from None
 
 
 def _confirmation_key(token: str, part: str) -> str:

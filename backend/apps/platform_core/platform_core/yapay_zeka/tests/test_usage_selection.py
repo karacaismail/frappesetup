@@ -170,3 +170,50 @@ class TestUsageSelection(YzTestCase):
 
 		self.assertEqual(gateway.calls, [(True, None), (False, ["u-1"])])
 		self.assertEqual(result["usage_logs"], {"status": "ok", "eligible": 1, "to_delete": 1, "deleted": 1})
+
+	def test_unexpected_gateway_failure_after_a_delete_is_rolled_back_and_answered_safely(self):
+		"""The gateway deletes one record and then fails with an error nobody planned for."""
+		manager = self.login(MANAGER)
+		old, victim = self.old_proposal(manager), self.old_proposal(manager)
+		marker = "leak-marker-in-a-gateway-crash"
+
+		class Crashing(Gateway):
+			def __call__(self, *, dry_run=False, names=None):
+				if not dry_run:
+					self.calls.append((dry_run, list(names or [])))
+					frappe.db.delete("AI Action Proposal", {"name": victim})
+					raise RuntimeError(marker)
+				return super().__call__(dry_run=dry_run, names=names)
+
+		gateway = Crashing(["u-1"])
+		frappe.db.delete("Error Log")
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
+
+		with installed(gateway):
+			token = self.post(manager).json["message"]["confirmation_token"]
+			done = self.post(manager, dry_run=False, confirmation_token=token)
+
+		self.assertEqual(done.status_code, 417, done.get_data(as_text=True))
+		self.assertNotIn(marker, done.get_data(as_text=True))
+		self.assertEqual(gateway.deletes, [["u-1"]])
+		# Rolled back: the record the gateway deleted and the layer's own record are both there.
+		self.assertTrue(self.exists(victim))
+		self.assertTrue(self.exists(old))
+		log = self.last_log(tool="purge_logs", decision="denied")
+		self.assertEqual(log.deny_reason, "purge_failed")
+		stored = frappe.get_all("Error Log", fields=["method", "error"]) + frappe.get_all(
+			"AI Action Log", fields=["*"]
+		)
+		self.assertNotIn(marker, str(stored))
+
+	def test_permission_refusal_of_the_gateway_at_delete_stays_403(self):
+		manager = self.login(MANAGER)
+		old = self.old_proposal(manager)
+		gateway = Gateway(["u-1"], fail_delete=frappe.PermissionError("no"))
+
+		with installed(gateway):
+			token = self.post(manager).json["message"]["confirmation_token"]
+			done = self.post(manager, dry_run=False, confirmation_token=token)
+
+		self.assertEqual(done.status_code, 403)
+		self.assertTrue(self.exists(old))

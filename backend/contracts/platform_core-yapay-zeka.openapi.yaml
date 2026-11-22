@@ -335,6 +335,8 @@ paths:
         The AI tool `purge_action_log` follows the same rule: its approval is bound to the chosen records and the numbers.
         A delete is all or nothing. If the gateway refuses the chosen usage records at the delete, nothing is deleted
         anywhere: the web answer is 417 with `preview_required`, and the AI tool's action does not succeed.
+        If the delete breaks off for an unexpected reason, also after the gateway deleted something, the whole request is
+        rolled back and the web answer is 417 with `purge_failed`. A refusal for a missing role stays 403.
         Retention periods:
         - "AI Action Log" records go after `older_than_days`, at least 365 days.
         - An "AI Action Proposal" goes 30 days after its decision or its expiry, whichever comes first. That period is fixed.
@@ -371,7 +373,7 @@ paths:
                 properties:
                   message: {$ref: "#/components/schemas/PurgeResult"}
         "403": {description: The request did not come from a human session or the user is not an administrator.}
-        "417": {description: "The retention period is out of range, or a delete came without a valid confirmation token."}
+        "417": {description: "Nothing was deleted. Either the retention period is out of range, or the delete came without a valid confirmation token (`preview_required`), or the delete broke off for an unexpected reason and was rolled back (`purge_failed`). The answer carries a fixed text, never the text of the error. The deny reason is in the AI Action Log."}
 
 components:
   securitySchemes:
@@ -477,6 +479,7 @@ components:
         - token_call_limit
         - unknown_tool
         - preview_required
+        - purge_failed
         - not_owner
         - not_pending
         - expired

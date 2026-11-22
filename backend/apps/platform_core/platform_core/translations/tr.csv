@@ -615,3 +615,4 @@ The digest is not valid.,Özet geçerli değil.,platform_core.yapay_zeka
 A proposal cannot change after it is opened or decided.,Öneri açıldıktan ya da karar verildikten sonra değişemez.,platform_core.yapay_zeka
 The tool failed. The error was recorded.,Araç hata verdi. Hata kaydedildi.,platform_core.yapay_zeka
 "Ask for a preview first, then send its confirmation token. Nothing was deleted.","Önce önizleme isteyin, sonra onay belirtecini gönderin. Hiçbir kayıt silinmedi.",platform_core.yapay_zeka
+The delete failed and was rolled back. Nothing was deleted.,Silme hata verdi ve geri alındı. Hiçbir kayıt silinmedi.,platform_core.yapay_zeka

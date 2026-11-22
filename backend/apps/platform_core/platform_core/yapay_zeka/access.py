@@ -99,6 +99,10 @@ class PreviewRequired(frappe.ValidationError):
 	"""A destructive call came without the confirmation of a preview the caller has seen."""
 
 
+class DeleteFailed(frappe.ValidationError):
+	"""A delete broke off for a reason nobody planned for. It was rolled back."""
+
+
 def human_call(stage: str, tool: str, action, *, proposal: str | None = None, log_success: bool = True):
 	"""Run the action of a human endpoint and write the result to the log.
 
@@ -110,6 +114,7 @@ def human_call(stage: str, tool: str, action, *, proposal: str | None = None, lo
 		(frappe.DoesNotExistError, "not_found"),
 		(WrongState, "not_pending"),
 		(PreviewRequired, "preview_required"),
+		(DeleteFailed, "purge_failed"),
 		(frappe.PermissionError, "role_required" if proposal is None else "not_owner"),
 		(frappe.ValidationError, "invalid_arguments"),
 	)
