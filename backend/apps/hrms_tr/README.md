@@ -16,6 +16,9 @@ Komut, bitiş tarihi sınırdan eski olan taslak veya iptal edilmiş izin kayıt
 bench --site <site> execute hrms_tr.retention.purge
 ```
 
+Komut bir seferde en çok 500 izin kaydı seçer ve kalan sayıyı gösterir.
+Sınırı değiştirmek için `limit` değerini girin.
+
 Bakım sırasında bu kayıtlara yazan web ve kuyruk süreçlerini durdurun.
 Sayıları kontrol ettikten sonra silme komutunu çalıştırın.
 

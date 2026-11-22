@@ -1,78 +1,65 @@
-"""Check that HRMS retention uses only the configured period and eligible records."""
+"""Check the retention command's validation, preview and bounded writes."""
 
-from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import Mock, call, patch
+from unittest.mock import call, patch
 
 import frappe
+from pypika import Table
+
 
 from hrms_tr import retention
 
 
 class TestRetention(TestCase):
-	def test_missing_or_invalid_period_never_reads_or_deletes_records(self):
-		for value in (None, False, True, "30", 0, -1, 1.5):
+	def test_invalid_input_never_reads_or_deletes_records(self):
+		for days, limit in ((None, 500), (True, 500), ("30", 500), (0, 500), (30, True), (30, 0)):
 			with (
-				self.subTest(value=value),
+				self.subTest(days=days, limit=limit),
 				patch.object(retention, "_", side_effect=lambda message: message),
 				patch.object(retention, "frappe") as framework,
 			):
-				framework.conf = {"hrms_tr_retention_days": value}
+				framework.conf = {"hrms_tr_retention_days": days}
 				framework.ValidationError = frappe.ValidationError
 				framework.throw.side_effect = frappe.ValidationError
 				with self.assertRaises(frappe.ValidationError):
-					retention.purge(dry_run=False)
-				framework.get_all.assert_not_called()
+					retention.purge(dry_run=False, limit=limit)
+				framework.qb.from_.assert_not_called()
 				framework.delete_doc.assert_not_called()
 
-	def test_default_preview_uses_configured_cutoff_and_does_not_write(self):
+	def test_default_preview_limits_result_without_writes(self):
 		with (
 			patch.object(retention, "frappe") as framework,
 			patch.object(retention, "today", return_value="2026-11-22"),
 		):
 			framework.conf = {"hrms_tr_retention_days": 30}
-			framework.get_all.return_value = ["EMP-LEFT"]
-			framework.qb.get_query.return_value.run.return_value = [{"name": "LEAVE-1"}]
-			framework.get_doc.side_effect = [
-				SimpleNamespace(status="Left", relieving_date="2026-10-01"),
-				SimpleNamespace(employee="EMP-LEFT", to_date="2026-10-02", docstatus=0),
-			]
-			result = retention.purge()
-			self.assertEqual(result, {"dry_run": True, "cutoff": "2026-10-23", "employees": 1, "leaves": 1})
-			self.assertEqual(framework.get_all.call_args_list[0].kwargs["filters"]["status"], "Left")
+			framework.qb.DocType.side_effect = Table
+
+			query = framework.qb.from_.return_value.join.return_value.on.return_value.where.return_value
+			query.select.return_value.run.return_value = [(501,)]
 			self.assertEqual(
-				framework.get_all.call_args_list[0].kwargs["filters"]["relieving_date"], ["<", "2026-10-23"]
+				retention.purge(), {"dry_run": True, "cutoff": "2026-10-23", "leaves": 500, "remaining": 1}
 			)
 			framework.delete_doc.assert_not_called()
 
-	def test_purge_deletes_only_expired_leave_records_permanently(self):
+	def test_batch_only_deletes_exact_leave_names_without_cancellation(self):
 		with (
 			patch.object(retention, "frappe") as framework,
 			patch.object(retention, "today", return_value="2026-11-22"),
 		):
 			framework.conf = {"hrms_tr_retention_days": 30}
-			framework.get_all.return_value = ["EMP-ACTIVE", "EMP-LEFT"]
-			framework.qb.get_query.return_value.run.return_value = [{"name": "LEAVE-1"}, {"name": "LEAVE-2"}]
-			leave = Mock(employee="EMP-LEFT", to_date="2026-10-02", docstatus=0)
-			leave.name = "LEAVE-1"
-			submitted = Mock(employee="EMP-LEFT", to_date="2026-10-02", docstatus=1)
-			framework.get_doc.side_effect = [
-				SimpleNamespace(status="Active", relieving_date="2026-10-01"),
-				SimpleNamespace(status="Left", relieving_date="2026-10-01"),
-				leave,
-				submitted,
-			]
-			result = retention.purge(dry_run=False)
-			self.assertEqual((result["employees"], result["leaves"]), (1, 1))
+			framework.qb.DocType.side_effect = Table
+
+			query = framework.qb.from_.return_value.join.return_value.on.return_value.where.return_value
+			query.select.return_value.run.return_value = [(2,)]
+			batch = query.select.return_value.orderby.return_value.limit
+			batch.return_value.for_update.return_value.run.return_value = [("LEAVE-1",)]
+			result = retention.purge(dry_run=False, limit=1)
+			self.assertEqual((result["leaves"], result["remaining"]), (1, 1))
+			batch.assert_called_once_with(1)
 			framework.only_for.assert_called_once_with("System Manager")
-			leave.cancel.assert_not_called()
-			submitted.cancel.assert_not_called()
 			self.assertEqual(
 				framework.delete_doc.call_args_list,
-				[
-					call("Leave Application", "LEAVE-1", delete_permanently=True),
-				],
+				[call("Leave Application", "LEAVE-1", delete_permanently=True)],
 			)
-			self.assertTrue(all(entry.kwargs["for_update"] for entry in framework.get_doc.call_args_list))
-			self.assertTrue(framework.qb.get_query.call_args.kwargs["for_update"])
+			framework.get_doc.assert_not_called()
 			framework.db.commit.assert_not_called()

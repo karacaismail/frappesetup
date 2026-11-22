@@ -66,5 +66,7 @@ Select an employee.,Bir çalışan seçin.,
 The leave application could not be approved.,İzin talebi onaylanamadı.,
 Managers can only change the status of a team leave application.,Yöneticiler ekip izin taleplerinde yalnız durumu değiştirebilir.,
 Use a boolean for dry_run.,dry_run için True veya False kullanın.,
+Use a positive integer for limit.,limit için sıfırdan büyük bir tam sayı girin.,
+
 Set a valid hrms_tr_retention_days site value.,Site ayarında geçerli bir hrms_tr_retention_days değeri girin.,
 The configured retention period exceeds the supported date range.,Saklama süresi desteklenen tarih aralığını aşıyor.,
