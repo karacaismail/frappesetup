@@ -6,17 +6,22 @@
   queue.
 - It deletes only what it created, chosen by document type and name together.
 
-The tests run on the shared test site, so the site name is patched where the run itself is
-under test. They never run the shared queue and never empty it: the measurement is shown a
-queue of its own, made for these tests, and the queue test removes only the one job it added. They take a picture of the tables that hold permissions, people, rules and logs
-before the run and compare it with the tables afterwards, also when the run stops half way.
+Two kinds of tests live here.
 
-The set-up of these tests changes a few rows of the shared site. It keeps a copy of every row
-it removes and puts the copies back, and it deletes only the rows it added itself.
+`TestMeasurementLogic` checks the decisions of the command with made-up data. It writes nothing
+to the database and runs on every site.
+
+The other classes run the command for real and compare the tables before and after. They
+change the database, so they follow the same rule as the command: they run only on a
+`perf-*.localhost` site with the fixture switched on, and are skipped everywhere else with the
+reason below. They never run the shared queue and never empty it: the measurement is shown a
+queue of its own, and the queue test removes only the one job it added.
 """
 
+import unittest
 from contextlib import contextmanager
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import frappe
 from frappe.utils.background_jobs import get_redis_conn
@@ -96,27 +101,59 @@ def own_queue() -> Queue:
 	return Queue("ar-measure-tests", connection=get_redis_conn())
 
 
-@contextmanager
-def on_a_perf_site(name: str = PERF_SITE, flag=1):
-	"""Let the measurement see a site it may run on, and the tests' own queue instead of the shared one.
+SKIP_REASON = (
+	"These tests change the database. They run only on a perf-*.localhost site "
+	"with allow_performance_fixture set to 1 (O-35)."
+)
 
-	The data still goes to the test site.
-	"""
+
+def require_perf_site() -> None:
+	"""Skip a class that writes to the database unless the site is a measuring site."""
+	if not performance.site_allowed(frappe.local.site, frappe.conf):
+		raise unittest.SkipTest(SKIP_REASON)
+
+
+@contextmanager
+def with_own_queue():
+	"""Show the measurement the tests' own queue instead of the shared one."""
+	with patch.object(performance, "get_queues", return_value=[own_queue()]):
+		yield
+
+
+@contextmanager
+def pretend_site(name: str = PERF_SITE, flag=1, waiting: int = 0):
+	"""For the logic tests: a site name, a flag and a queue length, all made up."""
+	queue = MagicMock()
+	queue.count = waiting
 	with (
 		patch.object(performance, "site_name", return_value=name),
-		patch.object(performance, "get_queues", return_value=[own_queue()]),
+		patch.object(performance, "get_queues", return_value=[queue]),
 		patch.dict(frappe.conf, clear=False),
 	):
 		frappe.conf.pop("allow_performance_fixture", None)
 		if flag is not None:
 			frappe.conf["allow_performance_fixture"] = flag
-		yield
+		yield queue
 
 
-class TestWhereTheMeasurementMayRun(ErisimTestCase):
-	"""Rule O-35, first part: the site."""
+class TestMeasurementLogic(unittest.TestCase):
+	"""The decisions of the command, with made-up data. Nothing is written to the database."""
 
-	RUN_WAITING_JOBS = False
+	def setUp(self):
+		# The three steps that would touch the database are replaced for every test here.
+		self.seed = self.replace("seed")
+		self.clean = self.replace("clean")
+		self.cases = self.replace("endpoint_cases", return_value=[])
+		self.rule_cost = self.replace("measure_rule_cost", return_value=[])
+		self.replace("as_markdown", return_value="")
+
+	def replace(self, name: str, **arguments) -> MagicMock:
+		patcher = patch.object(performance, name, **arguments)
+		self.addCleanup(patcher.stop)
+		return patcher.start()
+
+	def fill_sample(self, sample, employees, records) -> None:
+		sample.update(employees=employees, records=records, own="record", employee_name="employee")
 
 	def test_site_names(self):
 		allowed = ("perf-access.localhost", "perf-1.localhost")
@@ -145,23 +182,170 @@ class TestWhereTheMeasurementMayRun(ErisimTestCase):
 		self.assertFalse(performance.site_allowed(PERF_SITE, {"allow_tests": 1}))
 		self.assertTrue(performance.site_allowed(PERF_SITE, {"allow_performance_fixture": "1"}))
 
-	def test_measurement_refuses_the_test_site_and_creates_nothing(self):
-		before = picture()
-		with patch.dict(frappe.conf, {"allow_performance_fixture": 1}):
+	def test_wrong_site_stops_before_anything_is_created(self):
+		with pretend_site(name="test-platform-core.localhost"):
 			self.assertRaises(performance.NotAllowedHere, performance.measure, **SMALL)
 
-		self.assertEqual(picture(), before)
+		self.seed.assert_not_called()
+		self.clean.assert_not_called()
 
-	def test_measurement_refuses_a_perf_site_without_the_flag(self):
-		before = picture()
-		with on_a_perf_site(flag=None):
-			self.assertRaises(performance.NotAllowedHere, performance.measure, **SMALL)
+	def test_missing_flag_stops_before_anything_is_created(self):
+		for flag in (None, 0):
+			with self.subTest(flag=flag), pretend_site(flag=flag):
+				self.assertRaises(performance.NotAllowedHere, performance.measure, **SMALL)
 
-		self.assertEqual(picture(), before)
+		self.seed.assert_not_called()
+		self.clean.assert_not_called()
+
+	def test_waiting_job_stops_before_anything_is_created_and_is_not_run(self):
+		with pretend_site(waiting=3) as queue:
+			self.assertRaises(performance.QueueNotEmpty, performance.measure, **SMALL)
+
+		self.seed.assert_not_called()
+		self.clean.assert_not_called()
+		# The queue was only looked at: nothing was run, emptied or added.
+		self.assertEqual(queue.mock_calls, [])
+
+	def test_measurement_counts_every_queue_of_the_bench(self):
+		queues = [SimpleNamespace(count=2), SimpleNamespace(count=0), SimpleNamespace(count=5)]
+		with patch.object(performance, "get_queues", return_value=queues):
+			self.assertEqual(performance.waiting_jobs(), 7)
+
+	def test_clean_up_runs_when_the_run_finishes(self):
+		self.seed.side_effect = self.fill_sample
+		with pretend_site():
+			report = performance.measure(**SMALL)
+
+		self.assertEqual((report["employees"], report["records"]), (SMALL["employees"], SMALL["records"]))
+		self.clean.assert_called_once()
+		self.assertEqual(self.clean.call_args.args[0]["run"], self.seed.call_args.args[0]["run"])
+
+	def test_clean_up_runs_when_seeding_fails(self):
+		self.seed.side_effect = RuntimeError("stopped on purpose")
+		with pretend_site():
+			self.assertRaises(RuntimeError, performance.measure, **SMALL)
+
+		self.clean.assert_called_once()
+
+	def test_clean_up_runs_when_a_request_fails(self):
+		self.seed.side_effect = self.fill_sample
+		self.cases.side_effect = RuntimeError("stopped on purpose")
+		with pretend_site():
+			self.assertRaises(RuntimeError, performance.measure, **SMALL)
+
+		self.clean.assert_called_once()
+
+	def test_every_endpoint_is_called_at_least_fifty_times(self):
+		self.seed.side_effect = self.fill_sample
+		calls = []
+
+		def request(number):
+			calls.append(number)
+			return SimpleNamespace(status_code=200)
+
+		self.cases.return_value = [("read", "Made-up read", request)]
+		with pretend_site():
+			report = performance.measure(calls=3, employees=1, records=1)
+
+		# One warm-up call and fifty timed calls, also when fewer were asked for.
+		self.assertEqual(len(calls), 51)
+		self.assertEqual(report["endpoints"][0]["calls"], 50)
+		self.assertEqual(report["endpoints"][0]["result"], "pass")
+
+	def test_result_fails_on_a_slow_endpoint_and_on_an_error_answer(self):
+		self.seed.side_effect = self.fill_sample
+		ok = lambda _number: SimpleNamespace(status_code=200)  # noqa: E731
+		error = lambda _number: SimpleNamespace(status_code=500)  # noqa: E731
+		deleted = lambda _number: SimpleNamespace(status_code=202)  # noqa: E731
+		self.cases.return_value = [
+			("read", "fast read", ok),
+			("read", "slow read", ok),
+			("write", "slow write", ok),
+			("write", "delete", deleted),
+			("read", "error", error),
+		]
+		times = {
+			"fast read": performance.READ_LIMIT_MS,
+			"slow read": performance.READ_LIMIT_MS + 1,
+			"slow write": performance.WRITE_LIMIT_MS + 1,
+			"delete": 5,
+			"error": 5,
+		}
+		labels = iter(times)
+
+		def timed(calls, request):
+			return [float(times[next(labels)])] * calls, {request(0).status_code}
+
+		with pretend_site(), patch.object(performance, "timed", timed):
+			report = performance.measure(**SMALL)
+
+		results = {row["endpoint"]: row["result"] for row in report["endpoints"]}
+		self.assertEqual(
+			results,
+			{
+				"fast read": "pass",
+				"slow read": "fail",
+				"slow write": "fail",
+				"delete": "pass",
+				"error": "fail",
+			},
+		)
+
+	def test_every_name_of_a_run_carries_its_mark(self):
+		first, second = performance.new_sample(), performance.new_sample()
+
+		self.assertNotEqual(first["run"], second["run"])
+		names = [first["doctype"], first["company"], first["gender"], *first["roles"].values()]
+		for name in names:
+			with self.subTest(name=name):
+				self.assertTrue(name.startswith(f"{performance.MARK} {first['run']} "))
+		for email in first["users"].values():
+			with self.subTest(email=email):
+				self.assertTrue(email.startswith(f"ar.measure.{first['run']}."))
+				self.assertTrue(email.endswith("@example.test"))
+
+	def test_log_rows_are_chosen_by_type_and_name_together(self):
+		"""Rule O-35. The searches of the clean-up are recorded; none of them is run."""
+		sample = performance.new_sample()
+		made = [("Access Rule", "AR-00001"), ("Employee", "HR-EMP-00001"), ("Role", "A role")]
+		searches = []
+
+		def record(table, filters=None, **_arguments):
+			searches.append((table, filters))
+			return []
+
+		with patch.object(frappe, "get_all", record), patch.object(frappe.db, "delete") as delete:
+			performance.clean_traces(sample, made)
+
+		delete.assert_not_called()
+		self.assertGreater(len(searches), 10)
+		users = set(sample["users"].values())
+		fields = {table: (kind, name) for table, kind, name in performance.LOG_TABLES}
+		for table, filters in searches:
+			with self.subTest(table=table, filters=sorted(filters)):
+				# Never older than the run: a name can be given out again after a delete.
+				self.assertEqual(filters["creation"], (">=", sample["started"]))
+				by_user = set(filters.get("owner", filters.get("user", ("in", [])))[1]) == users
+				kind_field, name_field = fields.get(table, (None, None))
+				own_type = filters.get(kind_field) == sample["doctype"]
+				pair = kind_field in filters and (name_field in filters or "subject" in filters)
+				if "subject" in filters:
+					pair = "reference_doctype" in filters
+				self.assertTrue(by_user or own_type or pair)
+				if name_field in filters:
+					# A name is never searched without its type.
+					self.assertIn(filters[kind_field], {kind for kind, _name in made})
 
 
 class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
+	"""Runs the command for real. Only on a measuring site (O-35); skipped everywhere else."""
+
 	RUN_WAITING_JOBS = False
+
+	@classmethod
+	def setUpClass(cls):
+		require_perf_site()
+		super().setUpClass()
 
 	def setUp(self):
 		super().setUp()
@@ -236,7 +420,7 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 	def test_finished_measurement_changes_no_watched_table(self):
 		"""The whole run with real requests: every endpoint is called."""
 		with (
-			on_a_perf_site(),
+			with_own_queue(),
 			patch.object(performance, "measure_rule_cost", return_value=[]),
 			patch.object(performance, "as_markdown", return_value=""),
 		):
@@ -249,7 +433,7 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 
 	def test_measurement_with_the_rule_cost_changes_no_watched_table(self):
 		with (
-			on_a_perf_site(),
+			with_own_queue(),
 			patch.object(performance, "measure_endpoints", return_value=[]),
 			patch.object(performance, "as_markdown", return_value=""),
 		):
@@ -260,19 +444,19 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 
 	def test_failure_while_measuring_changes_no_watched_table(self):
 		stop = patch.object(performance, "measure_endpoints", side_effect=RuntimeError("stopped on purpose"))
-		with on_a_perf_site(), stop:
+		with with_own_queue(), stop:
 			self.assertRaises(RuntimeError, performance.measure, **SMALL)
 
 		self.assert_site_as_before()
 
 	def test_failure_while_seeding_changes_no_watched_table(self):
-		with on_a_perf_site(), patch.object(frappe.db, "bulk_insert", side_effect=RuntimeError("stopped")):
+		with with_own_queue(), patch.object(frappe.db, "bulk_insert", side_effect=RuntimeError("stopped")):
 			self.assertRaises(RuntimeError, performance.measure, **SMALL)
 
 		self.assert_site_as_before()
 
 	def test_failure_while_making_the_rules_changes_no_watched_table(self):
-		with on_a_perf_site(), patch.object(performance, "make_rules", side_effect=RuntimeError("stopped")):
+		with with_own_queue(), patch.object(performance, "make_rules", side_effect=RuntimeError("stopped")):
 			self.assertRaises(RuntimeError, performance.measure, **SMALL)
 
 		self.assert_site_as_before()
@@ -289,7 +473,7 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 				raise RuntimeError("stopped on purpose")
 			return response
 
-		with on_a_perf_site(), patch.object(performance, "send", stop_after_first_create):
+		with with_own_queue(), patch.object(performance, "send", stop_after_first_create):
 			self.assertRaises(RuntimeError, performance.measure, **SMALL)
 
 		self.assertEqual(len(created), 1)
@@ -298,7 +482,7 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 	def test_measurement_does_not_call_the_shared_test_setup(self):
 		"""The shared setup deletes user permissions and adds rows to the test types."""
 		with (
-			on_a_perf_site(),
+			with_own_queue(),
 			patch.object(base, "ensure_fixtures", side_effect=AssertionError("shared setup was called")),
 			patch.object(base, "run_queued_jobs", side_effect=AssertionError("the queue was run")),
 			patch.object(performance, "measure_endpoints", return_value=[]),
@@ -316,18 +500,12 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 		waiting = queue.count
 		self.assertGreaterEqual(waiting, 1)
 
-		with on_a_perf_site():
+		with with_own_queue():
 			self.assertRaises(performance.QueueNotEmpty, performance.measure, **SMALL)
 
 		self.assertEqual(queue.count, waiting)
 		self.assertIn(job.id, queue.job_ids)
 		self.assert_site_as_before()
-
-	def test_measurement_counts_the_shared_queue_when_nothing_is_patched(self):
-		"""Outside these tests the measurement looks at the real queues of the bench."""
-		from frappe.utils.background_jobs import get_queues
-
-		self.assertEqual(performance.waiting_jobs(), sum(queue.count for queue in get_queues()))
 
 	def test_log_rows_of_another_type_with_the_same_name_are_kept(self):
 		"""Rule O-35: the clean-up chooses by type and name together.
@@ -363,7 +541,7 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 
 		self.addCleanup(lambda: [frappe.db.delete(table, {"name": name}) for table, name in logs])
 		with (
-			on_a_perf_site(),
+			with_own_queue(),
 			patch.object(performance, "measure_endpoints", write_logs_of_another_type),
 			patch.object(performance, "measure_rule_cost", return_value=[]),
 			patch.object(performance, "as_markdown", return_value=""),
@@ -381,6 +559,11 @@ class TestTheSetUpPutsBackWhatItChanged(ErisimTestCase):
 	"""Review finding: the set-up above must not lose a permission that was there before it."""
 
 	RUN_WAITING_JOBS = False
+
+	@classmethod
+	def setUpClass(cls):
+		require_perf_site()
+		super().setUpClass()
 
 	def test_rows_from_before_the_set_up_survive_it(self):
 		# A custom permission of the portal role and a user permission, both from before.

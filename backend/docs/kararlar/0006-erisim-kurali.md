@@ -722,6 +722,19 @@ Güvenlik kapısı uç testlerini modülün yanında ister. Bu yüzden iki dosya
 
 Testler önce kancalar kapalıyken çalıştırıldı. 83 testten 80'i beklenen nedenle başarısız oldu (D-2). Örneğin çalışan bütün kayıtları gördü ve başkasının kaydı 200 döndü. Kancalar açılınca testler geçti.
 
+### Test siteleri atılabilir sitelerdir
+
+Adı `test-` ile başlayan siteler normal test siteleridir. Bu siteler atılabilir. İçlerinde korunacak veri yoktur.
+
+Erişim testlerinin ortak test sınıfı bu sitelerde her sınıfın sonunda bütün “Access Rule” kayıtlarını siler. Bu temizlik kabul edilmiştir. Karar orkestratörün kararıdır ve 22 Kasım 2026 Pazar günü verildi.
+
+Sonuçları şunlardır:
+
+- Erişim testleri yalnız test sitesinde çalıştırılır. Korunacak kuralı olan bir sitede çalıştırılmaz.
+- Başka bir uygulama test sitesine kural kurarsa erişim testleri o kuralları da siler. O uygulamanın testi kuralını kendi hazırlığında yeniden kurmalıdır.
+- Ortak test sınıfı test kullanıcılarının “User Permission” kayıtlarını da siler. Bu da aynı karara girer.
+- Ölçüm komutu bu kuralın dışındadır. Komut yalnız O-35'teki `perf-` sitesinde çalışır ve yalnız kendi kayıtlarını siler (20. bölüm).
+
 ## 15. Bağımsız inceleme
 
 Motor yetki kodudur. Bu yüzden kod art arda bağımsız incelemelerden geçti (R-9). İnceleyenler yalnız okudu. Her bulgu için önce başarısız test yazıldı, sonra kod düzeltildi.
@@ -898,7 +911,16 @@ Bunların adları çalışmanın işaretini taşır. Temizlik işarete göre sil
 
 Komut sitede önceden var olan hiçbir şeye dokunmaz. Kullanıcı, rol, izin satırı, kullanıcı izni (“User Permission”), kural ve kayıt aynı kalır. Komut testlerin ortak hazırlığını çağırmaz. O hazırlık kullanıcı izinlerini siler ve test türlerine izin satırı ekler.
 
-On beş test bunu sınar. Testler ölçümden önce ve sonra 22 tabloyu karşılaştırır. Testler ortak kuyruğu çalıştırmaz ve boşaltmaz. Ölçüme yalnız testlere ayrılmış bir kuyruk gösterilir. Tablolar izinleri, kişileri, kuralları, kayıt türlerini ve Frappe'nin iz kayıtlarını tutar. Testler önce sitede eski bir kural, bir düzey izni, bir kullanıcı izni ve portal izni olmayan eski bir tür bırakır.
+Komutun testleri iki türdür.
+
+| Tür | Ne yapar | Nerede koşar |
+| --- | --- | --- |
+| Mantık testleri (13 test) | Komutun kararlarını uydurma veriyle sınar. Veritabanına yazmaz. | Her sitede |
+| Gerçek çalıştırma testleri (10 test) | Komutu gerçekten çalıştırır. Ölçümden önce ve sonra 22 tabloyu karşılaştırır. | Yalnız O-35'teki `perf-` sitesinde |
+
+Gerçek çalıştırma testleri veritabanını değiştirir. Bu yüzden komutla aynı kurala uyar. Başka sitede bu testler atlanır ve atlama nedeni yazılır. Testler ortak kuyruğu çalıştırmaz ve boşaltmaz. Ölçüme yalnız testlere ayrılmış bir kuyruk gösterilir.
+
+Mantık testleri şunları sınar: site adı ve ayarı, yanlış sitede durma, dolu kuyrukta durma, yarıda kalınca temizliğin çalışması, her ucun en az 50 kez çağrılması, sonucun `pass` ya da `fail` olması ve iz satırlarının tür ve ad çiftiyle seçilmesi.
 
 Temizlik Frappe'nin yazdığı iz kayıtlarını da siler. İz kaydını tür ve ad çiftiyle seçer. Yalnız çalışmanın başından sonra yazılanları siler. Çalışan numarası gibi adlar silmeden sonra yeniden verilir. Eski bir iz kaydı aynı adı taşıyabilir.
 
