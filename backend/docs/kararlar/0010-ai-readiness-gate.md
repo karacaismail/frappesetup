@@ -50,7 +50,8 @@ Bağlam boşsa kapı kaynak metni Frappe çekirdek çevirisiyle karşılaştır�
 Kaynak iki yerde de varsa kapı bulgu yazar.
 
 Kapı çekirdek katalog için `backend/apps/frappe/frappe` yoluna bakar.
-Başka bir Frappe çalışma kopyası için `--frappe-root <yol>` kullanın.
+Başka bir Frappe çalışma kopyası için `FRAPPE_SOURCE` değişkenine yol yazın.
+Komutta `--frappe-root <yol>` verirseniz kapı o yolu kullanır.
 Kapı aynı dilin CSV ve PO dosyalarını okur.
 Örneğin `tr-TR` dosyası için `tr` dosyasına da bakar.
 Bir dilin çekirdek kataloğu yoksa `translation_core` sonucu `not_run` olur.
@@ -68,7 +69,7 @@ Kapı uygulama kurallarını Frappe 16.56.0'ın kesin sürüm sabitleriyle karş
 `Werkzeug>=4` bu sürümü dışarıda bıraktığı için kapı bulgu verir.
 Kapı Frappe'nin sürüm aralıklarını veya dolaylı bağımlılıkları çözmez.
 
-Frappe kaynağı başka yerdeyse `--frappe-root <yol>` kullanın.
+Kapı bağımlılık denetimi için de aynı Frappe yolunu kullanır.
 İstenen sürümün kaynağı yoksa `dependency_core` sonucu `not_run` olur.
 Uygulamalar arası karşılaştırma bu durumda da çalışır.
 Kapı Python sürüm kurallarını okumak için `packaging` kullanır.

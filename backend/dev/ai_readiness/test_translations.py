@@ -1,6 +1,7 @@
 """Exercise the translation checks through the readiness command."""
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -32,6 +33,7 @@ class TranslationChecksTests(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
+            env=dict(os.environ, FRAPPE_SOURCE=""),
         )
 
     def test_every_app_translation_record_requires_three_columns(self):

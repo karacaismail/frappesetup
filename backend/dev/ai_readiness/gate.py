@@ -914,7 +914,8 @@ def main():
             return 1
         print(json.dumps(location))
         return 0
-    frappe_root = args.frappe_root.resolve() if args.frappe_root else None
+    frappe_source = args.frappe_root or os.environ.get("FRAPPE_SOURCE")
+    frappe_root = Path(frappe_source).expanduser().resolve() if frappe_source else None
     raw_findings, checks = scan(root, args.commit_base, frappe_root)
     findings = [
         Finding(

@@ -1,6 +1,7 @@
 """Exercise application dependency checks through the readiness command."""
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -35,11 +36,12 @@ class DependencyChecksTests(unittest.TestCase):
         self.manifest(directory, "frappe", ["Werkzeug==3.1.9", "Other>=2,<3"])
         self.write(f"{directory}/frappe/__init__.py", f'__version__ = "{version}"\n')
 
-    def scan(self, *args, structured=True):
+    def scan(self, *args, structured=True, frappe_source=""):
         return subprocess.run(
             [sys.executable, "-B", GATE, "--root", self.root, *(["--json"] if structured else []), *args],
             capture_output=True,
             text=True,
+            env=dict(os.environ, FRAPPE_SOURCE=frappe_source),
         )
 
     def test_accepts_app_rules_that_include_frappe_pin(self):
@@ -96,3 +98,28 @@ class DependencyChecksTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout)
                 self.assertEqual(json.loads(result.stdout)["checks"]["dependency_core"], "not_run")
                 self.assertIn("dependency_core: not_run", self.scan(structured=False).stderr)
+
+    def test_frappe_source_enables_both_checks_and_cli_path_takes_precedence(self):
+        self.frappe(directory="external")
+        self.write("external/frappe/locale/tr.po", 'msgid "Open"\nmsgstr "Aç"\n')
+        self.manifest("apps/sample_app", "sample_app", ["Werkzeug~=3.1.9"])
+        self.write("apps/sample_app/sample_app/translations/tr.csv", "Open,Aç,button\n")
+        source = self.root / "external"
+
+        result = self.scan(frappe_source=str(source))
+        self.assertEqual(result.returncode, 0, result.stdout)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["checks"]["dependency_core"], "pass")
+        self.assertEqual(payload["checks"]["translation_core"], "pass")
+
+        missing = self.root / "missing"
+        result = self.scan("--frappe-root", str(missing), frappe_source=str(source))
+        checks = json.loads(result.stdout)["checks"]
+        self.assertEqual(checks["dependency_core"], "not_run")
+        self.assertEqual(checks["translation_core"], "not_run")
+
+        result = self.scan(frappe_source=str(missing))
+        self.assertEqual(result.returncode, 0, result.stdout)
+        checks = json.loads(result.stdout)["checks"]
+        self.assertEqual(checks["dependency_core"], "not_run")
+        self.assertEqual(checks["translation_core"], "not_run")
