@@ -38,7 +38,7 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 
 | İstemci | Tür | Akış | Dönüş adresi | Çıkış bildirimi |
 | --- | --- | --- | --- | --- |
-| `site-kiraci1` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<kiracı adresi>/api/method/platform_core.api.auth.keycloak_callback` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
+| `site-tenant1` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<kiracı adresi>/api/method/platform_core.api.auth.keycloak_callback` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
 | `press` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<Press adresi>/api/method/press_tr.api.auth.keycloak_callback` | `<Press adresi>/api/method/press_tr.api.keycloak_backchannel_logout` |
 | `site-tenant1-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
@@ -57,7 +57,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 
 | Kapsam | Eklediği `aud` | Kullanan |
 | --- | --- | --- |
-| `aud-site-kiraci1` | `site-kiraci1` | `identity-sync`, `press-service` |
+| `aud-site-tenant1` | `site-tenant1` | `identity-sync`, `press-service` |
 | `aud-press` | `press` | `identity-sync` |
 | `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri ve `press-service`. Örnek: `site-tenant1-service` |
 
