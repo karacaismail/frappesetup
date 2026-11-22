@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "field:sequence_key",
+ "creation": "2026-11-22 10:42:15.000000",
  "description": "Tracks the sync sequence for the site.",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -37,9 +38,13 @@
   }
  ],
  "links": [],
+ "modified": "2026-11-22 10:42:15.000000",
+ "modified_by": "Administrator",
  "module": "Mobil",
  "name": "Mobile Sequence",
+ "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": []

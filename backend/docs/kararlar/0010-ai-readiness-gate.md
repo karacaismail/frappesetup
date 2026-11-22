@@ -7,16 +7,50 @@ Depo kökünde `backend/dev/bin/ai-readiness` komutunu çalıştırın.
 Kapı Python 3.14 veya üstünü ister.
 Komut önce `python3.14` adını arar. Bu ad yoksa `python3` kullanır.
 Komut her bulguda dosyayı ve satırı gösterir.
-Bir bulgu varsa komut 1 döndürür. Bulgu yoksa 0 döndürür.
+Bir hata bulgusu varsa komut 1 döndürür. Hata yoksa 0 döndürür.
 Python sürümü yetersizse komut 2 döndürür.
 
 Başka bir arka uç klasörünü taramak için `--root` kullanın.
 Programın okuyacağı çıktı için `--json` ekleyin.
-JSON çıktısında `findings` bulguları, `checks.naming` ad denetiminin durumunu içerir.
+JSON çıktısında `findings` bulguları içerir.
+Her bulgunun `severity` alanı `error` veya `warning` olur.
+`checks.naming` ad denetiminin sonucunu gösterir.
 Testleri çalıştırmak için `backend/dev/bin/ai-readiness --self-test` kullanın.
 Güvenlik komutu da bu testleri çalıştırır.
+Güvenlik komutu da Python 3.14 veya üstünü ister.
+Kapı sürüm hatası verirse güvenlik komutu 1 döndürür.
+
+## Ad denetimi kipi
+
+Kapı `dev/naming/enforcement.json` dosyasındaki `mode` alanını okur.
+Kip `advisory` ise kapı ad bulgularını uyarı olarak yazar.
+Kapı yalnız uyarı varsa 0 döndürür.
+Kip `enforce` ise şu ad bulguları kapıyı durdurur.
+
+- `legacy-name`
+- `turkish-name`
+- `module-name`
+- `translation-binding`
+
+Öteki ad bulguları iki kipte de uyarıdır.
+Kip dosyası yoksa kapı `advisory` kullanır ve bunu çıktıda belirtir.
+JSON çıktısı kipi `checks.naming_mode` alanında gösterir.
+`checks.naming_mode_source` kipi dosyadan mı aldığını belirtir.
+Kip dosyası geçersizse veya ad betiği çalışmazsa kapı hata verir.
+Ad betiği yoksa kapı `not_run` yazar.
 
 ## Kapsam
+
+- Kapı karar notlarının dosya adındaki dört haneli sayıyı denetler.
+  Aynı sayı iki notta varsa kapı ikinci dosyayı gösterir.
+  Numaraları `backend/docs/gap-backlog.md` içindeki “Orkestratör” bölümü verir.
+- Kapı `website_user_allowed_methods` kancasında doğrudan yazılan yöntem adlarını denetler.
+  Uygulama yalnız kendi dışa açık yöntemlerini listeye yazar.
+  Hazır Frappe yöntemleri için sözleşmenin 5. bölümündeki liste geçerlidir.
+  Kapı bilinen yönetici ve servis uçlarını reddeder.
+  Kapı doğrudan yazılan yönetici rolü denetimini de tanır.
+  Bir yöntem başka bir hedefe yönleniyorsa kapı o hedefi de denetler.
+  Kapı çalışma anında belirlenen yetkiyi çözmez. Yetkiyi uygulamanın uç testleri doğrular.
 
 - Kapı DocType tanımlarını okur. DocType, bir kayıt türünün tanımıdır.
 - Kapı kayıt türünün ve alanlarının açıklamalarını arar.
@@ -38,13 +72,22 @@ Güvenlik komutu da bu testleri çalıştırır.
   Örneğin `langchain_openai`, `langchain` ailesine girer.
 - Kapı Python kodunda, yorumlarda ve uygulamanın metin dosyalarında model adı arar.
   Örneğin JavaScript ve JSON dosyalarını da okur.
+  Arama kalıbı tüm model adlarını yakalayamaz.
+  Örneğin kapı `gemini-pro` ve `text-embedding-3-small` adlarını yakalayamaz.
+  Kapı, model ailesi adlarını yalnız arama kalıplarında kullanır.
+  Kapı sağlayıcı kitaplıklarını yüklemez. Kapının kodu `apps/` tarama alanı dışındadır.
 - Kapı `hooks.py` dosyasında zamanlanmış iş kaydını arar.
   Kapı içe aktarılan iş kaydını ve zamanlanmış Server Script kayıtlarını da arar.
   Kapı Auto Repeat ve Auto Email Report kayıtlarını da arar.
+- Kapı `ai_tools` ve `override_whitelisted_methods` için tek düz atama ister.
+  Atama dosyanın en üst düzeyinde olmalıdır.
+  Örneğin kapı `+=` ve `.extend()` kullanımlarını bulgu sayar.
 - Kapı ham SQL çağrılarını yapay zekâ modülünde ve kayıtlı araç işlevlerinde arar.
   Ham SQL, veritabanına doğrudan gönderilen sorgudur.
   Kapı SQL işlevinin çağrısını ve bu işleve verilen başvuruyu arar.
-  Kapı aracın aynı uygulamada doğrudan çağırdığı yardımcı işlevleri de izler.
+  Kapı veritabanının imlecine ve bağlantısına verilen başvuruları da arar.
+  Kapı aynı uygulamadaki yardımcı işlevlerin çağrılarını ve başvurularını izler.
+  Kapı aracın iç işlevlerinde de bu izleri arar.
   Kapı sınır dosyasında yapay zekâ ve MCP yollarını bulur.
   Kapı bu yolları ve sorumlu modülleri denetler.
   Sorumlu modülde Python dosyası yoksa kapı bulgu yazar.

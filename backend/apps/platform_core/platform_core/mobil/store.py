@@ -3,24 +3,25 @@
 import json
 import time
 from datetime import UTC, datetime, timedelta
+from itertools import batched
 
 import frappe
 
+from .metadata import insert_metadata
 from .protocol import DELIVERY_AUDIT_SIZE, MobileError, content_digest
 
 SEQUENCE_DOCTYPE = "Mobile Sequence"
 SEQUENCE_NAME = "site"
 DELIVERY_AUDIT_INTERVAL = timedelta(minutes=5)
-INTERNAL_TYPES = frozenset(
-	{
-		SEQUENCE_DOCTYPE,
-		"Mobile Account State",
-		"Mobile Installation",
-		"Mobile Revoked Session",
-		"Mobile Operation",
-		"Mobile Change",
-		"Mobile Delivery",
-	}
+REVOCATION_BATCH_SIZE = 100
+REVOCATION_FIELDS = (
+	"name",
+	"revoked",
+	"session_id",
+	"session_subject",
+	"account",
+	"principal",
+	"notification_token",
 )
 
 
@@ -43,21 +44,7 @@ def _stored_session_subject(row):
 def seed_sequence():
 	"""Create the lock row after Frappe has synchronized the schema."""
 	if not frappe.db.exists(SEQUENCE_DOCTYPE, SEQUENCE_NAME):
-		_insert(SEQUENCE_DOCTYPE, sequence_key=SEQUENCE_NAME, ignore_duplicate=True)
-
-
-def _insert(doctype, *, ignore_duplicate=False, **fields):
-	if doctype not in INTERNAL_TYPES:
-		raise ValueError("Only mobile metadata may be inserted here")
-	doc = frappe.get_doc({"doctype": doctype, **fields})
-	previous = doc.flags.ignore_permissions
-	try:
-		# The approved operation creates server-owned metadata, never a business record.
-		return doc.insert(  # nosemgrep: frappe-ignore-permissions
-			ignore_permissions=True, ignore_if_duplicate=ignore_duplicate
-		)
-	finally:
-		doc.flags.ignore_permissions = previous
+		insert_metadata(SEQUENCE_DOCTYPE, sequence_key=SEQUENCE_NAME, ignore_duplicate=True)
 
 
 def _select(doctype, fields, filters, *, limit=None, order_by=None, for_update=False):
@@ -102,7 +89,7 @@ class MobileStore:
 		if current is None:
 			if check_new is not None:
 				check_new(identity)
-			_insert(
+			insert_metadata(
 				"Mobile Installation",
 				installation_id=installation_id,
 				account=identity.account,
@@ -200,24 +187,33 @@ class MobileStore:
 			scope=identity.scope,
 			principal=identity.principal,
 			include_revoked=installation_id is not None,
+			fields=REVOCATION_FIELDS,
 		)
-		return {"revoked": self.revoke_targets(row.name for row in rows)}
+		return {"revoked": self._revoke_rows(rows)}
 
 	def revoke_account_installations(self, account):
-		rows = self.revocation_targets(account, include_revoked=True)
-		changed = self.revoke_targets((row.name for row in rows), remote=False)
-
-		# Update only rows with a binding so a repeated call does not change them.
-		frappe.db.set_value(
-			"Mobile Installation",
-			{"account": account, "notification_token": ["is", "set"]},
-			"notification_token",
-			None,
-		)
-		return len(rows), changed
+		total = changed = 0
+		after = None
+		while True:
+			rows = self.revocation_targets(
+				account, include_revoked=True, after=after, fields=REVOCATION_FIELDS
+			)
+			total += len(rows)
+			changed += self._revoke_rows(rows, remote=False)
+			if len(rows) < REVOCATION_BATCH_SIZE:
+				return total, changed
+			after = rows[-1].name
 
 	def revocation_targets(
-		self, account, installation_id=None, *, scope=None, principal=None, include_revoked=False
+		self,
+		account,
+		installation_id=None,
+		*,
+		scope=None,
+		principal=None,
+		include_revoked=False,
+		after=None,
+		fields=("name", "revoked", "session_id"),
 	):
 		filters = {"account": account}
 		if not include_revoked:
@@ -228,36 +224,46 @@ class MobileStore:
 			filters["principal"] = principal
 		if installation_id is not None:
 			filters["name"] = installation_id
+		elif after is not None:
+			filters["name"] = [">", after]
 		return _select(
 			"Mobile Installation",
-			["name", "revoked", "session_id"],
+			fields,
 			filters,
+			limit=REVOCATION_BATCH_SIZE,
 			order_by="name asc",
 			for_update=True,
 		)
 
 	def revoke_targets(self, installation_ids, *, remote=True):
-		from .sessions import revoke_after_commit
-
 		count = 0
-		sessions = set()
-		for installation_id in installation_ids:
-			row = frappe.db.get_value(
+		for names in batched(installation_ids, REVOCATION_BATCH_SIZE, strict=False):
+			rows = _select(
 				"Mobile Installation",
-				installation_id,
-				["revoked", "session_id", "session_subject", "account", "principal", "notification_token"],
-				as_dict=True,
+				REVOCATION_FIELDS,
+				{"name": ["in", names]},
+				order_by="name asc",
 				for_update=True,
 			)
-			if row is None:
-				continue
+			count += self._revoke_rows(rows, remote=remote)
+		return count
+
+	def _revoke_rows(self, rows, *, remote=True):
+		from .sessions import revoke_after_commit
+
+		sessions = set()
+		updates = []
+		count = 0
+		for row in rows:
 			if row.session_id:
 				sessions.add((row.session_id, _stored_session_subject(row) if remote else None))
 			if not row.revoked or row.notification_token is not None:
-				frappe.db.set_value(
-					"Mobile Installation", installation_id, {"revoked": 1, "notification_token": None}
-				)
+				updates.append(row.name)
 				count += int(not row.revoked)
+		if updates:
+			frappe.db.set_value(
+				"Mobile Installation", {"name": ["in", updates]}, {"revoked": 1, "notification_token": None}
+			)
 		revoke_after_commit(sessions, remote=remote)
 		return count
 
@@ -275,7 +281,7 @@ class MobileStore:
 		return None
 
 	def remember_operation(self, key, digest, result):
-		_insert("Mobile Operation", operation_key=key, content_digest=digest, result=result)
+		insert_metadata("Mobile Operation", operation_key=key, content_digest=digest, result=result)
 
 	def append_change(self, record_type, record_id, kind, *, target_installation=None):
 		# Keep allocation and insertion under the same transaction lock.
@@ -283,7 +289,7 @@ class MobileStore:
 		if current == 2_147_483_647:
 			raise MobileError("mobile_sequence_exhausted", 503)
 		sequence = current + 1
-		_insert(
+		insert_metadata(
 			"Mobile Change",
 			sequence=sequence,
 			record_type=record_type,
@@ -351,7 +357,7 @@ class MobileStore:
 			if not row.visible:
 				frappe.db.set_value("Mobile Delivery", row.name, "visible", 1)
 			return
-		_insert(
+		insert_metadata(
 			"Mobile Delivery",
 			delivery_key=key,
 			installation_id=installation,
