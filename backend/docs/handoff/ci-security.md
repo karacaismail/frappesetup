@@ -13,6 +13,8 @@ CI sistemi değişiklikleri birleştirmeden önce denetimleri çalıştırır.
 ## Hazırlık
 
 GitHub checkout adımında `fetch-depth: 0` kullanın.
+`refs/heads/backend` yerel dal kaydını hazırlayın.
+Uygunluk kapısı, bu dalla ortak commit'ten sonraki mesajları tarar.
 Docker ve uv 0.13.9 kurun. uv ile Python 3.12 ve 3.14 hazırlayın.
 Araç sürümleri ve Gitleaks imaj özeti `backend/dev/security/tool-versions.env` dosyasındadır.
 Gitleaks imajını o özetle önceden indirin.
