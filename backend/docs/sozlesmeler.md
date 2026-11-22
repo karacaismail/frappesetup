@@ -60,6 +60,8 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - Bu kapsamlar varsayılan değildir. İstekte `scope` ile istenir.
 - Servis belirteci yalnız bir `aud` değeri taşır.
 - Admin API yetkileri kiracıya giden belirtece girmez.
+- `identity-sync` Admin API belirtecini ayrı ister. İstekte `scope=admin-api kc-admin-api` olur. Bu belirtecin `aud` değeri `realm-management` ve Admin API adresidir. Keycloak 26.8 Admin API'si bu kapsamı ister.
+- `press-service` istemcisi `aud-press` kapsamını isteyemez. Keycloak bu isteği `invalid_scope` ile reddeder.
 
 ### Politikalar
 
@@ -182,6 +184,25 @@ Açılan kullanıcının türü “Website User” olur (Proje kaydı D-5).
 | `press_tr.api.identity.ensure_team` | POST | Servis belirteci, `azp=identity-sync` | Takımı ve üyeliği hazırlar. Aynı istek iki kez gelirse aynı sonucu döner. |
 | `press_tr.api.identity.remove_team_member` | POST | Servis belirteci, `azp=identity-sync` | Üyeliği kaldırır. |
 
+### Kuruluş ile takım eşlemesi
+
+Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşılık gelir (Rail 4). Bağ Press tarafında “Team” kaydının `keycloak_org_id` alanında durur. Bu alanı `press_tr` ekler.
+
+`ensure_team` isteğinin alanları şunlardır:
+
+| Alan | Tür | Not |
+| --- | --- | --- |
+| `issuer` | metin | Zorunlu |
+| `subject` | metin | Zorunlu |
+| `email` | metin | Zorunlu. İlk bağ yalnız doğrulanmış e-postayla kurulur. |
+| `organization_id` | metin | Zorunlu. Keycloak'taki kuruluşun kimliğidir. |
+| `organization_name` | metin | İsteğe bağlı. Yeni takımın görünen adı olur. |
+
+- Press takımı `keycloak_org_id` alanıyla arar. Takım yoksa açar ve alana kimliği yazar.
+- Yanıt `team` ve `created` alanlarını taşır. `team`, Press'teki takımın adıdır.
+- `remove_team_member` isteği `issuer`, `subject` ve `organization_id` alanlarını taşır.
+- Takım adı istekte gelmez. Takım adını Press üretir.
+
 - Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
 - G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
 
@@ -300,7 +321,27 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 - `platform_core` içinde katmanı platform-core-yz işi kurar. Modül klasörü `yapay_zeka` olur.
 - Önce Frappe'nin hazır MCP yolunu inceleyin (T-1). Karar sitesi bunu `frappe_mcp` olarak anar (G-84).
-- Uç adresi ve araç adları o işin raporundan sonra bu dosyaya yazılır.
+- Ayrıntılı tasarım `docs/kararlar/0002-yapay-zeka-katmani.md` dosyasındadır.
+- Frappe 16'nın hazır MCP ucu (`/api/v2/mcp`) kiracı sitesinde kapatılır. Bu uç önizleme, onay ve günlük taşımaz.
+
+### Uçlar
+
+| Yol | Yöntem | Kimlik | İşi |
+| --- | --- | --- | --- |
+| `platform_core.api.ai.mcp` | POST | İnsan oturumu ya da aracı belirteci | MCP ucu: araç listesi ve araç çağrısı |
+| `platform_core.api.ai.issue_agent_token` | POST | İnsan oturumu | 300 saniyelik, 20 çağrılık aracı belirteci üretir. |
+| `platform_core.api.ai.list_proposals` | GET | İnsan oturumu | Kullanıcının önerilerini listeler. |
+| `platform_core.api.ai.get_proposal` | GET | İnsan oturumu | Önerinin önizlemesini ve özetini döner. |
+| `platform_core.api.ai.approve_proposal` | POST | İnsan oturumu | Öneriyi onaylar ve yürütür. |
+| `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
+| `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
+
+### Genel araçlar
+
+`search_doctypes`, `get_doctype_schema`, `list_documents`, `get_document`, `run_report`, `create_document`, `update_document`, `submit_document`, `cancel_document`, `delete_document` ve `get_proposal`.
+
+- Yazma araçları yalnız öneri açar. Öneri 10 dakika geçerlidir.
+- Uygulama araçlarının adı `<uygulama>_<araç>` biçimindedir. Uygulama araçlarını `ai_tools` kancasıyla bildirir.
 
 ## 11. Model geçidi ve sağlayıcı kaydı
 
