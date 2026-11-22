@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import base64
+import http.client
 import json
 import os
-import urllib.error
 import urllib.parse
-import urllib.request
+from contextlib import closing
 from pathlib import Path
 
 KLASOR = Path(__file__).resolve().parents[1]
@@ -80,10 +80,37 @@ def assert_refused_without_pkce(test, response: HttpYanit) -> None:
         test.assertEqual(response.durum, 400, detail)
 
 
+def local_test_authority(url, *, allow_mailpit=False):
+    if any(ord(character) < 32 or ord(character) == 127 for character in url):
+        raise ValueError("Expected a local test URL")
+    parts = urllib.parse.urlsplit(url)
+    host = parts.hostname
+    port = parts.port
+    if (
+        parts.scheme != "http" or host not in {"127.0.0.1", "localhost", "kimlik.localhost"}
+        or not port or parts.netloc.lower() != f"{host}:{port}" or parts.fragment
+    ):
+        raise ValueError("Expected an HTTP URL for a local test service")
+    if str(port) == os.environ.get("KC_PORT"):
+        return parts
+    if host != "kimlik.localhost":
+        if str(port) == os.environ.get("PROD_KC_PORT"):
+            return parts
+        if allow_mailpit and parts.path.startswith("/api/v1/") and str(port) == os.environ.get("MAILPIT_UI_PORT"):
+            return parts
+    raise ValueError("Unexpected port for the local test service")
+
+
 def istek(yontem: str, adres: str, *, form: dict | None = None, govde: dict | None = None,
           belirtec: str | None = None, basliklar: dict | None = None) -> HttpYanit:
+    parts = local_test_authority(
+        adres, allow_mailpit=form is None and govde is None and belirtec is None and not basliklar,
+    )
     veri = None
     ust = dict(basliklar or {})
+    if any(key.lower() == "host" for key in ust):
+        raise ValueError("The local test client sets the Host header")
+    ust["Host"] = parts.netloc
     if form is not None:
         veri = urllib.parse.urlencode(form).encode("ascii")
         ust["Content-Type"] = "application/x-www-form-urlencoded"
@@ -92,13 +119,13 @@ def istek(yontem: str, adres: str, *, form: dict | None = None, govde: dict | No
         ust["Content-Type"] = "application/json"
     if belirtec:
         ust["Authorization"] = f"Bearer {belirtec}"
-    ist = urllib.request.Request(adres, data=veri, method=yontem, headers=ust)
-    try:
-        with urllib.request.urlopen(ist, timeout=30) as yanit:
-            return HttpYanit(yanit.status, yanit.read(), dict(yanit.headers))
-    except urllib.error.HTTPError as hata:
-        with hata:
-            return HttpYanit(hata.code, hata.read(), dict(hata.headers))
+    target = urllib.parse.urlunsplit(("", "", parts.path or "/", parts.query, ""))
+    # Connect to the literal loopback address. The fixed Keycloak alias is only an HTTP Host value.
+    # http.client uses neither proxies nor redirects.
+    with closing(http.client.HTTPConnection("127.0.0.1", parts.port, timeout=30)) as connection:
+        connection.request(yontem, target, body=veri, headers=ust)
+        with connection.getresponse() as yanit:
+            return HttpYanit(yanit.status, yanit.read(), dict(yanit.getheaders()))
 
 
 def belirtec_ucu(realm: str = "platform") -> str:
@@ -135,17 +162,7 @@ def admin(yol: str, belirtec: str, yontem: str = "GET", govde: dict | None = Non
 def get_without_redirect(adres: str) -> HttpYanit:
     """GET that does not follow redirects, so the Location header can be inspected."""
 
-    class NoRedirect(urllib.request.HTTPRedirectHandler):
-        def redirect_request(self, req, fp, code, msg, headers, newurl):
-            return None
-
-    acici = urllib.request.build_opener(NoRedirect())
-    try:
-        with acici.open(urllib.request.Request(adres), timeout=30) as yanit:
-            return HttpYanit(yanit.status, yanit.read(), dict(yanit.headers))
-    except urllib.error.HTTPError as hata:
-        with hata:
-            return HttpYanit(hata.code, hata.read(), dict(hata.headers))
+    return istek("GET", adres)
 
 
 def pkce_pair() -> tuple:

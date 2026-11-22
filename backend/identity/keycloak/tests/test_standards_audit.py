@@ -182,19 +182,65 @@ class EnvExampleTest(unittest.TestCase):
                 self.assertNotIn(" #", line, line)
 
 
-class ResponseCleanupTest(unittest.TestCase):
-    def test_http_error_response_body_is_closed_after_reading(self):
-        import io
-        import urllib.error
+class LocalRequestTest(unittest.TestCase):
+    def test_external_host_and_unexpected_port_are_refused(self):
+        from yardimci import istek
+
+        with mock.patch.dict(os.environ, {"KC_PORT": "5070"}, clear=True):
+            with mock.patch("http.client.HTTPConnection", side_effect=AssertionError("Unexpected network request")):
+                for url in ("http://example.test:5070/token", "http://127.0.0.1:5071/token"):
+                    with self.subTest(url=url), self.assertRaises(ValueError):
+                        istek("POST", url, form={"client_secret": "dummy"})
+
+    def test_post_does_not_follow_redirect(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
 
         from yardimci import istek
 
-        url = "https://example.test/"
-        body = io.BytesIO(b"error")
-        error = urllib.error.HTTPError(url, 404, "Not Found", {}, body)
-        with mock.patch("urllib.request.urlopen", side_effect=error):
-            self.assertEqual(istek("GET", url).durum, 404)
-        self.assertTrue(body.closed)
+        calls = []
+
+        class Redirect(BaseHTTPRequestHandler):
+            def do_POST(self):
+                calls.append(self.path)
+                self.send_response(303)
+                self.send_header("Location", "/redirected")
+                self.end_headers()
+
+            def do_GET(self):
+                calls.append(self.path)
+                self.send_response(200)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        with HTTPServer(("127.0.0.1", 0), Redirect) as server:
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            port = server.server_address[1]
+            try:
+                with mock.patch.dict(os.environ, {"KC_PORT": str(port)}, clear=True):
+                    result = istek("POST", f"http://127.0.0.1:{port}/token", form={"client_secret": "dummy"})
+                self.assertEqual(result.durum, 303)
+                self.assertEqual(calls, ["/token"])
+            finally:
+                server.shutdown()
+                thread.join()
+
+
+class ResponseCleanupTest(unittest.TestCase):
+    def test_http_error_response_and_connection_are_closed(self):
+        from yardimci import istek
+
+        with mock.patch.dict(os.environ, {"KC_PORT": "5070"}, clear=True):
+            with mock.patch("http.client.HTTPConnection") as make_connection:
+                connection = make_connection.return_value
+                response = connection.getresponse.return_value
+                response.__enter__.return_value.status = 404
+                self.assertEqual(istek("GET", "http://localhost:5070/").durum, 404)
+                response.__exit__.assert_called_once()
+                connection.close.assert_called_once()
 
 
 class NoRawResponseInMessagesTest(unittest.TestCase):
