@@ -390,6 +390,41 @@ Proje kaydı Keycloak kullanıcı kimliğini kişisel veri sayar. Servisin kayı
 - Günlük e-posta, belirteç ve oturum kimliği yazmaz.
 - Mutabakat raporu e-posta taşımaz. Kullanıcıyı Keycloak kimliğiyle anar.
 
+## Eksik işlerin kanıtları
+
+### Olay alıcısının canlı denemesi
+
+22 Kasım 2026 Pazar günü gerçek Keycloak olay eklentisiyle deneme yapıldı.
+Geçerli olay 202 aldı. Bozuk imza ve eski zaman damgası 401 aldı.
+Deneme `48974c6` kaydında belgelendi. Press ve kiracı hedefleri bu denemede sahtedir.
+Güncel otomatik kontroller `tests/test_server.py` dosyasındadır:
+
+- `test_signature_made_by_the_fork_is_accepted`
+- `test_broken_fork_signature_is_rejected`
+- `test_old_fork_timestamp_is_rejected`
+
+Bu testler canlı ortam denemesinin yerine geçmez. Canlı ortam bu çalışma sırasında yeniden açılmadı.
+
+### Oturum kapatma
+
+`POST /v1/sessions/revoke` ucu uygulanmıştır. Sözleşme `contracts/identity_sync.openapi.yaml` dosyasındadır.
+`tests.test_server.SessionRevokeTest` sınıfı kendi üyeliğini, başka kiracıyı ve başka kullanıcının oturumunu sınar.
+Kapalı oturum için tekrar istek 200 alır. Başka kiracıya ait kullanıcı için istek 403 alır.
+
+### Hesap silme
+
+`POST /v1/account-deletions` ucu uygulanmıştır. Yalnız Press bu uca erişir.
+Servis yeni giriş zamanını doğrular. İşi ilk yazmadan önce kaydeder.
+`tests.test_server.AccountDeletionEndpointTest` sınıfı bu kuralları sınar.
+`tests.test_deletion_paths.DeletionPathsTest` sınıfı hata sonrası devam etmeyi ve tekrarlanan isteği sınar.
+
+### Telefon kurulumlarını iptal etme
+
+Servis, kullanıcı kapatılınca `platform_core.api.mobile.revoke_user_installations` ucunu çağırır.
+Çağrı `identity_sync/sites.py` dosyasındaki `revoke_user_installations` işlevindedir.
+`tests/test_pipeline.py` dosyasındaki `test_disabled_user_loses_the_phone_installations` testi iki kurulumun kaldırıldığını doğrular.
+Bu test sahte kiracı kullanır. Telefon sunucusunun iç uygulaması bu paketin kapsamı dışındadır.
+
 ## Testler
 
 Testleri `backend/identity/identity_sync` klasöründe çalıştırın:
