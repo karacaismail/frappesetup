@@ -272,6 +272,10 @@ def ensure_fixtures() -> None:
 class ErisimTestCase(IntegrationTestCase):
 	"""Each class sets up and deletes its own rules and records."""
 
+	# The shared test site has no worker, so a class runs the jobs that wait once many have
+	# gathered. The measurement tests switch this off: they must not run a queue (O-35).
+	RUN_WAITING_JOBS = True
+
 	# A subclass can change this. The default rules are the P1 scenario of the roadmap.
 	RULES = (
 		{
@@ -309,7 +313,8 @@ class ErisimTestCase(IntegrationTestCase):
 		super().setUpClass()
 		frappe.set_user("Administrator")
 		ensure_fixtures()
-		run_queued_jobs()
+		if cls.RUN_WAITING_JOBS:
+			run_queued_jobs()
 		cls.site = frappe.local.site
 		cls.rules = {}
 		for rule in cls.RULES:

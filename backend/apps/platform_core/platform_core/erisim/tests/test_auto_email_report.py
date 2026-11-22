@@ -273,11 +273,11 @@ class TestSwitchOffOnInstallAndMigrate(AutoEmailReportTestCase):
 		# (`frappe/email/doctype/auto_email_report/auto_email_report.py:70`) and a title can hold
 		# the name of a person, so no name is logged.
 		text = "\n".join(logged.output)
-		self.assertIn("3", text)
+		self.assertTrue("3" in text, "the response lacks a value it must carry")
 		for name in (*governed, free):
-			self.assertNotIn(name, text)
+			self.assertFalse(name in text, "the response carries a value it must not carry")
 		for report, _report_type in GOVERNED_REPORTS:
-			self.assertNotIn(report, text)
+			self.assertFalse(report in text, "the response carries a value it must not carry")
 
 
 class TestUngovernedData(AutoEmailReportTestCase):

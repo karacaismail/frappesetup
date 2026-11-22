@@ -245,7 +245,10 @@ class TestWebsiteUser(ErisimTestCase):
 		response = self.api(self.login(base.PORTAL), "GET", "explain_permission", query=query)
 
 		self.assertEqual(response.status_code, 403)
-		self.assertNotIn("Calisan kendi kaydi", response.get_data(as_text=True))
+		self.assertFalse(
+			"Calisan kendi kaydi" in response.get_data(as_text=True),
+			"the response carries a value it must not carry",
+		)
 
 	def test_website_user_cannot_change_levels(self):
 		body = {"doctype": DOCTYPE, "role": base.ROLE_PORTAL, "permlevel": 1, "read": True, "write": False}

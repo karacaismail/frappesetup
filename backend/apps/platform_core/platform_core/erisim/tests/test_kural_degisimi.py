@@ -119,7 +119,9 @@ class TestRuleChange(ErisimTestCase):
 
 		self.assertEqual(created.status_code, 200)
 		self.addCleanup(self.drop_rule, created.json["data"]["name"])
-		self.assertIn(ROLE_NO_RULE, created.get_data(as_text=True))
+		self.assertTrue(
+			ROLE_NO_RULE in created.get_data(as_text=True), "the response lacks a value it must carry"
+		)
 
 	def test_only_system_manager_manages_rules(self):
 		employee = self.login(EMPLOYEE_1)

@@ -898,7 +898,7 @@ Bunların adları çalışmanın işaretini taşır. Temizlik işarete göre sil
 
 Komut sitede önceden var olan hiçbir şeye dokunmaz. Kullanıcı, rol, izin satırı, kullanıcı izni (“User Permission”), kural ve kayıt aynı kalır. Komut testlerin ortak hazırlığını çağırmaz. O hazırlık kullanıcı izinlerini siler ve test türlerine izin satırı ekler.
 
-On dört test bunu sınar. Testler ölçümden önce ve sonra 22 tabloyu karşılaştırır. Tablolar izinleri, kişileri, kuralları, kayıt türlerini ve Frappe'nin iz kayıtlarını tutar. Testler önce sitede eski bir kural, bir düzey izni, bir kullanıcı izni ve portal izni olmayan eski bir tür bırakır.
+On beş test bunu sınar. Testler ölçümden önce ve sonra 22 tabloyu karşılaştırır. Testler ortak kuyruğu çalıştırmaz ve boşaltmaz. Ölçüme yalnız testlere ayrılmış bir kuyruk gösterilir. Tablolar izinleri, kişileri, kuralları, kayıt türlerini ve Frappe'nin iz kayıtlarını tutar. Testler önce sitede eski bir kural, bir düzey izni, bir kullanıcı izni ve portal izni olmayan eski bir tür bırakır.
 
 Temizlik Frappe'nin yazdığı iz kayıtlarını da siler. İz kaydını tür ve ad çiftiyle seçer. Yalnız çalışmanın başından sonra yazılanları siler. Çalışan numarası gibi adlar silmeden sonra yeniden verilir. Eski bir iz kaydı aynı adı taşıyabilir.
 

@@ -23,7 +23,9 @@ class TestFieldLevel(ErisimTestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assert_hidden(response.json["data"], "salary_amount")
-		self.assertNotIn(str(SALARY), response.get_data(as_text=True))
+		self.assertFalse(
+			str(SALARY) in response.get_data(as_text=True), "the response carries a value it must not carry"
+		)
 
 	def test_restricted_field_is_not_returned_on_list(self):
 		"""Frappe either removes a field without permission from the response or denies the request. The value is never returned."""
@@ -32,7 +34,9 @@ class TestFieldLevel(ErisimTestCase):
 		response = self.rest_list(client, fields=("name", "salary_amount"))
 
 		self.assertIn(response.status_code, (200, 403))
-		self.assertNotIn(str(SALARY), response.get_data(as_text=True))
+		self.assertFalse(
+			str(SALARY) in response.get_data(as_text=True), "the response carries a value it must not carry"
+		)
 
 	def test_restricted_field_cannot_be_used_as_a_filter(self):
 		"""A filter must not leak the value: filtering by a field without permission returns no record."""

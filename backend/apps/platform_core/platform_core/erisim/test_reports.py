@@ -38,7 +38,10 @@ class TestQueryReportGate(ErisimTestCase):
 
 				self.assertEqual(response.status_code, 403)
 				for name in self.records.values():
-					self.assertNotIn(name, response.get_data(as_text=True))
+					self.assertFalse(
+						name in response.get_data(as_text=True),
+						"the response carries a value it must not carry",
+					)
 
 	def test_export_query_foreign_data_denied(self):
 		response = self.send(
@@ -50,14 +53,18 @@ class TestQueryReportGate(ErisimTestCase):
 
 		self.assertEqual(response.status_code, 403)
 		for name in self.records.values():
-			self.assertNotIn(name, response.get_data(as_text=True))
+			self.assertFalse(
+				name in response.get_data(as_text=True), "the response carries a value it must not carry"
+			)
 
 	def test_run_guest_denied(self):
 		response = self.run_report(self.anonymous())
 
 		self.assertEqual(response.status_code, 403)
 		for name in self.records.values():
-			self.assertNotIn(name, response.get_data(as_text=True))
+			self.assertFalse(
+				name in response.get_data(as_text=True), "the response carries a value it must not carry"
+			)
 
 	def test_export_query_guest_denied(self):
 		response = self.send(
@@ -69,7 +76,9 @@ class TestQueryReportGate(ErisimTestCase):
 
 		self.assertEqual(response.status_code, 403)
 		for name in self.records.values():
-			self.assertNotIn(name, response.get_data(as_text=True))
+			self.assertFalse(
+				name in response.get_data(as_text=True), "the response carries a value it must not carry"
+			)
 
 	def test_user_who_sees_every_record_is_refused_too(self):
 		"""What the SQL of a query report reads cannot be verified. Only a System Manager runs it."""
@@ -83,7 +92,7 @@ class TestQueryReportGate(ErisimTestCase):
 		self.assertEqual(response.status_code, 200)
 		body = response.get_data(as_text=True)
 		for name in self.records.values():
-			self.assertIn(name, body)
+			self.assertTrue(name in body, "the response lacks a value it must carry")
 
 	def test_python_caller_reaches_the_gate_through_frappe_override(self):
 		"""Decision note, section 9: the caller finds the function with `frappe.override_whitelisted_method`."""

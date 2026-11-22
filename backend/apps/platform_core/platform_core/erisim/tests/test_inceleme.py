@@ -38,7 +38,10 @@ class TestIdentitySwap(ErisimTestCase):
 
 	def assert_untouched(self, response) -> None:
 		own, victim = self.records[EMPLOYEE_1], self.records[EMPLOYEE_2]
-		self.assertNotIn(f"Talep {EMPLOYEE_2}", response.get_data(as_text=True))
+		self.assertFalse(
+			f"Talep {EMPLOYEE_2}" in response.get_data(as_text=True),
+			"the response carries a value it must not carry",
+		)
 		self.assertGreaterEqual(response.status_code, 400)
 		self.assertEqual(self.stored(own, "title"), f"Talep {EMPLOYEE_1}")
 		self.assertEqual(self.stored(victim, "title"), f"Talep {EMPLOYEE_2}")
@@ -59,7 +62,10 @@ class TestIdentitySwap(ErisimTestCase):
 
 		response = self.send(self.login(EMPLOYEE_1), "POST", BULK_UPDATE, body={"docs": json.dumps(docs)})
 
-		self.assertNotIn(f"Talep {EMPLOYEE_2}", response.get_data(as_text=True))
+		self.assertFalse(
+			f"Talep {EMPLOYEE_2}" in response.get_data(as_text=True),
+			"the response carries a value it must not carry",
+		)
 		self.assertEqual(self.stored(self.records[EMPLOYEE_1], "title"), f"Talep {EMPLOYEE_1}")
 		self.assertEqual(self.stored(self.records[EMPLOYEE_2], "employee"), employee_of(EMPLOYEE_2))
 

@@ -118,7 +118,7 @@ class ReportRulesTestCase(ErisimTestCase):
 		self.assertIn(response.status_code, statuses)
 		body = response.get_data(as_text=True)
 		for name in self.records.values():
-			self.assertNotIn(name, body)
+			self.assertFalse(name in body, "the response carries a value it must not carry")
 
 	def denied(self, report: str, user: str) -> bool:
 		frappe.set_user(user)
@@ -139,7 +139,10 @@ class TestQueryReportRule(ReportRulesTestCase):
 			with self.subTest(report=report, user=ADMIN):
 				response = self.run_report(self.login(ADMIN), report)
 				self.assertEqual(response.status_code, 200)
-				self.assertIn(self.records[EMPLOYEE_1], response.get_data(as_text=True))
+				self.assertTrue(
+					self.records[EMPLOYEE_1] in response.get_data(as_text=True),
+					"the response lacks a value it must carry",
+				)
 
 	def test_report_of_an_ungoverned_type_is_closed_too_while_rules_exist(self):
 		"""The SQL may read any table, so the report's own document type proves nothing."""
@@ -257,7 +260,10 @@ class TestWhichReportRuns(ReportRulesTestCase):
 		response = self.run_report(self.login(ADMIN), self.STALE)
 
 		self.assertEqual(response.status_code, 200)
-		self.assertIn(self.records[EMPLOYEE_1], response.get_data(as_text=True))
+		self.assertTrue(
+			self.records[EMPLOYEE_1] in response.get_data(as_text=True),
+			"the response lacks a value it must carry",
+		)
 
 	def test_export_follows_the_same_decision(self):
 		body = {"report_name": self.STALE, "file_format_type": "CSV", "filters": "{}"}
@@ -433,9 +439,13 @@ class TestReportsWithoutRules(ReportRulesTestCase):
 		allowed = self.run_report(self.login(HR), SALARY_REPORT)
 
 		self.assertEqual(refused.status_code, 403)
-		self.assertNotIn(str(SALARY), refused.get_data(as_text=True))
+		self.assertFalse(
+			str(SALARY) in refused.get_data(as_text=True), "the response carries a value it must not carry"
+		)
 		self.assertEqual(allowed.status_code, 200)
-		self.assertIn(str(SALARY), allowed.get_data(as_text=True))
+		self.assertTrue(
+			str(SALARY) in allowed.get_data(as_text=True), "the response lacks a value it must carry"
+		)
 
 	def test_prepared_report_stays_open(self):
 		self.assertFalse(reports.touches_governed(NAME_REPORT))
@@ -569,7 +579,9 @@ class TestPreparedReportClosed(ReportRulesTestCase):
 	def test_stored_result_cannot_be_read_through_run(self):
 		response = self.run_report(self.login(ADMIN), NAME_REPORT, prepared_report_name=self.prepared)
 
-		self.assertNotIn("stored", response.get_data(as_text=True))
+		self.assertFalse(
+			"stored" in response.get_data(as_text=True), "the response carries a value it must not carry"
+		)
 
 	def test_stored_file_cannot_be_read_by_its_owner_or_through_a_share(self):
 		frappe.share.add_docshare("File", self.file, EMPLOYEE_1, read=1)

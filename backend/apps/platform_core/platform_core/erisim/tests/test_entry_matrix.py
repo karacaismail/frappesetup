@@ -136,10 +136,10 @@ class TestEntryMatrix(ErisimTestCase):
 				with self.subTest(endpoint=endpoint, caller=caller):
 					response = self.call(clients[caller], endpoint)
 					body = response.get_data(as_text=True)
-					self.assertEqual(response.status_code, expected, body[:300])
+					self.assertEqual(response.status_code, expected, f"{endpoint} as {caller}")
 					if expected == 403:
 						for name in self.records.values():
-							self.assertNotIn(name, body)
+							self.assertFalse(name in body, "the response carries a value it must not carry")
 				if endpoint.startswith("set_"):
 					self.restore_levels()
 
@@ -178,9 +178,12 @@ class TestEntryMatrix(ErisimTestCase):
 				with self.subTest(action=action, caller=caller):
 					response = self.rule_call(clients[caller], action)
 					body = response.get_data(as_text=True)
-					self.assertEqual(response.status_code, expected, body[:300])
+					self.assertEqual(response.status_code, expected, f"{action} as {caller}")
 					if expected == 403:
-						self.assertNotIn("Spare rule of the matrix", body)
+						self.assertFalse(
+							"Spare rule of the matrix" in body,
+							"the response carries a value it must not carry",
+						)
 						frappe.db.rollback()
 						self.assertEqual(frappe.db.count("Access Rule"), before)
 			if action == "create a rule":

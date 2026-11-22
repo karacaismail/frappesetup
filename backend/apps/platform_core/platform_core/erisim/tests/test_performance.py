@@ -7,7 +7,8 @@
 - It deletes only what it created, chosen by document type and name together.
 
 The tests run on the shared test site, so the site name is patched where the run itself is
-under test. They take a picture of the tables that hold permissions, people, rules and logs
+under test. They never run the shared queue and never empty it: the measurement is shown a
+queue of its own, made for these tests, and the queue test removes only the one job it added. They take a picture of the tables that hold permissions, people, rules and logs
 before the run and compare it with the tables afterwards, also when the run stops half way.
 
 The set-up of these tests changes a few rows of the shared site. It keeps a copy of every row
@@ -18,7 +19,8 @@ from contextlib import contextmanager
 from unittest.mock import patch
 
 import frappe
-from frappe.utils.background_jobs import get_queues
+from frappe.utils.background_jobs import get_redis_conn
+from rq import Queue
 
 from platform_core.erisim import field_level
 from platform_core.erisim.tests import base, performance
@@ -61,8 +63,13 @@ WATCHED = (
 	DOCTYPE,
 	FREE_DOCTYPE,
 )
-# The permission tables whose rows the set-up of these tests removes and must put back.
-RESTORED = ("DocPerm", "Custom DocPerm", "User Permission")
+# The rows the set-up of these tests may add, change or delete. It keeps all of them, with every
+# field, and puts them back exactly.
+SCOPE = {
+	"DocPerm": {"parent": DOCTYPE},
+	"Custom DocPerm": {"parent": DOCTYPE},
+	"User Permission": {"user": EMPLOYEE_1},
+}
 
 
 def picture() -> dict[str, list]:
@@ -84,14 +91,22 @@ def picture_of(table: str) -> list[tuple]:
 	return [tuple(str(row[key]) for key in sorted(row)) for row in rows]
 
 
-def waiting_jobs() -> int:
-	return sum(queue.count for queue in get_queues())
+def own_queue() -> Queue:
+	"""A queue only these tests use. No worker listens to it and nothing else puts jobs in it."""
+	return Queue("ar-measure-tests", connection=get_redis_conn())
 
 
 @contextmanager
 def on_a_perf_site(name: str = PERF_SITE, flag=1):
-	"""Let the measurement see a site it may run on. The data still goes to the test site."""
-	with patch.object(performance, "site_name", return_value=name), patch.dict(frappe.conf, clear=False):
+	"""Let the measurement see a site it may run on, and the tests' own queue instead of the shared one.
+
+	The data still goes to the test site.
+	"""
+	with (
+		patch.object(performance, "site_name", return_value=name),
+		patch.object(performance, "get_queues", return_value=[own_queue()]),
+		patch.dict(frappe.conf, clear=False),
+	):
 		frappe.conf.pop("allow_performance_fixture", None)
 		if flag is not None:
 			frappe.conf["allow_performance_fixture"] = flag
@@ -100,6 +115,8 @@ def on_a_perf_site(name: str = PERF_SITE, flag=1):
 
 class TestWhereTheMeasurementMayRun(ErisimTestCase):
 	"""Rule O-35, first part: the site."""
+
+	RUN_WAITING_JOBS = False
 
 	def test_site_names(self):
 		allowed = ("perf-access.localhost", "perf-1.localhost")
@@ -129,7 +146,6 @@ class TestWhereTheMeasurementMayRun(ErisimTestCase):
 		self.assertTrue(performance.site_allowed(PERF_SITE, {"allow_performance_fixture": "1"}))
 
 	def test_measurement_refuses_the_test_site_and_creates_nothing(self):
-		base.run_queued_jobs(room=1)
 		before = picture()
 		with patch.dict(frappe.conf, {"allow_performance_fixture": 1}):
 			self.assertRaises(performance.NotAllowedHere, performance.measure, **SMALL)
@@ -137,7 +153,6 @@ class TestWhereTheMeasurementMayRun(ErisimTestCase):
 		self.assertEqual(picture(), before)
 
 	def test_measurement_refuses_a_perf_site_without_the_flag(self):
-		base.run_queued_jobs(room=1)
 		before = picture()
 		with on_a_perf_site(flag=None):
 			self.assertRaises(performance.NotAllowedHere, performance.measure, **SMALL)
@@ -146,12 +161,13 @@ class TestWhereTheMeasurementMayRun(ErisimTestCase):
 
 
 class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
+	RUN_WAITING_JOBS = False
+
 	def setUp(self):
 		super().setUp()
-		# These tests need an empty queue. The shared test site has no worker, so run what waits.
-		base.run_queued_jobs(room=1)
-		self.removed: dict[str, list[dict]] = {table: [] for table in RESTORED}
-		self.added: list[tuple[str, str]] = []
+		# Every row the set-up below may add, change or delete, with all its fields.
+		self.kept = {table: self.rows(table, filters) for table, filters in SCOPE.items()}
+		self.added_rules: list[str] = []
 		self.addCleanup(self.restore_site)
 		rule = frappe.get_doc(
 			{
@@ -164,20 +180,16 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 				"is_active": 1,
 			}
 		).insert()
-		self.added.append((RULE_DOCTYPE, rule.name))
+		self.added_rules.append(rule.name)
 		# A level permission an administrator gave before: read and write at level 1.
-		copies = set(frappe.get_all("Custom DocPerm", filters={"parent": DOCTYPE}, pluck="name", limit=0))
 		field_level.set_level_access(DOCTYPE, ROLE_MANAGER, 1, True, True)
-		now_there = frappe.get_all("Custom DocPerm", filters={"parent": DOCTYPE}, pluck="name", limit=0)
-		self.added += [("Custom DocPerm", name) for name in now_there if name not in copies]
 		# A user permission an administrator gave to one of the made-up users.
-		permission = frappe.get_doc(
+		frappe.get_doc(
 			{"doctype": "User Permission", "user": EMPLOYEE_1, "allow": "Company", "for_value": COMPANY}
 		).insert()
-		self.added.append(("User Permission", permission.name))
 		# An older site: the test type has no row for the portal role yet.
-		self.remove_and_keep("DocPerm", {"parent": DOCTYPE, "role": ROLE_PORTAL})
-		self.remove_and_keep("Custom DocPerm", {"parent": DOCTYPE, "role": ROLE_PORTAL})
+		frappe.db.delete("DocPerm", {"parent": DOCTYPE, "role": ROLE_PORTAL})
+		frappe.db.delete("Custom DocPerm", {"parent": DOCTYPE, "role": ROLE_PORTAL})
 		frappe.clear_cache(doctype=DOCTYPE)
 		# Committed on purpose: the measurement commits and its requests use another connection.
 		frappe.db.commit()  # nosemgrep: frappe-request-commit
@@ -185,24 +197,29 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 		self.assertTrue(self.before["User Permission"])
 		self.assertTrue(self.before["Custom DocPerm"])
 
-	def remove_and_keep(self, table: str, filters: dict) -> None:
-		"""Delete rows for the test. A row from before the set-up is copied first, to be put back."""
-		for name in frappe.get_all(table, filters=filters, pluck="name", limit=0):
-			if (table, name) in self.added:
-				self.added.remove((table, name))
-			else:
-				self.removed[table].append(frappe.db.get_value(table, name, "*", as_dict=True))
-			frappe.db.delete(table, {"name": name})
+	@staticmethod
+	def rows(table: str, filters: dict) -> dict[str, dict]:
+		"""Every row in the scope, by name, with every column."""
+		return {row.name: row for row in frappe.get_all(table, filters=filters, fields=["*"], limit=0)}
 
 	def restore_site(self) -> None:
-		"""Delete only what the set-up added and put back every row it removed, unchanged."""
+		"""Make the rows in the scope exactly what they were before the set-up.
+
+		A row the set-up added is deleted. A row it deleted is written again. A row it changed,
+		for example a level permission whose write access it switched on, gets its old values
+		back. Rows outside the scope are never touched.
+		"""
 		frappe.set_user("Administrator")
 		frappe.db.rollback()
-		for table, name in self.added:
-			frappe.db.delete(table, {"name": name})
-		for table, rows in self.removed.items():
-			for row in rows:
-				if not frappe.db.exists(table, row["name"]):
+		for name in self.added_rules:
+			frappe.db.delete(RULE_DOCTYPE, {"name": name})
+		for table, filters in SCOPE.items():
+			now_there = self.rows(table, filters)
+			for name, row in now_there.items():
+				if name not in self.kept[table] or row != self.kept[table][name]:
+					frappe.db.delete(table, {"name": name})
+			for name, row in self.kept[table].items():
+				if name not in now_there or now_there[name] != row:
 					frappe.get_doc({"doctype": table, **row}).db_insert()
 		frappe.clear_cache(doctype=DOCTYPE)
 		# Committed on purpose: other connections must see this.
@@ -292,16 +309,25 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 
 	def test_waiting_job_stops_the_measurement_and_stays_in_the_queue(self):
 		"""Rule O-35: a job of other work waits. Nothing is created and the job is not run."""
-		frappe.enqueue("frappe.ping", queue="default")
-		self.addCleanup(base.run_queued_jobs, 1)
-		waiting = waiting_jobs()
+		queue = own_queue()
+		job = queue.enqueue("frappe.ping")
+		# Only the job this test added is removed. The queue is never run and never emptied.
+		self.addCleanup(job.delete)
+		waiting = queue.count
 		self.assertGreaterEqual(waiting, 1)
 
 		with on_a_perf_site():
 			self.assertRaises(performance.QueueNotEmpty, performance.measure, **SMALL)
 
-		self.assertEqual(waiting_jobs(), waiting)
+		self.assertEqual(queue.count, waiting)
+		self.assertIn(job.id, queue.job_ids)
 		self.assert_site_as_before()
+
+	def test_measurement_counts_the_shared_queue_when_nothing_is_patched(self):
+		"""Outside these tests the measurement looks at the real queues of the bench."""
+		from frappe.utils.background_jobs import get_queues
+
+		self.assertEqual(performance.waiting_jobs(), sum(queue.count for queue in get_queues()))
 
 	def test_log_rows_of_another_type_with_the_same_name_are_kept(self):
 		"""Rule O-35: the clean-up chooses by type and name together.
@@ -354,10 +380,15 @@ class TestMeasurementLeavesTheSiteAsItWas(ErisimTestCase):
 class TestTheSetUpPutsBackWhatItChanged(ErisimTestCase):
 	"""Review finding: the set-up above must not lose a permission that was there before it."""
 
+	RUN_WAITING_JOBS = False
+
 	def test_rows_from_before_the_set_up_survive_it(self):
 		# A custom permission of the portal role and a user permission, both from before.
 		copies = set(frappe.get_all("Custom DocPerm", filters={"parent": DOCTYPE}, pluck="name", limit=0))
 		field_level.set_level_access(DOCTYPE, ROLE_PORTAL, 1, True, False)
+		# The manager may read level 1 and may not write it. The set-up gives the manager write
+		# access for its own purpose; afterwards this row must be exactly as it is now.
+		field_level.set_level_access(DOCTYPE, ROLE_MANAGER, 1, True, False)
 		now_there = frappe.get_all("Custom DocPerm", filters={"parent": DOCTYPE}, pluck="name", limit=0)
 		made = [name for name in now_there if name not in copies]
 		earlier = frappe.get_doc(
@@ -372,8 +403,14 @@ class TestTheSetUpPutsBackWhatItChanged(ErisimTestCase):
 
 		inner = TestMeasurementLeavesTheSiteAsItWas("test_measurement_does_not_call_the_shared_test_setup")
 		inner.records, inner.rules, inner.site = self.records, self.rules, self.site
-		inner.setUp()
-		inner.doCleanups()
+		manager_row = {"parent": DOCTYPE, "role": ROLE_MANAGER, "permlevel": 1}
+		self.assertEqual(frappe.db.get_value("Custom DocPerm", manager_row, ["read", "write"]), (1, 0))
+		# The set-up and the clean-up must not run the shared queue either (O-35).
+		with patch.object(base, "run_queued_jobs", side_effect=AssertionError("the shared queue was run")):
+			inner.setUp()
+			inner.doCleanups()
+		frappe.db.rollback()
+		self.assertEqual(frappe.db.get_value("Custom DocPerm", manager_row, ["read", "write"]), (1, 0))
 
 		for table in tables:
 			with self.subTest(table=table):

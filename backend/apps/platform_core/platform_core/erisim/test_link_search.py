@@ -87,9 +87,9 @@ class TestLinkSearch(ErisimTestCase):
 	def assert_refused(self, response) -> None:
 		self.assertEqual(response.status_code, 403)
 		body = response.get_data(as_text=True)
-		self.assertNotIn(str(SALARY), body)
+		self.assertFalse(str(SALARY) in body, "the response carries a value it must not carry")
 		for name in self.records.values():
-			self.assertNotIn(name, body)
+			self.assertFalse(name in body, "the response carries a value it must not carry")
 
 	def test_search_link_guest_denied(self):
 		self.assert_refused(self.search(self.anonymous(), query=UNSAFE_QUERY))
@@ -267,7 +267,9 @@ class TestLinkSearch(ErisimTestCase):
 	def test_refusal_does_not_echo_markup_from_the_request(self):
 		response = self.search(self.login(EMPLOYEE_1), query="<img src=x onerror=alert(1)>" + UNSAFE_QUERY)
 
-		self.assertNotIn("<img", response.get_data(as_text=True))
+		self.assertFalse(
+			"<img" in response.get_data(as_text=True), "the response carries a value it must not carry"
+		)
 
 	def test_python_callers_get_the_same_refusal_from_the_public_guard(self):
 		frappe.set_user(EMPLOYEE_1)
@@ -290,8 +292,8 @@ class TestLinkSearch(ErisimTestCase):
 
 		for response in (direct, through_search):
 			body = response.get_data(as_text=True)
-			self.assertNotEqual(response.status_code, 200, body[:300])
-			self.assertNotIn(str(SALARY), body)
+			self.assertNotEqual(response.status_code, 200)
+			self.assertFalse(str(SALARY) in body, "the response carries a value it must not carry")
 
 	def test_no_test_file_in_the_package_declares_an_endpoint(self):
 		"""Test files ship with the app. A whitelisted function in one would be a live endpoint."""
