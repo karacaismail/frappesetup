@@ -82,7 +82,7 @@ def timeline() -> str:
     o.append("</svg>")
     caption = (
         "P2 ticari katman P1'in Keycloak ara kapısından (14. hafta) başlar ve operasyon sitesinin finans çekirdeğini "
-        "içerir; P3 AI ve P4 CronHR ilk dikey dilimden sonra paralel yürür; P6 operasyon düzlemi P2 tamamlanınca açılır; "
+        "içerir; P3 AI ve P4 HRMS TR ilk dikey dilimden sonra paralel yürür; P6 operasyon düzlemi P2 tamamlanınca açılır; "
         "P5 ilk ödeyen müşteriden sonra gelir."
     )
     return figure("diagram-timeline", "Yol haritası zaman çizelgesi", "\n".join(o), caption, "Yol haritası zaman çizelgesi")
@@ -151,7 +151,7 @@ def rails() -> str:
     o += box(40, 570, 280, 170, "Rail 1 — Press", "Frappe v15 · press.&lt;marka&gt;",
              ["Team · Site · Plan · Marketplace", "Abonelik · Fatura · Agent Job", "press_tr · press_ops_bridge"])
     o += box(360, 570, 320, 170, "Rail 2 — Kiracı siteleri", "ERPNext v16 · &lt;kiracı&gt;.app.&lt;marka&gt;",
-             ["Site + DB kiracı başına", "platform_core · tr_localization", "CronHR · CRM · Webshop app'leri"])
+             ["Site + DB kiracı başına", "platform_core · tr_localization", "HRMS TR · CRM · Webshop app'leri"])
     o += box(720, 570, 280, 170, "Rail 6 — Operasyon", "ERPNext v16 · ops.&lt;marka&gt;",
              ["Cari · Sales Invoice · e-belge", "press_tr_finance · CRM · Helpdesk", "Support Session · Hocuspocus"], accent=True)
     # Satır1 → Satır2 (230..300): etiketler y=256 (uzun) ve y=280 (kısa)
