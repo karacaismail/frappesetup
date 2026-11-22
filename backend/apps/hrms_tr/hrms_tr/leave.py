@@ -13,6 +13,7 @@ HR_ROLE = "HRMS TR Admin"
 MANAGER_ROLE = "HRMS TR Manager"
 APPROVER_ROLES = (MANAGER_ROLE, HR_ROLE)
 OPERATIONS_ROLES = ("System Manager", "HR Manager")
+HRMS_APPROVER_METHOD = "hrms.hr.doctype.leave_application.leave_application.get_leave_approver"
 
 LeaveName = Annotated[str, StringConstraints(min_length=1, max_length=140)]
 LeaveVersion = Annotated[str, StringConstraints(min_length=1, max_length=40)]
@@ -123,8 +124,6 @@ def cancel(name: str, *, expected_version: str) -> dict[str, str]:
 
 
 def get_approver(employee: str) -> str | None:
-	from hrms.hr.doctype.leave_application.leave_application import get_leave_approver
-
 	if not frappe.db.exists("Employee", employee):
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
-	return get_leave_approver(employee)
+	return frappe.get_attr(HRMS_APPROVER_METHOD)(employee)

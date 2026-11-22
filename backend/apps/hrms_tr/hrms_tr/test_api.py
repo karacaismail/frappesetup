@@ -46,16 +46,18 @@ class ApprovalEndpointTest(TestCase):
 		doc.cancel.assert_not_called()
 
 	def test_get_leave_approver_foreign_data_denied(self):
-		from hrms.hr.doctype.leave_application import leave_application as hrms_leave
-
+		native_module, method_name = leave.HRMS_APPROVER_METHOD.rsplit(".", 1)
+		native_lookup = getattr(frappe.get_module(native_module), method_name)
 		with (
 			patch.object(leave, "frappe") as fake,
-			patch.object(hrms_leave, "validate_leave_access", side_effect=frappe.PermissionError) as validate,
-			patch.object(hrms_leave, "get_employee_leave_approver") as lookup,
+			patch(f"{native_module}.validate_leave_access", side_effect=frappe.PermissionError) as validate,
+			patch(f"{native_module}.get_employee_leave_approver") as lookup,
 		):
 			fake.db.exists.return_value = True
+			fake.get_attr.return_value = native_lookup
 			with self.assertRaises(frappe.PermissionError):
 				get_leave_approver("EMP-FOREIGN-0001")
+		fake.get_attr.assert_called_once_with(leave.HRMS_APPROVER_METHOD)
 		validate.assert_called_once_with("EMP-FOREIGN-0001", None)
 		lookup.assert_not_called()
 
