@@ -96,6 +96,7 @@ test('identity sync provisions a Website User', async ({ request }) => {
     data,
   });
   expect(response.ok()).toBe(true);
+  expect((await response.json()).status).toBe('processed');
   const user = await resource(request, 'User', syncAccount, 'operator');
   expect(user.status()).toBe(200);
   expect((await user.json()).data.user_type).toBe('Website User');
@@ -180,7 +181,7 @@ test('model gateway falls back after the first provider returns 429', async ({ r
   const response = await request.post(
     `${localUrl('kiraci1.localhost', 1)}/api/method/platform_core.api.model.complete`,
     { headers: sessionHeaders('operator'), maxRedirects: 0,
-      data: { route: 'e2e-local-only', messages: [{ role: 'user', content: 'Integration test' }] } },
+      data: { route: required('E2E_MODEL_ROUTE'), messages: [{ role: 'user', content: 'Integration test' }] } },
   );
   expect(response.status()).toBe(200);
   const result = (await response.json()).message;
