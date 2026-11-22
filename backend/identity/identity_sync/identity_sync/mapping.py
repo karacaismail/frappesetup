@@ -19,7 +19,6 @@ from identity_sync.events import (
     ACCOUNT_DELETION,
     ACCOUNT_REMOVAL,
     MEMBERSHIP_TYPES,
-    USER_REMOVED_TYPES,
     Event,
     is_handled,
 )
@@ -378,10 +377,9 @@ def plan_actions(
     if event.type == ACCOUNT_REMOVAL:
         return plan_removed_user(subject, issuer=issuer, tenants=tenants)
 
-    if snapshot is None and event.type in USER_REMOVED_TYPES:
-        # The event says the user was deleted and Keycloak confirms it. If Keycloak still had
-        # the user, the plan below would follow that state and anonymize nothing.
-        return plan_removed_user(subject, issuer=issuer, tenants=tenants)
+    # A Keycloak delete event never plans an anonymization here. The pipeline first confirms
+    # the delete with one read and then continues only as the account job (ACCOUNT_REMOVAL).
+    # A delete event that still reaches this point just closes the user, like any missing user.
 
     if snapshot is None or not snapshot.enabled:
         # Deleted or disabled: the user is disabled on every tenant and leaves every Press team (X-11).

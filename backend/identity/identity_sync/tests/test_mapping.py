@@ -179,7 +179,6 @@ class RemovalTest(unittest.TestCase):
     def test_deletion_plans_are_ordered(self) -> None:
         # An ordered plan stops at the first step that is not done.
         self.assertIsInstance(plan(event("request", "ACCOUNT_DELETION"), None), OrderedPlan)
-        self.assertIsInstance(plan(event("admin", "USER_DELETE"), None), OrderedPlan)
         self.assertNotIsInstance(plan(event("admin", "USER_UPDATE"), user(enabled=False)), OrderedPlan)
 
     def test_every_deletion_step_is_destructive(self) -> None:
@@ -191,12 +190,18 @@ class RemovalTest(unittest.TestCase):
     def test_request_kind_with_another_type_is_not_handled(self) -> None:
         self.assertEqual(plan(event("request", "VERIFY_EMAIL"), user()), ())
 
-    def test_user_deleted_in_keycloak_gets_steps_two_to_four(self) -> None:
+    def test_removal_job_gets_steps_two_to_four(self) -> None:
         # An administrator deleted the user in Keycloak. There is nothing left to disable or delete
         # there, but steps 2, 3 and 4 still run (docs/sozlesmeler.md, section 7).
+        self.assertEqual(plan(event("request", "ACCOUNT_REMOVAL"), None), ACCOUNT_DELETION[1:-1])
+        self.assertIsInstance(plan(event("request", "ACCOUNT_REMOVAL"), None), OrderedPlan)
+
+    def test_delete_event_itself_never_plans_an_anonymization(self) -> None:
+        # Only the account job anonymizes. The pipeline turns a confirmed delete event into that
+        # job. A delete event that reaches the plan as an event only closes the user.
         for kind, type_ in (("admin", "USER_DELETE"), ("user", "DELETE_ACCOUNT")):
             with self.subTest(type=type_):
-                self.assertEqual(plan(event(kind, type_), None), ACCOUNT_DELETION[1:-1])
+                self.assertEqual(plan(event(kind, type_), None), DEPROVISION_EVERYWHERE)
 
     def test_delete_event_for_a_user_that_still_exists_does_not_anonymize(self) -> None:
         # The event says "deleted" but Keycloak still has the user. The current state decides.

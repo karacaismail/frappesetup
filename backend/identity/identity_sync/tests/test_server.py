@@ -981,6 +981,33 @@ class AccountDeletionEndpointTest(ServerCase):
         operations = [p["operation"] for p in preview["results"][0]["previews"]]
         self.assertEqual(operations, ["tenant.anonymize_user", "keycloak.delete_user"])
 
+    def test_queued_delete_event_preview_hides_the_account_when_reads_differ(self) -> None:
+        # The delete event is in the queue because Keycloak could not be read. During the retry
+        # preview the first read fails again and a later read says the user is gone.
+        keycloak = self.stack.keycloak
+        keycloak.remove_user(SUBJECT)
+        left = [99]
+
+        def read(_req: fakes.Recorded) -> fakes.Reply:
+            if left[0] > 0:
+                left[0] -= 1
+                return 500, None
+            return 404, {"error": "User not found"}
+
+        keycloak.on("GET", f"{keycloak.admin}/users/{SUBJECT}", read)
+        deleted = {"id": "e-del-2", "kind": "admin", "type": "USER_DELETE", "realm": "platform", "time": 1, "user_id": SUBJECT}
+        status, reply = self.post_event(deleted)
+        self.assertEqual((status, reply["status"]), (202, "dead_lettered"))
+        self.assertEqual(self.downstream_writes(), [])
+
+        for failures in (3, 1, 0):
+            with self.subTest(failures=failures):
+                left[0] = failures
+                status, preview = self.post_json("/v1/dead-letters/replay", {"dry_run": True}, PREVIEW_TOKEN)
+                self.assertEqual(status, 200)
+                self.assertNotIn(SUBJECT, json.dumps(preview))
+        self.assertEqual(self.downstream_writes(), [])
+
     def test_keycloak_delete_event_after_the_press_request_is_the_same_job(self) -> None:
         # Both real entry paths in one test: the Press request, then the event its last step causes.
         _status, body = self.request()

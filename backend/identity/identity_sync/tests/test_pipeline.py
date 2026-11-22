@@ -696,6 +696,60 @@ class AccountDeletionTest(PipelineCase):
         self.assertEqual(self.stack.app.store.dead_letters(), [])
         self.assertEqual(self.stack.app.processor.handle(self.job()).status, "duplicate")
 
+    def flaky_user_read(self, failures: int) -> None:
+        """The user read fails `failures` times, then Keycloak says the user is gone."""
+        keycloak = self.stack.keycloak
+        left = [failures]
+
+        def read(_req: fakes.Recorded) -> fakes.Reply:
+            if left[0] > 0:
+                left[0] -= 1
+                return 500, None
+            return 404, {"error": "User not found"}
+
+        keycloak.on("GET", f"{keycloak.admin}/users/{SUBJECT}", read)
+
+    def test_recovered_read_after_a_finished_job_writes_nothing(self) -> None:
+        # The Press job finished. Its last step caused a delete event. Every attempt of the
+        # first read fails, and a later read would work. The deletion must be decided by one
+        # read only: the event waits in the queue and no target is written.
+        self.assertEqual(self.stack.app.processor.handle(self.job()).status, "processed")
+        before = self.target_writes()
+        self.flaky_user_read(3)
+
+        result = self.stack.app.processor.handle(event("USER_DELETE", "admin"))
+
+        self.assertEqual((result.status, result.actions), ("dead_lettered", ()))
+        self.assertEqual(self.target_writes(), before)
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual((letter.event.id, letter.state), ("e-1", "failed"))
+        # The replay reads once, sees the user is gone, and finds the finished job.
+        ((_id, replayed),) = self.stack.app.processor.replay_dead_letters()
+        self.assertEqual(replayed.status, "duplicate")
+        self.assertEqual(self.target_writes(), before)
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+
+    def test_failed_read_never_plans_a_deletion_under_the_event_id(self) -> None:
+        # No job exists yet. The read fails, then recovers within the same call.
+        self.stack.keycloak.remove_user(SUBJECT)
+        self.flaky_user_read(3)
+
+        result = self.stack.app.processor.handle(event("USER_DELETE", "admin"))
+
+        self.assertEqual(result.status, "dead_lettered")
+        self.assertEqual(self.target_writes(), 0)
+
+    def test_preview_of_a_queued_delete_event_never_shows_the_account(self) -> None:
+        self.stack.keycloak.remove_user(SUBJECT)
+        self.flaky_user_read(3)
+        self.stack.app.processor.handle(event("USER_DELETE", "admin"))
+        for failures in (3, 1, 0):
+            with self.subTest(failures=failures):
+                self.flaky_user_read(failures)
+                ((_id, preview),) = self.stack.app.processor.replay_dead_letters(dry_run=True)
+                text = " ".join(f"{p.operation} {p.target} {p.summary}" for p in preview.previews)
+                self.assertNotIn(SUBJECT, text)
+
     def test_retry_preview_names_the_job_not_the_account(self) -> None:
         self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
         self.stack.app.processor.handle(self.job())

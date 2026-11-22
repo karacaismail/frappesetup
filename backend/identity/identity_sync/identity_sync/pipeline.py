@@ -188,14 +188,16 @@ class Processor:
         )
 
     def _as_job(self, event: Event) -> Event:
-        """Turn a Keycloak delete event into the account job, once Keycloak confirms the user is gone."""
+        """Turn a Keycloak delete event into the account job, once Keycloak confirms the user is gone.
+
+        This read is the only place that decides a deletion. If it fails, `_Failed` is raised:
+        the caller keeps the event in the queue and writes nothing. No later read may plan the
+        deletion under the event's own id, because the finished steps are recorded under the job.
+        """
         subject = event.user_id
         if event.kind == REQUEST_KIND or event.type not in USER_REMOVED_TYPES or not subject:
             return event
-        try:
-            user = self._retry("keycloak.read", lambda: self._keycloak.get_user(subject))
-        except _Failed:
-            return event  # stays an event; the normal path records the failure and a replay tries again
+        user = self._retry("keycloak.read", lambda: self._keycloak.get_user(subject))
         if user is not None:
             return event  # Keycloak still has the user: the current state decides, nothing is anonymized
         return self.account_job(subject, time=event.time, removed=True)
@@ -221,8 +223,8 @@ class Processor:
 
     def _preview(self, event: Event) -> tuple[EventResult, tuple[Action, ...] | None]:
         """Plan the event and describe the plan. Reads only. The second value is None when planning failed."""
-        event = self._as_job(event)
         try:
+            event = self._as_job(event)
             actions = self._plan(event)
         except _Failed:
             return EventResult("failed"), None
@@ -262,7 +264,16 @@ class Processor:
 
         `planned` is a plan that was already checked against an approval. It is written as it is.
         """
-        job = self._as_job(event)
+        try:
+            job = self._as_job(event)
+        except _Failed as failure:
+            # Keycloak could not say whether the user is gone. Nothing is written. The event
+            # waits in the queue and a replay asks again.
+            if self._store.is_processed(event.id):
+                return EventResult("duplicate")
+            self._store.begin(event)
+            self._store.add_dead_letter(event, str(failure))
+            return EventResult("dead_lettered")
         result = self._handle_job(job, allow_unknown, planned)
         if job.id != event.id:
             # The event is now the account job. A queued copy of the event itself is a leftover.
