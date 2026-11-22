@@ -108,8 +108,10 @@ class RealmDosyasiTesti(unittest.TestCase):
         self.assertIn("length(12)", r["passwordPolicy"])
         self.assertIn("passwordHistory(", r["passwordPolicy"])
         self.assertIn("passwordBlacklist(yaygin-parolalar.txt)", r["passwordPolicy"])
-        self.assertEqual(r["ssoSessionIdleTimeout"], 30 * 60)
-        self.assertEqual(r["ssoSessionMaxLifespan"], 12 * 60 * 60)
+        # O-25 replaced the G-78 web lifetimes: the realm carries the customer values (7 days, 30 days).
+        # Employee clients have 1 hour and 24 hours (test_session_lifetimes).
+        self.assertEqual(r["ssoSessionIdleTimeout"], 7 * 24 * 60 * 60)
+        self.assertEqual(r["ssoSessionMaxLifespan"], 30 * 24 * 60 * 60)
         self.assertEqual(r["accessTokenLifespan"], 5 * 60)
         self.assertTrue(r["revokeRefreshToken"])
         self.assertEqual(r["refreshTokenMaxReuse"], 0)

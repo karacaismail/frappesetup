@@ -165,21 +165,50 @@ class AccountBacklogLiveTest(unittest.TestCase):
         self.assertNotIn("delete-account", effective)
         self.assertIn("manage-account", effective)
 
-    def test_delete_account_step_opens_for_a_signed_in_customer(self):
-        # Only the confirmation page is opened. The sample user is not deleted.
-        url = tenant_authorize_url() + "&kc_action=delete_account"
-        opener, status, headers, html = _login(url)
+    def test_customer_deletes_the_account_through_the_delete_step(self):
+        # A throwaway customer without a second factor, so the test does not share TOTP codes.
+        import base64
+        import json as jsonlib
+        import re
+        import secrets
+
+        from test_event_listener import _sink_requests
+
+        username = f"customer-{uuid.uuid4().hex[:10]}"
+        password = "Musteri-" + secrets.token_urlsafe(12)
+        created = admin("/users", self.admin_token, "POST", {
+            "username": username, "email": f"{username}@example.test", "emailVerified": True,
+            "firstName": "Deneme", "lastName": "Musteri", "enabled": True,
+            "credentials": [{"type": "password", "value": password, "temporary": False}]})
+        self.assertEqual(created.durum, 201, created.govde[:200])
+        user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
+        self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
+
+        opener = _cerezli_acici()
+        _, _, html = _ac(opener, tenant_authorize_url() + "&kc_action=delete_account")
+        form = urllib.parse.urlencode({"username": f"{username}@example.test", "password": password,
+                                       "credentialId": ""}).encode()
+        status, headers, html = _ac(opener, _form_hedefi(html), form)
         location = headers.get("Location", "")
         self.assertNotIn("code=", location, "the step must ask before it returns a code")
         if status in (302, 303) and location.startswith(self.kc):
-            # Keycloak may move to its own required action page first.
             status, headers, html = _ac(opener, location)
         self.assertEqual(status, 200, location)
-        # Keycloak 26.8.2 delete-account-confirm.ftl (keycloak.v2 and base): the form posts to the login
-        # action and carries a cancel button named "cancel-aia".
-        self.assertIn('name="cancel-aia"', html, html[:400])
-        self.assertIn("login-actions/required-action", html)
+        # Keycloak 26.8.2 delete-account-confirm.ftl: form "kc-deleteaccount-form" with a "cancel-aia" button.
+        self.assertIn('id="kc-deleteaccount-form"', html, html[:400])
+        self.assertIn('name="cancel-aia"', html)
+        target = re.search(r'<form action="([^"]+)"[^>]*id="kc-deleteaccount-form"', html).group(1).replace("&amp;", "&")
+        _ac(opener, target, b"")
+        self.assertEqual(admin(f"/users/{user_id}", yonetici_belirteci()).durum, 404, "the account must be gone")
 
+        deadline = time.monotonic() + 20
+        sent = []
+        while time.monotonic() < deadline and not sent:
+            sent = [r for r in _sink_requests()
+                    if jsonlib.loads(base64.b64decode(r["body"])).get("type") == "DELETE_ACCOUNT"
+                    and jsonlib.loads(base64.b64decode(r["body"])).get("userId") == user_id]
+            time.sleep(0.5)
+        self.assertEqual(len(sent), 1, "identity-sync must hear about the deletion")
 
 if __name__ == "__main__":
     unittest.main()

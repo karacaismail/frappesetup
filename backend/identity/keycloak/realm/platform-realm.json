@@ -35,8 +35,8 @@
   "minimumQuickLoginWaitSeconds": 60,
   "passwordPolicy": "length(12) and passwordHistory(5) and passwordBlacklist(yaygin-parolalar.txt) and notUsername and notEmail",
   "defaultSignatureAlgorithm": "RS256",
-  "ssoSessionIdleTimeout": 1800,
-  "ssoSessionMaxLifespan": 43200,
+  "ssoSessionIdleTimeout": 604800,
+  "ssoSessionMaxLifespan": 2592000,
   "ssoSessionIdleTimeoutRememberMe": 0,
   "ssoSessionMaxLifespanRememberMe": 0,
   "clientSessionIdleTimeout": 0,
@@ -712,7 +712,12 @@
         "oidc.ciba.grant.enabled": "false",
         "use.refresh.tokens": "true",
         "client_credentials.use_refresh_token": "false",
-        "pkce.code.challenge.method": "S256"
+        "pkce.code.challenge.method": "S256",
+        "client.session.idle.timeout": "3600",
+        "client.session.max.lifespan": "86400",
+        "acr.loa.map": "{\"employee\": 1}",
+        "default.acr.values": "employee",
+        "minimum.acr.value": "employee"
       },
       "defaultClientScopes": [
         "web-origins",
@@ -856,7 +861,12 @@
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
         "use.refresh.tokens": "true",
-        "post.logout.redirect.uris": "${ATONOTA_MOBILE_REDIRECT_URI}"
+        "post.logout.redirect.uris": "${ATONOTA_MOBILE_REDIRECT_URI}",
+        "client.session.idle.timeout": "3600",
+        "client.session.max.lifespan": "86400",
+        "acr.loa.map": "{\"employee\": 1}",
+        "default.acr.values": "employee",
+        "minimum.acr.value": "employee"
       },
       "defaultClientScopes": [
         "web-origins",
@@ -979,17 +989,10 @@
       "authenticationExecutions": [
         {
           "authenticatorFlow": true,
-          "requirement": "ALTERNATIVE",
+          "requirement": "CONDITIONAL",
           "priority": 10,
-          "userSetupAllowed": false,
-          "flowAlias": "atonota-browser-parola"
-        },
-        {
-          "authenticatorFlow": true,
-          "requirement": "ALTERNATIVE",
-          "priority": 20,
-          "userSetupAllowed": false,
-          "flowAlias": "atonota-browser-sihirli"
+          "flowAlias": "atonota-browser-duzey",
+          "userSetupAllowed": false
         }
       ]
     },
@@ -1169,6 +1172,53 @@
           "authenticator": "webauthn-authenticator"
         }
       ]
+    },
+    {
+      "alias": "atonota-browser-yontem",
+      "description": "Login methods: password or magic link, each with the second factor.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "userSetupAllowed": false,
+          "flowAlias": "atonota-browser-parola"
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "userSetupAllowed": false,
+          "flowAlias": "atonota-browser-sihirli"
+        }
+      ]
+    },
+    {
+      "alias": "atonota-browser-duzey",
+      "description": "Level 1 (ACR employee). Valid for 3600 seconds (O-25). An expired level runs the login again.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-level-of-authentication",
+          "authenticatorConfig": "atonota-employee-loa",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "flowAlias": "atonota-browser-yontem",
+          "userSetupAllowed": false
+        }
+      ]
     }
   ],
   "authenticatorConfig": [
@@ -1182,6 +1232,13 @@
       "alias": "atonota-sihirli-baglanti",
       "config": {
         "magickey.validity.duration": "300"
+      }
+    },
+    {
+      "alias": "atonota-employee-loa",
+      "config": {
+        "loa-condition-level": "1",
+        "loa-max-age": "3600"
       }
     }
   ],

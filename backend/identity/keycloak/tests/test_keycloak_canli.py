@@ -147,8 +147,9 @@ class RealmAyarlariTesti(unittest.TestCase):
         self.assertEqual(r["maxDeltaTimeSeconds"], 300)
         self.assertIn("length(12)", r["passwordPolicy"])
         self.assertIn("passwordBlacklist(yaygin-parolalar.txt)", r["passwordPolicy"])
-        self.assertEqual(r["ssoSessionIdleTimeout"], 1800)
-        self.assertEqual(r["ssoSessionMaxLifespan"], 43200)
+        # O-25: customer lifetimes on the realm; employee clients carry 1 hour and 24 hours.
+        self.assertEqual(r["ssoSessionIdleTimeout"], 7 * 24 * 3600)
+        self.assertEqual(r["ssoSessionMaxLifespan"], 30 * 24 * 3600)
         self.assertEqual(r["accessTokenLifespan"], 300)
         self.assertTrue(r["revokeRefreshToken"])
         self.assertEqual(r["refreshTokenMaxReuse"], 0)
