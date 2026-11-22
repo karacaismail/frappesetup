@@ -21,7 +21,9 @@ from source import (
     mapping,
     qualified,
     resolve,
+    scope_nodes,
     sql_calls,
+    stable_bindings,
     string,
     walk,
 )
@@ -45,7 +47,8 @@ PROVIDERS = {
 }
 MODEL = re.compile(
     r"(?<![\w-])(?:gpt|claude|gemini|llama|mistral|mixtral|deepseek|qwen)"
-    r"(?:[-_:]?[0-9][a-z0-9_.:-]*|[-_](?:[a-z0-9]+[-_])*(?:sonnet|haiku|opus|latest)\b)"
+    r"(?:[0-9][a-z0-9_.:-]*|[-_:](?=[a-z0-9_.:-]*[0-9])[a-z0-9][a-z0-9_.:-]*"
+    r"|[-_](?:[a-z0-9]+[-_])*(?:sonnet|haiku|opus|latest)\b)"
     r"|(?<![\w-])command-r(?:-plus)?(?![\w-])"
     r"""|(?<![\w-])o[134](?:-mini|-preview|-pro)(?![\w-])|(?<=['"])o[134](?=['"])""",
     re.IGNORECASE,
@@ -140,13 +143,18 @@ def test_classes(tree, aliases):
     return tests
 
 
-def model_checks(path, source, emit, excluded=()):
+def model_checks(path, source, emit, excluded=(), tree=None):
     intervals = [(item.lineno, item.end_lineno) for item in excluded]
     for line, text in enumerate(source.splitlines(), 1):
         if any(first <= line <= last for first, last in intervals):
             continue
         if MODEL.search(text):
             emit(path, line, "model", "Keep model names in the registry.")
+    if tree is not None:
+        for item in walk(tree, excluded):
+            if isinstance(item, ast.Constant) and isinstance(item.value, str):
+                if MODEL.search(f'"{item.value}"'):
+                    emit(path, item.lineno, "model", "Keep model names in the registry.")
 
 
 def whitelist_checks(tree, bindings, module, path, emit):
@@ -166,10 +174,18 @@ def whitelist_checks(tree, bindings, module, path, emit):
             if item is not fn and isinstance(item, FUNCTIONS) and whitelisted(item)
         ]
         if nested:
+            returned = {
+                item.value.id
+                for item in scope_nodes(fn.body)
+                if isinstance(item, ast.Return) and isinstance(item.value, ast.Name)
+            }
             exports = [
                 (export, value)
                 for export, value in bindings.items()
-                if isinstance(value, ast.Call) and isinstance(value.func, ast.Name) and value.func.id == name
+                if any(item.name in returned for item in nested)
+                and isinstance(value, ast.Call)
+                and isinstance(value.func, ast.Name)
+                and value.func.id == name
             ]
             for export, value in exports:
                 exposed[f"{module}.{export}"] = path, value.lineno
@@ -339,13 +355,17 @@ def hook_checks(path, tree, bindings, emit):
 def provider_checks(path, tree, package, aliases, bindings, providers, emit):
     for item in ast.walk(tree):
         names = [name for _, name in imports(item, package)]
-        if (
-            isinstance(item, ast.Call)
-            and item.args
-            and qualified(item.func, aliases)
-            in {"__import__", "builtins.__import__", "importlib.import_module"}
-        ):
-            name = string(item.args[0], bindings)
+        if isinstance(item, ast.Call) and qualified(item.func, aliases) in {
+            "__import__",
+            "builtins.__import__",
+            "importlib.import_module",
+        }:
+            argument = (
+                item.args[0]
+                if item.args
+                else next((keyword.value for keyword in item.keywords if keyword.arg == "name"), None)
+            )
+            name = string(argument, bindings)
             if name:
                 names.append(name)
         for name in names:
@@ -422,8 +442,9 @@ def scan(root, commit_base=None):
         if name not in functions:
             continue
         module, fn = functions[name]
-        path, _, _, _, bindings, _ = sources[module]
-        for target_line, target in declaration_targets(fn, bindings, METHOD_PATH):
+        path, _, tree, _, _, _ = sources[module]
+        module_names = stable_bindings(tree.body)
+        for target_line, target in declaration_targets(fn, module_names, METHOD_PATH):
             if target is None:
                 emit(path, target_line, "sql", "Cannot resolve AI tool declaration target.")
             else:
@@ -465,7 +486,7 @@ def scan(root, commit_base=None):
 
     for module, (path, source, tree, aliases, _, _) in sources.items():
         excluded = test_classes(tree, aliases) if module not in production else set()
-        model_checks(path, source, emit, excluded)
+        model_checks(path, source, emit, excluded, tree)
         if any(matches(module, scope) for scope in scopes):
             for line in sql_calls(walk(tree, excluded), aliases):
                 emit(path, line, "sql", "Raw SQL is forbidden in AI tools.")

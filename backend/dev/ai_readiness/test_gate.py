@@ -222,8 +222,10 @@ class GateTests(unittest.TestCase):
             """
             import argparse
             import json
+            import sys
             from pathlib import Path
 
+            assert sys.flags.isolated
             parser = argparse.ArgumentParser()
             parser.add_argument("--root", type=Path, required=True)
             parser.add_argument("--json", action="store_true", required=True)
@@ -447,15 +449,74 @@ class GateTests(unittest.TestCase):
             import example_provider_plugin
             from importlib import import_module as load
             load("openai")
+            load(name="anthropic")
             """,
         )
-        self.scan(*(["provider"] * 4))
+        self.scan(*(["provider"] * 5))
 
     def test_model_names_in_assets_and_comments(self):
         self.write(f"{APP}/fixtures/examples.json", '{"model": "llama3.1:8b"}')
         self.write(f"{APP}/public/examples.js", 'export const model = "qwen2.5:7b";')
         self.write(f"{APP}/api.py", "# mistral-large-latest gemini-flash-latest command-r-plus")
         self.scan("model", "model", "model")
+
+    def test_model_scan_checks_decoded_python_strings(self):
+        self.write(f"{APP}/api.py", 'ESCAPED = "\\x67pt-4o"\nJOINED = "gpt" "-4o"')
+        self.scan("model", "model")
+
+    def test_tool_declaration_rejects_unknown_mapping_key(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            def declare():
+                return [{"handler": "sample_app.tools.run", role(): "sample_app.tools.prepare"}]
+            def run():
+                pass
+            def prepare():
+                pass
+            """,
+        )
+        self.scan("sql")
+
+    def test_tool_declaration_rejects_conditional_path(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            def declare():
+                PATH = "sample_app.tools.first"
+                if enabled():
+                    PATH = "sample_app.tools.second"
+                return [{"handler": PATH}]
+            def first():
+                pass
+            def second():
+                pass
+            """,
+        )
+        self.scan("sql")
+
+    def test_model_scan_preserves_numeric_suffix_names(self):
+        self.write(f"{APP}/api.py", 'MODEL = "gpt-oss-20b"\nOTHER = "deepseek-r1"')
+        self.scan("model", "model")
+
+    def test_nested_whitelist_does_not_prove_unrelated_factory_result(self):
+        self.write(
+            f"{APP}/api.py",
+            """
+            import frappe
+            def factory():
+                @frappe.whitelist(allow_guest=True)
+                def wrapper():
+                    pass
+                return object()
+            run = factory()
+            """,
+        )
+        self.write_contract()
+        findings = self.scan("endpoint", "endpoint")
+        self.assertTrue(any("Cannot resolve nested" in finding["message"] for finding in findings))
 
     def test_model_scan_accepts_review_item_label(self):
         self.write(f"{APP}/api.py", "# See O3 in the security review.")
@@ -510,6 +571,24 @@ class GateTests(unittest.TestCase):
             env=dict(os.environ, GIT_DIR=str(self.repository / "absent")),
         )
         self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_tracks_initialized_submodule_content(self):
+        from unittest.mock import patch
+
+        from forbidden_name import tracked_files
+
+        name = "".join(map(chr, (99, 114, 111, 110, 104, 114)))
+        child = self.repository / "sample-addon"
+        child.mkdir()
+        (child / ".git").write_text("gitdir: ../.git/modules/sample-addon")
+        (child / "guide.txt").write_text(name)
+        with patch(
+            "forbidden_name.stage_entries", side_effect=[[("sample-addon", True)], [("guide.txt", False)]]
+        ):
+            self.assertEqual(
+                list(tracked_files(self.repository)),
+                [("sample-addon/guide.txt", 1, "Forbidden product name in tracked content.")],
+            )
 
     def test_symlinks_excluded_directories_and_nul(self):
         self.write(f"{APP}/.hidden/broken.py", "!")

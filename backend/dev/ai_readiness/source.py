@@ -1,6 +1,7 @@
 """Resolve the static Python forms used by the readiness checks."""
 
 import ast
+from collections import Counter
 from importlib.util import resolve_name
 
 FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
@@ -90,8 +91,9 @@ def mapping(node, names, seen=frozenset()):
             entries.update(base)
         else:
             name = string(key, names)
-            if name is not None:
-                entries[name] = value
+            if name is None:
+                return None
+            entries[name] = value
     return entries
 
 
@@ -100,6 +102,24 @@ def walk(node, excluded=frozenset()):
         yield node
         for child in ast.iter_child_nodes(node):
             yield from walk(child, excluded)
+
+
+def scope_nodes(body):
+    for item in body:
+        yield item
+        if not isinstance(item, (*FUNCTIONS, ast.ClassDef, ast.Lambda)):
+            yield from scope_nodes(ast.iter_child_nodes(item))
+
+
+def stable_bindings(body, parent=None):
+    stores = Counter(
+        item.id
+        for item in scope_nodes(body)
+        if isinstance(item, ast.Name) and isinstance(item.ctx, (ast.Store, ast.Del))
+    )
+    names = {name: value for name, value in (parent or {}).items() if name not in stores}
+    names.update((name, value) for item in body for name, value in assignments(item) if stores[name] == 1)
+    return names
 
 
 def sql_calls(nodes, aliases):
@@ -120,8 +140,8 @@ def sql_calls(nodes, aliases):
 
 
 def declaration_targets(fn, module_names, method_pattern):
-    body = list(walk(fn))
-    names = module_names | dict(pair for item in body for pair in assignments(item))
+    body = list(scope_nodes(fn.body))
+    names = stable_bindings(fn.body, module_names)
     for statement in body:
         if not isinstance(statement, ast.Return):
             continue
