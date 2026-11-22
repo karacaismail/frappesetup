@@ -6,6 +6,7 @@ from frappe.rate_limiter import rate_limit
 
 from platform_core.kimlik import provider_setup, sign_in, sign_out
 from platform_core.kimlik.exceptions import InvalidRedirect, KeycloakLoginNotConfigured
+from platform_core.kimlik.safe_errors import safe_errors
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
@@ -36,6 +37,7 @@ def start_login(redirect_to: str | None = None) -> None:
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])
 @rate_limit(limit=20, seconds=60)
+@safe_errors
 def keycloak_callback(
 	code: str | None = None,
 	state: str | None = None,

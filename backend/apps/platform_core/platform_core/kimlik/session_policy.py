@@ -75,14 +75,16 @@ def is_background_request(request) -> bool:
 def requested_method(request) -> str:
 	"""Method name of a request in every form Frappe accepts (merge review Ö2).
 
-	`/api/method/<m>`, `/api/v1/method/<m>`, `/api/v2/method/<m>` and the `cmd` field in the form or
-	in the query string (frappe/app.py:340).
+	`/api/method/<m>`, `/api/v1/method/<m>`, `/api/v2/method/<m>` and the `cmd` field in the form, the
+	query string or a JSON body.
 	"""
 	path = request.path or ""
 	match = METHOD_PATH.match(path)
 	if match:
 		return match.group(1)
-	return str(request.form.get("cmd") or request.args.get("cmd") or "")
+	# Frappe reads `cmd` from the form, the query string and a JSON body into `form_dict`
+	# (frappe/app.py:338). Reading `form_dict` covers all three (merge review 2, Ö2).
+	return str(frappe.form_dict.get("cmd") or request.form.get("cmd") or request.args.get("cmd") or "")
 
 
 def before_request() -> None:

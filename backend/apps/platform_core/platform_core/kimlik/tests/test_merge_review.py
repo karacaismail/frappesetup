@@ -218,6 +218,7 @@ class TestMergeReview(FrappeAPITestCase):
 			lambda: h.request(client.get, f"/api/v2/method/{method}"),
 			lambda: h.request(client.post, "/", data={"cmd": method}, headers=h.csrf_headers(client)),
 			lambda: h.request(client.get, "/", query_string={"cmd": method}),
+			lambda: h.request(client.post, "/", json={"cmd": method}, headers=h.csrf_headers(client)),
 		):
 			call()
 			self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), 123)
@@ -248,6 +249,68 @@ class TestMergeReview(FrappeAPITestCase):
 		for sid in old:
 			self.assertFalse(frappe.db.exists("Sessions", {"sid": sid}))
 		self.assertEqual(h.session_count(FAKE_EMAIL), 105)
+
+	def test_sub_fallback_has_no_page_limit(self):
+		# Merge review 2, Ö3: the search goes to the last page. The page size and the old cap are made small
+		# so that the old session sits after the old cap.
+		from platform_core.kimlik import sign_out
+
+		now = frappe.utils.now_datetime()
+		iat = int(time.time()) - 600
+		for _n in range(6):
+			self._fake_session(now, minutes_ago=1, lastupdate_minutes_ago=20)
+		old = self._fake_session(now, minutes_ago=30, lastupdate_minutes_ago=1)
+		frappe.db.commit()
+		token = self.key.sign(
+			h.logout_payload(sub=FAKE_SUBJECT, sid="88888888-8888-4888-8888-888888888888", iat=iat)
+		)
+		client = h.new_client()
+		with patch.object(sign_out, "BATCH", 2), patch.object(sign_out, "MAX_BATCHES", 2, create=True):
+			response = h.request(
+				client.post,
+				"/api/method/platform_core.api.keycloak_backchannel_logout",
+				data={"logout_token": token},
+				content_type="application/x-www-form-urlencoded",
+				headers=h.csrf_headers(client),
+			)
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		self.assertEqual(response.json["message"], {"closed_sessions": 1})
+		h.refresh()
+		self.assertFalse(frappe.db.exists("Sessions", {"sid": old}))
+
+	def test_unexpected_callback_error_logs_only_safe_fields(self):
+		since = frappe.utils.now()
+		self._remember_log_sizes()
+		time.sleep(1)
+		code, state = "kod-gizli-ornek-4711", "durum-gizli-ornek-4711"
+		boom = RuntimeError(f"failure for {code} {state} {FAKE_EMAIL}")
+		with patch.object(sign_in, "complete_callback", side_effect=boom):
+			response = h.request(h.new_client().get, h.CALLBACK, query_string={"code": code, "state": state})
+		self.assertEqual(response.status_code, 500, response.data[:300])
+		for secret in (code, state):
+			self.assertNotIn(secret, response.data.decode())
+		self._assert_no_personal_data(response, code, since)
+		self._assert_no_personal_data(response, state, since)
+
+	def test_unexpected_back_channel_error_logs_only_safe_fields(self):
+		from platform_core.kimlik import sign_out
+
+		since = frappe.utils.now()
+		self._remember_log_sizes()
+		time.sleep(1)
+		token = "belirtec-gizli-ornek-4711"
+		boom = RuntimeError(f"failure for {token} {FAKE_SUBJECT}")
+		with patch.object(sign_out, "handle_logout_token", side_effect=boom):
+			client = h.new_client()
+			response = h.request(
+				client.post,
+				"/api/method/platform_core.api.keycloak_backchannel_logout",
+				data={"logout_token": token},
+				content_type="application/x-www-form-urlencoded",
+				headers=h.csrf_headers(client),
+			)
+		self.assertEqual(response.status_code, 500, response.data[:300])
+		self._assert_no_personal_data(response, token, since)
 
 	@staticmethod
 	def _fake_session(now, minutes_ago: int, lastupdate_minutes_ago: int) -> str:

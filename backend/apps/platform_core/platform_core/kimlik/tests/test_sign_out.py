@@ -117,8 +117,9 @@ class TestBackChannelLogout(FrappeAPITestCase):
 	def test_request_with_session_cookie_is_rejected(self):
 		h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE, sid=SID))
 		response = self.send(self.key.sign(h.logout_payload(sub="sub-ayse", sid=SID)), client=self.client)
-		self.assertEqual(response.status_code, 400)
-		self.assertEqual(response.json.get("exc_type"), "InvalidLogoutToken")
+		# The shell's Website User allow list refuses first (403). Without it the endpoint refuses (400).
+		self.assertIn(response.status_code, (400, 403))
+		self.assertIn(response.json.get("exc_type"), ("InvalidLogoutToken", "PermissionError"))
 		self.assertEqual(h.logged_user(self.client), h.AYSE)
 
 	def test_replayed_token_is_rejected_and_spares_new_sessions(self):

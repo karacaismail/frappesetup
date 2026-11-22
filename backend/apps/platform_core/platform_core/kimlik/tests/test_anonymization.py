@@ -243,6 +243,92 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.assertEqual(recipients, [f"x.{DELETED}", f"{DELETED}.ornek", anon])
 		self.assertEqual(frappe.db.get_value("Communication", other.name, "recipients"), similar)
 
+	def test_shared_contact_and_address_keep_the_other_persons_data(self):
+		# Deletion rule: in shared records only the deleted person's own fields are anonymized.
+		shared = frappe.get_doc(
+			{
+				"doctype": "Contact",
+				"first_name": "Ortak",
+				"last_name": "Kayit",
+				"email_ids": [
+					{"email_id": DELETED, "is_primary": 1},
+					{"email_id": NAMESAKE, "is_primary": 0},
+				],
+				"phone_nos": [{"phone": "+90 000 000 00 01", "is_primary_phone": 1}],
+			}
+		).insert(ignore_permissions=True)
+		address = frappe.get_doc(
+			{
+				"doctype": "Address",
+				"address_title": "Ortak Is Adresi",
+				"address_type": "Office",
+				"address_line1": "Ornek Cadde 1",
+				"city": "Ornekkent",
+				"country": frappe.db.get_value("Country", {}, "name"),
+				"email_id": DELETED,
+				"links": [{"link_doctype": "Contact", "link_name": shared.name}],
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.commit()
+		self.addCleanup(
+			frappe.delete_doc,
+			"Address",
+			address.name,
+			force=True,
+			ignore_permissions=True,
+			ignore_missing=True,
+		)
+		self.addCleanup(
+			frappe.delete_doc,
+			"Contact",
+			shared.name,
+			force=True,
+			ignore_permissions=True,
+			ignore_missing=True,
+		)
+		self.assertEqual(self.call().status_code, 200)
+		h.refresh()
+		contact = frappe.get_doc("Contact", shared.name)
+		self.assertEqual((contact.first_name, contact.last_name), ("Ortak", "Kayit"))
+		self.assertEqual([row.email_id for row in contact.email_ids], [NAMESAKE])
+		self.assertEqual([row.phone for row in contact.phone_nos], ["+90 000 000 00 01"])
+		kept = frappe.db.get_value(
+			"Address", address.name, ["address_title", "address_line1", "city", "email_id"], as_dict=True
+		)
+		self.assertEqual(
+			(kept.address_title, kept.address_line1, kept.city),
+			("Ortak Is Adresi", "Ornek Cadde 1", "Ornekkent"),
+		)
+		self.assertNotEqual(kept.email_id, DELETED)
+
+	def test_address_with_an_apostrophe_is_another_persons_address(self):
+		other = f"ekip'{DELETED}"
+		communication = frappe.get_doc(
+			{
+				"doctype": "Communication",
+				"communication_type": "Communication",
+				"communication_medium": "Email",
+				"subject": "Kesme isareti",
+				"sender": NAMESAKE,
+				"recipients": f"{other}, {DELETED}",
+				"cc": other,
+				"content": f"Yaz: {other}",
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.set_value("Communication", communication.name, "owner", DELETED, update_modified=False)
+		frappe.db.commit()
+		self.addCleanup(frappe.db.delete, "Communication", {"name": communication.name})
+		response = self.call()
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		anon = response.json["message"]["user"]
+		h.refresh()
+		row = frappe.db.get_value(
+			"Communication", communication.name, ["recipients", "cc", "content"], as_dict=True
+		)
+		self.assertEqual([a.strip() for a in row.recipients.split(",")], [other, anon])
+		self.assertEqual(row.cc, other)
+		self.assertIn(other, row.content)
+
 	def _file(self, name: str, doctype: str, docname: str) -> str:
 		doc = frappe.get_doc(
 			{

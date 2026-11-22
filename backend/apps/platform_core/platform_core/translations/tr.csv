@@ -235,7 +235,7 @@ E-mail,E-posta,platform_core.kimlik
 Password,Parola,platform_core.kimlik
 Sign-in failed. Check your e-mail and password.,Giriş başarısız. E-postanızı ve parolanızı denetleyin.,platform_core.kimlik
 The server could not be reached. Try again.,Sunucuya ulaşılamadı. Yeniden deneyin.,platform_core.kimlik
-Platform Identity Link,Kimlik Bağı
+Platform Identity Link,Kimlik Bağı,
 Issuer,Veren,Platform Identity Link
 Subject,Kullanıcı kimliği,Platform Identity Link
 User,Kullanıcı,Platform Identity Link
@@ -245,7 +245,7 @@ Stable user identifier at the identity provider (the sub claim). Together with I
 The Frappe user this identity signs in as. One user has at most one link.,Bu kimliğin oturum açtığı Frappe kullanıcısı. Bir kullanıcının en çok bir bağı olur.,Platform Identity Link
 The deletion key is not configured: {0},Silme anahtarı kurulu değil: {0},platform_core.kimlik
 This identity was deleted and cannot be used again.,Bu kimlik silindi ve yeniden kullanılamaz.,platform_core.kimlik
-Platform Identity Deletion,Kimlik Silme Kaydı
+Platform Identity Deletion,Kimlik Silme Kaydı,
 Identity Hash,Kimlik özeti,Platform Identity Deletion
 State,Durum,Platform Identity Deletion
 User,Kullanıcı,Platform Identity Deletion

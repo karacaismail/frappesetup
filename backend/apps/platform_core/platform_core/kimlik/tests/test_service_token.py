@@ -102,7 +102,9 @@ class TestServiceToken(FrappeAPITestCase):
 			json={},
 			headers={"Authorization": f"Bearer {token}"},
 		)
-		self.assertEqual(response.status_code, 401)
+		# Frappe answers 401 for a Bearer header with no user. The shell's metadata guard resolves the
+		# method first and may answer 417 for an unknown method. Both refuse; no user is set.
+		self.assertIn(response.status_code, (401, 417))
 
 	def test_token_does_not_open_other_endpoints(self):
 		response = h.request(

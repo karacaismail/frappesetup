@@ -155,10 +155,14 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		self.assertEqual(first.status_code, 302)
 		second = h.finish_login(h.new_client(), query, token)
 		self.assertEqual(second.status_code, 400)
+		# A signed-in Website User may not call guest endpoints: the shell's method allow list answers 403
+		# before the callback runs (docs/sozlesmeler.md, Website User allow list). A guest gets 400.
 		forged = h.finish_login(self.client, query, token, state="forged-state-value")
-		self.assertEqual(forged.status_code, 400)
+		self.assertIn(forged.status_code, (400, 403))
 		missing = h.request(self.client.get, h.CALLBACK, query_string={"code": "x"})
-		self.assertEqual(missing.status_code, 400)
+		self.assertIn(missing.status_code, (400, 403))
+		guest_missing = h.request(h.new_client().get, h.CALLBACK, query_string={"code": "x"})
+		self.assertEqual(guest_missing.status_code, 400)
 
 	def test_wrong_nonce_or_bad_id_token_is_refused(self):
 		_started, query = h.start_login(self.client)

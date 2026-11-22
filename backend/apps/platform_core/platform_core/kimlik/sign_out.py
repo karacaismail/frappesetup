@@ -13,7 +13,6 @@ from platform_core.kimlik.exceptions import InvalidLogoutToken, KeycloakKeysUnav
 
 LEEWAY = 30
 BATCH = 100
-MAX_BATCHES = 50
 LOGOUT_REASON = "Logged out by identity provider"
 LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout"
 JTI_PREFIX = "kimlik_logout_jti"
@@ -133,12 +132,14 @@ def sessions_for_user_before(user: str, iat: int) -> list[tuple[str, str]]:
 	"""Sessions of the user that were created before the logout token was issued. A replayed or
 	delayed token therefore never closes a session that was opened after it.
 
-	Merge review Ö3: every page is read. A first page full of newer sessions does not hide older ones.
+	Merge review Ö3: every page is read, up to the last one. There is no page cap, so an old session is
+	never left open behind newer ones.
 	"""
 	sessions = frappe.qb.DocType("Sessions")
 	now = now_datetime()
 	selected = []
-	for page in range(MAX_BATCHES):
+	page = 0
+	while True:
 		rows = (
 			frappe.qb.from_(sessions)
 			.select(sessions.sid, sessions.user, sessions.sessiondata)
@@ -156,6 +157,7 @@ def sessions_for_user_before(user: str, iat: int) -> list[tuple[str, str]]:
 				selected.append((sid, owner))
 		if len(rows) < BATCH:
 			break
+		page += 1
 	return selected
 
 

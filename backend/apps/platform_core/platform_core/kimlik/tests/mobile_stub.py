@@ -26,10 +26,22 @@ def register() -> Callable[[], None]:
 	# whitelisted object, so the module attribute must point to it while the test runs.
 	wrapped = frappe.whitelist(methods=["POST"])(original)
 	module.v1_whoami = wrapped
+	# Mobile calls run as the Website User. The shell's method allow list (docs/sozlesmeler.md) must
+	# list the stub while the test runs, as the mobile module lists its real endpoints.
+	real_get_hooks = frappe.get_hooks
+
+	def get_hooks(hook=None, *args, **kwargs):
+		value = real_get_hooks(hook, *args, **kwargs)
+		if hook == "website_user_allowed_methods":
+			return [*value, f"{__name__}.v1_whoami"]
+		return value
+
+	frappe.get_hooks = get_hooks
 
 	def unregister() -> None:
 		frappe.whitelisted.discard(wrapped)
 		frappe.allowed_http_methods_for_whitelisted_func.pop(wrapped, None)
 		module.v1_whoami = original
+		frappe.get_hooks = real_get_hooks
 
 	return unregister
