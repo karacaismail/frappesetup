@@ -509,6 +509,15 @@ class LeaveHttpTest(unittest.TestCase):
                     )
                     self.assertEqual(status, 403)
 
+    def test_stored_legacy_report_downloads_are_closed(self):
+        admin = Client(self, "Administrator", password=os.environ["ADMIN_PASSWORD"])
+        query = urlencode({"dn": self.data["prepared_report"]})
+        path = "/api/method/frappe.core.doctype.prepared_report.prepared_report.download_attachment"
+        status, _ = admin.page(f"{path}?{query}")
+        self.assertEqual(status, 403)
+        status, _ = admin.page(self.data["prepared_report_file"])
+        self.assertEqual(status, 403)
+
     def ai_call(self, client, name, version):
         return client.send(
             f"{AI_PATH}.mcp",

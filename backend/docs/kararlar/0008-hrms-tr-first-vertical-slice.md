@@ -93,3 +93,6 @@ HRMS TR, `platform_core.erisim` kancalarına ve “Access Rule” kayıt türün
 Onay ucu, kayıt iznini çağırdığı işlevde denetler.
 Eski HRMS ret ucu kayıt okumadan izin hatası verir.
 Semgrep bu iki yolu izleyemediği için ilgili uca dar istisna eklendi.
+
+Kapatılan raporların önceden üretilmiş sonuçları da indirilemez.
+Rapor uçları ve rapora bağlı özel dosya indirme yolu bu denetimi uygular.

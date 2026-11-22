@@ -28,6 +28,7 @@ extend_doctype_class = {
 	"Leave Application": "hrms_tr.leave_application.LeaveApplication",
 	"Report": "hrms_tr.hrms_endpoints.ReportAccess",
 	"Prepared Report": "hrms_tr.hrms_endpoints.PreparedReportAccess",
+	"File": "hrms_tr.hrms_endpoints.PreparedReportFileAccess",
 	"Attendance Request": "hrms_tr.hrms_endpoints.AttendanceRequestAccess",
 }
 

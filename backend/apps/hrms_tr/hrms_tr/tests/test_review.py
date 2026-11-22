@@ -198,3 +198,18 @@ class LeaveReportTest(unittest.TestCase):
 		with patch.object(hrms_endpoints, "deny_legacy_leave_query", side_effect=PermissionError):
 			with self.assertRaises(PermissionError):
 				PreparedReport().get_prepared_data(with_file_name=True)
+
+	def test_old_private_report_attachments_cannot_use_the_file_download_path(self):
+		from hrms_tr import hrms_endpoints
+
+		class NativeFile:
+			def is_downloadable(self):
+				return True
+
+		class File(hrms_endpoints.PreparedReportFileAccess, NativeFile):
+			attached_to_doctype = "Prepared Report"
+			attached_to_name = "PREPARED-TEST"
+
+		with patch.object(hrms_endpoints, "frappe") as fake:
+			fake.db.get_value.return_value = "Leave Ledger"
+			self.assertFalse(File().is_downloadable())

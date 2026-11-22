@@ -170,7 +170,26 @@ def seed(password):
         leaves[key] = leave.name
         leave_owners[key] = actor
 
+    prepared = frappe.get_doc(
+        {
+            "doctype": "Prepared Report",
+            "report_name": "Leave Ledger",
+            "status": "Completed",
+        }
+    )
+    prepared.db_insert()
+    attachment = insert(
+        "File",
+        file_name="hrms-tr-synthetic-leave-report.txt",
+        is_private=1,
+        attached_to_doctype="Prepared Report",
+        attached_to_name=prepared.name,
+        content="Synthetic result from an old leave report.",
+    )
+
     return {
+        "prepared_report": prepared.name,
+        "prepared_report_file": attachment.file_url,
         "users": USERS,
         "legacy_users": legacy_users,
         "employees": employees,
