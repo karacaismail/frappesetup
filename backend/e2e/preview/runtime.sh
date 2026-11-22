@@ -293,26 +293,35 @@ BASH
 
 export E2E_PROVIDER_IP
 E2E_PROVIDER_IP="$(docker_preview inspect --format "{{(index .NetworkSettings.Networks \"$network\").IPAddress}}" "$provider")"
-ports=()
-for port in "$KC_PORT" "$FS_TENANT_WEB_PORT" "$PTR_WEB_PORT" "$sync_port" "$MAILPIT_UI_PORT" "$provider_port"; do
-    if ! nc -z 127.0.0.1 "$port" 2>/dev/null; then ports+=("$port"); fi
-done
-if [[ -n "${ports[0]-}" ]]; then
-    PANE_SCRATCH_DIR="$tunnel_state" "$dev_dir/bin/tunnel" open "${ports[@]}"
+if [[ "${E2E_BROWSER_RUNTIME:-host}" == host ]]; then
+    ports=()
+    for port in "$KC_PORT" "$FS_TENANT_WEB_PORT" "$PTR_WEB_PORT" "$sync_port" "$MAILPIT_UI_PORT" "$provider_port"; do
+        if ! nc -z 127.0.0.1 "$port" 2>/dev/null; then ports+=("$port"); fi
+    done
+    if [[ -n "${ports[0]-}" ]]; then
+        PANE_SCRATCH_DIR="$tunnel_state" "$dev_dir/bin/tunnel" open "${ports[@]}"
+    fi
 fi
 
 wait_http() {
+    local url="$1" service="$2" attempt
+    local request=(curl -4 -fsS --noproxy "*" --max-time 2 -o /dev/null)
+    if [[ "${E2E_BROWSER_RUNTIME:-host}" == container ]]; then
+        request=(docker --context "$docker_context" exec "$tenant" "${request[@]}")
+    else
+        service=127.0.0.1
+    fi
     for ((attempt = 0; attempt < 40; attempt++)); do
-        if curl -4 -fsS --noproxy "*" --connect-to "::127.0.0.1:" --max-time 2 -o /dev/null "$1" 2>/dev/null; then return; fi
+        if "${request[@]}" --connect-to "::$service:" "$url" 2>/dev/null; then return; fi
         sleep 1
     done
-    printf 'Preview endpoint is not ready: %s\n' "$1" >&2
+    printf 'Preview endpoint is not ready: %s\n' "$url" >&2
     return 1
 }
 
-wait_http "http://127.0.0.1:$KC_PORT/realms/platform/.well-known/openid-configuration"
-wait_http "http://127.0.0.1:$sync_port/healthz"
-wait_http "http://127.0.0.1:$provider_port/attempts"
+wait_http "$KC_PUBLIC_URL/realms/platform/.well-known/openid-configuration" keycloak
+wait_http "http://$sync_host:$sync_port/healthz" "$sync_host"
+wait_http "http://$E2E_PROVIDER_HOST:$provider_port/attempts" "$E2E_PROVIDER_HOST"
 
 # Frappe caches site settings on requests, including the readiness ping.
 E2E_TENANT_MODULE_DIR="$(docker_preview exec "$tenant" env/bin/python -c 'import tempfile; print(tempfile.mkdtemp(prefix="e2e-tenant-"))')"
@@ -320,8 +329,8 @@ docker_preview cp "$suite_dir/preview/preview_site_config.py" "$tenant:$E2E_TENA
 E2E_TENANT_MODULE_DIR="$E2E_TENANT_MODULE_DIR" python3 "$suite_dir/preview/fixtures.py" prepare
 docker_preview exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c "exec bench serve --port \"\$PTR_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
 docker_preview exec -d -e PYTHONPATH="$E2E_TENANT_MODULE_DIR" -e E2E_KEYCLOAK_SERVICE_CLIENT_SECRET "$tenant" bash -c "exec bench serve --port \"\$FS_TENANT_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
-wait_http "$ATONOTA_SITE_TENANT1_URL/api/method/ping"
-wait_http "$ATONOTA_PRESS_URL/api/method/ping"
+wait_http "$ATONOTA_SITE_TENANT1_URL/api/method/ping" tenant-web
+wait_http "$ATONOTA_PRESS_URL/api/method/ping" web
 if [[ "${E2E_BROWSER_RUNTIME:-host}" == container ]]; then
     bash "$suite_dir/preview/run-container.sh" "$docker_context" "$network" "$browser" "$worktree"
 else
