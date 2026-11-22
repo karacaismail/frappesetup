@@ -53,7 +53,7 @@ bash backend/dev/press/compose.sh down
 ```
 
 Yamasız adayın sonucu [uyum denemesinde](unpatched-runtime.md) açıklanır.
-İki kaynak engeli sürdüğü için O-18 borcu açıktır.
+Üç kaynak engeli ve bağımlılık uyumsuzluğu sürdüğü için O-18 borcu açıktır.
 
 `patch-py314.sh` Press kaynaklarına uyum yaması uygular.
 Bu yama yalnız `development` imajında bulunur ve çalışır (O-18).

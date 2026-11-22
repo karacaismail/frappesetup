@@ -44,7 +44,11 @@ Ansible testi yalnız yerel görev çalıştırır. O-9 sunucu kurma borcunu kap
 Bu paketler mevcut geliştirme kurulumuna eklenmedi.
 Deneme imajı Press bağımlılıklarının tamamını kurmaz. Üretim için uygun değildir.
 `probe-requirements.txt` seçili doğrudan paketleri sabitler. Tam bağımlılık kilidi değildir.
-Aday paketlerin bakım, lisans ve geri dönüş kaydı [karar notundadır](decisions/press-python314-probe.md).
+Aday paketlerin bakım, lisans ve geri dönüş kaydı [0019 numaralı karar notundadır](decisions/0019-press-python314-probe.md).
+
+Yama kapsamı bütün uyum engellerini kapsamaz.
+İnceleme, `press/api/cookies.py` dosyasında üçüncü kaynak engelini de doğruladı.
+Tam bağımlılık çözümü ayrıca başarısızdır. Bu iki konu aşağıda ayrı açıklanır.
 
 ## Öneri 1: TypedDict tanımını düzeltin
 
@@ -75,7 +79,13 @@ Alan adları, türleri ve zorunlulukları korunur.
 Bakımcılar modülü Python 3.12 ve Python 3.14 üzerinde sınamalıdır.
 Testler dört alanın türünü ve zorunlu olduğunu da doğrulamalıdır.
 
+İkinci çağrı `press/press/doctype/deploy_candidate/test_deploy_candidate.py:39` satırındaki `AppInfo` tanımıdır.
+Bakımcılar `app`, `source` ve `release` alanlarını da sözlük biçimine taşımalıdır.
+Bu tanım `if typing.TYPE_CHECKING` bloğundadır. Normal çalışmada yürütülmez.
+Bu yüzden ayrı bir çalışma zamanı hatası olarak sayılmadı.
+
 [Press kaynak satırları](https://github.com/frappe/press/blob/v0.154.1/press/press/doctype/deploy_candidate/cache_utils.py#L11-L19)
+[İkinci TypedDict tanımı](https://github.com/frappe/press/blob/v0.154.1/press/press/doctype/deploy_candidate/test_deploy_candidate.py#L29-L44)
 [Python değişiklik kaydı](https://docs.python.org/3.13/library/typing.html#typing.TypedDict)
 
 ## Öneri 2: Telemetriyi Frappe sürümünden ayırın
@@ -95,28 +105,80 @@ Test şu hatayı verdi:
 ImportError: cannot import name 'init_telemetry' from 'frappe.utils.telemetry'
 ```
 
-Bakımcılar isteğe bağlı eski telemetriyi modül açılışından ayırmalıdır.
-Önerilen değişiklik şu adımlardan oluşur:
+Press zaten `press/utils/telemetry.py:14` içinde `init_telemetry` işlevini tanımlar.
+Bu yardımcı `posthog_host` ve `posthog_project_id` ayarlarını okur.
+Ayarlar varsa `frappe.local.posthog` istemcisini oluşturur. Ayarlar yoksa işlem yapmadan döner.
+Bu yardımcı, ürün denemesi kodunun kullandığı yerel istemciyi sağlar.
+Bakımcılar yeni yardımcı yazmadan önce mevcut işlevi yeniden kullanmalıdır.
+Önerilen import değişikliği şöyledir:
 
-1. Bakımcılar üst düzey `init_telemetry` import'unu kaldırır.
-2. Bakımcılar eski telemetri desteğini tek bir yardımcı işlevde denetler.
-3. Gerekli Frappe işlevi yoksa yardımcı işlev `None` döndürür.
-4. Olay ve takma ad yolları, istemci yoksa işlemi bitirir.
-5. Eski Frappe desteği varsa olay alanları ve takma ad davranışı korunur.
+```diff
+-from frappe.utils.telemetry import init_telemetry
++from press.utils.telemetry import init_telemetry
+```
 
-Yardımcı işlev yalnız eksik yeteneği ele almalıdır.
-Genel `ImportError` yakalamak, başka bozuk bağımlılıkları gizleyebilir.
+Bakımcılar mevcut istemci yokluğu denetimlerini korumalıdır.
+Olay alanları ve takma ad davranışı sahte PostHog istemcisiyle sınanmalıdır.
+Hazır yardımcı, `posthog` paketini içe aktarır. Bu bağımlılık da çözülmelidir.
 Frappe 16'nın `capture` işlevi aynı sözleşmeye sahip değildir.
 Bu işlev doğrudan yerine konmamalıdır.
 
-Bakımcılar Frappe 15 ve Frappe 16 testlerini ayrı çalıştırmalıdır.
+Bakımcılar Frappe 16 testlerini çalıştırmalıdır.
 Telemetri kapalıyken modül açılmalı ve dış istek oluşmamalıdır.
-Telemetri açık eski ortamda olay ve takma ad testleri geçmelidir.
+Telemetri açıkken olay ve takma ad testleri geçmelidir.
 Bu öneri kaynak dosyalarına uygulanmadı. Telemetri davranışı henüz değiştirilmedi.
 
 [Press kaynak dosyası](https://github.com/frappe/press/blob/v0.154.1/press/saas/doctype/product_trial_request/product_trial_request.py)
+[Press içindeki hazır yardımcı](https://github.com/frappe/press/blob/v0.154.1/press/utils/telemetry.py#L14-L26)
 [Frappe 16.56 kaynak dosyası](https://github.com/frappe/frappe/blob/v16.56.0/frappe/utils/telemetry/__init__.py)
 [Aynı hatanın Press kaydı](https://github.com/frappe/press/issues/7534)
+
+## Öneri 3: Çerez okuma yolunu Frappe 16'ya uyarlayın
+
+Çerez, tarayıcının istekle gönderdiği küçük bir değerdir.
+`press/api/cookies.py:7`, `frappe.oauth` içinden `get_cookie_dict_from_headers` işlevini alır.
+Frappe 16.56.0 bu işlevi sunmaz. `press.api.cookies` içe aktarılırken hata verir.
+Temel imajdaki 581 satırlık `frappe/oauth.py` dosyası ayrıca denetlendi.
+Doğrudan import denemesi de aynı hatayla sonuçlandı.
+Bu modüldeki `update_preferences` işlevi misafir çağrılarına açıktır.
+Hata, işlev çağrılmadan önce oluşur:
+
+```text
+ImportError: cannot import name 'get_cookie_dict_from_headers' from 'frappe.oauth'
+```
+
+Bakımcılar çerez değerini Frappe 16'nın istek nesnesinden okumalıdır.
+`frappe.local.request.cookies.get("cookie_perms")` yolu mevcut istek sözleşmesiyle değerlendirilmelidir.
+Bu yol metin döndürür. Eski çağrıdaki `.value` erişimi ayrıca kaldırılmalıdır.
+Bakımcılar boş, kodlanmış ve bozuk çerez değerlerini sınamalıdır.
+Analitik izni değişince kayıt oluştuğunu da sınamalıdır.
+Eksik işlevi paket kurarak geri getirmek mümkün değildir.
+Bu öneri uygulanmadı. Çerez davranışının uyumu henüz doğrulanmadı.
+
+[Press çerez kaynağı](https://github.com/frappe/press/blob/v0.154.1/press/api/cookies.py#L1-L33)
+[Frappe OAuth kaynağı](https://github.com/frappe/frappe/blob/v16.56.0/frappe/oauth.py)
+
+## Öneri 4: Tam bağımlılık çözümünü doğrulayın
+
+`Dockerfile.unpatched`, Press paketini `--no-deps` seçeneğiyle kurar.
+Bu seçim, hataları ayrı incelemek içindir. Tam kurulum başarısı değildir.
+`pyproject.toml:25-60` içindeki sürüm şartları ayrıca karşılanmalıdır.
+Örneğin Press Ansible `3.4.0` ister. Aday Ansible `14.0.0` kullanır.
+Press Stripe `~=2.56.0` ister. Aday Stripe `3.1.0` kullanır.
+Telegram raw paketi de `python-telegram-bot==13.15` şartını paket adı bakımından karşılamaz.
+Eksik paketler ve diğer sürüm çelişkileri de bağımlılık denetiminde görünür.
+Genişletilen denetim 177 pakette 32 uyumsuzluk buldu.
+Bu sayı eksik paketleri ve sürüm çelişkilerini birlikte içerir.
+Örneğin `requests<2.32` şartı, kurulu `2.33.1` sürümüyle çelişir.
+`wrapt~=1.15.0` şartı da kurulu `1.17.3` sürümüyle çelişir.
+
+Bakımcılar bağımlılık şartlarını Python 3.14 ve Frappe 16'ya uyarlamalıdır.
+Tam kilit, bütün doğrudan ve dolaylı paket sürümlerini sabitlemelidir.
+Temiz kurulum, kilitli paketlerle yeniden üretilebilmelidir.
+`uv pip check --python /home/frappe/frappe-bench/env/bin/python` başarılı olmalıdır.
+Bu denetim geçmeden yalnız modül açılışı tam uyum kanıtı olmaz.
+
+[Press bağımlılık bildirimi](https://github.com/frappe/press/blob/v0.154.1/pyproject.toml#L24-L61)
 
 ## Kabul sonucu
 
@@ -124,25 +186,37 @@ Bu öneri kaynak dosyalarına uygulanmadı. Telemetri davranışı henüz deği�
 `TypedDict` testi ve telemetri testi beklenen hatalarla düştü.
 Aynı denemede Press kaynak bütünlüğü testi geçti.
 
-Son adayda 10 kabul testi çalıştı. Altı test geçti. Dört test başarısız oldu.
+İlk v0.154.1 adayında 10 kabul testi çalıştı. Altı test geçti. Dört test başarısız oldu.
 Dört başarısız test, aynı iki kaynak engelini farklı düzeylerde doğruladı.
+Bu sayı, inceleme sonrası genişletilen testlerin sonucu değildir.
+
+22 Kasım 2026 Pazar günü inceleme sonrası kabul testleri tekrar çalıştırıldı.
+Bu devam denemesi başlangıçtaki `7a4384d5eec9f0f0dce4124e9dd48b106e51222f` kaynağına sabitlendi.
+Genişletilen 13 testin yedisi geçti. Altısı başarısız oldu.
+`TypedDict` ve telemetri engelleri ayrı ayrı ikişer testi düşürdü.
+Çerez import'u bir testi düşürdü. Tam bağımlılık denetimi de bir testi düşürdü.
 Testler hataları beklenen başarı olarak işaretlemez. Komut 1 koduyla çıkar.
+Tablo bu genişletilen denemenin sonucunu gösterir.
 
 | Denetim | Sonuç |
 | --- | --- |
 | Sabit Press commit kodu | `pass` |
 | Press klasöründe boş `git diff HEAD` | `pass` |
 | Press klasöründe beklenmeyen dosya olmaması | `pass` |
+| Geliştirme işareti, yama betiği ve paket yama izlerinin bulunmaması | `pass` |
 | Python 3.14 ve Frappe 16 | `pass` |
 | Standart modüller, Telegram ve Stripe import'u | `pass` |
 | `press.runner` import'u ve yerel Ansible görevi | `pass` |
 | `cache_utils` import'u ve ayrı `TypedDict` tanımı | `fail` |
 | Ürün denemesi modülü ve ayrı telemetri import'u | `fail` |
+| Çerez tercihi modülünün içe aktarılması | `fail` |
 | Tam bağımlılık uyumu, `uv pip check` | `fail` |
 | Site kurulumu ve HTTP açılışı | `not_run` |
 | Press masasının tarayıcıda yüklenmesi | `not_run` |
 | Ödeme, Telegram gönderimi ve gerçek sunucu kurulumu | `not_run` |
 
+Paket izi denetimi `.orig` yedeklerini ve `press-local:` izlerini arar.
+Bu iz taraması, paket dosyalarının tam bütünlüğünü kanıtlamaz.
 Deneme imajının tam bağımlılık denetimi de başarısızdır.
 Eksik paketler ve Press sürüm aralıklarıyla çelişen adaylar vardır.
 Site denemesinin ön koşulu olan modül açılışı başarısızdır.
@@ -151,14 +225,17 @@ Tarayıcı çalıştırılmadı. Firefox kullanılmadı. Zamanlanmış iş kurul
 
 ## O-18 kapanış koşulu
 
-İki kaynak düzeltmesi kabul edilmeden mevcut etiketle yamasız yol bulunamadı.
+Üç kaynak engeli ve tam bağımlılık uyumsuzluğu çözülmeden yamasız yol bulunamadı.
 O-18 ve ilgili borç satırı açık kaldı.
 Yamasız adayın çalışması ya da düzeltmenin Press'e kabulü mevcut kapanış koşuludur.
-Kabul edilen yeni kaynak, kurulum ve masa testleriyle ayrıca doğrulanmalıdır.
+Kabul edilen yeni kaynak, bütünlük ve bağımlılık testlerinden geçmelidir.
+Site kurulumu ve Press masası da ayrıca doğrulanmalıdır.
 Mevcut geliştirme yaması ancak bu sonuçtan sonra kaldırılabilir.
 
 Görev C, bu deneme imajını çalışan Press sitesi olarak kullanmamalıdır.
-İmaj, aynı iki engeli yeniden göstermek için bırakıldı.
+Sonraki sürümler de [ayrı taramada](press-python314-version-audit.md) incelendi.
+Yamasız yol bulunamadığı için araştırma kolu kapatıldı.
+Deneme imajının etiketi iş bitince silinir.
 Çalıştırma ve kapatma komutları [deneme rehberindedir](../dev/press/unpatched-runtime.md).
 
 Gerçek okurla denenmedi.

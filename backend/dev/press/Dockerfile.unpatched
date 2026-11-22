@@ -4,8 +4,13 @@ USER root
 RUN mkdir -p /opt/press-probe && chown frappe /opt/press-probe
 USER frappe
 WORKDIR /home/frappe/frappe-bench
-RUN git clone --depth 1 --branch v0.154.1 https://github.com/frappe/press apps/press \
-    && test "$(git -C apps/press rev-parse HEAD)" = 7a4384d5eec9f0f0dce4124e9dd48b106e51222f
+ARG PRESS_REVISION=7a4384d5eec9f0f0dce4124e9dd48b106e51222f
+RUN git init apps/press \
+    && git -C apps/press remote add origin https://github.com/frappe/press \
+    && git -C apps/press fetch --depth 1 origin "$PRESS_REVISION" \
+    && git -C apps/press checkout --detach FETCH_HEAD \
+    && test "$(git -C apps/press rev-parse HEAD)" = "$PRESS_REVISION"
+ENV PRESS_TEST_EXPECTED_REVISION=$PRESS_REVISION
 COPY --chown=frappe backend/dev/press/probe-requirements.txt /opt/press-probe/
 RUN uv pip install --python env/bin/python -r /opt/press-probe/probe-requirements.txt \
     && uv pip install --python env/bin/python --no-deps -e apps/press
