@@ -10,16 +10,25 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-
-from backend.e2e.preview import fixtures
+PREVIEW = Path(__file__).resolve().parents[1] / "preview"
 
 
-def load_fixtures():
-    spec = importlib.util.spec_from_file_location("backend.e2e.preview.fixtures_probe", fixtures.__file__)
+def load_module(name):
+    spec = importlib.util.spec_from_file_location(name, PREVIEW / f"{name}.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+browser_keycloak = load_module("browser_keycloak")
+
+
+def load_fixtures():
+    with patch.dict(sys.modules, {"browser_keycloak": browser_keycloak}):
+        return load_module("fixtures")
+
+
+fixtures = load_fixtures()
 
 
 class PreviewFixturesTest(unittest.TestCase):

@@ -3,17 +3,18 @@
 import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
-import sys
+import runpy
 import unittest
 from pathlib import Path
 
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+TLS_RELAY = runpy.run_path(str(Path(__file__).resolve().parents[1] / "preview" / "session_tls.py"))
+RELAY_TARGETS = TLS_RELAY["RELAY_TARGETS"]
+relay_handler = TLS_RELAY["relay_handler"]
+
 
 class SessionRelayTest(unittest.TestCase):
     def test_only_session_revocation_is_forwarded(self):
-        from backend.e2e.preview.session_tls import RELAY_TARGETS, relay_handler
-
         received = []
 
         class IdentitySync(BaseHTTPRequestHandler):
@@ -51,9 +52,7 @@ class SessionRelayTest(unittest.TestCase):
                 service.shutdown()
                 service.server_close()
 
-
     def test_keycloak_relay_allows_only_the_token_and_signing_keys(self):
-        from backend.e2e.preview.session_tls import RELAY_TARGETS
         self.assertEqual(RELAY_TARGETS["keycloak"], {
             ("POST", "/realms/platform/protocol/openid-connect/token"),
             ("GET", "/realms/platform/protocol/openid-connect/certs"),

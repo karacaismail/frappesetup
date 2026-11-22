@@ -136,9 +136,9 @@ Telefon paketi için `mobile-pkce.spec.ts` dosyasını seçin.
 
 ## Hesap ve oturum testleri
 
-| Senaryo | Sonuç | Eksik önkoşul |
+| Senaryo | Sonuç | Neden veya önkoşul |
 | --- | --- | --- |
-| Müşteri hesabını siler. | `not_run` | Press silme sayfası, kimlik eşitleme servisi ve örnek müşteri hesabı. |
+| Müşteri hesabını siler. | `fail` (Chromium ve WebKit) | Kiracı yanıtında `anonymized` ve `found` alanları eksik. Sahip iş `platform-core-kimlik`. |
 | Yönetici telefonu iptal eder. | `not_run` | Mobil kimlik doğrulaması ve Keycloak oturumu iptal ucu. |
 | Çalışan bir saat boşta kalır. | `not_run` | Çalışan için süre ayarı ve zorunlu yeniden doğrulama. |
 

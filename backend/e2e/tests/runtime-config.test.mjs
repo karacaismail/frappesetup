@@ -134,7 +134,17 @@ test('the HTTPS-enabled tenant uses the preview trust store for Python requests'
 
 
 test('preview exit removes the shared directory for raw Playwright artifacts', () => {
-  assert.ok(readFileSync(runtime, 'utf8').includes('"$PREVIEW_DIR/playwright-output"'));
+  const script = readFileSync(runtime, 'utf8');
+  const cleanup = script.match(/^cleanup\(\) \{\n([\s\S]*?)^\}/m)?.[1];
+  assert.ok(cleanup, 'runtime must define cleanup()');
+  assert.match(cleanup, /^\s*rm -rf -- [^\n]*"\$PREVIEW_DIR\/playwright-output"(?:\s|$)/m);
+  assert.match(script, /^trap cleanup EXIT$/m);
   const runner = readFileSync(new URL('../preview/run-tests.mjs', import.meta.url), 'utf8');
   assert.ok(runner.includes("join(previewDir, 'playwright-output', label)"));
+});
+
+test('the TLS relay certificate is a server leaf without certificate signing permission', () => {
+  const script = readFileSync(new URL('../preview/session-tls.sh', import.meta.url), 'utf8');
+  assert.match(script, /^basicConstraints=critical,CA:FALSE$/m);
+  assert.doesNotMatch(script, /^keyUsage=.*keyCertSign/m);
 });

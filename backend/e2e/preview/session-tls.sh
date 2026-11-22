@@ -20,8 +20,8 @@ prompt=no
 CN=identity-sync
 [tls]
 subjectAltName=DNS:identity-sync
-basicConstraints=critical,CA:TRUE
-keyUsage=critical,digitalSignature,keyEncipherment,keyCertSign
+basicConstraints=critical,CA:FALSE
+keyUsage=critical,digitalSignature,keyEncipherment
 extendedKeyUsage=serverAuth
 CONFIG
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 -config "$private/openssl.conf" \
