@@ -107,12 +107,21 @@ test -z "$(git status --porcelain=v1 --untracked-files=all)" &&
   python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD" --dry-run
 ```
 
-Önizlemeyi inceleyin. Uygulamak için şu komutu çalıştırın.
+Önizlemeyi inceleyin. Onaylı belge yamasının yolunu `cp2_docs_patch` değişkenine koyun.
+Ardından aşağıdaki komutları tek blok olarak çalıştırın.
 
 ```sh
 test -z "$(git status --porcelain=v1 --untracked-files=all)" &&
-  python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD"
+  git apply --check "$cp2_docs_patch" &&
+  git apply "$cp2_docs_patch" &&
+  python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD" &&
+  python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD" --check-modules &&
+  python3.14 -B backend/dev/naming/check_names.py --root "$PWD" --transition &&
+  python3.14 -B -m unittest discover -s backend/dev/tests
 ```
+
+Bir denetim kalırsa komut hata koduyla durur. Git kaydı oluşturmayın.
+Belgeyi kodla karşılaştıran testler için yamayı ad geçişiyle aynı Git kaydına alın.
 
 ### İşçi dalı
 

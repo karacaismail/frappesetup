@@ -169,7 +169,7 @@ def rewrite_source(source: str, rules: tuple[Rule, ...], path: str) -> str:
         for rule in rules
         if rule.type == "module"
         and rule.paths
-        and "/" in rule.old
+        and ("/" in rule.old or "." in rule.old)
         and re.fullmatch(r"`[\w./-]+`", rule.old)
         and re.fullmatch(r"`[\w./-]+`", rule.new)
     }

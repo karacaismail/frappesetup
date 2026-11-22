@@ -181,6 +181,22 @@ class RenameTests(unittest.TestCase):
         self.assertNotIn(path, check.stdout)
         self.assertIn("backend/unrelated.py", check.stdout)
 
+    def test_gateway_decision_assertion_renames_its_inline_module_reference(self):
+        path = "backend/dev/tests/test_gateway_decision.py"
+        text = 'assert "`platform_core.model_gecidi.api.complete`" in interface\n'
+        source = self.write(path, text)
+        other = self.write("backend/dev/tests/test_unrelated.py", text)
+        self.git("add", ".")
+        before = self.rename(None, "--check-modules")
+        self.assertIn(f"{path}:1:", before.stdout)
+        outcome = self.rename(None)
+        self.assertEqual(outcome.returncode, 0, outcome.stderr)
+        self.assertIn("`platform_core.model_gateway.api.complete`", source.read_text())
+        self.assertEqual(other.read_text(), text)
+        after = self.rename(None, "--check-modules")
+        self.assertNotIn(path, after.stdout)
+        self.assertIn("test_unrelated.py", after.stdout)
+
     def test_non_utf8_source_stops_before_any_changes(self):
         source = self.write("backend/sample.txt", "legacy\n")
         invalid = self.write("backend/unreadable.txt", "")

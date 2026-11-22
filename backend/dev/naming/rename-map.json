@@ -6258,5 +6258,13 @@
       "backend/contracts/platform_core-access.openapi.yaml",
       "backend/apps/platform_core/platform_core/erisim/tests/*"
     ]
+  },
+  {
+    "old": "`platform_core.model_gecidi.api.complete`",
+    "new": "`platform_core.model_gateway.api.complete`",
+    "type": "module",
+    "paths": [
+      "backend/dev/tests/test_gateway_decision.py"
+    ]
   }
 ]

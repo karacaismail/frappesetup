@@ -138,12 +138,24 @@ class BranchCommandTests(unittest.TestCase):
 
 class TransitionInstructionsTests(unittest.TestCase):
     def test_backend_instructions_require_clean_tree_and_direct_application(self):
-        decision = NAMING.parents[1] / "docs/kararlar/0009-naming-history-fix.md"
+        docs = NAMING.parents[1] / "docs"
+        decision = docs / "decisions/0009-naming-history-fix.md"
+        if not decision.is_file():
+            decision = docs / "kararlar/0009-naming-history-fix.md"
         instructions = decision.read_text().split("## Dalda uygulama", 1)[1]
         orchestrator = instructions.split("### İşçi dalı", 1)[0]
         clean_guard = 'test -z "$(git status --porcelain=v1 --untracked-files=all)"'
         apply = 'python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD"'
         self.assertIn(clean_guard + " &&", orchestrator)
         self.assertIn(apply + " --dry-run", orchestrator)
-        self.assertIn(apply + "\n", orchestrator)
+        commands = (
+            'git apply --check "$cp2_docs_patch"',
+            'git apply "$cp2_docs_patch"',
+            apply,
+            apply + " --check-modules",
+            'python3.14 -B backend/dev/naming/check_names.py --root "$PWD" --transition',
+            "python3.14 -B -m unittest discover -s backend/dev/tests",
+        )
+        chain = " &&\n  ".join(commands) + "\n"
+        self.assertIn(chain, orchestrator)
         self.assertNotIn("apply-to-branch --", orchestrator)

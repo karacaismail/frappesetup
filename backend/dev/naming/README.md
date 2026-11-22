@@ -24,15 +24,11 @@ Kuru çalıştırma kopyaları sonunda silinir.
 
 Orkestratör, geçiş onayı gelince önce `backend` dalını hazırlar.
 Sürücü `backend` ve `main` kopyalarında Git kaydı oluşturmaz.
-CP2 belge yaması onaylandıysa önce temiz tabanda `git apply --check` çalıştırın.
-Orkestratör yamayı uyguladıktan sonra ad betiğini doğrudan çalıştırır.
-
-```sh
-python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD" --dry-run
-python3.14 -B backend/dev/naming/apply_renames.py --repo "$PWD"
-```
-
-Dosyaları inceleyin ve denetimlerden sonra taban kaydını oluşturun.
+Karar notunun “Orkestratör” bölümündeki komutları kullanın.
+Notu geçişten önce `backend/docs/kararlar/0009-naming-history-fix.md` yolunda bulursunuz.
+Geçişten sonra not `backend/docs/decisions/0009-naming-history-fix.md` yoluna taşınır.
+O bölüm, belge yamasını, ad betiğini ve denetimleri sırayla çalıştırır.
+Denetim kalırsa taban kaydını oluşturmayın.
 İşçi dalları bu tabanı alınca 1. adımdaki denemeyi tekrarlayın.
 
 ### 3. Geçici Git kayıtlarını oluşturma
