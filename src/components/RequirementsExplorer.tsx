@@ -79,7 +79,7 @@ function byId(a: Requirement, b: Requirement) {
 function inlineCode(text: string): ReactNode[] {
   return text.split('`').map((part, i) =>
     i % 2 === 1 ? (
-      <code key={i}>
+      <code key={i} className={/\s/.test(part) ? 'req-code-wrap' : undefined}>
         {part}
       </code>
     ) : (

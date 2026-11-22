@@ -315,14 +315,14 @@ test.describe('text scaling', () => {
     await expect.soft(page.locator('.req-meta').first()).toHaveCSS('line-height', '24px', { timeout: 1000 });
   });
 
-  for (const width of [320, 360]) {
-    test(`@touch home action labels fit at ${width}px with 200% root font`, async ({ page }) => {
+  for (const { width, root } of [{ width: 320, root: 150 }, { width: 320, root: 200 }, { width: 360, root: 200 }, { width: 412, root: 200 }]) {
+    test(`@touch home action labels fit at ${width}px with ${root}% root font`, async ({ page }) => {
       await page.setViewportSize({ width, height: 640 });
       await page.goto('');
-      await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+      await page.evaluate((pct) => { document.documentElement.style.fontSize = `${pct}%`; }, root);
       await page.evaluate(() => document.fonts.ready);
       await noHorizontalOverflow(page);
-      await expectMinFont(page, 200);
+      await expectMinFont(page, root);
 
       const actions = page.locator('.hero .actions a');
       await expect(actions).toHaveCount(3);
@@ -959,6 +959,42 @@ async function codeOutsideLine(page: Page) {
 }
 
 test.describe('long inline code', () => {
+  test('all requirement cards fit plain text without emergency breaks at 320px @touch', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    const details = page.locator('.req-card-detail');
+    await expect(details).toHaveCount(requirements.length);
+    await page.evaluate(() => document.fonts.ready);
+    const overflows = await details.evaluateAll((cards) => cards.flatMap((card) => {
+      const detail = card as HTMLElement;
+      const right = detail.getBoundingClientRect().right;
+      const range = document.createRange();
+      detail.style.overflowWrap = 'normal';
+      const escaping: string[] = [];
+      for (const text of detail.childNodes) {
+        if (text.nodeType !== Node.TEXT_NODE) continue;
+        range.selectNodeContents(text);
+        if ([...range.getClientRects()].some((rect) => rect.right > right + 1)) {
+          escaping.push(`${detail.closest('li')?.id}: ${text.textContent?.trim()}`);
+        }
+      }
+      detail.style.removeProperty('overflow-wrap');
+      return escaping;
+    }));
+    expect(overflows).toEqual([]);
+    expect(await midWordSplits(page)).toEqual([]);
+    await noHorizontalOverflow(page);
+  });
+
+  test('requirement code preserves complete identifiers and allows spaces to wrap', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto('gereksinimler/');
+    const code = page.locator('.req-table .req-detail code');
+    await expect(code.filter({ hasText: /^marketplace_app_subscription\.py$/ })).toHaveCount(1);
+    await expect(code.filter({ hasText: /^Press Settings\.enable_mcp=1$/ })).toHaveCSS('white-space', 'normal');
+    await expect(code.filter({ hasText: /^frappe\.local\.system_user\(\)$/ })).toHaveCount(1);
+  });
+
   test('keeps long requirement settings and paths in their own scrollable code boxes @touch', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('gereksinimler/');

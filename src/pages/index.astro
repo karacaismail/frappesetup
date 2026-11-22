@@ -271,6 +271,10 @@ const phaseCards = phases.map((p) => ({ id: p.id, title: p.title, goal: p.goal }
       box-shadow var(--fs-dur) var(--fs-ease),
       transform var(--fs-dur) var(--fs-ease);
   }
+  .actions .btn {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+  }
   .btn > span {
     min-inline-size: 0;
   }
