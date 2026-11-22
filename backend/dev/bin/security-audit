@@ -29,7 +29,8 @@ scan_rules() (
     report="$(mktemp "${PANE_SCRATCH_DIR:-${TMPDIR:-/tmp}}/semgrep-review.XXXXXX")" || exit 1
     trap 'rm -f -- "$report"' EXIT
     before="$(python3 -B backend/dev/security/semgrep_exceptions.py --snapshot)" || exit 1
-    "${semgrep[@]}" scan --error --strict --metrics=off --json \
+    # Allow slower rules to finish while still rejecting incomplete scans.
+    "${semgrep[@]}" scan --error --strict --metrics=off --json --timeout 20 \
         --config "$rules" \
         --exclude 'backend/dev/security/fixtures/' backend \
         > "$report" || scan_status=$?

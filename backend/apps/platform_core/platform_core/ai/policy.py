@@ -99,7 +99,7 @@ ADMIN_DOCTYPES = frozenset(
 IDENTITY_DOCTYPES = frozenset({"PLT Identity Link"})
 
 # The layer's own records. They do not change through AI.
-LAYER_DOCTYPES = frozenset({"PLT AI Action Log", "PLT AI Action Proposal"})
+LAYER_DOCTYPES = frozenset({"PLT AI Action Log", "PLT AI Action Proposal", "PLT MCP Call Budget"})
 
 # Frappe framework DocTypes that are open to the general write tools.
 # The other framework DocTypes are settings, code or system records and are closed.

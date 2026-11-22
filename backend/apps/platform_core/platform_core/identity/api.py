@@ -12,6 +12,7 @@ from frappe import _
 
 from platform_core.identity import helpers, jwks, site_settings
 from platform_core.identity.exceptions import KeycloakKeysUnavailable, ServiceTokenRejected
+from platform_core.identity.mcp_tokens import mcp_oauth_config, verify_mcp_token
 
 LEEWAY = 30
 MOBILE_SCOPE = "mobile"

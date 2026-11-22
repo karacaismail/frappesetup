@@ -427,6 +427,22 @@ class GateTests(unittest.TestCase):
         self.write("docs/decisions/0010-second.md", "# Second")
         self.assertEqual(self.run_gate("--json").returncode, 1)
 
+    def test_reports_turkish_output_in_extensionless_python_cli(self):
+        checker = COMMAND.parents[1] / "naming/check_names.py"
+        self.write("dev/naming/check_names.py", checker.read_text(encoding="utf-8"))
+        self.write("dev/naming/rename-map.json", "[]")
+        self.write("dev/bin/dev-resources", '#!/usr/bin/env python3\nprint("| Bağlam | Durum |")\n')
+        subprocess.run(["git", "-C", str(self.repository), "add", "backend"], check=True)
+
+        result = self.run_gate("--json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        findings = json.loads(result.stdout)["findings"]
+        self.assertEqual([item["rule"] for item in findings], ["naming.source-text"])
+        (finding,) = findings
+        self.assertEqual(finding["path"], "dev/bin/dev-resources")
+        self.assertEqual(finding["line"], 2)
+        self.assertEqual(finding["severity"], "warning")
+
     def test_naming_enforce_blocks_only_four_rule_codes(self):
         policy_path = "dev/naming/enforcement.json"
         self.write(policy_path, (COMMAND.parents[2] / policy_path).read_text(encoding="utf-8"))
@@ -512,6 +528,7 @@ class GateTests(unittest.TestCase):
             parser = argparse.ArgumentParser()
             parser.add_argument("--root", type=Path, required=True)
             parser.add_argument("--json", action="store_true", required=True)
+            parser.add_argument("--include-source-text", action="store_true", required=True)
             args = parser.parse_args()
             assert (args.root / "backend/apps/example.py").is_file()
             print(json.dumps([{

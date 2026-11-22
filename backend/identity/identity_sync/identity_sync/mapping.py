@@ -1,10 +1,10 @@
-"""Olay ile eylem eşlemesi.
+"""Mapping events to actions.
 
-Bu modül saftır. Ağa ve diske dokunmaz.
+This module is pure. It performs no network or disk operations.
 
-Eylemi olayın adı değil kullanıcının Keycloak'taki güncel durumu belirler.
-Bu yüzden aynı olay iki kez gelirse ya da geç gelirse sonuç değişmez.
-Kuralların kaynağı karar sitesinin `rail-4-keycloak.md` sayfasının 4. bölümüdür.
+The current Keycloak user state determines the action, rather than the event name.
+Duplicate or late events therefore produce the same result.
+The rules come from section 4 of `rail-4-keycloak.md` on the decision site.
 """
 
 from __future__ import annotations
@@ -23,15 +23,15 @@ from identity_sync.events import (
     is_handled,
 )
 
-# Kendi kaydolan kullanıcıya Organization açan olaylar.
+# Events that create an Organization for a self-registered user.
 _SELF_REGISTRATION_TYPES = frozenset({"REGISTER", "VERIFY_EMAIL"})
 
 
 @dataclass(frozen=True)
 class Preview:
-    """Bir yazma işinin önizlemesi. İnsan onayı bu metne bakar.
+    """Preview of a write operation. Human approval is based on this text.
 
-    Önizleme e-posta ve sır taşımaz. Kullanıcıyı `sub` kimliğiyle anar.
+    The preview contains no email or secrets. It identifies the user by `sub`.
     """
 
     operation: str
@@ -65,7 +65,7 @@ class Organization:
 
 @dataclass(frozen=True)
 class Tenant:
-    """Bir kiracı sitesi. `organization`, kiracının Keycloak Organization takma adıdır."""
+    """A tenant site. `organization` is the tenant's Keycloak Organization alias."""
 
     name: str
     base_url: str
@@ -88,7 +88,7 @@ def service_client_id(tenant: str) -> str:
 
 @dataclass(frozen=True)
 class UserSnapshot:
-    """Kullanıcının Keycloak'taki güncel durumu."""
+    """The current state of the user in Keycloak."""
 
     subject: str
     email: str
@@ -376,10 +376,10 @@ def plan_actions(
     tenants: Sequence[Tenant],
     organization: Organization | None = None,
 ) -> tuple[Action, ...]:
-    """Olay için çalışacak eylemleri sırasıyla döner.
+    """Return the actions for this event in execution order.
 
-    `snapshot` kullanıcının güncel durumudur. Kullanıcı silindiyse `None` olur.
-    `organization` üyelik olayındaki Organization'dır. Organization silindiyse `None` olur.
+    `snapshot` is the current user state, or `None` if the user was deleted.
+    `organization` is the Organization in the membership event, or `None` if it was deleted.
     """
     if not is_handled(event) or event.user_id is None:
         return ()
@@ -408,7 +408,7 @@ def plan_actions(
         return _plan_membership(event, snapshot, issuer=issuer, tenants=tenants, organization=organization)
 
     if not snapshot.email_verified:
-        # İlk bağ yalnız doğrulanmış e-postayla kurulur (AU-4).
+        # Create the initial link only with a verified email address (AU-4).
         return ()
 
     if not snapshot.organizations:
@@ -438,7 +438,7 @@ def _plan_membership(
         # No organization id, so there is no team to name. Press rejects an empty id.
         return ()
     if organization is None:
-        # Organization silindi. Takma adı bilinmez. Kullanıcı üyesi olmadığı her kiracıda kapanır.
+        # The Organization was deleted and its alias is unknown. Disable the user in every tenant where membership is absent.
         aliases = {org.alias for org in snapshot.organizations}
         removal: list[Action] = [PressRemoveTeamMember(issuer=issuer, subject=snapshot.subject, organization_id=org_id)]
         for tenant in tenants:

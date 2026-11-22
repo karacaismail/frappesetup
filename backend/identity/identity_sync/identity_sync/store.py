@@ -11,13 +11,13 @@ project record counts as personal data. The id is kept only while the work needs
 
 The id of a finished event or job stays as a duplicate guard. A job id is a keyed digest.
 
-İki ayrı koruma vardır:
+There are two separate protections:
 
-- Her kayıt yazısı kısa bir veritabanı işlemidir ve hemen kalıcı olur.
-  Süreç yarıda durursa biten işlerin kaydı kaybolmaz.
-- `work_lock()` bir olayın işini sıraya koyar. Sunucu ve `replay-dead-letters` komutu
-  ayrı süreçlerdir. Kilit bir kilit dosyasındadır (`flock`). Süreç ölürse kilit kendiliğinden açılır.
-  Kilit veritabanını kilitlemez. Bu yüzden imza kaydı ve okuma uzun süren işi beklemez.
+- Each record write is a short database transaction and becomes durable immediately.
+  Completed work remains recorded if the process stops halfway through.
+- `work_lock()` serializes event processing. The server and `replay-dead-letters` command
+  run in separate processes. A lock file uses `flock`, which is released automatically when the process dies.
+  The lock does not lock the database, so signature claims and reads do not wait for long operations.
 """
 
 from __future__ import annotations
@@ -79,14 +79,14 @@ _SQLITE_TIMEOUT_SECONDS = 5.0
 
 
 class Busy(Exception):
-    """Başka bir süreç iş kilidini tutuyor ve bekleme süresi doldu."""
+    """Another process holds the work lock and the wait timed out."""
 
 
 @dataclass(frozen=True)
 class DeadLetter:
-    """`state` değeri `failed` ya da `unknown` olur.
+    """`state` is either `failed` or `unknown`.
 
-    `failed`: hedef işi reddetti ya da ulaşılamadı. `unknown`: işin bitip bitmediği bilinmiyor.
+    `failed`: the target rejected the work or was unreachable. `unknown`: completion is unknown.
     """
 
     event: Event
@@ -114,16 +114,16 @@ class DeadLetter:
 
 class Store:
     def __init__(self, path: str, *, clock: Callable[[], float] = time.time, lock_timeout: float = 10.0) -> None:
-        """`lock_timeout`, iş kilidini beklemenin en uzun süresidir. Birim saniyedir."""
+        """`lock_timeout` is the maximum wait for the work lock, in seconds."""
         self._clock = clock
         self._lock_timeout = lock_timeout
         self._lock_fd: int | None = None
         if path != ":memory:":
-            # Dosyaları yalnız servisin kullanıcısı okuyabilsin.
+            # Allow only the service user to read the files.
             os.close(os.open(path, os.O_CREAT | os.O_WRONLY, 0o600))
             os.chmod(path, 0o600)
             self._lock_fd = os.open(f"{path}.lock", os.O_CREAT | os.O_RDWR, 0o600)
-        # Her yazı kendi kısa işlemindedir (`isolation_level=None`: işlemi bu sınıf yönetir).
+        # Each write has a short transaction (`isolation_level=None`: this class manages transactions).
         self._db = sqlite3.connect(
             path, timeout=_SQLITE_TIMEOUT_SECONDS, isolation_level=None, check_same_thread=False
         )
@@ -132,7 +132,7 @@ class Store:
         self._migrate()
 
     def _migrate(self) -> None:
-        """Eski sürümün kayıt dosyasına eksik sütunu ekler."""
+        """Add the missing column to a store file from an older version."""
         columns = {row[1] for row in self._db.execute("PRAGMA table_info(dead_letters)")}
         missing = {
             "state": "TEXT NOT NULL DEFAULT 'failed'",
@@ -151,10 +151,10 @@ class Store:
 
     @contextmanager
     def work_lock(self) -> Iterator[None]:
-        """Bir olayın işini sıraya koyar. Öteki süreçler ve bağlantılar bekler.
+        """Serialize event processing. Other processes and connections wait.
 
-        Bekleme `lock_timeout` süresini aşarsa `Busy` yükselir. Kilit kayıtları geri almaz.
-        Kilit altında yazılan her kayıt hemen kalıcıdır.
+        Raise `Busy` if the wait exceeds `lock_timeout`. The lock does not roll back records.
+        Every record written under the lock becomes durable immediately.
         """
         deadline = time.monotonic() + self._lock_timeout
         if not self._thread_lock.acquire(timeout=self._lock_timeout):
@@ -179,7 +179,7 @@ class Store:
 
     @contextmanager
     def _transaction(self) -> Iterator[None]:
-        """Kısa bir yazma işlemi. Hata olursa yazılar geri alınır. İşlem açık kalmaz."""
+        """A short write transaction. Roll back writes on error and always close the transaction."""
         self._db.execute("BEGIN IMMEDIATE")
         try:
             yield
@@ -194,7 +194,7 @@ class Store:
         return row is not None
 
     def dead_letter_state(self, event_id: str) -> str | None:
-        """Olay bekleme kuyruğundaysa durumunu döner. Değilse `None` döner."""
+        """Return the event state if it is in the dead-letter queue, otherwise `None`."""
         row = self._db.execute("SELECT state FROM dead_letters WHERE event_id = ?", (event_id,)).fetchone()
         return row[0] if row else None
 
@@ -408,7 +408,7 @@ class Store:
                         self._db.execute("DELETE FROM dead_letters WHERE event_id = ?", (queued_id,))
 
     def add_dead_letter(self, event: Event, error: str, *, state: str = "failed") -> None:
-        """Olayı bekleme kuyruğuna yazar. Olay zaten kuyruktaysa deneme sayısını artırır."""
+        """Write the event to the dead-letter queue. Increment attempts if it is already queued."""
         if state not in STATES:
             raise ValueError("invalid dead letter state")
         now = self._clock()
@@ -454,10 +454,10 @@ class Store:
         ]
 
     def claim_signature(self, signature: str, *, now: float, expires_at: float) -> bool:
-        """İmzayı kullanılmış diye kaydeder. İmza daha önce kullanıldıysa `False` döner.
+        """Record a signature as used. Return `False` if it was used before.
 
-        `now`, zaman penceresini denetleyen saatin değeridir. Süresi dolan kayıtlar bu
-        çağrıda silinir. Zaman penceresi o imzaları zaten reddeder.
+        `now` comes from the clock used to check the time window. Remove expired records
+        during this call. The time window already rejects those signatures.
         """
         with self._transaction():
             self._db.execute("DELETE FROM used_signatures WHERE expires_at < ?", (now,))
