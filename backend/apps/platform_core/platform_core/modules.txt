@@ -3,3 +3,4 @@ Kabuk
 Yapay Zeka
 Model Gecidi
 Mobil
+Erisim
