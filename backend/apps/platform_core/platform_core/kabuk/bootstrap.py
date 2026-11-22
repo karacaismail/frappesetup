@@ -8,7 +8,6 @@ from frappe.desk.doctype.sidebar.sidebar import SidebarContext, get_navigable_mo
 from frappe.desk.utils import is_item_allowed
 
 from platform_core.kabuk.cache import permission_version
-from platform_core.kabuk.http import conditional_response
 from platform_core.kabuk.serialization import digest
 
 
@@ -26,7 +25,9 @@ def safe_url(value: str | None) -> bool:
 	return value.startswith("/") and not value.startswith("//")
 
 
-def get_bootstrap(user: str) -> dict | None:
+def get_bootstrap(user: str) -> dict:
+	if not user or user == "Guest" or user != frappe.session.user:
+		frappe.throw(frappe._("Log in to access this resource."), frappe.PermissionError)
 	context = SidebarContext.for_modules(get_navigable_modules(), user)
 	pages = [
 		page
@@ -87,7 +88,7 @@ def get_bootstrap(user: str) -> dict | None:
 		"perm_version": permission_version(),
 	}
 	payload["meta_hash"] = digest(payload)
-	return conditional_response(payload, user, payload["perm_version"])
+	return payload
 
 
 def workspace_target_allowed(page: dict, context) -> bool:

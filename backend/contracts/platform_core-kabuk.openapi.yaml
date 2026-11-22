@@ -38,7 +38,7 @@
                 }
               },
               "Cache-Control": {
-                "description": "Private, no-cache, must-revalidate. Effective permissions may only be retained in client memory.",
+                "description": "Private, no-store. Effective permissions may only be retained in client memory.",
                 "schema": {
                   "type": "string"
                 }
@@ -78,7 +78,7 @@
                 }
               },
               "Cache-Control": {
-                "description": "Private, no-cache, must-revalidate. Effective permissions may only be retained in client memory.",
+                "description": "Private, no-store. Effective permissions may only be retained in client memory.",
                 "schema": {
                   "type": "string"
                 }
@@ -92,17 +92,7 @@
             }
           },
           "403": {
-            "description": "Guest or denied permission. Authorization is rechecked before conditional handling.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "HTTP method is not permitted.",
+            "description": "Guest, denied permission or unsupported HTTP method.",
             "content": {
               "application/json": {
                 "schema": {
@@ -118,7 +108,7 @@
       "get": {
         "operationId": "getDocType",
         "summary": "Read an effective DocType definition",
-        "description": "Checks read permission before loading the real site definition and filtering field levels. Child tables require parent context and are rejected by this version. Authorization is rechecked before 304. Schema cache is site-scoped and content-addressed; effective cache is also user- and permission-scoped.",
+        "description": "Checks DocType read permission and filters fields for the current user. Includes child schemas reached through readable parent table fields. Authorization is rechecked before 304.",
         "parameters": [
           {
             "name": "doctype",
@@ -152,7 +142,7 @@
                 }
               },
               "Cache-Control": {
-                "description": "Private, no-cache, must-revalidate. Effective permissions may only be retained in client memory.",
+                "description": "Private, no-store. Effective permissions may only be retained in client memory.",
                 "schema": {
                   "type": "string"
                 }
@@ -192,7 +182,7 @@
                 }
               },
               "Cache-Control": {
-                "description": "Private, no-cache, must-revalidate. Effective permissions may only be retained in client memory.",
+                "description": "Private, no-store. Effective permissions may only be retained in client memory.",
                 "schema": {
                   "type": "string"
                 }
@@ -206,27 +196,7 @@
             }
           },
           "403": {
-            "description": "Guest or denied permission. Authorization is rechecked before conditional handling.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "DocType does not exist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "405": {
-            "description": "HTTP method is not permitted.",
+            "description": "Guest, unknown or unreadable DocType, a child without parent context, or an unsupported HTTP method. Authorization is rechecked before conditional handling.",
             "content": {
               "application/json": {
                 "schema": {
@@ -262,6 +232,26 @@
                   "type": "string"
                 }
               }
+            },
+            "headers": {
+              "Vary": {
+                "description": "Varies by the session cookie.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Content-Security-Policy": {
+                "description": "Restricts sources to this origin and prevents framing.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Prevents MIME type sniffing.",
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           },
           "302": {
@@ -269,6 +259,24 @@
             "headers": {
               "Location": {
                 "description": "Same-origin login route.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Vary": {
+                "description": "Varies by the session cookie.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Content-Security-Policy": {
+                "description": "Restricts sources to this origin and prevents framing.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "description": "Prevents MIME type sniffing.",
                 "schema": {
                   "type": "string"
                 }
@@ -480,7 +488,7 @@
             ]
           },
           "options": {
-            "description": "Native field options.",
+            "description": "Native field options. Treat HTML field options as untrusted content and sanitize them before rendering.",
             "type": [
               "string",
               "number",
@@ -709,7 +717,8 @@
         "required": [
           "schema",
           "meta_hash",
-          "perm_version"
+          "perm_version",
+          "child_tables"
         ],
         "properties": {
           "schema": {
@@ -717,11 +726,18 @@
           },
           "meta_hash": {
             "type": "string",
-            "description": "SHA-256 of the underlying schema, including effective custom permission rows."
+            "description": "SHA-256 of the parent schema and included child schemas."
           },
           "perm_version": {
             "type": "string",
-            "description": "Permission version including the current permission fingerprint."
+            "description": "Permission generation scoped to the current user roles."
+          },
+          "child_tables": {
+            "type": "object",
+            "description": "Child DocType schemas keyed by name. Only readable parent table fields contribute entries. Child fields inherit parent permission levels.",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DocType"
+            }
           }
         },
         "additionalProperties": false

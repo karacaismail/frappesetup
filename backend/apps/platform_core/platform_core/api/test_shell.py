@@ -4,7 +4,8 @@ from urllib.parse import urlencode
 import frappe
 from frappe.core.doctype.user.user import generate_keys
 
-from platform_core.kabuk.http_fixture import DOCTYPE, PRIVILEGED, READER, ShellHTTPFixture
+from platform_core.kabuk.bootstrap import get_bootstrap, safe_url
+from platform_core.tests.shell_http_fixture import DOCTYPE, PRIVILEGED, READER, ShellHTTPFixture
 
 
 class TestBootstrapHTTP(ShellHTTPFixture):
@@ -53,3 +54,40 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 			frappe.db.rollback()
 			frappe.db.set_value("User", READER, "api_key", None, update_modified=False)
 			frappe.db.commit()
+
+	def test_direct_bootstrap_cannot_switch_users(self):
+		frappe.set_user(READER)
+		try:
+			with self.assertRaises(frappe.PermissionError):
+				get_bootstrap(PRIVILEGED)
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_workspace_manager_cannot_see_hidden_or_unsafe_navigation(self):
+		user = frappe.get_doc("User", READER)
+		user.append("roles", {"role": "Workspace Manager"})
+		user.save()
+		frappe.db.commit()
+		try:
+			sid = self.login(READER)
+			status, _, body = self.request("/api/method/platform_core.api.shell.get_bootstrap", sid)
+			self.assertEqual(status, 200)
+			payload = json.loads(body)["message"]
+			self.assertIn("Workspace Manager", payload["user"]["roles"])
+			self.assertIn("Kabuk Visible", body.decode("utf-8"))
+			self.assertIn("Shell Safe Link", body.decode("utf-8"))
+			for target in ("Kabuk Hidden", "Shell Unsafe Shortcut", "Shell Unsafe Link", "javascript:"):
+				self.assertNotIn(target, body.decode("utf-8"))
+		finally:
+			frappe.db.rollback()
+			user = frappe.get_doc("User", READER)
+			user.set("roles", [{"role": "Kabuk Test Reader"}])
+			user.save()
+			frappe.db.commit()
+
+	def test_safe_url_rejects_disallowed_links(self):
+		for url in ("javascript:void(0)", "//example.test/path", "/\\example.test"):
+			with self.subTest(url=url):
+				self.assertFalse(safe_url(url))
+		self.assertTrue(safe_url("/panel"))
+		self.assertTrue(safe_url("https://example.test/panel"))

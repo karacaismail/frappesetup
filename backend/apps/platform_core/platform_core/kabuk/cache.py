@@ -1,11 +1,10 @@
-"""Site-local schema cache and permission generations."""
+"""Site-local permission generations."""
 
 from uuid import uuid4
 
 import frappe
 
 VERSION_KEY = "platform_core:kabuk:permission_version"
-CACHE_SECONDS = 300
 
 
 def permission_version() -> str:

@@ -1,6 +1,7 @@
 """Pure projections: never mutate Frappe's shared metadata objects."""
 
 import json
+import re
 from copy import deepcopy
 from hashlib import sha256
 
@@ -32,13 +33,37 @@ FIELD_PROPERTIES = (
 )
 
 
+DEPENDENCY_PROPERTIES = (
+	"depends_on",
+	"mandatory_depends_on",
+	"read_only_depends_on",
+	"collapsible_depends_on",
+)
+DOCUMENT_REFERENCE = re.compile(
+	r"""\b(doc|parent)\s*(?:\.\s*([A-Za-z_]\w*)|\[\s*['"]([A-Za-z_]\w*)['"]\s*\])"""
+)
+
+
+def has_readable_dependencies(condition: str, readable: set[str], parent_readable: set[str] | None) -> bool:
+	if not condition.startswith("eval:"):
+		return condition in readable
+	references = DOCUMENT_REFERENCE.findall(condition)
+	# Reject dynamic access and references to the whole document.
+	if re.search(r"\b(?:doc|parent)\b", DOCUMENT_REFERENCE.sub("", condition)):
+		return False
+	scopes = {"doc": readable, "parent": parent_readable or set()}
+	return all((dot_name or bracket_name) in scopes[scope] for scope, dot_name, bracket_name in references)
+
+
 def digest(value: object) -> str:
 	"""Hash stable JSON while retaining list order and scalar values."""
 	encoded = json.dumps(value, sort_keys=True, ensure_ascii=True, separators=(",", ":"), default=str)
 	return sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def project_meta(schema: dict, readable: set[str], writable: set[str]) -> dict:
+def project_meta(
+	schema: dict, readable: set[str], writable: set[str], *, parent_readable: set[str] | None = None
+) -> dict:
 	"""Return only UI properties and readable fields, without permission rows."""
 	fields = []
 	for source in schema.get("fields", []):
@@ -46,6 +71,9 @@ def project_meta(schema: dict, readable: set[str], writable: set[str]) -> dict:
 		if name not in readable:
 			continue
 		field = {key: deepcopy(source[key]) for key in FIELD_PROPERTIES if key in source}
+		for key in DEPENDENCY_PROPERTIES:
+			if field.get(key) and not has_readable_dependencies(field[key], readable, parent_readable):
+				del field[key]
 		field["read_only"] = bool(source.get("read_only")) or name not in writable
 		# A configured password default must never become client bootstrap data.
 		if field.get("fieldtype") == "Password":

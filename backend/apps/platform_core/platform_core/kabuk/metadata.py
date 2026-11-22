@@ -1,56 +1,71 @@
-"""Effective metadata for the authenticated tenant user."""
+"""Effective metadata for the current tenant user."""
 
 import frappe
 from frappe.model import NO_VALUE_FIELDS
+from frappe.permissions import has_permission
 
-from platform_core.kabuk.cache import CACHE_SECONDS, permission_version
-from platform_core.kabuk.http import conditional_response
+from platform_core.kabuk.cache import permission_version
 from platform_core.kabuk.serialization import digest, project_meta
 
+TABLE_FIELD_TYPES = {"Table", "Table MultiSelect"}
 
-def get_doctype(doctype: str, user: str) -> dict | None:
-	"""Project metadata after the HTTP entry point authorizes the current user."""
+
+def get_doctype(doctype: str, user: str) -> dict:
+	"""Authorize the current user before returning the parent and visible child schemas."""
+	if not user or user == "Guest" or user != frappe.session.user:
+		frappe.throw(frappe._("You cannot read this DocType."), frappe.PermissionError)
+	if not isinstance(doctype, str) or not doctype.strip() or len(doctype) > 140:
+		frappe.throw(frappe._("A valid DocType name is required."), frappe.ValidationError)
+
+	if not frappe.db.exists("DocType", doctype, cache=True):
+		frappe.throw(frappe._("You cannot read this DocType."), frappe.PermissionError)
 	meta = frappe.get_meta(doctype)
+	if meta.istable or not has_permission(meta.name, "read", user=user, print_logs=False):
+		frappe.throw(frappe._("You cannot read this DocType."), frappe.PermissionError)
 
-	readable = permitted_fields(meta, user, "read")
-	writable = permitted_fields(meta, user, "write")
 	raw = meta.as_dict()
-	meta_hash = digest(raw)
-	# Native get_meta already caches the site schema. The immutable projection is
-	# additionally addressed by its content hash, independent from user permissions.
-	schema_key = f"platform_core:kabuk:schema:{meta_hash}"
-	schema = frappe.cache.get_value(schema_key)
-	if schema is None:
-		all_names = {field.fieldname for field in meta.fields}
-		schema = project_meta(raw, all_names, all_names)
-		frappe.cache.set_value(schema_key, schema, expires_in_sec=CACHE_SECONDS)
+	schema = visible_schema(meta, raw, user)
+	parent_readable = {field["fieldname"] for field in schema["fields"]}
+	child_tables = {}
+	sources = {meta.name: raw}
+	for field in schema["fields"]:
+		child_name = field.get("options")
+		if field["fieldtype"] not in TABLE_FIELD_TYPES or not child_name or child_name in child_tables:
+			continue
+		child = frappe.get_meta(child_name)
+		if child.istable:
+			child_raw = child.as_dict()
+			sources[child.name] = child_raw
+			child_tables[child.name] = visible_schema(
+				child, child_raw, user, parenttype=meta.name, parent_readable=parent_readable
+			)
 
-	version = digest(
-		[
-			permission_version(),
-			sorted(frappe.get_roles(user)),
-			sorted(readable),
-			sorted(writable),
-		]
-	)
-	key = f"platform_core:kabuk:effective:{digest([user, version, meta_hash])}"
-	payload = frappe.cache.get_value(key)
-	if payload is None:
-		payload = {
-			"schema": project_meta(schema, readable, writable),
-			"meta_hash": meta_hash,
-			"perm_version": version,
-		}
-		frappe.cache.set_value(key, payload, expires_in_sec=CACHE_SECONDS)
-	return conditional_response(payload, user, version)
+	return {
+		"schema": schema,
+		"child_tables": child_tables,
+		"meta_hash": digest(sources),
+		"perm_version": digest([permission_version(), sorted(frappe.get_roles(user))]),
+	}
 
 
-def permitted_fields(meta, user: str, permission_type: str) -> set[str]:
-	"""Frappe excludes layout and table fields from get_permitted_fieldnames."""
+def visible_schema(
+	meta, raw: dict, user: str, *, parenttype: str | None = None, parent_readable: set[str] | None = None
+) -> dict:
+	readable = permitted_fields(meta, user, "read", parenttype=parenttype)
+	writable = permitted_fields(meta, user, "write", parenttype=parenttype)
+	return project_meta(raw, readable, writable, parent_readable=parent_readable)
+
+
+def permitted_fields(meta, user: str, permission_type: str, *, parenttype: str | None = None) -> set[str]:
+	"""Include structural fields at the levels Frappe permits."""
 	if user == "Administrator":
 		return {field.fieldname for field in meta.fields}
-	names = set(meta.get_permitted_fieldnames(user=user, permission_type=permission_type))
-	levels = set(meta.get_permlevel_access(permission_type=permission_type, user=user))
+	names = set(
+		meta.get_permitted_fieldnames(parenttype=parenttype, user=user, permission_type=permission_type)
+	)
+	levels = set(meta.get_permlevel_access(permission_type=permission_type, parenttype=parenttype, user=user))
+	if permission_type == "read":
+		levels.update(int(field.permlevel or 0) for field in meta.fields if field.fieldname in names)
 	names.update(
 		field.fieldname
 		for field in meta.fields

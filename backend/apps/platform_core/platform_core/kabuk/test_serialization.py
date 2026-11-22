@@ -106,9 +106,9 @@ class TestMetadataProjection(unittest.TestCase):
 		custom.update(
 			options="Short\nLong",
 			default="Short",
-			depends_on="eval:doc.enabled",
-			mandatory_depends_on="eval:doc.confirmed",
-			read_only_depends_on="eval:doc.locked",
+			depends_on="eval:doc.title",
+			mandatory_depends_on="eval:doc.title",
+			read_only_depends_on="eval:doc.title",
 			fetch_from="source.title",
 			fetch_if_empty=1,
 			set_only_once=1,
@@ -118,12 +118,33 @@ class TestMetadataProjection(unittest.TestCase):
 			precision="2",
 			non_negative=1,
 			collapsible=1,
-			collapsible_depends_on="eval:doc.closed",
+			collapsible_depends_on="eval:doc.title",
 		)
 
 		result = project_meta(schema, {"title"}, {"title"})
 
 		self.assertEqual(result["fields"][0], custom)
+
+	def test_dependencies_on_unreadable_fields_are_removed(self):
+		schema = sample_schema()
+		schema["fields"][0].update(
+			depends_on="eval:doc.title && doc.private_note",
+			mandatory_depends_on="private_note",
+			read_only_depends_on="eval:doc['private_note']",
+			collapsible_depends_on="eval:doc.title",
+		)
+		field = project_meta(schema, {"title"}, {"title"})["fields"][0]
+		for key in ("depends_on", "mandatory_depends_on", "read_only_depends_on"):
+			self.assertNotIn(key, field)
+		self.assertEqual(field["collapsible_depends_on"], "eval:doc.title")
+
+	def test_dependencies_require_a_readable_parent_field(self):
+		schema = sample_schema()
+		schema["fields"][0]["depends_on"] = "eval:parent.private_note"
+		field = project_meta(schema, {"title"}, {"title"})["fields"][0]
+		self.assertNotIn("depends_on", field)
+		allowed = project_meta(schema, {"title"}, {"title"}, parent_readable={"private_note"})
+		self.assertEqual(allowed["fields"][0]["depends_on"], "eval:parent.private_note")
 
 	def test_display_hidden_setting_is_not_a_permission_grant(self):
 		schema = sample_schema()

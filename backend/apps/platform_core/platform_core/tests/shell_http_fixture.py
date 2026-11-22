@@ -16,6 +16,8 @@ import frappe
 
 SITE = "test-kabuk.localhost"
 DOCTYPE = "Kabuk Test Record"
+CHILD_DOCTYPE = "Shell Test Child"
+PROTECTED_DOCTYPE = "Shell Test Protected"
 READER = "kabuk-reader@example.test"
 PRIVILEGED = "kabuk-privileged@example.test"
 
@@ -69,6 +71,68 @@ class ShellHTTPFixture(unittest.TestCase):
 						{"role": "Kabuk Test Privileged", "read": 1, "write": 1},
 						{"role": "Kabuk Test Privileged", "permlevel": 1, "read": 1, "write": 1},
 					],
+				}
+			).insert()
+		if not frappe.db.exists("DocType", CHILD_DOCTYPE):
+			frappe.get_doc(
+				{
+					"doctype": "DocType",
+					"name": CHILD_DOCTYPE,
+					"module": "Kabuk",
+					"custom": 1,
+					"istable": 1,
+					"fields": [
+						{
+							"fieldname": "entry",
+							"fieldtype": "Data",
+							"label": "Entry",
+							"description": "Public entry.",
+						},
+						{
+							"fieldname": "private_entry",
+							"fieldtype": "Data",
+							"label": "Private entry",
+							"permlevel": 1,
+							"description": "Restricted entry.",
+						},
+					],
+				}
+			).insert()
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_field
+
+		create_custom_field(
+			DOCTYPE,
+			{
+				"fieldname": "test_entries",
+				"fieldtype": "Table",
+				"options": CHILD_DOCTYPE,
+				"label": "Entries",
+				"description": "Entries for the test record.",
+			},
+		)
+		if not frappe.db.exists("DocType", PROTECTED_DOCTYPE):
+			frappe.get_doc(
+				{
+					"doctype": "DocType",
+					"name": PROTECTED_DOCTYPE,
+					"module": "Kabuk",
+					"custom": 1,
+					"fields": [
+						{
+							"fieldname": "title",
+							"fieldtype": "Data",
+							"label": "Title",
+							"description": "Shared title.",
+						},
+						{
+							"fieldname": "entries",
+							"fieldtype": "Table",
+							"label": "Entries",
+							"options": CHILD_DOCTYPE,
+							"description": "Shared entries.",
+						},
+					],
+					"permissions": [{"role": "Kabuk Test Privileged", "read": 1, "write": 1}],
 				}
 			).insert()
 		for email, roles in (
@@ -128,6 +192,36 @@ class ShellHTTPFixture(unittest.TestCase):
 						"content": "[]",
 					}
 				).insert()
+		if not frappe.db.exists("Workspace", "Shell Unsafe Shortcut"):
+			frappe.get_doc(
+				{
+					"doctype": "Workspace",
+					"title": "Shell Unsafe Shortcut",
+					"label": "Shell Unsafe Shortcut",
+					"module": "Kabuk",
+					"public": 1,
+					"type": "URL",
+					"external_link": "javascript:void(0)",
+					"content": "[]",
+				}
+			).insert()
+		if not frappe.db.exists("Sidebar", "Shell Review Links"):
+			frappe.get_doc(
+				{
+					"doctype": "Sidebar",
+					"title": "Shell Review Links",
+					"module": "Kabuk",
+					"items": [
+						{"type": "Link", "link_type": "URL", "label": "Shell Safe Link", "url": "/panel"},
+						{
+							"type": "Link",
+							"link_type": "URL",
+							"label": "Shell Unsafe Link",
+							"url": "javascript:void(0)",
+						},
+					],
+				}
+			).insert()
 		frappe.db.commit()
 		frappe.clear_cache()
 		frappe.db.commit()
@@ -181,9 +275,9 @@ class ShellHTTPFixture(unittest.TestCase):
 		finally:
 			connection.close()
 
-	def metadata(self, sid, headers=None):
+	def metadata(self, sid, headers=None, *, doctype=DOCTYPE):
 		return self.request(
-			"/api/method/platform_core.api.meta.get_doctype?" + urlencode({"doctype": DOCTYPE}),
+			"/api/method/platform_core.api.meta.get_doctype?" + urlencode({"doctype": doctype}),
 			sid,
 			headers=headers,
 		)
