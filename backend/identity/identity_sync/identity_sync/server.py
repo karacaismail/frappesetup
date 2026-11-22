@@ -520,6 +520,12 @@ class _Api:
         return 200, {"operation_id": operation_id, "state": "resolved", "resolution": resolution}
 
 
+class _SerialHTTPServer(HTTPServer):
+    # Keep mutations serial, but admit the supported burst of twenty clients.
+    # TCPServer's backlog of five can drop connections before HTTP dispatch.
+    request_queue_size = 128
+
+
 def make_server(
     app: App,
     verifier: Verifier,
@@ -716,4 +722,4 @@ def make_server(
             route = route_name(urlsplit(getattr(self, "path", "")).path)
             _LOG.info("%s %s", route, status if status.isdigit() else "-")
 
-    return HTTPServer((host, port), RequestHandler)
+    return _SerialHTTPServer((host, port), RequestHandler)

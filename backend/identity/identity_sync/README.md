@@ -434,6 +434,11 @@ docker --context colima-factory build -f identity/identity_sync/Dockerfile -t fs
 Bu imaj 22 Kasım 2026 Pazar günü `colima-factory` profilinde derlendi ve ağsız denendi. Deneme imajı ve container'ı sonra silindi.
 
 ## Performans ölçümü
+Sunucu işleri sırayla yürütür. Bağlantı kuyruğunun sınırı 128 olarak ayarlanır.
+Bu kuyruk, aynı anda gelen 20 bağlantıya yer bırakır.
+Python sunucusunun varsayılan sınırı 5 olduğunda bağlantılar yanıt gelmeden kopabilir.
+`tests.test_connection_queue` testi, sunucu beklerken 20 bağlantı açar. Sonra her bağlantıda 200 yanıtını doğrular.
+Bu test, performans testinin hata ve süre sınırlarını değiştirmez.
 
 Proje kaydının O-31 kararı iki sınır koyar. Okuma ucunda p95 en çok 500 milisaniyedir. Yazma ucunda p95 en çok 1 saniyedir. p95, çağrıların yüzde 95'inin altında kaldığı süredir.
 
