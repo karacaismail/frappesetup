@@ -8,6 +8,7 @@ from frappe.model.docstatus import DocStatus
 from pydantic import StringConstraints
 
 from hrms_tr.access import DOCTYPE
+from hrms_tr.users import HRMS_TR_ROLES
 
 HR_ROLE = "HRMS TR Admin"
 MANAGER_ROLE = "HRMS TR Manager"
@@ -124,6 +125,11 @@ def cancel(name: str, *, expected_version: str) -> dict[str, str]:
 
 
 def get_approver(employee: str) -> str | None:
+	roles = frappe.get_roles()
+	if frappe.session.user != "Administrator" and not set((*HRMS_TR_ROLES, *OPERATIONS_ROLES)).intersection(
+		roles
+	):
+		frappe.throw(_("Not permitted"), frappe.PermissionError)
 	if not frappe.db.exists("Employee", employee):
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
 	return frappe.get_attr(HRMS_APPROVER_METHOD)(employee)

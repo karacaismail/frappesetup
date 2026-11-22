@@ -213,7 +213,7 @@ paths:
     get:
       operationId: getLeaveApprover
       summary: Read the default leave approver for an employee the caller can access through HRMS.
-      description: Uses the standard HRMS employee access check and approver selection rules.
+      description: Requires an HRMS TR or authorized operations role. Uses the standard HRMS employee access check and approver selection rules.
       parameters:
         - in: query
           name: employee

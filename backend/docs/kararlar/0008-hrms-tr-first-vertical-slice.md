@@ -39,7 +39,7 @@ HRMS TR, izin listesine onay, iptal ve onaylayan kişi sorgusu uçlarını ekler
 Onay ucu rolü, kayıt erişimini ve sürümü ayrıca denetler.
 Eski HRMS yolları izin listesinde yer almaz.
 Çalışan, `hrms_tr.api.get_leave_approver` ile izin talebini kimin onaylayacağını öğrenir.
-Sunucu, sorgu için HRMS'in çalışan erişim kuralını uygular.
+Sunucu önce rolü denetler. Sonra HRMS'in çalışan erişim kuralını uygular.
 Yönetici ve İK rol profilleri çalışan rolünü de taşır.
 HRMS, varsayılan onaylayıcıya kendi “Leave Approver” rolünü ekler.
 HRMS TR, bu rolü HRMS TR hesabından çıkarır.

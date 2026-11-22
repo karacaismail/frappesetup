@@ -57,6 +57,7 @@ class ApprovalEndpointTest(TestCase):
 			patch(f"{native_module}.validate_leave_access", side_effect=frappe.PermissionError) as validate,
 			patch(f"{native_module}.get_employee_leave_approver") as lookup,
 		):
+			fake.get_roles.return_value = ["HRMS TR Employee"]
 			fake.db.exists.return_value = True
 			fake.get_attr.return_value = native_lookup
 			with self.assertRaises(frappe.PermissionError):

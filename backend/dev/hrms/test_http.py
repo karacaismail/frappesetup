@@ -123,6 +123,98 @@ class LeaveHttpTest(unittest.TestCase):
             if self.data["leave_owners"][key] in actors
         }
 
+    def test_d6_http_permission_matrix(self):
+        fixture = self.data["d6"]
+        actors = {
+            "guest": Client(self, None),
+            "roleless": Client(self, fixture["roleless"]),
+            "foreign": Client(self, fixture["foreign"]),
+            "authorized": self.login("hr"),
+        }
+        hr = actors["authorized"]
+        self.document(actors["foreign"], "foreign")
+        draft = self.document(hr, "d6")
+        list_query = urlencode({"filters": json.dumps({"name": draft["name"]})})
+        detail = self.leave_path("d6")
+        approver = "/api/method/hrms_tr.api.get_leave_approver"
+        closed = "/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
+        attendance = quote(fixture["attendance"], safe="")
+        warnings = f"/api/v2/document/Attendance%20Request/{attendance}/method/get_attendance_warnings/"
+
+        for actor, client in actors.items():
+            allowed = actor == "authorized"
+            with self.subTest(endpoint="list", actor=actor):
+                status, payload = client.send(f"{LEAVE_PATH}?{list_query}")
+                if allowed:
+                    self.assertEqual(status, 200, payload.get("exc_type"))
+                    self.assertEqual(payload["data"], [{"name": draft["name"]}])
+                else:
+                    self.assertIn(status, (200, 403), payload.get("exc_type"))
+                    if status == 200:
+                        self.assertEqual(payload["data"], [])
+                outcome = (
+                    f"{status} empty"
+                    if status == 200 and not payload["data"]
+                    else str(status)
+                )
+                print(f"D-6 list {actor}: {outcome}")
+
+            employee = (
+                fixture["roleless_employee"]
+                if actor == "roleless"
+                else draft["employee"]
+            )
+            approver_query = urlencode({"employee": employee})
+            scenarios = (
+                ("detail", "GET", detail, 200 if allowed else 403),
+                (
+                    "approver",
+                    "GET",
+                    f"{approver}?{approver_query}",
+                    200 if allowed else 403,
+                ),
+                ("closed GET", "GET", closed, 403),
+                ("closed POST", "POST", closed, 403),
+                ("attendance GET", "GET", warnings, 403),
+                ("attendance POST", "POST", warnings, 403),
+            )
+            for endpoint, method, path, expected in scenarios:
+                self.check_d6_response(actor, client, endpoint, method, path, expected)
+
+        for action, before, final_status in (("approve", 0, 1), ("cancel", 1, 2)):
+            initial = self.document(hr, "d6")
+            self.assertEqual(initial["docstatus"], before)
+            for actor, client in actors.items():
+                self.check_d6_response(
+                    actor,
+                    client,
+                    action,
+                    "POST",
+                    f"/api/method/hrms_tr.api.{action}_leave",
+                    200 if actor == "authorized" else 403,
+                    body=self.approval_payload(initial),
+                )
+                current = self.document(hr, "d6")
+                if actor == "authorized":
+                    self.assertEqual(current["docstatus"], final_status)
+                else:
+                    self.assertEqual(current, initial)
+
+    def check_d6_response(
+        self, actor, client, endpoint, method, path, expected, *, body=None
+    ):
+        with self.subTest(endpoint=endpoint, actor=actor):
+            status, payload = client.send(path, body, method=method)
+            print(f"D-6 {endpoint} {actor}: {status}")
+            self.assertEqual(status, expected, payload.get("exc_type"))
+            if expected == 403:
+                error_type = (
+                    payload["errors"][0]["type"]
+                    if path.startswith("/api/v2/")
+                    else payload.get("exc_type")
+                )
+                self.assertEqual(error_type, "PermissionError")
+
     def test_native_leave_list_projection_filters_and_pagination(self):
         client = self.login("employee")
         names = sorted(self.leaves_owned_by("employee"))[:2]

@@ -204,6 +204,98 @@ def seed(password):
     }
 
 
+def seed_permission_matrix(password, data):
+    roleless = insert(
+        "User",
+        email="hrms-tr-roleless@example.test",
+        first_name="Synthetic Roleless User",
+        user_type="Website User",
+        new_password=password,
+        send_welcome_email=0,
+    )
+    roleless_employee = insert(
+        "Employee",
+        first_name="Synthetic Roleless Employee",
+        company=COMPANY,
+        gender="Other",
+        status="Active",
+        date_of_birth="1990-01-01",
+        date_of_joining=add_days(today(), -30),
+        user_id=roleless.name,
+        create_user_permission=0,
+    )
+    foreign = insert(
+        "User",
+        email="hrms-tr-foreign-hr@example.test",
+        first_name="Synthetic Foreign HR",
+        user_type="Website User",
+        new_password=password,
+        send_welcome_email=0,
+        role_profiles=[{"role_profile": "HRMS TR Admin"}],
+    )
+    company = insert(
+        "Company",
+        company_name="HRMS TR Foreign Synthetic",
+        abbr="FHR",
+        default_currency="TRY",
+        country="Türkiye",
+    )
+    day = add_days(today(), 32)
+    employee = insert(
+        "Employee",
+        first_name="Synthetic Foreign Employee",
+        company=company.name,
+        gender="Other",
+        status="Active",
+        date_of_birth="1990-01-01",
+        date_of_joining=add_days(today(), -30),
+        create_user_permission=0,
+    )
+    leave = insert(
+        "Leave Application",
+        employee=employee.name,
+        company=company.name,
+        leave_type=LEAVE_TYPE,
+        from_date=day,
+        to_date=day,
+        posting_date=today(),
+        status="Open",
+    )
+    insert(
+        "User Permission",
+        user=foreign.name,
+        allow="Company",
+        for_value=company.name,
+        apply_to_all_doctypes=1,
+    )
+    attendance = insert(
+        "Attendance Request",
+        employee=data["employees"]["employee"],
+        from_date=add_days(today(), 61),
+        to_date=add_days(today(), 61),
+        reason="Work From Home",
+    )
+    draft = insert(
+        "Leave Application",
+        employee=data["employees"]["employee"],
+        company=COMPANY,
+        leave_type=LEAVE_TYPE,
+        from_date=day,
+        to_date=day,
+        posting_date=today(),
+        status="Open",
+    )
+    data["employees"]["foreign"] = employee.name
+    data["leaves"].update(d6=draft.name, foreign=leave.name)
+    data["leave_owners"].update(d6="employee", foreign="foreign")
+    data["d6"] = {
+        "roleless": roleless.name,
+        "roleless_employee": roleless_employee.name,
+        "foreign": foreign.name,
+        "attendance": attendance.name,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site", required=True)
@@ -221,6 +313,7 @@ def main():
             raise SystemExit("The site must have allow_tests enabled.")
         frappe.set_user("Administrator")
         data = seed(password)
+        seed_permission_matrix(password, data)
         frappe.db.commit()
         manifest.write_text(json.dumps(data, indent=2) + "\n")
     finally:
