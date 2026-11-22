@@ -152,6 +152,10 @@ def merge_dependencies(base, left, right):
 def resolve(worktree, filename):
     if filename not in (HOOKS, TRANSLATIONS, MODULES, DEPENDENCIES):
         raise MergeError("Manual resolution required.")
+    root = Path(worktree).resolve()
+    target = root / filename
+    if target.is_symlink() or not target.resolve().is_relative_to(root):
+        raise MergeError("Manual resolution required for a linked path.")
     stages = [git(worktree, "show", f":{stage}:{filename}", check=False) for stage in (1, 2, 3)]
     base, left, right = (result.stdout for result in stages)
     if stages[1].returncode or stages[2].returncode:
@@ -167,5 +171,5 @@ def resolve(worktree, filename):
         merged = "\n".join(ordered_union(left.splitlines(), right.splitlines())) + "\n"
     else:
         merged = merge_dependencies(base, left, right)
-    (Path(worktree) / filename).write_text(merged)
+    target.write_text(merged)
     git(worktree, "add", "--", filename)
