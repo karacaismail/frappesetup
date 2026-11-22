@@ -84,11 +84,11 @@ def _seed(suffix, credential, role, cleanup):
 
 	provider = insert("AI Provider", provider_name=f"Local {suffix}", adapter="ollama")
 	accounts = [
-		insert("AI Account", provider=provider, account_name=f"{position} account {suffix}")
+		insert("AI Account", provider=provider, account_name=f"{position} account {suffix}", currency="USD")
 		for position in ("First", "Second")
 	]
 	model_id = f"fixture-model-{suffix}"
-	model = insert("AI Model", provider=provider, model_id=model_id, context_size=4096)
+	model = insert("AI Model", provider=provider, model_id=model_id, context_size=4096, cost_currency="USD")
 	apis = [
 		insert(
 			"AI API",
