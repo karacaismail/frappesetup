@@ -35,7 +35,7 @@ class TestRetention(TestCase):
 			framework.qb.get_query.return_value.run.return_value = [{"name": "LEAVE-1"}]
 			framework.get_doc.side_effect = [
 				SimpleNamespace(status="Left", relieving_date="2026-10-01"),
-				SimpleNamespace(employee="EMP-LEFT", to_date="2026-10-02"),
+				SimpleNamespace(employee="EMP-LEFT", to_date="2026-10-02", docstatus=0),
 			]
 			result = retention.purge()
 			self.assertEqual(result, {"dry_run": True, "cutoff": "2026-10-23", "employees": 1, "leaves": 1})
@@ -45,7 +45,7 @@ class TestRetention(TestCase):
 			)
 			framework.delete_doc.assert_not_called()
 
-	def test_purge_rechecks_employment_and_deletes_exact_records_permanently(self):
+	def test_purge_deletes_only_expired_leave_records_permanently(self):
 		with (
 			patch.object(retention, "frappe") as framework,
 			patch.object(retention, "today", return_value="2026-11-22"),
@@ -53,7 +53,7 @@ class TestRetention(TestCase):
 			framework.conf = {"hrms_tr_retention_days": 30}
 			framework.get_all.return_value = ["EMP-ACTIVE", "EMP-LEFT"]
 			framework.qb.get_query.return_value.run.return_value = [{"name": "LEAVE-1"}]
-			leave = Mock(employee="EMP-LEFT", to_date="2026-10-02", docstatus=1)
+			leave = Mock(employee="EMP-LEFT", to_date="2026-10-02", docstatus=0)
 			leave.name = "LEAVE-1"
 			framework.get_doc.side_effect = [
 				SimpleNamespace(status="Active", relieving_date="2026-10-01"),
@@ -63,12 +63,11 @@ class TestRetention(TestCase):
 			result = retention.purge(dry_run=False)
 			self.assertEqual((result["employees"], result["leaves"]), (1, 1))
 			framework.only_for.assert_called_once_with("System Manager")
-			leave.cancel.assert_called_once_with()
+			leave.cancel.assert_not_called()
 			self.assertEqual(
 				framework.delete_doc.call_args_list,
 				[
 					call("Leave Application", "LEAVE-1", delete_permanently=True),
-					call("Employee", "EMP-LEFT", delete_permanently=True),
 				],
 			)
 			self.assertTrue(all(entry.kwargs["for_update"] for entry in framework.get_doc.call_args_list))

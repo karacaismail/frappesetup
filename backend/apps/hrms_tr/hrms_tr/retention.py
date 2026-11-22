@@ -1,4 +1,4 @@
-"""Manually remove expired HRMS TR employment and leave records."""
+"""Manually remove expired HRMS TR leave records."""
 
 from datetime import date
 
@@ -46,16 +46,12 @@ def purge(*, dry_run: bool = True) -> dict[str, bool | int | str]:
 		applications = [
 			frappe.get_doc("Leave Application", row["name"], for_update=not dry_run) for row in leave_rows
 		]
-		if any(
-			doc.employee != name or not doc.to_date or getdate(doc.to_date) >= cutoff for doc in applications
-		):
-			continue
-		if not dry_run:
-			for doc in applications:
-				if doc.docstatus == 1:
-					doc.cancel()
+		for doc in applications:
+			# HRMS cancellation changes leave ledger and attendance records.
+			if doc.employee != name or not doc.to_date or getdate(doc.to_date) >= cutoff or doc.docstatus == 1:
+				continue
+			if not dry_run:
 				frappe.delete_doc("Leave Application", doc.name, delete_permanently=True)
-			frappe.delete_doc("Employee", name, delete_permanently=True)
+			leaves += 1
 		employees += 1
-		leaves += len(applications)
 	return {"dry_run": dry_run, "cutoff": cutoff.isoformat(), "employees": employees, "leaves": leaves}

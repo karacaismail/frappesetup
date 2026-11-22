@@ -7,8 +7,8 @@ Uygulama GPL-3.0 lisansını kullanır.
 
 Hukuk sorumlusu süreyi belirleyince site ayarında `hrms_tr_retention_days` değerini sayı olarak girin.
 Bu ayar yoksa komut durur. Varsayılan saklama süresi yoktur.
-Komut, işten ayrılma tarihi sınırdan eski olan çalışanları seçer.
-İzin kaydının bitiş tarihi sınıra eşit veya daha yeniyse çalışan ve izinleri kalır.
+Komut, işten ayrılma tarihi sınırdan eski olan çalışanların izin kayıtlarına bakar.
+Komut, bitiş tarihi sınırdan eski olan taslak veya iptal edilmiş izin kayıtlarını seçer.
 
 Önce yedek alın. Sonra komutun göstereceği kayıt sayılarını kontrol edin.
 
@@ -23,9 +23,12 @@ Sayıları kontrol ettikten sonra silme komutunu çalıştırın.
 bench --site <site> execute hrms_tr.retention.purge --kwargs '{"dry_run": False}'
 ```
 
-Komut, gönderilmiş izin kayıtlarını Frappe üzerinden iptal eder ve kalıcı siler.
-Frappe bir bağlantı veya iptal kuralı nedeniyle işlemi durdurabilir.
+Komut gönderilmiş izin kayıtlarını korur.
+HRMS, iptal sırasında “Leave Ledger Entry” ve “Attendance” kayıtlarını değiştirebilir.
+Başka bir “Leave Application” kaydı, düzeltme bağlantısıyla silmeyi durdurabilir.
+Özel bağlantılar da Frappe'nin silme denetimine girer.
 Bu durumda komut hata verir. Geri dönüş için veritabanı yedeği kullanılır.
 
-Komut yalnız çalışan ve izin kayıtlarını kapsar.
+Komut yalnız izin kayıtlarını siler. Çalışan kaydı kalır.
+“Leave Allocation”, “Leave Ledger Entry”, “Attendance”, “Salary Slip” ve “Shift Assignment” kayıtları kalır.
 Kullanıcı hesapları, denetim kayıtları ve yedekler bu işlemin kapsamı dışındadır.
