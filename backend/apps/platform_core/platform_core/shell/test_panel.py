@@ -1,6 +1,8 @@
+import csv
 from html.parser import HTMLParser
+from pathlib import Path
 
-from platform_core.kabuk.http_fixture import ShellHTTPFixture
+from platform_core.shell.http_fixture import ShellHTTPFixture
 
 
 class PanelMetadata(HTMLParser):
@@ -36,3 +38,16 @@ class TestPanelHTTP(ShellHTTPFixture):
 		first = panel_token(self.reader_sid)
 		self.assertEqual(first, panel_token(self.reader_sid))
 		self.assertNotEqual(first, panel_token(self.privileged_sid))
+
+	def test_panel_uses_the_requested_language(self):
+		source = "Management panel"
+		catalog = Path(__file__).resolve().parents[1] / "translations" / "tr.csv"
+		with catalog.open(encoding="utf-8", newline="") as stream:
+			translation = dict(csv.reader(stream))[source]
+		self.assertNotEqual(translation, source)
+		for language, title in (("en", source), ("tr", translation)):
+			with self.subTest(language=language):
+				status, _, body = self.request(f"/panel?_lang={language}", self.reader_sid)
+				self.assertEqual(status, 200)
+				self.assertIn(f'<html lang="{language}">', body.decode("utf-8"))
+				self.assertIn(f"<title>{title}</title>", body.decode("utf-8"))

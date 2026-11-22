@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import frappe
 
-VERSION_KEY = "platform_core:kabuk:permission_version"
+VERSION_KEY = "platform_core:shell:permission_version"
 CACHE_SECONDS = 300
 
 

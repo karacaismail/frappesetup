@@ -7,9 +7,9 @@ from frappe.desk.desktop import get_workspaces
 from frappe.desk.doctype.sidebar.sidebar import SidebarContext, get_navigable_modules, resolve_sidebar
 from frappe.desk.utils import is_item_allowed
 
-from platform_core.kabuk.cache import permission_version
-from platform_core.kabuk.http import conditional_response
-from platform_core.kabuk.serialization import digest
+from platform_core.shell.cache import permission_version
+from platform_core.shell.http import conditional_response
+from platform_core.shell.serialization import digest
 
 
 def safe_url(value: str | None) -> bool:

@@ -3,15 +3,15 @@ import unittest
 from pathlib import Path
 
 
-class TestKabukBoundary(unittest.TestCase):
+class TestShellBoundary(unittest.TestCase):
 	def test_shell_code_only_imports_its_own_platform_module(self):
-		kabuk = Path(__file__).parent
-		root = kabuk.parent
+		shell = Path(__file__).parent
+		root = shell.parent
 		sources = [
 			root / "api" / "meta.py",
 			root / "api" / "shell.py",
 			root / "www" / "panel.py",
-			*(path for path in kabuk.glob("*.py") if not path.stem.startswith("test_")),
+			*(path for path in shell.glob("*.py") if not path.stem.startswith("test_")),
 		]
 		for source in sources:
 			tree = ast.parse(source.read_text(encoding="utf-8"))
@@ -27,4 +27,4 @@ class TestKabukBoundary(unittest.TestCase):
 				for module in modules:
 					if module.startswith("platform_core."):
 						with self.subTest(file=source.name, module=module):
-							self.assertEqual(module.split(".")[1], "kabuk")
+							self.assertEqual(module.split(".")[1], "shell")

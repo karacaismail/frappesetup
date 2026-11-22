@@ -4,7 +4,7 @@ from urllib.parse import urlencode
 import frappe
 from frappe.core.doctype.user.user import generate_keys
 
-from platform_core.kabuk.http_fixture import DOCTYPE, PRIVILEGED, READER, ShellHTTPFixture
+from platform_core.shell.http_fixture import DOCTYPE, PRIVILEGED, READER, ShellHTTPFixture
 
 
 class TestBootstrapHTTP(ShellHTTPFixture):
@@ -24,19 +24,19 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 		self.assertEqual(payload["user"]["name"], READER)
 		self.assertIn("platform_core", payload["installed_apps"])
 		names = [page["name"] for page in payload["workspaces"]]
-		self.assertIn("Kabuk Visible", names)
-		self.assertNotIn("Kabuk Hidden", names)
-		self.assertNotIn("Kabuk Restricted", names)
-		self.assertNotIn("Kabuk Hidden", json.dumps(payload["sidebars"]))
-		self.assertNotIn("Kabuk Restricted", json.dumps(payload["sidebars"]))
+		self.assertIn("Shell Visible", names)
+		self.assertNotIn("Shell Hidden", names)
+		self.assertNotIn("Shell Restricted", names)
+		self.assertNotIn("Shell Hidden", json.dumps(payload["sidebars"]))
+		self.assertNotIn("Shell Restricted", json.dumps(payload["sidebars"]))
 
 	def test_sidebar_includes_own_private_workspace_only(self):
 		status, _, body = self.request("/api/method/platform_core.api.shell.get_bootstrap", self.reader_sid)
 		self.assertEqual(status, 200)
 		sidebars = json.loads(body)["message"]["sidebars"]
 		targets = {item.get("link_to") for sidebar in sidebars for item in sidebar["data"]["items"]}
-		self.assertIn("Kabuk Reader Private", targets)
-		self.assertNotIn("Kabuk Other Private", targets)
+		self.assertIn("Shell Reader Private", targets)
+		self.assertNotIn("Shell Other Private", targets)
 
 	def test_api_key_does_not_create_browser_session(self):
 		keys = generate_keys(READER)

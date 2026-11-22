@@ -2,8 +2,8 @@
 
 import frappe
 
-from platform_core.kabuk.bootstrap import get_bootstrap as read_bootstrap
-from platform_core.kabuk.http import require_session
+from platform_core.shell.bootstrap import get_bootstrap as read_bootstrap
+from platform_core.shell.http import require_session
 
 
 # No record selector is accepted. Identity comes from the session cookie, and

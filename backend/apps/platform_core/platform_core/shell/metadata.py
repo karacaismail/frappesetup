@@ -3,9 +3,9 @@
 import frappe
 from frappe.model import NO_VALUE_FIELDS
 
-from platform_core.kabuk.cache import CACHE_SECONDS, permission_version
-from platform_core.kabuk.http import conditional_response
-from platform_core.kabuk.serialization import digest, project_meta
+from platform_core.shell.cache import CACHE_SECONDS, permission_version
+from platform_core.shell.http import conditional_response
+from platform_core.shell.serialization import digest, project_meta
 
 
 def get_doctype(doctype: str, user: str) -> dict | None:
@@ -18,7 +18,7 @@ def get_doctype(doctype: str, user: str) -> dict | None:
 	meta_hash = digest(raw)
 	# Native get_meta already caches the site schema. The immutable projection is
 	# additionally addressed by its content hash, independent from user permissions.
-	schema_key = f"platform_core:kabuk:schema:{meta_hash}"
+	schema_key = f"platform_core:shell:schema:{meta_hash}"
 	schema = frappe.cache.get_value(schema_key)
 	if schema is None:
 		all_names = {field.fieldname for field in meta.fields}
@@ -33,7 +33,7 @@ def get_doctype(doctype: str, user: str) -> dict | None:
 			sorted(writable),
 		]
 	)
-	key = f"platform_core:kabuk:effective:{digest([user, version, meta_hash])}"
+	key = f"platform_core:shell:effective:{digest([user, version, meta_hash])}"
 	payload = frappe.cache.get_value(key)
 	if payload is None:
 		payload = {

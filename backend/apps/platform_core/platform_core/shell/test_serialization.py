@@ -7,14 +7,14 @@ These fixtures contain invented metadata only.
 import copy
 import unittest
 
-from platform_core.kabuk.serialization import digest, etag_for, matches_etag, project_meta
+from platform_core.shell.serialization import digest, etag_for, matches_etag, project_meta
 
 
 def sample_schema() -> dict:
 	"""Return effective metadata after a site's custom fields and property setters."""
 	return {
 		"name": "Sample Record",
-		"module": "Kabuk",
+		"module": "Shell",
 		"title_field": "title",
 		"search_fields": "title,private_note",
 		"sort_field": "private_note",

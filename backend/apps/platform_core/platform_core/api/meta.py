@@ -2,8 +2,8 @@
 
 import frappe
 
-from platform_core.kabuk.http import require_session
-from platform_core.kabuk.metadata import get_doctype as read_doctype
+from platform_core.shell.http import require_session
+from platform_core.shell.metadata import get_doctype as read_doctype
 
 
 @frappe.whitelist(methods=["GET"])

@@ -2,7 +2,7 @@ import json
 
 import frappe
 
-from platform_core.kabuk.http_fixture import DOCTYPE, PRIVILEGED, READER, ShellHTTPFixture
+from platform_core.shell.http_fixture import DOCTYPE, PRIVILEGED, READER, ShellHTTPFixture
 
 
 class TestMetadataHTTP(ShellHTTPFixture):
@@ -56,7 +56,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertEqual(status, 200)
 		frappe.set_user("Administrator")
 		doc = frappe.get_doc("User", PRIVILEGED)
-		doc.set("roles", [{"role": "Kabuk Test Reader"}])
+		doc.set("roles", [{"role": "Shell Test Reader"}])
 		doc.save()
 		frappe.db.commit()
 		try:
@@ -68,7 +68,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 			)
 		finally:
 			doc = frappe.get_doc("User", PRIVILEGED)
-			doc.set("roles", [{"role": "Kabuk Test Reader"}, {"role": "Kabuk Test Privileged"}])
+			doc.set("roles", [{"role": "Shell Test Reader"}, {"role": "Shell Test Privileged"}])
 			doc.save()
 			frappe.db.commit()
 

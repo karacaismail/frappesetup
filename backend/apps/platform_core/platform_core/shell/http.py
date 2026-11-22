@@ -4,7 +4,7 @@ from urllib.parse import unquote
 
 import frappe
 
-from platform_core.kabuk.serialization import etag_for, matches_etag
+from platform_core.shell.serialization import etag_for, matches_etag
 
 
 def has_session_cookie() -> bool:

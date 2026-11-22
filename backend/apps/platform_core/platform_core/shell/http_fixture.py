@@ -1,6 +1,7 @@
-"""HTTP acceptance tests on a dedicated test-kabuk.localhost site only.
+"""HTTP acceptance tests on a dedicated test-shell.localhost site only.
 
-Run the local bench web process first. Fixtures use synthetic accounts.
+Initialize the test site encryption key before starting the local bench web process.
+Frappe caches the site configuration in the web process. Fixtures use synthetic accounts.
 The tests commit fixtures because real HTTP requests use separate transactions.
 """
 
@@ -14,25 +15,25 @@ from urllib.parse import urlencode
 
 import frappe
 
-SITE = "test-kabuk.localhost"
-DOCTYPE = "Kabuk Test Record"
-READER = "kabuk-reader@example.test"
-PRIVILEGED = "kabuk-privileged@example.test"
+SITE = "test-shell.localhost"
+DOCTYPE = "Shell Test Record"
+READER = "shell-reader@example.test"
+PRIVILEGED = "shell-privileged@example.test"
 
 
 class ShellHTTPFixture(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):
-		cls.site = os.environ.get("KABUK_TEST_SITE", SITE)
+		cls.site = os.environ.get("SHELL_TEST_SITE", SITE)
 		if cls.site != SITE:
-			raise RuntimeError("Use the isolated test-kabuk.localhost site.")
+			raise RuntimeError("Use the isolated test-shell.localhost site.")
 		frappe.init(site=cls.site, sites_path=os.getcwd())
 		frappe.connect()
 		if not frappe.conf.allow_tests:
 			raise RuntimeError("Tests are disabled on this site.")
 		frappe.set_user("Administrator")
 		cls.password = secrets.token_urlsafe(30)
-		for name in ("Kabuk Test Reader", "Kabuk Test Privileged"):
+		for name in ("Shell Test Reader", "Shell Test Privileged"):
 			if not frappe.db.exists("Role", name):
 				frappe.get_doc({"doctype": "Role", "role_name": name, "desk_access": 0}).insert()
 		if not frappe.db.exists("DocType", DOCTYPE):
@@ -40,7 +41,7 @@ class ShellHTTPFixture(unittest.TestCase):
 				{
 					"doctype": "DocType",
 					"name": DOCTYPE,
-					"module": "Kabuk",
+					"module": "Shell",
 					"custom": 1,
 					"fields": [
 						{
@@ -65,15 +66,15 @@ class ShellHTTPFixture(unittest.TestCase):
 						},
 					],
 					"permissions": [
-						{"role": "Kabuk Test Reader", "read": 1, "write": 1, "create": 1},
-						{"role": "Kabuk Test Privileged", "read": 1, "write": 1},
-						{"role": "Kabuk Test Privileged", "permlevel": 1, "read": 1, "write": 1},
+						{"role": "Shell Test Reader", "read": 1, "write": 1, "create": 1},
+						{"role": "Shell Test Privileged", "read": 1, "write": 1},
+						{"role": "Shell Test Privileged", "permlevel": 1, "read": 1, "write": 1},
 					],
 				}
 			).insert()
 		for email, roles in (
-			(READER, ["Kabuk Test Reader"]),
-			(PRIVILEGED, ["Kabuk Test Reader", "Kabuk Test Privileged"]),
+			(READER, ["Shell Test Reader"]),
+			(PRIVILEGED, ["Shell Test Reader", "Shell Test Privileged"]),
 		):
 			if not frappe.db.exists("User", email):
 				doc = frappe.get_doc(
@@ -97,9 +98,9 @@ class ShellHTTPFixture(unittest.TestCase):
 				doc.set("roles", [{"role": role} for role in roles])
 				doc.save()
 		for title, hidden, restricted in (
-			("Kabuk Visible", 0, False),
-			("Kabuk Hidden", 1, False),
-			("Kabuk Restricted", 0, True),
+			("Shell Visible", 0, False),
+			("Shell Hidden", 1, False),
+			("Shell Restricted", 0, True),
 		):
 			if not frappe.db.exists("Workspace", title):
 				frappe.get_doc(
@@ -108,21 +109,21 @@ class ShellHTTPFixture(unittest.TestCase):
 						"name": title,
 						"title": title,
 						"label": title,
-						"module": "Kabuk",
+						"module": "Shell",
 						"public": 1,
 						"is_hidden": hidden,
 						"content": "[]",
-						"roles": [{"role": "Kabuk Test Privileged"}] if restricted else [],
+						"roles": [{"role": "Shell Test Privileged"}] if restricted else [],
 					}
 				).insert()
-		for title, owner in (("Kabuk Reader Private", READER), ("Kabuk Other Private", PRIVILEGED)):
+		for title, owner in (("Shell Reader Private", READER), ("Shell Other Private", PRIVILEGED)):
 			if not frappe.db.exists("Workspace", title):
 				frappe.get_doc(
 					{
 						"doctype": "Workspace",
 						"title": title,
 						"label": title,
-						"module": "Kabuk",
+						"module": "Shell",
 						"public": 0,
 						"for_user": owner,
 						"content": "[]",
@@ -141,7 +142,7 @@ class ShellHTTPFixture(unittest.TestCase):
 	@classmethod
 	def request(cls, path, sid=None, method="GET", data=None, headers=None):
 		connection = http.client.HTTPConnection(
-			"127.0.0.1", int(os.environ.get("KABUK_TEST_PORT", "8000")), timeout=30
+			"127.0.0.1", int(os.environ.get("SHELL_TEST_PORT", "8000")), timeout=30
 		)
 		request_headers = {"Host": cls.site, "Accept": "application/json"}
 		if sid:
@@ -161,7 +162,7 @@ class ShellHTTPFixture(unittest.TestCase):
 	def login(cls, user):
 		cookies = SimpleCookie()
 		connection = http.client.HTTPConnection(
-			"127.0.0.1", int(os.environ.get("KABUK_TEST_PORT", "8000")), timeout=30
+			"127.0.0.1", int(os.environ.get("SHELL_TEST_PORT", "8000")), timeout=30
 		)
 		try:
 			connection.request(
