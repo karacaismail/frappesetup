@@ -64,6 +64,7 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 17. Giriş Keycloak ile olur. Keycloak'ın markası Atonota'dır. Atonota ayrı alan adında durur.
 18. İlk turda Press de geliştirilir.
 19. Bütün uygulamalar Frappe 16 ile yazılır. Press de Frappe 16 üzerinde çalışır.
+20. Her şey yapay zekâyla yönetilebilir olur. Katman model sağlayıcısından bağımsızdır.
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -743,6 +744,28 @@ Sonuç şudur:
 - Bu karar sitedeki K1 kararını değiştirir. K1, Press'i Frappe 15 üzerinde kurar.
 - Kurulumun kendi notuna göre Press bu sürümde yalnız yamalarla açılır. Sunucu kurma ve Ansible çalışmaz.
 - Üretimde Press'in hangi sürümle çalışacağı ayrı karardır. Konu `backend/PROJE-KAYDI.md` dosyasında A-11 maddesidir.
+
+### Karar 36. Her şey yapay zekâyla yönetilebilir olacak
+
+Proje sahibi şunu istedi:
+
+> bütün doctypes, bütün fields, db, backend, her bir zerresi, tamamen, ai il eetkileşime girebilir altyapıda geliştirilmesi. ai heryerde olmalı, ai provider'dan bağımsız, herşey ai ile yönetilebilmeli.
+
+Proje sahibi sonra sitedeki AI bölümünü gösterdi:
+
+> https://karacaismail.github.io/frappesetup/ai-bakis/
+>
+> şurada da ayrıca yönergeler var
+
+Sonuç şudur:
+
+- `platform_core` içinde bir yapay zekâ erişim katmanı kurulur. Modülün adı `yapay_zeka` olur.
+- Araçlar DocType tanımından çalışma anında üretilir. Böylece yeni DocType için ayrı kod gerekmez.
+- Yapay zekâ kullanıcının kimliğiyle ve aynı yetkiyle çalışır.
+- Dış arayüz MCP ve OpenAPI olur. Frappe uygulamalarında model sağlayıcısı kitaplığı ve model adı yoktur.
+- Sitenin AI bölümündeki kurallar geçerlidir. Örneğin her yazma insan onaylıdır. Gizli alan hiç okunmaz.
+- Veritabanına ham SQL aracı açılmaz. Veritabanı DocType katmanından açılır. Bu kural standartların G-5 ve G-10 kurallarından gelir.
+- Sitenin K9 kararı Claude Agent SDK'yı ve Claude modellerini adıyla seçer. Bu karar sağlayıcıdan bağımsızlıkla çelişir. Konu `backend/PROJE-KAYDI.md` dosyasında A-12 maddesidir.
 
 ## Modellerin kararları
 

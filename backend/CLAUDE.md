@@ -15,6 +15,7 @@ Bu klasör platformun sunucu kodunu tutar. Deponun kökündeki `AGENTS.md` karar
    - Keycloak için `rail-4-keycloak.md` dosyasını okuyun.
    - Press için `rail-1-press.md` dosyasını okuyun.
    - Kiracı sitesi için `rail-2-gelistirme.md` ve `rail-2-yapilandirma.md` dosyalarını okuyun.
+   - Yapay zekâ için `rail-5-ai.md` ve `ai-*.md` dosyalarını okuyun. `ai-bakis.md` dosyası özet kararları verir.
 
 Karar sitesi proje kaydıyla çelişebilir. Bu durumda proje kaydını uygulayın. Çelişkiyi raporunuza yazın.
 
@@ -32,6 +33,7 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `platform_core/api/__init__.py`, `api/auth.py`, `api/identity.py` | Kimlik uçları | platform-core-kimlik |
 | `apps/platform_core/platform_core/kabuk/` | Açılış verisi ve DocType tanımı | platform-core-kabuk |
 | `platform_core/api/shell.py`, `api/meta.py`, `www/panel.*` | Kabuk uçları ve `/panel` sayfası | platform-core-kabuk |
+| `apps/platform_core/platform_core/yapay_zeka/` | Yapay zekâ erişim katmanı | platform-core-yz |
 | `apps/press_tr/` | Press'in Türkiye uygulaması | press-tr |
 | `identity/keycloak/realm/` | Realm tanımı | kimlik-realm |
 | `identity/keycloak/themes/atonota/` | Atonota giriş teması | kimlik-tema |
@@ -70,6 +72,16 @@ Proje sahibi `cron` kurulumunu istemedi. Bu yüzden şunları kurmayın:
 - gece mutabakatı ya da saatlik yedek iş.
 
 Karar sitesi bazı yerlerde saatlik ya da gecelik iş anar. Bu işleri elle başlatılan komut olarak yazın.
+
+### Yapay zekâ erişimi
+
+Proje sahibi her şeyin yapay zekâyla yönetilebilir olmasını istedi (D-9). Ayrıntı sözleşmenin 10. bölümündedir.
+
+- Her DocType alanına `description` verin.
+- Her uca OpenAPI açıklaması yazın.
+- Elle başlatılan her komut için bir HTTP ucu da yazın.
+- Model sağlayıcısı kitaplığı eklemeyin. Kodda model adı yazmayın.
+- Yapay zekâya izin atlayan yol açmayın. Ham SQL ya da kabuk aracı yazmayın.
 
 ### Container kuralları
 

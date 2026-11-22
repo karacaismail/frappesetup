@@ -247,3 +247,54 @@ Tarayıcı ve container aynı adresi kullanmalıdır. Yoksa `iss` değeri tutmaz
 5. Container'lar aynı adresle Keycloak'a ulaşır.
 
 Kiracı ve Press sunucuları için de aynı yol geçerlidir. Keycloak çıkış bildirimini bu adreslere gönderir. Bu yolu ilk deneyen iş sonucu raporlar.
+
+## 10. Yapay zekâ erişim katmanı
+
+Proje sahibinin kararı şudur: Her şey yapay zekâyla yönetilebilir olacak. Katman model sağlayıcısından bağımsız olacak (Proje kaydı D-9). Bu bölüm bütün işler için geçerlidir.
+
+### Temel kurallar
+
+1. Her DocType ve her alan yapay zekâ katmanından görünür. Yeni DocType için ayrı kod gerekmez. Araçlar DocType tanımından çalışma anında üretilir.
+2. Yapay zekâ kullanıcının kimliğiyle çalışır. Yetki denetimi REST uçlarıyla aynıdır. `ignore_permissions` kullanılmaz (G-85).
+3. Yazma işi önce önizleme üretir. Önizlemeyi insan onaylar. Onay sunucuda üretilir ve tek kullanımlıktır (G-86). Model onay veremez.
+4. Her çağrı “AI Action Log” kaydına yazılır. Ret de yazılır (G-64).
+5. Ham SQL, ham Python, kabuk ve “Server Script” aracı yoktur. Veritabanı yalnız DocType katmanından açılır.
+6. Gizli alan hiç dönmez. Örneğin “Password” türündeki alanlar, belirteçler ve anahtarlar böyledir. Press'te okuma açık alan listesiyle yapılır.
+7. Kuyruğa alınma başarı sayılmaz. Başarı kaydın son durumundan okunur. Sonucu bilinmeyen iş “unknown” kalır. Aynı hedefe kör tekrar yapılmaz.
+8. Frappe uygulamalarına model sağlayıcısı kitaplığı eklenmez. Kodda model adı yazılmaz.
+9. Dış arayüz açık standartlardır: MCP ve OpenAPI. MCP, modellerin araç kullandığı açık protokoldür. Her sağlayıcının istemcisi bağlanabilir.
+
+### Araç türleri
+
+| Tür | Örnek | Kaynak |
+| --- | --- | --- |
+| Tanım | DocType'ı, alanları ve izinleri anlatır | DocType tanımı ve alan açıklamaları |
+| Okuma | Liste, kayıt, rapor | Kullanıcının okuma izni |
+| Yazma | Oluşturma, güncelleme, onaya gönderme, iptal, silme | Önizleme ve insan onayı |
+| Yönetim | Özel alan, alan ayarı, rol ve izin değişikliği | Yalnız yönetici rolü, önizleme ve insan onayı |
+| Uygulama aracı | Örneğin izin onayı | Uygulamanın `ai_tools` kancası (G-105) |
+| Geliştirme | DocType iskeleti, alan ekleme önerisi | İskelet davranış değildir. İş kuralı tek dosyalık onaylı öneriyle yazılır. Araç kod çalıştırmaz. |
+
+### Her işin uyacağı kurallar
+
+- Yazdığınız her DocType alanına `description` verin. Açıklama İngilizce yazılır. Türkçesi çeviri dosyasındadır. Yapay zekâ alanı bu açıklamadan anlar.
+- Yazdığınız her uca OpenAPI dosyasında özet ve açıklama yazın.
+- Ucu yıkıcı ya da ücretli bir iş yapıyorsa bunu sözleşmede belirtin.
+- Elle başlatılan her komut için bir HTTP ucu da yazın. Böylece yapay zekâ da komutu başlatabilir. Örneğin mutabakat komutu böyledir.
+- `press_tr` aynı kuralları uygular. Press işlemleri için depodaki `packages/press-ai` sözleşmesi temel alınır.
+
+### Karar sitesindeki AI kuralları
+
+Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md` dosyalarıdır. Özellikle şu kurallar bu katmana uyar:
+
+- Her yazma insan onaylıdır. Onay özete bağlı, tek kullanımlık ve sürelidir. Modelde onay aracı ya da `confirm` alanı yoktur.
+- Yürütme aynı işlem ve hedef için kilit alır. İstekten önce sonucu “unknown” olarak kaydeder.
+- Altyapı, DNS, yasal kutu ve ödeme işleri insanda kalır. Yapay zekâ bunlar için yalnız gereksinim metni üretir.
+- Resmî uygulamaların dosyası varsayılan olarak değiştirilmez.
+- AGPL lisanslı bir bileşen kendi kodumuzla birleşmeden önce lisans uyumu proje sahibine sorulur.
+
+### Sahiplik
+
+- `platform_core` içinde katmanı platform-core-yz işi kurar. Modül klasörü `yapay_zeka` olur.
+- Önce Frappe'nin hazır MCP yolunu inceleyin (T-1). Karar sitesi bunu `frappe_mcp` olarak anar (G-84).
+- Uç adresi ve araç adları o işin raporundan sonra bu dosyaya yazılır.

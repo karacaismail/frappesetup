@@ -25,6 +25,7 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 | --- | --- | --- |
 | `platform_core` | `kimlik` | Keycloak ile giriş, çıkış, kimlik bağı ve servis belirteci |
 | `platform_core` | `kabuk` | Açılış verisi, kenar çubuğu verisi ve DocType tanımı uçları |
+| `platform_core` | `yapay_zeka` | Yapay zekâ erişim katmanı: araç kaydı, MCP ucu, önizleme ve onay, işlem günlüğü |
 | `press_tr` | `kimlik` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
 | `identity_sync` | Yok | Keycloak ile Press ve kiracı siteleri arasında kullanıcı eşitleme |
 | `oidc_verify` | Yok | Belirteç doğrulama. Frappe'ye bağlı değildir. |
@@ -33,6 +34,7 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 
 - `platform_core.kimlik` ve `press_tr.kimlik` yalnız `oidc_verify` kitaplığını kullanır.
 - `platform_core.kabuk` ile `platform_core.kimlik` birbirini çağırmaz.
+- `platform_core.yapay_zeka` öteki modüllerin açık işlevlerini çağırabilir. Öteki modüller `yapay_zeka` modülünü çağırmaz. Uygulamalar araçlarını `ai_tools` kancasıyla bildirir.
 - `identity_sync` sitelerin açık uçlarını HTTP ile çağırır. Siteler `identity_sync` kodunu çağırmaz.
 - Döngü yasaktır. MVP'de bu yönler otomatik denetlenir (B-10).
 
@@ -63,6 +65,7 @@ Kararlar 22 Kasım 2026 Pazar günü Pane kartıyla alındı.
 - **D-5. Son kullanıcı yalnız ayrı arayüzü görür.** Son kullanıcının türü “Website User” olur (Karar 10, G-16).
 - **D-6. Zamanlanmış iş kurulmaz.** Proje sahibi `cron` kurulumunu istemedi (V-9).
 - **D-7. Bütün uygulamalar Frappe 16 ile yazılır.** `press_tr` de Frappe 16 üzerinde çalışır. Proje sahibi bunu şöyle yazdı: “app frappe v16.x ile koldlansın”.
+- **D-9. Her şey yapay zekâyla yönetilebilir olur.** Bütün DocType'lar, alanlar ve backend işlemleri yapay zekâya açık bir katmandan geçer. Katman model sağlayıcısından bağımsızdır. Proje sahibi şöyle yazdı: “ai heryerde olmalı, ai provider'dan bağımsız, herşey ai ile yönetilebilmeli.” Ayrıntı sözleşmenin 10. bölümündedir.
 - **D-8. Var olan Press kurulumu kullanılır.** Bu Mac'te Colima'da bir Press deneme kurulumu var. Kurulum değiştirilmez. İmajı ve kurulum betikleri yeniden kullanılır.
 
 ## Orkestratörün seçtiği varsayılanlar
@@ -89,6 +92,7 @@ Ajan bu maddeleri kendiliğinden kapatmaz. Etkilenen işi raporda yazar.
 - **A-8. `press_tr` lisansı.** Press AGPL-3.0 lisanslıdır. `press_tr` Press'i kullanır. Lisans etkisini hukuk değerlendirir (K-1).
 - **A-9. Gerçek veri.** Türkiye'deki kişilerin verisi güvence kurulmadan Hetzner'e konmaz (Karar 27). Bu tur yalnız yerel ortamda ve örnek veriyle yürür.
 - **A-11. Press'in Frappe 16 desteği.** Karar sitesinin K1 kararı Press'i Frappe 15 üzerinde kurar. D-7 bunu değiştirir. Press v0.154.1 Frappe 16 ve Python 3.14 üzerinde yalnız yamalarla açılır. Ansible ve sunucu kurma bu sürümde çalışmaz. Üretimde Press'in hangi sürümle çalışacağı ayrı karardır.
+- **A-12. Model sağlayıcısı.** Karar sitesinin K9 kararı Claude Agent SDK'yı ve Claude modellerini adıyla seçer. D-9 sağlayıcıdan bağımsızlık ister. Backend bu yüzden hiçbir sağlayıcıya bağlanmaz. Ajan servisinin sağlayıcı seçimi Rail 5 işinde ayrıca karara bağlanır.
 - **A-10. Eşitleme olaylarının kaynağı.** Zamanlanmış yoklama yasaktır (D-6). Keycloak olay eklentisi T-2 değerlendirmesi ister.
 
 ## Kişisel veri
