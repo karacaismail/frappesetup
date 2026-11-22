@@ -17,14 +17,16 @@ Bu nedenle ağ üzerinden sorgu yapan pip-audit seçeneğini kullanmadık.
 Bandit, var olan Semgrep kurallarına ek Python denetimleri sağlar. Python denetimini bunun için ayrı tuttuk.
 Çalışan site kontrolü, yerel bir adresten tek HTTP yanıtı alır.
 Komut `X-Content-Type-Options: nosniff` başlığını denetler. Yönlendirmeyi izlemez.
-ZAP Baseline ve canlı Schemathesis taraması uygulama kapsamı dışında kaldı.
+ZAP 2.17.0 bu yanıtı ağ erişimi kapalı bir ortamda inceler.
+Canlı Schemathesis adımı açıktır. `security-full --ci` bu adımı geçirmez.
 
 ## Bakım ve geri dönüş
 
 DevOps sorumlusu araç sürümlerini ve açık veritabanını günceller.
 Her yanlış alarm için sorumlu rolü ve gerekçeyi yazın.
 OSV istisnalarını `backend/dev/security/osv-exceptions.toml` dosyasına girin.
-Diğer araçlardaki istisna önerisini aynı işin karar kaydında incelemeye sunun.
+Bandit istisnaları `backend/dev/security/bandit-exceptions.json` dosyasındadır.
+Gitleaks istisnaları `backend/dev/security/.gitleaksignore` dosyasındadır.
 Yalnız incelemesi tamamlanan bulguları istisna sayın.
 
 Yeni komutlar geri alınırsa mevcut `guvenlik-denetimi` komutu çalışmaya devam eder.
@@ -40,3 +42,6 @@ Gitleaks yalnız kural, dosya, satır, commit ve parmak izi gösterir.
 
 OSV-Scanner kökteki npm kilidini ve diğer izlenen kilitleri tarar.
 Paket bulguları sürüm raporuna yazılır. Paket sürümü bu komutla değişmez.
+
+Python kilidi, Git'in izlediği backend projelerinin `dependencies` listelerini kapsar.
+Kilit isteğe bağlı paketleri kapsamaz.

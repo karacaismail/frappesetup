@@ -5,9 +5,9 @@ CI sistemi değişiklikleri birleştirmeden önce denetimleri çalıştırır.
 
 | İş | Çalışma klasörü | Komut |
 | --- | --- | --- |
-| Güvenlik araçlarının birim testleri | Depo kökü | `python3 -B -m unittest discover -s backend/dev/security -v` |
+| Güvenlik araçlarının birim testleri | Depo kökü | `uv run --no-project --offline --python 3.12 python -B -m unittest discover -s backend/dev/security -v` |
 | Kaynak, Git geçmişi ve bağımlılık taraması | Depo kökü | `FS_COLIMA_PROFILE=ci backend/dev/bin/security-full --ci` |
-| Yerel sitenin güvenlik başlığı | Depo kökü | `backend/dev/bin/dast-scan --ci "http://kiraci1.localhost:$((PANE_PORT + 1))"` |
+| Yerel yanıtın güvenlik başlığı ve pasif ZAP taraması | Depo kökü | `FS_COLIMA_PROFILE=ci backend/dev/bin/dast-scan --ci "http://kiraci1.localhost:$((PANE_PORT + 1))"` |
 | Son taramaların raporu | Depo kökü | `backend/dev/bin/release-report` |
 
 ## Hazırlık
@@ -16,8 +16,8 @@ GitHub checkout adımında `fetch-depth: 0` kullanın.
 `refs/heads/backend` yerel dal kaydını hazırlayın.
 Uygunluk kapısı, bu dalla ortak commit'ten sonraki mesajları tarar.
 Docker ve uv 0.13.9 kurun. uv ile Python 3.12 ve 3.14 hazırlayın.
-Araç sürümleri ve Gitleaks imaj özeti `backend/dev/security/tool-versions.env` dosyasındadır.
-Gitleaks imajını o özetle önceden indirin.
+Araç sürümleri ve imaj özetleri `backend/dev/security/tool-versions.env` dosyasındadır.
+Gitleaks ve ZAP imajlarını kayıtlı özetleriyle önceden indirin.
 CI kipi yerel Docker bağlamını kullanır. Colima'da `factory` ya da `default` seçin.
 Factory profilinde yeni imaj derlemeyin ve yeni site açmayın.
 
@@ -36,10 +36,14 @@ for ecosystem in PyPI npm; do
 done
 ```
 
+Tarama veritabanı yaşını dosyanın değişiklik zamanı üzerinden hesaplar.
+Dosyayı kopyalamak bu zamanı değiştirebilir.
+Bu ölçüm veritabanının yayımlanma tarihini doğrulamaz.
 Tarama yedi günden eski veritabanını reddeder.
 Python kaynak listeleri değişince `backend/dev/security/compile-lock` çalıştırın.
 Oluşan `backend/dev/security/requirements.txt` dosyasını commit edin.
-Kilit, uygulamaların bildirdiği Python paketlerini kapsar.
+Kilit, Git kayıtlı backend projelerinin zorunlu Python paketlerini kapsar.
+CI kipi kilidi bellekte yeniden üretir. Dosyadaki içerik farklıysa tarama durur.
 Bir Frappe imajının kurulu paketlerini ayrı listelemek için `--runtime-image IMAGE_ID` kullanın.
 `docker image inspect` çıktısındaki yerel imaj kimliğini verin.
 
@@ -51,7 +55,8 @@ Site kurulumu için gereken sırlar `MARIADB_ROOT_PASSWORD` ve `ADMIN_PASSWORD` 
 
 Başarısız tarama birleştirmeyi durdurur.
 CI kipinde zorunlu adım çalışmazsa komut 1 ile çıkar.
-ZAP Baseline ve canlı Schemathesis `not_run` döner. Bu yüzden iki tam CI kapısı geçmez.
+ZAP, yerel siteden alınan ilk yanıtı pasif olarak inceler. Yanıt yeniden gönderilmez.
+Canlı Schemathesis adımı `not_run` döner. `security-full --ci` bu adımda geçmez.
 Rapor kendi başına birleştirme kararı vermez.
 
 CodeQL Python işi için şu adımları kullanın.

@@ -73,7 +73,9 @@ class SecurityScanTests(unittest.TestCase):
             thread.start()
             try:
                 with tempfile.TemporaryDirectory() as directory:
-                    with patch.object(scans, "RESULTS", Path(directory)):
+                    with patch.object(scans, "RESULTS", Path(directory)), \
+                            patch.object(scans, "scan_zap", return_value=scans.Result("ZAP passive scan", "1", "zap", "pass")), \
+                            patch.object(scans, "source_state", return_value={"commit": "a", "dirty": False}):
                         self.assertEqual(scans.scan_local(f"http://dev.localhost:{port}"), 0)
                         self.assertIn("`pass`", scans.report(Path(directory)))
             finally:
@@ -93,18 +95,20 @@ class SecurityScanTests(unittest.TestCase):
     def test_scorecard_distinguishes_zero_from_missing_measurement(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
-            scans.save(path, "full", [scans.Result("Bandit", "1.9.4", "bandit", "fail")])
-            scorecard = scans.scorecard(path, open_findings=0, package_vulnerabilities=15)
-            self.assertIn("| Açık bulgu | 0 |", scorecard)
-            self.assertIn("| Paket açığı | 15 |", scorecard)
-            self.assertIn("| Reddedilen istek | Ölçülmedi |", scorecard)
-            self.assertIn("| Başarısız denetim | 1 |", scorecard)
+            with patch.object(scans, "source_state", return_value={"commit": "a", "dirty": False}):
+                scans.save(path, "full", [scans.Result("Bandit", "1.9.4", "bandit", "fail")])
+                scorecard = scans.scorecard(path, open_findings=0, package_vulnerabilities=15)
+            self.assertIn("| Open findings | 0 |", scorecard)
+            self.assertIn("| Dependency vulnerabilities | 15 |", scorecard)
+            self.assertIn("| Rejected requests | Not measured |", scorecard)
+            self.assertIn("| Failed checks | 1 |", scorecard)
 
     def test_report_keeps_skipped_results_visible(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
-            scans.save(path, "full", [scans.Result("Bandit", "1.9.4", "bandit -r backend", "fail")])
-            report = scans.report(path)
+            with patch.object(scans, "source_state", return_value={"commit": "a", "dirty": False}):
+                scans.save(path, "full", [scans.Result("Bandit", "1.9.4", "bandit -r backend", "fail")])
+                report = scans.report(path)
             self.assertIn("| Bandit | 1.9.4 | `bandit -r backend` | `fail` |", report)
             self.assertIn("`not_run`", report)
 

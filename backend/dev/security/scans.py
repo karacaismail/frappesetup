@@ -1,13 +1,17 @@
 """Manually invoked defensive checks and local release records."""
 
 import argparse
+import base64
 import hashlib
 import http.client
+import io
 import json
 import os
 import re
 import shlex
 import subprocess
+import sys
+import tarfile
 import tempfile
 from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta, timezone
@@ -73,23 +77,27 @@ def load_results(directory):
     current = source_state()
     for name, command in (("full", "security-full"), ("local", "dast-scan")):
         record = read_record(directory, name)
-        results = [Result(**entry) for entry in record.get("results", [])]
+        try:
+            results = [Result(**entry) for entry in record.get("results", [])]
+        except TypeError:
+            results = []
         if not results:
             yield Result(command, "—", f"backend/dev/bin/{command}", "not_run")
             continue
-        matches = all(record.get(key) == current[key] for key in ("commit", "dirty"))
+        matches = (record.get("dirty") is False and current["dirty"] is False
+                   and record.get("utc") and record.get("commit") == current["commit"])
         yield from (result if matches else replace(result, status="not_run", findings=()) for result in results)
 
 
 def report(directory):
-    lines = ["# Güvenlik taraması sonuçları", ""]
+    lines = ["# Security scan results", ""]
     for name in ("full", "local"):
         record = read_record(directory, name)
         if record:
-            state = "değişiklik var" if record["dirty"] else "temiz"
-            lines.append(f"- `{name}` · `{record['commit']}` · `{record.get('branch', '—')}` · "
-                         f"`{record['utc']}` · Çalışma ağacı {state}.")
-    lines.extend(["", "| Araç | Sürüm | Komut | Sonuç |", "| --- | --- | --- | --- |"])
+            state = {True: "dirty", False: "clean"}.get(record.get("dirty"), "unknown")
+            lines.append(f"- `{name}` · `{record.get('commit', '—')}` · `{record.get('branch', '—')}` · "
+                         f"`{record.get('utc', '—')}` · Working tree: {state}.")
+    lines.extend(["", "| Tool | Version | Command | Result |", "| --- | --- | --- | --- |"])
     results = list(load_results(directory))
     for result in results:
         lines.append(f"| {result.tool} | {result.version} | `{result.command}` | `{result.status}` |")
@@ -103,17 +111,17 @@ def report(directory):
 def scorecard(directory, *, open_findings=None, package_vulnerabilities=None, rejected_requests=None):
     statuses = [result.status for result in load_results(directory)]
     rows = [
-        ("Başarılı denetim", statuses.count("pass")),
-        ("Başarısız denetim", statuses.count("fail")),
-        ("Çalışmayan denetim", statuses.count("not_run")),
-        ("Geçerli olmayan denetim", statuses.count("not_applicable")),
-        ("Açık bulgu", open_findings),
-        ("Paket açığı", package_vulnerabilities),
-        ("Reddedilen istek", rejected_requests),
+        ("Passed checks", statuses.count("pass")),
+        ("Failed checks", statuses.count("fail")),
+        ("Checks not run", statuses.count("not_run")),
+        ("Inapplicable checks", statuses.count("not_applicable")),
+        ("Open findings", open_findings),
+        ("Dependency vulnerabilities", package_vulnerabilities),
+        ("Rejected requests", rejected_requests),
     ]
-    lines = ["# Güvenlik karnesi", "", "| Ölçüm | Sayı |", "| --- | --- |"]
+    lines = ["# Security scorecard", "", "| Metric | Count |", "| --- | --- |"]
     for name, count in rows:
-        value = "Ölçülmedi" if count is None else count
+        value = "Not measured" if count is None else count
         lines.append(f"| {name} | {value} |")
     return "\n".join(lines)
 
@@ -125,11 +133,11 @@ def nonnegative_count(value):
     return count
 
 
-def run(tool, version, command):
+def run(tool, version, command, *, input_data=None, timeout=None):
     print(f"Running {tool}: {shlex.join(command)}", flush=True)
     try:
-        code = subprocess.run(command, cwd=ROOT, check=False).returncode
-    except OSError as error:
+        code = subprocess.run(command, cwd=ROOT, check=False, input=input_data, timeout=timeout).returncode
+    except (OSError, subprocess.TimeoutExpired) as error:
         print(error)
         code = 1
     return Result(tool, version, shlex.join(command), "pass" if code == 0 else "fail")
@@ -200,9 +208,8 @@ def dependency_locks(files):
 
 
 def python_manifests():
-    prefixes = ("backend/apps/", "backend/identity/identity_sync/", "backend/libs/oidc_verify/")
     return sorted(path for path in git("ls-files", "-z").split("\0")
-                  if path.startswith(prefixes) and Path(path).name == "pyproject.toml")
+                  if path.startswith("backend/") and Path(path).name == "pyproject.toml")
 
 
 def manifest_digest(paths):
@@ -212,7 +219,7 @@ def manifest_digest(paths):
     return digest.hexdigest()
 
 
-def compile_lock():
+def generated_lock():
     import tomllib
 
     manifests = python_manifests()
@@ -229,16 +236,23 @@ def compile_lock():
     output = subprocess.check_output(command, cwd=ROOT, input="\n".join(external) + "\n", text=True)
     header = (f"# Regenerate with backend/dev/security/compile-lock.\n"
               f"# Manifest SHA256: {manifest_digest(manifests)}\n")
-    (ROOT / SECURITY / "requirements.txt").write_text(header + output)
+    return header + output
 
 
-def verify_python_lock(locks):
+def compile_lock():
+    (ROOT / SECURITY / "requirements.txt").write_text(generated_lock())
+
+
+def verify_python_lock(locks, *, reproduce=False):
     lock = SECURITY / "requirements.txt"
     if str(lock) not in locks:
         raise ValueError("Tracked backend Python dependency lock is missing.")
     expected = f"# Manifest SHA256: {manifest_digest(python_manifests())}"
-    if expected not in (ROOT / lock).read_text().splitlines():
+    content = (ROOT / lock).read_text()
+    if expected not in content.splitlines():
         raise ValueError("Python dependency lock is stale. Run backend/dev/security/compile-lock.")
+    if reproduce and generated_lock() != content:
+        raise ValueError("Python lock differs from the generated lock.")
 
 
 def validate_osv_inputs(locks):
@@ -264,7 +278,7 @@ def validate_osv_inputs(locks):
             raise ValueError(f"OSV {ecosystem} database must be downloaded within the last seven days.")
 
 
-def scan_dependencies(requirements=None):
+def scan_dependencies(requirements=None, *, reproduce=False):
     command = ["osv-scanner", "scan", "source", "--offline", "--format", "json",
                "--config", str(OSV_CONFIG)]
     locks = dependency_locks(git("ls-files", "-z").split("\0"))
@@ -272,7 +286,7 @@ def scan_dependencies(requirements=None):
     try:
         if not locks:
             raise ValueError("No tracked dependency lock files.")
-        verify_python_lock(locks)
+        verify_python_lock(locks, reproduce=reproduce)
         if requirements is not None:
             locks.append(str(requirements))
         output = subprocess.check_output(["osv-scanner", "--version"], text=True, cwd=ROOT)
@@ -336,13 +350,13 @@ def scan_full(requirements, *, ci=False, runtime_image=None):
     source = source_state()
     save(RESULTS, "full", [], source)
     results = [
-        run("Security tool tests", "Python", ["python3", "-B", "-m", "unittest", "discover",
+        run("Security tool tests", "Python", [sys.executable, "-B", "-m", "unittest", "discover",
                                                "-s", str(SECURITY)]),
         run("Backend gate", f"Semgrep {VERSIONS['SEMGREP_VERSION']} / Gitleaks {VERSIONS['GITLEAKS_VERSION']}",
             ["backend/dev/bin/guvenlik-denetimi"]),
         scan_bandit(),
         run("Gitleaks", VERSIONS["GITLEAKS_VERSION"], [str(SECURITY / "history-scan")]),
-        scan_dependencies(requirements),
+        scan_dependencies(requirements, reproduce=ci),
         runtime_inventory(runtime_image),
         Result("Live API contract checks", "—", "—", "not_run"),
     ]
@@ -365,15 +379,68 @@ def local_target(target):
     return host, port if port is not None else 80
 
 
+def scan_zap(url, status, reason, headers, body):
+    profile = os.environ.get("FS_COLIMA_PROFILE", "factory")
+    contexts = {"factory": ["--context", "colima-factory"], "default": ["--context", "colima"], "ci": []}
+    version = VERSIONS["ZAP_VERSION"]
+    if profile not in contexts:
+        print("FS_COLIMA_PROFILE must be factory, default or ci.")
+        return Result("ZAP passive scan", version, "docker run", "fail")
+
+    image = f"ghcr.io/zaproxy/zaproxy:{version}@{VERSIONS['ZAP_DIGEST']}"
+    mime = next((value for name, value in headers if name.lower() == "content-type"), "application/octet-stream")
+    har = {"log": {"version": "1.2", "creator": {"name": "dast-scan", "version": "1"},
+                   "entries": [{
+                       "startedDateTime": datetime.now(timezone.utc).isoformat(),
+                       "time": 0,
+                       "request": {"method": "GET", "url": url, "httpVersion": "HTTP/1.1",
+                                   "headers": [{"name": "Host", "value": urlsplit(url).netloc}],
+                                   "cookies": [], "queryString": [], "headersSize": -1, "bodySize": 0},
+                       "response": {"status": status, "statusText": reason, "httpVersion": "HTTP/1.1",
+                                    "headers": [{"name": name, "value": value} for name, value in headers],
+                                    "cookies": [], "headersSize": -1, "bodySize": len(body),
+                                    "content": {"size": len(body), "mimeType": mime, "encoding": "base64",
+                                                "text": base64.b64encode(body).decode("ascii")}},
+                       "cache": {}, "timings": {"send": 0, "wait": 0, "receive": 0},
+                   }]}}
+    plan = {"env": {"contexts": [{"name": "local", "urls": [url]}],
+                    "parameters": {"failOnError": True}},
+            "jobs": [
+                {"type": "import", "parameters": {"type": "har", "fileName": "/tmp/scan/response.har",
+                                                  "sendRequests": False}},
+                {"type": "passiveScan-wait", "parameters": {"maxDuration": 2}},
+                {"type": "exitStatus", "parameters": {"errorLevel": "Medium", "warnLevel": "Low"}},
+            ]}
+    payload = io.BytesIO()
+    with tarfile.open(fileobj=payload, mode="w") as archive:
+        for file, data in (("plan.yaml", plan), ("response.har", har)):
+            content = json.dumps(data).encode()
+            item = tarfile.TarInfo(file)
+            item.size = len(content)
+            archive.addfile(item, io.BytesIO(content))
+    command = ["docker", *contexts[profile], "run", "--rm", "-i", "--pull", "never", "--network", "none",
+               "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--entrypoint", "/bin/sh", image,
+               "-ec", "mkdir -p /tmp/scan; tar -xf - -C /tmp/scan; "
+                      "exec /zap/zap.sh -cmd -silent -dir /tmp/zap -autorun /tmp/scan/plan.yaml"]
+    return run("ZAP passive scan", version, command, input_data=payload.getvalue(), timeout=180)
+
+
 def scan_local(target, *, ci=False):
+    host, port = local_target(target)
     source = source_state()
     save(RESULTS, "local", [], source)
-    host, port = local_target(target)
+    zap = Result("ZAP passive scan", VERSIONS["ZAP_VERSION"], "docker run", "not_run")
     connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
     try:
         connection.request("GET", "/", headers={"Host": f"{host}:{port}"})
         with connection.getresponse() as response:
             print(f"HTTP {response.status}")
+            body = response.read(1024 * 1024 + 1)
+            if len(body) <= 1024 * 1024:
+                zap = scan_zap(f"http://{host}:{port}/", response.status, response.reason,
+                               response.getheaders(), body)
+            else:
+                print("Response exceeds the passive scan limit of 1 MiB.")
             if response.status >= 500:
                 status = "fail"
             elif response.getheader("X-Content-Type-Options", "").strip().lower() != "nosniff":
@@ -390,7 +457,7 @@ def scan_local(target, *, ci=False):
     finally:
         connection.close()
     results = [Result("Local HTTP header check", "1", "backend/dev/bin/dast-scan LOCAL_URL", status),
-               Result("ZAP Baseline", "—", "—", "not_run")]
+               zap]
     save(RESULTS, "local", results, source)
     return exit_status(results, ci=ci)
 
