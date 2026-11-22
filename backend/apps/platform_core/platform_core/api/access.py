@@ -1,6 +1,6 @@
-"""Erişim kuralı uçları. İş kuralı `platform_core.erisim` modülündedir.
+"""Access rule endpoints. The business rule is in the `platform_core.erisim` module.
 
-Sözleşme: `backend/contracts/platform_core-erisim.openapi.yaml`.
+Contract: `backend/contracts/platform_core-erisim.openapi.yaml`.
 """
 
 import frappe
@@ -11,7 +11,7 @@ from platform_core.erisim import explain, field_level
 
 @frappe.whitelist(methods=["GET"])
 def explain_permission(doctype: str, name: str, ptype: str = "read", user: str | None = None) -> dict:
-	"""Bir kayıtta iznin nedenini açıklar. Kayıt değiştirmez."""
+	"""Explains the reason for the permission on a record. Changes no record."""
 	if not frappe.has_permission(doctype, "read"):
 		frappe.throw(_("No permission to read {0}.").format(doctype), frappe.PermissionError)
 	return explain.explain(doctype, name, ptype, user)
@@ -19,7 +19,7 @@ def explain_permission(doctype: str, name: str, ptype: str = "read", user: str |
 
 @frappe.whitelist(methods=["GET"])
 def get_access_summary(doctype: str) -> dict:
-	"""Oturum sahibinin bir kayıt türündeki kural kapsamlarını döner."""
+	"""Returns the rule scopes of the session user in a document type."""
 	if not frappe.has_permission(doctype, "read"):
 		frappe.throw(_("No permission to read {0}.").format(doctype), frappe.PermissionError)
 	return explain.summary(doctype)
@@ -27,7 +27,7 @@ def get_access_summary(doctype: str) -> dict:
 
 @frappe.whitelist(methods=["POST"])
 def set_field_level(doctype: str, fieldname: str, permlevel: int) -> dict:
-	"""Bir alanın izin seviyesini değiştirir. Yalnız “System Manager”."""
+	"""Changes the permission level of a field. “System Manager” only."""
 	if not frappe.has_permission("Property Setter", "create"):
 		frappe.throw(_("No permission to change field levels."), frappe.PermissionError)
 	return field_level.set_field_level(doctype, fieldname, permlevel)
@@ -35,7 +35,7 @@ def set_field_level(doctype: str, fieldname: str, permlevel: int) -> dict:
 
 @frappe.whitelist(methods=["POST"])
 def set_level_access(doctype: str, role: str, permlevel: int, read: bool, write: bool) -> dict:
-	"""Bir role bir izin seviyesinde okuma ve yazma izni verir. Yalnız “System Manager”."""
+	"""Gives a role read and write permission at a permission level. “System Manager” only."""
 	if not frappe.has_permission("Custom DocPerm", "write"):
 		frappe.throw(_("No permission to change role permissions."), frappe.PermissionError)
 	return field_level.set_level_access(doctype, role, permlevel, read, write)

@@ -1,6 +1,6 @@
-"""Erişim uçlarının yetki testleri. Güvenlik kapısı her uç için bu iki testi ister.
+"""Authorization tests of the access endpoints. The security gate requires these two tests for each endpoint.
 
-Ayrıntılı davranış testleri `platform_core/erisim/tests/` klasöründedir.
+The detailed behavior tests are in the `platform_core/erisim/tests/` folder.
 """
 
 import frappe
@@ -23,7 +23,7 @@ class TestAccessEndpoints(ErisimTestCase):
 		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
 
 	def test_explain_permission_foreign_data_denied(self):
-		"""Çalışan başkasının iznini soramaz. Başkasının kaydında tek ret nedeni döner."""
+		"""An employee cannot ask about the permission of someone else. On the record of someone else a single denial reason is returned."""
 		client = self.login(EMPLOYEE_1)
 
 		other_user = self.explain(client, self.records[EMPLOYEE_1], user=EMPLOYEE_2)
@@ -45,7 +45,7 @@ class TestAccessEndpoints(ErisimTestCase):
 		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
 
 	def test_get_access_summary_foreign_data_denied(self):
-		"""Çalışanın “Access Rule” türünde okuma izni yoktur."""
+		"""The employee has no read permission on the “Access Rule” document type."""
 		response = self.api(
 			self.login(EMPLOYEE_1), "GET", "get_access_summary", query={"doctype": "Access Rule"}
 		)

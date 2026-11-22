@@ -1,4 +1,4 @@
-"""“Access Rule” kaydı: bir kayıt türünü bir rol için daraltan kural."""
+"""The “Access Rule” record: a rule that narrows a document type for a role."""
 
 import frappe
 from frappe import _
@@ -65,7 +65,7 @@ class AccessRule(Document):
 		return sorted(with_permission - covered - {"Administrator"})
 
 	def warn_about_roles_without_rule(self):
-		"""Kurallı türde kuralı olmayan rol erişimi kaybeder. Uyarı kaydı durdurmaz."""
+		"""In a governed document type a role without a rule loses access. The warning does not stop the save."""
 		if not self.is_active:
 			return
 		uncovered = self.roles_without_rule()

@@ -1,4 +1,4 @@
-"""İznin nedeni ve kapsam özeti. Sözleşme: `contracts/platform_core-erisim.openapi.yaml`."""
+"""The reason for the permission and the scope summary. Contract: `contracts/platform_core-erisim.openapi.yaml`."""
 
 import frappe
 import frappe.share
@@ -44,7 +44,7 @@ def explain(doctype: str, name: str, ptype: str = "read", user: str | None = Non
 		"layers": {"role": False, "access_rule": False, "share": False},
 		"rules": [],
 	}
-	# Açıklama motorun kendi okumasıdır. Sonuç çağırana göre aşağıda daraltılır.
+	# The explanation is the own read of the engine. The result is narrowed below for the caller.
 	owner = frappe.db.get_value(doctype, name, "owner")
 	exists = owner is not None
 	if not exists and is_admin:
@@ -70,7 +70,7 @@ def explain(doctype: str, name: str, ptype: str = "read", user: str | None = Non
 		result["reason"] = "allowed" if without_share else "allowed_by_share"
 		result["layers"].update(access_rule=by_rule, share=shared)
 	elif is_admin:
-		# Ret nedeninin ayrıntısı yalnız yöneticiye döner. Olağan kullanıcı tek neden görür.
+		# The detail of the denial reason is returned only to the administrator. An ordinary user sees a single reason.
 		result["reason"] = (
 			"no_role_permission" if not role else "user_permission" if by_rule else "no_matching_rule"
 		)

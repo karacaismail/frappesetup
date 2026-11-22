@@ -1,12 +1,12 @@
-"""Erişim kuralı testlerinin ortak tabanı.
+"""Shared base of the access rule tests.
 
-Testler isteği Frappe'nin WSGI uygulamasından geçirir (D-6). Böylece oturum, HTTP yöntemi
-ve izin kancaları gerçek yolda çalışır. Beklenen sonuçlar karar notundan
-(`docs/kararlar/0006-erisim-kurali.md`), sözleşmeden
-(`contracts/platform_core-erisim.openapi.yaml`) ve karar sitesinin G-60, G-61 ve G-121
-maddelerinden gelir (D-1). Bütün kişiler ve kayıtlar uydurmadır.
+The tests send the request through the WSGI application of Frappe (D-6). So the session, the HTTP method
+and the permission hooks run on the real path. The expected results come from the decision note
+(`docs/kararlar/0006-erisim-kurali.md`), from the contract
+(`contracts/platform_core-erisim.openapi.yaml`) and from items G-60, G-61 and G-121
+of the decision site (D-1). All people and records are made up.
 
-Örnek ağaç:
+Example tree:
 
     yonetici1 ── calisan1 ── calisan4
               └─ calisan2
@@ -45,7 +45,7 @@ HR = "er.ik@example.test"
 NO_RULE = "er.kuralsiz@example.test"
 ADMIN = "er.admin@example.test"
 
-# Kullanıcı, roller ve bağlı olduğu yönetici. `None` çalışan kaydı olmadığını gösterir.
+# The user, the roles and the manager the user reports to. `None` shows that there is no employee record.
 PEOPLE = (
 	(MANAGER_1, [ROLE_EMPLOYEE, ROLE_MANAGER], ""),
 	(MANAGER_2, [ROLE_EMPLOYEE, ROLE_MANAGER], ""),
@@ -59,7 +59,7 @@ PEOPLE = (
 )
 RECORD_OWNERS = (MANAGER_1, MANAGER_2, EMPLOYEE_1, EMPLOYEE_2, EMPLOYEE_3, EMPLOYEE_4)
 
-# Karar notunun 3. bölümündeki birleşim kuralına göre her kullanıcının göreceği kayıt sahipleri.
+# The record owners each user will see, by the union rule in section 3 of the decision note.
 EXPECTED_VISIBLE = {
 	EMPLOYEE_1: {EMPLOYEE_1},
 	EMPLOYEE_2: {EMPLOYEE_2},
@@ -152,8 +152,8 @@ def ensure_company() -> None:
 	if not frappe.db.exists("Gender", GENDER):
 		frappe.get_doc(doctype="Gender", gender=GENDER).insert()
 	if not frappe.db.exists("Company", COMPANY):
-		# Şirket satırı doğrudan yazılır. ERPNext'in şirket kurulumu hesap planı ve depo açar.
-		# O kurulum boş test sitesinde çalışmaz ve bu testlerin konusu değildir.
+		# The company row is written directly. The company setup of ERPNext creates a chart of accounts and warehouses.
+		# That setup does not run on an empty test site and is not the subject of these tests.
 		company = frappe.get_doc(
 			doctype="Company", company_name=COMPANY, abbr="ERT", default_currency="TRY", country="Türkiye"
 		)
@@ -188,8 +188,8 @@ def ensure_people() -> None:
 			date_of_birth="1990-01-01",
 			date_of_joining="2020-01-01",
 			user_id=email,
-			# ERPNext çalışana kendi “User Permission” kaydını açabilir. O kayıt da kayıtları daraltır.
-			# Testler motoru tek başına sınar. Bu yüzden o kayıt açılmaz.
+			# ERPNext can create a “User Permission” record of its own for the employee. That record also narrows the records.
+			# The tests check the engine alone. So that record is not created.
 			create_user_permission=0,
 			reports_to=employee_of(manager) if manager else None,
 		).insert()
@@ -198,20 +198,20 @@ def ensure_people() -> None:
 
 
 def ensure_fixtures() -> None:
-	"""Uydurma rolleri, kayıt türlerini, şirketi, kullanıcıları ve çalışanları bir kez kurar."""
+	"""Sets up the made-up roles, document types, company, users and employees once."""
 	if not frappe.db.exists("DocType", "Employee"):
-		raise RuntimeError("Bu testler ERPNext'in Employee kayıt türünü ister.")
+		raise RuntimeError("These tests need the Employee document type of ERPNext.")
 	ensure_roles()
 	ensure_doctypes()
 	ensure_company()
 	ensure_people()
-	frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+	frappe.db.commit()  # nosemgrep: the request uses another connection
 
 
 class ErisimTestCase(IntegrationTestCase):
-	"""Her sınıf kendi kurallarını ve kayıtlarını kurar ve siler."""
+	"""Each class sets up and deletes its own rules and records."""
 
-	# Alt sınıf değiştirebilir. Varsayılan kurallar yol haritasının P1 senaryosudur.
+	# A subclass can change this. The default rules are the P1 scenario of the roadmap.
 	RULES = (
 		{
 			"title": "Calisan kendi kaydi",
@@ -257,7 +257,7 @@ class ErisimTestCase(IntegrationTestCase):
 		for owner in RECORD_OWNERS:
 			cls.records[owner] = cls.insert_record(owner)
 		cls.owner_of = {name: owner for owner, name in cls.records.items()}
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 
 	@classmethod
 	def tearDownClass(cls):
@@ -272,7 +272,7 @@ class ErisimTestCase(IntegrationTestCase):
 
 	@classmethod
 	def insert_record(cls, owner: str, **values) -> str:
-		"""Kaydı yönetici olarak açar. Kaydın sahibi `employee` alanındaki çalışandır."""
+		"""Creates the record as the administrator. The owner of the record is the employee in the `employee` field."""
 		return (
 			frappe.get_doc(
 				{
@@ -298,7 +298,7 @@ class ErisimTestCase(IntegrationTestCase):
 		frappe.db.rollback()
 		super().tearDown()
 
-	# --- istek yardımcıları ---
+	# --- request helpers ---
 
 	def send(self, client, method: str, path: str, *, body=None, query=None):
 		headers = {"Accept": "application/json"}
@@ -308,14 +308,14 @@ class ErisimTestCase(IntegrationTestCase):
 			kwargs["data"] = json.dumps(body)
 		if query:
 			kwargs["query_string"] = query
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 		try:
 			return make_request(client.open, args=(), kwargs=kwargs, site=self.site)
 		finally:
 			frappe.db.rollback()
 
 	def login(self, user: str):
-		"""Kullanıcı adına oturum açar. Çerez istemcide kalır."""
+		"""Logs in on behalf of the user. The cookie stays in the client."""
 		client = get_test_client(use_cookies=True)
 		response = self.send(client, "POST", "/api/method/login", body={"usr": user, "pwd": PASSWORD})
 		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
@@ -327,7 +327,7 @@ class ErisimTestCase(IntegrationTestCase):
 	def api(self, client, method: str, endpoint: str, *, body=None, query=None):
 		return self.send(client, method, API + endpoint, body=body, query=query)
 
-	# --- veri yüzeyleri ---
+	# --- data surfaces ---
 
 	def rest_list(self, client, doctype: str = DOCTYPE, fields=("name",), filters=None):
 		query = {"fields": json.dumps(list(fields)), "limit": 500}
@@ -353,7 +353,7 @@ class ErisimTestCase(IntegrationTestCase):
 		return self.send(client, "DELETE", f"{REST}{doctype}/{name}")
 
 	def readable_names(self, client) -> set[str]:
-		"""Tek kayıt ucunun 200 döndüğü kayıtlar. Öteki kayıtlar 403 dönmelidir."""
+		"""The records for which the single record endpoint returns 200. The other records must return 403."""
 		readable = set()
 		for name in self.records.values():
 			status = self.rest_get(client, name).status_code
@@ -366,7 +366,7 @@ class ErisimTestCase(IntegrationTestCase):
 		return {self.records[owner] for owner in owners}
 
 	def assert_hidden(self, data: dict, fieldname: str) -> None:
-		"""Frappe izinsiz alanın değerini siler. Yanıtta alan ya yoktur ya da boştur."""
+		"""Frappe removes the value of a field without permission. In the response the field is either missing or empty."""
 		self.assertFalse(data.get(fieldname), data)
 
 	def stored(self, name: str, fieldname: str):

@@ -1,7 +1,7 @@
-"""Kuralı SQL koşuluna çevirir ve tek kayıt kararını aynı koşulla verir.
+"""Turns a rule into an SQL condition and decides on a single record with the same condition.
 
-Liste ve tek kayıt aynı koşulu kullanır. Yeni değerler de veritabanında sınanır:
-aynı koşulda sütunların yerine değerler konur. Karar notu 5., 6. ve 7. bölüm.
+The list and the single record use the same condition. New values are also tested in the database:
+the values replace the columns in the same condition. Decision note, sections 5, 6 and 7.
 """
 
 from collections.abc import Callable
@@ -32,10 +32,10 @@ def table_column(doctype: str) -> Column:
 
 
 def value_column(doc) -> Column:
-	"""Sütun yerine kaydın yeni değerini koyar.
+	"""Puts the new value of the record in place of the column.
 
-	Değer istemciden gelir. Sayı metne çevrilir: MariaDB `0 = 'HR-EMP-1'` karşılaştırmasını
-	doğru sayar. Liste ve sözlük boş değer olur. Boş değer hiçbir koşulu sağlamaz.
+	The value comes from the client. A number is turned into text: MariaDB counts the comparison
+	`0 = 'HR-EMP-1'` as true. A list and a dict become an empty value. An empty value meets no condition.
 	"""
 
 	def column(fieldname: str) -> Term:
@@ -50,7 +50,7 @@ def value_column(doc) -> Column:
 
 
 def _employees(where: Criterion, kind: str):
-	"""Koşula uyan çalışanların adları ya da kullanıcıları. Alt sorgu olarak kullanılır."""
+	"""Names or users of the employees that match the condition. Used as a subquery."""
 	employee = frappe.qb.DocType(EMPLOYEE)
 	if kind == "user":
 		return frappe.qb.from_(employee).select(employee.user_id).where(where & employee.user_id.isnotnull())
@@ -63,7 +63,7 @@ def scope_criterion(rule: dict, doctype: str, values: dict, col: Column) -> Crit
 		return always()
 	kind = rules.match_kind(doctype, rule["match_field"])
 	if kind not in rules.SCOPE_KINDS.get(scope, ()):
-		# Alan sonradan silinmiş ya da değişmiş olabilir. Kural hiçbir kaydı seçmez.
+		# The field may have been deleted or changed later. The rule selects no record.
 		return never()
 	field = col(rule["match_field"])
 	employee = frappe.qb.DocType(EMPLOYEE)
@@ -128,7 +128,7 @@ def any_rule(applicable: list[dict], doctype: str, user: str, col: Column) -> Cr
 
 
 def list_criterion(doctype: str, user: str) -> Criterion | None:
-	"""Liste koşulu. Kurallı olmayan türde `None` döner."""
+	"""The list condition. Returns `None` for a document type that is not governed."""
 	if not rules.is_governed(doctype):
 		return None
 	applicable = rules.applicable(doctype, user, "read")
@@ -138,7 +138,7 @@ def list_criterion(doctype: str, user: str) -> Criterion | None:
 
 
 def rule_fields(applicable: list[dict]) -> list[str]:
-	"""Kuralların baktığı alanlar. Değişip değişmediklerini anlamak için okunur."""
+	"""The fields the rules look at. They are read to see whether they changed."""
 	fields = []
 	for rule in applicable:
 		names = [rule["match_field"]] if rule["scope"] != "all" else []
@@ -152,7 +152,7 @@ def _flag(criterion: Criterion, alias: str) -> Term:
 
 
 def stored_row(doctype: str, name, flags: dict[str, Criterion], fields: list[str]):
-	"""Saklı kaydı tek sorguyla okur: koşul sonuçları ve kuralların baktığı alanlar."""
+	"""Reads the stored record with one query: the condition results and the fields the rules look at."""
 	columns = set(frappe.get_meta(doctype).get_valid_columns())
 	table = frappe.qb.DocType(doctype)
 	query = frappe.qb.from_(table).select(table.name).where(table.name == name).limit(1)
@@ -166,12 +166,12 @@ def stored_row(doctype: str, name, flags: dict[str, Criterion], fields: list[str
 
 
 def values_match(criterion: Criterion) -> bool:
-	"""Sütun yerine değer konmuş koşulu veritabanında sınar."""
+	"""Tests in the database the condition whose columns are replaced by values."""
 	return bool(frappe.qb.select(_flag(criterion, "ok")).run()[0][0])
 
 
 def decide(doc, ptype: str | None, user: str) -> bool:
-	"""Kurallı kayıt türünde tek kayıt kararı (karar notu 6. bölüm)."""
+	"""The single record decision for a governed document type (decision note, section 6)."""
 	doctype = doc.doctype
 	operation = rules.operation_of(ptype)
 	applicable = rules.applicable(doctype, user, operation)
@@ -198,7 +198,7 @@ def _same(new, stored) -> bool:
 
 
 def decide_stored(doctype: str, name, ptype: str, user: str) -> tuple[bool, list[dict]]:
-	"""Açıklama ucu için: motorun saklı kayıttaki kararı ve her kuralın sonucu."""
+	"""For the explain endpoint: the decision of the engine on the stored record and the result of each rule."""
 	operation = rules.operation_of(ptype)
 	all_rules = rules.rules_for(doctype)
 	if not all_rules:

@@ -1,4 +1,4 @@
-"""Sorgu sayısı: kural yüzünden kayıt başına sorgu açılmaz (P-1)."""
+"""Query count: a rule does not cause one query per record (P-1)."""
 
 from collections import defaultdict
 
@@ -11,7 +11,7 @@ EXTRA_RECORDS = 40
 
 class TestQueryCount(ErisimTestCase):
 	def count_list_queries(self, user: str) -> tuple[int, int]:
-		"""Kullanıcının listesini okur. Sorgu sayısını ve dönen kayıt sayısını verir."""
+		"""Reads the list of the user. Returns the query count and the number of records returned."""
 		queries = []
 		original = frappe.db.__class__.sql
 
@@ -20,7 +20,7 @@ class TestQueryCount(ErisimTestCase):
 			return original(*args, **kwargs)
 
 		frappe.set_user(user)
-		# İlk okuma kayıt türü tanımını ve rolleri önbelleğe alır. Ölçüm ikinci okumadır.
+		# The first read puts the document type definition and the roles in the cache. The measurement is the second read.
 		frappe.get_list(DOCTYPE, fields=["name", "title"], limit=1000)
 		# A real request starts with an empty request cache, so the engine's own queries are counted.
 		frappe.local.request_cache = defaultdict(dict)
@@ -48,7 +48,7 @@ class TestQueryCount(ErisimTestCase):
 		self.assertEqual(after, before)
 
 	def test_rule_adds_a_small_fixed_number_of_queries(self):
-		"""Karar notu 7. bölüm: özne için en çok 2 sorgu, kural listesi için en çok 1 sorgu."""
+		"""Decision note, section 7: at most 2 queries for the subject, at most 1 query for the rule list."""
 		with_rules, _visible = self.count_list_queries(MANAGER_1)
 		frappe.db.set_value("Access Rule", {"document_type": DOCTYPE}, "is_active", 0)
 

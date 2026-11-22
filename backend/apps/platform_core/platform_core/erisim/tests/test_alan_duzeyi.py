@@ -1,4 +1,4 @@
-"""Alan düzeyi: kısıtlı alan dönmez ve yazılamaz (G-61)."""
+"""Field level: a restricted field is not returned and cannot be written (G-61)."""
 
 import frappe
 
@@ -26,7 +26,7 @@ class TestFieldLevel(ErisimTestCase):
 		self.assertNotIn(str(SALARY), response.get_data(as_text=True))
 
 	def test_restricted_field_is_not_returned_on_list(self):
-		"""Frappe izinsiz alanı ya yanıttan çıkarır ya da isteği reddeder. Değer hiç dönmez."""
+		"""Frappe either removes a field without permission from the response or denies the request. The value is never returned."""
 		client = self.login(EMPLOYEE_1)
 
 		response = self.rest_list(client, fields=("name", "salary_amount"))
@@ -35,7 +35,7 @@ class TestFieldLevel(ErisimTestCase):
 		self.assertNotIn(str(SALARY), response.get_data(as_text=True))
 
 	def test_restricted_field_cannot_be_used_as_a_filter(self):
-		"""Süzgeç değeri sızdırmamalıdır: izinsiz alanla süzme kayıt döndürmez."""
+		"""A filter must not leak the value: filtering by a field without permission returns no record."""
 		client = self.login(EMPLOYEE_1)
 
 		response = self.rest_list(client, filters={"salary_amount": SALARY})
@@ -62,14 +62,14 @@ class TestFieldLevel(ErisimTestCase):
 
 
 class TestFieldLevelEndpoints(ErisimTestCase):
-	"""`set_field_level` ve `set_level_access` uçları (sözleşme)."""
+	"""The `set_field_level` and `set_level_access` endpoints (contract)."""
 
 	def reset(self):
 		frappe.set_user("Administrator")
 		frappe.db.delete("Property Setter", {"doc_type": DOCTYPE, "property": "permlevel"})
 		frappe.db.delete("Custom DocPerm", {"parent": DOCTYPE})
 		frappe.clear_cache(doctype=DOCTYPE)
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 
 	def setUp(self):
 		super().setUp()
@@ -156,7 +156,7 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 		self.assert_hidden(self.rest_get(manager, target).json["data"], "salary_amount")
 
 	def test_level_access_keeps_other_roles_permissions(self):
-		"""İlk değişiklik “Custom DocPerm” kopyası açar. Öteki rollerin izni kaybolmamalıdır."""
+		"""The first change creates a “Custom DocPerm” copy. The permission of the other roles must not be lost."""
 		admin = self.login(ADMIN)
 		hr = self.login(HR)
 

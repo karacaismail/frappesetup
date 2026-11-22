@@ -1,4 +1,4 @@
-"""Hiyerarşi: yönetici `reports_to` zincirindeki ekibini görür (G-60, G-104)."""
+"""Hierarchy: a manager sees their team in the `reports_to` chain (G-60, G-104)."""
 
 import frappe
 
@@ -22,7 +22,7 @@ class TestHierarchy(ErisimTestCase):
 		self.assertEqual(self.listed_names(client), expected)
 
 	def test_manager_sees_indirect_report(self):
-		"""calisan4, calisan1'e bağlıdır. calisan1 de yonetici1'e bağlıdır."""
+		"""calisan4 reports to calisan1. calisan1 reports to yonetici1."""
 		client = self.login(MANAGER_1)
 
 		self.assertEqual(self.rest_get(client, self.records[EMPLOYEE_4]).status_code, 200)
@@ -40,7 +40,7 @@ class TestHierarchy(ErisimTestCase):
 		self.assertEqual(self.rest_get(client, self.records[MANAGER_2]).status_code, 403)
 
 	def test_team_rule_is_read_only_for_manager(self):
-		"""Ekip kuralı yalnız `allow_read` taşır. Yönetici ekibinin kaydını değiştiremez."""
+		"""The team rule carries only `allow_read`. A manager cannot change the record of their team."""
 		client = self.login(MANAGER_1)
 		target = self.records[EMPLOYEE_2]
 
@@ -50,13 +50,13 @@ class TestHierarchy(ErisimTestCase):
 		self.assertEqual(self.stored(target, "title"), f"Talep {EMPLOYEE_2}")
 
 	def test_employee_with_reports_but_without_manager_role_sees_only_own(self):
-		"""calisan1'e calisan4 bağlıdır ama calisan1 yönetici rolü taşımaz."""
+		"""calisan4 reports to calisan1 but calisan1 does not have the manager role."""
 		client = self.login(EMPLOYEE_1)
 
 		self.assertEqual(self.listed_names(client), {self.records[EMPLOYEE_1]})
 
 	def test_reporting_change_takes_effect_on_next_request(self):
-		"""calisan3 yonetici1'e bağlanınca yonetici1 kaydı sonraki istekte görür."""
+		"""When calisan3 is made to report to yonetici1, yonetici1 sees the record in the next request."""
 		client = self.login(MANAGER_1)
 		target = self.records[EMPLOYEE_3]
 		self.assertEqual(self.rest_get(client, target).status_code, 403)
@@ -72,4 +72,4 @@ class TestHierarchy(ErisimTestCase):
 		employee = frappe.get_doc("Employee", employee_of(user))
 		employee.reports_to = employee_of(manager)
 		employee.save()
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection

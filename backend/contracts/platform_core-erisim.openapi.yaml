@@ -1,75 +1,76 @@
 openapi: 3.1.0
 info:
-  title: platform_core erişim kuralı motoru
+  title: platform_core access rule engine
   version: 0.1.0
-  summary: İznin nedeni, kapsam özeti ve alan düzeyi yönetimi uçları.
+  summary: Endpoints for the permission reason, the scope summary and field level management.
   description: |
-    Bu sözleşme `platform_core.erisim` modülünün uçlarını tarif eder.
-    Karar notu `docs/kararlar/0006-erisim-kurali.md` dosyasıdır.
+    This contract describes the endpoints of the `platform_core.erisim` module.
+    The decision note is the file `docs/kararlar/0006-erisim-kurali.md`.
 
-    Motor kayıtları daraltır. İzni rol izni verir. Alanı izin seviyesi kapatır.
+    The engine narrows records. The role permission grants access. The permission level closes a field.
 
-    Kural ekleme, değiştirme ve silme için ayrı uç yoktur.
-    Bu işler Frappe'nin hazır ucundan yapılır: `/api/v2/document/Access Rule`.
-    “Access Rule” kaydının alanları aşağıda `AccessRule` şemasındadır.
+    There is no separate endpoint to add, change or delete a rule.
+    These jobs use Frappe's built-in endpoint: `/api/v2/document/Access Rule`.
+    The fields of the “Access Rule” record are in the `AccessRule` schema below.
 
-    Kimlik: Frappe oturum çerezi. POST isteği `X-Frappe-CSRF-Token` başlığı ister.
-    Misafir hiçbir uca erişemez.
+    Identity: the Frappe session cookie. A POST request needs the `X-Frappe-CSRF-Token` header.
+    A guest cannot reach any endpoint.
 
-    Hata yanıtı Frappe'nin olağan biçimindedir. İzin hatası 403 döner.
-    Geçersiz girdi 417 döner. Bulunamayan kayıt 404 döner.
+    The error response has Frappe's usual format. A permission error returns 403.
+    Invalid input returns 417. A record that is not found returns 404.
 servers:
   - url: /api/method
-    description: Kiracı sitesinin Frappe uç kökü
+    description: Frappe endpoint root of the tenant site
 tags:
   - name: aciklama
-    description: Salt okunur uçlar. Kayıt değiştirmez.
+    description: Read-only endpoints. They do not change records.
   - name: alan-duzeyi
-    description: Alan düzeyi yönetimi. Site ayarını değiştirir.
-
+    description: Field level management. It changes the site settings.
+  - name: arama
+    description: Link search. Read-only. Replaces two Frappe endpoints at their own address.
 paths:
   /platform_core.api.access.explain_permission:
     get:
       tags: [aciklama]
       operationId: explainPermission
-      summary: Bir kayıtta iznin nedenini açıklar.
+      summary: Explains the reason for the permission on a record.
       description: |
-        Uç bir kullanıcının bir kayıtta bir işlemi yapıp yapamadığını söyler.
-        Uç nedeni de söyler. Uç kayıt değiştirmez.
+        The endpoint says whether a user can do an operation on a record.
+        The endpoint also gives the reason. The endpoint does not change records.
 
-        Olağan kullanıcı yalnız kendi iznini sorabilir.
-        Olağan kullanıcıya ret nedeni tek değerdir: `not_permitted_or_missing`.
-        Kayıt yoksa da aynı değer döner. Böylece uç kayıt varlığını ele vermez.
-        Olağan kullanıcının yanıtında `rules` listesi boş gelir.
+        An ordinary user can ask only about their own permission.
+        An ordinary user gets a single denial reason: `not_permitted_or_missing`.
+        The same value returns when the record does not exist. This way the endpoint does not reveal that a record exists.
+        The `rules` list is empty in the response to an ordinary user.
 
-        “System Manager” rolü başka kullanıcıyı da sorabilir.
-        Bu rol kuralları tek tek görür. Kayıt yoksa 404 alır.
+        The “System Manager” role can also ask about another user.
+        This role sees the rules one by one. It gets 404 when the record does not exist.
 
-        Uç önce çağıranın kayıt türündeki okuma iznine bakar. İzin yoksa 403 döner.
-        Kayıt türü yoksa da 403 döner.
+        The endpoint first checks the caller's read permission on the document type. It returns 403 when there is no permission.
+        It also returns 403 when the document type does not exist.
 
-        Olağan kullanıcıya ret yanıtında `layers.access_rule` ve `layers.share`
-        yanlış döner. Bu iki değer yalnız “System Manager” rolüne gerçek haliyle döner.
+        In a denial response to an ordinary user, `layers.access_rule` and `layers.share`
+        return false. These two values return with their real state only to the “System Manager” role.
 
-        `allowed` değeri Frappe'nin son kararıdır. Rol izni, kullanıcı izni,
-        erişim kuralı ve paylaşım bu karara birlikte girer.
+        The `allowed` value is Frappe's final decision. The role permission, the user permission,
+        the access rule and the share all go into this decision together.
       security:
         - oturum: []
       parameters:
         - name: doctype
           in: query
           required: true
-          description: Kayıt türünün adı. Örneğin `Employee`.
+          description: Name of the document type. For example `Employee`.
           schema: {type: string, maxLength: 140}
         - name: name
           in: query
           required: true
-          description: Kaydın adı.
+          description: Name of the record.
           schema: {type: string, maxLength: 140}
         - name: ptype
           in: query
           required: false
-          description: İşlem adı. Verilmezse `read` sayılır.
+          description: Name of the operation. It counts as `read` when it is not given.
           schema:
             type: string
             enum: [read, write, create, delete, submit, cancel]
@@ -78,12 +79,12 @@ paths:
           in: query
           required: false
           description: |
-            İzni sorulan kullanıcı. Verilmezse oturum sahibi sayılır.
-            Başka kullanıcıyı yalnız “System Manager” rolü sorabilir.
+            The user whose permission is asked. It counts as the session owner when it is not given.
+            Only the “System Manager” role can ask about another user.
           schema: {type: string, maxLength: 140}
       responses:
         "200":
-          description: Karar ve nedeni.
+          description: The decision and its reason.
           content:
             application/json:
               schema:
@@ -93,7 +94,7 @@ paths:
                   message: {$ref: "#/components/schemas/Explanation"}
               examples:
                 calisanReddedildi:
-                  summary: Çalışan başkasının kaydını soruyor.
+                  summary: An employee asks about someone else's record.
                   value:
                     message:
                       doctype: ER Test Talep
@@ -107,45 +108,45 @@ paths:
                       rules: []
         "403":
           description: |
-            Misafir isteği. Ya da olağan kullanıcı başka kullanıcıyı sordu.
-            Ya da çağıranın kayıt türünde okuma izni yok.
+            A guest request. Or an ordinary user asked about another user.
+            Or the caller has no read permission on the document type.
         "404":
-          description: Kayıt yok. Yalnız “System Manager” rolüne döner.
+          description: The record does not exist. It returns only to the “System Manager” role.
         "417":
           description: |
-            Girdi geçersiz. Örneğin `ptype` izinli değerlerden biri değil.
-            Alt tablo, tek kayıtlı tür ve sanal tür de bu yanıtı alır.
+            The input is invalid. For example `ptype` is not one of the allowed values.
+            A child table, a single-record type and a virtual type also get this response.
 
   /platform_core.api.access.get_access_summary:
     get:
       tags: [aciklama]
       operationId: getAccessSummary
-      summary: Oturum sahibinin bir kayıt türündeki kapsamlarını döner.
+      summary: Returns the scopes of the session owner on a document type.
       description: |
-        Uç oturum sahibine uyan etkin kuralların özetini döner.
-        Arayüz bu özetle hangi kayıtların görüneceğini kullanıcıya anlatır.
-        Uç kayıt değiştirmez.
+        The endpoint returns a summary of the active rules that match the session owner.
+        The interface uses this summary to tell the user which records will be visible.
+        The endpoint does not change records.
 
-        Özet yalnız erişim kurallarını taşır. Rol iznini ve alan iznini taşımaz.
-        Alan izinleri `platform_core.api.meta.get_doctype` ucundadır.
+        The summary carries only access rules. It does not carry the role permission or the field permission.
+        The field permissions are in the `platform_core.api.meta.get_doctype` endpoint.
 
-        Kayıt türü kurallı değilse `governed` yanlış döner ve listeler boş gelir.
-        O durumda rol izni tek başına geçerlidir.
-        Kayıt türü kurallıysa boş liste o işlemde erişim olmadığını gösterir.
+        When the document type is not governed, `governed` returns false and the lists are empty.
+        In that case the role permission applies on its own.
+        When the document type is governed, an empty list shows that there is no access for that operation.
 
-        Kullanıcının kayıt türünde okuma izni yoksa uç 403 döner.
-        Kayıt türü yoksa da 403 döner. Böylece uç tür varlığını ele vermez.
+        The endpoint returns 403 when the user has no read permission on the document type.
+        It also returns 403 when the document type does not exist. This way the endpoint does not reveal that a type exists.
       security:
         - oturum: []
       parameters:
         - name: doctype
           in: query
           required: true
-          description: Kayıt türünün adı.
+          description: Name of the document type.
           schema: {type: string, maxLength: 140}
       responses:
         "200":
-          description: Kapsam özeti.
+          description: The scope summary.
           content:
             application/json:
               schema:
@@ -155,7 +156,7 @@ paths:
                   message: {$ref: "#/components/schemas/AccessSummary"}
               examples:
                 yonetici:
-                  summary: Hem çalışan hem yönetici rolü taşıyan kullanıcı.
+                  summary: A user who has both the employee role and the manager role.
                   value:
                     message:
                       doctype: ER Test Talep
@@ -168,28 +169,28 @@ paths:
                         submit: []
                         cancel: []
         "403":
-          description: Misafir isteği, kayıt türünde okuma izni yok ya da kayıt türü yok.
+          description: A guest request, no read permission on the document type, or the document type does not exist.
 
   /platform_core.api.access.set_field_level:
     post:
       tags: [alan-duzeyi]
       operationId: setFieldLevel
-      summary: Bir alanın izin seviyesini değiştirir.
+      summary: Changes the permission level of a field.
       description: |
-        Uç alanın `permlevel` değerini değiştirir. Değişiklik “Property Setter”
-        kaydıyla tutulur. Frappe'nin kayıt türü tanımı değişmez.
+        The endpoint changes the `permlevel` value of the field. The change is kept
+        in a “Property Setter” record. Frappe's document type definition does not change.
 
-        **Bu uç site ayarını değiştirir.** Seviye 1 ve üstü alan, o seviyede
-        izni olmayan bütün rollere kapanır. Alan listede, kayıtta ve dışa
-        aktarmada dönmez. Etki hemen başlar.
+        **This endpoint changes the site settings.** A field at level 1 or above closes
+        to all roles that have no permission at that level. The field does not return
+        in the list, in the record or in the export. The effect starts at once.
 
-        İşlem geri alınabilir. Aynı uç eski seviyeyle yeniden çağrılır.
-        Yanıttaki `previous_permlevel` eski seviyeyi verir.
+        The operation can be undone. The same endpoint is called again with the old level.
+        `previous_permlevel` in the response gives the old level.
 
-        Uç yalnız “System Manager” rolüne açıktır.
-        Çağıranın “Property Setter” kaydı açma izni de olmalıdır.
-        Uç standart alanlara dokunmaz. Örneğin `name` ve `owner` değişmez.
-        Uç ücretli bir iş başlatmaz.
+        The endpoint is open only to the “System Manager” role.
+        The caller must also have permission to create a “Property Setter” record.
+        The endpoint does not touch standard fields. For example `name` and `owner` do not change.
+        The endpoint does not start a paid job.
       security:
         - oturum: []
       requestBody:
@@ -204,22 +205,22 @@ paths:
                 doctype:
                   type: string
                   maxLength: 140
-                  description: Kayıt türünün adı.
+                  description: Name of the document type.
                 fieldname:
                   type: string
                   maxLength: 140
-                  description: Alanın adı. Alan kayıt türünde tanımlı olmalıdır.
+                  description: Name of the field. The field must be defined in the document type.
                 permlevel:
                   type: integer
                   minimum: 0
                   maximum: 9
-                  description: Yeni izin seviyesi. 0 herkese açık seviyedir.
+                  description: The new permission level. 0 is the level open to everyone.
             examples:
               maas:
                 value: {doctype: ER Test Talep, fieldname: salary_amount, permlevel: 1}
       responses:
         "200":
-          description: Alanın yeni ve eski seviyesi.
+          description: The new level and the old level of the field.
           content:
             application/json:
               schema:
@@ -235,34 +236,34 @@ paths:
                       permlevel: {type: integer, minimum: 0, maximum: 9}
                       previous_permlevel: {type: integer, minimum: 0, maximum: 9}
         "403":
-          description: Kullanıcı “System Manager” değil ya da misafir.
+          description: The user is not “System Manager” or is a guest.
         "404":
-          description: Kayıt türü yok.
+          description: The document type does not exist.
         "417":
           description: |
-            Alan yok, alan standart ya da seviye 0 ile 9 arasında değil.
-            İzin sistemini tutan kayıt türü de bu yanıtı alır. Örneğin “Access Rule”.
+            The field does not exist, the field is standard, or the level is not between 0 and 9.
+            A document type that holds the permission system also gets this response. For example “Access Rule”.
 
   /platform_core.api.access.set_level_access:
     post:
       tags: [alan-duzeyi]
       operationId: setLevelAccess
-      summary: Bir role bir izin seviyesinde okuma ve yazma izni verir.
+      summary: Gives a role read and write permission at a permission level.
       description: |
-        Uç rolün bir kayıt türündeki seviye iznini ayarlar. Değişiklik
-        “Custom DocPerm” kaydıyla tutulur.
+        The endpoint sets the level permission of the role on a document type. The change
+        is kept in a “Custom DocPerm” record.
 
-        **Bu uç site ayarını değiştirir.** `read` ve `write` ikisi de yanlışsa
-        rolün o seviyedeki izni silinir. Rol o seviyedeki alanları artık göremez.
-        Etki hemen başlar.
+        **This endpoint changes the site settings.** When `read` and `write` are both false,
+        the permission of the role at that level is deleted. The role can no longer see the fields at that level.
+        The effect starts at once.
 
-        Uç seviye 0'a dokunmaz. Seviye 0 temel erişimdir.
-        Temel erişim Frappe'nin rol izni ekranından ya da ucundan yönetilir.
+        The endpoint does not touch level 0. Level 0 is the base access.
+        The base access is managed from Frappe's role permission screen or endpoint.
 
-        İşlem geri alınabilir. Aynı uç eski değerlerle yeniden çağrılır.
-        Uç yalnız “System Manager” rolüne açıktır.
-        Çağıranın “Custom DocPerm” kaydı yazma izni de olmalıdır.
-        Uç ücretli bir iş başlatmaz.
+        The operation can be undone. The same endpoint is called again with the old values.
+        The endpoint is open only to the “System Manager” role.
+        The caller must also have write permission on the “Custom DocPerm” record.
+        The endpoint does not start a paid job.
       security:
         - oturum: []
       requestBody:
@@ -277,30 +278,30 @@ paths:
                 doctype:
                   type: string
                   maxLength: 140
-                  description: Kayıt türünün adı.
+                  description: Name of the document type.
                 role:
                   type: string
                   maxLength: 140
-                  description: Rolün adı. Rol sitede tanımlı olmalıdır.
+                  description: Name of the role. The role must be defined on the site.
                 permlevel:
                   type: integer
                   minimum: 1
                   maximum: 9
-                  description: İzin seviyesi. Seviye 0 kabul edilmez.
+                  description: The permission level. Level 0 is not accepted.
                 read:
                   type: boolean
-                  description: Rol bu seviyedeki alanları okuyabilir.
+                  description: The role can read the fields at this level.
                 write:
                   type: boolean
                   description: |
-                    Rol bu seviyedeki alanları değiştirebilir.
-                    Yazma izni okuma izni olmadan verilemez.
+                    The role can change the fields at this level.
+                    Write permission cannot be given without read permission.
             examples:
               ik:
                 value: {doctype: ER Test Talep, role: ER IK, permlevel: 1, read: true, write: true}
       responses:
         "200":
-          description: Rolün o seviyedeki son izni.
+          description: The final permission of the role at that level.
           content:
             application/json:
               schema:
@@ -317,19 +318,213 @@ paths:
                       read: {type: boolean}
                       write: {type: boolean}
         "403":
-          description: Kullanıcı “System Manager” değil ya da misafir.
+          description: The user is not “System Manager” or is a guest.
         "404":
-          description: Kayıt türü ya da rol yok.
+          description: The document type or the role does not exist.
         "417":
           description: |
-            Seviye 1 ile 9 arasında değil ya da yazma okumasız istendi.
-            İzin sistemini tutan kayıt türü de bu yanıtı alır.
+            The level is not between 1 and 9, or write was requested without read.
+            A document type that holds the permission system also gets this response.
+
+  /platform_core.erisim.link_search.search_link:
+    get:
+      tags: [arama]
+      operationId: searchLink
+      summary: Link search behind the link search rule.
+      description: |
+        The engine puts this function in place of `frappe.desk.search.search_link`.
+        Clients keep calling `/api/method/frappe.desk.search.search_link`. The address and the
+        inputs do not change. POST is accepted too, with the same inputs in the body.
+
+        The endpoint does not change any record.
+
+        The standard search is unchanged. Its result passes the record rules and field levels.
+        On a governed document type a custom search function runs only when it is on the allow
+        list (`access_rule_allowed_queries`) and its code reads through permission-aware calls only.
+        The check is repeated on every search. Any other custom search function is refused with 403,
+        for every user except “Administrator”. A custom search function can come from the `query`
+        input or from the `standard_queries` hook. Both follow the same rule.
+        On a document type that is not governed a custom search runs as Frappe runs it.
+      security:
+        - oturum: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Document type to search in.
+          schema: {type: string, maxLength: 140}
+        - name: txt
+          in: query
+          required: true
+          description: Search text. It may be empty.
+          schema: {type: string}
+        - name: query
+          in: query
+          required: false
+          description: |
+            Dotted path of a custom search function. On a governed document type it is refused
+            unless the function is on the allow list and its code passes the check.
+          schema: {type: string}
+        - name: filters
+          in: query
+          required: false
+          description: Filters as JSON, passed on to the search.
+          schema: {type: string}
+        - name: page_length
+          in: query
+          required: false
+          description: Maximum number of results.
+          schema: {type: integer, default: 10}
+        - name: searchfield
+          in: query
+          required: false
+          description: Field to search in. Defaults to the name.
+          schema: {type: string}
+        - name: reference_doctype
+          in: query
+          required: false
+          description: Document type of the form that holds the link field.
+          schema: {type: string}
+        - name: link_fieldname
+          in: query
+          required: false
+          description: Name of the link field in the reference document type.
+          schema: {type: string}
+        - name: ignore_user_permissions
+          in: query
+          required: false
+          description: Frappe honours it only when the link field itself allows it.
+          schema: {type: boolean, default: false}
+      responses:
+        "200":
+          description: Matching records.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: array
+                    items:
+                      type: object
+                      required: [value]
+                      properties:
+                        value: {type: string, description: Name of the record.}
+                        label: {type: string, description: Title shown for the record.}
+                        description: {type: string, description: Extra text shown under the title.}
+        "403":
+          description: |
+            Guest request, no `select` or `read` permission on the document type, or a custom
+            search function that is not allowed on a governed document type.
+        "417":
+          description: Invalid input.
+
+  /platform_core.erisim.link_search.search_widget:
+    get:
+      tags: [arama]
+      operationId: searchWidget
+      summary: Raw link search behind the link search rule.
+      description: |
+        The engine puts this function in place of `frappe.desk.search.search_widget`.
+        Clients keep calling `/api/method/frappe.desk.search.search_widget`. The address and the
+        inputs do not change. POST is accepted too, with the same inputs in the body.
+
+        The endpoint does not change any record. It follows the same rule as `search_link`
+        and returns the rows of the search without formatting them for a link field.
+      security:
+        - oturum: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Document type to search in.
+          schema: {type: string, maxLength: 140}
+        - name: txt
+          in: query
+          required: true
+          description: Search text. It may be empty.
+          schema: {type: string}
+        - name: query
+          in: query
+          required: false
+          description: |
+            Dotted path of a custom search function. On a governed document type it is refused
+            unless the function is on the allow list and its code passes the check.
+          schema: {type: string}
+        - name: filters
+          in: query
+          required: false
+          description: Filters as JSON, passed on to the search.
+          schema: {type: string}
+        - name: page_length
+          in: query
+          required: false
+          description: Maximum number of results.
+          schema: {type: integer, default: 10}
+        - name: searchfield
+          in: query
+          required: false
+          description: Field to search in. Defaults to the name.
+          schema: {type: string}
+        - name: reference_doctype
+          in: query
+          required: false
+          description: Document type of the form that holds the link field.
+          schema: {type: string}
+        - name: link_fieldname
+          in: query
+          required: false
+          description: Name of the link field in the reference document type.
+          schema: {type: string}
+        - name: ignore_user_permissions
+          in: query
+          required: false
+          description: Frappe honours it only when the link field itself allows it.
+          schema: {type: boolean, default: false}
+        - name: start
+          in: query
+          required: false
+          description: Number of results to skip.
+          schema: {type: integer, default: 0}
+        - name: filter_fields
+          in: query
+          required: false
+          description: Extra fields to return, as JSON.
+          schema: {type: string}
+        - name: as_dict
+          in: query
+          required: false
+          description: Return each row as an object instead of a list.
+          schema: {type: boolean, default: false}
+      responses:
+        "200":
+          description: Matching rows. Each row starts with the record name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: array
+                    items:
+                      oneOf:
+                        - type: array
+                          items: {}
+                        - type: object
+        "403":
+          description: |
+            Guest request, no `select` or `read` permission on the document type, or a custom
+            search function that is not allowed on a governed document type.
+        "417":
+          description: Invalid input.
 
 x-replaced-endpoints:
   description: |
-    Motor Frappe'nin iki arama ucunun yerine kendi işlevini koyar.
-    Adresler değişmez. İstemci aynı adresi ve aynı girdileri kullanır.
-    Değişen davranış aşağıdadır. Bu, mevcut bir ucun davranış değişikliğidir.
+    The engine puts its own function in place of two Frappe search endpoints.
+    The addresses do not change. The client uses the same address and the same inputs.
+    The changed behaviour is below. This is a behaviour change of an existing endpoint.
   endpoints:
     - path: /api/method/frappe.desk.search.search_link
       replaced_by: platform_core.erisim.link_search.search_link
@@ -338,96 +533,96 @@ x-replaced-endpoints:
       replaced_by: platform_core.erisim.link_search.search_widget
       methods: [GET, POST]
   behaviour:
-    - Çağıranın aranan kayıt türünde `select` ya da `read` izni olmalıdır. Yoksa uç 403 döner.
-    - Frappe'nin standart araması değişmez. Sonuç liste kuralından ve alan seviyesinden geçer.
-    - Kurallı kayıt türünde özel arama işlevi yalnız izin listesindeyse çalışır.
-    - Özel arama işlevi `query` girdisiyle ya da `standard_queries` kancasıyla gelir. İkisi de aynı kurala uyar.
-    - İzin listesindeki işlevin kodu her aramada denetlenir. Kod yalnız izinli okuma yolu kullanmalıdır.
-    - Kurala uymayan özel arama 403 döner. Bu ret bütün kullanıcılar içindir. Tek istisna “Administrator” kullanıcısıdır.
-    - Kuralsız kayıt türünde özel arama Frappe'nin olağan davranışıyla çalışır.
-    - Bilinmeyen girdi adı reddedilir. Sarmalayıcılar Frappe'nin belgeli girdilerini kabul eder.
+    - The caller must have `select` or `read` permission on the searched document type. Otherwise the endpoint returns 403.
+    - Frappe's standard search does not change. The result passes through the list rule and the field level.
+    - On a governed document type, a custom search function runs only when it is in the allow list.
+    - A custom search function comes through the `query` input or through the `standard_queries` hook. Both follow the same rule.
+    - The code of a function in the allow list is checked on every search. The code must use only the permitted read path.
+    - A custom search that does not follow the rule returns 403. This denial is for all users. The only exception is the “Administrator” user.
+    - On a document type that is not governed, a custom search runs with Frappe's usual behaviour.
+    - An unknown input name is rejected. The wrappers accept Frappe's documented inputs.
 
 x-hooks:
-  description: Uygulamaların `hooks.py` dosyasında motora verdiği bildirimler.
+  description: The declarations that apps give to the engine in their `hooks.py` file.
   hooks:
     - name: access_rule_report_scopes
-      shape: '{"Rapor adı": {"Kayıt türü": ["alan", ...]}}'
+      shape: '{"Report Name": {"Document Type": ["field", ...]}}'
       description: |
-        Betik raporunun okuduğu kayıt türlerini ve alanları bildirir.
-        Bildirim boş olamaz. Her kayıt türü en az bir gerçek alan saymalıdır. `*` kabul edilmez.
-        Bildirim tek başına yetmez. Raporun kodu yalnız `frappe.get_list` ile okumalıdır.
-        Sorgu raporunu bu bildirim açmaz.
+        It declares the document types and fields that a script report reads.
+        The declaration cannot be empty. Each document type must list at least one real field. `*` is not accepted.
+        The declaration is not enough on its own. The code of the report must read only with `frappe.get_list`.
+        This declaration does not open a query report.
     - name: access_rule_allowed_queries
-      shape: '["uygulama.modul.islev", ...]'
+      shape: '["app.module.function", ...]'
       description: |
-        Kurallı kayıt türünde çalışabilecek özel arama işlevlerini sayar.
-        İşlevin modülü yalnız izinli okuma yolu kullanmalıdır. Motor bunu her aramada denetler.
+        It lists the custom search functions that may run on a governed document type.
+        The module of the function must use only the permitted read path. The engine checks this on every search.
 
     - name: ai_write_closed_doctypes
       shape: '["Access Rule"]'
       description: |
-        Bu kancayı yapay zekâ katmanı okur. Motor “Access Rule” kayıt türünü bu listeye yazar (O-28).
-        Genel yazma araçları bu türü değiştiremez. Örneğin `create_document` ve `update_document` reddedilir.
-        Kural yalnız motorun kendi araçlarıyla değişir: `propose_access_rule` ve `propose_access_rule_change`.
+        The AI layer reads this hook. The engine writes the “Access Rule” document type into this list (O-28).
+        The generic write tools cannot change this type. For example `create_document` and `update_document` are rejected.
+        A rule changes only through the engine's own tools: `propose_access_rule` and `propose_access_rule_change`.
 
 x-report-rules:
   description: |
-    Rapor uçları Frappe'nin kendi uçlarıdır. Motor rapor kaydını genişletir.
-    Sitede en az bir kurallı kayıt türü varken şu kurallar geçerlidir.
+    The report endpoints are Frappe's own endpoints. The engine extends the report record.
+    The following rules apply while the site has at least one governed document type.
   rules:
-    - Liste raporu (“Report Builder”) çalışır. Veri liste kuralından ve alan seviyesinden geçer.
-    - Sorgu raporu (“Query Report”) yalnız “System Manager” rolüne çalışır. Ötekiler 403 alır.
-    - Betik raporu (“Script Report”) yalnız bildirimi ve kod denetimi geçerliyse çalışır. Yoksa herkes 403 alır.
-    - Kurallı veriye dokunan raporda hazır rapor (“Prepared Report”) kapalıdır. Oluşturma, saklı sonucu okuma, dosya ve ZIP indirme, CSV dönüştürme reddedilir.
-    - Zamanlanmış e-posta raporu (“Auto Email Report”) aynı kurallara kayıttaki kullanıcı için uyar.
-    - Sitede kurallı tür yoksa kapı yalnız raporun ana türünün alan seviyesini denetler.
+    - The list report (“Report Builder”) runs. The data passes through the list rule and the field level.
+    - The query report (“Query Report”) runs only for the “System Manager” role. Others get 403.
+    - The script report (“Script Report”) runs only when its declaration and its code check are valid. Otherwise everyone gets 403.
+    - The prepared report (“Prepared Report”) is closed for a report that touches governed data. Creating it, reading the stored result, downloading the file and the ZIP, and converting to CSV are rejected.
+    - The scheduled email report (“Auto Email Report”) follows the same rules for the user in the record.
+    - When the site has no governed type, the gate checks only the field level of the report's main type.
 
 x-ai-tools:
   description: |
-    Motor dört yapay zekâ aracını `ai_tools` kancasıyla bildirir.
-    Bildirim biçimi `platform_core-yapay-zeka.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir.
-    Katman araç adının başına uygulama adını ekler. Örneğin `platform_core_list_access_rules` olur.
-    Bildirim işlevi `platform_core.erisim.ai_tools.declare` olur.
+    The engine declares four AI tools through the `ai_tools` hook.
+    The declaration format is in the `x-ai-tools-hook` section of the file `platform_core-yapay-zeka.openapi.yaml`.
+    The layer adds the app name to the start of the tool name. For example it becomes `platform_core_list_access_rules`.
+    The declaration function is `platform_core.erisim.ai_tools.declare`.
 
-    Araçlar yalnız yapılandırılmış alan alır. Hiçbir araç SQL metni ya da ham koşul almaz.
-    Girdi modelleri bilinmeyen alanı reddeder. Süzgeç satırları kural kaydıyla aynı doğrulamadan geçer.
-    Yazan araçlar kaydı değiştirmez. Araç bir öneri açar. İnsan önizlemeyi onaylar.
+    The tools take only structured fields. No tool takes SQL text or a raw condition.
+    The input models reject an unknown field. The filter rows pass the same validation as the rule record.
+    The writing tools do not change the record. The tool opens a proposal. A human approves the preview.
   tools:
     - name: list_access_rules
       kind: read
       roles: [System Manager]
       description: |
-        Erişim kurallarını listeler. Girdiler `document_type`, `role` ve `include_inactive` olur.
-        Çağıranın “Access Rule” türünde okuma izni olmalıdır. En çok 200 kural döner.
+        It lists the access rules. The inputs are `document_type`, `role` and `include_inactive`.
+        The caller must have read permission on the “Access Rule” type. At most 200 rules return.
     - name: explain_access
       kind: read
       description: |
-        Bir kullanıcının bir kayıtta bir işlemi neden yapabildiğini ya da yapamadığını açıklar.
-        Davranışı `explain_permission` ucuyla aynıdır. Olağan kullanıcı yalnız kendini sorar
-        ve tek ret nedeni görür. Kural ayrıntısı yalnız “System Manager” rolüne döner.
+        It explains why a user can or cannot do an operation on a record.
+        Its behaviour is the same as the `explain_permission` endpoint. An ordinary user asks only about themselves
+        and sees a single denial reason. The rule detail returns only to the “System Manager” role.
     - name: propose_access_rule
       kind: write
       destructive: true
       roles: [System Manager]
       description: |
-        Yeni kural önerir. Girdiler `AccessRule` şemasındaki alanlardır. `filters` alanı
-        `{field, operator, value}` satırlarının listesidir.
-        Önizleme özeti, alan değişikliklerini ve erişimi kaybedecek rolleri döner.
-        Bir kayıt türüne ilk kural yazılınca kuralı olmayan roller erişimi kaybeder.
-        Bu yüzden araç `destructive` bayrağını taşır.
-        Önizlemenin `target_version` değeri o kayıt türünün bütün kurallarının özetidir.
-        Onaydan önce başka bir kural değişirse katman onayı reddeder.
+        It proposes a new rule. The inputs are the fields in the `AccessRule` schema. The `filters` field
+        is a list of `{field, operator, value}` rows.
+        The preview returns the summary, the field changes and the roles that will lose access.
+        When the first rule is written for a document type, the roles that have no rule lose access.
+        This is why the tool carries the `destructive` flag.
+        The `target_version` value of the preview is a digest of all the rules of that document type.
+        If another rule changes before the approval, the layer rejects the approval.
     - name: propose_access_rule_change
       kind: write
       destructive: true
       versioned: true
       roles: [System Manager]
       description: |
-        Kayıtlı bir kuralda değişiklik önerir. Kuralı kapatmak da bu araçla yapılır.
-        Girdi kuralın `name` değeri ve değişecek alanlardır. Verilmeyen alan değişmez.
-        Önizleme `target_name` ve `target_version` döner. `target_version` kaydın `modified` değeridir.
-        Katman yürütmeden hemen önce sürümü yeniden karşılaştırır.
-        Kuralı daraltmak erişimi kaldırır. Bu yüzden araç `destructive` bayrağını taşır.
+        It proposes a change to a saved rule. Turning a rule off is also done with this tool.
+        The input is the `name` value of the rule and the fields to change. A field that is not given does not change.
+        The preview returns `target_name` and `target_version`. `target_version` is the `modified` value of the record.
+        The layer compares the version again just before it executes.
+        Narrowing a rule removes access. This is why the tool carries the `destructive` flag.
 
 components:
   securitySchemes:
@@ -435,18 +630,18 @@ components:
       type: apiKey
       in: cookie
       name: sid
-      description: Frappe oturum çerezi. POST isteği `X-Frappe-CSRF-Token` başlığı da ister.
+      description: The Frappe session cookie. A POST request also needs the `X-Frappe-CSRF-Token` header.
 
   schemas:
     Scope:
       type: string
       enum: [own, team, department, company, all]
       description: |
-        Kuralın özneye göre seçtiği kayıt kümesi.
-        `own` öznenin kendi kayıtlarıdır. `team` öznenin ve ona `reports_to`
-        zinciriyle bağlı çalışanların kayıtlarıdır. `department` öznenin
-        bölümündeki ve alt bölümlerindeki kayıtlardır. `company` öznenin
-        şirketindeki kayıtlardır. `all` bütün kayıtlardır.
+        The set of records that the rule selects for the user.
+        `own` is the user's own records. `team` is the records of the user and of
+        the employees linked to the user through the `reports_to` chain. `department` is
+        the records in the user's department and its sub-departments. `company` is
+        the records in the user's company. `all` is all records.
 
     Explanation:
       type: object
@@ -455,10 +650,10 @@ components:
         doctype: {type: string}
         name: {type: string}
         ptype: {type: string, enum: [read, write, create, delete, submit, cancel]}
-        user: {type: string, description: İzni sorulan kullanıcı.}
+        user: {type: string, description: The user whose permission is asked.}
         allowed:
           type: boolean
-          description: Frappe'nin son kararı. Bütün katmanlar bu karara girer.
+          description: Frappe's final decision. All layers go into this decision.
         reason:
           type: string
           enum:
@@ -469,47 +664,47 @@ components:
             - user_permission
             - not_permitted_or_missing
           description: |
-            `allowed`: Rol izni var ve kural kaydı seçiyor.
-            `allowed_by_share`: Kayıt kullanıcıyla paylaşılmış. Paylaşım kuralı aşar.
-            `no_role_permission`: Rolün bu işlem için izni yok. Yalnız “System Manager” görür.
-            `no_matching_rule`: Kayıt türü kurallı ve hiçbir kural kaydı seçmiyor. Yalnız “System Manager” görür.
-            `user_permission`: Frappe'nin kullanıcı izni kaydı engelliyor. Yalnız “System Manager” görür.
-            `not_permitted_or_missing`: Olağan kullanıcıya dönen tek ret nedeni.
+            `allowed`: The role permission exists and a rule selects the record.
+            `allowed_by_share`: The record is shared with the user. The share overrides the rule.
+            `no_role_permission`: The role has no permission for this operation. Only “System Manager” sees it.
+            `no_matching_rule`: The document type is governed and no rule selects the record. Only “System Manager” sees it.
+            `user_permission`: Frappe's user permission record blocks it. Only “System Manager” sees it.
+            `not_permitted_or_missing`: The only denial reason that returns to an ordinary user.
         governed:
           type: boolean
-          description: Kayıt türünün en az bir etkin kuralı var.
+          description: The document type has at least one active rule.
         layers:
           type: object
           required: [role, access_rule, share]
           properties:
             role:
               type: boolean
-              description: Rol izni bu işlemi açıyor.
+              description: The role permission opens this operation.
             access_rule:
               type: boolean
-              description: Motorun kararı. Kayıt türü kurallı değilse doğru döner.
+              description: The engine's decision. It returns true when the document type is not governed.
             share:
               type: boolean
-              description: Kayıt bu işlem için kullanıcıyla paylaşılmış.
+              description: The record is shared with the user for this operation.
         rules:
           type: array
           description: |
-            Kayıt türünün etkin kuralları, `priority` sırasıyla.
-            Yalnız “System Manager” rolüne dolu döner.
+            The active rules of the document type, in `priority` order.
+            It returns filled only to the “System Manager” role.
           items:
             type: object
             required: [name, title, role, scope, applies, matches]
             properties:
-              name: {type: string, description: Kural kaydının adı.}
+              name: {type: string, description: Name of the rule record.}
               title: {type: string}
               role: {type: string}
               scope: {$ref: "#/components/schemas/Scope"}
               applies:
                 type: boolean
-                description: Kullanıcı rolü taşıyor ve kural bu işlemi kapsıyor.
+                description: The user has the role and the rule covers this operation.
               matches:
                 type: boolean
-                description: Kural bu kaydı seçiyor. `applies` yanlışsa yanlış döner.
+                description: The rule selects this record. It returns false when `applies` is false.
 
     AccessSummary:
       type: object
@@ -518,10 +713,10 @@ components:
         doctype: {type: string}
         governed:
           type: boolean
-          description: Kayıt türünün en az bir etkin kuralı var.
+          description: The document type has at least one active rule.
         operations:
           type: object
-          description: Her işlem için oturum sahibine uyan kuralların kapsamları.
+          description: For each operation, the scopes of the rules that match the session owner.
           required: [read, write, create, delete, submit, cancel]
           additionalProperties: false
           properties:
@@ -535,37 +730,37 @@ components:
     AccessRule:
       type: object
       description: |
-        “Access Rule” kaydı. Kayıt `/api/v2/document/Access Rule` ucundan yönetilir.
-        Kaydı yalnız “System Manager” rolü okur ve yazar.
-        Kural kaydedilince etkisi sonraki istekte başlar.
+        The “Access Rule” record. The record is managed from the `/api/v2/document/Access Rule` endpoint.
+        Only the “System Manager” role reads and writes the record.
+        When a rule is saved, its effect starts on the next request.
 
-        Bir kayıt türüne ilk kural yazılınca kuralı olmayan roller o türde
-        erişimi kaybeder. Yanıt bu rolleri bir uyarı iletisiyle sayar.
+        When the first rule is written for a document type, the roles that have no rule
+        lose access to that type. The response lists these roles in a warning message.
       required: [title, document_type, role, scope]
       properties:
-        name: {type: string, readOnly: true, description: Kaydın adı. Sunucu üretir.}
-        title: {type: string, maxLength: 140, description: Kuralın kısa adı.}
-        is_active: {type: integer, enum: [0, 1], default: 1, description: "Kural etkin mi?"}
+        name: {type: string, readOnly: true, description: Name of the record. The server generates it.}
+        title: {type: string, maxLength: 140, description: Short name of the rule.}
+        is_active: {type: integer, enum: [0, 1], default: 1, description: "Is the rule active?"}
         document_type:
           type: string
           description: |
-            Kuralın daralttığı kayıt türü. Alt tablo, tek kayıtlı tür, sanal tür
-            ve izin sistemini tutan türler kabul edilmez.
-        role: {type: string, description: Kuralın uygulandığı rol.}
+            The document type that the rule narrows. A child table, a single-record type, a virtual type
+            and the types that hold the permission system are not accepted.
+        role: {type: string, description: The role that the rule applies to.}
         scope: {$ref: "#/components/schemas/Scope"}
         match_field:
           type: string
           description: |
-            Kaydı özneye bağlayan alan. Kapsam `all` değilse zorunludur.
-            `owner` kullanıcıyı gösterir. `name` kaydın kendisini gösterir.
-            Bağlantı alanı hedef türünü gösterir. Hedef kullanıcı, çalışan,
-            bölüm ya da şirket olabilir. Kapsama uymayan hedef reddedilir.
+            The field that links the record to the user. It is required when the scope is not `all`.
+            `owner` points to the user. `name` points to the record itself.
+            A link field points to its target type. The target can be a user, an employee,
+            a department or a company. A target that does not fit the scope is rejected.
         filters:
           type: string
           description: |
-            Ek koşulların JSON metni. Her satır `[alan, işleç, değer]` olur.
-            İşleçler `=`, `!=`, `in` ve `not in` olur. Koşulların hepsi sağlanmalıdır.
-            Değer sabit ya da şu değişkenlerden biri olur: `$user`,
+            The JSON text of the extra conditions. Each row is `[field, operator, value]`.
+            The operators are `=`, `!=`, `in` and `not in`. All of the conditions must hold.
+            The value is a constant or one of these variables: `$user`,
             `$user.employee`, `$user.department`, `$user.company`.
           examples:
             - '[["status", "=", "Open"], ["company", "=", "$user.company"]]'
@@ -578,5 +773,5 @@ components:
         priority:
           type: integer
           default: 0
-          description: Açıklama ucundaki sıra. Küçük sayı önce gelir. Sonucu değiştirmez.
-        description: {type: string, description: Kuralın neden var olduğu.}
+          description: The order in the explanation endpoint. A smaller number comes first. It does not change the result.
+        description: {type: string, description: Why the rule exists.}

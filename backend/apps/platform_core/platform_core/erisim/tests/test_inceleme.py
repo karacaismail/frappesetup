@@ -1,4 +1,4 @@
-"""Bağımsız incelemenin bulduğu durumlar (R-9). Her test bir bulguyu sınar."""
+"""The cases the independent review found (R-9). Each test checks one finding."""
 
 import json
 
@@ -26,7 +26,7 @@ QUERY_REPORT = "ER Test Sorgu Raporu"
 
 
 class TestIdentitySwap(ErisimTestCase):
-	"""Bulgu 1: istemci kaydın adını değiştirerek başkasının kaydına ulaşamaz."""
+	"""Finding 1: the client cannot reach the record of someone else by changing the name of the record."""
 
 	def swap_fields(self) -> dict:
 		own = self.records[EMPLOYEE_1]
@@ -70,10 +70,10 @@ class TestIdentitySwap(ErisimTestCase):
 
 
 class TestValueTypes(ErisimTestCase):
-	"""Bulgu 4: sayı, liste ya da sözlük değeri kuralı geçemez."""
+	"""Finding 4: a number, list or dict value cannot pass the rule."""
 
 	def test_numeric_employee_value_cannot_create_a_record(self):
-		"""MariaDB `0 = 'HR-EMP-1'` karşılaştırmasını doğru sayar. Motor değeri metne çevirmelidir."""
+		"""MariaDB counts the comparison `0 = 'HR-EMP-1'` as true. The engine must turn the value into text."""
 		client = self.login(EMPLOYEE_1)
 
 		response = self.rest_post(client, {"title": "Sayi ile", "employee": 0})
@@ -100,7 +100,7 @@ class TestValueTypes(ErisimTestCase):
 
 
 class TestPreparedReport(ErisimTestCase):
-	"""Bulgu 2: hazır rapor yolu da kapıdan geçer."""
+	"""Finding 2: the prepared report path also goes through the gate."""
 
 	@classmethod
 	def setUpClass(cls):
@@ -114,7 +114,7 @@ class TestPreparedReport(ErisimTestCase):
 				is_standard="No",
 				query=f"select name as `Name:Data:200`, title as `Title:Data:200` from `tab{DOCTYPE}`",
 			).insert()
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 
 	def setUp(self):
 		super().setUp()
@@ -124,7 +124,7 @@ class TestPreparedReport(ErisimTestCase):
 	def drop_prepared_reports(self) -> None:
 		frappe.set_user("Administrator")
 		frappe.db.delete("Prepared Report", {"report_name": QUERY_REPORT})
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 
 	def test_narrowed_user_cannot_queue_a_prepared_report(self):
 		frappe.set_user(EMPLOYEE_1)
@@ -143,7 +143,7 @@ class TestPreparedReport(ErisimTestCase):
 
 
 class TestRuleInput(ErisimTestCase):
-	"""Bulgu 5 ve 7: sonsuz sayı ve korumalı tür reddedilir."""
+	"""Findings 5 and 7: an infinite number and a protected document type are denied."""
 
 	def test_non_finite_filter_value_is_rejected(self):
 		for raw in ('[["idx", "=", NaN]]', '[["idx", "=", Infinity]]'):
@@ -165,7 +165,7 @@ class TestRuleInput(ErisimTestCase):
 		frappe.db.delete("Property Setter", {"doc_type": RULE_DOCTYPE, "property": "permlevel"})
 		frappe.db.delete("Custom DocPerm", {"parent": RULE_DOCTYPE})
 		frappe.clear_cache(doctype=RULE_DOCTYPE)
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 
 	def test_field_level_endpoints_refuse_protected_doctypes(self):
 		self.addCleanup(self.drop_rule_field_levels)
@@ -203,7 +203,7 @@ class TestRuleInput(ErisimTestCase):
 
 
 class TestOperators(ErisimTestCase):
-	"""`!=`, `in` ve `not in` işleçleri listede ve tek kayıtta aynı sonucu verir."""
+	"""The `!=`, `in` and `not in` operators give the same result in the list and on the single record."""
 
 	RULES = (
 		{
@@ -236,7 +236,7 @@ class TestOperators(ErisimTestCase):
 
 
 class TestDepartmentAndCompany(ErisimTestCase):
-	"""`department` ve `company` kapsamları (karar notu 3. ve 7. bölüm)."""
+	"""The `department` and `company` scopes (decision note, sections 3 and 7)."""
 
 	RULES = (
 		{
@@ -258,7 +258,7 @@ class TestDepartmentAndCompany(ErisimTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
-		# ERPNext üstü boş bölümü ilk köke bağlar. Bu yüzden açık bir kök kurulur.
+		# ERPNext attaches a department without a parent to the first root. So an explicit root is set up.
 		root = cls.department("ER Kok Bolum", None, is_group=1)
 		cls.parent = cls.department("ER Ust Bolum", root, is_group=1)
 		cls.child = cls.department("ER Alt Bolum", cls.parent)
@@ -266,7 +266,7 @@ class TestDepartmentAndCompany(ErisimTestCase):
 		for user, department in ((EMPLOYEE_1, cls.parent), (EMPLOYEE_2, cls.child), (EMPLOYEE_3, cls.other)):
 			frappe.db.set_value("Employee", employee_of(user), "department", department)
 		frappe.db.set_value(DOCTYPE, cls.records[EMPLOYEE_3], "company", None)
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 
 	@classmethod
 	def tearDownClass(cls):
@@ -291,7 +291,7 @@ class TestDepartmentAndCompany(ErisimTestCase):
 		return doc.insert().name
 
 	def test_department_scope_includes_sub_departments(self):
-		"""calisan1 üst bölümdedir. Alt bölümdeki calisan2'nin kaydını da görür."""
+		"""calisan1 is in the parent department. calisan1 also sees the record of calisan2 in the child department."""
 		expected = self.names_of([EMPLOYEE_1, EMPLOYEE_2])
 		client = self.login(EMPLOYEE_1)
 
@@ -314,7 +314,7 @@ class TestDepartmentAndCompany(ErisimTestCase):
 class TestDeleteAndRename(ErisimTestCase):
 	def test_role_with_delete_rule_deletes(self):
 		name = self.insert_record(EMPLOYEE_1, title="Silinecek")
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 
 		response = self.rest_delete(self.login(HR), name)
 

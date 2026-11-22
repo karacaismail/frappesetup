@@ -1,4 +1,4 @@
-"""Veri yüzeyleri: liste, kayıt, liste raporu ve dışa aktarma aynı kümeyi verir (G-121)."""
+"""Data surfaces: the list, the record, the list report and the export give the same set (G-121)."""
 
 import csv
 import io
@@ -15,7 +15,7 @@ from platform_core.erisim.tests.base import (
 
 class TestSurfaces(ErisimTestCase):
 	def report_view_names(self, client) -> set[str]:
-		"""Liste raporu (“Report Builder”) yüzeyi."""
+		"""The list report (“Report Builder”) surface."""
 		response = self.send(
 			client,
 			"POST",
@@ -37,7 +37,7 @@ class TestSurfaces(ErisimTestCase):
 		return response.json["message"]
 
 	def exported_names(self, client) -> set[str]:
-		"""Liste dışa aktarması yüzeyi. İlk satır başlıktır."""
+		"""The list export surface. The first row is the header."""
 		response = self.send(
 			client,
 			"POST",
@@ -56,7 +56,7 @@ class TestSurfaces(ErisimTestCase):
 		return {cell for row in rows[1:] for cell in row if cell in known}
 
 	def link_search_names(self, client) -> set[str]:
-		"""Bağlantı araması yüzeyi."""
+		"""The link search surface."""
 		response = self.send(
 			client,
 			"POST",

@@ -1,4 +1,4 @@
-"""Kural değişince sonuç sonraki istekte değişir (görev belgesi, karar notu 12. bölüm)."""
+"""When a rule changes, the result changes in the next request (task document; decision note, section 12)."""
 
 import frappe
 
@@ -26,7 +26,7 @@ class TestRuleChange(ErisimTestCase):
 		rule = frappe.get_doc(RULE_DOCTYPE, self.rules[OWN_RULE])
 		rule.update({"is_active": 1, "scope": "own", "match_field": "employee", "allow_read": 1})
 		rule.save()
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 
 	def test_widening_a_rule_over_rest_takes_effect_on_next_request(self):
 		admin = self.login(ADMIN)
@@ -99,7 +99,7 @@ class TestRuleChange(ErisimTestCase):
 		frappe.db.commit()  # nosemgrep
 
 	def test_first_rule_warns_about_roles_that_lose_access(self):
-		"""Karar notu 3. bölüm: uyarı kuralı olmayan rolleri sayar ve kaydı durdurmaz."""
+		"""Decision note, section 3: the warning lists the roles without a rule and does not stop the save."""
 		admin = self.login(ADMIN)
 
 		created = self.send(

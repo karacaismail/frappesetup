@@ -5,7 +5,7 @@ app_description = "Platform backend modules"
 app_email = "noreply@example.test"
 app_license = "mit"
 
-# Erişim kuralı motoru (erisim-kurali işi). Karar notu: docs/kararlar/0006-erisim-kurali.md
+# Access rule engine (erisim-kurali task). Decision note: docs/kararlar/0006-erisim-kurali.md
 permission_query_conditions = {"*": "platform_core.erisim.hooks.query_conditions"}
 has_permission = {"*": "platform_core.erisim.hooks.has_permission"}
 # Custom link searches on governed types run only when allow-listed and checked.

@@ -1,0 +1,84 @@
+Access Rule,Erişim Kuralı,Access Rule
+A rule that narrows which records of a document type a role may read or change. Role permissions grant access; Access Rules only narrow it.,Bir rolün bir kayıt türünde okuyabildiği ya da değiştirebildiği kayıtları daraltan kural. İzni rol izni verir. Erişim kuralı yalnız daraltır.,Access Rule
+Title,Başlık,Access Rule
+Is Active,Etkin,Access Rule
+Document Type,Kayıt Türü,Access Rule
+Role,Rol,Access Rule
+Scope,Kapsam,Access Rule
+Match Field,Eşleşme Alanı,Access Rule
+Priority,Öncelik,Access Rule
+Operations,İşlemler,Access Rule
+Allow Read,Okumaya İzin Ver,Access Rule
+Allow Write,Yazmaya İzin Ver,Access Rule
+Allow Create,Oluşturmaya İzin Ver,Access Rule
+Allow Delete,Silmeye İzin Ver,Access Rule
+Allow Submit,Onaya Göndermeye İzin Ver,Access Rule
+Allow Cancel,İptale İzin Ver,Access Rule
+Conditions,Koşullar,Access Rule
+Filters,Süzgeçler,Access Rule
+Description,Açıklama,Access Rule
+Short name of the rule. Shown when a permission is explained.,Kuralın kısa adı. İzin açıklanırken gösterilir.,Access Rule
+Only active rules are applied. An inactive rule does not govern its document type.,Yalnız etkin kurallar uygulanır. Etkin olmayan kural kayıt türünü kurallı yapmaz.,Access Rule
+"Document type whose records this rule narrows. Child tables, single and virtual document types and the document types of the permission system are not accepted.","Bu kuralın kayıtlarını daralttığı kayıt türü. Alt tablolar, tek kayıtlı ve sanal kayıt türleri ile izin sisteminin kayıt türleri kabul edilmez.",Access Rule
+Role the rule applies to. A user is covered when they hold this role.,"Kuralın uygulandığı rol. Kural, bu rolü taşıyan kullanıcıyı kapsar.",Access Rule
+"Which records the rule selects relative to the user: own (the user's records), team (the user and everyone reporting to them through Employee.reports_to), department (the user's department and its sub-departments), company (the user's company) or all (every record).","Kuralın kullanıcıya göre seçtiği kayıtlar: own (kullanıcının kayıtları), team (kullanıcı ve Employee.reports_to üzerinden ona bağlı herkes), department (kullanıcının bölümü ve alt bölümleri), company (kullanıcının şirketi) ya da all (bütün kayıtlar).",Access Rule
+"Field of the document type that ties a record to a user, employee, department or company, for example employee or owner. Required unless the scope is all. Use name when the record itself is the employee, department or company.","Kaydı bir kullanıcıya, çalışana, bölüme ya da şirkete bağlayan alan. Örneğin employee ya da owner. Kapsam all değilse zorunludur. Kaydın kendisi çalışan, bölüm ya da şirketse name yazın.",Access Rule
+Order in which rules are listed when a permission is explained. Lower numbers come first. It never changes the decision.,İzin açıklanırken kuralların sırası. Küçük sayı önce gelir. Kararı hiç değiştirmez.,Access Rule
+"The rule covers reading, listing, printing, emailing, exporting, reporting and sharing.","Kural okumayı, listelemeyi, yazdırmayı, e-postayla göndermeyi, dışa aktarmayı, raporlamayı ve paylaşmayı kapsar.",Access Rule
+The rule covers changing a saved record.,Kural kayıtlı bir kaydı değiştirmeyi kapsar.,Access Rule
+The rule covers creating and amending a record. The new values must satisfy the rule.,Kural kayıt oluşturmayı ve düzeltme kaydı açmayı kapsar. Yeni değerler kurala uymalıdır.,Access Rule
+The rule covers deleting a record.,Kural kayıt silmeyi kapsar.,Access Rule
+The rule covers submitting a record.,Kural kaydı onaya göndermeyi kapsar.,Access Rule
+The rule covers cancelling a submitted record.,Kural onaylanmış kaydı iptal etmeyi kapsar.,Access Rule
+"Extra conditions as a JSON list of [field, operator, value] rows. All rows must hold. Operators: =, !=, in, not in. A value may be a constant or one of $user, $user.employee, $user.department, $user.company.","Ek koşullar. [alan, işleç, değer] satırlarından oluşan bir JSON listesidir. Bütün satırlar sağlanmalıdır. İşleçler: =, !=, in, not in. Değer sabit olabilir ya da şunlardan biri olabilir: $user, $user.employee, $user.department, $user.company.",Access Rule
+Why this rule exists. Free text for administrators and assistants.,Bu kuralın neden var olduğu. Yöneticiler ve asistanlar için serbest metin.,Access Rule
+Access Rule,Erişim Kuralı,
+"Access Rules cannot govern child tables, single or virtual document types.","Erişim kuralı alt tabloya, tek kayıtlı ya da sanal kayıt türüne yazılamaz.",
+Access Rules cannot govern {0}.,{0} kayıt türüne erişim kuralı yazılamaz.,
+"Child tables, single and virtual document types are not supported.","Alt tablolar, tek kayıtlı ve sanal kayıt türleri desteklenmez.",
+Document type {0} not found.,{0} kayıt türü bulunamadı.,
+"Each filter must be a [field, operator, value] row.","Her süzgeç [alan, işleç, değer] biçiminde bir satır olmalıdır.",
+Field levels of {0} cannot be changed here.,{0} kayıt türünün alan seviyeleri buradan değiştirilemez.,
+Filter field {0} is not a column of {1}.,{0} süzgeç alanı {1} kayıt türünün bir sütunu değil.,
+Filter operator must be one of: {0},Süzgeç işleci şunlardan biri olmalıdır: {0},
+Filter values must be finite numbers.,Süzgeç değeri sonlu bir sayı olmalıdır.,
+Filter values must be text or numbers.,Süzgeç değeri metin ya da sayı olmalıdır.,
+"Filters must be a list of [field, operator, value] rows.","Süzgeçler [alan, işleç, değer] satırlarından oluşan bir liste olmalıdır.",
+Filters must be valid JSON.,Süzgeçler geçerli bir JSON olmalıdır.,
+Match Field is required unless the scope is all.,Kapsam all değilse Eşleşme Alanı zorunludur.,
+Match Field {0} must point to one of: {1},{0} eşleşme alanı şunlardan birini göstermelidir: {1},
+No permission to change field levels.,Alan seviyelerini değiştirme izniniz yok.,
+No permission to change role permissions.,Rol izinlerini değiştirme izniniz yok.,
+No permission to create Access Rules.,Erişim kuralı oluşturma izniniz yok.,
+No permission to read Access Rules.,Erişim kurallarını okuma izniniz yok.,
+No permission to read {0}.,{0} kayıt türünü okuma izniniz yok.,
+No permission to search {0}.,{0} kayıt türünde arama izniniz yok.,
+Only a System Manager can explain another user's permission.,Başka kullanıcının iznini yalnız System Manager açıklayabilir.,
+Operator {0} needs a non-empty list of values.,{0} işleci boş olmayan bir değer listesi ister.,
+Permission level must be between 0 and {0}.,İzin seviyesi 0 ile {0} arasında olmalıdır.,
+Permission level must be between 1 and {0}.,İzin seviyesi 1 ile {0} arasında olmalıdır.,
+Prepared Report is switched off for {0}: the report reads data governed by Access Rules.,{0} için hazır rapor kapalıdır. Rapor erişim kuralı olan veriyi okuyor.,
+Report {0} cannot apply the field levels of {1}.,{0} raporu {1} kayıt türünün alan seviyelerini uygulayamıyor.,
+Report {0} does not declare what it reads.,{0} raporu ne okuduğunu bildirmiyor.,
+Report {0} does not read through permission-aware calls only: {1},{0} raporu veriyi yalnız izinli okuma yoluyla okumuyor: {1},
+"Report {0} reads {1}, which you may not read.",{0} raporu {1} kayıt türünü okuyor. Bu türü okuma izniniz yok.,
+Report {0} runs its own SQL. Only a System Manager may run it while Access Rules exist.,{0} raporu kendi SQL sorgusunu çalıştırıyor. Erişim kuralı varken bu raporu yalnız System Manager çalıştırabilir.,
+Role {0} not found.,{0} rolü bulunamadı.,
+Roles without an active Access Rule have no access to {0}: {1},Etkin erişim kuralı olmayan roller {0} kayıt türüne erişemez: {1},
+Scope must be one of: {0},Kapsam şunlardan biri olmalıdır: {0},
+Search function {0} does not read through permission-aware calls only: {1},{0} arama işlevi veriyi yalnız izinli okuma yoluyla okumuyor: {1},
+"Search function {0} is not allowed on {1}, which is governed by Access Rules.",{0} arama işlevi {1} kayıt türünde kullanılamaz. Bu türün erişim kuralı var.,
+Select at least one operation for the rule.,Kural için en az bir işlem seçin.,
+The proposal does not change the rule.,Öneri kuralı değiştirmiyor.,
+This file belongs to a prepared report that is switched off.,Bu dosya kapatılmış bir hazır rapora ait.,
+Unknown variable {0}. Allowed: {1},{0} değişkeni bilinmiyor. İzinli değişkenler: {1},
+User {0} not found.,{0} kullanıcısı bulunamadı.,
+Variables can only be used with = and !=.,Değişkenler yalnız = ve != işleçleriyle kullanılabilir.,
+Write access needs read access.,Yazma izni okuma izni olmadan verilemez.,
+ptype must be one of: {0},ptype şunlardan biri olmalıdır: {0},
+{0} is not a field of {1}.,"{0}, {1} kayıt türünün bir alanı değil.",
+{0} {1} not found.,{0} {1} bulunamadı.,
+List the Access Rules that narrow which records each role may use.,Her rolün kullanabileceği kayıtları daraltan erişim kurallarını listeler.,
+Explain why a user may or may not read or change one record. Details about rules are returned to administrators only.,"Bir kullanıcının bir kaydı neden okuyabildiğini, değiştirebildiğini ya da bunu neden yapamadığını açıklar. Kural ayrıntıları yalnız yöneticilere döner.",
+Propose a new Access Rule from structured fields. The first rule on a document type removes access for every role without a rule. This only opens a proposal. A human must approve it before anything changes.,"Yapılandırılmış alanlardan yeni bir erişim kuralı önerir. Bir kayıt türüne yazılan ilk kural, kuralı olmayan bütün rollerin erişimini kaldırır. Bu araç yalnız bir öneri açar. Bir insan onaylamadan hiçbir şey değişmez.",
+"Propose a change to a saved Access Rule, including switching it off. Narrowing a rule removes access. This only opens a proposal. A human must approve it before anything changes.",Kayıtlı bir erişim kuralında değişiklik önerir. Kuralı kapatmak da buna dahildir. Kuralı daraltmak erişimi kaldırır. Bu araç yalnız bir öneri açar. Bir insan onaylamadan hiçbir şey değişmez.,

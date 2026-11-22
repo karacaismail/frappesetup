@@ -1,4 +1,4 @@
-"""Paylaşım: paylaşılan kayıt kuralı aşar ve iki yüzeyde de görünür (G-12, karar notu 10. bölüm)."""
+"""Share: a shared record goes past the rule and is visible on both surfaces (G-12; decision note, section 10)."""
 
 import frappe
 import frappe.share
@@ -19,7 +19,7 @@ class TestSharing(ErisimTestCase):
 	def share_with_employee_1(self, name: str, **rights) -> None:
 		frappe.set_user("Administrator")
 		frappe.share.add_docshare(DOCTYPE, name, EMPLOYEE_1, read=1, **rights)
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 		self.addCleanup(self.unshare, name)
 
 	def unshare(self, name: str) -> None:
@@ -48,7 +48,7 @@ class TestSharing(ErisimTestCase):
 		self.assertEqual(self.stored(shared, "title"), f"Talep {EMPLOYEE_2}")
 
 	def test_shared_record_cannot_be_deleted(self):
-		"""Silme paylaşılamaz. Kural silmeyi kapsamadığı için ret sürer."""
+		"""Delete cannot be shared. The denial stays because the rule does not cover delete."""
 		shared = self.records[EMPLOYEE_2]
 		self.share_with_employee_1(shared, write=1)
 		client = self.login(EMPLOYEE_1)
@@ -59,7 +59,7 @@ class TestSharing(ErisimTestCase):
 		self.assertTrue(frappe.db.exists(DOCTYPE, shared))
 
 	def test_user_outside_the_rule_cannot_share_a_record(self):
-		"""`share` işlemi kayıt kancasından geçer. Çalışan göremediği kaydı paylaşamaz."""
+		"""The `share` operation goes through the record hook. An employee cannot share a record they cannot see."""
 		target = self.records[EMPLOYEE_3]
 		client = self.login(EMPLOYEE_1)
 

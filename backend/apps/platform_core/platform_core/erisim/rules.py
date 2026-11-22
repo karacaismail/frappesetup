@@ -1,6 +1,6 @@
-"""Etkin kuralların okunması, önbelleği ve kural dilinin sabitleri.
+"""Reading of the active rules, their cache and the constants of the rule language.
 
-Karar notu: `docs/kararlar/0006-erisim-kurali.md`, 3. ve 12. bölüm.
+Decision note: `docs/kararlar/0006-erisim-kurali.md`, sections 3 and 12.
 """
 
 import json
@@ -17,7 +17,7 @@ OPERATIONS = ("read", "write", "create", "delete", "submit", "cancel")
 OPERATORS = ("=", "!=", "in", "not in")
 VARIABLES = ("$user", "$user.employee", "$user.department", "$user.company")
 
-# Frappe'nin işlem adı kuralın hangi bayrağını arar? Tanınmayan ad en dar bayrağı arar.
+# Which flag of the rule does the Frappe operation name look for? An unknown name looks for the narrowest flag.
 PTYPE_TO_OPERATION = {
 	"read": "read",
 	"select": "read",
@@ -34,7 +34,7 @@ PTYPE_TO_OPERATION = {
 	"cancel": "cancel",
 }
 
-# `match_field` alanının gösterdiği kayıt türü ve kapsamın kabul ettiği türler.
+# The document type the `match_field` field points to and the document types the scope accepts.
 MATCH_KINDS = {"User": "user", "Employee": "employee", "Department": "department", "Company": "company"}
 SCOPE_KINDS = {
 	"own": ("user", "employee"),
@@ -43,7 +43,7 @@ SCOPE_KINDS = {
 	"company": ("company", "employee", "user"),
 }
 
-# Bu türlere kural yazılırsa yönetici kendi yönetim yolunu kapatabilir.
+# If a rule is written for these document types, the administrator can close their own management path.
 PROTECTED_DOCTYPES = frozenset(
 	{
 		RULE_DOCTYPE,
@@ -91,7 +91,7 @@ def active_rules() -> dict[str, list[dict]]:
 
 def _load() -> dict[str, list[dict]]:
 	grouped: dict[str, list[dict]] = {}
-	# Kural tablosu küçüktür ve sistem verisidir. İzin süzmesi burada döngü kurardı (G-3 istisnası).
+	# The rule table is small and is system data. Permission filtering would create a loop here (exception to G-3).
 	rows = frappe.get_all(
 		RULE_DOCTYPE,
 		filters={"is_active": 1},
@@ -135,13 +135,13 @@ def applies(rule: dict, roles: set[str], operation: str) -> bool:
 
 
 def applicable(doctype: str, user: str, operation: str) -> list[dict]:
-	"""Kullanıcının rollerine uyan ve işlemi kapsayan etkin kurallar."""
+	"""The active rules that match the roles of the user and cover the operation."""
 	roles = set(frappe.get_roles(user))
 	return [rule for rule in rules_for(doctype) if applies(rule, roles, operation)]
 
 
 def match_kind(doctype: str, fieldname: str | None) -> str | None:
-	"""`match_field` neyi gösterir: kullanıcı, çalışan, bölüm ya da şirket. Bilinmiyorsa `None`."""
+	"""What `match_field` points to: user, employee, department or company. `None` if unknown."""
 	if not fieldname:
 		return None
 	if fieldname in ("owner", "modified_by"):
@@ -155,12 +155,12 @@ def match_kind(doctype: str, fieldname: str | None) -> str | None:
 
 
 def parse_filters(raw: str | None) -> list[list]:
-	"""Kayıtlı süzgeç metnini listeye çevirir. Metin kayıt sırasında doğrulanmıştır."""
+	"""Turns the saved filter text into a list. The text was validated when it was saved."""
 	return json.loads(raw) if raw else []
 
 
 def validate_filters(doctype: str, raw: str | None) -> str:
-	"""Süzgeci kural diline göre doğrular ve düzgün JSON metnini döner (karar notu 3. bölüm)."""
+	"""Validates the filter against the rule language and returns the clean JSON text (decision note, section 3)."""
 	if not raw or not raw.strip():
 		return ""
 	try:

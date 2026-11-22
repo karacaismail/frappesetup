@@ -1,4 +1,4 @@
-"""Kayıt kuralı: çalışan yalnız kendi kaydını görür ve değiştirir (G-60)."""
+"""Record rule: an employee sees and changes only their own record (G-60)."""
 
 import frappe
 
@@ -46,7 +46,7 @@ class TestRecordRule(ErisimTestCase):
 		self.assertEqual(self.stored(target, "title"), f"Talep {EMPLOYEE_2}")
 
 	def test_employee_cannot_take_over_a_record_by_changing_its_employee(self):
-		"""Karar notu 6. bölüm: saklı değer kurala uymuyorsa yeni değer işlemi kurtarmaz."""
+		"""Decision note, section 6: if the stored value does not match the rule, the new value does not save the operation."""
 		client = self.login(EMPLOYEE_1)
 		target = self.records[EMPLOYEE_2]
 
@@ -56,7 +56,7 @@ class TestRecordRule(ErisimTestCase):
 		self.assertEqual(self.stored(target, "employee"), employee_of(EMPLOYEE_2))
 
 	def test_employee_cannot_move_own_record_out_of_scope(self):
-		"""G-60: kaydı kapsam dışına taşıyan güncelleme reddedilir."""
+		"""G-60: an update that moves the record out of scope is denied."""
 		client = self.login(EMPLOYEE_1)
 		target = self.records[EMPLOYEE_1]
 
@@ -87,7 +87,7 @@ class TestRecordRule(ErisimTestCase):
 		self.assertFalse(frappe.db.exists(DOCTYPE, {"title": "Baskasi adina"}))
 
 	def test_employee_cannot_delete_own_record_without_delete_rule(self):
-		"""Rol izni silmeyi açar ama çalışan kuralında `allow_delete` yoktur."""
+		"""The role permission allows delete but the employee rule has no `allow_delete`."""
 		client = self.login(EMPLOYEE_1)
 		target = self.records[EMPLOYEE_1]
 
@@ -97,14 +97,14 @@ class TestRecordRule(ErisimTestCase):
 		self.assertTrue(frappe.db.exists(DOCTYPE, target))
 
 	def test_role_without_rule_sees_nothing_on_governed_doctype(self):
-		"""G-60: kurallı türde hiçbir kural uymazsa erişim yoktur."""
+		"""G-60: in a governed document type there is no access if no rule matches."""
 		client = self.login(NO_RULE)
 
 		self.assertEqual(self.listed_names(client), set())
 		self.assertEqual(self.rest_get(client, self.records[EMPLOYEE_1]).status_code, 403)
 
 	def test_engine_leaves_ungoverned_doctype_to_role_permission(self):
-		"""G-60: kuralı olmayan türde rol izni geçerlidir."""
+		"""G-60: in a document type without a rule the role permission applies."""
 		name = frappe.get_doc({"doctype": FREE_DOCTYPE, "title": "Serbest"}).insert().name
 		self.addCleanup(frappe.delete_doc, FREE_DOCTYPE, name, force=True)
 		client = self.login(NO_RULE)
@@ -119,7 +119,7 @@ class TestRecordRule(ErisimTestCase):
 
 
 class TestRuleFilters(ErisimTestCase):
-	"""`filters` alanı kapsamı daraltır. Koşulların hepsi birden sağlanmalıdır."""
+	"""The `filters` field narrows the scope. All the conditions must be met together."""
 
 	RULES = (
 		{
@@ -149,14 +149,14 @@ class TestRuleFilters(ErisimTestCase):
 		self.assertEqual(self.rest_get(client, target).status_code, 403)
 
 	def test_user_variable_without_value_matches_nothing(self):
-		"""İK kullanıcısının çalışan kaydı yoktur. `$user.company` boştur ve hiçbir kaydı seçmez."""
+		"""The HR user has no employee record. `$user.company` is empty and selects no record."""
 		client = self.login(HR)
 
 		self.assertEqual(self.listed_names(client), set())
 
 
 class TestRuleValidation(ErisimTestCase):
-	"""Geçersiz kural kaydedilmez (karar notu 3. bölüm)."""
+	"""An invalid rule is not saved (decision note, section 3)."""
 
 	def insert(self, **values):
 		doc = frappe.get_doc(
@@ -180,7 +180,7 @@ class TestRuleValidation(ErisimTestCase):
 		self.assertRaises(frappe.ValidationError, self.insert, match_field="no_such_field")
 
 	def test_match_field_must_fit_scope(self):
-		"""`own` kapsamı kullanıcı ya da çalışan ister. Şirket alanı uymaz."""
+		"""The `own` scope requires a user or an employee. A company field does not fit."""
 		self.assertRaises(frappe.ValidationError, self.insert, match_field="company")
 
 	def test_filters_must_be_a_list_of_triples(self):

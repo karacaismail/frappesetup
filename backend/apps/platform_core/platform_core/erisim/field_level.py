@@ -1,4 +1,4 @@
-"""Alan düzeyi yönetimi. Frappe'nin izin seviyesini hazır işlevlerle ayarlar (karar notu 8. bölüm)."""
+"""Field level management. Sets the permission level of Frappe with built-in functions (decision note, section 8)."""
 
 import frappe
 from frappe import _
@@ -18,7 +18,7 @@ def _require_admin(doctype: str) -> None:
 	if not frappe.db.exists("DocType", doctype, cache=True):
 		frappe.throw(_("Document type {0} not found.").format(doctype), frappe.DoesNotExistError)
 	if doctype in PROTECTED_DOCTYPES:
-		# Bu türlerde alan kapatmak izin yönetimini kilitleyebilir.
+		# Closing a field in these document types can lock permission management.
 		frappe.throw(_("Field levels of {0} cannot be changed here.").format(frappe.bold(doctype)))
 
 
@@ -34,7 +34,7 @@ def set_field_level(doctype: str, fieldname: str, permlevel: int) -> dict:
 		delete_property_setter(doctype, property="permlevel", field_name=fieldname)
 		frappe.clear_cache(doctype=doctype)
 		if cint(frappe.get_meta(doctype).get_field(fieldname).permlevel) != permlevel:
-			# Yetki yukarıda `only_for` ile denetlendi. Bu işlev izin denetlemez.
+			# The authority was checked above with `only_for`. This function does not check permissions.
 			make_property_setter(doctype, fieldname, "permlevel", permlevel, "Int")
 		frappe.clear_cache(doctype=doctype)
 	return {
@@ -54,7 +54,7 @@ def set_level_access(doctype: str, role: str, permlevel: int, read: bool, write:
 	if not frappe.db.exists("Role", role):
 		frappe.throw(_("Role {0} not found.").format(role), frappe.DoesNotExistError)
 
-	# İlk değişiklikte Frappe rol izinlerini “Custom DocPerm” tablosuna kopyalar.
+	# On the first change Frappe copies the role permissions to the “Custom DocPerm” table.
 	setup_custom_perms(doctype)
 	filters = {"parent": doctype, "role": role, "permlevel": permlevel, "if_owner": 0}
 	existing = frappe.db.get_value("Custom DocPerm", filters)
@@ -64,7 +64,7 @@ def set_level_access(doctype: str, role: str, permlevel: int, read: bool, write:
 	else:
 		if not existing:
 			existing = add_permission(doctype, role, permlevel, "read")
-		# Satır adla güncellenir. Rol ve seviyeyle arama `if_owner` satırını da bulabilir.
+		# The row is updated by name. A search by role and level can also find the `if_owner` row.
 		update_custom_docperm(existing, {"read": 1, "write": cint(write)})
 		validate_permissions_for_doctype(doctype)
 	frappe.clear_cache(doctype=doctype)

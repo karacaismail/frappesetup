@@ -1,4 +1,4 @@
-"""`explain_permission` ve `get_access_summary` uçları (sözleşme)."""
+"""The `explain_permission` and `get_access_summary` endpoints (contract)."""
 
 from platform_core.erisim.tests.base import (
 	ADMIN,
@@ -41,7 +41,7 @@ class TestExplainPermission(ErisimTestCase):
 		)
 
 	def test_user_gets_single_reason_for_denied_and_for_missing_record(self):
-		"""Sözleşme: uç kayıt varlığını olağan kullanıcıya ele vermez."""
+		"""Contract: the endpoint does not reveal to an ordinary user that a record exists."""
 		client = self.login(EMPLOYEE_1)
 
 		denied = self.explain(client, self.records[EMPLOYEE_2])
@@ -98,7 +98,7 @@ class TestExplainPermission(ErisimTestCase):
 		)
 
 	def test_ptype_selects_the_rule_flag(self):
-		"""Yönetici ekibinin kaydını okur ama yazamaz."""
+		"""A manager reads the record of their team but cannot write it."""
 		response = self.explain(self.login(ADMIN), self.records[EMPLOYEE_2], user=MANAGER_1, ptype="write")
 
 		message = response.json["message"]
@@ -190,7 +190,7 @@ class TestAccessSummary(ErisimTestCase):
 		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
 
 	def test_unknown_doctype_is_denied_like_an_unreadable_one(self):
-		"""Sözleşme: uç kayıt türünün varlığını ele vermez. Olmayan tür de 403 döner."""
+		"""Contract: the endpoint does not reveal that a document type exists. A missing document type also returns 403."""
 		response = self.summary(self.login(EMPLOYEE_1), "ER Olmayan Tur")
 
 		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))

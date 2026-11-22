@@ -703,7 +703,19 @@ Bu yüzden bir koşul zorunludur. Uygulama çalışana kendi “Employee” kayd
 
 İki davranış da inceleyenin kod okumasına dayanır. Bu tur ikisini de sınamadı.
 
-## 16. Bağımlılık ve sınırlar
+## 16. Görünen metnin dili
+
+Görünen metnin kaynağı İngilizcedir (D-12, O-21). Türkçesi `platform_core/translations/tr.csv` dosyasındadır. Dosyanın üç sütunu vardır: kaynak, çeviri ve bağlam (O-23).
+
+- Kayıt türünün adı, alan etiketleri ve alan açıklamaları İngilizcedir. Çeviri satırlarının bağlamı “Access Rule” olur. Örneğin “Scope” başka yerde başka anlam taşıyabilir.
+- Hata ve uyarı iletileri `frappe._` ile yazılır. Çeviri satırlarının bağlamı boştur.
+- Yapay zekâ araçlarının açıklamaları da İngilizcedir ve çeviri dosyasında karşılığı vardır.
+- Kullanıcının dili Türkçeyse etiket ve ileti Türkçe görünür. Dil İngilizceyse İngilizce görünür. Bir test bunu sınar.
+- Bir test motorun her görünen metninin çeviri dosyasında karşılığı olduğunu sınar. Yeni ileti karşılıksız eklenirse test başarısız olur.
+
+Kod adları bu işte değişmedi. Örneğin `erisim` klasörünün adı aynıdır. Adları naming-history-fix betiği değiştirir.
+
+## 17. Bağımlılık ve sınırlar
 
 - `erisim` modülü öteki `platform_core` modüllerini içe aktarmaz. Öteki modüller de `erisim` modülünü içe aktarmaz. Bu yön proje kaydındadır.
 - Motor “Employee”, “Department” ve “Company” kayıt türlerini adla kullanır. Bu türler ERPNext'ten gelir. Kiracı sitesi ERPNext taşır (proje kaydı, sürümler tablosu).
@@ -711,7 +723,7 @@ Bu yüzden bir koşul zorunludur. Uygulama çalışana kendi “Employee” kayd
 - Motor Frappe'nin ve ERPNext'in kodunu değiştirmez (M-4).
 - Motor zamanlanmış iş kurmaz (D-6).
 
-## 17. Ertelenen işler
+## 18. Ertelenen işler
 
 | İş | Neden ertelendi | Nerede |
 | --- | --- | --- |
@@ -722,6 +734,6 @@ Bu yüzden bir koşul zorunludur. Uygulama çalışana kendi “Employee” kayd
 | Kiracı yöneticisi rolü (“Tenant Admin”) | Rol henüz tanımlı değil. Uçlar şimdilik “System Manager” ister. | G-62 |
 | Dosya, arka plan işi ve anlık bildirim yüzeyleri | Bu tur liste, kayıt, rapor ve dışa aktarmayı kapsar. | G-121 |
 
-## 18. Geri dönüş
+## 19. Geri dönüş
 
 Motor iki kanca satırıyla bağlanır. Satırlar silinirse Frappe'nin olağan izinleri geçerli olur. “Access Rule” kayıtları veritabanında kalır ama etkisizdir. Veri geçişi gerekmez.

@@ -1,8 +1,8 @@
-"""Frappe'nin izin kancalarına bağlanan işlevler.
+"""Functions bound to the permission hooks of Frappe.
 
-`hooks.py` dosyası bu işlevleri `"*"` anahtarıyla bütün kayıt türlerine bağlar.
-Frappe 16'da `has_permission` kancası `None` dönerse erişim reddedilir
-(`frappe/permissions.py:497`). Bu yüzden işlev her zaman `True` ya da `False` döner.
+The `hooks.py` file binds these functions to all document types with the `"*"` key.
+In Frappe 16, access is denied if the `has_permission` hook returns `None`
+(`frappe/permissions.py:497`). So the function always returns `True` or `False`.
 """
 
 import frappe
@@ -11,7 +11,7 @@ from platform_core.erisim import engine, reports, rules
 
 
 def has_permission(doc, ptype: str | None = None, user: str | None = None, debug: bool = False) -> bool:
-	"""Tek kayıt kancası. Motor yalnız daraltır: `True` izin vermez, rol izni ayrıca aranır."""
+	"""The single record hook. The engine only narrows: `True` does not grant permission, the role permission is checked separately."""
 	user = user or frappe.session.user
 	if user == "Administrator":
 		return True
@@ -26,7 +26,7 @@ def has_permission(doc, ptype: str | None = None, user: str | None = None, debug
 
 
 def query_conditions(user: str | None = None, doctype: str | None = None):
-	"""Liste kancası. Kurallı olmayan türde koşul eklemez."""
+	"""The list hook. Adds no condition for a document type that is not governed."""
 	user = user or frappe.session.user
 	if user == "Administrator" or not doctype:
 		return None

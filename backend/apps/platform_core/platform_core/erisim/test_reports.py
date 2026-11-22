@@ -1,4 +1,4 @@
-"""Sorgu raporu kapısının testleri (karar notu 9. bölüm). Güvenlik kapısı bu dosya adını ister."""
+"""Tests of the query report gate (decision note, section 9). The security gate requires this file name."""
 
 import frappe
 
@@ -10,7 +10,7 @@ EXPORT = "/api/method/frappe.desk.query_report.export_query"
 
 
 class TestQueryReportGate(ErisimTestCase):
-	"""Sorgu raporu kendi SQL'iyle okur. Kapı daraltılmış kullanıcıyı reddeder (karar notu 9. bölüm)."""
+	"""A query report reads with its own SQL. The gate denies a narrowed user (decision note, section 9)."""
 
 	@classmethod
 	def setUpClass(cls):
@@ -24,13 +24,13 @@ class TestQueryReportGate(ErisimTestCase):
 				is_standard="No",
 				query=f"select name as `Name:Data:200`, title as `Title:Data:200` from `tab{DOCTYPE}`",
 			).insert()
-		frappe.db.commit()  # nosemgrep: istek ayrı bağlantı kullanır
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 
 	def run_report(self, client):
 		return self.send(client, "POST", RUN, body={"report_name": QUERY_REPORT, "filters": "{}"})
 
 	def test_run_foreign_data_denied(self):
-		"""Kayıtları daraltılmış kullanıcı sorgu raporunu çalıştıramaz."""
+		"""A user whose records are narrowed cannot run the query report."""
 		for user in (EMPLOYEE_1, MANAGER_1, NO_RULE):
 			with self.subTest(user=user):
 				response = self.run_report(self.login(user))
@@ -85,7 +85,7 @@ class TestQueryReportGate(ErisimTestCase):
 			self.assertIn(name, body)
 
 	def test_python_caller_reaches_the_gate_through_frappe_override(self):
-		"""Karar notu 9. bölüm: çağıran işlevi `frappe.override_whitelisted_method` ile bulur."""
+		"""Decision note, section 9: the caller finds the function with `frappe.override_whitelisted_method`."""
 		frappe.set_user(EMPLOYEE_1)
 		run = frappe.get_attr(frappe.override_whitelisted_method("frappe.desk.query_report.run"))
 
