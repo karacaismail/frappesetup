@@ -16,6 +16,7 @@ USERS = {
     actor: f"hrms-tr-{actor}@example.test"
     for actor in ("employee", "manager", "outsider", "hr")
 }
+LEGACY_ROLES = ("System Manager", "HR Manager", "HR User", "Leave Approver")
 ROLES = {
     "employee": "Employee",
     "manager": "Manager",
@@ -98,6 +99,19 @@ def seed(password):
             leave_approver=USERS["manager"] if actor == "employee" else None,
         ).name
 
+    legacy_users = {}
+    for index, role in enumerate(LEGACY_ROLES):
+        username = f"hrms-tr-legacy-{index}@example.test"
+        insert(
+            "User",
+            email=username,
+            first_name=f"Synthetic Legacy User {index}",
+            send_welcome_email=0,
+            new_password=password,
+            roles=[{"role": role}],
+        )
+        legacy_users[role] = username
+
     for actor in ("employee", "outsider"):
         insert(
             "Leave Allocation",
@@ -140,6 +154,7 @@ def seed(password):
 
     return {
         "users": USERS,
+        "legacy_users": legacy_users,
         "employees": employees,
         "leaves": leaves,
         "leave_owners": leave_owners,

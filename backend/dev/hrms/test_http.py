@@ -186,6 +186,16 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertEqual(self.listed(client), set(self.data["leaves"].values()))
         self.assertEqual(self.document(client, "outsider")["leave_balance"], 7)
 
+    def test_legacy_roles_do_not_grant_leave_access(self):
+        for role, user in self.data["legacy_users"].items():
+            with self.subTest(role=role):
+                client = Client(self, user)
+                status, result = client.send(LEAVE_PATH)
+                self.assertIn(status, (200, 403), result.get("exception"))
+                if status == 200:
+                    self.assertEqual(result["data"], [])
+                self.document(client, "employee", 403)
+
     def test_sensitive_balance_read_paths(self):
         client = self.login("employee")
         for prefix in (LEAVE_PATH, "/api/v2/document/Leave%20Application"):
@@ -288,6 +298,19 @@ class LeaveHttpTest(unittest.TestCase):
             },
         )
         self.assertEqual(status, 403, result.get("exception"))
+        filters = urlencode(
+            {
+                "filters": json.dumps(
+                    {
+                        "share_doctype": "Leave Application",
+                        "share_name": self.data["leaves"]["outsider"],
+                    }
+                )
+            }
+        )
+        status, result = admin.send(f"/api/resource/DocShare?{filters}")
+        self.assertEqual(status, 200, result.get("exception"))
+        self.assertEqual(result["data"], [])
         self.document(self.login("employee"), "outsider", 403)
 
     def test_missing_access_rules_close_list_and_document(self):

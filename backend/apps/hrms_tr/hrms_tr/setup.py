@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 
 from hrms_tr.access import DOCTYPE, RULE_DOCTYPE, engine_available
-from hrms_tr.users import HRMS_TR_ROLES, NATIVE_LEAVE_APPROVER
+from hrms_tr.users import APPROVER_PROFILES, EMPLOYEE_ROLE, HRMS_TR_ROLES, NATIVE_LEAVE_APPROVER
 
 RULE_FIXTURE = "03_access_rule.json"
 OWNED_POLICY_FIXTURES = (RULE_FIXTURE, "04_property_setter.json", "05_custom_docperm.json")
@@ -65,7 +65,10 @@ def after_migrate():
 		if name == "Administrator":
 			continue
 		user = frappe.get_doc("User", name)
-		if user.user_type != "Website User" or any(row.role == NATIVE_LEAVE_APPROVER for row in user.roles):
+		roles = {row.role for row in user.roles}
+		profiles = {row.role_profile for row in user.role_profiles}
+		missing_employee_role = EMPLOYEE_ROLE not in roles and profiles.intersection(APPROVER_PROFILES)
+		if user.user_type != "Website User" or NATIVE_LEAVE_APPROVER in roles or missing_employee_role:
 			user.save(ignore_permissions=True)
 
 

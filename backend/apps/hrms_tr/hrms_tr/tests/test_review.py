@@ -120,3 +120,16 @@ class FixtureLifecycleTest(unittest.TestCase):
 			setup.remove_policy_fixtures()
 			fake.delete_doc.assert_called_once_with("Access Rule", "HRMS TR Rule", ignore_permissions=True)
 			self.assertEqual(fake.db.commit.call_count, 2)
+
+	def test_migration_refreshes_manager_profile_without_waiting_for_a_queue(self):
+		user = Mock(
+			user_type="Website User",
+			roles=[SimpleNamespace(role="HRMS TR Manager")],
+			role_profiles=[SimpleNamespace(role_profile="HRMS TR Manager")],
+		)
+		with patch.object(setup, "frappe") as fake:
+			fake.local = SimpleNamespace(hrms_tr_disabled_rules=[])
+			fake.get_all.return_value = ["manager@example.test"]
+			fake.get_doc.return_value = user
+			setup.after_migrate()
+		user.save.assert_called_once_with(ignore_permissions=True)

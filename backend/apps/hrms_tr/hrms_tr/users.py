@@ -3,7 +3,9 @@
 import frappe
 from frappe import _
 
-HRMS_TR_ROLES = ("HRMS TR Employee", "HRMS TR Manager", "HRMS TR Admin")
+EMPLOYEE_ROLE = "HRMS TR Employee"
+APPROVER_PROFILES = ("HRMS TR Manager", "HRMS TR Admin")
+HRMS_TR_ROLES = (EMPLOYEE_ROLE, *APPROVER_PROFILES)
 NATIVE_LEAVE_APPROVER = "Leave Approver"
 
 
