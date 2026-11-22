@@ -365,9 +365,20 @@ def scan_dependencies(requirements=None, *, reproduce=False):
                     findings.add(f"{file} · {package['name']} {package['version']} · {vulnerability['id']}")
         if code == 1 and not findings:
             raise ValueError("OSV returned no findings for a failed scan.")
-        for finding in sorted(findings):
-            print(f"OSV: {finding}")
-        return replace(result, status="fail" if findings else "pass", findings=tuple(sorted(findings)))
+        unchecked = []
+        for lock in locks:
+            path = Path(lock)
+            if path.suffix != ".txt":
+                continue
+            label = path.name if path.is_absolute() else path
+            names = re.findall(r"(?mi)^[ 	]*([a-z0-9][a-z0-9_.-]*)[ 	]*@[ 	]*git\+",
+                               (ROOT / path).read_text())
+            unchecked.extend(f"not_run · {label} · {name} · Git dependency outside offline OSV scan"
+                             for name in sorted(set(names)))
+        notes = (*sorted(findings), *unchecked)
+        for note in notes:
+            print(f"OSV: {note}")
+        return replace(result, status="fail" if findings else "pass", findings=notes)
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         print(f"OSV check failed: {error}")
         return result

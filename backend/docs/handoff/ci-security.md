@@ -46,6 +46,7 @@ Python kaynak listeleri değişince `backend/dev/security/compile-lock` çalış
 Oluşan `backend/dev/security/requirements.txt` dosyasını commit edin.
 Kilit, Git kayıtlı backend projelerinin zorunlu Python paketlerini kapsar.
 CI kipi kilidi bellekte yeniden üretir. Dosyadaki içerik farklıysa tarama durur.
+OSV, Git üzerinden alınan Python paketlerini denetlemez. Rapor bu paketleri `not_run` olarak gösterir.
 Bir Frappe imajının kurulu paketlerini ayrı listelemek için `--runtime-image IMAGE_ID` kullanın.
 `docker image inspect` çıktısındaki yerel imaj kimliğini verin.
 

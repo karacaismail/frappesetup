@@ -64,7 +64,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - `identity-sync` Admin API belirtecini ayrı ister. İstekte `scope=admin-api kc-admin-api` olur. Bu belirtecin `aud` değeri `realm-management` ve Admin API adresidir. Keycloak 26.8 Admin API'si bu kapsamı ister.
 - `press-service` istemcisi `aud-press` kapsamını isteyemez. Keycloak bu isteği `invalid_scope` ile reddeder.
 - `identity-sync` servis hesabı davet ve kuruluş hazırlama için Keycloak'a yazar. Bu yüzden şu rolleri taşır: `view-users`, `query-users`, `manage-users`. Kuruluş ve üyelik için gereken en az ek rol Keycloak 26.8 kaynağında doğrulanır ve realm dosyasına yazılır.
-- Bu roller yalnız `scope=admin-api kc-admin-api` ile istenen belirtece girer. Kiracıya ve Press'e giden belirteç bu rolleri taşımaz. Canlı test bunu sınar: kiracı hedefli belirteç Admin API'de 403 alır.
+- Bu roller yalnız `scope=admin-api kc-admin-api` ile istenen belirtece girer. Kiracıya ve Press'e giden belirteç bu rolleri taşımaz. Canlı test bunu sınar: kiracı hedefli belirteç Admin API'de reddedilir. Keycloak 26.8.2 bu durumda 401 döner, çünkü önce belirtecin hedefini denetler. Test 401 ya da 403 kabul eder, 2xx kabul etmez.
 - Sihirli bağlantı eklentisinin bağlantı üreten yönetim ucu kapalıdır. Bu uç, belirteçteki rolü değil hesabın kayıtlı rolünü denetliyordu. Kapalı olduğu canlı testle (404) gösterilir.
 
 ### Politikalar
@@ -339,7 +339,7 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
 - `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır.
 - Onaylı işlem yürütme ucunu da kiracı sitesinin servis istemcisi çağırır. Onay kiracı sitesindeki yapay zekâ katmanında verilir. Bu yüzden `IDENTITY_SYNC_EXECUTE_AZP` ayarı kiracı servis istemcilerinin listesidir. Liste `IDENTITY_SYNC_SESSION_AZP` ile aynı istemcileri taşır.
 - Mutabakat için Press ve kiracı sitesi `list_identities` ucunu sunar. Uç yalnız identity-sync servis belirtecini kabul eder. Yanıt sayfalıdır ve her satırda yalnız `issuer`, `subject` ve hesabın açık ya da kapalı durumu bulunur. E-posta ve ad dönmez. Uç adları `press_tr.api.identity.list_identities` ve `platform_core.api.identity.list_identities` olur.
-  - İstek `start` ve `page_length` alır. `start` varsayılan 0 olur. `page_length` en çok 500, varsayılan 500 olur. Sıra `subject` değerine göre artandır.
+  - Uç `GET` ile çağrılır. İstek `start` ve `page_length` sorgu alanlarını alır. `cursor` ve `limit` alanları kullanılmaz. `start` varsayılan 0 olur. `page_length` en çok 500, varsayılan 500 olur. Sıra `subject` değerine göre artandır.
   - Yanıt `{"identities": [...], "has_next_page": true|false}` biçimindedir.
   - identity-sync bütün sayfaları toplar. Farkları ancak son sayfadan sonra hesaplar.
 - identity-sync, Keycloak'ta istemci açmaz. Servis hesabı `manage-clients` rolünü almaz. Yeni kiracının Keycloak istemcisini kimlik-realm işinin elle başlatılan komutu açar. Komut insan onayıyla çalışır.
@@ -471,6 +471,15 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 - Öneri `created_at` ve `expires_at` taşır. Zaman sitenin saat dilimiyle ve farkıyla ISO 8601 biçiminde döner.
 - Okuma araçlarının sonucu `as_of`, `site` ve `source` taşır. Sonuç sınırı aşarsa `truncated: true` döner. Alt tablo en çok 200 satır, sonuç verisi en çok 262.144 bayttır.
 - Oturumsuz istek 403, süresi dolmuş oturum 401 alır.
+
+#### Kullanım günlüğü temizliğinin modül arayüzü
+
+- “AI Usage Log” kaydının sahibi model geçididir. Temizlik işlevi `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False)` olur.
+- İşlev yetkiyi kendisi denetler. Yalnız “System Manager” çağırabilir. Öteki kullanıcı `frappe.PermissionError` alır.
+- Süre 365 gündür. Ayar bu süreyi değiştiremez. Kayıtlar O-32'ye göre kalıcı silinir.
+- İşlev `{"eligible": <sayı>, "deleted": <sayı>}` döner. `dry_run=True` iken hiçbir kayıt silinmez ve `deleted` 0 olur.
+- İşlev önizleme belirteci istemez. İnsan onayını çağıran taraf yönetir. Örneğin `platform_core.api.ai.purge_logs` kendi önizleme ve onay yolunu kullanır. Geçidin kendi HTTP ucu da kendi önizleme belirtecini kullanabilir.
+
 
 ### Genel araçlar
 

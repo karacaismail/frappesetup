@@ -218,3 +218,22 @@ class ReviewTests(unittest.TestCase):
                 with self.subTest(ci=ci):
                     self.assertEqual(scans.scan_full(None, ci=ci), 1)
                     self.assertIn(missing, save.call_args.args[2])
+
+    def test_offline_osv_reports_git_dependencies_as_unchecked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lock = scans.SECURITY / "requirements.txt"
+            (root / lock.parent).mkdir(parents=True)
+            (root / lock).write_text(
+                "regular==1.0\n"
+                "pypika @ git+https://example.test/upstream/pypika@abcdef\n"
+            )
+            fixture = {"results": [{"packages": [{"vulnerabilities": [{"id": "GHSA-hmr4-m2h5-33qx"}]}]}]}
+            version = f"osv-scanner version: {scans.OSV}\n"
+            with patch.object(scans, "ROOT", root), patch.object(scans, "git", return_value=str(lock)), \
+                    patch.object(scans.subprocess, "check_output", return_value=version), \
+                    patch.object(scans, "verify_python_lock"), patch.object(scans, "validate_osv_inputs"), \
+                    patch.object(scans, "run_json", side_effect=[(1, fixture), (0, {"results": []})]):
+                result = scans.scan_dependencies()
+            self.assertEqual(result.status, "pass")
+            self.assertEqual(result.findings, (f"not_run · {lock} · pypika · Git dependency outside offline OSV scan",))

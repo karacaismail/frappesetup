@@ -19,9 +19,20 @@ export const REALM = 'theme-test';
 export const ACCOUNT_DELETION_URL: string = env.IDENTITY_ACCOUNT_DELETION_URL ?? '';
 /** Brand name of the test environment. It comes from the IDENTITY_BRAND_NAME variable, never from the theme. */
 export const BRAND: string = env.IDENTITY_BRAND_NAME ?? '';
-// Uydurma deneme parolası. Gerçek hesapta kullanılmaz.
-export const PASSWORD = 'uzun-deneme-parolasi-1';
-export const TOTP_SECRET = 'atonota-deneme-anahtar';
+/**
+ * Reads a secret test value. The value comes from the environment or from the .env file that
+ * bin/theme-dev.sh writes. The repository holds no test secret. The value is never printed.
+ */
+function requiredSecret(name: string): string {
+  const value = process.env[name] ?? env[name];
+  if (!value) throw new Error(`${name} is not set. Run bin/theme-dev.sh up first. It writes a random value to test/.env.`);
+  return value;
+}
+
+/** Password of the made-up test users. Random for each test environment. */
+export const PASSWORD = requiredSecret('IDENTITY_TEST_PASSWORD');
+/** TOTP secret of the made-up test users. Random for each test environment. */
+export const TOTP_SECRET = requiredSecret('IDENTITY_TEST_TOTP_SECRET');
 
 let cachedToken: { value: string; until: number } | undefined;
 
@@ -293,8 +304,13 @@ export const screens: Screen[] = [
       const email = await createUser({ requiredActions: ['webauthn-register-passwordless'] });
       await openLogin(page);
       await submitPassword(page, email);
-      await page.locator('#registerWebAuthn').click();
-      await expect(page.locator('#kc-error-credential-form')).toBeAttached({ timeout: 20_000 });
+      // The page script binds the button after it loads. A click that comes earlier does nothing,
+      // so the click is repeated until the error form arrives.
+      const errorForm = page.locator('#kc-error-credential-form');
+      await expect(async () => {
+        if ((await errorForm.count()) === 0) await page.locator('#registerWebAuthn').click({ timeout: 2_000 }).catch(() => undefined);
+        await expect(errorForm).toBeAttached({ timeout: 2_000 });
+      }).toPass({ timeout: 30_000 });
     },
   },
 ];
@@ -367,4 +383,11 @@ export async function ensureMisconfiguredRealm(): Promise<void> {
 export async function userExists(email: string, realm = REALM): Promise<boolean> {
   const users = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`, {}, realm)).json()) as unknown[];
   return users.length > 0;
+}
+
+/** Ends every session of the user on the server, as an expired or revoked session would. The browser keeps its cookies. */
+export async function endSessions(email: string, realm = REALM): Promise<void> {
+  const [user] = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`, {}, realm)).json()) as { id: string }[];
+  const res = await admin(`/users/${user.id}/logout`, { method: 'POST' }, realm);
+  if (!res.ok) throw new Error(`Could not end the sessions: ${res.status}`);
 }

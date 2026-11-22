@@ -20,6 +20,7 @@ from merging import (
     resolve, translation_rows, verify_hook_lists,
 )
 
+BASH_PATH = shutil.which("bash")
 IDENTITY = "karacaismail <35493655+karacaismail@users.noreply.github.com>"
 GIT_ROUTING = (
     "GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
@@ -99,6 +100,8 @@ def merge_inputs(worktree, inputs, branch, report, base):
 
 
 def run_live(worktree, environment):
+    if not BASH_PATH or not Path(BASH_PATH).is_absolute():
+        raise MergeError("An absolute Bash executable path is required. Check PATH.")
     workspace = worktree / "backend" / "e2e"
     workspace.mkdir(parents=True, exist_ok=True)
     for filename in (*SUITE.glob("*.ts"), SUITE / "fake-provider.mjs"):
@@ -108,7 +111,7 @@ def run_live(worktree, environment):
         raise MergeError("Install the checkout's Playwright dependencies first.")
     (worktree / "node_modules").symlink_to(dependencies, target_is_directory=True)
     runtime = SUITE / "preview" / "runtime.sh"
-    with subprocess.Popen(["bash", str(runtime), str(worktree)], env=environment, start_new_session=True) as child:
+    with subprocess.Popen([BASH_PATH, str(runtime), str(worktree)], env=environment, start_new_session=True) as child:
         try:
             return child.wait()
         except KeyboardInterrupt:
@@ -186,14 +189,26 @@ def main():
             print(f"Preview stopped: {error}", file=sys.stderr)
         finally:
             if created:
+                entry = f"worktree {worktree}"
                 listed = git(repo, "worktree", "list", "--porcelain", "-z", check=False)
-                cleanup_ok = listed.returncode == 0
-                if cleanup_ok and f"worktree {worktree}" in listed.stdout.split("\0"):
-                    cleanup_ok = git(repo, "worktree", "remove", "--force", str(worktree), check=False).returncode == 0
-                elif cleanup_ok and worktree.exists():
-                    shutil.rmtree(worktree)
-                if cleanup_ok and git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}", check=False).returncode == 0:
-                    cleanup_ok = git(repo, "branch", "-D", branch, check=False).returncode == 0
+                if listed.returncode == 0:
+                    if entry in listed.stdout.split("\0"):
+                        git(repo, "worktree", "remove", "--force", str(worktree), check=False)
+                        listed = git(repo, "worktree", "list", "--porcelain", "-z", check=False)
+                    elif worktree.exists():
+                        shutil.rmtree(worktree)
+
+                branch_ref = f"refs/heads/{branch}"
+                ref = git(repo, "show-ref", "--verify", "--quiet", branch_ref, check=False)
+                if ref.returncode == 0:
+                    git(repo, "branch", "-D", branch, check=False)
+                    ref = git(repo, "show-ref", "--verify", "--quiet", branch_ref, check=False)
+                cleanup_ok = (
+                    listed.returncode == 0
+                    and entry not in listed.stdout.split("\0")
+                    and not worktree.exists()
+                    and ref.returncode == 1
+                )
                 if not cleanup_ok:
                     report.write("\nGeçici Git alanı temizlenemedi.\n")
                     result = 1
