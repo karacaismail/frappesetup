@@ -1,7 +1,7 @@
-"""Keycloak'tan istemci kimlik bilgisiyle servis belirteci alır.
+"""Obtain service tokens from Keycloak using client credentials.
 
-Her hedef için ayrı belirteç istenir. Belirteç yalnız o hedefin `aud` değerini taşır
-(`docs/sozlesmeler.md`, 2. bölüm). Belirteç bellekte durur. Diske ve günlüğe yazılmaz.
+Request a separate token for each target. The token contains only that target's `aud` value
+(`docs/sozlesmeler.md`, section 2). Keep tokens in memory, never on disk or in logs.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ class TokenProvider:
         self._cache: dict[str, tuple[str, float]] = {}
 
     def with_token(self, scope: str, call: Callable[[str], T]) -> T:
-        """Çağrıyı belirteçle yapar. Hedef 401 dönerse belirteci yeniler ve bir kez daha dener."""
+        """Call with a token. If the target returns 401, refresh the token and retry once."""
         try:
             return call(self.get(scope))
         except HttpError as error:
@@ -45,7 +45,7 @@ class TokenProvider:
         return call(self.get(scope))
 
     def get(self, scope: str) -> str:
-        """`scope` kapsamı için geçerli bir erişim belirteci döner."""
+        """Return a valid access token for `scope`."""
         cached = self._cache.get(scope)
         if cached and cached[1] > self._clock():
             return cached[0]

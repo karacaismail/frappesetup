@@ -5,7 +5,7 @@ app_description = "Platform backend modules"
 app_email = "noreply@example.test"
 app_license = "mit"
 
-# platform-core-kimlik: Keycloak sign-in, service tokens and the local sign-in gate (kimlik/README.md).
+# Identity: Keycloak sign-in, service tokens and the local sign-in gate (identity/README.md).
 # Other tasks append to the same list keys; do not replace them.
 before_login = ["platform_core.identity.login_policy.before_login"]
 before_request = [
@@ -22,7 +22,7 @@ auth_hooks = [
 	"platform_core.ai.agent_token.authenticate_request",
 	"platform_core.shell.native_metadata.guard_native_metadata",
 ]
-# AU-19: local sign-in functions are replaced by gated wrappers (kimlik/login_policy.py).
+# AU-19: local sign-in functions are replaced by gated wrappers (identity/login_policy.py).
 override_whitelisted_methods = {
 	"frappe.core.doctype.user.user.reset_password": "platform_core.identity.login_policy.reset_password",
 	"frappe.core.doctype.user.user.update_password": "platform_core.identity.login_policy.update_password",
@@ -48,7 +48,7 @@ override_whitelisted_methods = {
 	"frappe.client.validate_link_and_fetch": "platform_core.access.link_search.validate_link_and_fetch",
 }
 
-# platform-core-kimlik: Frappe idle timeout of 1 hour (O-25, kimlik/session_policy.py).
+# Identity: Frappe idle timeout of 1 hour (O-25, identity/session_policy.py).
 # Mobile sync tables must exist before the sequence row is created.
 # The access rule engine switches off Auto Email Reports on governed data in the same two hooks.
 # The AI access layer turns off Frappe's built-in MCP endpoint.

@@ -1,6 +1,6 @@
-"""Komut satırı. Her komut elle başlatılır. Zamanlanmış iş yoktur (Proje kaydı D-6).
+"""Command line interface. Every command is started manually. No scheduled jobs exist (project record D-6).
 
-Komutlar sonucu JSON olarak yazar. Her komutun bir HTTP ucu da vardır.
+Commands write their results as JSON. Every command also has an HTTP endpoint.
 """
 
 from __future__ import annotations
@@ -80,9 +80,9 @@ def _print(body: object) -> None:
 
 
 def configure_logging(stream: TextIO | None = None) -> None:
-    """Servisin günlüğünü açar. İşlem günlüğü INFO düzeyindedir.
+    """Enable service logging. Audit records use the INFO level.
 
-    Ayar yapılmazsa Python yalnız uyarıları yazar ve işlem günlüğü kaybolur.
+    Without configuration, Python logs only warnings and the audit records are lost.
     """
     logger = logging.getLogger("identity_sync")
     handler = logging.StreamHandler(stream or sys.stderr)

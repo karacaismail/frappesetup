@@ -1,7 +1,7 @@
-"""Modül sınırının otomatik denetimi (B-10).
+"""Automated module boundary checks (B-10).
 
-Servis yalnız Python'un kendi kitaplığını ve ortak `oidc_verify` kitaplığını kullanır.
-Servis site kodunu ve model sağlayıcısı kitaplığını içe aktarmaz.
+The service uses only the Python standard library and the shared `oidc_verify` library.
+The service does not import site code or model provider libraries.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ class BoundaryTest(unittest.TestCase):
         self.assertEqual(users, ["auth.py"])
 
     def test_no_scheduler_module(self) -> None:
-        # Zamanlanmış iş yasaktır (Proje kaydı D-6).
+        # Scheduled jobs are forbidden (project record D-6).
         for path in sorted(PACKAGE.glob("**/*.py")):
             with self.subTest(file=path.name):
                 self.assertEqual(imported_modules(path) & SCHEDULER_MODULES, set())

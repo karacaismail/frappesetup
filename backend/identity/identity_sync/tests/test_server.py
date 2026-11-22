@@ -1,7 +1,7 @@
-"""HTTP uçlarının testleri. İstekler gerçek HTTP yolundan gider (D-6).
+"""HTTP endpoint tests. Requests use the real HTTP path (D-6).
 
-Beklenen durum kodlarının kaynağı `contracts/identity_sync.openapi.yaml` dosyasıdır.
-Yazma kurallarının kaynağı `docs/sozlesmeler.md` dosyasının 10. bölümüdür.
+Expected status codes come from `contracts/identity_sync.openapi.yaml`.
+Write rules come from section 10 of `docs/sozlesmeler.md`.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from . import fakes
 from .fakes import DONE, ORG_ID, REALM_ID, SUBJECT, WEBHOOK_SECRET, Stack, keycloak_user
 
 NOW = 1_795_000_000
-PREVIEW_TOKEN = "preview-token"  # yapay zekâ aracısının belirteci: yalnız okur ve önizler
+PREVIEW_TOKEN = "preview-token"  # AI agent token: read and preview only
 # The service token of tenant kiraci1. The human approves on the tenant site, so this client
 # executes approved work. The same client ends sessions. The two names keep the tests readable.
 OPERATOR_TOKEN = "operator-token"
@@ -98,7 +98,7 @@ class ServerCase(unittest.TestCase):
                 return error.code, json.loads(error.read() or b"null")
 
     def timestamp(self) -> int:
-        # Her isteğin imzası ayrı olsun diye zaman damgası ilerler.
+        # Advance the timestamp so each request has a distinct signature.
         self._next_timestamp += 1
         return self._next_timestamp
 
@@ -196,7 +196,7 @@ class EventEndpointTest(ServerCase):
         self.assertEqual(self.downstream_writes(), [])
 
     def test_unclear_dry_run_value_never_executes(self) -> None:
-        # Sözleşme yalnız `true` ve `false` değerini kabul eder.
+        # The contract accepts only `true` and `false`.
         for query in ("dry_run=True", "dry_run=1", "dry_run=true&dry_run=true", "dry_run=", "dry_run=true&dry_run=false"):
             with self.subTest(query=query):
                 for mode in ("execute", "preview"):
@@ -211,7 +211,7 @@ class EventEndpointTest(ServerCase):
 
 
 class SignatureTest(ServerCase):
-    """İmza zaman damgasını ve yürütme seçimini kapsar. Aynı imza iki kez kullanılamaz."""
+    """The signature covers the timestamp and execution mode. It cannot be used twice."""
 
     def send(self, body: bytes, timestamp: int | None, signature: str | None, path: str = "/v1/events"):
         headers = {"Content-Type": "application/json"}
@@ -241,13 +241,13 @@ class SignatureTest(ServerCase):
         self.assert_rejected(self.send(json.dumps(EVENT).encode(), NOW, sign(other, NOW)))
 
     def test_body_only_signature_is_rejected(self) -> None:
-        # Eski biçim yalnız gövdeyi imzalardı.
+        # The old format signed only the body.
         body = json.dumps(EVENT).encode()
         old = "sha256=" + hmac.new(WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
         self.assert_rejected(self.send(body, NOW, old))
 
     def test_preview_signature_cannot_execute(self) -> None:
-        # Önizleme isteğini ele geçiren kişi sorgu alanını silerek yürütemez.
+        # An intercepted preview request cannot execute by removing the query field.
         body = json.dumps(EVENT).encode()
         preview_signature = sign(body, NOW, "preview")
 
@@ -349,7 +349,7 @@ class ForkedListenerTest(ServerCase):
 
 
 class KeycloakFormatTest(ServerCase):
-    """Keycloak'ın kendi olay biçimi. `realmId` realm'in iç kimliğidir, adı değildir."""
+    """Keycloak's native event format. `realmId` is the internal realm id, not its name."""
 
     def test_native_event_with_configured_realm_id_is_processed(self) -> None:
         native = {"id": "k-1", "time": 1, "type": "VERIFY_EMAIL", "realmId": REALM_ID, "userId": SUBJECT}
@@ -367,7 +367,7 @@ class KeycloakFormatTest(ServerCase):
         self.assertEqual(self.downstream_writes(), [])
 
     def test_realm_name_in_realm_id_field_is_not_trusted(self) -> None:
-        # Realm adı `platform` olur. Kimlik alanında ad gelirse olay bu realm'in sayılmaz.
+        # The realm name is `platform`. A name in the id field does not identify this realm.
         native = {"id": "k-1", "time": 1, "type": "VERIFY_EMAIL", "realmId": "platform", "userId": SUBJECT}
 
         status, body = self.post_event(native)
@@ -375,7 +375,7 @@ class KeycloakFormatTest(ServerCase):
         self.assertEqual((status, body["status"]), (202, "ignored"))
 
     def test_membership_create_without_user_is_ignored(self) -> None:
-        # Keycloak 26.8.2 üye ekleme olayında kullanıcıyı vermez. Servis bu olayı işleyemez.
+        # Keycloak 26.8.2 omits the user from membership-add events. The service cannot process them.
         native = {
             "id": "k-9",
             "time": 1,
@@ -387,13 +387,13 @@ class KeycloakFormatTest(ServerCase):
         ignored = {"status": "ignored", "actions": []}
 
         self.assertEqual(self.post_event(native), (202, ignored))
-        # Önizleme isteği sözleşmedeki gibi 200 döner.
+        # The preview request returns 200 as specified by the contract.
         self.assertEqual(self.post_event({**native, "id": "k-10"}, dry_run=True), (200, ignored))
         self.assertEqual(self.downstream_writes(), [])
 
 
 class RawSocketTest(ServerCase):
-    """Bozuk ve yavaş istemciler sunucuyu durdurmamalıdır."""
+    """Malformed or slow clients must not stop the server."""
 
     def raw(self, data: bytes) -> bytes:
         with socket.create_connection(("127.0.0.1", self.port), timeout=10) as sock:
@@ -417,7 +417,7 @@ class RawSocketTest(ServerCase):
         self.assertEqual(self.call("GET", "/healthz"), (200, {"status": "ok"}))
 
     def drip(self, data: bytes, stop: threading.Event) -> None:
-        # Her 0,1 saniyede bir bayt gönderir. Bekleme süresi hiç dolmaz, toplam süre dolar.
+        # Send one byte every 0.1 seconds. The idle timeout never expires, but the total deadline does.
         try:
             with socket.create_connection(("127.0.0.1", self.port), timeout=10) as sock:
                 for index in range(len(data)):
@@ -426,7 +426,7 @@ class RawSocketTest(ServerCase):
                     sock.sendall(data[index : index + 1])
                     time.sleep(0.1)
         except OSError:
-            return  # sunucu bağlantıyı kapattı: beklenen sonuç
+            return  # the server closed the connection, as expected
 
     def assert_health_answers_despite(self, slow_request: bytes) -> None:
         stop = threading.Event()
@@ -434,13 +434,13 @@ class RawSocketTest(ServerCase):
         thread.start()
         self.addCleanup(thread.join, 5)
         self.addCleanup(stop.set)
-        time.sleep(0.15)  # yavaş istemci sunucuya ilk ulaşan olsun
+        time.sleep(0.15)  # let the slow client reach the server first
         started = time.monotonic()
 
         reply = self.call("GET", "/healthz")
 
         self.assertEqual(reply, (200, {"status": "ok"}))
-        # Toplam sınır 0,5 saniyedir. Sınır olmasa bu istek 10 saniyeden uzun beklerdi.
+        # The total deadline is 0.5 seconds. Without it this request would wait more than 10 seconds.
         self.assertLess(time.monotonic() - started, 3.0)
 
     def test_slow_headers_hit_the_total_deadline(self) -> None:
@@ -495,7 +495,7 @@ class ServiceTokenTest(ServerCase):
         self.assertEqual(self.call("POST", "/v1/dead-letters/replay", body, headers)[0], 401)
 
     def test_verifier_crash_is_a_rejection(self) -> None:
-        # Doğrulayıcı beklenmeyen hata verirse istek yine reddedilir. Örneğin anahtar listesi alınamadı.
+        # An unexpected verifier error still rejects the request, for example when the key list cannot be fetched.
         def broken(_token: str) -> dict[str, object]:
             raise RuntimeError("jwks down")
 
@@ -510,7 +510,7 @@ class ServiceTokenTest(ServerCase):
 
 
 class ApprovalLayerTest(ServerCase):
-    """Yapay zekâ yalnız önizler. Yürütmeyi yalnız onay katmanı başlatır (sözleşme, 10. bölüm)."""
+    """AI can only preview. Only the approval layer starts execution (contract, section 10)."""
 
     def fail_once(self) -> None:
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
@@ -561,7 +561,7 @@ class ApprovalLayerTest(ServerCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["results"][0]["status"], "processed")
         self.assertEqual(self.stack.app.store.dead_letters(), [])
-        # İşlem günlüğü çağıranı, onay kimliğini, önizleme özetini ve sonucu taşır.
+        # The operation log contains the caller, approval id, preview digest and outcome.
         audit = "\n".join(logs.output)
         self.assertIn("replay_dead_letters", audit)
         self.assertIn("identity-sync-operator", audit)
@@ -675,7 +675,7 @@ class ApprovalLayerTest(ServerCase):
         self.assertEqual(len(self.stack.app.store.dead_letters()), 1)
 
     def test_execution_is_refused_when_plan_changed_after_preview(self) -> None:
-        # İnsan "kullanıcıyı hazırla" planını onayladı. Kullanıcı sonra kapatıldı. Plan artık yıkıcıdır.
+        # The person approved a provision-user plan. The user was then disabled. The plan is now destructive.
         self.fail_once()
         digest = self.preview_replay()["preview_digest"]
         self.stack.keycloak.add_user(keycloak_user(enabled=False), [])

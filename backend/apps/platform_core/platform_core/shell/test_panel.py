@@ -6,6 +6,11 @@ import frappe
 
 from platform_core.tests.shell_http_fixture import DOCTYPE, READER, ShellHTTPFixture
 
+PANEL_POLICY = (
+	"default-src 'self'; script-src 'self'; frame-ancestors 'none'; "
+	"object-src 'none'; base-uri 'self'; form-action 'self'"
+)
+
 
 class PanelMetadata(HTMLParser):
 	def __init__(self, body: bytes):
@@ -28,7 +33,8 @@ class TestPanelHTTP(ShellHTTPFixture):
 		self.assertEqual(status, 302)
 		self.assertEqual(headers["Location"], "/login?redirect-to=/panel")
 		self.assertIn("no-store", headers["Cache-Control"])
-		self.assertEqual(headers["Content-Security-Policy"], "default-src 'self'; frame-ancestors 'none'")
+		self.assertEqual(headers["Content-Security-Policy"], PANEL_POLICY)
+		self.assertEqual(headers["X-Frame-Options"], "DENY")
 		self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
 		self.assertIsNone(PanelMetadata(body).token)
 
@@ -39,7 +45,8 @@ class TestPanelHTTP(ShellHTTPFixture):
 			self.assertIn("private", headers["Cache-Control"])
 			self.assertIn("no-store", headers["Cache-Control"])
 			self.assertEqual(headers["Vary"], "Cookie")
-			self.assertEqual(headers["Content-Security-Policy"], "default-src 'self'; frame-ancestors 'none'")
+			self.assertEqual(headers["Content-Security-Policy"], PANEL_POLICY)
+			self.assertEqual(headers["X-Frame-Options"], "DENY")
 			self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
 			token = PanelMetadata(body).token
 			self.assertTrue(token)
