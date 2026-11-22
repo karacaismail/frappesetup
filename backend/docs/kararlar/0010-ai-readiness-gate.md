@@ -81,3 +81,40 @@ Kapı, varsa `dev/naming/check_names.py` betiğini ayrı bir Python sürecinde �
 Betik yoksa kapı `not_run` durumunu bildirir.
 Bu durumda diğer bulgular ve çıkış kodu aynen kalır.
 Betik çalışamazsa kapı bulgu yazar.
+
+## İnceleme sonrası dal taraması
+
+Ölçümde `6f2b47a` kaydındaki kapı ve Python 3.14.7 kullanıldı.
+Tablo, taranan her dalın Git kaydını gösterir.
+Kapı 12 dalda bulgu vermedi.
+Kapı 10 dalda toplam 287 bulgu verdi.
+4 dalda arka uç klasörü yoktu.
+
+| Dal | Git kaydı | Sonuç | Bulgu | Ad denetimi |
+| --- | --- | --- | ---: | --- |
+| `_reserve/43d361e2` | `308c37a` | `pass` | 0 | `not_run` |
+| `_reserve/7c7c61a6` | `8a814f4` | `not_applicable` | 0 | `not_applicable` |
+| `ai-readiness-gate` | `6f2b47a` | `pass` | 0 | `not_run` |
+| `backend` | `481cd35` | `pass` | 0 | `not_run` |
+| `dev-ortam` | `5261c77` | `fail` | 56 | `not_run` |
+| `e2e-merge-preview-cvf3hstx` | `6f61dde` | `fail` | 29 | `not_run` |
+| `e2e-preview` | `f099504` | `fail` | 58 | `not_run` |
+| `e2e-preview-ordered-frozen` | `6796fd3` | `fail` | 64 | `not_run` |
+| `erisim-kurali` | `974dc1f` | `fail` | 2 | `not_run` |
+| `guvenlik-kapisi` | `bb41ac3` | `fail` | 47 | `not_run` |
+| `identity-sync` | `7338595` | `pass` | 0 | `not_run` |
+| `ilk-dikey-dilim` | `a9f9b82` | `fail` | 8 | `not_run` |
+| `integration-e2e` | `0586ff1` | `pass` | 0 | `not_run` |
+| `kimlik-realm` | `02327df` | `pass` | 0 | `not_run` |
+| `kimlik-tema` | `178041e` | `pass` | 0 | `not_run` |
+| `main` | `f82a31c` | `not_applicable` | 0 | `not_applicable` |
+| `naming-history-fix` | `3ef8a85` | `fail` | 4 | `fail` |
+| `platform-core-gecit` | `d8469ab` | `pass` | 0 | `not_run` |
+| `platform-core-kabuk` | `69dddb1` | `pass` | 0 | `not_run` |
+| `platform-core-kimlik` | `4811e27` | `fail` | 15 | `not_run` |
+| `platform-core-mobil` | `30baf3c` | `pass` | 0 | `not_run` |
+| `platform-core-yz` | `f03b017` | `fail` | 4 | `not_run` |
+| `press-tr` | `d26aa5d` | `pass` | 0 | `not_run` |
+| `security-tooling` | `a7b24ed` | `pass` | 0 | `not_run` |
+| `site-hrms-tr-rename` | `f82a31c` | `not_applicable` | 0 | `not_applicable` |
+| `standartlar-ve-kararlar` | `d09c398` | `not_applicable` | 0 | `not_applicable` |
