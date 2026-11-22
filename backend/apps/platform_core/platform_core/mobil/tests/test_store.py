@@ -119,7 +119,7 @@ if frappe is not None:
 					"send_welcome_email": 0,
 				}
 			).insert()
-			storage._insert("Mobile Account State", account=user.name, revoked_through="0")
+			storage.insert_metadata("Mobile Account State", account=user.name, revoked_through="0")
 			installation = self.make_installation(user.name)
 			other_installation = self.make_installation("Administrator")
 			store = storage.MobileStore()
