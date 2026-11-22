@@ -28,37 +28,27 @@ Yalnız birleşme ve kanca denetimi için şu komutu kullanın.
 ```sh
 backend/e2e/bin/merge-preview --merge-only
 python3 -m unittest discover -s backend/e2e/tests -v
+node --experimental-strip-types --test backend/e2e/tests/*.test.*
 ```
 
 ## Sonuçlar
 
-| Senaryo | Sonuç | Eksik parça |
-| --- | --- | --- |
-| Atonota girişi kiracı oturumunu açar. | `not_run` | Keycloak, giriş teması ve kiracı girişi. |
-| Kullanıcı eşitleme servisi “Website User” açar. | `not_run` | Keycloak, eşitleme servisi ve kiracı kimlik ucu. |
-| Keycloak çıkışı kiracı oturumunu 60 saniyede kapatır. | `not_run` | Keycloak ve kiracı çıkış ucu. |
-| Aracı belirteci yalnız izinli kayıtları listeler. | `not_run` | Yapay zekâ erişim katmanı. |
-| Kayıt yalnız insan onayından sonra değişir. | `not_run` | Yapay zekâ erişim katmanı. |
-| Model geçidi 429 yanıtından sonra ikinci adresi kullanır. | `not_run` | Model geçidi. |
-| Erişim kuralı liste ve tek kayıt için aynı sonucu verir. | `not_run` | Erişim kuralı motoru. |
+Canlı Factory önizlemesi 22 Kasım 2026 Pazar günü çalıştı.
+Önizleme kaydı `4f1495a` ile 11 dal birleşti.
+Keycloak, Press, kiracı ve kimlik eşitleme sağlık denetimlerini geçti.
 
-Kiracı ortamı açıldı. Kiracı, `ping` isteğine yanıt verdi.
-Container içinde Frappe 16.56.0 ve ERPNext 16.55.0 çalıştı.
+| Senaryo | Son Factory koşusu | Önceki sıralı koşu | Son koşudaki engel |
+| --- | --- | --- | --- |
+| Atonota girişi kiracı oturumunu açar. | `fail` | `pass` | Chromium ve WebKit açılmadı. |
+| Eşitleme servisi “Website User” açar. | `not_run` | `pass` | API hazırlığı kiracı adresini çözemedi. |
+| Keycloak çıkışı kiracı oturumunu 60 saniyede kapatır. | `fail` | `pass` | Chromium ve WebKit açılmadı. |
+| Ajan belirteci yalnız izinli kayıtları listeler. | `not_run` | `pass` | API hazırlığı durdu. |
+| Kayıt yalnız insan onayından sonra değişir. | `not_run` | `pass` | API hazırlığı durdu. |
+| Model geçidi 429 yanıtından sonra ikinci adresi kullanır. | `not_run` | `fail` | API hazırlığı durdu. |
+| Erişim kuralı liste ve tek kayıt için aynı sonucu verir. | `not_run` | `pass` | API hazırlığı durdu. |
 
-Playwright 1.64.0 güncel yapılandırmada 21 test buldu.
-Chromium ve WebKit ön denemeleri giriş düğmesini bulamadı.
-Bu sonuç, kiracı girişi henüz birleşmediği için bekleniyordu.
-
-Önizlemedeki yapay zekâ sözleşmesi, `list_documents` sonucunda `documents` alanını tanımlar.
-
-Sahte sağlayıcı **429** ve **200** sırasını doğruladı.
-Kiracı ağı da sahte sağlayıcıya ulaştı.
-
-| İlgili dal | Birleştirme notu |
-| --- | --- |
-| `kimlik-realm`, `press-tr` | Dosyalar birleşince ana Compose dosyasına ekleyin. Açma betiği için servis ve port adlarını doğrulayın. |
-| `platform-core-kimlik`, `platform-core-kabuk` | Tarayıcı ön denemesi `/panel` sayfasında “Atonota ile oturum aç” düğmesini bulamadı. Bu akışı dallar birleşince tekrar sınayın. |
-| `identity-sync`, `platform-core-yz`, `platform-core-gecit`, `erisim-kurali` | İlgili uçlar birleşince örnek veriyi hazırlayın. Sonra testleri çalıştırın. |
+Önceki koşuda model geçidi, sahte sağlayıcının yerel adresini reddetti.
+Son koşuda bu senaryo uygulama yanıtına ulaşmadı.
 
 ## Çalıştırma
 
@@ -69,7 +59,7 @@ Pane, `PANE_PORT` değişkeniyle bu çalışma alanına port ayırır.
 
 - **Mevcut Factory ortamı.** Betik yalnız mevcut imajı ve siteyi yeniden kullanır. Factory diskinde en az 5 GiB boş alan gerekir.
 - **Yeni ortam.** `FS_COLIMA_PROFILE=default` kullanın. Betik açmadan önce `colima ssh -- free -g` ile belleği ölçer. Alt sınır 2 GB'tır.
-- **Press ortamı.** `FS_COLIMA_PROFILE=default` ile `environment.sh --press up` komutunu kullanın. Alt bellek sınırı 3 GB'tır. Press ve Keycloak birleşene kadar betik ölçümden sonra durur.
+- **Press ortamı.** `FS_COLIMA_PROFILE=default` ile `environment.sh --press up` komutunu kullanın. Alt bellek sınırı 3 GB'tır. Betik, Press ve Keycloak dosyaları eksikse ölçümden sonra durur.
 
 Mevcut kiracı imajı, son derlemede alınan kodu taşır.
 Kiracı kodu değişirse imajı güncelleyin ve sonra testleri çalıştırın.
@@ -81,7 +71,7 @@ Kiracı kodu değişirse imajı güncelleyin ve sonra testleri çalıştırın.
 3. İlgili test grubunu çalıştırın.
 4. `FS_COLIMA_PROFILE=default backend/e2e/environment.sh down` komutuyla ortamı kapatın.
 
-Varsayılan profilde `down`, bu test ortamının geçici birimlerini siler.
+Varsayılan profilde `down`, geçici birimleri ve bu ortamın imaj etiketini siler.
 Factory'de `down`, yeniden kullanılan mevcut veri birimlerini korur.
 Aynı Pane için bir seferde tek ortam açın.
 
@@ -94,6 +84,10 @@ npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=a
 ## Örnek veri
 
 Yalnız yerel test ortamını kullanın. Gerçek hesap veya veri kullanmayın.
+Önizleme, erişim kuralı örnek verisini `seed_access_fixture()` ile hazırlar.
+İşlev bir okuyucu hesabı ve bir erişim kuralı oluşturur.
+İşlev iki örnek kayıt ekler.
+Okuyucu yalnız kendi kaydını görebilir. İşlev okuyucu için geçici parola üretir.
 Parolaları, oturum çerezlerini ve anahtarları yalnız yerel ortam değişkenlerine koyun.
 
 - **Tarayıcı.** Keycloak'a doğrulanmış `e2e-user@example.test` hesabını ekleyin. Kiracıya aynı e-postayla bir “Website User” ekleyin. Parolasını `E2E_KEYCLOAK_PASSWORD` değişkenine verin. Kiracı ile Keycloak'ı kendi yerel adreslerinde bağlayın.
@@ -116,7 +110,7 @@ Telefon paketi için `mobile-pkce.spec.ts` dosyasını seçin.
 
 | Senaryo | Sonuç | Eksik önkoşul |
 | --- | --- | --- |
-| Müşteri hesabını siler. | `not_run` | Keycloak silme adımı, imzalı olay ve hesap kapatma akışı. |
+| Müşteri hesabını siler. | `not_run` | Press silme sayfası, kimlik eşitleme servisi ve örnek müşteri hesabı. |
 | Yönetici telefonu iptal eder. | `not_run` | Mobil kimlik doğrulaması ve Keycloak oturumu iptal ucu. |
 | Çalışan bir saat boşta kalır. | `not_run` | Çalışan için süre ayarı ve zorunlu yeniden doğrulama. |
 
@@ -130,3 +124,19 @@ Silme ve iptal için her koşuda yeni örnek veri hazırlayın.
 - **Çalışan oturumu.** `E2E_EMPLOYEE_IDLE=1` kullanın. Çalışan hesabı `e2e-employee-` ile başlamalı ve `@example.test` ile bitmeli. Hesabı `E2E_EMPLOYEE_EMAIL` ile verin. Parolayı `E2E_EMPLOYEE_PASSWORD` ile verin. Test gerçek saatte bir saat bekler. Test bu sırada yalnız Keycloak oturumunu kontrol eder.
 
 `playwright test -c backend/e2e/playwright.config.ts --project=chromium lifecycle.spec.ts` komutunu kullanın.
+
+### Press silme sayfası test sözleşmesi
+
+Press, hesap silme formunu `/account-deletion` sayfasında gösterir.
+Testler aşağıdaki seçicileri ve değerleri kullanır.
+
+| Seçici | Beklenen davranış |
+| --- | --- |
+| `#account-deletion` | Form, `POST /api/method/press_tr.api.account.request_deletion` ucuna bağlıdır. |
+| `#account-deletion[data-confirm="false"]` | Gönderme düğmesi yeniden giriş akışını başlatır. |
+| `#account-deletion[data-confirm="true"]` | Press bu değeri yeniden giriş doğrulandıktan sonra gösterir. |
+| `#account-deletion button[type=submit]` | Düğme, formun o adımdaki işlemini başlatır. |
+
+Son gönderim JSON gövdesinde `confirm: true` taşır.
+Press başarılı istekte `message.submitted: true` döndürür.
+Bu kayıt, Press şablonunun `3f53c3f` sürümüyle denetlendi.

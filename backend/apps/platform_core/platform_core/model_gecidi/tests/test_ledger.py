@@ -1,6 +1,7 @@
 """Regression tests for exact budget comparisons on MariaDB."""
 
 from decimal import Decimal
+from unittest.mock import patch
 from uuid import uuid4
 
 import frappe
@@ -65,4 +66,5 @@ class TestLedger(IntegrationTestCase):
 			account.name,
 			("name", "has_monthly_budget", "monthly_budget", "currency"),
 		)
-		self.assertEqual(ledger.remaining(locked), Decimal("0.000000002"))
+		with patch.object(ledger, "USAGE_PAGE_SIZE", 1):
+			self.assertEqual(ledger.remaining(locked), Decimal("0.000000002"))

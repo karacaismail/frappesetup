@@ -156,6 +156,7 @@ test.describe('Press account deletion', () => {
       && response.request().method() === 'POST');
     await form.locator('button[type=submit]').click();
     const submitted = await submission;
+    expect(submitted.request().postDataJSON()).toMatchObject({ confirm: true });
     expect(submitted.status()).toBe(200);
     expect((await submitted.json()).message).toMatchObject({ submitted: true });
 
@@ -249,23 +250,26 @@ async function keycloakStillSignedIn(page: Page) {
     && callback.searchParams.get('state') === state && callback.searchParams.has('code');
 }
 
-test('employee must authenticate again after one hour idle despite live Keycloak SSO', async ({ page }) => {
-  test.skip(process.env.E2E_EMPLOYEE_IDLE !== '1',
-    'Requires the employee one-hour idle configuration and the tenant forced re-authentication flow.');
-  test.setTimeout(IDLE_MS + 180_000);
-  const email = fixtureEmail('E2E_EMPLOYEE_EMAIL', 'employee');
-  const password = required('E2E_EMPLOYEE_PASSWORD');
-  await signIn(page, email, password);
-  expect(await loggedUser(page.request)).toBe(email);
-  const started = Date.now();
-  await new Promise((resolve) => setTimeout(resolve, 55 * 60 * 1000));
-  expect(await keycloakStillSignedIn(page)).toBe(true);
-  await new Promise((resolve) => setTimeout(resolve, Math.max(0, started + IDLE_MS + 2000 - Date.now())));
-  expect(await keycloakStillSignedIn(page)).toBe(true);
+test.describe('Employee idle session', () => {
+  test.skip(() => process.env.E2E_EMPLOYEE_IDLE !== '1',
+      'Requires the employee one-hour idle configuration and the tenant forced re-authentication flow.');
 
-  await page.goto(sites().tenant + '/panel');
-  await expect.poll(() => new URL(page.url()).origin).toBe(sites().identity);
-  await expect(page.locator('#password')).toBeVisible();
-  await enterCredentials(page, email, password);
-  await expect.poll(() => loggedUser(page.request)).toBe(email);
+  test('employee must authenticate again after one hour idle despite live Keycloak SSO', async ({ page }) => {
+    test.setTimeout(IDLE_MS + 180_000);
+    const email = fixtureEmail('E2E_EMPLOYEE_EMAIL', 'employee');
+    const password = required('E2E_EMPLOYEE_PASSWORD');
+    await signIn(page, email, password);
+    expect(await loggedUser(page.request)).toBe(email);
+    const started = Date.now();
+    await new Promise((resolve) => setTimeout(resolve, 55 * 60 * 1000));
+    expect(await keycloakStillSignedIn(page)).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, Math.max(0, started + IDLE_MS + 2000 - Date.now())));
+    expect(await keycloakStillSignedIn(page)).toBe(true);
+
+    await page.goto(sites().tenant + '/panel');
+    await expect.poll(() => new URL(page.url()).origin).toBe(sites().identity);
+    await expect(page.locator('#password')).toBeVisible();
+    await enterCredentials(page, email, password);
+    await expect.poll(() => loggedUser(page.request)).toBe(email);
+  });
 });
