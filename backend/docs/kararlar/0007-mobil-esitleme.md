@@ -298,6 +298,9 @@ Mobil modül belirteci kimlik modülünün servis istemcisinden alır.
 Kimlik modülü Keycloak adresini ve realm adını site ayarından alır.
 İç adres varsa kimlik modülü o adresi kullanır. Yoksa genel adresi kullanır.
 Servis belirteci almak için seçilen adres HTTPS olmalıdır.
+Geliştirme sitesi HTTP kullanırsa uzak kapatma isteği gitmez.
+Uzak kapatma beklemede kalır. Sistem bu durumu `delivery_pending` alanında saklar.
+Yerel oturum reddi geçerli kalır.
 Servis hesabı `keycloak_service_client_id` ve `keycloak_service_client_secret` kullanır.
 Kiracı servis istemcisinin adı, tarayıcı istemcisinin adına `-service` eklenerek oluşturulur.
 Kiracı servis hesabı belirteci `aud-identity-sync` kapsamıyla ister.

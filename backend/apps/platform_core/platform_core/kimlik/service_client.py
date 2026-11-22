@@ -2,6 +2,7 @@
 
 import json
 import re
+from threading import Lock
 from time import monotonic
 from urllib.error import HTTPError
 from urllib.parse import urlencode, urlsplit
@@ -24,6 +25,7 @@ class _NoRedirect(HTTPRedirectHandler):
 
 _OPENER = build_opener(_NoRedirect())
 _cached_bearer = None
+_cache_lock = Lock()
 
 
 def _token_url() -> str:
@@ -98,5 +100,14 @@ def identity_sync_bearer() -> str:
 		raise ValueError("Invalid identity-sync service token")
 	expires_in = payload.get("expires_in")
 	if type(expires_in) is int and expires_in > 5:
-		_cached_bearer = (cache_key, token, now + min(expires_in, 86400) - 5)
+		with _cache_lock:
+			_cached_bearer = (cache_key, token, now + min(expires_in, 86400) - 5)
 	return token
+
+
+def invalidate_identity_sync_bearer(rejected: str) -> None:
+	"""Evict only the rejected bearer so a concurrent refresh stays cached."""
+	global _cached_bearer
+	with _cache_lock:
+		if _cached_bearer is not None and _cached_bearer[1] == rejected:
+			_cached_bearer = None

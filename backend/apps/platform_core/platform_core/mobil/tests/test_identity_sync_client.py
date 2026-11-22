@@ -136,6 +136,18 @@ class IdentitySyncClientTest(TestCase):
 		)
 		self.assertIsNone(log.records[0].exc_info)
 
+	def test_unauthorized_closure_evicts_the_cached_bearer(self):
+		target = ("session", "subject")
+		self.open.side_effect = [
+			self.response(b'{"access_token":"old-bearer","expires_in":60}'),
+			self.response(status=401),
+			self.response(b'{"access_token":"new-bearer","expires_in":60}'),
+			self.response(),
+		]
+		self.assertEqual(client.send_session_revocations([target]), (target,))
+		self.assertEqual(client.send_session_revocations([target]), ())
+		self.assertEqual(self.open.call_args.args[0].get_header("Authorization"), "Bearer new-bearer")
+
 	def test_reuses_service_bearer_until_expiry(self):
 		self.open.side_effect = [
 			self.response(b'{"access_token":"fixture-bearer","expires_in":60}'),

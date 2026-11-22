@@ -8,7 +8,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import frappe
 
-from platform_core.kimlik.service_client import identity_sync_bearer
+from platform_core.kimlik.service_client import identity_sync_bearer, invalidate_identity_sync_bearer
 
 _TIMEOUT_SECONDS = 3
 _DELIVERY_ERRORS = (HTTPException, OSError, ValueError, RecursionError)
@@ -74,6 +74,8 @@ def send_session_revocations(sessions):
 					"Identity-sync refused mobile session closure (HTTP 403). Local revocation remains in effect."
 				)
 			elif status != 200:
+				if status == 401:
+					invalidate_identity_sync_bearer(bearer)
 				failed.append((sid, subject))
 
 	if failed:
