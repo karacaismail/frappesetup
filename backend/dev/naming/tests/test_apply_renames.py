@@ -515,3 +515,36 @@ class RenameTests(unittest.TestCase):
         rerun = self.rename(entries, "--dry-run")
         self.assertEqual(rerun.returncode, 0, rerun.stderr)
         self.assertIn("0 tracked file(s)", rerun.stdout)
+
+    def test_keycloak_proposals_use_specific_code_scopes(self):
+        sources = {
+            "backend/identity/keycloak/tests/test_realm_dosyalari.py": (
+                "anahtarlar = ()\nornek = 'sample.ornek@example.test'\n"
+                "for satir in ornek.splitlines():\n    pass\n",
+                "keys = ()\nexample = 'sample.ornek@example.test'\n"
+                "for line in example.splitlines():\n    pass\n",
+            ),
+            "backend/identity/keycloak/tests/test_eklentiler.py": (
+                "def _cerezli_acici():\n    return yonetici\n",
+                "def _cookie_opener():\n    return admin_token\n",
+            ),
+            "backend/libs/oidc_verify/tests/test_oidc_verify.py": (
+                "def erisim():\n    return saglayici\n",
+                "def access():\n    return provider\n",
+            ),
+            "backend/other/sample.py": ("ornek = True\n", "ornek = True\n"),
+        }
+        for path, (source, _) in sources.items():
+            self.write(path, source)
+        self.git("add", ".")
+        result = self.rename(None)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        names_after = {
+            "test_realm_dosyalari.py": "test_realm_files.py",
+            "test_eklentiler.py": "test_extensions.py",
+        }
+        for path, (_, expected) in sources.items():
+            target = Path(path)
+            target = target.with_name(names_after.get(target.name, target.name))
+            with self.subTest(path=path):
+                self.assertEqual((self.root / target).read_text(), expected)

@@ -3104,7 +3104,8 @@
     "new": "keys",
     "type": "identifier",
     "paths": [
-      "backend/libs/oidc_verify/*"
+      "backend/libs/oidc_verify/*",
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py"
     ]
   },
   {
@@ -3951,7 +3952,8 @@
     "new": "request",
     "type": "identifier",
     "paths": [
-      "backend/identity/keycloak/tests/*"
+      "backend/identity/keycloak/tests/*",
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py"
     ]
   },
   {
@@ -4063,7 +4065,8 @@
     "new": "provider",
     "type": "identifier",
     "paths": [
-      "backend/identity/keycloak/tests/*"
+      "backend/identity/keycloak/tests/*",
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
     ]
   },
   {
@@ -4175,7 +4178,9 @@
     "new": "line",
     "type": "identifier",
     "paths": [
-      "backend/identity/keycloak/bin/kc-dev.sh"
+      "backend/identity/keycloak/bin/kc-dev.sh",
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py",
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
     ]
   },
   {
@@ -4649,7 +4654,8 @@
     "new": "chunks",
     "type": "identifier",
     "paths": [
-      "backend/libs/oidc_verify/src/oidc_verify/jwks.py"
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
+      "backend/identity/keycloak/tests/yardimci.py"
     ]
   },
   {
@@ -4689,7 +4695,8 @@
     "new": "location",
     "type": "identifier",
     "paths": [
-      "backend/identity/keycloak/tests/test_eklentiler.py"
+      "backend/identity/keycloak/tests/test_eklentiler.py",
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
     ]
   },
   {
@@ -5778,6 +5785,386 @@
     "type": "reference",
     "paths": [
       "backend/dev/press/test_development_contract.py"
+    ]
+  },
+  {
+    "old": "_cerezli_acici",
+    "new": "_cookie_opener",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_account_backlog.py",
+      "backend/identity/keycloak/tests/test_eklentiler.py",
+      "backend/identity/keycloak/tests/test_magic_link.py",
+      "backend/identity/keycloak/tests/test_second_factor.py"
+    ]
+  },
+  {
+    "old": "_tek_aud",
+    "new": "_single_aud",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/dogrulama.py"
+    ]
+  },
+  {
+    "old": "cikis",
+    "new": "logout",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "degisiklik",
+    "new": "overrides",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/anahtarlar.py"
+    ]
+  },
+  {
+    "old": "erisim",
+    "new": "access",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "FrappeBagimsizligiTesti",
+    "new": "FrappeIndependenceTest",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "getir",
+    "new": "fetch",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py"
+    ]
+  },
+  {
+    "old": "JwksCacheTesti",
+    "new": "JwksCacheTest",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "ornek =",
+    "new": "example =",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py"
+    ]
+  },
+  {
+    "old": "ornek.splitlines",
+    "new": "example.splitlines",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py"
+    ]
+  },
+  {
+    "old": "OrnekEnvTesti",
+    "new": "ExampleEnvTest",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py"
+    ]
+  },
+  {
+    "old": "ozel",
+    "new": "private",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/anahtarlar.py"
+    ]
+  },
+  {
+    "old": "RealmAyarlariTesti",
+    "new": "RealmSettingsTest",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_30_saniyelik_pay_icinde_gecerli",
+    "new": "test_valid_within_30_second_leeway",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_apple_saglayicisi_kapali_ve_anahtarsiz",
+    "new": "test_apple_provider_disabled_without_keys",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "test_bozuk_jwk_kaydi_atlanir",
+    "new": "test_broken_jwk_entry_is_skipped",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_donus_adresleri_ortamdan_geldi",
+    "new": "test_redirect_uris_come_from_environment",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_eklentiler_sunucuda_yuklu",
+    "new": "test_extensions_loaded_on_server",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "test_eposta_mailpit_uzerinden",
+    "new": "test_email_goes_through_mailpit",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_google_kapali",
+    "new": "test_google_disabled",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_henuz_gecerli_degil",
+    "new": "test_not_yet_valid",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_imza_iss_aud",
+    "new": "test_signature_iss_aud",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_iss_well_known_ile_ayni",
+    "new": "test_iss_matches_well_known",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_kaynak_frappe_icermez",
+    "new": "test_source_has_no_frappe",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_kid_yoksa_bozuk",
+    "new": "test_missing_kid_is_malformed",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_nonce_varsa_reddedilir",
+    "new": "test_nonce_present_is_refused",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_none_algoritmasi",
+    "new": "test_none_algorithm",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_rs256_disi_algoritma",
+    "new": "test_non_rs256_algorithm",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_sid_ve_sub_yoksa_reddedilir",
+    "new": "test_refused_without_sid_and_sub",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_soguk_onbellekte_bilinmeyen_kid_tek_cekim",
+    "new": "test_cold_cache_unknown_kid_single_fetch",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_tarayici_akisi_bagli_ve_apple_kapali",
+    "new": "test_browser_flow_bound_and_apple_disabled",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "test_tarayici_akisinda_passkey_kosulu_ve_otp_var",
+    "new": "test_browser_flow_has_passkey_condition_and_otp",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "test_tarayici_akisinda_sihirli_baglanti_yok",
+    "new": "test_browser_flow_has_no_magic_link",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "test_totp_ve_passkey_acik",
+    "new": "test_totp_and_passkey_enabled",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_yalniz_http_ve_https_adresi",
+    "new": "test_only_http_and_https_url",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yalniz_sub_ile_gecerli",
+    "new": "test_valid_with_sub_only",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_aud",
+    "new": "test_wrong_aud",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_aud_ve_azp",
+    "new": "test_wrong_aud_and_azp",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_azp",
+    "new": "test_wrong_azp",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_imza",
+    "new": "test_wrong_signature",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_iss",
+    "new": "test_wrong_iss",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_iss_ve_sure",
+    "new": "test_wrong_iss_and_lifetime",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_nonce",
+    "new": "test_wrong_nonce",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yenileme_basarisizsa_eski_anahtarlar_kullanilir",
+    "new": "test_old_keys_used_when_refresh_fails",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yenilemeden_sonra_da_bilinmeyen_kid",
+    "new": "test_kid_still_unknown_after_refresh",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "yonetici",
+    "new": "admin_token",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py",
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "Yonlendirme",
+    "new": "NoRedirect",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
     ]
   }
 ]
