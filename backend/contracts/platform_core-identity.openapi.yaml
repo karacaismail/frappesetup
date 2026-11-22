@@ -799,6 +799,10 @@ paths:
 
         The endpoint then compares the `issuer` value with the `iss` value of the site. If they differ, it returns 400.
 
+        The server makes up to three attempts to acquire the identity locks. It retries database deadlocks
+        and stale snapshots (`QueryDeadlockError`). A lock wait timeout fails immediately.
+        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
+
         If the `(issuer, subject)` link exists, the user is found. The endpoint updates the first name, last name, `enabled` and
         `role_profiles` fields. If `email` differs from the user name, it returns 409.
         An e-mail change is made only through the `change_email` endpoint.
@@ -911,6 +915,8 @@ paths:
           $ref: "#/components/responses/KimlikSilindi"
         "417":
           $ref: "#/components/responses/GovdeBozuk"
+        "500":
+          $ref: "#/components/responses/IdentityLockRetryExhausted"
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
@@ -921,6 +927,10 @@ paths:
       summary: Enables or disables the linked user.
       description: |
         The sync service calls this endpoint. The service token must carry `azp=identity-sync`.
+
+        The server makes up to three attempts to acquire the identity locks. It retries database deadlocks
+        and stale snapshots (`QueryDeadlockError`). A lock wait timeout fails immediately.
+        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
 
         **This endpoint can disable the user.** When `enabled` comes as false, the user is disabled.
         A disabled user cannot sign in. When the same endpoint is called with `enabled` true, the user is enabled again.
@@ -971,6 +981,8 @@ paths:
           $ref: "#/components/responses/KimlikSilindi"
         "417":
           $ref: "#/components/responses/GovdeBozuk"
+        "500":
+          $ref: "#/components/responses/IdentityLockRetryExhausted"
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
@@ -981,6 +993,10 @@ paths:
       summary: Changes the e-mail of the linked user.
       description: |
         The sync service calls this endpoint. The service token must carry `azp=identity-sync`.
+
+        The server makes up to three attempts to acquire the identity locks. It retries database deadlocks
+        and stale snapshots (`QueryDeadlockError`). A lock wait timeout fails immediately.
+        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
 
         **This endpoint changes the user name.** In Frappe the user name is the e-mail.
         The endpoint renames the record with `rename_doc`. All records linked to the user move to the new name.
@@ -1045,6 +1061,8 @@ paths:
           $ref: "#/components/responses/KimlikSilindi"
         "417":
           $ref: "#/components/responses/GovdeBozuk"
+        "500":
+          $ref: "#/components/responses/IdentityLockRetryExhausted"
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
@@ -1061,6 +1079,9 @@ paths:
         The same rules apply in Press (`press_tr.api.identity.anonymize_user`).
 
         The work has two steps. Both steps are safe to repeat.
+        The server makes up to three attempts per step. It retries database deadlocks and stale snapshots
+        (`QueryDeadlockError`). A lock wait timeout fails immediately.
+        If the third attempt fails with a lock conflict, the server returns 500 `IdentityInternalError`.
 
         1. Step 1 locks the existing User first, then the identity link and the deletion record. It disables the user.
            It deletes the API key, the API secret and the stored password.
@@ -1147,6 +1168,8 @@ paths:
           $ref: "#/components/responses/GovdeBozuk"
         "410":
           $ref: "#/components/responses/KimlikSilindi"
+        "500":
+          $ref: "#/components/responses/IdentityLockRetryExhausted"
         "503":
           description: |
             Either the identity provider keys are not available (`KeycloakKeysUnavailable`),
@@ -2228,6 +2251,11 @@ components:
                 exc_type: IdentityNotFound
                 exception: "platform_core.identity.exceptions.IdentityNotFound: subject"
                 _server_messages: '["{\"message\": \"No user is linked to this identity.\"}"]'
+    IdentityLockRetryExhausted:
+      description: A lock conflict remained after three attempts. The `exc_type` value is `IdentityInternalError`.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/FrappeError"}
 
   schemas:
     Issuer:
@@ -2469,7 +2497,7 @@ components:
         The custom values in this file are these: `InvalidRedirect`, `KeycloakLoginNotConfigured`,
         `InvalidLogoutToken`, `ServiceTokenRejected`, `UnknownIssuer`, `EmailMismatch`,
         `EmailNotVerified`, `IdentityConflict`, `DeskRoleNotAllowed`, `IdentityNotFound`,
-        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput` and `KeycloakKeysUnavailable`.
+        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput`, `KeycloakKeysUnavailable` and `IdentityInternalError`.
         The general Frappe values can be `PermissionError`, `AuthenticationError`, `CSRFTokenError`,
         `DataError` and `RateLimitExceededError`.
         The `start_login` and `keycloak_callback` endpoints do not return this body. These two endpoints return an HTML page.

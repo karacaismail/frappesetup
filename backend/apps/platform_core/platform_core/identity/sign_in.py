@@ -260,7 +260,7 @@ def _close_new_session() -> None:
 
 	sid = frappe.session.sid
 	# Frappe stages these fields before the final identity check.
-	for field in ("message", "home_page", "full_name"):
+	for field in ("message", "home_page", "full_name", "redirect_to"):
 		frappe.local.response.pop(field, None)
 	frappe.local.cookie_manager.cookies.clear()
 	clear_cookies()
