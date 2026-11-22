@@ -47,7 +47,7 @@ Her denetim ihlali dosya ve satırla yazar. Çıkış kodu ihlal varsa 1, yoksa 
 
 ## Kontrol noktası 2: öteki dallarda ölçüm
 
-1. Kapıyı öteki işlerin dallarında salt okunur olarak çalıştırın. Dallar `/Users/w6x/Documents/frappesetup/worktrees/` altındadır.
+1. Kapıyı öteki işlerin dallarında salt okunur olarak çalıştırın. Dalların çalışma ağaçlarını `git worktree list` komutu gösterir.
 2. Başka dalda dosya değiştirmeyin ve commit atmayın.
 3. Her dal için ihlal sayısını ve ilk beş ihlali durum dosyasına yazın.
 4. `security-audit` komutuna yeni kapıyı çağıran satırı ekleyin.

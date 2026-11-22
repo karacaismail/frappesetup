@@ -62,6 +62,20 @@ Ayarlar `site_config.json` dosyasında durur. Sır depoya girmez.
 | `identity_service_azp` | Hayır | Servis belirtecinde izinli `azp` listesi. Varsayılan `["identity-sync"]` |
 | `kimlik_mobil_azp` | Hayır | Telefon belirtecinde izinli `azp` listesi. Varsayılan `["mobile"]` |
 | `kimlik_deletion_hmac_key` | Evet | Silme kaydındaki özetin gizli anahtarı. Yoksa kimlik değiştiren uçlar 503 döner. |
+| `mcp_oauth_enabled` | Hayır | Dış MCP erişimi başlangıçta kapalıdır. Açmak için `true` veya `1` yazın. |
+| `mcp_oauth_resource` | Dış MCP açıksa | MCP ucunun tam HTTPS adresi. Örnek `https://tenant.example.test/api/method/platform_core.api.ai.mcp`. |
+| `mcp_oauth_client_ids` | Dış MCP açıksa | İzinli Keycloak istemcilerinin kimlik listesi. Örnek `["mcp-external"]`. |
+| `mcp_oauth_introspection_secret` | Dış MCP açıksa | Sunucu bu sırla Keycloak'a belirtecin hâlâ geçerli olup olmadığını sorar. |
+
+MCP, dış araçların bu siteye bağlanmak için kullandığı bir protokoldür.
+Dış MCP erişimi açıkken Keycloak adresleri HTTPS kullanır.
+İzinli dış istemciler, yetki koduyla giriş yapar.
+İstemci kodu S256 PKCE yöntemiyle korur.
+Sunucu, belirteci denetlemek için ayrı bir Keycloak istemcisi kullanır.
+Bu istemcinin kimliği MCP ucunun tam adresidir.
+Belirteç tek bir hedef taşır.
+Hedef ve imzalı `mcp_resource` alanı MCP adresiyle eşleşir.
+Sunucu, istemci sırrını yalnız `site_config.json` dosyasından okur.
 
 ## Kurulum adımı
 

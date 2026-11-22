@@ -44,8 +44,11 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `mobile-app` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | `ATONOTA_MOBILE_REDIRECT_URI` | Yok |
+| `account-console` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | Realm dosyasındaki Keycloak hesap sayfaları | Yok |
 
 - Dönüş adresini tam adresle kaydedin. Joker karakter kullanmayın.
+- Keycloak hesap ekranı kendi belirtecini kullanır. Bu belirtecin hedefi `account` olur.
+- `account-console` yalnız kullanıcıya verilmiş hesap rollerini taşır. İstemci yönetim rolü alamaz.
 - Çıkış bildiriminde “oturum gerekli” ayarını açın.
 - Yeni kiracı için aynı biçimi kullanın. Örneğin `site-kiraci2` yazın.
 - Her kiracının iki istemcisi vardır. `site-<kiracı>` yalnız tarayıcı girişi içindir. Servis hesabı kapalıdır ve isteğe bağlı servis kapsamı taşımaz. `site-<kiracı>-service` yalnız servis hesabıdır. Tarayıcı akışı kapalıdır. Kiracının iki istemcisi içinde `aud-identity-sync` kapsamını yalnız servis istemcisi isteyebilir. Böylece tarayıcı girişi servis hedefli belirteç alamaz. Press'teki `press` ve `press-service` ayrımı da böyledir.
@@ -321,6 +324,13 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Kurulum iptal edilince `platform_core` bu ucu çağırır. Aynı `sid` ile gelen belirteç de reddedilir (Proje kaydı O-25).
 - `POST /v1/account-deletions` ucu hesap silme isteğini kaydeder (Proje kaydı O-27). Ucu yalnız Press çağırır. Belirteç `azp=press-service` ve `aud=identity-sync` taşır. Gövde `issuer`, `subject` ve `reauthenticated_at` alanlarını taşır.
 - Müşteri silme isteğini Press'te verir. Press önce kullanıcıyı Keycloak'ta yeniden doğrular (`prompt=login`, `max_age=0`). `reauthenticated_at` bu doğrulamanın zamanıdır. identity-sync 300 saniyeden eski doğrulamayı reddeder.
+- Press bağlantıyı 10 saniye, yanıtı varsayılan olarak 45 saniye bekler.
+- `press_deletion_request_timeout` yanıt süresini değiştirir. Sayı 0'dan büyük ve en çok 90 olmalıdır.
+- Ayar ondalıklı değer kabul eder. Geçersiz ayar isteği durdurur ve günlüğe uyarı yazılır.
+- Okuma süresi dolarsa veya Identity Sync `unknown` döndürürse Press `pending: true` döndürür. Bağlantı hatasında Press 502 döndürür.
+- Press son bildiği durumu aynı oturumda beş dakika saklar. Yenileme Identity Sync'e durum sormaz.
+- Press'in gönderildi yanıtı, işin tamamlandığını doğrulamaz.
+- Tekrar gönderim aynı hesap için yeni bir silme işi açmaz.
 - Keycloak'ın kendi `delete_account` eylemi kapalıdır. Bu eylem kullanıcıyı ilk adımda siler. Hesap ekranındaki silme bağlantısı Press'teki silme sayfasına gider.
 - Yönetici kullanıcıyı Keycloak yönetim ekranından silerse olay dinleyici olayı gönderir. identity-sync 2., 3. ve 4. adımları yine çalıştırır. Olay kaybolursa elle başlatılan mutabakat komutu silinmiş kullanıcıyı bulur. Komut önce önizleme gösterir. İnsan onay verirse komut kalan silme adımlarını sırayla çalıştırır. Yerel hesap önceden kapalı olsa da bu adımlar çalışır.
 - Press isteği ve Keycloak silme olayı aynı hesap işine bağlanır. İş kimliği hesabın özetidir. Tamamlanan adım yeniden çağrılmaz. Yeniden deneme yanıtı hesap kimliğini değil iş kimliğini gösterir.
@@ -334,7 +344,7 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 
 ### Anonim yapma kuralları
 
-Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve Press'te (`press_tr.api.identity.anonymize_user`) aynıdır. Kararın kaynağı proje kaydındaki O-27'dir.
+Temel kurallar kiracı sitesi (`platform_core.api.identity.anonymize_user`) ve Press (`press_tr.api.identity.anonymize_user`) için geçerlidir. Kuralların kaynağı proje kaydındaki O-27'dir.
 
 1. Silme iki adımdır. Birinci adım hesabı kapatır, oturumları sayfalayarak kapatır, API anahtarlarını iptal eder ve silme durumunu kaydeder. İkinci adım kişisel veriyi anonim yapar. İki adım da tekrar güvenlidir.
 2. Silme kaydı ham kimliği tutmaz. Kayıt `(iss, sub)` çiftinin HMAC-SHA256 özetini tutar. Anahtar site ayarındaki gizli değerdir. Kimlik bağındaki ham `sub` silinir.
@@ -348,9 +358,11 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
    - iki adımlı doğrulama anahtarları, varsayılan değer satırları, sosyal giriş ve ek e-posta satırları,
    - Press'te takımın fatura adı ve telefonu, SSH anahtarları ve sertifikaları.
 
-   Kiracıda `clear_fields` içindeki zorunlu olmayan alan boşaltılır. Zorunlu alan bu listeye yazılamaz.
-   Bu seçenek yalnız `redact_fields` içinde bulunan alanlar için geçerlidir.
-   Kod, listeye yazılmış zorunlu alanda olağan anonim değeri kullanır.
+   Kiracı sitesi `user_data_fields` kancasını aşağıdaki kurallarla uygular.
+
+   - `clear_fields`, `redact_fields` içindeki tek değerli alanları boşaltır. Sistem, zorunlu olmayan alana `null` yazar. Listede zorunlu bir alan varsa sistem hata verir.
+   - Sistem, boşalttığı `Attach` ve `Attach Image` alanlarına bağlı “File” kayıtlarını siler. Başka bir dosya kaydı aynı içeriği kullanıyorsa içerik diskte kalır. Başka bir kayıt ortak küçük resmi kullanıyorsa sistem küçük resmi korur. Son bağlı kayıt silindiğinde dosya da diskten silinir. Sistem, aynı kayıtta aynı dosya adresi kullanılmıyorsa geçmişteki yükleme bağlantısını da siler.
+   - Sistem, ilgili kaydın “Version” geçmişinde seçili tek değerli alanların eski ve yeni değerlerini temizler. Sistem bu işlemi geçmişi kimin yazdığına bakmadan yapar. Alt tablo ve diğer alanların geçmişi kalır. Geçmiş verisi bozuksa sistem hata verir ve mevcut geçmişi korur.
 
 5. Frappe'nin tam adı bütün satırlarda arayan değiştirmesi kullanılmaz. Yalnız kullanıcıya bağlı alanlar değişir. Böylece aynı adı taşıyan başka bir kişinin verisi değişmez.
 6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
@@ -391,7 +403,7 @@ Aşağıdaki tablo, HRMS TR kayıtlarında kişisel verinin nasıl silindiğini 
 
 | Kişisel veri | Silme yolu |
 | --- | --- |
-| HRMS TR çalışan kartı | `user_data_fields` kancası kartı `user_id` ile bulur. Adlar, e-posta, telefon, acil durum kişisi, yakınlık, adresler ve biyografi anonimleşir. Pasaport numarası ve düzenlenme yeri anonimleşir. Banka adı, hesap numarası, IBAN, sağlık notu, sigorta numarası ve aile bilgisi anonimleşir. Doğum tarihi, pasaport tarihleri, devam cihazı kimliği, kan grubu ve medeni durum alanları boşalır. Fotoğraf alanı boşalır. Karta yüklenen fotoğraf dosyası şimdilik kalır. Çalışan kartının değişiklik geçmişi eski değerleri şimdilik tutar. Eğitim ve önceki iş alt tabloları kalır (O-41). |
+| HRMS TR çalışan kartı | `user_data_fields` kancası kartı `user_id` ile bulur. Adlar, e-posta, telefon, acil durum kişisi, yakınlık, adresler ve biyografi anonimleşir. Pasaport numarası ve düzenlenme yeri anonimleşir. Banka adı, hesap numarası, IBAN, sağlık notu, sigorta numarası ve aile bilgisi anonimleşir. Doğum tarihi, pasaport tarihleri, devam cihazı kimliği, kan grubu ve medeni durum alanları boşalır. Sistem fotoğraf alanını boşaltır ve bağlı dosya kaydını siler. Dosyanın diskten silinmesi ve yükleme bağlantısının temizlenmesi 7. bölümdeki kurallara uyar. Sistem, seçili kart alanlarının eski ve yeni değerlerini İK'nın yazdığı geçmişten de temizler. Eğitim ve önceki iş alt tabloları kalır (O-41). |
 | HRMS TR iş kayıtları | Hesap silme kayıtları korur. İzin, devam ve bordrodaki çalışan adı kopyaları değişmez (O-41). `hrms_tr.retention.purge` yalnız süresi dolan taslak ve iptal edilmiş izinleri siler (O-39). |
 
 ## 9. Geliştirme ortamı

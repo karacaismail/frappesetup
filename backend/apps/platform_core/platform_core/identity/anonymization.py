@@ -114,7 +114,12 @@ def anonymize_user(data: dict) -> dict:
 
 
 def _with_retry(step, issuer: str, subject: str):
-	"""Run each repeatable deletion step in a fresh transaction."""
+	"""Run each repeatable deletion step in a fresh transaction.
+
+	MariaDB can refuse a locking read if a row changed after the transaction's snapshot
+	(error 1020, exposed as QueryDeadlockError by Frappe). Starting a fresh transaction
+	before the step lets the next attempt see the other call's committed changes.
+	"""
 	for attempt in range(3):
 		frappe.db.commit()
 		try:

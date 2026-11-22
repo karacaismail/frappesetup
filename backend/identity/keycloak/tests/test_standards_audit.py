@@ -202,9 +202,12 @@ class LocalRequestTest(unittest.TestCase):
 
         class Redirect(BaseHTTPRequestHandler):
             def do_POST(self):
+                # Closing the socket with unread POST data can reset the connection.
+                self.rfile.read(int(self.headers["Content-Length"]))
                 calls.append(self.path)
                 self.send_response(303)
                 self.send_header("Location", "/redirected")
+                self.send_header("Content-Length", "0")
                 self.end_headers()
 
             def do_GET(self):
@@ -223,6 +226,7 @@ class LocalRequestTest(unittest.TestCase):
                 with mock.patch.dict(os.environ, {"KC_PORT": str(port)}, clear=True):
                     result = request("POST", f"http://127.0.0.1:{port}/token", form={"client_secret": "dummy"})
                 self.assertEqual(result.status, 303)
+                self.assertEqual(result.headers["Location"], "/redirected")
                 self.assertEqual(calls, ["/token"])
             finally:
                 server.shutdown()

@@ -3,6 +3,7 @@
 Beklenen değerler docs/sozlesmeler.md 2. bölümünden ve görev belgesinden alındı.
 """
 
+import hashlib
 import re
 import unittest
 
@@ -182,15 +183,36 @@ class RealmFileTest(unittest.TestCase):
         self.assertTrue(request_body.endswith(b"\n"))
         self.assertGreater(request_body.count(b"\n"), 100)
 
+    def test_password_list_has_no_email_shaped_entries(self):
+        # The repository is public. An "@" followed by a domain may be a real address.
+        email_shaped = re.compile(r"@[^@\s]+\.[A-Za-z]{2,}")
+        lines = PASSWORD_LIST.read_text(encoding="utf-8").splitlines()
+        found = [number for number, line in enumerate(lines, 1) if email_shaped.search(line)]
+        self.assertEqual(found, [], "email-shaped entries at these line numbers")
+
+    def test_password_list_matches_digest_in_source_note(self):
+        # SOURCE.md pins the reviewed list. Any edit to the list must update the note.
+        note = (PASSWORD_LIST.parent / "SOURCE.md").read_text(encoding="utf-8")
+        pinned = re.search(r"SHA-256 özeti `([0-9a-f]{64})`", note)
+        self.assertIsNotNone(pinned, "SOURCE.md must pin the list digest")
+        self.assertEqual(hashlib.sha256(PASSWORD_LIST.read_bytes()).hexdigest(), pinned.group(1))
+
 
 class ComposeFileTest(unittest.TestCase):
     def test_image_tag_is_unique_per_pane(self):
-        # Parallel Panes build the same image. The tag must include the Pane port (KC_PORT = PANE_PORT).
+        # Shared stacks use the worktree namespace. Standalone runs use the Pane port.
         compose = (DIRECTORY.parents[1] / "dev" / "compose.keycloak.yaml").read_text(encoding="utf-8")
-        self.assertRegex(compose, r"image: fs-keycloak-atonota:dev-\$\{KC_PORT:\?\}")
+        self.assertIn("    image: fs-keycloak-atonota:dev-${FS_STACK_IMAGE_TAG:-${KC_PORT:?}}", compose.splitlines())
+        self.assertIn("    image: fs-kimlik-realm-event-sink:${FS_STACK_IMAGE_TAG:-dev}", compose.splitlines())
 
 
 class ExampleUserTest(unittest.TestCase):
+    def test_imported_users_receive_the_same_default_role_as_new_users(self):
+        default_role = read_realm()["defaultRole"]["name"]
+        for user in read_users()["users"]:
+            with self.subTest(username=user["username"]):
+                self.assertEqual(user.get("realmRoles"), [default_role])
+
     def test_example_users_are_in_separate_file_with_example_test_domain(self):
         request_body = read_users()
         self.assertEqual(request_body["realm"], "platform")
