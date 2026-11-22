@@ -1,5 +1,9 @@
-# Yalnız realm klasörü imaja girer.
+# Yalnız realm ve tema klasörleri imaja girer.
 *
 !realm/
 !realm/**
+!themes/
+!themes/**
+themes/**/*.md
+themes/atonota/test/
 .env

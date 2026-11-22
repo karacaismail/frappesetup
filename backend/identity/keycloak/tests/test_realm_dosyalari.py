@@ -31,8 +31,10 @@ class RealmDosyasiTesti(unittest.TestCase):
         self.assertEqual(self.realm["defaultLocale"], "tr")
         self.assertEqual(set(self.realm["supportedLocales"]), {"tr", "en"})
 
-    def test_giris_temasi_bu_turda_keycloak_v2(self):
-        self.assertEqual(self.realm["loginTheme"], "keycloak.v2")
+    def test_giris_ve_eposta_temasi_atonota(self):
+        # Sözleşme 2. bölüm: giriş ve e-posta teması atonota adını taşır. Tema kimlik-tema işinden gelir.
+        self.assertEqual(self.realm["loginTheme"], "atonota")
+        self.assertEqual(self.realm["emailTheme"], "atonota")
 
     def test_istemciler_var(self):
         self.assertTrue(ISTEMCILER <= set(self.istemciler), set(self.istemciler))

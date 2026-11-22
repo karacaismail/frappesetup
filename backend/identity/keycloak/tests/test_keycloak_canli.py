@@ -104,7 +104,8 @@ class RealmAyarlariTesti(unittest.TestCase):
         self.assertEqual(r["displayName"], "Atonota")
         self.assertEqual(r["defaultLocale"], "tr")
         self.assertEqual(set(r["supportedLocales"]), {"tr", "en"})
-        self.assertEqual(r["loginTheme"], "keycloak.v2")
+        self.assertEqual(r["loginTheme"], "atonota")
+        self.assertEqual(r["emailTheme"], "atonota")
 
     def test_g78_politikalari_yuklendi(self):
         r = self.realm

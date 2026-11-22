@@ -12,6 +12,8 @@ ADD --checksum=sha256:4091dee2a1ec9e0771bef4bd46005197d86b0a2b1f25198c41738476b1
     /opt/keycloak/providers/apple-identity-provider-1.17.0.jar
 COPY --chown=1000:0 realm/platform-realm.json /opt/keycloak/data/import/platform-realm.json
 COPY --chown=1000:0 realm/password-blacklists/yaygin-parolalar.txt /opt/keycloak/data/password-blacklists/yaygin-parolalar.txt
+# Temalar (themes/OKUBENI.md). atonota teması kimlik-tema işinindir. test klasörü .dockerignore ile dışarıda kalır.
+COPY --chown=1000:0 themes/ /opt/keycloak/themes/
 
 # Geliştirme hedefi örnek kullanıcıları da taşır. Üretim imajı prod hedefinden alınır.
 FROM prod AS dev

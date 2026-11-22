@@ -11,10 +11,10 @@
     "en"
   ],
   "defaultLocale": "tr",
-  "loginTheme": "keycloak.v2",
+  "loginTheme": "atonota",
   "accountTheme": "keycloak.v3",
   "adminTheme": "keycloak.v2",
-  "emailTheme": "keycloak",
+  "emailTheme": "atonota",
   "registrationAllowed": true,
   "registrationEmailAsUsername": true,
   "loginWithEmailAllowed": true,
