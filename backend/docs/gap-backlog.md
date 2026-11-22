@@ -27,7 +27,7 @@ Kurallar şunlardır:
 
 1. Kapandı. `auth_hooks` telefon belirtecini doğrular. `test_mobile_identity.py` geçerli ve geçersiz belirteçleri sınar.
 2. Kapandı. `/login` sayfası Atonota girişini gösterir. `start_login` GET ucu OpenAPI sözleşmesinde ve `test_login_page.py` testinde yer alır.
-3. Frappe oturum süresi 1 saat boşta kalma olsun (O-25).
+3. Kapandı. Frappe oturumu bir saat boşta kalınca sona erer. `test_session_policy.py` süreyi ve sona eren oturumu sınar.
 4. Kimlik bağı DocType'ı `ai_write_closed_doctypes` kancasına girsin (O-28).
 5. Sözleşmedeki insan uçlarına 401 yanıtı eklensin (SZ-8).
 6. `oidc_verify` bağımlılığı `pyproject.toml` dosyasında yazılsın.
