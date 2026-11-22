@@ -105,6 +105,20 @@ Keycloak çıkışta `logout_token` gönderir. Doğrulamada şunları denetleyin
 - `sid` ya da `sub` değerinin varlığı,
 - `nonce` alanının yokluğu.
 
+### Telefon kimliği
+
+Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_identity` değerini yazar. Değer şu alanları taşıyan bir sözlüktür:
+
+| Alan | Tür | Not |
+| --- | --- | --- |
+| `account` | metin | Frappe kullanıcısının adı |
+| `scope` | metin | Her zaman `mobile` |
+| `site` | metin | İsteğin geldiği site |
+| `installation` | metin | Telefon kurulumunun kimliği |
+| `sid` | metin | Keycloak oturum kimliği |
+
+Kabuk ve mobil modülü bu değeri okur. Değer yoksa ya da biçimi tutmazsa istek telefon isteği sayılmaz.
+
 ### Kitaplığın arayüzü
 
 `press_tr` ve `platform_core` kitaplığı aynı anda kullanacak. Bu yüzden arayüz önceden belirlendi. Kitaplık Python 3.11 ve sonrasında çalışır. Frappe 16 Python 3.14 kullanır. Kitaplık Frappe'ye bağlı değildir.
@@ -170,6 +184,15 @@ Adres biçimi `/api/method/<yol>` olur.
 - `kimlik_yalniz_keycloak` ayarı açıkken Frappe'nin yerel giriş işlevleri kapanır. Kapatma adrese değil, çağrılan işleve uygulanır. `override_whitelisted_methods` kancası kullanılır. Kapsam şudur: parola girişi, parola sıfırlama ve güncelleme, e-posta bağlantısıyla giriş ve hazır sosyal giriş uçları. `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi 403 alır.
 - Yönetici kurtarma yolu yalnız site ayarıyla açılır. Ayarı sunucuya erişen yönetici yazar. Yol README'de anlatılır.
 - `/panel` sayfası `platform_core/www/` altında durur. Sayfa CSRF belirtecini taşır (G-45). Sahibi platform-core-kabuk işidir.
+
+### Website User için yöntem izin listesi
+
+- Website User yalnız izin listesindeki yöntemleri çağırabilir. Öteki her yöntem 403 döner. Kural `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsine uygulanır.
+- Denetim adrese değil, Frappe'nin çözdüğü işleve uygulanır. Böylece takma yol da aynı kurala takılır.
+- Liste `website_user_allowed_methods` kancasından gelir. Her uygulama yalnız kendi yöntemlerini ekler. Örneğin `platform_core.api.shell.get_bootstrap` ve `platform_core.api.meta.get_doctype` bu listededir.
+- Frappe'nin yöntemlerinden yalnız şunlar listededir: `frappe.auth.get_logged_user`, `logout` ve kurallı aramayı saran `frappe.desk.search.search_link`. Yeni bir Frappe yöntemi listeye ancak testle girer.
+- REST kayıt uçları (`/api/resource`, `/api/v2/document`) bu kuralın dışındadır. Bu uçlar Frappe'nin kayıt izinleriyle ve erişim kuralı motoruyla denetlenir.
+- Sahibi platform-core-kabuk işidir. Masaüstü kullanıcısı bu kuraldan etkilenmez.
 - `api/__init__.py`, `api/auth.py` ve `api/identity.py` dosyaları platform-core-kimlik işinindir.
 - `api/shell.py` ve `api/meta.py` dosyaları platform-core-kabuk işinindir.
 - Uç dosyası ince kalır. İş kuralı modül klasöründe durur.
@@ -227,6 +250,14 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Aynı `remove_team_member` isteği iki kez gelirse ikinci istek de 200 döner ve bir şey değiştirmez.
 - Takım adı istekte gelmez. Takım adını Press üretir.
 
+### Press kullanıcısını anonim yapma
+
+- `anonymize_user` isteği `issuer` ve `subject` alanlarını taşır. İki alan da zorunludur.
+- İş geri alınamaz. Uç bunu açıklamasında yazar.
+- Yanıt 200 döner ve `anonymized` ile `found` alanlarını taşır. Kimlik bulunamazsa `found: false` olur. Tekrar çağrı aynı yanıtı alır.
+- Kilit çakışması ya da zaman aşımı 409 döner. identity-sync isteği yeniden dener.
+- Anonim yapma kuralları 7. bölümdeki ortak kurallardır.
+
 - Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
 - G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
 - Press'te misafir için izin listesi uygulanır. Misafir yalnız listedeki yöntemleri çağırabilir. Liste şudur: `ping`, `press_tr.api.auth.get_login_url`, `press_tr.api.auth.keycloak_callback`, `press_tr.api.keycloak_backchannel_logout`. Öteki bütün yöntemler misafire 403 döner.
@@ -248,15 +279,38 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Her işlem tekrar edilebilir olmalıdır. Aynı olay iki kez gelirse sonuç değişmez.
 - Başarısız olay ayrı kuyrukta bekler.
 - Mutabakat elle başlatılan bir komuttur. Komut farkları raporlar.
-- `POST /v1/sessions/revoke` ucu bir Keycloak oturumunu kapatır. Gövde `{"sid": "<oturum kimliği>"}` olur. Ucu yalnız `platform_core` servis belirteci çağırır. identity-sync, Keycloak Admin API ile o oturumu siler. Oturum silinince yenileme belirteci de geçersiz olur. Uç tekrar edilebilir: kapalı oturum için de 200 döner.
+- `POST /v1/sessions/revoke` ucu bir Keycloak oturumunu kapatır. Gövde `{"sid": "<oturum kimliği>", "subject": "<kullanıcı>"}` olur. Ucu yalnız `platform_core` servis belirteci çağırır. identity-sync önce oturumun bu kullanıcıya ait olduğunu Keycloak Admin API'den doğrular. Sonra kullanıcının çağıran kiracının kuruluşuna üye olduğunu doğrular. Kiracı, belirtecin `azp` değerinden kiracı listesiyle bulunur. Doğrulama tutmazsa uç 403 döner. identity-sync, Keycloak Admin API ile o oturumu siler. Oturum silinince yenileme belirteci de geçersiz olur. Uç tekrar edilebilir: kapalı oturum için de 200 döner.
 - Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Kurulum iptal edilince `platform_core` bu ucu çağırır. Aynı `sid` ile gelen belirteç de reddedilir (Proje kaydı O-25).
-- `POST /v1/account-deletions` ucu hesap silme isteğini kaydeder (Proje kaydı O-27). Keycloak'ın hesap silme olayı da aynı akışı başlatır. Akış sırası şudur:
+- `POST /v1/account-deletions` ucu hesap silme isteğini kaydeder (Proje kaydı O-27). Ucu yalnız Press çağırır. Belirteç `azp=press-service` ve `aud=identity-sync` taşır. Gövde `issuer`, `subject` ve `reauthenticated_at` alanlarını taşır.
+- Müşteri silme isteğini Press'te verir. Press önce kullanıcıyı Keycloak'ta yeniden doğrular (`prompt=login`, `max_age=0`). `reauthenticated_at` bu doğrulamanın zamanıdır. identity-sync 300 saniyeden eski doğrulamayı reddeder.
+- Keycloak'ın kendi `delete_account` eylemi kapalıdır. Bu eylem kullanıcıyı ilk adımda siler. Hesap ekranındaki silme bağlantısı Press'teki silme sayfasına gider.
+- Yönetici kullanıcıyı Keycloak yönetim ekranından silerse olay dinleyici olayı gönderir. identity-sync 2., 3. ve 4. adımları yine çalıştırır. Olay kaybolursa elle başlatılan mutabakat komutu silinmiş kullanıcıyı bulur.
+- Akış sırası şudur:
   1. Keycloak kullanıcısı kapanır.
   2. Press kullanıcısı kapanır ve API anahtarları geçersiz olur (`remove_team_member`, `all_organizations: true`).
   3. Kiracı sitelerindeki kullanıcı kapanır. Telefon kurulumları ve bildirim bağları silinir.
   4. Kişiyi gösteren alanlar anonim yapılır. İş kayıtları silinmez.
   5. Keycloak kullanıcısı silinir. İstek kaydı anonim yapılır.
 - Her adım tekrar edilebilir. Bir adım başarısız olursa istek hata kuyruğuna girer ve elle yeniden denenir.
+
+### Anonim yapma kuralları
+
+Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve Press'te (`press_tr.api.identity.anonymize_user`) aynıdır. Kararın kaynağı proje kaydındaki O-27'dir.
+
+1. Silme iki adımdır. Birinci adım hesabı kapatır, oturumları sayfalayarak kapatır, API anahtarlarını iptal eder ve silme durumunu kaydeder. İkinci adım kişisel veriyi anonim yapar. İki adım da tekrar güvenlidir.
+2. Silme kaydı ham kimliği tutmaz. Kayıt `(iss, sub)` çiftinin HMAC-SHA256 özetini tutar. Anahtar site ayarındaki gizli değerdir. Kimlik bağındaki ham `sub` silinir.
+3. Hesap açma, durum değiştirme ve e-posta değiştirme uçları önce silme kaydını denetler. Silinmiş kimlik yeniden açılamaz. Bu uçlar aynı satır kilidini kullanır.
+4. Kapsam Frappe'nin `user_data_fields` kancasından türer. Ek olarak şunlar temizlenir ya da anonim yapılır:
+   - kullanıcıya bağlı “Contact” ve adres kayıtları,
+   - “Activity Log” kayıtlarındaki ad ve IP adresi,
+   - “Version” kayıtlarındaki eski kişisel değerler,
+   - profil fotoğrafı ve kullanıcının yüklediği kişisel dosyalar,
+   - “Communication” ve e-posta kuyruğundaki adresler,
+   - iki adımlı doğrulama anahtarları, varsayılan değer satırları, sosyal giriş ve ek e-posta satırları,
+   - Press'te takımın fatura adı ve telefonu, SSH anahtarları ve sertifikaları.
+5. Frappe'nin tam adı bütün satırlarda arayan değiştirmesi kullanılmaz. Yalnız kullanıcıya bağlı alanlar değişir. Böylece aynı adı taşıyan başka bir kişinin verisi değişmez.
+6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
+7. Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
 - `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır.
 - Hesap silme akışının 3. ve 4. adımı şu uçları çağırır: `platform_core.api.mobile.revoke_user_installations`, `platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user`.
 
@@ -380,6 +434,11 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 | `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
 | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
 | `platform_core.api.ai.purge_logs` | POST | “System Manager” rolü | Saklama süresi dolan günlükleri elle siler. Yıkıcıdır. |
+
+- `list_proposals` yanıtı bir nesnedir: `proposals` ve `has_next_page`. İstek `start` alır. Süzme ve sayfalama veritabanında yapılır.
+- Öneri `created_at` ve `expires_at` taşır. Zaman sitenin saat dilimiyle ve farkıyla ISO 8601 biçiminde döner.
+- Okuma araçlarının sonucu `as_of`, `site` ve `source` taşır. Sonuç sınırı aşarsa `truncated: true` döner. Alt tablo en çok 200 satır, sonuç verisi en çok 262.144 bayttır.
+- Oturumsuz istek 403, süresi dolmuş oturum 401 alır.
 
 ### Genel araçlar
 
