@@ -242,7 +242,36 @@ def _property_value(property: str, value: str | int | bool) -> str:
 	return value
 
 
+def _property_state(doctype: str, fieldname: str, property: str, *, for_update: bool = False) -> list:
+	"""The "Property Setter" rows of one field property: name, value and `modified` of each.
+
+	With `for_update` this is a locking read. It returns the latest committed rows and also locks
+	the gap, so no other transaction can add the first row for this property until this one ends.
+	If the database refuses the lock because a row changed after this transaction's snapshot,
+	the target has changed and the action stops.
+	"""
+	key = {"doc_type": doctype, "field_name": fieldname, "property": property}
+	try:
+		rows = frappe.db.get_values(
+			"Property Setter", key, ["name", "value", "modified"], for_update=for_update, as_dict=True
+		)
+	except frappe.QueryDeadlockError:
+		raise ToolDenied(
+			"document_changed", _("The target changed after the preview.", context=CONTEXT)
+		) from None
+	return sorted([row.name, row.value, str(row.modified)] for row in rows)
+
+
 def preview_field_property(doctype: str, fieldname: str, property: str, value: str | int | bool) -> dict:
+	return _field_property_spec(
+		doctype, fieldname, property, value, _property_state(doctype, fieldname, property)
+	)
+
+
+def _field_property_spec(
+	doctype: str, fieldname: str, property: str, value: str | int | bool, state: list
+) -> dict:
+	"""Build the preview. `state` is the property's stored rows, which the version is made of."""
 	meta = _admin_meta(doctype)
 	if not frappe.has_permission("Property Setter", "create"):
 		raise ToolDenied("permission", _("You may not change field properties.", context=CONTEXT))
@@ -260,7 +289,7 @@ def preview_field_property(doctype: str, fieldname: str, property: str, value: s
 		f"Set {property} of {doctype}.{fieldname}",
 		"Property Setter",
 		f"{doctype}-{fieldname}-{property}",
-		json.dumps(old, default=str),
+		json.dumps({"shown": old, "stored": state}, default=str, sort_keys=True),
 		changes,
 	)
 
@@ -268,16 +297,17 @@ def preview_field_property(doctype: str, fieldname: str, property: str, value: s
 def prepare_field_property(
 	doctype: str, fieldname: str, property: str, value: str | int | bool, expected_version=_UNCHECKED
 ) -> dict:
-	"""Pre-check: lock the real target, then read the value again from a fresh definition."""
-	_admin_meta(doctype)
+	"""Pre-check: read the current property under a lock, then compare it with the approved preview.
+
+	The locking read comes before every plain read. It covers an existing row and the first insert.
+	The compared version is built from the rows of that same locking read.
+	"""
+	state = _property_state(doctype, fieldname, property, for_update=True)
 	new = _property_value(property, value)
 	key = {"doc_type": doctype, "field_name": fieldname, "property": property}
-	existing = frappe.get_list("Property Setter", filters=key, pluck="name", limit_page_length=1)
-	if existing:
-		store.lock_row("Property Setter", existing[0])
 	frappe.clear_cache(doctype=doctype)
-	_verify(preview_field_property(doctype, fieldname, property, value), expected_version)
-	return {"existing": existing[0] if existing else None, "value": new, "key": key}
+	_verify(_field_property_spec(doctype, fieldname, property, value, state), expected_version)
+	return {"existing": state[0][0] if state else None, "value": new, "key": key}
 
 
 def write_field_property(prepared: dict) -> dict:

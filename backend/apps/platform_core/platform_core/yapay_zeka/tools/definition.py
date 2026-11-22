@@ -66,14 +66,8 @@ def get_doctype_schema(doctype: str) -> dict:
 
 
 def _schema(doctype: str, meta, permissions: dict, can_read: set, can_write: set, write_closed: bool) -> dict:
-	# The field list is the large part of a definition. It is cut at the byte limit.
-	described = [
-		_field_schema(field, can_read, can_write)
-		for field in meta.fields
-		if field.fieldtype not in LAYOUT_FIELDTYPES
-	]
-	fields, cut = envelope.fit_rows(described, MAX_RESULT_BYTES)
-	return {
+	# The byte limit covers the whole definition: the head with the description, then the fields.
+	head = {
 		"doctype": doctype,
 		"description": meta.description,
 		"module": meta.module,
@@ -83,9 +77,22 @@ def _schema(doctype: str, meta, permissions: dict, can_read: set, can_write: set
 		"title_field": meta.title_field,
 		"generic_write_tools": "closed" if write_closed else "open",
 		"permissions": permissions,
-		"fields": fields,
-		"truncated": cut,
+		"fields": [],
+		"truncated": False,
 	}
+	cut = False
+	over = envelope.size(head) - MAX_RESULT_BYTES
+	if over > 0:
+		# The description alone is over the limit. It is shortened, so the caller still gets its start.
+		text = head["description"] or ""
+		head["description"], cut = text[: max(0, len(text) - over)], True
+	described = [
+		_field_schema(field, can_read, can_write)
+		for field in meta.fields
+		if field.fieldtype not in LAYOUT_FIELDTYPES
+	]
+	fields, fields_cut = envelope.fit_rows(described, MAX_RESULT_BYTES - envelope.size(head) + 2)
+	return {**head, "fields": fields, "truncated": cut or fields_cut}
 
 
 def _field_schema(field, can_read: set[str], can_write: set[str]) -> dict:

@@ -547,7 +547,14 @@ Codex dördüncü incelemede bir engel, dört önemli ve iki küçük bulgu yazd
 
 Veritabanı MariaDB 11.8.9 sürümüdür. Yalıtım kipi `REPEATABLE-READ` ve `innodb_snapshot_isolation` ayarı açıktır. Bu ayar açıkken veritabanı, anlık görüntüden sonra değişmiş satırı kilitlemeyi reddeder. Katman bu ayara güvenmez ve kilitli okumanın sonucunu kullanır.
 
-Aynı kalıp `tools/admin.py` dosyasında alan ayarı aracında da vardır. Araç “Property Setter” satırını kilitler, sonra önizlemeyi kilitsiz okur. Bu yer bu turda değişmedi. Açık iş olarak 14. bölüme yazıldı.
+### Sekizinci tur: birleştirme öncesi inceleme
+
+Birleştirme öncesi inceleme bir engel, bir önemli ve bir küçük bulgu yazdı. Katman üçünü de düzeltti. Testler `tests/test_merge_review.py` dosyasındadır.
+
+- **Alan ayarı aracı güncel değeri kilit altında okur.** Araç ön denetimde önce “Property Setter” satırlarını kilitli okur. Bu okuma her kilitsiz okumadan önce gelir. Kilit var olan satırı ve ilk eklemeyi birlikte korur. Araç sürümü aynı kilitli okumanın satırlarından üretir. Satır değiştiyse ya da ilk satır eklendiyse sonuç `document_changed` olur.
+- **Veritabanı kilidi reddederse araç durur.** MariaDB, anlık görüntüden sonra değişmiş satırın kilidini reddedebilir. Araç bu hatayı da `document_changed` sayar.
+- **DocType açıklaması bayt sınırına girer.** `get_doctype_schema` önce üst bilgiyi ölçer, sonra alanları kalan yere sığdırır. Açıklama tek başına sınırı aşarsa araç açıklamayı kısaltır ve `truncated` değerini doğru döner.
+- **Çeviri dosyası LF satır sonu kullanır.**
 
 ### Çeviri (O-21 ve O-23)
 
@@ -572,4 +579,4 @@ Son kullanıcı panelde Website User olarak çalışır. Katmanın yedi ucu `web
 - Gerçek bir MCP istemcisiyle oturum açılmadı. Testler istemciyi taklit edecek.
 - Sürecin yürütme ortasında ölmesi testle denenmedi. Bu durumda sonuç `unknown` kalır. Kod okunarak incelendi.
 - GitHub'daki `version-16` dalı 16.60.2 sürümündedir. İmajdaki sürüm 16.56.0'dır. Aradaki fark incelenmedi.
-- Alan ayarı aracı “Property Setter” satırını kilitledikten sonra önizlemeyi kilitsiz okur. Tekrarlanabilir okuma kipindeki eski okuma olasılığı bu araçta testle denenmedi.
+- Alan ayarı aracının kilidi yalnız “Property Setter” satırlarını korur. Alanın kendi tanımı aynı anda değişirse araç bunu kilitle görmez. Bu durum testle denenmedi.
