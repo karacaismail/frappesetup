@@ -4,9 +4,15 @@ nav: "Ölçüm ve gözlem"
 order: 12
 ---
 
-Bu sayfa tasarım sözleşmesidir; adapterlar ve rıza kapısı henüz uygulanmadı ve test edilmedi.
+Bu sayfa tasarımı anlatır. Ekip adapterları ve rıza denetimini henüz uygulamadı veya test etmedi.
 
-Google Tag Manager (GTM), Google Analytics 4 (GA4), Google Ads, Yandex Metrica, Meta Pixel, Criteo, AdRoll ve Metabase platformda varsayılan olarak hazır ve **etkindir**: kod, kayıt ve olay eşlemesi her sürümle gelir ve kapatılmaz. **Etkin olmak veri aktarmak değildir:** satıcıya ilk istek ancak yapılandırma ve yetki, ilgili amaç için rıza veya kayıtlı hukuki dayanak, izin veren origin sınıfı ve hassas olmayan yüzey birlikte sağlanınca çıkar. **Tek güven kuralı:** oturum çerezi ya da belirteç basan uç barındıran origin'lerde (`panel.`, kiracının kayıtlı origin'leri (G-119), `operator.`, `ops.`, `press.`, `api.login.atonota.net`) satıcı JS'i, oturum kaydı ve kiracı GTM'i yüklenmez; bu origin'lerde satıcıya aktarım yalnız birinci taraf toplayıcıdan rızalı sunucu olayıyla yapılır. Satıcı tarayıcı SDK'sı yalnız oturumsuz public origin'de yüklenir (pazarlama sitesi; Webshop vitrini yalnız ayrı oturumsuz origin'den sunulursa, K-11). Origin sınıfı yalnız teslim biçimini (tarayıcı SDK'sı ya da sunucu olayı) seçer; yapılandırma ve rıza kapıları aynıdır. Sunucu olayı arayüzü adapter başına bildirilir (Meta Conversions API; diğerleri doğrulanacak); arayüzü olmayan satıcıya oturumlu origin'den aktarım yoktur (G-134). Plan: adapter çerçevesi ve yedi tarayıcı adapteri P2 (G-134, G-135), Metabase P6 (G-136), birinci taraf RUM P1 (G-149), log, metrik ve iz P0 (G-113). Bu çalışma gerçek bir analitik veya reklam hesabı bağlamaz, veri aktarmaz ve bunlara yetki vermez; testler sahte uç noktalarla koşar. Kampanya parametrelerinin yakalanması, korunması, temizlenmesi ve kanonik adres kuralı [URL ve paylaşım](/frappesetup/paylasim-url/) sayfasındadır (G-133).
+Yedi tarayıcı adapteri ve Metabase her sürümde açık kalır. Kod, kayıt ve olay eşlemesi sürümle gelir. Satıcıya ilk istek için aşağıdaki dört kapı da geçilir.
+
+Oturum çerezi veya belirteç üreten adreslerde satıcı betiği, oturum kaydı ve kiracı GTM'i yüklenmez. Bu kural `panel.`, `operator.`, `ops.`, `press.`, `api.login.atonota.net` ve kayıtlı kiracı adresleri (G-119) için geçerlidir. Rıza varsa kendi toplayıcımız sunucu olayı gönderir. Adapter, sunucu arayüzünü bildirir. Meta, Conversions API kullanır. Diğer arayüzler doğrulanacak. Sunucu arayüzü yoksa aktarım yapılmaz (G-134).
+
+Satıcı SDK'sı yalnız oturumsuz, herkese açık adreslerde yüklenir. Pazarlama sitesi bu kapsamdadır. Webshop vitrini için ayrı oturumsuz adres gerekir (K-11). Adres aktarım biçimini belirler. Yapılandırma ve rıza koşulları iki biçimde de geçerlidir.
+
+Plan log, metrik ve iz için P0 (G-113), birinci taraf RUM için P1 (G-149) öngörür. Adapter çerçevesi ve yedi tarayıcı adapteri P2 kapsamındadır (G-134, G-135). Metabase P6 kapsamındadır (G-136). Çalışma gerçek analitik veya reklam hesabı bağlamaz, veri aktarmaz ve bunlara yetki vermez. Testler sahte uç noktalar kullanır. Kampanya parametrelerini alma, koruma ve temizleme ile kanonik adres kuralları [URL ve paylaşım](/frappesetup/paylasim-url/) sayfasındadır (G-133).
 
 ## Roller: kim neyi ölçer
 

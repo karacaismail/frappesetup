@@ -1472,7 +1472,7 @@
  {
   "id": "G-148",
   "title": "Tarayıcı belirteç modeli: BFF ve kısa ömürlü aracı belirteçleri",
-  "detail": "Önerilen teknik varsayım (K-25): tarayıcı kalıcı erişim veya yenileme belirteci tutmaz. Frappe siteleri OIDC kodunu sunucuda alır (G-12, G-44) ve HttpOnly oturum + CSRF ile çalışır; agent servisi ve Hocuspocus için kiracı sitesi (platform_core) oturumdan tek amaçlı, kısa ömürlü (dakikalar), audience'ı tek servise ve tek siteye bağlı, `jti`'li bir aracı belirteci basar; belirteç yalnız bellekte tutulur, yeniden kullanımı ve kapsam dışı kullanımı sunucuda reddedilir. Press ticari araçları için Press OAuth belirteci agent servisinde kalır (G-28). Kabul: tarayıcı depolamasında belirteç yok; süresi dolan veya başka siteye sunulan belirteç reddedilir; oturum kapanınca yeni belirteç basılmaz.",
+  "detail": "Önerilen teknik varsayım (K-25): tarayıcı kalıcı erişim veya yenileme belirteci tutmaz. Frappe siteleri OIDC kodunu sunucuda alır (G-12, G-44) ve HttpOnly oturum + CSRF ile çalışır; agent servisi ve Hocuspocus için kiracı sitesi (`platform_core`) oturumdan tek amaçlı, kısa ömürlü (dakikalar), audience'ı tek servise ve tek siteye bağlı, `jti`'li bir aracı belirteci basar; belirteç yalnız bellekte tutulur, yeniden kullanımı ve kapsam dışı kullanımı sunucuda reddedilir. Press ticari araçları için Press OAuth belirteci agent servisinde kalır (G-28). Kabul: tarayıcı depolamasında belirteç yok; süresi dolan veya başka siteye sunulan belirteç reddedilir; oturum kapanınca yeni belirteç basılmaz.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P1",
@@ -1682,7 +1682,7 @@
  {
   "id": "SA-15",
   "title": "AI kredi ölçümü: AI Credit Plan ve Agent servisinden Usage Record",
-  "detail": "Ajan servisi ücretli çağrıları Press Usage Record kaydına yazar. Servis System User hesabıyla yazar. AI Credit Plan fiyatı birim başına TRY olarak belirlenir. Balance Transaction kaynağı AI Consumption olur. Servis tur başında tahmini üst tutarı ayırır. Tur kimliği aynı tutarın ikinci kez ayrılmasını önler. Servis gerçek tutarı düşer ve artanı bırakır. Satır kilidi veya koşullu güncelleme aynı bakiyenin iki kez harcanmasını önler. Zaman aşımında ayrılan tutar bırakılır. Tekrar teslim çift fatura çıkarmaz. Servis tutarı ayırmadan önce Team.get_balance ve apply_limits/spending_limit değerlerini denetler. Bakiye yetersizse ücretli araçlar kilitlenir. Ücretli yazma işlemleri öneri, önizleme ve insan onayı gerektirir. Kullanıcı panelde receive_budget_alerts ayarını değiştirebilir. Testler eşzamanlı çağrıyı, zaman aşımını ve tekrar teslimi sınar. AI Credit Plan, Plan kaydının alt sınıfıdır ve `price_try/unit` değerini taşır. Press Usage Record içinde `plan_type=AI Credit Plan` ve `interval=Daily` kullanılır.",
+  "detail": "Ajan servisi ücretli çağrıları Press Usage Record kaydına yazar. Servis System User hesabıyla yazar. AI Credit Plan fiyatı birim başına TRY olarak belirlenir. Balance Transaction kaynağı AI Consumption olur. Servis tur başında tahmini üst tutarı ayırır. Tur kimliği aynı tutarın ikinci kez ayrılmasını önler. Servis gerçek tutarı düşer ve artanı bırakır. Satır kilidi veya koşullu güncelleme aynı bakiyenin iki kez harcanmasını önler. Zaman aşımında ayrılan tutar bırakılır. Tekrar teslim çift fatura çıkarmaz. Servis tutarı ayırmadan önce Team.get_balance ve `apply_limits`/`spending_limit` değerlerini denetler. Bakiye yetersizse ücretli araçlar kilitlenir. Ücretli yazma işlemleri öneri, önizleme ve insan onayı gerektirir. Kullanıcı panelde `receive_budget_alerts` ayarını değiştirebilir. Testler eşzamanlı çağrıyı, zaman aşımını ve tekrar teslimi sınar. AI Credit Plan, Plan kaydının alt sınıfıdır ve `price_try/unit` değerini taşır. Press Usage Record içinde `plan_type=AI Credit Plan` ve `interval=Daily` kullanılır.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P3",
@@ -1862,7 +1862,7 @@
  {
   "id": "SA-33",
   "title": "iyzico hak ediş mutabakatı ve elle başlatılan mutabakat raporu",
-  "detail": "Operatör SFTP rapor çekimini ve mutabakatı elle başlatır (D-6). Ödeme ve kesim raporu report.iyzipay.com üzerinden alınır. Operatör hak edişi ödeme döngüsünde elle alır. Sistem Iyzico Settlement Line ve komisyon düşülmüş Payment Entry oluşturur. Hak ediş toplamını Bank Transaction ile eşler. conversationId Press faturasını bulur. Mutabakat ödenmiş Press faturasıyla Sales Invoice kaydını karşılaştırır. Kredi hareketi ödeme veya avansla, iyzico ödemesi hak edişle karşılaştırılır. Farklar Error Log ve panelde görünür. BillingAudit kontrolleri korunur.",
+  "detail": "Operatör SFTP rapor çekimini ve mutabakatı elle başlatır (D-6). Ödeme ve kesim raporu `report.iyzipay.com` üzerinden alınır. Operatör hak edişi ödeme döngüsünde elle alır. Sistem Iyzico Settlement Line ve komisyon düşülmüş Payment Entry oluşturur. Hak ediş toplamını Bank Transaction ile eşler. conversationId Press faturasını bulur. Mutabakat ödenmiş Press faturasıyla Sales Invoice kaydını karşılaştırır. Kredi hareketi ödeme veya avansla, iyzico ödemesi hak edişle karşılaştırılır. Farklar Error Log ve panelde görünür. BillingAudit kontrolleri korunur.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
