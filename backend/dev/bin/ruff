@@ -1,0 +1,9 @@
+#!/bin/bash
+set -euo pipefail
+DEV_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+# Build copies the current checkout; existing containers may still contain old code.
+"$DEV_DIR/bin/compose" build kiraci-web
+"$DEV_DIR/bin/compose" run --rm --no-deps kiraci-web env/bin/ruff check apps/platform_core
+"$DEV_DIR/bin/compose" run --rm --no-deps kiraci-web env/bin/ruff format --check apps/platform_core
+"$DEV_DIR/bin/compose" run --rm --no-deps kiraci-web env/bin/ruff check /workspace/dev
+"$DEV_DIR/bin/compose" run --rm --no-deps kiraci-web env/bin/ruff format --check /workspace/dev

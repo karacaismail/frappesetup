@@ -410,10 +410,13 @@ Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinde
 - Bağlantı denetimi ücretli bir çağrıdır. Bu yüzden ücretli işaretini taşır.
 - Mesaj içeriği varsayılan olarak günlüğe yazılmaz.
 - Yol kaydının veri kısıtı, model çağrısından önce veri seçimini ve maskelemeyi ister (G-90).
+- Dış sağlayıcıya giden içerik her zaman maskelenir. Yolun veri kısıtını “AI Manager” rolü seçer. Kısıt `masked` ise maskelenmiş içerik dış sağlayıcıya gidebilir. Ayrıca içerik bazında ön onay istenmez.
+- Aracı belirteci model ucunda geçmez. Aracı modele `yapay_zeka` katmanı üzerinden ulaşır. Bu katman `model_gecidi` modülünün açık işlevini çağırır. Böylece belirtecin biçimi tek yerde, `yapay_zeka` modülünde kalır.
+- `model_gecidi` modülünün açık çağrı işlevi arka plan işinde de çalışır. İşlev o anki kullanıcının yetkisini denetler. Misafir kullanıcı çağıramaz.
 
 ### Uç
 
 | Yol | Yöntem | Kimlik | İşi |
 | --- | --- | --- | --- |
-| `platform_core.api.model.complete` | POST | Oturum ya da aracı belirteci | Ortak çağrıyı yapar. Yetki ve kota denetlenir. |
+| `platform_core.api.model.complete` | POST | İnsan oturumu ya da API anahtarı | Ortak çağrıyı yapar. Yetki ve kota denetlenir. |
 | `platform_core.api.model.test_api` | POST | “AI Manager” rolü | Bir API'ye küçük deneme çağrısı yapar. Ücretlidir. |
