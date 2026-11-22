@@ -2,6 +2,8 @@
 
 from http.cookies import SimpleCookie
 
+import frappe
+
 from platform_core.tests.shell_http_fixture import DESK, ShellHTTPFixture
 
 BOOTSTRAP = "/api/method/platform_core.api.shell.get_bootstrap"
@@ -38,9 +40,6 @@ class TestShellResponseHeaders(ShellHTTPFixture):
 		self.assert_security_headers(headers)
 
 	def test_headers_on_guest_page_redirect_and_denial(self):
-		status, headers, _unused_body = self.request("/", response_header_type=list)
-		self.assertIn(status, (200, 302))
-		self.assert_security_headers(headers)
 		for path, expected in (("/login", 200), ("/panel", 302), (BOOTSTRAP, 403)):
 			with self.subTest(path=path):
 				status, headers, _unused_body = self.request(path, response_header_type=list)
@@ -49,6 +48,32 @@ class TestShellResponseHeaders(ShellHTTPFixture):
 					self.assert_security_headers(headers, LOGIN_POLICY, "DENY")
 				else:
 					self.assert_security_headers(headers)
+
+	def test_login_aliases_have_strict_headers(self):
+		for path in ("/login.html", "//login", "/login%20"):
+			with self.subTest(path=path):
+				status, headers, body = self.request(path, response_header_type=list)
+				self.assertEqual(status, 200)
+				self.assertIn(b'data-page="platform-core-login"', body)
+				self.assert_security_headers(headers, LOGIN_POLICY, "DENY")
+
+	def test_login_home_page_has_strict_headers(self):
+		settings = "Website Settings"
+		home_page = frappe.db.get_single_value(settings, "home_page")
+		try:
+			frappe.db.set_single_value(settings, "home_page", "login")
+			frappe.db.commit()
+			frappe.cache.delete_value("home_page")
+			for path in ("/", "/index"):
+				with self.subTest(path=path):
+					status, headers, body = self.request(path, response_header_type=list)
+					self.assertEqual(status, 200)
+					self.assertIn(b'data-page="platform-core-login"', body)
+					self.assert_security_headers(headers, LOGIN_POLICY, "DENY")
+		finally:
+			frappe.db.set_single_value(settings, "home_page", home_page)
+			frappe.db.commit()
+			frappe.cache.delete_value("home_page")
 
 	def test_authenticated_login_redirect_has_strict_headers(self):
 		status, headers, _unused_body = self.request(

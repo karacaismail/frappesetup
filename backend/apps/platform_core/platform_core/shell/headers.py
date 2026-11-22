@@ -19,8 +19,9 @@ def add_security_headers(response: Response | None, request: Request | None = No
 
 	# Frappe applies pending endpoint headers after the after_request hooks.
 	pending = frappe.local.response_headers
-	# The tenant login override loads its script and styles from the same origin.
-	is_login = request is not None and request.path.rstrip("/") == "/login"
+	# Frappe can resolve the site home page to the tenant login template.
+	request_path = request.path.strip("/ ").removesuffix(".html") if request is not None else ""
+	is_login = getattr(frappe.local, "path", None) == "login" or request_path == "login"
 	headers = {
 		**SECURITY_HEADERS,
 		"Content-Security-Policy": STRICT_CSP if is_login else BASE_CSP,
