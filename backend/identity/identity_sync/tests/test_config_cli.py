@@ -24,7 +24,7 @@ def environment(keycloak: str, press: str, tenant: str, db: str) -> dict[str, st
         "IDENTITY_SYNC_TENANTS": json.dumps([{"name": "kiraci1", "base_url": tenant, "organization": "kiraci1"}]),
         "IDENTITY_SYNC_WEBHOOK_SECRET": "test-webhook-secret",
         "IDENTITY_SYNC_DB": db,
-        "IDENTITY_SYNC_DIGEST_KEY": "test-digest-key-0123456789",
+        "IDENTITY_SYNC_DIGEST_KEY": fakes.DIGEST_KEY,
         "IDENTITY_SYNC_REALM_ID": fakes.REALM_ID,
         "IDENTITY_SYNC_EXECUTE_AZP": "site-kiraci1-service",
         "IDENTITY_SYNC_PREVIEW_AZP": "ai-agent, ops-bff",
@@ -70,7 +70,7 @@ class ConfigTest(unittest.TestCase):
         self.assertIn("IDENTITY_SYNC_DIGEST_KEY", str(caught.exception))
         with self.assertRaises(ConfigError):
             load_settings({**self.ENV, "IDENTITY_SYNC_DIGEST_KEY": "kisa"})
-        self.assertNotIn("test-digest-key", repr(load_settings(self.ENV)))
+        self.assertNotIn(fakes.DIGEST_KEY, repr(load_settings(self.ENV)))
 
     def test_client_cannot_be_in_both_lists(self) -> None:
         with self.assertRaises(ConfigError):

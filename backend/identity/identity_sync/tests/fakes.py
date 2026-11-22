@@ -6,6 +6,7 @@ Sunucu Keycloak, Press ve kiracı sitesi yerine geçer. Gelen her isteği kayded
 from __future__ import annotations
 
 import json
+import secrets
 import threading
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -284,6 +285,8 @@ TENANT_ANONYMIZE = "/api/method/platform_core.api.identity.anonymize_user"
 PRESS_ANONYMIZE = "/api/method/press_tr.api.identity.anonymize_user"
 ANONYMOUS = "anonymized"
 WEBHOOK_SECRET = "test-webhook-secret"
+# Made at run time, so no key-shaped constant sits in the repository. One value per test run.
+DIGEST_KEY = secrets.token_hex(16)
 # Sentinel: passing DONE to FakeSite.on() restores the site's own contract behaviour for that path.
 DONE = (-1, None)
 # The server reads the request, then closes the connection without answering.
@@ -561,7 +564,7 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
         webhook_secret=WEBHOOK_SECRET,
         db_path=db_path,
         admin_scope=ADMIN_SCOPE,
-        digest_key="test-digest-key-0123456789",
+        digest_key=DIGEST_KEY,
         http_timeout=5.0,
         realm_id=REALM_ID,
         # docs/sozlesmeler.md, section 7: both lists hold the service clients of the configured tenants.
