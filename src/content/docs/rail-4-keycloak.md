@@ -183,3 +183,37 @@ Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse
 | Realm/client/Organization tanımları realm JSON + identity-sync kodunda sürümlü | platform ekibi |
 
 **Kabul (P0/P1/P2):** Keycloak HA ve public host'ta yönetim uçlarının kapalı olması (P0); Keycloak ile Press'e giriş ve `(iss, sub)` eşleme testleri (P1); özel alan adında giriş-çıkış (P2, G-124); test kiracısında etkileşimsiz SSO; panel çıkışı sonrası Keycloak account console'da oturum yok; 'Sign out all sessions' sonrası Frappe 60 sn içinde 401; davet edilen kullanıcı tek hesapla panel, Press ve kiracı sitede oturum açar; e-posta değişikliği yalnızca identity-sync yoluyla; bir Keycloak düğümü kapatıldığında giriş kesintisiz.
+
+## Oturum süreleri
+
+| Ayar | Kiracı ve telefon | Press |
+| --- | --- | --- |
+| Boşta kalma sınırı | 1 saat | 7 gün |
+| Toplam oturum süresi | 24 saat | 30 gün |
+| Erişim belirteci süresi | 5 dakika | 5 dakika |
+
+Telefon uygulaması arka plandayken çalışan için 2 dakika sonra kilitlenir. Müşteri için bu süre 5 dakikadır.
+
+Telefona kurulan uygulama çevrimdışı erişimi çalışan için 24 saat açık tutar. Müşteri için bu süre 72 saattir. Tarayıcıdan kurulan uygulama çalışan için 8 saat çevrimdışı erişim verir. Müşteri için bu süre 24 saattir. Uygulama çıkıştan sonra taslakları 7 gün saklar.
+
+**Kaynak:** Proje kaydı O-25 ve sözleşme 2. bölüm.
+
+## Hesap silme
+
+Müşteri deneme kaydında hesabını açabilir. Çalışan hesabını davetle açar. Hesap silme ilk sürümün kapsamındadır.
+
+1. Müşteri Press'te silme isteği verir. Keycloak'taki silme bağlantısı bu sayfaya gider. Keycloak'ın kendi hesap silme eylemi kapalıdır.
+2. Press, müşteriyi Keycloak'ta yeniden doğrular. identity-sync, 5 dakikadan eski doğrulamayı reddeder.
+3. identity-sync isteği kaydeder ve Keycloak hesabını kapatır.
+4. identity-sync Press hesabını kapatır. API anahtarları geçersiz olur.
+5. identity-sync kiracı hesaplarını kapatır. Telefon kurulumları ve bildirim bağları silinir.
+6. Sistem iş kayıtlarındaki kişiyi gösteren alanları anonim yapar. Örneğin izin talebi kalır, çalışanın adı silinir. Faturalar kesildikleri hâliyle saklanır.
+7. identity-sync Keycloak hesabını siler. Sistem istek kaydını anonim yapar.
+
+Sistem kimliğin ham değerini siler. Hesabın yeniden açılmasını önlemek için yalnız HMAC özetini saklar. HMAC, gizli anahtarla hesaplanan bir özettir.
+
+Kullanıcı takımın tek üyesiyse sistem takımı kapatır. Sistem siteleri askıya alır ve silmez.
+
+Bir adım başarısız olursa istek hata kuyruğuna girer. Operatör isteği elle yeniden dener. Sistem tamamlanan adımları tekrarlamaz.
+
+**Kaynak:** Proje kaydı O-27 ve sözleşme 7. bölüm.

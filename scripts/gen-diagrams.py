@@ -170,7 +170,7 @@ def rails() -> str:
         "Press kontrol düzlemi (Frappe 16), Rail 2 kiracı ERPNext v16 siteleri ve Rail 6 operasyon sitesi. Oklar: panelden "
         "Press'e press.api ve realtime (panel host'u), kiracıya aynı origin'den /api/v2 ve bootstrap/meta, operasyona customer_360 "
         "ve HD Ticket, AI servisine SSE, Keycloak'a OIDC yönlendirmesi (kod sunucuda değişir); AI servisinden Press'e press.mcp, "
-        "kiracıya site aracı belirteciyle frappe_mcp; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm "
+        "kiracıya site aracı belirteciyle Kiracı MCP; Keycloak'tan Press ve kiracıya Social Login Key, operasyona operatör realm "
         "rolleri. Yatay sözleşmeler: Press→Kiracı site_config sk_app ve Agent Job; Press→Ops create-fc-invoice (press_tr_finance), "
         "delete-fc-team, press_ops_bridge; Ops→Press press_tr.api.ops. Taban bantları: ortak sözleşmeler (host'a bağlı oturum, "
         "has_permission, tasarım tokenları, audit) ve Hetzner bare-metal self-host altyapısı.</desc>",
@@ -205,7 +205,7 @@ def rails() -> str:
     o += arrow(975, 230, 975, 570, "customer_360 · HD Ticket", 965, 280, "end")
     # Satır2 → Satır3 (470..570): etiketler y=498 / y=522
     o += arrow(190, 470, 190, 570, "press.mcp · press_tr.mcp", 200, 498)
-    o += arrow(420, 470, 420, 570, "frappe_mcp (aracı belirteci)", 432, 522)
+    o += arrow(420, 470, 420, 570, "Kiracı MCP (aracı belirteci)", 432, 522)
     o += arrow(650, 470, 650, 570, "Social Login Key · JWKS · SLO", 662, 498)
     o += arrow(880, 470, 880, 570, "operatör realm rolleri", 868, 522, "end")
     # Keycloak → Press (kesikli dirsek)

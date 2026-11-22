@@ -17,7 +17,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | K-5 | App Release onay kapısı (G-14) | Ürün sahibi | `bypass_automated_audit` + otomatik Approved / App Release Approval Request | alpha ve beta'da otomatik, rc ve prod Release Group'ta Approval Request zorunlu | P1 |
 | K-6 | Keycloak teması (G-80) | Teknik varsayım | Keycloakify / FTL | MVP'de kapandı: tema Keycloak'ın kendi tema yapısıyla (FTL) kurulur (backend O-4). Keycloakify, panelin tasarım tokenları hazır olunca yeniden değerlendirilir. Tema Java kodu içermez (G-152). Giriş sayfası ve panelin tokenları bugün iki ayrı dosyadadır. Tek kaynağa geçiş backend borcudur | P1 |
 | K-7 | SMTP relay (G-47) | Ürün sahibi | Hetzner'de Postfix / AB bölgeli sağlayıcı | AB bölgeli sağlayıcı (teslimat itibarı), KVKK envanterine eklenir; kurulum DevOps sorumlusu, DNS değerlerini alan adı sorumlusu uygular | P1 |
-| K-8 | Ürün parametreleri | Ürün sahibi | `rounding_method` (G-41), `session_expiry` 8–24 saat (G-43), `track_views` (G-64), `apply_strict_user_permissions` (G-52) | Banker's Rounding, 12 saat, track\_views yalnızca hassas doctype'larda, strict açık | P1 |
+| K-8 | Ürün parametreleri | Ürün sahibi | `rounding_method` (G-41), `track_views` (G-64), `apply_strict_user_permissions` (G-52) | Banker's Rounding, track\_views yalnızca hassas doctype'larda, strict açık | P1 |
 | K-9 | GİB özel entegratörü ve e-belge kodu (G-22, G-65) | Mali müşavir + ürün sahibi | Hazır Frappe e-belge uygulaması / `tr_edocs` geliştirme; Sovos, Logo, Uyumsoft, eLogo | Entegratör mali müşavirle seçilir; UBL-TR katmanı tek kez yazılır, operasyon sitesi (`press_tr_finance`) ve kiracılar paylaşır | P2 |
 | K-10 | Yurt dışı müşteri ve USD (G-10) | Ürün sahibi | iyzico USD/EUR / AB tüzel kişiliğiyle Stripe | P2'de yalnızca TRY; USD yolu P5 sonrasında ayrı ADR | P2 |
 | K-11 | P5 kararları (G-33, G-109) | Ürün sahibi | Partner programı açılışı; Webshop vitrini Frappe web sayfası / ayrı SSR | P5 başında kanal talebi ve segment verisiyle; vitrinde satıcı tarayıcı SDK'sı yalnız ayrı oturumsuz origin seçeneğinde (G-134) | P5 |
@@ -63,7 +63,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | K-38 | Magic link (KM-10) | Ürün sahibi | Özgün eklenti (bağımsız güvenlik incelemesiyle) / Phase Two ile ticari lisans / ertele | Notta öneri yok | — |
 | K-39 | Telefonla giriş (KM-11) | Ürün sahibi | E-postayla tanıma + SMS kodu / telefon = kullanıcı adı / özgün authenticator | Notta öneri yok; ilk seçenek bugün mümkün | — |
 | K-40 | E-postasız hesap (KM-12) | Ürün sahibi | E-posta zorunlu / ayrı model | Repo e-posta zorunlu varsayar | — |
-| K-41 | Oturum süreleri (KM-14) | Ürün sahibi | Keycloak boşta ve azami; Frappe oturumu | Repoda G-78: SSO boşta 30 dk, azami 12 saat, erişim belirteci 5 dk; K-8: 8–24 saat | — |
+| K-41 | Oturum süreleri (KM-14) | Karar verildi | Boşta kalma ve toplam süre | Kiracı için 1 saat ve 24 saat. Press için 7 gün ve 30 gün. Kaynak: proje kaydı O-25. | |
 | K-42 | Giriş süresi hedefi (KM-15) | Ürün sahibi | Yük altında azami süre | PERF-01 k6 hipotezdir, sayı yok | — |
 | K-43 | Teknik inceleyici (KM-16) | Ürün sahibi | Ekipten geliştirici / dış güvenlik danışmanı | Notta öneri yok | — |
 | K-44 | Casdoor yeniden değerlendirme (KM-13) | Ürün sahibi | Hedef sürümde CERT/CC bildirimlerinin ve CVE-2026-90942'nin düzeldiği gösterilir; yeni imza/anahtar sınıfı kritik açık yok; bildirimlere yanıt veren güvenlik süreci | Koşullar sağlanana kadar aday değil | — |
@@ -99,7 +99,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | Frappe Version fixture'ında 'Version 15' default (X-04; doğrulandı) | Yeni Release Group yanlış sürümde açılır | `after_migrate` 'Version 16' default=1 |
 | AI agent çağrıları kiracı `cpu_time_per_day` limitini tüketir (G-46, X-13) | Kiracı askıya alınır | Agent kiracı başına çağrı kotası; ağır işler `reports`/`long` kuyruğunda |
 | Prompt injection ile yetki aşımı (G-85, G-89) | Veri sızıntısı | Araç çağrısı kullanıcı kimliğiyle; kırmızı takım eval seti CI kapısı |
-| Anthropic aktarımı KVKK (G-90) | İdari yaptırım | Veri envanteri + standart sözleşme; PII maskeleme; takım düzeyinde AI kapatma |
+| Model sağlayıcısına aktarım (G-90) | İdari yaptırım | Sistem kişisel bilgileri maskeler. Ekip aktarımı envantere ve sözleşmeye yazar. Takım yöneticisi AI özelliğini kapatabilir. Kaynak: proje kaydı D-11. |
 | Tek SSO oturumunun ortak site oturumu sanılması, çapraz kiracı çerez/CSRF hatası (G-119) | Kiracılar arası erişim | Host'a bağlı oturum, CORS yok, negatif testler P1 kapısında |
 | Aynı ekonomik olayın iki yoldan kaydı (SA-41) | Çift veya eksik vergi kaydı | Tek olay–belge matrisi, idempotensi anahtarları, elle başlatılan mutabakat |
 | Yetki kararı veri yüzeylerinde farklı (rapor, dışa aktarım, `get_all`) (G-121) | Yetkisiz veri | Yüzey kapsama matrisi ve UI'sız negatif testler |

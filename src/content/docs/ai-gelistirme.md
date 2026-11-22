@@ -13,7 +13,7 @@ Bu sayfa [Press yetkinliğindeki](/frappesetup/ai-press-yetkinlik/) boşlukları
 | Frappe uygulama geliştirme bilgisi | `frappe/skills` (`frappe-app-dev`, `deep-app-audit`), atıfla | `frappe-custom-app`, `frappe-app-extension` | Resmi ve derin; lisans dosyası yok, metin kopyalanmaz |
 | Press teşhisi | Press içi MCP (`enable_mcp`) | `press-build-triage`, `press-diagnoser` | Araçlar hazır, teşhis sırası yok |
 | Press kurulum ve dağıtım | — | `press-ai` MCP, `press-operations`, `press-operator` | Hiçbir hazır depo onaylı biçimde karşılamıyor |
-| Site içi veri araçları | `frappe/mcp` çatısı ya da kullanıcı kimlikli sunucu | `platform_core` araçları (Rail 5) | Kullanıcı kimliği ve denetim izi gerekir |
+| Site içi veri araçları | `platform_core.ai` | Kullanıcı yetkisi korunur. Yazmayı insan onaylar. | Kaynak: karar notu 0002 ve sözleşme 10. bölüm. |
 | Kullanıcıya dönük asistan | Flow izlenir (not: sınıf C); Jarvis ve Huf beta ortamında denenir | Agent servisi (Rail 5) | Keycloak delege token, kiracı kotası, Press kredi ölçümü hiçbirinde yok |
 
 AGPL bileşenleri (Flow, huf, Jarvis, Ask ALYF, Raven) kendi kodumuzla aynı süreçte birleştirilmeden önce lisans uyumu kullanıcıyla netleştirilir; yeni depolara lisans onaysız seçilmez.

@@ -10,7 +10,7 @@ Bu sayfa iki kararı verir: hangi hazır MCP sunucusu neye kullanılır ve paket
 
 - **Press teşhisi:** Press içi MCP (frappe/press `press/mcp`) okuma ve teşhis için kullanılabilir. Yalnız System Manager ve System User erişir, `Press Settings → Enable MCP` ile açılır; açmadan önce etkisini DevOps sorumlusu inceler.
 - **Press kurulum ve dağıtımı:** hazır sunucu yok; paketin `press-ai` sunucusu yazılır (taslak).
-- **Site içi veri araçları:** kullanıcı kimliğiyle çalışan ve yazmayı kodda onaylayan model (vyogotech) ya da `frappe/mcp` çatısıyla yazılan araçlar (G-84). Paylaşılan anahtarlı proxy'ler kullanılmaz.
+- **Site içi veri araçları:** `platform_core.ai` kullanıcı yetkisiyle çalışır. İnsan yazma önerisini ayrı uçtan onaylar. Kaynak: karar notu 0002 ve sözleşme 10. bölüm.
 - **Ağa açılmaz:** kimliksiz uç açan ya da keyfi komut çalıştıran sunucular.
 
 ## Hazır sunucular: kanıt
@@ -18,7 +18,7 @@ Bu sayfa iki kararı verir: hangi hazır MCP sunucusu neye kullanılır ve paket
 | Depo | Biçim | Lisans | Kimlik | Yazma onayı (kodda) | Denetim izi | Test kanıtı | Press ve altyapı |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | frappe/press `press/mcp` | Press içi | bu incelemede okunmadı | System Manager, System User | yazan araçlarda `confirm=True` | gizli değer maskeleme | incelenmedi | telemetri, log, disk teşhisi; kurulum ve dağıtım aracı yok |
-| frappe/mcp | Frappe app kütüphanesi (`pip install frappe-mcp`) | MIT | Frappe oturumu, OAuth2 | yok (yalnız çatı) | yok | 4 test dosyası | yok |
+| frappe/mcp (arşivlendi, karar notu 0002) | Frappe app kütüphanesi (`pip install frappe-mcp`) | MIT | Frappe oturumu, OAuth2 | yok (yalnız çatı) | yok | 4 test dosyası | yok |
 | buildswithpaul/Frappe_Assistant_Core | Frappe app | AGPL-3.0 | OAuth 2.0, API anahtarı | genel önizleme yok | `Assistant Audit Log` | yaklaşık 50 test dosyası | yok |
 | vyogotech/frappe-mcp-server | Go proxy | MIT | OAuth2 bearer, `sid`, API anahtarı | tek kullanımlık onay token'ı | log satırı | yaklaşık 60 test dosyası | yok |
 | skaslam1407/Frappe-MCP-Server | Python, yerel bench ya da SSH | MIT | tam ve salt okunur token | onay kapısı | JSONL | 19 test dosyası | bench, site, app, yedek; `fc_request` |

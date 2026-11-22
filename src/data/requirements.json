@@ -422,7 +422,7 @@
  {
   "id": "G-43",
   "title": "Oturum ve parola politikası",
-  "detail": "session_expiry '12:00' (ürün kararıyla 8-24 saat), `enable_password_policy=1`, `minimum_password_score=3`, `allow_consecutive_login_attempts=5`, `allow_login_after_fail=300`, `logout_on_password_reset=1`, `reset_password_link_expiry_duration=900`, `password_reset_limit=3`, `document_share_key_expiry=7`; Keycloak realm SSO Session Idle/Max bu değerlerle hizalanır. Frappe parola politikası yalnızca Administrator/break-glass hesapları için geçerli kalır.",
+  "detail": "Kiracı oturumu 1 saat boşta kalır veya toplam 24 saat sürer (kaynak: proje kaydı O-25), enable_password_policy=1, minimum_password_score=3, allow_consecutive_login_attempts=5, allow_login_after_fail=300, logout_on_password_reset=1, reset_password_link_expiry_duration=900, password_reset_limit=3, document_share_key_expiry=7; Keycloak realm SSO Session Idle/Max bu değerlerle hizalanır. Frappe parola politikası yalnızca Administrator/break-glass hesapları için geçerli kalır.",
   "rail": "R2 Frappe yapılandırma",
   "priority": "MUST",
   "phase": "P1",
@@ -772,7 +772,7 @@
  {
   "id": "G-78",
   "title": "Realm güvenlik ve oturum politikaları",
-  "detail": "Login with email ON, Verify email Required, e-posta değişikliği self-service kapalı (G-57), brute force detection, parola politikası (uzunluk ≥12, geçmiş, yaygın parola), MFA: TOTP ve WebAuthn/passkey; kiracı admin ve finans rolleri için koşullu zorunlu, diğerleri için teşvik; SSO Session Idle 30 dk / Max 12 saat Frappe session_expiry ile hizalı; Remember me kapalı; token lifespan 5 dk; refresh token rotation; yurt dışı aktarım yok (self-host).",
+  "detail": "Login with email ON, Verify email Required, e-posta değişikliği self-service kapalı (G-57), brute force detection, parola politikası (uzunluk ≥12, geçmiş, yaygın parola), MFA: TOTP ve WebAuthn/passkey; kiracı admin ve finans rolleri için koşullu zorunlu, diğerleri için teşvik; Kiracı için boşta 1 saat ve toplam 24 saat sınırı vardır. Press için sınırlar 7 ve 30 gündür. Kaynak: proje kaydı O-25. Remember me kapalı; token lifespan 5 dk; refresh token rotation; yurt dışı aktarım yok (self-host).",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P1",
@@ -802,7 +802,7 @@
  {
   "id": "G-81",
   "title": "identity-sync servisi: Keycloak olayları → Press ve Frappe provizyonu",
-  "detail": "Keycloak Event Listener SPI (tek izinli SPI istisnası: küçük, sürümlü, her minor sürüme karşı sözleşme testli; G-152) veya admin event polling ile user create/update/delete/disable, organization membership ve email değişikliği olayları alınır; `press_tr` `api.identity.*` ve `platform_core` `api.identity.*` uçlarına imzalı çağrılarla Team üyeliği, kiracı client oluşturma, Frappe System User provizyonu, rename_doc ve deprovisyon yapılır; idempotent, yeniden denemeli, ölü-mektup kuyruğu ve mutabakat (nightly reconcile) işi; kod agent servisiyle aynı depoda ayrı süreç olarak yaşar.",
+  "detail": "identity-sync Keycloak olaylarını Press ve kiracı sitelerine işler. Kiracı hesabı Website User olur (G-57). Operatör fark denetimini elle başlatır. Komut önce farkları gösterir ve onay ister. Sistem aynı olayı tekrar işlediğinde sonuç değişmez. İşlenemeyen olaylar ayrı kuyrukta bekler. Kaynak: proje kaydı D-6 ve O-11, sözleşme 7. bölüm.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P1",
@@ -862,7 +862,7 @@
  {
   "id": "G-87",
   "title": "AI denetim izi, ölçüm ve maliyet",
-  "detail": "Her konuşma turu, araç çağrısı, önizleme/onay, model, token ve maliyet agent DB'sinde ve kiracı sitede AI Action Log (G-64) olarak tutulur; Version kaydıyla bağ; takım/kullanıcı başına kullanım panelde görünür; saklama süresi KVKK politikasıyla (varsayılan 365 gün, konuşma içeriği 90 gün) tanımlanır; operatör için anonimleştirilmiş kalite metrikleri.",
+  "detail": "AI Action Log işlemi, AI Usage Log model kullanımını kaydeder (G-64). Her iki kayıt 365 gün saklanır. Öneriler karar veya süre dolumundan sonra 30 gün saklanır. Yönetici temizliği elle başlatır (O-32). Kaynak: proje kaydı, “Kişisel veri” bölümü ve sözleşme 10. bölüm.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -1512,7 +1512,7 @@
  {
   "id": "G-152",
   "title": "Realm-as-code ve SPI istisna politikası",
-  "detail": "Realm, client, rol ve akış tanımları Git'te sürümlenir ve uygulanır; elle değişiklik haftalık sapma kontrolüyle raporlanır. Özel Keycloak SPI'ı varsayılan olarak yazılmaz; tek istisna identity-sync olay köprüsüdür: küçük, sürümlü ve her Keycloak minor sürümüne karşı sözleşme testli bir Event Listener ya da yönetici olayı yoklamasıyla değiştirilebilir tasarım. Tema Keycloakify ile (Java kodu yok). Kabul: sapma raporu sıfır; SPI sözleşme testi yükseltme kapısında.",
+  "detail": "Realm, client, rol ve akış tanımları Git'te sürümlenir ve uygulanır; operatör değişiklik farkını elle denetler (proje kaydı D-6). Özel Keycloak SPI'ı varsayılan olarak yazılmaz; tek istisna identity-sync olay köprüsüdür: küçük, sürümlü ve her Keycloak minor sürümüne karşı sözleşme testli bir Event Listener olay bağlantısı (proje kaydı O-11). Tema `keycloak.v2` üzerinden kurulur (proje kaydı O-4). Kabul: sapma raporu sıfır; SPI sözleşme testi yükseltme kapısında.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P1",

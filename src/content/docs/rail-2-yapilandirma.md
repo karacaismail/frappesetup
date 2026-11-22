@@ -21,7 +21,7 @@ Site Config Key tohumlama press\_tr fixture'ıdır: Password → `mail_password`
 | Alan | Değer |
 | --- | --- |
 | Şema kaynağı | developer\_mode=0, server\_script\_enabled=0; DocType değişikliği yalnızca uygulama modül dosyaları ve fixture'lardan |
-| Oturum/parola | session\_expiry '12:00', enable\_password\_policy=1, minimum\_password\_score=3, allow\_consecutive\_login\_attempts=5, allow\_login\_after\_fail=300, logout\_on\_password\_reset=1, reset\_password\_link\_expiry\_duration=900, password\_reset\_limit=3; Keycloak SSO Session Idle/Max aynı değerlerle (G-78) |
+| Oturum/parola | Kiracı oturumu boşta 1 saat ile sınırlıdır. Kaynak: proje kaydı O-25. Parola ayarları: enable\_password\_policy=1, minimum\_password\_score=3, allow\_consecutive\_login\_attempts=5, allow\_login\_after\_fail=300, logout\_on\_password\_reset=1, reset\_password\_link\_expiry\_duration=900, password\_reset\_limit=3; Keycloak SSO Session Idle/Max aynı değerlerle (G-78) |
 | Kimlik | Social Login Key provider 'Keycloak', base\_url `https://<idp>/realms/<realm>`, sign\_ups='Deny', user\_id\_property='sub'; Keycloak doğrulandıktan sonra disable\_user\_pass\_login=1, login\_with\_email\_link=0, Website Settings.disable\_signup=1; MFA Keycloak'ta; Administrator break-glass yalnızca Agent set-admin-password ile |
 | Oran sınırı | Site Plan.cpu\_time\_per\_day → rate\_limit: istek işleme süresinin site geneli toplamını ölçer, CPU'yu ve kullanıcı/IP'yi ayırmaz (doğrulandı); kaynak izolasyonu değildir. Ağır raporlar 'reports' kuyruğunda; AI ve ödeme uçları `@frappe.rate_limit` (istek sayar) |
 | API yüzeyi | Önce kullanılan uçların envanteri, sonra nginx'te `/api/method/*` için allowlist; Server Script, System Console ve test uçları kapalı (G-143, G-40) |

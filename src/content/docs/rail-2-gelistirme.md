@@ -63,7 +63,7 @@ Hook'un varlığı her kod yolunu kapsamaz; her yüzey aynı kararı vermeli ve 
 | Dışa aktarım, Data Import | `export_query`, Data Import | Liste koşulu + dışa aktarım izni; içe aktarma yalnız yetkili rol |
 | Dosya ve ekler | `File`, private dosya uçları | Ekin bağlı olduğu belgenin izni |
 | Özel metotlar, arka plan işleri | whitelisted metot, `frappe.enqueue` | Metot içinde `has_permission`; işler kullanıcı bağlamını taşır |
-| MCP araçları, realtime | `frappe_mcp`, socket.io | Kullanıcı kimliğiyle aynı yol (G-85); oda aboneliğinde `has_permission` |
+| MCP araçları, realtime | `platform_core.ai`, socket.io | Kullanıcı kimliğiyle aynı yol (G-85); oda aboneliğinde `has_permission` |
 | Sistem bağlamı | `frappe.get_all`, ham SQL | İzin uygulamaz (doğrulandı: Frappe Database API); kullanıcı yüzeyli kodda yalnız gerekçeli istisna + lint |
 
 ## Meta API ve shell bootstrap
@@ -108,7 +108,7 @@ Hook'un varlığı her kod yolunu kapsamaz; her yüzey aynı kararı vermeli ve 
 | `press_tr.api.ops.*` | yeni özel | press\_tr (Press bench'i) | System User servis hesabı; operatör kimliği denetime |
 | `create-fc-invoice`, `delete-fc-team` | upstream istemci adı, yeni alıcı | press\_tr\_finance (operasyon sitesi) | `override_whitelisted_methods` ile bağlı; ayrılmış API kullanıcısı |
 | `press.api.site.install_app` ve diğer `press.api.*` | upstream hazır | press | Press oturumu + Press Role (G-16) |
-| Kiracı MCP (`frappe_mcp` + `ai_tools`) | upstream deneysel + özel | frappe\_mcp, platform\_core | Aracı belirteci (G-148, G-59) |
+| Kiracı MCP | Uygulama araçları | `platform_core.ai` (karar notu 0002) | Aracı belirteci (G-148, G-59) |
 
 
 ## Teslim sırası ve kabul
@@ -121,3 +121,18 @@ Hook'un varlığı her kod yolunu kapsamaz; her yüzey aynı kararı vermeli ve 
 | P1-d | Denetim + saklama işleri | 366 günlük Permission Log kaydı silinir; AI Action Log Version'a bağlı |
 | P1 (asgari) / P3 (tam) | auth\_hooks adaptörü: aracı belirteci ve servis JWT'si (G-59, G-148) | Aracı belirteciyle yapılan MCP çağrısı Access Rule'dan geçer; süresi dolmuş, başka siteye ait veya yeniden kullanılan belirteç reddedilir; yetkisiz çağrı `denied` olarak loglanır (G-85) |
 | P6 | `support` ve `ops` modülleri | Support Session olmadan `user.impersonate` reddedilir; `customer_360` yalnız operatör rolüyle döner ve her çağrı Operator Audit'e yazılır (SA-25, SA-26) |
+
+## Website User yöntem izin listesi
+
+Kiracıdaki son kullanıcı “Website User” olur. Kaynak D-5 ve O-3 kararıdır.
+
+Website User yalnız izin listesindeki yöntemleri çağırabilir. Sunucu diğer yöntemlere 403 yanıtı verir. Sunucu, Frappe'nin bulduğu işlevi denetler. Aynı işlevin takma adresi de aynı kurala uyar.
+
+- Kural `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` çağrılarına uygulanır.
+- Her uygulama kendi yöntemlerini `website_user_allowed_methods` kancasına ekler.
+- Frappe'den yalnız `frappe.auth.get_logged_user`, `logout` ve kurallı `frappe.desk.search.search_link` çağrıları listededir.
+- Frappe kayıt izinleri ve erişim kuralları REST kayıt uçlarında yürür. Bu uçlar `/api/resource` ve `/api/v2/document` yollarıdır.
+- Kayıt yöntemleri belge izinlerine uyar. Bunlar `/api/v2/document/<doctype>/<name>/method/<method>/` ve eski `run_method` çağrılarıdır.
+- Frappe masaüstü hesabı bu listeden etkilenmez.
+
+**Kaynak:** Backend sözleşmesi 5. bölüm.

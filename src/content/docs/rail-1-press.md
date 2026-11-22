@@ -6,6 +6,8 @@ order: 3
 
 Press v0.154.x ticari katmanın omurgasıdır: Site Plan, Marketplace App / App Plan, Subscription → Usage Record → Invoice zinciri, Team Tier, Product Trial standby havuzu ve App Source → Release Group → Deploy Candidate → Bench → Site Update dağıtım zinciri olduğu gibi kullanılır (doğrulandı). Frappe Cloud'a özgü varsayımları kendi ticari gerçekliğimize uyarlayan tek özel uygulama `press_tr`dir (G-7): ödeme, TRY, e-belge köprüsü, fixture temizliği, auth allowlist, Keycloak sarmalayıcıları ve Türkçe e-posta şablonları `hooks`, `override_doctype_class`, `doc_events` ve Custom Field ile burada yaşar; Press'te düzeltme gerektiren noktalar ayrıca upstream PR olarak açılır.
 
+Press, Frappe 16 üzerinde yamalarla açılır. Sunucu kurma akışı doğrulanmadan üretime çıkılmaz. Kaynak: proje kaydı D-7 ve O-9.
+
 ## 1. Aktivasyon akışı (G-29, G-30, G-35, G-95)
 
 ```mermaid
