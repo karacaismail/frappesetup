@@ -515,6 +515,47 @@ class StackTests(unittest.TestCase):
                 self.assertIn("ignored by Git", result.stderr)
                 self.assertFalse(path.exists())
 
+    def written_staging_paths(self, target):
+        """Create credentials and return each staging file seen before publication."""
+        namespace = runpy.run_path(str(STACK))
+        seen = []
+        real_link = os.link
+
+        def link(source, destination):
+            source = Path(source)
+            self.assertTrue(source.is_file())
+            self.assertEqual(source.parent, target.parent)
+            namespace["assert_ignored"](source)
+            seen.append(source)
+            return real_link(source, destination)
+
+        with patch("os.link", side_effect=link):
+            namespace["credentials"](target)
+        return seen
+
+    def test_staging_file_for_default_and_custom_targets_is_ignored_by_git(self):
+        folder = ROOT / "backend/e2e" / ("staging-test-" + os.urandom(4).hex())
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        folder.mkdir()
+        for target in (folder / ".env", Path(self.env["E2E_ENV_FILE"])):
+            with self.subTest(target=target):
+                seen = self.written_staging_paths(target)
+                self.assertEqual(len(seen), 1)
+                self.assertFalse(seen[0].exists())
+                self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+                self.assertEqual(sorted(path.name for path in target.parent.iterdir()), [target.name])
+
+    def test_refuses_a_staging_path_that_git_could_track(self):
+        folder = ROOT / "backend/e2e" / ("staging-test-" + os.urandom(4).hex())
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        folder.mkdir()
+        target = folder / ".env.production"
+        namespace = runpy.run_path(str(STACK))
+        namespace["assert_ignored"](target)
+        with self.assertRaisesRegex(ValueError, "ignored by Git"):
+            namespace["credentials"](target)
+        self.assertEqual(list(folder.iterdir()), [])
+
     def test_git_ignore_check_cannot_be_redirected_by_git_variables(self):
         path = ROOT / "backend/e2e/stack-candidate.env"
         self.addCleanup(path.unlink, missing_ok=True)

@@ -12,7 +12,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -97,15 +96,22 @@ def credentials(path):
                     value = secrets.token_urlsafe(32)
                 values[key] = value
         path.parent.mkdir(parents=True, exist_ok=True)
-        # Publish only complete credentials and never overwrite a competing writer.
-        with tempfile.NamedTemporaryFile(mode="w", dir=path.parent) as stream:
-            stream.write("".join(f"{key}={value}\n" for key, value in values.items()))
-            stream.flush()
-            os.fsync(stream.fileno())
-            try:
-                os.link(stream.name, path)
-            except FileExistsError:
-                pass
+        # The staging file holds secrets too, so Git must ignore its name before it exists.
+        staging = path.with_name(f"{path.name}.tmp-{secrets.token_hex(8)}")
+        assert_ignored(staging)
+        descriptor = os.open(staging, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(descriptor, "w") as stream:
+                stream.write("".join(f"{key}={value}\n" for key, value in values.items()))
+                stream.flush()
+                os.fsync(stream.fileno())
+                # Publish only complete credentials and never overwrite a competing writer.
+                try:
+                    os.link(staging, path)
+                except FileExistsError:
+                    pass
+        finally:
+            staging.unlink(missing_ok=True)
     metadata = path.lstat()
     if not stat.S_ISREG(metadata.st_mode) or metadata.st_mode & 0o077:
         raise ValueError("The environment file must be a private regular file (0600).")
