@@ -27,12 +27,18 @@ class RoleFixtureTest(unittest.TestCase):
 		for profile in fixture("02_role_profile.json"):
 			self.assertIn("HRMS TR Employee", {row["role"] for row in profile["roles"]})
 
-	def test_only_hr_can_cancel_and_amend(self):
+	def test_only_authorized_roles_can_cancel_and_amend(self):
 		perms = [row for row in fixture("05_custom_docperm.json") if row["permlevel"] == 0]
-		self.assertEqual({row["role"] for row in perms if row.get("cancel")}, {"HRMS TR Admin"})
+		self.assertEqual(
+			{row["role"] for row in perms if row.get("cancel")},
+			{"HRMS TR Admin", "System Manager", "HR Manager"},
+		)
 		self.assertEqual({row["role"] for row in perms if row.get("amend")}, {"HRMS TR Admin"})
 		rules = fixture("03_access_rule.json")
-		self.assertEqual({row["role"] for row in rules if row.get("allow_cancel")}, {"HRMS TR Admin"})
+		self.assertEqual(
+			{row["role"] for row in rules if row.get("allow_cancel")},
+			{"HRMS TR Admin", "System Manager", "HR Manager"},
+		)
 
 
 class AccessGateTest(unittest.TestCase):
@@ -118,7 +124,7 @@ class FixtureLifecycleTest(unittest.TestCase):
 			rows.side_effect = [[{"doctype": "Access Rule", "name": "HRMS TR Rule"}], [], []] * 2
 			setup.remove_policy_fixtures()
 			setup.remove_policy_fixtures()
-			fake.delete_doc.assert_called_once_with("Access Rule", "HRMS TR Rule", ignore_permissions=True)
+			fake.delete_doc.assert_called_once_with("Access Rule", "HRMS TR Rule")
 			self.assertEqual(fake.db.commit.call_count, 2)
 
 	def test_migration_refreshes_manager_profile_without_waiting_for_a_queue(self):
@@ -132,4 +138,63 @@ class FixtureLifecycleTest(unittest.TestCase):
 			fake.get_all.return_value = ["manager@example.test"]
 			fake.get_doc.return_value = user
 			setup.after_migrate()
-		user.save.assert_called_once_with(ignore_permissions=True)
+		user.save.assert_called_once_with()
+
+
+class OperationsRoleTest(unittest.TestCase):
+	def test_operations_roles_have_native_permissions_and_matching_access_rules(self):
+		permissions = fixture("05_custom_docperm.json")
+		rules = fixture("03_access_rule.json")
+		for role in ("System Manager", "HR Manager"):
+			with self.subTest(role=role):
+				native = {row["permlevel"]: row for row in permissions if row["role"] == role}
+				self.assertEqual(set(native), {0, 1})
+				for operation in ("read", "write", "submit", "cancel"):
+					self.assertEqual(native[0][operation], 1)
+				self.assertEqual(native[1]["read"], 1)
+				self.assertEqual(native[1]["write"], 1)
+				rule = next(row for row in rules if row["role"] == role)
+				self.assertEqual(rule["scope"], "all")
+				self.assertTrue(all(rule[f"allow_{name}"] for name in ("read", "write", "submit", "cancel")))
+		self.assertFalse({"Employee", "Leave Approver", "HR User"} & {row["role"] for row in permissions})
+
+	def test_operations_roles_can_cancel_natively(self):
+		with patch.object(leave, "frappe") as fake:
+			fake.session.user = "operations@example.test"
+			for role in ("System Manager", "HR Manager"):
+				fake.get_roles.return_value = [role]
+				leave.validate_cancellation(None)
+			fake.throw.assert_not_called()
+
+
+class LeaveReportTest(unittest.TestCase):
+	def test_unsafe_reports_are_denied_before_the_native_role_check(self):
+		from hrms_tr.hrms_endpoints import ReportAccess
+
+		class NativeReport:
+			def is_permitted(self):
+				return True
+
+		class Report(ReportAccess, NativeReport):
+			pass
+
+		report = Report()
+		for name in ("Employee Leave Balance Summary", "Employee Leave Balance", "Leave Ledger"):
+			report.name = name
+			self.assertFalse(report.is_permitted())
+		report.name = "Unrelated Report"
+		self.assertTrue(report.is_permitted())
+
+	def test_saved_prepared_report_cannot_return_blocked_report_content(self):
+		from hrms_tr import hrms_endpoints
+
+		class NativePreparedReport:
+			def get_prepared_data(self, with_file_name=False):
+				return "stored result"
+
+		class PreparedReport(hrms_endpoints.PreparedReportAccess, NativePreparedReport):
+			report_name = "Leave Ledger"
+
+		with patch.object(hrms_endpoints, "deny_legacy_leave_query", side_effect=PermissionError):
+			with self.assertRaises(PermissionError):
+				PreparedReport().get_prepared_data(with_file_name=True)

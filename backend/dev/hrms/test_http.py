@@ -22,10 +22,11 @@ class Client:
         self.base = case.base
         self.site = case.site
         self.opener = build_opener(HTTPCookieProcessor(CookieJar()))
-        status, _ = self.send(
-            "/api/method/login", {"usr": user, "pwd": password or case.password}
-        )
-        case.assertEqual(status, 200, f"Synthetic login failed for {user}")
+        if user is not None:
+            status, _ = self.send(
+                "/api/method/login", {"usr": user, "pwd": password or case.password}
+            )
+            case.assertEqual(status, 200, f"Synthetic login failed for {user}")
 
     def page(self, path):
         request = Request(self.base + path, headers={"X-Frappe-Site-Name": self.site})
@@ -80,10 +81,18 @@ class LeaveHttpTest(unittest.TestCase):
         return result.get("data")
 
     def listed(self, client):
-        query = urlencode({"fields": json.dumps(["name"]), "limit_page_length": 100})
+        query = urlencode(
+            {"fields": json.dumps(["name", "employee"]), "limit_page_length": 100}
+        )
         code, result = client.send(f"{LEAVE_PATH}?{query}")
         self.assertEqual(code, 200, result.get("exc_type"))
-        return {row["name"] for row in result["data"]}
+        return {row["name"]: row["employee"] for row in result["data"]}
+
+    def assert_list_scope(self, client, *actors):
+        records = self.listed(client)
+        self.assertTrue(self.leaves_owned_by(*actors) <= records.keys())
+        allowed = {self.data["employees"][actor] for actor in actors}
+        self.assertLessEqual(set(records.values()), allowed)
 
     def leaves_owned_by(self, *actors):
         return {
@@ -103,10 +112,7 @@ class LeaveHttpTest(unittest.TestCase):
 
     def test_employee_sees_only_own_leave_and_no_balance(self):
         client = self.login("employee")
-        self.assertEqual(
-            self.listed(client),
-            self.leaves_owned_by("employee"),
-        )
+        self.assert_list_scope(client, "employee")
         self.assertNotIn("leave_balance", self.document(client, "employee"))
         query = urlencode({"fields": json.dumps(["name", "leave_balance"])})
         code, payload = client.send(f"{LEAVE_PATH}?{query}")
@@ -122,7 +128,7 @@ class LeaveHttpTest(unittest.TestCase):
             403,
         )
 
-    def test_z_employee_can_create_draft_with_team_approver(self):
+    def test_employee_can_create_draft_with_team_approver(self):
         client = self.login("employee")
         own = self.document(client, "employee")
         status, result = client.send(
@@ -163,10 +169,7 @@ class LeaveHttpTest(unittest.TestCase):
 
     def test_manager_can_only_approve_team_leave(self):
         client = self.login("manager")
-        self.assertEqual(
-            self.listed(client),
-            self.leaves_owned_by("employee", "manager"),
-        )
+        self.assert_list_scope(client, "employee", "manager")
         self.assertEqual(self.document(client, "employee")["leave_balance"], 7)
         self.document(client, "outsider", 403)
         endpoint = "/api/method/hrms_tr.api.approve_leave"
@@ -176,18 +179,21 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertEqual(
             client.send(endpoint, {"name": self.data["leaves"]["manager"]})[0], 403
         )
-        code, result = client.send(endpoint, {"name": self.data["leaves"]["employee"]})
+        code, result = client.send(
+            endpoint, {"name": self.data["leaves"]["manager_approve"]}
+        )
         self.assertEqual(code, 200, result.get("exc_type"))
-        doc = self.document(client, "employee")
+        doc = self.document(client, "manager_approve")
         self.assertEqual((doc["status"], doc["docstatus"]), ("Approved", 1))
 
     def test_hr_can_read_all_leaves(self):
         client = self.login("hr")
-        self.assertEqual(self.listed(client), set(self.data["leaves"].values()))
+        self.assert_list_scope(client, *self.data["employees"])
         self.assertEqual(self.document(client, "outsider")["leave_balance"], 7)
 
     def test_legacy_roles_do_not_grant_leave_access(self):
-        for role, user in self.data["legacy_users"].items():
+        for role in ("HR User", "Leave Approver", "Employee"):
+            user = self.data["legacy_users"][role]
             with self.subTest(role=role):
                 client = Client(self, user)
                 status, result = client.send(LEAVE_PATH)
@@ -195,6 +201,40 @@ class LeaveHttpTest(unittest.TestCase):
                 if status == 200:
                     self.assertEqual(result["data"], [])
                 self.document(client, "employee", 403)
+
+    def test_operations_roles_can_read_write_submit_and_cancel(self):
+        for role, key in (
+            ("System Manager", "system_manager_approve"),
+            ("HR Manager", "hr_manager_approve"),
+        ):
+            with self.subTest(role=role):
+                client = Client(self, self.data["legacy_users"][role])
+                self.assert_list_scope(client, *self.data["employees"])
+                initial = self.document(client, key)
+                self.assertEqual(initial["status"], "Open")
+                self.assertEqual(initial["docstatus"], 0)
+                description = "Reviewed by a synthetic operations user"
+                code, result = client.send(
+                    self.leave_path(key), {"description": description}, method="PUT"
+                )
+                self.assertEqual(code, 200, result.get("exception"))
+                self.assertEqual(result["data"]["description"], description)
+
+                draft = {**result["data"], "status": "Approved"}
+                code, result = client.send(
+                    "/api/method/frappe.client.submit", {"doc": draft}
+                )
+                self.assertEqual(code, 200, result.get("exception"))
+                approved = self.document(client, key)
+                self.assertEqual(approved["status"], "Approved")
+                self.assertEqual(approved["docstatus"], 1)
+
+                code, result = client.send(
+                    "/api/method/frappe.client.cancel",
+                    {"doctype": "Leave Application", "name": initial["name"]},
+                )
+                self.assertEqual(code, 200, result.get("exception"))
+                self.assertEqual(self.document(client, key)["docstatus"], 2)
 
     def test_sensitive_balance_read_paths(self):
         client = self.login("employee")
@@ -321,14 +361,24 @@ class LeaveHttpTest(unittest.TestCase):
             {
                 "filters": json.dumps(
                     {"document_type": "Leave Application", "is_active": 1}
-                )
+                ),
+                "fields": json.dumps(["name", "role"]),
             }
         )
         status, payload = admin.send(f"{path}?{query}")
         self.assertEqual(status, 200, payload.get("exception"))
         names = [row["name"] for row in payload["data"]]
-        self.assertEqual(len(names), 3)
-        self.assertTrue(all(name.startswith("HRMS TR ") for name in names))
+        self.assertEqual(
+            {row["role"] for row in payload["data"]},
+            {
+                "HRMS TR Employee",
+                "HRMS TR Manager",
+                "HRMS TR Admin",
+                "System Manager",
+                "HR Manager",
+            },
+        )
+        self.assertEqual(len(names), 5)
         changed = []
         self.assertTrue(self.listed(client))
         try:
@@ -337,7 +387,7 @@ class LeaveHttpTest(unittest.TestCase):
                 status, payload = admin.send(endpoint, {"is_active": 0}, method="PUT")
                 self.assertEqual(status, 200, payload.get("exception"))
                 changed.append(endpoint)
-            self.assertEqual(self.listed(client), set())
+            self.assertEqual(self.listed(client), {})
             self.document(client, "employee", 403)
         finally:
             for endpoint in changed:
@@ -349,11 +399,12 @@ class LeaveHttpTest(unittest.TestCase):
         today = date.today().isoformat()
         for actor in ("employee", "outsider"):
             for method, args in (
-                ("get_leave_details", {}),
+                (f"{HRMS_LEAVE}.get_leave_details", {}),
                 (
-                    "get_leave_balance_on",
+                    f"{HRMS_LEAVE}.get_leave_balance_on",
                     {"leave_type": self.data["allocated_leave_type"]},
                 ),
+                ("/api/method/hrms.api.get_leave_types", {}),
             ):
                 with self.subTest(method=method, actor=actor):
                     arguments = {
@@ -361,9 +412,7 @@ class LeaveHttpTest(unittest.TestCase):
                         "date": today,
                         **args,
                     }
-                    code, result = client.send(
-                        f"{HRMS_LEAVE}.{method}?{urlencode(arguments)}"
-                    )
+                    code, result = client.send(f"{method}?{urlencode(arguments)}")
                     self.assertEqual(code, 403, result.get("exception"))
         for endpoint in (
             "/api/method/hrms.api.get_leave_balance_map",
@@ -372,6 +421,93 @@ class LeaveHttpTest(unittest.TestCase):
             with self.subTest(endpoint=endpoint):
                 code, result = client.send(endpoint)
                 self.assertEqual(code, 403, result.get("exception"))
+
+    def test_guest_cannot_approve_or_call_legacy_replacement(self):
+        guest = Client(self, None)
+        name = self.data["leaves"]["outsider"]
+        code, _ = guest.send("/api/method/hrms_tr.api.approve_leave", {"name": name})
+        self.assertIn(code, (401, 403))
+        code, _ = guest.send(
+            "/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
+        )
+        self.assertIn(code, (401, 403))
+        code, _ = self.login("manager").send(
+            "/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
+        )
+        self.assertEqual(code, 403)
+
+    def test_legacy_derived_leave_data_endpoints_are_closed(self):
+        hr = Client(self, self.data["legacy_users"]["HR Manager"])
+        for method, args in (
+            (
+                "hrms.payroll.doctype.salary_slip.salary_slip.make_salary_slip_from_timesheet",
+                {"source_name": "SYNTHETIC-TIMESHEET"},
+            ),
+            (
+                "hrms.payroll.doctype.salary_structure.salary_structure.make_salary_slip",
+                {
+                    "source_name": "SYNTHETIC-SALARY-STRUCTURE",
+                    "employee": self.data["employees"]["employee"],
+                },
+            ),
+        ):
+            with self.subTest(method=method):
+                status, result = hr.send(f"/api/method/{method}", args)
+                self.assertEqual(status, 403, result.get("exception"))
+                self.assertIn("Read leave information", result.get("exception", ""))
+
+        admin = Client(self, "Administrator", password=os.environ["ADMIN_PASSWORD"])
+        day = (date.today() + timedelta(days=60)).isoformat()
+        code, payload = admin.send(
+            "/api/resource/Attendance%20Request",
+            {
+                "employee": self.data["employees"]["employee"],
+                "from_date": day,
+                "to_date": day,
+                "reason": "Work From Home",
+            },
+        )
+        self.assertEqual(code, 200, payload.get("exception"))
+        name = quote(payload["data"]["name"], safe="")
+        path = f"/api/v2/document/Attendance%20Request/{name}/method/get_attendance_warnings/"
+        status, _ = admin.page(path)
+        self.assertEqual(status, 403)
+
+    def test_legacy_hrms_leave_reports_are_closed(self):
+        client = Client(self, self.data["legacy_users"]["HR Manager"])
+        today = date.today().isoformat()
+        leave = self.document(client, "employee")
+        filters = json.dumps(
+            {
+                "company": leave["company"],
+                "employee": leave["employee"],
+                "from_date": today,
+                "to_date": today,
+            }
+        )
+        for report in (
+            "Employee Leave Balance Summary",
+            "Employee Leave Balance",
+            "Leave Ledger",
+        ):
+            status, _ = client.send(
+                "/api/method/frappe.core.doctype.prepared_report.prepared_report.make_prepared_report",
+                {"report_name": report, "filters": filters},
+            )
+            self.assertEqual(status, 403)
+            for method in ("run", "export_query"):
+                with self.subTest(report=report, method=method):
+                    query = urlencode(
+                        {
+                            "report_name": report,
+                            "filters": filters,
+                            "file_format_type": "CSV",
+                        }
+                    )
+                    status, _ = client.page(
+                        f"/api/method/frappe.desk.query_report.{method}?{query}"
+                    )
+                    self.assertEqual(status, 403)
 
     def ai_call(self, client, name, version):
         return client.send(

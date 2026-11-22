@@ -53,7 +53,7 @@ def after_migrate():
 		if frappe.db.get_value(RULE_DOCTYPE, name, "is_active"):
 			doc = frappe.get_doc(RULE_DOCTYPE, name)
 			doc.is_active = 0
-			doc.save(ignore_permissions=True)
+			doc.save()
 
 	user_names = frappe.get_all(
 		"Has Role",
@@ -69,7 +69,7 @@ def after_migrate():
 		profiles = {row.role_profile for row in user.role_profiles}
 		missing_employee_role = EMPLOYEE_ROLE not in roles and profiles.intersection(APPROVER_PROFILES)
 		if user.user_type != "Website User" or NATIVE_LEAVE_APPROVER in roles or missing_employee_role:
-			user.save(ignore_permissions=True)
+			user.save()
 
 
 def policy_fixture_keys():
@@ -93,7 +93,7 @@ def remove_policy_fixtures(keys=None):
 		return
 	for doctype, name in policy_fixture_keys() if keys is None else keys:
 		if frappe.db.exists("DocType", doctype) and frappe.db.exists(doctype, name):
-			frappe.delete_doc(doctype, name, ignore_permissions=True)
+			frappe.delete_doc(doctype, name)
 	# The framework commits app removal before after_uninstall and does not commit again.
 	frappe.db.commit()
 	frappe.clear_cache(doctype=DOCTYPE)

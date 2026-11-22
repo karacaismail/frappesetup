@@ -3,7 +3,7 @@ app_title = "HRMS TR"
 app_publisher = "HRMS TR"
 app_description = "Leave application workflow"
 app_email = "dev@example.test"
-app_license = "gpl-3.0"
+app_license = "GPL-3.0-only"
 
 required_apps = ["hrms", "platform_core"]
 
@@ -24,11 +24,19 @@ doc_events = {
 	"DocShare": {"validate": "hrms_tr.access.deny_sharing"},
 	"User": {"before_save": "hrms_tr.users.keep_portal_user"},
 }
-extend_doctype_class = {"Leave Application": "hrms_tr.leave_application.LeaveApplication"}
+extend_doctype_class = {
+	"Leave Application": "hrms_tr.leave_application.LeaveApplication",
+	"Report": "hrms_tr.hrms_endpoints.ReportAccess",
+	"Prepared Report": "hrms_tr.hrms_endpoints.PreparedReportAccess",
+	"Attendance Request": "hrms_tr.hrms_endpoints.AttendanceRequestAccess",
+}
 
 override_whitelisted_methods = {
 	"hrms.hr.doctype.leave_application.leave_application.get_leave_details": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
 	"hrms.hr.doctype.leave_application.leave_application.get_leave_balance_on": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
 	"hrms.api.get_leave_balance_map": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
+	"hrms.api.get_leave_types": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
+	"hrms.payroll.doctype.salary_slip.salary_slip.make_salary_slip_from_timesheet": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
+	"hrms.payroll.doctype.salary_structure.salary_structure.make_salary_slip": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
 	"hrms.hr.doctype.leave_application.leave_application.get_events": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
 }

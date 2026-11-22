@@ -45,5 +45,35 @@
     "allow_submit": 1,
     "description": "Manage leave applications in this site.",
     "allow_cancel": 1
+  },
+  {
+    "doctype": "Access Rule",
+    "name": "HRMS TR System Manager Leave Application",
+    "title": "HRMS TR System Manager Leave Application",
+    "document_type": "Leave Application",
+    "role": "System Manager",
+    "scope": "all",
+    "is_active": 1,
+    "allow_read": 1,
+    "allow_create": 0,
+    "allow_write": 1,
+    "allow_submit": 1,
+    "allow_cancel": 1,
+    "description": "Preserve operations access to leave applications on this site."
+  },
+  {
+    "doctype": "Access Rule",
+    "name": "HRMS TR HR Manager Leave Application",
+    "title": "HRMS TR HR Manager Leave Application",
+    "document_type": "Leave Application",
+    "role": "HR Manager",
+    "scope": "all",
+    "is_active": 1,
+    "allow_read": 1,
+    "allow_create": 0,
+    "allow_write": 1,
+    "allow_submit": 1,
+    "allow_cancel": 1,
+    "description": "Preserve operations access to leave applications on this site."
   }
 ]

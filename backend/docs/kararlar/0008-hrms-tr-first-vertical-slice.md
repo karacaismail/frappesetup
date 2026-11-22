@@ -49,7 +49,12 @@ Yetkili kullanıcı bakiyeyi izin talebi üzerinden okur.
 İzin kuralı veya motor kancası yoksa kayıt erişimi kapanır.
 
 Frappe, özel izin satırları varsa bu satırları standart izinlerin yerine kullanır.
-HRMS ve “System Manager” rolleri tek başına HRMS TR erişimi vermez.
+“System Manager” ve “HR Manager” işlemleri için ayrı izin satırları vardır.
+Bu roller izin talebini okuyabilir, yazabilir, onaylayabilir ve iptal edebilir.
+Birinci seviye durum alanını okuyup yazabilirler. İzin bakiyesi ikinci seviyede kalır.
+HRMS TR, “HR User”, “Employee” ve “Leave Approver” rollerine özel izin eklemez.
+Erişim motoru bu roller için izin talebi kuralı bulamaz.
+HRMS'in daha önce kurduğu standart özel izin kayıtlarına dokunulmaz.
 Frappe’nin “Administrator” hesabı kendi yönetim yetkisini korur.
 
 Frappe, alan ayarlarına standart ad verir. HRMS TR bu adları korur.
@@ -63,5 +68,28 @@ HRMS TR, GPL-3.0-only lisansını kullanır. Bu ifade yalnız GPL sürüm 3’ü
 
 Geçiş, mevcut izin talebi paylaşımı varsa durur.
 Kaldırma sonrası temizlik yarıda kalırsa yetkili operatör aynı işlemi yeniden çalıştırabilir.
-Operatör, site konsolundan `hrms_tr.setup.remove_policy_fixtures()` işlevini çağırır.
+Operatör, “Administrator” oturumuyla site konsolundan `hrms_tr.setup.remove_policy_fixtures()` işlevini çağırır.
 İşlev HRMS TR hâlâ kuruluysa kayıt silmez.
+
+## Kurulum sırası ve kapalı HRMS yolları
+
+HRMS TR, `platform_core.erisim` kancalarına ve “Access Rule” kayıt türüne dayanır.
+`erisim-kurali` dalı HRMS TR dalından önce birleşir.
+
+| HRMS yolu | Kapatma nedeni |
+| --- | --- |
+| `get_leave_details` | Bekleyen izinleri kayıt iznini uygulamadan toplar. |
+| `get_leave_balance_on` | İzin kaydından yarım gün bilgisi okur. |
+| `hrms.api.get_leave_balance_map` | Bakiye hesabını eski izin yolu üzerinden yapar. |
+| `hrms.api.get_leave_types` | Eski izin detaylarını okuyarak türleri çıkarır. |
+| `get_events` | Ayar açıkken izin takvimini kayıt izni olmadan okur. |
+| Employee Leave Balance | Bakiye hesabı kayıt geri dönüşlerini izin kuralına bağlamaz. |
+| Employee Leave Balance Summary | Eski izin detayları üzerinden bekleyen talepleri toplar. |
+| Leave Ledger | İzin talebi bağlantılarını kayıt izni uygulamadan döndürür. |
+| Attendance Request uyarıları | İzin kaydı varsa gün bilgisini açıklar. |
+| Bordro taslağı, vardiya çizelgesinden | İzin bilgisiyle çalışma günü hesabı yapar. |
+| Bordro taslağı, maaş yapısından | İzin bilgisiyle çalışma günü hesabı yapar. |
+
+Onay ucu, kayıt iznini çağırdığı işlevde denetler.
+Eski HRMS ret ucu kayıt okumadan izin hatası verir.
+Semgrep bu iki yolu izleyemediği için ilgili uca dar istisna eklendi.

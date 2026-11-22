@@ -11,12 +11,13 @@ from hrms_tr.access import DOCTYPE
 
 HR_ROLE = "HRMS TR Admin"
 APPROVER_ROLES = ("HRMS TR Manager", HR_ROLE)
+OPERATIONS_ROLES = ("System Manager", "HR Manager")
 
 LeaveName = Annotated[str, StringConstraints(min_length=1, max_length=140)]
 
 
 def check_approver_role():
-	if not set(APPROVER_ROLES).intersection(frappe.get_roles()):
+	if not set((*APPROVER_ROLES, *OPERATIONS_ROLES)).intersection(frappe.get_roles()):
 		frappe.throw(_("You do not have permission to approve leave."), frappe.PermissionError)
 
 
@@ -27,11 +28,14 @@ def check_not_own_leave(doc):
 
 def check_hr_role():
 	if frappe.session.user != "Administrator" and HR_ROLE not in frappe.get_roles():
-		frappe.throw(_("Only HRMS TR Admin can cancel or amend leave applications."), frappe.PermissionError)
+		frappe.throw(_("Only HRMS TR Admin can amend leave applications."), frappe.PermissionError)
 
 
 def validate_cancellation(doc, method=None):
-	check_hr_role()
+	if frappe.session.user != "Administrator" and not set((HR_ROLE, *OPERATIONS_ROLES)).intersection(
+		frappe.get_roles()
+	):
+		frappe.throw(_("You do not have permission to cancel leave."), frappe.PermissionError)
 
 
 def validate_approval(doc, method=None):

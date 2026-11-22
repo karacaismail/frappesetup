@@ -16,7 +16,8 @@ USERS = {
     actor: f"hrms-tr-{actor}@example.test"
     for actor in ("employee", "manager", "outsider", "hr")
 }
-LEGACY_ROLES = ("System Manager", "HR Manager", "HR User", "Leave Approver")
+OPERATIONS_ROLES = ("System Manager", "HR Manager")
+LEGACY_ROLES = ("HR User", "Leave Approver", "Employee")
 ROLES = {
     "employee": "Employee",
     "manager": "Manager",
@@ -100,16 +101,30 @@ def seed(password):
         ).name
 
     legacy_users = {}
-    for index, role in enumerate(LEGACY_ROLES):
+    for index, role in enumerate((*OPERATIONS_ROLES, *LEGACY_ROLES)):
         username = f"hrms-tr-legacy-{index}@example.test"
-        insert(
+        legacy_user = insert(
             "User",
             email=username,
             first_name=f"Synthetic Legacy User {index}",
             send_welcome_email=0,
             new_password=password,
-            roles=[{"role": role}],
+            roles=[] if role == "Employee" else [{"role": role}],
         )
+        if role == "Employee":
+            insert(
+                "Employee",
+                first_name="Synthetic Legacy Employee",
+                company=company.name,
+                status="Active",
+                gender="Other",
+                date_of_birth="1990-01-01",
+                date_of_joining=add_days(today(), -30),
+                user_id=username,
+                create_user_permission=0,
+            )
+            legacy_user.reload()
+            legacy_user.add_roles(role)
         legacy_users[role] = username
 
     for actor in ("employee", "outsider"):
@@ -134,6 +149,9 @@ def seed(password):
             ("ai_stale", "employee"),
             ("hr", "hr"),
             ("hr_approve", "outsider"),
+            ("manager_approve", "employee"),
+            ("system_manager_approve", "outsider"),
+            ("hr_manager_approve", "outsider"),
         ),
         start=2,
     ):
