@@ -446,10 +446,14 @@ Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinde
 
 ### Güvenlik
 
+- Dış bağlantı (`external`) özel ağ adresine gidemez. Denetim bağlantı anında çözülen adrese yapılır.
+- Yerel bağlantı (`local`) yalnız site ayarındaki sabit adres listesine gider. Örnek: `{"kind": "local", "addresses": ["10.0.5.7"]}`. Bağlantı yerel adresler (`169.254.0.0/16`, `fe80::/10`), `0.0.0.0/8` ve çoklu yayın adresleri her zaman reddedilir.
+- Şifresiz HTTP yalnız listedeki yerel adrese izinlidir. Açık internetteki adrese şifresiz istek gönderilmez.
 - Gizli anahtar “Password” alanında şifreli durur. Hiçbir uç ve hiçbir yapay zekâ aracı anahtarı dönmez.
 - Kayıt, günlük ve hata metni anahtarı içermez.
 - Kaydı yalnız “AI Manager” rolü ve “System Manager” rolü yönetir.
-- Yapay zekâ kaydı yönetim araçlarıyla değiştirebilir. Her değişiklik önizleme ve insan onayı ister.
+- Genel yazma araçları AI API ve AI Account kayıtlarına yazamaz (Proje kaydı O-28). Yapay zekâ bu kayıtları yalnız model geçidinin kendi yönetim araçlarıyla değiştirir. Her değişiklik önizleme ve insan onayı ister.
+- Yönetim aracı bağlantı adresini değiştirirse kayıtlı anahtar silinir ve bağlantı kapanır. Yeni anahtarı insan Desk ekranında girer. Böylece kayıtlı anahtar yeni adrese gitmez.
 - Bağlantı denetimi ücretli bir çağrıdır. Bu yüzden ücretli işaretini taşır.
 - Mesaj içeriği varsayılan olarak günlüğe yazılmaz.
 - Yol kaydının veri kısıtı, model çağrısından önce veri seçimini ve maskelemeyi ister (G-90).
