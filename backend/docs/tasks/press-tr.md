@@ -2,7 +2,7 @@
 
 Bu iş Press'i geliştirme ortamında kurar. `press_tr` uygulamasının kimlik bölümünü de yazar. Press, kiracı sitelerini yöneten kontrol düzlemidir.
 
-Önce `backend/AGENTS.md`, `backend/PROJE-KAYDI.md` ve `backend/docs/sozlesmeler.md` dosyalarını okuyun. Sonra karar sitesinin `rail-1-press.md` ve `rail-4-keycloak.md` sayfalarını okuyun. Rail 4 sayfasının 6. bölümü Press girişini anlatır (G-12).
+Önce `backend/AGENTS.md`, `backend/PROJECT-RECORD.md` ve `backend/docs/contracts.md` dosyalarını okuyun. Sonra karar sitesinin `rail-1-press.md` ve `rail-4-keycloak.md` sayfalarını okuyun. Rail 4 sayfasının 6. bölümü Press girişini anlatır (G-12).
 
 ## Güncelleme: 22 Kasım 2026 Pazar
 
@@ -32,7 +32,7 @@ Proje sahibi iki karar verdi. Bu bölüm aşağıdaki Frappe 15 bilgilerinin yer
 4. Press'in kendi ajanını, sunucularını ve Ansible kurulumunu bu turda kurmayın. Yalnız Press uygulaması ve sitesi yeterlidir.
 5. Container içinde `bench new-app press_tr --no-git` ile iskeleti üretin. Lisans AGPL-3.0 olsun (O-8). Uygulama klasörüne lisans dosyasını koyun. Yayıncı e-postası olarak `noreply@example.test` yazın.
 6. `required_apps` listesine `press` ekleyin. Frappe aralığı `>=15.0.0,<16.0.0` olsun.
-7. Modül olarak `Kimlik` ekleyin. Klasör adı `kimlik` olsun.
+7. Modül olarak `Identity` ekleyin. Klasör adı `identity` olsun.
 8. `press.localhost` sitesini açın. Press'i ve `press_tr` uygulamasını kurun.
 9. Duman testini yazın ve çalıştırın.
 10. Commit atın ve `ready` raporlayın. Raporda çalışan sürümleri ve komutları yazın.

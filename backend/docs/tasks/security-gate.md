@@ -5,16 +5,16 @@ Bu iş backend için otomatik bir güvenlik kapısı kurar. Kapı her değişikl
 Önce şu dosyaları okuyun:
 
 1. `backend/AGENTS.md`
-2. `backend/PROJE-KAYDI.md`
-3. `backend/docs/sozlesmeler.md`
+2. `backend/PROJECT-RECORD.md`
+3. `backend/docs/contracts.md`
 4. `docs/standartlar/frappe-python-standartlari.md`, özellikle 6. bölüm (G-1 ile G-16)
 5. Karar sitesinde `src/content/docs/kalite-kurallari.md`
 
 ## Sahip olduğunuz yerler
 
-- `backend/dev/guvenlik/`
-- `backend/dev/bin/guvenlik-denetimi`
-- `backend/docs/kararlar/0005-guvenlik-kapisi.md`
+- `backend/dev/security/`
+- `backend/dev/bin/security-check`
+- `backend/docs/decisions/0005-security-gate.md`
 
 ## Ekibin önerdiği önlemler
 
@@ -60,9 +60,9 @@ Her kural için bir hatalı ve bir doğru örnek dosya yazın. Test, kuralın ha
 1. Bütün `@frappe.whitelist` uçlarını listeleyen bir betik yazın. Python'un `ast` modülü yeterlidir.
 2. Betik misafire açık uçları ayrı bir raporda göstersin.
 3. Her uç için iki testin varlığını denetleyin: girişsiz ret ve başka kullanıcının verisi. Test yoksa denetim başarısız olsun.
-4. Testlerin adlandırma kuralını `backend/dev/guvenlik/README.md` dosyasına yazın.
+4. Testlerin adlandırma kuralını `backend/dev/security/README.md` dosyasına yazın.
 5. Yeni özellik için kötüye kullanım kartı şablonunu yazın. Kart üç soru sorar: Kim yapabilir? Veri kimin? Girişsiz biri neyi görür?
-6. Bütün denetimleri `backend/dev/bin/guvenlik-denetimi` komutunda toplayın.
+6. Bütün denetimleri `backend/dev/bin/security-check` komutunda toplayın.
 7. Commit atın ve `done` raporlayın.
 
 ## Sınırlar
