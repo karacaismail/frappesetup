@@ -15,10 +15,12 @@ import socketserver
 import threading
 import time
 import unittest
+from unittest.mock import Mock, patch
 
 from anahtarlar import Anahtar, SahteJwks
 
 from oidc_verify import JwksCache, JwksUnavailable
+from oidc_verify.jwks import _Deadline, _http_fetcher
 
 TRICKLE_SECONDS = 4.0
 
@@ -133,6 +135,50 @@ class InFlightLimitTest(unittest.TestCase):
         deadline = time.monotonic() + TRICKLE_SECONDS + 2
         while _open_downloads() and time.monotonic() < deadline:
             time.sleep(0.1)
+
+    def test_cut_during_socket_setup_prevents_connect(self):
+        deadline = _Deadline(time.monotonic() + 1)
+        connection_socket = Mock()
+
+        def create_socket(*args):
+            deadline.cut()
+            return connection_socket
+
+        address = (socket.AF_INET, socket.SOCK_STREAM, 0, "", ("127.0.0.1", 443))
+        with patch.object(socket, "getaddrinfo", return_value=[address]):
+            with patch.object(socket, "socket", side_effect=create_socket):
+                with self.assertRaises(TimeoutError):
+                    deadline.create_connection(("example.test", 443), timeout=1)
+        connection_socket.connect.assert_not_called()
+        connection_socket.close.assert_called_once()
+
+    def test_replacement_download_uses_only_the_remaining_budget(self):
+        old_worker = Mock()
+        old_worker.is_alive.side_effect = [True, False]
+        new_worker = Mock()
+        old_finished = Mock()
+        new_finished = Mock()
+        now = 0.0
+
+        def consume_budget(seconds):
+            nonlocal now
+            now += seconds
+            return False
+
+        old_finished.wait.side_effect = consume_budget
+        old_worker.join.side_effect = lambda timeout: consume_budget(0.75)
+        new_finished.wait.side_effect = consume_budget
+
+        with (
+            patch.object(time, "monotonic", side_effect=lambda: now),
+            patch.object(threading, "Thread", side_effect=[old_worker, new_worker]),
+            patch.object(threading, "Event", side_effect=[old_finished, new_finished]),
+        ):
+            fetch = _http_fetcher("https://example.test/certs", timeout=1, total_timeout=1)
+            for _ in range(2):
+                with self.assertRaises(TimeoutError):
+                    fetch()
+        new_finished.wait.assert_called_once_with(0.25)
 
     def test_repeated_timeouts_keep_at_most_one_open_download(self):
         def slow_getaddrinfo(*args, **kwargs):

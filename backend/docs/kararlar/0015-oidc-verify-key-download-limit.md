@@ -14,9 +14,9 @@ Kitaplık, belirteç imzasını doğrulamak için Keycloak'ın anahtar listesini
 
 1. Her önbellek için aynı anda en çok bir indirme işi çalışır.
 2. İş sürerken gelen çağrı yeni iş başlatmaz. Çağrı önceki işi en çok `total_timeout` saniye bekler.
-3. Önceki iş biterse yeni iş başlar.
+3. Önceki iş zamanında biterse yeni iş kalan süreyi kullanır.
 4. Önceki iş bitmezse çağrı hata alır. Önbellekte geçerli eski anahtar varsa çağrı o anahtarı kullanır. Yoksa `JwksUnavailable` alır.
-5. Toplam süre ilk ağ adımında başlar. Adres araması, bağlantı, şifreli bağlantı kurulumu, başlıklar ve gövde bu süreye girer.
+5. Çağrı tek süre sınırı kullanır. Bekleme ve adres araması bu süreye girer. Bağlantı, şifreli bağlantı, başlıklar ve gövde de aynı süreye girer.
 6. Süre dolunca açık bağlantı kesilir.
 7. Süresi dolan iş, adres araması bittikten sonra bağlantı açmaz.
 
@@ -30,9 +30,10 @@ En kötü durumda bir önbellekte bir indirme işi açık kalır. Yeni iş başl
 
 Testler `backend/libs/oidc_verify/tests/test_jwks_total_deadline.py` dosyasındadır:
 
-- `test_repeated_timeouts_keep_at_most_one_open_download`: art arda dört süre dolumunda en çok bir iş açık kalır.
-- `test_expired_download_does_not_connect_after_name_resolution`: süresi dolan iş, adres araması bittikten sonra bağlantı açmaz.
-- `test_total_deadline_covers_name_resolution` ve `test_total_deadline_covers_the_tls_handshake`: çağrı ve kilit süre dolunca serbest kalır.
+- `test_repeated_timeouts_keep_at_most_one_open_download` dört süre dolumunda açık iş sayısını ölçer.
+- `test_expired_download_does_not_connect_after_name_resolution` geç biten adres aramasını sınar.
+- `test_cut_during_socket_setup_prevents_connect` bağlantı hazırlığında süre dolmasını sınar.
+- İki süre testi, adres araması ve şifreli bağlantı sırasında çağrının döndüğünü gösterir.
 
 ## Geri dönüş
 

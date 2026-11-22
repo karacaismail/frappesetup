@@ -100,7 +100,9 @@ class ServisBelirteciTesti(unittest.TestCase):
 
     def test_yonetim_rolleri_kc_admin_api_olmadan_admin_api_acmaz(self):
         veri = self.belirtec("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api")
-        self.assertEqual(admin("/users?max=1", veri["access_token"]).durum, 403)
+        response = admin("/users?max=1", veri["access_token"])
+        # Without kc-admin-api, the Admin API audience check rejects the token.
+        self.assertEqual(response.durum, 401, safe_detail(response))
 
     def test_press_service_kiraci_kapsami_alir_press_kapsami_alamaz(self):
         veri = self.belirtec("press-service", "ATONOTA_PRESS_SERVICE_SECRET", "aud-site-kiraci1")
@@ -208,7 +210,8 @@ class RealmAyarlariTesti(unittest.TestCase):
             govde={"clientId": "saldirgan-istemci", "redirectUris": ["https://kotu.example/*"]},
         )
         self.assertIn(yanit.durum, (401, 403), safe_detail(yanit))
-        self.assertEqual(admin("/clients?clientId=saldirgan-istemci", self.yonetici).json(), [])
+        clients = admin("/clients?clientId=saldirgan-istemci", self.yonetici)
+        self.assertTrue(clients.json() == [], safe_detail(clients))
 
     def test_tenant_authorize_without_pkce_is_refused(self):
         # D-6: the real authorize endpoint must refuse a tenant login request that carries no code_challenge.
@@ -219,9 +222,9 @@ class RealmAyarlariTesti(unittest.TestCase):
         yanit = get_without_redirect(f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{sorgu}")
         konum = yanit.basliklar.get("Location", "")
         self.assertFalse(b'name="username"' in yanit.govde, safe_detail(yanit))
-        self.assertNotIn("code=", konum)
+        self.assertFalse("code=" in konum, safe_detail(yanit))
         if yanit.durum in (302, 303):
-            self.assertIn("error=invalid_request", konum)
+            self.assertTrue("error=invalid_request" in konum, safe_detail(yanit))
         else:
             self.assertEqual(yanit.durum, 400)
 

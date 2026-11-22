@@ -126,10 +126,10 @@ class AccountBacklogLiveTest(unittest.TestCase):
             self.assertTrue(actions[alias]["enabled"], alias)
 
     def test_disabled_providers_are_not_on_the_login_page(self):
-        _, _, html = _ac(_cerezli_acici(), tenant_authorize_url())
+        status, _, html = _ac(_cerezli_acici(), tenant_authorize_url())
         for alias in ("google", "apple"):
-            self.assertNotIn(f"/broker/{alias}/login", html, alias)
-            self.assertNotIn(f'id="social-{alias}"', html, alias)
+            self.assertFalse(f"/broker/{alias}/login" in html, f"HTTP {status}")
+            self.assertFalse(f'id="social-{alias}"' in html, f"HTTP {status}")
 
     def test_new_user_does_not_get_the_delete_account_role(self):
         username = f"customer-{uuid.uuid4().hex[:10]}"
@@ -170,7 +170,7 @@ class AccountBacklogLiveTest(unittest.TestCase):
         location = headers.get("Location", "")
         if status in (302, 303) and location.startswith(self.kc):
             status, headers, html = _ac(opener, location)
-        self.assertNotIn('id="kc-deleteaccount-form"', html, "Keycloak must not offer its own delete step")
+        self.assertFalse('id="kc-deleteaccount-form"' in html, f"HTTP {status}")
         self.assertEqual(admin(f"/users/{user_id}", yonetici_belirteci()).durum, 200, "the user must still exist")
 
 

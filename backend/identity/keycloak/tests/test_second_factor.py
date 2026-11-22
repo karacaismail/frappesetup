@@ -92,18 +92,18 @@ class SecondFactorTest(unittest.TestCase):
         form = urllib.parse.urlencode({"username": TOTP_USER, "password": TOTP_PASSWORD, "credentialId": ""}).encode()
         status, headers, html = _ac(opener, _form_hedefi(html), form)
         self.assertEqual(status, 200, "password alone must not finish the login")
-        self.assertNotIn("code=", headers.get("Location", ""))
+        self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "the OTP form must be shown after the password")
         self._pause_for_quick_login_check()
         # A wrong code is rejected.
         status, headers, html = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": "000000"}).encode())
-        self.assertNotIn("code=", headers.get("Location", ""))
+        self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "wrong code must keep the OTP form")
         self._pause_for_quick_login_check()
         # The correct code completes the login with an authorization code.
         status, headers, _ = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         self.assertEqual(status, 302)
-        self.assertIn("code=", headers.get("Location", ""))
+        self.assertTrue("code=" in headers.get("Location", ""), f"HTTP {status}")
 
     def test_authorization_code_is_bound_to_pkce_verifier(self):
         """The code from a full login can only be exchanged with the matching code_verifier."""

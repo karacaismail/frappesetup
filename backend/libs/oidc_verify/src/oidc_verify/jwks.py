@@ -66,10 +66,16 @@ class _Deadline:
     read in any stage that has a socket: the TLS handshake, the status line, the headers and the body.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, end: float) -> None:
         self._lock = threading.Lock()
         self._conn: http.client.HTTPConnection | None = None
-        self.expired = False
+        self._connecting: socket.socket | None = None
+        self._end = end
+        self._cancelled = False
+
+    @property
+    def expired(self) -> bool:
+        return self._cancelled or time.monotonic() >= self._end
 
     def attach(self, conn: http.client.HTTPConnection) -> None:
         with self._lock:
@@ -94,22 +100,40 @@ class _Deadline:
                 raise TimeoutError("JWKS download exceeded total_timeout")
             sock = socket.socket(family, kind, proto)
             try:
-                if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:  # type: ignore[attr-defined]
-                    sock.settimeout(timeout)
                 if source_address:
                     sock.bind(source_address)
+                with self._lock:
+                    remaining = self._end - time.monotonic()
+                    if self._cancelled or remaining <= 0:
+                        raise TimeoutError("JWKS download exceeded total_timeout")
+                    operation_timeout = None if timeout is socket._GLOBAL_DEFAULT_TIMEOUT else timeout  # type: ignore[attr-defined]
+                    sock.settimeout(
+                        remaining if operation_timeout is None else min(remaining, operation_timeout)
+                    )
+                    self._connecting = sock
                 sock.connect(target)
+                with self._lock:
+                    if self.expired:
+                        raise TimeoutError("JWKS download exceeded total_timeout")
+                    sock.settimeout(operation_timeout)
+                    if self._conn is not None:
+                        self._conn.sock = sock
                 return sock
             except OSError as error:
                 last_error = error
                 sock.close()
+            finally:
+                with self._lock:
+                    self._connecting = None
         raise last_error or OSError("getaddrinfo returned no address")
 
     def cut(self) -> None:
         with self._lock:
-            self.expired = True
-            conn = self._conn
-        sock = getattr(conn, "sock", None)
+            self._cancelled = True
+            connecting = self._connecting
+            sock = getattr(self._conn, "sock", None)
+        if connecting is not None and connecting is not sock:
+            connecting.close()
         if sock is not None:
             try:
                 sock.shutdown(socket.SHUT_RDWR)
@@ -226,7 +250,8 @@ def _http_fetcher(
         # The URL was checked in JwksCache.__init__ (_check_url). The opener refuses redirects.
         # S310 checks the scheme of a URL opened by urllib: _check_url allows only https and dev http.
         request = urllib.request.Request(jwks_url, headers={"Accept": "application/json"})  # noqa: S310
-        deadline = _Deadline()
+        end = time.monotonic() + total_timeout
+        deadline = _Deadline(end)
         opener = urllib.request.build_opener(
             _NoRedirect(), _DeadlineHTTPHandler(deadline), _DeadlineHTTPSHandler(deadline)
         )
@@ -245,12 +270,14 @@ def _http_fetcher(
         with running_lock:
             if running and running[0].is_alive():
                 # A cut download ends within moments. Wait for it at most total_timeout, never longer.
-                running[0].join(total_timeout)
+                running[0].join(max(0.0, end - time.monotonic()))
                 if running[0].is_alive():
                     raise TimeoutError("the previous JWKS download is still running")
+            if deadline.expired:
+                raise TimeoutError("JWKS download exceeded total_timeout")
             running[:] = [worker]
             worker.start()
-        if not finished.wait(total_timeout):
+        if not finished.wait(max(0.0, end - time.monotonic())) or deadline.expired:
             deadline.cut()
             raise TimeoutError("JWKS download exceeded total_timeout")
         if "error" in outcome:

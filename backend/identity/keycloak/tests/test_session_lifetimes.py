@@ -116,47 +116,47 @@ class SessionLifetimeLiveTest(unittest.TestCase):
     def test_cookie_finishes_the_login_while_the_level_is_valid(self):
         opener, status, headers, _ = _login(tenant_authorize_url())
         self.assertEqual(status, 302)
-        self.assertIn("code=", headers["Location"])
+        self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
         status, headers, _ = _ac(opener, tenant_authorize_url())
         self.assertEqual(status, 302, "a valid level lets the cookie finish the login")
-        self.assertIn("code=", headers["Location"])
+        self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
 
     def test_employee_must_log_in_again_after_the_level_expires(self):
         opener, status, headers, _ = _login(tenant_authorize_url())
-        self.assertIn("code=", headers["Location"])
+        self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
         time.sleep(self.SHORT + 2)
         status, headers, html = _ac(opener, tenant_authorize_url())
-        self.assertNotIn("code=", headers.get("Location", ""), "the open cookie must not skip the login")
+        self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertEqual(status, 200)
-        self.assertIn('name="password"', html)
+        self.assertTrue('name="password"' in html, f"HTTP {status}")
 
     def test_a_lower_requested_level_does_not_skip_the_login(self):
         # minimum.acr.value=employee: acr_values=0 or an unknown ACR must not let the cookie answer after expiry.
         opener, status, headers, _ = _login(tenant_authorize_url())
-        self.assertIn("code=", headers["Location"])
+        self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
         time.sleep(self.SHORT + 2)
         for extra in ("&acr_values=0", "&acr_values=unknown"):
             with self.subTest(extra=extra):
                 status, headers, html = _ac(opener, tenant_authorize_url() + extra)
-                self.assertNotIn("code=", headers.get("Location", ""), "a lower level must not skip the login")
+                self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
 
     def test_customer_cookie_is_not_affected(self):
         opener, status, headers, _ = _login(tenant_authorize_url())
-        self.assertIn("code=", headers["Location"])
+        self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
         time.sleep(self.SHORT + 2)
         _pause()
         status, headers, _ = _ac(opener, self._press_authorize_url())
         self.assertEqual(status, 302, "the customer client requests no level, so the 7 day cookie is enough")
-        self.assertIn("code=", headers["Location"])
+        self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
 
 
     def test_press_can_force_a_fresh_login(self):
         # Contract 42f8e32: before an account deletion Press asks Keycloak for a fresh login
         # (prompt=login, max_age=0). The open cookie must not answer either request.
         opener, status, headers, _ = _login(tenant_authorize_url())
-        self.assertIn("code=", headers["Location"])
+        self.assertTrue("code=" in headers["Location"], f"HTTP {status}")
         status, headers, _ = _ac(opener, self._press_authorize_url())
-        self.assertIn("code=", headers.get("Location", ""), "without the parameters the cookie is enough")
+        self.assertTrue("code=" in headers.get("Location", ""), f"HTTP {status}")
         # OIDCLoginProtocol.requireReauthentication (26.8.2, line 570) asks again only when
         # auth_time + max_age < now, counted in whole seconds. A max_age=0 request in the same second as the
         # login is answered by the cookie. prompt=login always asks again. Press sends both parameters.
@@ -164,9 +164,9 @@ class SessionLifetimeLiveTest(unittest.TestCase):
         for extra in ({"prompt": "login"}, {"max_age": "0"}, {"prompt": "login", "max_age": "0"}):
             with self.subTest(**extra):
                 status, headers, html = _ac(opener, self._press_authorize_url(**extra))
-                self.assertNotIn("code=", headers.get("Location", ""), "the cookie must not skip the login")
+                self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
                 self.assertEqual(status, 200)
-                self.assertIn('name="password"', html)
+                self.assertTrue('name="password"' in html, f"HTTP {status}")
 
 if __name__ == "__main__":
     unittest.main()

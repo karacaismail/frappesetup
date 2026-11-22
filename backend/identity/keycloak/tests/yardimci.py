@@ -45,7 +45,10 @@ class HttpYanit:
         self.basliklar = basliklar
 
     def json(self):
-        return json.loads(self.govde.decode("utf-8"))
+        try:
+            return json.loads(self.govde.decode("utf-8"))
+        except ValueError:
+            raise ValueError(safe_detail(self)) from None
 
 
 def safe_detail(response: "HttpYanit") -> str:

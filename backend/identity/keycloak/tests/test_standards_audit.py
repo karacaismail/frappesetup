@@ -192,6 +192,12 @@ class NoRawResponseInMessagesTest(unittest.TestCase):
             # A slice of a response object's raw body; a local dict of decoded claims is fine.
             self.assertIsNone(re.search(r"\.govde\[", text), path.name)
 
+    def test_unreadable_json_reports_only_status(self):
+        from yardimci import HttpYanit
+
+        with self.assertRaisesRegex(ValueError, r"^HTTP 502$"):
+            HttpYanit(502, b"\xff", {}).json()
+
     def test_safe_detail_keeps_status_and_error_code_only(self):
         from yardimci import HttpYanit, safe_detail
 

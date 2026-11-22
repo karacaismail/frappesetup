@@ -125,30 +125,30 @@ class MagicLinkLiveTest(unittest.TestCase):
         # MT-7: a preview or scanner without the browser session must not consume the link.
         stranger = _cerezli_acici()
         status, headers, _ = _keycloak_icinde_izle(stranger, link, self.kc)
-        self.assertNotIn("code=", headers.get("Location", ""), "another browser must not get a code")
+        self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         # The requesting browser still completes the login.
         status, headers, _ = _keycloak_icinde_izle(opener, link, self.kc)
         location = headers.get("Location", "")
         self.assertEqual(status, 302, "first click in the requesting browser must finish the login")
-        self.assertTrue(location.startswith(ortam("ATONOTA_SITE_KIRACI1_URL")), location[:120])
-        self.assertIn("code=", location)
+        self.assertTrue(location.startswith(ortam("ATONOTA_SITE_KIRACI1_URL")), f"HTTP {status}")
+        self.assertTrue("code=" in location, f"HTTP {status}")
         # Single use: the same link does not work twice.
         status, headers, _ = _keycloak_icinde_izle(opener, link, self.kc)
-        self.assertNotIn("code=", headers.get("Location", ""), "link must be single use")
+        self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
 
     def test_link_does_not_skip_totp(self):
         opener, link = self._request_link(TOTP_USER)
         status, headers, html = _keycloak_icinde_izle(opener, link, self.kc)
-        self.assertNotIn("code=", headers.get("Location", ""), "no code before the second factor")
+        self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "the OTP form must follow the magic link")
         time.sleep(1.2)
         status, headers, html = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": "000000"}).encode())
-        self.assertNotIn("code=", headers.get("Location", ""))
+        self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "wrong code must keep the OTP form")
         time.sleep(1.2)
         status, headers, _ = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         self.assertEqual(status, 302)
-        self.assertIn("code=", headers.get("Location", ""))
+        self.assertTrue("code=" in headers.get("Location", ""), f"HTTP {status}")
 
     def test_link_lifetime_matches_configuration(self):
         executions = admin(f"/authentication/flows/{AKIS}/executions", self.admin_token).json()
@@ -173,4 +173,4 @@ class MagicLinkLiveTest(unittest.TestCase):
         other = _cerezli_acici()
         _ac(other, tenant_authorize_url())
         status, headers, _ = _keycloak_icinde_izle(other, link, self.kc)
-        self.assertNotIn("code=", headers.get("Location", ""))
+        self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
