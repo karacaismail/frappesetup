@@ -26,9 +26,9 @@ Kapatma komutu veritabanı birimlerini korur.
 Kiracı adresinde `kiraci1.localhost` adını kullanın.
 Frappe, adresin bu bölümünden siteyi seçer.
 Açma komutu yerel bağlantı için SSH tünelini de başlatır.
-Tüneli ayrı açmak için `backend/dev/bin/tunel ac` komutunu kullanın.
-Farklı portlar gerekirse önce `backend/dev/bin/tunel kapat` komutunu çalıştırın.
-Sonra `backend/dev/bin/tunel ac` komutuna gereken tüm portları yazın.
+Tüneli ayrı açmak için `backend/dev/bin/tunnel open` komutunu kullanın.
+Farklı portlar gerekirse önce `backend/dev/bin/tunnel close` komutunu çalıştırın.
+Sonra `backend/dev/bin/tunnel open` komutuna gereken tüm portları yazın.
 
 Test komutu `test-platform-core.localhost` sitesini kullanır.
 `allow_tests` ayarı yalnız test sitesinde açıktır.
