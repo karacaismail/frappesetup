@@ -4,8 +4,8 @@ info:
   version: 0.1.0
   summary: Endpoints for the permission reason, the scope summary and field level management.
   description: |
-    This contract describes the endpoints of the `platform_core.erisim` module.
-    The decision note is the file `docs/kararlar/0006-erisim-kurali.md`.
+    This contract describes the endpoints of the `platform_core.access` module.
+    The decision note is the file `docs/decisions/0006-access-rule.md`.
 
     The engine narrows records. The role permission grants access. The permission level closes a field.
 
@@ -14,7 +14,8 @@ info:
     The fields of the “Access Rule” record are in the `AccessRule` schema below.
 
     Identity: the Frappe session cookie. A POST request needs the `X-Frappe-CSRF-Token` header.
-    A guest cannot reach any endpoint.
+    A guest without a session receives 403. A missing or expired session referenced by a cookie
+    receives 401 with `session_expired: 1` and `exc_type: SessionExpired` (shared contract SZ-8).
 
     The error response has Frappe's usual format. A permission error returns 403.
     Invalid input returns 417. A record that is not found returns 404.
@@ -110,6 +111,8 @@ paths:
                       governed: true
                       layers: {role: true, access_rule: false, share: false}
                       rules: []
+        "401":
+          $ref: "#/components/responses/SessionExpired"
         "403":
           description: |
             A guest request. Or an ordinary user asked about another user.
@@ -175,6 +178,8 @@ paths:
                         delete: []
                         submit: []
                         cancel: []
+        "401":
+          $ref: "#/components/responses/SessionExpired"
         "403":
           description: A guest request, no read permission on the document type, or the document type does not exist.
 
@@ -418,6 +423,8 @@ paths:
                         value: {type: string, description: Name of the record.}
                         label: {type: string, description: Title shown for the record.}
                         description: {type: string, description: Extra text shown under the title.}
+        "401":
+          $ref: "#/components/responses/SessionExpired"
         "403":
           description: |
             Guest request, no `select` or `read` permission on the document type, or a custom
@@ -528,6 +535,8 @@ paths:
                         - type: array
                           items: {}
                         - type: object
+        "401":
+          $ref: "#/components/responses/SessionExpired"
         "403":
           description: |
             Guest request, no `select` or `read` permission on the document type, or a custom
@@ -591,6 +600,8 @@ paths:
                 properties:
                   message:
                     type: object
+        "401":
+          $ref: "#/components/responses/SessionExpired"
         "403":
           description: |
             Guest request, no `select` or `read` permission on the document type, or a custom
@@ -727,6 +738,24 @@ x-ai-tools:
         Narrowing a rule removes access. This is why the tool carries the `destructive` flag.
 
 components:
+  responses:
+    SessionExpired:
+      description: The session cookie refers to a missing or expired session. Sign in again.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [session_expired, exc_type]
+            properties:
+              session_expired:
+                type: integer
+                const: 1
+              exc_type:
+                type: string
+                const: SessionExpired
+          example:
+            session_expired: 1
+            exc_type: SessionExpired
   securitySchemes:
     frappeSession:
       type: apiKey
