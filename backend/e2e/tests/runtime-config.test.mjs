@@ -62,6 +62,7 @@ test('preview webhook uses the Keycloak development hostname and its network ali
             done
             while [[ "$1" != --network-alias && $# -gt 1 ]]; do shift; done
             printf '%s\\n' "$2" > "$PREVIEW_DIR/alias"
+            printf '%s\\n' "$*" > "$PREVIEW_DIR/sync-create"
             exit 42 ;;
         esac
       `,
@@ -87,6 +88,7 @@ test('preview webhook uses the Keycloak development hostname and its network ali
     assert.equal(webhook.protocol, 'http:');
     assert.equal(webhook.hostname, 'event-sink.localhost');
     assert.equal(webhook.pathname, '/v1/events');
+    assert.match(readFileSync(join(root, 'sync-create'), 'utf8'), /--network-alias identity-sync(?: |\n)/);
     assert.equal(readFileSync(join(root, 'alias'), 'utf8').trim(), webhook.hostname);
     assert.equal(readFileSync(join(root, 'service-secret-in-env'), 'utf8'), '');
     assert.throws(() => readFileSync(join(root, 'service-secret-on-disk')), { code: 'ENOENT' });

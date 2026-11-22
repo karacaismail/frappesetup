@@ -11,7 +11,7 @@ try {
     [0, 'keycloak', port],
     [1, 'tenant-web', port + 1],
     [3, 'web', port + 3],
-    [5, 'event-sink.localhost', port + 5],
+    [5, 'identity-sync', port + 5],
     [6, 'mailpit', 8025],
     [7, 'e2e-provider', port + 7],
   ]) {

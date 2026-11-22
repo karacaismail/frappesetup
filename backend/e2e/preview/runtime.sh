@@ -279,7 +279,7 @@ BASH
         printf '%s\n' 'IDENTITY_SYNC_HOST=0.0.0.0' 'IDENTITY_SYNC_REALM=platform' 'IDENTITY_SYNC_CLIENT_ID=identity-sync' \
             'IDENTITY_SYNC_ADMIN_SCOPE=admin-api kc-admin-api' 'IDENTITY_SYNC_DB=/tmp/e2e-sync.sqlite' 'IDENTITY_SYNC_SESSION_AZP=site-tenant1-service' 'IDENTITY_SYNC_EXECUTE_AZP=site-tenant1-service'
     } > "$sync_env"
-    docker_preview create --label "$sidecar_label=$PREVIEW_PROJECT" --name "$sync" --network "$network" --network-alias "$sync_host" --memory 128m \
+    docker_preview create --label "$sidecar_label=$PREVIEW_PROJECT" --name "$sync" --network "$network" --network-alias "$sync_host" --network-alias identity-sync --memory 128m \
         --env-file "$sync_env" -e PYTHONPATH=/tmp --publish "127.0.0.1:$sync_port:$sync_port" \
         --entrypoint /home/frappe/frappe-bench/env/bin/python "$tenant_image" -m identity_sync serve
     docker_preview cp "$identity_dir/identity_sync/identity_sync" "$sync:/tmp/identity_sync"
@@ -320,7 +320,7 @@ wait_http() {
 }
 
 wait_http "$KC_PUBLIC_URL/realms/platform/.well-known/openid-configuration" keycloak
-wait_http "http://$sync_host:$sync_port/healthz" "$sync_host"
+wait_http "http://$sync_host:$sync_port/healthz" identity-sync
 wait_http "http://$E2E_PROVIDER_HOST:$provider_port/attempts" "$E2E_PROVIDER_HOST"
 
 # Frappe caches site settings on requests, including the readiness ping.
