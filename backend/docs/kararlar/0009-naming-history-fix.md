@@ -37,7 +37,7 @@ Git taramasında taşınacak uygulama değeri bulunmadı.
 Türkçe seçenekler, sonunda kendi kayıtlarını silen bir testte bulundu.
 Betik bu seçenekleri `Red` ve `Blue` olarak düzeltir.
 Test verisi için taşıma yaması eklenmedi.
-Canlı bir sitede eski değer bulunursa o değeri ayrı bir Frappe yamasıyla taşıyın.
+Canlı sitede eski değer varsa Frappe yamasıyla taşıyın.
 Yama alanı ve eski değeri açıkça belirtmelidir.
 Yamayı önce eski verinin bir kopyasında sınayın.
 
