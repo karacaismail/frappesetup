@@ -18,7 +18,6 @@ from hook_validation import HOOK_RULES, invalid_hook_uses, node_names, opaque_ho
 from source import (
     FUNCTIONS,
     assignments,
-    declaration_targets,
     imports,
     mapping,
     qualified,
@@ -27,6 +26,7 @@ from source import (
     sql_calls,
     stable_bindings,
     string,
+    tool_declarations,
     walk,
 )
 from translations import translation_checks
@@ -520,6 +520,114 @@ def tool_helper_names(body, module, package, inherited_aliases):
             yield name
 
 
+TOOL_FIELDS = {
+    "name",
+    "description",
+    "arguments",
+    "kind",
+    "roles",
+    "destructive",
+    "billable",
+    "handler",
+    "preview",
+    "prepare",
+    "versioned",
+}
+
+
+def tool_function(name, functions, sources, reexports):
+    target = resolve_app_export(name, functions, reexports)
+    if target is None:
+        return None
+    module, fn = functions[target]
+    _, _, tree, _, _, _ = sources[module]
+    if fn not in tree.body or target != f"{module}.{fn.name}":
+        return None
+    index = tree.body.index(fn)
+    return None if binding_changes(tree.body[index + 1 :], fn.name) else target
+
+
+def preview_uses_execution(callbacks, functions, sources, reexports):
+    preview = callbacks.get("preview")
+    handler = callbacks.get("handler")
+    if preview is None or handler is None:
+        return False
+    module, fn = functions[preview]
+    _, _, tree, _, _, package = sources[module]
+    aliases = imported_aliases(tree.body, package)
+    return any(
+        resolve_app_export(name, functions, reexports) == handler
+        for name in tool_helper_names(fn.body, module, package, aliases)
+    )
+
+
+def tool_registration_checks(registered, functions, sources, reexports, endpoints, emit):
+    targets = {}
+    for name, (hook, line) in registered.items():
+        function = tool_function(name, functions, sources, reexports)
+        if function is None:
+            emit(hook, line, "ai-tool", f"No callable registration function for {name}.")
+            continue
+        targets[function] = hook, line
+        module, fn = functions[function]
+        path, _, tree, _, _, _ = sources[module]
+        if not has_text(ast.get_docstring(fn)):
+            emit(path, fn.lineno, "ai-tool", f"Registration function {name} needs a docstring.")
+        for entry_line, entry, names in tool_declarations(fn, stable_bindings(tree.body)):
+            if not entry or "handler" not in entry:
+                emit(path, entry_line, "ai-tool", "Cannot resolve AI tool declaration and handler.")
+                continue
+            if entry.keys() - TOOL_FIELDS:
+                emit(path, entry_line, "ai-tool", "AI tool declaration contains unsupported fields.")
+            if not has_text(string(entry.get("description"), names)):
+                emit(path, entry_line, "ai-tool", "AI tool needs a non-empty description.")
+            kind = string(entry.get("kind"), names)
+            if kind not in {"read", "write"}:
+                emit(path, entry_line, "ai-tool", "AI tool kind must be read or write.")
+            callbacks = {}
+            for key in ("handler", "preview", "prepare"):
+                if key not in entry:
+                    continue
+                value = string(entry[key], names)
+                callback = (
+                    tool_function(value, functions, sources, reexports)
+                    if value and METHOD_PATH.fullmatch(value)
+                    else None
+                )
+                if callback is None:
+                    emit(
+                        path,
+                        entry[key].lineno,
+                        "ai-tool",
+                        f"AI tool {key} must point to an existing function.",
+                    )
+                else:
+                    callbacks[key] = callback
+                    targets[callback] = path, entry[key].lineno
+            if kind != "write":
+                continue
+            if "preview" not in entry or (
+                "preview" in callbacks and callbacks["preview"] == callbacks.get("handler")
+            ):
+                emit(path, entry_line, "ai-tool", "Write tool needs a separate preview function.")
+            elif preview_uses_execution(callbacks, functions, sources, reexports):
+                emit(
+                    path,
+                    entry["preview"].lineno,
+                    "ai-tool",
+                    "Write tool preview must not call its write handler.",
+                )
+            for key in ("handler", "prepare"):
+                if callbacks.get(key) in endpoints:
+                    emit(
+                        path,
+                        entry[key].lineno,
+                        "ai-tool",
+                        f"Write tool {key} must run through shared approval.",
+                    )
+    return targets
+
+
 def tool_sql_checks(targets, functions, sources, reexports, emit):
     pending = []
     for target, (hook, line) in targets.items():
@@ -666,7 +774,7 @@ def binding_changes(nodes, name):
     )
 
 
-def stable_website_reexports(sources):
+def stable_package_reexports(sources):
     return {
         f"{module}.{alias}": target
         for module, (path, _, tree, _, _, package) in sources.items()
@@ -819,28 +927,17 @@ def scan(root, commit_base=None, frappe_root=None):
         if path.stem == "__init__"
         for alias, name in imported_aliases(tree.body, package).items()
     }
+    stable_reexports = stable_package_reexports(sources)
     website_method_checks(
         website_entries,
         endpoints,
         functions,
         sources,
-        stable_website_reexports(sources),
+        stable_reexports,
         override_candidates,
         emit,
     )
-    targets = dict(registered)
-    for name, (hook, line) in registered.items():
-        function = resolve_app_export(name, functions, reexports)
-        if function is None:
-            continue
-        module, fn = functions[function]
-        path, _, tree, _, _, _ = sources[module]
-        module_names = stable_bindings(tree.body)
-        for target_line, target in declaration_targets(fn, module_names, METHOD_PATH):
-            if target is None:
-                emit(path, target_line, "sql", "Cannot resolve AI tool declaration target.")
-            else:
-                targets[target] = hook, line
+    targets = tool_registration_checks(registered, functions, sources, stable_reexports, endpoints, emit)
 
     referenced.update(tool_sql_checks(targets, functions, sources, reexports, emit))
 

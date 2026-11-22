@@ -16,6 +16,11 @@ APP = "apps/sample_app/sample_app"
 DOCTYPE = f"{APP}/records/doctype/contact_card/contact_card.json"
 CONTRACT = "contracts/sample_app.openapi.yaml"
 
+READ_REGISTRATION = (
+    'def declare():\n    "Register tools."\n'
+    '    return [{"description": "Read a card.", "kind": "read", "handler": "sample_app.tools.run"}]\n'
+)
+
 
 class GateTests(unittest.TestCase):
     def setUp(self):
@@ -583,6 +588,7 @@ class GateTests(unittest.TestCase):
             f"{APP}/declarations.py",
             """
             def tools():
+                "Register tools."
                 return [{
                     "name": "read_card",
                     "description": "Read a card.",
@@ -603,26 +609,34 @@ class GateTests(unittest.TestCase):
             """
             import frappe
             PATH = "sample_app.tools."
-            BASE = {"handler": PATH + "run"}
+            BASE = {"description": "Write a card.", "kind": "write", "handler": PATH + "run"}
 
             def declare():
-                return [{**BASE, "prepare": f"{PATH}prepare"}]
+                "Register tools."
+                return [{**BASE, "prepare": f"{PATH}prepare", "preview": f"{PATH}preview"}]
 
             def run():
                 frappe.db.sql("SELECT 1")
 
             def prepare():
                 frappe.db.sql("SELECT 1")
+
+            def preview():
+                pass
             """,
         )
         self.scan("sql", "sql")
 
     def test_unresolved_and_empty_tool_declarations(self):
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
-        for result in ('[{"handler": build_path()}]', '[{"name": "read"}]', "[]"):
+        for result in (
+            '[{"description": "Read a card.", "kind": "read", "handler": build_path()}]',
+            '[{"name": "read"}]',
+            "[]",
+        ):
             with self.subTest(result=result):
-                self.write(f"{APP}/tools.py", f"def declare():\n    return {result}\n")
-                self.scan("sql")
+                self.write(f"{APP}/tools.py", f'def declare():\n    "Register tools."\n    return {result}\n')
+                self.scan("ai-tool")
 
     def test_nested_whitelist_and_external_overrides(self):
         self.write(
@@ -776,7 +790,8 @@ class GateTests(unittest.TestCase):
             """
             from . import service as helpers
             def declare():
-                return [{"handler": "sample_app.tools.run"}]
+                "Register tools."
+                return [{"description": "Read a card.", "kind": "read", "handler": "sample_app.tools.run"}]
             def run():
                 helpers.read()
         """,
@@ -806,7 +821,7 @@ class GateTests(unittest.TestCase):
             with self.subTest(body=body):
                 self.write(
                     f"{APP}/tools.py",
-                    'def declare(): return [{"handler": "sample_app.tools.run"}]\ndef run():\n' + body,
+                    READ_REGISTRATION + "def run():\n" + body,
                 )
                 (finding,) = self.scan("sql")
                 self.assertEqual(finding["path"], f"{APP}/queries.py")
@@ -815,7 +830,7 @@ class GateTests(unittest.TestCase):
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.declarations.declare"]')
         self.write(
             f"{APP}/declarations.py",
-            'def declare(): return [{"handler": "sample_app.tools.run"}]',
+            READ_REGISTRATION,
         )
         self.write(
             f"{APP}/tools.py",
@@ -849,7 +864,8 @@ class GateTests(unittest.TestCase):
             """
             import frappe
             def declare():
-                return [{"handler": "sample_app.tools.run"}]
+                "Register tools."
+                return [{"description": "Read a card.", "kind": "read", "handler": "sample_app.tools.run"}]
             def run():
                 frappe.db.sql("SELECT 1")
             """,
@@ -861,7 +877,7 @@ class GateTests(unittest.TestCase):
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.declarations.declare"]')
         self.write(
             f"{APP}/declarations.py",
-            'def declare(): return [{"handler": "sample_app.tools.run"}]',
+            READ_REGISTRATION,
         )
         self.write(f"{APP}/__init__.py", "from .helpers import read")
         self.write(f"{APP}/helpers/__init__.py", "from .queries import query as read")
@@ -884,7 +900,8 @@ class GateTests(unittest.TestCase):
             """
             from .service import raw as read
             def declare():
-                return [{"handler": "sample_app.tools.run"}]
+                "Register tools."
+                return [{"description": "Read a card.", "kind": "read", "handler": "sample_app.tools.run"}]
             def run():
                 read()
             def unrelated():
@@ -1032,6 +1049,7 @@ class GateTests(unittest.TestCase):
             f"{APP}/tools.py",
             """
             def declare():
+                "Register tools."
                 return [{"handler": "sample_app.tools.run", role(): "sample_app.tools.prepare"}]
             def run():
                 pass
@@ -1039,7 +1057,7 @@ class GateTests(unittest.TestCase):
                 pass
             """,
         )
-        self.scan("sql")
+        self.scan("ai-tool")
 
     def test_tool_declaration_rejects_conditional_path(self):
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
@@ -1047,17 +1065,18 @@ class GateTests(unittest.TestCase):
             f"{APP}/tools.py",
             """
             def declare():
+                "Register tools."
                 PATH = "sample_app.tools.first"
                 if enabled():
                     PATH = "sample_app.tools.second"
-                return [{"handler": PATH}]
+                return [{"description": "Read a card.", "kind": "read", "handler": PATH}]
             def first():
                 pass
             def second():
                 pass
             """,
         )
-        self.scan("sql")
+        self.scan("ai-tool")
 
     def test_model_scan_preserves_numeric_suffix_names(self):
         self.write(f"{APP}/api.py", 'MODEL = "gpt-oss-20b"\nOTHER = "deepseek-r1"')
@@ -1161,6 +1180,108 @@ class GateTests(unittest.TestCase):
         self.write(f"{APP}/broken.py", chr(0))
         self.scan("input", "input")
 
+    def test_tool_registry_reports_missing_entry_and_description(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.missing", "sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            def declare():
+                return [{"kind": "read", "handler": "sample_app.tools.read"}]
+            def read():
+                pass
+            """,
+        )
+        findings = self.scan("ai-tool", "ai-tool", "ai-tool")
+        self.assertTrue(any("missing" in row["message"] for row in findings))
+        self.assertTrue(any("docstring" in row["message"] for row in findings))
+        self.assertTrue(any("description" in row["message"] for row in findings))
+
+    def test_write_tool_requires_distinct_preview_and_shared_approval(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        for fields, expected in (
+            ({}, ("ai-tool",)),
+            ({"preview": "sample_app.tools.write"}, ("ai-tool",)),
+            ({"preview": "sample_app.tools.missing"}, ("ai-tool",)),
+            ({"preview": "sample_app.tools.show", "requires_approval": False}, ("ai-tool",)),
+            ({"preview": "sample_app.tools.show"}, ()),
+        ):
+            with self.subTest(fields=fields):
+                entry = {
+                    "description": "Write a card.",
+                    "kind": "write",
+                    "handler": "sample_app.tools.write",
+                    **fields,
+                }
+                self.write(
+                    f"{APP}/tools.py",
+                    f'def declare():\n    "Register tools."\n    return [{entry!r}]\n'
+                    "def write(): pass\ndef show(): pass",
+                )
+                self.scan(*expected)
+
+    def test_write_tool_preview_cannot_call_execution_function(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            def declare():
+                "Register tool."
+                return [{
+                    "description": "Write a card.", "kind": "write",
+                    "handler": "sample_app.tools.run", "preview": "sample_app.tools.show",
+                }]
+            def run():
+                pass
+            def show():
+                return run()
+            """,
+        )
+        self.scan("ai-tool")
+
+    def test_write_tool_preview_can_reuse_preparation(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            def declare():
+                "Register tool."
+                return [{
+                    "description": "Write a card.", "kind": "write",
+                    "handler": "sample_app.tools.run", "preview": "sample_app.tools.show",
+                    "prepare": "sample_app.tools.prepare",
+                }]
+            def run():
+                pass
+            def prepare():
+                return {"summary": "Plan a card update."}
+            def show():
+                return prepare()
+            """,
+        )
+        self.scan()
+
+    def test_write_tool_rejects_whitelisted_execution_function(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.api.declare"]')
+        self.write(
+            f"{APP}/api.py",
+            """
+            import frappe
+            def declare():
+                "Register tool."
+                return [{
+                    "description": "Write a card.", "kind": "write",
+                    "handler": "sample_app.api.run", "preview": "sample_app.api.show",
+                }]
+            @frappe.whitelist()
+            def run():
+                pass
+            def show():
+                pass
+            """,
+        )
+        self.write_contract()
+        self.scan("ai-tool")
+
     def test_supported_python_version(self):
         from unittest.mock import patch
 
@@ -1228,10 +1349,7 @@ class GateTests(unittest.TestCase):
             with self.subTest(prefix=prefix, body=body):
                 self.write(
                     f"{APP}/tools.py",
-                    'from .queries import read\ndef declare(): return [{"handler": "sample_app.tools.run"}]\n'
-                    + prefix
-                    + "\n"
-                    + body,
+                    "from .queries import read\n" + READ_REGISTRATION + prefix + "\n" + body,
                 )
                 self.scan("sql")
 

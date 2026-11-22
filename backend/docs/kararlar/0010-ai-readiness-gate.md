@@ -132,10 +132,16 @@ Atlanan karşılaştırma için sonuç `not_run` olur. Kapı hata bulgusu yazmaz
   Kapı sınır dosyasında yapay zekâ ve MCP yollarını bulur.
   Kapı bu yolları ve sorumlu modülleri denetler.
   Sorumlu modülde Python dosyası yoksa kapı bulgu yazar.
-- Kapı araç bildiriminde `handler`, `preview` ve `prepare` değerlerini çözer.
+- Kapı `ai_tools` kaydının var olan bir kayıt işlevine gittiğini denetler.
+  Kayıt işlevinin açıklaması ve her aracın `description` alanı dolu olmalıdır.
+  Kapı `handler`, `preview` ve `prepare` adreslerinin var olan işlevlere gittiğini denetler.
   Kapı düz metni, birleştirilen metni ve f-string biçimini tanır.
   Kapı sabit bir sözlükten kopyalanan değerleri de inceler.
-  Kapı bir değeri çözemezse veya bildirim işlev vermiyorsa bulgu yazar.
+  Yazma aracı ayrı bir önizleme işlevi taşır.
+  Önizleme, yazma işlevini doğrudan çağırırsa kapı bulgu verir.
+  Yazma ve hazırlık işlevleri dışarıya açık ağ ucu olamaz.
+  Ortak yapay zekâ katmanı, `kind: write` araçlarını insan onayından geçirir.
+  Kapı kaynak kodunu okur. Çalışma anındaki onayı uç testleri doğrular.
 - Kapı test sınıflarındaki örnek model adlarını ve SQL çağrılarını atlayabilir.
   Bu istisna yalnız test modülündeki test sınıflarına uygulanır.
   Kapı başka bir modülden alınan ortak test sınıfını da tanır.
