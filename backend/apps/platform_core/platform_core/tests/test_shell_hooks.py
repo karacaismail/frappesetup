@@ -20,7 +20,7 @@ class TestShellPermissionHooks(IntegrationTestCase):
 
 		response = Response(headers={"X-Frame-Options": "DENY"})
 		pending = Headers({"Referrer-Policy": "no-referrer"})
-		with patch.object(frappe.local, "response_headers", pending):
+		with patch.object(frappe.local, "response_headers", pending, create=True):
 			add_security_headers(response)
 		self.assertEqual(response.headers.getlist("X-Frame-Options"), ["DENY"])
 		self.assertEqual(response.headers.getlist("X-Content-Type-Options"), ["nosniff"])
