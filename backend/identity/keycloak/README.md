@@ -73,7 +73,7 @@ Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzd
 
 ## İmaj çekme hatası
 
-Bu Mac'te Docker istemcisi `osxkeychain` yardımcısını arar ama yardımcı kurulu değil. İlk çekimde “error getting credentials” hatası çıkar. Çözüm: boş bir Docker ayar klasörü verin ve içine `contexts` ile `cli-plugins` klasörlerini kopyalayın. Sonra çekimi `DOCKER_CONFIG=<klasör>` ile yapın. İmaj yerelde olunca `kc-dev.sh up` normal çalışır.
+Bu Mac'te Docker istemcisi `osxkeychain` yardımcısını arar ama yardımcı kurulu değil. İlk çekimde “error getting credentials” hatası çıkar. Çözüm için boş bir Docker ayar klasörü açın. İçine `contexts` ve `cli-plugins` klasörlerini kopyalayın. Sonra çekimi `DOCKER_CONFIG=<klasör>` ile yapın. İmaj yerelde olunca `kc-dev.sh up` normal çalışır.
 
 ## Kapatma
 

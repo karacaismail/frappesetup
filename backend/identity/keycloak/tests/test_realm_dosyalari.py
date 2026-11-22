@@ -130,11 +130,15 @@ class RealmDosyasiTesti(unittest.TestCase):
             self.assertNotIn("credentials", kullanici)
 
     def test_identity_sync_has_least_privilege(self):
-        # Second review E2: identity-sync only reads users. No manage-* role anywhere.
+        # Contract 26a274c: identity-sync writes users (invites) and organizations (membership).
+        # Minimum set verified in Keycloak 26.8.2 (docs/kararlar/0003-keycloak-eklentileri.md).
+        beklenen = {"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations"}
         eslemeler = self.realm["clientScopeMappings"]["realm-management"]
-        self.assertEqual(set(eslemeler[0]["roles"]), {"view-users", "query-users"})
+        self.assertEqual(set(eslemeler[0]["roles"]), beklenen)
         hesap = [u for u in self.realm["users"] if u.get("serviceAccountClientId") == "identity-sync"][0]
-        self.assertEqual(set(hesap["clientRoles"]["realm-management"]), {"view-users", "query-users"})
+        self.assertEqual(set(hesap["clientRoles"]["realm-management"]), beklenen)
+        for yasak in ("manage-realm", "manage-clients", "realm-admin", "impersonation", "manage-identity-providers"):
+            self.assertNotIn(yasak, eslemeler[0]["roles"])
 
     def test_yonetim_rolleri_yalniz_ayri_kapsamda(self):
         eslemeler = self.realm["clientScopeMappings"]["realm-management"]

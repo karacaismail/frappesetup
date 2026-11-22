@@ -63,22 +63,37 @@ class ServisBelirteciTesti(unittest.TestCase):
         veri = self.belirtec("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api kc-admin-api")
         govde = jwt_govdesi(veri["access_token"])
         roller = set(govde["resource_access"]["realm-management"]["roles"])
-        # Least privilege (second review E2): read-only user roles; view-users expands to query-* roles.
-        self.assertTrue({"view-users", "query-users"} <= roller, roller)
-        self.assertFalse({r for r in roller if r.startswith("manage-")}, roller)
+        # Contract 26a274c: user and organization write roles, nothing realm-wide.
+        self.assertTrue({"view-users", "query-users", "manage-users", "view-organizations", "manage-organizations"} <= roller, roller)
+        self.assertFalse({"manage-realm", "manage-clients", "realm-admin", "impersonation"} & roller, roller)
         self.assertIn("realm-management", aud_listesi(govde))
         self.assertIn(f"{ortam('KC_PUBLIC_URL')}/admin/realms/platform", aud_listesi(govde))
         self.assertNotIn("site-kiraci1", aud_listesi(govde))
         self.assertEqual(admin("/users?max=1", veri["access_token"]).durum, 200)
 
-    def test_identity_sync_cannot_write_to_keycloak(self):
-        # D-6: the real Admin API must refuse a write with the identity-sync token while reads work.
-        veri = self.belirtec("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api kc-admin-api")
-        token = veri["access_token"]
-        self.assertEqual(admin("/users?max=1", token).durum, 200)
-        olustur = admin("/users", token, yontem="POST", govde={"username": "yazma-denemesi@example.test", "enabled": True})
-        self.assertEqual(olustur.durum, 403, olustur.govde[:200])
-        self.assertEqual(admin("/users?username=yazma-denemesi@example.test&exact=true", self.__class__.yonetici_token()).json(), [])
+    def test_identity_sync_admin_scope_can_create_user_and_organization(self):
+        # D-6 on the real Admin API: the admin-api token creates a user and an organization; the
+        # tenant-scoped token of the same account gets 403 (test_kiraci_belirtecinde_yonetim_yetkisi_yok).
+        token = self.belirtec("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api kc-admin-api")["access_token"]
+        yonetici = self.__class__.yonetici_token()
+        kullanici = "davet-denemesi@example.test"
+        for u in admin(f"/users?username={kullanici}&exact=true", yonetici).json():
+            admin(f"/users/{u['id']}", yonetici, yontem="DELETE")
+        olustur = admin("/users", token, yontem="POST", govde={"username": kullanici, "email": kullanici, "enabled": True})
+        self.assertEqual(olustur.durum, 201, olustur.govde[:200])
+        kuruluslar = admin("/organizations?search=deneme-kurulus&exact=true", yonetici).json()
+        for k in kuruluslar:
+            admin(f"/organizations/{k['id']}", yonetici, yontem="DELETE")
+        kurulus = admin("/organizations", token, yontem="POST",
+                        govde={"name": "deneme-kurulus", "alias": "deneme-kurulus", "domains": [{"name": "deneme-kurulus.example.test"}]})
+        self.assertEqual(kurulus.durum, 201, kurulus.govde[:200])
+        # Realm-wide writes stay forbidden for this account.
+        self.assertEqual(admin("/clients", token, yontem="POST", govde={"clientId": "yetki-denemesi"}).durum, 403)
+        # Cleanup with the master admin.
+        for u in admin(f"/users?username={kullanici}&exact=true", yonetici).json():
+            admin(f"/users/{u['id']}", yonetici, yontem="DELETE")
+        for k in admin("/organizations?search=deneme-kurulus&exact=true", yonetici).json():
+            admin(f"/organizations/{k['id']}", yonetici, yontem="DELETE")
 
     def test_yonetim_rolleri_kc_admin_api_olmadan_admin_api_acmaz(self):
         veri = self.belirtec("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api")

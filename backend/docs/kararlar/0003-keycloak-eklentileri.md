@@ -70,9 +70,48 @@ Proje sahibinin kararı açıktır: sihirli bağlantı ve Apple ile giriş MVP'y
 - Eklenti bir yıldır değişmedi. Güvenlik düzeltmesi gerekirse çatal alınır. Bu karar o zaman yeniden açılır.
 - Giriş ve e-posta şablonları eklentinin jar dosyasından gelir. Türkçe metinler kimlik-tema işinin `atonota` temasında verilir.
 
-### identity-sync en az yetki
+### identity-sync rolleri (sözleşme 26a274c)
 
-Aynı incelemenin eki: identity-sync servis hesabı yalnız `view-users` ve `query-users` rollerini taşır. `manage-users`, `manage-clients` ve `view-organizations` kaldırıldı. Canlı test bu hesabın Admin API'den kullanıcı okuyabildiğini gösterir. Aynı test kullanıcı oluşturma isteğinin 403 aldığını gösterir. identity-sync Keycloak'a yazmaz. Yazma gerekirse bu karar yeniden açılır.
+identity-sync davet ve kuruluş hazırlama için Keycloak'a yazar. Servis hesabı şu rolleri taşır: `view-users`, `query-users`, `manage-users`, `view-organizations`, `manage-organizations`. `manage-clients`, `manage-realm` ve `impersonation` yoktur. Roller yalnız `scope=admin-api kc-admin-api` belirtecine girer. Kiracı hedefli belirteç bu rolleri taşımaz ve Admin API'de 403 alır.
+
+En az rol kümesi Keycloak 26.8.2 kaynağından çıkarıldı:
+
+| İş | Keycloak ucu ve denetimi | Gereken rol |
+| --- | --- | --- |
+| Kullanıcı açma, davet e-postası (`execute-actions-email`) | `UsersResource` ve `UserResource`: `auth.users().requireManage()` | `manage-users` |
+| Kullanıcı okuma ve arama | `auth.users().requireView()` ve `requireQuery()` | `view-users` (bileşik: `query-users`, `query-groups`) |
+| Kuruluş açma | `services/src/main/java/org/keycloak/organization/admin/resource/OrganizationsResource.java`: `auth.orgs().requireManage()` | `manage-organizations` |
+| Kuruluşa üye ekleme ve çıkarma | `OrganizationMemberResource.java`: `auth.orgs().requireManage(organization)` ve `auth.users().requireView(member)` | `manage-organizations` ve `view-users` |
+| Kuruluş daveti | `OrganizationInvitationResource.java`: `auth.orgs().requireManage(organization)` | `manage-organizations` |
+| Kuruluş okuma ve arama | `auth.orgs().requireView(organization)` ve `requireQuery()` | `view-organizations` (bileşik: `query-organizations`) |
+
+Bileşik roller `services/src/main/java/org/keycloak/services/managers/RealmManager.java` 285 ile 289. satırlarında tanımlıdır. `manage-*` rolleri `view-*` rollerini içermez. Bu yüzden `view-users` ve `view-organizations` açıkça verilir. Rol adları `server-spi-private/src/main/java/org/keycloak/models/AdminRoles.java` dosyasındadır.
+
+Canlı test (`test_identity_sync_admin_scope_can_create_user_and_organization`) admin-api belirteciyle kullanıcı ve kuruluş açar (201). Aynı belirteçle istemci açma 403 alır. Kiracı hedefli belirteç Admin API'de 401 ya da 403 alır (`test_kiraci_belirtecinde_yonetim_yetkisi_yok`).
+
+### Olay dinleyici eklentisi (sözleşme 26a274c, Proje kaydı A-10)
+
+İhtiyaç: Keycloak kullanıcı ve yönetim olaylarını `identity_sync` servisinin `/v1/events` ucuna imzalı göndersin. İmza biçimi identity-sync sözleşmesindedir (`contracts/identity_sync.openapi.yaml`, `webhookSignature`): başlık `X-Identity-Sync-Signature: sha256=<onaltılık özet>`, başlık `X-Identity-Sync-Timestamp` (Unix saniye), HMAC-SHA256 anahtarı `IDENTITY_SYNC_WEBHOOK_SECRET`, imzalanan içerik `<zaman damgası>.<kip>.<ham gövde>`, kip `execute` ya da `preview`. Servis zaman damgasını 300 saniye payla denetler ve aynı imzayı bir kez kabul eder.
+
+Adaylar (22 Kasım 2026):
+
+| Eklenti | Lisans | Son değişiklik | İmza | Uyum |
+| --- | --- | --- | --- | --- |
+| `p2-inc/keycloak-events` | Elastic License 2.0 | 17 Kasım 2026 | `X-Keycloak-Signature`, HMAC gövde üzerinde | Lisans açık kaynak değil. Elenir. |
+| `vymalo/keycloak-webhook` | MIT | 5 Kasım 2025 | İmza yok. Yalnız temel kimlik doğrulama (`WEBHOOK_HTTP_AUTH_*`). | İmza koşulu sağlanmaz. |
+| `sashyo/keycloak-webhook-listener` | Apache-2.0 | 23 Ekim 2026 | `X-Keycloak-Signature: sha256=<özet>`, HMAC yalnız gövde üzerinde. Zaman damgası yok. Başlık adı ve imzalanan içerik kodda sabittir (`WebhookEventListenerProvider.java` 87 ve 101. satırlar). | Başlık adı, zaman damgası ve `<zaman>.<kip>.<gövde>` biçimi tutmaz. Yeniden gönderim koruması yok. |
+| `evilnet/keycloak-webhook-spi` | Depoda lisans dosyası yok | 20 Kasım 2026 | `X-Webhook-Signature: t=<saniye>,v1=<özet>`, HMAC `<t>.<gövde>` üzerinde. | Lisans belirsiz. Başlık adı ve biçim tutmaz. Kip parçası yok. |
+| `jessylenne/keycloak-event-listener-http` | Apache-2.0 | 13 Kasım 2025 | İmza yok. | İmza koşulu sağlanmaz. |
+
+Sonuç: Sözleşmedeki imza biçimini olduğu gibi üreten açık kaynak eklenti bulunamadı. Gövde biçimi de tutmaz: sashyo kendi alan adlarını yazar (`realm` adı, `realmId` yok). Sözleşme `realmId` ister.
+
+Seçenekler, orkestratörün kararına sunuldu:
+
+1. `sashyo/keycloak-webhook-listener` çatallanır (Apache-2.0, üç dosya, 8 KB). Başlık adları, zaman damgası ve `<zaman>.<kip>.<gövde>` imzası sözleşmeye göre eklenir. Gövde Keycloak'ın kendi olay biçiminde (`realmId` ile) gönderilir. Çatal bu depoda `identity/keycloak/event-listener/` altında durur ve imaj derlemesinde Maven ile derlenir. Bakımı bizde kalır. Önerilen yol budur.
+2. identity-sync sözleşmesi sashyo eklentisinin biçimine uyarlanır: `X-Keycloak-Signature`, yalnız gövde imzası. Yeniden gönderim koruması kaybolur. Sözleşme sahibi karar verir.
+3. Olay eklentisi bu turda kurulmaz. identity-sync olayları kendi işlemleriyle başlatır (karar notu 0001'deki eklentisiz yol).
+
+Bu karar verilene kadar olay eklentisi kurulmadı. Durum raporu `blocked` olarak verildi.
 
 ### Sosyal girişte ikinci adım (O6)
 

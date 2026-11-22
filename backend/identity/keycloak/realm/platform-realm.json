@@ -610,7 +610,7 @@
     },
     {
       "name": "admin-api",
-      "description": "identity-sync'in Admin API rolleri: yalnız kullanıcı okuma (view-users, query-users). Yalnız Admin API için ayrı istenen belirtece girer. kc-admin-api kapsamıyla birlikte istenir.",
+      "description": "identity-sync'in Admin API rolleri: kullanıcı okuma ve yazma, kuruluş okuma ve yazma. Yalnız Admin API için ayrı istenen belirtece girer. kc-admin-api kapsamıyla birlikte istenir.",
       "protocol": "openid-connect",
       "attributes": {
         "include.in.token.scope": "false",
@@ -646,7 +646,10 @@
         "clientScope": "admin-api",
         "roles": [
           "view-users",
-          "query-users"
+          "query-users",
+          "manage-users",
+          "view-organizations",
+          "manage-organizations"
         ]
       }
     ]
@@ -809,7 +812,10 @@
       "clientRoles": {
         "realm-management": [
           "view-users",
-          "query-users"
+          "query-users",
+          "manage-users",
+          "view-organizations",
+          "manage-organizations"
         ]
       }
     }
