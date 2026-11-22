@@ -1,5 +1,33 @@
 # Uçtan uca entegrasyon testleri
 
+## Birleştirme önizlemesi
+
+Resmî birleşme öncesi depo kökünden bu komutu çalıştırın.
+
+```sh
+backend/e2e/bin/merge-preview
+```
+
+Komut O-19 sırasını `preview/branches.txt` dosyasından okur.
+Backend ve işçi commit'lerini başlangıçta sabitler.
+Birleşmeleri ayrı bir worktree ve dal içinde yapar.
+Çakışma tablosu dosyayı ve iki dalı gösterir.
+Komut, tanımadığı bir çakışmada durur ve nedeni rapora yazar.
+
+Canlı koşu, `PANE_PORT`, kurulu Playwright ve varsayılan Colima'yı ister.
+Ağır ortam için en az 3 GB kullanılabilir bellek gerekir.
+Komut varsayılan Colima'da örnek ortamı açar ve senaryoları koşar.
+Model sağlayıcısı yalnız kendi sabit yerel adres listesiyle kaydedilir.
+Testten sonra geçici birimler, imajlar, derleme alanı ve worktree kaldırılır.
+Rapor ve günlükler komutun yazdığı yerel klasörde kalır.
+
+Yalnız birleşme ve kanca denetimi için şu komutu kullanın.
+
+```sh
+backend/e2e/bin/merge-preview --merge-only
+python3 -m unittest discover -s backend/e2e/tests -v
+```
+
 ## Sonuçlar
 
 | Senaryo | Sonuç | Eksik parça |

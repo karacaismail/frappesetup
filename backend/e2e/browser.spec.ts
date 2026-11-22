@@ -16,7 +16,7 @@ async function login(page: Page, entry: 'button' | 'api') {
 
   if (entry === 'button') {
     await page.goto(`${site}/panel`);
-    await page.getByRole('button', { name: 'Atonota ile oturum aç', exact: true }).click();
+    await page.getByRole('link', { name: /^(Sign in with Atonota|Atonota ile oturum aç)$/i }).click();
   } else {
     const response = await page.request.post(`${site}/api/method/platform_core.api.auth.get_login_url`, {
       data: { redirect_to: '/panel' }, maxRedirects: 0,
