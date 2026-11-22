@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.13.0
+  version: 0.17.0
   summary: Endpoints of the user sync service
   description: |
     This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
@@ -132,6 +132,61 @@ info:
     These endpoints return 409 for a lock conflict or a timeout. The service then tries the request again.
     The responses the service expects are in the `Target` schemas at the end of this file.
 
+    ### Timeout of an anonymize call (H-5)
+
+    An anonymize call takes longer than the other calls. The tenant renames the user and closes every session.
+    The `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` setting is the wait for this call. The default is 30 seconds, at most 80.
+    The other calls use `IDENTITY_SYNC_HTTP_TIMEOUT`, 10 seconds by default.
+
+    A deletion request carries one deadline, `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` after it starts.
+    Name lookups, connections and TLS handshakes end at that deadline.
+    So do the wait for the work lock, every database wait, every network read and every retry pause.
+    A database wait has three parts: the shared connection, the start of the write and its commit.
+    Together they end at the deadline. Without time left the write is rolled back.
+    The outcome records share one later end, 5 seconds after the deadline. All of them together stay within it.
+    So the service answers within `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 5 seconds: 35 seconds by default, 85 at most.
+    Press waits at most 90 seconds. When Press stops waiting, it tells the customer that the deletion is in progress.
+    When the work lock does not come free in time, the reply is 503 `busy` and the job does not start.
+
+    A step can stop halfway, for example when a reply is late. The job then waits in the dead-letter queue.
+    Its state is `unknown` when the result is not known.
+    Every step of the deletion job can be repeated. A repeated call for the same identity gets the same reply.
+    So the service calls the unfinished step again. It never concludes a result from an identity list.
+    An anonymize step is done only on HTTP 200 with `anonymized` and `found`, both booleans.
+    The step is done when `anonymized` is true, or `found` is false. An unknown identity gets 200 with `found` false.
+    A 404 is not a result (project record O-43). The job stays `unknown` and the Keycloak user is not deleted.
+    A reply with a missing field or a wrong type also keeps the job `unknown`.
+    When the step is done, the job goes on from the next step. Step 5 deletes the Keycloak user.
+
+    The service continues the job in two places: the next `POST /v1/account-deletions` request for the account,
+    and every event handled by `POST /v1/events`.
+    Both places keep a count and spacing limit, also after a definite failure.
+    One job is tried at most 5 times. The timed-out request counts as one try. Two tries are at least 30 seconds apart.
+    When a limit is reached, the service calls no target. The reply gives the queue state: `dead_lettered` or `unknown`.
+    A human replay with `include_unknown` and an approved reconcile skip the limits.
+    When every step is finished and only the final record is missing, no limit applies: no target is called.
+
+    The event path has one deadline too, 5 seconds after the event is handled.
+    The queue read, the claims, the connections, every network read and every retry pause end at that deadline.
+    The outcome records share the same later end as in a deletion request.
+    The database picks only jobs that may be tried now, at most 3 per event. A long queue is never read in full.
+    The queue query itself stops at the deadline, even when it finds no job.
+    The service does not hold the work lock while it calls a target. Other processes, for example a replay command, do not wait.
+    The service handles HTTP requests one at a time, so the 5-second limit also bounds the wait of the next request.
+
+    Two calls for the same job never run at the same time. Before each try the service claims the job.
+    The claim and the completion check are one database step. A job another process finished is not run again.
+    When another process holds the claim, the service leaves the job alone and replies with the queue state.
+    Before every external write the service extends the claim to `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 30 seconds from that moment.
+    Every retry of a step, for example after a 409, is a new write and extends the claim again.
+    So the claim also covers a last call that starts late in the request.
+    After an unknown outcome the claim stays: the target may still work on the last call. No second call goes out meanwhile.
+    The claim ends by itself at that time, so a crashed process cannot keep it.
+    If a target works even longer, a second call may rarely go out. It does not damage data:
+    the target returns the same result for the same identity and takes a row lock.
+    There is no scheduled job. When the tries are used up, the job stays in the queue.
+    A human then checks the target and replays the job with `include_unknown`.
+
     ## Common errors of all endpoints
 
     These errors are not written separately on every endpoint.
@@ -164,6 +219,7 @@ info:
     For a user with no tenant link, the tenant returns 404 and `IdentityNotFound`.
     The service counts this response as success in two operations. They are disabling the user and changing the email.
     The reason is that without a link there is no record to disable or to rename.
+    The anonymize call is not one of them. There a 404 is not a result (project record O-43).
     If the `exc_type` field is not `IdentityNotFound`, a 404 is an error. A wrong address also returns 404.
 
     In the tenant the service calls `change_email` first and `provision` after it.
@@ -669,6 +725,9 @@ paths:
         If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`. No later step is executed.
         The request is then in the dead-letter queue. A human replays the request with `POST /v1/dead-letters/replay`.
         Press can also send the same request again. The service continues from the first step that is not finished.
+        The service answers within `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 5 seconds: 35 seconds by default, 85 at most. Press waits at most 90 seconds.
+        A step that did not finish in that time stays queued. A later request or event continues the job.
+        The rules are in the section "Timeout of an anonymize call" at the start of this file.
       x-durum: uygulandi
       x-yikici: true
       x-yurutme: press-only
@@ -1624,8 +1683,8 @@ components:
         The endpoint disables the user and anonymizes the fields that identify the person. It does not delete business records.
         The endpoint in Press also invalidates the API keys.
         The request carries the `issuer` and `subject` fields. A repeated call gets the same response.
-        If the endpoint does not know the identity, `found` is false. The service counts this response as success.
-        The tenant can also return 404 and `IdentityNotFound` for an unknown identity. The service counts this response as success too.
+        If the endpoint does not know the identity, it returns 200 with `found` false. The service counts this response as success.
+        A 404 is not a result (project record O-43). The service keeps the job `unknown` and does not delete the Keycloak user.
         The endpoint returns 409 for a lock conflict or a timeout. The service then tries the request again.
         If a field is missing, the service does not know the result and does not continue with the next step.
       required: [message]

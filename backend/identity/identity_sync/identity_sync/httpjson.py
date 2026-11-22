@@ -7,13 +7,18 @@ Error messages omit response bodies, which may contain personal data.
 
 from __future__ import annotations
 
+import http.client
+import io
 import json
 import socket
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+
+from identity_sync.deadline import deadline, remaining
 
 _MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
@@ -99,7 +104,155 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-_OPENER = urllib.request.build_opener(_NoRedirect)
+class _DeadlineSocket:
+    """A connected socket whose every send and receive waits at most the time left (inceleme 18).
+
+    The socket timeout of Python counts each receive on its own. A target that sends its reply in
+    small pieces could then keep one request open far past the end. Here each call first shortens
+    the timeout to the time left, and fails at once when no time is left.
+    """
+
+    def __init__(self, sock: socket.socket) -> None:
+        self._sock = sock
+        self._timeout = sock.gettimeout()
+
+    def _arm(self) -> None:
+        left = remaining()
+        if left is None:
+            return
+        if left <= 0:
+            raise TimeoutError("deadline passed")
+        self._sock.settimeout(left if self._timeout is None else min(self._timeout, left))
+
+    def recv_into(self, buffer: memoryview, nbytes: int = 0) -> int:
+        self._arm()
+        return self._sock.recv_into(buffer, nbytes)
+
+    def recv(self, size: int) -> bytes:
+        self._arm()
+        return self._sock.recv(size)
+
+    def sendall(self, data: bytes) -> None:
+        self._arm()
+        self._sock.sendall(data)
+
+    def makefile(self, mode: str = "r", *args: object, **kwargs: object) -> io.BufferedReader:
+        # Reads must come back through `recv_into` above, so the file is built on this object.
+        self._sock._io_refs += 1
+        return io.BufferedReader(socket.SocketIO(self, "rb"))
+
+    def _decref_socketios(self) -> None:
+        self._sock._decref_socketios()
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._sock, name)
+
+
+class _NotSent(OSError):
+    """The request never left this host: the name lookup or the connection did not finish in time."""
+
+
+def _lookup(host: str, port: int, left: float) -> list[tuple]:
+    """Resolve the name, but wait at most `left` seconds (inceleme 19).
+
+    `getaddrinfo` has no timeout of its own. It runs in a helper thread. When the time is up the
+    request gives up. The helper thread ends by itself when the lookup returns.
+    """
+    found: dict[str, object] = {}
+
+    def work() -> None:
+        try:
+            found["infos"] = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+        except OSError as error:
+            found["error"] = error
+
+    helper = threading.Thread(target=work, name="identity-sync-lookup", daemon=True)
+    helper.start()
+    helper.join(left)
+    if helper.is_alive():
+        raise _NotSent("deadline passed during the name lookup")
+    if "error" in found:
+        raise found["error"]  # a gaierror: the request was not sent
+    return found["infos"]
+
+
+def _create_connection(
+    address: tuple[str, int], timeout: object = None, source_address: tuple[str, int] | None = None
+) -> socket.socket:
+    """`socket.create_connection` whose lookup and connect end at the deadline (inceleme 19)."""
+    if remaining() is None:
+        return socket.create_connection(address, timeout, source_address)
+    host, port = address
+    infos = _lookup(host, port, remaining() or 0.0)
+    last: OSError | None = None
+    for family, kind, proto, _name, target in infos:
+        left = remaining()
+        if not left:
+            break
+        sock = socket.socket(family, kind, proto)
+        sock.settimeout(min(timeout, left) if isinstance(timeout, (int, float)) else left)
+        try:
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(target)
+        except OSError as error:
+            sock.close()
+            last = error
+            continue
+        # The TLS handshake that follows waits at most the time left.
+        sock.settimeout(min(timeout, remaining() or 0.001) if isinstance(timeout, (int, float)) else remaining())
+        return sock
+    raise _NotSent("connection not made before the deadline") from last
+
+
+class _DeadlineHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self._create_connection = _create_connection
+
+    def connect(self) -> None:
+        super().connect()
+        if remaining() is not None:
+            self.sock = _DeadlineSocket(self.sock)
+
+
+class _DeadlineHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self._create_connection = _create_connection
+
+    def connect(self) -> None:
+        super().connect()
+        if remaining() is not None:
+            self.sock = _DeadlineSocket(self.sock)
+
+
+class _DeadlineHTTPHandler(urllib.request.HTTPHandler):
+    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        return self.do_open(_DeadlineHTTPConnection, req)
+
+
+class _DeadlineHTTPSHandler(urllib.request.HTTPSHandler):
+    def https_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
+        options: dict[str, object] = {"context": self._context}
+        if hasattr(self, "_check_hostname"):  # Python 3.11 still passes this option
+            options["check_hostname"] = self._check_hostname
+        return self.do_open(_DeadlineHTTPSConnection, req, **options)
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect, _DeadlineHTTPHandler, _DeadlineHTTPSHandler)
+
+# `deadline` lives in its own module because the store and the pipeline use it too.
+__all__ = ["deadline"]
+
+
+def _bounded(timeout: float) -> float:
+    left = remaining()
+    if left is None:
+        return timeout
+    if left <= 0:
+        raise ConnectFailed("deadline passed")
+    return min(timeout, left)
 
 
 def request_json(
@@ -130,6 +283,7 @@ def request_json(
         data = json.dumps(json_body).encode("utf-8")
         send_headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, method=method, headers=send_headers)
+    timeout = _bounded(timeout)  # before the request is sent: a passed deadline sends nothing
     try:
         with _OPENER.open(request, timeout=timeout) as raw:
             payload = raw.read(_MAX_RESPONSE_BYTES + 1)
@@ -140,7 +294,7 @@ def request_json(
         error.close()
         raise HttpError(error.code, code) from None
     except urllib.error.URLError as error:
-        if isinstance(error.reason, (ConnectionRefusedError, socket.gaierror)):
+        if isinstance(error.reason, (ConnectionRefusedError, socket.gaierror, _NotSent)):
             raise ConnectFailed("connection failed") from None
         raise TransportError(type(error.reason).__name__) from None
     except (TimeoutError, ConnectionError, OSError) as error:

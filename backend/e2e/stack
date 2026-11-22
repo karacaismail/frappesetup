@@ -8,13 +8,16 @@ import json
 import os
 import re
 import secrets
+import shutil
 import stat
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
+# Tests may move BACKEND. The trusted credential root stays this checkout.
+REPOSITORY = Path(__file__).resolve().parents[2]
+CONTAINER_ID = re.compile(r"[0-9a-f]{12,64}")
 REDIS = "redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
 
 
@@ -25,8 +28,55 @@ def project_name(environment):
     return f"fs-e2e-{port}-{digest}"
 
 
-def run(command, environment, **kwargs):
-    return subprocess.run(command, env=environment, check=True, **kwargs)
+def env_file(value):
+    """Return a canonical environment file path inside this checkout."""
+    value = str(value)
+    if any(character in value for character in "\0\r\n"):
+        raise ValueError("E2E_ENV_FILE contains a control character.")
+    path = Path(value)
+    if path.name in ("", ".", ".."):
+        raise ValueError("E2E_ENV_FILE must name a file.")
+    # Resolve only the parent: credentials() must still reject a symlinked file.
+    path = Path(os.path.abspath(path.parent)).resolve() / path.name
+    if not path.is_relative_to(REPOSITORY.resolve()):
+        raise ValueError(f"E2E_ENV_FILE must be inside {REPOSITORY}.")
+    return path
+
+
+def assert_ignored(path):
+    """Refuse a credential path that Git could add to the public repository."""
+    git = shutil.which("git")
+    if not git:
+        raise ValueError("Git is required to check that E2E_ENV_FILE is ignored by Git.")
+    # GIT_* variables could point the check at another repository.
+    clean = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    result = run(
+        [git, "-C", str(REPOSITORY), "check-ignore", "-q", "--", str(path)],
+        clean,
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if result.returncode != 0:
+        raise ValueError("E2E_ENV_FILE must be a path that is ignored by Git.")
+
+
+def container_ids(output):
+    ids = output.split()
+    if not all(CONTAINER_ID.fullmatch(value) for value in ids):
+        raise ValueError("Docker returned an invalid container ID.")
+    return ids
+
+
+def run(command, environment, check=True, **kwargs):
+    """Run Docker without a shell after checking every argument."""
+    if not command or not all(isinstance(argument, str) and "\0" not in argument for argument in command):
+        raise ValueError("Commands must be non-empty text arguments without NUL bytes.")
+    if "--env-file" in command:
+        index = command.index("--env-file") + 1
+        if index >= len(command) or str(env_file(command[index])) != command[index]:
+            raise ValueError("The Compose environment file was not validated.")
+    return subprocess.run(command, env=environment, check=check, **kwargs)
 
 
 def credentials(path):
@@ -46,15 +96,23 @@ def credentials(path):
                     value = secrets.token_urlsafe(32)
                 values[key] = value
         path.parent.mkdir(parents=True, exist_ok=True)
-        # Publish only complete credentials and never overwrite a competing writer.
-        with tempfile.NamedTemporaryFile(mode="w", dir=path.parent) as stream:
-            stream.write("".join(f"{key}={value}\n" for key, value in values.items()))
-            stream.flush()
-            os.fsync(stream.fileno())
-            try:
-                os.link(stream.name, path)
-            except FileExistsError:
-                pass
+        # The staging file holds secrets too, so Git must ignore its name before it exists.
+        # The name is independent of the target so one narrow .gitignore rule covers it.
+        staging = path.parent / f".fs-stack-env.{secrets.token_hex(8)}.tmp"
+        assert_ignored(staging)
+        descriptor = os.open(staging, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(descriptor, "w") as stream:
+                stream.write("".join(f"{key}={value}\n" for key, value in values.items()))
+                stream.flush()
+                os.fsync(stream.fileno())
+                # Publish only complete credentials and never overwrite a competing writer.
+                try:
+                    os.link(staging, path)
+                except FileExistsError:
+                    pass
+        finally:
+            staging.unlink(missing_ok=True)
     metadata = path.lstat()
     if not stat.S_ISREG(metadata.st_mode) or metadata.st_mode & 0o077:
         raise ValueError("The environment file must be a private regular file (0600).")
@@ -78,7 +136,8 @@ def setup():
         raise ValueError("FS_COLIMA_PROFILE must be factory or default.")
     port = int(port)
     context = "colima-factory" if profile == "factory" else "colima"
-    path = Path(os.environ.get("E2E_ENV_FILE", BACKEND / "e2e/.env"))
+    path = env_file(os.environ.get("E2E_ENV_FILE", BACKEND / "e2e/.env"))
+    assert_ignored(path)
     environment = dict(os.environ, **credentials(path))
     environment.update(
         {
@@ -127,12 +186,14 @@ def assert_owner(engine, compose, environment, create=False):
     ).hexdigest()
     marker = project + "-owner"
     label = "io.frappesetup.stack-owner"
-    ids = run(
-        [*engine, "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"],
-        environment,
-        capture_output=True,
-        text=True,
-    ).stdout.split()
+    ids = container_ids(
+        run(
+            [*engine, "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"],
+            environment,
+            capture_output=True,
+            text=True,
+        ).stdout
+    )
     if ids:
         containers = json.loads(
             run([*engine, "inspect", *ids], environment, capture_output=True, text=True).stdout
@@ -312,7 +373,46 @@ def check_resources(engine, environment):
         raise ValueError("Startup requires 10 GiB free disk and 3 GiB available memory.")
 
 
+PRESS_SETTINGS = ("ATONOTA_PRESS_URL", "KC_PUBLIC_URL", "ATONOTA_PRESS_SECRET", "ATONOTA_PRESS_SERVICE_SECRET")
+
+
+def require_press_settings(environment):
+    """Name missing Press settings without printing any value."""
+    missing = [key for key in PRESS_SETTINGS if not environment.get(key)]
+    if missing:
+        raise ValueError(
+            "Press setup needs these settings: "
+            + ", ".join(missing)
+            + ". Copy the missing keys from backend/identity/keycloak/.env.example into E2E_ENV_FILE."
+        )
+
+
+def configure_press(compose, environment):
+    require_press_settings(environment)
+    settings = {
+        "host_name": environment["ATONOTA_PRESS_URL"],
+        "keycloak_public_url": environment["KC_PUBLIC_URL"],
+        "keycloak_internal_url": environment["KC_PUBLIC_URL"],
+        "keycloak_realm": "platform",
+        "keycloak_client_id": "press",
+        "keycloak_client_secret": environment["ATONOTA_PRESS_SECRET"],
+        "press_identity_sync_user": "identity-sync@example.test",
+        "press_service_client_secret": environment["ATONOTA_PRESS_SERVICE_SECRET"],
+        "identity_sync_url": "http://identity-sync.localhost:6115",
+    }
+    script = (BACKEND / "e2e/preview/configure-stack-press.py").read_text()
+    run(
+        [*compose, "exec", "-T", "--workdir", "/home/frappe/benches/frappe-bench",
+         "web", "env/bin/python", "-c", script],
+        environment,
+        input=json.dumps(settings),
+        text=True,
+    )
+
+
 def up(engine, compose, environment):
+    # Fail before any container work, not after a long startup.
+    require_press_settings(environment)
     check_resources(engine, environment)
     model = config(compose, environment)
     ensure_images(engine, compose, environment, model)
@@ -405,7 +505,7 @@ def up(engine, compose, environment):
         ],
         environment,
     )
-    ready = subprocess.run(
+    ready = run(
         [
             *compose,
             "exec",
@@ -415,7 +515,8 @@ def up(engine, compose, environment):
             "-f",
             "/home/frappe/benches/.stack-installed",
         ],
-        env=environment,
+        environment,
+        check=False,
     )
     if ready.returncode:
         with (BACKEND / "dev/press/install.sh").open() as stream:
@@ -444,6 +545,7 @@ def up(engine, compose, environment):
             ],
             environment,
         )
+    configure_press(compose, environment)
     run(
         [
             *compose,
@@ -474,7 +576,7 @@ def up(engine, compose, environment):
     )
     check(compose, environment)
     resources(engine, environment)
-    ids = run([*compose, "ps", "-q"], environment, capture_output=True, text=True).stdout.split()
+    ids = container_ids(run([*compose, "ps", "-q"], environment, capture_output=True, text=True).stdout)
     run(
         [*engine, "stats", "--no-stream", "--format", "{{.Name}}: {{.MemUsage}}", *ids],
         environment,
@@ -509,6 +611,8 @@ def main():
             check_resources(engine, environment)
             run([*compose, "build", "web"], environment)
         elif args.action == "up":
+            # Check local settings before the ownership probe or any other Docker call.
+            require_press_settings(environment)
             assert_owner(engine, compose, environment, create=True)
             up(engine, compose, environment)
         elif args.action == "down":

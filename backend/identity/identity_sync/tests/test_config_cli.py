@@ -56,6 +56,20 @@ class ConfigTest(unittest.TestCase):
         # docs/sozlesmeler.md, section 2: the Admin API token is requested with this scope.
         self.assertEqual(load_settings(self.ENV).admin_scope, "admin-api kc-admin-api")
 
+    def test_anonymize_timeout_has_its_own_setting(self) -> None:
+        # H-5: the anonymize call waits longer than the other calls. The default comes from README.md.
+        settings = load_settings(self.ENV)
+        self.assertEqual((settings.http_timeout, settings.anonymize_timeout), (10.0, 30.0))
+        changed = load_settings({**self.ENV, "IDENTITY_SYNC_ANONYMIZE_TIMEOUT": "45"})
+        self.assertEqual((changed.http_timeout, changed.anonymize_timeout), (10.0, 45.0))
+        # The upper limit itself is allowed. One second more is not. Press waits at most 90 seconds,
+        # and a deletion request answers within the timeout plus 5 seconds.
+        self.assertEqual(load_settings({**self.ENV, "IDENTITY_SYNC_ANONYMIZE_TIMEOUT": "80"}).anonymize_timeout, 80.0)
+        for value in ("0", "-1", "81", "601", "nan", "inf", "on"):
+            with self.subTest(value=value), self.assertRaises(ConfigError) as caught:
+                load_settings({**self.ENV, "IDENTITY_SYNC_ANONYMIZE_TIMEOUT": value})
+            self.assertIn("IDENTITY_SYNC_ANONYMIZE_TIMEOUT", str(caught.exception))
+
     def test_webhook_secret_must_be_long_enough(self) -> None:
         # The event listener fork also refuses a secret shorter than 16 characters.
         with self.assertRaises(ConfigError) as caught:
