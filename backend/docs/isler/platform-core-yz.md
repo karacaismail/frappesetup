@@ -32,7 +32,7 @@ Bu iş `platform_core` içinde yapay zekâ erişim katmanını kurar. Proje sahi
    - Önizleme ve onay nasıl çalışır (G-86)?
    - “AI Action Log” kaydı hangi alanları tutar (G-64)?
    - Gizli alanlar nasıl dışarıda kalır?
-4. Yeni paket gerekiyorsa T-2 bölümünü yazın ve `blocked` raporlayın. AGPL lisanslı bileşen için de proje sahibine sorun.
+4. Yeni paket gerekiyorsa T-2 bölümünü yazın. Açık kaynak lisanslı paketi gerekçesiyle seçin (D-10). AGPL lisanslı bileşeni `platform_core` içine almayın (O-12). Soru sormayın.
 
 ## Kontrol noktası 2: çekirdek katman
 

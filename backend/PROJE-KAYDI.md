@@ -48,7 +48,7 @@ Bu bölümü dev-ortam işi doldurur. Her komutun çalıştığı klasör de yaz
 
 ## Proje sahibinin kararları
 
-Kararlar 22 Kasım 2026 Pazar günü Pane kartıyla alındı.
+Kararlar 22 Kasım 2026 Pazar günü alındı.
 
 - **D-1. Seviye MVP'dir.** Proje sahibi “MVP, ilk kullanılabilir sürüm” seçeneğini seçti.
 - **D-2. Kod frappesetup deposundadır.** Kod `backend/` klasöründe durur. Kodun lisansı deponun kod lisansıdır, yani MIT'dir.
@@ -65,8 +65,9 @@ Kararlar 22 Kasım 2026 Pazar günü Pane kartıyla alındı.
 - **D-5. Son kullanıcı yalnız ayrı arayüzü görür.** Son kullanıcının türü “Website User” olur (Karar 10, G-16).
 - **D-6. Zamanlanmış iş kurulmaz.** Proje sahibi `cron` kurulumunu istemedi (V-9).
 - **D-7. Bütün uygulamalar Frappe 16 ile yazılır.** `press_tr` de Frappe 16 üzerinde çalışır. Proje sahibi bunu şöyle yazdı: “app frappe v16.x ile koldlansın”.
-- **D-9. Her şey yapay zekâyla yönetilebilir olur.** Bütün DocType'lar, alanlar ve backend işlemleri yapay zekâya açık bir katmandan geçer. Katman model sağlayıcısından bağımsızdır. Proje sahibi şöyle yazdı: “ai heryerde olmalı, ai provider'dan bağımsız, herşey ai ile yönetilebilmeli.” Ayrıntı sözleşmenin 10. bölümündedir.
 - **D-8. Var olan Press kurulumu kullanılır.** Bu Mac'te Colima'da bir Press deneme kurulumu var. Kurulum değiştirilmez. İmajı ve kurulum betikleri yeniden kullanılır.
+- **D-9. Her şey yapay zekâyla yönetilebilir olur.** Bütün DocType'lar, alanlar ve backend işlemleri yapay zekâya açık bir katmandan geçer. Katman model sağlayıcısından bağımsızdır. Proje sahibi şöyle yazdı: “ai heryerde olmalı, ai provider'dan bağımsız, herşey ai ile yönetilebilmeli.” Ayrıntı sözleşmenin 10. bölümündedir.
+- **D-10. Kararlar ajana bırakıldı.** Proje sahibi şöyle yazdı: “Herşeyi onaylıyorum ve izin veriyorum, karar ver soru sorma”. Ayrıntı aşağıdaki “Orkestratörün kararları” bölümündedir.
 
 ## Orkestratörün seçtiği varsayılanlar
 
@@ -78,22 +79,28 @@ Proje sahibi bu konularda karar vermedi. Orkestratör şu varsayılanları seçt
 - **V-4. Ortak kitaplık.** Belirteç doğrulama tek kitaplıkta durur. `platform_core` ve `press_tr` aynı kodu kullanır (H-8).
 - **V-5. Container profili.** Geliştirme `colima-factory` profilinde yürür. Bu profilde daha çok bellek var.
 
-## Açık kararlar ve çelişkiler
+## Orkestratörün kararları
 
-Ajan bu maddeleri kendiliğinden kapatmaz. Etkilenen işi raporda yazar.
+Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyorum ve izin veriyorum, karar ver soru sorma”. Bu söz D-10 kararıdır. Orkestratör açık kararları bu yetkiyle kapattı. Proje sahibi her kararı değiştirebilir.
 
-- **A-1. Keycloak'ın tam sunucu adı.** Ad `atonota.net` mi olacak, yoksa `id.atonota.net` gibi bir alt ad mı? Kararı proje sahibi verir. DNS değerini DevOps sorumlusu hazırlar. Alan adının kayıt yeri doğrulanmadı.
-- **A-2. Platformun alan adı.** Karar sitesi `<marka>.com.tr` yazar. Marka henüz belli değil. Kod bu adı ayardan alır.
-- **A-3. Kiracıdaki kullanıcı türü.** Karar sitesi G-57'de “System User” der. Karar 10 “Website User” der. Karar 10 uygulanır. Frappe 16'da Website User'ın API ile çalışabildiği kaynak kodda doğrulanmalı.
-- **A-4. Giriş temasının yapım yolu.** G-80 Keycloakify ister. Panelin tasarım tokenları henüz yok. Tema işi başlamadan proje sahibine sorulur.
-- **A-5. Oturum süreleri.** G-78 30 dakika boşta kalma ve 12 saat toplam süre der. Karar 19 mobil için daha uzun süreler seçti. Web realm'i G-78 ile kurulur. Mobil iş başlayınca süreler istemciye göre ayrılır.
-- **A-6. Sihirli bağlantı ve Apple ile giriş.** Keycloak bu iki yolu hazır sunmaz. Eklenti T-2 değerlendirmesi ve proje kararı ister (K-38).
-- **A-7. Press'te uygulama kaynağı.** Press uygulamayı deponun kökünde bekleyebilir. Bu bilgi doğrulanmadı. Doğruysa `backend/apps/` yapısı dağıtımda ayrı depo ister.
-- **A-8. `press_tr` lisansı.** Press AGPL-3.0 lisanslıdır. `press_tr` Press'i kullanır. Lisans etkisini hukuk değerlendirir (K-1).
-- **A-9. Gerçek veri.** Türkiye'deki kişilerin verisi güvence kurulmadan Hetzner'e konmaz (Karar 27). Bu tur yalnız yerel ortamda ve örnek veriyle yürür.
-- **A-11. Press'in Frappe 16 desteği.** Karar sitesinin K1 kararı Press'i Frappe 15 üzerinde kurar. D-7 bunu değiştirir. Press v0.154.1 Frappe 16 ve Python 3.14 üzerinde yalnız yamalarla açılır. Ansible ve sunucu kurma bu sürümde çalışmaz. Üretimde Press'in hangi sürümle çalışacağı ayrı karardır.
-- **A-12. Model sağlayıcısı.** Karar sitesinin K9 kararı Claude Agent SDK'yı ve Claude modellerini adıyla seçer. D-9 sağlayıcıdan bağımsızlık ister. Backend bu yüzden hiçbir sağlayıcıya bağlanmaz. Ajan servisinin sağlayıcı seçimi Rail 5 işinde ayrıca karara bağlanır.
-- **A-10. Eşitleme olaylarının kaynağı.** Zamanlanmış yoklama yasaktır (D-6). Keycloak olay eklentisi T-2 değerlendirmesi ister.
+- **O-1. Keycloak'ın sunucu adı `id.atonota.net` olur.** Kök alan adı markanın tanıtım sayfasına kalır. DNS değerini DevOps sorumlusu hazırlar. Kaydı alan adı sorumlusu uygular. Ajan DNS'e dokunmaz. Alan adının kayıt yeri doğrulanmadı.
+- **O-2. Platformun alan adı ayardan gelir.** Karar sitesi `<marka>.com.tr` yazar. Marka belli olunca yalnız ayar değişir.
+- **O-3. Kiracıda son kullanıcı “Website User” olur.** Bu, Karar 10'dur. Frappe 16 bu yolu engellerse işçi engeli kaynakla raporlar.
+- **O-4. Giriş teması Keycloak'ın kendi tema yapısıyla kurulur.** Tema `keycloak.v2` temasından türer. Renkler ve yazılar CSS değişkeniyle verilir. Bu yol yeni teknoloji eklemez (T-1). Keycloakify (G-80), panelin tasarım tokenları hazır olunca yeniden değerlendirilir.
+- **O-5. Web realm'i G-78 süreleriyle kurulur.** Mobil iş başlayınca Karar 19 süreleri mobil istemcilere uygulanır.
+- **O-6. Sihirli bağlantı ve Apple ile giriş MVP'ye girer.** Bu, Karar 17'dir. Eklentiyi kimlik-realm işi T-2 notuyla seçer. Eklentinin lisansı Apache-2.0 ya da MIT olmalıdır.
+- **O-7. Press dağıtımında her uygulama ayrı depoya bölünür.** Bölme `git subtree split` ile dağıtım zamanında yapılır. Geliştirmede `backend/apps/` yapısı kalır.
+- **O-8. `press_tr` lisansı AGPL-3.0 olur.** Press AGPL-3.0'dır. `press_tr` Press'i aynı süreçte kullanır. En güvenli seçim budur. Öteki backend kodu MIT kalır. Hukuk görüşü alınmadı.
+- **O-9. Press de Frappe 16 üzerinde geliştirilir.** Press bu sürümde yalnız yamalarla açılır. Press'in sunucu kurma akışı Frappe 16'da çalışmadan üretime çıkılmaz. Bu madde teknik borç tablosundadır.
+- **O-10. Ajan servisi sağlayıcıdan bağımsızdır.** Model ve sağlayıcı ayardan gelir. Claude desteklenen sağlayıcılardan biridir. K9'daki Claude Agent SDK seçimi bu yüzden zorunlu değildir.
+- **O-11. Eşitleme olaylarının kaynağını identity-sync işi seçer.** İşçi T-2 notunda en yalın açık kaynak yolu seçer. Zamanlanmış yoklama yine yasaktır (D-6).
+- **O-12. `platform_core` MIT lisanslı kalır.** AGPL lisanslı bir bileşen `platform_core` içine alınmaz. Böyle bir bileşen gerekirse ayrı uygulama ya da ayrı servis olur.
+
+## Değişmeyen sınırlar
+
+- Türkiye'deki kişilerin verisi güvence kurulmadan Hetzner'e konmaz (Karar 27). Bu tur yalnız yerel ortamda ve örnek veriyle yürür.
+- Sunucu, DNS, yasal kutu ve ödeme hesabı işleri insanda kalır.
+- Push, pull request ve canlıya yükleme bu turda yapılmaz.
 
 ## Kişisel veri
 
@@ -105,4 +112,4 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
-| Henüz yok | Yok | Yok | Yok |
+| `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |

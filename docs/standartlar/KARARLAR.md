@@ -65,6 +65,7 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 18. İlk turda Press de geliştirilir.
 19. Bütün uygulamalar Frappe 16 ile yazılır. Press de Frappe 16 üzerinde çalışır.
 20. Her şey yapay zekâyla yönetilebilir olur. Katman model sağlayıcısından bağımsızdır.
+21. Proje sahibi kararları Claude'a bıraktı. Claude açık kararları kapatır ve kayda yazar.
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -766,6 +767,32 @@ Sonuç şudur:
 - Sitenin AI bölümündeki kurallar geçerlidir. Örneğin her yazma insan onaylıdır. Gizli alan hiç okunmaz.
 - Veritabanına ham SQL aracı açılmaz. Veritabanı DocType katmanından açılır. Bu kural standartların G-5 ve G-10 kurallarından gelir.
 - Sitenin K9 kararı Claude Agent SDK'yı ve Claude modellerini adıyla seçer. Bu karar sağlayıcıdan bağımsızlıkla çelişir. Konu `backend/PROJE-KAYDI.md` dosyasında A-12 maddesidir.
+
+### Karar 37. Kararlar Claude'a bırakıldı
+
+Claude açık kalan kararları listeledi. Proje sahibi şöyle cevap verdi:
+
+> Herşeyi onaylıyorum ve izin veriyorum, karar ver soru sorma
+
+Sonuç şudur. Claude açık kararları kapattı. Kararların tam listesi `backend/PROJE-KAYDI.md` dosyasının “Orkestratörün kararları” bölümündedir. Özeti şudur:
+
+| Konu | Karar |
+|---|---|
+| Keycloak'ın sunucu adı | `id.atonota.net` |
+| Giriş teması | Keycloak'ın kendi tema yapısı. Keycloakify sonra yeniden değerlendirilir. |
+| Sihirli bağlantı ve Apple ile giriş | MVP'ye girer. Eklentinin lisansı Apache-2.0 ya da MIT olur. |
+| `press_tr` lisansı | AGPL-3.0. Press AGPL-3.0'dır. Hukuk görüşü alınmadı. |
+| Press'in üretim sürümü | Frappe 16. Sunucu kurma akışı çalışmadan üretime çıkılmaz. |
+| Model sağlayıcısı | Ajan servisi sağlayıcıdan bağımsızdır. Claude sağlayıcılardan biridir. |
+| Press dağıtımı | Her uygulama dağıtımda ayrı depoya bölünür. |
+
+İşçiler de artık proje sahibine soru sormaz. İşçi en güvenli ve en yalın seçeneği seçer ve kararı yazar. Claude kararları birleştirmede inceler.
+
+Şu sınırlar değişmedi:
+
+- Gerçek kişi verisi güvence kurulmadan Hetzner'e konmaz (Karar 27).
+- Sunucu, DNS, yasal kutu ve ödeme hesabı işleri insanda kalır.
+- Bu turda push, pull request ve canlıya yükleme yapılmaz.
 
 ## Modellerin kararları
 

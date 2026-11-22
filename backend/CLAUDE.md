@@ -116,7 +116,7 @@ Proje sahibi her şeyin yapay zekâyla yönetilebilir olmasını istedi (D-9). A
 - Önce Frappe'nin ve kurulu paketlerin hazır yolunu arayın (A-1, T-1).
 - Yeni paket gerekiyorsa T-2 karar notu yazın. Not `docs/kararlar/` klasörüne girer.
 - Notta ihtiyacı, seçenekleri, lisansı, bakımı ve geri dönüşü yazın.
-- Onay gelmeden paketi eklemeyin. Onayı aşağıdaki soru yoluyla isteyin.
+- Paket açık kaynak lisanslıysa ve gerekçe yazılıysa ekleyebilirsiniz (D-10). AGPL lisanslı paketi `platform_core` içine almayın (O-12).
 
 ### Frappe davranışı
 
@@ -135,7 +135,10 @@ runpane report --state <ready|blocked|failed|done> --summary-file <durum dosyas�
 - Durum dosyasını `.pane/prompts/durum.md` yoluna yazın. Bu klasör Git'e girmez.
 - Durum dosyasına her denetimin komutunu ve sonucunu yazın. Sonuç `pass`, `fail`, `not_run` ya da `not_applicable` olur.
 - Kontrol noktasında `ready` raporlayın. Orkestratör dalınızı inceler ve birleştirir.
-- Karar gerekiyorsa `blocked` raporlayın. Soruyu ve seçenekleri şöyle verin:
+- Proje sahibi kararları ajana bıraktı (D-10). Proje sahibine soru sormayın.
+- Karar gerekiyorsa en güvenli ve en yalın seçeneği seçin. Kararı gerekçesiyle durum dosyasına ve gerekiyorsa `docs/kararlar/` notuna yazın. Sonra işe devam edin.
+- Orkestratör kararı birleştirmede inceler. Gerekirse değiştirir.
+- Yalnız şu durumda `blocked` raporlayın: iş ilerleyemiyor ve seçim geri alınamaz bir sonuç doğuruyor. Örneğin veri silme ya da dış servise yazma böyledir. Soruyu ve seçenekleri şöyle verin:
 
   ```bash
   runpane report --state blocked --question 'Soru metni' --choices '[{"label":"Seçenek","detail":"Sonucu","recommended":true},{"label":"Öteki seçenek","detail":"Sonucu"}]'

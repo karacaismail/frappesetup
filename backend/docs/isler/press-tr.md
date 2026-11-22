@@ -30,8 +30,7 @@ Proje sahibi iki karar verdi. Bu bölüm aşağıdaki Frappe 15 bilgilerinin yer
    - Web servisi ağda `press.localhost` takma adını taşısın.
 3. `colima` bağlamında `frappe/erpnext:v15.124.5` imajı var. Bu imajı kullanabilirsiniz. Kullanacaksanız `colima-factory` bağlamına kopyalayın.
 4. Press'in kendi ajanını, sunucularını ve Ansible kurulumunu bu turda kurmayın. Yalnız Press uygulaması ve sitesi yeterlidir.
-5. Container içinde `bench new-app press_tr --no-git` ile iskeleti üretin. Lisans MIT olsun. Yayıncı e-postası olarak `noreply@example.test` yazın.
-   - Lisans hukuk değerlendirmesi bekliyor (Proje kaydı A-8). Raporda bunu anın.
+5. Container içinde `bench new-app press_tr --no-git` ile iskeleti üretin. Lisans AGPL-3.0 olsun (O-8). Uygulama klasörüne lisans dosyasını koyun. Yayıncı e-postası olarak `noreply@example.test` yazın.
 6. `required_apps` listesine `press` ekleyin. Frappe aralığı `>=15.0.0,<16.0.0` olsun.
 7. Modül olarak `Kimlik` ekleyin. Klasör adı `kimlik` olsun.
 8. `press.localhost` sitesini açın. Press'i ve `press_tr` uygulamasını kurun.

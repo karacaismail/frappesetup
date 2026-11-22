@@ -15,7 +15,7 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 
 - Kimlik markasının adı “Atonota”dır.
 - Düğme metni “Atonota ile oturum aç” olur.
-- Üretimdeki alan adı atonota.net olur. Tam sunucu adı açık karardır (Proje kaydı A-1).
+- Keycloak'ın üretimdeki adresi `https://id.atonota.net` olur (Proje kaydı O-1).
 - Kod marka adını ve alan adını ayardan okur. Kodda sabit yazmayın.
 
 ## 2. Keycloak
@@ -27,6 +27,7 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 - Belirteçteki `iss` değeri `<keycloak_public_url>/realms/platform` olur.
 - Sunucu Keycloak'a başka adresten ulaşacaksa `keycloak_internal_url` ayarını kullanın. Bu ayar boşsa genel adres kullanılır.
 - Realm'in görünen adı “Atonota” olur. Giriş ve e-posta teması `atonota` adını taşır.
+- Tema Keycloak'ın kendi tema yapısıyla kurulur (Proje kaydı O-4).
 - Varsayılan dil Türkçedir. İkinci dil İngilizcedir.
 
 ### İstemciler
