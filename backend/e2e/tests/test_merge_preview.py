@@ -88,6 +88,24 @@ class MergePreviewTest(unittest.TestCase):
         result, _ = self.preview()
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_applies_the_approved_werkzeug_constraint(self):
+        dependencies = HOOKS.parents[1] / "pyproject.toml"
+        template = '[project]\ndependencies = [\n    "{}"\n]\n'
+        self.commit_file(dependencies, template.format("frappe"))
+        for name, constraint in zip(ORDER, ("Werkzeug>=3.1.9,<4", "Werkzeug~=3.1.9")):
+            self.git("switch", name)
+            self.git("merge", "--ff-only", "backend")
+            self.commit_file(dependencies, template.format(constraint))
+        self.git("switch", "backend")
+
+        result, report = self.preview()
+
+        self.assertEqual(result.returncode, 0, report)
+        head = re.search(r"Önizleme commit'i `([0-9a-f]+)`", report)[1]
+        merged = self.git("show", f"{head}:{dependencies}")
+        self.assertIn('"Werkzeug~=3.1.9"', merged)
+        self.assertNotIn("Werkzeug>=3.1.9,<4", merged)
+
     def test_blocks_an_unknown_conflict_and_still_cleans_up(self):
         for name in ORDER[:2]:
             self.git("switch", name)
