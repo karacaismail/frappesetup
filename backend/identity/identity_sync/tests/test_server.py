@@ -1514,3 +1514,64 @@ class RequestLogTest(ServerCase):
 
         self.assertNotIn(self.PERSONAL, log)
         self.assertNotIn("ayse", log)
+
+
+class TargetErrorValueTest(ServerCase):
+    """A value a target puts into its error reply never reaches the log, a reply or the store.
+
+    The target's error name (`exc_type`) is free text chosen by the target. A plain word passes
+    any shape check, and it may be a customer code. The service keeps the HTTP status and, only
+    for the names in its own fixed list, the name.
+    """
+
+    MARKER = "MUSTERI48213"
+
+    def everything(self, logs) -> str:
+        store = "\n".join(self.stack.app.store._db.iterdump())
+        _status, queue = self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN))
+        return "\n".join(logs.output) + store + json.dumps(queue)
+
+    def test_unknown_error_name_from_keycloak_is_dropped(self) -> None:
+        keycloak = self.stack.keycloak
+        keycloak.add_session(SUBJECT, "sid-1")
+        keycloak.on("DELETE", f"{keycloak.admin}/sessions/sid-1", (500, {"exc_type": self.MARKER, "message": self.MARKER}))
+        body = {"sid": "sid-1", "subject": SUBJECT}
+
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            reply = self.post_json("/v1/sessions/revoke", body, SESSION_TOKEN)
+            text = self.everything(logs)
+
+        self.assertEqual(reply, (502, {"error": "upstream_failed"}))
+        self.assertNotIn(self.MARKER, text)
+        self.assertIn("upstream failed on /v1/sessions/revoke: HTTP 500", text)
+
+    def test_unknown_error_name_from_a_tenant_is_dropped_everywhere(self) -> None:
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (409, {"exc_type": self.MARKER, "exception": self.MARKER}))
+
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            status, reply = self.post_event()
+            text = self.everything(logs) + json.dumps(reply)
+
+        self.assertEqual((status, reply["status"]), (202, "dead_lettered"))
+        self.assertNotIn(self.MARKER, text)
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertIn("tenant.provision kiraci1: HTTP 409", letter.error)
+
+    def test_known_error_name_is_kept_for_the_operator(self) -> None:
+        # A name from the target contracts tells the operator what to fix. It is from a fixed list.
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (409, {"exc_type": "EmailMismatch"}))
+
+        self.post_event()
+
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertIn("HTTP 409 EmailMismatch", letter.error)
+
+    def test_only_listed_names_are_ever_kept(self) -> None:
+        from identity_sync.httpjson import KNOWN_ERROR_CODES, HttpError
+
+        self.assertIn("IdentityNotFound", KNOWN_ERROR_CODES)
+        self.assertEqual(str(HttpError(409, "EmailMismatch")), "HTTP 409 EmailMismatch")
+        for name in (self.MARKER, "Musteri48213", "emailmismatch", "EmailMismatch2", ""):
+            with self.subTest(name=name):
+                error = HttpError(409, name)
+                self.assertEqual((error.code, str(error)), (None, "HTTP 409"))

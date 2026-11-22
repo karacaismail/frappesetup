@@ -8,7 +8,6 @@ Hata metni yanıt gövdesini taşımaz. Gövde kişisel veri içerebilir.
 from __future__ import annotations
 
 import json
-import re
 import socket
 import urllib.error
 import urllib.parse
@@ -19,19 +18,36 @@ from dataclasses import dataclass, field
 _MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 
-_ERROR_CODE = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,63}$")
+# Error names the service knows from the target contracts (docs/sozlesmeler.md, sections 5 and 6).
+# A target's error name is free text chosen by the target. A shape check is not enough: a plain
+# word may be a customer code. Only a name from this fixed list is kept. Any other value is
+# dropped, so it cannot reach a log line, a stored error text or a reply.
+KNOWN_ERROR_CODES = frozenset(
+    {
+        "IdentityNotFound",
+        "IdentityConflict",
+        "EmailMismatch",
+        "EmailInUse",
+        "EmailNotVerified",
+        "InvalidInput",
+        "InvalidTeamSelector",
+        "ValidationError",
+        "PermissionError",
+    }
+)
 _MAX_ERROR_BYTES = 65536
 
 
 class HttpError(Exception):
     """Sunucu 2xx dışında yanıt verdi.
 
-    `code` is the target's machine-readable error name (Frappe's `exc_type`), when the error
-    body carries one. Only a plain identifier is kept. The rest of the body is dropped because
-    it may hold personal data.
+    `code` is the target's error name (Frappe's `exc_type`), and only when it is one of
+    `KNOWN_ERROR_CODES`. Every other name and the rest of the body are dropped because they may
+    hold personal data. The text of the error is the HTTP status and, at most, that fixed name.
     """
 
     def __init__(self, status: int, code: str | None = None) -> None:
+        code = code if code in KNOWN_ERROR_CODES else None
         super().__init__(f"HTTP {status} {code}" if code else f"HTTP {status}")
         self.status = status
         self.code = code
@@ -75,7 +91,7 @@ def _error_code(error: urllib.error.HTTPError) -> str | None:
     except (OSError, UnicodeDecodeError, ValueError, RecursionError):
         return None
     code = body.get("exc_type") if isinstance(body, dict) else None
-    return code if isinstance(code, str) and _ERROR_CODE.fullmatch(code) else None
+    return code if isinstance(code, str) and code in KNOWN_ERROR_CODES else None
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
