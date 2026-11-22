@@ -36,7 +36,7 @@ class ServerCase(unittest.TestCase):
     def setUp(self) -> None:
         self.stack = Stack()
         self.addCleanup(self.stack.close)
-        self.httpd = make_server(self.stack.app, fake_verifier, host="127.0.0.1", port=0)
+        self.httpd = make_server(self.stack.app, fake_verifier, host="127.0.0.1", port=0, request_timeout=0.5)
         thread = threading.Thread(target=self.httpd.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
         thread.start()
         self.addCleanup(thread.join, 5)
@@ -84,8 +84,10 @@ class EventEndpointTest(ServerCase):
         status, body = self.post_event()
 
         self.assertEqual(status, 202)
-        self.assertEqual(body, {"status": "processed", "actions": ["press.ensure_team", "tenant.provision"]})
-        self.assertEqual(len(self.downstream_writes()), 2)
+        self.assertEqual(
+            body, {"status": "processed", "actions": ["press.ensure_team", "tenant.provision", "tenant.change_email"]}
+        )
+        self.assertEqual(len(self.downstream_writes()), 3)
 
     def test_second_delivery_is_a_duplicate(self) -> None:
         self.post_event()
@@ -93,7 +95,7 @@ class EventEndpointTest(ServerCase):
         status, body = self.post_event()
 
         self.assertEqual((status, body["status"]), (202, "duplicate"))
-        self.assertEqual(len(self.downstream_writes()), 2)
+        self.assertEqual(len(self.downstream_writes()), 3)
 
     def test_missing_signature_is_rejected(self) -> None:
         body = json.dumps(EVENT).encode()
@@ -163,8 +165,82 @@ class EventEndpointTest(ServerCase):
 
         self.assertEqual(status, 200)
         self.assertEqual(body["status"], "preview")
-        self.assertEqual([p["operation"] for p in body["previews"]], ["press.ensure_team", "tenant.provision"])
-        self.assertEqual([p["destructive"] for p in body["previews"]], [False, False])
+        self.assertEqual(
+            [p["operation"] for p in body["previews"]], ["press.ensure_team", "tenant.provision", "tenant.change_email"]
+        )
+        self.assertEqual([p["destructive"] for p in body["previews"]], [False, False, False])
+        self.assertEqual(self.downstream_writes(), [])
+
+    def test_unclear_dry_run_value_never_executes(self) -> None:
+        # Sözleşme yalnız `true` ve `false` değerini kabul eder.
+        for query in ("dry_run=True", "dry_run=1", "dry_run=true&dry_run=true", "dry_run=", "dry_run=true&dry_run=false"):
+            with self.subTest(query=query):
+                status, reply = self.post_event(path=f"/v1/events?{query}")
+                self.assertEqual((status, reply), (400, {"error": "bad_request"}))
+        self.assertEqual(self.downstream_writes(), [])
+
+    def test_dry_run_false_executes(self) -> None:
+        status, body = self.post_event(path="/v1/events?dry_run=false")
+
+        self.assertEqual((status, body["status"]), (202, "processed"))
+
+    def test_native_membership_create_without_user_is_ignored(self) -> None:
+        # Keycloak 26.8.2 üye ekleme olayında kullanıcıyı vermez. Servis bu olayı işleyemez.
+        native = {
+            "id": "k-9",
+            "time": 1,
+            "realmId": "platform",
+            "operationType": "CREATE",
+            "resourceType": "ORGANIZATION_MEMBERSHIP",
+            "resourcePath": f"organizations/{ORG_ID}/members",
+        }
+
+        status, body = self.post_event(native)
+
+        self.assertEqual((status, body), (202, {"status": "ignored", "actions": []}))
+        self.assertEqual(self.downstream_writes(), [])
+
+
+class RawSocketTest(ServerCase):
+    """Bozuk ve yavaş istemciler sunucuyu durdurmamalıdır."""
+
+    def raw(self, data: bytes, *, read: bool = True) -> bytes:
+        import socket
+
+        with socket.create_connection(("127.0.0.1", self.httpd.server_address[1]), timeout=10) as sock:
+            sock.sendall(data)
+            if not read:
+                return b""
+            chunks = []
+            while chunk := sock.recv(65536):
+                chunks.append(chunk)
+            return b"".join(chunks)
+
+    def test_garbage_request_line_gets_an_answer(self) -> None:
+        reply = self.raw(b"GARBAGE\r\n\r\n")
+
+        self.assertIn(b"400", reply.split(b"\r\n", 1)[0])
+        self.assertEqual(self.call("GET", "/healthz")[0], 200)
+
+    def test_unsupported_methods_get_json_405(self) -> None:
+        for method in ("PUT", "DELETE", "PATCH"):
+            with self.subTest(method=method):
+                self.assertEqual(self.call(method, "/v1/events"), (405, {"error": "method_not_allowed"}))
+
+    def test_stalled_client_does_not_block_the_server(self) -> None:
+        import socket
+
+        stalled = socket.create_connection(("127.0.0.1", self.httpd.server_address[1]), timeout=10)
+        self.addCleanup(stalled.close)
+        stalled.sendall(b"POST /v1/events HTTP/1.1\r\nContent-Length: 100\r\n\r\n")
+
+        self.assertEqual(self.call("GET", "/healthz"), (200, {"status": "ok"}))
+
+    def test_bad_content_length_is_rejected(self) -> None:
+        for value in (b"-1", b"abc", b"99999999"):
+            with self.subTest(value=value):
+                reply = self.raw(b"POST /v1/events HTTP/1.1\r\nContent-Length: " + value + b"\r\n\r\n")
+                self.assertIn(b" 413 ", reply.split(b"\r\n", 1)[0])
         self.assertEqual(self.downstream_writes(), [])
 
 
@@ -198,6 +274,21 @@ class ServiceTokenTest(ServerCase):
         )
 
         self.assertEqual(status, 401)
+
+    def test_verifier_crash_is_a_rejection(self) -> None:
+        # Doğrulayıcı beklenmeyen hata verirse istek yine reddedilir. Örneğin anahtar listesi alınamadı.
+        def broken(_token: str) -> dict[str, object]:
+            raise RuntimeError("jwks down")
+
+        httpd = make_server(self.stack.app, broken, host="127.0.0.1", port=0, request_timeout=0.5)
+        thread = threading.Thread(target=httpd.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
+        thread.start()
+        self.addCleanup(thread.join, 5)
+        self.addCleanup(httpd.server_close)
+        self.addCleanup(httpd.shutdown)
+        self.base = f"http://127.0.0.1:{httpd.server_address[1]}"
+
+        self.assertEqual(self.call("GET", "/v1/dead-letters", None, self.bearer()), (401, {"error": "unauthorized"}))
 
     def test_request_with_cookie_and_token_is_rejected(self) -> None:
         headers = {**self.bearer(), "Cookie": "sid=abc"}
@@ -309,6 +400,14 @@ class InvitationEndpointTest(ServerCase):
         status, reply = self.call("POST", "/v1/invitations", body, self.bearer())
 
         self.assertEqual((status, reply), (400, {"error": "bad_request"}))
+
+    def test_bad_organization_id_is_bad_request(self) -> None:
+        body = json.dumps({"email": "davetli@example.test", "organization_id": "..", "dry_run": True}).encode()
+
+        status, _reply = self.call("POST", "/v1/invitations", body, self.bearer())
+
+        self.assertEqual(status, 400)
+        self.assertEqual(self.stack.keycloak.requests, [])
 
     def test_bad_email_is_bad_request(self) -> None:
         body = json.dumps({"email": "eposta-degil", "organization_id": ORG_ID, "dry_run": True}).encode()

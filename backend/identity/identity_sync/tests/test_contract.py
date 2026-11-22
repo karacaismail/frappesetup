@@ -12,6 +12,7 @@ import unittest
 import urllib.error
 import urllib.request
 
+from identity_sync.auth import reject_all
 from identity_sync.server import make_server
 
 from .fakes import Stack
@@ -39,7 +40,7 @@ class ContractTest(unittest.TestCase):
     def setUp(self) -> None:
         self.stack = Stack()
         self.addCleanup(self.stack.close)
-        self.httpd = make_server(self.stack.app, lambda _token: {}, host="127.0.0.1", port=0)
+        self.httpd = make_server(self.stack.app, reject_all, host="127.0.0.1", port=0)
         thread = threading.Thread(target=self.httpd.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
         thread.start()
         self.addCleanup(thread.join, 5)
@@ -72,8 +73,11 @@ class ContractTest(unittest.TestCase):
         for (method, path), fields in contract_operations().items():
             with self.subTest(operation=(method, path)):
                 status = self.status(method, path)
-                if fields["x-durum"] == "uygulandi":
-                    self.assertNotIn(status, (404, 405))
+                if path == "/healthz":
+                    self.assertEqual(status, 200)
+                elif fields["x-durum"] == "uygulandi":
+                    # Kimliksiz istek her korumalı uçta 401 alır.
+                    self.assertEqual(status, 401)
                 else:
                     self.assertEqual(status, 404)
 

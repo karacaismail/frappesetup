@@ -53,9 +53,10 @@ class DeadLetter:
 class Store:
     def __init__(self, path: str, *, clock: Callable[[], float] = time.time) -> None:
         self._clock = clock
-        if path != ":memory:" and not os.path.exists(path):
+        if path != ":memory:":
             # Dosyayı yalnız servisin kullanıcısı okuyabilsin.
             os.close(os.open(path, os.O_CREAT | os.O_WRONLY, 0o600))
+            os.chmod(path, 0o600)
         # Sunucu tek iş parçacığıyla çalışır. Testler bağlantıyı başka iş parçacığından kapatır.
         self._db = sqlite3.connect(path, check_same_thread=False)
         with self._db:
@@ -69,11 +70,13 @@ class Store:
         return row is not None
 
     def mark_processed(self, event_id: str, status: str) -> None:
+        """Olayı işlenmiş sayar ve bekleme kuyruğundan çıkarır. İki yazı tek işlemdedir."""
         with self._db:
             self._db.execute(
                 "INSERT OR IGNORE INTO processed_events (event_id, status, processed_at) VALUES (?, ?, ?)",
                 (event_id, status, self._clock()),
             )
+            self._db.execute("DELETE FROM dead_letters WHERE event_id = ?", (event_id,))
 
     def add_dead_letter(self, event: Event, error: str) -> None:
         """Olayı bekleme kuyruğuna yazar. Olay zaten kuyruktaysa deneme sayısını artırır."""

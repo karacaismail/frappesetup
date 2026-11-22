@@ -58,6 +58,9 @@ class ParseEventTest(unittest.TestCase):
             {**base, "id": ""},
             {**base, "id": "x" * 129},
             {**base, "user_id": 5},
+            {**base, "user_id": ".."},
+            {**base, "user_id": "a/b"},
+            {**base, "user_id": "a b"},
         ):
             with self.subTest(bad=bad), self.assertRaises(EventError):
                 parse_event(bad)

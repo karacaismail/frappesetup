@@ -123,6 +123,7 @@ class FakeKeycloak(FakeServer):
         self.memberships: dict[str, list[dict[str, object]]] = {}
         self.organizations: dict[str, dict[str, object]] = {}
         self.on("POST", f"/realms/{ISSUER_REALM}/protocol/openid-connect/token", self._token)
+        self.on("GET", f"/admin/realms/{ISSUER_REALM}/users/count", lambda _r: (200, len(self.users)))
 
     @property
     def admin(self) -> str:
@@ -193,17 +194,20 @@ class FakeSite(FakeServer):
         return [r for r in self.requests if r.method != "GET"]
 
 
-def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, db_path: str):
+def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, db_path: str, tenant2=None):
     from identity_sync.config import Settings
     from identity_sync.mapping import Tenant
 
+    tenants = [Tenant(name=TENANT, base_url=tenant.url, organization=TENANT)]
+    if tenant2 is not None:
+        tenants.append(Tenant(name="kiraci2", base_url=tenant2.url, organization="kiraci2"))
     return Settings(
         keycloak_public_url=keycloak.url,
         realm=ISSUER_REALM,
         client_id="identity-sync",
         client_secret="test-client-secret",
         press_url=press.url,
-        tenants=(Tenant(name=TENANT, base_url=tenant.url, organization=TENANT),),
+        tenants=tuple(tenants),
         webhook_secret=WEBHOOK_SECRET,
         db_path=db_path,
         admin_scope="admin-api",
@@ -214,13 +218,14 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
 class Stack:
     """Üç sahte sunucuyu ve servisi birlikte kurar."""
 
-    def __init__(self, db_path: str = ":memory:") -> None:
+    def __init__(self, db_path: str = ":memory:", *, two_tenants: bool = False) -> None:
         from identity_sync.app import build_app
 
         self.keycloak = FakeKeycloak()
         self.press = FakeSite()
         self.tenant = FakeSite()
-        self.settings = make_settings(self.keycloak, self.press, self.tenant, db_path)
+        self.tenant2 = FakeSite() if two_tenants else None
+        self.settings = make_settings(self.keycloak, self.press, self.tenant, db_path, self.tenant2)
         self.sleeps: list[float] = []
         self.app = build_app(self.settings, sleep=self.sleeps.append)
 
@@ -230,5 +235,6 @@ class Stack:
 
     def close(self) -> None:
         self.app.close()
-        for server in (self.keycloak, self.press, self.tenant):
-            server.close()
+        for server in (self.keycloak, self.press, self.tenant, self.tenant2):
+            if server is not None:
+                server.close()

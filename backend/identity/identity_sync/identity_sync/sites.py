@@ -32,15 +32,24 @@ def tenant_scope(tenant: str) -> str:
 
 
 def _call_method(
-    base_url: str, method_path: str, token: str, *, timeout: float, body: Mapping[str, object] | None = None
+    base_url: str,
+    method_path: str,
+    tokens: TokenProvider,
+    scope: str,
+    *,
+    timeout: float,
+    body: Mapping[str, object] | None = None,
 ) -> object:
     """Frappe ucunu çağırır ve yanıttaki `message` değerini döner."""
-    response = request_json(
-        "GET" if body is None else "POST",
-        f"{base_url.rstrip('/')}/api/method/{method_path}",
-        timeout=timeout,
-        headers={"Authorization": f"Bearer {token}"},
-        json_body=body,
+    response = tokens.with_token(
+        scope,
+        lambda token: request_json(
+            "GET" if body is None else "POST",
+            f"{base_url.rstrip('/')}/api/method/{method_path}",
+            timeout=timeout,
+            headers={"Authorization": f"Bearer {token}"},
+            json_body=body,
+        ),
     )
     return response.body.get("message") if isinstance(response.body, Mapping) else None
 
@@ -70,7 +79,7 @@ class PressClient:
         self._timeout = timeout
 
     def _call(self, method_path: str, body: Mapping[str, object] | None = None) -> object:
-        return _call_method(self._base_url, method_path, self._tokens.get(PRESS_SCOPE), timeout=self._timeout, body=body)
+        return _call_method(self._base_url, method_path, self._tokens, PRESS_SCOPE, timeout=self._timeout, body=body)
 
     def ensure_team(self, action: PressEnsureTeam) -> None:
         self._call("press_tr.api.identity.ensure_team", asdict(action))
@@ -91,8 +100,7 @@ class TenantClient:
     def _call(self, tenant: str, method_path: str, body: Mapping[str, object] | None = None) -> object:
         # Hedef adres yalnız ayardaki kiracı listesinden gelir (G-13).
         base_url = self._tenants[tenant].base_url
-        token = self._tokens.get(tenant_scope(tenant))
-        return _call_method(base_url, method_path, token, timeout=self._timeout, body=body)
+        return _call_method(base_url, method_path, self._tokens, tenant_scope(tenant), timeout=self._timeout, body=body)
 
     @staticmethod
     def _body(action: object) -> dict[str, object]:

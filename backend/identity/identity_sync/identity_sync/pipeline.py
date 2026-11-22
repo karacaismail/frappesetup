@@ -90,6 +90,8 @@ class Processor:
             except _Failed:
                 return EventResult("failed")
         if self._store.is_processed(event.id):
+            # Olay kuyrukta kalmışsa kalıntıdır. Kalıntı yeniden işlemeyi sonsuza dek başarısız gösterir.
+            self._store.remove_dead_letter(event.id)
             return EventResult("duplicate")
         try:
             names = self._run(event)
@@ -97,7 +99,6 @@ class Processor:
             self._store.add_dead_letter(event, str(failure))
             return EventResult("dead_lettered")
         self._store.mark_processed(event.id, "processed")
-        self._store.remove_dead_letter(event.id)
         return EventResult("processed", actions=tuple(names))
 
     def replay_dead_letters(self, *, dry_run: bool = False) -> list[tuple[str, EventResult]]:
@@ -119,10 +120,19 @@ class Processor:
         names: list[str] = []
         for _pass in range(_MAX_PASSES):
             actions = self._plan(event)
+            failures: list[str] = []
             for action in actions:
                 preview = action.preview()
-                self._retry(f"{preview.operation} {preview.target}", lambda action=action: self._execute(action))
-                names.append(preview.operation)
+                # Başarısız adım öteki adımları durdurmaz. Örneğin Press yanıt vermese de
+                # kullanıcı bütün kiracılarda kapanır. Adımlar tekrar edilebilir.
+                try:
+                    self._retry(f"{preview.operation} {preview.target}", lambda action=action: self._execute(action))
+                except _Failed as failure:
+                    failures.append(str(failure))
+                else:
+                    names.append(preview.operation)
+            if failures:
+                raise _Failed("; ".join(failures))
             if not any(isinstance(action, EnsureOrganization) for action in actions):
                 break
         return names
@@ -150,8 +160,9 @@ class Processor:
                 return call()
             except HttpError as error:
                 reason, transient = str(error), error.transient
-            except TransportError:
-                reason, transient = "network error", True
+            except TransportError as error:
+                # Bu metinler sabittir. Yanıt gövdesi taşımaz.
+                reason, transient = str(error) or "network error", True
             if not transient or attempt == self._max_attempts:
                 raise _Failed(f"{label}: {reason}")
             self._sleep(_BACKOFF_SECONDS * 2 ** (attempt - 1))

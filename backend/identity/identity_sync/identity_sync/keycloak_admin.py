@@ -14,7 +14,7 @@ import urllib.parse
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 
-from identity_sync.httpjson import HttpError, Response, request_json
+from identity_sync.httpjson import HttpError, Response, TransportError, request_json
 from identity_sync.mapping import Organization, Preview, UserSnapshot
 from identity_sync.tokens import TokenProvider
 
@@ -55,6 +55,9 @@ def site_client_id(tenant: str) -> str:
 
 
 def _quote(value: str) -> str:
+    """Değeri adres yoluna güvenle koyar. Yolu değiştirebilen değeri reddeder."""
+    if value in ("", ".", ".."):
+        raise ValueError("invalid path segment")
     return urllib.parse.quote(value, safe="")
 
 
@@ -62,7 +65,7 @@ def _id_from_location(response: Response) -> str:
     location = response.headers.get("location", "")
     new_id = location.rstrip("/").rsplit("/", 1)[-1]
     if not new_id:
-        raise HttpError(response.status)
+        raise TransportError("unexpected Keycloak response")
     return urllib.parse.unquote(new_id)
 
 
@@ -86,30 +89,53 @@ class KeycloakAdmin:
         json_body: object = None,
         has_body: bool = False,
     ) -> Response:
-        return request_json(
-            method,
-            f"{self._root}{path}",
-            timeout=self._timeout,
-            headers={"Authorization": f"Bearer {self._tokens.get(self._admin_scope)}"},
-            query=query,
-            json_body=json_body,
-            has_body=has_body,
+        return self._tokens.with_token(
+            self._admin_scope,
+            lambda token: request_json(
+                method,
+                f"{self._root}{path}",
+                timeout=self._timeout,
+                headers={"Authorization": f"Bearer {token}"},
+                query=query,
+                json_body=json_body,
+                has_body=has_body,
+            ),
         )
 
-    def _get_or_none(self, path: str, *, query: Mapping[str, object] | None = None) -> object:
+    def _get_object_or_none(self, path: str) -> Mapping[str, object] | None:
+        """Kaydı okur. Kayıt yoksa `None` döner.
+
+        404 yanıtı tek başına "kayıt yok" kanıtı değildir. Yanlış realm adı ya da aradaki
+        bir vekil sunucu da 404 döner. Bu yüzden işlev realm'in yanıt verdiğini ayrıca doğrular.
+        Belirsiz yanıt hata sayılır. Çünkü "kullanıcı yok" sonucu kullanıcıyı her yerde kapatır.
+        """
         try:
-            return self._call("GET", path, query=query).body
+            body = self._call("GET", path).body
         except HttpError as error:
-            if error.status == 404:
-                return None
-            raise
+            if error.status != 404:
+                raise
+            self._confirm_realm_answers()
+            return None
+        if not isinstance(body, Mapping):
+            raise TransportError("unexpected Keycloak response")
+        return body
+
+    def _confirm_realm_answers(self) -> None:
+        count = self._call("GET", "/users/count").body
+        if isinstance(count, bool) or not isinstance(count, int):
+            raise TransportError("unexpected Keycloak response")
+
+    def _list(self, path: str, *, query: Mapping[str, object] | None = None) -> list[Mapping[str, object]]:
+        body = self._call("GET", path, query=query).body
+        if not isinstance(body, list) or not all(isinstance(row, Mapping) for row in body):
+            raise TransportError("unexpected Keycloak response")
+        return body
 
     def _pages(self, path: str, *, query: Mapping[str, object] | None = None) -> Iterator[Mapping[str, object]]:
         first = 0
         while True:
-            body = self._call("GET", path, query={**(query or {}), "first": first, "max": PAGE_SIZE}).body
-            rows = body if isinstance(body, list) else []
-            yield from (row for row in rows if isinstance(row, Mapping))
+            rows = self._list(path, query={**(query or {}), "first": first, "max": PAGE_SIZE})
+            yield from rows
             if len(rows) < PAGE_SIZE:
                 return
             first += PAGE_SIZE
@@ -118,13 +144,16 @@ class KeycloakAdmin:
 
     def get_user(self, subject: str) -> Mapping[str, object] | None:
         """Kullanıcının Keycloak gösterimini döner. Kullanıcı yoksa `None` döner."""
-        body = self._get_or_none(f"/users/{_quote(subject)}")
-        return body if isinstance(body, Mapping) else None
+        user = self._get_object_or_none(f"/users/{_quote(subject)}")
+        if user is None:
+            return None
+        if user.get("id") != subject or not isinstance(user.get("enabled"), bool):
+            raise TransportError("unexpected Keycloak response")
+        return user
 
     def find_user_by_email(self, email: str) -> Mapping[str, object] | None:
-        body = self._call("GET", "/users", query={"email": email, "exact": "true"}).body
-        for row in body if isinstance(body, list) else []:
-            if isinstance(row, Mapping) and str(row.get("email", "")).lower() == email.lower():
+        for row in self._list("/users", query={"email": email, "exact": "true"}):
+            if str(row.get("email", "")).lower() == email.lower():
                 return row
         return None
 
@@ -133,8 +162,8 @@ class KeycloakAdmin:
         return self._pages("/users")
 
     def list_user_organizations(self, subject: str) -> tuple[Organization, ...]:
-        body = self._get_or_none(f"/organizations/members/{_quote(subject)}/organizations")
-        return tuple(_organization(row) for row in (body if isinstance(body, list) else []))
+        """Kullanıcının üyeliklerini döner. Okunamayan üyelik "üyelik yok" sayılmaz, hata olur."""
+        return tuple(_organization(row) for row in self._list(f"/organizations/members/{_quote(subject)}/organizations"))
 
     def get_user_snapshot(self, subject: str) -> UserSnapshot | None:
         """Kullanıcının güncel durumunu ve üyeliklerini birlikte döner."""
@@ -144,17 +173,16 @@ class KeycloakAdmin:
         return snapshot_from_user(user, self.list_user_organizations(subject))
 
     def get_organization(self, organization_id: str) -> Organization | None:
-        body = self._get_or_none(f"/organizations/{_quote(organization_id)}")
-        return _organization(body) if isinstance(body, Mapping) else None
+        body = self._get_object_or_none(f"/organizations/{_quote(organization_id)}")
+        return _organization(body) if body is not None else None
 
     def find_organization(self, name: str, alias: str) -> Organization | None:
         """Organization'ı adıyla arar. Yalnız takma adı da tutan kaydı döner.
 
         Keycloak arama ucu ada ve alan adına bakar. Takma ada bakmaz.
         """
-        body = self._call("GET", "/organizations", query={"search": name, "exact": "true"}).body
-        for row in body if isinstance(body, list) else []:
-            if isinstance(row, Mapping) and row.get("alias") == alias:
+        for row in self._list("/organizations", query={"search": name, "exact": "true"}):
+            if row.get("alias") == alias:
                 return _organization(row)
         return None
 
@@ -165,9 +193,8 @@ class KeycloakAdmin:
         return self._pages(f"/organizations/{_quote(organization_id)}/members")
 
     def find_client(self, client_id: str) -> Mapping[str, object] | None:
-        body = self._call("GET", "/clients", query={"clientId": client_id}).body
-        for row in body if isinstance(body, list) else []:
-            if isinstance(row, Mapping) and row.get("clientId") == client_id:
+        for row in self._list("/clients", query={"clientId": client_id}):
+            if row.get("clientId") == client_id:
                 return row
         return None
 
@@ -175,7 +202,7 @@ class KeycloakAdmin:
         """İstemcinin sırrını döner. Çağıran sırrı günlüğe yazmamalıdır."""
         body = self._call("GET", f"/clients/{_quote(client_uuid)}/client-secret").body
         if not isinstance(body, Mapping) or not isinstance(body.get("value"), str):
-            raise HttpError(502)
+            raise TransportError("unexpected Keycloak response")
         return body["value"]
 
     # --- yazma: her işlev tek iş yapar ---

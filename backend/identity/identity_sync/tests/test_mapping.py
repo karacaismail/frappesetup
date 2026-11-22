@@ -100,7 +100,7 @@ class RegistrationTest(unittest.TestCase):
         )
 
     def test_verified_member_gets_team_and_tenant_user(self) -> None:
-        self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user()), (TEAM, PROVISION))
+        self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user()), (TEAM, PROVISION, CHANGE_EMAIL))
 
     def test_member_of_unknown_organization_gets_only_a_team(self) -> None:
         team = PressEnsureTeam(
@@ -149,13 +149,13 @@ class AdminUpdateTest(unittest.TestCase):
         self.assertEqual(plan(event("admin", "USER_UPDATE"), user()), (TEAM, PROVISION, CHANGE_EMAIL))
 
     def test_admin_create_of_verified_member_provisions(self) -> None:
-        self.assertEqual(plan(event("admin", "USER_CREATE"), user()), (TEAM, PROVISION))
+        self.assertEqual(plan(event("admin", "USER_CREATE"), user()), (TEAM, PROVISION, CHANGE_EMAIL))
 
 
 class MembershipTest(unittest.TestCase):
     def test_new_membership_provisions_that_organization(self) -> None:
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_CREATE", ORG.id)
-        self.assertEqual(plan(ev, user(), ORG), (TEAM, PROVISION))
+        self.assertEqual(plan(ev, user(), ORG), (TEAM, PROVISION, CHANGE_EMAIL))
 
     def test_removed_membership_deprovisions_only_that_organization(self) -> None:
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_DELETE", ORG.id)
@@ -170,14 +170,23 @@ class MembershipTest(unittest.TestCase):
     def test_late_delete_event_does_not_remove_current_member(self) -> None:
         # Olay geç geldi. Kullanıcı yeniden üye. Güncel durum geçerlidir.
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_DELETE", ORG.id)
-        self.assertEqual(plan(ev, user(), ORG), (TEAM, PROVISION))
+        self.assertEqual(plan(ev, user(), ORG), (TEAM, PROVISION, CHANGE_EMAIL))
 
-    def test_membership_of_deleted_organization_removes_team_member(self) -> None:
+    def test_membership_of_deleted_organization_disables_non_member_tenants(self) -> None:
+        # Organization silindi. Takma adı bilinmez. Kullanıcı üyesi olmadığı her kiracıda kapanır.
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_DELETE", ORG.id)
+        kiraci2 = Organization(id="o-2", alias="kiraci2")
         self.assertEqual(
-            plan(ev, user(orgs=()), None),
-            (PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=ORG.id),),
+            plan(ev, user(orgs=(kiraci2,)), None),
+            (
+                PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=ORG.id),
+                TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject=SUB, enabled=False),
+            ),
         )
+
+    def test_verify_after_admin_email_change_still_renames(self) -> None:
+        # Yönetici e-postayı değiştirdi. Kullanıcı sonra doğruladı. Kiracıda ad yine değişmelidir (G-57).
+        self.assertIn(CHANGE_EMAIL, plan(event("user", "VERIFY_EMAIL"), user()))
 
     def test_membership_of_unverified_user_waits(self) -> None:
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_CREATE", ORG.id)

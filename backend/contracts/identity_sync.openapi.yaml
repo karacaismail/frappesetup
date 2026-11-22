@@ -21,6 +21,12 @@ info:
     Önizleme, çalışacak işleri ve her işin yıkıcı olup olmadığını listeler.
     İnsan onayı ileride bu önizlemeye bakacak (`docs/sozlesmeler.md`, 10. bölüm).
 
+    Bütün uçlar şu hataları dönebilir. Bu yüzden hatalar her uçta ayrıca yazılmadı.
+    Bilinmeyen yol 404 ve `not_found` döner.
+    Yanlış yöntem 405 ve `method_not_allowed` döner.
+    65.536 bayttan büyük ya da uzunluğu belirsiz gövde 413 ve `too_large` döner.
+    Kayıt dosyası hatası 500 ve `storage_failed` döner.
+
     Elle başlatılan her komutun bir ucu vardır.
     Böylece yapay zekâ katmanı da komutu başlatabilir.
     Bu uçlar servis belirteci ister. Olay ucu imza ister.
@@ -70,6 +76,12 @@ paths:
 
         Servis eylemi olayın içeriğinden seçmez. Kullanıcının Keycloak'taki güncel durumundan seçer.
         Gövde Keycloak'ın kendi olay biçiminde de gelebilir. Servis bu biçimi zarfa çevirir.
+        Bir istisna vardır. Keycloak 26.8.2 üye ekleme olayında kullanıcının kimliğini vermez.
+        Servis Keycloak biçimindeki bu olayı işleyemez ve `ignored` döner.
+        Üye eklemeyi bildirmek için zarfı `user_id` alanıyla gönderin.
+
+        İmza yalnız gövdeyi kapsar. `dry_run` parametresini kapsamaz.
+        Bu yüzden uç yalnız iç ağda ya da TLS arkasında kullanılmalıdır.
       x-durum: uygulandi
       x-yikici: true
       security:
@@ -81,6 +93,8 @@ paths:
           description: |
             Değer `true` ise servis hiçbir kaydı değiştirmez.
             Servis yalnız çalışacak işlerin önizlemesini döner. Yanıt kodu 200 olur.
+            Parametre yoksa değer `false` sayılır.
+            Başka değer ya da yinelenen parametre 400 döner. Servis o isteği yürütmez.
           schema:
             type: string
             enum: ["true", "false"]
@@ -112,7 +126,9 @@ paths:
                   organization_id: 22222222-2222-4222-8222-222222222222
       responses:
         "200":
-          description: Önizleme. Servis hiçbir kaydı değiştirmedi.
+          description: |
+            Önizleme isteğinin yanıtı. Servis hiçbir kaydı değiştirmedi.
+            Durum `preview`, `ignored` ya da `failed` olur.
           content:
             application/json:
               schema:
@@ -124,7 +140,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/EventResult"
         "400":
-          description: Gövde JSON değil ya da zorunlu alan eksik.
+          description: Gövde JSON değil, zorunlu alan eksik ya da `dry_run` değeri geçersiz.
           content:
             application/json:
               schema:
@@ -333,7 +349,7 @@ paths:
                   maxLength: 150
                 organization_id:
                   type: string
-                  maxLength: 150
+                  pattern: "^[A-Za-z0-9_-]{1,128}$"
                 dry_run:
                   type: boolean
                   description: Doğruysa servis yalnız önizleme üretir.
@@ -394,7 +410,7 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
     UpstreamFailed:
-      description: Keycloak, Press ya da kiracı sitesi yanıt vermedi.
+      description: Keycloak, Press ya da kiracı sitesi yanıt vermedi ya da isteği reddetti.
       content:
         application/json:
           schema:
@@ -432,9 +448,11 @@ components:
           description: Olayın zamanı. Birim milisaniyedir.
         user_id:
           type: string
+          pattern: "^[A-Za-z0-9_-]{1,128}$"
           description: Kullanıcının Keycloak kimliği (`sub`). İşlenen bütün türlerde zorunludur.
         organization_id:
           type: string
+          pattern: "^[A-Za-z0-9_-]{1,128}$"
           description: Organization kimliği. Üyelik olaylarında zorunludur.
       additionalProperties: true
     EventResult:
@@ -449,7 +467,8 @@ components:
             `duplicate` değeri olayın daha önce işlendiğini gösterir.
             `ignored` değeri servisin bu olay türünü ya da realm'i işlemediğini gösterir.
             `dead_lettered` değeri olayın bekleme kuyruğuna girdiğini gösterir.
-            Kuyruğa girmek başarı değildir.
+            Kuyruğa girmek başarı değildir. Servis yine de bütün adımları dener.
+            Örneğin Press yanıt vermese de kullanıcı kiracılarda kapanır.
             `preview` değeri yalnız önizleme üretildiğini gösterir.
             `failed` değeri önizlemenin üretilemediğini gösterir. Örneğin Keycloak yanıt vermedi.
         actions:
@@ -502,7 +521,9 @@ components:
           $ref: "#/components/schemas/Event"
         error:
           type: string
-          description: Başarısız adım ve durum kodu. Yanıt gövdesi saklanmaz.
+          description: |
+            Başarısız adımlar ve durum kodları. Adımlar noktalı virgülle ayrılır.
+            Yanıt gövdesi saklanmaz.
           examples: ["tenant.provision kiraci1: HTTP 503"]
         attempts:
           type: integer

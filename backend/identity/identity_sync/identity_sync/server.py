@@ -21,7 +21,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from identity_sync.app import App
 from identity_sync.auth import TokenRejected, Verifier
-from identity_sync.events import EventError, from_keycloak, looks_like_keycloak, parse_event
+from identity_sync.events import RESOURCE_ID, EventError, from_keycloak, looks_like_keycloak, parse_event
 from identity_sync.httpjson import HttpError, TransportError
 
 __all__ = ["TokenRejected", "make_server"]
@@ -71,12 +71,22 @@ class _Api:
         self._app = app
 
     def post_event(self, body: bytes, query: Mapping[str, list[str]]) -> Reply:
+        # Belirsiz `dry_run` değeri hiçbir zaman yürütmeye dönüşmez.
+        dry_run_values = query.get("dry_run", ["false"])
+        if dry_run_values not in (["true"], ["false"]):
+            raise _BadRequest
         payload = _json_object(body)
         try:
-            event = parse_event(from_keycloak(payload) if looks_like_keycloak(payload) else payload)
+            if looks_like_keycloak(payload):
+                payload = from_keycloak(payload)
+                if payload.get("type") == "ORGANIZATION_MEMBERSHIP_CREATE" and "user_id" not in payload:
+                    # Keycloak üye ekleme olayında kullanıcıyı vermez. Servis bu olayı işleyemez.
+                    _LOG.warning("ignored membership event without user")
+                    return 202, {"status": "ignored", "actions": []}
+            event = parse_event(payload)
         except EventError:
             raise _BadRequest from None
-        if query.get("dry_run") == ["true"]:
+        if dry_run_values == ["true"]:
             return 200, self._app.processor.handle(event, dry_run=True).to_dict()
         return 202, self._app.processor.handle(event).to_dict()
 
@@ -98,18 +108,22 @@ class _Api:
         email = _text(payload, "email", required=True, max_length=254)
         if not _EMAIL.fullmatch(email):
             raise _BadRequest
+        organization_id = _text(payload, "organization_id", required=True)
+        if not RESOURCE_ID.fullmatch(organization_id):
+            raise _BadRequest
         result = self._app.keycloak.invite_user(
-            email,
-            _text(payload, "first_name"),
-            _text(payload, "last_name"),
-            _text(payload, "organization_id", required=True),
-            dry_run=dry_run,
+            email, _text(payload, "first_name"), _text(payload, "last_name"), organization_id, dry_run=dry_run
         )
         return 200, {"subject": result.subject, "previews": [preview.to_dict() for preview in result.previews]}
 
 
-def make_server(app: App, verifier: Verifier, *, host: str, port: int) -> HTTPServer:
-    """Sunucuyu kurar. `verifier` servis belirtecini doğrular ve hatada `TokenRejected` yükseltir."""
+def make_server(
+    app: App, verifier: Verifier, *, host: str, port: int, request_timeout: float = 10.0
+) -> HTTPServer:
+    """Sunucuyu kurar. `verifier` servis belirtecini doğrular ve hatada `TokenRejected` yükseltir.
+
+    `request_timeout`, yavaş istemcinin sunucuyu tutabileceği en uzun süredir. Birim saniyedir.
+    """
     api = _Api(app)
     secret = app.settings.webhook_secret.encode("utf-8")
     Handler = Callable[[bytes, Mapping[str, list[str]]], Reply]
@@ -125,25 +139,30 @@ def make_server(app: App, verifier: Verifier, *, host: str, port: int) -> HTTPSe
     class RequestHandler(BaseHTTPRequestHandler):
         server_version = "identity_sync"
         sys_version = ""
+        # Sunucu tek iş parçacığıdır. Süre sınırı olmazsa susan bir istemci sunucuyu durdurur.
+        timeout = request_timeout
 
         def do_GET(self) -> None:
             self._dispatch()
 
-        def do_POST(self) -> None:
-            self._dispatch()
+        do_POST = do_PUT = do_PATCH = do_DELETE = do_HEAD = do_OPTIONS = do_GET
 
         def _dispatch(self) -> None:
             parts = urlsplit(self.path)
-            status, body = self._respond(parts.path, parse_qs(parts.query))
+            status, body = self._respond(parts.path, parse_qs(parts.query, keep_blank_values=True))
             raw = json.dumps(body).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(raw)))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
-            self.wfile.write(raw)
+            if self.command != "HEAD":
+                self.wfile.write(raw)
 
         def _respond(self, path: str, query: Mapping[str, list[str]]) -> Reply:
+            if self.command not in ("GET", "POST"):
+                self.close_connection = True  # gövde okunmadı
+                return 405, {"error": "method_not_allowed"}
             if path == "/healthz":
                 return (200, {"status": "ok"}) if self.command == "GET" else (405, {"error": "method_not_allowed"})
             route = routes.get(path)
@@ -201,10 +220,16 @@ def make_server(app: App, verifier: Verifier, *, host: str, port: int) -> HTTPSe
                 verifier(token.strip())
             except TokenRejected:
                 return False
+            except Exception as error:  # doğrulayıcı çökerse istek yine reddedilir
+                _LOG.error("token verifier failed: %s", type(error).__name__)
+                return False
             return True
 
         def log_message(self, format: str, *args: object) -> None:
-            # Günlüğe yalnız yöntem, yol ve durum yazılır. Sorgu ve gövde yazılmaz.
-            _LOG.info("%s %s %s", self.command, urlsplit(self.path).path, args[1] if len(args) > 1 else "")
+            # Günlüğe yalnız yol ve sayısal durum yazılır. Sorgu, gövde ve istemcinin metni yazılmaz.
+            # Bozuk istekte `path` henüz yoktur.
+            status = str(args[1]) if len(args) > 1 else ""
+            path = urlsplit(getattr(self, "path", "")).path
+            _LOG.info("%s %s", path[:200], status if status.isdigit() else "-")
 
     return HTTPServer((host, port), RequestHandler)

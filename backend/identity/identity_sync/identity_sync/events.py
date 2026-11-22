@@ -10,6 +10,7 @@ Servis kullanıcının güncel durumunu Keycloak'tan okur.
 from __future__ import annotations
 
 import hashlib
+import re
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 
@@ -18,6 +19,8 @@ MEMBERSHIP_TYPES = frozenset({"ORGANIZATION_MEMBERSHIP_CREATE", "ORGANIZATION_ME
 ADMIN_TYPES = frozenset({"USER_CREATE", "USER_UPDATE", "USER_DELETE"}) | MEMBERSHIP_TYPES
 
 MAX_ID_LENGTH = 128
+# Kimlikler adres yoluna girer. Bu yüzden yalnız güvenli karakterler kabul edilir.
+RESOURCE_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _MAX_FIELD_LENGTH = 255
 
 
@@ -57,6 +60,13 @@ def _text(payload: Mapping[str, object], name: str, *, required: bool, max_lengt
     return value
 
 
+def _resource_id(payload: Mapping[str, object], name: str) -> str | None:
+    value = _text(payload, name, required=False)
+    if value is not None and not RESOURCE_ID.fullmatch(value):
+        raise EventError(f"invalid field: {name}")
+    return value
+
+
 def parse_event(payload: object) -> Event:
     """Zarfı doğrular ve `Event` üretir. Gereksiz alanları atar."""
     if not isinstance(payload, Mapping):
@@ -73,8 +83,8 @@ def parse_event(payload: object) -> Event:
         type=_text(payload, "type", required=True) or "",
         realm=_text(payload, "realm", required=True) or "",
         time=time,
-        user_id=_text(payload, "user_id", required=False),
-        organization_id=_text(payload, "organization_id", required=False),
+        user_id=_resource_id(payload, "user_id"),
+        organization_id=_resource_id(payload, "organization_id"),
     )
     if is_handled(event):
         if event.user_id is None:

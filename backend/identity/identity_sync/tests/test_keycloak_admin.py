@@ -54,7 +54,21 @@ class ReadTest(AdminCase):
 
         self.assertIsNone(self.admin.get_user_snapshot(SUBJECT))
 
+    def test_404_without_working_realm_is_an_error(self) -> None:
+        self.kc.on("GET", f"{self.base}/users/count", (404, None))
+
+        with self.assertRaises(HttpError):
+            self.admin.get_user(SUBJECT)
+
+    def test_dot_segments_are_never_sent(self) -> None:
+        for bad in ("..", ".", ""):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                self.admin.get_user(bad)
+        self.assertEqual(self.kc.requests, [])
+
     def test_missing_organization_gives_none(self) -> None:
+        self.kc.on("GET", f"{self.base}/organizations/{ORG_ID}", (404, {"error": "Organization not found."}))
+
         self.assertIsNone(self.admin.get_organization(ORG_ID))
 
     def test_server_error_is_raised_not_hidden(self) -> None:

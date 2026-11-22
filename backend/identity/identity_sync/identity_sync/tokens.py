@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Mapping
+from typing import TypeVar
 
-from identity_sync.httpjson import TransportError, request_json
+from identity_sync.httpjson import HttpError, TransportError, request_json
+
+T = TypeVar("T")
 
 _EXPIRY_MARGIN_SECONDS = 30.0
 
@@ -30,6 +33,16 @@ class TokenProvider:
         self._timeout = timeout
         self._clock = clock
         self._cache: dict[str, tuple[str, float]] = {}
+
+    def with_token(self, scope: str, call: Callable[[str], T]) -> T:
+        """Çağrıyı belirteçle yapar. Hedef 401 dönerse belirteci yeniler ve bir kez daha dener."""
+        try:
+            return call(self.get(scope))
+        except HttpError as error:
+            if error.status != 401:
+                raise
+        self._cache.pop(scope, None)
+        return call(self.get(scope))
 
     def get(self, scope: str) -> str:
         """`scope` kapsamı için geçerli bir erişim belirteci döner."""

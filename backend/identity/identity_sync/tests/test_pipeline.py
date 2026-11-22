@@ -34,7 +34,7 @@ class ProvisionTest(PipelineCase):
         result = self.stack.app.processor.handle(event())
 
         self.assertEqual(result.status, "processed")
-        self.assertEqual(result.actions, ("press.ensure_team", "tenant.provision"))
+        self.assertEqual(result.actions, ("press.ensure_team", "tenant.provision", "tenant.change_email"))
         (team,) = self.stack.press.calls("POST", fakes.PRESS_ENSURE_TEAM)
         self.assertEqual(
             team.json(),
@@ -143,6 +143,9 @@ class ProvisionTest(PipelineCase):
         self.assertEqual(
             changed.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "new_email": "yeni@example.test"}
         )
+        # Önce kayıt hazırlanır, sonra ad değişir. Yeni kullanıcıda `change_email` iş yapmaz.
+        order = [r.path for r in self.stack.tenant.writes()]
+        self.assertEqual(order, [fakes.TENANT_PROVISION, fakes.TENANT_CHANGE_EMAIL])
 
     def test_membership_delete_resolves_organization(self) -> None:
         self.stack.keycloak.add_user(keycloak_user(), [])
@@ -170,6 +173,86 @@ class ProvisionTest(PipelineCase):
         self.assertEqual(self.stack.keycloak.requests, [])
 
 
+class AmbiguousReadTest(PipelineCase):
+    """Belirsiz Keycloak yanıtı kullanıcıyı kapatmamalıdır."""
+
+    def assert_nothing_disabled(self, result) -> None:
+        self.assertEqual(result.status, "dead_lettered")
+        self.assertEqual(self.stack.press.writes() + self.stack.tenant.writes(), [])
+
+    def test_404_from_wrong_realm_or_proxy_does_not_disable(self) -> None:
+        # Kullanıcı ucu 404 döner. Realm'in kendisi de yanıt vermez. Bu silinme kanıtı değildir.
+        kc = self.stack.keycloak
+        kc.on("GET", f"{kc.admin}/users/{SUBJECT}", (404, None))
+        kc.on("GET", f"{kc.admin}/users/count", (404, None))
+
+        self.assert_nothing_disabled(self.stack.app.processor.handle(event()))
+
+    def test_empty_200_does_not_disable(self) -> None:
+        kc = self.stack.keycloak
+        kc.on("GET", f"{kc.admin}/users/{SUBJECT}", (200, None))
+
+        self.assert_nothing_disabled(self.stack.app.processor.handle(event()))
+
+    def test_user_without_enabled_field_does_not_disable(self) -> None:
+        user = keycloak_user()
+        del user["enabled"]
+        self.stack.keycloak.add_user(user, [self.org])
+
+        self.assert_nothing_disabled(self.stack.app.processor.handle(event()))
+
+    def test_other_users_representation_does_not_disable(self) -> None:
+        kc = self.stack.keycloak
+        kc.on("GET", f"{kc.admin}/users/{SUBJECT}", (200, {"id": "baska", "enabled": False}))
+
+        self.assert_nothing_disabled(self.stack.app.processor.handle(event()))
+
+    def test_failed_membership_read_does_not_deprovision(self) -> None:
+        kc = self.stack.keycloak
+        kc.add_user(keycloak_user(), [self.org])
+        kc.add_organization(ORG_ID, "kiraci1")
+        kc.on("GET", f"{kc.admin}/organizations/members/{SUBJECT}/organizations", (404, None))
+
+        result = self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
+
+        self.assert_nothing_disabled(result)
+
+    def test_confirmed_missing_user_is_deprovisioned(self) -> None:
+        # Kullanıcı ucu 404 döner. Realm kullanıcı sayısını verir. Bu silinme kanıtıdır.
+        self.stack.keycloak.remove_user(SUBJECT)
+
+        result = self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+
+        self.assertEqual(result.status, "processed")
+        self.assertEqual(len(self.stack.keycloak.calls("GET", f"{self.stack.keycloak.admin}/users/count")), 1)
+
+
+class FanOutTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.stack = Stack(two_tenants=True)
+        self.addCleanup(self.stack.close)
+        self.stack.keycloak.remove_user(SUBJECT)
+
+    def test_failing_press_does_not_stop_tenant_disable(self) -> None:
+        self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, (503, None))
+
+        result = self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+
+        self.assertEqual(result.status, "dead_lettered")
+        self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_SET_ENABLED)), 1)
+        self.assertEqual(len(self.stack.tenant2.calls("POST", fakes.TENANT_SET_ENABLED)), 1)
+
+    def test_dead_letter_lists_every_failed_step(self) -> None:
+        self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, (403, None))
+        self.stack.tenant.on("POST", fakes.TENANT_SET_ENABLED, (404, None))
+
+        self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual(letter.error, "press.remove_team_member press: HTTP 403; tenant.set_enabled kiraci1: HTTP 404")
+        self.assertEqual(len(self.stack.tenant2.calls("POST", fakes.TENANT_SET_ENABLED)), 1)
+
+
 class IdempotencyTest(PipelineCase):
     def test_same_event_twice_changes_nothing(self) -> None:
         self.add_member()
@@ -191,6 +274,33 @@ class IdempotencyTest(PipelineCase):
         first, second = self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)
         self.assertEqual(first.json(), second.json())
 
+    def test_duplicate_clears_leftover_dead_letter(self) -> None:
+        # Süreç iki kayıt arasında durduysa olay hem işlenmiş hem kuyrukta görünür.
+        self.add_member()
+        self.stack.app.processor.handle(event())
+        self.stack.app.store.add_dead_letter(event(), "kalıntı")
+
+        results = self.stack.app.processor.replay_dead_letters()
+
+        self.assertEqual([r.status for _id, r in results], ["duplicate"])
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+
+    def test_expired_token_is_refreshed_once(self) -> None:
+        self.add_member()
+        seen: list[str] = []
+
+        def provision(req: fakes.Recorded) -> fakes.Reply:
+            seen.append(req.headers["authorization"])
+            return (401, None) if len(seen) == 1 else (200, {"message": {"ok": True}})
+
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, provision)
+
+        result = self.stack.app.processor.handle(event())
+
+        self.assertEqual(result.status, "processed")
+        token_calls = self.stack.keycloak.calls("POST", "/realms/platform/protocol/openid-connect/token")
+        self.assertEqual(sorted(c.form()["scope"][0] for c in token_calls).count("aud-site-kiraci1"), 2)
+
 
 class FailureTest(PipelineCase):
     def test_failing_tenant_sends_event_to_dead_letters_after_retries(self) -> None:
@@ -202,6 +312,8 @@ class FailureTest(PipelineCase):
         self.assertEqual(result.status, "dead_lettered")
         self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)), 3)
         self.assertEqual(len(self.stack.sleeps), 2)
+        # Başarısız adım öteki adımları durdurmaz.
+        self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_CHANGE_EMAIL)), 1)
         (letter,) = self.stack.app.store.dead_letters()
         self.assertEqual(letter.event, event())
         self.assertEqual(letter.error, "tenant.provision kiraci1: HTTP 503")

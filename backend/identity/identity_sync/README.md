@@ -21,9 +21,15 @@ Servis eylemi olayın içeriğinden seçmez. Kullanıcının güncel durumundan 
 | Kullanıcı silindi ya da kapatıldı. | Servis kullanıcıyı bütün kiracılarda kapatır. Servis Press üyeliğini kaldırır. |
 | Kullanıcının e-postası doğrulanmadı. | Servis iş yapmaz. İlk bağ yalnız doğrulanmış e-postayla kurulur. |
 | Kullanıcı kendi kaydoldu ve Organization üyesi değil. | Servis bir Organization açar ve kullanıcıyı ekler. Sonra Press'te takımı hazırlar. |
-| Kullanıcı Organization üyesi. | Servis Press'te takımı hazırlar. Servis kullanıcıyı ilgili kiracıda açar ya da günceller. |
-| E-posta değişmiş olabilir. | Servis ayrıca kiracıda `change_email` ucunu çağırır. |
+| Kullanıcı Organization üyesi. | Servis Press'te takımı hazırlar. Servis kullanıcıyı ilgili kiracıda açar ya da günceller. Sonra kiracıda `change_email` ucunu çağırır. |
 | Kullanıcı bir Organization'dan çıktı. | Servis o Organization'ın takım üyeliğini kaldırır. Servis kullanıcıyı o kiracıda kapatır. |
+| Keycloak belirsiz yanıt verdi. | Servis hiçbir kaydı değiştirmez. Olay bekleme kuyruğuna girer. |
+
+Servis `change_email` ucunu her eşitlemede çağırır. Çünkü olayın adı e-postanın değiştiğini söylemez. E-posta aynıysa kiracı iş yapmaz.
+
+Servis silinmeyi iki adımda doğrular. Keycloak önce kullanıcı için 404 dönmelidir. Sonra realm kullanıcı sayısını vermelidir. Yanlış adres de 404 döner. Bu yüzden tek 404 yanıtı kullanıcıyı kapatmaz.
+
+Bir adım başarısız olursa servis öteki adımları yine dener. Örneğin Press yanıt vermese de kullanıcı kiracılarda kapanır.
 
 Organization, Keycloak'ta bir müşteri kuruluşunu temsil eden kayıttır. Kurallar `identity_sync/mapping.py` dosyasındadır. Bu dosya ağa ve diske dokunmaz.
 

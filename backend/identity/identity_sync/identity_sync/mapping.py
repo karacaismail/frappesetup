@@ -16,8 +16,6 @@ from identity_sync.events import MEMBERSHIP_TYPES, Event, is_handled
 
 # Kendi kaydolan kullanıcıya Organization açan olaylar.
 _SELF_REGISTRATION_TYPES = frozenset({"REGISTER", "VERIFY_EMAIL"})
-# E-postanın değişmiş olabileceği olaylar.
-_EMAIL_CHANGE_TYPES = frozenset({"UPDATE_EMAIL", "USER_UPDATE"})
 
 
 @dataclass(frozen=True)
@@ -214,15 +212,10 @@ def plan_actions(
         return ()
 
     aliases = {org.alias for org in snapshot.organizations}
-    member_tenants = [t for t in tenants if t.organization in aliases]
     actions: list[Action] = [_team(snapshot, issuer, org.id) for org in snapshot.organizations]
-    actions += [_provision(snapshot, issuer, t.name) for t in member_tenants]
-    if event.type in _EMAIL_CHANGE_TYPES:
-        # Kiracı e-postayı yalnız `change_email` ile değiştirir (G-57).
-        actions += [
-            TenantChangeEmail(tenant=t.name, issuer=issuer, subject=subject, new_email=snapshot.email)
-            for t in member_tenants
-        ]
+    for tenant in tenants:
+        if tenant.organization in aliases:
+            actions += _sync_on_tenant(snapshot, issuer, tenant.name)
     return tuple(actions)
 
 
@@ -236,15 +229,24 @@ def _plan_membership(
 ) -> tuple[Action, ...]:
     org_id = event.organization_id or ""
     if organization is None:
-        return (PressRemoveTeamMember(issuer=issuer, subject=snapshot.subject, organization_id=org_id),)
+        # Organization silindi. Takma adı bilinmez. Kullanıcı üyesi olmadığı her kiracıda kapanır.
+        aliases = {org.alias for org in snapshot.organizations}
+        return (
+            PressRemoveTeamMember(issuer=issuer, subject=snapshot.subject, organization_id=org_id),
+            *(
+                TenantSetEnabled(tenant=t.name, issuer=issuer, subject=snapshot.subject, enabled=False)
+                for t in tenants
+                if t.organization not in aliases
+            ),
+        )
     org_tenants = [t for t in tenants if t.organization == organization.alias]
     if any(org.id == organization.id for org in snapshot.organizations):
         if not snapshot.email_verified:
             return ()
-        return (
-            _team(snapshot, issuer, organization.id),
-            *(_provision(snapshot, issuer, t.name) for t in org_tenants),
-        )
+        actions: list[Action] = [_team(snapshot, issuer, organization.id)]
+        for tenant in org_tenants:
+            actions += _sync_on_tenant(snapshot, issuer, tenant.name)
+        return tuple(actions)
     return (
         PressRemoveTeamMember(issuer=issuer, subject=snapshot.subject, organization_id=organization.id),
         *(TenantSetEnabled(tenant=t.name, issuer=issuer, subject=snapshot.subject, enabled=False) for t in org_tenants),
@@ -263,8 +265,14 @@ def _team(snapshot: UserSnapshot, issuer: str, organization_id: str) -> PressEns
     )
 
 
-def _provision(snapshot: UserSnapshot, issuer: str, tenant: str) -> TenantProvision:
-    return TenantProvision(
+def _sync_on_tenant(snapshot: UserSnapshot, issuer: str, tenant: str) -> list[Action]:
+    """Kiracıda kaydı hazırlar, sonra e-postayı güncel değere getirir.
+
+    Kiracı e-postayı yalnız `change_email` ile değiştirir (G-57). E-postanın değişip
+    değişmediğini olayın adı söylemez. Bu yüzden `change_email` her eşitlemede çağrılır.
+    E-posta aynıysa kiracı iş yapmaz.
+    """
+    provision = TenantProvision(
         tenant=tenant,
         issuer=issuer,
         subject=snapshot.subject,
@@ -274,3 +282,6 @@ def _provision(snapshot: UserSnapshot, issuer: str, tenant: str) -> TenantProvis
         last_name=snapshot.last_name,
         enabled=True,
     )
+    rename = TenantChangeEmail(tenant=tenant, issuer=issuer, subject=snapshot.subject, new_email=snapshot.email)
+    return [provision, rename]
+
