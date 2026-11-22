@@ -10,6 +10,7 @@ dynamic = ["version"]
 dependencies = [
     "pydantic~=2.12.5",
     "urllib3>=2.2.0,<3",
+    "Werkzeug>=3.1.9,<4",
 ]
 
 [tool.bench.frappe-dependencies]

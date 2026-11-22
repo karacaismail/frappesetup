@@ -1,10 +1,16 @@
 """Shared authentication and conditional response handling."""
 
+from collections.abc import Callable
 from urllib.parse import unquote
 
 import frappe
+from frappe.api import ApiVersion, get_api_version
+from frappe.utils import orjson_dumps
+from frappe.utils.response import json_handler, make_logs
 
 from platform_core.kabuk.serialization import etag_for, matches_etag
+
+MAX_RESPONSE_BYTES = 262_144
 
 
 def has_session_cookie() -> bool:
@@ -35,9 +41,27 @@ def require_session() -> str:
 	return user
 
 
-def conditional_response(payload: dict, user: str, version: str) -> dict | None:
+def conditional_response(payload: dict, user: str, compact: Callable[[dict], dict]) -> dict | None:
 	"""Call only after evaluating the current user's authorization."""
-	etag = etag_for(frappe.local.site, user, version, payload)
+	# Measure the same envelope and serializer Frappe uses, including JSON escaping.
+	make_logs()
+	response = {
+		key: value
+		for key, value in frappe.local.response.items()
+		if key != "http_status_code" and (key != "docs" or value)
+	}
+	key = "data" if get_api_version() == ApiVersion.V2 and not frappe.form_dict.get("cmd") else "message"
+	response[key] = payload
+	if len(orjson_dumps(response, default=json_handler, decode=False)) > MAX_RESPONSE_BYTES:
+		payload = compact(payload)
+		# The compact representation has only bounded scalars and empty collections.
+		# Omit transient response diagnostics too, so Frappe cannot exceed the budget.
+		frappe.local.response.clear()
+		frappe.local.message_log.clear()
+		frappe.local.error_log.clear()
+		frappe.local.debug_log.clear()
+		frappe.flags.error_message = None
+	etag = etag_for(frappe.local.site, user, payload["perm_version"], payload)
 	frappe.local.response_headers.update(
 		{
 			"ETag": etag,
