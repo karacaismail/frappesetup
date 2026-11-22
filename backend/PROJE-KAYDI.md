@@ -245,6 +245,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
+| `BORC(mvp)`: Üretim işçi sayısı ölçülmedi | 50 eşzamanlı telefonda 4 Gunicorn işçisiyle istemci p95 1 saniyeyi aştı. Sunucu süresi sınırın altında kaldı | DevOps sorumlusu | Üretim kapasite ölçümü yapılır ve işçi sayısı ölçümle seçilir |
 | `BORC(mvp)`: identity-sync canlı Keycloak, Press ve kiracı ile denenmedi | Sahte hedeflerin kaçırdığı uyumsuzluk üretimde çıkabilir | integration-e2e | Uçtan uca test gerçek servislerle geçer |
 | `BORC(mvp)`: `list_identities` uçları yok | Mutabakat gerçek hedeflerde çalışmaz | press-tr ve platform-core-kimlik | İki uç sözleşmeye uygun yazılır ve sayfalı yanıt verir |
 | `BORC(mvp)`: Yeni kiracının Keycloak istemcisini açan komut yok | Yeni kiracı istemcisi elle açılır | kimlik-realm | Elle başlatılan, insan onaylı komut yazılır |
