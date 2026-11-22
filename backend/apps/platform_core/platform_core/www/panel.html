@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="{{ panel_language | e }}">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="csrf-token" content="{{ panel_csrf_token | e }}">
+	{{ include_style('panel.bundle.css') }}
+	<title>{{ _("Admin panel", context="shell.panel") | e }}</title>
+</head>
+<body>
+	<a class="skip-link" href="#panel">{{ _("Skip to main content", context="shell.panel") | e }}</a>
+	<main id="panel" tabindex="-1">
+		<h1>{{ _("Admin panel", context="shell.panel") | e }}</h1>
+		<p>{{ _("The panel is not available yet.", context="shell.panel") | e }}</p>
+		<a href="/">{{ _("Go to site home", context="shell.panel") | e }}</a>
+	</main>
+	{{ include_script('panel-focus.bundle.js') }}
+</body>
+</html>

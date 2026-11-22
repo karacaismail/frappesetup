@@ -1,0 +1,61 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "description": "Records a change for mobile sync.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sequence",
+  "record_type",
+  "record_id",
+  "kind",
+  "target_installation"
+ ],
+ "fields": [
+  {
+   "description": "The server orders changes by this number.",
+   "fieldname": "sequence",
+   "fieldtype": "Int",
+   "label": "Sequence number",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "The type code for the changed record.",
+   "fieldname": "record_type",
+   "fieldtype": "Data",
+   "label": "Record type",
+   "reqd": 1
+  },
+  {
+   "description": "The identifier of the changed record.",
+   "fieldname": "record_id",
+   "fieldtype": "Data",
+   "label": "Record ID",
+   "reqd": 1
+  },
+  {
+   "description": "Indicates whether the record was updated or removed.",
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Change type",
+   "options": "upsert\nremove",
+   "reqd": 1
+  },
+  {
+   "description": "When set, only this installation receives the change.",
+   "fieldname": "target_installation",
+   "fieldtype": "Link",
+   "label": "Target installation",
+   "options": "Mobile Installation",
+   "search_index": 1
+  }
+ ],
+ "links": [],
+ "module": "Mobil",
+ "name": "Mobile Change",
+ "permissions": [],
+ "sort_field": "sequence",
+ "sort_order": "DESC",
+ "states": []
+}
