@@ -201,6 +201,31 @@ class CliTest(unittest.TestCase):
         app.close()
         self.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
 
+    def test_serve_reports_an_address_the_token_library_refuses(self) -> None:
+        # Found by starting the real container: the library takes plain http only for localhost.
+        # The service must say so and stop, not die with a traceback.
+        import sys
+        import types
+
+        library = types.ModuleType("oidc_verify")
+
+        def refuse(url: str, **_options: object) -> None:
+            raise ValueError("jwks_url must use https; plain http is allowed only for localhost and loopback")
+
+        library.JwksCache = refuse
+        previous = sys.modules.get("oidc_verify")
+        sys.modules["oidc_verify"] = library
+        self.addCleanup(lambda: sys.modules.pop("oidc_verify") if previous is None else sys.modules.update(oidc_verify=previous))
+        errors = io.StringIO()
+
+        with contextlib.redirect_stderr(errors), contextlib.redirect_stdout(io.StringIO()):
+            code = cli.main(["serve"], env=self.env)
+
+        self.assertEqual(code, 2)
+        self.assertIn("configuration error: token verification cannot start", errors.getvalue())
+        self.assertIn("IDENTITY_SYNC_KEYCLOAK_INTERNAL_URL", errors.getvalue())
+        self.assertNotIn("Traceback", errors.getvalue())
+
     def test_dead_letters_lists_queue(self) -> None:
         self.queue_failed_event()
 

@@ -96,7 +96,17 @@ def _serve(app: App) -> int:
     from identity_sync.server import make_server
 
     configure_logging()
-    verifier = build_verifier(app.settings)
+    try:
+        verifier = build_verifier(app.settings)
+    except ValueError as error:
+        # The token library refused a setting, for example a plain http key address that is
+        # not localhost. Starting without a verifier would only hide the mistake.
+        print(
+            f"configuration error: token verification cannot start: {error}. "
+            "Check IDENTITY_SYNC_KEYCLOAK_INTERNAL_URL",
+            file=sys.stderr,
+        )
+        return EXIT_ERROR
     if verifier is reject_all:
         print("warning: service tokens cannot be verified; protected endpoints reject every request", file=sys.stderr)
     httpd = make_server(app, verifier, host=app.settings.host, port=app.settings.port)

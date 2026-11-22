@@ -362,11 +362,35 @@ PYTHONPATH=../../libs/oidc_verify/src uv run --no-project --with 'pyjwt>=2.13,<3
 
 Bu komutta hiçbir test atlanmamalıdır. Testler RSA anahtarını kendisi üretir.
 
+## Container
+
+Servisin container dosyası bu klasördeki `Dockerfile` dosyasıdır. İmaj servisi `oidc_verify` kitaplığıyla kurar.
+
+Kitaplık `backend/libs/oidc_verify` klasöründedir. Bu yüzden derlemeyi `backend` klasöründen başlatın:
+
+```bash
+docker --context colima-factory build -f identity/identity_sync/Dockerfile -t fs-identity-sync .
+```
+
+- Temel imaj özetiyle sabitlidir. Sürüm Python 3.14'tür.
+- Derleme `oidc_verify` kitaplığını içe aktaramazsa durur.
+- Servis container içinde `identity` kullanıcısıyla çalışır. Bu kullanıcı yönetici değildir.
+- Kayıt dosyası `/data` biriminde durur.
+- İmaj hiçbir ayar ve sır taşımaz. Ayarları çalıştırırken ortam değişkeniyle verin. Adlar `.env.example` dosyasındadır.
+- Container bütün ağ arayüzlerini dinler. Portu ana bilgisayarda yalnız `127.0.0.1` adresine bağlayın.
+
+`oidc_verify` kitaplığı anahtar adresi için düz `http` kabul etmez. Tek istisna `localhost` ve geri döngü adresidir.
+
+- `IDENTITY_SYNC_KEYCLOAK_INTERNAL_URL` ayarı `https` ile başlamalıdır ya da `localhost` adresini göstermelidir.
+- Adres bu kurala uymazsa servis açılmaz. Servis nedeni tek satırla yazar ve 2 koduyla çıkar.
+- Örneğin `http://keycloak:8080` adresi reddedilir.
+
+Bu imaj 22 Kasım 2026 Pazar günü `colima-factory` profilinde derlendi ve ağsız denendi. Deneme imajı ve container'ı sonra silindi.
+
 ## Bilinen eksikler
 
 Bu maddeler bilerek bırakılan eksiklerdir. Her biri bir teknik borçtur. `BORC(mvp)` işareti, eksiğin MVP seviyesini tamamlamayı engellediğini gösterir.
 
 - `BORC(mvp)`: Servis canlı Keycloak, Press ve kiracı ile denenmedi. Olay eklentisinin yalnız imza kodu denendi. Etki: Sahte hedeflerin kaçırdığı bir uyumsuzluk üretimde ortaya çıkabilir. Sorumlu: integration-e2e işi. Kapanma koşulu: Uçtan uca test gerçek servislerle geçer.
 - `BORC(mvp)`: Ortak sözleşme `list_identities` yanıtının sayfalı olduğunu söyler. Sayfalama alanlarını adlandırmaz. Bu servis tek yanıt okur. Etki: Uzun kullanıcı listesinde mutabakat eksik kalır. Sorumlu: press-tr, platform-core-kimlik ve identity-sync işleri. Kapanma koşulu: Alan adları sözleşmeye girer ve bir test iki sayfa okur.
-- `BORC(mvp)`: Servisin container dosyası yok. Etki: Servis ortak geliştirme ortamında başlatılamaz. Sorumlu: identity-sync ve dev-ortam işleri. Kapanma koşulu: Container dosyası yazılır ve servis `oidc_verify` kitaplığıyla açılır.
 - `BORC(mvp)`: Bu servisin testleri ve biçim denetimi CI'da koşmaz. Etki: Bozulma yalnız elle çalıştırılan testte görülür. Sorumlu: DevOps sorumlusu. Kapanma koşulu: CI bu klasörün testlerini her değişiklikte koşar.

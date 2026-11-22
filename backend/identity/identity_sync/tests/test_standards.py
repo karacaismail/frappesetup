@@ -171,3 +171,42 @@ class ReachabilityTest(unittest.TestCase):
         }
         self.assertEqual(states, {"uygulandi"})
         self.assertNotIn("/v1/tenants/{tenant}/client", CONTRACT["paths"])
+
+
+class ContainerFileTest(unittest.TestCase):
+    """The container file of the service (frappe-python-disi-standartlari.md, Y-9 and F-5; O-18)."""
+
+    def setUp(self) -> None:
+        self.text = (PACKAGE / "Dockerfile").read_text(encoding="utf-8")
+        self.lines = [line.strip() for line in self.text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+
+    def test_base_image_is_pinned_by_digest(self) -> None:
+        bases = [line for line in self.lines if line.startswith("FROM ")]
+        self.assertGreaterEqual(len(bases), 1)
+        for base in bases:
+            self.assertRegex(base, r"^FROM \S+@sha256:[0-9a-f]{64}( AS \w+)?$")
+
+    def test_service_starts_with_the_token_library(self) -> None:
+        # Without oidc_verify the service refuses every token endpoint.
+        self.assertIn("libs/oidc_verify", self.text)
+        self.assertRegex(self.text, r"pip install[^\n]*(/src/oidc_verify|oidc_verify)")
+        # The build fails if the library cannot be imported.
+        self.assertIn("import oidc_verify", self.text)
+
+    def test_container_does_not_run_as_root(self) -> None:
+        users = [line for line in self.lines if line.startswith("USER ")]
+        self.assertTrue(users)
+        self.assertNotIn(users[-1].split()[1], ("root", "0"))
+
+    def test_no_setting_or_secret_is_baked_into_the_image(self) -> None:
+        # Settings come from the environment at run time (.env stays out of Git and out of the image).
+        self.assertNotRegex(self.text, r"(?i)(secret|password|token)\s*=")
+        self.assertNotRegex(self.text, r"(?m)^\s*(ENV|ARG)\s+IDENTITY_SYNC_\w*(SECRET|KEY)")
+        ignore = (PACKAGE / "Dockerfile.dockerignore").read_text(encoding="utf-8")
+        for pattern in ("**/.env", "**/*.sqlite3", "**/tests"):
+            self.assertIn(pattern, ignore.splitlines())
+
+    def test_container_listens_on_every_interface_and_keeps_its_file_on_a_volume(self) -> None:
+        self.assertIn("IDENTITY_SYNC_HOST=0.0.0.0", self.text)
+        self.assertRegex(self.text, r"(?m)^VOLUME ")
+        self.assertRegex(self.text, r'(?m)^(CMD|ENTRYPOINT) \[.*"serve"\]')
