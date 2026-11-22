@@ -128,7 +128,7 @@ class IdentityHttpTest(
 		headers = {"Content-Type": "application/json", **(extra_headers or {})}
 		if token:
 			headers["Authorization"] = f"Bearer {token}"
-		status, _, response = self.exchange(
+		status, _headers, response = self.exchange(
 			"POST", f"/api/method/press_tr.api.identity.{method}", headers, json.dumps(body)
 		)
 		return status, json.loads(response) if response.startswith(b"{") else response.decode()
@@ -153,7 +153,7 @@ class IdentityHttpTest(
 		headers = {**session, "X-Frappe-CSRF-Token": csrf, "Content-Type": "application/json"}
 		self.assertEqual(self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')[0], 403)
 		self.assertEqual(self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": "false"}')[0], 403)
-		status, _, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": false}')
+		status, _headers, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": false}')
 		self.assertEqual(status, 200)
 		query = parse_qs(urlsplit(json.loads(payload)["message"]["url"]).query)
 		self.assertEqual(query["prompt"], ["login"])
@@ -164,7 +164,7 @@ class IdentityHttpTest(
 		subject = uuid4().hex
 		email = f"{subject}@example.test"
 		session = self.sign_in(subject, email, uuid4().hex)
-		status, _, page = self.exchange("GET", "/account-deletion", session)
+		status, _headers, page = self.exchange("GET", "/account-deletion", session)
 		self.assertEqual(status, 200)
 		csrf = re.search(rb'name="csrf_token" value="([^"]+)"', page).group(1).decode()
 		headers = {**session, "X-Frappe-CSRF-Token": csrf, "Content-Type": "application/json"}
@@ -199,13 +199,13 @@ class IdentityHttpTest(
 		status, result_headers, payload = self.exchange("GET", callback, callback_session)
 		self.assertEqual(status, 302)
 		self.assertEqual(result_headers["Location"], "/account-deletion")
-		status, _, page = self.exchange("GET", "/account-deletion", session)
+		status, _headers, page = self.exchange("GET", "/account-deletion", session)
 		self.assertEqual(status, 200)
 		self.assertIn(b"Confirm account deletion", page)
 
 		service_token = self.token(audience="identity-sync", authorized_party="press-service")
 		self.service_tokens[service_token] = True
-		status, _, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
+		status, _headers, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
 		self.assertEqual(status, 200)
 		self.assertEqual(json.loads(payload)["message"], {"submitted": True})
 		self.assertEqual(
@@ -223,7 +223,7 @@ class IdentityHttpTest(
 		email = f"{subject}@example.test"
 		original_sid, reauthenticated_sid = uuid4().hex, uuid4().hex
 		session = self.sign_in(subject, email, original_sid)
-		status, _, page = self.exchange("GET", "/account-deletion", session)
+		status, _headers, page = self.exchange("GET", "/account-deletion", session)
 		self.assertEqual(status, 200)
 		csrf = re.search(rb'name="csrf_token" value="([^"]+)"', page).group(1).decode()
 		headers = {**session, "X-Frappe-CSRF-Token": csrf, "Content-Type": "application/json"}
@@ -271,7 +271,7 @@ class IdentityHttpTest(
 				(self.token(authorized_party="press-service"), {}),
 			):
 				with self.subTest(method=method, headers=headers):
-					status, _ = self.call(
+					status, _payload = self.call(
 						method,
 						{"issuer": ISSUER, "subject": "example", "organization_id": "example"},
 						token,
@@ -281,7 +281,7 @@ class IdentityHttpTest(
 			for extra in ({"cmd": "ping"}, {"team": "legacy"}):
 				with self.subTest(method=method, extra=extra):
 					body = {"issuer": ISSUER, "subject": "example", "organization_id": "example", **extra}
-					status, _ = self.call(method, body, self.token())
+					status, _payload = self.call(method, body, self.token())
 					self.assertEqual(status, 403)
 
 	def identity_inventory(self, query, token=None, extra_headers=None):
@@ -416,7 +416,7 @@ class IdentityHttpTest(
 		self.assertEqual(self.identity_inventory({"limit": 2}, self.token())[0], 403)
 		self.assertIn(self.call("list_identities", {}, self.token())[0], {401, 403, 405})
 		headers = {"Authorization": f"Bearer {self.token()}", "Content-Type": "application/json"}
-		status, _, _ = self.exchange("GET", IDENTITY_INVENTORY_ROUTE, headers, json.dumps({"start": 1}))
+		status, _headers, _body = self.exchange("GET", IDENTITY_INVENTORY_ROUTE, headers, json.dumps({"start": 1}))
 		self.assertEqual(status, 403)
 		for body in (
 			{"start": True},
@@ -472,13 +472,13 @@ class IdentityHttpTest(
 			"organization_id": uuid4().hex,
 			"email_verified": True,
 		}
-		status, _ = self.call("ensure_team", payload, self.token(), {"Cookie": "sid=Guest"})
+		status, _payload = self.call("ensure_team", payload, self.token(), {"Cookie": "sid=Guest"})
 		self.assertEqual(status, 200)
 
 	def test_team_and_membership_requests_are_repeatable(self):
 		token = self.token()
 		owner = uuid4().hex
-		members = [uuid4().hex for _ in range(2)]
+		members = [uuid4().hex for _iteration in range(2)]
 		organization_id = uuid4().hex
 
 		def ensure(subject, **options):
@@ -513,7 +513,7 @@ class IdentityHttpTest(
 			futures = [pool.submit(ensure, member) for member in members]
 			memberships = [future.result() for future in futures]
 		owner_cookie = self.sign_in(owner, f"{owner}@example.test", uuid4().hex)
-		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, owner_cookie)
+		status, _headers, payload = self.exchange("GET", ACCOUNT_ROUTE, owner_cookie)
 		self.assertEqual(status, 200)
 		team_data = json.loads(payload)["message"]["team"]
 		self.assertEqual(team_data["team_title"], "Example Organization")
@@ -521,19 +521,19 @@ class IdentityHttpTest(
 		stored_members = {user["email"] for user in json.loads(payload)["message"]["team_members"]}
 		self.assertEqual(stored_members, {f"{subject}@example.test" for subject in [owner, *members]})
 		first_member = self.sign_in(members[0], f"{members[0]}@example.test", uuid4().hex)
-		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, first_member)
+		status, _headers, payload = self.exchange("GET", ACCOUNT_ROUTE, first_member)
 		self.assertEqual(status, 200)
 		self.assertEqual([row["name"] for row in json.loads(payload)["message"]["teams"]], [team])
 		for member, membership in zip(members, memberships, strict=True):
 			self.assertEqual(ensure(member), membership)
 			body = {"issuer": ISSUER, "subject": member, "organization_id": organization_id}
-			for _ in range(2):
+			for _iteration in range(2):
 				status, result = self.call("remove_team_member", body, token)
 				self.assertEqual(status, 200)
 				self.assertEqual(result["message"], {"team": team, "member": False})
 		member = members[1]
 		member_cookie = self.sign_in(member, f"{member}@example.test", uuid4().hex)
-		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, member_cookie)
+		status, _headers, payload = self.exchange("GET", ACCOUNT_ROUTE, member_cookie)
 		self.assertEqual(status, 200)
 		self.assertNotIn(team, {row["name"] for row in json.loads(payload)["message"]["teams"]})
 
@@ -553,7 +553,7 @@ class IdentityHttpTest(
 			{"organization_id": None, "all_organizations": True},
 		):
 			with self.subTest(selectors=selectors):
-				status, _ = self.call("remove_team_member", body | selectors, token)
+				status, _payload = self.call("remove_team_member", body | selectors, token)
 				self.assertEqual(status, 400)
 
 	def test_remove_all_organizations_keeps_the_personal_team(self):
@@ -563,7 +563,7 @@ class IdentityHttpTest(
 		token = self.token()
 		organization_teams = []
 
-		for _ in range(2):
+		for _iteration in range(2):
 			organization = uuid4().hex
 			owner = uuid4().hex
 			for subject in (owner, member):
@@ -579,7 +579,7 @@ class IdentityHttpTest(
 			organization_teams.append(result["message"]["team"])
 
 		body = {"issuer": ISSUER, "subject": member, "all_organizations": True}
-		for _ in range(2):
+		for _iteration in range(2):
 			status, result = self.call("remove_team_member", body, token)
 			self.assertEqual(status, 200)
 			self.assertEqual(result["message"], {"team": None, "member": False})
@@ -616,7 +616,7 @@ class IdentityHttpTest(
 		headers = {"Authorization": f"token {key}:{secret}"}
 		self.assertEqual(self.exchange("GET", ACCOUNT_ROUTE, headers)[0], 200)
 		body = {"issuer": ISSUER, "subject": subject}
-		for _ in range(2):
+		for _iteration in range(2):
 			status, result = self.call("remove_team_member", body | {"all_organizations": True}, self.token())
 			self.assertEqual(status, 200)
 			self.assertEqual(result["message"], {"team": None, "member": False})
@@ -699,7 +699,7 @@ class IdentityHttpTest(
 					"links": [{"link_doctype": "Contact", "link_name": contact.name}],
 				}
 			).insert(ignore_permissions=True)
-			for _ in range(125):
+			for _iteration in range(125):
 				row = frappe.get_doc(
 					{
 						"doctype": "Activity Log",
@@ -786,7 +786,7 @@ class IdentityHttpTest(
 			frappe.destroy()
 
 		self.assertEqual(self.call("anonymize_user", body, self.token(), session)[0], 403)
-		for _ in range(2):
+		for _iteration in range(2):
 			started = time.monotonic()
 			status, result = self.call("anonymize_user", body, self.token())
 			print(
@@ -988,7 +988,7 @@ class IdentityHttpTest(
 		session = self.sign_in(subject, f"{subject}@example.test", uuid4().hex)
 		self.assertEqual(self.exchange("GET", ACCOUNT_ROUTE, session)[0], 200)
 
-		status, headers, _ = self.exchange("GET", "/app", session)
+		status, headers, _body = self.exchange("GET", "/app", session)
 		self.assertIn(status, {301, 302, 307, 308})
 		self.assertEqual(urlsplit(headers["Location"]).path, "/desk")
 		for path in ("/desk", "/desk/build"):
@@ -998,14 +998,14 @@ class IdentityHttpTest(
 	def test_signed_in_user_cannot_call_local_login_or_team_invitation(self):
 		subject = uuid4().hex
 		session = self.sign_in(subject, f"{subject}@example.test", uuid4().hex)
-		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, session)
+		status, _headers, payload = self.exchange("GET", ACCOUNT_ROUTE, session)
 		self.assertEqual(status, 200)
 		team = json.loads(payload)["message"]["team"]["name"]
 		self.assertEqual(
 			self.exchange("GET", "/api/method/press.api.account.send_login_link", session)[0], 403
 		)
 		arguments = urlencode({"dt": "Team", "dn": team, "method": "invite_team_member"})
-		status, _, _ = self.exchange(
+		status, _headers, _body = self.exchange(
 			"GET", f"/api/method/press.api.client.run_doc_method?{arguments}", session
 		)
 		self.assertEqual(status, 403)
@@ -1032,12 +1032,12 @@ class IdentityHttpTest(
 		team = result["message"]["team"]
 		body = {"issuer": ISSUER, "subject": owner, "all_organizations": True}
 		self.assertEqual(self.call("remove_team_member", body, token)[0], 200)
-		for _ in range(2):
+		for _iteration in range(2):
 			status, result = ensure(member)
 			self.assertEqual(status, 200)
 			self.assertEqual(result["message"], {"team": team, "created": False, "owner_disabled": True})
 		session = self.sign_in(member, f"{member}@example.test", uuid4().hex)
-		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, session)
+		status, _headers, payload = self.exchange("GET", ACCOUNT_ROUTE, session)
 		self.assertEqual(status, 200)
 		self.assertIn(team, {row["name"] for row in json.loads(payload)["message"]["teams"]})
 
@@ -1074,10 +1074,10 @@ class IdentityHttpTest(
 		)
 		if other_browser is not None:
 			self.assertNotEqual(state_cookie, other_browser)
-			status, _, _ = self.exchange("GET", callback, other_browser)
+			status, _headers, _body = self.exchange("GET", callback, other_browser)
 			self.assertEqual(status, 403)
 			self.assertIn(code, self.codes)
-		status, headers, _ = self.exchange("GET", callback, state_cookie)
+		status, headers, _body = self.exchange("GET", callback, state_cookie)
 		self.assertEqual(status, expected_status)
 		if expected_status != 302:
 			return None
@@ -1087,7 +1087,7 @@ class IdentityHttpTest(
 			cookies.load(value)
 		sid = cookies["sid"].value
 		self.assertNotEqual(sid, "Guest")
-		status, _, _ = self.exchange("GET", callback, state_cookie)
+		status, _headers, _body = self.exchange("GET", callback, state_cookie)
 		self.assertEqual(status, 403)
 
 		return {"Cookie": f"sid={sid}"}
@@ -1131,7 +1131,7 @@ class IdentityHttpTest(
 			jti=uuid4().hex,
 			events={"http://schemas.openid.net/event/backchannel-logout": {}},
 		)
-		for _ in range(120):
+		for _iteration in range(120):
 			self.assertEqual(self.post_logout("invalid-fixture"), 403)
 		self.assertEqual(self.post_logout("invalid-fixture", "/api/v2/method/"), 429)
 		# Seed the old shared ceiling without sending 1,200 requests.
@@ -1155,7 +1155,7 @@ class IdentityHttpTest(
 		subject = uuid4().hex
 		keycloak_sid = uuid4().hex
 		session_cookie = self.sign_in(subject, f"{subject}@example.test", keycloak_sid)
-		status, _, _ = self.exchange("GET", ACCOUNT_ROUTE, session_cookie)
+		status, _headers, _body = self.exchange("GET", ACCOUNT_ROUTE, session_cookie)
 		self.assertEqual(status, 200)
 
 		token = self.token(
@@ -1165,8 +1165,8 @@ class IdentityHttpTest(
 			jti=uuid4().hex,
 			events={"http://schemas.openid.net/event/backchannel-logout": {}},
 		)
-		for _ in range(2):
-			status, _, _ = self.exchange(
+		for _iteration in range(2):
+			status, _headers, _body = self.exchange(
 				"POST",
 				"/api/method/press_tr.api.keycloak_backchannel_logout",
 				{"Content-Type": "application/x-www-form-urlencoded"},
@@ -1174,5 +1174,5 @@ class IdentityHttpTest(
 			)
 			self.assertEqual(status, 200)
 
-		status, _, _ = self.exchange("GET", ACCOUNT_ROUTE, session_cookie)
+		status, _headers, _body = self.exchange("GET", ACCOUNT_ROUTE, session_cookie)
 		self.assertIn(status, {401, 403})

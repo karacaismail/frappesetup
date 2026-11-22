@@ -48,7 +48,7 @@ def get_login_url() -> dict[str, str]:
 
 
 def start_login(reauthentication: dict | None = None) -> dict[str, str]:
-	state, nonce, verifier, browser = (secrets.token_urlsafe(32) for _ in range(4))
+	state, nonce, verifier, browser = (secrets.token_urlsafe(32) for _iteration in range(4))
 	browser_digest = hashlib.sha256(browser.encode("ascii")).hexdigest()
 	challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
 	redirect_uri = callback_url()

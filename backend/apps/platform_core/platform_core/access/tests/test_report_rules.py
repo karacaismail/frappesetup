@@ -30,7 +30,7 @@ from platform_core.access.tests.base import (
 	HR,
 	MANAGER_1,
 	NO_RULE,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 RUN = "/api/method/frappe.desk.query_report.run"
@@ -105,7 +105,7 @@ def ensure_reports() -> None:
 	frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 
-class ReportRulesTestCase(ErisimTestCase):
+class ReportRulesTestCase(AccessRuleTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()

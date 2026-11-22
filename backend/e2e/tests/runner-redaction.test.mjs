@@ -16,6 +16,11 @@ function runPreview(fixture, settings = {}) {
     mkdirSync(playwright, { recursive: true });
     mkdirSync(binaries, { recursive: true });
     writeFileSync(join(playwright, 'index.js'), `
+      exports.chromium = { launch: async () => {
+        if (process.env.TEST_CHROMIUM_UNAVAILABLE) throw new Error('could not launch test Chromium');
+        return { close: async () => {} };
+      } };
+      exports.webkit = { launch: async () => ({ close: async () => {} }) };
       exports.request = { newContext: async () => ({
         post: async () => ({ ok: () => true }),
         get: async () => ({ ok: () => true, text: async () => '<meta name="csrf-token" content="test-csrf">' }),
@@ -24,9 +29,18 @@ function runPreview(fixture, settings = {}) {
       }) };
     `);
     writeFileSync(join(binaries, 'playwright'), `#!/usr/bin/env node
+      if (process.argv.includes('browser.spec.ts') || process.argv.includes('integration.spec.ts')) {
+        if (process.env.E2E_BROWSER_RUNTIME === 'container') {
+          console.error('ran ' + process.argv.slice(2).join(' '));
+          console.log(JSON.stringify({ suites: [] }));
+        } else {
+          console.log('ran ' + process.argv.slice(2).join(' '));
+        }
+      }
       if (process.argv.includes('lifecycle.spec.ts')) {
+        if (process.env.E2E_BROWSER_RUNTIME === 'container') console.error('ran ' + process.argv.slice(2).join(' '));
         console.log(JSON.stringify({ suites: [{ specs: [{ title: process.env.E2E_DELETE_PASSWORD,
-          tests: [{ annotations: [] }] }] }], submitted: process.env.E2E_REVOKE_MOBILE_REFRESH_TOKEN }));
+          tests: [{ projectName: 'chromium', annotations: [], results: [{ status: 'passed' }] }] }] }], submitted: process.env.E2E_REVOKE_MOBILE_REFRESH_TOKEN }));
         console.error('Authorization value: ' + process.env.E2E_DELETE_PRESS_AUTHORIZATION);
       }
     `, { mode: 0o700 });
@@ -52,7 +66,7 @@ test('preview redacts lifecycle credentials from logs and terminal output', () =
   const result = runPreview({ E2E_PREVIEW_READER_PASSWORD: 'test-password' }, settings);
   const { log } = result;
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /pass \[redacted\]/);
+  assert.match(result.stdout, /pass \[chromium\] \[redacted\]/);
   for (const value of Object.values(settings)) {
     for (const output of [log, result.stdout, result.stderr]) {
       assert.equal(output.includes(value), false);
@@ -65,4 +79,24 @@ test('preview rejects a fixture with a non-text value', () => {
   const result = runPreview({ E2E_PREVIEW_READER_PASSWORD: ['test-password'] });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Invalid preview fixture/);
+});
+
+test('preview reports a launch failure as not run and keeps the other engine and API', () => {
+  const result = runPreview({ E2E_PREVIEW_READER_PASSWORD: 'test-password' }, {
+    TEST_CHROMIUM_UNAVAILABLE: '1',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /not_run chromium/);
+  assert.match(result.stdout, /ran .*--project=webkit.*browser\.spec\.ts/);
+  assert.doesNotMatch(result.stdout, /ran .*--project=chromium.*browser\.spec\.ts/);
+  assert.match(result.stdout, /ran .*integration\.spec\.ts/);
+});
+
+test('container preview runs all requested files in both engines', () => {
+  const result = runPreview({ E2E_PREVIEW_READER_PASSWORD: 'test-password' }, {
+    E2E_BROWSER_RUNTIME: 'container',
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /ran .*--project=chromium.*--project=webkit.*browser\.spec\.ts/);
+  assert.match(result.stderr, /ran .*--project=chromium.*--project=webkit.*lifecycle\.spec\.ts/);
 });

@@ -18,7 +18,9 @@ import time
 
 import frappe
 
-IDLE_TIMEOUT = "01:00:00"
+# System Settings validates hh:mm. Frappe's session parser expects hh:mm:ss.
+SYSTEM_SETTINGS_IDLE_TIMEOUT = "01:00"
+IDLE_TIMEOUT = f"{SYSTEM_SETTINGS_IDLE_TIMEOUT}:00"
 IDLE_SECONDS = 3600
 ACTIVITY_PREFIX = "kimlik_activity"
 AUTH_TIME_LEEWAY = 30
@@ -35,9 +37,9 @@ BACKGROUND_METHOD_PREFIXES = (
 
 def apply() -> None:
 	"""Writes the idle limit into System Settings. Called by `after_install` and `after_migrate`."""
-	if frappe.db.get_single_value("System Settings", "session_expiry") != IDLE_TIMEOUT:
+	if frappe.db.get_single_value("System Settings", "session_expiry") != SYSTEM_SETTINGS_IDLE_TIMEOUT:
 		# V-1 exception: a single field of a single DocType, no validation side effects are wanted here.
-		frappe.db.set_single_value("System Settings", "session_expiry", IDLE_TIMEOUT)
+		frappe.db.set_single_value("System Settings", "session_expiry", SYSTEM_SETTINGS_IDLE_TIMEOUT)
 		frappe.clear_cache()
 
 

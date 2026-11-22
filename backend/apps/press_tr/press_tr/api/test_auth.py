@@ -19,6 +19,6 @@ class AuthAccessTests:
 		self.assertEqual(self.exchange("GET", CALLBACK_ROUTE)[0], 403)
 
 	def test_keycloak_callback_foreign_data_denied(self):
-		_, other_browser = self.start_login()
+		_login_url, other_browser = self.start_login()
 		subject = uuid4().hex
 		self.sign_in(subject, f"{subject}@example.test", uuid4().hex, other_browser=other_browser)

@@ -24,7 +24,7 @@ class TimedIdentityHttpTest(IdentityHttpTest):
 
 def main() -> int:
 	test_name = "test_anonymize_user_preserves_linked_records_on_retry"
-	tests = unittest.TestSuite(TimedIdentityHttpTest(test_name) for _ in range(SAMPLE_COUNT))
+	tests = unittest.TestSuite(TimedIdentityHttpTest(test_name) for _iteration in range(SAMPLE_COUNT))
 	if not unittest.TextTestRunner().run(tests).wasSuccessful():
 		return 1
 

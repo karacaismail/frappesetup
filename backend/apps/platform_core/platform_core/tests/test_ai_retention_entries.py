@@ -160,7 +160,7 @@ class TestRetentionEntries(AiTestCase):
 
 	def test_one_run_takes_500_of_501_records(self):
 		self.need_gateway_with_names()
-		for _ in range(501):
+		for _iteration in range(501):
 			usage_record(366)
 		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		manager = self.login(MANAGER)
@@ -192,7 +192,7 @@ class TestRetentionEntries(AiTestCase):
 	def test_old_confirmation_is_refused_when_one_more_usage_record_waits(self):
 		"""Over the batch limit the number to delete stays 500, but the human saw 501 waiting."""
 		self.need_gateway_with_names()
-		for _ in range(501):
+		for _iteration in range(501):
 			usage_record(366)
 		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		manager = self.login(MANAGER)

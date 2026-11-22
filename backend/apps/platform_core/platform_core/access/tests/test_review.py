@@ -15,7 +15,7 @@ from platform_core.access.tests.base import (
 	MANAGER_1,
 	ROLE_EMPLOYEE,
 	RULE_DOCTYPE,
-	ErisimTestCase,
+	AccessRuleTestCase,
 	employee_of,
 )
 
@@ -25,7 +25,7 @@ PREPARED = "/api/method/frappe.core.doctype.prepared_report.prepared_report.make
 QUERY_REPORT = "ER Test Sorgu Raporu"
 
 
-class TestIdentitySwap(ErisimTestCase):
+class TestIdentitySwap(AccessRuleTestCase):
 	"""Finding 1: the client cannot reach the record of someone else by changing the name of the record."""
 
 	def swap_fields(self) -> dict:
@@ -75,7 +75,7 @@ class TestIdentitySwap(ErisimTestCase):
 		self.assert_untouched(response)
 
 
-class TestValueTypes(ErisimTestCase):
+class TestValueTypes(AccessRuleTestCase):
 	"""Finding 4: a number, list or dict value cannot pass the rule."""
 
 	def test_numeric_employee_value_cannot_create_a_record(self):
@@ -105,7 +105,7 @@ class TestValueTypes(ErisimTestCase):
 		self.assertFalse(frappe.db.exists(DOCTYPE, {"title": "Liste ile"}))
 
 
-class TestPreparedReport(ErisimTestCase):
+class TestPreparedReport(AccessRuleTestCase):
 	"""Finding 2: the prepared report path also goes through the gate."""
 
 	@classmethod
@@ -150,7 +150,7 @@ class TestPreparedReport(ErisimTestCase):
 		self.assertFalse(frappe.db.exists("Prepared Report", {"report_name": QUERY_REPORT}))
 
 
-class TestRuleInput(ErisimTestCase):
+class TestRuleInput(AccessRuleTestCase):
 	"""Findings 5 and 7: an infinite number and a protected document type are denied."""
 
 	def test_non_finite_filter_value_is_rejected(self):
@@ -211,7 +211,7 @@ class TestRuleInput(ErisimTestCase):
 		self.assertIn(response.status_code, (403, 417))
 
 
-class TestOperators(ErisimTestCase):
+class TestOperators(AccessRuleTestCase):
 	"""The `!=`, `in` and `not in` operators give the same result in the list and on the single record."""
 
 	RULES = (
@@ -244,7 +244,7 @@ class TestOperators(ErisimTestCase):
 		self.assertEqual(self.readable_names(hr), {closed})
 
 
-class TestDepartmentAndCompany(ErisimTestCase):
+class TestDepartmentAndCompany(AccessRuleTestCase):
 	"""The `department` and `company` scopes (decision note, sections 3 and 7)."""
 
 	RULES = (
@@ -322,7 +322,7 @@ class TestDepartmentAndCompany(ErisimTestCase):
 		self.assertEqual(self.readable_names(client), expected)
 
 
-class TestDeleteAndRename(ErisimTestCase):
+class TestDeleteAndRename(AccessRuleTestCase):
 	def test_role_with_delete_rule_deletes(self):
 		name = self.insert_record(EMPLOYEE_1, title="Silinecek")
 		# Committed on purpose: the request uses another connection.

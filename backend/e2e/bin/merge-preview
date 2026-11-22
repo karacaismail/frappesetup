@@ -170,7 +170,7 @@ def main():
             else:
                 environment = {
                     **os.environ,
-                    "FS_COLIMA_PROFILE": "default",
+                    "FS_COLIMA_PROFILE": os.environ.get("FS_COLIMA_PROFILE", "default"),
                     "PREVIEW_DIR": str(artifacts),
                     "PREVIEW_PROJECT": f"fs-e2e-preview-{port}-{artifacts.name.rsplit('-', 1)[-1].replace('_', '-')}",
                 }

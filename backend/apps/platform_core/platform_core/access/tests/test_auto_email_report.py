@@ -21,7 +21,7 @@ from frappe.utils.background_jobs import execute_job
 
 import platform_core
 from platform_core.access import reports
-from platform_core.access.tests.base import ADMIN, EMPLOYEE_1, HR, ErisimTestCase
+from platform_core.access.tests.base import ADMIN, EMPLOYEE_1, HR, AccessRuleTestCase
 from platform_core.access.tests.test_report_rules import (
 	BUILDER_REPORT,
 	FREE_BUILDER_REPORT,
@@ -41,7 +41,7 @@ GOVERNED_REPORTS = (
 )
 
 
-class AutoEmailReportTestCase(ErisimTestCase):
+class AutoEmailReportTestCase(AccessRuleTestCase):
 	@classmethod
 	def setUpClass(cls):
 		super().setUpClass()
