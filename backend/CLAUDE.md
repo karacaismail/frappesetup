@@ -34,6 +34,7 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `apps/platform_core/platform_core/kabuk/` | Açılış verisi ve DocType tanımı | platform-core-kabuk |
 | `platform_core/api/shell.py`, `api/meta.py`, `www/panel.*` | Kabuk uçları ve `/panel` sayfası | platform-core-kabuk |
 | `apps/platform_core/platform_core/yapay_zeka/` | Yapay zekâ erişim katmanı | platform-core-yz |
+| `apps/platform_core/platform_core/model_gecidi/`, `api/model.py` | Sağlayıcı kaydı ve model geçidi | platform-core-gecit |
 | `apps/press_tr/` | Press'in Türkiye uygulaması | press-tr |
 | `identity/keycloak/realm/` | Realm tanımı | kimlik-realm |
 | `identity/keycloak/themes/atonota/` | Atonota giriş teması | kimlik-tema |

@@ -66,6 +66,7 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 19. Bütün uygulamalar Frappe 16 ile yazılır. Press de Frappe 16 üzerinde çalışır.
 20. Her şey yapay zekâyla yönetilebilir olur. Katman model sağlayıcısından bağımsızdır.
 21. Proje sahibi kararları Claude'a bıraktı. Claude açık kararları kapatır ve kayda yazar.
+22. Sisteme n tane yapay zekâ sağlayıcısı, hesabı ve API'si eklenebilir.
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -793,6 +794,23 @@ Sonuç şudur. Claude açık kararları kapattı. Kararların tam listesi `backe
 - Gerçek kişi verisi güvence kurulmadan Hetzner'e konmaz (Karar 27).
 - Sunucu, DNS, yasal kutu ve ödeme hesabı işleri insanda kalır.
 - Bu turda push, pull request ve canlıya yükleme yapılmaz.
+
+### Karar 38. Altyapı yapay zekâ tabanlı ve çok sağlayıcılı olacak
+
+Proje sahibi şunu istedi:
+
+> bütün doctypes, bütün fields, db, backend, her bir zerresi, tamamen, ai ile etkileşime girmelidir, ai tabanlı altyapı geliştirilmesi şarttır. ai heryerde olmalı, ai provider'dan bağımsız, herşey ai ile yönetilebilmeli.  birden fazla (n tane) ai provider eklenebilmeli, birden fazla (n tane)  her hangi bir provider'dan, ai account eklenebilmeli, n tane api eklenebilmeli. birden fazla (n tane)  her hangi bir provider'dan, ai api eklenebilmeli, n tane api eklenebilmeli.
+
+Sonuç şudur:
+
+- `platform_core` içinde ikinci bir yapay zekâ modülü kurulur. Modülün adı `model_gecidi` olur.
+- Modül sağlayıcıları, hesapları, API'leri ve modelleri kayıtta tutar. Her birinden n tane eklenebilir.
+- Model çağrısı tek bir geçitten geçer. Geçit sağlayıcıya düz HTTP ile bağlanır. Sağlayıcı kitaplığı kullanılmaz.
+- Geçit sırayla dener. Bir API sınıra takılırsa sıradaki API ya da hesap kullanılır.
+- Gizli anahtar şifreli durur. Hiçbir uç ve hiçbir yapay zekâ aracı anahtarı dönmez.
+- Her kiracı kendi sağlayıcılarını ekleyebilir. Platformun ortak hesapları sonraki turdadır.
+- Sağlık denetimi zamanlanmaz. Sağlık gerçek çağrıların sonucundan çıkar.
+- Ayrıntı `backend/docs/sozlesmeler.md` dosyasının 11. bölümündedir.
 
 ## Modellerin kararları
 

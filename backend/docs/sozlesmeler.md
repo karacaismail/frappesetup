@@ -10,6 +10,8 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 | `contracts/platform_core-kabuk.openapi.yaml` | platform-core-kabuk |
 | `contracts/press_tr.openapi.yaml` | press-tr |
 | `contracts/identity_sync.openapi.yaml` | identity-sync |
+| `contracts/platform_core-model-gecidi.openapi.yaml` | platform-core-gecit |
+| `contracts/platform_core-yapay-zeka.openapi.yaml` | platform-core-yz |
 
 ## 1. Marka
 
@@ -299,3 +301,66 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 - `platform_core` içinde katmanı platform-core-yz işi kurar. Modül klasörü `yapay_zeka` olur.
 - Önce Frappe'nin hazır MCP yolunu inceleyin (T-1). Karar sitesi bunu `frappe_mcp` olarak anar (G-84).
 - Uç adresi ve araç adları o işin raporundan sonra bu dosyaya yazılır.
+
+## 11. Model geçidi ve sağlayıcı kaydı
+
+Altyapı yapay zekâ tabanlıdır. Sisteme n tane sağlayıcı, her sağlayıcıdan n tane hesap ve her hesaptan n tane API eklenebilir (Proje kaydı D-11). Sağlayıcı, model sunan şirket ya da sunucudur. Hesap, o sağlayıcıdaki üyeliktir. API, hesaba bağlı bir adres ve anahtardır.
+
+### DocType'lar
+
+Bütün DocType'lar `model_gecidi` modülündedir. Her alan açıklama taşır (D-9).
+
+| DocType | Görevi | Önemli alanlar |
+| --- | --- | --- |
+| `AI Provider` | Sağlayıcı türü | ad, bağdaştırıcı, varsayılan adres, açık mı |
+| `AI Account` | Sağlayıcıdaki hesap | sağlayıcı, hesap adı, kurum ya da proje kimliği, aylık bütçe ve para birimi, açık mı |
+| `AI API` | Hesaba bağlı adres ve kimlik bilgisi | hesap, adres, kimlik türü, gizli anahtar, izinli modeller, dakika sınırları, öncelik, ağırlık, sağlık durumu, açık mı |
+| `AI Model` | Model ve yetenekleri | sağlayıcı, model kimliği, yetenekler, bağlam boyu, birim fiyatlar |
+| `AI Route` | İş türüne göre model sırası | ad, gereken yetenekler, seçme yolu, sıralı model ve API listesi, veri kısıtı |
+| `AI Usage Log` | Her çağrının kaydı | zaman, kullanıcı, yol, sağlayıcı, hesap, API, model, token sayıları, maliyet, süre, sonuç |
+
+### Bağdaştırıcılar
+
+Bağdaştırıcı, ortak çağrıyı sağlayıcının biçimine çeviren küçük koddur. İlk bağdaştırıcılar şunlardır:
+
+- OpenAI uyumlu sohbet biçimi,
+- Anthropic Messages biçimi,
+- Google Gemini biçimi,
+- yerel sunucu, örneğin Ollama.
+
+Yeni sağlayıcı eklemek kod istemez. Yeni bir biçim eklemek yalnız yeni bağdaştırıcı ister. Bağdaştırıcılar düz HTTP kullanır. Sağlayıcı kitaplığı eklenmez.
+
+Kimlik türleri şunlardır: API anahtarı, taşıyıcı belirteç, OAuth istemci kimlik bilgisi ve kimliksiz yerel sunucu.
+
+### Ortak çağrı
+
+`model_gecidi` dışarıya tek bir işlev açar. İşlev bir yol adı ve mesajları alır. Araç tanımı ve yanıt biçimi isteğe bağlıdır. Yanıt sağlayıcıdan bağımsız tek biçimdedir: metin, araç çağrıları, kullanım ve hangi model ile API'nin kullanıldığı.
+
+### Yönlendirme
+
+1. Yol kaydından aday modelleri ve API'leri alın.
+2. Kapalı, yeteneği eksik, bütçesi dolmuş ve devresi açık adayları çıkarın.
+3. Adayları yolun seçme biçimine göre sıralayın. Seçme biçimleri öncelik, ağırlık ve en düşük maliyettir.
+4. İlk adayı çağırın.
+5. 429, 5xx ya da zaman aşımı gelirse adayı bir süre dinlendirin ve sıradakine geçin.
+6. Kimlik hatası gelirse API'yi kapalı sayın ve yönetici kaydına yazın.
+7. Her denemeyi “AI Usage Log” kaydına yazın.
+
+Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinden döner. Zamanlanmış iş yoktur (O-15).
+
+### Güvenlik
+
+- Gizli anahtar “Password” alanında şifreli durur. Hiçbir uç ve hiçbir yapay zekâ aracı anahtarı dönmez.
+- Kayıt, günlük ve hata metni anahtarı içermez.
+- Kaydı yalnız “AI Manager” rolü ve “System Manager” rolü yönetir.
+- Yapay zekâ kaydı yönetim araçlarıyla değiştirebilir. Her değişiklik önizleme ve insan onayı ister.
+- Bağlantı denetimi ücretli bir çağrıdır. Bu yüzden ücretli işaretini taşır.
+- Mesaj içeriği varsayılan olarak günlüğe yazılmaz.
+- Yol kaydının veri kısıtı, model çağrısından önce veri seçimini ve maskelemeyi ister (G-90).
+
+### Uç
+
+| Yol | Yöntem | Kimlik | İşi |
+| --- | --- | --- | --- |
+| `platform_core.api.model.complete` | POST | Oturum ya da aracı belirteci | Ortak çağrıyı yapar. Yetki ve kota denetlenir. |
+| `platform_core.api.model.test_api` | POST | “AI Manager” rolü | Bir API'ye küçük deneme çağrısı yapar. Ücretlidir. |

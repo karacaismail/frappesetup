@@ -26,6 +26,7 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 | `platform_core` | `kimlik` | Keycloak ile giriş, çıkış, kimlik bağı ve servis belirteci |
 | `platform_core` | `kabuk` | Açılış verisi, kenar çubuğu verisi ve DocType tanımı uçları |
 | `platform_core` | `yapay_zeka` | Yapay zekâ erişim katmanı: araç kaydı, MCP ucu, önizleme ve onay, işlem günlüğü |
+| `platform_core` | `model_gecidi` | Sağlayıcı, hesap, API ve model kaydı. Yönlendirme, model çağrısı ve kullanım kaydı. |
 | `press_tr` | `kimlik` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
 | `identity_sync` | Yok | Keycloak ile Press ve kiracı siteleri arasında kullanıcı eşitleme |
 | `oidc_verify` | Yok | Belirteç doğrulama. Frappe'ye bağlı değildir. |
@@ -34,6 +35,7 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 
 - `platform_core.kimlik` ve `press_tr.kimlik` yalnız `oidc_verify` kitaplığını kullanır.
 - `platform_core.kabuk` ile `platform_core.kimlik` birbirini çağırmaz.
+- `platform_core.model_gecidi` öteki modülleri çağırmaz. `yapay_zeka` modülü `model_gecidi` modülünün açık işlevlerini çağırabilir.
 - `platform_core.yapay_zeka` öteki modüllerin açık işlevlerini çağırabilir. Öteki modüller `yapay_zeka` modülünü çağırmaz. Uygulamalar araçlarını `ai_tools` kancasıyla bildirir.
 - `identity_sync` sitelerin açık uçlarını HTTP ile çağırır. Siteler `identity_sync` kodunu çağırmaz.
 - Döngü yasaktır. MVP'de bu yönler otomatik denetlenir (B-10).
@@ -68,6 +70,7 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
 - **D-8. Var olan Press kurulumu kullanılır.** Bu Mac'te Colima'da bir Press deneme kurulumu var. Kurulum değiştirilmez. İmajı ve kurulum betikleri yeniden kullanılır.
 - **D-9. Her şey yapay zekâyla yönetilebilir olur.** Bütün DocType'lar, alanlar ve backend işlemleri yapay zekâya açık bir katmandan geçer. Katman model sağlayıcısından bağımsızdır. Proje sahibi şöyle yazdı: “ai heryerde olmalı, ai provider'dan bağımsız, herşey ai ile yönetilebilmeli.” Ayrıntı sözleşmenin 10. bölümündedir.
 - **D-10. Kararlar ajana bırakıldı.** Proje sahibi şöyle yazdı: “Herşeyi onaylıyorum ve izin veriyorum, karar ver soru sorma”. Ayrıntı aşağıdaki “Orkestratörün kararları” bölümündedir.
+- **D-11. Altyapı yapay zekâ tabanlıdır ve çok sağlayıcılıdır.** Sisteme n tane sağlayıcı eklenebilir. Her sağlayıcıdan n tane hesap eklenebilir. Her hesaptan n tane API eklenebilir. Proje sahibi şöyle yazdı: “birden fazla (n tane) ai provider eklenebilmeli, birden fazla (n tane) her hangi bir provider'dan, ai account eklenebilmeli, n tane api eklenebilmeli.” Ayrıntı sözleşmenin 11. bölümündedir.
 
 ## Orkestratörün seçtiği varsayılanlar
 
@@ -95,6 +98,10 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-10. Ajan servisi sağlayıcıdan bağımsızdır.** Model ve sağlayıcı ayardan gelir. Claude desteklenen sağlayıcılardan biridir. K9'daki Claude Agent SDK seçimi bu yüzden zorunlu değildir.
 - **O-11. Eşitleme olaylarının kaynağını identity-sync işi seçer.** İşçi T-2 notunda en yalın açık kaynak yolu seçer. Zamanlanmış yoklama yine yasaktır (D-6).
 - **O-12. `platform_core` MIT lisanslı kalır.** AGPL lisanslı bir bileşen `platform_core` içine alınmaz. Böyle bir bileşen gerekirse ayrı uygulama ya da ayrı servis olur.
+
+- **O-13. Model geçidi `platform_core` içinde durur.** Modül `model_gecidi` olur. Geçit sağlayıcılara düz HTTP ile bağlanır. Sağlayıcı kitaplığı kullanılmaz. Model adları yalnız kayıtta durur.
+- **O-14. Kayıt önce kiracı sitesindedir.** Her kiracı kendi sağlayıcılarını, hesaplarını ve API'lerini ekleyebilir. Platformun ortak hesapları sonraki turda Press'ten site ayarına gelir.
+- **O-15. Sağlık denetimi zamanlanmaz.** API'nin sağlığı gerçek çağrıların sonucundan çıkar. Elle başlatılan bağlantı denetimi de vardır (D-6).
 
 ## Değişmeyen sınırlar
 
