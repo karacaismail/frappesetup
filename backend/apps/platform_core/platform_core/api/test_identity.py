@@ -90,3 +90,40 @@ class TestListIdentities(FrappeAPITestCase):
 			):
 				self.assertEqual(response.status_code, status, response.data[:300])
 				self.assertNotIn("message", response.json)
+
+	def _assert_mutation_denied(self, method, *, claims=None):
+		headers = {}
+		if claims:
+			headers["Authorization"] = f"Bearer {self.key.sign(h.access_payload(**claims))}"
+		response = h.request(
+			h.new_client().post,
+			f"/api/method/platform_core.api.identity.{method}",
+			json={"issuer": h.ISSUER, "subject": "reconciliation-z"},
+			headers=headers,
+		)
+		self.assertEqual(response.status_code, 401 if claims else 403)
+		self.assertNotIn("message", response.json)
+
+	def test_provision_guest_denied(self):
+		self._assert_mutation_denied("provision")
+
+	def test_provision_foreign_data_denied(self):
+		self._assert_mutation_denied("provision", claims={"aud": "other-tenant"})
+
+	def test_set_enabled_guest_denied(self):
+		self._assert_mutation_denied("set_enabled")
+
+	def test_set_enabled_foreign_data_denied(self):
+		self._assert_mutation_denied("set_enabled", claims={"aud": "other-tenant"})
+
+	def test_change_email_guest_denied(self):
+		self._assert_mutation_denied("change_email")
+
+	def test_change_email_foreign_data_denied(self):
+		self._assert_mutation_denied("change_email", claims={"aud": "other-tenant"})
+
+	def test_anonymize_user_guest_denied(self):
+		self._assert_mutation_denied("anonymize_user")
+
+	def test_anonymize_user_foreign_data_denied(self):
+		self._assert_mutation_denied("anonymize_user", claims={"aud": "other-tenant"})

@@ -43,7 +43,8 @@ def list_identities(start: object = 0, page_length: object = 500) -> dict:
 	return list_linked_identities(start, page_length)
 
 
-@frappe.whitelist(methods=["POST"])
+# The verified site-scoped service claim authorizes the internal identity operations.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=SERVICE_LIMIT, seconds=SERVICE_WINDOW, user_based=True)
 @safe_errors
 def provision(
@@ -75,7 +76,8 @@ def provision(
 	)
 
 
-@frappe.whitelist(methods=["POST"])
+# The verified site-scoped service claim authorizes the internal identity operations.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=SERVICE_LIMIT, seconds=SERVICE_WINDOW, user_based=True)
 @safe_errors
 def set_enabled(issuer: object = None, subject: object = None, enabled: object = None) -> dict:
@@ -85,7 +87,8 @@ def set_enabled(issuer: object = None, subject: object = None, enabled: object =
 	return provisioning.set_enabled({"issuer": issuer, "subject": subject, "enabled": enabled})
 
 
-@frappe.whitelist(methods=["POST"])
+# The verified site-scoped service claim authorizes the internal identity operations.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=SERVICE_LIMIT, seconds=SERVICE_WINDOW, user_based=True)
 @safe_errors
 def change_email(issuer: object = None, subject: object = None, new_email: object = None) -> dict:
@@ -95,7 +98,8 @@ def change_email(issuer: object = None, subject: object = None, new_email: objec
 	return provisioning.change_email({"issuer": issuer, "subject": subject, "new_email": new_email})
 
 
-@frappe.whitelist(methods=["POST"])
+# The verified site-scoped service claim authorizes the internal identity operations.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=SERVICE_LIMIT, seconds=SERVICE_WINDOW, user_based=True)
 @safe_errors
 def anonymize_user(issuer: object = None, subject: object = None) -> dict:

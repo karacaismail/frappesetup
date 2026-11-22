@@ -7,7 +7,8 @@ from platform_core.kimlik import sign_out
 from platform_core.kimlik.safe_errors import safe_errors
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])
+# The signed logout token authorizes only the session claims it carries.
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=300, seconds=60)
 @safe_errors
 def keycloak_backchannel_logout(logout_token: str | None = None) -> dict:

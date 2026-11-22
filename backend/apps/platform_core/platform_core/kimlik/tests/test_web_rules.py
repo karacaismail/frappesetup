@@ -12,6 +12,7 @@ import ast
 import csv
 import os
 import re
+from unittest.mock import patch
 
 import frappe
 import yaml
@@ -189,6 +190,13 @@ class TestWebRules(FrappeAPITestCase):
 		self.assertEqual(unknown.status_code, 404)
 		check(path, "404", unknown.json)
 
+		path = "/platform_core.api.auth.setup_keycloak_login"
+		admin = h.new_client()
+		admin.set_cookie("sid", self.sid)
+		setup = h.request(admin.post, "/api/method" + path, headers=h.csrf_headers(admin))
+		self.assertEqual(setup.status_code, 200)
+		check(path, "200", setup.json)
+
 		path = "/platform_core.api.identity.list_identities"
 		page = h.request(h.new_client().get, "/api/method" + path, headers=headers)
 		self.assertEqual(page.status_code, 200, page.data[:200])
@@ -196,6 +204,22 @@ class TestWebRules(FrappeAPITestCase):
 		denied = h.request(h.new_client().get, "/api/method" + path)
 		self.assertEqual(denied.status_code, 403)
 		check(path, "403", denied.json, method="get")
+
+	def test_callback_code_exchange_failure_matches_contract(self):
+		client = h.new_client()
+		started, query = h.start_login(client)
+		self.assertEqual(started.status_code, 200)
+		with patch("requests.post") as exchange:
+			exchange.return_value.status_code = 400
+			response = h.request(
+				client.get,
+				h.CALLBACK,
+				query_string={"state": query["state"], "code": "rejected-example"},
+			)
+		self.assertEqual(response.status_code, 503)
+		callback = _contract()["paths"]["/platform_core.api.auth.keycloak_callback"]["get"]
+		self.assertIn(response.mimetype, callback["responses"]["503"]["content"])
+		self.assertIn("code exchange failed", callback["responses"]["503"]["description"].lower())
 
 
 def _resolve(node, contract):

@@ -16,6 +16,7 @@ import base64
 import hashlib
 import hmac
 import threading
+from pathlib import Path
 from unittest.mock import patch
 
 import frappe
@@ -206,6 +207,55 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.assertFalse(frappe.db.exists("File", personal))
 		self.assertTrue(frappe.db.exists("File", business))
 
+	def test_personal_file_is_removed_from_disk_and_business_path_survives(self):
+		business_doc = frappe.rename_doc("ToDo", self.todo.name, DELETED, force=True)
+		self.addCleanup(frappe.delete_doc, "ToDo", business_doc, force=True, ignore_missing=True)
+		personal = self._file("personal-audit.txt", "User", DELETED)
+		business = self._file("business-audit.txt", "ToDo", business_doc)
+		path = Path(frappe.get_doc("File", personal).get_full_path())
+		url = frappe.db.get_value("File", business, "file_url")
+		self.assertTrue(path.is_file())
+		self.assertEqual(self.call().status_code, 200)
+		h.refresh()
+		self.assertFalse(path.exists())
+		self.assertEqual(frappe.db.get_value("File", business, "file_url"), url)
+		self.assertFalse(
+			frappe.db.exists("Deleted Document", {"deleted_doctype": "File", "deleted_name": personal})
+		)
+
+	def test_namesake_sender_and_direct_user_address(self):
+		message = frappe.get_doc(
+			{
+				"doctype": "Communication",
+				"subject": "Fixture",
+				"sender": NAMESAKE,
+				"sender_full_name": frappe.db.get_value("User", DELETED, "full_name"),
+				"recipients": DELETED,
+				"communication_type": "Communication",
+				"sent_or_received": "Received",
+			}
+		).insert()
+		address = frappe.get_doc(
+			{
+				"doctype": "Address",
+				"address_title": "Private fixture",
+				"address_type": "Office",
+				"address_line1": "Private street",
+				"city": "Fixture city",
+				"country": frappe.db.get_value("Country", {}, "name"),
+				"links": [{"link_doctype": "User", "link_name": DELETED}],
+			}
+		).insert()
+		self.addCleanup(frappe.delete_doc, "Communication", message.name, force=True)
+		self.addCleanup(frappe.delete_doc, "Address", address.name, force=True)
+		h.refresh()
+		self.assertEqual(self.call().status_code, 200)
+		h.refresh()
+		self.assertEqual(
+			frappe.db.get_value("Communication", message.name, "sender_full_name"), message.sender_full_name
+		)
+		self.assertNotEqual(frappe.db.get_value("Address", address.name, "address_line1"), "Private street")
+
 	def test_only_the_exact_address_changes_in_e_mail_fields(self):
 		similar = f"x.{DELETED}, {DELETED}.ornek"
 		communication = frappe.get_doc(
@@ -395,7 +445,7 @@ class TestAnonymizeUser(FrappeAPITestCase):
 			{
 				"doctype": "File",
 				"file_name": name,
-				"content": b"ornek",
+				"content": name.encode(),
 				"is_private": 1,
 				"attached_to_doctype": doctype,
 				"attached_to_name": docname,

@@ -318,7 +318,7 @@ class TestMergeReview(FrappeAPITestCase):
 		since = frappe.utils.now()
 		self._remember_log_sizes()
 		time.sleep(1)
-		token = "belirtec-gizli-ornek-4711"
+		token = frappe.generate_hash(length=24)
 		boom = RuntimeError(f"failure for {token} {FAKE_SUBJECT}")
 		with patch.object(sign_out, "handle_logout_token", side_effect=boom):
 			client = h.new_client()

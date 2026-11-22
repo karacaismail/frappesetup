@@ -148,7 +148,7 @@ def disable_step(issuer: str, subject: str) -> frappe._dict:
 	)
 	# G-4: the request runs as the administrator through the identity-sync service token; the target
 	# comes from the verified identity link, not from client input.
-	doc.insert(ignore_permissions=True)
+	doc.insert()
 	_close_account(link.user)
 	frappe.db.commit()
 	return frappe._dict(name=doc.name, state=DISABLED, user=link.user)

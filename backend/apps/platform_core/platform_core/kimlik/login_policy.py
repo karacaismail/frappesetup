@@ -94,112 +94,113 @@ GATED_FUNCTIONS = {
 }
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])
+# These wrappers apply the site gate and then use the original Frappe credential checks.
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def reset_password(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.core.doctype.user.user.reset_password` (AU-19)."""
 	return _call_gated("frappe.core.doctype.user.user.reset_password", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def update_password(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.core.doctype.user.user.update_password` (AU-19)."""
 	return _call_gated("frappe.core.doctype.user.user.update_password", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def sign_up(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.core.doctype.user.user.sign_up` (AU-19)."""
 	return _call_gated("frappe.core.doctype.user.user.sign_up", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def send_login_link(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.www.login.send_login_link` (AU-19)."""
 	return _call_gated("frappe.www.login.send_login_link", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def login_via_key(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.www.login.login_via_key` (AU-19)."""
 	return _call_gated("frappe.www.login.login_via_key", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def login_via_token(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.www.login.login_via_token` (AU-19)."""
 	return _call_gated("frappe.www.login.login_via_token", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def login_via_google(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_google` (AU-19)."""
 	return _call_gated("frappe.integrations.oauth2_logins.login_via_google", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def login_via_github(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_github` (AU-19)."""
 	return _call_gated("frappe.integrations.oauth2_logins.login_via_github", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def login_via_facebook(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_facebook` (AU-19)."""
 	return _call_gated("frappe.integrations.oauth2_logins.login_via_facebook", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def login_via_frappe(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_frappe` (AU-19)."""
 	return _call_gated("frappe.integrations.oauth2_logins.login_via_frappe", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def login_via_office365(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_office365` (AU-19)."""
 	return _call_gated("frappe.integrations.oauth2_logins.login_via_office365", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def login_via_salesforce(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_salesforce` (AU-19)."""
 	return _call_gated("frappe.integrations.oauth2_logins.login_via_salesforce", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def login_via_fairlogin(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_fairlogin` (AU-19)."""
 	return _call_gated("frappe.integrations.oauth2_logins.login_via_fairlogin", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def login_via_keycloak(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_keycloak` (AU-19)."""
 	return _call_gated("frappe.integrations.oauth2_logins.login_via_keycloak", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])
+@frappe.whitelist(allow_guest=True, methods=["GET", "POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def custom(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.oauth2_logins.custom` (AU-19)."""
 	return _call_gated("frappe.integrations.oauth2_logins.custom", args, kwargs)
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=GUEST_LIMIT, seconds=GUEST_WINDOW)
 def ldap_login(*args: object, **kwargs: object) -> object:
 	"""Gated wrapper of `frappe.integrations.doctype.ldap_settings.ldap_settings.login` (AU-19)."""

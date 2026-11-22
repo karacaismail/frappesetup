@@ -26,7 +26,7 @@ REDACTED = "[REDACTED]"
 # P-3: growing lists are read page by page with a stable order.
 PAGE_SIZE = 500
 # Rows that `_extra_records` handles with the own or shared distinction (merge review 2, E3).
-HANDLED_BY_OWNERSHIP = frozenset(("Contact", "Contact Email", "Address"))
+HANDLED_BY_OWNERSHIP = frozenset(("Contact", "Contact Email", "Address", "File", "Communication"))
 TEXT_TYPES = frozenset(
 	("Data", "Small Text", "Text", "Long Text", "Text Editor", "Code", "HTML Editor", "Markdown Editor")
 )
@@ -116,6 +116,13 @@ def _ownership(user: str) -> frappe._dict:
 		if row.user == user:
 			user_contacts.add(row.name)
 	addresses = set(_rows("Address", filters={"email_id": user}, pluck="name"))
+	addresses.update(
+		_rows(
+			"Dynamic Link",
+			filters={"parenttype": "Address", "link_doctype": "User", "link_name": user},
+			pluck="parent",
+		)
+	)
 	own_contacts = set()
 
 	for batch in batched(candidates, PAGE_SIZE, strict=False):
@@ -152,6 +159,8 @@ def _ownership(user: str) -> frappe._dict:
 			filters={"parent": ("in", batch), "parenttype": "Address"},
 			fields=["parent", "link_doctype", "link_name"],
 		):
+			if link.link_doctype == "User" and link.link_name == user:
+				continue
 			if link.link_doctype != "Contact" or link.link_name not in own_contacts:
 				shared_addresses.add(link.parent)
 	return frappe._dict(
@@ -360,9 +369,18 @@ def _extra_records(user: str, anon: str, full_name: str, owned: frappe._dict) ->
 			)
 		)
 	for name in files:
-		# G-4: the request runs as the administrator under the identity-sync token. The files are the
-		# person's own (bound to the User record or the person's own Contact), found by those links.
-		frappe.delete_doc("File", name, force=True, ignore_permissions=True)
+		file = frappe.get_doc("File", name)
+		frappe.delete_doc("File", name, force=True, delete_permanently=True)
+		# File.on_trash schedules disk cleanup and writes the filename into a timeline comment.
+		frappe.db.delete(
+			"Comment",
+			{
+				"reference_doctype": file.attached_to_doctype,
+				"reference_name": file.attached_to_name,
+				"comment_type": "Attachment Removed",
+				"content": file.file_name,
+			},
+		)
 	frappe.db.set_value("User", user, {"user_image": None, "banner_image": None}, update_modified=False)
 
 	# Communication and the e-mail queue.

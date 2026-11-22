@@ -247,7 +247,7 @@ paths:
                 atonota:
                   value:
                     message:
-                      login_url: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?client_id=site-kiraci1&response_type=code&scope=openid+profile+email&redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fapi%2Fmethod%2Fplatform_core.api.auth.keycloak_callback&state=a1b2c3d4e5f6a7b8&nonce=c9d8e7f6a5b4c3d2&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
+                      login_url: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?client_id=site-kiraci1&response_type=code&scope=openid&redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fapi%2Fmethod%2Fplatform_core.api.auth.keycloak_callback&state=a1b2c3d4e5f6a7b8&nonce=c9d8e7f6a5b4c3d2&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
                       brand_name: Atonota
                       label: Sign in with Atonota
         "400":
@@ -259,7 +259,7 @@ paths:
                 disAdres:
                   value:
                     exc_type: InvalidRedirect
-                    exception: "platform_core.kimlik.hatalar.InvalidRedirect: redirect_to"
+                    exception: "platform_core.kimlik.exceptions.InvalidRedirect: redirect_to"
                     _server_messages: '["{\"message\": \"Redirect target must be a relative path on this site.\"}"]'
         "417":
           $ref: "#/components/responses/GovdeBozuk"
@@ -276,7 +276,7 @@ paths:
                 kuruluDegil:
                   value:
                     exc_type: KeycloakLoginNotConfigured
-                    exception: "platform_core.kimlik.hatalar.KeycloakLoginNotConfigured: keycloak_client_id"
+                    exception: "platform_core.kimlik.exceptions.KeycloakLoginNotConfigured: keycloak_client_id"
                     _server_messages: '["{\"message\": \"Sign in with the identity provider is not configured.\"}"]'
 
   /platform_core.api.auth.start_login:
@@ -331,7 +331,7 @@ paths:
               schema: {type: string, format: uri}
               examples:
                 atonota:
-                  value: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?client_id=site-kiraci1&response_type=code&scope=openid+profile+email&redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fapi%2Fmethod%2Fplatform_core.api.auth.keycloak_callback&state=a1b2c3d4e5f6a7b8&nonce=c9d8e7f6a5b4c3d2&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
+                  value: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?client_id=site-kiraci1&response_type=code&scope=openid&redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fapi%2Fmethod%2Fplatform_core.api.auth.keycloak_callback&state=a1b2c3d4e5f6a7b8&nonce=c9d8e7f6a5b4c3d2&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
             Set-Cookie:
               description: |
                 Cookie that binds the sign-in flow to the browser. In development its name is `kimlik_login`. On HTTPS it is `__Host-kimlik_login`.
@@ -378,7 +378,7 @@ paths:
            If the SHA-256 hash of the cookie value does not match the hash in the record, it returns 403.
         3. If Keycloak returned `error`, the server returns 400. No code exchange is done.
         4. The server exchanges the code for tokens at the Keycloak token endpoint with the PKCE `code_verifier`.
-           If the exchange fails, it returns 400.
+           If the exchange fails, it returns 503.
         5. The server verifies the ID token with `oidc_verify.verify_id_token`. `nonce` is also checked.
            If the token is not valid, it returns 400.
         6. The server finds the user by the `(iss, sub)` link.
@@ -387,14 +387,13 @@ paths:
            An unknown e-mail gets 403. No record is created. The sync service creates the user.
            If the link belongs to another user, it returns 403. If the same e-mail is linked to another `sub` value, it returns 403.
            A disabled user gets 403.
-        7. If the user is an employee, the server checks real activity (O-25).
-           An employee is a “System User” user with a desk role.
-           If the employee made a real request on this site in the last 3600 seconds, the sign-in continues.
+        7. The server checks real activity for all tenant users (O-25).
+           If the user made a real request on this site in the last 3600 seconds, the sign-in continues.
            Otherwise no session is opened. The server generates a new `state` and records the start time of the new attempt.
            It sends the browser back to Keycloak with `prompt=login`. The response is 302.
            So an open Keycloak cookie does not skip re-authentication.
            On this forced attempt the ID token `auth_time` must not be older than the attempt start (30 seconds leeway).
-           If `auth_time` is missing or older, it returns 403. A customer does not go through this step.
+           If `auth_time` is missing or older, it returns 403.
         8. The server opens a Frappe session. The Keycloak session id (`sid`) is written to the session data.
            Back-channel logout matches on this value.
            The session closes after 1 hour without real activity. Background requests do not count.
@@ -403,7 +402,7 @@ paths:
            Frappe's own idle limit of 1 hour (`session_expiry`) also stays.
         9. The server redirects the browser to the `redirect_to` path. If the record has no path, it redirects to the `platform_panel_url` address.
 
-        If Keycloak cannot be reached or the key list cannot be fetched, it returns 503.
+        If the code exchange fails or the key list cannot be fetched, it returns 503.
         At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
 
         The endpoint opens a session. The endpoint does not close sessions. The endpoint does not create user records.
@@ -457,7 +456,6 @@ paths:
             - `state` is missing, expired or used before,
             - the `kimlik_login` cookie is missing,
             - Keycloak returned `error`,
-            - the code exchange failed,
             - the ID token is not valid. A `nonce` mismatch also counts here.
 
             The page tells the user to start sign-in again.
@@ -486,7 +484,7 @@ paths:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}
         "503":
           description: |
-            Keycloak could not be reached or the key list could not be fetched. The page title is “Sign-in failed”. The page body says the identity provider could not be reached.
+            The code exchange failed or the key list could not be fetched. The page title is “Sign-in failed”. The page body says the identity provider could not be reached.
             The page tells the user to try again a little later.
           content:
             text/html:
@@ -550,7 +548,7 @@ paths:
     post:
       tags: [kurulum]
       operationId: setupKeycloakLogin
-      summary: Turns on Keycloak sign-in on the site.
+      summary: Configures the Keycloak record for the site.
       description: |
         The site admin calls this endpoint. Only the “System Manager” role can call it.
 
@@ -571,7 +569,7 @@ paths:
           csrfToken: []
       responses:
         "200":
-          description: Keycloak sign-in is on.
+          description: The record is configured. Frappe’s native social sign-in remains disabled.
           content:
             application/json:
               schema:
@@ -584,7 +582,7 @@ paths:
                   value:
                     message:
                       social_login_key: keycloak
-                      enabled: true
+                      enabled: false
                       provider_name: Atonota
         "400":
           description: |
@@ -597,7 +595,7 @@ paths:
                 markaEksik:
                   value:
                     exc_type: KeycloakSettingsMissing
-                    exception: "platform_core.kimlik.hatalar.KeycloakSettingsMissing: kimlik_marka_adi"
+                    exception: "platform_core.kimlik.exceptions.KeycloakSettingsMissing: kimlik_marka_adi"
                     _server_messages: '["{\"message\": \"Keycloak settings are missing: kimlik_marka_adi\"}"]'
         "429":
           $ref: "#/components/responses/IstekSiniri"
@@ -654,7 +652,7 @@ paths:
               keycloak:
                 summary: The form that Keycloak sends.
                 value:
-                  logout_token: eyJhbGciOiJSUzI1NiIsImtpZCI6Im9ybmVrIn0.eyJpc3MiOiJodHRwOi8va2ltbGlrLmxvY2FsaG9zdDo4NjYwL3JlYWxtcy9wbGF0Zm9ybSJ9.ornek-imza
+                  logout_token: signed-logout-token-placeholder
       responses:
         "200":
           description: The request was processed. The number of closed sessions is returned.
@@ -699,7 +697,7 @@ paths:
                 gecersiz:
                   value:
                     exc_type: InvalidLogoutToken
-                    exception: "platform_core.kimlik.hatalar.InvalidLogoutToken: logout_token"
+                    exception: "platform_core.kimlik.exceptions.InvalidLogoutToken: logout_token"
                     _server_messages: '["{\"message\": \"Logout token rejected: malformed\"}"]'
         "429":
           $ref: "#/components/responses/IstekSiniri"
@@ -855,12 +853,12 @@ paths:
                 yabanciIssuer:
                   value:
                     exc_type: UnknownIssuer
-                    exception: "platform_core.kimlik.hatalar.UnknownIssuer: issuer"
+                    exception: "platform_core.kimlik.exceptions.UnknownIssuer: issuer"
                     _server_messages: '["{\"message\": \"Issuer is not the configured identity provider.\"}"]'
                 dogrulamaEksik:
                   value:
                     exc_type: InvalidInput
-                    exception: "platform_core.kimlik.hatalar.InvalidInput: email_verified"
+                    exception: "platform_core.kimlik.exceptions.InvalidInput: email_verified"
                     _server_messages: '["{\"message\": \"Field email_verified is required.\"}"]'
         "401":
           $ref: "#/components/responses/ServisBelirteciReddi"
@@ -884,12 +882,12 @@ paths:
                 dogrulanmamis:
                   value:
                     exc_type: EmailNotVerified
-                    exception: "platform_core.kimlik.hatalar.EmailNotVerified: email_verified"
+                    exception: "platform_core.kimlik.exceptions.EmailNotVerified: email_verified"
                     _server_messages: '["{\"message\": \"The first link requires a verified e-mail address.\"}"]'
                 yonetimHesabi:
                   value:
                     exc_type: IdentityConflict
-                    exception: "platform_core.kimlik.hatalar.IdentityConflict: email"
+                    exception: "platform_core.kimlik.exceptions.IdentityConflict: email"
                     _server_messages: '["{\"message\": \"This e-mail belongs to a desk user and cannot be provisioned.\"}"]'
         "410":
           $ref: "#/components/responses/KimlikSilindi"
@@ -1023,7 +1021,7 @@ paths:
                 kullanimda:
                   value:
                     exc_type: EmailInUse
-                    exception: "platform_core.kimlik.hatalar.EmailInUse: new_email"
+                    exception: "platform_core.kimlik.exceptions.EmailInUse: new_email"
                     _server_messages: '["{\"message\": \"The new e-mail address belongs to another user.\"}"]'
         "410":
           $ref: "#/components/responses/KimlikSilindi"
@@ -2094,7 +2092,7 @@ components:
             suresiDolmus:
               value:
                 exc_type: ServiceTokenRejected
-                exception: "platform_core.kimlik.hatalar.ServiceTokenRejected: expired"
+                exception: "platform_core.kimlik.exceptions.ServiceTokenRejected: expired"
                 _server_messages: '["{\"message\": \"Service token rejected: expired\"}"]'
     ServisYetkisiYok:
       description: |
@@ -2118,7 +2116,7 @@ components:
             enabledYanlis:
               value:
                 exc_type: InvalidInput
-                exception: "platform_core.kimlik.hatalar.InvalidInput: enabled"
+                exception: "platform_core.kimlik.exceptions.InvalidInput: enabled"
                 _server_messages: '["{\"message\": \"Field enabled must be true or false.\"}"]'
     AnahtarListesiYok:
       description: |
@@ -2131,7 +2129,7 @@ components:
             keycloakKapali:
               value:
                 exc_type: KeycloakKeysUnavailable
-                exception: "platform_core.kimlik.hatalar.KeycloakKeysUnavailable: jwks"
+                exception: "platform_core.kimlik.exceptions.KeycloakKeysUnavailable: jwks"
                 _server_messages: '["{\"message\": \"Identity provider keys are not available.\"}"]'
     BagYok:
       description: "The `(issuer, subject)` link does not exist. The `exc_type` value is `IdentityNotFound`."
@@ -2142,7 +2140,7 @@ components:
             bagYok:
               value:
                 exc_type: IdentityNotFound
-                exception: "platform_core.kimlik.hatalar.IdentityNotFound: subject"
+                exception: "platform_core.kimlik.exceptions.IdentityNotFound: subject"
                 _server_messages: '["{\"message\": \"No user is linked to this identity.\"}"]'
 
   schemas:
@@ -2256,7 +2254,7 @@ components:
           description: Name of the “Social Login Key” record.
         enabled:
           type: boolean
-          const: true
+          const: false
           description: The record is enabled.
         provider_name:
           type: string
@@ -2359,7 +2357,7 @@ components:
         user:
           type: string
           maxLength: 140
-          description: The anonymous name of the user. Its form is `deleted-user-<number>@<site>`. It does not identify the person.
+          description: The anonymous name of the user. Its form is `deleted-user-<16 hex characters>@deleted.invalid`. It does not identify the person.
         enabled:
           type: boolean
           const: false

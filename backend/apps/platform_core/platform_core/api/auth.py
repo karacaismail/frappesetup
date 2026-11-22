@@ -9,14 +9,16 @@ from platform_core.kimlik.exceptions import InvalidRedirect, KeycloakLoginNotCon
 from platform_core.kimlik.safe_errors import safe_errors
 
 
-@frappe.whitelist(allow_guest=True, methods=["POST"])
+# The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
+@frappe.whitelist(allow_guest=True, methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=20, seconds=60)
 def get_login_url(redirect_to: str | None = None) -> dict:
 	"""Builds the Keycloak sign-in address. `state` is generated on the server. `redirect_to` must be a relative path."""
 	return sign_in.build_login_url(redirect_to)
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])
+# The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=20, seconds=60)
 def start_login(redirect_to: str | None = None) -> None:
 	"""Browser entry point of the sign-in: same work as `get_login_url`, then a 302 to Keycloak.
@@ -35,7 +37,8 @@ def start_login(redirect_to: str | None = None) -> None:
 	frappe.local.response["location"] = result["login_url"]
 
 
-@frappe.whitelist(allow_guest=True, methods=["GET"])
+# The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
+@frappe.whitelist(allow_guest=True, methods=["GET"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=20, seconds=60)
 @safe_errors
 def keycloak_callback(
@@ -62,14 +65,16 @@ def keycloak_callback(
 	frappe.local.response["location"] = target
 
 
-@frappe.whitelist(methods=["POST"])
+# The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=20, seconds=60, user_based=True)
 def logout() -> dict:
 	"""Closes the Frappe session and returns the Keycloak logout address."""
 	return sign_out.logout_current_session()
 
 
-@frappe.whitelist(methods=["POST"])
+# The login routes validate browser state and never take a Frappe record selector. Session routes check the current session or role.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
 @rate_limit(limit=10, seconds=60, user_based=True)
 def setup_keycloak_login() -> dict:
 	"""Creates or updates the Keycloak “Social Login Key” from site settings. System Manager only."""

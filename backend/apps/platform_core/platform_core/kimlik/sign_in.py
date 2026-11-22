@@ -310,7 +310,7 @@ def create_link(issuer: str, subject: str, user: str) -> str:
 
 	inserted = False
 	with savepoint(catch=(frappe.UniqueValidationError, frappe.DuplicateEntryError)):
-		doc.insert(ignore_permissions=True)
+		doc.insert(ignore_permissions=True)  # nosemgrep: frappe-ignore-permissions
 		inserted = True
 	if inserted:
 		return doc.name
@@ -331,9 +331,10 @@ def exchange_code(settings, code: str, code_verifier: str, redirect_uri: str) ->
 	"""Exchanges the authorization code at the token endpoint. Only the configured Keycloak is called (G-13)."""
 	import requests
 
+	token_endpoint = helpers.token_url(settings.internal_url, settings.realm)
 	try:
 		response = requests.post(
-			helpers.token_url(settings.internal_url, settings.realm),
+			token_endpoint,
 			data={
 				"grant_type": "authorization_code",
 				"code": code,

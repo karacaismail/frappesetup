@@ -43,8 +43,8 @@ Her yerde önce kimlik bağı, sonra silme kaydı kilitlenir. Giriş de aynı ki
 
 - Kapsam `user_data_fields` kancasından ve sözleşmedeki ek kayıtlardan türer. Kod `kimlik/anonymization_scope.py` dosyasındadır.
 - Yalnız kullanıcıya bağlı satırlar değişir. Tam ad yalnız kullanıcının kendi satırlarında değişir.
-- Bir “Contact” kaydı, bütün e-posta satırları kişinin adresiyse kişinindir. Başka bir adres de varsa kayıt ortaktır. Ortak kayıttan yalnız kişinin e-posta satırı silinir.
-- Bir “Address” kaydı, bütün bağları kişinin kendi “Contact” kayıtlarına gidiyorsa kişinindir. Ortak adreste yalnız kişinin e-postası boşalır.
+- Bir “Contact” kaydı, bütün e-posta satırları kişinin adresiyse kişinindir. Başka bir adres varsa kayıt ortaktır. Bir iş kaydına bağlanan kişi kaydı da ortaktır. Ortak kayıttan yalnız kişinin e-posta satırı silinir.
+- Bir “Address” kaydı, bütün bağları kişinin kendi “User” veya “Contact” kayıtlarına gidiyorsa kişinindir. Ortak adreste yalnız kişinin e-postası boşalır.
 - Yalnız kişisel dosya silinir. Kişisel dosya, “User” kaydına ya da kişinin kendi “Contact” kaydına bağlı dosyadır. İş kaydına bağlı dosya kalır.
 - E-posta alanlarında yalnız tam adres değişir. Adres listeleri tek tek ayrıştırılır.
 
