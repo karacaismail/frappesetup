@@ -567,8 +567,8 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
         digest_key=DIGEST_KEY,
         http_timeout=5.0,
         realm_id=REALM_ID,
-        # docs/sozlesmeler.md, section 7: both lists hold the service clients of the configured tenants.
-        execute_azp=frozenset(f"site-{item.name}-service" for item in tenants),
+        # Platform operations use an operator account separate from tenant accounts.
+        execute_azp=frozenset({"identity-sync-operator"}),
         preview_azp=frozenset({"ai-agent"}),
         session_azp=frozenset(f"site-{item.name}-service" for item in tenants),
         deletion_azp=frozenset({"press-service"}),

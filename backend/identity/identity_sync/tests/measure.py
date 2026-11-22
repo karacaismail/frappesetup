@@ -40,6 +40,7 @@ from .test_server import sign
 
 READ_LIMIT_MS, WRITE_LIMIT_MS = 500, 1000
 DEFAULT_SAMPLES, DEFAULT_CONCURRENCY, DEFAULT_USERS = 50, 20, 200
+OPERATOR = "identity-sync-operator"
 SITE, AGENT, PRESS = "site-kiraci1-service", "ai-agent", "press-service"
 
 
@@ -79,7 +80,7 @@ class _Bench:
         self.stack.app.settings = dataclasses.replace(
             settings,
             preview_azp=frozenset({AGENT}),
-            execute_azp=sites,
+            execute_azp=frozenset({OPERATOR}),
             session_azp=sites,
             deletion_azp=frozenset({PRESS}),
             rate_limit=max(settings.rate_limit, requests_needed),
@@ -214,7 +215,7 @@ class _Bench:
         self.serve_users()
         _status, preview = self.request("POST", "/v1/reconcile", {"dry_run": True}, AGENT)
         body = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": self.fresh("onay")}
-        return self.call("POST", "/v1/reconcile", body, SITE)
+        return self.call("POST", "/v1/reconcile", body, OPERATOR)
 
     def queue_event(self) -> None:
         subject = self.subjects[self.counter % len(self.subjects)]
@@ -231,7 +232,7 @@ class _Bench:
         self.queue_event()
         _status, preview = self.request("POST", "/v1/dead-letters/replay", {"dry_run": True}, AGENT)
         body = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": self.fresh("onay")}
-        return self.call("POST", "/v1/dead-letters/replay", body, SITE)
+        return self.call("POST", "/v1/dead-letters/replay", body, OPERATOR)
 
     def open_operation(self) -> str:
         operation_id = self.fresh("op")
@@ -242,19 +243,19 @@ class _Bench:
         return self.call("GET", "/v1/operations", None, AGENT)
 
     def resolve_operation(self) -> Callable[[], int]:
-        return self.call("POST", f"/v1/operations/{self.open_operation()}/resolve", {"resolution": "abandoned"}, SITE)
+        return self.call("POST", f"/v1/operations/{self.open_operation()}/resolve", {"resolution": "abandoned"}, OPERATOR)
 
     def invitation(self) -> dict[str, object]:
         return {"email": f"{self.fresh('invite')}@example.test", "organization_id": ORG_ID}
 
     def preview_invitation(self) -> Callable[[], int]:
-        return self.call("POST", "/v1/invitations", {**self.invitation(), "dry_run": True}, SITE)
+        return self.call("POST", "/v1/invitations", {**self.invitation(), "dry_run": True}, OPERATOR)
 
     def execute_invitation(self) -> Callable[[], int]:
         invitation = self.invitation()
-        _status, preview = self.request("POST", "/v1/invitations", {**invitation, "dry_run": True}, SITE)
+        _status, preview = self.request("POST", "/v1/invitations", {**invitation, "dry_run": True}, OPERATOR)
         body = {**invitation, "dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": self.fresh("onay")}
-        return self.call("POST", "/v1/invitations", body, SITE)
+        return self.call("POST", "/v1/invitations", body, OPERATOR)
 
     def serve_invitations(self) -> None:
         """Keycloak answers for an invitation: create the user, add the member, send the e-mail."""

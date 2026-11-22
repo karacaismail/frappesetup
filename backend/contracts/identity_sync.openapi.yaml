@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.11.3
+  version: 0.12.0
   summary: Endpoints of the user sync service
   description: |
     This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
@@ -60,15 +60,13 @@ info:
 
     The service keeps four client lists.
     A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
-    A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute. This list holds the service clients of the tenant sites.
-    The human gives the approval in the AI layer of the tenant site. So the tenant site calls the execution.
-    A client in the `IDENTITY_SYNC_SESSION_AZP` list can end a session. This list holds the same tenant site clients.
-    The two lists must be equal. Every client in them must be the service client of a tenant in the tenant list.
-    If not, the service does not start. A client that is bound to no tenant gets 403 when it asks for execution.
-    A client in the preview list or in the deletion list cannot be in another list.
-    A tenant site client can invite a user only into the organization of its own tenant.
-    The service finds the tenant from the `azp` value of the token. The body cannot choose the tenant.
-    The reconcile, replay and operation endpoints work on the whole platform. They are not bound to one tenant.
+    A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute approved platform operations.
+    It is a separate trusted operator client, for example `identity-sync-operator`.
+    Tenant service clients cannot read, preview or execute platform operations, even when misconfigured in those lists.
+    A client in the `IDENTITY_SYNC_SESSION_AZP` list can end sessions of its own tenant members.
+    Every session client must be the service client of a configured tenant.
+    The four lists must be disjoint. Site clients cannot hold operator, preview or global deletion rights.
+    Invitations, reconcile, replay and operation endpoints are platform operations.
     This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
     A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
     Only a trusted service client goes into the execute list.
@@ -787,12 +785,12 @@ components:
         The token that goes to the tenant and to Press does not carry these roles.
         The service verifies the token with the shared `oidc_verify` library.
         The `aud` value of the token must be only `identity-sync`.
-        The `azp` value of the token must be in one of two lists.
+        The `azp` value of the token must be in one of four lists.
         The `IDENTITY_SYNC_PREVIEW_AZP` list gives permission to read and to preview.
         The `IDENTITY_SYNC_EXECUTE_AZP` list also gives permission to execute.
         The `IDENTITY_SYNC_SESSION_AZP` list opens only the `/v1/sessions/revoke` endpoint.
         A client can be in only one of these lists.
-        If both lists are empty, the service rejects every request.
+        If all lists are empty, the service rejects every request.
         If the library is not installed, the service also rejects every request.
         If the request also carries a cookie, the service rejects the request.
   responses:

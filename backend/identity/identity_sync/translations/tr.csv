@@ -355,12 +355,12 @@ The roles are `view-users`, `query-users`, `manage-users` and the minimum role n
 The token that goes to the tenant and to Press does not carry these roles.
 The service verifies the token with the shared `oidc_verify` library.
 The `aud` value of the token must be only `identity-sync`.
-The `azp` value of the token must be in one of two lists.
+The `azp` value of the token must be in one of four lists.
 The `IDENTITY_SYNC_PREVIEW_AZP` list gives permission to read and to preview.
 The `IDENTITY_SYNC_EXECUTE_AZP` list also gives permission to execute.
 The `IDENTITY_SYNC_SESSION_AZP` list opens only the `/v1/sessions/revoke` endpoint.
 A client can be in only one of these lists.
-If both lists are empty, the service rejects every request.
+If all lists are empty, the service rejects every request.
 If the library is not installed, the service also rejects every request.
 If the request also carries a cookie, the service rejects the request.
 ","Keycloak servis belirteci. Kurallar ortak sözleşmenin 3. bölümündedir.
@@ -372,12 +372,12 @@ Roller `view-users`, `query-users`, `manage-users` ve kuruluş için gereken en 
 Kiracıya ve Press'e giden belirteç bu rolleri taşımaz.
 Servis belirteci ortak `oidc_verify` kitaplığıyla doğrular.
 Belirtecin `aud` değeri yalnız `identity-sync` olmalıdır.
-Belirtecin `azp` değeri iki listeden birinde olmalıdır.
+Belirtecin `azp` değeri dört listeden birinde olmalıdır.
 `IDENTITY_SYNC_PREVIEW_AZP` listesi okuma ve önizleme izni verir.
 `IDENTITY_SYNC_EXECUTE_AZP` listesi ayrıca yürütme izni verir.
 `IDENTITY_SYNC_SESSION_AZP` listesi yalnız `/v1/sessions/revoke` ucunu açar.
 Bir istemci bu listelerden yalnız birinde durabilir.
-İki liste de boşsa servis her isteği reddeder.
+Bütün listeler boşsa servis her isteği reddeder.
 Kitaplık kurulu değilse servis yine her isteği reddeder.
 İstek çerez de taşıyorsa servis isteği reddeder.
 ",identity_sync.openapi.yaml: components.securitySchemes.serviceToken.description
@@ -464,15 +464,13 @@ The service computes the plan once more at execution time. If the plan is not ex
 
 The service keeps four client lists.
 A client in the `IDENTITY_SYNC_PREVIEW_AZP` list only reads and previews.
-A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute. This list holds the service clients of the tenant sites.
-The human gives the approval in the AI layer of the tenant site. So the tenant site calls the execution.
-A client in the `IDENTITY_SYNC_SESSION_AZP` list can end a session. This list holds the same tenant site clients.
-The two lists must be equal. Every client in them must be the service client of a tenant in the tenant list.
-If not, the service does not start. A client that is bound to no tenant gets 403 when it asks for execution.
-A client in the preview list or in the deletion list cannot be in another list.
-A tenant site client can invite a user only into the organization of its own tenant.
-The service finds the tenant from the `azp` value of the token. The body cannot choose the tenant.
-The reconcile, replay and operation endpoints work on the whole platform. They are not bound to one tenant.
+A client in the `IDENTITY_SYNC_EXECUTE_AZP` list can execute approved platform operations.
+It is a separate trusted operator client, for example `identity-sync-operator`.
+Tenant service clients cannot read, preview or execute platform operations, even when misconfigured in those lists.
+A client in the `IDENTITY_SYNC_SESSION_AZP` list can end sessions of its own tenant members.
+Every session client must be the service client of a configured tenant.
+The four lists must be disjoint. Site clients cannot hold operator, preview or global deletion rights.
+Invitations, reconcile, replay and operation endpoints are platform operations.
 This service opens no client in Keycloak. The job that owns the realm opens the client of a new tenant with a command a human starts.
 A client in the `IDENTITY_SYNC_DELETION_AZP` list can only request an account deletion. It is the Press client.
 Only a trusted service client goes into the execute list.
@@ -650,15 +648,13 @@ Servis yürütme anında planı bir kez daha hesaplar. Plan birebir aynı değil
 
 Servis dört istemci listesi tutar.
 `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
-`IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır.
-İnsan onayı kiracı sitesindeki yapay zekâ katmanında verir. Bu yüzden yürütmeyi kiracı sitesi çağırır.
-`IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
-İki liste eşit olmalıdır. Listelerdeki her istemci, kiracı listesindeki bir kiracının servis istemcisi olmalıdır.
-Değilse servis açılmaz. Hiçbir kiracıya bağlı olmayan istemci yürütme isterse 403 alır.
-Önizleme listesindeki ya da silme listesindeki istemci başka bir listede olamaz.
-Kiracı sitesinin istemcisi yalnız kendi kiracısının kuruluşuna kullanıcı davet edebilir.
-Servis kiracıyı belirtecin `azp` değerinden bulur. Gövde kiracıyı seçemez.
-Mutabakat, yeniden işletme ve işlem uçları bütün platformda çalışır. Bu uçlar tek kiracıya bağlı değildir.
+`IDENTITY_SYNC_EXECUTE_AZP` listesi ayrı yönetim istemcisini taşır. Örnek: `identity-sync-operator`.
+Kiracı istemcileri yönetim uçlarını okuyamaz, önizleyemez veya yürütemez. Yanlış ayar da bu yasağı kaldırmaz.
+`IDENTITY_SYNC_SESSION_AZP` listesi kiracıların servis istemcilerini taşır.
+Bu istemciler yalnız kendi kiracılarının üyelerine ait oturumları kapatabilir.
+Her oturum istemcisi kayıtlı bir kiracıya bağlı olmalıdır.
+Dört liste birbirinden ayrıdır. Kiracı istemcileri yönetim, önizleme veya genel silme yetkisi alamaz.
+Davet, mutabakat, yeniden işletme ve işlem uçları bütün platformda çalışır.
 Bu servis Keycloak'ta istemci açmaz. Yeni kiracının istemcisini kimlik-realm işi açar. O komutu insan başlatır.
 `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
 Yürütme listesine yalnız güvenilir servis istemcisi girer.

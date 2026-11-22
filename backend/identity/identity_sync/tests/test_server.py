@@ -24,8 +24,7 @@ from .fakes import DONE, ORG_ID, REALM_ID, SUBJECT, WEBHOOK_SECRET, Stack, keycl
 
 NOW = 1_795_000_000
 PREVIEW_TOKEN = "preview-token"  # yapay zekâ aracısının belirteci: yalnız okur ve önizler
-# The service token of tenant kiraci1. The human approves on the tenant site, so this client
-# executes approved work. The same client ends sessions. The two names keep the tests readable.
+# The operator executes approved platform work. The tenant client only ends its own sessions.
 EXECUTE_TOKEN = "execute-token"
 SESSION_TOKEN = "session-token"
 OTHER_SITE_TOKEN = "other-site-token"  # the service token of tenant kiraci2
@@ -37,7 +36,7 @@ ALL_ACTIONS = ["press.ensure_team", "tenant.change_email", "tenant.provision"]
 def fake_verifier(token: str) -> dict[str, object]:
     azp = {
         PREVIEW_TOKEN: "ai-agent",
-        EXECUTE_TOKEN: "site-kiraci1-service",
+        EXECUTE_TOKEN: "identity-sync-operator",
         SESSION_TOKEN: "site-kiraci1-service",
         OTHER_SITE_TOKEN: "site-kiraci2-service",
         PRESS_TOKEN: "press-service",
@@ -62,7 +61,7 @@ class ServerCase(unittest.TestCase):
         self.addCleanup(self.stack.close)
         self.now = float(NOW)
         self.start_server(fake_verifier)
-        # The organization of tenant kiraci1. An execute client may only invite into its own organization.
+        # The organization of tenant kiraci1, used by invitation and session tests.
         organization = self.stack.keycloak.add_organization(ORG_ID, "kiraci1")
         self.stack.keycloak.add_user(keycloak_user(), [organization])
         self._next_timestamp = NOW - 100
@@ -560,7 +559,7 @@ class ApprovalLayerTest(ServerCase):
         # İşlem günlüğü çağıranı, onay kimliğini, önizleme özetini ve sonucu taşır.
         audit = "\n".join(logs.output)
         self.assertIn("replay_dead_letters", audit)
-        self.assertIn("site-kiraci1-service", audit)
+        self.assertIn("identity-sync-operator", audit)
         self.assertIn("onay-1", audit)
         self.assertIn(digest, audit)
         self.assertIn("outcome=executed", audit)
@@ -731,9 +730,9 @@ class ApprovalLayerTest(ServerCase):
         other = {**invitation, "organization_id": "baska-kurulus", "dry_run": False}
         other.update(preview_digest=preview["preview_digest"], approval_id="onay-4")
 
-        self.assertEqual(self.post_json("/v1/invitations", other), (403, {"error": "forbidden"}))
+        self.assertEqual(self.post_json("/v1/invitations", other, SESSION_TOKEN), (403, {"error": "forbidden"}))
         preview_request = {"email": "x@example.test", "organization_id": "baska-kurulus", "dry_run": True}
-        self.assertEqual(self.post_json("/v1/invitations", preview_request), (403, {"error": "forbidden"}))
+        self.assertEqual(self.post_json("/v1/invitations", preview_request, SESSION_TOKEN), (403, {"error": "forbidden"}))
         self.assertEqual(self.keycloak_writes(), [])
 
     def test_invitation_input_is_validated(self) -> None:
@@ -827,18 +826,16 @@ class SessionRevokeTest(ServerCase):
         self.assertEqual(self.stack.keycloak.sessions[self.OTHER_USER], [self.OTHER_SID])
 
     def test_only_a_site_client_may_call(self) -> None:
-        for token in (PREVIEW_TOKEN, PRESS_TOKEN, "stranger-token"):
+        for token in (EXECUTE_TOKEN, PREVIEW_TOKEN, PRESS_TOKEN, "stranger-token"):
             with self.subTest(token=token):
                 self.assertEqual(self.revoke(token=token), (403, {"error": "forbidden"}))
         self.assertEqual(self.call("POST", self.PATH, b'{"sid": "x", "subject": "y"}')[0], 401)
         self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [self.SID])
 
-    def test_execute_and_session_tokens_are_the_same_tenant_client(self) -> None:
-        # docs/sozlesmeler.md, section 7: the execute list and the session list hold the same
-        # clients. So the client that ends a session is also the one that executes approved work.
+    def test_operator_and_session_tokens_are_separate_clients(self) -> None:
         settings = self.stack.app.settings
-        self.assertEqual(settings.execute_azp, settings.session_azp)
-        self.assertEqual(fake_verifier(SESSION_TOKEN), fake_verifier(EXECUTE_TOKEN))
+        self.assertFalse(settings.execute_azp & settings.session_azp)
+        self.assertNotEqual(fake_verifier(SESSION_TOKEN), fake_verifier(EXECUTE_TOKEN))
 
     def test_bad_request_bodies(self) -> None:
         good = {"sid": self.SID, "subject": SUBJECT}

@@ -118,20 +118,20 @@ python3 -m identity_sync resolve-operation <kimlik> --resolution completed
 
 `serve` komutu günlüğü standart hata akışına yazar. İşlem günlüğü satırı `execute operation=` ile başlar.
 
-Servis dört istemci listesi tutar:
+Servis dört ayrı istemci listesi tutar:
 
 - `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
-- `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır. Örnek: `site-kiraci1-service`.
-- `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
-- `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
+- `IDENTITY_SYNC_EXECUTE_AZP` listesi ayrı yönetim istemcisini taşır. Örnek: `identity-sync-operator`.
+- `IDENTITY_SYNC_SESSION_AZP` listesi kiracıların servis istemcilerini taşır. Bu istemciler kendi üyelerinin oturumlarını kapatabilir.
+- `IDENTITY_SYNC_DELETION_AZP` listesi Press istemcisini taşır. Press bütün platformdaki hesabın silinmesini ister.
 
-İnsan onayı kiracı sitesindeki yapay zekâ katmanında verir. Bu yüzden yürütmeyi kiracı sitesi çağırır.
+İnsan yönetim işlemini onaylar. Ayrı yönetim istemcisi bu onayı denetleyerek işlemi başlatır.
 
-- Yürütme listesi ile oturum listesi aynı istemcileri taşımalıdır. Listeler farklıysa servis açılmaz.
-- Bu iki listedeki her istemci, `IDENTITY_SYNC_TENANTS` ayarındaki bir kiracının servis istemcisi olmalıdır. Örneğin `kiraci1` kiracısının istemcisi `site-kiraci1-service` adını taşır. Kayıtsız bir kiracının istemcisi listeye yazılırsa servis açılmaz.
-- Servis çalışırken de aynı kuralı uygular. Kiracıya bağlı olmayan istemci yürütme isterse 403 alır.
-- Önizleme ya da silme listesindeki istemci başka bir listede olamaz.
-- Bu servis Keycloak'ta istemci açmaz. Yeni kiracının istemcisini kimlik-realm işi açar. O komutu insan başlatır.
+- Dört liste birbirinden ayrıdır. Aynı istemci iki listede bulunursa servis açılmaz.
+- Oturum listesindeki her istemci kayıtlı bir kiracıya bağlı olmalıdır.
+- `site-` ile başlayan istemciler yönetim, önizleme veya genel silme yetkisi alamaz.
+- Servis çalışma sırasında da kiracıların yönetim uçlarına erişimini reddeder.
+- Bu servis Keycloak'ta istemci açmaz. İstemciyi kimlik-realm işi açar.
 
 Aracı belirteci yürütme listesine girmez. Önizleme listesindeki istemci yürütme isterse 403 alır.
 
@@ -325,13 +325,13 @@ Bu tablo her ucu her çağıran türüyle gösterir. Tabloyu `tests/test_access_
 
 | Uç | Belirteçsiz | Listede olmayan istemci | Yanlış `azp` | Yanlış `aud` | Süresi dolmuş | Başka kiracının istemcisi | Doğru istemci |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `POST /v1/reconcile`, önizleme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
-| `POST /v1/reconcile`, yürütme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | Kabul |
-| `GET /v1/dead-letters` | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
-| `POST /v1/dead-letters/replay`, önizleme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
-| `POST /v1/dead-letters/replay`, yürütme | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | Kabul |
-| `GET /v1/operations` | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | 200 |
-| `POST /v1/operations/{kimlik}/resolve` | 401 | 401 | 403 | 401 | 401 | Kiracıya bağlı değil | Kabul |
+| `POST /v1/reconcile`, önizleme | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/reconcile`, yürütme | 401 | 401 | 403 | 401 | 401 | 403 | Kabul |
+| `GET /v1/dead-letters` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/dead-letters/replay`, önizleme | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/dead-letters/replay`, yürütme | 401 | 401 | 403 | 401 | 401 | 403 | Kabul |
+| `GET /v1/operations` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
+| `POST /v1/operations/{kimlik}/resolve` | 401 | 401 | 403 | 401 | 401 | 403 | Kabul |
 | `POST /v1/invitations`, önizleme | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
 | `POST /v1/invitations`, yürütme | 401 | 401 | 403 | 401 | 401 | 403 | Kabul |
 | `POST /v1/sessions/revoke` | 401 | 401 | 403 | 401 | 401 | 403 | 200 |
@@ -345,7 +345,7 @@ Bu tablo her ucu her çağıran türüyle gösterir. Tabloyu `tests/test_access_
 - Yanlış `aud` ve süresi dolmuş belirteç sütunları gerçek `oidc_verify` kitaplığını ister. Kitaplık yoksa bu iki sütunun testi atlanır.
 - Olay ucu belirteç kabul etmez. Yalnız imzayı kabul eder. Bozuk imza, eski zaman damgası ve ikinci kez kullanılan imza 401 alır.
 - Sağlık ucu kimlik istemez. Yanıt yalnız servisin ayakta olduğunu söyler.
-- Mutabakat, yeniden işletme ve işlem uçları bütün platformda çalışır. Bu yüzden tek kiracıya bağlı değildir. Yürütme listesindeki her kiracı istemcisi bu uçları çağırabilir.
+- Mutabakat, yeniden işletme ve işlem uçları bütün platformda çalışır. Bu yüzden tek kiracıya bağlı değildir. Bu uçları yalnız ayrı yönetim istemcisi yürütebilir. Kiracı istemcileri bu uçlara erişemez.
 
 ## İstek sınırı
 

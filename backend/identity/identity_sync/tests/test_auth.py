@@ -115,8 +115,8 @@ class RealVerificationTest(unittest.TestCase):
         claims: dict[str, object] = {
             "iss": self.stack.issuer,
             "aud": "identity-sync",
-            "azp": "site-kiraci1-service",
-            "sub": "service-account-site-kiraci1-service",
+            "azp": "identity-sync-operator",
+            "sub": "service-account-identity-sync-operator",
             "iat": now,
             "exp": now + 300,
         }
@@ -174,7 +174,7 @@ class RealVerificationTest(unittest.TestCase):
     def test_symmetric_algorithm_is_rejected(self) -> None:
         # Yalnız RS256 kabul edilir.
         forged = jwt.encode(
-            {"iss": self.stack.issuer, "aud": "identity-sync", "azp": "site-kiraci1-service", "exp": int(time.time()) + 300},
+            {"iss": self.stack.issuer, "aud": "identity-sync", "azp": "identity-sync-operator", "exp": int(time.time()) + 300},
             "x" * 64,
             algorithm="HS256",
             headers={"kid": "k1"},

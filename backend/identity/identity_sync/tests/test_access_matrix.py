@@ -37,6 +37,7 @@ from .test_server import NOW, sign
 
 SITE, OTHER_SITE, AGENT, PRESS = "site-kiraci1-service", "site-kiraci2-service", "ai-agent", "press-service"
 # The browser login client of the same tenant. It has no service account (docs/sozlesmeler.md, section 2).
+OPERATOR = "identity-sync-operator"
 BROWSER = "site-kiraci1"
 SID = "55555555-5555-4555-8555-555555555555"
 STALE = {"dry_run": False, "preview_digest": "0" * 64, "approval_id": "onay-x1"}
@@ -58,19 +59,19 @@ class Row:
     right: str
     right_status: int
     wrong_azp: str
-    other_tenant: int | None = None
+    other_tenant: int | None = 403
 
 
 ROWS = (
     Row("reconcile preview", "POST", "/v1/reconcile", {"dry_run": True}, AGENT, 200, PRESS),
-    Row("reconcile execute", "POST", "/v1/reconcile", STALE, SITE, 409, AGENT),
+    Row("reconcile execute", "POST", "/v1/reconcile", STALE, OPERATOR, 409, AGENT),
     Row("dead-letters list", "GET", "/v1/dead-letters", None, AGENT, 200, PRESS),
     Row("replay preview", "POST", "/v1/dead-letters/replay", {"dry_run": True}, AGENT, 200, PRESS),
-    Row("replay execute", "POST", "/v1/dead-letters/replay", STALE, SITE, 409, AGENT),
+    Row("replay execute", "POST", "/v1/dead-letters/replay", STALE, OPERATOR, 409, AGENT),
     Row("operations list", "GET", "/v1/operations", None, AGENT, 200, PRESS),
-    Row("operation resolve", "POST", "/v1/operations/o-1/resolve", {"resolution": "abandoned"}, SITE, 404, AGENT),
-    Row("invitation preview", "POST", "/v1/invitations", {**INVITATION, "dry_run": True}, SITE, 200, PRESS, 403),
-    Row("invitation execute", "POST", "/v1/invitations", {**INVITATION, **STALE}, SITE, 409, AGENT, 403),
+    Row("operation resolve", "POST", "/v1/operations/o-1/resolve", {"resolution": "abandoned"}, OPERATOR, 404, AGENT),
+    Row("invitation preview", "POST", "/v1/invitations", {**INVITATION, "dry_run": True}, OPERATOR, 200, PRESS, 403),
+    Row("invitation execute", "POST", "/v1/invitations", {**INVITATION, **STALE}, OPERATOR, 409, AGENT, 403),
     Row("session revoke", "POST", "/v1/sessions/revoke", {"sid": SID, "subject": SUBJECT}, SITE, 200, AGENT, 403),
     Row("account deletion", "POST", "/v1/account-deletions", None, PRESS, 200, SITE, 403),
 )
@@ -83,11 +84,11 @@ class MatrixCase(unittest.TestCase):
         self.stack = Stack(two_tenants=True)
         self.addCleanup(self.stack.close)
         sites = frozenset({SITE, OTHER_SITE})
-        # docs/sozlesmeler.md, section 7: the tenant site clients execute and end sessions.
+        # The handoff separates platform operators from tenant session clients.
         self.stack.app.settings = dataclasses.replace(
             self.stack.app.settings,
             preview_azp=frozenset({AGENT}),
-            execute_azp=sites,
+            execute_azp=frozenset({OPERATOR}),
             session_azp=sites,
             deletion_azp=frozenset({PRESS}),
         )
@@ -179,24 +180,20 @@ class MatrixCase(unittest.TestCase):
         self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [SID])
         self.assertEqual(self.send(row, self.credential(SITE)), 200)
 
-    def test_listed_client_without_a_tenant_cannot_execute_anything(self) -> None:
-        # Defence in depth. The settings refuse such a list. If a list held a client that is
-        # bound to no configured tenant, the service would still refuse to execute for it:
-        # it could not tell whose organization the work belongs to.
+    def test_tenant_cannot_gain_platform_rights_through_misconfiguration(self) -> None:
         if type(self) is MatrixCase:
             self.skipTest("the shared base has no verifier; the two subclasses run this test")
-        unbound = "approval-service"
         settings = self.stack.app.settings
         self.stack.app.settings = dataclasses.replace(
-            settings, execute_azp=settings.execute_azp | {unbound}, session_azp=settings.session_azp | {unbound}
+            settings, execute_azp=settings.execute_azp | {SITE}, preview_azp=settings.preview_azp | {SITE}
         )
         self.serve_again()
         before = self.writes()
         for row in ROWS:
-            if row.right != SITE:
+            if row.right not in (OPERATOR, AGENT):
                 continue
             with self.subTest(row=row.name):
-                self.assertEqual(self.send(row, self.credential(unbound)), 403)
+                self.assertEqual(self.send(row, self.credential(SITE)), 403)
         self.assertEqual(self.writes(), before)
         self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [SID])
 

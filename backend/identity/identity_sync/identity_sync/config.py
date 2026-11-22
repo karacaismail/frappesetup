@@ -147,36 +147,24 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     execute_azp, preview_azp = _names(get("EXECUTE_AZP")), _names(get("PREVIEW_AZP"))
     session_azp = _names(get("SESSION_AZP"))
     deletion_azp = _names(get("DELETION_AZP", DEFAULT_DELETION_AZP))
-    # Each list grants a different right. One overlap is intended: a tenant site client both
-    # executes approved work and ends sessions (docs/sozlesmeler.md, section 7). A preview
-    # client must never execute, and the Press client only requests deletions.
+    # Platform operators and tenant service clients are separate trust domains.
     tenants = _tenants(get("TENANTS"))
     listed = execute_azp | preview_azp | session_azp | deletion_azp
     for tenant in tenants:
-        # `site-<tenant>` is the browser login client. It has no service account, so a token
-        # with that `azp` is a user's login token. It must never be accepted as a service caller.
         if browser_client_id(tenant.name) in listed:
             raise ConfigError(
                 f"{browser_client_id(tenant.name)} is a browser client and cannot be in a client list; "
                 f"use {service_client_id(tenant.name)}"
             )
-    # docs/sozlesmeler.md, section 7: the execute list and the session list carry the same
-    # clients, the service clients of the tenant sites. A client bound to no configured tenant
-    # could execute without the service knowing whose organization the work belongs to.
-    if execute_azp != session_azp:
-        raise ConfigError(f"{PREFIX}EXECUTE_AZP and {PREFIX}SESSION_AZP must hold the same clients")
-    tenant_clients = execute_azp | session_azp
     known_tenant_clients = {service_client_id(tenant.name) for tenant in tenants}
-    for client in sorted(tenant_clients - known_tenant_clients):
-        raise ConfigError(
-            f"{client} is not the service client of a configured tenant; "
-            f"a tenant named in {PREFIX}TENANTS has the client site-<tenant>-service"
-        )
-    if preview_azp & tenant_clients or deletion_azp & (preview_azp | tenant_clients):
-        raise ConfigError(
-            f"a client in {PREFIX}PREVIEW_AZP or {PREFIX}DELETION_AZP cannot be in another list; "
-            f"only {PREFIX}EXECUTE_AZP and {PREFIX}SESSION_AZP may share clients"
-        )
+    for client in sorted(session_azp - known_tenant_clients):
+        raise ConfigError(f"{client} is not the service client of a configured tenant")
+    # Reserve the entire site namespace, including sites not configured here yet.
+    if any(client.startswith("site-") for client in execute_azp | preview_azp | deletion_azp):
+        raise ConfigError("tenant clients cannot hold platform operator, preview or global deletion rights")
+    groups = (execute_azp, preview_azp, session_azp, deletion_azp)
+    if any(left & right for index, left in enumerate(groups) for right in groups[index + 1:]):
+        raise ConfigError("client permission lists must be disjoint")
     if len(get("WEBHOOK_SECRET")) < MIN_WEBHOOK_SECRET_LENGTH:
         raise ConfigError(f"{PREFIX}WEBHOOK_SECRET must be at least {MIN_WEBHOOK_SECRET_LENGTH} characters long")
     if len(get("DIGEST_KEY")) < MIN_DIGEST_KEY_LENGTH:

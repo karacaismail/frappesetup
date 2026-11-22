@@ -242,9 +242,8 @@ class _Api:
 
     def _approved_digest(self, operation: str, payload: Mapping[str, object], azp: str) -> str:
         """Check who asks and the shape of the approval. Consumes nothing."""
-        if azp not in self._settings.execute_azp or self._tenant_of(azp) is None:
-            # An execute client is the service client of a configured tenant. The settings
-            # check that at start. A client bound to no tenant is refused here as well.
+        if azp not in self._settings.execute_azp or azp.startswith("site-"):
+            # Reject tenant clients even if Settings was constructed without validation.
             _LOG.warning("execute operation=%s azp=%s outcome=forbidden", operation, azp)
             raise _Forbidden
         digest = _text(payload, "preview_digest", required=True, max_length=64)
@@ -308,7 +307,7 @@ class _Api:
             raise _BadRequest
         digest = None if dry_run else self._approved_digest("invite_user", payload, azp)
         keycloak = self._app.keycloak
-        self._require_own_organization(azp, organization_id)
+        self._require_platform_client(azp)
         preview = keycloak.invite_user(email, first_name, last_name, organization_id, dry_run=True)
         previews = [item.to_dict() for item in preview.previews]
         # The digest also covers the request fields: one invitation's approval does not fit another.
@@ -458,23 +457,9 @@ class _Api:
         """
         return next((tenant for tenant in self._settings.tenants if service_client_id(tenant.name) == azp), None)
 
-    def _require_own_organization(self, azp: str, organization_id: str) -> None:
-        """A tenant site may only invite into its own organization.
-
-        The execute list holds the tenant site clients. Without this check the site of one
-        tenant could add users to the organization of another tenant. A caller that is not
-        a tenant site (a preview client) is not bound to a tenant.
-        """
-        tenant = self._tenant_of(azp)
-        if tenant is None:
-            if azp in self._settings.execute_azp:
-                # Listed to execute but bound to no tenant: nobody's organization is its own.
-                _LOG.warning("execute operation=invite_user azp=%s outcome=forbidden", azp)
-                raise _Forbidden
-            return  # a preview client reads for the whole platform
-        organization = self._app.keycloak.get_organization(organization_id)
-        if organization is None or organization.alias != tenant.organization:
-            _LOG.warning("execute operation=invite_user azp=%s outcome=forbidden", azp)
+    def _require_platform_client(self, azp: str) -> None:
+        """Invitations are platform operations, never tenant service operations."""
+        if azp.startswith("site-"):
             raise _Forbidden
 
     def _is_member(self, subject: str, organization_alias: str) -> bool:
@@ -495,7 +480,7 @@ class _Api:
         This changes only the local journal. Only the approval layer may call it.
         """
         payload = _json_object(body)
-        if azp not in self._settings.execute_azp or self._tenant_of(azp) is None:
+        if azp not in self._settings.execute_azp or azp.startswith("site-"):
             # A refused caller is not trusted with anything. The id it sent is not logged:
             # it may be any text, for example a customer number put there by mistake.
             _LOG.warning("execute operation=resolve_operation azp=%s outcome=forbidden", azp)
@@ -636,7 +621,7 @@ def make_server(
             if azp is None:
                 return 401, {"error": "unauthorized"}
             allowed = special_routes.get(path, settings.staff_azp)
-            if azp not in allowed:
+            if azp not in allowed or (path not in special_routes and azp.startswith("site-")):
                 return 403, {"error": "forbidden"}
             if resolve is not None:
                 return api.post_resolve_operation(resolve.group(1), body, azp)
