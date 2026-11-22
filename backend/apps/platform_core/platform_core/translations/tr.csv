@@ -177,6 +177,200 @@ Skip to main content,Ana içeriğe geçin,shell.panel
 Go to site home,Sitenin ana sayfasına gidin,shell.panel
 A valid metadata surface is required.,Tanım için geçerli bir kullanım alanı seçin.,shell.metadata
 The request has invalid parameters.,İstekte geçersiz alanlar var.,shell.request
+Mobile Account State,Mobil Hesap Durumu
+Stores the token cutoff for mobile installation registration.,Yeni telefon kurulumunda geçerli belirteç zamanını tutar.,Mobile Account State
+The account that owns this revocation state.,Bu hesap iptal kaydının sahibidir.,Mobile Account State
+Revoked through,İptal zamanı,Mobile Account State
+Registration rejects tokens issued at or before this Unix timestamp.,"Kurulum, bu zamana kadar verilen belirteçleri reddeder.",Mobile Account State
+Account,Hesap,Mobile Account State
+Account,Hesap,Mobile Installation
+Last Audit At,Son denetim zamanı,Mobile Installation
+The UTC time when the installation last completed its delivery audit.,Kurulumun son teslim denetimini bitirdiği UTC zamanıdır.,Mobile Installation
+List mobile installations for a user.,Kullanıcının telefon kurulumlarını listele.
+Propose revoking one mobile installation.,Bir telefon kurulumunu iptal etmeyi öner.
+Propose revoking all mobile installations for a user.,Kullanıcının bütün telefon kurulumlarını iptal etmeyi öner.
+Request approval to run mobile cleanup in dry-run mode.,Temizlik denemesi için onay iste.
+Only a System Manager can administer mobile installations.,Telefon kurulumlarını yalnız sistem yöneticisi yönetebilir.
+The mobile account is unavailable.,Telefon hesabına erişilemiyor.
+The mobile installation is unavailable.,Telefon kurulumuna erişilemiyor.
+Revoke one installation and request Keycloak session closure.,Bir kurulumu iptal et ve Keycloak oturumunun kapanmasını iste.
+Revoke all installations and request Keycloak session closure.,Bütün kurulumları iptal et ve Keycloak oturumlarının kapanmasını iste.
+A prepared mobile revocation is required.,Önce telefon kurulumu için iptal önerisi hazırlayın.
+Count expired mobile records without deleting them.,Süresi dolan mobil kayıtları say.
+A prepared mobile cleanup preview is required.,Önce mobil temizlik önerisi hazırlayın.
+Mobile Revoked Session,İptal Edilen Mobil Oturum
+Prevents a revoked Keycloak session from accessing mobile sync.,İptal edilen Keycloak oturumunun eşitlemeye erişimini engeller.,Mobile Revoked Session
+Session key,Oturum anahtarı,Mobile Revoked Session
+A digest of the revoked Keycloak session identifier.,İptal edilen Keycloak oturum kimliğinin özeti.,Mobile Revoked Session
+Keycloak session ID,Keycloak oturum kimliği,Mobile Installation
+The verified Keycloak session that registered this installation.,Kurulumu açan doğrulanmış Keycloak oturumu.,Mobile Installation
+Closure pending,Kapatma bekliyor,Mobile Revoked Session
+Last closure attempt time,Son kapatma denemesinin zamanı,Mobile Revoked Session
+Identity-sync has not confirmed closure of this Keycloak session.,Kimlik servisi bu Keycloak oturumunun kapandığını henüz doğrulamadı.,Mobile Revoked Session
+Notification token,Bildirim belirteci,Mobile Installation
+The private notification binding for this installation.,Bu kuruluma ait özel bildirim bağı.,Mobile Installation
+Sequence number,Sıra numarası,Mobile Change
+Record type,Kayıt türü,Mobile Change
+Record type,Kayıt türü,Mobile Delivery
+Record ID,Kayıt kimliği,Mobile Change
+Record ID,Kayıt kimliği,Mobile Delivery
+Change type,Değişiklik türü,Mobile Change
+Target installation,Hedef kurulum,Mobile Change
+Delivery key,Teslim anahtarı,Mobile Delivery
+Installation ID,Kurulum kimliği,Mobile Delivery
+Installation ID,Kurulum kimliği,Mobile Installation
+Visible,Görünür,Mobile Delivery
+Stable account key,Sabit hesap anahtarı,Mobile Installation
+Scope,Kapsam,Mobile Installation
+Revoked,İptal edildi,Mobile Installation
+Operation key,İşlem anahtarı,Mobile Operation
+Content digest,İçerik özeti,Mobile Operation
+Original result,İlk sonuç,Mobile Operation
+Counter key,Sayaç anahtarı,Mobile Sequence
+Latest sequence number,Son sıra numarası,Mobile Sequence
+Oldest valid sequence,En eski geçerli sıra,Mobile Sequence
+Records a change for mobile sync.,Telefon eşitlemesi için bir değişiklik kaydeder.,Mobile Change
+The server orders changes by this number.,Sunucu değişiklikleri bu numaraya göre sıraya koyar.,Mobile Change
+The type code for the changed record.,Bu kod değişen kaydın türünü belirtir.,Mobile Change
+The identifier of the changed record.,Bu değer değişen kaydı belirtir.,Mobile Change
+Indicates whether the record was updated or removed.,"Tür, kaydın yenilendiğini veya kaldırıldığını belirtir.",Mobile Change
+"When set, only this installation receives the change.",Bu alan doluysa değişikliği yalnız bu kurulum alır.,Mobile Change
+Tracks records delivered to a mobile installation.,Bir telefon kurulumuna gönderilen kayıtları izler.,Mobile Delivery
+"The server derives the key from the installation ID, record type, and record ID.","Sunucu anahtarı kurulum kimliği, kayıt türü ve kayıt kimliğinden üretir.",Mobile Delivery
+Identifies the installation that received the record.,Bu kimlik kaydı alan telefon kurulumunu belirtir.,Mobile Delivery
+The type code for the delivered record.,Bu kod telefona gönderilen kaydın türünü belirtir.,Mobile Delivery
+The identifier of the delivered record.,Bu değer telefona gönderilen kaydı belirtir.,Mobile Delivery
+Shows the last read permission delivered by the server.,Sunucunun bildirdiği son okuma iznini gösterir.,Mobile Delivery
+Links a mobile installation to its account.,Telefon kurulumunu hesabına bağlar.,Mobile Installation
+Identifies the mobile installation.,Bu değer telefon kurulumunu belirtir.,Mobile Installation
+The account that owns the installation.,Bu hesap telefon kurulumunun sahibidir.,Mobile Installation
+The server derives this value from the stable identity link.,Sistem bu değeri sabit kimlik bağına göre üretir.,Mobile Installation
+Identifies the sync scope for this installation.,"Kapsam, bu kurulumun eşitleme alanını belirtir.",Mobile Installation
+The server rejects sync for a revoked installation.,Bu işaret açıkken sunucu kurulumun eşitleme isteğini reddeder.,Mobile Installation
+Last user activity time,Son kullanıcı işleminin zamanı,Mobile Installation
+Mobile sync,Telefon eşitlemesi,OpenAPI mobile.info.title
+"The phone sends pending operations and receives changes when connectivity returns.
+Request bodies may be at most 256 KiB. Larger requests return 413.
+The server accepts up to 60 requests per account per minute. Further requests return 429.
+This version starts with an empty allowlist. The server does not accept files.
+","Telefon, bağlantı gelince bekleyen işleri gönderir ve değişiklikleri alır.
+İstek gövdesi en çok 256 KiB olabilir. Aşımda 413 döner.
+Sunucu her hesaba dakikada en çok 60 istek işler. Aşımda 429 döner.
+Bu sürümde izin listesi boş başlar. Sunucu dosya kabul etmez.
+",OpenAPI mobile.info.description
+Register a mobile installation,Telefon kurulumunu kaydet,OpenAPI mobile.paths./platform_core.api.mobile.v1_register.post.summary
+"Binds the installation to a verified Keycloak session.
+A revoked installation cannot be reactivated. A new session requires a new installation ID.
+","Telefon kurulumunu doğrulanmış Keycloak oturumuna bağlar.
+İptal edilen kurulum yeniden açılamaz. Yeni oturum yeni kurulum kimliği ister.
+",OpenAPI mobile.paths./platform_core.api.mobile.v1_register.post.description
+Revoke a mobile installation,Telefon kurulumunu iptal et,OpenAPI mobile.paths./platform_core.api.mobile.v1_revoke.post.summary
+"Revokes one installation or all active installations for the account.
+The returned count reflects local revocations. The server then requests session closure.
+A single-installation revocation can be retried from another valid session.
+","Hesabın bir kurulumunu veya bütün etkin kurulumlarını iptal eder.
+Yanıttaki sayı yerel iptali gösterir. Sunucu daha sonra oturum kapatma isteği gönderir.
+Başka bir geçerli oturumla tekli iptal yinelenebilir.
+",OpenAPI mobile.paths./platform_core.api.mobile.v1_revoke.post.description
+Record the user's last activity time,Kullanıcının son işlem saatini kaydet,OpenAPI mobile.paths./platform_core.api.mobile.v1_activity.post.summary
+"The client calls this endpoint only when the user acts.
+The server records its own time. Background sync does not change it.
+","İstemci bu ucu yalnız kullanıcı işlem yaptığında çağırır.
+Sunucu kendi saatini kaydeder. Arka plan eşitlemesi bu saati değiştirmez.
+",OpenAPI mobile.paths./platform_core.api.mobile.v1_activity.post.description
+The server returns the last activity time in Unix seconds.,Sunucu son işlem saatini Unix saniyesi olarak döndürür.,OpenAPI mobile.paths./platform_core.api.mobile.v1_activity.post.responses.200.description
+Push mobile changes to the server,Telefondaki değişiklikleri sunucuya gönder,OpenAPI mobile.paths./platform_core.api.mobile.v1_push.post.summary
+"Processes up to 20 operations in order. If any operation fails, the server rolls back the entire batch.
+For an operation with the same ID and content, the server returns the original committed result.
+","En çok 20 işi sırayla işler. Bir iş başarısız olursa bütün grubu geri alır.
+Sunucu aynı kimlik ve içerikle gelen işe ilk kesinleşen sonucu verir.
+",OpenAPI mobile.paths./platform_core.api.mobile.v1_push.post.description
+The operation content changed or the record version is stale.,İşlem içeriği değişti veya kayıt sürümü eski.,OpenAPI mobile.paths./platform_core.api.mobile.v1_push.post.responses.409.description
+Pull records to the phone,Kayıtları sunucudan telefona al,OpenAPI mobile.paths./platform_core.api.mobile.v1_pull.post.summary
+Starts the initial copy when no cursor is provided. Later calls use the cursor returned by the server.,İmleç yoksa ilk kopyayı başlatır. Sonraki çağrılar sunucunun verdiği imleci kullanır.,OpenAPI mobile.paths./platform_core.api.mobile.v1_pull.post.description
+The cursor is invalid or has expired. Request a full copy.,İmleç geçersiz veya süresi doldu. Tam kopya alın.,OpenAPI mobile.paths./platform_core.api.mobile.v1_pull.post.responses.410.description
+Clean up expired sync records,Süresi dolan eşitleme kayıtlarını temizle,OpenAPI mobile.paths./platform_core.api.mobile.v1_cleanup.post.summary
+A site administrator manually removes expired events and operation records. A dry run leaves records intact.,Site yöneticisi süresi dolmuş olayları ve işlem kayıtlarını elle temizler. Önizleme kayıt silmez.,OpenAPI mobile.paths./platform_core.api.mobile.v1_cleanup.post.description
+Revoke all mobile installations for a user,Kullanıcının tüm telefon kurulumlarını iptal et,OpenAPI mobile.paths./platform_core.api.mobile.revoke_user_installations.post.summary
+"The identity service revokes all mobile installations for the user.
+The server removes notification bindings. Repeating the request returns the same status and count.
+The server finds the user by issuer and subject.
+","Kimlik servisi kullanıcının bütün telefon kurulumlarını iptal eder.
+Sunucu bildirim bağlarını siler. Aynı istek aynı durumu ve sayıyı döndürür.
+Sunucu kullanıcıyı veren ve konu kimliğiyle bulur.
+",OpenAPI mobile.paths./platform_core.api.mobile.revoke_user_installations.post.description
+The number of revoked installations for the user.,Kullanıcının iptal edilmiş kurulum sayısı.,OpenAPI mobile.paths./platform_core.api.mobile.revoke_user_installations.post.responses.200.description
+The identity link was not found. The exc_type field is IdentityNotFound.,Kimlik bağı bulunamadı. exc_type alanı IdentityNotFound döner.,OpenAPI mobile.paths./platform_core.api.mobile.revoke_user_installations.post.responses.404.description
+Register a mobile installation,Telefon kurulumunu kaydet,OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_register.post.summary
+"Registers the mobile installation using a same-origin Frappe session.
+A revoked installation cannot be reactivated. A new session requires a new installation ID.
+","Telefon kurulumunu aynı kökendeki Frappe oturumuyla kaydeder.
+İptal edilen kurulum yeniden açılamaz. Yeni oturum yeni kurulum kimliği ister.
+",OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_register.post.description
+Revoke a mobile installation,Telefon kurulumunu iptal et,OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_revoke.post.summary
+"Revokes one installation or all active installations for the account.
+The returned count reflects local revocations. The server then requests session closure.
+A single-installation revocation can be retried from another valid session.
+","Hesabın bir kurulumunu veya bütün etkin kurulumlarını iptal eder.
+Yanıttaki sayı yerel iptali gösterir. Sunucu daha sonra oturum kapatma isteği gönderir.
+Başka bir geçerli oturumla tekli iptal yinelenebilir.
+",OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_revoke.post.description
+Record the user's last activity time,Kullanıcının son işlem saatini kaydet,OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_activity.post.summary
+"The client calls this endpoint only when the user acts.
+The server records its own time. Background sync does not change it.
+","İstemci bu ucu yalnız kullanıcı işlem yaptığında çağırır.
+Sunucu kendi saatini kaydeder. Arka plan eşitlemesi bu saati değiştirmez.
+",OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_activity.post.description
+The server returns the last activity time in Unix seconds.,Sunucu son işlem saatini Unix saniyesi olarak döndürür.,OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_activity.post.responses.200.description
+Push mobile changes to the server,Telefondaki değişiklikleri sunucuya gönder,OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_push.post.summary
+"Processes up to 20 operations in order. If any operation fails, the server rolls back the entire batch.
+For an operation with the same ID and content, the server returns the original committed result.
+","En çok 20 işi sırayla işler. Bir iş başarısız olursa bütün grubu geri alır.
+Sunucu aynı kimlik ve içerikle gelen işe ilk kesinleşen sonucu verir.
+",OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_push.post.description
+The operation content changed or the record version is stale.,İşlem içeriği değişti veya kayıt sürümü eski.,OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_push.post.responses.409.description
+Pull records to the phone,Kayıtları sunucudan telefona al,OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_pull.post.summary
+Starts the initial copy when no cursor is provided. Later calls use the cursor returned by the server.,İmleç yoksa ilk kopyayı başlatır. Sonraki çağrılar sunucunun verdiği imleci kullanır.,OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_pull.post.description
+The cursor is invalid or has expired. Request a full copy.,İmleç geçersiz veya süresi doldu. Tam kopya alın.,OpenAPI mobile.paths./platform_core.api.mobile_pwa.v1_pull.post.responses.410.description
+Service token verified by the identity hook with azp set to identity-sync.,Kimlik kancasının doğruladığı ve azp değeri identity-sync olan servis belirteci.,OpenAPI mobile.components.securitySchemes.identitySyncBearer.description
+The PWA and tenant site are served from the same origin.,PWA ve kiracı sitesi aynı kökenden sunulur.,OpenAPI mobile.components.parameters.PwaOrigin.description
+"Server time at the start of the request, expressed in Unix seconds.",Sunucunun istek başındaki saati. Unix saniyesi olarak verilir.,OpenAPI mobile.components.schemas.ServerTime.description
+Record version required for updates and deletions.,Güncelleme ve silmede zorunlu kayıt sürümü.,OpenAPI mobile.components.schemas.Operation.properties.version.description
+Fields allowed by the command.,Komutun izin verdiği alanlar.,OpenAPI mobile.components.schemas.Operation.properties.fields.description
+Error code returned by the mobile endpoint.,Mobil ucun verdiği hata kodu.,OpenAPI mobile.components.schemas.Error.properties.code.description
+Error type returned if Frappe rejects the request before it reaches the endpoint.,Frappe isteği uca ulaşmadan reddederse gelen hata türü.,OpenAPI mobile.components.schemas.Error.properties.exc_type.description
+Current record visible to the user.,Kullanıcının görebildiği güncel kayıt.,OpenAPI mobile.components.schemas.Error.properties.current.description
+The request completed.,İstek tamamlandı.,OpenAPI mobile.components.responses.DeviceSuccess.description
+The request completed.,İstek tamamlandı.,OpenAPI mobile.components.responses.RevokedSuccess.description
+The request completed.,İstek tamamlandı.,OpenAPI mobile.components.responses.AppliedOperationsSuccess.description
+The request completed.,İstek tamamlandı.,OpenAPI mobile.components.responses.CleanupResultSuccess.description
+A page of records and the cursor for the next request.,Kayıt sayfası ve sonraki çağrı için imleç.,OpenAPI mobile.components.responses.Page.description
+The request was rejected.,İstek reddedildi.,OpenAPI mobile.components.responses.Error.description
+The request rate limit was exceeded.,İstek sıklığı sınırı aşıldı.,OpenAPI mobile.components.responses.Throttled.description
+The server could not complete the operation.,Sunucu şu anda işlemi tamamlayamadı.,OpenAPI mobile.components.responses.Unavailable.description
+Seconds to wait before trying again.,Yeni denemeden önce beklenecek saniye.,OpenAPI mobile.components.responses.Unavailable.headers.Retry-After.description
+Stores the original operation result for retries.,İlk iş sonucunu yeniden gönderim için saklar.,Mobile Operation.description
+"The server derives the key from the site, account, and operation ID.","Sunucu anahtarı site, hesap ve işlem kimliğinden üretir.",Mobile Operation.fields.operation_key.description
+The server uses this digest to compare the contents of a repeated request.,Sunucu bu özeti kullanarak yinelenen isteğin içeriğini karşılaştırır.,Mobile Operation.fields.content_digest.description
+The server stores the original request result in this field.,Sunucu ilk isteğin sonucunu bu alanda saklar.,Mobile Operation.fields.result.description
+Tracks the sync sequence for the site.,Sitenin eşitleme sırasını tutar.,Mobile Sequence.description
+The site's only counter record uses this key.,Site için tek sayaç kaydı bu anahtarı taşır.,Mobile Sequence.fields.sequence_key.description
+The server assigns each new change a sequence number higher than this value.,Sunucu her yeni değişikliğe bu sayıdan büyük bir sıra numarası verir.,Mobile Sequence.fields.sequence.description
+The server rejects requests with a cursor below this sequence number.,Sunucu daha eski sıra numarası olan imleçle gelen isteği reddeder.,Mobile Sequence.fields.retention_floor.description
+Session binding time,Oturum bağlama zamanı,Mobile Installation
+List your mobile installations,Telefon kurulumlarınızı listeleyin,Mobile sync API
+Revoke one of your mobile installations,Bir telefon kurulumunuzu iptal edin,Mobile sync API
+A page of installations for the authenticated account.,Oturum açan hesabın kurulum sayfası.,Mobile sync API
+Unix time of the last reported interactive action for this installation.,Bu kurulumda bildirilen son kullanıcı işleminin Unix zamanı.,Mobile Installation
+Unix time when the server last scheduled remote session closure.,Sunucunun son kapatma isteğini sıraya aldığı Unix zamanı.,Mobile Revoked Session
+Unix time used as the idle baseline for the current authenticated session.,Geçerli oturumun boşta kalma hesabında kullanılan Unix zamanı.,Mobile Installation
+"Lists installations for the verified account, ordered by installation ID.",Doğrulanmış hesabın kurulumlarını kimliğe göre sıralar.,Mobile sync API
+"Lists installations for the signed-in account, ordered by installation ID.",Oturum açan hesabın kurulumlarını kimliğe göre sıralar.,Mobile sync API
+Revokes one owned installation and requests closure of its Keycloak session when present.,Hesabın kurulumunu iptal eder. Keycloak oturumu varsa kapatılmasını ister.,Mobile sync API
+Revokes one owned installation without signing out the current browser.,Hesabın bir kurulumunu iptal eder. Tarayıcı oturumu açık kalır.,Mobile sync API
+Keycloak user ID,Keycloak kullanıcı kimliği,Mobile Installation
+The Keycloak user identifier bound to this session.,Bu oturuma bağlı Keycloak kullanıcı kimliği.,Mobile Installation
+You are not permitted to call this method.,Bu yöntemi çağırma izniniz yok.,shell.request
 This action needs a human session.,Bu işlem için insan oturumu gerekir.,platform_core.yapay_zeka
 This action cannot run inside a transaction with pending writes.,"Bu işlem, bekleyen yazı taşıyan bir işlemin içinde çalışamaz.",platform_core.yapay_zeka
 "Send either a session cookie or an agent token, not both.",Oturum çerezini ya da aracı belirtecini gönderin. İkisini birlikte göndermeyin.,platform_core.yapay_zeka

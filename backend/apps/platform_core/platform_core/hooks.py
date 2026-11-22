@@ -5,14 +5,31 @@ app_description = "Platform backend modules"
 app_email = "noreply@example.test"
 app_license = "mit"
 
-# --- platform-core-yz: AI access layer ---
-after_install = "platform_core.yapay_zeka.setup.disable_builtin_mcp"
-after_migrate = ["platform_core.yapay_zeka.setup.disable_builtin_mcp"]
+# Mobile sync tables must exist before the sequence row is created.
+# The AI access layer turns off Frappe's built-in MCP endpoint.
+after_install = [
+	"platform_core.mobil.store.seed_sequence",
+	"platform_core.yapay_zeka.setup.disable_builtin_mcp",
+]
+after_migrate = [
+	"platform_core.mobil.store.seed_sequence",
+	"platform_core.yapay_zeka.setup.disable_builtin_mcp",
+]
+
 fixtures = [{"dt": "Role", "filters": [["name", "=", "AI Manager"]]}]
 
-ai_write_closed_doctypes = ["AI API", "AI Account"]
+ai_write_closed_doctypes = [
+	"AI API",
+	"AI Account",
+	"Mobile Revoked Session",
+	"Mobile Installation",
+	"Mobile Account State",
+]
 
-ai_tools = ["platform_core.model_gecidi.management_tools.declare"]
+ai_tools = [
+	"platform_core.model_gecidi.management_tools.declare",
+	"platform_core.mobil.ai_tools.declarations",
+]
 
 # Shell permission generations. Keep other modules' hook entries alongside these.
 clear_cache = ["platform_core.kabuk.cache.clear_cache"]
@@ -20,7 +37,10 @@ clear_cache = ["platform_core.kabuk.cache.clear_cache"]
 doc_events = {
 	"User": {
 		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
-		"on_trash": ["platform_core.kabuk.cache.invalidate_permissions"],
+		"on_trash": [
+			"platform_core.kabuk.cache.invalidate_permissions",
+			"platform_core.mobil.store.delete_user_state",
+		],
 	},
 	"Role": {
 		"on_update": ["platform_core.kabuk.cache.invalidate_permissions"],
@@ -80,6 +100,13 @@ website_user_allowed_methods = [
 	"platform_core.api.ai.approve_proposal",
 	"platform_core.api.ai.reject_proposal",
 	"platform_core.api.ai.resolve_proposal",
+	"platform_core.api.mobile_pwa.v1_activity",
+	"platform_core.api.mobile_pwa.v1_list_installations",
+	"platform_core.api.mobile_pwa.v1_pull",
+	"platform_core.api.mobile_pwa.v1_push",
+	"platform_core.api.mobile_pwa.v1_register",
+	"platform_core.api.mobile_pwa.v1_revoke",
+	"platform_core.api.mobile_pwa.v1_revoke_installation",
 ]
 
 after_build = ["platform_core.kabuk.assets.remove_panel_source_maps"]
