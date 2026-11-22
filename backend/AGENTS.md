@@ -43,7 +43,7 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `identity/identity_sync/` | Kullanıcı eşitleme servisi | identity-sync |
 | `libs/oidc_verify/` | Ortak belirteç doğrulama kitaplığı | kimlik-realm |
 | `apps/platform_core/platform_core/erisim/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
-| `dev/guvenlik/`, `dev/bin/guvenlik-denetimi`, `dev/security/`, `dev/bin/security-full`, `dev/bin/dast-scan`, `dev/bin/release-report` | Güvenlik kapısı ve elle başlatılan taramalar | security-tooling |
+| `dev/guvenlik/`, `dev/bin/guvenlik-denetimi`, `dev/security/`, `dev/bin/security-full`, `dev/bin/dast-scan`, `dev/bin/release-report`, `dev/bin/security-scorecard` | Güvenlik kapısı ve elle başlatılan taramalar | security-tooling |
 | `apps/platform_core/platform_core/mobil/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
 | `apps/hrms_tr/`, `dev/hrms/` | HRMS TR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
 | `e2e/` | Uçtan uca entegrasyon testleri | integration-e2e |
