@@ -58,3 +58,12 @@ Sekizinci denetim, varsa `dev/naming/check_names.py` betiğini çağırır.
 Betik yoksa kapı hata akışına `naming: not_run` yazar.
 JSON bulgu listesi ve çıkış kodu bu durumda değişmez.
 Betik çalışamazsa kapı bunu bulgu sayar.
+
+## Test uçları
+
+Dokuzuncu denetim uygulama paketindeki `tests` klasörünü tarar.
+Adı `test_` ile başlayan modül ve paketleri de tarar.
+Kapı, dış çağrıya açılan test işlevini dosya ve satırla bildirir.
+Uç için OpenAPI açıklaması olsa bile kapı bulgu verir.
+Kapı, dosya yüklenirken doğrudan atanan açık işlevi de yakalar.
+Yalnız test çalışırken bir işlev içinden yapılan geçici kayıt bu denetimin dışındadır.

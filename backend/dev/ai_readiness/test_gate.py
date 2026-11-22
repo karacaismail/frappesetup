@@ -226,6 +226,73 @@ class GateTests(unittest.TestCase):
         self.write(checker, "raise SystemExit(2)")
         self.scan("naming")
 
+    def test_whitelisted_test_endpoint_is_reported_even_with_contract(self):
+        cases = (
+            ("identity/tests/mobile_stub.py", "identity.tests.mobile_stub"),
+            ("test_mobile.py", "test_mobile"),
+            ("test_support/__init__.py", "test_support"),
+        )
+        for relative, module in cases:
+            with self.subTest(relative=relative):
+                path = f"{APP}/{relative}"
+                self.write(
+                    path,
+                    """
+                    from frappe import whitelist as expose
+
+                    @expose()
+                    def whoami():
+                        return {}
+                    """,
+                )
+                self.write(
+                    CONTRACT,
+                    f"""
+                    paths:
+                      /api/method/sample_app.{module}.whoami:
+                        post:
+                          summary: Read identity
+                          description: Read the request identity.
+                    """,
+                )
+                try:
+                    findings = self.scan("test-endpoint")
+                    self.assertEqual((findings[0]["path"], findings[0]["line"]), (path, 4))
+                finally:
+                    (self.root / path).unlink()
+
+    def test_whitelisted_wrapper_assigned_at_import_is_reported(self):
+        self.write(
+            f"{APP}/identity/tests/mobile_stub.py",
+            """
+            import frappe
+
+            def whoami():
+                return {}
+
+            whoami = frappe.whitelist()(whoami)
+            """,
+        )
+        findings = self.scan("test-endpoint")
+        self.assertEqual(findings[0]["line"], 6)
+
+    def test_test_only_registration_does_not_expose_an_endpoint_on_import(self):
+        self.write(
+            f"{APP}/identity/tests/mobile_stub.py",
+            """
+            import frappe
+
+            def whoami():
+                return {}
+
+            def register():
+                if not frappe.in_test:
+                    raise RuntimeError("Only available in tests.")
+                return frappe.whitelist()(whoami)
+            """,
+        )
+        self.scan()
+
     def test_sql_in_ai_module_and_registered_tool(self):
         command = 'import frappe\n\ndef run():\n    return frappe.db.sql("SELECT 1")\n'
         self.write(f"{APP}/tools.py", command)

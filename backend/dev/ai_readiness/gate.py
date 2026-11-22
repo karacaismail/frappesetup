@@ -234,11 +234,30 @@ def scan(root):
                 if any(name == provider or name.startswith(provider + ".") for provider in PROVIDERS):
                     emit(path, item.lineno, "provider", f"Provider import is forbidden: {name}.")
         sources[module] = path, aliases
+        package_parts = path.relative_to(root / "apps").parts[1:]
+        test_endpoint_scope = len(package_parts) >= 2 and (
+            "tests" in package_parts[:-1] or any(part.startswith("test_") for part in package_parts)
+        )
+        whitelist_modules = modules | {"frappe"}
         for name, fn in definitions(tree):
             qualified = f"{module}.{name}"
             functions[qualified] = module, fn
-            if any(is_whitelist(dec, modules | {"frappe"}, decorators) for dec in fn.decorator_list):
+            if any(is_whitelist(dec, whitelist_modules, decorators) for dec in fn.decorator_list):
                 endpoints[qualified] = path, fn.lineno
+                if test_endpoint_scope:
+                    emit(path, fn.lineno, "test-endpoint", f"Test function is whitelisted: {qualified}.")
+
+        if test_endpoint_scope:
+            for statement in tree.body:
+                if not isinstance(statement, (ast.Assign, ast.AnnAssign)):
+                    continue
+                value = statement.value
+                if (
+                    isinstance(value, ast.Call)
+                    and isinstance(value.func, ast.Call)
+                    and is_whitelist(value.func, whitelist_modules, decorators)
+                ):
+                    emit(path, statement.lineno, "test-endpoint", "Test function is whitelisted at import.")
 
         is_test = (
             any(part in {"test", "tests"} for part in path.relative_to(root / "apps").parts)
