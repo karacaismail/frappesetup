@@ -15,7 +15,7 @@ from pathlib import Path
 SUITE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SUITE / "preview"))
 
-from merging import HOOKS, MergeError, git, hook_values, resolve, verify_hook_lists
+from merging import HOOKS, MergeError, duplicate_hook_assignments, git, hook_values, resolve, verify_hook_lists
 
 IDENTITY = "karacaismail <35493655+karacaismail@users.noreply.github.com>"
 GIT_ROUTING = (
@@ -74,10 +74,17 @@ def merge_inputs(worktree, inputs, branch, report, base):
         sources.append(sha)
 
     merged = git(worktree, "show", f"HEAD:{HOOKS}", check=False).stdout
+    duplicates = duplicate_hook_assignments(merged)
+    if duplicates:
+        report.write("\n## Yinelenen kanca atamaları\n\n| Dosya | Ad | Satırlar |\n| --- | --- | --- |\n")
+        for name, lines in duplicates.items():
+            report.write(f"| `{HOOKS}` | `{name}` | {', '.join(map(str, lines))} |\n")
+        raise MergeError("Duplicate top-level hook assignments. See the report.")
+    merged_values = hook_values(merged)
     for sha in sources:
         source = git(worktree, "show", f"{sha}:{HOOKS}", check=False).stdout
         if source:
-            verify_hook_lists(hook_values(source), hook_values(merged))
+            verify_hook_lists(hook_values(source), merged_values)
     report.write("\nKanca listeleri korundu.\n")
 
 

@@ -13,6 +13,8 @@ Backend ve işçi commit'lerini başlangıçta sabitler.
 Birleşmeleri ayrı bir worktree ve dal içinde yapar.
 Çakışma tablosu dosyayı ve iki dalı gösterir.
 Komut, tanımadığı bir çakışmada durur ve nedeni rapora yazar.
+Birleşen `hooks.py` dosyasında aynı üst düzey ad yeniden atanırsa komut durur.
+Rapor, Git çakışması olmasa bile adı ve satırları gösterir.
 
 Canlı koşu, `PANE_PORT`, kurulu Playwright ve varsayılan Colima'yı ister.
 Ağır ortam için en az 3 GB kullanılabilir bellek gerekir.

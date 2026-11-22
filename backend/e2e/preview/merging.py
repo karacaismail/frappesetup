@@ -35,6 +35,22 @@ def ordered_union(left, right):
     return values
 
 
+def duplicate_hook_assignments(source):
+    assignments = {}
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets = [node.target]
+        else:
+            continue
+        for target in targets:
+            for name in ast.walk(target):
+                if isinstance(name, ast.Name) and isinstance(name.ctx, ast.Store):
+                    assignments.setdefault(name.id, []).append(name.lineno)
+    return {name: lines for name, lines in assignments.items() if len(lines) > 1}
+
+
 def hook_values(source):
     values = {}
     for node in ast.parse(source).body:

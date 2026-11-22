@@ -97,6 +97,24 @@ class MergePreviewTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("Hook list lost an entry: hooks.auth_hooks", report)
 
+    def test_reports_duplicate_hook_assignments_after_a_clean_git_merge(self):
+        base = [f'anchor_{index} = "keep"\n' for index in range(16)]
+        self.commit_file(HOOKS, "".join(base))
+        for index, name in zip((2, 7, 12), ORDER):
+            self.git("switch", name)
+            self.git("merge", "--ff-only", "backend")
+            content = base[:index] + [f'auth_hooks = ["{name}"]\n'] + base[index:]
+            self.commit_file(HOOKS, "".join(content))
+        self.git("switch", "backend")
+
+        result, report = self.preview()
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("## Yinelenen kanca atamaları", report)
+        self.assertIn(f"| `{HOOKS}` | `auth_hooks` | 3, 9, 15 |", report)
+        self.assertNotIn("Birleştirildi |", report)
+        self.assertIn("Geçici worktree ve dal kaldırıldı.", report)
+
     def test_refuses_git_index_overrides_before_creating_artifacts(self):
         before = self.refs()
         env = {**self.env, "GIT_INDEX_FILE": str(self.root / "foreign-index")}
