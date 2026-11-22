@@ -1,7 +1,14 @@
 # Yerel geliştirme ortamı
 
 Bu ortam kiracı sitesini, Keycloak giriş sunucusunu ve Press sitesini birlikte açar.
-Compose, bu servisleri tek proje altında yönetir. Projenin adı `fs-e2e-ortam` olur.
+Compose, bu servisleri tek proje altında yönetir.
+Proje adı `fs-e2e-<port>-<özet>` biçimindedir.
+Betik özeti çalışma ağacının tam yolundan ve `PANE_PORT` değerinden üretir.
+Her çalışma ağacı ve port birleşimi ayrı veri birimleri kullanır.
+Aynı anda açık yığınların port aralıkları çakışmamalıdır.
+Sahiplik koruması başka sahibin verisini kullanmayı veya değiştirmeyi reddeder.
+Eski `fs-e2e-ortam` birimleri korunur. Yeni yığın bu verileri kendiliğinden taşımaz.
+`stack config` çıktısındaki `name` alanı geçerli proje adını gösterir.
 Bu kurulum yalnız yerel geliştirme içindir. Gerçek müşteri verisi kullanmayın.
 Press'in sunucu kurma işlemleri bu ortamda desteklenmez.
 

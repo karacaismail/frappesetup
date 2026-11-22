@@ -15,8 +15,14 @@ import tempfile
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
-PROJECT = "fs-e2e-ortam"
 REDIS = "redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
+
+
+def project_name(environment):
+    """Give each canonical worktree and port base a stable resource namespace."""
+    port = environment["PANE_PORT"]
+    digest = hashlib.sha256(f"{BACKEND.resolve()}\n{port}".encode()).hexdigest()[:20]
+    return f"fs-e2e-{port}-{digest}"
 
 
 def run(command, environment, **kwargs):
@@ -102,7 +108,7 @@ def setup():
         *engine,
         "compose",
         "--project-name",
-        PROJECT,
+        project_name(environment),
         "--env-file",
         str(path),
         "--file",
@@ -112,15 +118,16 @@ def setup():
 
 
 def assert_owner(engine, compose, environment, create=False):
-    """Keep the fixed project name from crossing worktrees or port ranges."""
+    """Reject foreign resources even inside the worktree's own namespace."""
+    project = project_name(environment)
     env_path = str(Path(compose[compose.index("--env-file") + 1]).resolve())
     owner = hashlib.sha256(
         f"{BACKEND.resolve()}\n{environment['PANE_PORT']}\n{env_path}".encode()
     ).hexdigest()
-    marker = PROJECT + "-owner"
+    marker = project + "-owner"
     label = "io.frappesetup.stack-owner"
     ids = run(
-        [*engine, "ps", "-aq", "--filter", f"label=com.docker.compose.project={PROJECT}"],
+        [*engine, "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"],
         environment,
         capture_output=True,
         text=True,
@@ -145,7 +152,7 @@ def assert_owner(engine, compose, environment, create=False):
     volumes = run(
         [*engine, "volume", "ls", "--format", "{{.Name}}"], environment, capture_output=True, text=True
     ).stdout.splitlines()
-    if marker not in volumes and not ids and any(name.startswith(PROJECT + "_") for name in volumes):
+    if marker not in volumes and any(name.startswith(project + "_") for name in volumes):
         raise ValueError("Unclaimed stack volumes exist. Their ownership must be checked before reuse.")
     if create and marker not in volumes:
         run(
@@ -200,7 +207,7 @@ def resources(engine, environment):
 
 def ensure_images(engine, compose, environment, model):
     for service in ("tenant-web", "keycloak", "event-sink", "web", "identity-sync"):
-        image = model["services"][service].get("image", f"{PROJECT}-{service}")
+        image = model["services"][service].get("image") or f"{project_name(environment)}-{service}"
         found = subprocess.run(
             [*engine, "image", "inspect", image],
             env=environment,
