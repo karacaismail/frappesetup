@@ -76,8 +76,12 @@ LEVEL_0 = {"read": 1, "write": 1, "create": 1, "delete": 1, "report": 1, "export
 
 def ensure_roles() -> None:
 	for role in (ROLE_EMPLOYEE, ROLE_MANAGER, ROLE_HR, ROLE_NO_RULE):
+		# Desk users: the shell lets a Website User call only its own short list of methods
+		# (`kabuk/native_metadata.py`). The engine's surfaces under test are desk surfaces.
 		if not frappe.db.exists("Role", role):
-			frappe.get_doc(doctype="Role", role_name=role, desk_access=0).insert()
+			frappe.get_doc(doctype="Role", role_name=role, desk_access=1).insert()
+		elif not frappe.db.get_value("Role", role, "desk_access"):
+			frappe.db.set_value("Role", role, "desk_access", 1)
 
 
 def ensure_doctypes() -> None:
@@ -176,6 +180,9 @@ def ensure_people() -> None:
 				roles=[{"role": role} for role in roles],
 			).insert()
 			update_password(email, PASSWORD)
+		elif frappe.db.get_value("User", email, "user_type") != "System User":
+			# The user type follows the roles; saving works it out again.
+			frappe.get_doc("User", email).save()
 	for email, _roles, manager in PEOPLE:
 		if manager is None or employee_of(email):
 			continue

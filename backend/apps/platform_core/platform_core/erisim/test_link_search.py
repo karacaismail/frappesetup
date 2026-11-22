@@ -230,17 +230,23 @@ class TestLinkSearch(ErisimTestCase):
 		self.assertEqual(offenders, [])
 
 	def test_no_platform_code_calls_frappes_search_directly(self):
-		"""Frappe's own search function cannot be intercepted from Python. Our code must not call it."""
+		"""Frappe's own search function cannot be intercepted from Python. Our code must not call it.
+
+		Naming the endpoint in a string is fine: hooks and the shell's allow-list do that.
+		"""
 		root = Path(platform_core.__file__).parent
-		# `hooks.py` only names the two endpoints it replaces.
-		allowed = {root / "erisim" / "link_search.py", root / "hooks.py"}
+		reaches_search = re.compile(
+			r"from\s+frappe\.desk\.search\s+import|from\s+frappe\.desk\s+import\s+[^\n]*\bsearch\b"
+			r"|import\s+frappe\.desk\.search|(?<![\"'\w.])frappe\.desk\.search\.\w+\s*\("
+			r"|get_attr\(\s*[\"']frappe\.desk\.search"
+		)
+		allowed = {root / "erisim" / "link_search.py"}
 		offenders = [
 			str(path.relative_to(root))
 			for path in root.rglob("*.py")
 			if path not in allowed
 			and not path.name.startswith("test_")
-			and "frappe.desk.search"
-			in path.read_text().replace("from frappe.desk import search", "frappe.desk.search")
+			and reaches_search.search(path.read_text())
 		]
 
 		self.assertEqual(offenders, [])
