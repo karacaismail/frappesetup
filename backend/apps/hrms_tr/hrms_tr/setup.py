@@ -5,6 +5,7 @@ from pathlib import Path
 
 import frappe
 from frappe import _
+from frappe.permissions import setup_custom_perms
 
 from hrms_tr.access import DOCTYPE, RULE_DOCTYPE, engine_available
 from hrms_tr.users import APPROVER_PROFILES, EMPLOYEE_ROLE, HRMS_TR_ROLES, NATIVE_LEAVE_APPROVER
@@ -38,11 +39,18 @@ def check_install():
 	for row in fixture_rows("04_property_setter.json"):
 		if frappe.db.exists(row["doctype"], row["name"]):
 			frappe.throw(_("Resolve existing leave balance field settings before installing HRMS TR."))
+	preserve_employee_permissions()
+
+
+def preserve_employee_permissions():
+	# Frappe uses custom rows instead of the standard permissions once any custom row exists.
+	setup_custom_perms("Employee")
 
 
 def before_migrate():
 	require_access_engine()
 	require_unshared_applications()
+	preserve_employee_permissions()
 	frappe.local.hrms_tr_disabled_rules = frappe.get_all(
 		RULE_DOCTYPE,
 		filters={"name": ["in", [row["name"] for row in fixture_rows(RULE_FIXTURE)]], "is_active": 0},
@@ -136,3 +144,4 @@ def remove_policy_fixtures(keys=None):
 	# The framework commits app removal before after_uninstall and does not commit again.
 	frappe.db.commit()
 	frappe.clear_cache(doctype=DOCTYPE)
+	frappe.clear_cache(doctype="Employee")

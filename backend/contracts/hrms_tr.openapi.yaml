@@ -233,7 +233,10 @@ x-ai-tool:
     required: [name]
     properties:
       name: {type: string, minLength: 1, maxLength: 140, description: "Document name of the leave application."}
-  description: The tool creates a proposal and records the current modified value. The approval flow checks that value before submitting the application.
+  description: |
+    The tool creates a proposal and records the current modified value. Approval checks that value
+    before submitting the application. If the application leaves the Open status after the proposal
+    is created, approval can return invalid_arguments and stops without submitting the application.
   preview:
     type: object
     properties:
@@ -304,13 +307,19 @@ components:
           example: "2026-11-22 09:00:00.000001"
     LeaveApplication:
       type: object
+      description: A leave application can include additional fields that the user has permission to read.
+      required: [name]
       properties:
         name: {type: string}
         employee: {type: [string, "null"]}
         employee_name: {type: [string, "null"]}
+        company: {type: [string, "null"]}
+        leave_approver: {type: [string, "null"]}
         leave_type: {type: [string, "null"]}
         from_date: {type: [string, "null"], format: date}
         to_date: {type: [string, "null"], format: date}
+        description: {type: [string, "null"]}
+        amended_from: {type: [string, "null"]}
         status: {type: [string, "null"], enum: [Open, Approved, Rejected, Cancelled, null]}
         docstatus: {type: integer, enum: [0, 1, 2]}
         modified:

@@ -60,3 +60,4 @@ Use this order for stable paging when modification timestamps match.,Bu sırayı
 The authenticated user exceeded the approval request limit.,Kullanıcının onay isteği sayısı sınırı aştı.
 Read the leave application version before approving.,Onaylamadan önce izin talebinin güncel kaydını açın.
 The leave application could not be approved.,İzin talebi onaylanamadı.
+Managers can only change the status of a team leave application.,Yöneticiler ekip izin taleplerinde yalnız durumu değiştirebilir.

@@ -20,6 +20,8 @@ permission_query_conditions = {"Leave Application": "hrms_tr.access.query_condit
 has_permission = {"Leave Application": "hrms_tr.access.has_permission"}
 doc_events = {
 	"Leave Application": {
+		"before_validate": "hrms_tr.leave.validate_manager_fields",
+		"before_update_after_submit": "hrms_tr.leave.validate_manager_fields",
 		"validate": "hrms_tr.leave.validate_approval",
 		"before_cancel": "hrms_tr.leave.validate_cancellation",
 	},

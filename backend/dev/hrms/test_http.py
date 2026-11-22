@@ -153,6 +153,27 @@ class LeaveHttpTest(unittest.TestCase):
         )
 
         query = urlencode(
+            {
+                "fields": json.dumps(["name", "modified"]),
+                "filters": filters,
+                "order_by": "modified desc, name asc",
+            }
+        )
+        code, result = client.send(f"{LEAVE_PATH}?{query}")
+        self.assertEqual(code, 200, result.get("exc_type"))
+        self.contract_validators["list"].validate(result)
+        rows = result["data"]
+        self.assertEqual(sorted(row["name"] for row in rows), names)
+        self.assertEqual(
+            rows,
+            sorted(
+                sorted(rows, key=lambda row: row["name"]),
+                key=lambda row: row["modified"],
+                reverse=True,
+            ),
+        )
+
+        query = urlencode(
             {"filters": json.dumps({"employee": self.data["employees"]["outsider"]})}
         )
         code, result = client.send(f"{LEAVE_PATH}?{query}")
@@ -229,6 +250,62 @@ class LeaveHttpTest(unittest.TestCase):
             code, result = admin.send(settings_path, {mandatory: 0}, method="PUT")
             self.assertEqual(code, 200, result.get("exception"))
 
+    def test_employee_and_manager_cannot_create_outside_their_permissions(self):
+        source = self.document(self.login("employee"), "employee")
+        day = (date.fromisoformat(source["from_date"]) + timedelta(days=12)).isoformat()
+        for actor, employee in (("employee", "outsider"), ("manager", "employee")):
+            with self.subTest(actor=actor):
+                draft = {
+                    "employee": self.data["employees"][employee],
+                    "company": source["company"],
+                    "leave_type": source["leave_type"],
+                    "from_date": day,
+                    "to_date": day,
+                    "status": "Open",
+                }
+                code, result = self.login(actor).send(LEAVE_PATH, draft)
+                self.assertEqual(
+                    (code, result.get("exc_type")), (403, "PermissionError")
+                )
+
+    def test_hr_can_read_employee_records_with_read_only_permission(self):
+        employee = self.data["employees"]["outsider"]
+        path = f"/api/resource/Employee/{quote(employee, safe='')}"
+        hr = self.login("hr")
+        code, result = hr.send(path)
+        self.assertEqual(code, 200, result.get("exc_type"))
+        self.assertEqual(result["data"]["name"], employee)
+        code, result = hr.send(
+            path, {"first_name": "Unauthorized synthetic update"}, method="PUT"
+        )
+        self.assertEqual((code, result.get("exc_type")), (403, "PermissionError"))
+        for actor in ("manager", "employee"):
+            with self.subTest(actor=actor):
+                code, result = self.login(actor).send(path)
+                self.assertEqual(
+                    (code, result.get("exc_type")), (403, "PermissionError")
+                )
+
+    def test_manager_cannot_edit_team_leave_details(self):
+        manager = self.login("manager")
+        before = self.document(manager, "manager_edit")
+        day = (date.fromisoformat(before["to_date"]) + timedelta(days=1)).isoformat()
+        for changes in (
+            {"from_date": day, "to_date": day},
+            {"leave_type": self.data["allocated_leave_type"]},
+            {"description": "Unauthorized manager edit"},
+        ):
+            with self.subTest(changes=changes):
+                code, result = manager.send(
+                    self.leave_path("manager_edit"), changes, method="PUT"
+                )
+                self.assertEqual(
+                    (code, result.get("exc_type")), (403, "PermissionError")
+                )
+                after = self.document(manager, "manager_edit")
+                for field in (*changes, "modified"):
+                    self.assertEqual(after.get(field), before.get(field), field)
+
     @staticmethod
     def approval_payload(document):
         return {"name": document["name"], "version": document["modified"]}
@@ -245,7 +322,7 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertEqual(client.send(endpoint, self.approval_payload(own))[0], 403)
 
         before = self.document(client, "manager_approve")
-        code, result = client.send(
+        code, result = self.login("employee").send(
             self.leave_path("manager_approve"),
             {"description": "Updated after the manager reviewed the request"},
             method="PUT",
@@ -349,6 +426,14 @@ class LeaveHttpTest(unittest.TestCase):
                 else:
                     self.assertIn(code, (403, 417), payload.get("exception"))
 
+        for option in ("filters", "or_filters"):
+            with self.subTest(option=option):
+                query = urlencode({option: json.dumps({"leave_balance": [">", 5]})})
+                code, payload = client.send(f"{LEAVE_PATH}?{query}")
+                self.assertIn(code, (200, 403, 417), payload.get("exc_type"))
+                if code == 200:
+                    self.assertEqual(payload["data"], [])
+
         args = urlencode(
             {
                 "doctype": "Leave Application",
@@ -413,7 +498,11 @@ class LeaveHttpTest(unittest.TestCase):
         status, result = self.login("outsider").send(LEAVE_PATH, amendment)
         self.assertIn(status, (403, 417), result.get("exception"))
         status, result = hr.send(LEAVE_PATH, amendment)
-        self.assertEqual(status, 200, result.get("exception"))
+        self.assertEqual(
+            status,
+            200,
+            {key: result.get(key) for key in ("exc_type", "_server_messages")},
+        )
         self.assertEqual(result["data"]["amended_from"], name)
 
     def test_leave_sharing_is_denied(self):
@@ -716,6 +805,8 @@ class LeaveHttpTest(unittest.TestCase):
             method="PUT",
         )
         self.assertEqual(code, 200, result.get("exception"))
+        changed = self.document(employee, "ai_stale")
+        self.assertNotEqual(changed["modified"], before["modified"])
         approval = self.ai_approval(manager, proposal)
         code, result = manager.send(
             f"{AI_PATH}.approve_proposal", approval, csrf_token=manager.csrf_token()
@@ -723,7 +814,13 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertEqual(code, 200, result.get("exception"))
         self.assertFalse(result["message"]["executed"])
         self.assertEqual(result["message"]["deny_reason"], "document_changed")
-        self.assertEqual(self.document(manager, "ai_stale")["docstatus"], 0)
+        query = urlencode({"proposal_id": proposal["proposal_id"]})
+        code, response = manager.send(f"{AI_PATH}.get_proposal?{query}")
+        self.assertEqual(code, 200, response.get("exc_type"))
+        self.assertEqual(response["message"]["status"], "rejected")
+        persisted = self.document(manager, "ai_stale")
+        self.assertEqual(persisted["docstatus"], 0)
+        self.assertEqual(persisted["modified"], changed["modified"])
 
     def test_ai_tool_writes_only_after_human_approval(self):
         if not self.with_ai:

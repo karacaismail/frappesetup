@@ -27,6 +27,13 @@ class RoleFixtureTest(unittest.TestCase):
 		for profile in fixture("02_role_profile.json"):
 			self.assertIn("HRMS TR Employee", {row["role"] for row in profile["roles"]})
 
+	def test_hr_employee_permission_only_grants_read(self):
+		permissions = [row for row in fixture("05_custom_docperm.json") if row["parent"] == "Employee"]
+		self.assertEqual(len(permissions), 1)
+		permission = permissions[0]
+		self.assertEqual(permission["role"], "HRMS TR Admin")
+		self.assertEqual({key for key, value in permission.items() if value == 1}, {"read"})
+
 	def test_only_authorized_roles_can_cancel_and_amend(self):
 		perms = [row for row in fixture("05_custom_docperm.json") if row["permlevel"] == 0]
 		self.assertEqual(

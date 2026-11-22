@@ -18,7 +18,7 @@ Yönetici ve İK rolleri bu seviyede okuma hakkı alır.
 Kabuk, kurulu HRMS uygulamasının “Workspace Sidebar” kaydından menü öğelerini alır.
 HRMS TR, panel yolu veya ayrı bir menü tanımlamaz.
 
-`hrms_tr_approve_leave` aracı kayıt adı ve sürümüyle öneri oluşturur.
+`hrms_tr_approve_leave` aracı yalnız kayıt adını alır ve öneri oluşturur.
 Önizleme kayıt sürümünü ve durum değişikliğini gösterir.
 İnsan oturumu öneriyi onaylayınca yapay zekâ katmanı izni yeniden denetler.
 HRMS TR, kaydı Frappe üzerinden onaylar ve gönderir.
@@ -41,7 +41,12 @@ HRMS TR, bu rolü HRMS TR hesabından çıkarır.
 HRMS TR hesapları masaüstü erişimi veren başka rol alamaz.
 
 İK, onaylı talebi iptal edebilir. İK, iptal edilen talebin düzeltme kopyasını açabilir.
+İK rolü, bu işlem için kiracıdaki `Employee` kayıtlarını okuyabilir.
+İK rolünün çalışan kayıtlarına yazma, rapor alma, dışa aktarma ve yazdırma izni yoktur.
+Yönetici ve çalışan rolleri, başka bir kişinin `Employee` kaydını okuyamaz.
 Kaydedilen talepte çalışan değiştirilemez. Düzeltme kopyasında aynı çalışan kalır.
+Yönetici, ekip üyesinin talebinde yalnız durum alanlarını değiştirebilir.
+Sunucu tarih, izin türü ve açıklama değişikliklerini reddeder.
 Yönetici ve İK kendi taleplerini onaylayamaz.
 
 HRMS TR, eski HRMS bakiye ve takvim uçlarını kiracı sitesinde kapatır.
@@ -113,6 +118,8 @@ Bu durumda talebin durumu değişmez.
 Yapay zekâ aracı yalnız talebin kayıt adını alır.
 Önizleme, kaydın güncel sürümünü `target_version` alanına yazar.
 Platform, insan onayında ve çalıştırmadan önce kilit altında sürümü denetler.
+Talep öneriden sonra açık durumdan çıkarsa platform onayı durdurur.
+Platform bu durumda `invalid_arguments` döndürebilir.
 Önizleme, alan farklarını `fieldname`, `label`, `old` ve `new` ile gösterir.
 Öneri ayrıntısında yalnız talebin kayıt adı bulunur.
 Önizleme çalışan adı, izin tarihleri ve gün sayısını içermez.

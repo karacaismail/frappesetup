@@ -150,6 +150,7 @@ def seed(password):
             ("hr", "hr"),
             ("hr_approve", "outsider"),
             ("manager_approve", "employee"),
+            ("manager_edit", "employee"),
             ("system_manager_approve", "outsider"),
             ("hr_manager_approve", "outsider"),
         ),

@@ -10,7 +10,8 @@ from pydantic import StringConstraints
 from hrms_tr.access import DOCTYPE
 
 HR_ROLE = "HRMS TR Admin"
-APPROVER_ROLES = ("HRMS TR Manager", HR_ROLE)
+MANAGER_ROLE = "HRMS TR Manager"
+APPROVER_ROLES = (MANAGER_ROLE, HR_ROLE)
 OPERATIONS_ROLES = ("System Manager", "HR Manager")
 
 LeaveName = Annotated[str, StringConstraints(min_length=1, max_length=140)]
@@ -37,6 +38,28 @@ def validate_cancellation(doc, method=None):
 		frappe.get_roles()
 	):
 		frappe.throw(_("You do not have permission to cancel leave."), frappe.PermissionError)
+
+
+def validate_manager_fields(doc, method=None):
+	"""Restrict team drafts to status edits for managers."""
+	before = doc.get_doc_before_save()
+	if before is None or frappe.session.user == "Administrator":
+		return
+	roles = set(frappe.get_roles())
+	if MANAGER_ROLE not in roles or roles.intersection((HR_ROLE, *OPERATIONS_ROLES)):
+		return
+	if frappe.db.get_value("Employee", before.employee, "user_id") == frappe.session.user:
+		return
+	columns = set(doc.meta.get_valid_columns())
+	if any(
+		field.fieldname in columns
+		and field.fieldname not in {"status", "docstatus"}
+		and doc.has_value_changed(field.fieldname)
+		for field in doc.meta.fields
+	):
+		frappe.throw(
+			_("Managers can only change the status of a team leave application."), frappe.PermissionError
+		)
 
 
 def validate_approval(doc, method=None):
