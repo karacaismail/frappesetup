@@ -40,10 +40,6 @@ doc_events = {
 		"on_update": "platform_core.kabuk.cache.invalidate_permissions",
 		"on_trash": "platform_core.kabuk.cache.invalidate_permissions",
 	},
-	"Access Rule": {
-		"on_update": "platform_core.kabuk.cache.invalidate_permissions",
-		"on_trash": "platform_core.kabuk.cache.invalidate_permissions",
-	},
 }
 
 # Frappe resolves cookie and token authentication before calling this hook.

@@ -64,6 +64,32 @@
                     }
                   },
                   "additionalProperties": false
+                },
+                "example": {
+                  "message": {
+                    "user": {
+                      "name": "sample@example.test",
+                      "full_name": "Sample Reader",
+                      "language": "tr",
+                      "roles": [
+                        "Sample Reader"
+                      ]
+                    },
+                    "installed_apps": [
+                      "frappe",
+                      "platform_core"
+                    ],
+                    "workspaces": [],
+                    "sidebars": [],
+                    "formatting": {
+                      "time_zone": "Europe/Istanbul",
+                      "currency": "TRY",
+                      "number_format": "#.###,##",
+                      "rounding_method": "Commercial Rounding"
+                    },
+                    "meta_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "perm_version": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                  }
                 }
               }
             }
@@ -97,6 +123,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "PermissionError"
                 }
               }
             }
@@ -107,6 +136,10 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "SessionExpired",
+                  "session_expired": 1
                 }
               }
             }
@@ -191,6 +224,33 @@
                     }
                   },
                   "additionalProperties": false
+                },
+                "example": {
+                  "message": {
+                    "schema": {
+                      "name": "Sample Record",
+                      "module": "Sample",
+                      "sensitivity": "standard",
+                      "fields": [
+                        {
+                          "fieldname": "title",
+                          "fieldtype": "Data",
+                          "read_only": true,
+                          "label": "Sample title",
+                          "reqd": true,
+                          "component": "input",
+                          "sensitivity": "standard"
+                        }
+                      ],
+                      "title_field": "title",
+                      "search_fields": "title",
+                      "sort_field": null
+                    },
+                    "child_tables": {},
+                    "catalog_version": 1,
+                    "meta_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                    "perm_version": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+                  }
                 }
               }
             }
@@ -224,6 +284,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "PermissionError"
                 }
               }
             }
@@ -244,6 +307,10 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "SessionExpired",
+                  "session_expired": 1
                 }
               }
             }
@@ -367,6 +434,9 @@
                     }
                   },
                   "additionalProperties": false
+                },
+                "example": {
+                  "message": "sample@example.test"
                 }
               }
             }
@@ -377,6 +447,10 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "SessionExpired",
+                  "session_expired": 1
                 }
               }
             }
@@ -387,6 +461,9 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "exc_type": "PermissionError"
                 }
               }
             }
@@ -598,7 +675,7 @@
             ]
           },
           "options": {
-            "description": "Native field options. Dynamic Link options are omitted when their target-type field is unreadable. Treat HTML field options as untrusted content and sanitize them before rendering.",
+            "description": "Native field options. Dynamic Link options are omitted when their target-type field is unreadable. Unapproved fields do not carry options or defaults.",
             "type": [
               "string",
               "null"
@@ -1101,7 +1178,7 @@
               "lt",
               "lte"
             ],
-            "description": "Approved operator."
+            "description": "Approved operator. Equality and inequality use strict scalar comparison."
           },
           "value": {
             "type": [
@@ -1112,7 +1189,36 @@
             ],
             "description": "Scalar comparison value. Omitted for truth tests."
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "op": {
+                  "enum": [
+                    "truthy",
+                    "falsy"
+                  ]
+                }
+              },
+              "required": [
+                "op"
+              ]
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "value"
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "value"
+              ]
+            }
+          }
+        ]
       },
       "SelectChoice": {
         "type": "object",

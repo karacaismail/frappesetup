@@ -166,6 +166,13 @@ class TestMetadataProjection(unittest.TestCase):
 		self.assertNotIn("read_only_depends_on", field)
 		self.assertEqual(field["unsupported_conditions"], ["read_only_depends_on"])
 
+	def test_loose_javascript_equality_is_omitted(self):
+		schema = sample_schema()
+		schema["fields"][0]["depends_on"] = "eval:doc.title == 1"
+		field = project_meta(schema, {"title"}, set())["fields"][0]
+		self.assertNotIn("depends_on", field)
+		self.assertEqual(field["unsupported_conditions"], ["depends_on"])
+
 	def test_fetch_from_and_dynamic_links_cannot_reference_hidden_fields(self):
 		schema = sample_schema()
 		schema["fields"][0]["fetch_from"] = "private_note.title"

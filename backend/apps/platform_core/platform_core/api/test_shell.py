@@ -1,6 +1,6 @@
 import json
 from unittest.mock import patch
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import frappe
 from frappe.core.doctype.user.user import generate_keys
@@ -48,6 +48,8 @@ class TestBootstrapHTTP(ShellHTTPFixture):
 			status, _, _ = self.request("/api/method/frappe.auth.get_logged_user", headers=headers)
 			self.assertEqual(status, 200)
 			status, _, _ = self.request("/api/method/platform_core.api.shell.get_bootstrap", headers=headers)
+			self.assertEqual(status, 403)
+			status, _, _ = self.request(f"/api/v2/doctype/{quote(DOCTYPE)}/meta", headers=headers)
 			self.assertEqual(status, 403)
 			status, _, _ = self.request("/panel", headers=headers)
 			self.assertEqual(status, 302)

@@ -272,3 +272,13 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertEqual(value["label"], "Yönetim paneli")
 		self.assertEqual(value["description"], "Yönetim paneli")
 		self.assertEqual(value["choices"], [{"value": "Admin panel", "label": "Yönetim paneli"}])
+
+	def test_verified_mobile_identity_cannot_select_web_metadata(self):
+		frappe.set_user(PRIVILEGED)
+		try:
+			identity = {"account": PRIVILEGED, "scope": "mobile", "site": frappe.local.site}
+			with patch.object(frappe.local, "mobile_identity", identity, create=True):
+				with self.assertRaises(frappe.PermissionError):
+					get_doctype(DOCTYPE, PRIVILEGED, surface="web")
+		finally:
+			frappe.set_user("Administrator")

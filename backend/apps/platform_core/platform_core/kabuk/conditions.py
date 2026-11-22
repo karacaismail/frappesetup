@@ -7,11 +7,11 @@ import re
 FIELD_NAME = re.compile(r"[A-Za-z_]\w*", re.ASCII)
 PREDICATE = re.compile(
 	r"(?P<negated>!)?\s*(?P<scope>doc|parent)\.(?P<field>[A-Za-z_]\w*)"
-	r"(?:\s*(?P<operator>===|!==|==|!=|>=|<=|>|<)\s*(?P<literal>.+))?",
+	r"(?:\s*(?P<operator>===|!==|>=|<=|>|<)\s*(?P<literal>.+))?",
 	re.ASCII,
 )
 SINGLE_QUOTED = re.compile(r"'([^'\\\r\n]*)'")
-OPERATORS = {"===": "eq", "==": "eq", "!==": "ne", "!=": "ne", ">=": "gte", "<=": "lte", ">": "gt", "<": "lt"}
+OPERATORS = {"===": "eq", "!==": "ne", ">=": "gte", "<=": "lte", ">": "gt", "<": "lt"}
 
 
 def project_condition(source: object, readable: set[str], parent_readable: set[str] | None) -> dict | None:

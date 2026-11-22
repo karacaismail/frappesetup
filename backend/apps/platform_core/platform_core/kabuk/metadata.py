@@ -20,7 +20,8 @@ def get_doctype(doctype: str, user: str, *, surface: str = "web") -> dict:
 	if surface not in {"web", "mobile"}:
 		frappe.throw(frappe._("A valid metadata surface is required."), frappe.ValidationError)
 
-	mobile = surface == "mobile"
+	# The identity hook establishes this context after verifying a mobile token.
+	mobile = surface == "mobile" or getattr(frappe.local, "mobile_identity", None) is not None
 	canonical_name = frappe.db.exists("DocType", doctype, cache=True)
 	meta = frappe.get_meta(canonical_name) if canonical_name else None
 	if (
@@ -103,7 +104,7 @@ def visible_schema(
 		options = field.get("options")
 		if field["fieldtype"] == "Select" and isinstance(options, str):
 			field["choices"] = [
-				{"value": option, "label": frappe._(option)} for option in options.splitlines()
+				{"value": option, "label": frappe._(option)} for option in options.split("\n")
 			]
 		if field["component"] is None:
 			field.pop("options", None)
