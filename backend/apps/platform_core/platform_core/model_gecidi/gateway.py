@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from math import ceil
 from time import monotonic, time
+from uuid import UUID
 
 import frappe
 from frappe.utils.password import get_decrypted_password
@@ -15,7 +16,8 @@ from platform_core.model_gecidi import adapters, ledger, policy, routing
 from platform_core.model_gecidi.policy import Denied
 
 COOLDOWN = 60
-MAX_ROUTE_SECONDS = 105
+MAX_ROUTE_SECONDS = 60
+FINALIZATION_SECONDS = 0.5
 LOCK_SECONDS = 10
 STALE_ATTEMPT_SECONDS = 135
 RESPONSE_OVERHEAD_SECONDS = 8
@@ -67,13 +69,17 @@ def _json(value):
 	return json.loads(value) if isinstance(value, str) else value or []
 
 
+def _valid_name(name):
+	return isinstance(name, str) and 0 < len(name) <= 140
+
+
 def _document(doctype, name):
-	if not isinstance(name, str) or not 0 < len(name) <= 140:
+	if not _valid_name(name):
 		raise Denied(400, "invalid_request")
 	try:
 		return frappe.get_doc(doctype, name)
 	except frappe.DoesNotExistError:
-		raise Denied(403, "permission_denied") from None
+		raise frappe.PermissionError from None
 
 
 def _target(api_id, model_id):
@@ -81,10 +87,81 @@ def _target(api_id, model_id):
 	model = _document("AI Model", model_id)
 	account = _document("AI Account", api.account)
 	provider = _document("AI Provider", account.provider)
+	return _checked_target(api, account, provider, model)
+
+
+def _checked_target(api, account, provider, model):
 	models = _json(api.allowed_models)
 	if model.provider != provider.name or (models and model.model_id not in models):
 		raise Denied(400, "invalid_target")
 	return Target(api, account, provider, model)
+
+
+def _record_key(name):
+	# The database can return the canonical spelling of a UUID link.
+	try:
+		return str(UUID(str(name)))
+	except ValueError:
+		return name
+
+
+def _selection_rows(doctype, names, fields):
+	names = list(dict.fromkeys(name for name in names if _valid_name(name)))
+	if not names:
+		return {}
+	return {
+		_record_key(row.name): row
+		for row in frappe.get_all(doctype, filters={"name": ["in", names]}, fields=["name", *fields])
+	}
+
+
+def _selection_row(rows, name):
+	if not _valid_name(name):
+		raise Denied(400, "invalid_request")
+	row = rows.get(_record_key(name))
+	if row is None:
+		raise frappe.PermissionError
+	return row
+
+
+def _route_targets(items):
+	# The route is authorized before this internal read. Selection needs no credentials.
+	apis = _selection_rows(
+		"AI API",
+		(item.api for item in items),
+		("account", "allowed_models", "enabled", "health_status", "priority", "weight"),
+	)
+	models = _selection_rows(
+		"AI Model",
+		(item.model for item in items),
+		(
+			"provider",
+			"model_id",
+			"enabled",
+			"context_size",
+			"prices_known",
+			"input_price",
+			"output_price",
+			"cost_currency",
+			"capabilities",
+		),
+	)
+	accounts = _selection_rows(
+		"AI Account",
+		(api.account for api in apis.values()),
+		("provider", "enabled", "has_monthly_budget", "currency"),
+	)
+	providers = _selection_rows(
+		"AI Provider", (account.provider for account in accounts.values()), ("enabled",)
+	)
+	targets = []
+	for item in items:
+		api = _selection_row(apis, item.api)
+		model = _selection_row(models, item.model)
+		account = _selection_row(accounts, api.account)
+		provider = _selection_row(providers, account.provider)
+		targets.append(_checked_target(api, account, provider, model))
+	return targets
 
 
 def _cache_key(api):
@@ -126,7 +203,7 @@ def _choose(targets, route, request):
 
 def read_timeout(limit, output_tokens_per_second):
 	seconds = RESPONSE_OVERHEAD_SECONDS + ceil(limit / output_tokens_per_second)
-	if seconds > MAX_ROUTE_SECONDS - CONNECT_SECONDS:
+	if seconds > MAX_ROUTE_SECONDS - CONNECT_SECONDS - FINALIZATION_SECONDS:
 		raise Denied(400, "output_limit_exceeds_deadline")
 	return seconds
 
@@ -194,6 +271,8 @@ def _attempt(candidate, target, request, timeout, deadline, log):
 			_set_health(target.api.name, "unhealthy")
 			frappe.cache.set(_cache_key(target.api.name), decision.candidate.cooldown_until, ex=COOLDOWN)
 		retry = retry_allowed(code, capped=target.account.has_monthly_budget)
+		if code == "timeout" and not retry:
+			raise Denied(503, "provider_timeout") from None
 		return None, retry and decision.try_next
 	finally:
 		ledger.finish(
@@ -289,6 +368,8 @@ def _reserve(route, target, request):
 
 
 def _dispatch(route, targets, request, deadline):
+	# Leave time for the usage write and the HTTP response after provider I/O.
+	provider_deadline = deadline - FINALIZATION_SECONDS
 	failed_apis = set()
 	last_denial = None
 	for candidate, target in _choose(targets, route, request):
@@ -296,19 +377,23 @@ def _dispatch(route, targets, request, deadline):
 			continue
 		try:
 			current = _target(target.api.name, target.model.name)
+		except (Denied, frappe.PermissionError) as failure:
+			last_denial = failure
+			continue
+		try:
 			choices = _choose([current], route, request)
 			if not choices:
 				continue
 			candidate, current = choices[0]
 			timeout = read_timeout(request.limit, current.model.output_tokens_per_second or 30)
-			if timeout > deadline - monotonic() - CONNECT_SECONDS:
+			if timeout > provider_deadline - monotonic() - CONNECT_SECONDS:
 				last_denial = Denied(503, "provider_unavailable")
 				continue
 			outbound = policy.outbound(current.base_url, current.oauth_url, route, request)
 			log = _reserve(route, current, outbound)
-			result, retry = _attempt(candidate, current, outbound, timeout, deadline, log)
+			result, retry = _attempt(candidate, current, outbound, timeout, provider_deadline, log)
 		except Denied as failure:
-			if failure.code == "gateway_unavailable":
+			if failure.code in {"gateway_unavailable", "provider_timeout"}:
 				raise
 			last_denial = failure
 			continue
@@ -329,15 +414,15 @@ def _require_clean_transaction():
 
 
 def complete(route, messages, tools=None, schema=None, limit=1024):
+	deadline = monotonic() + MAX_ROUTE_SECONDS
 	policy.require_user()
 	_require_clean_transaction()
-	deadline = monotonic() + MAX_ROUTE_SECONDS
 	request = policy.parse(messages, tools, schema, limit)
 	route = _document("AI Route", route)
 	policy.require_route(route)
 	if len(route.targets) > MAX_TARGETS:
 		raise Denied(400, "invalid_route")
-	targets = [_target(item.api, item.model) for item in route.targets]
+	targets = _route_targets(route.targets)
 	try:
 		return _dispatch(route, targets, request, deadline)
 	except RedisError:
@@ -345,9 +430,9 @@ def complete(route, messages, tools=None, schema=None, limit=1024):
 
 
 def test_api(api, model):
+	deadline = monotonic() + MAX_ROUTE_SECONDS
 	policy.require_user(managers_only=True)
 	_require_clean_transaction()
-	deadline = monotonic() + MAX_ROUTE_SECONDS
 	target = _target(api, model)
 	request = policy.Request([{"role": "user", "content": "Reply with OK."}], [], None, 8)
 	try:

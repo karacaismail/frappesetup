@@ -1,6 +1,6 @@
 # frappesetup — ajan talimatları
 
-Astro 7 + React 19 + Mantine 9 statik dokümantasyon sitesi; GitHub Pages'te `https://karacaismail.github.io/frappesetup/` (`base: /frappesetup`, `trailingSlash: always`). Node ≥ 22.12 (yerelde 24). Site, kapalı SaaS ürününün tasarım ve karar çerçevesidir; SaaS henüz kurulmadı: sayfalardaki kontroller gereksinimdir, uygulanmış güvenlik gibi sunulmaz.
+Astro 7 + React 19 + Mantine 9 statik dokümantasyon sitesi; GitHub Pages'te `https://karacaismail.github.io/frappesetup/` (`base: /frappesetup`, `trailingSlash: always`). Node ≥ 22.23.4 (astro 7.4 alt sınırı; yerelde ve CI'da 24). Site, kapalı SaaS ürününün tasarım ve karar çerçevesidir; SaaS henüz kurulmadı: sayfalardaki kontroller gereksinimdir, uygulanmış güvenlik gibi sunulmaz.
 
 ## Komutlar
 
@@ -48,18 +48,18 @@ Astro 7 + React 19 + Mantine 9 statik dokümantasyon sitesi; GitHub Pages'te `ht
 - Açılır listeler Mantine `Select` ile yapılır (native `<select>` yok). Gezginin faz/ray/kaynak süzgeçleri açılır liste değil `aria-pressed` düğme gruplarıdır (yerel `<details>` içinde); açılır panel kodu adayı bütçeden taşırdı.
 - Mobil öncelik: 320 px'ten başlar; test matrisi `tests/smoke.spec.ts` içinde: taşma + ≥1rem + sözcük bölünmesi (satırına sığan sözcük iki harf arasından bölünmez, zorlayıcı kırma kuralı yok) tüm sayfalarda 320'de, 6 sayfada 7 viewport; uzun satır içi kod (kendi kutusunda kayar, yalnız taşan kutu Tab sırasında, üç motor); %125/%200 kök yazı; odak (tek görünür outline yalnız odaklanan öğede ya da görünmez Switch girdisinin izinde; kenarlık/gölge ikinci çerçeve yok; Tab/Shift+Tab); süzgeç düğmeleri klavye; hidrasyon öncesi tek yazım (masaüstü ve 320 `@touch`); yön değişimi; reduced-motion; axe (tüm sayfalar × açık/koyu; WCAG 2.0/2.1/2.2 A-AA + best-practice; her etki düzeyi başarısızlık; otomatik kural kapsamıdır, tam AA uyumu iddiası değildir); ağ bütçesi; iPhone 13 dokunma profili. Yeni bileşen bu testlere eklenmeden teslim edilmez. Gerçek macOS/iOS Safari ve Android ayrı raporlanır; çalıştırılmayan kontrol `not_run` yazılır.
 
-## Performans bütçesi (ölçüm: `npm run build` + Playwright ağ testi, gzip zlib varsayılan düzey, 8 Ekim 2026)
+## Performans bütçesi (ölçüm: `npm run build` + Playwright ağ testi, gzip zlib varsayılan düzey, 22 Kasım 2026, astro 7.4.7 ve mermaid 12.2.0)
 
 | Varlık | Ölçülen (gzip) | Bütçe |
 | --- | --- | --- |
-| Kabuk JS: ilk görünümde gereken tüm parçalar (React/ReactDOM `client`, `Shell`, paylaşılan Mantine/tema ve React parçaları) | 96,9 KB (giriş parçaları `client` + `Shell` 77,9 KB, ayrıca raporlanır) | ≤ 100 KB |
+| Kabuk JS: ilk görünümde gereken tüm parçalar (React/ReactDOM `client`, `Shell`, paylaşılan Mantine/tema ve React parçaları) | 97,4 KB (giriş parçaları `client` + `Shell` 78,5 KB, ayrıca raporlanır) | ≤ 100 KB |
 | Gezgin adası: Gereksinimler sayfasının kabuğa ek indirdiği JS | 17,3 KB | ≤ 30 KB |
-| Mermaid yükleyici (`Mermaid`); mermaid çekirdeği yalnız diyagramlı sayfada dinamik | 2,1 KB (+ mermaid parçaları isteğe bağlı) | — |
-| CSS (Mantine + global + fontsource bildirimleri) | 53,3 KB + 1,7 KB | ≤ 70 KB |
+| Mermaid yükleyici (`Mermaid`); mermaid çekirdeği yalnız diyagramlı sayfada dinamik | 2,1 KB (+ mermaid parçaları isteğe bağlı; `rail-4-keycloak` sayfasında kabuğa ek 196,4 KB, KaTeX inmez) | — |
+| CSS (Mantine + global + fontsource bildirimleri) | 53,5 KB + 1,7 KB | ≤ 70 KB |
 | Yazı tipleri (Outfit Variable latin + latin-ext; JetBrains Mono 400/600) | ilk görünümde 88,0 KB (Inter ile 172,2 KB) | ≤ 200 KB |
-| HTML: ana sayfa / tipik bölüm / Gereksinimler | 18,0 KB / 13,5 KB / 198,8 KB | 25 / 25 / 200 KB |
+| HTML: ana sayfa / tipik bölüm / Gereksinimler | 19,7 KB / 14,7 KB / 199,8 KB | 25 / 25 / 200 KB |
 
-Kabuk bütçesinin kapsamı ilk görünümün toplam JS'idir; giriş parçalarıyla daraltılmaz. Önceki "85 KB" bildirimi yalnız giriş parçalarını sayıyordu; aynı derlemenin gerçek toplamı 125,2 KB idi. Kabuktan Tooltip/ScrollArea/NavLink/ActionIcon çıkarılıp gezgin süzgeçleri düğme grubuna çevrilince 96,7 KB'a indi (tema ve gezinme düzeltmeleriyle 96,9 KB). Bütçe aşımı bir teslim engelidir. Gereksinimler sayfası sınıra yakındır (198,8 / 200 KB; liste satırı işaretlemesi sadeleştirildi): büyümeden önce SSR'da tek görünüm (kart veya tablo) üretmek ele alınır; açık iş olarak İzlenebilirlik sayfasındadır.
+Kabuk bütçesinin kapsamı ilk görünümün toplam JS'idir; giriş parçalarıyla daraltılmaz. Önceki "85 KB" bildirimi yalnız giriş parçalarını sayıyordu; aynı derlemenin gerçek toplamı 125,2 KB idi. Kabuktan Tooltip/ScrollArea/NavLink/ActionIcon çıkarılıp gezgin süzgeçleri düğme grubuna çevrilince 96,7 KB'a indi (tema ve gezinme düzeltmeleriyle 96,9 KB). Bütçe aşımı bir teslim engelidir. Gereksinimler sayfası sınıra yakındır (199,8 / 200 KB; liste satırı işaretlemesi sadeleştirildi). astro 7.3.7 → 7.4.7 yükseltmesi her sayfanın satır içi ada betiğine yaklaşık 0,2 KB gzip ekledi (aynı gün 7.3.7 ile 199,6 KB ölçüldü): büyümeden önce SSR'da tek görünüm (kart veya tablo) üretmek ele alınır; açık iş olarak İzlenebilirlik sayfasındadır.
 
 ## Teslim ve Git
 

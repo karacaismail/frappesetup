@@ -16,8 +16,7 @@ test_options=()
 if [[ "$APP" == platform_core ]]; then
     REQUIRED_APPS=(--app erpnext)
     test_options=(
-        -v "$DEV_DIR/../contracts/platform_core-kabuk.openapi.yaml:/workspace/shell.openapi.yaml:ro"
-        -e SHELL_TEST_OPENAPI=/workspace/shell.openapi.yaml
+        -e SHELL_TEST_OPENAPI=/workspace/contracts/platform_core-kabuk.openapi.yaml
     )
 fi
 python3 "$DEV_DIR/init_env.py"
