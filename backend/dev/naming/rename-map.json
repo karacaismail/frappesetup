@@ -3961,7 +3961,13 @@
     "new": "method",
     "type": "identifier",
     "paths": [
-      "backend/identity/keycloak/tests/*"
+      "backend/identity/keycloak/tests/test_account_backlog.py",
+      "backend/identity/keycloak/tests/test_create_tenant_client.py",
+      "backend/identity/keycloak/tests/test_keycloak_canli.py",
+      "backend/identity/keycloak/tests/test_second_factor.py",
+      "backend/identity/keycloak/tests/test_session_lifetimes.py",
+      "backend/identity/keycloak/tests/test_token_access_matrix.py",
+      "backend/identity/keycloak/tests/yardimci.py"
     ]
   },
   {
@@ -5312,11 +5318,62 @@
     ]
   },
   {
-    "old": "\"get_proposal\"",
-    "new": "\"plt_get_proposal\"",
+    "old": "\"get_proposal\",",
+    "new": "\"plt_get_proposal\",",
     "type": "reference",
     "paths": [
-      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+      "backend/apps/platform_core/platform_core/yapay_zeka/registry.py",
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_identity.py"
+    ]
+  },
+  {
+    "old": "\"get_proposal\":",
+    "new": "\"plt_get_proposal\":",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tools/results.py"
+    ]
+  },
+  {
+    "old": "human_call(\"call\", \"get_proposal\",",
+    "new": "human_call(\"call\", \"plt_get_proposal\",",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/proposals.py"
+    ]
+  },
+  {
+    "old": "call_tool(client, \"get_proposal\",",
+    "new": "call_tool(client, \"plt_get_proposal\",",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_approval.py",
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_backlog.py"
+    ]
+  },
+  {
+    "old": "last_log(tool=\"get_proposal\",",
+    "new": "last_log(tool=\"plt_get_proposal\",",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_backlog.py",
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_codex.py"
+    ]
+  },
+  {
+    "old": "for tool in (\"get_proposal\", \"reject_proposal\", \"resolve_proposal\"):",
+    "new": "for tool in (\"plt_get_proposal\", \"reject_proposal\", \"resolve_proposal\"):",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_codex.py"
+    ]
+  },
+  {
+    "old": "self.check(client, schemas, \"get_proposal\",",
+    "new": "self.check(client, schemas, \"plt_get_proposal\",",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_results.py"
     ]
   },
   {
