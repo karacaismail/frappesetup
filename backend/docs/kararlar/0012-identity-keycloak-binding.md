@@ -1,4 +1,4 @@
-# Karar notu 0008: kiracı sitesinin Keycloak bağı
+# Karar notu 0012: kiracı sitesinin Keycloak bağı
 
 Tarih: 22 Kasım 2026 Pazar. Sahibi: platform-core-kimlik işi. Bu not platform-core-kimlik dalının seçimlerini anlatır. Orkestratör birleştirmede gözden geçirir.
 

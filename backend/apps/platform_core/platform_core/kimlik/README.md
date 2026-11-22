@@ -16,7 +16,7 @@ Bu modül kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis be
 | `login_policy.py` | Yerel girişi kapatan kapı ve portal sayfalarının kapatılması. |
 | `jwks.py` | Anahtar listesi önbelleği. |
 | `session_policy.py` | Oturum 1 saat işlem olmazsa kapanır. Eski girişli çalışan yeniden kimlik doğrular (O-25). |
-| `anonymization.py` | Hesap silme: kullanıcıyı kapatır ve kişi alanlarını anonim yapar (O-27, karar notu 0009). |
+| `anonymization.py` | Hesap silme: kullanıcıyı kapatır ve kişi alanlarını anonim yapar (O-27, karar notu 0013). |
 | `api.py` | Telefon belirtecini doğrulayan açık işlevler. |
 | `doctype/platform_identity_link/` | Kimlik bağı kaydı. `issuer` ve `subject` çifti tekildir. |
 

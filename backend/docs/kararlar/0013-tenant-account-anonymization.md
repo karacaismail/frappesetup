@@ -1,4 +1,4 @@
-# Karar notu 0009: kiracı sitesinde hesap silme
+# Karar notu 0013: kiracı sitesinde hesap silme
 
 Tarih: 22 Kasım 2026 Pazar. Sahibi: platform-core-kimlik işi. Orkestratör birleştirmede gözden geçirir.
 
