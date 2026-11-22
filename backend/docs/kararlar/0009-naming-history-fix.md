@@ -22,12 +22,39 @@ Yayımlanmış bir uçta eski adı koruyun. Kullananlar geçince eski adı kald�
 
 `backend/dev/naming/rename-map.json` üzerinde uzlaşılan kod adlarını tutar.
 Betik bu listede yazan adları değiştirir.
-Belge başlıkları ve Türkçe anlatım korunur. Belge yolları ve teknik atıflar güncellenir.
-Kodda geçen cümlelerin çevirisi ayrı bir kontrol noktasında yapılır.
-Çeviri dosyaları, standartlar ve Pane dal adları geçiş kapsamı dışındadır.
+Betik belge içeriğini, kod yorumlarını ve görünen cümleleri korur.
+Her iş sahibi kendi etiketlerini ve iletilerini sonra çevirir (O-21).
+Betik yalnız değişen adların çeviri anahtarlarını günceller. Türkçe karşılıkları korur.
+Eski proje kaydı ve sözleşme yollarında tek satırlık bağlantı kalır (O-22).
+Standart belgeleri ve Pane dal adları geçiş kapsamı dışındadır.
 Betik geliştirme sitesine, veritabanına veya Git geçmişine yazmaz.
 Yeni site adları ve ayar anahtarları yerel kurulumda da kullanılmalıdır.
-İkinci kontrol noktasında yerel siteyi yeniden kurma adımları belgelenir.
+
+## Geliştirme sitelerini yeniden kurma
+
+O-20 yalnız gerçek veri içermeyen geliştirme siteleri için geçerlidir.
+Bu geçişte veri yaması ve `frappe.rename_doc` kullanılmaz.
+Eski siteye `bench migrate` uygulamak eski tabloyu yeni ada taşımaz.
+
+1. Orkestratör geçişi başlatınca eski Compose proje adını doğrulayın.
+2. Kendi geliştirme projenizi eski Compose adıyla kapatın.
+3. Ad değiştirme betiğini çalıştırın.
+4. Yeni örnek dosyadan yerel ortam ayarlarını hazırlayın.
+5. Kiracı ve Press test sitelerini yeni adlarla yeniden kurun.
+6. Keycloak test alanını yeni istemci adlarıyla yeniden kurun.
+7. İlgili işin test komutlarını yeniden çalıştırın.
+
+Örneğin eski proje adı `fs-kiraci-dev` ise kapatma komutu şöyledir.
+
+```sh
+docker --context colima-factory compose -p fs-kiraci-dev -f backend/dev/compose.kiraci.yaml down
+```
+
+Aşağıdaki denetim eski ayar anahtarlarını gösterir. Ayar değerlerini yazdırmaz.
+
+```sh
+python3 backend/dev/naming/apply_renames.py --check-settings backend/dev/.env /path/to/site_config.json
+```
 
 ## Kaydedilen seçenekler ve durumlar
 
@@ -37,7 +64,7 @@ Git taramasında taşınacak uygulama değeri bulunmadı.
 Türkçe seçenekler, sonunda kendi kayıtlarını silen bir testte bulundu.
 Betik bu seçenekleri `Red` ve `Blue` olarak düzeltir.
 Test verisi için taşıma yaması eklenmedi.
-Canlı sitede eski değer varsa Frappe yamasıyla taşıyın.
+İlk yayından sonra veri taşıma yaması gerekir.
 Yama alanı ve eski değeri açıkça belirtmelidir.
 Yamayı önce eski verinin bir kopyasında sınayın.
 
@@ -56,3 +83,4 @@ python3 backend/dev/naming/apply_renames.py --dry-run
 Betik taşınacak dosyaları önce denetler. Hedef doluysa betik durur.
 İş yarıda kesilirse Git farkını inceleyin. Sorunu giderince betiği yeniden çalıştırın.
 Betik yalnız Git'in izlediği dosyaları taşır.
+Betik ilgili uygulama varsa ortak sözlüğü uygulamanın köküne ekler.
