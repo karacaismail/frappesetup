@@ -83,7 +83,7 @@ def _respond(call, *args, allow_api_key=False):
 # Defer annotations so Frappe leaves JSON values to the gateway's strict validators.
 # Eager validation could coerce malformed input or change the HTTP error response.
 # Access to a route is checked by gateway.complete and policy.require_route.
-@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 def complete(
 	route: str,
 	messages: list[CompletionMessage],
@@ -96,13 +96,13 @@ def complete(
 
 
 # Gateway operations check manager permissions and record access in the service layer.
-@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 def test_api(api: str, model: str) -> CompletionResult | ErrorResponse:
 	"""Send one bounded, billable test request as an AI or site manager."""
 	return _respond(gateway.test_api, api, model)
 
 
-@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 def resolve_usage(
 	log: str, cost: str, currency: str | None = None, note: str | None = None
 ) -> ResolvedUsage | ErrorResponse:
@@ -110,19 +110,19 @@ def resolve_usage(
 	return _respond(maintenance.resolve_usage, log, cost, currency, note)
 
 
-@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 def reconcile_stale_pending() -> ReconciledPending | ErrorResponse:
 	"""Close expired reservations as unknown without releasing reserved cost."""
 	return _respond(maintenance.reconcile_stale_pending)
 
 
-@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 def purge_usage(dry_run: bool = True, preview_token: str | None = None) -> PurgedUsage | ErrorResponse:
 	"""Preview or delete closed usage records beyond the fixed 365-day retention window."""
 	return _respond(maintenance.purge_usage, dry_run, preview_token)
 
 
-@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
 def clear_api_credential(api: str) -> ClearedCredential | ErrorResponse:
 	"""Remove the credential of a disabled API connection."""
 	return _respond(maintenance.clear_api_credential, api)

@@ -6,6 +6,9 @@ rules=backend/dev/security/fixtures
 source backend/dev/security/container-settings
 semgrep=(uvx --python 3.12 --exclude-newer "$TOOL_CUTOFF" "semgrep@$SEMGREP_VERSION")
 export SEMGREP_ENABLE_VERSION_CHECK=0
+if [[ -z "${SSL_CERT_FILE:-}" && -r /etc/ssl/cert.pem ]]; then
+    export SSL_CERT_FILE=/etc/ssl/cert.pem
+fi
 
 scan_secrets() {
     # Colima cannot mount this checkout. Transfer a read-only source snapshot.
@@ -28,7 +31,7 @@ scan_rules() (
     before="$(python3 -B backend/dev/security/semgrep_exceptions.py --snapshot)" || exit 1
     "${semgrep[@]}" scan --error --strict --metrics=off --json \
         --config "$rules" \
-        --exclude 'backend/dev/security/fixtures/' --exclude 'backend/dev/security/fixtures/' backend \
+        --exclude 'backend/dev/security/fixtures/' backend \
         > "$report" || scan_status=$?
     python3 -B backend/dev/security/semgrep_exceptions.py "$report" "$scan_status" "$before"
 )

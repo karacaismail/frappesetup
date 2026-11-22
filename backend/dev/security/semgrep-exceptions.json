@@ -1,6 +1,6 @@
 {
   "scope": "backend/apps/press_tr",
-  "sha256": "991acab52e01beb0190f9e6e2aa048907a83d1da1a07ff7c2f5a75dad912cfe2",
+  "sha256": "9512e29277577579b5998e496f565b6f7b15b0eda9f7f6bed3fb2c0ca0d800a1",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
@@ -23,13 +23,13 @@
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/auth.py",
-      "line": 33,
+      "line": 41,
       "reason": "Starts browser-bound login without reading or modifying an application record."
     },
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/auth.py",
-      "line": 144,
+      "line": 152,
       "reason": "Consumes browser-bound state once and verifies ID token claims before binding identity."
     },
     {

@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[3]
 RESULTS = ROOT / ".pane/prompts/security-results"
 SECURITY = Path("backend/dev/security")
 FIXTURES = SECURITY / "fixtures"
+CONTRACT_FIXTURE = SECURITY / "contract-fixtures" / "contract.yaml"
 OSV_CONFIG = SECURITY / "osv-exceptions.toml"
 VERSIONS = dict(line.split("=", 1) for line in (ROOT / SECURITY / "tool-versions.env").read_text().splitlines())
 BANDIT = VERSIONS["BANDIT_VERSION"]
@@ -515,7 +516,7 @@ def contract_fixture_found():
         thread = threading.Thread(target=server.serve_forever)
         thread.start()
         try:
-            findings, _tested = run_contract(str(FIXTURES / "contract.yaml"), "fixture.localhost",
+            findings, _tested = run_contract(str(CONTRACT_FIXTURE), "fixture.localhost",
                                              server.server_port)
         finally:
             server.shutdown()
