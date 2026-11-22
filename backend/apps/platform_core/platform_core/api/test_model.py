@@ -313,7 +313,7 @@ class TestModelHTTP(unittest.TestCase):
 			"1023456789",
 			"TR33 0006 1005 1978 6457 8413 26",
 			"4111 1111 1111 1111",
-			"+90 532 123 45 67",
+			"+90 200 000 00 00",
 			"fixture@example.test",
 		)
 		message = " | ".join((*identifiers, "Order 12345678901234567890"))
