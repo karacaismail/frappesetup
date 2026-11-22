@@ -49,10 +49,12 @@ class TestOtherServiceEndpoints(FrappeAPITestCase):
 			if not frappe.in_test:
 				raise
 			module = types.ModuleType(MODULE)
-			module.revoke_user_installations = frappe.whitelist(methods=["POST"])(_stand_in)
+			module.revoke_user_installations = _stand_in
+			frappe.whitelisted.add(_stand_in)
+			frappe.allowed_http_methods_for_whitelisted_func[_stand_in] = ["POST"]
 			sys.modules[MODULE] = module
 			cls.stand_in = True
-			cls.addClassCleanup(cls._remove_stand_in, module.revoke_user_installations)
+			cls.addClassCleanup(cls._remove_stand_in, _stand_in)
 
 	@staticmethod
 	def _remove_stand_in(function):
