@@ -512,7 +512,7 @@
  {
   "id": "G-52",
   "title": "KVKK denetim ve saklama ayarları, kişisel veri talepleri",
-  "detail": "enable_telemetry=0, `allow_error_traceback=0`, log_api_requests=1, `apply_strict_user_permissions` kararla; Logs To Clear: Activity Log 365, Access Log 365, API Request Log 90, Error Log 30, Email Queue 30, Scheduled Job Log 14, View Log 90, Route History 90, Integration Request 90, OAuth Bearer Token 30, Webhook Request Log 30, Prepared Report 14; Permission Log LogType protokolüne uymadığı için (doğrulandı) `platform_core` günlük işi Permission Log ve Deleted Document'ı 365 günde temizler. Personal Data Download/Deletion Request akışları etkin ve her uygulama `user_data_fields` hook'unu tanımlar; Frappe 'Version' track_changes satılan tüm doctype'larda açık.",
+  "detail": "Ayarlar: enable_telemetry=0, allow_error_traceback=0, log_api_requests=1. Ekip apply_strict_user_permissions değerini ürün kararına göre ayarlar. Yönetici saklama temizliğini elle başlatır (D-6, O-32). Saklama süreleri gün cinsindendir. Activity Log, Access Log, Permission Log ve Deleted Document 365 gün saklanır. API Request Log, View Log, Route History, Integration Request ve Webhook Request Log 90 gün saklanır. Error Log, Email Queue ve OAuth Bearer Token 30 gün saklanır. Scheduled Job Log ve Prepared Report 14 gün saklanır. Uygulamalar veri talepleri için `user_data_fields` bildirir. Satılan kayıt türlerinde track_changes açıktır.",
   "rail": "R2 Frappe yapılandırma",
   "priority": "MUST",
   "phase": "P1",
@@ -522,7 +522,7 @@
  {
   "id": "G-53",
   "title": "Yetki sınırı: System Manager yalnızca operatörde, Desk erişim politikası",
-  "detail": "System Manager rolü yalnızca platform operatör hesabında kalır; kiracı admini uygulama Role Profile'ları ve 'Role Permission for Page and Report' ile sınırlı yönetim alır (System Settings, Social Login Key, Email Account'u bozamaz). Frappe'de System User'ı Desk'ten uzak tutan yerel anahtar yoktur (doğrulandı); `platform_core` `before_request` 'Platform Operator' rolü olmayan kullanıcılar için /app* ve /desk isteklerini SPA'ya yönlendirir; enable_onboarding=0, `disable_system_update_notification=1`, `disable_change_log_notification=1`, Website Settings.home_page SPA adresi.",
+  "detail": "System Manager rolü platform operatöründe kalır. Kiracı yöneticisi Website User olur. Uygulama rol profilleri yönetim kapsamını belirler. Kiracı yöneticisi System Settings, Social Login Key ve Email Account ayarlarını değiştiremez. Operatör olmayan kullanıcıları /app ve /desk yolları panele yönlendirir. Panel ana sayfa olarak ayarlanır.",
   "rail": "R2 Frappe yapılandırma",
   "priority": "MUST",
   "phase": "P1",
@@ -772,7 +772,7 @@
  {
   "id": "G-78",
   "title": "Realm güvenlik ve oturum politikaları",
-  "detail": "Login with email ON, Verify email Required, e-posta değişikliği self-service kapalı (G-57), brute force detection, parola politikası (uzunluk ≥12, geçmiş, yaygın parola), MFA: TOTP ve WebAuthn/passkey; kiracı admin ve finans rolleri için koşullu zorunlu, diğerleri için teşvik; Kiracı için boşta 1 saat ve toplam 24 saat sınırı vardır. Press için sınırlar 7 ve 30 gündür. Kaynak: proje kaydı O-25. Remember me kapalı; token lifespan 5 dk; refresh token rotation; yurt dışı aktarım yok (self-host).",
+  "detail": "Keycloak e-postayla giriş ve e-posta doğrulaması ister. Kullanıcı kendi e-posta adresini değiştiremez (G-57). Keycloak parola geçmişini ve yaygın parola listesini denetler. Parola en az 12 karakterdir. Keycloak kaba kuvvet saldırılarını sınırlar. Kiracı yönetimi ve finans rollerinde ikinci adım koşula bağlı zorunludur. Tek seferlik kod ve geçiş anahtarı kullanılabilir. Kiracı ve telefon oturumu boşta 1 saat, toplamda 24 saat sürer. Press oturumu boşta 7 gün, toplamda 30 gün sürer. Erişim belirteci 5 dakika yaşar. Yenileme belirteci her kullanımda değişir. Beni hatırla kapalıdır. Kaynak proje kaydı O-25 ve sözleşme 2. bölümdür.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P1",
@@ -782,7 +782,7 @@
  {
   "id": "G-79",
   "title": "Kayıt, davet ve çoklu uygulama tek hesap akışı",
-  "detail": "Self-registration yalnızca deneme akışında (`press_tr.api.trial.start`) Keycloak kayıt sayfası + e-posta doğrulama ile; kayıt tamamlanınca identity-sync Team/Organization ve Press hesabını açar. Takım daveti panelden: Admin API ile kullanıcı oluşturma veya mevcut kullanıcıyı Organization'a ekleme + 'execute actions email' (parola belirleme) + Press Team üyeliği + Frappe System User provizyonu. Bir Keycloak hesabı panel, Press ve tüm kiracı sitelerinde tek SSO oturumudur; disposable e-posta reddi Keycloak ve Press'te tutarlı.",
+  "detail": "Müşteri deneme kaydını Keycloak üzerinden açar ve e-postasını doğrular. identity-sync kuruluş, takım ve Press hesabını açar. Takım yöneticisi panelden davet yollar. Keycloak kişiyi kuruluşa ekler ve parola bağlantısını yollar. Sistem Press takım üyeliğini ve kiracıda Website User hesabını açar. Aynı Keycloak hesabı panel, Press ve kiracı sitelerine giriş sağlar. Press ve Keycloak geçici e-posta adreslerini reddeder.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P1",
@@ -1152,7 +1152,7 @@
  {
   "id": "G-116",
   "title": "KVKK programı ve kiracı ayrılış/silme SLA'sı",
-  "detail": "Her kiracıyla veri işleyen–veri sorumlusu sözleşmesi, VERBİS kaydı, veri envanteri (Hetzner DE/FI barındırma da Türkiye dışı aktarımdır; SMTP sağlayıcısı, GlitchTip, Anthropic ve etkinleştirilen ölçüm satıcıları dahil tüm yurt dışı alıcılar), Kurul standart sözleşmesi ve imzadan sonra 5 iş günü içinde Kurula bildirim (7499 sonrası KVKK duyurusu; uygulanabilirliği ve aktarım mekanizması hukuk teyidi), veri ihlali 72 saat runbook'u, panel ilk girişte aydınlatma kaydı, saklama/imha politikası (G-24, G-52 süreleriyle aynı). Ayrılış: `Site.archive(create_offsite_backup=True)` → sözleşmedeki saklama süresi (karar: 30 gün) sonunda `delete_offsite_backups(keep_latest=False)` + `delete_physical_backups`, Site Config'teki Password sırlarının temizliği, Hetzner nesnelerinin silindiğinin doğrulanması ve imzalı silme teyidi; Press'in kendi kişisel verileri (Team, Account Request, Site Activity) için ayrı süre; Team Deletion Request akışı belgelenir.",
+  "detail": "Her kiracıyla veri işleyen–veri sorumlusu sözleşmesi, VERBİS kaydı, veri envanteri (Hetzner DE/FI barındırma da Türkiye dışı aktarımdır; SMTP sağlayıcısı, GlitchTip, model sağlayıcıları ve etkinleştirilen ölçüm satıcıları dahil tüm yurt dışı alıcılar), Kurul standart sözleşmesi ve imzadan sonra 5 iş günü içinde Kurula bildirim (7499 sonrası KVKK duyurusu; uygulanabilirliği ve aktarım mekanizması hukuk teyidi), veri ihlali 72 saat runbook'u, panel ilk girişte aydınlatma kaydı, saklama/imha politikası (G-24, G-52 süreleriyle aynı). Ayrılış: `Site.archive(create_offsite_backup=True)` → sözleşmedeki saklama süresi (karar: 30 gün) sonunda `delete_offsite_backups(keep_latest=False)` + `delete_physical_backups`, Site Config'teki Password sırlarının temizliği, Hetzner nesnelerinin silindiğinin doğrulanması ve imzalı silme teyidi; Press'in kendi kişisel verileri (Team, Account Request, Site Activity) için ayrı süre; Team Deletion Request akışı belgelenir.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P2",
@@ -1772,7 +1772,7 @@
  {
   "id": "SA-24",
   "title": "Superadmin paneli operatör modu ekranları",
-  "detail": "React kabuğu Keycloak operatör rolüyle operatör moduna geçer: Müşteri 360, Tahsilat ve kredi (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), Abonelik ve modüller, Destek (HD Ticket + Support Access + Support Session), Tahsilat aşaması, KVKK denetim raporu, gece mutabakat farkları. Ant Design tokenları, 320 px'den başlayan akışkan yerleşim; panel kendi veri tabanı tutmaz, yazma `press_tr.api.ops` veya ops sitesine gider.",
+  "detail": "React kabuğu Keycloak operatör rolüyle operatör moduna geçer: Müşteri 360, Tahsilat ve kredi (bakiye, BT ekstresi, kredi tahsisi, bekleyen EFT kuyruğu, iade), Abonelik ve modüller, Destek (HD Ticket + Support Access + Support Session), Tahsilat aşaması, KVKK denetim raporu, elle başlatılan mutabakat farkları. Ant Design tokenları, 320 px'den başlayan akışkan yerleşim; panel kendi veri tabanı tutmaz, yazma press_tr.api.ops veya ops sitesine gider.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
@@ -1861,8 +1861,8 @@
  },
  {
   "id": "SA-33",
-  "title": "iyzico hak ediş mutabakatı ve gece mutabakat raporu",
-  "detail": "Zamanlanmış SFTP çekimi (`report.iyzipay.com`; transaction/cutoff günlük 01:00 TRT, settlement payout döngüsünde) → 'Iyzico Settlement Line' → ödeme başına komisyon kesintili Payment Entry, payout toplamı Bank Transaction ile eşleşir (anahtar conversationId → Press Invoice). Gece işi Press Paid Invoice ↔ Sales Invoice, Balance Transaction ↔ Payment Entry/avans, Iyzico Payment Record ↔ settlement farklarını Error Log + panel uyarısı olarak üretir; BillingAudit kontrolleri korunur.",
+  "title": "iyzico hak ediş mutabakatı ve elle başlatılan mutabakat raporu",
+  "detail": "Zamanlanmış SFTP çekimi (report.iyzipay.com; transaction/cutoff günlük 01:00 TRT, settlement payout döngüsünde) → 'Iyzico Settlement Line' → ödeme başına komisyon kesintili Payment Entry, payout toplamı Bank Transaction ile eşleşir (anahtar conversationId → Press Invoice). Gece işi Press Paid Invoice ↔ Sales Invoice, Balance Transaction ↔ Payment Entry/avans, Iyzico Payment Record ↔ settlement farklarını Error Log + panel uyarısı olarak üretir; BillingAudit kontrolleri korunur.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
@@ -1942,7 +1942,7 @@
  {
   "id": "SA-41",
   "title": "Finans olay–belge matrisi ve tek kayıt kuralı",
-  "detail": "Hizmet tahakkuku, Press faturasının kesinleşmesi, kart tahsilatı, EFT, kredi yükleme, kredi tüketimi, iade/kısmi iade ve itiraz için tek tablo: Press kaydı, operasyon sitesi belgesi, tetik, idempotensi anahtarı ve karar sahibi. Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi ya satış faturası ya avans kaydı olur, ikisi birden olmaz; aynı ekonomik olay iki yoldan kaydedilmez. Vergi ve belge zamanlaması (yükleme anında fatura mı, tüketimde mi; ödenmemiş faturanın e-belge zamanı) mali müşavirle kapanır (K-13); G-22, SA-19 ve SA-21 bu matrise göre uygulanır. Bu doküman yeni vergi veya muhasebe politikası seçmez. Kabul: her satır için çift kayıt ve eksik kayıt testi; gece mutabakatında fark sıfır.",
+  "detail": "Hizmet tahakkuku, Press faturasının kesinleşmesi, kart tahsilatı, EFT, kredi yükleme, kredi tüketimi, iade/kısmi iade ve itiraz için tek tablo: Press kaydı, operasyon sitesi belgesi, tetik, idempotensi anahtarı ve karar sahibi. Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi ya satış faturası ya avans kaydı olur, ikisi birden olmaz; aynı ekonomik olay iki yoldan kaydedilmez. Vergi ve belge zamanlaması (yükleme anında fatura mı, tüketimde mi; ödenmemiş faturanın e-belge zamanı) mali müşavirle kapanır (K-13); G-22, SA-19 ve SA-21 bu matrise göre uygulanır. Bu doküman yeni vergi veya muhasebe politikası seçmez. Kabul: her satır için çift kayıt ve eksik kayıt testi; elle başlatılan mutabakatında fark sıfır.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P2",

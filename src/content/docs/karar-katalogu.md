@@ -43,7 +43,7 @@ Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez,
 
 | ID | Karar | Durum | Kaynak | Yer |
 | --- | --- | --- | --- | --- |
-| AI-01 | Resmi AI katmanı üretime hazır değil (`frappe/mcp` ve Flow deneysel, `frappe/skills` geliştirici aracı). Raven 1 Ocak 2026'dan resmi: mesajlaşma sınıf A, Raven AI ajanları B ve kapalı. | Kesin | AE | [Agents](/frappesetup/ai-agents/) |
+| AI-01 | Resmi AI katmanı üretime hazır değil (`frappe/mcp` arşivlendi, Flow deneysel, `frappe/skills` geliştirici aracı). Raven 1 Ocak 2026'dan resmi: mesajlaşma sınıf A, Raven AI ajanları B ve kapalı. | Kesin | AE | [Agents](/frappesetup/ai-agents/) |
 | AI-02 | Sınıf üretim güvenliği ve olgunluktur (A, B, C), depo başına gerekçeli. | Kesin | AE | [Agents](/frappesetup/ai-agents/) |
 | AI-03 | Dört yetki seviyesi: yalnız okur, öneri verir, veriyi değiştirir, otomatik aksiyon alır. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
 | AI-04 | Seviye 3 ve 4 yalnız taslak üretir, submit yetkisi olmaz; öğrenci, ücret ve muhasebe doctype'larında kapalıdır (EDU sitesi). | Çelişki | AE | K-53 |
@@ -51,7 +51,7 @@ Kullanıcının araştırma notlarından çıkan kararlar; her ihtiyaç bir kez,
 | AI-06 | Frappe Assistant Core en olgun MCP (sınıf B, tek kişiye bağlı); yalnız beta ortamında Python, SQL ve silme araçları kapalı denenir. Lisans v2.0.0'da MIT'den AGPL'ye geçti. | Koşullu | AE | [MCP](/frappesetup/ai-mcp/) |
 | AI-07 | Geliştirici skill paketleri geliştirme ortamında kurulur, siteye kurulmaz; üretilen kod yine incelenir. | Kesin | AE | [Skills](/frappesetup/ai-skills/) |
 | AI-08 | beta ortamında denenecek: Jarvis (hazırla-onayla, Trigger kapalı), Huf (Ollama, LiteLLM sürümü sabit), Builder Bob (yalnız pazarlama sayfası, onay açık). | Koşullu | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
-| AI-09 | İzlenecek: Flow tam sürümü, Grove, Studio, frappectl, yerel OCR belge kuyruğu, Helpdesk AI, Raven V3 sağlayıcıları, `frappe/mcp` kararlı sürümü. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
+| AI-09 | İzlenecek: Flow tam sürümü, Grove, Studio, frappectl, yerel OCR belge kuyruğu, Helpdesk AI, Raven V3 sağlayıcıları. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
 | AI-10 | Kaçınılacak: otomatik ana veri üreten OCR ve submit yetkili ajan. | Kesin | AE | [AI genel bakış](/frappesetup/ai-bakis/) |
 | AI-11 | Öğrenci verisine dokunan yapay zekâ yerel modelle sınırlı; dış LLM yalnız anonim içerik ve kod geliştirme için. GPU'suz sunucuda yalnız 7–8B model, yalnız sınıflandırma ve özetleme. | Çelişki | AE | K-54 |
 | AI-12 | Huf'ta LiteLLM PyPI tedarik zinciri olayı (24 Mart 2026): LiteLLM sürümü sabitlenir (güvenli ≤ 1.82.6). | Kesin | AE | [Agents](/frappesetup/ai-agents/) |

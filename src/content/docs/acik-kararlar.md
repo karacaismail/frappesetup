@@ -63,7 +63,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | K-38 | Magic link (KM-10) | Ürün sahibi | Özgün eklenti (bağımsız güvenlik incelemesiyle) / Phase Two ile ticari lisans / ertele | Notta öneri yok | — |
 | K-39 | Telefonla giriş (KM-11) | Ürün sahibi | E-postayla tanıma + SMS kodu / telefon = kullanıcı adı / özgün authenticator | Notta öneri yok; ilk seçenek bugün mümkün | — |
 | K-40 | E-postasız hesap (KM-12) | Ürün sahibi | E-posta zorunlu / ayrı model | Repo e-posta zorunlu varsayar | — |
-| K-41 | Oturum süreleri (KM-14) | Karar verildi | Boşta kalma ve toplam süre | Kiracı için 1 saat ve 24 saat. Press için 7 gün ve 30 gün. Kaynak: proje kaydı O-25. | |
+| K-41 | Oturum süreleri (KM-14) | Karar verildi | Boşta kalma ve toplam süre | Kiracı için 1 saat ve 24 saat. Press için 7 gün ve 30 gün. Kaynak: proje kaydı O-25. | Uygulanmaz |
 | K-42 | Giriş süresi hedefi (KM-15) | Ürün sahibi | Yük altında azami süre | PERF-01 k6 hipotezdir, sayı yok | — |
 | K-43 | Teknik inceleyici (KM-16) | Ürün sahibi | Ekipten geliştirici / dış güvenlik danışmanı | Notta öneri yok | — |
 | K-44 | Casdoor yeniden değerlendirme (KM-13) | Ürün sahibi | Hedef sürümde CERT/CC bildirimlerinin ve CVE-2026-90942'nin düzeldiği gösterilir; yeni imza/anahtar sınıfı kritik açık yok; bildirimlere yanıt veren güvenlik süreci | Koşullar sağlanana kadar aday değil | — |

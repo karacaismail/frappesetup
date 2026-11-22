@@ -67,7 +67,7 @@ Bu kontrol listesi, satılan her uygulamanın (HRMS TR, CRM, Webshop) içine otu
 
 | Kalem | Backend kaynağı | Yöntem | G-id |
 | --- | --- | --- | --- |
-| Takım üyeleri ve davet (Keycloak kullanıcı + Press Team + Frappe System User tek akışta) | `press_tr.api.team.invite`, identity-sync | develop (press\_tr, platform\_core) | G-16, G-79, G-81 |
+| Takım üyeleri ve davet (Keycloak kullanıcı + Press Team + kiracıda Website User tek akışta) | `press_tr.api.team.invite`, identity-sync | develop (press\_tr, platform\_core) | G-16, G-79, G-81 |
 | Press Role bayrakları ve kaynak kısıtı | Press Role, Press Role Permission | configure | G-16 |
 | Role Profile atama ve rol matrisi (doctype × izin × permlevel) | `permission_manager` API'leri | native | G-62, G-98 |
 | Access Rule editörü: kapsam, filtre oluşturucu, önizleme | Access Rule doctype, `permission_query_conditions`/`has_permission` | develop (platform\_core) | G-60, G-98 |
@@ -81,8 +81,8 @@ Bu kontrol listesi, satılan her uygulamanın (HRMS TR, CRM, Webshop) içine otu
 | `@ant-design/x` Bubble/Sender/Conversations/Prompts/ThoughtChain/Actions, SSE akışı, 320 px'te Drawer | sağlayıcıdan bağımsız agent servisi ve `platform_core` model geçidi | develop (`@platform/ai-sidebar`, agent) | G-83, G-88 |
 | Sayfa bağlamı ve uygulamanın tek tık Prompts manifesti | `AppModule` AI sözleşmesi, `ai_tools` hook | develop | G-88, G-105 |
 | Yetki eşitliği: sitenin kullanıcı adına bastığı kısa ömürlü aracı belirteci (G-148) ve kullanıcıya bağlı Press bearer'ı | `auth_hooks` adaptörü, Press OAuth Client | develop + configure | G-59, G-82, G-85 |
-| Önizle+onayla, yıkıcı/ücretli sınıflandırma | confirm bayrağı + önizleme hash'i | develop (agent, press\_tr MCP) | G-27, G-86 |
-| AI Action Log, kullanım ve kota göstergesi, takım düzeyinde AI kapatma | AI Action Log doctype, App Plan features | develop | G-64, G-87, G-90, G-92 |
+| Yazma önerisi ve önizleme | İnsan kendi oturumundan ayrı uçla onay verir. | develop | G-86 |
+| İşlem denetimi, kullanım ve kota | AI Action Log işlemi tutar. AI Usage Log model, token ve maliyeti tutar. App Plan kotayı belirler. | develop | G-64, G-87, G-90, G-92 |
 
 ## 8. Bildirim, denetim ve destek
 
@@ -118,7 +118,7 @@ Her bölüm yukarıdaki ekranları aynı katmandan üretir; bu katman olmadan sh
 | Faturalama sayfası: geçmiş faturalar + e-Arşiv PDF'i, yaklaşan fatura, EFT talimatı (ödeme referans kodu PRS-… ve IBAN), iyzico Checkout Form, ödeme yöntemi değiştirme | `press.api.billing.past_invoices`, `invoice_pdf`, `upcoming_invoice`, `press_tr.api.billing.create_iyzico_checkout_form` | native (API) + develop (UI) | SA-4, SA-8, G-96 |
 | Sürümlü yasal belge onay kapısı: aydınlatma, açık rıza, çerez ve abonelik sözleşmesi sürümü değişince yeniden onay | platform\_core `Legal Document Acceptance` (belge, sürüm, hash, kullanıcı, zaman) | develop (platform\_core, `@platform/shell`) | SA-36, G-23 |
 | Bildirim merkezi ek türleri: Security Alert (impersonation), Support Access durum değişimi, ödeme hatırlatma ve askıya alma uyarıları | Frappe Notification Log, Press Notification | configure + develop (UI) | SA-28, SA-13, G-100 |
-| Operatör modu anahtarı: yalnız `operator.` origin'inde (dışında rol kabuğu değiştirmez) Keycloak `ops-*` rolü için aynı kabuk operatör navigasyonunu (Müşteri 360, Tahsilat ve kredi, Abonelik ve modüller, Destek, Tahsilat aşaması, KVKK denetim raporu, gece mutabakat farkları) açar; tenant verisi ile operatör verisi aynı ekranda karışmaz | `platform_core.api.ops.customer_360`, `press.api.client.*`, `press_tr.api.ops` (BFF) | develop (`@platform/shell`, BFF) | SA-24, SA-25 |
+| Operatör modu yalnız `operator.` adresinde açılır. Keycloak `ops-*` rolleri operatör menüsünü açar. Menüde elle başlatılan mutabakat farkları görünür. Kiracı ve operatör verisi ayrı ekranlarda kalır. | `platform_core.api.ops.customer_360`, `press.api.client.*`, `press_tr.api.ops` (BFF) | develop (`@platform/shell`, BFF) | SA-24, SA-25 |
 | Modül aktivasyon durumu: Marketplace App Subscription durumuna göre Workspace/modül görünürlüğü ve 'Modül satın al / plan değiştir' eylemi | Press `Marketplace App Subscription`, `press.api.marketplace.change_app_plan`, `get_subscription_info` | native (API) + develop (UI) | SA-16, G-30, G-95 |
 
 ## 11. Kabul ölçütleri

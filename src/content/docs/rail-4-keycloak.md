@@ -184,21 +184,23 @@ Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse
 
 **Kabul (P0/P1/P2):** Keycloak HA ve public host'ta yönetim uçlarının kapalı olması (P0); Keycloak ile Press'e giriş ve `(iss, sub)` eşleme testleri (P1); özel alan adında giriş-çıkış (P2, G-124); test kiracısında etkileşimsiz SSO; panel çıkışı sonrası Keycloak account console'da oturum yok; 'Sign out all sessions' sonrası Frappe 60 sn içinde 401; davet edilen kullanıcı tek hesapla panel, Press ve kiracı sitede oturum açar; e-posta değişikliği yalnızca identity-sync yoluyla; bir Keycloak düğümü kapatıldığında giriş kesintisiz.
 
-## Oturum süreleri
+## 9. Oturum süreleri
 
-| Ayar | Kiracı ve telefon | Press |
+İlk sürümde kiracı sitesi ve telefon paketi herkese çalışan oturum sürelerini uygular. Keycloak bu istemcilerde `employee` düzeyini ister. Müşteri oturum süresi yalnız Press için geçerlidir.
+
+| Ayar | Kiracı sitesi ve telefon | Press |
 | --- | --- | --- |
 | Boşta kalma sınırı | 1 saat | 7 gün |
 | Toplam oturum süresi | 24 saat | 30 gün |
 | Erişim belirteci süresi | 5 dakika | 5 dakika |
 
-Telefon uygulaması arka plandayken çalışan için 2 dakika sonra kilitlenir. Müşteri için bu süre 5 dakikadır.
+Telefon paketi arka planda 2 dakika sonra kilitlenir. Paket internetsiz erişimi 24 saat açık tutar. Tarayıcıdan kurulan uygulamada bu süre 8 saattir. Frappe çerezi boşta 1 saat sonra kapanır. Uygulama çıkıştan sonra taslakları 7 gün saklar.
 
-Telefona kurulan uygulama çevrimdışı erişimi çalışan için 24 saat açık tutar. Müşteri için bu süre 72 saattir. Tarayıcıdan kurulan uygulama çalışan için 8 saat çevrimdışı erişim verir. Müşteri için bu süre 24 saattir. Uygulama çıkıştan sonra taslakları 7 gün saklar.
+Arka plan eşitlemesi oturumu uzatmaz. Süre dolunca uygulama eşitlemeyi durdurur ve Keycloak ile yeniden giriş ister.
 
-**Kaynak:** Proje kaydı O-25 ve sözleşme 2. bölüm.
+**Kaynak:** Proje kaydı O-25 ile sözleşmenin 2. ve 3. bölümleri.
 
-## Hesap silme
+## 10. Hesap silme
 
 Müşteri deneme kaydında hesabını açabilir. Çalışan hesabını davetle açar. Hesap silme ilk sürümün kapsamındadır.
 
