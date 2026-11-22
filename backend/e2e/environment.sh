@@ -83,7 +83,15 @@ case "${1:-}" in
             "${compose[@]}" up --no-build -d kiraci-web kiraci-socket
         fi
         "$dev_dir/bin/tunel" kapat
-        "$dev_dir/bin/tunel" ac "$KIRACI_WEB_PORT" "$KIRACI_SOCKET_PORT" "$provider_port"
+        forward_ports=()
+        for port in "$KIRACI_WEB_PORT" "$KIRACI_SOCKET_PORT" "$provider_port"; do
+            if ! nc -z 127.0.0.1 "$port" 2>/dev/null; then
+                forward_ports+=("$port")
+            fi
+        done
+        if [[ -n "${forward_ports[0]-}" ]]; then
+            "$dev_dir/bin/tunel" ac "${forward_ports[@]}"
+        fi
         printf 'Tenant URL: http://kiraci1.localhost:%s\n' "$KIRACI_WEB_PORT"
         ;;
     down)
