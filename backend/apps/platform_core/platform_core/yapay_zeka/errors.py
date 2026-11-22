@@ -1,10 +1,14 @@
-"""Katmanın ret türü."""
+"""The denial type of the layer."""
+
+# Translation context of every user-visible message of this layer (O-23). A context keeps the
+# layer's Turkish text from overriding Frappe's own translation of the same English words.
+CONTEXT = "platform_core.yapay_zeka"
 
 
 class ToolDenied(Exception):
-	"""Araç çağrısının bilinen bir nedenle reddi.
+	"""Denial of a tool call for a known reason.
 
-	`code` değeri sözleşmedeki `DenyReason` listesinden gelir ve günlüğe yazılır.
+	The `code` value comes from the `DenyReason` list in the contract and is written to the log.
 	"""
 
 	def __init__(self, code: str, message: str):

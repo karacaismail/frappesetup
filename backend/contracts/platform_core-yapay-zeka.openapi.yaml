@@ -1,51 +1,68 @@
 openapi: 3.1.0
 info:
-  title: platform_core yapay zekâ erişim katmanı
+  title: platform_core AI access layer
   version: 0.1.0
-  summary: MCP ucu, aracı belirteci ve insan onayı uçları.
+  summary: MCP endpoint, agent token and human approval endpoints.
   description: |
-    Bu sözleşme `platform_core.yapay_zeka` modülünün uçlarını tarif eder.
-    Karar notu `docs/kararlar/0002-yapay-zeka-katmani.md` dosyasıdır.
+    This contract describes the endpoints of the `platform_core.yapay_zeka` module.
+    The decision note is the file `docs/kararlar/0002-yapay-zeka-katmani.md`.
 
-    Kimlik türleri:
+    Identity types:
 
-    - İnsan oturumu: Frappe oturum çerezi ve `X-Frappe-CSRF-Token` başlığı.
-      `Authorization` başlığı taşıyan istek insan oturumu sayılmaz.
-    - Aracı belirteci: `Authorization: Bearer fsat_...` başlığı. Yalnız MCP ucunda geçer.
+    - Human session: the Frappe session cookie and the `X-Frappe-CSRF-Token` header.
+      A request that carries an `Authorization` header does not count as a human session.
+    - Agent token: the `Authorization: Bearer fsat_...` header. It is valid only on the MCP endpoint.
 
-    API anahtarı ve OAuth belirteci bu uçlarda kabul edilmez.
-    Hem çerez hem `Authorization` başlığı taşıyan istek reddedilir.
+    API keys and OAuth tokens are not accepted on these endpoints.
+    A request that carries both a cookie and an `Authorization` header is denied.
 
-    Hiçbir şemada `confirm`, `approved` ya da `force` alanı yoktur.
-    Onay yalnız `approve_proposal` ucundan ve yalnız insan oturumundan gelir.
+    No schema has a `confirm`, `approved` or `force` field.
+    Approval comes only from the `approve_proposal` endpoint and only from a human session.
+
+    An approval is valid only for the preview the human saw. At approval the server previews again
+    and compares the whole preview and its target with what it stored. If they differ, nothing runs,
+    the answer is `document_changed`, and a new proposal with a new human approval is needed.
+
+    What is written to the AI Action Log:
+
+    - every tool call on the MCP endpoint, allowed or denied;
+    - every denial of a request whose user is known, on every endpoint;
+    - every approval, rejection, execution and resolution.
+
+    What is not written to the AI Action Log:
+
+    - a successful GET request (`list_proposals`, `get_proposal`). A read writes no row and commits nothing;
+    - a request without a known user: a guest, or an unknown or expired token;
+    - a request that Frappe refuses before the endpoint runs, for example an expired session (401) or a
+      guest (403). The evidence for those is the web server's access log, not this log.
 servers:
   - url: /api/method
-    description: Kiracı sitesinin Frappe uç kökü
+    description: Frappe endpoint root of the tenant site
 tags:
   - name: mcp
-    description: Modelin kullandığı MCP ucu
+    description: The MCP endpoint the model uses
   - name: belirtec
-    description: Aracı belirteci
+    description: Agent token
   - name: oneri
-    description: Yazma önerileri ve insan onayı
+    description: Write proposals and human approval
   - name: yonetim
-    description: Elle başlatılan bakım komutları
+    description: Maintenance commands started by hand
 
 paths:
   /platform_core.api.ai.mcp:
     post:
       tags: [mcp]
       operationId: mcp
-      summary: MCP ucu (Streamable HTTP, tek JSON yanıt).
+      summary: MCP endpoint (Streamable HTTP, single JSON response).
       description: |
-        JSON-RPC 2.0 isteği alır. Desteklenen yöntemler `initialize` (yalnız 2025-11-25),
-        `server/discover` (yalnız 2026-07-28), `ping`, `tools/list` ve `tools/call` olur.
-        Uç oturum tutmaz. Yanıt akış değil, tek JSON'dur. Bildirim 202 döner.
+        Takes a JSON-RPC 2.0 request. The supported methods are `initialize` (2025-11-25 only),
+        `server/discover` (2026-07-28 only), `ping`, `tools/list` and `tools/call`.
+        The endpoint keeps no session. The response is a single JSON, not a stream. A notification returns 202.
 
-        Okuma araçları kullanıcının izniyle çalışır. Yazma araçları kaydı değiştirmez.
-        Yazma aracı bir öneri açar ve `approval_required` durumunu döner.
-        Araç hatası HTTP hatası değildir. Araç hatası `isError: true` taşıyan sonuçtur.
-        Her çağrı ve her ret “AI Action Log” kaydına yazılır.
+        Read tools run with the user's permission. Write tools do not change the document.
+        A write tool opens a proposal and returns the `approval_required` status.
+        A tool error is not an HTTP error. A tool error is a result that carries `isError: true`.
+        Every call and every denial is written to an "AI Action Log" record.
       security:
         - insanOturumu: []
         - araciBelirteci: []
@@ -53,22 +70,22 @@ paths:
         - name: MCP-Protocol-Version
           in: header
           required: false
-          description: 2026-07-28 sürümünde zorunludur. Yoksa 2025-11-25 varsayılır.
+          description: Required in version 2026-07-28. If it is missing, 2025-11-25 is assumed.
           schema: {type: string, enum: ["2026-07-28", "2025-11-25"]}
         - name: Mcp-Method
           in: header
           required: false
-          description: 2026-07-28 sürümünde zorunludur. Gövdedeki `method` ile aynı olmalıdır.
+          description: Required in version 2026-07-28. It must be the same as `method` in the body.
           schema: {type: string}
         - name: Mcp-Name
           in: header
           required: false
-          description: 2026-07-28 sürümünde `tools/call` için zorunludur. Araç adıyla aynı olmalıdır.
+          description: Required for `tools/call` in version 2026-07-28. It must be the same as the tool name.
           schema: {type: string}
         - name: Mcp-Conversation-Id
           in: header
           required: false
-          description: İstemcinin konuşma kimliği. Günlükte `session_id` alanına yazılır. Güvenilmeyen metindir.
+          description: The client's conversation id. It is written to the `session_id` field of the log. It is untrusted text.
           schema: {type: string, maxLength: 140}
       requestBody:
         required: true
@@ -77,33 +94,33 @@ paths:
             schema: {$ref: "#/components/schemas/JsonRpcRequest"}
       responses:
         "200":
-          description: JSON-RPC sonucu ya da JSON-RPC hatası.
+          description: JSON-RPC result or JSON-RPC error.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/JsonRpcResponse"}
-        "202": {description: Bildirim kabul edildi. Gövde yoktur.}
-        "400": {description: "Geçersiz JSON-RPC gövdesi, başlık uyuşmazlığı ya da desteklenmeyen sürüm. Kimliği bilinen kullanıcının erken reddi günlüğe `protocol_error` ya da `origin_not_allowed` koduyla yazılır."}
-        "401": {description: "Belirteç bilinmiyor, süresi dolmuş, bağlı oturumu bitmiş ya da çağrı hakkı tükenmiş."}
-        "403": {description: "İstek kimlik taşımıyor, köken izinli değil, kimlik türü kabul edilmiyor ya da çerezle belirteç birlikte geldi. Uç misafire açık değildir. Frappe kimliksiz isteği 403 ile reddeder."}
-        "404": {description: Bilinmeyen yöntem ya da bilinmeyen araç.}
-        "406": {description: "`Accept` başlığı `application/json` değerine izin vermiyor."}
-        "415": {description: "`Content-Type` değeri `application/json` değil."}
+        "202": {description: Notification accepted. There is no body.}
+        "400": {description: "Invalid JSON-RPC body, header mismatch or unsupported version. The early denial of a user whose identity is known is written to the log with the code `protocol_error` or `origin_not_allowed`."}
+        "401": {description: "The token is unknown, has expired, its bound session has ended or its call allowance is used up."}
+        "403": {description: "The request carries no identity, the origin is not allowed, the identity type is not accepted or a cookie came together with a token. The endpoint is not open to guests. Frappe denies a request without identity with 403."}
+        "404": {description: Unknown method or unknown tool.}
+        "406": {description: "The `Accept` header does not allow the value `application/json`."}
+        "415": {description: "The `Content-Type` value is not `application/json`."}
 
   /platform_core.api.ai.issue_agent_token:
     post:
       tags: [belirtec]
       operationId: issueAgentToken
-      summary: İnsan oturumundan kısa ömürlü aracı belirteci üretir.
+      summary: Issues a short-lived agent token from a human session.
       description: |
-        Belirteç 300 saniye ve en çok 20 araç çağrısı için geçerlidir. Belirteç yalnız MCP ucunda geçer.
-        Belirteç, isteği yapan Frappe oturumuna bağlıdır. Oturum kapanınca belirteç geçersiz olur.
-        Sunucu belirtecin yalnız özetini saklar. Belirteç yalnız bu yanıtta görünür.
-        Belirteci tarayıcı deposuna yazmayın. Yalnız bellekte tutun (G-148).
+        The token is valid for 300 seconds and at most 20 tool calls. The token is valid only on the MCP endpoint.
+        The token is bound to the Frappe session that made the request. When the session ends, the token becomes invalid.
+        The server stores only the digest of the token. The token is visible only in this response.
+        Do not write the token to browser storage. Keep it only in memory (G-148).
       security: [{insanOturumu: []}]
       responses:
-        "401": {description: "Oturumun süresi dolmuş. Frappe ucu çağırmadan reddeder. İstemci yeniden giriş ister."}
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
         "200":
-          description: Belirteç üretildi.
+          description: The token was issued.
           content:
             application/json:
               schema:
@@ -111,17 +128,17 @@ paths:
                 required: [message]
                 properties:
                   message: {$ref: "#/components/schemas/AgentToken"}
-        "403": {description: İstek insan oturumundan gelmedi.}
+        "403": {description: The request did not come from a human session.}
 
   /platform_core.api.ai.list_proposals:
     get:
       tags: [oneri]
       operationId: listProposals
-      summary: Oturumdaki kullanıcının yazma önerilerini sayfa sayfa listeler.
+      summary: Lists the write proposals of the session user page by page.
       description: |
-        Yalnız kullanıcının kendi önerileri döner. En yeni öneri başta gelir.
-        Süzme ve sayfalama veritabanında yapılır. Sonraki sayfa için `start` değerini `limit` kadar artırın.
-        Başarılı okuma günlüğe yazılmaz. Reddedilen okuma yazılır.
+        Only the user's own proposals are returned. The newest proposal comes first.
+        Filtering and paging are done in the database. For the next page, increase `start` by `limit`.
+        A successful read is not written to the log. A denied read is written.
       security: [{insanOturumu: []}]
       parameters:
         - name: status
@@ -135,12 +152,12 @@ paths:
         - name: start
           in: query
           required: false
-          description: Atlanacak öneri sayısı.
-          schema: {type: integer, minimum: 0, default: 0}
+          description: Number of proposals to skip.
+          schema: {type: integer, minimum: 0, maximum: 10000, default: 0}
       responses:
-        "401": {description: "Oturumun süresi dolmuş. Frappe ucu çağırmadan reddeder. İstemci yeniden giriş ister."}
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
         "200":
-          description: Öneri listesi.
+          description: List of proposals.
           content:
             application/json:
               schema:
@@ -155,16 +172,16 @@ paths:
                         type: array
                         items: {$ref: "#/components/schemas/Proposal"}
                       has_next_page: {type: boolean}
-        "403": {description: İstek insan oturumundan gelmedi.}
+        "403": {description: The request did not come from a human session.}
 
   /platform_core.api.ai.get_proposal:
     get:
       tags: [oneri]
       operationId: getProposal
-      summary: Bir önerinin önizlemesini, özetini ve durumunu döner.
+      summary: Returns the preview, digest and status of a proposal.
       description: |
-        İnsan bu yanıttaki önizlemeyi okur. Onay isteği bu yanıttaki `digest` değerini taşır.
-        Başarılı okuma günlüğe yazılmaz. Reddedilen okuma yazılır.
+        The human reads the preview in this response. The approval request carries the `digest` value from this response.
+        A successful read is not written to the log. A denied read is written.
       security: [{insanOturumu: []}]
       parameters:
         - name: proposal_id
@@ -172,9 +189,9 @@ paths:
           required: true
           schema: {type: string}
       responses:
-        "401": {description: "Oturumun süresi dolmuş. Frappe ucu çağırmadan reddeder. İstemci yeniden giriş ister."}
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
         "200":
-          description: Öneri.
+          description: The proposal.
           content:
             application/json:
               schema:
@@ -182,32 +199,32 @@ paths:
                 required: [message]
                 properties:
                   message: {$ref: "#/components/schemas/Proposal"}
-        "403": {description: İstek insan oturumundan gelmedi ya da öneri başka kullanıcıya ait.}
-        "404": {description: Öneri yok.}
+        "403": {description: The request did not come from a human session or the proposal belongs to another user.}
+        "404": {description: The proposal does not exist.}
 
   /platform_core.api.ai.approve_proposal:
     post:
       tags: [oneri]
       operationId: approveProposal
-      summary: Öneriyi onaylar ve işi bu istekte yürütür.
+      summary: Approves the proposal and executes the action in this request.
       description: |
-        YIKICI OLABİLİR. Bu uç kaydı oluşturur, değiştirir, onaya gönderir, iptal eder ya da siler.
-        Uygulama aracı ücretli bir iş de başlatabilir. Önerideki `destructive` ve `billable` alanlarına bakın.
+        CAN BE DESTRUCTIVE. This endpoint creates, changes, submits, cancels or deletes a document.
+        An application tool can also start a billable action. Check the `destructive` and `billable` fields of the proposal.
 
-        Yazan her insan isteği `X-Frappe-CSRF-Token` başlığını taşır. Oturumda CSRF belirteci yoksa istek reddedilir.
-        Onay tek kullanımlıktır. Sunucu sırayla şunları denetler: insan oturumu, aynı kullanıcı,
-        `pending` durumu, süre, özet eşleşmesi, kaydın değişmemiş olması, güncel izin ve
-        aynı hedefte sonucu bilinmeyen iş.
-        Denetim başarısızsa iş yürümez ve yanıt `executed: false` ile ret nedenini taşır.
+        Every human request that writes carries the `X-Frappe-CSRF-Token` header. If the session has no CSRF token, the request is denied.
+        An approval can be used only once. The server checks these in order: human session, same user,
+        `pending` status, expiry, digest match, that the document has not changed, current permission and
+        an action with an unknown result on the same target.
+        If a check fails, the action does not run and the response carries `executed: false` and the deny reason.
 
-        Sunucu yürütmeden önce sonucu `unknown` olarak kaydeder. Süreç yarıda kesilirse sonuç `unknown` kalır.
-        Yürütme hata verirse sonuç yalnız şu durumda `failed` olur: hata katmanın kendi denetiminde oluşmuştur.
-        Katmanın denetimi bittikten sonraki her hata `unknown` olur. Bu bölümde Frappe'nin kayıt yöntemleri
-        (`insert`, `save`, `submit`, `cancel`, silme), kancaları ve uygulama aracının bütün işlevleri çalışır.
-        Uygulama aracının kendi `prepare` işlevi de bu bölümdedir.
-        Araç, hedefi yazmadan hemen önce kilitler ve sürümünü önizlemedekiyle karşılaştırır.
-        Uygulama aracı hata verirse sonuç yine `unknown` kalır. Araç dış sisteme dokunmuş olabilir.
-        Aynı hedefe kör tekrar yapılmaz. İnsan durumu `resolve_proposal` ile kapatır.
+        Before executing, the server records the result as `unknown`. If the process is cut off midway, the result stays `unknown`.
+        If execution raises an error, the result becomes `failed` only in this case: the error occurred in the layer's own check.
+        Every error after the layer's check has finished becomes `unknown`. In this part Frappe's document methods
+        (`insert`, `save`, `submit`, `cancel`, delete), its hooks and all functions of the application tool run.
+        The application tool's own `prepare` function is also in this part.
+        The tool locks the target just before writing it and compares its version with the one in the preview.
+        If the application tool raises an error, the result still stays `unknown`. The tool may have touched an external system.
+        No blind retry is made on the same target. The human closes the state with `resolve_proposal`.
       security: [{insanOturumu: []}]
       requestBody:
         required: true
@@ -221,11 +238,11 @@ paths:
                 proposal_id: {type: string}
                 digest:
                   type: string
-                  description: İnsanın gördüğü önizlemenin özeti. `get_proposal` yanıtından alınır.
+                  description: Digest of the preview the human saw. It is taken from the `get_proposal` response.
                   pattern: "^[0-9a-f]{64}$"
       responses:
         "200":
-          description: Onay sonucu. Ret de 200 döner ve `executed` yanlış olur.
+          description: Approval outcome. A denial also returns 200 and `executed` is false.
           content:
             application/json:
               schema:
@@ -233,16 +250,16 @@ paths:
                 required: [message]
                 properties:
                   message: {$ref: "#/components/schemas/ApprovalOutcome"}
-        "401": {description: "İstek aracı belirteci taşıyor. Belirteç yalnız MCP ucunda geçer. Ret günlüğe `token_out_of_scope` koduyla yazılır."}
-        "403": {description: "İstek insan oturumundan gelmedi, oturumda CSRF belirteci yok ya da öneri başka kullanıcıya ait. Başkasının önerisi yanıtta dönmez."}
-        "404": {description: Öneri yok.}
+        "401": {description: "The request carries an agent token. The token is valid only on the MCP endpoint. The denial is written to the log with the code `token_out_of_scope`."}
+        "403": {description: "The request did not come from a human session, the session has no CSRF token or the proposal belongs to another user. Another user's proposal is not returned in the response."}
+        "404": {description: The proposal does not exist.}
 
   /platform_core.api.ai.reject_proposal:
     post:
       tags: [oneri]
       operationId: rejectProposal
-      summary: Bekleyen öneriyi reddeder.
-      description: Kayda hiçbir şey yazılmaz. Reddedilen öneri sonradan onaylanamaz. Öneri `pending` değilse 417 döner.
+      summary: Rejects a pending proposal.
+      description: Nothing is written to the document. A rejected proposal cannot be approved later. If the proposal is not `pending`, 417 is returned.
       security: [{insanOturumu: []}]
       requestBody:
         required: true
@@ -255,9 +272,9 @@ paths:
               properties:
                 proposal_id: {type: string}
       responses:
-        "401": {description: "Oturumun süresi dolmuş. Frappe ucu çağırmadan reddeder. İstemci yeniden giriş ister."}
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
         "200":
-          description: Önerinin yeni durumu.
+          description: The new state of the proposal.
           content:
             application/json:
               schema:
@@ -265,17 +282,17 @@ paths:
                 required: [message]
                 properties:
                   message: {$ref: "#/components/schemas/Proposal"}
-        "403": {description: İstek insan oturumundan gelmedi ya da öneri başka kullanıcıya ait.}
+        "403": {description: The request did not come from a human session or the proposal belongs to another user.}
 
   /platform_core.api.ai.resolve_proposal:
     post:
       tags: [oneri]
       operationId: resolveProposal
-      summary: Sonucu bilinmeyen öneriyi insan kararıyla kapatır.
+      summary: Closes a proposal with an unknown result by human decision.
       description: |
-        İnsan hedef kaydı kendi gözüyle denetler. Sonra işin uygulanıp uygulanmadığını bildirir.
-        Bu uç kayda yazmaz. Yalnız önerinin sonucunu `succeeded` ya da `failed` yapar.
-        Sonra aynı hedefe yeni öneri açılabilir.
+        The human checks the target document with their own eyes. Then they report whether the action was applied.
+        This endpoint does not write to the document. It only sets the result of the proposal to `succeeded` or `failed`.
+        After that a new proposal can be opened for the same target.
       security: [{insanOturumu: []}]
       requestBody:
         required: true
@@ -289,9 +306,9 @@ paths:
                 proposal_id: {type: string}
                 outcome: {type: string, enum: [succeeded, failed]}
       responses:
-        "401": {description: "Oturumun süresi dolmuş. Frappe ucu çağırmadan reddeder. İstemci yeniden giriş ister."}
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
         "200":
-          description: Önerinin yeni durumu.
+          description: The new state of the proposal.
           content:
             application/json:
               schema:
@@ -299,20 +316,20 @@ paths:
                 required: [message]
                 properties:
                   message: {$ref: "#/components/schemas/Proposal"}
-        "403": {description: İstek insan oturumundan gelmedi ya da öneri başka kullanıcıya ait.}
+        "403": {description: The request did not come from a human session or the proposal belongs to another user.}
 
   /platform_core.api.ai.purge_logs:
     post:
       tags: [yonetim]
       operationId: purgeLogs
-      summary: Saklama süresi dolan günlük ve öneri kayıtlarını siler.
+      summary: Deletes log and proposal records whose retention period has passed.
       description: |
-        YIKICI. Geri alınamaz. Yalnız “System Manager” rolü ve insan oturumu çağırabilir.
-        `dry_run` doğruysa hiçbir şey silinmez. Yanıt silinecek kayıt sayısını döner. Varsayılan budur.
-        Saklama süresi en az 365 gündür. Sonucu bilinmeyen öneriler silinmez.
-        Zamanlanmış iş yoktur. Bu uç elle başlatılır. Aynı işin komutu şudur:
+        DESTRUCTIVE. Cannot be undone. Only the "System Manager" role and a human session can call it.
+        If `dry_run` is true, nothing is deleted. The response returns the number of records that would be deleted. This is the default.
+        The retention period is at least 365 days. Proposals with an unknown result are not deleted.
+        There is no scheduled job. This endpoint is started by hand. The command for the same action is this:
         `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs "{'older_than_days': 365}"`.
-        Yapay zekâ aynı işi `purge_action_log` aracıyla, önizleme ve insan onayıyla başlatır.
+        The AI starts the same action with the `purge_action_log` tool, with a preview and human approval.
       security: [{insanOturumu: []}]
       requestBody:
         required: false
@@ -325,9 +342,9 @@ paths:
                 older_than_days: {type: integer, minimum: 365, default: 365}
                 dry_run: {type: boolean, default: true}
       responses:
-        "401": {description: "Oturumun süresi dolmuş. Frappe ucu çağırmadan reddeder. İstemci yeniden giriş ister."}
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
         "200":
-          description: Silinen ya da silinecek kayıt sayıları.
+          description: Numbers of records deleted or to be deleted.
           content:
             application/json:
               schema:
@@ -335,8 +352,8 @@ paths:
                 required: [message]
                 properties:
                   message: {$ref: "#/components/schemas/PurgeResult"}
-        "403": {description: İstek insan oturumundan gelmedi ya da kullanıcı yönetici değil.}
-        "417": {description: Saklama süresi 365 günden kısa verildi.}
+        "403": {description: The request did not come from a human session or the user is not an administrator.}
+        "417": {description: The retention period given was shorter than 365 days.}
 
 components:
   securitySchemes:
@@ -344,11 +361,11 @@ components:
       type: apiKey
       in: cookie
       name: sid
-      description: Frappe oturum çerezi. POST isteği `X-Frappe-CSRF-Token` başlığını da taşır.
+      description: Frappe session cookie. A POST request also carries the `X-Frappe-CSRF-Token` header.
     araciBelirteci:
       type: http
       scheme: bearer
-      description: "`issue_agent_token` ucunun ürettiği `fsat_` önekli belirteç."
+      description: "The token with the `fsat_` prefix that the `issue_agent_token` endpoint issues."
 
   schemas:
     JsonRpcRequest:
@@ -357,14 +374,14 @@ components:
       properties:
         jsonrpc: {const: "2.0"}
         id:
-          description: Bildirimde bulunmaz.
+          description: Not present in a notification.
           oneOf: [{type: string}, {type: integer}]
         method:
           type: string
           enum: [initialize, server/discover, ping, tools/list, tools/call, notifications/initialized]
         params:
           type: object
-          description: "`tools/call` için `name` ve `arguments` taşır."
+          description: "Carries `name` and `arguments` for `tools/call`."
 
     JsonRpcResponse:
       type: object
@@ -374,7 +391,7 @@ components:
         id:
           oneOf: [{type: string}, {type: integer}, {type: "null"}]
         result:
-          description: "`tools/call` için ToolResult, `tools/list` için araç tanımları."
+          description: "ToolResult for `tools/call`, tool definitions for `tools/list`."
           type: object
         error:
           type: object
@@ -385,7 +402,7 @@ components:
 
     ToolResult:
       type: object
-      description: MCP araç sonucu.
+      description: MCP tool result.
       required: [content, isError]
       properties:
         content:
@@ -398,12 +415,12 @@ components:
               text: {type: string}
         structuredContent:
           type: object
-          description: Başarıda aracın sonucu. Rette `error` nesnesi.
+          description: On success, the result of the tool. On denial, the `error` object.
         isError: {type: boolean}
 
     ToolError:
       type: object
-      description: Ret ya da hata durumunda `structuredContent` içeriği.
+      description: Content of `structuredContent` on denial or error.
       required: [error]
       properties:
         error:
@@ -415,7 +432,7 @@ components:
 
     DenyReason:
       type: string
-      description: Ret nedeninin kodu. “AI Action Log” kaydındaki `deny_reason` alanıyla aynıdır.
+      description: Code of the deny reason. It is the same as the `deny_reason` field of the AI Action Log record.
       enum:
         - invalid_arguments
         - unknown_doctype
@@ -454,22 +471,22 @@ components:
       type: object
       required: [token, expires_in, max_calls, audience]
       properties:
-        token: {type: string, description: "`fsat_` önekli belirteç. Yalnız bu yanıtta görünür."}
-        expires_in: {type: integer, description: Saniye cinsinden ömür., examples: [300]}
-        max_calls: {type: integer, description: İzinli araç çağrısı sayısı., examples: [20]}
-        audience: {type: string, description: "Belirtecin hedef servisi. `ai_agent_audience` site ayarından gelir."}
+        token: {type: string, description: "Token with the `fsat_` prefix. It is visible only in this response."}
+        expires_in: {type: integer, description: Lifetime in seconds., examples: [300]}
+        max_calls: {type: integer, description: Number of allowed tool calls., examples: [20]}
+        audience: {type: string, description: "The target service of the token. It comes from the `ai_agent_audience` site setting."}
 
     ProposalStatus:
       type: string
       enum: [pending, rejected, expired, consumed]
       description: |
-        `pending`: insan kararını bekler. `rejected`: insan reddetti ya da onay denetimi kalıcı olarak başarısız oldu.
-        `expired`: süre doldu. `consumed`: onaylandı ve yürütme başladı. Sonuç `result` alanındadır.
+        `pending`: waits for the human decision. `rejected`: the human rejected it or the approval check failed permanently.
+        `expired`: the time ran out. `consumed`: it was approved and execution started. The outcome is in the `result` field.
 
     ProposalResult:
       type: string
       enum: ["", unknown, succeeded, failed]
-      description: Boş değer yürütmenin başlamadığını gösterir. `unknown` kör tekrar yapılmayacağını gösterir.
+      description: An empty value shows that execution has not started. `unknown` shows that no blind retry will be made.
 
     Proposal:
       type: object
@@ -485,16 +502,16 @@ components:
         billable: {type: boolean}
         preview: {$ref: "#/components/schemas/Preview"}
         digest: {type: string, pattern: "^[0-9a-f]{64}$"}
-        expires_at: {type: string, format: date-time, description: "Son geçerlilik zamanı. ISO 8601, saat farkıyla."}
-        created_at: {type: string, format: date-time, description: "Önerinin açıldığı zaman. ISO 8601, saat farkıyla."}
+        expires_at: {type: string, format: date-time, description: "Expiry time. ISO 8601, with a UTC offset."}
+        created_at: {type: string, format: date-time, description: "The time the proposal was opened. ISO 8601, with a UTC offset."}
         result_document:
           type: [string, "null"]
-          description: Yürütme başarılıysa etkilenen kaydın adı.
-        error: {type: [string, "null"], description: Yürütme başarısızsa hata metni.}
+          description: Name of the affected document if execution succeeded.
+        error: {type: [string, "null"], description: Error text if execution failed.}
 
     Preview:
       type: object
-      description: İnsanın onaylayacağı değişikliğin özeti. Gizli alan değeri taşımaz.
+      description: Summary of the change the human will approve. It carries no secret field value.
       required: [action, summary]
       properties:
         action: {type: string, enum: [create, update, submit, cancel, delete, app_tool, admin]}
@@ -509,7 +526,7 @@ components:
               label: {type: [string, "null"]}
               old: {}
               new: {}
-        details: {type: object, description: Uygulama aracının önizleme üreticisinden gelen ek veri.}
+        details: {type: object, description: Extra data from the preview function of the application tool.}
 
     ApprovalOutcome:
       type: object
@@ -526,12 +543,12 @@ components:
       properties:
         dry_run: {type: boolean}
         older_than_days: {type: integer}
-        logs: {type: integer, description: Silinen ya da silinecek “AI Action Log” sayısı.}
-        proposals: {type: integer, description: Silinen ya da silinecek “AI Action Proposal” sayısı.}
+        logs: {type: integer, description: Number of AI Action Log records deleted or to be deleted.}
+        proposals: {type: integer, description: Number of AI Action Proposal records deleted or to be deleted.}
 
     ApprovalRequired:
       type: object
-      description: Yazma aracının model tarafına döndüğü sonuç. Kayıt henüz değişmemiştir.
+      description: The result a write tool returns to the model side. The document has not changed yet.
       required: [status, proposal_id, preview, expires_at, created_at]
       properties:
         status: {const: approval_required}
@@ -540,8 +557,8 @@ components:
         expires_at: {type: string, format: date-time}
         created_at: {type: string, format: date-time}
 
-# Araç şeması. `tools/list` bu adları ve girdi şemalarını döner.
-# Her girdi şeması `additionalProperties: false` taşır. Bilinmeyen alan çağrıyı reddettirir.
+# Tool schema. `tools/list` returns these names and input schemas.
+# Every input schema carries `additionalProperties: false`. An unknown field makes the call be denied.
 x-mcp-tools:
   - name: search_doctypes
     class: definition
@@ -665,7 +682,7 @@ x-mcp-tools:
       properties:
         proposal_id: {type: string, minLength: 1}
 
-  # Yönetim araçları. Yalnız “System Manager” rolüne görünür. Hepsi önizleme ve insan onayı ister.
+  # Admin tools. Visible only to the "System Manager" role. All of them require a preview and human approval.
   - name: add_custom_field
     class: admin
     annotations: {readOnlyHint: false, destructiveHint: false}
@@ -742,10 +759,10 @@ x-mcp-tools:
       properties:
         older_than_days: {type: integer, minimum: 365, default: 365}
 
-# Araçların sonuç şeması. Başarılı çağrı bu biçimi `structuredContent` içinde döner.
-# `tools/list` aynı şemayı `outputSchema` olarak yayımlar. Bir test kodu bu bölüme bağlar.
-# Reddedilen çağrı bu şemaya uymaz. O çağrı `isError: true` ve `ToolError` nesnesini döner.
-# Yazma ve yönetim araçlarının hepsi `ApprovalRequired` döner. Uygulamaların yazma araçları da öyle.
+# Result schema of the tools. A successful call returns this shape in `structuredContent`.
+# `tools/list` publishes the same schema as `outputSchema`. A test ties the code to this section.
+# A denied call does not follow this schema. That call returns `isError: true` and the `ToolError` object.
+# All write and admin tools return `ApprovalRequired`. So do the write tools of applications.
 x-mcp-results:
   SearchDoctypes:
     type: object
@@ -760,11 +777,12 @@ x-mcp-results:
   DoctypeSchema:
     type: object
     required: [doctype, module, is_submittable, is_single, is_child_table, generic_write_tools, permissions, fields,
-      as_of, site, source]
+      truncated, as_of, site, source]
     properties:
       as_of: {type: string, description: 'Time of the read, ISO 8601 with a UTC offset.'}
       site: {type: string}
       source: {type: string, description: 'What the data was read from, for example a DocType or a report.'}
+      truncated: {type: boolean, description: True when rows or values were left out to stay within the limits.}
       doctype: {type: string}
       description:
         type: [string, 'null']
@@ -806,12 +824,15 @@ x-mcp-results:
             writable: {type: boolean}
   ListDocuments:
     type: object
-    required: [documents, has_next_page, truncated, as_of, site, source]
+    required: [documents, has_next_page, next_start, truncated, as_of, site, source]
     properties:
       documents:
         type: array
         items: {type: object}
       has_next_page: {type: boolean}
+      next_start:
+        type: [integer, 'null']
+        description: Value of start for the next page. Null on the last page.
       truncated: {type: boolean, description: True when rows or values were left out to stay within the limits.}
       as_of: {type: string, description: 'Time of the read, ISO 8601 with a UTC offset.'}
       site: {type: string}
@@ -935,42 +956,42 @@ x-mcp-schemas:
       user: {type: string, minLength: 1}
       role: {type: string, minLength: 1}
 
-# Alt tablo satırları için kurallar. `create_document` ve `update_document` araçları uygular.
+# Rules for child table rows. The `create_document` and `update_document` tools apply them.
 x-child-table-rules:
-  - Satır listesi tablonun tamamının yerine geçer. Listede olmayan satır silinir. Önizleme eski satırları gösterir.
-  - Satırın `name` değeri yalnız güncellenen kaydın aynı tablosundaki bir satırın adı olabilir.
-  - Yeni kayıtta ve yeni satırda `name` gönderilmez. Adı sunucu üretir.
-  - Satır `parent`, `parenttype`, `parentfield`, `owner`, `docstatus` ve `idx` alanlarını taşıyamaz.
-  - Satır alanlarında da alan düzeyi yazma izni aranır. Gizli alan satırda da yazılamaz.
-  - Bu denetimler önizlemede ve yürütmede yapılır.
+  - The row list replaces the whole table. A row that is not in the list is deleted. The preview shows the old rows.
+  - The `name` value of a row can only be the name of a row in the same table of the document being updated.
+  - No `name` is sent for a new document or a new row. The server generates the name.
+  - A row cannot carry the `parent`, `parenttype`, `parentfield`, `owner`, `docstatus` and `idx` fields.
+  - Field-level write permission is also required for row fields. A secret field cannot be written in a row either.
+  - These checks are made at preview and at execution.
 
-# `run_report` aracı raporu çalıştırmadan önce erişim motorunun rapor kapısını çağırır.
+# Before running the report, the `run_report` tool calls the report gate of the access engine.
 x-report-gate:
-  - Kapı `platform_core.erisim.api.report_guard(report_name)` işlevidir. Bu, erişim modülünün açık yoludur.
-  - Kapı kullanıcıyı reddederse araç `permission` döner ve rapor çalışmaz.
-  - Kapı kurulu değilse araç `report_gate_unavailable` döner. Rapor aracı kapalı kalır.
-  - Arka planda hazırlanan rapor istek içinde çalıştırılmaz. Araç `report_too_large` döner.
-  - Araç en çok `limit` kadar satır okur ve kopyalar.
+  - The gate is the function `platform_core.erisim.api.report_guard(report_name)`. This is the public path of the access engine.
+  - If the gate denies the user, the tool returns `permission` and the report does not run.
+  - If the gate is not installed, the tool returns `report_gate_unavailable`. The report tool stays closed.
+  - A report that is prepared in the background is not run inside the request. The tool returns `report_too_large`.
+  - The tool reads and copies at most `limit` rows.
 
-# Rapor sütunu şu durumlarda `run_report` yanıtından çıkar.
+# A report column is removed from the `run_report` response in these cases.
 x-report-secret-rules:
-  - Sütunun türü “Password” olur.
-  - Sütunun alan adı ya da etiketi gizli ad kalıbına uyar.
-  - Raporun kaynak DocType'ında aynı adlı alan gizlidir.
-  - Raporu yazan, başka kaynaktan gelen gizli değeri bu üç yoldan biriyle işaretler.
+  - The column type is "Password".
+  - The field name or label of the column matches the secret name pattern.
+  - The field with the same name in the report's source DocType is secret.
+  - The author of the report marks a secret value that comes from another source in one of these three ways.
 
-# Uygulama bir DocType'ı genel yazma araçlarına kapatabilir.
+# An application can close a DocType to the generic write tools.
 x-ai-write-closed-hook:
   description: |
-    Uygulama `hooks.py` dosyasına `ai_write_closed_doctypes = ["DocType adı"]` yazar.
-    Listedeki DocType'a genel yazma araçları `blocked_doctype` döner.
-    Örneğin kimlik bağı ya da erişim kuralı tutan DocType böyle kapatılır.
+    The application writes `ai_write_closed_doctypes = ["DocType name"]` in its `hooks.py` file.
+    The generic write tools return `blocked_doctype` for a DocType in the list.
+    For example, a DocType that holds an identity link or an access rule is closed this way.
 
-# Uygulamaların `ai_tools` kancasıyla bildirdiği aracın biçimi (G-105).
+# The shape of a tool that applications declare with the `ai_tools` hook (G-105).
 x-ai-tools-hook:
   description: |
-    Uygulama `hooks.py` dosyasına `ai_tools = ["uygulama.yol.islev"]` yazar.
-    İşlev aşağıdaki biçimde bir liste döner. Katman bildirimi yüklerken doğrular.
+    The application writes `ai_tools = ["app.path.function"]` in its `hooks.py` file.
+    The function returns a list in the shape below. The layer validates the declaration when it loads it.
   declaration:
     type: object
     additionalProperties: false
@@ -979,32 +1000,32 @@ x-ai-tools-hook:
       name:
         type: string
         pattern: "^[a-z][a-z0-9_]{2,63}$"
-        description: Araç adı. Katman başına uygulama adını ekler. Örnek sonuç `hrms_tr_approve_leave` olur.
-      description: {type: string, description: İngilizce açıklama. Türkçesi çeviri dosyasındadır.}
-      arguments: {type: string, description: "Girdi modelinin yolu. Model bir `pydantic.BaseModel` sınıfıdır ve `extra=\"forbid\"` ayarını taşır. `confirm`, `approved` ve `force` gibi alan adları reddedilir."}
+        description: Tool name. The layer puts the application name in front. An example result is `hrms_tr_approve_leave`.
+      description: {type: string, description: English description. The Turkish text is in the translation file.}
+      arguments: {type: string, description: "Path of the input model. The model is a `pydantic.BaseModel` class and carries the `extra=\"forbid\"` setting. Field names such as `confirm`, `approved` and `force` are rejected."}
       kind: {type: string, enum: [read, write]}
-      roles: {type: array, items: {type: string}, description: Aracı görebilen roller. Boşsa giriş yapmış her kullanıcı görür.}
+      roles: {type: array, items: {type: string}, description: "Roles that can see the tool. If empty, every logged-in user sees it."}
       destructive: {type: boolean, default: false}
       billable: {type: boolean, default: false}
-      handler: {type: string, description: "İşi yapan işlevin yolu. İşlev kendi izin denetimini yapar. Yazma aracında `name` anahtarıyla etkilenen kaydın adını döner."}
+      handler: {type: string, description: "Path of the function that does the work. The function makes its own permission check. For a write tool it returns the name of the affected document under the `name` key."}
       prepare:
         type: string
         description: |
-          İsteğe bağlı. Yazma aracının kendi ön denetim işlevinin yolu. `handler` yalnız bu işlevin döndürdüğü değeri alır.
-          Bu işlev uygulamanın kodudur, katmanın kendi denetimi değildir. İşlev başladıktan sonraki her hata
-          `unknown` sonucunu verir. İşlev dış sisteme dokunmuş olabilir.
+          Optional. Path of the write tool's own pre-check function. `handler` receives only the value this function returns.
+          This function is the application's code, not the layer's own check. Every error after the function has started
+          gives the `unknown` result. The function may have touched an external system.
       versioned:
         type: boolean
         default: false
         description: |
-          İsteğe bağlı. Doğruysa katman yürütmeden hemen önce hedef satırı kilitler ve önizlemeyi yeniden çalıştırır.
-          `target_version` değiştiyse iş yürümez. Sonuç `failed`, hata `document_changed` olur.
-          Önizleme `target_doctype`, `target_name` ve `target_version` dönmelidir. Biri eksikse araç `invalid_preview` döner.
-          Bu denetim öneri açılmadan önce, onay anında ve yürütmeden hemen önce yapılır.
+          Optional. If true, the layer locks the target row just before executing and runs the preview again.
+          If `target_version` has changed, the action does not run. The result becomes `failed` and the error `document_changed`.
+          The preview must return `target_doctype`, `target_name` and `target_version`. If one is missing, the tool returns `invalid_preview`.
+          This check is made before the proposal is opened, at approval time and just before execution.
       preview:
         type: string
         description: |
-          Önizleme üreten işlevin yolu. `kind: write` için zorunludur. İşlev izni denetler ve bir sözlük döner.
-          İşlev `frappe.ValidationError` verirse araç `invalid_arguments` döner. Onay anında verirse öneri `rejected` olur.
-          Sözlükte `summary` zorunludur. `target_doctype`, `target_name`, `target_version`, `changes` ve `details` isteğe bağlıdır.
-          Katman önizlemeyi onay anında yeniden çalıştırır. `target_version` değiştiyse onayı reddeder.
+          Path of the function that produces the preview. Required for `kind: write`. The function checks permission and returns a dict.
+          If the function raises `frappe.ValidationError`, the tool returns `invalid_arguments`. If it raises it at approval time, the proposal becomes `rejected`.
+          In the dict `summary` is required. `target_doctype`, `target_name`, `target_version`, `changes` and `details` are optional.
+          The layer runs the preview again at approval time. If `target_version` has changed, it denies the approval.

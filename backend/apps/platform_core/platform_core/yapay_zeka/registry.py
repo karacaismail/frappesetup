@@ -1,4 +1,4 @@
-"""Araç kaydı: yerleşik araçlar ve uygulamaların `ai_tools` kancasıyla bildirdikleri (G-105)."""
+"""Tool registry: built-in tools and those that apps declare with the `ai_tools` hook (G-105)."""
 
 import re
 from collections.abc import Callable
@@ -42,7 +42,7 @@ class AiTool:
 	roles: tuple[str, ...] = ()
 	destructive: bool = False
 	billable: bool = False
-	# Yürütme işlevi önizlemedeki sürümü `expected_version` olarak alıyorsa doğrudur.
+	# True if the execution function takes the previewed version as `expected_version`.
 	versioned: bool = False
 	# Pre-check of a write tool. It calls no Frappe document method. When it is set, the handler
 	# takes only what the pre-check returned. See `proposals._execute` for the boundary.
@@ -281,7 +281,7 @@ def _builtin_tools() -> tuple[AiTool, ...]:
 
 
 def app_tools(taken: set[str]) -> list[AiTool]:
-	"""Uygulamaların bildirdiği araçları yükler. Geçersiz bildirim yüklenmez ve hata kaydına düşer."""
+	"""Load the tools apps declare. An invalid declaration is not loaded and lands in the error log."""
 	tools = []
 	for path in frappe.get_hooks("ai_tools") or []:
 		app = path.split(".")[0]
@@ -294,7 +294,7 @@ def app_tools(taken: set[str]) -> list[AiTool]:
 			try:
 				tool = build_app_tool(app, declaration, taken)
 			except Exception as error:
-				# Bozuk bir bildirim öteki araçları durdurmaz. Yalnız o araç yüklenmez.
+				# A broken declaration does not stop the other tools. Only that tool is not loaded.
 				_report_once(f"ai_tools: invalid declaration in {app}", error)
 				continue
 			taken.add(tool.name)
@@ -306,7 +306,7 @@ _reported: set[str] = set()
 
 
 def _report_once(title: str, error: Exception) -> None:
-	"""Aynı hatayı süreç başına bir kez hata kaydına yazar. Kanca her istekte okunur."""
+	"""Write the same error to the error log once per process. The hook is read on every request."""
 	key = f"{title}: {error!r}"
 	if key not in _reported:
 		_reported.add(key)
@@ -314,7 +314,7 @@ def _report_once(title: str, error: Exception) -> None:
 
 
 def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
-	"""Bildirimi doğrular. Kural dışı bildirimde `ValueError` verir."""
+	"""Validate the declaration. Raises `ValueError` for a declaration that breaks the rules."""
 	from platform_core.yapay_zeka.tools import results
 
 	if not isinstance(declaration, dict) or set(declaration) - DECLARATION_KEYS:
@@ -333,7 +333,7 @@ def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
 	if not isinstance(declaration.get("arguments"), str) or not isinstance(declaration.get("handler"), str):
 		raise ValueError(f"{name}: arguments and handler must be dotted paths")
 
-	# Yol kullanıcı girdisinden değil, kurulu uygulamanın hooks.py dosyasından gelir (G-10).
+	# The path comes from the hooks.py file of the installed app, not from user input (G-10).
 	arguments = frappe.get_attr(declaration["arguments"])
 	if not (isinstance(arguments, type) and issubclass(arguments, BaseModel)):
 		raise ValueError(f"{name}: arguments must be a pydantic model")
@@ -373,7 +373,7 @@ def build_app_tool(app: str, declaration: dict, taken: set[str]) -> AiTool:
 
 
 def all_tools() -> list[AiTool]:
-	"""Araç listesi istek başına bir kez kurulur."""
+	"""The tool list is built once per request."""
 	cached = getattr(frappe.local, "yz_tools", None)
 	if cached is None:
 		tools = list(builtin_tools())
@@ -386,7 +386,7 @@ def find(name: str) -> AiTool | None:
 
 
 def definitions() -> list[dict]:
-	"""Kullanıcının rollerine göre daraltılmış araç listesi (G-84)."""
+	"""The tool list narrowed by the user's roles (G-84)."""
 	return [tool.definition() for tool in all_tools() if tool.visible()]
 
 

@@ -1,9 +1,10 @@
-"""Katmanın kendi kayıtlarını yazan tek yer.
+"""The only place that writes the layer's own records.
 
-`ignore_permissions` ve doğrudan veritabanı okuması yalnız bu dosyadadır (G-4).
-Gerekçe: “AI Action Log” ve “AI Action Proposal” sistem kayıtlarıdır. Son kullanıcının bu
-türlere izni yoktur. Hedef kaydı kullanıcı seçmez. Kullanıcıya dönen satırlar burada
-`user` alanıyla süzülür. Bir test bu istisnanın başka dosyaya taşmadığını denetler.
+`ignore_permissions` and direct database reads exist only in this file (G-4).
+Reason: "AI Action Log" and "AI Action Proposal" are system records. The end user has no
+permission on these types. The user does not choose the target record. Rows returned to
+the user are filtered here by the `user` field. A test checks that this exception does not
+spread to another file.
 """
 
 from collections.abc import Iterator
@@ -100,7 +101,7 @@ def proposals_of(user: str, status: str | None, start: int, limit: int) -> list[
 
 
 def unresolved_unknown_exists(target_key: str, *, exclude: str | None = None) -> bool:
-	"""Aynı hedefte sonucu bilinmeyen bir yürütme var mı?"""
+	"""Is there an execution with an unknown result on the same target?"""
 	filters = {"target_key": target_key, "status": "consumed", "result": "unknown"}
 	if exclude:
 		filters["name"] = ("!=", exclude)
@@ -108,10 +109,11 @@ def unresolved_unknown_exists(target_key: str, *, exclude: str | None = None) ->
 
 
 def lock_target(target_key: str) -> list[dict]:
-	"""Aynı hedefin bütün önerilerini satır kilidiyle okur.
+	"""Read all proposals of the same target with a row lock.
 
-	İki onay aynı hedefte yarışırsa ikincisi burada bekler. Birincinin `unknown` yazısı
-	kesinleşince ikinci onu görür. Kilit veritabanındadır, birden çok sunucuda da çalışır.
+	If two approvals race on the same target, the second waits here. When the `unknown` write
+	of the first is committed, the second sees it. The lock is in the database, so it also
+	works across several servers.
 	"""
 	return frappe.db.get_values(
 		PROPOSAL, {"target_key": target_key}, ["name", "status", "result"], for_update=True, as_dict=True
@@ -119,15 +121,31 @@ def lock_target(target_key: str) -> list[dict]:
 
 
 def lock_row(doctype: str, name: str) -> bool:
-	"""Bir sistem kaydının satırını kilitler. Satır yoksa yanlış döner.
+	"""Lock the row of a system record. Return false if the row does not exist.
 
-	Yönetim araçları asıl hedefi yazmadan hemen önce bununla kilitler. Değer okunmaz.
+	Admin tools lock the real target with this just before they write it. No value is read.
 	"""
 	return bool(frappe.db.get_value(doctype, name, "name", for_update=True))
 
 
+def row_stamp(doctype: str, name: str) -> str | None:
+	"""The `modified` value of a target row, read by the layer itself. None if the row does not exist."""
+	value = frappe.db.get_value(doctype, name, "modified")
+	return str(value) if value else None
+
+
+def locked_row_stamp(doctype: str, name: str) -> str | None:
+	"""Lock a target row and return its `modified` value from that same locking read.
+
+	A locking read returns the latest committed row even under repeatable read. An unlocked
+	read after the lock could still answer from the older snapshot of the transaction.
+	"""
+	value = frappe.db.get_value(doctype, name, "modified", for_update=True)
+	return str(value) if value else None
+
+
 def latest_version(doctype: str | None, name: str | None) -> str | None:
-	"""Yazmanın ürettiği “Version” kaydının adı. Yalnız günlüğe bağ olarak yazılır."""
+	"""Name of the "Version" record the write produced. Written only as a link in the log."""
 	if not doctype or not name:
 		return None
 	return frappe.db.get_value(
@@ -136,10 +154,10 @@ def latest_version(doctype: str | None, name: str | None) -> str | None:
 
 
 def purge_older_than(days: int, *, delete: bool) -> tuple[int, int]:
-	"""Saklama süresi dolan kayıtları sayar, istenirse siler.
+	"""Count the records past the retention period and delete them if asked.
 
-	Silme doğrudan veritabanında yapılır. Günlüğün controller'ı tek tek silmeyi engeller.
-	Bu yolu yalnız `retention.purge` çağırır. O işlev yönetici rolünü denetler.
+	The delete is done directly in the database. The controller of the log blocks deleting
+	rows one by one. Only `retention.purge` calls this path. That function checks the admin role.
 	"""
 	cutoff = add_days(now_datetime(), -days)
 	log_filters = {"creation": ("<", cutoff)}

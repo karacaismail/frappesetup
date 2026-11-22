@@ -1,4 +1,4 @@
-"""Bağımsız güvenlik incelemesinin bulguları (B1-B6). Her test bir saldırıyı gösterir."""
+"""Findings of the independent security review (B1-B6). Each test shows one attack."""
 
 from unittest.mock import patch
 
@@ -18,7 +18,7 @@ from platform_core.yapay_zeka.tests.base import (
 
 
 class TestChildTables(YzTestCase):
-	"""B1: alt tablo yazımı başka kaydın satırını ya da yüksek izinli alanı değiştiremez."""
+	"""B1: a child table write cannot change another record's row or a high-permission field."""
 
 	def row_of(self, parent: str) -> dict:
 		return frappe.db.get_value(
@@ -141,7 +141,7 @@ class TestChildTables(YzTestCase):
 
 
 class TestReportSecrets(YzTestCase):
-	"""B2: rapor çıktısındaki Password sütunu modele gitmez."""
+	"""B2: a Password column in report output does not reach the model."""
 
 	COLUMNS = (
 		{"fieldname": "title", "label": "Title", "fieldtype": "Data"},
@@ -213,7 +213,7 @@ class TestReportSecrets(YzTestCase):
 
 
 class TestResultState(YzTestCase):
-	"""B3: kalıcı etki bırakan hata `failed` sayılmaz."""
+	"""B3: an error that leaves a lasting effect does not count as `failed`."""
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -264,7 +264,7 @@ class TestResultState(YzTestCase):
 		seen = {}
 
 		def probe(*args, **kwargs):
-			# Geri alma, kesinleşmemiş her yazıyı siler. Kalan durum kesinleşmiş durumdur.
+			# Rollback removes every uncommitted write. What remains is the committed state.
 			frappe.db.rollback()
 			seen["state"] = frappe.db.get_value("AI Action Proposal", proposal_id, ["status", "result"])
 			return original(*args, **kwargs)
@@ -289,7 +289,7 @@ class TestResultState(YzTestCase):
 
 
 class TestAdminVersion(YzTestCase):
-	"""B4: yönetim aracı, son denetimden sonra araya giren değişikliğin üstüne yazmaz."""
+	"""B4: the admin tool does not overwrite a change that slipped in after the last check."""
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
@@ -303,7 +303,7 @@ class TestAdminVersion(YzTestCase):
 		super().tearDown()
 
 	def approve_with_rival(self, client, proposal_id: str, function_name: str, rival) -> dict:
-		"""Yürütme işlevinden hemen önce başka bir isteğin kesinleşmiş değişikliğini araya koyar."""
+		"""Inserts another request's committed change right before the execute function."""
 		from platform_core.yapay_zeka.tools import admin
 
 		original = getattr(admin, function_name)
@@ -445,7 +445,7 @@ class TestAdminVersion(YzTestCase):
 
 
 class TestSessionBoundToken(YzTestCase):
-	"""B5: süresi dolmuş oturumun belirteci kabul edilmez. Oturum satırı silinmese de."""
+	"""B5: the token of an expired session is rejected. Even if the session row is not deleted."""
 
 	def test_token_of_an_expired_session_is_rejected(self):
 		client = self.login(USER_A)
@@ -474,7 +474,7 @@ class TestSessionBoundToken(YzTestCase):
 
 
 class TestHumanCallLog(YzTestCase):
-	"""B6: kimliği bilinen her insan çağrısı ve reddi günlüğe düşer."""
+	"""B6: every human call and denial with a known identity is logged."""
 
 	def test_token_issue_is_logged(self):
 		client = self.login(USER_A)
@@ -555,7 +555,7 @@ class TestHumanCallLog(YzTestCase):
 		digest = self.digest_of(client, proposal_id)
 		client.csrf_token = "yanlis"
 
-		# Frappe kendi denetimini bazı ayarlarda atlar. O durum burada kurulur.
+		# Frappe skips its own check under some settings. That case is set up here.
 		with patch("frappe.auth.HTTPRequest.validate_csrf_token", lambda self: None):
 			response = self.approve(client, proposal_id, digest)
 

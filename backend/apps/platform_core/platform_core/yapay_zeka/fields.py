@@ -1,4 +1,4 @@
-"""Kullanıcının hangi alanı okuyup yazabileceğini hesaplar ve yanıtı temizler."""
+"""Work out which fields the user may read and write, and clean the response."""
 
 from typing import TYPE_CHECKING, Any
 
@@ -6,7 +6,7 @@ import frappe
 from frappe import _
 
 from platform_core.yapay_zeka import policy
-from platform_core.yapay_zeka.errors import ToolDenied
+from platform_core.yapay_zeka.errors import CONTEXT, ToolDenied
 
 if TYPE_CHECKING:
 	from frappe.model.meta import Meta
@@ -19,14 +19,16 @@ def get_meta(doctype: str) -> "Meta":
 		return frappe.get_meta(doctype)
 	except frappe.DoesNotExistError:
 		frappe.clear_messages()
-		raise ToolDenied("unknown_doctype", _("DocType {0} does not exist.").format(doctype)) from None
+		raise ToolDenied(
+			"unknown_doctype", _("DocType {0} does not exist.", context=CONTEXT).format(doctype)
+		) from None
 
 
 def _permitted(meta: "Meta", ptype: str, parenttype: str | None) -> set[str]:
-	"""İzinli alan adları. Alt tablo alanı da izin seviyesine göre girer.
+	"""Permitted field names. A child table field is also included by its permission level.
 
-	Frappe'nin `get_permitted_fieldnames` işlevi tablo alanlarını saymaz. Tablo alanının
-	izni, alanın izin seviyesinin kullanıcıya açık olmasıdır.
+	Frappe's `get_permitted_fieldnames` function does not count table fields. A table field is
+	permitted when its permission level is open to the user.
 	"""
 	names = set(meta.get_permitted_fieldnames(parenttype=parenttype, permission_type=ptype))
 	if not meta.istable:
@@ -36,7 +38,7 @@ def _permitted(meta: "Meta", ptype: str, parenttype: str | None) -> set[str]:
 
 
 def readable(meta: "Meta", parenttype: str | None = None) -> set[str]:
-	"""Kullanıcının okuyabildiği, gizli olmayan alanlar."""
+	"""Fields the user can read that are not secret."""
 	permitted = _permitted(meta, "read", parenttype)
 	names = {
 		field.fieldname
@@ -47,7 +49,7 @@ def readable(meta: "Meta", parenttype: str | None = None) -> set[str]:
 
 
 def writable(meta: "Meta", parenttype: str | None = None) -> set[str]:
-	"""Kullanıcının yazabildiği, gizli olmayan alanlar."""
+	"""Fields the user can write that are not secret."""
 	permitted = _permitted(meta, "write", parenttype)
 	return {
 		field.fieldname
@@ -57,23 +59,25 @@ def writable(meta: "Meta", parenttype: str | None = None) -> set[str]:
 
 
 def check_readable(meta: "Meta", fieldname: str) -> None:
-	"""Alan okunamıyorsa çağrıyı reddeder. Süzgeç ve sıralama alanları da buradan geçer."""
+	"""Refuse the call if the field cannot be read. Filter and sort fields pass through here too."""
 	if fieldname in STANDARD_FIELDS:
 		return
 	field = meta.get_field(fieldname)
 	if field is None or not fieldname.isidentifier():
-		raise ToolDenied("invalid_arguments", _("Unknown field: {0}").format(fieldname))
+		raise ToolDenied("invalid_arguments", _("Unknown field: {0}", context=CONTEXT).format(fieldname))
 	if policy.is_secret_field(field):
-		raise ToolDenied("secret_field", _("Field {0} is secret.").format(fieldname))
+		raise ToolDenied("secret_field", _("Field {0} is secret.", context=CONTEXT).format(fieldname))
 	if fieldname not in readable(meta):
-		raise ToolDenied("field_not_permitted", _("You may not read field {0}.").format(fieldname))
+		raise ToolDenied(
+			"field_not_permitted", _("You may not read field {0}.", context=CONTEXT).format(fieldname)
+		)
 
 
 def clean(data: dict[str, Any], meta: "Meta", parenttype: str | None = None) -> dict[str, Any]:
-	"""Kayıt sözlüğünde yalnız okunabilir alanları bırakır. Alt tabloları da temizler.
+	"""Keep only the readable fields in a record dict. Child tables are cleaned too.
 
-	Frappe izin seviyesi yüksek alanın değerini boşaltır ama anahtarı bırakır.
-	Burada anahtar da çıkar. Gizli alanlar ve iç anahtarlar da çıkar.
+	Frappe empties the value of a field with a high permission level but leaves the key.
+	Here the key is removed too. Secret fields and internal keys are removed too.
 	"""
 	allowed = readable(meta, parenttype)
 	result = {}

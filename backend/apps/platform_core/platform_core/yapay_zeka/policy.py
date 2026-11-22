@@ -1,4 +1,4 @@
-"""Hangi alanın gizli, hangi DocType'ın kapalı olduğunu tek yerde tanımlar."""
+"""Define in one place which field is secret and which DocType is closed."""
 
 import re
 from typing import TYPE_CHECKING
@@ -12,7 +12,7 @@ SECRET_NAME = re.compile(
 	r"|apikey|credential|credentials|authorization|otp|signature|salt|cookie|sid|pem)(_|$)"
 )
 
-# Kimlik bilgisi taşıyan kayıtlar. Okunmaz ve yazılmaz.
+# Records that carry credentials. Not read and not written.
 CREDENTIAL_DOCTYPES = frozenset(
 	{
 		"OAuth Bearer Token",
@@ -34,7 +34,7 @@ CREDENTIAL_DOCTYPES = frozenset(
 		"Webhook Header",
 		"Webhook Request Log",
 		"Error Log",
-		# Silinen ya da değişen kayıtların eski değerlerini ve iş girdilerini taşıyanlar.
+		# Those that carry old values of deleted or changed records, and job inputs.
 		"Deleted Document",
 		"Version",
 		"RQ Job",
@@ -44,7 +44,8 @@ CREDENTIAL_DOCTYPES = frozenset(
 	}
 )
 
-# Kod, şablon, dış istek ya da zamanlama taşıyan kayıtlar. Yazmak kod çalıştırma yolu açar.
+# Records that carry code, templates, outbound requests or schedules. Writing them opens a
+# way to run code.
 CODE_DOCTYPES = frozenset(
 	{
 		"Server Script",
@@ -67,7 +68,7 @@ CODE_DOCTYPES = frozenset(
 	}
 )
 
-# Yapı, rol ve izin kayıtları. Yalnız yönetim araçları değiştirir.
+# Structure, role and permission records. Only admin tools change them.
 ADMIN_DOCTYPES = frozenset(
 	{
 		"DocType",
@@ -97,20 +98,21 @@ ADMIN_DOCTYPES = frozenset(
 # Records that bind a person to an account. AI tools never write them, admin tools included.
 IDENTITY_DOCTYPES = frozenset({"Platform Identity Link"})
 
-# Katmanın kendi kayıtları. Yapay zekâ yoluyla değişmez.
+# The layer's own records. They do not change through AI.
 LAYER_DOCTYPES = frozenset({"AI Action Log", "AI Action Proposal"})
 
-# Frappe çatısının kendi DocType'larından genel yazma araçlarına açık olanlar.
-# Çatının öteki DocType'ları ayar, kod ya da sistem kaydıdır ve kapalıdır.
+# Frappe framework DocTypes that are open to the general write tools.
+# The other framework DocTypes are settings, code or system records and are closed.
 FRAMEWORK_OPEN = frozenset({"ToDo", "Note", "Event", "Contact", "Address"})
 
-# Model önerileri yalnız `get_proposal` aracıyla okur. Böylece onay özetine ulaşamaz.
+# The model reads proposals only with the `get_proposal` tool. So it cannot reach the
+# approval digest.
 READ_BLOCKED = CREDENTIAL_DOCTYPES | LAYER_DOCTYPES
 WRITE_BLOCKED = CREDENTIAL_DOCTYPES | CODE_DOCTYPES | LAYER_DOCTYPES | IDENTITY_DOCTYPES
 # No admin tool may touch these: no custom field, no field property, no role permission.
 ADMIN_TOOL_BLOCKED = CREDENTIAL_DOCTYPES | LAYER_DOCTYPES | IDENTITY_DOCTYPES
 
-# Yapay zekâ yoluyla verilmeyen ve alınmayan roller.
+# Roles that are not granted and not removed through AI.
 PROTECTED_ROLES = frozenset(
 	{
 		"Administrator",
@@ -124,18 +126,18 @@ PROTECTED_ROLES = frozenset(
 		"Workspace Manager",
 	}
 )
-# İzinleri yapay zekâ yoluyla değişmeyen roller. Bu roller herkesi ya da tam yetkiyi kapsar.
+# Roles whose permissions do not change through AI. These roles cover everyone or full access.
 PROTECTED_PERMISSION_ROLES = frozenset({"Administrator", "Guest", "All", "Desk User"})
 
 FORBIDDEN_ARGUMENT_NAMES = frozenset({"confirm", "confirmed", "approve", "approved", "force"})
 
 
 def is_framework_doctype(meta) -> bool:
-	"""DocType Frappe çatısına aitse ve açık listede değilse doğru döner.
+	"""Return true if the DocType belongs to the Frappe framework and is not on the open list.
 
-	Yeni bir sistem DocType'ı listeye eklenmese de kapalı kalır. Uygulamaların ve
-	kullanıcıların kendi DocType'ları bu kurala girmez. Modülün uygulaması bulunamazsa
-	DocType kapalı sayılır.
+	A new system DocType stays closed even if it is not added to a list. The DocTypes of apps
+	and of users do not fall under this rule. If the app of the module cannot be found, the
+	DocType counts as closed.
 	"""
 	import frappe
 
@@ -146,9 +148,10 @@ def is_framework_doctype(meta) -> bool:
 
 
 def is_closed_by_app(doctype: str) -> bool:
-	"""Uygulama bu DocType'ı `ai_write_closed_doctypes` kancasıyla kapattıysa doğru döner.
+	"""Return true if an app closed this DocType with the `ai_write_closed_doctypes` hook.
 
-	Örneğin kimlik bağı ya da erişim kuralı tutan DocType'ın sahibi onu bu kancayla kapatır.
+	For example, the owner of a DocType that holds identity links or access rules closes it
+	with this hook.
 	"""
 	import frappe
 

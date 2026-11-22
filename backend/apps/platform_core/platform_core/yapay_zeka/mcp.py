@@ -1,8 +1,8 @@
-"""MCP ucu: Streamable HTTP, tek JSON yanıt, oturumsuz.
+"""MCP endpoint: Streamable HTTP, single JSON response, no session.
 
-Protokol ayrıştırması Frappe'nin `frappe.mcp.transport` ve `frappe.mcp.protocol`
-modüllerinden gelir. Araçlar, kimlik kuralları ve günlük bu katmanındır.
-Karar: docs/kararlar/0002-yapay-zeka-katmani.md.
+Protocol parsing comes from Frappe's `frappe.mcp.transport` and `frappe.mcp.protocol`
+modules. The tools, the identity rules and the log belong to this layer.
+Decision: docs/kararlar/0002-yapay-zeka-katmani.md.
 """
 
 import json
@@ -20,7 +20,7 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from platform_core.yapay_zeka import access, agent_token, proposals, registry
-from platform_core.yapay_zeka.errors import ToolDenied
+from platform_core.yapay_zeka.errors import CONTEXT, ToolDenied
 
 LIST_TTL_MS = 60000
 
@@ -73,7 +73,7 @@ def _handle() -> Response:
 	frappe.local.yz_client_info = _client_info(params)
 
 	if "id" not in payload:
-		# Bildirim araç çalıştırmaz ve JSON-RPC yanıtı almaz.
+		# A notification runs no tool and gets no JSON-RPC response.
 		return Response(status=202)
 
 	context.method = payload["method"]
@@ -88,7 +88,7 @@ def _check_principal() -> None:
 		# endpoint does not allow guests. The check stays as a second guard.
 		raise McpError(protocol.INVALID_REQUEST, "Authentication required", status=401)
 	if kind == access.OTHER:
-		# API anahtarı ve OAuth belirteci uzun ömürlüdür ve G-148 sınırlarını taşımaz.
+		# API keys and OAuth tokens are long-lived and do not carry the G-148 limits.
 		# The user is known here, so the denial is logged. The 403 response rolls the request
 		# back, so the log row is committed first. Nothing else has been written yet.
 		access.record_denial("auth", "credential_not_accepted")
@@ -153,10 +153,10 @@ def _server_configuration() -> dict:
 
 
 def call_tool(params: dict) -> dict:
-	"""Aracı çalıştırır. Her sonuç ve her ret “AI Action Log” kaydına yazılır."""
+	"""Run the tool. Every result and every denial is written to an "AI Action Log" record."""
 	started = time.monotonic()
 	name = params.get("name")
-	# Çağrı hakkı araç aranmadan önce düşer. Bilinmeyen araç adı da hak harcar.
+	# A call is spent before the tool is looked up. An unknown tool name spends one too.
 	if not agent_token.spend_call():
 		access.record_denial("call", "token_call_limit", tool=str(name)[:140], started=started)
 		raise _logged(McpError(protocol.INVALID_REQUEST, "The agent token has no calls left", status=401))
@@ -171,7 +171,9 @@ def call_tool(params: dict) -> dict:
 
 	try:
 		if not tool.visible():
-			raise ToolDenied("role_required", _("Your roles do not allow tool {0}.").format(tool.name))
+			raise ToolDenied(
+				"role_required", _("Your roles do not allow tool {0}.", context=CONTEXT).format(tool.name)
+			)
 		try:
 			arguments = tool.arguments.model_validate(raw).model_dump()
 		except ValidationError as error:
@@ -190,7 +192,7 @@ def call_tool(params: dict) -> dict:
 			return _success(result)
 
 		result = tool.handler(**arguments)
-		# Okuma aracı kalıcı yazı bırakamaz. Yazdıysa burada geri alınır.
+		# A read tool cannot leave a permanent write. If it wrote, it is rolled back here.
 		frappe.db.rollback()
 		access.record("call", decision="allowed", **context)
 		return _success(result)
@@ -223,7 +225,7 @@ def _target(arguments: dict) -> dict:
 
 
 def _deny(context: dict, code: str, message: str) -> dict:
-	"""Ret hata değildir. Araç sonucu döner. Böylece günlük yazısı geri alınmaz."""
+	"""A denial is not an error. A tool result is returned. So the log write is not rolled back."""
 	frappe.db.rollback()
 	frappe.clear_messages()
 	stage = "preview" if context["tool_class"] in ("write", "admin") else "call"

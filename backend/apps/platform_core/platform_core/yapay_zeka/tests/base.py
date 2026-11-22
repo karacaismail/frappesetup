@@ -1,8 +1,8 @@
-"""Yapay zekâ katmanı testlerinin ortak tabanı.
+"""Shared base of the AI layer tests.
 
-Testler isteği Frappe'nin WSGI uygulamasından geçirir (D-6). Böylece kimlik doğrulama,
-HTTP yöntemi ve misafir denetimi gerçek yolda çalışır. Beklenen değerler
-`contracts/platform_core-yapay-zeka.openapi.yaml` sözleşmesinden gelir (D-1).
+The tests pass the request through Frappe's WSGI application (D-6). This way authentication,
+the HTTP method and the guest check run on the real path. The expected values
+come from the `contracts/platform_core-yapay-zeka.openapi.yaml` contract (D-1).
 """
 
 import json
@@ -25,7 +25,7 @@ PASSWORD = "Sahte-Parola-7391-yz!"
 
 
 def ensure_fixtures() -> None:
-	"""Uydurma rol, kayıt türü ve kullanıcıları bir kez kurar."""
+	"""Sets up the made-up role, record type and users once."""
 	if not frappe.db.exists("Role", RESTRICTED_ROLE):
 		frappe.get_doc(doctype="Role", role_name=RESTRICTED_ROLE, desk_access=0).insert()
 	if not frappe.db.exists("DocType", CHILD_DOCTYPE):
@@ -47,7 +47,7 @@ def ensure_fixtures() -> None:
 			],
 		).insert()
 	if frappe.db.exists("DocType", DOCTYPE) and not frappe.get_meta(DOCTYPE).has_field("rows"):
-		# Eski test tanımı alt tablo taşımaz. Tanım yeniden kurulur.
+		# The old test definition has no child table. The definition is rebuilt.
 		for name in frappe.get_all(DOCTYPE, pluck="name"):
 			frappe.db.set_value(DOCTYPE, name, "docstatus", 0)
 			frappe.delete_doc(DOCTYPE, name, force=True)
@@ -160,12 +160,12 @@ class YzTestCase(IntegrationTestCase):
 	def tearDown(self):
 		frappe.set_user("Administrator")
 		frappe.db.rollback()
-		# Sonucu bilinmeyen öneri sonraki testin aynı hedefini kilitler. Test verisi temizlenir.
+		# A proposal with an unknown result locks the same target of the next test. Test data is cleaned.
 		frappe.db.delete("AI Action Proposal", {"result": "unknown"})
 		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		super().tearDown()
 
-	# --- istek yardımcıları ---
+	# --- request helpers ---
 
 	def send(self, client, method: str, path: str, *, body=None, headers=None, query=None):
 		request_headers = {"Accept": "application/json"}
@@ -185,10 +185,10 @@ class YzTestCase(IntegrationTestCase):
 			frappe.db.rollback()
 
 	def login(self, user: str, *, csrf: bool = True):
-		"""Kullanıcı adına oturum açar. Çerez istemcide kalır.
+		"""Logs in on behalf of the user. The cookie stays in the client.
 
-		Panel sayfası oturuma CSRF belirteci koyar ve tarayıcı onu başlıkta gönderir.
-		Test aynı durumu kurar: belirteci oturuma yazar ve her yazan istekte gönderir.
+		The desk page puts a CSRF token in the session and the browser sends it in a header.
+		The test sets up the same state: it writes the token to the session and sends it on every write.
 		"""
 		client = get_test_client(use_cookies=True)
 		response = self.send(client, "POST", "/api/method/login", body={"usr": user, "pwd": PASSWORD})
@@ -219,7 +219,7 @@ class YzTestCase(IntegrationTestCase):
 		return self.send(client, "POST", MCP_PATH, body=payload, headers=request_headers)
 
 	def call_tool(self, client, name: str, arguments: dict, *, token=None) -> dict:
-		"""Aracı çağırır ve MCP araç sonucunu döner."""
+		"""Calls the tool and returns the MCP tool result."""
 		response = self.rpc(client, "tools/call", {"name": name, "arguments": arguments}, token=token)
 		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
 		self.assertIn("result", response.json, response.json)
@@ -282,7 +282,7 @@ class YzTestCase(IntegrationTestCase):
 		thread.start()
 		thread.join()
 
-	# --- veri yardımcıları ---
+	# --- data helpers ---
 
 	def make_record(self, owner: str, **values) -> str:
 		frappe.set_user(owner)

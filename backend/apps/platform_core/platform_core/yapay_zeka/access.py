@@ -1,4 +1,4 @@
-"""İsteğin kimlik türü ve işlem günlüğü yazımı."""
+"""Identity type of the request and writing of the action log."""
 
 import hashlib
 import json
@@ -10,6 +10,7 @@ import frappe
 from frappe import _
 
 from platform_core.yapay_zeka import store
+from platform_core.yapay_zeka.errors import CONTEXT
 
 HUMAN = "human_session"
 AGENT = "agent_token"
@@ -19,10 +20,11 @@ CONVERSATION_HEADER = "Mcp-Conversation-Id"
 
 
 def principal() -> str:
-	"""İsteğin kimlik türünü döner.
+	"""Return the identity type of the request.
 
-	İnsan oturumu yalnız çerezle gelen oturumdur. `Authorization` başlığı taşıyan istek
-	insan oturumu sayılmaz. Aracı belirtecini `agent_token.authenticate_request` işaretler.
+	A human session is only a session that comes with a cookie. A request that carries an
+	`Authorization` header does not count as a human session. `agent_token.authenticate_request`
+	marks the agent token.
 	"""
 	if getattr(frappe.local, "yz_agent", None):
 		return AGENT
@@ -34,11 +36,11 @@ def principal() -> str:
 
 
 def require_human(stage: str, *, tool: str | None = None) -> None:
-	"""İstek insan oturumundan gelmediyse reddi günlüğe yazar ve 403 verir."""
+	"""If the request is not from a human session, log the denial and answer 403."""
 	if principal() == HUMAN and _csrf_checked():
 		return
 	record_denial(stage, "not_human_session", tool=tool)
-	raise frappe.PermissionError(_("This action needs a human session."))
+	raise frappe.PermissionError(_("This action needs a human session.", context=CONTEXT))
 
 
 class TransactionActive(frappe.ValidationError):
@@ -52,7 +54,10 @@ def require_clean_transaction() -> None:
 	another caller's pending writes permanent.
 	"""
 	if frappe.db.transaction_writes:
-		frappe.throw(_("This action cannot run inside a transaction with pending writes."), TransactionActive)
+		frappe.throw(
+			_("This action cannot run inside a transaction with pending writes.", context=CONTEXT),
+			TransactionActive,
+		)
 
 
 def commit_own_writes() -> None:
@@ -73,11 +78,11 @@ def record_denial(stage: str, deny_reason: str, **fields) -> str:
 
 
 def _csrf_checked() -> bool:
-	"""Yazan istekte CSRF başlığı oturumdaki belirteçle aynı olmalı.
+	"""On a writing request the CSRF header must equal the token in the session.
 
-	Frappe bu karşılaştırmayı oturumda belirteç yoksa, `ignore_csrf` açıksa ya da
-	izinli yönlendiren varsa atlar (`frappe/auth.py` içinde `validate_csrf_token`).
-	Onay gibi işlerde karşılaştırma burada her zaman yapılır.
+	Frappe skips this comparison when the session has no token, when `ignore_csrf` is on or
+	when there is an allowed referrer (`validate_csrf_token` in `frappe/auth.py`).
+	For actions such as approval the comparison is always done here.
 	"""
 	if frappe.request.method in ("GET", "HEAD", "OPTIONS"):
 		return True
@@ -87,14 +92,14 @@ def _csrf_checked() -> bool:
 
 
 class WrongState(frappe.ValidationError):
-	"""Öneri bu iş için uygun durumda değil."""
+	"""The proposal is not in the right state for this action."""
 
 
 def human_call(stage: str, tool: str, action, *, proposal: str | None = None, log_success: bool = True):
-	"""İnsan ucunun işini çalıştırır ve sonucu günlüğe yazar.
+	"""Run the action of a human endpoint and write the result to the log.
 
-	Hata yanıtı ve GET isteği işlemi geri alır (`frappe/app.py`). Günlük kaydı kalsın diye
-	kayıt burada kesinleştirilir. Ret durumunda bu noktaya kadar başka yazı yoktur.
+	An error response and a GET request roll the transaction back (`frappe/app.py`). The log
+	row is committed here so that it stays. On a denial nothing else has been written so far.
 	"""
 	require_human(stage, tool=tool)
 	codes = (
@@ -148,7 +153,7 @@ def record(
 	user: str | None = None,
 	principal_type: str | None = None,
 ) -> str:
-	"""“AI Action Log” kaydı açar. Girdinin kendisi değil, özeti yazılır."""
+	"""Create an "AI Action Log" record. A digest of the input is written, not the input itself."""
 	return store.insert_log(
 		{
 			"user": user or frappe.session.user,

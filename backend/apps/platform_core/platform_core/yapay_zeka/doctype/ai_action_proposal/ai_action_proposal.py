@@ -1,4 +1,4 @@
-"""AI Action Proposal: insan onayı bekleyen yazma önerisi (G-86)."""
+"""AI Action Proposal: a write proposal that waits for human approval (G-86)."""
 
 from frappe.model.document import Document
 

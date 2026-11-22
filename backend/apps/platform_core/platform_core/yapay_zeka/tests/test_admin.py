@@ -1,4 +1,4 @@
-"""Yönetim araçları: yalnız yönetici rolü, önizleme ve insan onayı."""
+"""Admin tools: admin role only, preview and human approval."""
 
 import frappe
 from frappe.permissions import reset_perms
@@ -71,7 +71,7 @@ class TestAdminTools(YzTestCase):
 		self.assertEqual((log.decision, log.tool_class), ("denied", "admin"))
 
 	def test_admin_functions_check_the_role_themselves(self):
-		"""Araç listesi atlanırsa bile işlevler yönetici rolünü denetler."""
+		"""Even if the tool list is bypassed, the functions check the admin role."""
 		from platform_core.yapay_zeka import retention
 		from platform_core.yapay_zeka.tools import admin
 

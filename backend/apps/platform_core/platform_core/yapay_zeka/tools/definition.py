@@ -1,4 +1,4 @@
-"""Tanım araçları: DocType'ı, alanlarını ve kullanıcının izinlerini anlatır."""
+"""Definition tools: describe the DocType, its fields and the user's permissions."""
 
 import frappe
 from frappe import _
@@ -7,10 +7,12 @@ from frappe.model import NO_VALUE_FIELDS
 from pydantic import Field
 
 from platform_core.yapay_zeka import fields, policy
-from platform_core.yapay_zeka.errors import ToolDenied
+from platform_core.yapay_zeka.errors import CONTEXT, ToolDenied
 from platform_core.yapay_zeka.tools import envelope
 
 LAYOUT_FIELDTYPES = NO_VALUE_FIELDS - {"Table", "Table MultiSelect"}
+# Named here so that a test can lower it for this module.
+MAX_RESULT_BYTES = envelope.MAX_RESULT_BYTES
 PERMISSION_TYPES = ("read", "write", "create", "delete", "submit", "cancel")
 
 
@@ -24,7 +26,7 @@ class GetDoctypeSchemaArguments(ToolArguments):
 
 
 def search_doctypes(query: str | None = None, limit: int = 50) -> dict:
-	"""Kullanıcının okuyabildiği DocType adlarını döner."""
+	"""Returns the DocType names the user can read."""
 	needle = (query or "").lower()
 	names = sorted(
 		name
@@ -35,20 +37,24 @@ def search_doctypes(query: str | None = None, limit: int = 50) -> dict:
 
 
 def get_doctype_schema(doctype: str) -> dict:
-	"""Alan tanımlarını çalışma anında DocType tanımından üretir.
+	"""Builds the field definitions from the DocType definition at run time.
 
-	`frappe.get_meta` “Custom Field” ve “Property Setter” değişikliklerini de içerir.
+	`frappe.get_meta` also includes "Custom Field" and "Property Setter" changes.
 	"""
 	meta = fields.get_meta(doctype)
 	permissions = {
-		# Değer izin kararı için değil, bilgi için döner.
+		# The value is returned for information, not for the permission decision.
 		ptype: False if meta.istable else bool(frappe.has_permission(doctype, ptype))
 		for ptype in PERMISSION_TYPES
 	}
 	if doctype in policy.READ_BLOCKED:
-		raise ToolDenied("blocked_doctype", _("DocType {0} is closed to AI tools.").format(doctype))
+		raise ToolDenied(
+			"blocked_doctype", _("DocType {0} is closed to AI tools.", context=CONTEXT).format(doctype)
+		)
 	if not meta.istable and not any(permissions.values()):
-		raise ToolDenied("permission", _("You have no permission on DocType {0}.").format(doctype))
+		raise ToolDenied(
+			"permission", _("You have no permission on DocType {0}.", context=CONTEXT).format(doctype)
+		)
 
 	can_read = fields.readable(meta)
 	can_write = fields.writable(meta)
@@ -60,6 +66,13 @@ def get_doctype_schema(doctype: str) -> dict:
 
 
 def _schema(doctype: str, meta, permissions: dict, can_read: set, can_write: set, write_closed: bool) -> dict:
+	# The field list is the large part of a definition. It is cut at the byte limit.
+	described = [
+		_field_schema(field, can_read, can_write)
+		for field in meta.fields
+		if field.fieldtype not in LAYOUT_FIELDTYPES
+	]
+	fields, cut = envelope.fit_rows(described, MAX_RESULT_BYTES)
 	return {
 		"doctype": doctype,
 		"description": meta.description,
@@ -70,11 +83,8 @@ def _schema(doctype: str, meta, permissions: dict, can_read: set, can_write: set
 		"title_field": meta.title_field,
 		"generic_write_tools": "closed" if write_closed else "open",
 		"permissions": permissions,
-		"fields": [
-			_field_schema(field, can_read, can_write)
-			for field in meta.fields
-			if field.fieldtype not in LAYOUT_FIELDTYPES
-		],
+		"fields": fields,
+		"truncated": cut,
 	}
 
 

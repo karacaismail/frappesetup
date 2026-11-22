@@ -1,4 +1,4 @@
-"""Okuma araçları: yetki eşitliği, izin seviyesi ve gizli alanlar (G-85)."""
+"""Read tools: permission parity, permission level and secret fields (G-85)."""
 
 import frappe
 

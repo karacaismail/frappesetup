@@ -1,4 +1,4 @@
-"""Önizleme ve insan onayı (G-86)."""
+"""Preview and human approval (G-86)."""
 
 from unittest.mock import patch
 
@@ -29,7 +29,7 @@ class TestApproval(YzTestCase):
 		self.assertEqual(log.proposal, proposal["proposal_id"])
 
 	def race(self, calls: list[tuple]) -> list[dict]:
-		"""Onay isteklerini aynı anda gönderir ve yanıtları döner."""
+		"""Sends the approval requests at the same time and returns the responses."""
 		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
 		threads = []
 		for client, proposal_id, digest in calls:
@@ -106,8 +106,8 @@ class TestApproval(YzTestCase):
 		proposal_id = self.propose_update(client, name, title="Yeni")["proposal_id"]
 		digest = self.digest_of(client, proposal_id)
 
-		# Frappe test kipinde “Version” kaydı yazmaz (`Document._save`). Üretim davranışını
-		# görmek için bu tek istekte test kipi kapatılır.
+		# Frappe does not write a "Version" record in test mode (`Document._save`). To see the
+		# production behaviour, test mode is turned off for this single request.
 		with patch.object(frappe, "in_test", False):
 			outcome = self.approve(client, proposal_id, digest).json["message"]
 
@@ -360,7 +360,7 @@ class TestApproval(YzTestCase):
 		proposal = self.call_tool(
 			client, "create_document", {"doctype": DOCTYPE, "data": {"title": "Hata", "amount": 1}}
 		)["structuredContent"]
-		# Zorunlu alan kuralı önizlemeden sonra eklenir. Yürütme bu yüzden hata verir.
+		# The mandatory field rule is added after the preview. That is why execution fails.
 		frappe.db.set_value("DocField", {"parent": DOCTYPE, "fieldname": "access_token"}, "reqd", 1)
 		frappe.clear_cache(doctype=DOCTYPE)
 		self.addCleanup(self.clear_reqd)

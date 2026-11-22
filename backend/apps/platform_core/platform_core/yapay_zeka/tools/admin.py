@@ -1,7 +1,7 @@
-"""Yönetim araçları: özel alan, alan ayarı, rol ve izin değişikliği.
+"""Admin tools: custom field, field property, role and permission changes.
 
-Yalnız “System Manager” rolüne açıktır. Her araç önizleme üretir ve insan onayı ister.
-Yürütme Frappe'nin kendi yönetim yollarını kullanır. Bu yollar yetkiyi yeniden denetler.
+Open only to the "System Manager" role. Each tool produces a preview and asks for human approval.
+Execution uses Frappe's own admin paths. These paths check the authorization again.
 """
 
 import json
@@ -14,7 +14,7 @@ from frappe.mcp.tools import ToolArguments
 from pydantic import Field
 
 from platform_core.yapay_zeka import fields, policy, retention, store, versioning
-from platform_core.yapay_zeka.errors import ToolDenied
+from platform_core.yapay_zeka.errors import CONTEXT, ToolDenied
 
 ADMIN_ROLE = "System Manager"
 
@@ -35,7 +35,7 @@ FieldType = Literal[
 	"Link",
 	"Password",
 ]
-# İfade çalıştıran ayarlar (`depends_on`, `fetch_from` gibi) bu listede yoktur.
+# Properties that run expressions (such as `depends_on`, `fetch_from`) are not in this list.
 PROPERTY_TYPES = {
 	"label": "Data",
 	"description": "Text",
@@ -120,15 +120,17 @@ class PurgeActionLogArguments(ToolArguments):
 	older_than_days: int = Field(default=retention.MIN_DAYS, ge=retention.MIN_DAYS)
 
 
-# Doğrudan çağrıda sürüm denetimi yoktur. Onay akışı beklenen sürümü her zaman verir.
+# A direct call has no version check. The approval flow always passes the expected version.
 _UNCHECKED = object()
 
 
 def _admin_meta(doctype: str):
-	"""Yönetici denetimini yapar ve yapısı değişebilen DocType'ın tanımını döner."""
+	"""Runs the admin check and returns the definition of a DocType whose structure may change."""
 	frappe.only_for(ADMIN_ROLE)
 	if doctype in policy.ADMIN_TOOL_BLOCKED:
-		raise ToolDenied("blocked_doctype", _("DocType {0} is closed to AI tools.").format(doctype))
+		raise ToolDenied(
+			"blocked_doctype", _("DocType {0} is closed to AI tools.", context=CONTEXT).format(doctype)
+		)
 	return fields.get_meta(doctype)
 
 
@@ -144,15 +146,15 @@ def _spec(summary: str, doctype: str, name: str, version: str | None, changes: l
 
 
 def _verify(spec: dict, expected_version) -> None:
-	"""Yazmadan hemen önce hedefin sürümünü önizlemedekiyle karşılaştırır.
+	"""Compares the target's version with the one in the preview right before writing.
 
-	Çağıran önce asıl hedefi kilitler, sonra önizlemeyi güncel veriyle yeniden üretir.
-	Sürüm farklıysa onay eski veriye verilmiştir ve iş yürümez.
+	The caller first locks the actual target, then rebuilds the preview from current data.
+	If the version differs, the approval was given for old data and the job does not run.
 	"""
 	if expected_version is _UNCHECKED:
 		return
 	if versioning.token(spec["target_version"]) != expected_version:
-		raise ToolDenied("document_changed", _("The target changed after the preview."))
+		raise ToolDenied("document_changed", _("The target changed after the preview.", context=CONTEXT))
 
 
 def _grants_desk_access(role: str) -> bool:
@@ -165,21 +167,25 @@ def _role_exists(role: str) -> bool:
 	return bool(frappe.get_list("Role", filters={"name": role}, pluck="name", limit_page_length=1))
 
 
-# --- özel alan ---
+# --- custom field ---
 
 
 def preview_custom_field(doctype: str, fieldname: str, **values) -> dict:
 	meta = _admin_meta(doctype)
 	if not frappe.has_permission("Custom Field", "create"):
-		raise ToolDenied("permission", _("You may not create custom fields."))
+		raise ToolDenied("permission", _("You may not create custom fields.", context=CONTEXT))
 	if meta.has_field(fieldname):
-		raise ToolDenied("invalid_arguments", _("Field {0} already exists.").format(fieldname))
+		raise ToolDenied(
+			"invalid_arguments", _("Field {0} already exists.", context=CONTEXT).format(fieldname)
+		)
 	if values["fieldtype"] in ("Select", "Link") and not values.get("options"):
-		raise ToolDenied("invalid_arguments", _("Select and Link fields need options."))
+		raise ToolDenied("invalid_arguments", _("Select and Link fields need options.", context=CONTEXT))
 	if values["fieldtype"] == "Link":
 		fields.get_meta(values["options"])
 	if values.get("insert_after") and not meta.has_field(values["insert_after"]):
-		raise ToolDenied("invalid_arguments", _("insert_after names a field that does not exist."))
+		raise ToolDenied(
+			"invalid_arguments", _("insert_after names a field that does not exist.", context=CONTEXT)
+		)
 	changes = [
 		{"fieldname": key, "label": None, "old": None, "new": value}
 		for key, value in {"fieldname": fieldname, **values}.items()
@@ -214,33 +220,39 @@ def run_custom_field(doctype: str, fieldname: str, expected_version=_UNCHECKED, 
 	return write_custom_field(prepare_custom_field(doctype, fieldname, expected_version, **values))
 
 
-# --- alan ayarı ---
+# --- field property ---
 
 
 def _property_value(property: str, value: str | int | bool) -> str:
 	kind = PROPERTY_TYPES[property]
 	if kind == "Check":
 		if value not in (True, False, 0, 1):
-			raise ToolDenied("invalid_arguments", _("{0} takes true or false.").format(property))
+			raise ToolDenied(
+				"invalid_arguments", _("{0} takes true or false.", context=CONTEXT).format(property)
+			)
 		return str(int(bool(value)))
 	if kind == "Int":
 		if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 9:
-			raise ToolDenied("invalid_arguments", _("{0} takes a number from 0 to 9.").format(property))
+			raise ToolDenied(
+				"invalid_arguments", _("{0} takes a number from 0 to 9.", context=CONTEXT).format(property)
+			)
 		return str(value)
 	if not isinstance(value, str):
-		raise ToolDenied("invalid_arguments", _("{0} takes text.").format(property))
+		raise ToolDenied("invalid_arguments", _("{0} takes text.", context=CONTEXT).format(property))
 	return value
 
 
 def preview_field_property(doctype: str, fieldname: str, property: str, value: str | int | bool) -> dict:
 	meta = _admin_meta(doctype)
 	if not frappe.has_permission("Property Setter", "create"):
-		raise ToolDenied("permission", _("You may not change field properties."))
+		raise ToolDenied("permission", _("You may not change field properties.", context=CONTEXT))
 	field = meta.get_field(fieldname)
 	if field is None:
-		raise ToolDenied("invalid_arguments", _("Unknown field: {0}").format(fieldname))
+		raise ToolDenied("invalid_arguments", _("Unknown field: {0}", context=CONTEXT).format(fieldname))
 	if property == "options" and field.fieldtype != "Select":
-		raise ToolDenied("invalid_arguments", _("options can change only on a Select field."))
+		raise ToolDenied(
+			"invalid_arguments", _("options can change only on a Select field.", context=CONTEXT)
+		)
 	new = _property_value(property, value)
 	old = field.get(property)
 	changes = [{"fieldname": f"{fieldname}.{property}", "label": field.label, "old": old, "new": new}]
@@ -305,10 +317,13 @@ def _permission_row(doctype: str, role: str, permlevel: int) -> dict | None:
 		if (row.permlevel or 0) == permlevel
 	]
 	if len(rows) > 1:
-		# Frappe güncellemede bu satırlardan hangisini seçeceğini belirtmez.
+		# Frappe does not say which of these rows it will pick on update.
 		raise ToolDenied(
 			"invalid_arguments",
-			_("This role has more than one rule at this level. Change it in the permission manager."),
+			_(
+				"This role has more than one rule at this level. Change it in the permission manager.",
+				context=CONTEXT,
+			),
 		)
 	return rows[0] if rows else None
 
@@ -321,23 +336,25 @@ def preview_role_permission(
 		or doctype in policy.CODE_DOCTYPES
 		or doctype in policy.ADMIN_DOCTYPES
 	):
-		# Bu türlerde izin vermek, kod çalıştırma ya da yetki yükseltme yolu açar.
+		# Granting permission on these types opens a path to code execution or privilege escalation.
 		raise ToolDenied(
-			"blocked_doctype", _("Permissions of DocType {0} do not change through AI.").format(doctype)
+			"blocked_doctype",
+			_("Permissions of DocType {0} do not change through AI.", context=CONTEXT).format(doctype),
 		)
 	if role in policy.PROTECTED_PERMISSION_ROLES:
 		raise ToolDenied(
-			"protected_role", _("Permissions of role {0} do not change through AI.").format(role)
+			"protected_role",
+			_("Permissions of role {0} do not change through AI.", context=CONTEXT).format(role),
 		)
 	_admin_meta(doctype)
 	if not _role_exists(role):
-		raise ToolDenied("invalid_arguments", _("Unknown role: {0}").format(role))
+		raise ToolDenied("invalid_arguments", _("Unknown role: {0}", context=CONTEXT).format(role))
 	if not permissions or set(permissions) - set(PERMISSION_TYPES):
-		raise ToolDenied("invalid_arguments", _("permissions takes known permission types."))
+		raise ToolDenied("invalid_arguments", _("permissions takes known permission types.", context=CONTEXT))
 	row = _permission_row(doctype, role, permlevel)
 	current = {ptype: int((row or {}).get(ptype) or 0) for ptype in PERMISSION_TYPES}
-	# Kural yoksa Frappe yeni kuralı okuma izniyle açar (`frappe.permissions.add_permission`).
-	# Önizleme bu izni de gösterir.
+	# If there is no rule, Frappe creates the new rule with read permission
+	# (`frappe.permissions.add_permission`). The preview shows this permission too.
 	target = {**({} if row else {"read": True}), **permissions}
 	changes = [
 		{"fieldname": ptype, "label": None, "old": current[ptype], "new": int(value)}
@@ -392,15 +409,17 @@ def run_role_permission(
 	)
 
 
-# --- kullanıcı rolü ---
+# --- user role ---
 
 
 def _user_for_role_change(user: str, role: str, *, adding: bool, lock: bool = False):
 	frappe.only_for(ADMIN_ROLE)
 	if role in policy.PROTECTED_ROLES or user in ("Administrator", "Guest"):
-		raise ToolDenied("protected_role", _("Role {0} does not change through AI.").format(role))
+		raise ToolDenied(
+			"protected_role", _("Role {0} does not change through AI.", context=CONTEXT).format(role)
+		)
 	if not _role_exists(role):
-		raise ToolDenied("invalid_arguments", _("Unknown role: {0}").format(role))
+		raise ToolDenied("invalid_arguments", _("Unknown role: {0}", context=CONTEXT).format(role))
 	doc = frappe.get_doc("User", user, for_update=lock)
 	doc.check_permission("write")
 	if adding and doc.user_type == "Website User" and _grants_desk_access(role):
@@ -408,11 +427,15 @@ def _user_for_role_change(user: str, role: str, *, adding: bool, lock: bool = Fa
 		# System User on save (`frappe/core/doctype/user/user.py`, `set_system_user`).
 		raise ToolDenied(
 			"desk_role_for_end_user",
-			_("Role {0} gives desk access. An end user cannot have it.").format(role),
+			_("Role {0} gives desk access. An end user cannot have it.", context=CONTEXT).format(role),
 		)
 	has_role = role in {row.role for row in doc.roles}
 	if adding == has_role:
-		message = _("The user already has this role.") if adding else _("The user does not have this role.")
+		message = (
+			_("The user already has this role.", context=CONTEXT)
+			if adding
+			else _("The user does not have this role.", context=CONTEXT)
+		)
 		raise ToolDenied("invalid_arguments", message)
 	return doc
 
@@ -469,7 +492,7 @@ def run_remove_role(user: str, role: str, expected_version=_UNCHECKED) -> dict:
 	return write_remove_role(prepare_remove_role(user, role, expected_version))
 
 
-# --- elle başlatılan komut: günlük temizliği ---
+# --- manually started command: log cleanup ---
 
 
 def preview_purge(older_than_days: int = retention.MIN_DAYS) -> dict:

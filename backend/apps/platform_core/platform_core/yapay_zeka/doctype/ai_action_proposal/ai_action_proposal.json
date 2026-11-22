@@ -18,6 +18,7 @@
   "args_json",
   "preview_json",
   "digest",
+  "preview_digest",
   "destructive",
   "billable",
   "expires_at",
@@ -121,6 +122,13 @@
    "read_only": 1
   },
   {
+   "description": "SHA-256 of the whole preview and its target. The server previews again at approval and compares.",
+   "fieldname": "preview_digest",
+   "fieldtype": "Data",
+   "label": "Preview Digest",
+   "read_only": 1
+  },
+  {
    "fieldname": "destructive",
    "fieldtype": "Check",
    "label": "Destructive",
@@ -185,7 +193,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 13:30:00.000000",
+ "modified": "2026-11-22 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Yapay Zeka",
  "name": "AI Action Proposal",

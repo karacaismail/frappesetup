@@ -1,4 +1,4 @@
-"""Araç kaydı: `ai_tools` kancası (G-105) ve kodun durağan denetimleri (B-10)."""
+"""Tool registry: the `ai_tools` hook (G-105) and static checks of the code (B-10)."""
 
 import re
 from pathlib import Path
@@ -20,7 +20,7 @@ PROVIDER_LIBRARIES = (
 
 
 def with_sample_tools():
-	"""Örnek araçları kancaya ekler. Yama süreç genelindedir, istek iş parçacığını da kapsar."""
+	"""Adds the sample tools to the hook. The patch is process-wide and covers the request thread too."""
 	original = frappe.get_hooks
 
 	def get_hooks(hook=None, *args, **kwargs):
@@ -160,7 +160,7 @@ class TestStaticRules(YzTestCase):
 		self.assertEqual(offenders, [])
 		self.assertEqual(declared, [])
 
-	# The rule “no model name in code” is enforced by the project's AI readiness gate
+	# The rule "no model name in code" is enforced by the project's AI readiness gate
 	# (`dev/bin/ai-readiness`, rule `model`). A test here would have to spell model names itself.
 
 	def test_layer_code_does_not_bypass_permissions(self):
@@ -232,14 +232,14 @@ class TestStaticRules(YzTestCase):
 
 
 class TestContract(YzTestCase):
-	"""Sözleşmedeki araç şeması ile çalışan araç kaydı aynı olmalı (SZ-3)."""
+	"""The tool schema in the contract and the running tool registry must match (SZ-3)."""
 
 	CONTRACT = APP_ROOT.parents[2] / "contracts" / "platform_core-yapay-zeka.openapi.yaml"
 
 	def setUp(self):
 		super().setUp()
 		if not self.CONTRACT.exists():
-			self.skipTest(f"Sözleşme dosyası bu ortamda yok: {self.CONTRACT}")
+			self.skipTest(f"Contract file is missing in this environment: {self.CONTRACT}")
 		import yaml
 
 		self.contract = yaml.safe_load(self.CONTRACT.read_text())

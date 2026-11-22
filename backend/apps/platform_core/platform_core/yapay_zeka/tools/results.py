@@ -67,10 +67,12 @@ DOCTYPE_SCHEMA = {
 		"generic_write_tools",
 		"permissions",
 		"fields",
+		"truncated",
 		*_PROVENANCE_KEYS,
 	],
 	"properties": {
 		**_PROVENANCE,
+		"truncated": _TRUNCATED,
 		"doctype": _STRING,
 		"description": _NULLABLE_STRING,
 		"module": _STRING,
@@ -120,10 +122,14 @@ DOCTYPE_SCHEMA = {
 
 LIST_DOCUMENTS = {
 	"type": "object",
-	"required": ["documents", "has_next_page", "truncated", *_PROVENANCE_KEYS],
+	"required": ["documents", "has_next_page", "next_start", "truncated", *_PROVENANCE_KEYS],
 	"properties": {
 		"documents": {"type": "array", "items": {"type": "object"}},
 		"has_next_page": _BOOLEAN,
+		"next_start": {
+			"type": ["integer", "null"],
+			"description": "Value of start for the next page. Null on the last page.",
+		},
 		"truncated": _TRUNCATED,
 		**_PROVENANCE,
 	},

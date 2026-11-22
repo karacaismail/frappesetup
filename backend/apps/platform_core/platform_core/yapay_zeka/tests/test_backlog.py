@@ -263,7 +263,7 @@ class TestProposalPages(YzTestCase):
 		third = self.human(
 			client, "GET", "list_proposals", query={"limit": 2, "start": 4, "status": "pending"}
 		).json["message"]
-		far = self.human(client, "GET", "list_proposals", query={"limit": 2, "start": 100000}).json["message"]
+		far = self.human(client, "GET", "list_proposals", query={"limit": 2, "start": 10000}).json["message"]
 
 		page = lambda body: [row["proposal_id"] for row in body["proposals"]]  # noqa: E731
 		self.assertEqual(page(first), [ids[4], ids[3]])

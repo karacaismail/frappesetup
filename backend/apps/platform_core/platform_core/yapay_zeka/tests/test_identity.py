@@ -1,4 +1,4 @@
-"""Kimlik: insan oturumu, aracı belirteci ve MCP taşıması (G-148)."""
+"""Identity: human session, agent token and MCP transport (G-148)."""
 
 import frappe
 from frappe.core.doctype.user.user import generate_keys

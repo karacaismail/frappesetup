@@ -1,4 +1,4 @@
-"""Yazma önerileri: önizleme, insan onayı, tek kullanımlık yürütme ve “unknown” kuralı (G-86)."""
+"""Write proposals: preview, human approval, single-use execution and the "unknown" rule (G-86)."""
 
 import hashlib
 import json
@@ -12,8 +12,9 @@ from frappe.utils import add_to_date, get_datetime, now_datetime, strip_html
 from frappe.utils.response import json_handler
 from pydantic import Field
 
-from platform_core.yapay_zeka import access, registry, store, timestamps, versioning
-from platform_core.yapay_zeka.errors import ToolDenied
+from platform_core.yapay_zeka import access, registry, schema_check, store, timestamps, versioning
+from platform_core.yapay_zeka.errors import CONTEXT, ToolDenied
+from platform_core.yapay_zeka.tools import results
 
 TTL_SECONDS = 600
 STATUS_FILTERS = {
@@ -23,6 +24,8 @@ STATUS_FILTERS = {
 	"consumed": ("consumed",),
 }
 APPROVE_ATTEMPTS = 4
+# Paging by offset scans the skipped rows. The list is for a human's recent proposals.
+MAX_LIST_START = 10_000
 PREVIEW_KEYS = ("action", "summary", "changes", "details")
 
 
@@ -43,10 +46,10 @@ def _target_key(doctype: str | None, name: str | None) -> str | None:
 def _digest(
 	user: str, tool: str, target_key: str | None, version: str | None, args: str, preview: str
 ) -> str:
-	"""Onayı bu önizlemeye bağlayan özet.
+	"""The digest that binds the approval to this preview.
 
-	Rastgele bir değer de girer. Böylece model özeti kendi bildiği girdilerden hesaplayamaz.
-	Özet yalnız insan ucundan (`get_proposal`) döner.
+	A random value goes in too. So the model cannot compute the digest from inputs it knows.
+	The digest is returned only from the human endpoint (`get_proposal`).
 	"""
 	parts = [
 		frappe.local.site,
@@ -66,42 +69,55 @@ CHANGE_KEYS = frozenset({"fieldname", "label", "old", "new"})
 
 
 def preview_problems(spec: dict) -> list[str]:
-	"""Check a preview against the preview schema of the contract. Return what is wrong with it."""
-	problems = []
+	"""Check a preview against the published preview schema. Return what is wrong with it."""
+	preview = {key: spec[key] for key in PREVIEW_KEYS if spec.get(key) is not None}
+	preview.setdefault("action", "app_tool")
+	problems = schema_check.problems(preview, results.PREVIEW, "preview")
 	if not isinstance(spec.get("summary"), str) or not spec["summary"].strip():
-		problems.append("summary must be a text")
-	if spec.get("action", "app_tool") not in PREVIEW_ACTIONS:
-		problems.append("action is not known")
-	if spec.get("details") is not None and not isinstance(spec["details"], dict):
-		problems.append("details must be an object")
-	changes = spec.get("changes")
-	if changes is None:
-		return problems
-	if not isinstance(changes, list):
-		return [*problems, "changes must be a list"]
-	for index, change in enumerate(changes):
-		if not isinstance(change, dict):
-			problems.append(f"changes[{index}] must be an object")
-		elif set(change) - CHANGE_KEYS:
-			problems.append(
-				f"changes[{index}] has unknown keys: {', '.join(sorted(set(change) - CHANGE_KEYS))}"
-			)
-		elif not isinstance(change.get("fieldname"), str) or "new" not in change:
-			problems.append(f"changes[{index}] needs fieldname and new")
+		problems.append("preview.summary must be a text")
+	for index, change in enumerate(preview.get("changes") or []):
+		if isinstance(change, dict) and set(change) - CHANGE_KEYS:
+			unknown = ", ".join(sorted(set(change) - CHANGE_KEYS))
+			problems.append(f"preview.changes[{index}] has unknown keys: {unknown}")
 	return problems
+
+
+def _guards_row(tool: registry.AiTool) -> bool:
+	"""An app tool that declares `versioned` asks the layer to guard the target row itself."""
+	return tool.tool_class == "app" and tool.versioned
+
+
+def preview_digest(spec: dict, row_stamp: str | None = None) -> str:
+	"""Digest of everything the human approves: the whole preview and the target it is aimed at.
+
+	An approval is valid only while a fresh preview gives the same digest. `row_stamp` is the
+	layer's own reading of the target row. At execution it comes from the locking read.
+	"""
+	shown = {key: spec[key] for key in PREVIEW_KEYS if spec.get(key) is not None}
+	shown["target"] = [spec.get("target_doctype"), spec.get("target_name"), row_stamp]
+	return hashlib.sha256(_json(shown).encode()).hexdigest()
+
+
+def _row_stamp(tool: registry.AiTool, spec: dict) -> str | None:
+	return store.row_stamp(spec["target_doctype"], spec["target_name"]) if _guards_row(tool) else None
 
 
 def _run_preview(tool: registry.AiTool, arguments: dict) -> dict:
 	spec = tool.preview(**arguments)
 	if not isinstance(spec, dict):
-		raise ToolDenied("invalid_preview", _("The preview of tool {0} must be an object.").format(tool.name))
+		raise ToolDenied(
+			"invalid_preview",
+			_("The preview of tool {0} must be an object.", context=CONTEXT).format(tool.name),
+		)
 	spec.setdefault("action", "app_tool")
 	# The preview is what the human approves. It is stored only if it follows the preview schema.
 	problems = preview_problems(spec)
 	if problems:
 		raise ToolDenied(
 			"invalid_preview",
-			_("The preview of tool {0} is not valid: {1}").format(tool.name, "; ".join(problems)),
+			_("The preview of tool {0} is not valid: {1}", context=CONTEXT).format(
+				tool.name, "; ".join(problems)
+			),
 		)
 	if tool.tool_class == "app" and tool.versioned:
 		# The tool asked the layer to guard the target's version. Without all three values the
@@ -110,25 +126,34 @@ def _run_preview(tool: registry.AiTool, arguments: dict) -> dict:
 		if missing:
 			raise ToolDenied(
 				"invalid_preview",
-				_("The preview of versioned tool {0} must return {1}.").format(tool.name, ", ".join(missing)),
+				_("The preview of versioned tool {0} must return {1}.", context=CONTEXT).format(
+					tool.name, ", ".join(missing)
+				),
 			)
 	spec["target_version"] = versioning.token(spec.get("target_version"))
 	return spec
 
 
 def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
-	"""Önizleme üretir ve öneri kaydını açar. Hedef kayda hiçbir şey yazılmaz."""
-	spec = _run_preview(tool, arguments)
+	"""Build the preview and open the proposal record. Nothing is written to the target record."""
+	# The stored input is canonical JSON. The preview is built from that same form, so the
+	# preview made at approval, from the stored input, lists its changes in the same order.
 	args_json = _json(arguments)
-	# Hedefi olmayan işte (örneğin yeni kayıt) anahtar araç ve girdiden üretilir.
-	# Böylece sonucu bilinmeyen iş aynı girdiyle yeniden önerilemez.
+	arguments = json.loads(args_json)
+	spec = _run_preview(tool, arguments)
+	# For an action without a target (for example a new record) the key is built from the
+	# tool and the input. So an action with an unknown result cannot be proposed again with
+	# the same input.
 	target_key = _target_key(spec.get("target_doctype"), spec.get("target_name")) or _target_key(
 		tool.name, args_json
 	)
 	if store.unresolved_unknown_exists(target_key):
 		raise ToolDenied(
 			"unresolved_unknown",
-			_("An earlier action on this target has an unknown result. A human must resolve it first."),
+			_(
+				"An earlier action on this target has an unknown result. A human must resolve it first.",
+				context=CONTEXT,
+			),
 		)
 	preview = {key: spec[key] for key in PREVIEW_KEYS if spec.get(key) is not None}
 	preview_json = _json(preview)
@@ -146,6 +171,7 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 			"target_modified": version,
 			"args_json": args_json,
 			"preview_json": preview_json,
+			"preview_digest": preview_digest(spec, _row_stamp(tool, spec)),
 			"digest": _digest(frappe.session.user, tool.name, target_key, version, args_json, preview_json),
 			"destructive": int(tool.destructive),
 			"billable": int(tool.billable),
@@ -164,7 +190,7 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 
 
 def public(doc, *, with_digest: bool = True) -> dict:
-	"""Önerinin dışarıya dönen biçimi. Süresi dolan bekleyen öneri `expired` görünür."""
+	"""The outward form of the proposal. A pending proposal past its time shows as `expired`."""
 	status = doc.status
 	if status == "pending" and get_datetime(doc.expires_at) < now_datetime():
 		status = "expired"
@@ -189,17 +215,17 @@ def public(doc, *, with_digest: bool = True) -> dict:
 
 
 def _own(proposal_id: str, *, for_update: bool = False):
-	"""Kullanıcının kendi önerisini yükler. Başkasının önerisi izin hatası verir."""
+	"""Load the user's own proposal. Another user's proposal raises a permission error."""
 	doc = store.load_proposal(proposal_id, for_update=for_update)
 	if doc is None:
-		raise frappe.DoesNotExistError(_("Proposal not found."))
+		raise frappe.DoesNotExistError(_("Proposal not found.", context=CONTEXT))
 	if doc.user != frappe.session.user:
-		raise frappe.PermissionError(_("This proposal belongs to another user."))
+		raise frappe.PermissionError(_("This proposal belongs to another user.", context=CONTEXT))
 	return doc
 
 
 def read_for_model(proposal_id: str) -> dict:
-	"""`get_proposal` aracı. Onay özetini dönmez."""
+	"""The `get_proposal` tool. Does not return the approval digest."""
 	return public(_own(proposal_id), with_digest=False)
 
 
@@ -212,9 +238,12 @@ def list_for_human(status: str | None = None, limit: int = 20, start: int = 0) -
 
 	def page() -> dict:
 		if status and status not in STATUS_FILTERS:
-			frappe.throw(_("Unknown status."), frappe.ValidationError)
-		if int(start) < 0:
-			frappe.throw(_("start cannot be negative."), frappe.ValidationError)
+			frappe.throw(_("Unknown status.", context=CONTEXT), frappe.ValidationError)
+		if not 0 <= int(start) <= MAX_LIST_START:
+			frappe.throw(
+				_("start must be between 0 and {0}.", context=CONTEXT).format(MAX_LIST_START),
+				frappe.ValidationError,
+			)
 		count = min(max(int(limit), 1), 100)
 		rows = store.proposals_of(frappe.session.user, status or None, int(start), count + 1)
 		return {"proposals": [public(row) for row in rows[:count]], "has_next_page": len(rows) > count}
@@ -249,11 +278,11 @@ def _denied(doc, reason: str, *, new_status: str | None = None) -> dict:
 
 
 def approve(proposal_id: str, digest: str) -> dict:
-	"""İnsan onayı. Denetimler geçerse işi bu istekte, bir kez yürütür.
+	"""Human approval. If the checks pass, executes the action once, in this request.
 
-	Yarışan bir onay satırı değiştirdiyse veritabanı kilitli okumayı reddeder
-	(`frappe/database/mariadb/database.py:27`). O zaman işlem geri alınır ve denetimler
-	güncel veriyle yeniden yapılır. Kilit alınmadan önce hiçbir şey yazılmamıştır.
+	If a racing approval changed the row, the database refuses the locked read
+	(`frappe/database/mariadb/database.py:27`). Then the transaction is rolled back and the
+	checks are done again with current data. Nothing has been written before the lock is taken.
 	"""
 	access.require_human("approve")
 	if frappe.db.transaction_writes:
@@ -262,7 +291,7 @@ def approve(proposal_id: str, digest: str) -> dict:
 		access.require_clean_transaction()
 	if store.load_proposal(proposal_id) is None:
 		access.record_denial("approve", "not_found", tool="approve_proposal")
-		raise frappe.DoesNotExistError(_("Proposal not found."))
+		raise frappe.DoesNotExistError(_("Proposal not found.", context=CONTEXT))
 	for _attempt in range(APPROVE_ATTEMPTS - 1):
 		try:
 			return _approve(proposal_id, digest)
@@ -275,16 +304,18 @@ def approve(proposal_id: str, digest: str) -> dict:
 def _approve(proposal_id: str, digest: str) -> dict:
 	doc = store.load_proposal(proposal_id)
 	if doc is None:
-		raise frappe.DoesNotExistError(_("Proposal not found."))
+		raise frappe.DoesNotExistError(_("Proposal not found.", context=CONTEXT))
 	if doc.user != frappe.session.user:
-		# Başkasının önerisi yanıtta dönmez. Önizleme o kullanıcının verisini taşır.
+		# Another user's proposal is not returned in the response. The preview carries that
+		# user's data.
 		frappe.db.rollback()
 		_log("approve", doc, decision="denied", deny_reason="not_owner")
 		access.commit_own_writes()
-		raise frappe.PermissionError(_("This proposal belongs to another user."))
+		raise frappe.PermissionError(_("This proposal belongs to another user.", context=CONTEXT))
 
-	# Kilit sırası her istekte aynıdır: önce hedefin bütün önerileri, sonra bu öneri.
-	# Sıra değişirse yarışan iki onay birbirini kilitler. Durum kilit altında yeniden okunur.
+	# The lock order is the same in every request: first all proposals of the target, then this
+	# proposal. If the order changes, two racing approvals lock each other. The status is read
+	# again under the lock.
 	siblings = store.lock_target(doc.target_key) if doc.target_key else []
 	doc = store.load_proposal(proposal_id, for_update=True)
 	if doc.status != "pending":
@@ -302,7 +333,8 @@ def _approve(proposal_id: str, digest: str) -> dict:
 	if any(row.name != doc.name and row.status == "consumed" and row.result == "unknown" for row in siblings):
 		return _denied(doc, "unresolved_unknown")
 
-	# Önizleme kilit altında yeniden çalışır. İzin ve kaydın sürümü yürütme anında denetlenir.
+	# The preview runs again under the lock. Permission and the record's version are checked at
+	# execution time.
 	try:
 		spec = _run_preview(tool, arguments)
 	except ToolDenied as error:
@@ -319,12 +351,17 @@ def _approve(proposal_id: str, digest: str) -> dict:
 		return _denied(doc, "invalid_arguments", new_status="rejected")
 	if (spec.get("target_version") or None) != (doc.target_modified or None):
 		return _denied(doc, "document_changed", new_status="rejected")
+	if preview_digest(spec, _row_stamp(tool, spec)) != doc.preview_digest:
+		# The human approved another preview than the one the tool gives now. A new proposal
+		# and a new approval are needed.
+		return _denied(doc, "document_changed", new_status="rejected")
 	return _execute(doc, tool, arguments)
 
 
 def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
-	# İstekten önce sonuç `unknown` yazılır ve kesinleştirilir (sözleşme 10, kural 7).
-	# Bilinçli V-2 istisnası: süreç yarıda ölürse iz kalır ve öneri yeniden kullanılamaz.
+	# Before the request the result is written as `unknown` and committed (contract 10, rule 7).
+	# Deliberate V-2 exception: if the process dies midway, a trace stays and the proposal
+	# cannot be reused.
 	doc.status, doc.result, doc.decided_at = "consumed", "unknown", now_datetime()
 	store.save_proposal(doc)
 	_log("approve", doc, decision="allowed")
@@ -375,18 +412,23 @@ def _pre_check(doc, tool: registry.AiTool, arguments: dict) -> Any:
 	"""Run the layer's own check before the write boundary. Return what a built-in write step needs.
 
 	A built-in tool checks the previewed version itself, under a row lock. For an app tool that
-	declares `versioned`, the layer locks the target row, runs the preview again and compares
-	the version. An app tool's own `prepare` is not part of this check. It runs after the boundary.
+	declares `versioned`, the layer locks the stored target row and reads its stamp in that same
+	locking read, then runs the preview again and compares preview, target, stamp and version. An app tool's own `prepare` is not part of this check. It runs after the boundary.
 	"""
 	if tool.tool_class != "app":
 		extra = {"expected_version": doc.target_modified} if tool.versioned else {}
 		return tool.prepare(**arguments, **extra)
-	if tool.versioned:
-		spec = _run_preview(tool, arguments)
-		store.lock_row(spec["target_doctype"], spec["target_name"])
-		# Read again under the lock, then compare with the version the human approved.
-		if _run_preview(tool, arguments)["target_version"] != doc.target_modified:
-			raise ToolDenied("document_changed", _("The target changed after the preview."))
+	# For a versioned tool the stored target is locked first. The row stamp comes from that same
+	# locking read, so a stale snapshot in the tool's own preview cannot hide a changed target.
+	# A proposal without a stored target has nothing to lock. The preview below then fails or differs.
+	guarded = _guards_row(tool) and doc.target_doctype and doc.target_name
+	stamp = store.locked_row_stamp(doc.target_doctype, doc.target_name) if guarded else None
+	# Preview again and compare the whole preview, the target and the version with what the
+	# human approved.
+	spec = _run_preview(tool, arguments)
+	changed = preview_digest(spec, stamp) != doc.preview_digest
+	if changed or spec["target_version"] != (doc.target_modified or None):
+		raise ToolDenied("document_changed", _("The target changed after the preview.", context=CONTEXT))
 	return None
 
 
@@ -404,7 +446,7 @@ def _execution_error(doc, tool: registry.AiTool, error: Exception, *, result: st
 
 
 def _error_text(tool: registry.AiTool, error: Exception) -> str:
-	"""Kullanıcıya dönen hata metni. Beklenmeyen hatanın ayrıntısı yalnız hata kaydına gider."""
+	"""Error text returned to the user. Details of an unexpected error go only to the error log."""
 	if isinstance(error, ToolDenied):
 		return error.code
 	if isinstance(error, frappe.ValidationError | frappe.PermissionError):
@@ -417,7 +459,7 @@ def reject(proposal_id: str) -> dict:
 	def run() -> dict:
 		doc = _own(proposal_id, for_update=True)
 		if doc.status != "pending":
-			raise access.WrongState(_("Only a pending proposal can be rejected."))
+			raise access.WrongState(_("Only a pending proposal can be rejected.", context=CONTEXT))
 		doc.status, doc.decided_at = "rejected", now_datetime()
 		store.save_proposal(doc)
 		_log("reject", doc, decision="allowed")
@@ -427,14 +469,16 @@ def reject(proposal_id: str) -> dict:
 
 
 def resolve(proposal_id: str, outcome: str) -> dict:
-	"""Sonucu bilinmeyen öneriyi insan kararıyla kapatır. Hedef kayda yazmaz."""
+	"""Close a proposal with an unknown result by a human decision. Writes nothing to the target."""
 
 	def run() -> dict:
 		if outcome not in ("succeeded", "failed"):
-			frappe.throw(_("outcome must be succeeded or failed."), frappe.ValidationError)
+			frappe.throw(_("outcome must be succeeded or failed.", context=CONTEXT), frappe.ValidationError)
 		doc = _own(proposal_id, for_update=True)
 		if doc.status != "consumed" or doc.result != "unknown":
-			raise access.WrongState(_("Only a proposal with an unknown result can be resolved."))
+			raise access.WrongState(
+				_("Only a proposal with an unknown result can be resolved.", context=CONTEXT)
+			)
 		doc.result, doc.decided_at = outcome, now_datetime()
 		store.save_proposal(doc)
 		_log("resolve", doc, decision="allowed")
