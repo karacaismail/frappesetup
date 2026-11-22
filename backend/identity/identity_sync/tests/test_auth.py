@@ -55,7 +55,8 @@ class FailClosedTest(unittest.TestCase):
     def test_empty_client_lists_reject_everything(self) -> None:
         import dataclasses
 
-        settings = dataclasses.replace(self.stack.settings, execute_azp=frozenset(), preview_azp=frozenset())
+        empty = frozenset()
+        settings = dataclasses.replace(self.stack.settings, execute_azp=empty, preview_azp=empty, session_azp=empty)
 
         self.assertIs(build_verifier(settings), reject_all)
 
