@@ -469,7 +469,7 @@ class TestApproval(AiTestCase):
 
 		listed_a = self.human(client_a, "GET", "list_proposals").json["message"]["proposals"]
 		listed_b = self.human(client_b, "GET", "list_proposals").json["message"]["proposals"]
-		other = self.human(client_b, "GET", "get_proposal", query={"proposal_id": proposal_id})
+		other = self.human(client_b, "GET", "plt_get_proposal", query={"proposal_id": proposal_id})
 
 		self.assertIn(proposal_id, [row["proposal_id"] for row in listed_a])
 		self.assertNotIn(proposal_id, [row["proposal_id"] for row in listed_b])

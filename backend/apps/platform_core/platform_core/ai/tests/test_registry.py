@@ -93,7 +93,7 @@ class TestAiToolsHook(AiTestCase):
 				"structuredContent"
 			]
 			unchanged = frappe.db.get_value(DOCTYPE, name, "title")
-			shown = self.human(client, "GET", "get_proposal", query={"proposal_id": proposal["proposal_id"]})
+			shown = self.human(client, "GET", "plt_get_proposal", query={"proposal_id": proposal["proposal_id"]})
 			outcome = self.approve(client, proposal["proposal_id"]).json["message"]
 
 		self.assertEqual(proposal["status"], "approval_required")
