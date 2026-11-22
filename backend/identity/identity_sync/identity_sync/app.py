@@ -154,5 +154,8 @@ def build_app(settings: Settings, *, sleep: Callable[[float], object] = time.sle
         store=store,
         digest_key=settings.digest_key.encode("utf-8"),
         sleep=sleep,
+        # A repeat inside a deletion request waits at most the anonymize timeout. 30 seconds cover
+        # the retry pauses. A crashed process cannot keep the claim longer.
+        repeat_hold=settings.anonymize_timeout + 30.0,
     )
     return App(settings, store, keycloak, press, tenant_client, processor)

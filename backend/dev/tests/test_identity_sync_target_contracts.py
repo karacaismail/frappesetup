@@ -61,28 +61,75 @@ def resolve(spec, schema):
             node = node[part]
         schema = node
     if isinstance(schema, dict) and "allOf" in schema:
-        merged = {"properties": {}, "required": []}
+        merged = {key: value for key, value in schema.items() if key != "allOf"}
+        merged.setdefault("properties", {})
+        merged.setdefault("required", [])
         for part in schema["allOf"]:
             part = resolve(spec, part)
-            merged["properties"].update(part.get("properties", {}))
-            merged["required"] += part.get("required", [])
+            for key, value in part.items():
+                if key == "properties":
+                    merged["properties"].update(value)
+                elif key == "required":
+                    merged["required"] += value
+                else:
+                    merged.setdefault(key, value)
         return merged
     return schema
 
 
 def required_fields(spec, schema, prefix=""):
     """Every required field of a schema, nested objects included, as dotted paths."""
+    return list(required_schemas(spec, schema, prefix))
+
+
+def required_schemas(spec, schema, prefix=""):
+    """Every required field of a schema with its own resolved schema, keyed by dotted path."""
     schema = resolve(spec, schema)
-    found = []
+    found = {}
     for name in schema.get("required", []):
         path = f"{prefix}{name}"
-        found.append(path)
         child = resolve(spec, schema.get("properties", {}).get(name))
+        found[path] = child if isinstance(child, dict) else {}
         if isinstance(child, dict) and "items" in child:
-            found += required_fields(spec, child["items"], f"{path}[].")
+            found.update(required_schemas(spec, child["items"], f"{path}[]."))
         elif child is not None:
-            found += required_fields(spec, child, f"{path}.")
+            found.update(required_schemas(spec, child, f"{path}."))
     return found
+
+
+_JSON_TYPES = {bool: "boolean", int: "integer", float: "number", str: "string", type(None): "null"}
+
+
+def value_types(schema):
+    """The JSON types a schema allows, or None when the schema does not say."""
+    if "type" in schema:
+        kinds = schema["type"]
+        return frozenset([kinds] if isinstance(kinds, str) else kinds)
+    values = [schema["const"]] if "const" in schema else schema.get("enum")
+    if values is not None:
+        return frozenset(_JSON_TYPES.get(type(value), "object") for value in values)
+    return None
+
+
+def type_mismatches(service_fields, target_fields):
+    """Required fields whose target type the service would not accept.
+
+    The service accepts a value only of its own types. A target that sends another type, or does
+    not say which type it sends, fails. When the service fixes a value with `const`, the target
+    must fix the same value. A field the target lacks is reported by the field check, not here.
+    """
+    wrong = []
+    for path, wanted in service_fields.items():
+        promised = target_fields.get(path)
+        accepted = value_types(wanted)
+        if promised is None or accepted is None:
+            continue
+        sent = value_types(promised)
+        if sent is None or not sent <= accepted:
+            wrong.append(path)
+        elif "const" in wanted and promised.get("const", object()) != wanted["const"]:
+            wrong.append(path)
+    return wrong
 
 
 def reply_schema(spec, path, method):
@@ -108,6 +155,30 @@ class IdentitySyncTargetContractTests(unittest.TestCase):
                 with self.subTest(target=schema_name, contract=contract, path=path):
                     missing = [field for field in expected if field not in promised]
                     self.assertEqual(missing, [], f"{contract} {path} does not promise these reply fields")
+
+    def test_target_contracts_promise_the_types_the_service_accepts(self):
+        service = load(SERVICE)
+        for schema_name, endpoints in TARGETS.items():
+            expected = required_schemas(service, service["components"]["schemas"][schema_name])
+            for contract, path, *method in endpoints:
+                spec = load(contract)
+                promised = required_schemas(spec, reply_schema(spec, path, method[0] if method else "post"))
+                with self.subTest(target=schema_name, contract=contract, path=path):
+                    wrong = type_mismatches(expected, promised)
+                    self.assertEqual(wrong, [], f"{contract} {path} promises other types for these fields")
+
+    def test_type_check_catches_a_text_value_for_a_boolean_field(self):
+        service = {
+            "found": {"type": "boolean"},
+            "anonymized": {"type": "boolean"},
+            "member": {"const": False},
+        }
+        target = {"found": {"type": "string"}, "anonymized": {"const": True}, "member": {"type": "boolean"}}
+        self.assertEqual(type_mismatches(service, target), ["found", "member"])
+        self.assertEqual(type_mismatches(service, {"found": {}}), ["found"])
+        self.assertEqual(
+            type_mismatches(service, {"found": {"type": "boolean"}, "member": {"const": False}}), []
+        )
 
 
 if __name__ == "__main__":

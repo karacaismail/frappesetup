@@ -153,7 +153,7 @@ Servis yanıttaki son durumu istediği durumla da karşılaştırır. Örneğin 
 - Servis böyle bir olayı `unknown` durumuyla bekleme kuyruğuna yazar.
 - İstek gitti ama yanıt okunamadıysa sonuç yine bilinmez. 502 ve 504 yanıtları da böyledir.
 - Servis bu olayı işlenmiş saymaz. Servis olayı kendiliğinden yeniden denemez.
-- Hesap silme işinde tek istisna vardır. Servis anonim yapma adımının durumunu hedefe sorar. Ayrıntı "Silme işinde zaman aşımı" bölümündedir.
+- Hesap silme işinde tek istisna vardır. Silme işinin her adımı tekrar edilebilir. Servis yarım kalan adımı yeniden çağırır. Ayrıntı "Silme işinde zaman aşımı" bölümündedir.
 - Aynı olay yeniden gelirse servis yazmayı tekrarlamaz.
 - İnsan hedefi denetler. Sonra olayı `--include-unknown` seçeneğiyle yeniden işletir.
 
@@ -256,39 +256,40 @@ Varsayılan değeri ölçüm belirledi:
 - Son MVP testinde makine çok yüklüydü. Aynı iş orada yaklaşık 12 saniye sürdü.
 - 30 saniye bu en kötü ölçümün iki buçuk katıdır.
 
-Zaman aşımı yine olabilir. O zaman adımın sonucu bilinmez:
+Silme isteğinin toplam süresi de sınırlıdır:
 
-1. Servis işi `unknown` durumuyla bekleme kuyruğuna yazar.
-2. Servis anonim yapma çağrısını körü körüne yinelemez.
-3. Bir sonraki istekte ya da olayda servis hedefe durum sorar.
-4. Durum sorgusu `list_identities` ucudur. Bu uç yalnız okur.
-5. Anonim yapılan kimlik bu listede yer almaz. Kimlik listede yoksa servis adımı bitmiş sayar.
-6. Servis sonra işi sonraki adımdan sürdürür. Son adımda Keycloak kullanıcısını siler.
+- Servis önce iş kilidini bekler. Bu bekleme en çok `IDENTITY_SYNC_LOCK_TIMEOUT` kadar sürer.
+- Sonra bütün hedef çağrıları birlikte en çok `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` kadar sürer.
+- Yeniden deneme araları en çok 5 saniye ekler.
+- Varsayılan ayarlarla servis en geç 45 saniyede cevap verir.
+- Press bu süreden uzun bekler. Press zaman aşımında müşteriye "silme sürüyor" der.
 
-Bu uzlaşma iki yerde çalışır:
+Bir adım yarıda kalabilir. Örneğin hedefin cevabı gecikir. O zaman servis şunu yapar:
 
-- Press aynı silme isteğini yeniden gönderdiğinde.
+1. Servis işi bekleme kuyruğuna yazar. Sonuç belli değilse durum `unknown` olur.
+2. Silme işinin her adımı tekrar edilebilir. Aynı kimlik için yinelenen çağrı aynı cevabı alır.
+3. Servis bu yüzden yarım kalan adımı yeniden çağırır. Servis kimlik listesinden sonuç çıkarmaz.
+4. Adım ancak kesin başarı cevabıyla biter. Örneğin `anonymized` doğru olmalıdır.
+5. Cevapta alan eksikse ya da alanın türü yanlışsa iş `unknown` kalır.
+6. Adım bitince iş sonraki adımdan sürer. Son adımda Keycloak kullanıcısı silinir.
+
+Servis işi iki yerde sürdürür:
+
+- Press aynı silme isteğini yeniden gönderdiğinde. Bu yol sayı ve ara sınırına bağlı değildir.
 - Servis `/v1/events` ucunda bir olay işlediğinde. Olay başka bir kullanıcıya ait olabilir.
 
-Servis zamanlanmış iş kurmaz. Kimlik listede duruyorsa iş `unknown` kalır. Örneğin kiracı işi yarıda bırakmış olabilir. Liste okunamazsa da iş `unknown` kalır. Bu durumda insan hedefi denetler. Sonra işi `--include-unknown` ile yeniden işletir.
+Olay yolunun sınırları şunlardır:
 
-Yönetici bir kullanıcıyı Keycloak yönetim ekranından silebilir. Olay dinleyici o zaman olayı gönderir. Servis 2., 3. ve 4. adımı yürütür.
+- Bir olay en çok 3 işi sürdürür.
+- Bir olay bu işlere toplam en çok 5 saniye harcar. Her çağrı kalan süre kadar bekler.
+- Servis bir işi olay yolunda en çok 5 kez dener. Önceki zaman aşımı da bir deneme sayılır.
+- İki deneme arasında en az 30 saniye geçer.
+- Servis hedefi çağırırken iş kilidini tutmaz. Böylece elle çalışan komutlar beklemez.
+- Servis HTTP isteklerini sırayla işler. Bu yüzden 5 saniyelik sınır öteki istekleri de korur.
 
-Press isteği ve Keycloak silme olayı bir hesap için tek iştir:
+Aynı iş için iki çağrı aynı anda çalışmaz. Servis her denemeden önce işi kendine ayırır. İşi başka bir süreç ayırdıysa servis o işe dokunmaz ve `unknown` döner. Ayırma en geç `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 30 saniye sonra kendiliğinden biter. Böylece çöken bir süreç işi kilitli bırakmaz.
 
-- İşin kimliği hesabın anahtarlı özetidir. Kimlik `del-` ile başlar.
-- 5. adım Keycloak kullanıcısını siler. Olay dinleyici bu silmeyi de bildirir. O olay bitmiş işi bulur ve hiçbir iş başlatmaz.
-- Press isteği bir adımda durduysa silme olayı aynı işi sürdürür. Servis bitmiş adımı yeniden çağırmaz.
-- Önizleme ve bekleme kuyruğu listesi işin kimliğini gösterir. Hesabın kimliğini göstermez.
-
-Silme olayı kaybolabilir. O zaman `reconcile` komutu silinen kullanıcıyı bulur:
-
-1. Komut farkı `deleted_in_keycloak` türüyle raporlar.
-2. Önizleme işin kalan adımlarını gösterir.
-3. İnsan onay verir.
-4. Komut kalan adımları sırayla yürütür. Yerel hesap önceden kapalı olsa da adımlar çalışır.
-
-Keycloak'ta kapatılan kullanıcının telefon kurulumları da iptal edilir. Bu iş kapatma planının parçasıdır.
+Servis zamanlanmış iş kurmaz. Denemeler biterse iş kuyrukta kalır. İnsan o zaman hedefi denetler. Sonra işi `--include-unknown` ile yeniden işletir.
 
 ## Hesap silme yolları
 

@@ -15,7 +15,6 @@ one, nothing is written.
 
 from __future__ import annotations
 
-import logging
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, replace
@@ -31,7 +30,7 @@ from identity_sync.events import (
     Event,
     is_handled,
 )
-from identity_sync.httpjson import HttpError, TransportError, UnknownOutcome
+from identity_sync.httpjson import HttpError, TransportError, UnknownOutcome, deadline
 from identity_sync.keycloak_admin import KeycloakAdmin
 from identity_sync.mapping import (
     Action,
@@ -56,11 +55,17 @@ from identity_sync.sites import PressClient, TenantClient
 from identity_sync.store import DeadLetter, Store
 
 T = TypeVar("T")
-_LOG = logging.getLogger("identity_sync")
 
 # After an organization was created, the state is read once more and the plan is renewed.
 _MAX_PASSES = 2
 _BACKOFF_SECONDS = 0.2
+# Repeats of a queued account deletion job (H-5). Every step of the job may be repeated.
+# One handled event settles at most this many jobs and spends at most this long on them.
+SETTLE_MAX_JOBS = 3
+SETTLE_BUDGET_SECONDS = 5.0
+# An event repeats one job at most this often, and waits this long between two repeats.
+SETTLE_MAX_ATTEMPTS = 5
+SETTLE_INTERVAL_SECONDS = 30.0
 
 
 @dataclass(frozen=True)
@@ -142,6 +147,7 @@ class Processor:
         digest_key: bytes,
         max_attempts: int = 3,
         sleep: Callable[[float], object] = time.sleep,
+        repeat_hold: float = 60.0,
     ) -> None:
         self._issuer = issuer
         self._realm = realm
@@ -153,6 +159,8 @@ class Processor:
         self._digest_key = digest_key
         self._max_attempts = max_attempts
         self._sleep = sleep
+        # How long the claim of a job repeat lasts at most. It ends earlier when the repeat ends.
+        self._repeat_hold = repeat_hold
 
     def handle(
         self,
@@ -351,12 +359,24 @@ class Processor:
             # A row left in the queue is a leftover. It would make every replay look failed.
             self._store.remove_dead_letter(event.id)
             return EventResult("duplicate")
+        if event.type in JOB_TYPES:
+            # Every step of an account job may be repeated: a repeated call gets the same reply
+            # (docs/sozlesmeler.md, section 7). So a job whose outcome is unknown runs again from
+            # its first step that is not finished (H-5). The claim makes sure that two callers
+            # never repeat the steps of one job at the same time.
+            if not self._store.claim_repeat(event.id, hold=self._repeat_hold):
+                return EventResult("unknown")
+            try:
+                return self._execute_job(event, planned)
+            finally:
+                self._store.release_repeat(event.id)
         if not allow_unknown and self._store.dead_letter_state(event.id) == "unknown":
             # The event came again but its earlier outcome is unknown. No blind repeat.
-            # An account job asks the target for the state of the unknown step first (H-5).
-            # When the target confirms it, the job goes on from the next step.
-            if event.type not in JOB_TYPES or not self._settle(event):
-                return EventResult("unknown")
+            return EventResult("unknown")
+        return self._execute_job(event, planned)
+
+    def _execute_job(self, event: Event, planned: tuple[Action, ...] | None) -> EventResult:
+        """Run the pending steps and record the outcome. The caller decided that the event may run."""
         # Keep the accepted event on record before any work. A crash must not lose it.
         self._store.begin(event)
         try:
@@ -372,44 +392,41 @@ class Processor:
         self._store.mark_processed(event.id, "processed", forget_subject=forget)
         return EventResult("processed", actions=tuple(names))
 
-    def _settle(self, job: Event) -> bool:
-        """Settle the unknown step of an account job by a state query. Reads only. The caller holds the work lock.
+    def settle_queued_jobs(self) -> list[tuple[str, EventResult]]:
+        """Continue queued account deletion jobs while an event is handled (H-5). No scheduler is involved.
 
-        An ordered plan stops at the first step that is not done, so the unknown step is the first
-        pending one. True means the step is confirmed and recorded as finished, or no step is left.
-        False means the state is still unknown: the target still lists the identity, the step has
-        no state query, or the read failed. Nothing is written to a target here.
+        The work lock is not taken: targets are called without it, so other requests do not wait.
+        The claim of each job keeps every other caller away from that job meanwhile.
+        Limits: at most `SETTLE_MAX_JOBS` jobs and `SETTLE_BUDGET_SECONDS` for all of them. Every
+        request waits at most the time that is left. One job is repeated at most
+        `SETTLE_MAX_ATTEMPTS` times, at least `SETTLE_INTERVAL_SECONDS` apart. After that a human decides.
         """
-        pending = self._pending(job, self._plan(job))
-        if not pending:
-            return True
-        step = pending[0]
-        try:
-            if isinstance(step, TenantAnonymizeUser):
-                confirmed = self._tenant_client.is_anonymized(step)
-            elif isinstance(step, PressAnonymizeUser):
-                confirmed = self._press.is_anonymized(step)
-            else:
-                return False  # no read shows this step's outcome; a human decides
-        except (HttpError, TransportError) as error:
-            _LOG.warning("state query failed for job %s: %s", job.id, error)
-            return False
-        if confirmed:
-            self._store.add_progress(job.id, self._step_key(step))
-        return confirmed
-
-    def settle_unknown_jobs(self) -> list[tuple[str, EventResult]]:
-        """Try every account job whose outcome is unknown once (H-5). Runs while an event is handled.
-
-        Each job first asks the target for the state of its unknown step. A job whose step is still
-        unknown stays as it is. A confirmed job runs its remaining steps. No scheduler is involved.
-        """
-        with self._store.work_lock():
-            letters = [
-                letter for letter in self._store.dead_letters()
-                if letter.state == "unknown" and letter.event.type in JOB_TYPES
-            ]
-            return [(letter.event.id, self._handle_job(letter.event, False, None)) for letter in letters]
+        end = time.monotonic() + SETTLE_BUDGET_SECONDS
+        results: list[tuple[str, EventResult]] = []
+        for letter in self._store.dead_letters():
+            left = end - time.monotonic()
+            if len(results) >= SETTLE_MAX_JOBS or left <= 0:
+                break
+            job = letter.event
+            if job.type not in JOB_TYPES:
+                continue
+            claimed = self._store.claim_repeat(
+                job.id,
+                hold=self._repeat_hold,
+                max_attempts=SETTLE_MAX_ATTEMPTS,
+                min_interval=SETTLE_INTERVAL_SECONDS,
+            )
+            if not claimed:
+                continue
+            try:
+                if self._store.is_processed(job.id):
+                    self._store.remove_dead_letter(job.id)
+                    continue
+                with deadline(left):
+                    results.append((job.id, self._execute_job(job, None)))
+            finally:
+                self._store.release_repeat(job.id)
+        return results
 
     def replay_dead_letters(
         self, *, dry_run: bool = False, include_unknown: bool = False, expected_digest: str | None = None

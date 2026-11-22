@@ -143,10 +143,6 @@ def _is_removed(message: object) -> bool:
     return isinstance(message, Mapping) and message.get("member") is False and "team" in message
 
 
-def _listed(identities: Sequence[Identity], issuer: str, subject: str) -> bool:
-    return any(identity.issuer == issuer and identity.subject == subject for identity in identities)
-
-
 def _organization_ids(value: object) -> tuple[str, ...]:
     """Team memberships of a Press identity, one Keycloak organization id each. Tenants send none."""
     if value is None:
@@ -248,14 +244,6 @@ class PressClient:
             ANONYMIZE_RETRY_STATUSES,
             timeout=self._anonymize_timeout,
         )
-
-    def is_anonymized(self, action: PressAnonymizeUser) -> bool:
-        """State query for an anonymize call with an unknown outcome. Reads only.
-
-        Press leaves anonymous deletion records out of `list_identities` (contracts/press_tr.openapi.yaml).
-        So an identity that is missing from the list is anonymized, or Press never had it.
-        """
-        return not _listed(self.list_identities(), action.issuer, action.subject)
 
     def ensure_team(self, action: PressEnsureTeam) -> None:
         body = asdict(action)
@@ -390,16 +378,6 @@ class TenantClient:
             retry_statuses=ANONYMIZE_RETRY_STATUSES,
             timeout=self._anonymize_timeout,
         )
-
-    def is_anonymized(self, action: TenantAnonymizeUser) -> bool:
-        """State query for an anonymize call with an unknown outcome. Reads only.
-
-        Step 2 of the tenant's anonymize work deletes the identity link
-        (contracts/platform_core-identity.openapi.yaml). Only linked identities are listed.
-        So an identity that is missing from the list is anonymized, or the tenant never had it.
-        After step 1 alone the link is still there: the identity is listed and the state stays unknown.
-        """
-        return not _listed(self.list_identities(action.tenant), action.issuer, action.subject)
 
     def list_identities(self, tenant: str) -> list[Identity]:
         method = "platform_core.api.identity.list_identities"

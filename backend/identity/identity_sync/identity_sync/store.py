@@ -65,6 +65,12 @@ CREATE TABLE IF NOT EXISTS operations (
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS job_repeats (
+    job_id TEXT PRIMARY KEY,
+    attempts INTEGER NOT NULL,
+    last_at REAL NOT NULL,
+    claimed_until REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS used_approvals (
     approval_id TEXT PRIMARY KEY,
     preview_digest TEXT NOT NULL,
@@ -128,6 +134,9 @@ class Store:
             path, timeout=_SQLITE_TIMEOUT_SECONDS, isolation_level=None, check_same_thread=False
         )
         self._thread_lock = threading.Lock()
+        # One connection serves every thread. A repeat of a deletion job writes without the work
+        # lock (H-5), so the transactions of two threads must not interleave on the connection.
+        self._db_lock = threading.RLock()
         self._db.executescript(_SCHEMA)
         self._migrate()
 
@@ -180,14 +189,15 @@ class Store:
     @contextmanager
     def _transaction(self) -> Iterator[None]:
         """A short write transaction. Roll back writes on error and always close the transaction."""
-        self._db.execute("BEGIN IMMEDIATE")
-        try:
-            yield
-            self._db.execute("COMMIT")
-        except BaseException:
-            if self._db.in_transaction:
-                self._db.execute("ROLLBACK")
-            raise
+        with self._db_lock:
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                yield
+                self._db.execute("COMMIT")
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                raise
 
     def is_processed(self, event_id: str) -> bool:
         row = self._db.execute("SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)).fetchone()
@@ -399,6 +409,7 @@ class Store:
                 (event_id, status, self._clock()),
             )
             self._db.execute("DELETE FROM dead_letters WHERE event_id = ?", (event_id,))
+            self._db.execute("DELETE FROM job_repeats WHERE job_id = ?", (event_id,))
             if forget_subject:
                 self._db.execute("UPDATE operations SET subject = '' WHERE subject = ?", (forget_subject,))
                 queued = self._db.execute("SELECT event_id, event FROM dead_letters").fetchall()
@@ -425,6 +436,48 @@ class Store:
                 """,
                 (event.id, json.dumps(event.to_dict()), error, state, now, now),
             )
+
+    def claim_repeat(
+        self,
+        job_id: str,
+        *,
+        hold: float,
+        max_attempts: int | None = None,
+        min_interval: float = 0.0,
+    ) -> bool:
+        """Claim the right to repeat the steps of a queued account job (H-5). One transaction.
+
+        False when another caller holds the claim. Then two repeats of one job never run at once,
+        in this process or in another. With `max_attempts`, also False when the job was repeated
+        that often, or when the last repeat is less than `min_interval` seconds old.
+        `hold`: the claim ends by itself after this many seconds, so a crash cannot keep it.
+        """
+        now = self._clock()
+        with self._transaction():
+            row = self._db.execute(
+                "SELECT attempts, last_at, claimed_until FROM job_repeats WHERE job_id = ?", (job_id,)
+            ).fetchone()
+            attempts = 0
+            if row is not None:
+                attempts, last_at, claimed_until = row
+                if claimed_until > now:
+                    return False
+                if max_attempts is not None and (attempts >= max_attempts or now - last_at < min_interval):
+                    return False
+            self._db.execute(
+                "INSERT OR REPLACE INTO job_repeats (job_id, attempts, last_at, claimed_until) VALUES (?, ?, ?, ?)",
+                (job_id, attempts + 1, now, now + hold),
+            )
+        return True
+
+    def release_repeat(self, job_id: str) -> None:
+        with self._transaction():
+            self._db.execute("UPDATE job_repeats SET claimed_until = 0 WHERE job_id = ?", (job_id,))
+
+    def repeat_claimed(self, job_id: str) -> bool:
+        """Does another caller repeat the steps of this job right now?"""
+        row = self._db.execute("SELECT claimed_until FROM job_repeats WHERE job_id = ?", (job_id,)).fetchone()
+        return row is not None and row[0] > self._clock()
 
     def remove_dead_letter(self, event_id: str) -> None:
         with self._transaction():

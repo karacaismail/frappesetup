@@ -545,15 +545,31 @@ The responses the service expects are in the `Target` schemas at the end of this
 An anonymize call takes longer than the other calls. The tenant renames the user and closes every session.
 The `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` setting is the wait for this call. The default is 30 seconds, at most 600.
 The other calls use `IDENTITY_SYNC_HTTP_TIMEOUT`, 10 seconds by default.
-If the call still times out, the result of step 4 is unknown. The job waits in the queue in the `unknown` state.
-The service does not repeat the anonymize call. It asks the target for the state instead.
-The state query is the target's `list_identities` endpoint. It only reads.
-The tenant deletes the identity link when it anonymizes. Press leaves anonymous deletion records out of the list.
-So an identity that is missing from the list is anonymized, and the service records the step as finished.
-Then the job goes on from the next step. Step 5 deletes the Keycloak user.
-The state query runs on the next `POST /v1/account-deletions` request for the account.
-It also runs after every event handled by `POST /v1/events`, for every account job in the `unknown` state.
-There is no scheduled job. If the identity is still listed or the list cannot be read, the job stays `unknown`.
+
+A deletion request has a time limit too. First the service waits for the work lock, at most `IDENTITY_SYNC_LOCK_TIMEOUT`.
+Then all target calls of the request together take at most `IDENTITY_SYNC_ANONYMIZE_TIMEOUT`. The retry pauses add at most 5 seconds.
+With the default settings the service answers within 45 seconds. Press waits longer than that.
+When Press stops waiting, it tells the customer that the deletion is in progress. The service still finishes the job.
+
+A step can stop halfway, for example when a reply is late. The job then waits in the dead-letter queue.
+Its state is `unknown` when the result is not known.
+Every step of the deletion job can be repeated. A repeated call for the same identity gets the same reply.
+So the service calls the unfinished step again. It never concludes a result from an identity list.
+A step is done only on its definite success reply. For `anonymize_user` that is `anonymized` true, or `found` false.
+Both fields must be booleans. A reply with a missing field or a wrong type keeps the job `unknown`.
+When the step is done, the job goes on from the next step. Step 5 deletes the Keycloak user.
+
+The service continues the job in two places.
+The first is the next `POST /v1/account-deletions` request for the account. This path has no count or spacing limit.
+The second is every event handled by `POST /v1/events`. That path has limits.
+One event continues at most 3 jobs and spends at most 5 seconds on them. Every call waits at most the time that is left.
+The event path tries one job at most 5 times. The timed-out request counts as one try. Two tries are at least 30 seconds apart.
+The service does not hold the work lock while it calls a target. Other processes, for example a replay command, do not wait.
+The service handles HTTP requests one at a time, so the 5-second limit also bounds the wait of the next request.
+Two calls for the same job never run at the same time. Before each try the service claims the job.
+When another process holds the claim, the service leaves the job alone and returns `unknown`.
+The claim ends by itself `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 30 seconds after it started, so a crashed process cannot keep it.
+There is no scheduled job. When the tries are used up, the job stays in the queue.
 A human then checks the target and replays the job with `include_unknown`.
 
 ## Common errors of all endpoints
@@ -750,15 +766,31 @@ Servisin beklediği yanıtlar bu dosyanın sonundaki `Target` şemalarındadır.
 Anonim yapma çağrısı öteki çağrılardan uzun sürer. Kiracı kullanıcının adını değiştirir ve bütün oturumlarını kapatır.
 Bu çağrının bekleme süresi `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` ayarındadır. Varsayılan değer 30 saniyedir, en çok 600 saniyedir.
 Öteki çağrılar `IDENTITY_SYNC_HTTP_TIMEOUT` ayarını kullanır. Bu ayarın varsayılanı 10 saniyedir.
-Çağrı yine zaman aşımına uğrarsa 4. adımın sonucu bilinmez. İş `unknown` durumuyla bekleme kuyruğunda bekler.
-Servis anonim yapma çağrısını yinelemez. Bunun yerine hedefe durum sorar.
-Durum sorgusu hedefin `list_identities` ucudur. Bu uç yalnız okur.
-Kiracı anonim yaparken kimlik bağını siler. Press anonim silme kayıtlarını listeye koymaz.
-Bu yüzden listede olmayan kimlik anonim yapılmıştır. Servis adımı bitmiş olarak kaydeder.
-Sonra iş sonraki adımdan sürer. 5. adım Keycloak kullanıcısını siler.
-Durum sorgusu hesabın bir sonraki `POST /v1/account-deletions` isteğinde çalışır.
-`POST /v1/events` ucunun işlediği her olaydan sonra da çalışır. Bu sorgu `unknown` durumundaki bütün hesap işlerine yapılır.
-Zamanlanmış iş yoktur. Kimlik listede duruyorsa ya da liste okunamazsa iş `unknown` kalır.
+
+Silme isteğinin de süre sınırı vardır. Servis önce iş kilidini en çok `IDENTITY_SYNC_LOCK_TIMEOUT` kadar bekler.
+Sonra isteğin bütün hedef çağrıları birlikte en çok `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` kadar sürer. Yeniden deneme araları en çok 5 saniye ekler.
+Varsayılan ayarlarla servis en geç 45 saniyede cevap verir. Press bundan uzun bekler.
+Press beklemeyi bırakınca müşteriye silmenin sürdüğünü söyler. Servis işi yine bitirir.
+
+Bir adım yarıda kalabilir. Örneğin bir cevap gecikir. İş o zaman bekleme kuyruğunda bekler.
+Sonuç belli değilse durum `unknown` olur.
+Silme işinin her adımı tekrar edilebilir. Aynı kimlik için yinelenen çağrı aynı cevabı alır.
+Servis bu yüzden bitmemiş adımı yeniden çağırır. Servis kimlik listesinden sonuç çıkarmaz.
+Adım ancak kesin başarı cevabıyla biter. `anonymize_user` için bu cevap `anonymized` doğru ya da `found` yanlış olur.
+İki alan da mantıksal değer olmalıdır. Alanı eksik ya da türü yanlış cevap işi `unknown` bırakır.
+Adım bitince iş sonraki adımdan sürer. 5. adım Keycloak kullanıcısını siler.
+
+Servis işi iki yerde sürdürür.
+Birincisi hesabın bir sonraki `POST /v1/account-deletions` isteğidir. Bu yolda sayı ve ara sınırı yoktur.
+İkincisi `POST /v1/events` ucunun işlediği her olaydır. Bu yolun sınırları vardır.
+Bir olay en çok 3 işi sürdürür ve bu işlere en çok 5 saniye harcar. Her çağrı kalan süre kadar bekler.
+Olay yolu bir işi en çok 5 kez dener. Zaman aşımına uğrayan istek de bir deneme sayılır. İki deneme arasında en az 30 saniye geçer.
+Servis hedefi çağırırken iş kilidini tutmaz. Öteki süreçler, örneğin yeniden işletme komutu, beklemez.
+Servis HTTP isteklerini sırayla işler. Bu yüzden 5 saniyelik sınır sonraki isteğin beklemesini de sınırlar.
+Aynı iş için iki çağrı aynı anda çalışmaz. Servis her denemeden önce işi kendine ayırır.
+İşi başka bir süreç ayırdıysa servis işe dokunmaz ve `unknown` döner.
+Ayırma, başladıktan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 30 saniye sonra kendiliğinden biter. Böylece çöken süreç işi tutamaz.
+Zamanlanmış iş yoktur. Denemeler biterse iş kuyrukta kalır.
 İnsan o zaman hedefi denetler. Sonra işi `include_unknown` ile yeniden işletir.
 
 ## Bütün uçların ortak hataları
@@ -845,7 +877,8 @@ The service records the request before it starts the work. The id of the request
 If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`. No later step is executed.
 The request is then in the dead-letter queue. A human replays the request with `POST /v1/dead-letters/replay`.
 Press can also send the same request again. The service continues from the first step that is not finished.
-If the job is `unknown` because an anonymize call timed out, that request first asks the target for the state.
+The service answers within `IDENTITY_SYNC_LOCK_TIMEOUT` plus `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 5 seconds. With the defaults that is 45 seconds.
+A step that did not finish in that time stays queued. A later request or event continues the job.
 The rules are in the section ""Timeout of an anonymize call"" at the start of this file.
 ","Kaynak ortak sözleşmenin 7. bölümü ve proje kaydının O-27 kararıdır.
 Müşteri kendi hesabının silinmesini Press'te ister. Press o zaman bu ucu çağırır.
@@ -865,7 +898,8 @@ Servis isteği işe başlamadan önce kaydeder. İsteğin kimliği hesabın anah
 Bir adım başarısız olursa yanıt yine 200 olur ve durum `dead_lettered` ya da `unknown` olur. Sonraki adımlar yürümez.
 İstek o zaman bekleme kuyruğundadır. İnsan isteği `POST /v1/dead-letters/replay` ile yeniden işletir.
 Press de aynı isteği yeniden gönderebilir. Servis bitmemiş ilk adımdan sürdürür.
-İş anonim yapma çağrısının zaman aşımı yüzünden `unknown` ise bu istek önce hedefe durum sorar.
+Servis en geç `IDENTITY_SYNC_LOCK_TIMEOUT` artı `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 5 saniyede cevap verir. Varsayılan ayarlarla bu süre 45 saniyedir.
+Bu sürede bitmeyen adım kuyrukta kalır. Sonraki bir istek ya da olay işi sürdürür.
 Kurallar bu dosyanın başındaki ""Anonim yapma çağrısında zaman aşımı"" bölümündedir.
 ",identity_sync.openapi.yaml: paths./v1/account-deletions.post.description
 "The result of the request. The status is `processed`, `dead_lettered`, `unknown` or `duplicate`.","İsteğin sonucu. Durum `processed`, `dead_lettered`, `unknown` ya da `duplicate` olur.",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.200.description

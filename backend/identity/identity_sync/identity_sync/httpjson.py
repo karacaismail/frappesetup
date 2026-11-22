@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import json
 import socket
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 _MAX_RESPONSE_BYTES = 8 * 1024 * 1024
@@ -101,6 +104,35 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 _OPENER = urllib.request.build_opener(_NoRedirect)
 
+# The latest moment, on the monotonic clock, at which a request of this thread may still wait.
+_DEADLINE: ContextVar[float | None] = ContextVar("identity_sync_deadline", default=None)
+
+
+@contextmanager
+def deadline(seconds: float) -> Iterator[None]:
+    """Bound the total wait of every request made inside the block (H-5).
+
+    Each request waits at most its own timeout and at most the time left. When no time is left,
+    the request is not sent and `ConnectFailed` is raised. A nested block never extends an outer one.
+    """
+    end = time.monotonic() + seconds
+    outer = _DEADLINE.get()
+    token = _DEADLINE.set(end if outer is None else min(outer, end))
+    try:
+        yield
+    finally:
+        _DEADLINE.reset(token)
+
+
+def _bounded(timeout: float) -> float:
+    end = _DEADLINE.get()
+    if end is None:
+        return timeout
+    left = end - time.monotonic()
+    if left <= 0:
+        raise ConnectFailed("deadline passed")
+    return min(timeout, left)
+
 
 def request_json(
     method: str,
@@ -130,6 +162,7 @@ def request_json(
         data = json.dumps(json_body).encode("utf-8")
         send_headers["Content-Type"] = "application/json"
     request = urllib.request.Request(url, data=data, method=method, headers=send_headers)
+    timeout = _bounded(timeout)  # before the request is sent: a passed deadline sends nothing
     try:
         with _OPENER.open(request, timeout=timeout) as raw:
             payload = raw.read(_MAX_RESPONSE_BYTES + 1)
