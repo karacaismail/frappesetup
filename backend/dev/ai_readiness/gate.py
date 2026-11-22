@@ -12,8 +12,9 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from contracts import METHOD_PATH, operations
-from forbidden_name import find_path_code, match_lines, redact_path, tracked_findings
-from hook_validation import HOOK_RULES, invalid_hook_uses, node_names
+from dependencies import FRAPPE_VERSION, dependency_checks
+from forbidden_name import find_path_code, match_lines, redact_path, require_git_executable, tracked_findings
+from hook_validation import HOOK_RULES, invalid_hook_uses, node_names, opaque_hook_lines
 from source import (
     FUNCTIONS,
     assignments,
@@ -28,6 +29,7 @@ from source import (
     string,
     walk,
 )
+from translations import translation_checks
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "guvenlik"))
 # Reuse the sibling endpoint checker after adding its directory for direct CLI execution.
@@ -100,7 +102,7 @@ def module_name(path, root):
     return ".".join(parts)
 
 
-def source_files(directory, emit):
+def source_files(directory, emit, *, exclude=frozenset()):
     def unreadable(error):
         emit(Path(error.filename), 1, "input", "Could not list source directory.")
 
@@ -109,7 +111,12 @@ def source_files(directory, emit):
         return
     for current, folders, files in os.walk(directory, onerror=unreadable):
         base = Path(current)
-        folders[:] = sorted(name for name in folders if not name.startswith(".") and name != "node_modules")
+        folders[:] = sorted(
+            name
+            for name in folders
+            if not name.startswith(".") and name != "node_modules" and base / name not in exclude
+        )
+        files = [name for name in files if base / name not in exclude]
         for name in [*folders, *sorted(files)]:
             path = base / name
             if path.is_symlink():
@@ -140,6 +147,8 @@ def test_classes(sources):
         "unittest.TestCase",
         "unittest.IsolatedAsyncioTestCase",
         "frappe.tests.classes.IntegrationTestCase",
+        "frappe.tests.classes.integration_test_case.IntegrationTestCase",
+        "frappe.tests.classes.unit_test_case.UnitTestCase",
         "frappe.tests.classes.UnitTestCase",
         "frappe.tests.test_api.FrappeAPITestCase",
         "frappe.tests.utils.FrappeTestCase",
@@ -348,6 +357,16 @@ def naming_checks(root, findings):
     naming = naming_findings(root)
     checks = {"naming": "not_run", "naming_mode": mode, "naming_mode_source": source}
     if naming is None:
+        if mode == "enforce":
+            findings.add(
+                Finding(
+                    "dev/naming/enforcement.json",
+                    1,
+                    "naming-config",
+                    "Naming enforce mode requires the naming checker.",
+                )
+            )
+            checks["naming"] = "fail"
         return checks
 
     checks["naming"] = "pass"
@@ -406,6 +425,10 @@ def naming_findings(root: Path) -> list[Finding] | None:
 
 
 def hook_checks(path, tree, bindings, emit):
+    for line in opaque_hook_lines(tree):
+        emit(
+            path, line, "hook-dynamic", "Use explicit hook declarations instead of dynamic namespace changes."
+        )
     for name, line in invalid_hook_uses(tree):
         emit(path, line, HOOK_RULES[name], f"{name} must use one direct top-level assignment.")
 
@@ -484,7 +507,12 @@ def tool_helper_names(body, module, package, inherited_aliases):
     aliases = inherited_aliases | imported_aliases(nodes, package)
     for item in nodes:
         if isinstance(item, FUNCTIONS):
+            signature = [item.args, *item.decorator_list]
+            yield from tool_helper_names(signature, module, package, aliases)
+        if isinstance(item, (*FUNCTIONS, ast.ClassDef)):
             yield from tool_helper_names(item.body, module, package, aliases)
+        if isinstance(item, ast.Lambda):
+            yield from tool_helper_names([item.args, item.body], module, package, aliases)
         if isinstance(item, (ast.Name, ast.Attribute)) and isinstance(item.ctx, ast.Load):
             name = qualified(item, aliases)
             if isinstance(item, ast.Name) and name == item.id:
@@ -522,7 +550,7 @@ def tool_sql_checks(targets, functions, sources, reexports, emit):
         for sql_line in sql_calls(walk(fn), outer_aliases | local_aliases):
             emit(path, sql_line, "sql", "Raw SQL is forbidden in AI tools.")
         app = module.partition(".")[0]
-        for name in tool_helper_names(fn.body, module, package, module_aliases):
+        for name in tool_helper_names([fn], module, package, module_aliases):
             if name.partition(".")[0] == app:
                 function = resolve_app_export(name, functions, reexports)
                 if function is not None and function not in visited:
@@ -559,7 +587,7 @@ def decision_number_checks(directory, emit):
     first_notes = {}
     for path in sorted(source_files(directory, emit)):
         match = DECISION_NUMBER.match(path.name)
-        if path.suffix != ".md" or not match:
+        if path.suffix.lower() != ".md" or not match:
             continue
         number = match[1]
         first = first_notes.setdefault(number, path)
@@ -587,9 +615,28 @@ def privileged_website_method(target, functions, sources):
     if target not in functions:
         return False
     module, fn = functions[target]
+    if manager_guard(fn, module, sources):
+        return True
+    _, _, tree, _, _, package = sources[module]
+    aliases = imported_aliases(tree.body, package) | imported_aliases(scope_nodes(fn.body), package)
+    for item in scope_nodes(fn.body):
+        if not isinstance(item, ast.Call):
+            continue
+        name = qualified(item.func, aliases)
+        if isinstance(item.func, ast.Name) and name == item.func.id:
+            name = f"{module}.{name}"
+        if name in functions and name.partition(".")[0] == module.partition(".")[0]:
+            helper_module, helper = functions[name]
+            if manager_guard(helper, helper_module, sources):
+                return True
+    return False
+
+
+def manager_guard(fn, module, sources):
     _, _, tree, _, _, package = sources[module]
     nodes = list(scope_nodes(fn.body))
     aliases = imported_aliases(tree.body, package) | imported_aliases(nodes, package)
+    bindings = stable_bindings(fn.body, stable_bindings(tree.body))
     for item in nodes:
         if not isinstance(item, ast.Call):
             continue
@@ -602,10 +649,10 @@ def privileged_website_method(target, functions, sources):
                 if item.args
                 else next((arg.value for arg in item.keywords if arg.arg == "roles"), None)
             )
+            role = resolve(role, bindings)
             roles = role.elts if isinstance(role, (ast.List, ast.Tuple, ast.Set)) else [role]
             if roles and all(
-                isinstance(value, ast.Constant)
-                and value.value in ("Administrator", "System Manager", "AI Manager")
+                string(value, bindings) in ("Administrator", "System Manager", "AI Manager")
                 for value in roles
             ):
                 return True
@@ -673,11 +720,13 @@ def website_method_checks(entries, endpoints, functions, sources, reexports, ove
                 break
 
 
-def scan(root, commit_base=None):
+def scan(root, commit_base=None, frappe_root=None):
     findings = set()
     functions = {}
     endpoints = {}
     sources = {}
+    translation_paths = []
+    app_manifests = []
     registered = {}
     overrides = {}
     override_candidates = {}
@@ -698,7 +747,28 @@ def scan(root, commit_base=None):
 
     if not (root / "apps").is_dir():
         emit(root / "apps", 1, "input", "Backend apps directory is missing.")
-    for path in source_files(root / "apps", emit):
+    default_frappe_checkout = root / "apps" / "frappe"
+    frappe_checkout = frappe_root or default_frappe_checkout
+    frappe_package = frappe_checkout / "frappe" if (frappe_checkout / "frappe").is_dir() else frappe_checkout
+    frappe_manifest = frappe_checkout / "pyproject.toml"
+    if (
+        not frappe_manifest.is_file()
+        and frappe_checkout == frappe_package
+        and (frappe_package / "__init__.py").is_file()
+    ):
+        frappe_manifest = frappe_package.parent / "pyproject.toml"
+    excluded_roots = {default_frappe_checkout, frappe_checkout}
+    if frappe_manifest.parent.parent == root / "apps":
+        excluded_roots.add(frappe_manifest.parent)
+    for path in source_files(root / "apps", emit, exclude=excluded_roots):
+        if path.name == "pyproject.toml" and path.parent.parent == root / "apps":
+            app_manifests.append(path)
+        if (
+            path.suffix == ".csv"
+            and path.parent.name == "translations"
+            and len(path.relative_to(root).parts) in {4, 5}
+        ):
+            translation_paths.append(path)
         try:
             if path.suffix == ".json":
                 doctype_checks(path, emit)
@@ -834,6 +904,8 @@ def scan(root, commit_base=None):
     for path, line, message in tracked_findings(root, commit_base):
         findings.add(Finding(path, line, "forbidden-name", message))
     checks = naming_checks(root, findings)
+    checks["translation_core"] = translation_checks(translation_paths, frappe_package, emit)
+    checks.update(dependency_checks(app_manifests, frappe_manifest, frappe_package, root, emit))
     return sorted(findings), checks
 
 
@@ -845,13 +917,36 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--list-interfaces", action="store_true", help="List backend module interfaces as Markdown."
+    )
     parser.add_argument("--path-code", help="Locate a redacted path by its Git index slot.")
     parser.add_argument("--commit-base", help="Check commit messages after this revision through HEAD.")
+    parser.add_argument(
+        "--frappe-root",
+        type=Path,
+        help="Read core translation catalogs and dependency pins from this Frappe checkout.",
+    )
     args = parser.parse_args()
+    if args.list_interfaces and (args.json or args.path_code or args.commit_base or args.frappe_root):
+        parser.error("--list-interfaces only accepts --root.")
     if not supports_python():
         print("ai-readiness requires Python 3.14 or newer.", file=sys.stderr)
         return 2
+    try:
+        require_git_executable()
+    except FileNotFoundError as error:
+        print(str(error), file=sys.stderr)
+        return 2
     root = args.root.resolve()
+    if args.list_interfaces:
+        from interfaces import list_interfaces
+
+        try:
+            print(list_interfaces(root, source_files, whitelist_checks))
+        except (OSError, TypeError, ValueError) as error:
+            parser.error(f"Could not list module interfaces: {error}.")
+        return 0
     if args.path_code:
         try:
             location = find_path_code(root, args.path_code)
@@ -862,7 +957,9 @@ def main():
             return 1
         print(json.dumps(location))
         return 0
-    raw_findings, checks = scan(root, args.commit_base)
+    frappe_source = args.frappe_root or os.environ.get("FRAPPE_SOURCE")
+    frappe_root = Path(frappe_source).expanduser().resolve() if frappe_source else None
+    raw_findings, checks = scan(root, args.commit_base, frappe_root)
     findings = [
         Finding(
             redact_path(finding.path),
@@ -880,6 +977,10 @@ def main():
             print("naming: not_run (checker unavailable)", file=sys.stderr)
         if checks["naming_mode_source"] == "default":
             print("naming mode: advisory (enforcement.json missing)", file=sys.stderr)
+        if checks["translation_core"] == "not_run":
+            print("translation_core: not_run (Frappe core catalog unavailable)", file=sys.stderr)
+        if checks["dependency_core"] == "not_run":
+            print(f"dependency_core: not_run (Frappe {FRAPPE_VERSION} manifest unavailable)", file=sys.stderr)
         for finding in findings:
             prefix = "Warning: " if finding.severity == "warning" else ""
             print(f"{prefix}{finding.path}:{finding.line} [{finding.rule}] {finding.message}")

@@ -1,8 +1,16 @@
 # Regenerate with backend/dev/security/compile-lock.
-# Manifest SHA256: 47c45e678c91e3c69dcbcaf5f5be0ca1a6163dc1201b2779ca26d0e20340e59b
+# Manifest SHA256: 6ce7a28f48e624491d60296814f8fe8f4928c33b9aa92c200de19a4851303444
 annotated-types==0.8.0
+certifi==2026.11.20
+charset-normalizer==3.5.2
+idna==3.20
+markupsafe==3.0.4
 pydantic==2.12.5
 pydantic-core==2.41.5
+pypika @ git+https://github.com/frappe/pypika@7ef6e40215d46cd531e8c4e58650b84c11abbd04
+redis==7.1.1
+requests==2.33.1
 typing-extensions==4.16.0
 typing-inspection==0.4.5
 urllib3==2.8.0
+werkzeug==3.1.9

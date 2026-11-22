@@ -21,7 +21,7 @@ class GateTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(dir=SCRATCH if SCRATCH.is_dir() else None)
         self.addCleanup(temporary.cleanup)
-        self.repository = Path(temporary.name)
+        self.repository = Path(temporary.name).resolve()
         subprocess.run(["git", "init", "--quiet", self.repository], check=True)
         self.root = self.repository / "backend"
         self.write(f"{APP}/__init__.py", "")
@@ -208,12 +208,12 @@ class GateTests(unittest.TestCase):
 
     def test_duplicate_decision_number_reports_later_note(self):
         self.write("docs/kararlar/0010-one.md", "# One")
-        self.write("docs/kararlar/0010-two.md", "# Two")
+        self.write("docs/kararlar/0010-two.MD", "# Two")
         self.write("docs/kararlar/00101-three.md", "# Three")
         self.write("docs/kararlar/0011-four.md", "# Four")
         self.write("docs/elsewhere/0010-other.md", "# Elsewhere")
         (finding,) = self.scan("decision-number")
-        self.assertEqual(finding["path"], "docs/kararlar/0010-two.md")
+        self.assertEqual(finding["path"], "docs/kararlar/0010-two.MD")
         self.assertIn("0010-one.md", finding["message"])
 
     def test_website_user_methods_require_real_same_app_whitelisted_functions(self):
@@ -471,6 +471,9 @@ class GateTests(unittest.TestCase):
                     "naming": "not_run",
                     "naming_mode": "advisory",
                     "naming_mode_source": "default",
+                    "translation_core": "not_run",
+                    "dependency_core": "not_run",
+                    "dependency_apps": "pass",
                 },
             },
         )
@@ -678,6 +681,8 @@ class GateTests(unittest.TestCase):
             ("frappe.tests.test_api", "FrappeAPITestCase"),
             ("frappe.tests.classes", "IntegrationTestCase"),
             ("frappe.tests.classes", "UnitTestCase"),
+            ("frappe.tests.classes.unit_test_case", "UnitTestCase"),
+            ("frappe.tests.classes.integration_test_case", "IntegrationTestCase"),
         ):
             with self.subTest(module=module, base=base):
                 self.write(
@@ -1197,6 +1202,53 @@ class GateTests(unittest.TestCase):
             json.dumps([{"doctype": "Server Script", "script_type": "Scheduler Event"}]),
         )
         self.scan("scheduler", "scheduler")
+
+    def test_opaque_hook_registrations_are_findings(self):
+        for syntax in (
+            "from .extra import *",
+            "globals()['ai_tools'] = []",
+            "globals().update(ai_tools=[])",
+            "vars()['ai_tools'] = []",
+            "locals().update(ai_tools=[])",
+            "setattr(module, 'ai_tools', [])",
+        ):
+            with self.subTest(syntax=syntax):
+                self.write(f"{APP}/hooks.py", syntax)
+                self.scan("hook-dynamic")
+
+    def test_sql_in_helpers_referenced_from_nested_syntax(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(f"{APP}/queries.py", "import frappe\ndef read(): frappe.db.sql('SELECT 1')")
+        for prefix, body in (
+            ("def run():", "    task = lambda: read()"),
+            ("def run():", "    class Reader:\n        def read(self): read()"),
+            ("def run(value=read()):", "    pass"),
+            ("@read()\ndef run():", "    pass"),
+        ):
+            with self.subTest(prefix=prefix, body=body):
+                self.write(
+                    f"{APP}/tools.py",
+                    'from .queries import read\ndef declare(): return [{"handler": "sample_app.tools.run"}]\n'
+                    + prefix
+                    + "\n"
+                    + body,
+                )
+                self.scan("sql")
+
+    def test_website_user_rejects_constant_and_helper_role_guards(self):
+        self.write(f"{APP}/hooks.py", 'website_user_allowed_methods = ["sample_app.api.run"]')
+        self.write_contract()
+        for guard, body in (
+            ('ROLES = ["System Manager"]', "frappe.only_for(ROLES)"),
+            ('def _guard(): frappe.only_for("System Manager")', "_guard()"),
+        ):
+            with self.subTest(body=body):
+                self.write(f"{APP}/api.py", f"import frappe\n{guard}\n@frappe.whitelist()\ndef run(): {body}")
+                self.scan("website-user")
+
+    def test_naming_enforce_requires_checker(self):
+        self.write("dev/naming/enforcement.json", '{"mode": "enforce"}')
+        self.scan("naming-config")
 
 
 if __name__ == "__main__":
