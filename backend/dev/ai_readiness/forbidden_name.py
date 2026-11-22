@@ -2,12 +2,14 @@
 
 import hashlib
 import os
+import shutil
 import subprocess
 import unicodedata
 from collections import deque
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
+GIT_EXECUTABLE = shutil.which("git")
 NAME_DIGEST = bytes.fromhex("17618b2344e07d3418e161912308ad63a118158bf4e3f1307329b5543b5fd743")
 WINDOW_LENGTH = 6
 # Case-folded lookalikes, grouped by script and ordered by alphabet.
@@ -73,16 +75,23 @@ def redact_path(path: str) -> str:
     return f"[redacted path {fingerprint}]"
 
 
+def require_git_executable() -> str:
+    if GIT_EXECUTABLE is None or not os.path.isabs(GIT_EXECUTABLE):
+        raise FileNotFoundError("Git executable is missing or has no absolute path. Check PATH.")
+    return GIT_EXECUTABLE
+
+
 def git_output(directory: Path, *arguments: str) -> bytes:
+    executable = require_git_executable()
     local_variables = subprocess.run(
-        ["git", "rev-parse", "--local-env-vars"],
+        [executable, "rev-parse", "--local-env-vars"],
         check=True,
         capture_output=True,
         text=True,
     ).stdout.splitlines()
     environment = {key: value for key, value in os.environ.items() if key not in local_variables}
     return subprocess.run(
-        ["git", "-C", str(directory), *arguments],
+        [executable, "-C", str(directory), *arguments],
         check=True,
         capture_output=True,
         env=environment,
