@@ -2,9 +2,10 @@
 
 import json
 from http.client import HTTPException
+from ipaddress import IPv6Address, ip_address
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.parse import SplitResult, urlsplit
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 import frappe
 
@@ -21,6 +22,25 @@ class _NoRedirect(HTTPRedirectHandler):
 
 
 _OPENER = build_opener(_NoRedirect())
+_LOCAL_OPENER = build_opener(ProxyHandler({}), _NoRedirect())
+
+
+def _development_http_allowed(address: SplitResult) -> bool:
+	if (
+		address.scheme != "http"
+		or frappe.conf.get("developer_mode") not in (1, "1")
+		or frappe.conf.get("mobile_allow_development_http") not in (1, "1")
+		or not address.hostname
+		or address.port == 0
+	):
+		return False
+	if address.hostname in ("localhost", "identity-sync.localhost"):
+		return True
+	try:
+		host = ip_address(address.hostname)
+		return host.is_loopback and not (isinstance(host, IPv6Address) and host.ipv4_mapped is not None)
+	except ValueError:
+		return False
 
 
 def _identity_sync_origin():
@@ -29,7 +49,7 @@ def _identity_sync_origin():
 		raise ValueError("Invalid identity-sync URL")
 	address = urlsplit(value)
 	if (
-		address.scheme != "https"
+		(address.scheme != "https" and not _development_http_allowed(address))
 		or not address.hostname
 		or address.username is not None
 		or address.query
@@ -52,8 +72,10 @@ def send_session_revocations(sessions):
 	except _DELIVERY_ERRORS:
 		failed = sessions
 	else:
+		opener = _LOCAL_OPENER if urlsplit(endpoint).scheme == "http" else _OPENER
 		failed = []
-		for sid, subject in sessions:
+		refreshed = False
+		for index, (sid, subject) in enumerate(sessions):
 			req = Request(
 				endpoint,
 				data=json.dumps({"sid": sid, "subject": subject}).encode("utf-8"),
@@ -61,7 +83,7 @@ def send_session_revocations(sessions):
 				method="POST",
 			)
 			try:
-				with _OPENER.open(req, timeout=_TIMEOUT_SECONDS) as response:
+				with opener.open(req, timeout=_TIMEOUT_SECONDS) as response:
 					status = response.status
 			except HTTPError as error:
 				with error:
@@ -74,9 +96,16 @@ def send_session_revocations(sessions):
 					"Identity-sync refused mobile session closure (HTTP 403). Local revocation remains in effect."
 				)
 			elif status != 200:
+				failed.append((sid, subject))
 				if status == 401:
 					invalidate_identity_sync_bearer(bearer)
-				failed.append((sid, subject))
+					if not refreshed and index + 1 < len(sessions):
+						try:
+							bearer = identity_sync_bearer()
+						except _DELIVERY_ERRORS:
+							failed.extend(sessions[index + 1 :])
+							break
+						refreshed = True
 
 	if failed:
 		frappe.logger("mobile_sessions").warning(
