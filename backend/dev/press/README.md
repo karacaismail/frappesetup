@@ -45,3 +45,6 @@ sh backend/apps/press_tr/tests/smoke.sh
 ```sh
 press_compose down
 ```
+
+`patch-py314.sh` Press kaynaklarına uyum yaması uygular.
+Bu yama yalnız ayrı geliştirme ortamında kullanılır (A-11).

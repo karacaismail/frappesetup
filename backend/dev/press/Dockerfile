@@ -1,4 +1,4 @@
-FROM frappe/bench:latest
+FROM frappe/bench@sha256:a822a0aedf309582c1d5e49e461a88b5b891b446063b74263c896da92281bd70
 
 USER root
 # `dockerfile==3.2.0` (pinned by press) has no linux-arm64 wheel; its sdist builds with GOPATH-mode
