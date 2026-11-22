@@ -187,6 +187,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Keycloak ayarlarını kimlik-realm işi kurar. Frappe çerez süresini platform-core-kimlik işi kurar. Paket ve PWA sürelerini sunucu tarafında platform-core-mobil işi denetler.
   - Çalışan 1 saat boşta kalırsa yeniden kimlik doğrular. Keycloak'ın açık çerezi bu adımı atlatmaz. Bunu canlı test gösterir.
   - Arka plan eşitlemesi süreleri uzatmaz. Sunucu gerçek kullanıcı işlemini ayrıca sayar.
+  - MVP'de kiracı sitesinin ve telefon paketinin bütün kullanıcıları çalışan süresini alır. Müşteri süreleri Press'e uygulanır. Ayrıntı sözleşmenin 3. bölümündedir.
 - **O-26. Telefon paketi bu turda yazılmaz.** Sunucu tarafı MVP düzeyinde kurulur. Paket işi açılınca `mobile.md` MVP koşulları o işe yazılır. Mağaza hesapları proje sahibindedir.
 - **O-27. Müşteri kendi hesabını açabilir. Bu yüzden hesap silme yolu MVP'dedir.** Deneme akışı Keycloak kayıt sayfasıyla başlar (G-79). Kuralın dayanağı karar dosyasındaki hesap silme kuralı ve CK-6'dır.
   - Çalışan kendi hesabını açamaz. Çalışan yalnız davetle gelir.
