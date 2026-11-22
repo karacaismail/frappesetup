@@ -407,3 +407,4 @@ Mobile Operation,Mobil İşlem,Mobile Operation
 Mobile Sequence,Mobil Sıra,Mobile Sequence
 upsert,Ekle veya güncelle,Mobile Change
 remove,Kaldır,Mobile Change
+You are not permitted to call this method.,Bu yöntemi çağırma izniniz yok.,shell.request
