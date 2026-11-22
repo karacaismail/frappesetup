@@ -4,14 +4,14 @@ from frappe import _
 from pydantic import BaseModel, ConfigDict, Field
 
 from hrms_tr import leave
-from hrms_tr.leave import LeaveName
+from hrms_tr.leave import LeaveName, LeaveVersion
 
 
 class ApprovalArguments(BaseModel):
 	model_config = ConfigDict(extra="forbid")
 
 	name: LeaveName = Field(description="Document name of the leave application.")
-	version: str = Field(min_length=1, max_length=40, description="Modified value of the reviewed draft.")
+	version: LeaveVersion = Field(description="Modified value of the reviewed draft.")
 
 
 def declarations() -> list[dict]:
@@ -37,16 +37,10 @@ def preview_approval(name: str, version: str) -> dict:
 		"target_name": doc.name,
 		"target_version": str(doc.modified),
 		"changes": [
-			{"field": "status", "before": "Open", "after": "Approved"},
-			{"field": "docstatus", "before": 0, "after": 1},
+			{"fieldname": "status", "old": "Open", "new": "Approved"},
+			{"fieldname": "docstatus", "old": 0, "new": 1},
 		],
-		"details": {
-			"name": doc.name,
-			"employee_name": doc.employee_name,
-			"from_date": str(doc.from_date),
-			"to_date": str(doc.to_date),
-			"total_leave_days": doc.total_leave_days,
-		},
+		"details": {"name": doc.name},
 	}
 
 

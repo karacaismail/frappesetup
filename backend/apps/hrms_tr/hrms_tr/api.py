@@ -3,10 +3,10 @@
 import frappe
 
 from hrms_tr import leave
-from hrms_tr.leave import LeaveName
+from hrms_tr.leave import LeaveName, LeaveVersion
 
 
 # leave.approve locks the target and checks its read, write, and submit rights.
 @frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
-def approve_leave(name: LeaveName) -> dict:
-	return leave.approve(name)
+def approve_leave(name: LeaveName, version: LeaveVersion) -> dict:
+	return leave.approve(name, expected_version=version)

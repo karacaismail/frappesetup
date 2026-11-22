@@ -14,6 +14,7 @@ APPROVER_ROLES = ("HRMS TR Manager", HR_ROLE)
 OPERATIONS_ROLES = ("System Manager", "HR Manager")
 
 LeaveName = Annotated[str, StringConstraints(min_length=1, max_length=140)]
+LeaveVersion = Annotated[str, StringConstraints(min_length=1, max_length=40)]
 
 
 def check_approver_role():
@@ -56,7 +57,7 @@ def validate_approval(doc, method=None):
 	check_not_own_leave(doc)
 
 
-def pending_leave(name: str, *, lock: bool = False, expected_version: str | None = None):
+def pending_leave(name: str, *, expected_version: str, lock: bool = False):
 	check_approver_role()
 	doc = frappe.get_doc(DOCTYPE, name, for_update=lock)
 	for operation in ("read", "write", "submit"):
@@ -64,12 +65,12 @@ def pending_leave(name: str, *, lock: bool = False, expected_version: str | None
 	check_not_own_leave(doc)
 	if doc.docstatus != DocStatus.draft() or doc.status != "Open":
 		frappe.throw(_("Only open draft leave applications can be approved."))
-	if expected_version is not None and str(doc.modified) != expected_version:
+	if str(doc.modified) != expected_version:
 		frappe.throw(_("The leave application changed. Open it again before approving."))
 	return doc
 
 
-def approve(name: str, *, expected_version: str | None = None) -> dict:
+def approve(name: str, *, expected_version: str) -> dict:
 	doc = pending_leave(name, lock=True, expected_version=expected_version)
 	doc.status = "Approved"
 	doc.submit()

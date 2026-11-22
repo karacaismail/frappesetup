@@ -12,6 +12,54 @@ paths:
     get:
       operationId: listLeaveApplications
       summary: Kullanıcının okuyabildiği izin taleplerini listeler.
+      description: |
+        Frappe'nin genel kayıt ucunu kullanır. Frappe, kayıt ve alan izinlerini uygular.
+        Bu sözleşme, uygulamanın kullandığı alan ve süzgeç biçimini tanımlar.
+      parameters:
+        - name: fields
+          in: query
+          description: |
+            URL kodlu JSON dizisi. Alanı vermezseniz Frappe yalnız name döndürür.
+            Frappe, yalnız kullanıcının okuma izni olan alanları döndürür.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  enum: [name, employee, employee_name, leave_type, from_date, to_date, status, docstatus, modified, total_leave_days, leave_balance]
+                default: [name]
+              example: [name, status, modified]
+        - name: filters
+          in: query
+          description: |
+            URL kodlu JSON nesnesi. Frappe, nesnedeki eşitlik koşullarını birlikte uygular.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  name: {type: string}
+                  employee: {type: string}
+                  leave_type: {type: string}
+                  status: {type: string, enum: [Open, Approved, Rejected, Cancelled]}
+                  docstatus: {type: integer, enum: [0, 1, 2]}
+              example: {status: Open, docstatus: 0}
+        - name: limit_start
+          in: query
+          description: Atlanacak kayıt sayısı. İlk kayıt 0 değerinden başlar.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit_page_length
+          in: query
+          description: Bir sayfada istenen en çok kayıt sayısı.
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
       responses:
         "200":
           description: "Kendi talepleri, bağlı ekip veya tüm site kayıtları."
@@ -51,7 +99,10 @@ paths:
     post:
       operationId: approveLeaveApplication
       summary: Açık izin talebini onaylar ve gönderir.
-      description: Yönetici bağlı ekipteki talebi onaylar. İK sitedeki talepleri onaylar.
+      description: |
+        Yönetici bağlı ekipteki talebi onaylar. İK sitedeki talepleri onaylar.
+        Yetkili işletim rolleri sitedeki talepleri onaylar.
+        Talebi okurken gelen modified değerini version alanında gönderin.
       parameters:
         - in: header
           name: X-Frappe-CSRF-Token
@@ -63,7 +114,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LeaveName"
+              $ref: "#/components/schemas/ApproveLeaveRequest"
       responses:
         "200":
           description: Onaylanan kaydın adı.
@@ -78,7 +129,8 @@ paths:
         "404":
           $ref: "#/components/responses/LeaveNotFound"
         "417":
-          description: Talep açık bir taslak değil veya HRMS doğrulaması başarısız.
+          description: |
+            Talebin sürümü değişti, talep açık bir taslak değil veya HRMS doğrulaması başarısız.
           content:
             application/json:
               schema:
@@ -113,12 +165,16 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/FrappeError"
+          example:
+            exc_type: AuthenticationError
     PermissionDenied:
       description: Erişim reddedildi. Oturum veya gerekli izin eksik olabilir.
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/FrappeError"
+          example:
+            exc_type: PermissionError
     LeaveNotFound:
       description: İzin talebi bulunamadı.
       content:
@@ -132,12 +188,33 @@ components:
       required: [name]
       properties:
         name: {type: string, minLength: 1, maxLength: 140, description: "İzin talebinin kayıt adı."}
+    ApproveLeaveRequest:
+      type: object
+      additionalProperties: false
+      required: [name, version]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 140, description: "İzin talebinin kayıt adı."}
+        version:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: İzin talebini okurken gelen modified değeri.
+          example: "2026-11-22 09:00:00.000001"
     LeaveApplication:
       type: object
       properties:
         name: {type: string}
         employee: {type: [string, "null"]}
-        status: {type: [string, "null"]}
+        employee_name: {type: [string, "null"]}
+        leave_type: {type: [string, "null"]}
+        from_date: {type: [string, "null"], format: date}
+        to_date: {type: [string, "null"], format: date}
+        status: {type: [string, "null"], enum: [Open, Approved, Rejected, Cancelled, null]}
+        docstatus: {type: integer, enum: [0, 1, 2]}
+        modified:
+          type: string
+          description: Onay isteğinde version olarak gönderilen kayıt sürümü.
+        total_leave_days: {type: [number, "null"]}
         leave_balance:
           type: [number, "null"]
           description: Frappe bu alanı yalnız okuma izni varsa döndürür.
@@ -149,18 +226,31 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/LeaveApplication"
+      examples:
+        - data:
+            - name: HR-LAP-TEST-01
+              status: Open
+              modified: "2026-11-22 09:00:00.000001"
     LeaveApplicationResponse:
       type: object
       required: [data]
       properties:
         data:
           $ref: "#/components/schemas/LeaveApplication"
+      examples:
+        - data:
+            name: HR-LAP-TEST-01
+            status: Open
+            modified: "2026-11-22 09:00:00.000001"
     ApproveLeaveResponse:
       type: object
       required: [message]
       properties:
         message:
           $ref: "#/components/schemas/LeaveName"
+      examples:
+        - message:
+            name: HR-LAP-TEST-01
     FrappeError:
       type: object
       properties:

@@ -101,6 +101,42 @@ class LeaveHttpTest(unittest.TestCase):
             if self.data["leave_owners"][key] in actors
         }
 
+    def test_native_leave_list_projection_filters_and_pagination(self):
+        client = self.login("employee")
+        names = sorted(self.leaves_owned_by("employee"))[:2]
+        filters = json.dumps([["name", "in", names]])
+        query = urlencode(
+            {"filters": filters, "order_by": "name asc", "limit_page_length": 1}
+        )
+        code, result = client.send(f"{LEAVE_PATH}?{query}")
+        self.assertEqual(code, 200, result.get("exception"))
+        self.assertEqual(result["data"], [{"name": names[0]}])
+
+        query = urlencode(
+            {
+                "fields": json.dumps(["name", "employee"]),
+                "filters": filters,
+                "order_by": "name asc",
+                "limit_start": 1,
+                "limit_page_length": 1,
+            }
+        )
+        code, result = client.send(f"{LEAVE_PATH}?{query}")
+        self.assertEqual(code, 200, result.get("exception"))
+        self.assertEqual(
+            result["data"],
+            [{"name": names[1], "employee": self.data["employees"]["employee"]}],
+        )
+
+        query = urlencode(
+            {"filters": json.dumps({"employee": self.data["employees"]["outsider"]})}
+        )
+        code, result = client.send(f"{LEAVE_PATH}?{query}")
+        self.assertEqual(code, 200, result.get("exception"))
+        self.assertEqual(result["data"], [])
+        code, _ = Client(self, None).send(LEAVE_PATH)
+        self.assertIn(code, (401, 403))
+
     def test_hrms_tr_roles_do_not_grant_desk_access(self):
         for actor in ("employee", "manager", "hr"):
             with self.subTest(actor=actor):
@@ -113,7 +149,8 @@ class LeaveHttpTest(unittest.TestCase):
     def test_employee_sees_only_own_leave_and_no_balance(self):
         client = self.login("employee")
         self.assert_list_scope(client, "employee")
-        self.assertNotIn("leave_balance", self.document(client, "employee"))
+        employee_draft = self.document(client, "employee")
+        self.assertNotIn("leave_balance", employee_draft)
         query = urlencode({"fields": json.dumps(["name", "leave_balance"])})
         code, payload = client.send(f"{LEAVE_PATH}?{query}")
         self.assertIn(code, (200, 403, 417), payload.get("exc_type"))
@@ -123,7 +160,7 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertEqual(
             client.send(
                 "/api/method/hrms_tr.api.approve_leave",
-                {"name": self.data["leaves"]["employee"]},
+                self.approval_payload(employee_draft),
             )[0],
             403,
         )
@@ -167,21 +204,35 @@ class LeaveHttpTest(unittest.TestCase):
             code, result = admin.send(settings_path, {mandatory: 0}, method="PUT")
             self.assertEqual(code, 200, result.get("exception"))
 
+    @staticmethod
+    def approval_payload(document):
+        return {"name": document["name"], "version": document["modified"]}
+
     def test_manager_can_only_approve_team_leave(self):
         client = self.login("manager")
         self.assert_list_scope(client, "employee", "manager")
         self.assertEqual(self.document(client, "employee")["leave_balance"], 7)
         self.document(client, "outsider", 403)
         endpoint = "/api/method/hrms_tr.api.approve_leave"
-        self.assertEqual(
-            client.send(endpoint, {"name": self.data["leaves"]["outsider"]})[0], 403
-        )
-        self.assertEqual(
-            client.send(endpoint, {"name": self.data["leaves"]["manager"]})[0], 403
-        )
+        outsider = self.document(self.login("hr"), "outsider")
+        self.assertEqual(client.send(endpoint, self.approval_payload(outsider))[0], 403)
+        own = self.document(client, "manager")
+        self.assertEqual(client.send(endpoint, self.approval_payload(own))[0], 403)
+
+        before = self.document(client, "manager_approve")
         code, result = client.send(
-            endpoint, {"name": self.data["leaves"]["manager_approve"]}
+            self.leave_path("manager_approve"),
+            {"description": "Updated after the manager reviewed the request"},
+            method="PUT",
         )
+        self.assertEqual(code, 200, result.get("exception"))
+        changed = self.document(client, "manager_approve")
+        self.assertNotEqual(changed["modified"], before["modified"])
+        code, result = client.send(endpoint, self.approval_payload(before))
+        self.assertEqual(code, 417, result.get("exception"))
+        self.assertEqual(self.document(client, "manager_approve"), changed)
+
+        code, result = client.send(endpoint, self.approval_payload(changed))
         self.assertEqual(code, 200, result.get("exc_type"))
         doc = self.document(client, "manager_approve")
         self.assertEqual((doc["status"], doc["docstatus"]), ("Approved", 1))
@@ -304,10 +355,12 @@ class LeaveHttpTest(unittest.TestCase):
         hr = self.login("hr")
         manager = self.login("manager")
         approve = "/api/method/hrms_tr.api.approve_leave"
-        name = self.data["leaves"]["hr_approve"]
-        approved = hr.send(approve, {"name": name})
+        target = self.document(hr, "hr_approve")
+        name = target["name"]
+        approved = hr.send(approve, self.approval_payload(target))
         self.assertEqual(approved[0], 200, approved[1].get("exception"))
-        self.assertEqual(hr.send(approve, {"name": self.data["leaves"]["hr"]})[0], 403)
+        own = self.document(hr, "hr")
+        self.assertEqual(hr.send(approve, self.approval_payload(own))[0], 403)
         cancel = "/api/method/frappe.client.cancel"
         args = {"doctype": "Leave Application", "name": name}
         status, result = manager.send(cancel, args)
@@ -424,8 +477,10 @@ class LeaveHttpTest(unittest.TestCase):
 
     def test_guest_cannot_approve_or_call_legacy_replacement(self):
         guest = Client(self, None)
-        name = self.data["leaves"]["outsider"]
-        code, _ = guest.send("/api/method/hrms_tr.api.approve_leave", {"name": name})
+        outsider = self.document(self.login("hr"), "outsider")
+        code, _ = guest.send(
+            "/api/method/hrms_tr.api.approve_leave", self.approval_payload(outsider)
+        )
         self.assertIn(code, (401, 403))
         code, _ = guest.send(
             "/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
@@ -537,7 +592,14 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertEqual(code, 200, response)
         proposal = response["result"]["structuredContent"]
         self.assertEqual(proposal["status"], "approval_required")
-        self.assertEqual(proposal["preview"]["details"]["name"], document["name"])
+        self.assertEqual(proposal["preview"]["details"], {"name": document["name"]})
+        self.assertEqual(
+            proposal["preview"]["changes"],
+            [
+                {"fieldname": "status", "old": "Open", "new": "Approved"},
+                {"fieldname": "docstatus", "old": 0, "new": 1},
+            ],
+        )
         return proposal
 
     def ai_approval(self, client, proposal):

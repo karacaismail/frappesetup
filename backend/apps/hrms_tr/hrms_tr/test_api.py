@@ -31,6 +31,24 @@ class ApprovalEndpointTest(TestCase):
 			fake.get_roles.return_value = ["HRMS TR Manager"]
 			fake.get_doc.return_value = doc
 			with self.assertRaises(frappe.PermissionError):
-				approve_leave("LEAVE-FOREIGN-0001")
+				approve_leave("LEAVE-FOREIGN-0001", "2026-11-22 12:00:00")
 		doc.check_permission.assert_called_once_with("read")
 		doc.submit.assert_not_called()
+
+	def test_approve_leave_stale_version_is_rejected_under_lock(self):
+		doc = Mock(employee="EMP-0001", docstatus=0, status="Open", modified="2026-11-22 12:00:01")
+		with (
+			patch.object(leave, "frappe") as fake,
+			patch.object(leave, "_", side_effect=lambda message: message),
+		):
+			fake.get_roles.return_value = ["HRMS TR Manager"]
+			fake.session.user = "manager@example.test"
+			fake.db.get_value.return_value = "employee@example.test"
+			fake.get_doc.return_value = doc
+			fake.throw.side_effect = lambda message: raise_permission_error(message, frappe.ValidationError)
+			with self.assertRaises(frappe.ValidationError) as error:
+				approve_leave("LEAVE-STALE-0001", "2026-11-22 12:00:00")
+		self.assertEqual(error.exception.http_status_code, 417)
+		fake.get_doc.assert_called_once_with("Leave Application", "LEAVE-STALE-0001", for_update=True)
+		doc.submit.assert_not_called()
+		self.assertEqual(doc.status, "Open")
