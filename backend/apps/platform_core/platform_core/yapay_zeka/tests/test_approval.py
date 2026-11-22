@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.core.doctype.user.user import generate_keys
+from frappe.tests.test_api import ThreadWithReturnValue
 from frappe.utils import add_to_date, now_datetime
 
 from platform_core.yapay_zeka.tests.base import DOCTYPE, MANAGER, MCP_PATH, USER_A, USER_B, YzTestCase
@@ -26,6 +27,57 @@ class TestApproval(YzTestCase):
 		log = self.last_log(tool="update_document", target_name=name)
 		self.assertEqual((log.decision, log.stage, log.approval_state), ("allowed", "preview", "pending"))
 		self.assertEqual(log.proposal, proposal["proposal_id"])
+
+	def race(self, calls: list[tuple]) -> list[dict]:
+		"""Onay isteklerini aynı anda gönderir ve yanıtları döner."""
+		frappe.db.commit()  # nosemgrep: istekler ayrı bağlantı kullanır
+		threads = []
+		for client, proposal_id, digest in calls:
+			kwargs = {
+				"path": "/api/method/platform_core.api.ai.approve_proposal",
+				"method": "POST",
+				"headers": {"Accept": "application/json", "X-Frappe-CSRF-Token": client.csrf_token},
+				"json": {"proposal_id": proposal_id, "digest": digest},
+			}
+			threads.append(ThreadWithReturnValue(target=client.open, kwargs=kwargs, site=self.site))
+		for thread in threads:
+			thread.start()
+		for thread in threads:
+			thread.join()
+		frappe.db.rollback()
+		for thread in threads:
+			self.assertEqual(thread._return.status_code, 200, thread._return.get_data(as_text=True))
+		return [thread._return.json["message"] for thread in threads]
+
+	def test_same_proposal_approved_twice_at_once_executes_once(self):
+		for _attempt in range(5):
+			name = self.make_record(USER_A, title="Eski")
+			first, second = self.login(USER_A), self.login(USER_A)
+			proposal_id = self.propose_update(first, name, title="Yeni")["proposal_id"]
+			digest = self.digest_of(first, proposal_id)
+
+			outcomes = self.race([(first, proposal_id, digest), (second, proposal_id, digest)])
+
+			self.assertEqual(sorted(outcome["executed"] for outcome in outcomes), [False, True], outcomes)
+			executions = frappe.get_all(
+				"AI Action Log", filters={"proposal": proposal_id, "stage": "execute"}
+			)
+			self.assertEqual(len(executions), 1)
+
+	def test_two_proposals_on_one_target_approved_at_once_execute_once(self):
+		for _attempt in range(5):
+			name = self.make_record(USER_A, title="Eski")
+			first, second = self.login(USER_A), self.login(USER_A)
+			one = self.propose_update(first, name, title="Bir")["proposal_id"]
+			two = self.propose_update(first, name, title="Iki")["proposal_id"]
+			calls = [(first, one, self.digest_of(first, one)), (second, two, self.digest_of(first, two))]
+
+			outcomes = self.race(calls)
+
+			executed = [outcome for outcome in outcomes if outcome["executed"]]
+			self.assertEqual(len(executed), 1, outcomes)
+			winner = "Bir" if executed[0]["proposal"]["proposal_id"] == one else "Iki"
+			self.assertEqual(self.value(name), winner)
 
 	def test_approval_executes_once_and_second_use_is_rejected(self):
 		name = self.make_record(USER_A, title="Eski")

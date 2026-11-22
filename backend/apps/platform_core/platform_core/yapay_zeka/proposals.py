@@ -22,6 +22,7 @@ STATUS_FILTERS = {
 	"rejected": ("rejected",),
 	"consumed": ("consumed",),
 }
+APPROVE_ATTEMPTS = 4
 PREVIEW_KEYS = ("action", "summary", "changes", "details")
 
 
@@ -198,9 +199,24 @@ def _denied(doc, reason: str, *, new_status: str | None = None) -> dict:
 
 
 def approve(proposal_id: str, digest: str) -> dict:
-	"""İnsan onayı. Denetimler geçerse işi bu istekte, bir kez yürütür."""
+	"""İnsan onayı. Denetimler geçerse işi bu istekte, bir kez yürütür.
+
+	Yarışan bir onay satırı değiştirdiyse veritabanı kilitli okumayı reddeder
+	(`frappe/database/mariadb/database.py:27`). O zaman işlem geri alınır ve denetimler
+	güncel veriyle yeniden yapılır. Kilit alınmadan önce hiçbir şey yazılmamıştır.
+	"""
 	access.require_human("approve")
-	doc = store.load_proposal(proposal_id, for_update=True)
+	for _attempt in range(APPROVE_ATTEMPTS - 1):
+		try:
+			return _approve(proposal_id, digest)
+		except frappe.QueryDeadlockError:
+			frappe.db.rollback()
+			frappe.clear_messages()
+	return _approve(proposal_id, digest)
+
+
+def _approve(proposal_id: str, digest: str) -> dict:
+	doc = store.load_proposal(proposal_id)
 	if doc is None:
 		raise frappe.DoesNotExistError(_("Proposal not found."))
 	if doc.user != frappe.session.user:
@@ -208,6 +224,11 @@ def approve(proposal_id: str, digest: str) -> dict:
 		_log("approve", doc, decision="denied", deny_reason="not_owner")
 		frappe.db.commit()  # nosemgrep: 403 yanıtı işlemi geri alır, ret kaydı kalmalı
 		raise frappe.PermissionError(_("This proposal belongs to another user."))
+
+	# Kilit sırası her istekte aynıdır: önce hedefin bütün önerileri, sonra bu öneri.
+	# Sıra değişirse yarışan iki onay birbirini kilitler. Durum kilit altında yeniden okunur.
+	siblings = store.lock_target(doc.target_key) if doc.target_key else []
+	doc = store.load_proposal(proposal_id, for_update=True)
 	if doc.status != "pending":
 		return _denied(doc, "not_pending")
 	if get_datetime(doc.expires_at) < now_datetime():
@@ -220,11 +241,7 @@ def approve(proposal_id: str, digest: str) -> dict:
 	if tool is None or tool.kind != "write" or not tool.visible():
 		return _denied(doc, "not_found", new_status="rejected")
 
-	# Aynı hedefin önerileri kilitlenir. Yarışan ikinci onay burada bekler.
-	if doc.target_key and any(
-		row.name != doc.name and row.status == "consumed" and row.result == "unknown"
-		for row in store.lock_target(doc.target_key)
-	):
+	if any(row.name != doc.name and row.status == "consumed" and row.result == "unknown" for row in siblings):
 		return _denied(doc, "unresolved_unknown")
 
 	# Önizleme kilit altında yeniden çalışır. İzin ve kaydın sürümü yürütme anında denetlenir.
