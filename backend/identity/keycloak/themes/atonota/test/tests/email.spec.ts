@@ -280,11 +280,11 @@ async function expectMail(
   return link;
 }
 
-const readMessages = (lang: Lang): Map<string, string> => {
+const readMessages = (lang: Lang, directory = emailDir): Map<string, string> => {
   const entries = new Map<string, string>();
-  for (const line of readFileSync(join(emailDir, 'messages', `messages_${lang}.properties`), 'utf8').split('\n')) {
+  for (const line of readFileSync(join(directory, 'messages', `messages_${lang}.properties`), 'utf8').split('\n')) {
     if (!line.trim() || line.startsWith('#') || !line.includes('=')) continue;
-    entries.set(line.slice(0, line.indexOf('=')).trim(), line.slice(line.indexOf('=') + 1));
+    entries.set(line.slice(0, line.indexOf('=')).trim().replace(/\\ /g, ' '), line.slice(line.indexOf('=') + 1));
   }
   return entries;
 };
@@ -325,7 +325,7 @@ test.describe('e-posta ileti dosyaları', () => {
     }
   });
 
-  test('sihirli bağlantı şablonları ve konu anahtarı kurulu eklentiyle eşleşir', () => {
+  test('sihirli bağlantı şablonları ve iletileri kurulu eklentiyle eşleşir', () => {
     const jar = process.env.MAGIC_LINK_PROVIDER_JAR;
     test.skip(!jar, 'Kurulu eklentinin arşiv yolu MAGIC_LINK_PROVIDER_JAR ile verilir.');
     if (!jar) return;
@@ -343,13 +343,33 @@ test.describe('e-posta ileti dosyaları', () => {
     const subjectKeys = [...messages.matchAll(/^([^#=\s]+[Ss]ubject)\s*=/gm)].map((match) => match[1]);
     expect(subjectKeys).toHaveLength(1);
 
+    const constants = (className: string) => {
+      const entry = entries.find((path) => path.endsWith(`/${className}.class`));
+      if (!entry) throw new Error(`Provider class missing from archive: ${className}`);
+      return execFileSync('unzip', ['-p', jar, entry]).toString('latin1').split(/[^ -~]+/);
+    };
+    const providerId = constants('MagicLinkAuthenticatorNormalFactory').find((value) => value === 'magiclink');
+    const sentKey = constants('MagicLinkAuthenticatorNormal').find((value) => value.endsWith('-emailSentText'));
+    const emptyEmailKey = constants('AbstractMagicLinkAuthenticator').find((value) => value === 'Email cannot be empty');
+    expect(providerId).toBeDefined();
+    expect(sentKey).toBeDefined();
+    expect(emptyEmailKey).toBeDefined();
+    expect(messages).toContain(`${sentKey}=`);
+    // Keycloak looks up the alternatives using the provider ID and these suffixes.
+    const loginKeys = [`${providerId}-display-name`, `${providerId}-help-text`, sentKey!, emptyEmailKey!];
+    const loginDir = fileURLToPath(new URL('../../login/', import.meta.url));
+
     const missing = templates.filter((template) => !existsSync(join(emailDir, template)));
     for (const lang of ['tr', 'en'] as const) {
       if (!readMessages(lang).get(subjectKeys[0])?.trim()) {
-        missing.push(`messages/messages_${lang}.properties: ${subjectKeys[0]}`);
+        missing.push(`email/messages/messages_${lang}.properties: ${subjectKeys[0]}`);
+      }
+      const loginMessages = readMessages(lang, loginDir);
+      for (const key of loginKeys) {
+        if (!loginMessages.get(key)?.trim()) missing.push(`login/messages/messages_${lang}.properties: ${key}`);
       }
     }
-    expect(missing, 'temada eksik e-posta şablonu veya konu anahtarı').toEqual([]);
+    expect(missing, 'temada eksik şablon veya ileti anahtarı').toEqual([]);
   });
 });
 
@@ -430,7 +450,11 @@ test.describe('sihirli bağlantı e-postası', () => {
       await page.goto(loginUrl(lang, realmName, base));
       const alternative = page.locator('form:has([name="tryAnotherWay"])');
       await alternative.evaluate((form: HTMLFormElement) => form.requestSubmit());
-      await page.getByRole('button', { name: /magiclink-display-name|magic link|sihirli bağlantı/i }).click();
+      const signInOption = {
+        tr: 'Sihirli bağlantı E-postanıza gelen bağlantıyla oturum açın.',
+        en: 'Magic link Sign in with a link sent to your email.',
+      };
+      await page.getByRole('button', { name: signInOption[lang], exact: true }).click();
       const username = page.locator('input[name="username"]:visible');
       await username.fill(email);
       await username.evaluate((input: HTMLInputElement) => input.form!.requestSubmit());
@@ -485,7 +509,11 @@ test('email colours are the light design tokens of the login theme', () => {
   // An email cannot read CSS variables, so the template repeats the values. This test keeps the copy equal.
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const css = readFileSync(`${root}login/resources/css/atonota.css`, 'utf8');
-  const lightBlock = css.slice(css.indexOf('/* tokens:start */'), css.indexOf('@media (prefers-color-scheme: dark)'));
+  const lightStart = css.indexOf('/* tokens:start */');
+  const darkStart = css.indexOf(':root.pf-v5-theme-dark');
+  expect(lightStart).toBeGreaterThanOrEqual(0);
+  expect(darkStart).toBeGreaterThan(lightStart);
+  const lightBlock = css.slice(lightStart, darkStart);
   const token = (name: string) => new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,8})`).exec(lightBlock)?.[1].toLowerCase();
   const template = readFileSync(`${root}email/html/template.ftl`, 'utf8');
   const value = (name: string) => new RegExp(`${name} = "(#[0-9a-fA-F]{3,8})"`).exec(template)?.[1].toLowerCase();

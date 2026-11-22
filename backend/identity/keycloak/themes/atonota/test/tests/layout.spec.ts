@@ -76,6 +76,13 @@ for (const item of screens) {
           found.push(`${control.tagName.toLowerCase()}#${control.id} ${Math.round(box.width)}x${Math.round(box.height)}`);
         }
       }
+      for (const checkbox of document.querySelectorAll<HTMLInputElement>('input[type=checkbox]')) {
+        if (!checkbox.checkVisibility()) continue;
+        const boxes = [...(checkbox.labels ?? [])].map((label) => label.getBoundingClientRect());
+        if (!boxes.some((box) => box.width >= min - 0.5 && box.height >= min - 0.5)) {
+          found.push(`checkbox#${checkbox.id} has no label with a ${min}px touch target`);
+        }
+      }
       return found;
     }, minimum);
     expect(smallTargets, 'küçük dokunma alanı').toEqual([]);
@@ -115,6 +122,18 @@ for (const percent of [125, 200]) {
   }
 }
 
+test('recovery confirmation can be selected from the edge of its label', async ({ page }) => {
+  await screen('recovery-codes-setup').open(page);
+  const checkbox = page.getByRole('checkbox', { name: 'Kodları güvenli bir yere kaydettim' });
+  const label = page.locator('label').filter({ hasText: 'Kodları güvenli bir yere kaydettim' });
+  const inputBox = await checkbox.boundingBox();
+  const labelBox = await label.boundingBox();
+  expect(inputBox!.height).toBeLessThan(44);
+  expect(labelBox!.height).toBeGreaterThanOrEqual(44);
+  await label.click({ position: { x: labelBox!.width - 3, y: 3 } });
+  await expect(checkbox).toBeChecked();
+});
+
 test.describe('dokunmatik profil', () => {
   test.use({ hasTouch: true, isMobile: false });
   test('kaba işaretçide kontroller en az 48 pikseldir', async ({ page, browserName }) => {
@@ -127,5 +146,17 @@ test.describe('dokunmatik profil', () => {
         .map((element) => Math.round(element.getBoundingClientRect().height)),
     );
     expect(Math.min(...heights)).toBeGreaterThanOrEqual(48);
+  });
+
+  test('recovery confirmation has a 48px target with a coarse pointer', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'Coarse pointer emulation is only reliable in Chromium');
+    await screen('recovery-codes-setup').open(page);
+    expect(await page.evaluate(() => matchMedia('(any-pointer: coarse)').matches)).toBe(true);
+    const label = page.locator('label').filter({ hasText: 'Kodları güvenli bir yere kaydettim' });
+    const box = await label.boundingBox();
+    expect(box!.width).toBeGreaterThanOrEqual(48);
+    expect(box!.height).toBeGreaterThanOrEqual(48);
+    await label.tap({ position: { x: box!.width - 3, y: 3 } });
+    await expect(page.getByRole('checkbox', { name: 'Kodları güvenli bir yere kaydettim' })).toBeChecked();
   });
 });

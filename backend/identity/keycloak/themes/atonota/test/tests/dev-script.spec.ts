@@ -138,3 +138,50 @@ test('the account provider is built in one place only', () => {
   const dockerfile = readFileSync(join(repo, 'backend/identity/keycloak/themes/atonota/test/Dockerfile'), 'utf8');
   expect(dockerfile).toMatch(/RUN \S*build\.sh /);
 });
+
+test('rebuilding the account provider drops stale classes and keeps one metadata directory', ({}, testInfo) => {
+  const root = testInfo.outputPath('provider-build');
+  const tools = join(root, 'tools');
+  const source = join(root, 'src');
+  const output = join(root, 'out');
+  const main = join(source, 'main', 'java');
+  const checks = join(source, 'test', 'java');
+  const metadata = join(source, 'main', 'resources', 'META-INF', 'services');
+  for (const directory of [tools, main, checks, metadata, output]) mkdirSync(directory, { recursive: true });
+
+  // Substitute the JDK but keep the actual file copy and archive operations.
+  writeFileSync(join(tools, 'javac'), `#!/bin/sh
+set -eu
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -d) destination=$2; shift 2 ;;
+    *.java) name=\${1##*/}; : > "$destination/\${name%.java}.class"; shift ;;
+    *) shift ;;
+  esac
+done
+`, { mode: 0o755 });
+  writeFileSync(join(tools, 'jar'), '#!/bin/sh\nexec tar -cf "$3" -C "$5" "$6"\n', { mode: 0o755 });
+  writeFileSync(join(tools, 'java'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const obsolete = join(main, 'Obsolete.java');
+  writeFileSync(obsolete, '');
+  writeFileSync(join(main, 'Provider.java'), '');
+  writeFileSync(join(checks, 'ProviderCheck.java'), '');
+  writeFileSync(join(metadata, 'provider'), 'Provider');
+  writeFileSync(join(output, 'keep.txt'), 'unrelated output');
+
+  const build = fileURLToPath(new URL('../../account-provider/build.sh', import.meta.url));
+  const runBuild = () => execFileSync('/bin/bash', [build, join(root, 'lib'), source, output], {
+    env: { PATH: `${tools}:/usr/bin:/bin` },
+  });
+  const archive = () => execFileSync('tar', ['-tf', join(output, 'account-deletion-link-provider.jar')], { encoding: 'utf8' });
+  runBuild();
+  expect(archive()).toContain('Obsolete.class');
+  rmSync(obsolete);
+  runBuild();
+  const entries = archive();
+  expect(entries).not.toContain('Obsolete.class');
+  expect(entries).not.toContain('META-INF/META-INF');
+  expect(entries).toContain('META-INF/services/provider');
+  expect(entries).toContain('Provider.class');
+  expect(readFileSync(join(output, 'keep.txt'), 'utf8')).toBe('unrelated output');
+});

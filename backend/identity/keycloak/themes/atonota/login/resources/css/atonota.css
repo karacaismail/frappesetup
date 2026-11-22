@@ -155,6 +155,7 @@
 /* Login-only layout tokens. */
 :root {
   --at-recovery-code-column: 16ch;
+  --at-checkbox-box: 1.25rem;
 }
 
 /* PatternFly değişkenleri Atonota tokenlarına bağlanır. Böylece temel bileşenler de aynı kimliği taşır. */
@@ -507,8 +508,8 @@
 
 .login-pf .pf-v5-c-check__input {
   accent-color: var(--at-color-action);
-  inline-size: 1.25rem;
-  block-size: 1.25rem;
+  inline-size: var(--at-checkbox-box);
+  block-size: var(--at-checkbox-box);
 }
 
 .login-pf .pf-v5-c-input-group {
