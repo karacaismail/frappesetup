@@ -40,6 +40,7 @@ from identity_sync.events import (
 )
 from identity_sync.httpjson import HttpError, TransportError
 from identity_sync.keycloak_admin import InviteResult, PlanChanged, site_client_id
+from identity_sync.mapping import Tenant
 from identity_sync.pipeline import PreviewChanged, replay_report
 from identity_sync.store import Busy
 
@@ -304,6 +305,7 @@ class _Api:
             raise _BadRequest
         digest = None if dry_run else self._approved_digest("invite_user", payload, azp)
         keycloak = self._app.keycloak
+        self._require_own_organization(azp, organization_id)
         preview = keycloak.invite_user(email, first_name, last_name, organization_id, dry_run=True)
         previews = [item.to_dict() for item in preview.previews]
         # The digest also covers the request fields: one invitation's approval does not fit another.
@@ -431,7 +433,7 @@ class _Api:
             raise _BadRequest
         keycloak = self._app.keycloak
         try:
-            tenant = next((t for t in self._settings.tenants if site_client_id(t.name) == azp), None)
+            tenant = self._tenant_of(azp)
             if tenant is None or not self._is_member(subject, tenant.organization):
                 _LOG.warning("execute operation=revoke_session azp=%s outcome=forbidden", azp)
                 raise _Forbidden
@@ -445,6 +447,25 @@ class _Api:
         # The session id is not a secret, but it is not needed in the log either.
         _LOG.info("execute operation=revoke_session azp=%s outcome=executed", azp)
         return 200, {"sid": sid, "revoked": True}
+
+    def _tenant_of(self, azp: str) -> Tenant | None:
+        """The tenant whose site client is calling. The tenant comes from the token, never from the body."""
+        return next((tenant for tenant in self._settings.tenants if site_client_id(tenant.name) == azp), None)
+
+    def _require_own_organization(self, azp: str, organization_id: str) -> None:
+        """A tenant site may only invite into its own organization.
+
+        The execute list holds the tenant site clients. Without this check the site of one
+        tenant could add users to the organization of another tenant. A caller that is not
+        a tenant site (a preview client) is not bound to a tenant.
+        """
+        tenant = self._tenant_of(azp)
+        if tenant is None:
+            return
+        organization = self._app.keycloak.get_organization(organization_id)
+        if organization is None or organization.alias != tenant.organization:
+            _LOG.warning("execute operation=invite_user azp=%s outcome=forbidden", azp)
+            raise _Forbidden
 
     def _is_member(self, subject: str, organization_alias: str) -> bool:
         keycloak = self._app.keycloak
