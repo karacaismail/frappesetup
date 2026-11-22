@@ -1,5 +1,6 @@
 import json
-from urllib.parse import quote
+from unittest.mock import patch
+from urllib.parse import quote, urlencode
 
 import frappe
 
@@ -197,3 +198,77 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertNotIn("data", json.loads(body))
 		status, _, _ = self.metadata(self.reader_sid)
 		self.assertEqual(status, 200)
+
+	def test_catalog_marks_unapproved_field_types(self):
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_field
+
+		field = create_custom_field(
+			DOCTYPE,
+			{
+				"fieldname": "unsupported_html",
+				"fieldtype": "HTML",
+				"label": "Unapproved field",
+				"options": "<script>example()</script>",
+			},
+		)
+		self.addCleanup(self.delete_fixture, field)
+		frappe.db.commit()
+		status, _, body = self.metadata(self.reader_sid)
+		self.assertEqual(status, 200)
+		payload = json.loads(body)["message"]
+		self.assertEqual(payload["catalog_version"], 1)
+		fields = {field["fieldname"]: field for field in payload["schema"]["fields"]}
+		self.assertEqual(fields["title"]["component"], "input")
+		self.assertEqual(fields["test_entries"]["component"], "table")
+		self.assertIsNone(fields["unsupported_html"]["component"])
+		self.assertNotIn("options", fields["unsupported_html"])
+
+	def test_mobile_surface_denies_by_default_and_omits_restricted_fields(self):
+		path = "/api/method/platform_core.api.meta.get_doctype?" + urlencode(
+			{"doctype": DOCTYPE, "surface": "mobile"}
+		)
+		status, _, _ = self.request(path, self.reader_sid)
+		self.assertEqual(status, 403)
+		frappe.set_user(PRIVILEGED)
+		try:
+			with patch.dict(frappe.conf, {"shell_mobile_doctypes": [DOCTYPE, CHILD_DOCTYPE]}):
+				payload = get_doctype(DOCTYPE, PRIVILEGED, surface="mobile")
+				self.assertEqual(payload["schema"]["sensitivity"], "standard")
+				self.assertNotIn(
+					"private_note", {field["fieldname"] for field in payload["schema"]["fields"]}
+				)
+				self.assertEqual(
+					{field["fieldname"] for field in payload["child_tables"][CHILD_DOCTYPE]["fields"]},
+					{"entry"},
+				)
+			web = get_doctype(DOCTYPE, PRIVILEGED)
+			private = next(field for field in web["schema"]["fields"] if field["fieldname"] == "private_note")
+			self.assertEqual(private["sensitivity"], "restricted")
+		finally:
+			frappe.set_user("Administrator")
+
+	def test_http_metadata_translates_display_text_and_preserves_select_values(self):
+		from frappe.custom.doctype.custom_field.custom_field import create_custom_field
+
+		field = create_custom_field(
+			DOCTYPE,
+			{
+				"fieldname": "locale_test",
+				"fieldtype": "Select",
+				"label": "Admin panel",
+				"description": "Admin panel",
+				"options": "Admin panel",
+			},
+		)
+		self.addCleanup(self.delete_fixture, field)
+		frappe.db.commit()
+		path = "/api/method/platform_core.api.meta.get_doctype?" + urlencode(
+			{"doctype": DOCTYPE, "_lang": "tr"}
+		)
+		status, _, body = self.request(path, self.reader_sid)
+		self.assertEqual(status, 200)
+		payload = json.loads(body)["message"]
+		value = next(field for field in payload["schema"]["fields"] if field["fieldname"] == "locale_test")
+		self.assertEqual(value["label"], "Yönetim paneli")
+		self.assertEqual(value["description"], "Yönetim paneli")
+		self.assertEqual(value["choices"], [{"value": "Admin panel", "label": "Yönetim paneli"}])

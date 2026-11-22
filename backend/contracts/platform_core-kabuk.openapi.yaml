@@ -129,6 +129,19 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "surface",
+            "in": "query",
+            "description": "Mobile requests use a site allowlist and never include restricted fields.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ],
+              "default": "web"
+            }
           }
         ],
         "responses": {
@@ -479,7 +492,9 @@
         "required": [
           "fieldname",
           "fieldtype",
-          "read_only"
+          "read_only",
+          "component",
+          "sensitivity"
         ],
         "additionalProperties": false,
         "properties": {
@@ -673,6 +688,23 @@
                 "collapsible_depends_on"
               ]
             }
+          },
+          "component": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Approved renderer key, or null for an unsupported field type."
+          },
+          "sensitivity": {
+            "$ref": "#/components/schemas/Sensitivity"
+          },
+          "choices": {
+            "type": "array",
+            "description": "Select options with original values and translated labels.",
+            "items": {
+              "$ref": "#/components/schemas/SelectChoice"
+            }
           }
         }
       },
@@ -685,7 +717,8 @@
           "fields",
           "title_field",
           "search_fields",
-          "sort_field"
+          "sort_field",
+          "sensitivity"
         ],
         "properties": {
           "name": {
@@ -723,6 +756,9 @@
               "null"
             ],
             "description": "Readable sort field, otherwise null."
+          },
+          "sensitivity": {
+            "$ref": "#/components/schemas/Sensitivity"
           }
         },
         "additionalProperties": false
@@ -734,7 +770,8 @@
           "schema",
           "meta_hash",
           "perm_version",
-          "child_tables"
+          "child_tables",
+          "catalog_version"
         ],
         "properties": {
           "schema": {
@@ -754,6 +791,11 @@
             "additionalProperties": {
               "$ref": "#/components/schemas/DocType"
             }
+          },
+          "catalog_version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Version of the approved component catalog."
           }
         },
         "additionalProperties": false
@@ -1059,6 +1101,32 @@
             "description": "Scalar comparison value. Omitted for truth tests."
           }
         }
+      },
+      "SelectChoice": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "value",
+          "label"
+        ],
+        "properties": {
+          "value": {
+            "type": "string",
+            "description": "Unchanged stored value."
+          },
+          "label": {
+            "type": "string",
+            "description": "Translated option label."
+          }
+        }
+      },
+      "Sensitivity": {
+        "type": "string",
+        "enum": [
+          "standard",
+          "restricted"
+        ],
+        "description": "High privacy marker. Restricted fields are never returned to the mobile surface."
       }
     }
   }
