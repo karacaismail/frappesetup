@@ -47,7 +47,7 @@ class TestTimesAndProvenance(AiTestCase):
 			"structuredContent"
 		]
 		for_human = self.human(
-			client, "GET", "get_proposal", query={"proposal_id": opened["proposal_id"]}
+			client, "GET", "plt_get_proposal", query={"proposal_id": opened["proposal_id"]}
 		).json["message"]
 
 		for shape in (opened, for_model, for_human):
@@ -283,7 +283,7 @@ class TestGetWritesOnlyDenials(AiTestCase):
 		proposal_id = self.propose_update(client, name, title="New")["proposal_id"]
 		before = frappe.db.count("PLT AI Action Log")
 
-		self.human(client, "GET", "get_proposal", query={"proposal_id": proposal_id})
+		self.human(client, "GET", "plt_get_proposal", query={"proposal_id": proposal_id})
 		self.human(client, "GET", "list_proposals")
 
 		self.assertEqual(frappe.db.count("PLT AI Action Log"), before)
@@ -292,7 +292,7 @@ class TestGetWritesOnlyDenials(AiTestCase):
 		name = self.make_record(USER_A)
 		proposal_id = self.propose_update(self.login(USER_A), name, title="New")["proposal_id"]
 
-		response = self.human(self.login(USER_B), "GET", "get_proposal", query={"proposal_id": proposal_id})
+		response = self.human(self.login(USER_B), "GET", "plt_get_proposal", query={"proposal_id": proposal_id})
 
 		self.assertEqual(response.status_code, 403)
 		log = self.last_log(tool="plt_get_proposal", user=USER_B, proposal=proposal_id)
