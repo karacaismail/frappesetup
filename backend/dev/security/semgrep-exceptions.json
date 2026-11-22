@@ -120,7 +120,7 @@
   "additionalReviews": [
     {
       "scope": "backend/apps/platform_core/platform_core",
-      "sha256": "625d35b9011c36bda9e4bda9b5cacd9605adf359b91a7040a53ddb623c41a4f4",
+      "sha256": "8b5749df8e71db49ca50eadab81089fd82d97a28d1221791d2d6f0060a16bf86",
       "findings": [
         {
           "rule": "frappe-missing-permission",
@@ -152,6 +152,17 @@
           "line": 20,
           "reason": "Checks DocType read permission before returning the session user’s access summary."
         }
+      ],
+      "files": [
+        "backend/apps/platform_core/platform_core/access/engine.py",
+        "backend/apps/platform_core/platform_core/access/explain.py",
+        "backend/apps/platform_core/platform_core/access/hooks.py",
+        "backend/apps/platform_core/platform_core/access/link_search.py",
+        "backend/apps/platform_core/platform_core/access/reports.py",
+        "backend/apps/platform_core/platform_core/access/rules.py",
+        "backend/apps/platform_core/platform_core/access/subject.py",
+        "backend/apps/platform_core/platform_core/api/access.py",
+        "backend/apps/platform_core/platform_core/hooks.py"
       ]
     }
   ]

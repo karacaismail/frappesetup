@@ -73,6 +73,19 @@ Komut her kapsam için bir özet yazdırır.
 Onayları inceleyince yeni özeti aynı kapsamın `sha256` alanına yazın.
 Ardından `backend/dev/bin/security-audit` komutunu çalıştırın.
 
+Erişim onayları yalnız listelenen dosyalara bağlıdır.
+Aşağıdaki yollar `backend/apps/platform_core/platform_core/` klasörüne göredir.
+
+- `access/link_search.py` ve `api/access.py`, incelenen beş ucu tanımlar.
+- `access/explain.py`, yetki açıklamasını ve kapsam özetini üretir.
+- `access/rules.py`, belge türünün erişim kurallarını okur.
+- `access/engine.py` ve `access/subject.py`, yetki kararını ve kullanıcı kapsamını hesaplar.
+- `hooks.py` ve `access/hooks.py`, Frappe izin ve arama kancalarını bağlar.
+- `access/reports.py`, izin kancasındaki rapor ve rapor dosyası koşullarını sağlar.
+
+Kapsam dışındaki dosya değişikliği bu özeti değiştirmez.
+İki onay kapsamı çakışırsa kapı hata verir.
+
 Uç listesi `backend/apps/<uygulama>/<paket>/` altındaki Python kaynaklarını okur.
 Çalışırken eklenen uçlar için Frappe yapılandırmasını ayrıca inceleyin.
 Sınıf yöntemini listede sınıf ve yöntem adıyla bulabilirsiniz.

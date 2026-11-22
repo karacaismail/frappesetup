@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from semgrep_exceptions import CONFIG, RULES, reviewed_findings, source_digest
+from semgrep_exceptions import CONFIG, RULES, review_scopes, reviewed_findings, source_digest
 
 
 class SemgrepExceptionsTests(unittest.TestCase):
@@ -106,6 +106,51 @@ class SemgrepExceptionsTests(unittest.TestCase):
                              [findings[1]])
             (root / "access/api.py").write_text("changed = True\n")
             self.assertEqual(reviewed_findings(root, config, findings, before), [findings[1]])
+
+    def test_overlapping_review_targets_are_rejected(self):
+        press = {"scope": "backend/apps/press", "findings": []}
+        access = {"scope": "backend/apps/core", "files": ["backend/apps/core/allowed.py"], "findings": []}
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory) / "exceptions.json"
+            for extra in (
+                [{"scope": "backend/apps", "findings": []}],
+                [access, {"scope": "backend/apps", "files": ["backend/apps/core/allowed.py"], "findings": []}],
+            ):
+                with self.subTest(extra=extra):
+                    config.write_text(json.dumps({**press, "additionalReviews": extra}))
+                    with self.assertRaisesRegex(ValueError, "overlap"):
+                        review_scopes(config)
+
+    def test_file_scope_ignores_unrelated_files_and_invalidates_on_helper_change(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            files = ["core/endpoint.py", "core/helper.py"]
+            unrelated = root / "core/unrelated.py"
+            rules = root / RULES
+            rules.parent.mkdir(parents=True)
+            rules.write_text("rules: []")
+            unrelated.parent.mkdir()
+            for path in [*(root / file for file in files), unrelated]:
+                path.write_text("pass\n")
+            self.git(root, "init", "-q")
+            self.git(root, "add", "core")
+            before = source_digest(root, "core", files)
+            config = root / "exceptions.json"
+            entry = {"rule": "frappe-missing-permission", "path": files[0], "line": 1,
+                     "reason": "Reviewed permission check."}
+            config.write_text(json.dumps({
+                "scope": "core", "files": files, "sha256": before,
+                "findings": [entry, {**entry, "path": "core/unrelated.py"}],
+            }))
+            finding = {"check_id": "rules.frappe-missing-permission",
+                       "path": files[0], "start": {"line": 1}}
+            other = {**finding, "path": "core/unrelated.py"}
+            unrelated.write_text("changed = True\n")
+            self.assertEqual(reviewed_findings(root, config, [finding, other], {"core": before}), [other])
+            (root / files[1]).write_text("changed = True\n")
+            self.assertEqual(reviewed_findings(root, config, [finding, other], {"core": before}), [finding, other])
+            (root / files[1]).unlink()
+            self.assertIsNone(source_digest(root, "core", files))
 
     def test_missing_rule_file_cannot_produce_a_digest(self):
         with tempfile.TemporaryDirectory() as directory:
