@@ -57,3 +57,25 @@ Komut Gunicorn işçilerini, yanıt kodlarını ve MariaDB hata numaralarını d
 Eski Werkzeug yükünü karşılaştırmak için boş bir sitede `--workers 0` kullanın.
 İstemci süresine Gunicorn kuyruğu da girer. O-31 sınırı sunucu süresine uygulanır.
 Komut, hata veya sınır aşımı varsa 1 döndürür.
+
+## Üretim işçi sayısı için kapasite denemesi
+
+Üretime denk bir deneme ortamında ayrı bir `perf-*.localhost` sitesi hazırlayın.
+Aynı işlemci, bellek, veri tabanı ve ağ koşullarını kullanın.
+Canlı siteye ölçüm verisi göndermeyin.
+
+```bash
+env/bin/python -m mobile_test_app.measure_concurrent \
+  --site perf-mobile.localhost --worker-candidates 4 8 12 --repeats 3 \
+  --client-p95-limit-ms 1000 --status-file /yol/isci-olcumu.md
+```
+
+Komut, her işçi sayısıyla 50 telefonun 100 eşzamanlı isteğini ölçer.
+Her koşu ayrı ölçüm verisi kurar ve sonunda o veriyi temizler.
+Komut bütün koşularda sınırları karşılayan en küçük sayıyı önerir.
+Hiçbir sayı sınırları karşılamazsa komut sonuçları yazar ve 1 döndürür.
+İstemci p95 sınırı öneri içindir. O-31 sınırı sunucu süresine uygulanır.
+
+Ölçüm örnek izin görünümünü ve yerel HTTP yolunu kullanır.
+Üretim seçimi için ters vekil, gerçek izin görünümü ve diğer yükleri de ölçün.
+Hüseyin Cengiz, üretime denk ölçümden sonra işçi sayısını seçer.
