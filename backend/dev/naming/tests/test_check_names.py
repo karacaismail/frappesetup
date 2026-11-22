@@ -102,6 +102,21 @@ class NamingGateTests(unittest.TestCase):
         )
         self.assertEqual(self.run_gate(), (0, set()))
 
+    def test_source_text_ignores_markdown_code_without_hiding_turkish_prose(self):
+        self.write(
+            self.root / "backend/contracts/example.openapi.yaml",
+            "openapi: 3.1.0\ninfo:\n"
+            "  summary: Read `x-durum` and `yalniz-onay-katmani`.\n"
+            "  description: >-\n"
+            "    See `contracts/platform_core-kimlik.openapi.yaml`.\n"
+            "paths:\n  /status:\n    get:\n"
+            "      summary: ``x-durum`` için kayıt getir.\n",
+        )
+        status, findings = self.gate_findings("--source-text")
+        self.assertEqual(status, 1)
+        self.assertEqual([finding["line"] for finding in findings], [9])
+        self.assertIn("kayıt getir", findings[0]["message"])
+
     def test_rejects_wrong_metadata_and_glossary_names(self):
         self.record(
             "platform_core/doctype/example/example.json",

@@ -30,6 +30,7 @@ TURKISH_WORD = re.compile(
     re.IGNORECASE,
 )
 COPY_KEYS = {"label", "description", "title"}
+MARKDOWN_CODE = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.DOTALL)
 SOURCE_SKIP = {
     "tests",
     "test",
@@ -336,6 +337,7 @@ def scan(root: Path, *, legacy: bool = False, map_path: Path = DEFAULT_MAP) -> l
 
 
 def turkish_text(value: str) -> bool:
+    value = MARKDOWN_CODE.sub(" ", value)
     value = re.sub(r"\{[\w.]+\}", "", value)
     return bool(TURKISH_LETTER.search(value) or TURKISH_WORD.search(value))
 
@@ -431,7 +433,7 @@ def yaml_source_text(source: str):
                 consumed = offset
             value = " ".join(chunks)
         else:
-            token = re.match(JS_STRING, value)
+            token = re.match(JS_STRING, value) if value.startswith(("'", '"')) else None
             value = token[0][1:-1] if token else re.split(r"\s+#", value, maxsplit=1)[0]
         yield position, key, value
 
