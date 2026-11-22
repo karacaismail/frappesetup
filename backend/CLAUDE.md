@@ -43,7 +43,7 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `identity/identity_sync/` | Kullanıcı eşitleme servisi | identity-sync |
 | `libs/oidc_verify/` | Ortak belirteç doğrulama kitaplığı | kimlik-realm |
 | `apps/platform_core/platform_core/erisim/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
-| `dev/guvenlik/`, `dev/bin/guvenlik-denetimi` | Güvenlik kapısı | guvenlik-kapisi |
+| `dev/guvenlik/`, `dev/bin/guvenlik-denetimi`, `dev/security/`, `dev/bin/security-full`, `dev/bin/dast-scan`, `dev/bin/release-report` | Güvenlik kapısı ve elle başlatılan taramalar | security-tooling |
 | `apps/platform_core/platform_core/mobil/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
 | `apps/hrms_tr/`, `dev/hrms/` | HRMS TR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
 | `e2e/` | Uçtan uca entegrasyon testleri | integration-e2e |
@@ -128,6 +128,7 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
    - Kendi eski `fs-*` imajlarınızı ve derleme önbelleğinizi silin. Başka projenin imajına dokunmayın.
    - Boş yer 5 GB'ın altına inerse raporlayın. Gerekirse `colima` profili kullanılır. O profilde 64 GB boş disk ama 8 GB bellek var.
    - 22 Kasım 2026 Pazar günü orkestratör ölü imaj ve birimleri sildi. Boş yer 5,7 GB oldu.
+   - Aynı gün boş yer 2,3 GB'a düştü. Orkestratör geçici birimleri ve kullanılmayan önbelleği sildi. Boş yer 4,2 GB oldu. Geçici site için rastgele adlı birim açmayın. Bir deneme bitince kendi geçici birimini silin.
    - Her `up` imajı yeniden derlemesin. İmaj varsa yeniden kullanın.
    - Press gereken ağır ortamı `colima` profilinde açın. Önce `colima ssh -- free -g` ile en az 3 GB boş bellek ölçün.
 5. **Colima'yı yeniden başlatmayın.** Kalıcı çözüm `colima restart factory` ister. Bu komut başka projelerin container'larını yeniden başlatır.
