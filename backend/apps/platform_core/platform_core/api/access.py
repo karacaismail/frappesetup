@@ -12,7 +12,7 @@ from platform_core.access import explain, field_level
 @frappe.whitelist(methods=["GET"])
 def explain_permission(doctype: str, name: str, ptype: str = "read", user: str | None = None) -> dict:
 	"""Explains the reason for the permission on a record. Changes no record."""
-	if not frappe.has_permission(doctype, "read"):
+	if not doctype or not frappe.db.exists("DocType", doctype) or not frappe.has_permission(doctype, "read"):
 		frappe.throw(_("No permission to read {0}.").format(doctype), frappe.PermissionError)
 	return explain.explain(doctype, name, ptype, user)
 
@@ -20,7 +20,7 @@ def explain_permission(doctype: str, name: str, ptype: str = "read", user: str |
 @frappe.whitelist(methods=["GET"])
 def get_access_summary(doctype: str) -> dict:
 	"""Returns the rule scopes of the session user in a document type."""
-	if not frappe.has_permission(doctype, "read"):
+	if not doctype or not frappe.db.exists("DocType", doctype) or not frappe.has_permission(doctype, "read"):
 		frappe.throw(_("No permission to read {0}.").format(doctype), frappe.PermissionError)
 	return explain.summary(doctype)
 

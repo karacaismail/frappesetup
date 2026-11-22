@@ -261,6 +261,12 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Eğitim ve önceki iş alt tabloları bu kancayla temizlenmez. Bu tablolar açık teknik borçtur.
   - İzin, devam ve bordro kayıtlarındaki çalışan adı kopyaları kalır. Bu kopyalar için `platform_core` tarafında ayrı bir kanca gerekir.
 
+- **O-42. Erişim Semgrep onayları dosya listesine bağlıdır.**
+  - Özet, beş onayın geçtiği iki dosyayı ve yetki yardımcılarını kapsar.
+  - Dosya listesi `backend/dev/security/README.md` içindedir.
+  - Kapsamdaki bir dosya değişirse kapı bu onayları yeniden ister.
+  - Onay kapsamları çakışırsa kapı hata verir.
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:

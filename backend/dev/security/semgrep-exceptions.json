@@ -1,6 +1,6 @@
 {
   "scope": "backend/apps/press_tr",
-  "sha256": "253fc8feef88811bf5676f6e5c56e9d6cc34a294709deb5d3298d951df9f8675",
+  "sha256": "1976dd6a42dacb543cf00ab25c4ccd5246337cbced681cf1de690a319bb3446b",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
@@ -115,6 +115,55 @@
       "path": "backend/apps/press_tr/press_tr/press_identity/sessions.py",
       "line": 37,
       "reason": "Matches the current account and exact logout session ID before deleting the internal mapping."
+    }
+  ],
+  "additionalReviews": [
+    {
+      "scope": "backend/apps/platform_core/platform_core",
+      "sha256": "8b5749df8e71db49ca50eadab81089fd82d97a28d1221791d2d6f0060a16bf86",
+      "findings": [
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/access/link_search.py",
+          "line": 56,
+          "reason": "Checks DocType select permission and rejects custom queries on governed types before search."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/access/link_search.py",
+          "line": 90,
+          "reason": "Checks DocType select permission and rejects custom queries on governed types before search."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/access/link_search.py",
+          "line": 137,
+          "reason": "Checks DocType select permission and rejects custom queries on governed types before link validation."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 12,
+          "reason": "Checks DocType read permission before explaining access and restricts other-user requests to managers."
+        },
+        {
+          "rule": "frappe-missing-permission",
+          "path": "backend/apps/platform_core/platform_core/api/access.py",
+          "line": 20,
+          "reason": "Checks DocType read permission before returning the session user’s access summary."
+        }
+      ],
+      "files": [
+        "backend/apps/platform_core/platform_core/access/engine.py",
+        "backend/apps/platform_core/platform_core/access/explain.py",
+        "backend/apps/platform_core/platform_core/access/hooks.py",
+        "backend/apps/platform_core/platform_core/access/link_search.py",
+        "backend/apps/platform_core/platform_core/access/reports.py",
+        "backend/apps/platform_core/platform_core/access/rules.py",
+        "backend/apps/platform_core/platform_core/access/subject.py",
+        "backend/apps/platform_core/platform_core/api/access.py",
+        "backend/apps/platform_core/platform_core/hooks.py"
+      ]
     }
   ]
 }
