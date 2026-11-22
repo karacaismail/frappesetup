@@ -43,7 +43,7 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `apps/platform_core/platform_core/erisim/`, `api/access.py` | Erişim kuralı motoru | erisim-kurali |
 | `dev/guvenlik/`, `dev/bin/guvenlik-denetimi` | Güvenlik kapısı | guvenlik-kapisi |
 | `apps/platform_core/platform_core/mobil/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
-| `apps/cronhr/`, `dev/hrms/` | CronHR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
+| `apps/hrms_tr/`, `dev/hrms/` | HRMS TR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
 | `e2e/` | Uçtan uca entegrasyon testleri | integration-e2e |
 | `dev/naming/` | Geçmiş adların düzeltilmesi | naming-history-fix |
 | `dev/ai_readiness/`, `dev/bin/ai-readiness` | Yapay zekâ uygunluk kapısı | ai-readiness-gate |
@@ -91,6 +91,8 @@ Yeni kod İngilizce adlarla yazılır (D-12). Kural yalnız bundan sonrası içi
 - Yeni yazdığınız koddaki yorumu, hata iletisini ve günlük metnini İngilizce yazın.
 - Var olan dosya, klasör ve modüllerin adını değiştirmeyin.
 - Var olan bir klasöre yeni dosya eklerseniz yalnız yeni dosyanın adını İngilizce verin.
+- Proje sahibi bir ürün adını bu depoda yasakladı (D-13). Ad bu projeyle ilgili değildir. Adı hiçbir dosyaya, commit mesajına, imaj ya da container adına yazmayın.
+- İK uygulamasının teknik adı `hrms_tr` olur. Görünen adı “HRMS TR” olur. Yapay zekâ uygunluk kapısı yasaklı adı yakalar.
 
 ### Yapay zekâ erişimi
 

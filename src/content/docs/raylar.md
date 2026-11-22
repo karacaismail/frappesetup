@@ -48,7 +48,7 @@ Aynı DocType tanımı her sitede farklı efektif meta üretebilir: kiracı öze
 
 ## Modül düzeyindeki geliştirmelerin Rail 1'e yansıması
 
-Satılan her uygulama (CronHR, CRM, Webshop) Rail 2'de geliştirilir ve Rail 1'de şu kayıtlarla ticarileşir:
+Satılan her uygulama (HRMS TR, CRM, Webshop) Rail 2'de geliştirilir ve Rail 1'de şu kayıtlarla ticarileşir:
 
 1. **Kaynak ve dağıtım:** App + App Source (GitHub App), `pyproject.toml` içinde `[tool.bench.frappe-dependencies] frappe = ">=16.0.0 <17.0.0"`, `erpnext-v16-tr-staging` (auto deploy) ve `erpnext-v16-tr-prod` (zamanlanmış, `deploy_hours` UTC) Release Group'ları (G-14, G-54).
 2. **Katalog:** Marketplace App (Published, `run_after_install_script=1`) ve Marketplace App Plan'lar — TRY fiyat + USD karşılığı; Free/Freemium için `price_usd=0` plan zorunlu, aksi halde Subscription ve `sk_<app>` yazılmaz (G-10, G-29).
