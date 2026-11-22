@@ -23,7 +23,7 @@ from frappe import _
 from frappe.model.naming import set_new_name
 
 from platform_core.kimlik import provisioning
-from platform_core.kimlik.exceptions import IdentityConflict
+from platform_core.kimlik.exceptions import IdentityConflict, IdentityNotFound
 
 REQUEST = "Personal Data Deletion Request"
 DELETED = "Deleted"
@@ -33,10 +33,16 @@ PROTECTED_USERS = ("Administrator", "Guest")
 def anonymize_user(data: dict) -> dict:
 	issuer = provisioning._issuer(data)
 	subject = provisioning._text(data, "subject", provisioning.MAX_SUBJECT)
-	user = provisioning._linked_user_or_404(issuer, subject)
+	# Locking reads: a retry that arrives while the first call is still open waits for its commit, then
+	# sees the anonymous name and the finished request (review finding, repeatable request rule).
+	user = frappe.db.get_value(
+		provisioning.LINK, {"issuer": issuer, "subject": subject}, "user", for_update=True
+	)
+	if not user:
+		frappe.throw(_("No user is linked to this identity."), IdentityNotFound)
 	if user in PROTECTED_USERS:
 		frappe.throw(_("This account cannot be anonymized."), IdentityConflict)
-	if frappe.db.get_value(REQUEST, user, "status") == DELETED:
+	if frappe.db.get_value(REQUEST, user, "status", for_update=True) == DELETED:
 		# Repeated request: the link already points to the anonymous user.
 		return _result(user)
 

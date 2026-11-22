@@ -3,7 +3,7 @@
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
-from platform_core.kimlik import provider_setup
+from platform_core.kimlik import login_policy, provider_setup
 from platform_core.kimlik.tests import helpers as h
 
 
@@ -136,6 +136,31 @@ class TestKeycloakOnly(FrappeAPITestCase):
 				data={"cmd": "login", "usr": self.admin_user, "pwd": self.admin_password},
 			)
 			self.assertEqual(via_cmd_login.status_code, 401, via_cmd_login.data[:200])
+
+	def test_every_gated_function_answers_403_for_guest_and_signed_in_user(self):
+		# Contract `x-yerel-giris-kapisi`: each of the 15 wrappers refuses with 403 `PermissionError` while the
+		# gate is on, both under Frappe's path (override) and under the wrapper's own path, with or without a session.
+		self.assertEqual(len(login_policy.GATED_FUNCTIONS), 15)
+		with h.SiteSettings({"kimlik_yalniz_keycloak": 1}):
+			signed_in = h.new_client()
+			response = h.login_with_keycloak(signed_in, h.userinfo("sub-ayse", h.AYSE))
+			self.assertEqual(response.status_code, 302, response.data[:200])
+			for original, (name, methods) in login_policy.GATED_FUNCTIONS.items():
+				verb = "post" if methods == ["POST"] else "get"
+				for path in (
+					f"/api/method/{original}",
+					f"/api/method/platform_core.kimlik.login_policy.{name}",
+				):
+					for label, client in (("guest", h.new_client()), ("signed in", signed_in)):
+						headers = h.csrf_headers(client) if label == "signed in" else {}
+						call = getattr(client, verb)
+						if verb == "post":
+							answer = h.request(call, path, data={"x": "1"}, headers=headers)
+						else:
+							answer = h.request(call, path, query_string={"x": "1"}, headers=headers)
+						self.assertEqual(answer.status_code, 403, f"{label} {path}: {answer.data[:160]}")
+						self.assertEqual(answer.json.get("exc_type"), "PermissionError", f"{label} {path}")
+			self.assertEqual(h.logged_user(signed_in), h.AYSE)
 
 	def test_gate_off_delegates_to_the_original_functions(self):
 		# With the gate off the wrappers must behave like Frappe: reset_password answers 200 for any address.

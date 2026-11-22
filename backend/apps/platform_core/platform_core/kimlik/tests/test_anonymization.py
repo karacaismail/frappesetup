@@ -152,6 +152,26 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.assertEqual(response.status_code, 403, response.data[:300])
 		self.assertEqual(h.logged_user(client), "Guest")
 
+	def test_link_and_request_are_read_with_row_locks(self):
+		# Review finding: a retry that runs while the first call is still open must wait for it. Locking reads
+		# (SELECT ... FOR UPDATE) serialize the two calls and see the committed anonymous name.
+		from unittest.mock import patch
+
+		from platform_core.kimlik import anonymization
+
+		real = frappe.db.get_value
+		calls = []
+
+		def spy(doctype, *args, **kwargs):
+			calls.append((doctype, kwargs.get("for_update")))
+			return real(doctype, *args, **kwargs)
+
+		with patch.object(frappe.db, "get_value", side_effect=spy):
+			anonymization.anonymize_user({"issuer": h.ISSUER, "subject": SUBJECT})
+		frappe.db.rollback()
+		self.assertIn(("Platform Identity Link", True), calls)
+		self.assertIn(("Personal Data Deletion Request", True), calls)
+
 	def test_unknown_identity_gets_404(self):
 		response = self.call(self.body(subject="sub-yok"))
 		self.assertEqual(response.status_code, 404, response.data[:300])

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: platform_core kimlik uçları
-  version: 0.4.0
+  version: 0.5.0
   summary: Keycloak ile giriş, dönüş, çıkış ve kullanıcı eşitleme uçları.
   description: |
     Bu sözleşme `platform_core.kimlik` modülünün uçlarını tarif eder.
@@ -79,6 +79,8 @@ servers:
         description: Kiracı sitesinin kök adresi. Sonunda eğik çizgi olmaz.
 
 tags:
+  - name: yerel-giris-kapisi
+    description: Kapalı yerel giriş işlevleri. Kapı açıkken hepsi 403 döner.
   - name: giris
     description: Tarayıcının giriş, dönüş ve çıkış uçları.
   - name: kurulum
@@ -1009,6 +1011,594 @@ paths:
         "503":
           $ref: "#/components/responses/AnahtarListesiYok"
 
+  /platform_core.kimlik.login_policy.reset_password:
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedResetPassword
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.core.doctype.user.user.reset_password` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.core.doctype.user.user.reset_password` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Parola sıfırlama e-postası ister.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.core.doctype.user.user.reset_password` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.core.doctype.user.user.reset_password
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.update_password:
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedUpdatePassword
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.core.doctype.user.user.update_password` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.core.doctype.user.user.update_password` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Yeni parolayı yazar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.core.doctype.user.user.update_password` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.core.doctype.user.user.update_password
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.sign_up:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedSignUpGet
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.core.doctype.user.user.sign_up` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.core.doctype.user.user.sign_up` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Yeni hesap açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.core.doctype.user.user.sign_up` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.core.doctype.user.user.sign_up
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedSignUpPost
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.core.doctype.user.user.sign_up` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.core.doctype.user.user.sign_up` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Yeni hesap açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.core.doctype.user.user.sign_up` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.core.doctype.user.user.sign_up
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.send_login_link:
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedSendLoginLink
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.www.login.send_login_link` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.www.login.send_login_link` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: E-postayla giriş bağlantısı yollar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.www.login.send_login_link` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.www.login.send_login_link
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.login_via_key:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaKey
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.www.login.login_via_key` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.www.login.login_via_key` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: E-postadaki anahtarla oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.www.login.login_via_key` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.www.login.login_via_key
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.login_via_token:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaTokenGet
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.www.login.login_via_token` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.www.login.login_via_token` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Giriş belirteciyle oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.www.login.login_via_token` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.www.login.login_via_token
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaTokenPost
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.www.login.login_via_token` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.www.login.login_via_token` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Giriş belirteciyle oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.www.login.login_via_token` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.www.login.login_via_token
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.login_via_google:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaGoogleGet
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_google` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_google` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Google ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_google` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_google
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaGooglePost
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_google` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_google` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Google ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_google` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_google
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.login_via_github:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaGithubGet
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_github` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_github` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: GitHub ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_github` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_github
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaGithubPost
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_github` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_github` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: GitHub ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_github` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_github
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.login_via_facebook:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaFacebookGet
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_facebook` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_facebook` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Facebook ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_facebook` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_facebook
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaFacebookPost
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_facebook` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_facebook` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Facebook ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_facebook` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_facebook
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.login_via_frappe:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaFrappeGet
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_frappe` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_frappe` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Frappe hesabıyla oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_frappe` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_frappe
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaFrappePost
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_frappe` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_frappe` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Frappe hesabıyla oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_frappe` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_frappe
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.login_via_office365:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaOffice365Get
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_office365` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_office365` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Office 365 ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_office365` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_office365
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaOffice365Post
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_office365` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_office365` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Office 365 ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_office365` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_office365
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.login_via_salesforce:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaSalesforceGet
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_salesforce` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_salesforce` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Salesforce ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_salesforce` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_salesforce
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaSalesforcePost
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_salesforce` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_salesforce` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Salesforce ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_salesforce` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_salesforce
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.login_via_fairlogin:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaFairloginGet
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_fairlogin` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_fairlogin` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: FairLogin ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_fairlogin` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_fairlogin
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaFairloginPost
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_fairlogin` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_fairlogin` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: FairLogin ile oturum açar.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_fairlogin` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_fairlogin
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.login_via_keycloak:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaKeycloakGet
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_keycloak` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_keycloak` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Frappe'nin hazır Keycloak dönüş ucudur.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_keycloak
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLoginViaKeycloakPost
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_keycloak` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_keycloak` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Frappe'nin hazır Keycloak dönüş ucudur.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.login_via_keycloak
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+  /platform_core.kimlik.login_policy.custom:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedCustomGet
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.custom` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.custom` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Özel sağlayıcı dönüş ucudur.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.custom` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.custom
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedCustomPost
+      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.custom` ucudur.
+      description: |
+        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.custom` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Özel sağlayıcı dönüş ucudur.
+        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
+        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.custom` çağrısı da aynı yanıtı alır.
+        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+
+        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
+        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
+        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
+        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      x-yikici: false
+      x-frappe-original: frappe.integrations.oauth2_logins.custom
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        default:
+          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+
 components:
   securitySchemes:
     frappeSession:
@@ -1047,6 +1637,18 @@ components:
         Keycloak anahtar listesi alınamazsa uç 503 ve `KeycloakKeysUnavailable` döner.
 
   responses:
+    YerelGirisKapali:
+      description: |
+        Yerel giriş kapalı. `kimlik_yalniz_keycloak` ayarı 1. `exc_type` değeri `PermissionError` olur.
+        Kullanıcı giriş sayfasındaki marka düğmesiyle oturum açar.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/FrappeError"}
+          examples:
+            kapali:
+              value:
+                exc_type: PermissionError
+                exception: "frappe.exceptions.PermissionError: Local sign-in is disabled. Sign in with the identity provider."
     IstekSiniri:
       description: |
         İstek sınırı aşıldı. Sınır IP adresine göre sayılır.

@@ -44,22 +44,16 @@ def _is_portal_path(path: str) -> bool:
 	return any(path == root or path.startswith(root + "/") for root in PORTAL_PATHS)
 
 
-def _gated(original: str, name: str, methods: list[str] | None = None):
-	"""Whitelisted wrapper: 403 while the gate is on, otherwise the original Frappe function."""
-
-	@frappe.whitelist(allow_guest=True, methods=methods)
-	def wrapper(*args, **kwargs):
-		if site_settings.keycloak_only():
-			frappe.throw(_(GATE_MESSAGE), frappe.PermissionError)
-		return frappe.call(frappe.get_attr(original), *args, **kwargs)
-
-	wrapper.__name__ = wrapper.__qualname__ = name
-	wrapper.__doc__ = f"Gated wrapper of `{original}` (AU-19)."
-	return wrapper
+def _call_gated(original: str, args: tuple, kwargs: dict):
+	"""403 while the gate is on, otherwise the original Frappe function with the same arguments."""
+	if site_settings.keycloak_only():
+		frappe.throw(_(GATE_MESSAGE), frappe.PermissionError)
+	return frappe.call(frappe.get_attr(original), *args, **kwargs)
 
 
 # HTTP methods mirror the originals (frappe/core/doctype/user/user.py, frappe/www/login.py,
 # frappe/integrations/oauth2_logins.py) so that Frappe's method check behaves the same.
+# The wrappers are written out one by one, so the AI readiness gate and the contract can see each endpoint.
 GATED_FUNCTIONS = {
 	"frappe.core.doctype.user.user.reset_password": ("reset_password", ["POST"]),
 	"frappe.core.doctype.user.user.update_password": ("update_password", ["POST"]),
@@ -78,23 +72,95 @@ GATED_FUNCTIONS = {
 	"frappe.integrations.oauth2_logins.custom": ("custom", None),
 }
 
-reset_password = _gated("frappe.core.doctype.user.user.reset_password", "reset_password", ["POST"])
-update_password = _gated("frappe.core.doctype.user.user.update_password", "update_password", ["POST"])
-sign_up = _gated("frappe.core.doctype.user.user.sign_up", "sign_up")
-send_login_link = _gated("frappe.www.login.send_login_link", "send_login_link", ["POST"])
-login_via_key = _gated("frappe.www.login.login_via_key", "login_via_key", ["GET"])
-login_via_token = _gated("frappe.www.login.login_via_token", "login_via_token")
-login_via_google = _gated("frappe.integrations.oauth2_logins.login_via_google", "login_via_google")
-login_via_github = _gated("frappe.integrations.oauth2_logins.login_via_github", "login_via_github")
-login_via_facebook = _gated("frappe.integrations.oauth2_logins.login_via_facebook", "login_via_facebook")
-login_via_frappe = _gated("frappe.integrations.oauth2_logins.login_via_frappe", "login_via_frappe")
-login_via_office365 = _gated("frappe.integrations.oauth2_logins.login_via_office365", "login_via_office365")
-login_via_salesforce = _gated(
-	"frappe.integrations.oauth2_logins.login_via_salesforce", "login_via_salesforce"
-)
-login_via_fairlogin = _gated("frappe.integrations.oauth2_logins.login_via_fairlogin", "login_via_fairlogin")
-login_via_keycloak = _gated("frappe.integrations.oauth2_logins.login_via_keycloak", "login_via_keycloak")
-custom = _gated("frappe.integrations.oauth2_logins.custom", "custom")
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def reset_password(*args, **kwargs):
+	"""Gated wrapper of `frappe.core.doctype.user.user.reset_password` (AU-19)."""
+	return _call_gated("frappe.core.doctype.user.user.reset_password", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def update_password(*args, **kwargs):
+	"""Gated wrapper of `frappe.core.doctype.user.user.update_password` (AU-19)."""
+	return _call_gated("frappe.core.doctype.user.user.update_password", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def sign_up(*args, **kwargs):
+	"""Gated wrapper of `frappe.core.doctype.user.user.sign_up` (AU-19)."""
+	return _call_gated("frappe.core.doctype.user.user.sign_up", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True, methods=["POST"])
+def send_login_link(*args, **kwargs):
+	"""Gated wrapper of `frappe.www.login.send_login_link` (AU-19)."""
+	return _call_gated("frappe.www.login.send_login_link", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+def login_via_key(*args, **kwargs):
+	"""Gated wrapper of `frappe.www.login.login_via_key` (AU-19)."""
+	return _call_gated("frappe.www.login.login_via_key", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def login_via_token(*args, **kwargs):
+	"""Gated wrapper of `frappe.www.login.login_via_token` (AU-19)."""
+	return _call_gated("frappe.www.login.login_via_token", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def login_via_google(*args, **kwargs):
+	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_google` (AU-19)."""
+	return _call_gated("frappe.integrations.oauth2_logins.login_via_google", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def login_via_github(*args, **kwargs):
+	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_github` (AU-19)."""
+	return _call_gated("frappe.integrations.oauth2_logins.login_via_github", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def login_via_facebook(*args, **kwargs):
+	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_facebook` (AU-19)."""
+	return _call_gated("frappe.integrations.oauth2_logins.login_via_facebook", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def login_via_frappe(*args, **kwargs):
+	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_frappe` (AU-19)."""
+	return _call_gated("frappe.integrations.oauth2_logins.login_via_frappe", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def login_via_office365(*args, **kwargs):
+	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_office365` (AU-19)."""
+	return _call_gated("frappe.integrations.oauth2_logins.login_via_office365", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def login_via_salesforce(*args, **kwargs):
+	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_salesforce` (AU-19)."""
+	return _call_gated("frappe.integrations.oauth2_logins.login_via_salesforce", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def login_via_fairlogin(*args, **kwargs):
+	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_fairlogin` (AU-19)."""
+	return _call_gated("frappe.integrations.oauth2_logins.login_via_fairlogin", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def login_via_keycloak(*args, **kwargs):
+	"""Gated wrapper of `frappe.integrations.oauth2_logins.login_via_keycloak` (AU-19)."""
+	return _call_gated("frappe.integrations.oauth2_logins.login_via_keycloak", args, kwargs)
+
+
+@frappe.whitelist(allow_guest=True)
+def custom(*args, **kwargs):
+	"""Gated wrapper of `frappe.integrations.oauth2_logins.custom` (AU-19)."""
+	return _call_gated("frappe.integrations.oauth2_logins.custom", args, kwargs)
 
 
 def override_map() -> dict[str, str]:
