@@ -37,8 +37,16 @@ class PressOpenAPIContractTest(unittest.TestCase):
         operation = self.spec["paths"]["/api/method/press_tr.api.identity.list_identities"]["post"]
         self.assertEqual(operation["security"], [{"identitySync": []}])
         self.assertIn("403", operation["responses"])
-        response = operation["responses"]["200"]["content"]["application/json"]["schema"]
-        self.assertIn("next_cursor", response["required"])
-        row = response["properties"]["message"]["items"]
+        request = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]
+        self.assertCountEqual(request, ["start", "page_length"])
+        self.assertEqual(request["start"]["default"], 0)
+        self.assertEqual(request["start"]["maximum"], (1 << 64) - 1)
+        self.assertEqual(request["page_length"]["default"], 500)
+        self.assertEqual(request["page_length"]["maximum"], 500)
+        response = operation["responses"]["200"]["content"]["application/json"]["schema"]["properties"]
+        page = response["message"]
+        self.assertCountEqual(page["required"], ["identities", "has_next_page"])
+        self.assertFalse(page["additionalProperties"])
+        row = page["properties"]["identities"]["items"]
         self.assertCountEqual(row["required"], ["issuer", "subject", "enabled"])
         self.assertFalse(row["additionalProperties"])

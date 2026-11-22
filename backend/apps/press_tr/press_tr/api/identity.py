@@ -15,7 +15,9 @@ from press_tr.kimlik.oidc import claim, reject
 from press_tr.kimlik.oidc import issuer as configured_issuer
 from press_tr.kimlik.service import require_service
 
-IDENTITY_PAGE_SIZE = 100
+IDENTITY_PAGE_SIZE = 500
+# Frappe's JSON decoder and MariaDB offsets support unsigned 64-bit integers.
+MAX_IDENTITY_START = (1 << 64) - 1
 
 
 def reset_read_snapshot() -> None:
@@ -196,23 +198,23 @@ class InvalidIdentityPage(frappe.ValidationError):
 
 
 @frappe.whitelist(methods=["POST"])
-def list_identities(cursor: Any = None, limit: Any = IDENTITY_PAGE_SIZE) -> list[dict[str, str | bool]]:
+def list_identities(start: Any = 0, page_length: Any = IDENTITY_PAGE_SIZE) -> dict:
 	issuer = configured_issuer()
 	require_service(issuer)
 	if (
-		type(limit) is not int
-		or not 1 <= limit <= IDENTITY_PAGE_SIZE
-		or (cursor is not None and (not isinstance(cursor, str) or not 1 <= len(cursor) <= 255))
+		type(start) is not int
+		or not 0 <= start <= MAX_IDENTITY_START
+		or type(page_length) is not int
+		or not 1 <= page_length <= IDENTITY_PAGE_SIZE
 	):
 		frappe.throw(
-			_("Send a valid identity page cursor and limit.", context="press_tr"), InvalidIdentityPage
+			_("Send a valid identity page start and length.", context="press_tr"), InvalidIdentityPage
 		)
-
 	links = frappe.qb.DocType(IDENTITY_LINK)
 	users = frappe.qb.DocType("User")
 	# This verified service operation inventories one issuer and excludes anonymous tombstones.
 	# Keep the indexed lookup, then compare the issuer exactly despite MariaDB's collation.
-	query = (
+	rows = (
 		frappe.qb.from_(links)
 		.left_join(users)
 		.on(users.name == links.user)
@@ -220,13 +222,14 @@ def list_identities(cursor: Any = None, limit: Any = IDENTITY_PAGE_SIZE) -> list
 		.where(links.issuer == issuer)
 		.where(Cast(links.issuer, "BINARY") == issuer)
 		.orderby(links.subject)
-		.limit(limit + 1)
+		.limit(page_length + 1)
+		.offset(start)
+		.run(as_dict=True)
 	)
-	if cursor is not None:
-		query = query.where(links.subject > cursor)
-	rows = query.run(as_dict=True)
-	frappe.response["next_cursor"] = rows[limit - 1]["subject"] if len(rows) > limit else None
-	return [
-		{"issuer": row["issuer"], "subject": row["subject"], "enabled": bool(row["enabled"])}
-		for row in rows[:limit]
-	]
+	return {
+		"identities": [
+			{"issuer": row["issuer"], "subject": row["subject"], "enabled": bool(row["enabled"])}
+			for row in rows[:page_length]
+		],
+		"has_next_page": len(rows) > page_length,
+	}

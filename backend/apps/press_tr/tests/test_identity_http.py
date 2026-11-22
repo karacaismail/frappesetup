@@ -296,27 +296,70 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			frappe.destroy()
 
 		token = self.token()
-		status, first = self.call("list_identities", {"cursor": f"{prefix}-0", "limit": 1}, token)
+		status, inventory = self.call("list_identities", {}, token)
+		self.assertEqual(status, 200, inventory)
+		subjects = [row["subject"] for row in inventory["message"]["identities"]]
+		self.assertEqual(subjects, sorted(subjects))
+		self.assertNotIn(tombstone_subject, subjects)
+		self.assertNotIn(other_issuer_subject, subjects)
+		self.assertTrue(
+			all(set(row) == {"issuer", "subject", "enabled"} for row in inventory["message"]["identities"])
+		)
+		start = subjects.index(open_subject)
+		status, first = self.call("list_identities", {"start": start, "page_length": 1}, token)
 		self.assertEqual(status, 200, first)
 		self.assertEqual(
 			first,
 			{
-				"message": [{"issuer": ISSUER, "subject": open_subject, "enabled": True}],
-				"next_cursor": open_subject,
+				"message": {
+					"identities": [{"issuer": ISSUER, "subject": open_subject, "enabled": True}],
+					"has_next_page": True,
+				},
 			},
 		)
-		status, second = self.call("list_identities", {"cursor": first["next_cursor"], "limit": 100}, token)
+		status, second = self.call("list_identities", {"start": start + 1, "page_length": 500}, token)
 		self.assertEqual(status, 200, second)
 		self.assertEqual(
-			second["message"][0], {"issuer": ISSUER, "subject": closed_subject, "enabled": False}
+			second["message"]["identities"][0],
+			{"issuer": ISSUER, "subject": closed_subject, "enabled": False},
 		)
-		self.assertNotIn(tombstone_subject, {row["subject"] for row in second["message"]})
-		self.assertNotIn(other_issuer_subject, {row["subject"] for row in second["message"]})
-		self.assertTrue(all(set(row) == {"issuer", "subject", "enabled"} for row in second["message"]))
-		self.assertIsNone(second["next_cursor"])
-		status, final = self.call("list_identities", {"cursor": second["message"][-1]["subject"]}, token)
+		self.assertFalse(second["message"]["has_next_page"])
+		status, final = self.call("list_identities", {"start": len(subjects)}, token)
 		self.assertEqual(status, 200, final)
-		self.assertEqual(final, {"message": [], "next_cursor": None})
+		self.assertEqual(final, {"message": {"identities": [], "has_next_page": False}})
+		status, distant = self.call("list_identities", {"start": (1 << 64) - 1}, token)
+		self.assertEqual(status, 200, distant)
+		self.assertEqual(distant, final)
+
+	def test_list_identities_default_page_is_bounded_at_500(self):
+		prefix = f"inventory-cap-{uuid4().hex}"
+		fixtures = [f"{prefix}-{index:03d}" for index in range(501)]
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			frappe.db.bulk_insert(
+				"Press Identity Link",
+				fields=["name", "issuer", "subject", "user"],
+				values=[(name, ISSUER, name, f"{name}@example.test") for name in fixtures],
+			)
+			frappe.db.commit()
+			token = self.token()
+			status, first = self.call("list_identities", {}, token)
+			self.assertEqual(status, 200, first)
+			self.assertEqual(len(first["message"]["identities"]), 500)
+			self.assertTrue(first["message"]["has_next_page"])
+			status, second = self.call("list_identities", {"start": 500}, token)
+			self.assertEqual(status, 200, second)
+			self.assertFalse(second["message"]["has_next_page"])
+			rows = first["message"]["identities"] + second["message"]["identities"]
+			self.assertEqual(
+				[row for row in rows if row["subject"].startswith(prefix)],
+				[{"issuer": ISSUER, "subject": fixture, "enabled": False} for fixture in fixtures],
+			)
+		finally:
+			frappe.db.delete("Press Identity Link", {"name": ["in", fixtures]})
+			frappe.db.commit()
+			frappe.destroy()
 
 	def test_list_identities_rejects_untrusted_callers_and_parameters(self):
 		subject = uuid4().hex
@@ -338,7 +381,16 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 				self.assertEqual(status, 403)
 				self.assertNotIn("message", payload if isinstance(payload, dict) else {})
 		self.assertEqual(self.call("list_identities", {"issuer": ISSUER}, self.token())[0], 403)
-		for body in ({"limit": True}, {"limit": 0}, {"limit": 101}, {"cursor": ""}, {"cursor": "a" * 256}):
+		self.assertEqual(self.call("list_identities", {"cursor": "legacy"}, self.token())[0], 403)
+		for body in (
+			{"start": True},
+			{"start": -1},
+			{"start": "2"},
+			{"start": 1 << 64},
+			{"page_length": True},
+			{"page_length": 0},
+			{"page_length": 501},
+		):
 			with self.subTest(body=body):
 				self.assertEqual(self.call("list_identities", body, self.token())[0], 400)
 

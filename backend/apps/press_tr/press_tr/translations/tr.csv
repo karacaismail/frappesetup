@@ -101,10 +101,10 @@ A human Press browser session with a Frappe CSRF token.,Frappe istek koruma beli
 Configure a stable site key for Press anonymization.,Press hesap silme işlemi için kalıcı bir site anahtarı ayarlayın.,press_tr
 Message cleared after account anonymization.,Hesap anonim yapıldı. İleti metni silindi.,press_tr
 This Press request is not allowed.,Press bu isteğe izin vermiyor.,press_tr
-Send a valid identity page cursor and limit.,Geçerli sayfa işareti ve kayıt sınırı gönderin.,press_tr
+Send a valid identity page start and length.,Geçerli ilk sıra ve kayıt sayısı gönderin.,press_tr
 List Press identities for reconciliation.,Karşılaştırma için Press kimliklerini listeleyin.,press_tr.openapi
 Lists identities for the configured issuer in subject order. Anonymous deletion records are omitted.,"Liste, ayarlı kaynağın kimliklerini kullanıcı kimliğine göre sıralar. Anonim silme kayıtları listeden çıkarılır.",press_tr.openapi
-Omit on the first page. On later pages send the previous next_cursor.,İlk sayfada işaret göndermeyin. Sonraki sayfa için önceki next_cursor değerini gönderin.,press_tr.openapi
-An identity page and a cursor for the next page when one exists.,Yanıt bir kimlik sayfası verir. Bir sonraki sayfa varsa yanıt işaret de verir.,press_tr.openapi
-The page cursor or limit is invalid.,Sayfa işareti veya kayıt sınırı geçersiz.,press_tr.openapi
+Number of matching records to skip.,Listede atlanacak kayıt sayısı.,press_tr.openapi
+An identity page and a flag that indicates whether another page exists.,Yanıt kimlikleri verir. Sonraki sayfanın var olup olmadığını da gösterir.,press_tr.openapi
+The page start or length is invalid.,İlk sıra veya kayıt sayısı geçersiz.,press_tr.openapi
 The service token or request parameters were rejected.,Press servis belirtecini veya istek alanlarını reddetti.,press_tr.openapi

@@ -219,43 +219,49 @@ paths:
               type: object
               additionalProperties: false
               properties:
-                cursor:
-                  type: [string, "null"]
-                  minLength: 1
-                  maxLength: 255
-                  description: Omit on the first page. On later pages send the previous next_cursor.
-                limit:
+                start:
+                  type: integer
+                  minimum: 0
+                  maximum: 18446744073709551615
+                  default: 0
+                  description: Number of matching records to skip.
+                page_length:
                   type: integer
                   minimum: 1
-                  maximum: 100
-                  default: 100
+                  maximum: 500
+                  default: 500
       responses:
         "200":
-          description: An identity page and a cursor for the next page when one exists.
+          description: An identity page and a flag that indicates whether another page exists.
           content:
             application/json:
               schema:
                 type: object
-                required: [message, next_cursor]
+                required: [message]
                 properties:
                   message:
-                    type: array
-                    maxItems: 100
-                    items:
-                      type: object
-                      additionalProperties: false
-                      required: [issuer, subject, enabled]
-                      properties:
-                        issuer:
-                          type: string
-                        subject:
-                          type: string
-                        enabled:
-                          type: boolean
-                  next_cursor:
-                    type: [string, "null"]
+                    type: object
+                    additionalProperties: false
+                    required: [identities, has_next_page]
+                    properties:
+                      identities:
+                        type: array
+                        maxItems: 500
+                        items:
+                          type: object
+                          additionalProperties: false
+                          required: [issuer, subject, enabled]
+                          properties:
+                            issuer:
+                              type: string
+                            subject:
+                              type: string
+                            enabled:
+                              type: boolean
+                      has_next_page:
+                        type: boolean
         "400":
-          description: The page cursor or limit is invalid.
+          description: The page start or length is invalid.
         "403":
           description: The service token or request parameters were rejected.
         "503":
