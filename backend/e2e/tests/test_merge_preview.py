@@ -213,6 +213,26 @@ class MergePreviewTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("Geçici worktree ve dal kaldırıldı.", report)
 
+    def test_removes_branch_when_worktree_removal_completes_with_an_error_status(self):
+        fake_bin = self.root / "bin"
+        fake_bin.mkdir()
+        wrapper = fake_bin / "git"
+        wrapper.write_text(
+            '#!/bin/bash\n'
+            'if [[ "$3" == worktree && "$4" == remove ]]; then\n'
+            '  "$PREVIEW_TEST_GIT" "$@" || exit $?\n'
+            '  exit 42\n'
+            'fi\n'
+            'exec "$PREVIEW_TEST_GIT" "$@"\n'
+        )
+        wrapper.chmod(0o755)
+        self.env.update(PREVIEW_TEST_GIT=shutil.which("git"), PATH=str(fake_bin) + os.pathsep + self.env["PATH"])
+
+        result, report = self.preview()
+
+        self.assertEqual(result.returncode, 0, report)
+        self.assertIn("Geçici worktree ve dal kaldırıldı.", report)
+
     def test_live_build_failure_cleans_its_builder_and_keeps_foreign_sidecars(self):
         runtime = SUITE / "preview" / "runtime.sh"
         preview = self.root / "runtime"

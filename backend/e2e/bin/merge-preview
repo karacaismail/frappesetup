@@ -189,14 +189,26 @@ def main():
             print(f"Preview stopped: {error}", file=sys.stderr)
         finally:
             if created:
+                entry = f"worktree {worktree}"
                 listed = git(repo, "worktree", "list", "--porcelain", "-z", check=False)
-                cleanup_ok = listed.returncode == 0
-                if cleanup_ok and f"worktree {worktree}" in listed.stdout.split("\0"):
-                    cleanup_ok = git(repo, "worktree", "remove", "--force", str(worktree), check=False).returncode == 0
-                elif cleanup_ok and worktree.exists():
-                    shutil.rmtree(worktree)
-                if cleanup_ok and git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}", check=False).returncode == 0:
-                    cleanup_ok = git(repo, "branch", "-D", branch, check=False).returncode == 0
+                if listed.returncode == 0:
+                    if entry in listed.stdout.split("\0"):
+                        git(repo, "worktree", "remove", "--force", str(worktree), check=False)
+                        listed = git(repo, "worktree", "list", "--porcelain", "-z", check=False)
+                    elif worktree.exists():
+                        shutil.rmtree(worktree)
+
+                branch_ref = f"refs/heads/{branch}"
+                ref = git(repo, "show-ref", "--verify", "--quiet", branch_ref, check=False)
+                if ref.returncode == 0:
+                    git(repo, "branch", "-D", branch, check=False)
+                    ref = git(repo, "show-ref", "--verify", "--quiet", branch_ref, check=False)
+                cleanup_ok = (
+                    listed.returncode == 0
+                    and entry not in listed.stdout.split("\0")
+                    and not worktree.exists()
+                    and ref.returncode == 1
+                )
                 if not cleanup_ok:
                     report.write("\nGeçici Git alanı temizlenemedi.\n")
                     result = 1
