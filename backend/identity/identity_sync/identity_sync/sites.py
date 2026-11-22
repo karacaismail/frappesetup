@@ -9,10 +9,10 @@ BORC(mvp): Uçlar sözleşmeye girince adları buradan doğrulanır. Sorumlu: id
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict
 
-from identity_sync.httpjson import TransportError, request_json
+from identity_sync.httpjson import TransportError, UnknownOutcome, request_json
 from identity_sync.mapping import (
     PressEnsureTeam,
     PressRemoveTeamMember,
@@ -39,6 +39,7 @@ def _call_method(
     *,
     timeout: float,
     body: Mapping[str, object] | None = None,
+    is_success: Callable[[int, object], bool] | None = None,
 ) -> object:
     """Frappe ucunu çağırır ve yanıttaki `message` değerini döner."""
     response = tokens.with_token(
@@ -51,7 +52,27 @@ def _call_method(
             json_body=body,
         ),
     )
-    return response.body.get("message") if isinstance(response.body, Mapping) else None
+    message = response.body.get("message") if isinstance(response.body, Mapping) else None
+    if body is not None and not (is_success or _is_done)(response.status, message):
+        # Yazma işinin kesin başarı yanıtı gelmedi. Kuyruğa alınma başarı sayılmaz.
+        raise UnknownOutcome
+    return message
+
+
+def _is_team(status: int, message: object) -> bool:
+    """`ensure_team` ucunun kesin başarı yanıtı: 200, dolu `team` adı ve `created` bayrağı."""
+    return (
+        status == 200
+        and isinstance(message, Mapping)
+        and isinstance(message.get("team"), str)
+        and bool(message.get("team"))
+        and isinstance(message.get("created"), bool)
+    )
+
+
+def _is_done(status: int, message: object) -> bool:
+    """Yazma ucunun kesin başarı yanıtı: 200 ve `{"message": {"status": "done"}}`."""
+    return status == 200 and isinstance(message, Mapping) and message.get("status") == "done"
 
 
 def _identities(message: object) -> list[Identity]:
@@ -78,11 +99,21 @@ class PressClient:
         self._tokens = tokens
         self._timeout = timeout
 
-    def _call(self, method_path: str, body: Mapping[str, object] | None = None) -> object:
-        return _call_method(self._base_url, method_path, self._tokens, PRESS_SCOPE, timeout=self._timeout, body=body)
+    def _call(
+        self,
+        method_path: str,
+        body: Mapping[str, object] | None = None,
+        is_success: Callable[[int, object], bool] | None = None,
+    ) -> object:
+        return _call_method(
+            self._base_url, method_path, self._tokens, PRESS_SCOPE, timeout=self._timeout, body=body, is_success=is_success
+        )
 
     def ensure_team(self, action: PressEnsureTeam) -> None:
-        self._call("press_tr.api.identity.ensure_team", asdict(action))
+        body = asdict(action)
+        if not action.organization_name:
+            del body["organization_name"]  # isteğe bağlı alan
+        self._call("press_tr.api.identity.ensure_team", body, _is_team)
 
     def remove_team_member(self, action: PressRemoveTeamMember) -> None:
         self._call("press_tr.api.identity.remove_team_member", asdict(action))

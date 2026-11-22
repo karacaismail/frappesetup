@@ -3,6 +3,10 @@
 Sıra şudur: kullanıcının güncel durumunu oku, eylemleri planla, eylemleri çalıştır.
 Başarısız olay bekleme kuyruğuna girer. Kuyruk yalnız elle yeniden işlenir.
 Bu modülde zamanlanmış iş ve yoklama döngüsü yoktur (Proje kaydı D-6).
+
+Bir olayın bütün işi kayıt dosyasının kilidi altında yürür. Böylece sunucu ve
+`replay-dead-letters` komutu aynı olayı birlikte çalıştıramaz. Aynı kullanıcının
+iki olayı da sıraya girer. Geç kalan süreç kullanıcının durumunu yeniden okur.
 """
 
 from __future__ import annotations
@@ -13,7 +17,7 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 from identity_sync.events import MEMBERSHIP_TYPES, Event, is_handled
-from identity_sync.httpjson import HttpError, TransportError
+from identity_sync.httpjson import HttpError, TransportError, UnknownOutcome
 from identity_sync.keycloak_admin import KeycloakAdmin
 from identity_sync.mapping import (
     Action,
@@ -25,6 +29,7 @@ from identity_sync.mapping import (
     TenantChangeEmail,
     TenantProvision,
     TenantSetEnabled,
+    digest_of,
     plan_actions,
 )
 from identity_sync.sites import PressClient, TenantClient
@@ -39,7 +44,7 @@ _BACKOFF_SECONDS = 0.2
 
 @dataclass(frozen=True)
 class EventResult:
-    """`status` değerleri: processed, duplicate, ignored, dead_lettered, preview, failed."""
+    """`status` değerleri: processed, duplicate, ignored, dead_lettered, unknown, preview, failed."""
 
     status: str
     actions: tuple[str, ...] = ()
@@ -52,8 +57,23 @@ class EventResult:
         return body
 
 
+ReplayResults = list[tuple[str, EventResult]]
+
+
+def replay_report(results: ReplayResults) -> list[dict[str, object]]:
+    return [{"event_id": event_id, **result.to_dict()} for event_id, result in results]
+
+
+class PreviewChanged(Exception):
+    """Plan önizlemeden sonra değişti. Onay eski plana aittir, yürütme yapılmaz."""
+
+
 class _Failed(Exception):
     """Bir adım kalıcı olarak başarısız oldu. Metin kişisel veri taşımaz."""
+
+    def __init__(self, message: str, *, unknown: bool = False) -> None:
+        super().__init__(message)
+        self.unknown = unknown
 
 
 class Processor:
@@ -89,21 +109,49 @@ class Processor:
                 return EventResult("preview", previews=tuple(a.preview() for a in self._plan(event)))
             except _Failed:
                 return EventResult("failed")
-        if self._store.is_processed(event.id):
-            # Olay kuyrukta kalmışsa kalıntıdır. Kalıntı yeniden işlemeyi sonsuza dek başarısız gösterir.
-            self._store.remove_dead_letter(event.id)
-            return EventResult("duplicate")
-        try:
-            names = self._run(event)
-        except _Failed as failure:
-            self._store.add_dead_letter(event, str(failure))
-            return EventResult("dead_lettered")
-        self._store.mark_processed(event.id, "processed")
-        return EventResult("processed", actions=tuple(names))
+        # Denetim, dış yazmalar ve kayıt tek kilit altındadır.
+        with self._store.exclusive():
+            if self._store.is_processed(event.id):
+                # Olay kuyrukta kalmışsa kalıntıdır. Kalıntı yeniden işlemeyi sonsuza dek başarısız gösterir.
+                self._store.remove_dead_letter(event.id)
+                return EventResult("duplicate")
+            try:
+                names = self._run(event)
+            except _Failed as failure:
+                # Sonucu bilinmeyen olay işlenmiş sayılmaz (`docs/sozlesmeler.md`, 10. bölüm).
+                state = "unknown" if failure.unknown else "failed"
+                self._store.add_dead_letter(event, str(failure), state=state)
+                return EventResult("unknown" if failure.unknown else "dead_lettered")
+            self._store.mark_processed(event.id, "processed")
+            return EventResult("processed", actions=tuple(names))
 
-    def replay_dead_letters(self, *, dry_run: bool = False) -> list[tuple[str, EventResult]]:
-        """Bekleme kuyruğundaki olayları bir kez yeniden işler. Bu iş elle başlatılır."""
-        return [(letter.event.id, self.handle(letter.event, dry_run=dry_run)) for letter in self._store.dead_letters()]
+    def replay_dead_letters(
+        self, *, dry_run: bool = False, include_unknown: bool = False, expected_digest: str | None = None
+    ) -> ReplayResults:
+        """Bekleme kuyruğundaki olayları bir kez yeniden işler. Bu iş elle başlatılır.
+
+        Sonucu bilinmeyen olaylar atlanır. Çünkü aynı hedefe kör tekrar yapılmaz.
+        `include_unknown` doğruysa bu olaylar da işlenir. Bu, insanın açık kararıdır.
+        `expected_digest` verilirse plan önce yeniden hesaplanır. Özet tutmazsa
+        `PreviewChanged` yükselir ve hiçbir olay işlenmez.
+        """
+        if dry_run:
+            return self._replay(True, include_unknown)
+        with self._store.exclusive():
+            if expected_digest is not None:
+                current = digest_of(replay_report(self._replay(True, include_unknown)))
+                if current != expected_digest:
+                    raise PreviewChanged
+            return self._replay(False, include_unknown)
+
+    def _replay(self, dry_run: bool, include_unknown: bool) -> ReplayResults:
+        results: ReplayResults = []
+        for letter in self._store.dead_letters():
+            if letter.state == "unknown" and not include_unknown:
+                results.append((letter.event.id, EventResult("unknown")))
+            else:
+                results.append((letter.event.id, self.handle(letter.event, dry_run=dry_run)))
+        return results
 
     def _plan(self, event: Event) -> tuple[Action, ...]:
         subject = event.user_id or ""
@@ -121,18 +169,24 @@ class Processor:
         for _pass in range(_MAX_PASSES):
             actions = self._plan(event)
             failures: list[str] = []
+            unknown = False
             for action in actions:
                 preview = action.preview()
+                label = f"{preview.operation} {preview.target}"
                 # Başarısız adım öteki adımları durdurmaz. Örneğin Press yanıt vermese de
                 # kullanıcı bütün kiracılarda kapanır. Adımlar tekrar edilebilir.
                 try:
-                    self._retry(f"{preview.operation} {preview.target}", lambda action=action: self._execute(action))
+                    self._retry(label, lambda action=action: self._execute(action))
                 except _Failed as failure:
                     failures.append(str(failure))
+                except UnknownOutcome:
+                    # Sonuç bilinmiyor. Kör tekrar yapılmaz.
+                    failures.append(f"{label}: unknown outcome")
+                    unknown = True
                 else:
                     names.append(preview.operation)
             if failures:
-                raise _Failed("; ".join(failures))
+                raise _Failed("; ".join(failures), unknown=unknown)
             if not any(isinstance(action, EnsureOrganization) for action in actions):
                 break
         return names
@@ -154,7 +208,10 @@ class Processor:
             raise TypeError(f"unknown action: {type(action).__name__}")
 
     def _retry(self, label: str, call: Callable[[], T]) -> T:
-        """Geçici hatada sınırlı sayıda yeniden dener. Kalıcı hatada hemen bırakır."""
+        """Geçici hatada sınırlı sayıda yeniden dener. Kalıcı hatada hemen bırakır.
+
+        `UnknownOutcome` yeniden denenmez ve çağırana geçer.
+        """
         for attempt in range(1, self._max_attempts + 1):
             try:
                 return call()

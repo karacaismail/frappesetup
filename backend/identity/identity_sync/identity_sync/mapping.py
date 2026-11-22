@@ -9,6 +9,8 @@ Kuralların kaynağı karar sitesinin `rail-4-keycloak.md` sayfasının 4. böl�
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 
@@ -34,10 +36,20 @@ class Preview:
         return asdict(self)
 
 
+def digest_of(value: object) -> str:
+    """Önizlemenin özetini döner. Onay bu özete bağlanır.
+
+    Yürütme isteği aynı özeti taşımalıdır. Plan önizlemeden sonra değiştiyse özet tutmaz.
+    """
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 @dataclass(frozen=True)
 class Organization:
     id: str
     alias: str
+    name: str = ""
 
 
 @dataclass(frozen=True)
@@ -81,13 +93,16 @@ class EnsureOrganization:
 
 @dataclass(frozen=True)
 class PressEnsureTeam:
+    """Alanlar `docs/sozlesmeler.md` dosyasının "Kuruluş ile takım eşlemesi" bölümünden gelir.
+
+    Takım adı gönderilmez. Takım adını Press üretir. `organization_name` boşsa gönderilmez.
+    """
+
     issuer: str
     subject: str
     email: str
-    email_verified: bool
-    first_name: str
-    last_name: str
     organization_id: str
+    organization_name: str = ""
 
     def preview(self) -> Preview:
         return Preview(
@@ -193,8 +208,16 @@ def plan_actions(
 
     if snapshot is None or not snapshot.enabled:
         # Silme ve kapatma: bütün sitelerde kullanıcı kapanır, Press üyeliği kalkar (X-11).
+        if snapshot is None:
+            # Silinen kullanıcının kuruluşları artık okunamaz. Üyelik kuruluş belirtilmeden kalkar.
+            removals = [PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=None)]
+        else:
+            removals = [
+                PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=org.id)
+                for org in snapshot.organizations
+            ]
         return (
-            PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=None),
+            *removals,
             *(TenantSetEnabled(tenant=t.name, issuer=issuer, subject=subject, enabled=False) for t in tenants),
         )
 
@@ -212,7 +235,7 @@ def plan_actions(
         return ()
 
     aliases = {org.alias for org in snapshot.organizations}
-    actions: list[Action] = [_team(snapshot, issuer, org.id) for org in snapshot.organizations]
+    actions: list[Action] = [_team(snapshot, issuer, org) for org in snapshot.organizations]
     for tenant in tenants:
         if tenant.organization in aliases:
             actions += _sync_on_tenant(snapshot, issuer, tenant.name)
@@ -243,7 +266,7 @@ def _plan_membership(
     if any(org.id == organization.id for org in snapshot.organizations):
         if not snapshot.email_verified:
             return ()
-        actions: list[Action] = [_team(snapshot, issuer, organization.id)]
+        actions: list[Action] = [_team(snapshot, issuer, organization)]
         for tenant in org_tenants:
             actions += _sync_on_tenant(snapshot, issuer, tenant.name)
         return tuple(actions)
@@ -253,15 +276,13 @@ def _plan_membership(
     )
 
 
-def _team(snapshot: UserSnapshot, issuer: str, organization_id: str) -> PressEnsureTeam:
+def _team(snapshot: UserSnapshot, issuer: str, organization: Organization) -> PressEnsureTeam:
     return PressEnsureTeam(
         issuer=issuer,
         subject=snapshot.subject,
         email=snapshot.email,
-        email_verified=snapshot.email_verified,
-        first_name=snapshot.first_name,
-        last_name=snapshot.last_name,
-        organization_id=organization_id,
+        organization_id=organization.id,
+        organization_name=organization.name,
     )
 
 

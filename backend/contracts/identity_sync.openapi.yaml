@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.1.0
+  version: 0.2.0
   summary: Kullanıcı eşitleme servisinin uçları
   description: |
     Bu servis Keycloak'taki kullanıcı değişikliklerini Press'e ve kiracı sitelerine taşır (G-81).
@@ -9,7 +9,9 @@ info:
     Servis olayı alır. Sonra kullanıcının güncel durumunu Keycloak'tan okur.
     Eylemleri bu güncel duruma göre seçer. Bu yüzden aynı olay iki kez gelse de sonuç değişmez.
 
-    Durum alanı `x-durum` her ucun kodda olup olmadığını söyler.
+    ## Uçların işaretleri
+
+    `x-durum` alanı ucun kodda olup olmadığını söyler.
     `uygulandi` değeri ucun kodda olduğunu gösterir.
     `planlandi` değeri ucun henüz yazılmadığını gösterir.
 
@@ -17,19 +19,59 @@ info:
     Yıkıcı iş, kullanıcıyı kapatan ya da üyeliği kaldıran iştir.
     Hiçbir uç ücretli iş yapmaz.
 
-    Yazan her uç önizleme üretebilir. Önizleme hiçbir kaydı değiştirmez.
-    Önizleme, çalışacak işleri ve her işin yıkıcı olup olmadığını listeler.
-    İnsan onayı ileride bu önizlemeye bakacak (`docs/sozlesmeler.md`, 10. bölüm).
+    `x-yurutme` alanı ucu kimin yürütebildiğini söyler.
+    `yalniz-onay-katmani` değeri şunu söyler: gerçek yürütmeyi yalnız onay katmanı başlatır.
+    `otomatik` değeri ucun insan onayı istemediğini söyler. Örneğin olay ucu böyledir.
+    `yalniz-okur` değeri ucun hiçbir kaydı değiştirmediğini söyler.
 
-    Bütün uçlar şu hataları dönebilir. Bu yüzden hatalar her uçta ayrıca yazılmadı.
+    ## Yapay zekâ ve insan onayı
+
+    Kurallar `docs/sozlesmeler.md` dosyasının 10. bölümündedir.
+
+    Yapay zekâ bu servisin yazma uçlarını doğrudan yürütemez.
+    Yapay zekâ aracısı yalnız okur ve önizleme ister. Önizleme hiçbir kaydı değiştirmez.
+    Gerçek yürütme yalnız `platform_core` içindeki onay katmanından gelir.
+    Onay katmanı insan onayladıktan sonra kendi servis belirteciyle çağırır.
+
+    Akış şudur:
+
+    1. Aracı ya da onay katmanı ucu `dry_run: true` ile çağırır.
+    2. Servis çalışacak işleri ve bir `preview_digest` değeri döner.
+    3. Onay katmanı işleri insana gösterir. Onay bu özete bağlanır.
+    4. İnsan onaylar. Onay katmanı ucu `dry_run: false` ile çağırır.
+    5. İstek `preview_digest` ve `approval_id` alanlarını taşır.
+    6. Servis planı yeniden hesaplar. Özet tutmazsa 409 ve `preview_changed` döner.
+    7. Servis çağıranı, onay kimliğini ve özeti günlüğe yazar. Sonra işi yürütür.
+
+    Servis iki istemci listesi tutar.
+    `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
+    `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir.
+    Yürütme listesine yalnız güvenilir servis istemcisi girer.
+    Aracı belirteci ve model kimliği bu listeye girmez.
+    Onayın tek kullanımını ve süresini onay katmanı denetler. Bu servis onay vermez.
+
+    ## Bütün uçların ortak hataları
+
+    Bu hatalar her uçta ayrıca yazılmadı.
     Bilinmeyen yol 404 ve `not_found` döner.
     Yanlış yöntem 405 ve `method_not_allowed` döner.
     65.536 bayttan büyük ya da uzunluğu belirsiz gövde 413 ve `too_large` döner.
     Kayıt dosyası hatası 500 ve `storage_failed` döner.
+    Başlığını ve gövdesini 10 saniyede tamamlamayan isteğin bağlantısı kapanır.
 
-    Elle başlatılan her komutun bir ucu vardır.
-    Böylece yapay zekâ katmanı da komutu başlatabilir.
-    Bu uçlar servis belirteci ister. Olay ucu imza ister.
+    ## Hedef uçların kesin başarı yanıtı
+
+    Servis Press'in ve kiracının yazma uçlarını çağırır.
+    Bu uçlar `press_tr.api.identity.*` ve `platform_core.api.identity.*` adlarını taşır.
+    Servis yalnız şu yanıtı başarı sayar: HTTP 200 ve aşağıdaki şemalardan birine uyan gövde.
+    `ensure_team` ucunun yanıtı `EnsureTeamResult` şemasına uymalıdır.
+    Bu yanıt ortak sözleşmenin “Kuruluş ile takım eşlemesi” bölümünde tanımlıdır.
+    Öteki yazma uçlarının yanıtı `TargetWriteResult` şemasına uymalıdır.
+    Hedef işi yanıt vermeden önce bitirmiş olmalıdır.
+    202, boş gövde ya da başka `status` değeri başarı değildir.
+    Servis böyle bir olayı `unknown` durumuyla bekleme kuyruğuna yazar.
+    Servis bu olayı işlenmiş saymaz ve kendiliğinden yeniden denemez.
+    İnsan hedefi denetler. Sonra olayı `include_unknown` seçeneğiyle yeniden işletir.
   license:
     name: MIT
     identifier: MIT
@@ -47,6 +89,7 @@ paths:
       description: Bu uç yalnız okur. Kimlik istemez. Kişisel veri dönmez.
       x-durum: uygulandi
       x-yikici: false
+      x-yurutme: yalniz-okur
       security: []
       responses:
         "200":
@@ -54,36 +97,39 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [status]
-                properties:
-                  status:
-                    type: string
-                    const: ok
+                $ref: "#/components/schemas/Health"
   /v1/events:
     post:
       operationId: postEvent
       summary: Bir Keycloak olayını alır ve işler.
       description: |
-        Olay kaynağı T-2 kararıyla seçilir (Proje kaydı A-10).
-        Kaynak ne olursa olsun bu uca aşağıdaki zarfı gönderir.
+        Seçilen olay kaynağı eklentisiz yoldur (karar notu 0001).
+        Bu ucu bizim işlemlerimiz çağırır. Sonradan bir eklenti eklenirse eklenti de bu uca gönderir.
 
         Servis olayı aynı istekte işler. Eylem başarısız olursa olay bekleme kuyruğuna girer.
         Bu durumda yanıt yine 202 olur. Çünkü olayı artık servis saklar.
 
         Bu uç yıkıcı iş yapabilir. Örneğin kullanıcı Keycloak'ta kapatıldıysa
         servis kullanıcıyı bütün kiracılarda kapatır ve Press üyeliğini kaldırır.
+        Bu uç insan onayı istemez. Çünkü olay Keycloak'ta zaten olmuş bir değişikliği taşır.
 
         Servis eylemi olayın içeriğinden seçmez. Kullanıcının Keycloak'taki güncel durumundan seçer.
-        Gövde Keycloak'ın kendi olay biçiminde de gelebilir. Servis bu biçimi zarfa çevirir.
+
+        Gövde iki biçimden biri olabilir.
+        Birinci biçim servis zarfıdır. Şeması `Event` adını taşır.
+        İkinci biçim Keycloak'ın kendi olay biçimidir.
+        Şemaları `KeycloakUserEvent` ve `KeycloakAdminEvent` adını taşır.
+
+        Keycloak `realmId` alanına realm'in iç kimliğini yazar. Realm adını yazmaz.
+        Servis bu kimliği `IDENTITY_SYNC_REALM_ID` ayarıyla karşılaştırır.
+        Kimlik tutmazsa servis olayı yok sayar. Ayar boşsa servis Keycloak biçimini 400 ile reddeder.
+
         Bir istisna vardır. Keycloak 26.8.2 üye ekleme olayında kullanıcının kimliğini vermez.
         Servis Keycloak biçimindeki bu olayı işleyemez ve `ignored` döner.
         Üye eklemeyi bildirmek için zarfı `user_id` alanıyla gönderin.
-
-        İmza yalnız gövdeyi kapsar. `dry_run` parametresini kapsamaz.
-        Bu yüzden uç yalnız iç ağda ya da TLS arkasında kullanılmalıdır.
       x-durum: uygulandi
       x-yikici: true
+      x-yurutme: otomatik
       security:
         - webhookSignature: []
       parameters:
@@ -95,15 +141,26 @@ paths:
             Servis yalnız çalışacak işlerin önizlemesini döner. Yanıt kodu 200 olur.
             Parametre yoksa değer `false` sayılır.
             Başka değer ya da yinelenen parametre 400 döner. Servis o isteği yürütmez.
+            İmza bu seçimi kapsar. Önizleme imzası yürütmede geçmez.
           schema:
             type: string
             enum: ["true", "false"]
+        - name: X-Identity-Sync-Timestamp
+          in: header
+          required: true
+          description: İmzanın üretildiği an. Birim saniyedir (Unix zamanı).
+          schema:
+            type: string
+            pattern: "^[0-9]{1,12}$"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/Event"
+              oneOf:
+                - $ref: "#/components/schemas/Event"
+                - $ref: "#/components/schemas/KeycloakUserEvent"
+                - $ref: "#/components/schemas/KeycloakAdminEvent"
             examples:
               epostaDogrulandi:
                 summary: Kullanıcı e-postasını doğruladı.
@@ -124,6 +181,23 @@ paths:
                   time: 1795000000500
                   user_id: 11111111-1111-4111-8111-111111111111
                   organization_id: 22222222-2222-4222-8222-222222222222
+              keycloakKullaniciOlayi:
+                summary: Keycloak'ın kendi biçiminde bir kullanıcı olayı.
+                value:
+                  id: 5f0c1f6e-0000-4000-8000-000000000003
+                  time: 1795000000900
+                  type: UPDATE_EMAIL
+                  realmId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  userId: 11111111-1111-4111-8111-111111111111
+              keycloakYoneticiOlayi:
+                summary: Keycloak'ın kendi biçiminde bir yönetici olayı.
+                value:
+                  id: 5f0c1f6e-0000-4000-8000-000000000004
+                  time: 1795000001000
+                  realmId: 7c9e6679-7425-40de-944b-e07fc1f90ae7
+                  operationType: UPDATE
+                  resourceType: USER
+                  resourcePath: users/11111111-1111-4111-8111-111111111111
       responses:
         "200":
           description: |
@@ -146,19 +220,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "401":
-          description: İmza yok ya da yanlış.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "413":
-          description: Gövde 65.536 bayttan büyük.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-        "500":
-          description: Servis olayı saklayamadı. Gönderen olayı yeniden göndermelidir.
+          description: |
+            İmza yok, yanlış, süresi geçmiş ya da daha önce kullanılmış.
+            Hata kodu `bad_signature` olur.
           content:
             application/json:
               schema:
@@ -173,8 +237,10 @@ paths:
         Keycloak doğruluk kaynağıdır.
         Yanıt e-posta taşımaz. Kullanıcıyı `sub` kimliğiyle anar.
         Uç zamanlanmaz. Yalnız çağrılınca çalışır.
+        Önizleme listesindeki ve yürütme listesindeki istemciler bu ucu çağırabilir.
       x-durum: uygulandi
       x-yikici: false
+      x-yurutme: yalniz-okur
       security:
         - serviceToken: []
       responses:
@@ -186,17 +252,21 @@ paths:
                 $ref: "#/components/schemas/ReconcileReport"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "502":
           $ref: "#/components/responses/UpstreamFailed"
   /v1/dead-letters:
     get:
       operationId: listDeadLetters
-      summary: Bekleme kuyruğundaki başarısız olayları listeler.
+      summary: Bekleme kuyruğundaki olayları listeler.
       description: |
         Bu uç `dead-letters` komutunun HTTP karşılığıdır.
         Uç yalnız okur. Kayıtlar e-posta taşımaz.
+        Önizleme listesindeki ve yürütme listesindeki istemciler bu ucu çağırabilir.
       x-durum: uygulandi
       x-yikici: false
+      x-yurutme: yalniz-okur
       security:
         - serviceToken: []
       responses:
@@ -205,15 +275,11 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [dead_letters]
-                properties:
-                  dead_letters:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/DeadLetter"
+                $ref: "#/components/schemas/DeadLetterList"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /v1/dead-letters/replay:
     post:
       operationId: replayDeadLetters
@@ -221,11 +287,18 @@ paths:
       description: |
         Bu uç `replay-dead-letters` komutunun HTTP karşılığıdır.
         Bu uç yıkıcı iş yapabilir. Bekleyen olay bir kullanıcıyı kapatabilir.
-        Çağıran `dry_run` alanını açıkça yazmalıdır.
-        Değer `true` ise servis yalnız önizleme döner ve kuyruğu değiştirmez.
+
+        Önizleme herkese açıktır: `dry_run: true` isteğini iki listedeki istemci de gönderebilir.
+        Gerçek yürütmeyi yalnız onay katmanı başlatır.
+        Yürütme isteği `preview_digest` ve `approval_id` alanlarını taşımalıdır.
+        Plan önizlemeden sonra değiştiyse servis 409 döner ve hiçbir olayı işlemez.
+
         Başarılı olay kuyruktan çıkar. Yine başarısız olan olay kuyrukta kalır.
+        Servis `unknown` durumundaki olayı atlar. Çünkü aynı hedefe kör tekrar yapılmaz.
+        `include_unknown: true` bu olayları da işletir. Önce hedefi denetleyin.
       x-durum: uygulandi
       x-yikici: true
+      x-yurutme: yalniz-onay-katmani
       security:
         - serviceToken: []
       requestBody:
@@ -233,39 +306,26 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [dry_run]
-              properties:
-                dry_run:
-                  type: boolean
-                  description: Doğruysa servis yalnız önizleme üretir.
+              $ref: "#/components/schemas/ReplayRequest"
       responses:
         "200":
-          description: Her olayın sonucu.
+          description: Her olayın sonucu. Önizlemede `preview_digest` de döner.
           content:
             application/json:
               schema:
-                type: object
-                required: [results]
-                properties:
-                  results:
-                    type: array
-                    items:
-                      allOf:
-                        - $ref: "#/components/schemas/EventResult"
-                        - type: object
-                          required: [event_id]
-                          properties:
-                            event_id:
-                              type: string
+                $ref: "#/components/schemas/ReplayReport"
         "400":
-          description: Gövde JSON değil ya da `dry_run` alanı yok.
+          description: Gövde hatalı. Örneğin `dry_run` yok ya da yürütmede onay alanları eksik.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/PreviewChanged"
   /v1/tenants/{tenant}/client:
     post:
       operationId: ensureTenantClient
@@ -277,6 +337,7 @@ paths:
         Bu yüzden uç yapay zekâ aracı olarak sunulmaz. Sırrın Press'e nasıl gideceği açık karardır.
       x-durum: planlandi
       x-yikici: false
+      x-yurutme: yalniz-onay-katmani
       security:
         - serviceToken: []
       parameters:
@@ -296,7 +357,6 @@ paths:
               properties:
                 base_url:
                   type: string
-                  format: uri
                   description: Kiracı sitesinin tam adresi.
       responses:
         "200":
@@ -322,11 +382,17 @@ paths:
         Sonra `execute-actions-email` ile davet e-postasını gönderir.
         E-postadaki işler UPDATE_PASSWORD ve CONFIGURE_TOTP olur.
         Bu uç kayıt silmez ve kullanıcı kapatmaz. Ama gönderilen e-posta geri alınamaz.
-        Çağıran `dry_run` alanını açıkça yazmalıdır.
-        Değer `true` ise servis yalnız okur ve önizleme döner.
+
+        Önizleme herkese açıktır: `dry_run: true` isteğini iki listedeki istemci de gönderebilir.
+        Önizleme yalnız okur.
+        Gerçek yürütmeyi yalnız onay katmanı başlatır.
+        Yürütme isteği `preview_digest` ve `approval_id` alanlarını taşımalıdır.
+        Özet isteğin alanlarını da kapsar. Bir davetin onayı başka davette geçmez.
+
         Uç tekrar edilebilir. İkinci çağrı ikinci kullanıcı açmaz. Ama e-postayı yeniden gönderir.
       x-durum: uygulandi
       x-yikici: false
+      x-yurutme: yalniz-onay-katmani
       security:
         - serviceToken: []
       requestBody:
@@ -334,51 +400,26 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required: [email, organization_id, dry_run]
-              properties:
-                email:
-                  type: string
-                  format: email
-                  maxLength: 254
-                first_name:
-                  type: string
-                  maxLength: 150
-                last_name:
-                  type: string
-                  maxLength: 150
-                organization_id:
-                  type: string
-                  pattern: "^[A-Za-z0-9_-]{1,128}$"
-                dry_run:
-                  type: boolean
-                  description: Doğruysa servis yalnız önizleme üretir.
+              $ref: "#/components/schemas/InvitationRequest"
       responses:
         "200":
           description: Davet gönderildi ya da önizleme üretildi.
           content:
             application/json:
               schema:
-                type: object
-                required: [subject, previews]
-                properties:
-                  subject:
-                    type: [string, "null"]
-                    description: |
-                      Kullanıcının Keycloak kimliği (`sub`).
-                      Önizlemede kullanıcı henüz yoksa değer boştur.
-                  previews:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Preview"
+                $ref: "#/components/schemas/InvitationResult"
         "400":
-          description: Gövde hatalı ya da `dry_run` alanı yok.
+          description: Gövde hatalı. Örneğin `dry_run` yok ya da yürütmede onay alanları eksik.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/PreviewChanged"
         "502":
           $ref: "#/components/responses/UpstreamFailed"
 components:
@@ -389,8 +430,18 @@ components:
       name: X-Identity-Sync-Signature
       description: |
         Değer `sha256=<onaltılık özet>` biçimindedir.
-        Özet, ham istek gövdesinin HMAC-SHA256 değeridir.
-        Anahtar `IDENTITY_SYNC_WEBHOOK_SECRET` ortam değişkenindedir.
+        Özet HMAC-SHA256 ile üretilir. Anahtar `IDENTITY_SYNC_WEBHOOK_SECRET` ortam değişkenindedir.
+
+        İmzalanan içerik üç parçadır: `<zaman damgası>.<kip>.<ham gövde>`.
+        Zaman damgası `X-Identity-Sync-Timestamp` başlığındaki değerdir.
+        Kip `execute` ya da `preview` olur. `dry_run=true` isteğinin kipi `preview` olur.
+
+        Servis şu üç denetimi yapar.
+        Zaman damgası servisin saatinden en çok 300 saniye farklı olabilir.
+        Aynı imza yalnız bir kez geçer. İkinci kullanım 401 alır.
+        Önizleme imzası yürütmede geçmez. Yürütme imzası da önizlemede geçmez.
+
+        Gönderen aynı olayı yeniden gönderecekse yeni zaman damgasıyla yeniden imzalar.
     serviceToken:
       type: http
       scheme: bearer
@@ -398,13 +449,32 @@ components:
       description: |
         Keycloak servis belirteci. Kurallar ortak sözleşmenin 3. bölümündedir.
         Servis belirteci ortak `oidc_verify` kitaplığıyla doğrular.
-        Belirtecin `aud` değeri `identity-sync` olmalıdır.
-        Belirtecin `azp` değeri servisin izin listesinde olmalıdır.
-        Liste `IDENTITY_SYNC_ALLOWED_AZP` ortam değişkenindedir. Liste boşsa servis her isteği reddeder.
+        Belirtecin `aud` değeri yalnız `identity-sync` olmalıdır.
+        Belirtecin `azp` değeri iki listeden birinde olmalıdır.
+        `IDENTITY_SYNC_PREVIEW_AZP` listesi okuma ve önizleme izni verir.
+        `IDENTITY_SYNC_EXECUTE_AZP` listesi ayrıca yürütme izni verir.
+        İki liste de boşsa servis her isteği reddeder.
+        Kitaplık kurulu değilse servis yine her isteği reddeder.
         İstek çerez de taşıyorsa servis isteği reddeder.
   responses:
     Unauthorized:
-      description: Servis belirteci yok ya da geçersiz.
+      description: Servis belirteci yok ya da geçersiz. Hata kodu `unauthorized` olur.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: |
+        Belirteç geçerli ama istemcinin bu işe izni yok. Hata kodu `forbidden` olur.
+        Örneğin önizleme listesindeki istemci yürütme istedi.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PreviewChanged:
+      description: |
+        Plan önizlemeden sonra değişti. Hata kodu `preview_changed` olur.
+        Servis hiçbir işi yürütmedi. Yeni önizleme ve yeni onay gerekir.
       content:
         application/json:
           schema:
@@ -416,8 +486,20 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
   schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          const: ok
+    ResourceId:
+      type: string
+      pattern: "^[A-Za-z0-9_-]{1,128}$"
+      description: Adres yoluna giren kimlik. Yalnız harf, rakam, tire ve alt çizgi taşır.
     Event:
       type: object
+      description: Servis zarfı. Kişisel veri taşımaz.
       required: [id, kind, type, realm, time]
       properties:
         id:
@@ -433,6 +515,8 @@ components:
             `admin` değeri yöneticinin ya da Admin API'nin yaptığı işi gösterir.
         type:
           type: string
+          minLength: 1
+          maxLength: 255
           description: |
             Servisin işlediği türler şunlardır.
             `user` için REGISTER, VERIFY_EMAIL, UPDATE_EMAIL ve DELETE_ACCOUNT.
@@ -441,39 +525,89 @@ components:
             Servis başka türü yok sayar ve `ignored` döner.
         realm:
           type: string
-          description: Realm adı. Ayardaki realm ile aynı değilse servis olayı yok sayar.
+          minLength: 1
+          maxLength: 255
+          description: Realm adı. Ayardaki realm adıyla aynı değilse servis olayı yok sayar.
         time:
           type: integer
-          format: int64
           description: Olayın zamanı. Birim milisaniyedir.
         user_id:
-          type: string
-          pattern: "^[A-Za-z0-9_-]{1,128}$"
-          description: Kullanıcının Keycloak kimliği (`sub`). İşlenen bütün türlerde zorunludur.
+          $ref: "#/components/schemas/ResourceId"
         organization_id:
+          $ref: "#/components/schemas/ResourceId"
+      additionalProperties: true
+    KeycloakUserEvent:
+      type: object
+      description: |
+        Keycloak'ın kullanıcı olayı gösterimi (Keycloak 26.8.2, EventRepresentation).
+        Servis yalnız aşağıdaki alanları kullanır. Öteki alanları atar.
+      required: [id, time, type, realmId]
+      properties:
+        id:
           type: string
-          pattern: "^[A-Za-z0-9_-]{1,128}$"
-          description: Organization kimliği. Üyelik olaylarında zorunludur.
+          minLength: 1
+          maxLength: 128
+        time:
+          type: integer
+        type:
+          type: string
+          minLength: 1
+          maxLength: 255
+        realmId:
+          type: string
+          description: Realm'in iç kimliği. Realm adı değildir.
+        userId:
+          $ref: "#/components/schemas/ResourceId"
+      additionalProperties: true
+    KeycloakAdminEvent:
+      type: object
+      description: |
+        Keycloak'ın yönetici olayı gösterimi (Keycloak 26.8.2, AdminEventRepresentation).
+        Servis kullanıcının ve Organization'ın kimliğini `resourcePath` alanından okur.
+        `id` alanı yoksa servis olaydan kararlı bir kimlik türetir.
+      required: [time, realmId, operationType, resourceType, resourcePath]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 128
+        time:
+          type: integer
+        realmId:
+          type: string
+          description: Realm'in iç kimliği. Realm adı değildir.
+        operationType:
+          type: string
+          minLength: 1
+        resourceType:
+          type: string
+          minLength: 1
+        resourcePath:
+          type: string
+          description: Örneğin `users/<kullanıcı>` ya da `organizations/<kuruluş>/members/<kullanıcı>`.
       additionalProperties: true
     EventResult:
       type: object
-      required: [status]
+      required: [status, actions]
       properties:
         status:
           type: string
-          enum: [processed, duplicate, ignored, dead_lettered, preview, failed]
+          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed]
           description: |
-            `processed` değeri bütün eylemlerin bittiğini gösterir.
+            `processed` değeri bütün eylemlerin kesin başarıyla bittiğini gösterir.
             `duplicate` değeri olayın daha önce işlendiğini gösterir.
             `ignored` değeri servisin bu olay türünü ya da realm'i işlemediğini gösterir.
             `dead_lettered` değeri olayın bekleme kuyruğuna girdiğini gösterir.
             Kuyruğa girmek başarı değildir. Servis yine de bütün adımları dener.
             Örneğin Press yanıt vermese de kullanıcı kiracılarda kapanır.
+            `unknown` değeri bir hedefin kesin başarı yanıtı vermediğini gösterir.
+            Olay kuyrukta `unknown` durumuyla bekler. Servis olayı işlenmiş saymaz.
+            Yeniden işleme yanıtında `unknown` değeri olayın atlandığını gösterir.
             `preview` değeri yalnız önizleme üretildiğini gösterir.
             `failed` değeri önizlemenin üretilemediğini gösterir. Örneğin Keycloak yanıt vermedi.
         actions:
           type: array
-          description: Çalışan eylemlerin adları.
+          description: Kesin başarıyla biten eylemlerin adları.
           items:
             type: string
         previews:
@@ -513,9 +647,21 @@ components:
             İş yıkıcıysa doğrudur.
             `press.remove_team_member` her zaman yıkıcıdır.
             `tenant.set_enabled` kullanıcıyı kapatıyorsa yıkıcıdır.
+    PreviewDigest:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+      description: |
+        Önizlemenin SHA-256 özeti. Onay bu özete bağlanır.
+        Yürütme isteği aynı özeti taşımalıdır.
+    ApprovalId:
+      type: string
+      pattern: "^[A-Za-z0-9_-]{1,128}$"
+      description: |
+        Onay katmanındaki onay kaydının kimliği.
+        Servis bu değeri işlem günlüğüne yazar. Değerin geçerliliğini onay katmanı denetler.
     DeadLetter:
       type: object
-      required: [event, error, attempts, first_failed_at, last_failed_at]
+      required: [event, error, state, attempts, first_failed_at, last_failed_at]
       properties:
         event:
           $ref: "#/components/schemas/Event"
@@ -523,8 +669,13 @@ components:
           type: string
           description: |
             Başarısız adımlar ve durum kodları. Adımlar noktalı virgülle ayrılır.
-            Yanıt gövdesi saklanmaz.
-          examples: ["tenant.provision kiraci1: HTTP 503"]
+            Yanıt gövdesi saklanmaz. Örnek: `tenant.provision kiraci1: HTTP 503`.
+        state:
+          type: string
+          enum: [failed, unknown]
+          description: |
+            `failed` değeri hedefin işi reddettiğini ya da ulaşılamadığını gösterir.
+            `unknown` değeri işin bitip bitmediğinin bilinmediğini gösterir.
         attempts:
           type: integer
           description: Olayın kaç kez başarısız olduğu.
@@ -534,6 +685,95 @@ components:
         last_failed_at:
           type: number
           description: Son hatanın zamanı. Birim saniyedir (Unix zamanı).
+    DeadLetterList:
+      type: object
+      required: [dead_letters]
+      properties:
+        dead_letters:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeadLetter"
+    ReplayRequest:
+      type: object
+      required: [dry_run]
+      properties:
+        dry_run:
+          type: boolean
+          description: Doğruysa servis yalnız önizleme üretir. Çağıran bu alanı açıkça yazmalıdır.
+        include_unknown:
+          type: boolean
+          description: |
+            Doğruysa servis `unknown` durumundaki olayları da işler.
+            Varsayılan değer yanlıştır.
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+        approval_id:
+          $ref: "#/components/schemas/ApprovalId"
+    ReplayReport:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReplayResult"
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+    ReplayResult:
+      type: object
+      required: [event_id, status, actions]
+      properties:
+        event_id:
+          type: string
+        status:
+          type: string
+          enum: [processed, duplicate, ignored, dead_lettered, unknown, preview, failed]
+        actions:
+          type: array
+          items:
+            type: string
+        previews:
+          type: array
+          items:
+            $ref: "#/components/schemas/Preview"
+    InvitationRequest:
+      type: object
+      required: [email, organization_id, dry_run]
+      properties:
+        email:
+          type: string
+          maxLength: 254
+          pattern: "^[^@\\s]{1,64}@[^@\\s]{1,189}$"
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        organization_id:
+          $ref: "#/components/schemas/ResourceId"
+        dry_run:
+          type: boolean
+          description: Doğruysa servis yalnız önizleme üretir. Çağıran bu alanı açıkça yazmalıdır.
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+        approval_id:
+          $ref: "#/components/schemas/ApprovalId"
+    InvitationResult:
+      type: object
+      required: [subject, previews]
+      properties:
+        subject:
+          type: [string, "null"]
+          description: |
+            Kullanıcının Keycloak kimliği (`sub`).
+            Önizlemede kullanıcı henüz yoksa değer boştur.
+        previews:
+          type: array
+          items:
+            $ref: "#/components/schemas/Preview"
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
     ReconcileReport:
       type: object
       required: [count, differences]
@@ -543,27 +783,75 @@ components:
         differences:
           type: array
           items:
-            type: object
-            required: [target, subject, kind]
-            properties:
-              target:
-                type: string
-                description: Farkın görüldüğü yer. Değer `press` ya da kiracının adıdır.
-              subject:
-                type: string
-                description: Kullanıcının Keycloak kimliği (`sub`).
-              kind:
-                type: string
-                enum: [missing, unexpected, email_mismatch, disabled]
-                description: |
-                  `missing` değeri kullanıcının hedefte olmadığını gösterir.
-                  `unexpected` değeri hedefte açık ama Keycloak'a göre beklenmeyen kaydı gösterir.
-                  `email_mismatch` değeri e-postanın farklı olduğunu gösterir.
-                  `disabled` değeri beklenen kullanıcının hedefte kapalı olduğunu gösterir.
+            $ref: "#/components/schemas/Difference"
+    Difference:
+      type: object
+      required: [target, subject, kind]
+      properties:
+        target:
+          type: string
+          description: Farkın görüldüğü yer. Değer `press` ya da kiracının adıdır.
+        subject:
+          type: string
+          description: Kullanıcının Keycloak kimliği (`sub`).
+        kind:
+          type: string
+          enum: [missing, unexpected, email_mismatch, disabled]
+          description: |
+            `missing` değeri kullanıcının hedefte olmadığını gösterir.
+            `unexpected` değeri hedefte açık ama Keycloak'a göre beklenmeyen kaydı gösterir.
+            `email_mismatch` değeri e-postanın farklı olduğunu gösterir.
+            `disabled` değeri beklenen kullanıcının hedefte kapalı olduğunu gösterir.
+    EnsureTeamResult:
+      type: object
+      description: |
+        `press_tr.api.identity.ensure_team` ucundan beklenen kesin başarı yanıtı.
+        Bu şema bu servisin ucu değildir. Servisin Press'ten beklediği yanıttır.
+        Kaynak: ortak sözleşmenin “Kuruluş ile takım eşlemesi” bölümü.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [team, created]
+          properties:
+            team:
+              type: string
+              minLength: 1
+              description: Press'teki takımın adı.
+            created:
+              type: boolean
+              description: Takım bu istekte açıldıysa doğrudur.
+          additionalProperties: true
+    TargetWriteResult:
+      type: object
+      description: |
+        `remove_team_member`, `provision`, `set_enabled` ve `change_email` uçlarından beklenen yanıt.
+        Hedef bu yanıtı işi bitirdikten sonra HTTP 200 ile döner.
+        Bu şema bu servisin ucu değildir. Servisin hedeften beklediği yanıttır.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+              const: done
+          additionalProperties: true
     Error:
       type: object
       required: [error]
       properties:
         error:
           type: string
-          enum: [bad_request, bad_signature, unauthorized, too_large, not_found, method_not_allowed, storage_failed, upstream_failed]
+          enum:
+            - bad_request
+            - bad_signature
+            - unauthorized
+            - forbidden
+            - preview_changed
+            - too_large
+            - not_found
+            - method_not_allowed
+            - storage_failed
+            - upstream_failed

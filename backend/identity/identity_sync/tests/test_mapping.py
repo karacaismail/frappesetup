@@ -24,7 +24,7 @@ from identity_sync.mapping import (
 
 ISSUER = "http://kimlik.localhost:6110/realms/platform"
 SUB = "11111111-1111-4111-8111-111111111111"
-ORG = Organization(id="22222222-2222-4222-8222-222222222222", alias="kiraci1")
+ORG = Organization(id="22222222-2222-4222-8222-222222222222", alias="kiraci1", name="Kiracı 1")
 OTHER_ORG = Organization(id="33333333-3333-4333-8333-333333333333", alias="baska")
 TENANTS = (
     Tenant(name="kiraci1", base_url="http://kiraci1.localhost:6111", organization="kiraci1"),
@@ -60,14 +60,9 @@ def plan(ev: Event, snapshot: UserSnapshot | None, organization: Organization | 
     return plan_actions(ev, snapshot, issuer=ISSUER, tenants=TENANTS, organization=organization)
 
 
+# Alanlar `docs/sozlesmeler.md` dosyasının "Kuruluş ile takım eşlemesi" bölümünden gelir.
 TEAM = PressEnsureTeam(
-    issuer=ISSUER,
-    subject=SUB,
-    email="ayse@example.test",
-    email_verified=True,
-    first_name="Ayşe",
-    last_name="Örnek",
-    organization_id=ORG.id,
+    issuer=ISSUER, subject=SUB, email="ayse@example.test", organization_id=ORG.id, organization_name="Kiracı 1"
 )
 PROVISION = TenantProvision(
     tenant="kiraci1",
@@ -80,6 +75,12 @@ PROVISION = TenantProvision(
     enabled=True,
 )
 CHANGE_EMAIL = TenantChangeEmail(tenant="kiraci1", issuer=ISSUER, subject=SUB, new_email="ayse@example.test")
+DISABLED_MEMBER = (
+    PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=ORG.id),
+    TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject=SUB, enabled=False),
+    TenantSetEnabled(tenant="kiraci2", issuer=ISSUER, subject=SUB, enabled=False),
+)
+# Silinen kullanıcının kuruluşları artık okunamaz. Üyelik kuruluş belirtilmeden kalkar.
 DEPROVISION_EVERYWHERE = (
     PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=None),
     TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject=SUB, enabled=False),
@@ -104,13 +105,7 @@ class RegistrationTest(unittest.TestCase):
 
     def test_member_of_unknown_organization_gets_only_a_team(self) -> None:
         team = PressEnsureTeam(
-            issuer=ISSUER,
-            subject=SUB,
-            email="ayse@example.test",
-            email_verified=True,
-            first_name="Ayşe",
-            last_name="Örnek",
-            organization_id=OTHER_ORG.id,
+            issuer=ISSUER, subject=SUB, email="ayse@example.test", organization_id=OTHER_ORG.id, organization_name=""
         )
         self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user(orgs=(OTHER_ORG,))), (team,))
 
@@ -137,11 +132,17 @@ class RemovalTest(unittest.TestCase):
         self.assertEqual(plan(event("admin", "USER_DELETE"), None), DEPROVISION_EVERYWHERE)
 
     def test_disabled_user_is_disabled_everywhere(self) -> None:
-        self.assertEqual(plan(event("admin", "USER_UPDATE"), user(enabled=False)), DEPROVISION_EVERYWHERE)
+        # Kapatılan kullanıcının kuruluşları bilinir. Üyelik her kuruluş için ayrı kalkar.
+        self.assertEqual(plan(event("admin", "USER_UPDATE"), user(enabled=False)), DISABLED_MEMBER)
+
+    def test_disabled_user_in_two_organizations_leaves_both_teams(self) -> None:
+        actions = plan(event("admin", "USER_UPDATE"), user(enabled=False, orgs=(ORG, OTHER_ORG)))
+        removed = [a.organization_id for a in actions if isinstance(a, PressRemoveTeamMember)]
+        self.assertEqual(removed, [ORG.id, OTHER_ORG.id])
 
     def test_disabled_state_wins_over_event_type(self) -> None:
         # Eylemi olayın adı değil kullanıcının güncel durumu belirler.
-        self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user(enabled=False)), DEPROVISION_EVERYWHERE)
+        self.assertEqual(plan(event("user", "VERIFY_EMAIL"), user(enabled=False)), DISABLED_MEMBER)
 
 
 class AdminUpdateTest(unittest.TestCase):

@@ -36,7 +36,16 @@ class Settings:
     host: str = "127.0.0.1"
     port: int = 8085
     service_audience: str = "identity-sync"
-    allowed_azp: frozenset[str] = frozenset()
+    # Keycloak realm'in iç kimliği. Keycloak olaylarındaki `realmId` bu değerdir, realm adı değildir.
+    realm_id: str = ""
+    # Yürütebilen istemciler: yalnız insan onayını denetleyen güvenilir servisler.
+    execute_azp: frozenset[str] = frozenset()
+    # Yalnız okuyabilen ve önizleyebilen istemciler. Yapay zekâ aracısı bu listeye girer.
+    preview_azp: frozenset[str] = frozenset()
+
+    @property
+    def known_azp(self) -> frozenset[str]:
+        return self.execute_azp | self.preview_azp
 
     @property
     def issuer(self) -> str:
@@ -81,6 +90,10 @@ def _tenants(raw: str) -> tuple[Tenant, ...]:
     return tuple(tenants)
 
 
+def _names(raw: str) -> frozenset[str]:
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
 def load_settings(env: Mapping[str, str]) -> Settings:
     """Ayarları ortamdan okur. Eksik ayarların adlarını tek hatada listeler."""
     required = ("KEYCLOAK_PUBLIC_URL", "CLIENT_SECRET", "PRESS_URL", "TENANTS", "WEBHOOK_SECRET", "DB")
@@ -114,5 +127,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         host=get("HOST", "127.0.0.1"),
         port=port,
         service_audience=get("AUDIENCE", "identity-sync"),
-        allowed_azp=frozenset(part.strip() for part in get("ALLOWED_AZP").split(",") if part.strip()),
+        realm_id=get("REALM_ID"),
+        execute_azp=_names(get("EXECUTE_AZP")),
+        preview_azp=_names(get("PREVIEW_AZP")),
     )

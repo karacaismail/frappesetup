@@ -354,7 +354,7 @@ class KeycloakAdmin:
 
 
 def _organization(row: Mapping[str, object]) -> Organization:
-    return Organization(id=str(row.get("id", "")), alias=str(row.get("alias", "")))
+    return Organization(id=str(row.get("id", "")), alias=str(row.get("alias", "")), name=str(row.get("name") or ""))
 
 
 def snapshot_from_user(user: Mapping[str, object], organizations: Sequence[Organization]) -> UserSnapshot:

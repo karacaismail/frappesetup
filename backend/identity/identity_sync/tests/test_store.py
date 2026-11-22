@@ -56,6 +56,49 @@ class StoreTest(unittest.TestCase):
         self.assertEqual((letter.attempts, letter.error), (2, "ikinci"))
         self.assertEqual((letter.first_failed_at, letter.last_failed_at), (100.0, 250.0))
 
+    def test_dead_letter_state_defaults_to_failed_and_can_be_unknown(self) -> None:
+        store = self.open()
+        store.add_dead_letter(EVENT, "x")
+        self.assertEqual(store.dead_letters()[0].state, "failed")
+        store.add_dead_letter(EVENT, "y", state="unknown")
+        self.assertEqual(store.dead_letters()[0].state, "unknown")
+
+    def test_signature_can_be_claimed_once(self) -> None:
+        store = self.open()
+        self.assertTrue(store.claim_signature("abc", now=1000.0, expires_at=1300.0))
+        self.assertFalse(store.claim_signature("abc", now=1000.0, expires_at=1300.0))
+        store.close()
+        self.assertFalse(self.open().claim_signature("abc", now=1001.0, expires_at=1301.0))
+
+    def test_expired_signatures_are_removed(self) -> None:
+        store = self.open()
+        store.claim_signature("abc", now=1000.0, expires_at=1300.0)
+        self.assertTrue(store.claim_signature("def", now=1301.0, expires_at=1601.0))
+        # Süresi dolan kayıt silindi. Zaman penceresi bu imzayı artık zaten reddeder.
+        self.assertTrue(store.claim_signature("abc", now=1301.0, expires_at=1601.0))
+
+    def test_exclusive_blocks_a_second_connection(self) -> None:
+        import sqlite3
+
+        first = self.open()
+        second = Store(self.path, busy_timeout=0.2)
+        self.addCleanup(second.close)
+        with first.exclusive():
+            first.mark_processed("e-1", "processed")
+            with self.assertRaises(sqlite3.OperationalError):
+                with second.exclusive():
+                    pass
+        with second.exclusive():
+            self.assertTrue(second.is_processed("e-1"))
+
+    def test_exclusive_rolls_back_on_error(self) -> None:
+        store = self.open()
+        with self.assertRaises(RuntimeError):
+            with store.exclusive():
+                store.mark_processed("e-1", "processed")
+                raise RuntimeError("boom")
+        self.assertFalse(store.is_processed("e-1"))
+
     def test_remove_dead_letter(self) -> None:
         store = self.open()
         store.add_dead_letter(EVENT, "x")

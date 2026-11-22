@@ -11,6 +11,11 @@ import unittest
 from identity_sync.events import Event, EventError, from_keycloak, is_handled, parse_event
 
 SUB = "11111111-1111-4111-8111-111111111111"
+REALM_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+
+
+def translate(payload):
+    return from_keycloak(payload, realm_id=REALM_ID, realm="platform")
 ORG = "22222222-2222-4222-8222-222222222222"
 
 
@@ -96,12 +101,12 @@ class ParseEventTest(unittest.TestCase):
 
 class FromKeycloakTest(unittest.TestCase):
     def test_user_event(self) -> None:
-        envelope = from_keycloak(
+        envelope = translate(
             {
                 "id": "k-1",
                 "time": 1795000000000,
                 "type": "VERIFY_EMAIL",
-                "realmId": "platform",
+                "realmId": REALM_ID,
                 "clientId": "press",
                 "userId": SUB,
                 "ipAddress": "192.0.2.1",
@@ -121,11 +126,11 @@ class FromKeycloakTest(unittest.TestCase):
         )
 
     def test_admin_user_update(self) -> None:
-        envelope = from_keycloak(
+        envelope = translate(
             {
                 "id": "k-2",
                 "time": 7,
-                "realmId": "platform",
+                "realmId": REALM_ID,
                 "operationType": "UPDATE",
                 "resourceType": "USER",
                 "resourcePath": f"users/{SUB}",
@@ -138,11 +143,11 @@ class FromKeycloakTest(unittest.TestCase):
         )
 
     def test_admin_organization_membership(self) -> None:
-        envelope = from_keycloak(
+        envelope = translate(
             {
                 "id": "k-3",
                 "time": 8,
-                "realmId": "platform",
+                "realmId": REALM_ID,
                 "operationType": "DELETE",
                 "resourceType": "ORGANIZATION_MEMBERSHIP",
                 "resourcePath": f"organizations/{ORG}/members/{SUB}",
@@ -155,11 +160,11 @@ class FromKeycloakTest(unittest.TestCase):
     def test_admin_membership_create_has_no_user(self) -> None:
         # Keycloak 26.8.2 üye ekleme olayında yola kullanıcı kimliğini yazmaz.
         # Kaynak: OrganizationMemberResource.java, `resourcePath(session.getContext().getUri())`.
-        envelope = from_keycloak(
+        envelope = translate(
             {
                 "id": "k-4",
                 "time": 8,
-                "realmId": "platform",
+                "realmId": REALM_ID,
                 "operationType": "CREATE",
                 "resourceType": "ORGANIZATION_MEMBERSHIP",
                 "resourcePath": f"organizations/{ORG}/members",
@@ -173,18 +178,37 @@ class FromKeycloakTest(unittest.TestCase):
     def test_admin_event_without_id_gets_a_stable_id(self) -> None:
         payload = {
             "time": 9,
-            "realmId": "platform",
+            "realmId": REALM_ID,
             "operationType": "DELETE",
             "resourceType": "USER",
             "resourcePath": f"users/{SUB}",
         }
-        first, second = from_keycloak(payload), from_keycloak(dict(payload))
+        first, second = translate(payload), translate(dict(payload))
         self.assertEqual(first["id"], second["id"])
-        self.assertNotEqual(first["id"], from_keycloak({**payload, "time": 10})["id"])
+        self.assertNotEqual(first["id"], translate({**payload, "time": 10})["id"])
+
+    def test_realm_id_is_mapped_to_configured_realm_name(self) -> None:
+        # Keycloak `realmId` alanına iç kimliği yazar. Ad `platform` olur (EventBuilder.java, 26.8.2).
+        envelope = translate({"id": "k-1", "time": 1, "type": "REGISTER", "realmId": REALM_ID, "userId": SUB})
+        self.assertEqual(envelope["realm"], "platform")
+
+    def test_other_realm_id_never_maps_to_configured_name(self) -> None:
+        for other in ("baska-kimlik", "platform", "", None):
+            with self.subTest(other=other):
+                envelope = translate({"id": "k-1", "time": 1, "type": "REGISTER", "realmId": other, "userId": SUB})
+                self.assertNotEqual(envelope["realm"], "platform")
+
+    def test_unconfigured_realm_id_is_an_error(self) -> None:
+        with self.assertRaises(EventError):
+            from_keycloak(
+                {"id": "k-1", "time": 1, "type": "REGISTER", "realmId": "platform", "userId": SUB},
+                realm_id="",
+                realm="platform",
+            )
 
     def test_rejects_unknown_shape(self) -> None:
         with self.assertRaises(EventError):
-            from_keycloak({"hello": "world"})
+            translate({"hello": "world"})
 
 
 if __name__ == "__main__":

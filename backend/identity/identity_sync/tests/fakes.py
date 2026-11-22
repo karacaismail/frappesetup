@@ -13,6 +13,8 @@ from typing import Callable
 from urllib.parse import parse_qs, urlsplit
 
 ISSUER_REALM = "platform"
+# Keycloak realm'in iç kimliği. Addan farklıdır.
+REALM_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
 SUBJECT = "11111111-1111-4111-8111-111111111111"
 ORG_ID = "22222222-2222-4222-8222-222222222222"
 
@@ -174,6 +176,10 @@ TENANT_SET_ENABLED = "/api/method/platform_core.api.identity.set_enabled"
 TENANT_CHANGE_EMAIL = "/api/method/platform_core.api.identity.change_email"
 TENANT_LIST = "/api/method/platform_core.api.identity.list_identities"
 WEBHOOK_SECRET = "test-webhook-secret"
+# Hedef uçların kesin başarı yanıtı (`contracts/identity_sync.openapi.yaml`, TargetWriteResult).
+DONE = (200, {"message": {"status": "done"}})
+# `ensure_team` yanıtı (`docs/sozlesmeler.md`, "Kuruluş ile takım eşlemesi").
+TEAM_READY = (200, {"message": {"team": "team-0001", "created": True}})
 
 
 class FakeSite(FakeServer):
@@ -188,7 +194,7 @@ class FakeSite(FakeServer):
             TENANT_SET_ENABLED,
             TENANT_CHANGE_EMAIL,
         ):
-            self.on("POST", path, (200, {"message": {"ok": True}}))
+            self.on("POST", path, TEAM_READY if path == PRESS_ENSURE_TEAM else DONE)
 
     def writes(self) -> list[Recorded]:
         return [r for r in self.requests if r.method != "GET"]
@@ -212,6 +218,9 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
         db_path=db_path,
         admin_scope="admin-api",
         http_timeout=5.0,
+        realm_id=REALM_ID,
+        execute_azp=frozenset({"approval-service"}),
+        preview_azp=frozenset({"ai-agent"}),
     )
 
 

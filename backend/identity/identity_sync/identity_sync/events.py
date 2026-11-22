@@ -99,15 +99,25 @@ def looks_like_keycloak(payload: object) -> bool:
     return isinstance(payload, Mapping) and "kind" not in payload and "realmId" in payload
 
 
-def from_keycloak(payload: Mapping[str, object]) -> dict[str, object]:
+OTHER_REALM = "(other realm)"
+
+
+def from_keycloak(payload: Mapping[str, object], *, realm_id: str, realm: str) -> dict[str, object]:
     """Keycloak'ın olay gösterimini servis zarfına çevirir.
 
     Kullanıcı olayı `type` ve `userId` taşır. Yönetici olayı `operationType`,
     `resourceType` ve `resourcePath` taşır. Kaynak: Keycloak 26.8.2 Admin REST API.
+
+    Keycloak `realmId` alanına realm'in iç kimliğini yazar, adını yazmaz
+    (EventBuilder.java, 26.8.2). `realm_id` ayardan gelen güvenilir kimliktir.
+    Olayın kimliği bu değere eşitse zarf `realm` adını taşır. Değilse olay başka realm'indir.
     """
     if not isinstance(payload, Mapping) or "realmId" not in payload:
         raise EventError("not a Keycloak event")
-    envelope: dict[str, object] = {"realm": payload.get("realmId"), "time": payload.get("time")}
+    if not realm_id:
+        raise EventError("realm id is not configured")
+    same_realm = payload.get("realmId") == realm_id
+    envelope: dict[str, object] = {"realm": realm if same_realm else OTHER_REALM, "time": payload.get("time")}
     if "operationType" in payload or "resourceType" in payload:
         resource = str(payload.get("resourceType") or "")
         operation = str(payload.get("operationType") or "")

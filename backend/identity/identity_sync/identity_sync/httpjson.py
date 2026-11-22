@@ -29,6 +29,13 @@ class HttpError(Exception):
         return self.status >= 500 or self.status in (408, 429)
 
 
+class UnknownOutcome(Exception):
+    """Hedef kesin başarı yanıtı vermedi. İşin bitip bitmediği bilinmiyor.
+
+    Örneğin hedef işi kuyruğa aldı ve 202 döndü. Bu durumda kör tekrar yapılmaz.
+    """
+
+
 class TransportError(Exception):
     """İstek sunucuya ulaşmadı ya da yanıt okunamadı."""
 

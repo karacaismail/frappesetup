@@ -2,6 +2,10 @@
 
 Doğrulamayı ortak `oidc_verify` kitaplığı yapar (`docs/sozlesmeler.md`, 3. bölüm).
 Servis kendi doğrulama kodunu yazmaz. Kitaplık yoksa bütün istekler reddedilir.
+
+İstemci listesi iki parçadır. `preview_azp` yalnız okur ve önizler. `execute_azp` yürütür.
+Yürütme listesine yalnız insan onayını denetleyen güvenilir servisler girer.
+Bu ayrımı sunucu uygular. Doğrulayıcı iki listenin birleşimini kabul eder.
 """
 
 from __future__ import annotations
@@ -30,7 +34,7 @@ def build_verifier(settings: Settings) -> Verifier:
         import oidc_verify
     except ImportError:
         return reject_all
-    if not settings.allowed_azp:
+    if not settings.known_azp:
         return reject_all
     cache = oidc_verify.JwksCache(settings.jwks_url, ttl_seconds=JWKS_TTL_SECONDS)
 
@@ -41,7 +45,7 @@ def build_verifier(settings: Settings) -> Verifier:
                 cache=cache,
                 issuer=settings.issuer,
                 audience=settings.service_audience,
-                allowed_azp=set(settings.allowed_azp),
+                allowed_azp=set(settings.known_azp),
                 leeway=LEEWAY_SECONDS,
             )
         except oidc_verify.TokenError as error:

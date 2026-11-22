@@ -24,6 +24,9 @@ def environment(keycloak: str, press: str, tenant: str, db: str) -> dict[str, st
         "IDENTITY_SYNC_TENANTS": json.dumps([{"name": "kiraci1", "base_url": tenant, "organization": "kiraci1"}]),
         "IDENTITY_SYNC_WEBHOOK_SECRET": "test-webhook-secret",
         "IDENTITY_SYNC_DB": db,
+        "IDENTITY_SYNC_REALM_ID": fakes.REALM_ID,
+        "IDENTITY_SYNC_EXECUTE_AZP": "approval-service",
+        "IDENTITY_SYNC_PREVIEW_AZP": "ai-agent, ops-bff",
     }
 
 
@@ -39,6 +42,19 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(settings.keycloak_base_url, "http://kimlik.localhost:6110")
         self.assertEqual(settings.host, "127.0.0.1")
         self.assertEqual(settings.tenants[0].name, "kiraci1")
+        self.assertEqual(settings.realm_id, fakes.REALM_ID)
+
+    def test_execute_and_preview_clients_are_separate_lists(self) -> None:
+        settings = load_settings(self.ENV)
+
+        self.assertEqual(settings.execute_azp, frozenset({"approval-service"}))
+        self.assertEqual(settings.preview_azp, frozenset({"ai-agent", "ops-bff"}))
+
+    def test_client_lists_default_to_empty(self) -> None:
+        env = {k: v for k, v in self.ENV.items() if not k.endswith("_AZP")}
+        settings = load_settings(env)
+
+        self.assertEqual((settings.execute_azp, settings.preview_azp), (frozenset(), frozenset()))
 
     def test_internal_url_is_used_for_calls_but_not_for_issuer(self) -> None:
         settings = load_settings({**self.ENV, "IDENTITY_SYNC_KEYCLOAK_INTERNAL_URL": "http://keycloak:8080"})
@@ -102,7 +118,7 @@ class CliTest(unittest.TestCase):
         app = build_app(load_settings(self.env), sleep=lambda _s: None)
         app.processor.handle(Event(id="e-1", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT))
         app.close()
-        self.tenant.on("POST", fakes.TENANT_PROVISION, (200, {"message": {"ok": True}}))
+        self.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
 
     def test_dead_letters_lists_queue(self) -> None:
         self.queue_failed_event()
@@ -127,6 +143,22 @@ class CliTest(unittest.TestCase):
 
         self.assertEqual((code, body["results"][0]["status"]), (0, "processed"))
         self.assertEqual(self.run_cli("dead-letters")[1], {"dead_letters": []})
+
+    def test_replay_leaves_unknown_events_unless_asked(self) -> None:
+        self.tenant.on("POST", fakes.TENANT_PROVISION, (202, {"message": {"status": "queued"}}))
+        from identity_sync.app import build_app
+        from identity_sync.events import Event
+
+        app = build_app(load_settings(self.env), sleep=lambda _s: None)
+        app.processor.handle(Event(id="e-1", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT))
+        app.close()
+        self.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
+
+        code, body = self.run_cli("replay-dead-letters")
+        self.assertEqual((code, body["results"][0]["status"]), (1, "unknown"))
+
+        code, body = self.run_cli("replay-dead-letters", "--include-unknown")
+        self.assertEqual((code, body["results"][0]["status"]), (0, "processed"))
 
     def test_replay_fails_when_event_still_fails(self) -> None:
         self.queue_failed_event()

@@ -15,6 +15,7 @@ from identity_sync.app import App, build_app
 from identity_sync.auth import build_verifier, reject_all
 from identity_sync.config import ConfigError, load_settings
 from identity_sync.httpjson import HttpError, TransportError
+from identity_sync.pipeline import replay_report
 
 EXIT_OK, EXIT_FOUND, EXIT_ERROR = 0, 1, 2
 
@@ -27,6 +28,11 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("dead-letters", help="List failed events that wait in the queue.")
     replay = commands.add_parser("replay-dead-letters", help="Process the waiting failed events once.")
     replay.add_argument("--dry-run", action="store_true", help="Show the planned actions without running them.")
+    replay.add_argument(
+        "--include-unknown",
+        action="store_true",
+        help="Also re-run events whose outcome is unknown. Check the target first: this repeats the write.",
+    )
     return parser
 
 
@@ -51,7 +57,7 @@ def _serve(app: App) -> int:
     return EXIT_OK
 
 
-def _run(command: str, dry_run: bool, app: App) -> int:
+def _run(command: str, dry_run: bool, include_unknown: bool, app: App) -> int:
     if command == "serve":
         return _serve(app)
     if command == "reconcile":
@@ -61,8 +67,8 @@ def _run(command: str, dry_run: bool, app: App) -> int:
     if command == "dead-letters":
         _print({"dead_letters": [letter.to_dict() for letter in app.store.dead_letters()]})
         return EXIT_OK
-    results = app.processor.replay_dead_letters(dry_run=dry_run)
-    _print({"results": [{"event_id": event_id, **result.to_dict()} for event_id, result in results]})
+    results = app.processor.replay_dead_letters(dry_run=dry_run, include_unknown=include_unknown)
+    _print({"results": replay_report(results)})
     wanted = "preview" if dry_run else "processed"
     return EXIT_OK if all(result.status == wanted for _id, result in results) else EXIT_FOUND
 
@@ -76,7 +82,7 @@ def main(argv: Sequence[str] | None = None, *, env: Mapping[str, str] | None = N
         return EXIT_ERROR
     app = build_app(settings)
     try:
-        return _run(args.command, getattr(args, "dry_run", False), app)
+        return _run(args.command, getattr(args, "dry_run", False), getattr(args, "include_unknown", False), app)
     except (HttpError, TransportError) as error:
         print(f"upstream error: {error}", file=sys.stderr)
         return EXIT_ERROR

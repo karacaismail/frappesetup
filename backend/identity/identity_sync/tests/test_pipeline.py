@@ -42,10 +42,8 @@ class ProvisionTest(PipelineCase):
                 "issuer": self.stack.issuer,
                 "subject": SUBJECT,
                 "email": "ayse@example.test",
-                "email_verified": True,
-                "first_name": "Ayşe",
-                "last_name": "Örnek",
                 "organization_id": ORG_ID,
+                "organization_name": "kiraci1",
             },
         )
         (provision,) = self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)
@@ -156,6 +154,23 @@ class ProvisionTest(PipelineCase):
         self.assertEqual(result.actions, ("press.remove_team_member", "tenant.set_enabled"))
         (removed,) = self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)
         self.assertEqual(removed.json()["organization_id"], ORG_ID)
+
+    def test_disabled_member_leaves_team_by_organization_id(self) -> None:
+        self.add_member(enabled=False)
+
+        self.stack.app.processor.handle(event("USER_UPDATE", "admin"))
+
+        (removed,) = self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)
+        self.assertEqual(removed.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "organization_id": ORG_ID})
+
+    def test_team_reply_without_team_name_is_unknown(self) -> None:
+        # `ensure_team` yanıtı `team` ve `created` alanlarını taşır (sözleşme, 6. bölüm).
+        self.add_member()
+        for reply in ((200, {"message": {"status": "done"}}), (200, {"message": {"team": "", "created": True}})):
+            with self.subTest(reply=reply):
+                self.stack.press.on("POST", fakes.PRESS_ENSURE_TEAM, reply)
+                result = self.stack.app.processor.handle(event(id_=f"t-{reply[1]}"[:40].replace(" ", "")))
+                self.assertEqual(result.status, "unknown")
 
     def test_other_realm_is_ignored(self) -> None:
         self.add_member()
@@ -291,7 +306,7 @@ class IdempotencyTest(PipelineCase):
 
         def provision(req: fakes.Recorded) -> fakes.Reply:
             seen.append(req.headers["authorization"])
-            return (401, None) if len(seen) == 1 else (200, {"message": {"ok": True}})
+            return (401, None) if len(seen) == 1 else fakes.DONE
 
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, provision)
 
@@ -350,7 +365,7 @@ class FailureTest(PipelineCase):
         self.add_member()
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
         self.stack.app.processor.handle(event())
-        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (200, {"message": {"ok": True}}))
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
 
         results = self.stack.app.processor.replay_dead_letters()
 
@@ -368,6 +383,160 @@ class FailureTest(PipelineCase):
         self.assertEqual([r.status for _id, r in results], ["dead_lettered"])
         (letter,) = self.stack.app.store.dead_letters()
         self.assertEqual(letter.attempts, 2)
+
+
+class UnknownOutcomeTest(PipelineCase):
+    """Hedefin kesin başarı yanıtı `{"message": {"status": "done"}}` olur. Gerisi belirsizdir."""
+
+    UNCLEAR = (
+        (202, {"message": {"status": "queued"}}),
+        (200, None),
+        (200, {"message": {"status": "queued"}}),
+        (200, {"message": None}),
+        (200, {"exc": "x"}),
+        (204, None),
+    )
+
+    def test_unclear_reply_is_not_recorded_as_processed(self) -> None:
+        for index, reply in enumerate(self.UNCLEAR):
+            with self.subTest(reply=reply):
+                stack = Stack()
+                self.addCleanup(stack.close)
+                stack.keycloak.add_user(keycloak_user(), [self.org])
+                stack.tenant.on("POST", fakes.TENANT_PROVISION, reply)
+
+                result = stack.app.processor.handle(event(id_=f"u-{index}"))
+
+                self.assertEqual(result.status, "unknown")
+                (letter,) = stack.app.store.dead_letters()
+                self.assertEqual(letter.state, "unknown")
+                self.assertEqual(letter.error, "tenant.provision kiraci1: unknown outcome")
+                # Belirsiz sonuçta kör tekrar yapılmaz.
+                self.assertEqual(len(stack.tenant.calls("POST", fakes.TENANT_PROVISION)), 1)
+
+    def test_unknown_event_is_not_a_duplicate_later(self) -> None:
+        self.add_member()
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (202, {"message": {"status": "queued"}}))
+        self.stack.app.processor.handle(event())
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
+
+        self.assertEqual(self.stack.app.processor.handle(event()).status, "processed")
+
+    def test_replay_skips_unknown_events_unless_asked(self) -> None:
+        self.add_member()
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (202, {"message": {"status": "queued"}}))
+        self.stack.app.processor.handle(event())
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
+        calls = len(self.stack.tenant.writes())
+
+        skipped = self.stack.app.processor.replay_dead_letters()
+
+        self.assertEqual([(i, r.status) for i, r in skipped], [("e-1", "unknown")])
+        self.assertEqual(len(self.stack.tenant.writes()), calls)
+        self.assertEqual(len(self.stack.app.store.dead_letters()), 1)
+
+        replayed = self.stack.app.processor.replay_dead_letters(include_unknown=True)
+
+        self.assertEqual([r.status for _i, r in replayed], ["processed"])
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+
+    def test_failure_and_unknown_together_stay_unknown(self) -> None:
+        self.add_member()
+        self.stack.press.on("POST", fakes.PRESS_ENSURE_TEAM, (403, None))
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (202, None))
+
+        result = self.stack.app.processor.handle(event())
+
+        self.assertEqual(result.status, "unknown")
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual(letter.error, "press.ensure_team press: HTTP 403; tenant.provision kiraci1: unknown outcome")
+
+
+class CrossProcessTest(unittest.TestCase):
+    """Sunucu ve `replay-dead-letters` komutu ayrı süreçlerdir. Aynı kayıt dosyasını açarlar."""
+
+    def setUp(self) -> None:
+        import os
+        import tempfile
+
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.server_side = Stack(os.path.join(self.dir.name, "db.sqlite3"))
+        self.addCleanup(self.server_side.close)
+        self.server_side.keycloak.add_user(keycloak_user(), [{"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}])
+        # İkinci süreç: aynı ayar, ayrı bağlantı.
+        from identity_sync.app import build_app
+
+        self.command_side = build_app(self.server_side.settings, sleep=lambda _s: None)
+        self.addCleanup(self.command_side.close)
+
+    def test_server_and_replay_do_not_run_the_same_event_twice(self) -> None:
+        import threading
+        import time
+
+        tenant = self.server_side.tenant
+        tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
+        self.server_side.app.processor.handle(event())
+        entered, release = threading.Event(), threading.Event()
+
+        def slow_provision(_req: fakes.Recorded) -> fakes.Reply:
+            entered.set()
+            release.wait(5)
+            return fakes.DONE
+
+        tenant.on("POST", fakes.TENANT_PROVISION, slow_provision)
+        before = len(tenant.calls("POST", fakes.TENANT_PROVISION))
+        statuses: dict[str, list[str]] = {}
+
+        def replay() -> None:
+            statuses["replay"] = [r.status for _i, r in self.command_side.processor.replay_dead_letters()]
+
+        def deliver() -> None:
+            statuses["server"] = [self.server_side.app.processor.handle(event()).status]
+
+        first = threading.Thread(target=replay)
+        first.start()
+        self.assertTrue(entered.wait(5))
+        second = threading.Thread(target=deliver)
+        second.start()
+        time.sleep(0.3)  # ikinci süreç kilitte beklemelidir
+        self.assertEqual(len(tenant.calls("POST", fakes.TENANT_PROVISION)) - before, 1)
+        release.set()
+        first.join(10)
+        second.join(10)
+
+        self.assertEqual(statuses, {"replay": ["processed"], "server": ["duplicate"]})
+        self.assertEqual(len(tenant.calls("POST", fakes.TENANT_PROVISION)) - before, 1)
+
+    def test_events_of_one_user_are_serialized_across_processes(self) -> None:
+        # Eski "açık" durumla başlayan süreç, kapatma işleminden sonra kullanıcıyı yeniden açamaz.
+        import threading
+        import time
+
+        keycloak, tenant = self.server_side.keycloak, self.server_side.tenant
+        entered, release = threading.Event(), threading.Event()
+
+        def slow_provision(_req: fakes.Recorded) -> fakes.Reply:
+            entered.set()
+            release.wait(5)
+            return fakes.DONE
+
+        tenant.on("POST", fakes.TENANT_PROVISION, slow_provision)
+        enable = threading.Thread(target=lambda: self.server_side.app.processor.handle(event(id_="ac")))
+        enable.start()
+        self.assertTrue(entered.wait(5))
+        keycloak.add_user(keycloak_user(enabled=False), [])
+        disable = threading.Thread(target=lambda: self.command_side.processor.handle(event("USER_UPDATE", "admin", "kapat")))
+        disable.start()
+        time.sleep(0.3)
+        self.assertEqual(tenant.calls("POST", fakes.TENANT_SET_ENABLED), [])  # kapatma sırasını bekler
+        release.set()
+        enable.join(10)
+        disable.join(10)
+
+        last_write = tenant.writes()[-1]
+        self.assertEqual(last_write.path, fakes.TENANT_SET_ENABLED)
+        self.assertEqual(last_write.json()["enabled"], False)
 
 
 class PreviewTest(PipelineCase):

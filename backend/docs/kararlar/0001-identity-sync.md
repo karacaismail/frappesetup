@@ -120,7 +120,7 @@ Servisin olay ucu her üç yolda aynıdır. Uç `POST /v1/events` adresidir. Yol
 
 Uç bu yüzden şöyle korunur:
 
-- Uç imzalı istek kabul eder. İmza HMAC-SHA256 ile üretilir. Eklentiler bu imzayı üretebilir.
+- Uç imzalı istek kabul eder. İmza HMAC-SHA256 ile üretilir. İmza zaman damgasını da kapsar. Bir eklenti bu imzayı üretebilir.
 - Servis Keycloak'ın kendi olay biçimini servis zarfına çevirebilir. Çeviri kodu yazıldı ve sınandı.
 - Servis eylemi olayın içeriğinden değil kullanıcının güncel durumundan seçer. Bu yüzden eksik ya da geç gelen olay yanlış sonuç üretmez.
 

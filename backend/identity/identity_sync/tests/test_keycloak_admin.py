@@ -47,7 +47,7 @@ class ReadTest(AdminCase):
         self.assertEqual(snapshot.email, "ayse@example.test")
         self.assertTrue(snapshot.email_verified)
         self.assertTrue(snapshot.enabled)
-        self.assertEqual(snapshot.organizations, (Organization(id=ORG_ID, alias="kiraci1"),))
+        self.assertEqual(snapshot.organizations, (Organization(id=ORG_ID, alias="kiraci1", name="Kiracı 1"),))
 
     def test_missing_user_gives_none(self) -> None:
         self.kc.remove_user(SUBJECT)
