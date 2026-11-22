@@ -1,5 +1,7 @@
 """The shared stack must isolate services and never expose credentials."""
 
+import contextlib
+import io
 import json
 import os
 import re
@@ -325,6 +327,35 @@ class StackTests(unittest.TestCase):
                         namespace["up"](["docker"], ["compose"], environment)
                 for value in PRESS_ENVIRONMENT.values():
                     self.assertNotIn(value, str(caught.exception))
+
+    def test_up_command_names_missing_press_settings_before_any_docker_call(self):
+        namespace = runpy.run_path(str(STACK))
+        for missing in (("ATONOTA_PRESS_SECRET",), ("ATONOTA_PRESS_URL", "ATONOTA_PRESS_SERVICE_SECRET")):
+            with self.subTest(missing=missing):
+                environment = {key: value for key, value in PRESS_ENVIRONMENT.items() if key not in missing}
+                errors = io.StringIO()
+                with (
+                    patch("sys.argv", [str(STACK), "up"]),
+                    patch.dict(
+                        namespace["main"].__globals__,
+                        {
+                            "setup": lambda: (dict(environment), ["docker"], ["compose"]),
+                            "run": lambda *args, **kwargs: self.fail("Must reject before Docker"),
+                        },
+                    ),
+                    patch("subprocess.run", side_effect=AssertionError("Direct subprocess call")),
+                    patch("subprocess.Popen", side_effect=AssertionError("Direct process start")),
+                    contextlib.redirect_stderr(errors),
+                ):
+                    self.assertEqual(namespace["main"](), 2)
+                message = errors.getvalue()
+                for key in PRESS_ENVIRONMENT:
+                    if key in missing:
+                        self.assertIn(key, message)
+                    else:
+                        self.assertNotIn(key, message)
+                for value in PRESS_ENVIRONMENT.values():
+                    self.assertNotIn(value, message)
 
     def test_setup_supplies_every_press_setting_from_the_templates(self):
         namespace = runpy.run_path(str(STACK))

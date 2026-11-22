@@ -611,6 +611,8 @@ def main():
             check_resources(engine, environment)
             run([*compose, "build", "web"], environment)
         elif args.action == "up":
+            # Check local settings before the ownership probe or any other Docker call.
+            require_press_settings(environment)
             assert_owner(engine, compose, environment, create=True)
             up(engine, compose, environment)
         elif args.action == "down":
