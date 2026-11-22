@@ -1,14 +1,14 @@
-"""Servisin HTTP uçları. Sözleşme `backend/contracts/identity_sync.openapi.yaml` dosyasındadır.
+"""Service HTTP endpoints. The contract is in `backend/contracts/identity_sync.openapi.yaml`.
 
-Sunucu Python'un kendi `http.server` modülüdür ve istekleri tek tek işler.
+The server uses the Python standard-library `http.server` module and processes requests serially.
 
-Kimlik kuralları şunlardır:
+Authentication rules:
 
-- Olay ucu imza ister. İmza zaman damgasını, yürütme seçimini ve gövdeyi kapsar.
-- Öteki uçlar servis belirteci ister. Elle başlatılan her komutun burada bir ucu vardır.
-- Yapay zekâ aracısı yalnız okur ve önizler. Yürütmeyi yalnız onay katmanı başlatır.
-  Onay katmanı insan onayından sonra kendi servis belirteciyle çağırır.
-- Yürütme isteği önizlemenin özetini taşır. Plan değiştiyse servis yürütmez.
+- The event endpoint requires a signature covering the timestamp, execution mode, and body.
+- Other endpoints require a service token. Every manually started command has an endpoint here.
+- The AI agent only reads and previews. Only the approval layer initiates execution.
+  After human approval, the approval layer calls with its own service token.
+- Execution requests contain the preview digest. The service refuses execution if the plan changed.
 """
 
 from __future__ import annotations
@@ -82,10 +82,10 @@ class _ApprovalUsed(Exception):
 
 
 class _DeadlineReader(io.RawIOBase):
-    """Soketten okur ve isteğin toplam süresini sınırlar.
+    """Read from the socket and bound the total request duration.
 
-    Soketin kendi süre sınırı her okumada yeniden başlar. Yavaş yavaş veri gönderen
-    istemci o sınırı hiç doldurmaz. Bu sınıf kalan süreyi her okumada yeniden hesaplar.
+    The socket timeout resets on each read. A client sending data slowly can avoid
+    that limit. This class recalculates the remaining time before every read.
     """
 
     def __init__(self, connection: socket.socket, deadline: float) -> None:
@@ -130,7 +130,7 @@ def _text(payload: Mapping[str, object], name: str, *, required: bool = False, m
 
 
 def _event_mode(query: Query) -> str:
-    """Olay isteğinin kipini döner. Belirsiz `dry_run` değeri hiçbir zaman yürütmeye dönüşmez."""
+    """Return the event request mode. An ambiguous `dry_run` value never enables execution."""
     values = query.get("dry_run", ["false"])
     if values == ["true"]:
         return "preview"
@@ -182,13 +182,13 @@ class _RateLimiter:
 
 
 class _Api:
-    """Uçların iş kısmı. HTTP ayrıntısını bilmez."""
+    """Endpoint application logic, independent of HTTP details."""
 
     def __init__(self, app: App) -> None:
         self._app = app
         self._settings = app.settings
 
-    # --- olay ucu: imzalı, otomatik ---
+    # --- event endpoint: signed, automatic ---
 
     def post_event(self, body: bytes, mode: str) -> Reply:
         dry_run = mode == "preview"
@@ -197,7 +197,7 @@ class _Api:
             if looks_like_keycloak(payload):
                 payload = from_keycloak(payload, realm_id=self._settings.realm_id, realm=self._settings.realm)
                 if payload.get("type") == "ORGANIZATION_MEMBERSHIP_CREATE" and "user_id" not in payload:
-                    # Keycloak üye ekleme olayında kullanıcıyı vermez. Servis bu olayı işleyemez.
+                    # Keycloak omits the user from member-addition events. The service cannot process this event.
                     _LOG.warning("ignored membership event without user")
                     return (200 if dry_run else 202), {"status": "ignored", "actions": []}
             event = parse_event(payload)
@@ -206,7 +206,7 @@ class _Api:
         result = self._app.processor.handle(event, dry_run=dry_run)
         return (200 if dry_run else 202), result.to_dict()
 
-    # --- okuma uçları ---
+    # --- read endpoints ---
 
     def post_reconcile(self, body: bytes, azp: str) -> Reply:
         """Reconcile: only operators may preview or execute an approved repair."""
@@ -228,13 +228,13 @@ class _Api:
         letters = self._app.store.dead_letters(limit=limit + 1, offset=offset)
         return 200, _paged("dead_letters", [self._app.processor.listed(letter) for letter in letters], limit, offset)
 
-    # --- yazma uçları: önizleme herkese, yürütme yalnız onay katmanına ---
+    # --- write endpoints: previews for callers, execution only through the approval layer ---
 
     def _approval(self, operation: str, payload: Mapping[str, object], azp: str) -> str:
-        """Yürütme isteğini denetler ve onaylanan önizlemenin özetini döner.
+        """Validate the execution request and return the approved preview digest.
 
-        Yürütmeyi yalnız `execute_azp` listesindeki istemci başlatır. İstek onay kimliğini
-        ve önizleme özetini taşır. Servis çağıranı, onayı ve özeti günlüğe yazar.
+        Only a client in `execute_azp` initiates execution. The request contains the approval ID
+        and preview digest. The service logs the caller, approval, and digest.
         """
         digest = self._approved_digest(operation, payload, azp)
         self._claim(operation, payload, azp, digest)
@@ -274,7 +274,7 @@ class _Api:
 
     @staticmethod
     def _audit(operation: str, payload: Mapping[str, object], azp: str, outcome: str) -> None:
-        """İşlem günlüğü: kim, hangi onayla, hangi planı istedi ve sonuç ne oldu."""
+        """Audit record: who requested which plan, under which approval, and the outcome."""
         _LOG.info(
             "execute operation=%s azp=%s approval_id=%s preview_digest=%s outcome=%s",
             operation,
@@ -535,10 +535,10 @@ def make_server(
     request_timeout: float = 10.0,
     clock: Callable[[], float] = time.time,
 ) -> HTTPServer:
-    """Sunucuyu kurar. `verifier` servis belirtecini doğrular ve hatada `TokenRejected` yükseltir.
+    """Build the server. `verifier` verifies service tokens and raises `TokenRejected` on failure.
 
-    `request_timeout`, bir isteğin başlığının ve gövdesinin okunabileceği toplam süredir.
-    Birim saniyedir. `clock` imzanın zaman penceresi için kullanılır.
+    `request_timeout` is the total time allowed to read one request's headers and body.
+    The unit is seconds. `clock` checks the signature time window.
     """
     api = _Api(app)
     settings = app.settings
@@ -576,12 +576,12 @@ def make_server(
     class RequestHandler(BaseHTTPRequestHandler):
         server_version = "identity_sync"
         sys_version = ""
-        # Yazarken de susan istemci sunucuyu tutamasın.
+        # A client that stops reading must not block the server while it writes.
         timeout = request_timeout
 
         def setup(self) -> None:
             super().setup()
-            # Sunucu tek iş parçacığıdır. Başlık ve gövde okuması toplam süreyle sınırlanır.
+            # The server is single-threaded. A total deadline bounds header and body reads.
             self.rfile.close()
             deadline = time.monotonic() + request_timeout
             self.rfile = io.BufferedReader(_DeadlineReader(self.connection, deadline))
@@ -614,7 +614,7 @@ def make_server(
             except _ApprovalUsed:
                 return 409, {"error": "approval_used"}
             except Busy:
-                # Başka bir süreç bir olayı işliyor. Çağıran yeniden denemelidir.
+                # Another process is handling an event. The caller must retry.
                 return 503, {"error": "busy"}
             except sqlite3.Error:
                 _LOG.error("storage failed on %s", route_name(parts.path))
@@ -639,7 +639,7 @@ def make_server(
             body = self._read_body()
             if body is None:
                 return 413, {"error": "too_large"}
-            # Kimlik denetimi gövde yorumlanmadan önce yapılır.
+            # Authenticate before interpreting the body.
             if path == "/v1/events":
                 mode = _event_mode(query)
                 if not self._signature_ok(body, mode):
@@ -667,19 +667,19 @@ def make_server(
             if 0 <= length <= MAX_BODY_BYTES:
                 body = self.rfile.read(length)
                 if len(body) != length:
-                    raise _BadRequest  # istemci gövdeyi tamamlamadan bağlantıyı kapattı
+                    raise _BadRequest  # the client closed the connection before completing the body
                 return body
             if 0 < length <= _MAX_DRAIN_BYTES:
-                self.rfile.read(length)  # istemci yanıtı okuyabilsin diye gövdeyi tüket
+                self.rfile.read(length)  # drain the body so the client can read the response
             else:
                 self.close_connection = True
             return None
 
         def _signature_ok(self, body: bytes, mode: str) -> bool:
-            """İmzayı, zaman penceresini ve tek kullanımı denetler.
+            """Check the signature, time window, and single use.
 
-            İmzalanan içerik `<zaman damgası>.<kip>.<gövde>` olur. Kip `execute` ya da `preview` olur.
-            Böylece önizleme imzası yürütmede geçmez.
+            The signed content is `<timestamp>.<mode>.<body>`. Mode is `execute` or `preview`.
+            This prevents a preview signature from authorizing execution.
             """
             given = self.headers.get(SIGNATURE_HEADER, "")
             timestamp = self.headers.get(TIMESTAMP_HEADER, "")
@@ -692,13 +692,13 @@ def make_server(
             now = clock()
             if abs(now - int(timestamp)) > SIGNATURE_WINDOW_SECONDS:
                 return False
-            # Aynı imza ikinci kez kullanılamaz. Kayıt pencere bitene kadar durur.
+            # A signature cannot be reused. Keep its record until the time window ends.
             expires_at = int(timestamp) + SIGNATURE_WINDOW_SECONDS + 1
             return app.store.claim_signature(expected, now=now, expires_at=expires_at)
 
         def _caller(self) -> str | None:
-            """Belirteci doğrular ve çağıran istemcinin `azp` değerini döner."""
-            # Hem çerez hem belirteç taşıyan istek reddedilir (`docs/sozlesmeler.md`, 3. bölüm).
+            """Verify the token and return the calling client's `azp` value."""
+            # Reject requests containing both a cookie and a token (`docs/sozlesmeler.md`, section 3).
             if self.headers.get("Cookie"):
                 return None
             scheme, _, token = self.headers.get("Authorization", "").partition(" ")
@@ -708,7 +708,7 @@ def make_server(
                 claims = verifier(token.strip())
             except TokenRejected:
                 return None
-            except Exception as error:  # doğrulayıcı çökerse istek yine reddedilir
+            except Exception as error:  # reject the request even if the verifier crashes
                 _LOG.error("token verifier failed: %s", type(error).__name__)
                 return None
             azp = claims.get("azp") if isinstance(claims, Mapping) else None
