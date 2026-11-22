@@ -73,6 +73,55 @@ compose() {
   docker --context "$CONTEXT" compose -p "$PROJECT" -f "$COMPOSE_FILE" "$@"
 }
 
+suggest_port_base() {
+  local published
+  published="$(docker --context "$CONTEXT" ps --format '{{.Ports}}')" || return
+  python3 - "$KC_PORT" "$published" <<'PYTHON'
+import re
+import socket
+import sys
+from contextlib import ExitStack
+
+base = int(sys.argv[1])
+ranges = [(int(start), int(end or start)) for start, end in
+          re.findall(r":(\d+)(?:-(\d+))?->", sys.argv[2])]
+for candidate in range(base + 10, 65528, 10):
+    ports = (candidate, candidate + 6, candidate + 8)
+    if any(start <= port <= end for port in ports for start, end in ranges):
+        continue
+    try:
+        with ExitStack() as sockets:
+            for port in ports:
+                listener = sockets.enter_context(socket.socket())
+                listener.bind(("127.0.0.1", port))
+    except OSError:
+        continue
+    print(candidate)
+    break
+PYTHON
+}
+
+start_services() {
+  local output exit_code alternative
+  if output=$(compose up -d --wait "$@" 2>&1); then
+    printf '%s\n' "$output"
+    return
+  else
+    exit_code=$?
+  fi
+  printf '%s\n' "$output" >&2
+  if grep -Eiq 'port is already allocated|address already in use|ports are not available' <<< "$output"; then
+    printf 'Port conflict. Keycloak uses %s and Mailpit uses %s.\n' "$KC_PORT" "$MAILPIT_UI_PORT" >&2
+    alternative="$(suggest_port_base)" || alternative=""
+    if [ -n "$alternative" ]; then
+      printf 'Try PANE_PORT=%s %s up\n' "$alternative" "$0" >&2
+    else
+      printf 'Choose PANE_PORT so it and PANE_PORT + 6 are free.\n' >&2
+    fi
+  fi
+  return "$exit_code"
+}
+
 TUNNEL_PID="$SCRIPT_DIR/.tunnel.pid"
 
 # Opens one ssh connection to the Colima VM that carries the given ports to this Mac.
@@ -137,7 +186,7 @@ case "$command" in
     esac
     ;;
   # İmaj varsa yeniden kullanılır. Realm ya da eklenti değişince imajı "build" komutuyla derleyin.
-  up) compose up -d --wait "$@" ;;
+  up) start_services "$@" ;;
   build) compose build "$@" ;;
   down) close_tunnel; compose down "$@" ;;
   restart) compose restart "$@" ;;
