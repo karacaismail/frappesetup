@@ -8,7 +8,7 @@ from frappe import _
 from frappe.sessions import delete_session
 from frappe.utils import get_datetime, now_datetime
 
-from platform_core.kimlik import helpers, jwks, site_settings
+from platform_core.kimlik import helpers, jwks, sign_in, site_settings
 from platform_core.kimlik.exceptions import InvalidLogoutToken, KeycloakKeysUnavailable
 
 LEEWAY = 30
@@ -25,6 +25,9 @@ def logout_current_session() -> dict:
 	There is no `id_token_hint`: the ID token is not kept after sign-in.
 	"""
 	settings = site_settings.get()
+	keycloak_sid = frappe.session.data.get("keycloak_sid")
+	if helpers.is_session_id(keycloak_sid):
+		sign_in.forget_keycloak_session(keycloak_sid, frappe.session.sid)
 	frappe.local.login_manager.logout()
 	frappe.db.commit()
 	return {
@@ -37,10 +40,13 @@ def logout_current_session() -> dict:
 def handle_logout_token(logout_token: object) -> dict:
 	"""Verifies the logout token and closes the matching Frappe sessions."""
 	frappe.local.response_headers["Cache-Control"] = "no-store"
+	sign_in.guard_guest_request()
 	if frappe.session.user != "Guest":
 		_reject(_("Back-channel logout must not carry a session cookie."))
 	if not isinstance(logout_token, str) or not logout_token:
 		_reject(_("Logout token is missing."))
+	if len(logout_token) > helpers.MAX_TOKEN_LENGTH:
+		_reject(_("Logout token rejected: {0}").format("malformed"))
 
 	from oidc_verify import TokenError, verify_logout_token
 
@@ -67,7 +73,11 @@ def handle_logout_token(logout_token: object) -> dict:
 	closed = 0
 	sid = claims.get("sid")
 	if helpers.is_session_id(sid):
-		closed += _close(sessions_for_keycloak_sid, sid)
+		for frappe_sid in sign_in.frappe_sids_for(sid):
+			if _session_exists(frappe_sid):
+				delete_session(frappe_sid, reason=LOGOUT_REASON)
+				closed += 1
+		sign_in.forget_keycloak_session(sid)
 
 	subject = claims.get("sub")
 	if closed == 0 and isinstance(subject, str) and subject:
@@ -117,16 +127,9 @@ def _close(finder, *args) -> int:
 	return closed
 
 
-def sessions_for_keycloak_sid(sid: str) -> list[tuple[str, str]]:
-	"""Frappe sessions whose data carries this Keycloak `sid`. The format is restricted by `is_session_id`."""
+def _session_exists(frappe_sid: str) -> bool:
 	sessions = frappe.qb.DocType("Sessions")
-	return (
-		frappe.qb.from_(sessions)
-		.select(sessions.sid, sessions.user)
-		.where(sessions.sessiondata.like(f"%{helpers.session_marker(sid)}%"))
-		.limit(BATCH)
-		.run()
-	)
+	return bool(frappe.qb.from_(sessions).select(sessions.sid).where(sessions.sid == frappe_sid).run())
 
 
 def sessions_for_user_before(user: str, iat: int) -> list[tuple[str, str]]:

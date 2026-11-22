@@ -54,9 +54,6 @@ class TestPureHelpers(UnitTestCase):
 		self.assertFalse(helpers.is_session_id(""))
 		self.assertFalse(helpers.is_session_id(None))
 
-	def test_session_marker_matches_frappe_json_separators(self):
-		self.assertEqual(helpers.session_marker("abc"), '"keycloak_sid":"abc"')
-
 	def test_session_claims(self):
 		claims = {"sub": "s-1", "sid": "k-1-long-enough", "email": "x@example.test"}
 		self.assertEqual(

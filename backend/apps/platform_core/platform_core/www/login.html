@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="ltr">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<meta name="robots" content="noindex">
+	<title>{{ title }}</title>
+	<link rel="stylesheet" href="/assets/platform_core/kimlik/login.css">
+	<script>
+		// Visible keyboard focus starts off and is switched on only by Tab or Shift+Tab (AGENT.md focus rule).
+		(function () {
+			var root = document.documentElement;
+			document.addEventListener("keydown", function (event) {
+				if (event.key === "Tab") { root.setAttribute("data-kbd", ""); }
+			}, true);
+			["pointerdown", "touchstart"].forEach(function (name) {
+				document.addEventListener(name, function () { root.removeAttribute("data-kbd"); }, true);
+			});
+		})();
+	</script>
+</head>
+<body data-page="platform-core-login">
+	<main class="login" aria-labelledby="login-title">
+		<h1 id="login-title" class="login__title">{{ title }}</h1>
+		{% if configured %}
+			<p class="login__lead">{{ _("Use your {0} account to continue.").format(brand_name) }}</p>
+			<a class="button button--primary" href="{{ start_url }}" rel="nofollow">{{ button_label }}</a>
+			{% if not keycloak_only %}
+				<section class="login__local" aria-labelledby="local-title">
+					<h2 id="local-title" class="login__subtitle">{{ _("Sign in with password") }}</h2>
+					<form class="form" method="post" action="{{ login_endpoint }}" data-login-endpoint="{{ login_endpoint }}" data-after-login="{{ after_login }}" novalidate>
+						<label class="form__label" for="usr">{{ _("E-mail") }}</label>
+						<input class="form__input" id="usr" name="usr" type="email" autocomplete="username" required>
+						<label class="form__label" for="pwd">{{ _("Password") }}</label>
+						<input class="form__input" id="pwd" name="pwd" type="password" autocomplete="current-password" required>
+						<p class="form__error" id="login-error" role="alert" aria-live="assertive" hidden></p>
+						<button class="button button--secondary" type="submit">{{ _("Sign in") }}</button>
+					</form>
+				</section>
+				<script>
+					(function () {
+						var form = document.querySelector("form[data-login-endpoint]");
+						var error = document.getElementById("login-error");
+						form.addEventListener("submit", function (event) {
+							event.preventDefault();
+							error.hidden = true;
+							var body = new URLSearchParams(new FormData(form));
+							fetch(form.dataset.loginEndpoint, {
+								method: "POST",
+								headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
+								body: body,
+								credentials: "same-origin"
+							}).then(function (response) {
+								if (response.ok) { window.location.assign(form.dataset.afterLogin); return; }
+								error.textContent = {{ _("Sign-in failed. Check your e-mail and password.") | tojson }};
+								error.hidden = false;
+							}).catch(function () {
+								error.textContent = {{ _("The server could not be reached. Try again.") | tojson }};
+								error.hidden = false;
+							});
+						});
+					})();
+				</script>
+			{% endif %}
+		{% else %}
+			<p class="login__lead" role="alert">{{ _("Sign in with the identity provider is not configured.") }}</p>
+		{% endif %}
+	</main>
+</body>
+</html>

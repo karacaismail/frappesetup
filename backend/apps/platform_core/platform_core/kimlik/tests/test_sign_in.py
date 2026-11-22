@@ -179,6 +179,19 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		)
 		self.assertEqual(response.status_code, 400)
 
+	def test_oversized_code_or_state_is_refused(self):
+		_started, query = h.start_login(self.client)
+		long_state = h.finish_login(self.client, query, "x", state="s" * 300)
+		self.assertEqual(long_state.status_code, 400)
+		long_code = h.finish_login(self.client, query, "x", code="c" * 5000)
+		self.assertEqual(long_code.status_code, 400)
+		big_body = h.request(
+			self.client.post,
+			"/api/method/platform_core.api.auth.get_login_url",
+			json={"redirect_to": "/panel", "padding": "p" * 20000},
+		)
+		self.assertEqual(big_body.status_code, 413)
+
 	def test_keycloak_error_response_is_shown_not_trusted(self):
 		_started, query = h.start_login(self.client)
 		response = h.request(

@@ -146,6 +146,17 @@ class TestBackChannelLogout(FrappeAPITestCase):
 		self.assertEqual(response.json["message"], {"closed_sessions": 0})
 		self.assertEqual(h.logged_user(self.client), h.AYSE)
 
+	def test_oversized_token_and_body_are_rejected_early(self):
+		huge = self.send("a" * 9000)
+		self.assertEqual(huge.status_code, 400)
+		body = h.request(
+			h.new_client().post,
+			ENDPOINT,
+			data={"logout_token": "x", "padding": "p" * 20000},
+			content_type="application/x-www-form-urlencoded",
+		)
+		self.assertEqual(body.status_code, 413, body.data[:200])
+
 	def test_get_is_rejected(self):
 		# Frappe answers a wrong HTTP method with PermissionError (frappe/handler.py:110).
 		response = h.request(h.new_client().get, ENDPOINT)

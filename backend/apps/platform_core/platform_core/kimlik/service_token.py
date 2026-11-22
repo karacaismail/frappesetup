@@ -24,17 +24,26 @@ def validate() -> None:
 	request = getattr(frappe.local, "request", None)
 	if request is None or request.method == "OPTIONS":
 		return
-	if request.path not in IDENTITY_ENDPOINTS:
+	from platform_core.kimlik import api as kimlik_api
+
+	mobile = kimlik_api.is_mobile_path(request.path)
+	if request.path not in IDENTITY_ENDPOINTS and not mobile:
 		return
 	parts = (frappe.get_request_header("Authorization") or "").split(" ", 1)
 	if len(parts) != 2 or parts[0].lower() != "bearer":
 		return
 	token = parts[1].strip()
+	if len(token) > helpers.MAX_TOKEN_LENGTH:
+		_refuse(_("Service token rejected: {0}").format("malformed"))
 
 	if frappe.form_dict.get("cmd"):
 		_refuse(_("Service requests must not carry a cmd field."))
 	if frappe.session.user not in ("", "Guest"):
 		_refuse(_("Service requests must not carry a session cookie."))
+
+	if mobile:
+		kimlik_api.authenticate_mobile_request(token)
+		return
 
 	from oidc_verify import TokenError, verify_access_token
 

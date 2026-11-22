@@ -9,6 +9,11 @@ readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     "pydantic~=2.12.5",
+    # platform-core-kimlik: HTTP call to the Keycloak token endpoint and shared token verification.
+    # requests ships with Frappe 16 (2.33.x). oidc_verify lives in backend/libs/oidc_verify and is
+    # installed from there (dev images use `pip install --no-deps -e`); it is not on PyPI.
+    "requests>=2.32,<3",
+    "oidc_verify>=0.1.0",
 ]
 
 [tool.bench.frappe-dependencies]

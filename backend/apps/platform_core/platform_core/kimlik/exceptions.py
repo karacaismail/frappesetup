@@ -18,6 +18,10 @@ class InvalidInput(frappe.ValidationError):
 	http_status_code = 400
 
 
+class PayloadTooLarge(frappe.ValidationError):
+	http_status_code = 413
+
+
 class KeycloakLoginNotConfigured(frappe.ValidationError):
 	http_status_code = 503
 

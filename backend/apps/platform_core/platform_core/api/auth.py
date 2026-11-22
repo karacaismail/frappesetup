@@ -5,6 +5,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 
 from platform_core.kimlik import provider_setup, sign_in, sign_out
+from platform_core.kimlik.exceptions import InvalidRedirect, KeycloakLoginNotConfigured
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
@@ -12,6 +13,22 @@ from platform_core.kimlik import provider_setup, sign_in, sign_out
 def get_login_url(redirect_to: str | None = None) -> dict:
 	"""Builds the Keycloak sign-in address. `state` is generated on the server. `redirect_to` must be a relative path."""
 	return sign_in.build_login_url(redirect_to)
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+@rate_limit(limit=20, seconds=60)
+def start_login(redirect_to: str | None = None) -> None:
+	"""Browser entry point of the sign-in: same work as `get_login_url`, then a 302 to Keycloak.
+	The brand button on the tenant `/login` page links here."""
+	try:
+		result = sign_in.build_login_url(redirect_to)
+	except (InvalidRedirect, KeycloakLoginNotConfigured) as error:
+		frappe.respond_as_web_page(
+			_("Sign-in failed"), str(error), http_status_code=error.http_status_code, indicator_color="red"
+		)
+		return
+	frappe.local.response["type"] = "redirect"
+	frappe.local.response["location"] = result["login_url"]
 
 
 @frappe.whitelist(allow_guest=True, methods=["GET"])

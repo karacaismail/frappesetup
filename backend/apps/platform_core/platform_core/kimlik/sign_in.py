@@ -25,6 +25,7 @@ from platform_core.kimlik.exceptions import (
 	InvalidRedirect,
 	KeycloakLoginNotConfigured,
 	KeycloakSettingsMissing,
+	PayloadTooLarge,
 )
 
 LINK_DOCTYPE = "Platform Identity Link"
@@ -49,8 +50,17 @@ class ExchangeFailed(Exception):
 	"""The token endpoint did not return a token. The response body is never logged."""
 
 
+def guard_guest_request(max_bytes: int = helpers.MAX_GUEST_BODY_BYTES) -> None:
+	"""Guest endpoints refuse oversized bodies before doing any work (AU-14, review item O9)."""
+	request = getattr(frappe.local, "request", None)
+	length = getattr(request, "content_length", None) if request is not None else None
+	if length and length > max_bytes:
+		frappe.throw(_("Request body is too large."), PayloadTooLarge)
+
+
 def build_login_url(redirect_to: str | None = None) -> dict:
 	"""Builds the Keycloak authorize address and binds the attempt to this browser."""
+	guard_guest_request()
 	if redirect_to and not helpers.is_safe_redirect(redirect_to):
 		frappe.throw(_("Redirect target must be a relative path on this site."), InvalidRedirect)
 	try:
@@ -91,9 +101,12 @@ def build_login_url(redirect_to: str | None = None) -> dict:
 
 def complete_callback(code: str | None, state: str | None, error: str | None = None) -> str:
 	"""Finishes the sign-in. Returns the redirect target. Raises `SignInRefused` on any refusal."""
+	guard_guest_request()
 	if error:
 		raise SignInRefused(400, _("The identity provider refused or cancelled the sign-in."))
 	if not isinstance(state, str) or not state or not isinstance(code, str) or not code:
+		raise SignInRefused(400, _("The sign-in response is incomplete."))
+	if len(state) > helpers.MAX_STATE_LENGTH or len(code) > helpers.MAX_CODE_LENGTH:
 		raise SignInRefused(400, _("The sign-in response is incomplete."))
 
 	record = _pop_state(state)
@@ -141,6 +154,7 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 	user = resolve_user(settings.issuer, claims)
 	frappe.local.login_manager.login_as(user)
 	frappe.local.session.data.update(helpers.session_claims(claims, settings.issuer))
+	remember_keycloak_session(claims.get("sid"), frappe.session.sid)
 	# Frappe skips the CSRF check while the session has no token (frappe/auth.py:92). Create it now,
 	# so the first write after sign-in already needs the X-Frappe-CSRF-Token header.
 	frappe.sessions.get_csrf_token()
@@ -221,6 +235,41 @@ def exchange_code(settings, code: str, code_verifier: str, redirect_uri: str) ->
 
 def callback_url() -> str:
 	return get_url(helpers.CALLBACK_PATH)
+
+
+SID_INDEX_PREFIX = "kimlik_kc_sid"
+
+
+def _sid_index_key(keycloak_sid: str) -> str:
+	return frappe.cache.make_key(f"{SID_INDEX_PREFIX}:{helpers.sha256_hex(keycloak_sid)}")
+
+
+def remember_keycloak_session(keycloak_sid: object, frappe_sid: str) -> None:
+	"""Indexed lookup for back-channel logout: Keycloak sid -> Frappe sids (review item K9).
+
+	The index lives in Redis for the session lifetime. If it is lost, the logout falls back to the
+	`sub` claim, which closes the user's sessions opened before the token (see sign_out.py).
+	"""
+	if not helpers.is_session_id(keycloak_sid) or not frappe_sid:
+		return
+	from frappe.sessions import get_expiry_in_seconds
+
+	key = _sid_index_key(keycloak_sid)
+	frappe.cache.sadd(key, frappe_sid)
+	frappe.cache.expire(key, get_expiry_in_seconds())
+
+
+def frappe_sids_for(keycloak_sid: str) -> list[str]:
+	members = frappe.cache.smembers(_sid_index_key(keycloak_sid)) or set()
+	return sorted(m.decode() if isinstance(m, bytes) else str(m) for m in members)
+
+
+def forget_keycloak_session(keycloak_sid: str, frappe_sid: str | None = None) -> None:
+	key = _sid_index_key(keycloak_sid)
+	if frappe_sid:
+		frappe.cache.srem(key, frappe_sid)
+	else:
+		frappe.cache.delete(key)
 
 
 def _cookie_name() -> str:
