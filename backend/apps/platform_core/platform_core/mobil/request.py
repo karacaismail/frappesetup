@@ -5,8 +5,12 @@ import random
 import re
 import time
 from dataclasses import dataclass
+from datetime import datetime
+from hmac import compare_digest
+from zoneinfo import ZoneInfo
 
 import frappe
+from frappe.utils import get_system_timezone
 
 from .protocol import BODY_BYTES, REQUESTS_PER_MINUTE, TOKEN_CLOCK_SKEW_SECONDS, MobileError, content_digest
 from .sessions import is_session_revoked, valid_session_id
@@ -32,7 +36,7 @@ class Identity:
 	principal: str
 	scope: str
 	issued_at: int
-	sid: str
+	sid: str | None
 
 
 def _unique_keys(pairs):
@@ -119,17 +123,56 @@ def mobile_request(endpoint):
 		raise MobileError("mobile_session_revoked", 401)
 	principal = content_digest([issuer, subject])
 
+	return _sync_payload(request, Identity(frappe.local.site, account, principal, scope, issued_at, sid))
+
+
+def pwa_request(endpoint):
+	request = frappe.local.request
+	if request.path != f"/api/method/platform_core.api.mobile_pwa.{endpoint}" or "cmd" in request.args:
+		raise MobileError("invalid_mobile_route")
+	if "Authorization" in request.headers:
+		raise MobileError("mixed_authentication")
+	account = frappe.session.user
+	login_manager = getattr(frappe.local, "login_manager", None)
+	sid = request.cookies.get("sid")
+	if (
+		not account
+		or account == "Guest"
+		or account != getattr(login_manager, "user", None)
+		or not sid
+		or sid != frappe.session.sid
+	):
+		raise MobileError("pwa_session_required", 401)
+
+	origin = request.headers.get("Origin")
+	csrf_token = request.headers.get("X-Frappe-CSRF-Token", "")
+	expected_csrf = frappe.session.data.csrf_token
+	if origin != request.host_url.rstrip("/") or not expected_csrf or not compare_digest(
+		csrf_token.encode(), expected_csrf.encode()
+	):
+		raise MobileError("pwa_request_forbidden", 403)
+
+	try:
+		created = datetime.fromisoformat(str(frappe.session.data.creation))
+	except ValueError as error:
+		raise MobileError("pwa_session_required", 401) from error
+	issued_at = int(created.replace(tzinfo=ZoneInfo(get_system_timezone())).timestamp())
+	principal = content_digest(["pwa", account])
+	return _sync_payload(request, Identity(frappe.local.site, account, principal, "pwa", issued_at, None))
+
+
+def _sync_payload(request, identity):
 	app_version = request.headers.get("X-Mobile-App-Version", "")
 	contract_version = request.headers.get("X-Mobile-Contract-Version", "")
 	if not APP_VERSION.fullmatch(app_version) or not CONTRACT_VERSION.fullmatch(contract_version):
 		raise MobileError("invalid_client_version")
-	_limit_and_count(principal, app_version, contract_version)
+	_limit_and_count(identity.principal, app_version, contract_version)
 	if contract_version != "1":
 		raise MobileError("unsupported_contract_version")
 	body = _read_json(request)
 	if "cmd" in body:
 		raise MobileError("invalid_mobile_route")
-	return Identity(frappe.local.site, account, principal, scope, issued_at, sid), body
+	return identity, body
 
 
 def identity_sync_request():
@@ -187,6 +230,21 @@ def endpoint_response(endpoint, action):
 		return _error_response(error)
 
 	return run_transaction(action, identity, body)
+
+
+def pwa_endpoint_response(endpoint, action):
+	session = getattr(frappe.local, "session_obj", None)
+	# Frappe 16 schedules a refresh when this request-local object is present.
+	# Background sync must not extend the interactive browser session.
+	frappe.local.session_obj = None
+	try:
+		identity, body = pwa_request(endpoint)
+	except MobileError as error:
+		return _error_response(error)
+	result = run_transaction(action, identity, body)
+	if endpoint == "v1_activity" and result is not None:
+		frappe.local.session_obj = session
+	return result
 
 
 def identity_sync_response(action):

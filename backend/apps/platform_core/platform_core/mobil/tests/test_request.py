@@ -150,3 +150,44 @@ class MobileRequestTest(unittest.TestCase):
 		self.assertEqual(action.call_count, 3)
 		self.assertEqual(self.frappe.local.response["http_status_code"], 503)
 		self.assertEqual(self.frappe.local.response_headers, {"Retry-After": "1"})
+
+	def test_pwa_requires_matching_cookie_origin_and_csrf(self):
+		self.request.path = "/api/method/platform_core.api.mobile_pwa.v1_pull"
+		self.request.host_url = "https://test-mobile.localhost/"
+		self.request.cookies = {"sid": "cookie-session"}
+		self.request.headers.pop("Authorization")
+		self.request.headers.update(
+			{"Origin": "https://test-mobile.localhost", "X-Frappe-CSRF-Token": "csrf-token"}
+		)
+		self.frappe.local.login_manager.user = self.frappe.session.user
+		self.frappe.session.sid = "cookie-session"
+		self.frappe.session.data = SimpleNamespace(csrf_token="csrf-token", creation="2026-11-22 07:00:00")
+		with patch.object(request, "_limit_and_count"), patch.object(
+			request, "get_system_timezone", return_value="UTC", create=True
+		):
+			identity, body = request.pwa_request("v1_pull")
+			self.assertEqual((identity.scope, identity.sid, body), ("pwa", None, {}))
+			for header, invalid in (
+				("Origin", "https://other.example.test"),
+				("X-Frappe-CSRF-Token", ""),
+				("X-Frappe-CSRF-Token", "wrong"),
+				("Authorization", "Bearer unrelated"),
+			):
+				with self.subTest(header=header), patch.dict(self.request.headers, {header: invalid}):
+					with self.assertRaises(MobileError):
+						request.pwa_request("v1_pull")
+			self.request.cookies["sid"] = "other-session"
+			with self.assertRaises(MobileError):
+				request.pwa_request("v1_pull")
+
+	def test_pwa_background_request_does_not_schedule_session_refresh(self):
+		session = Mock()
+		self.frappe.local.session_obj = session
+		with patch.object(request, "pwa_request", return_value=(Mock(), {})), patch.object(
+			request, "run_transaction", return_value={}
+		):
+			request.pwa_endpoint_response("v1_pull", Mock())
+			self.assertIsNone(self.frappe.local.session_obj)
+			self.frappe.local.session_obj = session
+			request.pwa_endpoint_response("v1_activity", Mock())
+			self.assertIs(self.frappe.local.session_obj, session)

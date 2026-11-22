@@ -223,6 +223,173 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '503': { $ref: '#/components/responses/Unavailable' }
+  /platform_core.api.mobile_pwa.v1_register:
+    post:
+      summary: Telefon kurulumunu kaydet
+      operationId: mobilePwaV1Register
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: |
+        Telefon kurulumunu aynı kökendeki Frappe oturumuyla kaydeder.
+        İptal edilen kurulum yeniden açılamaz. Yeni oturum yeni kurulum kimliği ister.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200': { $ref: '#/components/responses/DeviceSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_revoke:
+    post:
+      summary: Telefon kurulumunu iptal et
+      operationId: mobilePwaV1Revoke
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: |
+        Hesabın bir kurulumunu veya bütün etkin kurulumlarını iptal eder.
+        Yanıttaki sayı yerel iptali gösterir. Sunucu daha sonra oturum kapatma isteği gönderir.
+        Başka bir geçerli oturumla tekli iptal yinelenebilir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { $ref: '#/components/schemas/Device' }
+                - type: object
+                  additionalProperties: false
+                  required: [all]
+                  properties:
+                    all: { const: true }
+      responses:
+        '200': { $ref: '#/components/responses/RevokedSuccess' }
+        '401': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_activity:
+    post:
+      summary: Kullanıcının son işlem saatini kaydet
+      operationId: mobilePwaV1Activity
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      description: |
+        İstemci bu ucu yalnız kullanıcı işlem yaptığında çağırır.
+        Sunucu kendi saatini kaydeder. Arka plan eşitlemesi bu saati değiştirmez.
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Device' }
+      responses:
+        '200':
+          description: Sunucu son işlem saatini Unix saniyesi olarak döndürür.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [last_user_activity_at]
+                    properties:
+                      last_user_activity_at: { type: integer }
+        '401': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_push:
+    post:
+      summary: Telefondaki değişiklikleri sunucuya gönder
+      operationId: mobilePwaV1Push
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: |
+        En çok 20 işi sırayla işler. Bir iş başarısız olursa bütün grubu geri alır.
+        Sunucu aynı kimlik ve içerikle gelen işe ilk kesinleşen sonucu verir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [installation_id, operations]
+              properties:
+                installation_id: { $ref: '#/components/schemas/UUID' }
+                operations:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: { $ref: '#/components/schemas/Operation' }
+      responses:
+        '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
+        '409': { $ref: '#/components/responses/Error', description: İşlem içeriği değişti veya kayıt sürümü eski. }
+        '401': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
+  /platform_core.api.mobile_pwa.v1_pull:
+    post:
+      summary: Kayıtları sunucudan telefona al
+      operationId: mobilePwaV1Pull
+      security:
+        - pwaSession: []
+          pwaCsrf: []
+      parameters:
+        - { $ref: '#/components/parameters/PwaOrigin' }
+        - { $ref: '#/components/parameters/AppVersion' }
+        - { $ref: '#/components/parameters/ContractVersion' }
+      description: İmleç yoksa ilk kopyayı başlatır. Sonraki çağrılar sunucunun verdiği imleci kullanır.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [installation_id]
+              properties:
+                installation_id: { $ref: '#/components/schemas/UUID' }
+                cursor: { type: string, maxLength: 2048 }
+                limit: { type: integer, minimum: 1, maximum: 100, default: 100 }
+      responses:
+        '200': { $ref: '#/components/responses/Page' }
+        '410': { $ref: '#/components/responses/Error', description: İmleç geçersiz veya süresi doldu. Tam kopya alın. }
+        '401': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Throttled' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     identitySyncBearer:
@@ -230,7 +397,15 @@ components:
       scheme: bearer
       description: Kimlik kancasının doğruladığı ve azp değeri identity-sync olan servis belirteci.
     mobileBearer: { type: http, scheme: bearer }
+    pwaSession: { type: apiKey, in: cookie, name: sid }
+    pwaCsrf: { type: apiKey, in: header, name: X-Frappe-CSRF-Token }
   parameters:
+    PwaOrigin:
+      name: Origin
+      in: header
+      required: true
+      description: PWA ve kiracı sitesi aynı kökenden sunulur.
+      schema: { type: string }
     AppVersion:
       name: X-Mobile-App-Version
       in: header
