@@ -18,7 +18,7 @@ PRESS_BENCH = "/home/frappe/benches/frappe-bench"
 
 
 def keycloak_request(port, path, *, token=None, data=None, form=False, expect_denial=False):
-    headers = {"Host": f"kimlik.localhost:{port}"}
+    headers = {"Host": f"identity.localhost:{port}"}
     body = None
     if token:
         headers["Authorization"] = "Bearer " + token
@@ -134,7 +134,9 @@ def seed_keycloak(port, password):
 
 def seed_site(project, service, bench, environment):
     source = Path(__file__).with_name("site-seed.py")
-    command = ["docker", "--context", "colima", "exec", "-i", "--workdir", bench]
+    profile = os.environ.get("FS_COLIMA_PROFILE", "default")
+    context = {"default": "colima", "factory": "colima-factory"}[profile]
+    command = ["docker", "--context", context, "exec", "-i", "--workdir", bench]
     for name in environment:
         command.extend(("--env", name))
     command.extend((f"{project}-{service}-1", "env/bin/python", "-", service))

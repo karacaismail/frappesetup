@@ -98,3 +98,27 @@ test('preview webhook uses the Keycloak development hostname and its network ali
     rmSync(root, { recursive: true });
   }
 });
+
+test('factory mode probes the factory Docker context before creating resources', () => {
+  const root = mkdtempSync(join(process.env.PANE_SCRATCH_DIR || tmpdir(), 'runtime-factory-'));
+  try {
+    const worktree = join(root, 'worktree');
+    mkdirSync(worktree);
+    writeFileSync(join(root, 'docker'), `#!/bin/bash
+      [[ "$1 $2 $3" == "--context colima-factory run" ]] || exit 42
+      echo 'MemAvailable: 2097152 kB'
+    `, { mode: 0o700 });
+    const result = spawnSync('bash', [runtime, worktree], {
+      env: {
+        ...process.env, PATH: root + ':' + process.env.PATH,
+        PREVIEW_DIR: root, PREVIEW_PROJECT: 'fs-e2e-preview-factory-test', PANE_PORT: '6500',
+        FS_COLIMA_PROFILE: 'factory', E2E_BROWSER_RUNTIME: 'container',
+      },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /at least 3 GiB/);
+  } finally {
+    rmSync(root, { recursive: true });
+  }
+});
