@@ -4,7 +4,7 @@ nav: "App çerçevesi"
 order: 16
 ---
 
-Satılan her uygulama (CronHR, CRM, Webshop ve sonrakiler) aynı çerçeveden geçer: ortak admin shell'in içine oturur, aynı yetki/AI/abonelik sözleşmelerini uygular ve Press'e aynı zincirle kaydolur. Çerçeve bir manifesttir; uygulama ekibi her kalemi doldurur, CI ve X-09 uyumluluk betiği doğrular, Marketplace App yayımı bu listenin tamamlanmasına bağlıdır.
+Satılan her uygulama (HRMS TR, CRM, Webshop ve sonrakiler) aynı çerçeveden geçer: ortak admin shell'in içine oturur, aynı yetki/AI/abonelik sözleşmelerini uygular ve Press'e aynı zincirle kaydolur. Çerçeve bir manifesttir; uygulama ekibi her kalemi doldurur, CI ve X-09 uyumluluk betiği doğrular, Marketplace App yayımı bu listenin tamamlanmasına bağlıdır.
 
 ## App Frame manifesti (kontrol listesi)
 
@@ -23,7 +23,7 @@ Satılan her uygulama (CronHR, CRM, Webshop ve sonrakiler) aynı çerçeveden ge
 
 ## Press'e kayıt zinciri (tüm uygulamalar için ortak)
 
-1. **App + App Source**: GitHub App entegrasyonuyla depo bağlanır; `branch` ve `versions` tablosunda `Version 16`; `required_apps` ile bağımlılık (örn. CronHR → hrms) bildirilir (doğrulandı: App Source alanları).
+1. **App + App Source**: GitHub App entegrasyonuyla depo bağlanır; `branch` ve `versions` tablosunda `Version 16`; `required_apps` ile bağımlılık (örn. hrms_tr → hrms) bildirilir (doğrulandı: App Source alanları).
 2. **Release Group**: `erpnext-v16-tr-staging` (auto deploy) ve `erpnext-v16-tr-prod` (Scheduled Deploy Settings) gruplarına eklenir; bench düzeyinde uygulama kümesi ortaktır, kiracı yalnızca `install_app` ile kurduğunu görür (G-32).
 3. **Marketplace App**: `team` = yayıncı takımımız, `status` Published, `frappe_approved=1`, `subscription_type` (Free/Paid/Freemium), `sources` → App Source, `site_config` varsayılanları, `after_install_script` + `run_after_install_script=1`, `after_uninstall_script` karşılığı, `collect_feedback=1`; Türkiye yerelleştirmesi için `localisation_apps` satırı `country='Türkiye'` → `tr_localization` (G-65).
 4. **Marketplace App Plan**: `enabled=1`, `interval` Monthly, `price_try` Custom Field + USD karşılığı (`price_usd` kapılar için &gt;0, ücretsiz planda 0), `available_on_versions` Version 16, `features` (AI kotası, e-posta kotası, modül bayrakları), `roles` görünürlük (G-9, G-10, G-92).
@@ -33,22 +33,22 @@ Satılan her uygulama (CronHR, CRM, Webshop ve sonrakiler) aynı çerçeveden ge
 
 ## Uygulama uzmanlaşmaları
 
-| Alan | CronHR (HRMS) | CRM | Webshop |
+| Alan | HRMS TR | CRM | Webshop |
 | --- | --- | --- | --- |
-| Upstream bağımlılık | `frappe/hrms` version-16; ayrı `cronhr` app | `frappe/crm` main dalı (version-16 dalı yok; v16 uyumu Deploy Candidate'te doğrulanacak) | `frappe/webshop` + `frappe/payments` version-16 |
+| Upstream bağımlılık | `frappe/hrms` version-16; ayrı `hrms_tr` app | `frappe/crm` main dalı (version-16 dalı yok; v16 uyumu Deploy Candidate'te doğrulanacak) | `frappe/webshop` + `frappe/payments` version-16 |
 | Marketplace App | Paid/Freemium, Product Trial var | Freemium | Paid |
 | Hiyerarşi ve kapsam | `Employee.reports_to`, `Department` ağacı; Access Rule şablonu: çalışan kendi kayıtları, yönetici ekibi, İK tümü | Deal/Lead sahibi, Territory, satış ekibi; şablon: temsilci kendi fırsatları, ekip lideri ekibi | Customer Group, Warehouse, Company; şablon: mağaza yöneticisi kendi şirketi |
 | Hassas alan permlevel | Maaş bileşenleri, TCKN, IBAN, sağlık/disiplin kayıtları | Telefon, e-posta, görüşme notları (kişisel veri) | Müşteri adresi, sipariş ödeme bilgileri |
 | AI tek tık akışları | İzin onayı + yöneticiye bildirim, bordro kontrol özeti, eksik SGK verisi tarama | Lead → Deal dönüştür ve görev aç, e-posta özetinden sonraki adım öner | Stok uyarısından sipariş önerisi, iade talebini Credit Note'a dönüştür (onaylı) |
 | Uygulamaya özgü zorunluluk | TR bordro: SGK primleri, gelir vergisi dilimleri, damga vergisi, kıdem/ihbar, 4857 yıllık izin; mevzuat parametreleri yıllık fixture tablosu (mali müşavir teyidi); e-bildirge/APHB dışa aktarım hazırlığı | `Email Account` IMAP yalnızca CRM'de panelden tanımlanır (G-47); headless meta-driven + CRM override'ları | `payments` uygulamasına kiracının kendi hesabıyla iyzico sağlayıcısı (G-109); vitrin SSR kararı ürün sahibinde; kiracı e-Arşiv/e-Fatura ihtiyacı `tr_edocs` ile (P5) |
-| Helpdesk / SLA | HD Team 'CronHR'; bordro döneminde (ayın 1–10'u) yükseltilmiş SLA | HD Team 'CRM' | HD Team 'Webshop'; ödeme hataları Billing ekibine |
+| Helpdesk / SLA | HD Team 'HRMS TR'; bordro döneminde (ayın 1–10'u) yükseltilmiş SLA | HD Team 'CRM' | HD Team 'Webshop'; ödeme hataları Billing ekibine |
 | Gereksinim | G-108 | G-109 | G-109 |
 
 Her sütundaki kalem manifestin 3–5. maddelerinin uygulamaya özgü doldurulmuş halidir; ortak çerçeve değişmez, yalnızca içerik farklılaşır.
 
 ## Rail 6 kayıtları: her app'in operasyon düzlemine bildirdikleri
 
-- **Helpdesk kategorisi ve SLA kademesi:** app, HD Ticket için ürün etiketini (`cronhr`, `crm`, `webshop`), varsayılan `HD Team` atamasını ve plan kademesine göre SLA'yı bildirir (SA-31).
+- **Helpdesk kategorisi ve SLA kademesi:** app, HD Ticket için ürün etiketini (`hrms_tr`, `crm`, `webshop`), varsayılan `HD Team` atamasını ve plan kademesine göre SLA'yı bildirir (SA-31).
 - **Kredi maliyeti tablosu:** app'in `ai_tools` manifestindeki her ücretli araç için birim kredi maliyeti ve kota etiketi; agent servisi bunu `AI Credit Plan` Usage Record'una yazar (SA-15).
 - **Faturalama kalemi eşlemesi:** app'in Marketplace App Plan'ı operasyon sitesinde `APP-<ad>` Item'ına ve KDV şablonuna eşlenir; `create-fc-invoice` alıcısı bu eşlemeyle Sales Invoice satırı üretir (SA-19).
 - **Müşteri 360 özeti:** app, operatör paneli için salt okur özet sağlayıcısını (`platform_core.api.ops.customer_360` eklentisi: kullanım, son etkinlik, açık onaylar) bildirir; özet aşağıdaki yaşam döngüsü sinyalleriyle aynı outbox yoluyla operasyon sitesine akar, Müşteri 360 kiracı sitesini çağırmaz (SA-24).
@@ -65,4 +65,4 @@ Her sütundaki kalem manifestin 3–5. maddelerinin uygulamaya özgü doldurulmu
 - Türkçe `tr.po` tam; panel metinleri i18n kataloğunda (G-73).
 - İlk Paid Invoice operasyon sitesinde `APP-<ad>` satırıyla Sales Invoice olarak görünür (SA-19).
 
-CronHR bu çerçevenin ilk uygulamasıdır (P4); CRM ve Webshop aynı manifestle P5'te yayına alınır, çerçevede değişiklik gerekirse önce manifest güncellenir, sonra üç uygulama birlikte yeniden doğrulanır.
+HRMS TR bu çerçevenin ilk uygulamasıdır (P4); CRM ve Webshop aynı manifestle P5'te yayına alınır, çerçevede değişiklik gerekirse önce manifest güncellenir, sonra üç uygulama birlikte yeniden doğrulanır.

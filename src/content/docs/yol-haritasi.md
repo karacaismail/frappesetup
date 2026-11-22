@@ -18,7 +18,7 @@ Eksen hafta cinsindendir; çubuklar bağımlılıkla zincirlenir, takvim tarihi 
 
 <div data-embed="timeline"></div>
 
-P2 ticari katman P1'in Keycloak ara kapısından (14. hafta) başlar ve operasyon sitesinin finans çekirdeğini (SA-17, SA-19, SA-35, SA-41) içerir; P3 AI ve P4 CronHR ilk dikey dilimden (P1 çıkışı) sonra paralel yürür; P6 operasyon düzlemi P2 tamamlanınca (26. hafta) açılır; P5 ilk ödeyen müşteriden sonra gelir.
+P2 ticari katman P1'in Keycloak ara kapısından (14. hafta) başlar ve operasyon sitesinin finans çekirdeğini (SA-17, SA-19, SA-35, SA-41) içerir; P3 AI ve P4 HRMS TR ilk dikey dilimden (P1 çıkışı) sonra paralel yürür; P6 operasyon düzlemi P2 tamamlanınca (26. hafta) açılır; P5 ilk ödeyen müşteriden sonra gelir.
 
 ## İlk dikey dilim: İzin talebi (Leave Application)
 
@@ -30,7 +30,7 @@ P1 çıkışında bir HR ekranı tüm katmanlardan uçtan uca geçer. AI ve dest
 | 2. Shell | `api.shell.get_bootstrap`; sidebar HR Workspace Sidebar + kurulu hrms'ten türer | G-63, G-94 |
 | 3. Liste/form | `Leave Application` meta'dan TanStack Table + Form; adres `/ik/izin-talebi/<kimlik>`; 320 px'te belge yan paneli Drawer | G-69..G-71, G-132 |
 | 4. Yetki | Access Rule: Employee kendi kayıtlarını, yönetici `reports_to` ekibini görür; `leave_balance` permlevel ile kısıtlı; liste, belge, rapor ve dışa aktarım aynı sonucu verir | G-60, G-61, G-104, G-121 |
-| 5. AI prototipi | "Bu izni onayla": tek araç `cronhr.approve_leave` site aracı belirteciyle; önizleme + sunucuda bağlanan onay; AI Action Log. Sınıflandırıcı, kredi ölçümü ve müşteriye açılış yok | G-129 (tam teslim P3: G-59, G-84..G-86) |
+| 5. AI prototipi | "Bu izni onayla": tek araç `hrms_tr.approve_leave` site aracı belirteciyle; önizleme + sunucuda bağlanan onay; AI Action Log. Sınıflandırıcı, kredi ölçümü ve müşteriye açılış yok | G-129 (tam teslim P3: G-59, G-84..G-86) |
 | 6. Destek prototipi | Support Access → Support Session (yalnız görüntüle) → tek oda; rota, imleç, filtre paylaşılır, alan değeri paylaşılmaz; Revoke bağlantıyı 2 sn içinde keser | SA-40 (tam teslim P6: SA-42..SA-44) |
 | 7. Kabul | Playwright: 320/360/375/390/tablet/masaüstü × Chromium/Firefox/WebKit; Tab/Shift+Tab odak, Escape, yön değişimi; gerçek Safari ayrı raporlanır; pass/fail/not\_run kayıtlı | G-74, X-20 |
 
@@ -44,8 +44,8 @@ P1 çıkışında bir HR ekranı tüm katmanlardan uçtan uca geçer. AI ve dest
 - G-42 başsız setup wizard → G-41 TR temel çizgisi → G-31 Product Trial yükü.
 - G-19 iyzico + G-20 Invoice override + G-125 durum makinesi → G-29 ücretli App Plan → G-30 aktivasyon → G-95 mağaza UX.
 - SA-17/SA-19/SA-35 operasyon sitesi finans çekirdeği + SA-41 matrisi (K-13, mali müşavir) → P2 çıkışındaki e-belge kabulü; SA-6/SA-8 → SA-21/SA-34 (P2) → SA-33 hak ediş mutabakatı (P6); SA-21 (P2) → SA-15 (P3): AI tüketim ölçümü P2'deki tahakkuk kuralını kullanır.
-- G-35 `get_subscription_info` → G-106 özellik kapıları → G-127 uygulama durum modeli → CronHR plan farklılaştırması.
-- G-102..G-107 ve G-141 sözleşmeleri P4'te CronHR, P5'te CRM/Webshop ile aynı X-09 uyumluluk listesinden geçer.
+- G-35 `get_subscription_info` → G-106 özellik kapıları → G-127 uygulama durum modeli → HRMS TR plan farklılaştırması.
+- G-102..G-107 ve G-141 sözleşmeleri P4'te HRMS TR, P5'te CRM/Webshop ile aynı X-09 uyumluluk listesinden geçer.
 - SA-1/SA-2 operatör kimliği (P1) → SA-25 → SA-24 Müşteri 360; SA-40 destek prototipi (P1) → SA-27/SA-28 → SA-42..SA-44 kapsam modeli → SA-29 Hocuspocus (Hüseyin Cengiz).
 - X-02 ortam matrisi (Colima dev / staging / prod) ve X-03 dağıtım hatları P1 içinde Hüseyin Cengiz tarafından kurulur; her faz kapısında X-06 DR tatbikatı ve X-20 zincir E2E koşar.
 
@@ -68,7 +68,7 @@ P1 çıkışında bir HR ekranı tüm katmanlardan uçtan uca geçer. AI ve dest
 | WP-11 | P2 | Operasyon sitesi finans çekirdeği ve olay–belge matrisi | WP-01 | Hüseyin Cengiz + Platform ekibi + Finans | press\_tr\_finance, ops sitesi | e-belge PDF; SA-41 çift/eksik kayıt testleri |
 | WP-12 | P2 | Ölçüm adapterları, rıza kapısı, atıf sözleşmesi | WP-08 | Frontend ekibi | panel monorepo | Rıza yokken satıcıya istek yok (ağ kanıtı) |
 | WP-13 | P3 | Agent servisi, MCP, önizle+onayla, kredi rezervasyonu | WP-09 | Platform + AI ekibi | agent, platform\_core, press\_tr | G-86 negatif testleri, SA-15 eşzamanlılık testi |
-| WP-14 | P4 | CronHR, uygulama durum modeli, paylaşım/önizleme, tur | WP-10, WP-08 | App ekibi + Frontend ekibi | cronhr, panel | E2E aktivasyon; oturumsuz önizlemede veri yok |
+| WP-14 | P4 | HRMS TR, uygulama durum modeli, paylaşım/önizleme, tur | WP-10, WP-08 | App ekibi + Frontend ekibi | hrms_tr, panel | E2E aktivasyon; oturumsuz önizlemede veri yok |
 | WP-15 | P6 | Operatör modu, CRM/Helpdesk, destek kapsamları, BI | WP-11, WP-09 | Platform + Frontend; Hüseyin Cengiz | ops sitesi, panel, Hocuspocus, Metabase | Revoke ≤ 2 sn; maskeli alan ağ kaydında yok |
 | WP-16 | P5 | CRM/Webshop, ilişki kataloğu, izolasyon kademeleri | WP-14 | Platform + App ekibi | crm, webshop | G-122 matrisi testleri |
 
