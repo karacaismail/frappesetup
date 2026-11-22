@@ -62,6 +62,9 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - Admin API yetkileri kiracıya giden belirtece girmez.
 - `identity-sync` Admin API belirtecini ayrı ister. İstekte `scope=admin-api kc-admin-api` olur. Bu belirtecin `aud` değeri `realm-management` ve Admin API adresidir. Keycloak 26.8 Admin API'si bu kapsamı ister.
 - `press-service` istemcisi `aud-press` kapsamını isteyemez. Keycloak bu isteği `invalid_scope` ile reddeder.
+- `identity-sync` servis hesabı davet ve kuruluş hazırlama için Keycloak'a yazar. Bu yüzden şu rolleri taşır: `view-users`, `query-users`, `manage-users`. Kuruluş ve üyelik için gereken en az ek rol Keycloak 26.8 kaynağında doğrulanır ve realm dosyasına yazılır.
+- Bu roller yalnız `scope=admin-api kc-admin-api` ile istenen belirtece girer. Kiracıya ve Press'e giden belirteç bu rolleri taşımaz. Canlı test bunu sınar: kiracı hedefli belirteç Admin API'de 403 alır.
+- Sihirli bağlantı eklentisinin bağlantı üreten yönetim ucu kapalıdır. Bu uç, belirteçteki rolü değil hesabın kayıtlı rolünü denetliyordu. Kapalı olduğu canlı testle (404) gösterilir.
 
 ### Politikalar
 
@@ -225,18 +228,31 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Press'te misafir için izin listesi uygulanır. Misafir yalnız listedeki yöntemleri çağırabilir. Liste şudur: `ping`, `press_tr.api.auth.get_login_url`, `press_tr.api.auth.keycloak_callback`, `press_tr.api.keycloak_backchannel_logout`. Öteki bütün yöntemler misafire 403 döner.
 - Denetim yöntemin adına değil, çağrılan işleve uygulanır. Böylece başka modülün içe aktardığı aynı işlev de kapanır. `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi aynı denetimden geçer.
 - Takım üyeliği yalnız Keycloak kuruluşundan gelir. Press'in kendi takım davet ve davet kabul uçları kapanır.
+- G-12'deki yerel giriş, kayıt, parola, tek kullanımlık kodla giriş ve bağlantıyla giriş uçları her çağırana kapalıdır. Misafir de, oturum açmış kullanıcı da 403 alır. Denetim işlev nesnesiyle yapılır.
+- Press'in makineden makineye çağrılan misafir uçları açık kalır. Bunlar ajan geri bildirimi, ödeme sağlayıcısı, GitHub, izleme, e-posta ve yedek uçlarıdır. Her biri kendi imzasını ya da anahtarını denetler. Liste sözleşmenin Press OpenAPI dosyasında tek tek yazılır. Bir uç listeye ancak kendi kimlik denetimi testle gösterilince girer.
+- Takım sahibi kapatılınca takım silinmez. Kuruluşa yeni üye eklenebilir. Sahipliği yönetici elle devreder. Sahibi kapalı takım için `ensure_team` 200 döner ve yanıtta `owner_disabled: true` taşır.
 - Kullanıcı Keycloak'ta kapatılınca ya da silinince Press kullanıcıyı da kapatır. Kullanıcının Press API anahtarları geçersiz olur.
 - Misafir istek sınırı istemcinin gerçek adresine bağlıdır. Üretimdeki ara sunucu `X-Forwarded-For` başlığının üzerine yazar. Ara sunucu ayarı depoda durur.
 
 ## 7. `identity_sync`
 
-- Keycloak olaylarını alır. Olay kaynağı T-2 kararıyla seçilir (Proje kaydı A-10).
+- Keycloak olaylarını alır. Olay kaynağı şudur: Keycloak'a bir olay dinleyici eklentisi kurulur. Eklenti kullanıcı ve yönetim olaylarını imzalı olarak `identity_sync` servisinin `/v1/events` ucuna gönderir. Eklentinin lisansı Apache-2.0 ya da MIT olur. Seçim T-2 karar notuna yazılır (Proje kaydı O-11).
+- Olay kaybolabilir. Bu yüzden elle başlatılan mutabakat komutu yedek yoldur. Komut farkları bulur ve önizleme ile onay akışından geçirir. Zamanlanmış iş yoktur.
 - Belirteci Keycloak'tan istemci kimlik bilgisiyle alır.
 - `press_tr.api.identity.*` ve `platform_core.api.identity.*` uçlarını çağırır.
 - Kiracı listesini ayardan okur. Geliştirmede tek kiracı `kiraci1` vardır.
 - Her işlem tekrar edilebilir olmalıdır. Aynı olay iki kez gelirse sonuç değişmez.
 - Başarısız olay ayrı kuyrukta bekler.
 - Mutabakat elle başlatılan bir komuttur. Komut farkları raporlar.
+- `POST /v1/sessions/revoke` ucu bir Keycloak oturumunu kapatır. Gövde `{"sid": "<oturum kimliği>"}` olur. Ucu yalnız `platform_core` servis belirteci çağırır. identity-sync, Keycloak Admin API ile o oturumu siler. Oturum silinince yenileme belirteci de geçersiz olur. Uç tekrar edilebilir: kapalı oturum için de 200 döner.
+- Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Kurulum iptal edilince `platform_core` bu ucu çağırır. Aynı `sid` ile gelen belirteç de reddedilir (Proje kaydı O-25).
+- `POST /v1/account-deletions` ucu hesap silme isteğini kaydeder (Proje kaydı O-27). Keycloak'ın hesap silme olayı da aynı akışı başlatır. Akış sırası şudur:
+  1. Keycloak kullanıcısı kapanır.
+  2. Press kullanıcısı kapanır ve API anahtarları geçersiz olur (`remove_team_member`, `all_organizations: true`).
+  3. Kiracı sitelerindeki kullanıcı kapanır. Telefon kurulumları ve bildirim bağları silinir.
+  4. Kişiyi gösteren alanlar anonim yapılır. İş kayıtları silinmez.
+  5. Keycloak kullanıcısı silinir. İstek kaydı anonim yapılır.
+- Her adım tekrar edilebilir. Bir adım başarısız olursa istek hata kuyruğuna girer ve elle yeniden denenir.
 
 ## 8. Site ayarları
 
