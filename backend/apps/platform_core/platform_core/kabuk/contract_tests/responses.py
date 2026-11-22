@@ -5,7 +5,7 @@ import os
 import unittest
 from http.cookies import SimpleCookie
 from pathlib import Path
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 
 from jsonschema import Draft202012Validator
 
@@ -19,6 +19,7 @@ SNAPSHOT = Path(__file__).resolve().parents[2] / "tests" / "shell_contract_compo
 BOOTSTRAP = "/api/method/platform_core.api.shell.get_bootstrap"
 METADATA = "/api/method/platform_core.api.meta.get_doctype"
 POLICY_CHECK = "/api/method/platform_core.api.meta.validate_mobile_policy"
+NATIVE_METADATA = "/api/v2/doctype/{doctype}/meta"
 PROBE = "/api/method/frappe.auth.get_logged_user"
 DOCTYPE = "Kabuk Test Record"
 
@@ -124,6 +125,19 @@ class TestShellResponses(unittest.TestCase):
 	def test_policy_check_rejects_unsupported_query_parameters(self):
 		result = self.request(POLICY_CHECK + "?unexpected=sample", sid=self.sid)
 		self.validate(POLICY_CHECK, 417, result)
+
+	def test_policy_check_expired_session_matches_the_contract(self):
+		result = self.request(POLICY_CHECK, sid="missing-shell-contract-session")
+		self.validate(POLICY_CHECK, 401, result)
+		self.assertEqual(parse_json(result[2])["session_expired"], 1)
+
+	def test_native_missing_doctype_matches_the_contract_for_a_system_user(self):
+		existing = NATIVE_METADATA.format(doctype="ToDo")
+		self.assertEqual(self.request(existing, sid=self.sid)[0], 200)
+		route = NATIVE_METADATA.format(doctype=quote("Shell Missing Native DocType"))
+		result = self.request(route, sid=self.sid)
+		self.validate(NATIVE_METADATA, 404, result)
+		self.assertEqual([error["type"] for error in parse_json(result[2])["errors"]], ["DoesNotExistError"])
 
 	def test_official_projection_snapshot_matches_openapi(self):
 		snapshot = parse_json(SNAPSHOT.read_text(encoding="utf-8"))
