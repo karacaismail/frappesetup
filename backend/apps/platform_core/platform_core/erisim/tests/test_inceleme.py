@@ -39,7 +39,7 @@ class TestIdentitySwap(ErisimTestCase):
 	def assert_untouched(self, response) -> None:
 		own, victim = self.records[EMPLOYEE_1], self.records[EMPLOYEE_2]
 		self.assertNotIn(f"Talep {EMPLOYEE_2}", response.get_data(as_text=True))
-		self.assertGreaterEqual(response.status_code, 400, response.get_data(as_text=True))
+		self.assertGreaterEqual(response.status_code, 400)
 		self.assertEqual(self.stored(own, "title"), f"Talep {EMPLOYEE_1}")
 		self.assertEqual(self.stored(victim, "title"), f"Talep {EMPLOYEE_2}")
 		self.assertEqual(self.stored(victim, "employee"), employee_of(EMPLOYEE_2))
@@ -78,7 +78,7 @@ class TestValueTypes(ErisimTestCase):
 
 		response = self.rest_post(client, {"title": "Sayi ile", "employee": 0})
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertFalse(frappe.db.exists(DOCTYPE, {"title": "Sayi ile"}))
 
 	def test_numeric_employee_value_cannot_move_a_record_out_of_scope(self):
@@ -87,7 +87,7 @@ class TestValueTypes(ErisimTestCase):
 
 		response = self.rest_put(client, target, {"employee": 0})
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertEqual(self.stored(target, "employee"), employee_of(EMPLOYEE_1))
 
 	def test_list_or_dict_value_is_denied_without_a_server_error(self):
@@ -95,7 +95,7 @@ class TestValueTypes(ErisimTestCase):
 		for value in (["x"], {"a": 1}):
 			response = self.rest_post(client, {"title": "Liste ile", "employee": value})
 
-			self.assertIn(response.status_code, (403, 417), response.get_data(as_text=True))
+			self.assertIn(response.status_code, (403, 417))
 		self.assertFalse(frappe.db.exists(DOCTYPE, {"title": "Liste ile"}))
 
 
@@ -140,7 +140,7 @@ class TestPreparedReport(ErisimTestCase):
 	def test_narrowed_user_cannot_call_the_prepared_report_endpoint(self):
 		response = self.send(self.login(EMPLOYEE_1), "POST", PREPARED, body={"report_name": QUERY_REPORT})
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertFalse(frappe.db.exists("Prepared Report", {"report_name": QUERY_REPORT}))
 
 
@@ -193,8 +193,8 @@ class TestRuleInput(ErisimTestCase):
 			},
 		)
 
-		self.assertEqual(field.status_code, 417, field.get_data(as_text=True))
-		self.assertEqual(level.status_code, 417, level.get_data(as_text=True))
+		self.assertEqual(field.status_code, 417)
+		self.assertEqual(level.status_code, 417)
 		self.assertEqual(frappe.get_meta(RULE_DOCTYPE).get_field("role").permlevel, 0)
 
 	def test_explain_refuses_child_tables(self):
@@ -202,7 +202,7 @@ class TestRuleInput(ErisimTestCase):
 			self.login(ADMIN), "GET", "explain_permission", query={"doctype": "Has Role", "name": "x"}
 		)
 
-		self.assertIn(response.status_code, (403, 417), response.get_data(as_text=True))
+		self.assertIn(response.status_code, (403, 417))
 
 
 class TestOperators(ErisimTestCase):
@@ -324,7 +324,7 @@ class TestDeleteAndRename(ErisimTestCase):
 
 		response = self.rest_delete(self.login(HR), name)
 
-		self.assertIn(response.status_code, (200, 202), response.get_data(as_text=True))
+		self.assertIn(response.status_code, (200, 202))
 		self.assertFalse(frappe.db.exists(DOCTYPE, name))
 
 	def test_employee_cannot_rename_another_employees_record(self):
@@ -337,5 +337,5 @@ class TestDeleteAndRename(ErisimTestCase):
 			body={"doctype": DOCTYPE, "docname": target, "name": "ele-gecirildi"},
 		)
 
-		self.assertGreaterEqual(response.status_code, 400, response.get_data(as_text=True))
+		self.assertGreaterEqual(response.status_code, 400)
 		self.assertTrue(frappe.db.exists(DOCTYPE, target))

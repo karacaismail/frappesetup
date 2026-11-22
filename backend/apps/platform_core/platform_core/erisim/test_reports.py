@@ -36,7 +36,7 @@ class TestQueryReportGate(ErisimTestCase):
 			with self.subTest(user=user):
 				response = self.run_report(self.login(user))
 
-				self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+				self.assertEqual(response.status_code, 403)
 				for name in self.records.values():
 					self.assertNotIn(name, response.get_data(as_text=True))
 
@@ -48,14 +48,14 @@ class TestQueryReportGate(ErisimTestCase):
 			body={"report_name": QUERY_REPORT, "file_format_type": "CSV", "filters": "{}"},
 		)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		for name in self.records.values():
 			self.assertNotIn(name, response.get_data(as_text=True))
 
 	def test_run_guest_denied(self):
 		response = self.run_report(self.anonymous())
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		for name in self.records.values():
 			self.assertNotIn(name, response.get_data(as_text=True))
 
@@ -67,7 +67,7 @@ class TestQueryReportGate(ErisimTestCase):
 			body={"report_name": QUERY_REPORT, "file_format_type": "CSV", "filters": "{}"},
 		)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		for name in self.records.values():
 			self.assertNotIn(name, response.get_data(as_text=True))
 
@@ -75,12 +75,12 @@ class TestQueryReportGate(ErisimTestCase):
 		"""What the SQL of a query report reads cannot be verified. Only a System Manager runs it."""
 		response = self.run_report(self.login(HR))
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 
 	def test_system_manager_runs_query_report(self):
 		response = self.run_report(self.login(ADMIN))
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		body = response.get_data(as_text=True)
 		for name in self.records.values():
 			self.assertIn(name, body)

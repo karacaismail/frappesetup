@@ -32,7 +32,7 @@ class TestHierarchy(ErisimTestCase):
 
 		response = self.rest_get(client, self.records[EMPLOYEE_3])
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 
 	def test_manager_cannot_read_peer_managers_record(self):
 		client = self.login(MANAGER_1)
@@ -46,7 +46,7 @@ class TestHierarchy(ErisimTestCase):
 
 		response = self.rest_put(client, target, {"title": "Yonetici degistirdi"})
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertEqual(self.stored(target, "title"), f"Talep {EMPLOYEE_2}")
 
 	def test_employee_with_reports_but_without_manager_role_sees_only_own(self):

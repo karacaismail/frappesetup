@@ -22,7 +22,7 @@ class TestSurfaces(ErisimTestCase):
 			"/api/method/frappe.desk.reportview.get",
 			body={"doctype": DOCTYPE, "fields": json.dumps([f"`tab{DOCTYPE}`.`name`"]), "page_length": 500},
 		)
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		message = response.json.get("message") or {}
 		if not message:
 			return set()
@@ -33,7 +33,7 @@ class TestSurfaces(ErisimTestCase):
 		response = self.send(
 			client, "POST", "/api/method/frappe.desk.reportview.get_count", body={"doctype": DOCTYPE}
 		)
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		return response.json["message"]
 
 	def exported_names(self, client) -> set[str]:
@@ -50,7 +50,7 @@ class TestSurfaces(ErisimTestCase):
 				"page_length": 500,
 			},
 		)
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		rows = list(csv.reader(io.StringIO(response.get_data(as_text=True).lstrip("﻿"))))
 		known = set(self.records.values())
 		return {cell for row in rows[1:] for cell in row if cell in known}
@@ -63,7 +63,7 @@ class TestSurfaces(ErisimTestCase):
 			"/api/method/frappe.desk.search.search_link",
 			body={"doctype": DOCTYPE, "txt": "", "page_length": 500},
 		)
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		return {row["value"] for row in response.json["message"]}
 
 	def test_every_surface_returns_the_same_records_for_every_user(self):
@@ -90,4 +90,4 @@ class TestSurfaces(ErisimTestCase):
 
 		response = self.send(client, "GET", path, query={"doctype": DOCTYPE, "name": other})
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)

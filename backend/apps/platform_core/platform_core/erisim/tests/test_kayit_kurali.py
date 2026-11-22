@@ -26,7 +26,7 @@ class TestRecordRule(ErisimTestCase):
 
 		response = self.rest_get(client, self.records[EMPLOYEE_1])
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.json["data"]["employee"], employee_of(EMPLOYEE_1))
 
 	def test_employee_cannot_read_another_employees_record(self):
@@ -34,7 +34,7 @@ class TestRecordRule(ErisimTestCase):
 
 		response = self.rest_get(client, self.records[EMPLOYEE_2])
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 
 	def test_employee_cannot_write_another_employees_record(self):
 		client = self.login(EMPLOYEE_1)
@@ -42,7 +42,7 @@ class TestRecordRule(ErisimTestCase):
 
 		response = self.rest_put(client, target, {"title": "Ele gecirildi"})
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertEqual(self.stored(target, "title"), f"Talep {EMPLOYEE_2}")
 
 	def test_employee_cannot_take_over_a_record_by_changing_its_employee(self):
@@ -52,7 +52,7 @@ class TestRecordRule(ErisimTestCase):
 
 		response = self.rest_put(client, target, {"employee": employee_of(EMPLOYEE_1)})
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertEqual(self.stored(target, "employee"), employee_of(EMPLOYEE_2))
 
 	def test_employee_cannot_move_own_record_out_of_scope(self):
@@ -62,7 +62,7 @@ class TestRecordRule(ErisimTestCase):
 
 		response = self.rest_put(client, target, {"employee": employee_of(EMPLOYEE_2)})
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertEqual(self.stored(target, "employee"), employee_of(EMPLOYEE_1))
 
 	def test_employee_updates_own_record(self):
@@ -72,7 +72,7 @@ class TestRecordRule(ErisimTestCase):
 
 		response = self.rest_put(client, target, {"status": "Closed"})
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		self.assertEqual(self.stored(target, "status"), "Closed")
 
 	def test_employee_creates_only_for_self(self):
@@ -81,8 +81,8 @@ class TestRecordRule(ErisimTestCase):
 		denied = self.rest_post(client, {"title": "Baskasi adina", "employee": employee_of(EMPLOYEE_2)})
 		allowed = self.rest_post(client, {"title": "Kendi adima", "employee": employee_of(EMPLOYEE_1)})
 
-		self.assertEqual(denied.status_code, 403, denied.get_data(as_text=True))
-		self.assertEqual(allowed.status_code, 200, allowed.get_data(as_text=True))
+		self.assertEqual(denied.status_code, 403)
+		self.assertEqual(allowed.status_code, 200)
 		self.addCleanup(frappe.delete_doc, DOCTYPE, allowed.json["data"]["name"], force=True)
 		self.assertFalse(frappe.db.exists(DOCTYPE, {"title": "Baskasi adina"}))
 
@@ -93,7 +93,7 @@ class TestRecordRule(ErisimTestCase):
 
 		response = self.rest_delete(client, target)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertTrue(frappe.db.exists(DOCTYPE, target))
 
 	def test_role_without_rule_sees_nothing_on_governed_doctype(self):

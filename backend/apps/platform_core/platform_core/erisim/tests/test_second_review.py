@@ -55,7 +55,7 @@ class TestStaleReader(ErisimTestCase):
 		# Another request removes the permission and commits.
 		path = f"{REST}{RULE_DOCTYPE}/{self.rules[self.OWN_RULE]}"
 		changed = self.raw_request(admin, "PUT", path, {"is_active": 0})
-		self.assertEqual(changed.status_code, 200, changed.get_data(as_text=True)[:300])
+		self.assertEqual(changed.status_code, 200)
 
 		# The slow reader looks the rules up again from its old snapshot, as a cache miss would.
 		frappe.local.cache = {}
@@ -65,4 +65,4 @@ class TestStaleReader(ErisimTestCase):
 
 		# The next request must already be denied.
 		response = self.raw_request(employee, "GET", f"{REST}{DOCTYPE}/{own}")
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True)[:300])
+		self.assertEqual(response.status_code, 403)

@@ -148,7 +148,7 @@ class TestSwitchedOffForEveryone(AutoEmailReportTestCase):
 		version_2 = self.send(client, "POST", f"/api/v2/document/{RECORD}", body=body)
 
 		for response in (version_1, version_2):
-			self.assertEqual(response.status_code, 403, response.get_data(as_text=True)[:300])
+			self.assertEqual(response.status_code, 403)
 		self.assertFalse(frappe.db.count(RECORD))
 
 	def test_nobody_can_enable_an_existing_one(self):
@@ -164,7 +164,7 @@ class TestSwitchedOffForEveryone(AutoEmailReportTestCase):
 		client = self.login(ADMIN)
 		for path in (f"/api/resource/{RECORD}/{name}", f"/api/v2/document/{RECORD}/{name}"):
 			response = self.send(client, "PUT", path, body={"enabled": 1})
-			self.assertEqual(response.status_code, 403, response.get_data(as_text=True)[:300])
+			self.assertEqual(response.status_code, 403)
 		self.assertEqual(frappe.db.get_value(RECORD, name, "enabled"), 0)
 
 	def test_existing_one_can_still_be_switched_off_or_deleted(self):

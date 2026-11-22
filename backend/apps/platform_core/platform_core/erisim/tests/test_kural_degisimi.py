@@ -37,7 +37,7 @@ class TestRuleChange(ErisimTestCase):
 
 		response = self.send(admin, "PUT", self.rule_path(OWN_RULE), body={"scope": "all", "match_field": ""})
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		self.assertEqual(self.listed_names(employee), set(self.records.values()))
 		self.assertEqual(self.readable_names(employee), set(self.records.values()))
 
@@ -50,7 +50,7 @@ class TestRuleChange(ErisimTestCase):
 
 		response = self.send(admin, "PUT", self.rule_path(OWN_RULE), body={"is_active": 0})
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		self.assertEqual(self.rest_get(employee, own).status_code, 403)
 		self.assertEqual(self.listed_names(employee), set())
 
@@ -83,14 +83,14 @@ class TestRuleChange(ErisimTestCase):
 			},
 		)
 
-		self.assertEqual(created.status_code, 200, created.get_data(as_text=True))
+		self.assertEqual(created.status_code, 200)
 		rule = created.json["data"]["name"]
 		self.addCleanup(self.drop_rule, rule)
 		self.assertEqual(self.rest_get(user, name, FREE_DOCTYPE).status_code, 403)
 
 		deleted = self.send(admin, "DELETE", f"{REST}{RULE_DOCTYPE}/{rule}")
 
-		self.assertIn(deleted.status_code, (200, 202), deleted.get_data(as_text=True))
+		self.assertIn(deleted.status_code, (200, 202))
 		self.assertEqual(self.rest_get(user, name, FREE_DOCTYPE).status_code, 200)
 
 	def drop_rule(self, rule: str) -> None:
@@ -117,7 +117,7 @@ class TestRuleChange(ErisimTestCase):
 			},
 		)
 
-		self.assertEqual(created.status_code, 200, created.get_data(as_text=True))
+		self.assertEqual(created.status_code, 200)
 		self.addCleanup(self.drop_rule, created.json["data"]["name"])
 		self.assertIn(ROLE_NO_RULE, created.get_data(as_text=True))
 
@@ -129,7 +129,7 @@ class TestRuleChange(ErisimTestCase):
 			employee, "PUT", self.rule_path(OWN_RULE), body={"scope": "all", "match_field": ""}
 		)
 
-		self.assertEqual(listed.status_code, 403, listed.get_data(as_text=True))
-		self.assertEqual(changed.status_code, 403, changed.get_data(as_text=True))
+		self.assertEqual(listed.status_code, 403)
+		self.assertEqual(changed.status_code, 403)
 		self.assertEqual(frappe.db.get_value(RULE_DOCTYPE, self.rules[OWN_RULE], "scope"), "own")
 		self.assertTrue(frappe.db.exists(DOCTYPE, self.records[EMPLOYEE_1]))

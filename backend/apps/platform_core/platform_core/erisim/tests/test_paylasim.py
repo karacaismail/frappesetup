@@ -46,7 +46,7 @@ class TestSharing(ErisimTestCase):
 
 		response = self.rest_put(client, shared, {"title": "Paylasimla degisti"})
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertEqual(self.stored(shared, "title"), f"Talep {EMPLOYEE_2}")
 
 	def test_shared_record_cannot_be_deleted(self):
@@ -57,7 +57,7 @@ class TestSharing(ErisimTestCase):
 
 		response = self.rest_delete(client, shared)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertTrue(frappe.db.exists(DOCTYPE, shared))
 
 	def test_user_outside_the_rule_cannot_share_a_record(self):
@@ -69,7 +69,7 @@ class TestSharing(ErisimTestCase):
 			client, "POST", SHARE, body={"doctype": DOCTYPE, "name": target, "user": EMPLOYEE_2, "read": 1}
 		)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertFalse(frappe.db.exists("DocShare", {"share_doctype": DOCTYPE, "share_name": target}))
 
 	def test_explain_names_share_as_the_reason(self):
@@ -81,7 +81,7 @@ class TestSharing(ErisimTestCase):
 			admin, "GET", "explain_permission", query={"doctype": DOCTYPE, "name": shared, "user": EMPLOYEE_1}
 		)
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		message = response.json["message"]
 		self.assertTrue(message["allowed"])
 		self.assertEqual(message["reason"], "allowed_by_share")

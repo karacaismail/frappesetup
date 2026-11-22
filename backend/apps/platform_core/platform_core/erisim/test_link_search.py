@@ -80,12 +80,12 @@ class TestLinkSearch(ErisimTestCase):
 		return self.send(client, "POST", path, body=body)
 
 	def values(self, response) -> set[str]:
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+		self.assertEqual(response.status_code, 200)
 		rows = response.json["message"]
 		return {row["value"] if isinstance(row, dict) else row[0] for row in rows}
 
 	def assert_refused(self, response) -> None:
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True)[:300])
+		self.assertEqual(response.status_code, 403)
 		body = response.get_data(as_text=True)
 		self.assertNotIn(str(SALARY), body)
 		for name in self.records.values():
@@ -239,9 +239,9 @@ class TestLinkSearch(ErisimTestCase):
 		own = self.validate_link(client, self.records[EMPLOYEE_1])
 		foreign = self.validate_link(client, self.records[EMPLOYEE_2])
 
-		self.assertEqual(own.status_code, 200, own.get_data(as_text=True)[:300])
+		self.assertEqual(own.status_code, 200)
 		self.assertEqual(own.json["message"], {"name": self.records[EMPLOYEE_1]})
-		self.assertEqual(foreign.status_code, 200, foreign.get_data(as_text=True)[:300])
+		self.assertEqual(foreign.status_code, 200)
 		self.assertFalse(foreign.json["message"])
 
 	def test_replacements_accept_every_argument_of_the_frappe_function(self):

@@ -21,7 +21,7 @@ class TestFieldLevel(ErisimTestCase):
 
 		response = self.rest_get(client, self.records[EMPLOYEE_1])
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		self.assert_hidden(response.json["data"], "salary_amount")
 		self.assertNotIn(str(SALARY), response.get_data(as_text=True))
 
@@ -31,7 +31,7 @@ class TestFieldLevel(ErisimTestCase):
 
 		response = self.rest_list(client, fields=("name", "salary_amount"))
 
-		self.assertIn(response.status_code, (200, 403), response.get_data(as_text=True))
+		self.assertIn(response.status_code, (200, 403))
 		self.assertNotIn(str(SALARY), response.get_data(as_text=True))
 
 	def test_restricted_field_cannot_be_used_as_a_filter(self):
@@ -40,7 +40,7 @@ class TestFieldLevel(ErisimTestCase):
 
 		response = self.rest_list(client, filters={"salary_amount": SALARY})
 
-		self.assertIn(response.status_code, (200, 403), response.get_data(as_text=True))
+		self.assertIn(response.status_code, (200, 403))
 		if response.status_code == 200:
 			self.assertEqual(response.json["data"], [])
 
@@ -57,7 +57,7 @@ class TestFieldLevel(ErisimTestCase):
 
 		response = self.rest_get(client, self.records[EMPLOYEE_1])
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.json["data"]["salary_amount"], SALARY)
 
 
@@ -86,7 +86,7 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 			admin, "POST", "set_field_level", body={"doctype": DOCTYPE, "fieldname": "status", "permlevel": 1}
 		)
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		self.assertEqual(
 			response.json["message"],
 			{"doctype": DOCTYPE, "fieldname": "status", "permlevel": 1, "previous_permlevel": 0},
@@ -114,7 +114,7 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 			body={"doctype": DOCTYPE, "fieldname": "salary_amount", "permlevel": 0},
 		)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertEqual(frappe.get_meta(DOCTYPE).get_field("salary_amount").permlevel, 1)
 
 	def test_field_level_rejects_bad_input(self):
@@ -135,7 +135,7 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 			admin, "GET", "set_field_level", query={"doctype": DOCTYPE, "fieldname": "status", "permlevel": 1}
 		)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assertEqual(frappe.get_meta(DOCTYPE).get_field("status").permlevel, 0)
 
 	def test_admin_grants_and_revokes_level_access(self):
@@ -147,13 +147,13 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 
 		granted = self.api(admin, "POST", "set_level_access", body=body)
 
-		self.assertEqual(granted.status_code, 200, granted.get_data(as_text=True))
+		self.assertEqual(granted.status_code, 200)
 		self.assertEqual(granted.json["message"], body)
 		self.assertEqual(self.rest_get(manager, target).json["data"]["salary_amount"], SALARY)
 
 		revoked = self.api(admin, "POST", "set_level_access", body={**body, "read": False})
 
-		self.assertEqual(revoked.status_code, 200, revoked.get_data(as_text=True))
+		self.assertEqual(revoked.status_code, 200)
 		self.assert_hidden(self.rest_get(manager, target).json["data"], "salary_amount")
 
 	def test_level_access_keeps_other_roles_permissions(self):
@@ -188,7 +188,7 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 			body={"doctype": DOCTYPE, "role": "ER Olmayan Rol", "permlevel": 1, "read": True, "write": False},
 		)
 
-		self.assertEqual(response.status_code, 404, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 404)
 
 	def test_non_admin_cannot_grant_level_access(self):
 		employee = self.login(EMPLOYEE_1)
@@ -200,5 +200,5 @@ class TestFieldLevelEndpoints(ErisimTestCase):
 			body={"doctype": DOCTYPE, "role": "ER Calisan", "permlevel": 1, "read": True, "write": True},
 		)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 		self.assert_hidden(self.rest_get(employee, self.records[EMPLOYEE_1]).json["data"], "salary_amount")

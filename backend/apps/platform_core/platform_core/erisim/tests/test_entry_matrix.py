@@ -222,5 +222,5 @@ class TestEntryMatrix(ErisimTestCase):
 			self.login(PORTAL), "POST", SEARCH_LINK, body={"doctype": DOCTYPE, "txt": "", "page_length": 500}
 		)
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+		self.assertEqual(response.status_code, 200)
 		self.assertEqual({row["value"] for row in response.json["message"]}, {own})

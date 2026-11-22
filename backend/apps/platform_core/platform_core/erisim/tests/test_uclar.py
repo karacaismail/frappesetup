@@ -28,7 +28,7 @@ class TestExplainPermission(ErisimTestCase):
 	def test_user_gets_allowed_for_own_record(self):
 		response = self.explain(self.login(EMPLOYEE_1), self.records[EMPLOYEE_1])
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		self.assertEqual(
 			response.json["message"],
 			{
@@ -52,7 +52,7 @@ class TestExplainPermission(ErisimTestCase):
 		missing = self.explain(client, "olmayan-kayit")
 
 		for response in (denied, missing):
-			self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+			self.assertEqual(response.status_code, 200)
 			self.assertFalse(response.json["message"]["allowed"])
 			self.assertEqual(response.json["message"]["reason"], "not_permitted_or_missing")
 			self.assertEqual(response.json["message"]["rules"], [])
@@ -65,12 +65,12 @@ class TestExplainPermission(ErisimTestCase):
 	def test_user_cannot_ask_about_another_user(self):
 		response = self.explain(self.login(EMPLOYEE_1), self.records[EMPLOYEE_1], user=EMPLOYEE_2)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 
 	def test_admin_sees_which_rule_failed(self):
 		response = self.explain(self.login(ADMIN), self.records[EMPLOYEE_2], user=EMPLOYEE_1)
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		message = response.json["message"]
 		self.assertFalse(message["allowed"])
 		self.assertEqual(message["reason"], "no_matching_rule")
@@ -113,17 +113,17 @@ class TestExplainPermission(ErisimTestCase):
 	def test_admin_gets_not_found_for_missing_record(self):
 		response = self.explain(self.login(ADMIN), "olmayan-kayit", user=EMPLOYEE_1)
 
-		self.assertEqual(response.status_code, 404, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 404)
 
 	def test_invalid_ptype_is_rejected(self):
 		response = self.explain(self.login(EMPLOYEE_1), self.records[EMPLOYEE_1], ptype="drop")
 
-		self.assertEqual(response.status_code, 417, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 417)
 
 	def test_guest_is_rejected(self):
 		response = self.explain(self.anonymous(), self.records[EMPLOYEE_1])
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 
 	def test_explain_is_get_only(self):
 		response = self.api(
@@ -133,7 +133,7 @@ class TestExplainPermission(ErisimTestCase):
 			body={"doctype": DOCTYPE, "name": self.records[EMPLOYEE_1]},
 		)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 
 
 class TestAccessSummary(ErisimTestCase):
@@ -141,7 +141,7 @@ class TestAccessSummary(ErisimTestCase):
 		return self.api(client, "GET", "get_access_summary", query={"doctype": doctype})
 
 	def scopes(self, response) -> dict:
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		operations = response.json["message"]["operations"]
 		self.assertEqual(set(operations), set(OPERATIONS))
 		return {operation: sorted(scopes) for operation, scopes in operations.items()}
@@ -191,18 +191,18 @@ class TestAccessSummary(ErisimTestCase):
 	def test_summary_needs_role_read_permission(self):
 		response = self.summary(self.login(EMPLOYEE_1), "Access Rule")
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 
 	def test_unknown_doctype_is_denied_like_an_unreadable_one(self):
 		"""Contract: the endpoint does not reveal that a document type exists. A missing document type also returns 403."""
 		response = self.summary(self.login(EMPLOYEE_1), "ER Olmayan Tur")
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 
 	def test_guest_is_rejected(self):
 		response = self.summary(self.anonymous())
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 403)
 
 
 class TestWebsiteUser(ErisimTestCase):
@@ -230,7 +230,7 @@ class TestWebsiteUser(ErisimTestCase):
 	def test_website_user_gets_their_own_summary(self):
 		response = self.api(self.login(base.PORTAL), "GET", "get_access_summary", query={"doctype": DOCTYPE})
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+		self.assertEqual(response.status_code, 200)
 		message = response.json["message"]
 		self.assertTrue(message["governed"])
 		self.assertEqual(message["operations"]["read"], ["own"])
@@ -244,7 +244,7 @@ class TestWebsiteUser(ErisimTestCase):
 
 		response = self.api(self.login(base.PORTAL), "GET", "explain_permission", query=query)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True)[:300])
+		self.assertEqual(response.status_code, 403)
 		self.assertNotIn("Calisan kendi kaydi", response.get_data(as_text=True))
 
 	def test_website_user_cannot_change_levels(self):
@@ -252,7 +252,7 @@ class TestWebsiteUser(ErisimTestCase):
 
 		response = self.api(self.login(base.PORTAL), "POST", "set_level_access", body=body)
 
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True)[:300])
+		self.assertEqual(response.status_code, 403)
 
 	def test_summary_is_on_the_shell_allow_list_and_the_explanation_is_not(self):
 		allowed = frappe.get_hooks("website_user_allowed_methods")

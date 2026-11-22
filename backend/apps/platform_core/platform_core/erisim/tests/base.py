@@ -383,7 +383,7 @@ class ErisimTestCase(IntegrationTestCase):
 		"""Logs in on behalf of the user. The cookie stays in the client."""
 		client = get_test_client(use_cookies=True)
 		response = self.send(client, "POST", "/api/method/login", body={"usr": user, "pwd": PASSWORD})
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		return client
 
 	def anonymous(self):
@@ -402,7 +402,7 @@ class ErisimTestCase(IntegrationTestCase):
 
 	def listed_names(self, client, doctype: str = DOCTYPE) -> set[str]:
 		response = self.rest_list(client, doctype)
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+		self.assertEqual(response.status_code, 200)
 		return {row["name"] for row in response.json["data"]}
 
 	def rest_get(self, client, name: str, doctype: str = DOCTYPE):

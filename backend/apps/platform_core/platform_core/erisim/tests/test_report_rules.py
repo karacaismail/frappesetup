@@ -115,7 +115,7 @@ class ReportRulesTestCase(ErisimTestCase):
 		return self.send(client, "POST", RUN, body={"report_name": report, "filters": "{}", **extra})
 
 	def assert_refused(self, response, statuses=(403,)) -> None:
-		self.assertIn(response.status_code, statuses, response.get_data(as_text=True)[:300])
+		self.assertIn(response.status_code, statuses)
 		body = response.get_data(as_text=True)
 		for name in self.records.values():
 			self.assertNotIn(name, body)
@@ -138,7 +138,7 @@ class TestQueryReportRule(ReportRulesTestCase):
 					self.assert_refused(self.run_report(self.login(user), report))
 			with self.subTest(report=report, user=ADMIN):
 				response = self.run_report(self.login(ADMIN), report)
-				self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+				self.assertEqual(response.status_code, 200)
 				self.assertIn(self.records[EMPLOYEE_1], response.get_data(as_text=True))
 
 	def test_report_of_an_ungoverned_type_is_closed_too_while_rules_exist(self):
@@ -256,7 +256,7 @@ class TestWhichReportRuns(ReportRulesTestCase):
 	def test_system_manager_still_runs_the_report_with_a_stale_reference(self):
 		response = self.run_report(self.login(ADMIN), self.STALE)
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+		self.assertEqual(response.status_code, 200)
 		self.assertIn(self.records[EMPLOYEE_1], response.get_data(as_text=True))
 
 	def test_export_follows_the_same_decision(self):
@@ -269,7 +269,7 @@ class TestWhichReportRuns(ReportRulesTestCase):
 			with self.subTest(report=report):
 				self.assert_refused(self.run_report(self.login(HR), report))
 				allowed = self.run_report(self.login(ADMIN), report)
-				self.assertEqual(allowed.status_code, 200, allowed.get_data(as_text=True)[:300])
+				self.assertEqual(allowed.status_code, 200)
 
 	def export_report(self, client, report: str):
 		body = {"report_name": report, "file_format_type": "CSV", "filters": "{}"}
@@ -322,7 +322,7 @@ class TestWhichReportRuns(ReportRulesTestCase):
 	def test_a_report_in_a_long_loop_can_still_be_opened(self):
 		opened = self.send(self.login(ADMIN), "GET", f"/api/v2/document/Report/{self.RING[0]}")
 
-		self.assertEqual(opened.status_code, 200, opened.get_data(as_text=True)[:300])
+		self.assertEqual(opened.status_code, 200)
 
 	def test_a_report_that_refers_to_itself_is_refused_and_can_be_opened(self):
 		frappe.db.set_value("Report", self.LOOP_A, "reference_report", self.LOOP_A)
@@ -333,7 +333,7 @@ class TestWhichReportRuns(ReportRulesTestCase):
 
 		self.assert_refused(self.run_report(client, self.LOOP_A))
 		opened = self.send(client, "GET", f"/api/v2/document/Report/{self.LOOP_A}")
-		self.assertEqual(opened.status_code, 200, opened.get_data(as_text=True)[:300])
+		self.assertEqual(opened.status_code, 200)
 
 	def test_loop_check_works_without_a_request_cache(self):
 		"""Some processes run without `frappe.local.request_cache`. Loading a report must still work there."""
@@ -359,13 +359,13 @@ class TestWhichReportRuns(ReportRulesTestCase):
 		"""Reading the record once is not following the loop. An administrator must be able to fix it."""
 		client = self.login(ADMIN)
 		opened = self.send(client, "GET", f"/api/v2/document/Report/{self.LOOP_A}")
-		self.assertEqual(opened.status_code, 200, opened.get_data(as_text=True)[:300])
+		self.assertEqual(opened.status_code, 200)
 
 		self.addCleanup(self.restore_loop)
 		saved = self.send(
 			client, "PUT", f"/api/v2/document/Report/{self.LOOP_A}", body={"reference_report": NAME_REPORT}
 		)
-		self.assertEqual(saved.status_code, 200, saved.get_data(as_text=True)[:300])
+		self.assertEqual(saved.status_code, 200)
 		self.assertEqual(self.run_report(client, self.LOOP_A).status_code, 200)
 
 	def restore_loop(self) -> None:
@@ -410,7 +410,7 @@ class TestWhichReportRuns(ReportRulesTestCase):
 		response = self.send(
 			client, "POST", "/api/v2/document/Auto Email Report", body={**body, "frequency": "Daily"}
 		)
-		self.assertEqual(response.status_code, 403, response.get_data(as_text=True)[:300])
+		self.assertEqual(response.status_code, 403)
 		self.assertFalse(frappe.db.count("Auto Email Report"))
 
 
@@ -422,7 +422,7 @@ class TestReportsWithoutRules(ReportRulesTestCase):
 	def test_query_report_runs_for_a_user_with_role_permission(self):
 		response = self.run_report(self.login(HR), NAME_REPORT)
 
-		self.assertEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
+		self.assertEqual(response.status_code, 200)
 
 	def test_restricted_field_still_needs_its_level(self):
 		frappe.db.set_value(DOCTYPE, self.records[EMPLOYEE_1], "salary_amount", SALARY)
@@ -432,9 +432,9 @@ class TestReportsWithoutRules(ReportRulesTestCase):
 		refused = self.run_report(self.login(MANAGER_1), SALARY_REPORT)
 		allowed = self.run_report(self.login(HR), SALARY_REPORT)
 
-		self.assertEqual(refused.status_code, 403, refused.get_data(as_text=True)[:300])
+		self.assertEqual(refused.status_code, 403)
 		self.assertNotIn(str(SALARY), refused.get_data(as_text=True))
-		self.assertEqual(allowed.status_code, 200, allowed.get_data(as_text=True)[:300])
+		self.assertEqual(allowed.status_code, 200)
 		self.assertIn(str(SALARY), allowed.get_data(as_text=True))
 
 	def test_prepared_report_stays_open(self):
