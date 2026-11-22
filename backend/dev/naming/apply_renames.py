@@ -73,8 +73,26 @@ def included(path: str) -> bool:
     )
 
 
+def load_json(path: Path):
+    # Keep the command standalone when invoked with Python's isolated mode.
+    def object_from_pairs(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"{path}: Duplicate JSON key.")
+            result[key] = value
+        return result
+
+    def reject_constant(_constant):
+        raise ValueError(f"{path}: Non-finite JSON number.")
+
+    return json.loads(
+        path.read_text(encoding="utf-8"), object_pairs_hook=object_from_pairs, parse_constant=reject_constant
+    )
+
+
 def load_rules(map_path: Path) -> tuple[Rule, ...]:
-    entries = json.loads(map_path.read_bytes())
+    entries = load_json(map_path)
     if not isinstance(entries, list):
         raise ValueError("The naming map must contain a list of rules.")
     rules = []
@@ -178,7 +196,11 @@ def rewrite_source(source: str, rules: tuple[Rule, ...], path: str) -> str:
     elif suffix in {".yaml", ".yml"}:
         copies = rf"""(?im)^\s*["']?(?:{COPY_KEYS})["']?\s*:\s*({QUOTED}|[^\r\n]*)"""
         spans = [(*match.span(1), "", True) for match in re.finditer(copies, source)]
-        blocks = rf"(?m)^(?P<indent>[ \t]*)(?:{COPY_KEYS}):[ \t]*[>|][+-]?(?:\r?\n(?P=indent)[ \t]+[^\r\n]*)+"
+        blocks = (
+            rf"""(?m)^(?P<indent>[ \t]*)(?P<quote>["']?)(?:{COPY_KEYS})(?P=quote):[ \t]*[>|]"""
+            r"(?:[1-9][+-]?|[+-][1-9]?)?[ \t]*(?:#[^\r\n]*)?"
+            r"(?:\r?\n(?:[ \t]*(?=\r?$)|(?P=indent)[ \t]+[^\r\n]*))+"
+        )
         spans.extend((*match.span(), "", True) for match in re.finditer(blocks, source))
     elif suffix in {".sh", ".toml"} or path.startswith("backend/dev/bin/"):
         for match in re.finditer(QUOTED + r"|(?<!\S)#[^\r\n]*", source):
@@ -224,7 +246,7 @@ def rewrite_source(source: str, rules: tuple[Rule, ...], path: str) -> str:
     return pattern.sub(replace, source)
 
 
-def rewrite_translation(source: str, rules: tuple[Rule, ...], suffix: str) -> str:
+def rewrite_translation(source: str, rules: tuple[Rule, ...], path: str, suffix: str) -> str:
     keys = {rule.old: rule.new for rule in rules}
     if suffix == ".po":
 
@@ -239,8 +261,16 @@ def rewrite_translation(source: str, rules: tuple[Rule, ...], suffix: str) -> st
         return re.sub(pattern, update_msgid, source, flags=re.M)
     cell = re.compile(r'"(?:[^"]|"")*"|[^,\r\n]*')
     stream = io.StringIO(source, newline="")
+    reader = csv.reader(stream)
     output, start = [], 0
-    for row in csv.reader(stream):
+    original_keys = {}
+    for row in reader:
+        if len(row) in {2, 3}:
+            context = row[2] if len(row) == 3 else ""
+            previous_key = (row[0], context)
+            updated_key = (keys.get(row[0], row[0]), keys.get(context, context))
+            if original_keys.setdefault(updated_key, previous_key) != previous_key:
+                raise ValueError(f"Translation key collision in {path}:{reader.line_num}")
         end = stream.tell()
         original = source[start:end]
         start = end
@@ -271,7 +301,7 @@ def rewrite(data: bytes, rules: tuple[Rule, ...], path: str) -> bytes:
         raise ValueError(f"Cannot rename non-UTF-8 source: {path}") from error
     translation = {"translations", "locale"}.intersection(PurePosixPath(path).parts)
     if translation and suffix in {".csv", ".po"}:
-        return rewrite_translation(source, rules, suffix).encode("utf-8")
+        return rewrite_translation(source, rules, path, suffix).encode("utf-8")
     return rewrite_source(source, rules, path).encode("utf-8")
 
 
@@ -508,7 +538,7 @@ def legacy_module_pattern(rules: tuple[Rule, ...]) -> re.Pattern[str]:
 def check_modules(root: Path, rules: tuple[Rule, ...], allowlist: Path) -> int:
     allowed = set()
     if allowlist.is_file():
-        entries = json.loads(allowlist.read_bytes())
+        entries = load_json(allowlist)
         allowed = {(entry["path"], entry["line_text"]) for entry in entries}
     pattern = legacy_module_pattern(rules)
     module_labels = {rule.old for rule in rules if rule.type == "module" and "." not in rule.old}

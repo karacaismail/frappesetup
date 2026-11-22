@@ -4829,6 +4829,105 @@
     ]
   },
   {
+    "old": "operationId: mobileV1Activity",
+    "new": "operationId: recordMobileActivityV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileRevokeUserInstallations",
+    "new": "operationId: revokeUserMobileInstallations",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1Register",
+    "new": "operationId: registerMobilePwaInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1Revoke",
+    "new": "operationId: revokeMobilePwaInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1Activity",
+    "new": "operationId: recordMobilePwaActivityV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1Push",
+    "new": "operationId: pushMobilePwaChangesV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1Pull",
+    "new": "operationId: pullMobilePwaChangesV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1ListInstallations",
+    "new": "operationId: listMobileInstallationsV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1RevokeInstallation",
+    "new": "operationId: revokeOwnedMobileInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1ListInstallations",
+    "new": "operationId: listMobilePwaInstallationsV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1RevokeInstallation",
+    "new": "operationId: revokeOwnedMobilePwaInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
     "old": "operationId: getLoginUrl",
     "new": "operationId: getPlatformLoginUrl",
     "type": "reference",

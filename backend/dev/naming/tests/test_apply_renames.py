@@ -259,6 +259,29 @@ class RenameTests(unittest.TestCase):
         self.assertIn("Name collision", result.stderr)
         self.assertIn("ad = name", source.read_text())
 
+    def test_translation_rename_cannot_merge_two_sources_in_one_context(self):
+        source = self.write("backend/app/record.json", '{"name":"Old Label"}\n')
+        translations = self.write(
+            "backend/app/translations/tr.csv",
+            "Old Label,Eski çeviri,Shared context\nNew Label,Yeni çeviri,Shared context\n",
+        )
+        before = translations.read_bytes()
+        self.git("add", ".")
+        rules = [{"old": "Old Label", "new": "New Label", "type": "doctype"}]
+        result = self.rename(rules)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("backend/app/translations/tr.csv:2", result.stderr)
+        self.assertEqual(translations.read_bytes(), before)
+        self.assertEqual(source.read_text(), '{"name":"Old Label"}\n')
+
+        translations.write_text("Old Label,Eski çeviri,First context\nNew Label,Yeni çeviri,Second context\n")
+        result = self.rename(rules)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            translations.read_text(),
+            "New Label,Eski çeviri,First context\nNew Label,Yeni çeviri,Second context\n",
+        )
+
     def test_settings_check_only_prints_legacy_keys(self):
         config = self.write("backend/config.env", "export LEGACY_KEY=never-print-this\n")
         self.git("add", ".")
@@ -284,6 +307,46 @@ class RenameTests(unittest.TestCase):
         self.assertEqual(markup.read_text(), '<div class="status">Son durum</div>\n')
         self.assertEqual(contract.read_text(), "summary: >-\n  Son durum\n")
         self.assertEqual(properties.read_text(), "caption=Son durum\n")
+
+    def test_preserves_openapi_copy_after_blank_lines_and_its_translation_key(self):
+        content = "First paragraph.\n\nSee `docs/sozlesmeler.md` and `site-kiraci1`.\n"
+        contract = self.write(
+            "backend/contracts/identity_sync.openapi.yaml",
+            "description: |\n  First paragraph.\n\n  See `docs/sozlesmeler.md` and `site-kiraci1`.\n"
+            "technical: site-kiraci1\n",
+        )
+        translation = self.write(
+            "backend/identity/identity_sync/translations/tr.csv",
+            f'"{content}",Türkçe karşılık,identity_sync.openapi.yaml: info.description\n',
+        )
+        translation_before = translation.read_bytes()
+        self.git("add", ".")
+        rules = [
+            {"old": "docs/sozlesmeler.md", "new": "docs/contracts.md", "type": "reference"},
+            {"old": "site-kiraci1", "new": "site-tenant1", "type": "setting"},
+        ]
+        result = self.rename(rules)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("  See `docs/sozlesmeler.md` and `site-kiraci1`.\n", contract.read_text())
+        self.assertIn("technical: site-tenant1\n", contract.read_text())
+        self.assertEqual(translation.read_bytes(), translation_before)
+
+    def test_preserves_yaml_block_copy_with_quoted_keys_and_crlf(self):
+        for header, ending in (
+            ("description: |", "\r\n"),
+            ('"description": |', "\n"),
+            ("'description': |2- # Copy", "\r\n"),
+        ):
+            with self.subTest(header=header, ending=ending):
+                target = self.write("backend/contracts/example.yaml", "")
+                original_copy = ending.join([header, "  First paragraph.", "", "  See old_name."])
+                target.write_bytes((original_copy + ending + "technical: old_name" + ending).encode())
+                self.git("add", ".")
+                result = self.rename([{"old": "old_name", "new": "new_name", "type": "reference"}])
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(
+                    target.read_bytes(), (original_copy + ending + "technical: new_name" + ending).encode()
+                )
 
     def test_rejects_a_module_binding_collision(self):
         source = self.write("backend/collision.py", "name = 1\nad = 2\n")

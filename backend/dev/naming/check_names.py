@@ -99,22 +99,62 @@ def tree_files(root: Path) -> list[Path]:
     return [path for path in backend.rglob("*") if path.is_file()]
 
 
-def read_glossary(path: Path) -> tuple[set[str], set[str]]:
-    if not path.is_file():
-        return set(), set()
-    doctype_names = set()
-    avoid = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        match = re.fullmatch(r"(?:\s+|- )(doctype|avoid):\s*(.*?)\s*", line)
+def load_json(source: str):
+    def object_from_pairs(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("Duplicate JSON key.")
+            result[key] = value
+        return result
+
+    def reject_constant(_constant):
+        raise ValueError("Non-finite JSON number.")
+
+    return json.loads(source, object_pairs_hook=object_from_pairs, parse_constant=reject_constant)
+
+
+def glossary_fields(path: Path):
+    """Read flat glossary entries without accepting ambiguous mapping keys."""
+    if not path.is_file() or path.is_symlink():
+        return
+    entry_indent = None
+    fields = set()
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        content = line.lstrip(" \t")
+        if not content or content.startswith("#"):
+            continue
+        indentation = line[: len(line) - len(content)]
+        if "\t" in indentation:
+            raise ValueError(f"{path}:{number}: YAML indentation must use spaces.")
+        indent = len(indentation)
+        item = re.match(r"^-( +|$)", content)
+        if item and (entry_indent is None or indent < entry_indent):
+            entry_indent = indent + len(item[0]) if item[0] != "-" else indent + 2
+            fields.clear()
+            content = content[item.end() :]
+        elif entry_indent is not None and indent != entry_indent:
+            continue
+        match = re.fullmatch(r"""(["']?)([A-Za-z_][\w-]*)\1:\s*(.*?)\s*""", content)
         if not match:
             continue
-        name, value = match.groups()
+        _, name, field_value = match.groups()
+        if name in fields:
+            raise ValueError(f"{path}:{number}: Duplicate YAML key {name!r}.")
+        fields.add(name)
+        yield name, field_value
+
+
+def read_glossary(path: Path) -> tuple[set[str], set[str]]:
+    doctype_names = set()
+    avoid = set()
+    for name, value in glossary_fields(path):
         if name == "doctype":
             doctype_names.add(value.strip("\"'"))
-        elif value.startswith("[") and value.endswith("]"):
+        elif name == "avoid":
+            if not value.startswith("[") or not value.endswith("]"):
+                raise ValueError(f"Expected an inline avoid list in {path.name}.")
             avoid.update(word.strip().strip("\"'") for word in value[1:-1].split(",") if word.strip())
-        else:
-            raise ValueError(f"Expected an inline avoid list in {path.name}.")
     return doctype_names, avoid
 
 
@@ -142,12 +182,11 @@ def turkish_roots(entries: list[dict], glossaries: list[Path]) -> set[str]:
         if entry["type"] in {"identifier", "module"} and re.fullmatch(r"[\w .-]+", entry["old"]):
             candidates.update(name_words(entry["old"]))
     for glossary in glossaries:
-        if not glossary.is_file() or glossary.is_symlink():
-            continue
-        for line in glossary.read_text(encoding="utf-8").splitlines():
-            if match := re.match(r"\s*(?:-\s+)?(?:term_tr|code):\s*(.+)", line):
-                target = candidates if "term_tr:" in line else english_names
-                target.update(name_words(match[1]))
+        for name, value in glossary_fields(glossary):
+            if name == "term_tr":
+                candidates.update(name_words(value))
+            elif name == "code":
+                english_names.update(name_words(value))
     return {
         candidate
         for candidate in candidates - english_names
@@ -170,7 +209,7 @@ def replacement(names: dict[str, list[dict]], name: str, path: str, kinds: set[s
 
 
 def json_records(path: Path):
-    content = json.loads(path.read_text(encoding="utf-8"))
+    content = load_json(path.read_text(encoding="utf-8"))
     records = content if isinstance(content, list) else [content]
     for record in records:
         if not isinstance(record, dict):
@@ -399,7 +438,7 @@ def scan(
         if selected is None or relative in selected:
             findings.append(Finding(relative, line, rule, message))
 
-    entries = json.loads(map_path.read_text(encoding="utf-8"))
+    entries = load_json(map_path.read_text(encoding="utf-8"))
     names = name_rules(entries)
     files = tree_files(root)
     if selected is not None:
@@ -453,7 +492,7 @@ def scan(
             elif path.suffix == ".json" and JSON_RECORD_FOLDERS.intersection(path.relative_to(app).parts):
                 try:
                     records = list(json_records(path))
-                except (UnicodeError, json.JSONDecodeError):
+                except ValueError:
                     emit(path, "json", "Frappe metadata is not a readable JSON file.")
                     continue
                 for record in records:
@@ -483,7 +522,7 @@ def turkish_text(value: str) -> bool:
 
 
 def json_source_text(source: str, keys: set[str], *, doctype: bool):
-    document = json.loads(source)
+    document = load_json(source)
     if doctype and (not isinstance(document, dict) or document.get("doctype") != "DocType"):
         return
     positions = iter(
