@@ -1299,8 +1299,8 @@
     "rule": "B603",
     "file": "backend/dev/security/semgrep_exceptions.py",
     "code": "listing = subprocess.run(",
-    "statementSha256": "21caf1cad401f2bdf4b597eeb30e928055b0fc391631cb7106487ec2e2fea9bf",
-    "reason": "Executes absolute Git without a shell and limits file listing to a literal path after the argument separator.",
+    "statementSha256": "706b7f50459ff1d9b451b9f967fd3a58b0f32af0ea4af26410d11f8462d4007c",
+    "reason": "Calls absolute Git without a shell, with validated literal file or directory pathspecs after the argument separator.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
   },
