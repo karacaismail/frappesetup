@@ -285,10 +285,6 @@ class SchemathesisRunTests(CleanEnvironment):
             with self.subTest(base=base):
                 self.assertIn("/api/method/fixture.read", paths)
 
-    def test_output_masks_session(self):
-        self.assertEqual(scans.mask_session("curl -H 'Cookie: sid=abc123; x=1'"),
-                         "curl -H 'Cookie: sid=[masked]; x=1'")
-
     def test_writes_require_explicit_option(self):
         _result, calls = self.run_against(200, writes=True)
         self.assertIn("POST", {method for method, *_rest in calls})

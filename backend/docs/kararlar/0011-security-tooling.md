@@ -33,7 +33,11 @@ Bu denetim imajdaki paketleri kapsamadı.
 
 Nuclei yerine ZAP seçildi. ZAP kaydedilen yanıtı yeni istek göndermeden inceler.
 Tarayıcıya paket eklenmez. ZAP, yerel denetimde ayrı imaj olarak çalışır.
-Canlı Schemathesis adımı açıktır. `security-full --ci` bu adımı geçirmez.
+Yerel hedef yoksa sözleşme adımı `not_run` döner.
+Sözleşme denetimi varsayılan olarak GET işlemlerini kapsar.
+Özet, sınanan işlem sayısını gösterir. Erişim izni ayrı rol testiyle doğrulanır.
+Ayrı test, aynı uçta iki sahte hesabı kullanır.
+Yetkili hesap 200, yetkisiz hesap 403 almalıdır.
 
 ## Bakım ve geri dönüş
 

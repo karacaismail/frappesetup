@@ -58,8 +58,11 @@ Site kurulumu için gereken sırlar `MARIADB_ROOT_PASSWORD` ve `ADMIN_PASSWORD` 
 Başarısız tarama birleştirmeyi durdurur.
 CI kipinde zorunlu adım çalışmazsa komut 1 ile çıkar.
 ZAP, yerel siteden alınan ilk yanıtı pasif olarak inceler. Yanıt yeniden gönderilmez.
-Yukarıdaki `security-full --ci` komutunda canlı sözleşme adımı `not_run` döner.
-Bu sonuç komutun 1 ile çıkmasına yol açar.
+Yerel hedef yoksa sözleşme adımı `not_run` döner.
+Sözleşme denetimi varsayılan olarak GET işlemlerini kapsar.
+Özet, sınanan işlem sayısını gösterir. Erişim izni ayrı rol testiyle doğrulanır.
+Ayrı test, aynı uçta iki sahte hesabı kullanır.
+Yetkili hesap 200, yetkisiz hesap 403 almalıdır.
 Rapor kendi başına birleştirme kararı vermez.
 
 CodeQL Python işi için aşağıdaki ayarları kullanın.

@@ -156,7 +156,7 @@
     "rule": "B603",
     "file": "backend/dev/security/scans.py",
     "code": "process = subprocess.run(command, cwd=directory, check=False, env=environment, timeout=600,",
-    "statementSha256": "50556703a28fea4df417e91a640b7187bd178010c1ab5c86bd86e85b51c79a6f",
+    "statementSha256": "ba416a908b8314977e08a421e70cf17e5c7c5bc0639ee4fe8f18b9f3c63bec11",
     "reason": "The pinned Schemathesis command runs without a shell against a validated loopback port.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"

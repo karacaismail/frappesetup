@@ -101,7 +101,8 @@ def report(directory):
     for name in ("full", "local"):
         record = read_record(directory, name)
         if record:
-            state = {True: "dirty", False: "clean"}.get(record.get("dirty"), "unknown")
+            dirty = record.get("dirty")
+            state = "dirty" if dirty is True else "clean" if dirty is False else "unknown"
             lines.append(f"- {markdown_code(name)} · {markdown_code(record.get('commit', '—'))} · "
                          f"{markdown_code(record.get('branch', '—'))} · {markdown_code(record.get('utc', '—'))} · Working tree: {state}.")
     lines.extend(["", "| Tool | Version | Command | Result |", "| --- | --- | --- | --- |"])
@@ -439,8 +440,8 @@ def contract_session(host, port):
     return sid
 
 
-def mask_session(text):
-    return re.sub(r"sid=[^;'\" \s]+", "sid=[masked]", text)
+class ContractToolError(ValueError):
+    pass
 
 
 def run_contract(contract, host, port, *, writes=False, sid=None):
@@ -458,20 +459,21 @@ def run_contract(contract, host, port, *, writes=False, sid=None):
         environment["FS_SCHEMATHESIS_SID"] = sid or ""
         print(f"Running Schemathesis: {contract}", flush=True)
         # The tool keeps a crash cache in its working directory; keep it out of the repository.
-        process = subprocess.run(command, cwd=directory, check=False, env=environment, timeout=600,
-                                 capture_output=True, text=True)
+        try:
+            process = subprocess.run(command, cwd=directory, check=False, env=environment, timeout=600,
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.SubprocessError):
+            raise ContractToolError(f"CONTRACT_TOOL_FAILED {contract}") from None
         try:
             report = json.loads(report_path.read_text())
         except (OSError, ValueError):
-            print(mask_session(process.stdout[-4000:]), mask_session(process.stderr[-4000:]), sep="\n")
-            raise ValueError(f"Schemathesis wrote no report for {contract}.") from None
+            raise ContractToolError(f"CONTRACT_REPORT_UNAVAILABLE {contract}") from None
         if process.returncode == 2 and report.get("operations", {}).get("selected") == 0:
             print(f"Schemathesis: {contract} has no operations for this mode.")
             return (), 0
         findings = contract_findings(report, contract)
         if process.returncode not in (0, 1) or (process.returncode == 1) != bool(findings):
-            print(mask_session(process.stdout[-4000:]), mask_session(process.stderr[-4000:]), sep="\n")
-            raise ValueError(f"Schemathesis exited with code {process.returncode} for {contract}.")
+            raise ContractToolError(f"CONTRACT_STATUS_UNEXPECTED {contract}")
         return findings, report["operations"]["tested"]
 
 
@@ -536,10 +538,15 @@ def scan_contracts(target, *, writes=False, contracts=None):
         findings = tuple(finding for items, _tested in runs for finding in items)
         for finding in findings:
             print(f"Schemathesis: {finding}")
-        if not findings and not sum(tested for _findings, tested in runs):
+        tested = sum(count for _findings, count in runs)
+        print(f"Schemathesis: {tested} operations tested ({mode}). Authorization requires separate role tests.")
+        if not findings and not tested:
             print("Schemathesis: no operation was tested.")
             return replace(result, status="not_run")
         return replace(result, status="fail" if findings else "pass", findings=findings)
+    except ContractToolError as error:
+        print(error)
+        return result
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
         print(f"Schemathesis check failed: {error}")
         return result

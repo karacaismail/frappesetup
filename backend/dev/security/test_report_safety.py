@@ -1,9 +1,11 @@
 import hashlib
 import json
+import io
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 import scans
 
 
@@ -70,6 +72,40 @@ class ReportSafetyTests(unittest.TestCase):
                     if expected == "fail":
                         self.assertIn("Unused exception", " ".join(result.findings))
                         self.assertIn("B603 · backend/a.py:1", result.findings)
+
+    def test_malformed_dirty_field_reports_unknown(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "full.json").write_text('{"dirty": [], "results": []}')
+            self.assertIn("Working tree: unknown.", scans.report(root))
+
+    def test_missing_contract_report_discards_raw_tool_output(self):
+        contract = "backend/contracts/example.yaml"
+        email = "fake-person@example.test"
+        cookie = "sid=fake-session; alternate=fake-cookie"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            output = io.StringIO()
+            with patch.object(scans.http.client, "HTTPConnection"), patch.object(scans, "contract_session", return_value=None), \
+                    patch.object(scans, "contract_fixture_found", return_value=True), \
+                    patch.object(scans.subprocess, "run", return_value=Mock(stdout=email, stderr=cookie, returncode=2)), redirect_stdout(output):
+                result = scans.scan_contracts("http://127.0.0.1:1234", contracts=[contract])
+            scans.save(path, "full", [result])
+            self.assertEqual(result.status, "fail")
+            self.assertIn(f"CONTRACT_REPORT_UNAVAILABLE {contract}", output.getvalue())
+            for value in (email, "fake-session", "fake-cookie"):
+                self.assertNotIn(value, output.getvalue())
+                self.assertNotIn(value, (path / "full.json").read_text())
+
+    def test_contract_summary_separates_coverage_from_authorization(self):
+        output = io.StringIO()
+        with patch.object(scans.http.client, "HTTPConnection"), patch.object(scans, "contract_session", return_value=None), \
+                patch.object(scans, "contract_fixture_found", return_value=True), \
+                patch.object(scans, "run_contract", return_value=((), 3)), redirect_stdout(output):
+            result = scans.scan_contracts("http://127.0.0.1:1234", contracts=["backend/contracts/example.yaml"])
+        self.assertEqual(result.status, "pass")
+        self.assertIn("3 operations tested (GET only)", output.getvalue())
+        self.assertIn("Authorization requires separate role tests.", output.getvalue())
 
 
 if __name__ == "__main__":
