@@ -28,14 +28,32 @@ PREVIEW = {
 				"properties": {"fieldname": _STRING, "label": _NULLABLE_STRING, "old": {}, "new": {}},
 			},
 		},
-		"details": {"type": "object"},
+		"details": {
+			"type": "object",
+			"description": "Extra facts of the tool for the human, as plain values.",
+		},
 	},
+}
+
+# Every read result says when it was read, on which site and from what.
+_PROVENANCE = {
+	"as_of": {"type": "string", "description": "Time of the read, ISO 8601 with a UTC offset."},
+	"site": _STRING,
+	"source": {
+		"type": "string",
+		"description": "What the data was read from, for example a DocType or a report.",
+	},
+}
+_PROVENANCE_KEYS = ["as_of", "site", "source"]
+_TRUNCATED = {
+	"type": "boolean",
+	"description": "True when rows or values were left out to stay within the limits.",
 }
 
 SEARCH_DOCTYPES = {
 	"type": "object",
-	"required": ["doctypes"],
-	"properties": {"doctypes": {"type": "array", "items": _STRING}},
+	"required": ["doctypes", *_PROVENANCE_KEYS],
+	"properties": {"doctypes": {"type": "array", "items": _STRING}, **_PROVENANCE},
 }
 
 DOCTYPE_SCHEMA = {
@@ -49,8 +67,10 @@ DOCTYPE_SCHEMA = {
 		"generic_write_tools",
 		"permissions",
 		"fields",
+		*_PROVENANCE_KEYS,
 	],
 	"properties": {
+		**_PROVENANCE,
 		"doctype": _STRING,
 		"description": _NULLABLE_STRING,
 		"module": _STRING,
@@ -100,33 +120,56 @@ DOCTYPE_SCHEMA = {
 
 LIST_DOCUMENTS = {
 	"type": "object",
-	"required": ["documents", "has_next_page"],
+	"required": ["documents", "has_next_page", "truncated", *_PROVENANCE_KEYS],
 	"properties": {
 		"documents": {"type": "array", "items": {"type": "object"}},
 		"has_next_page": _BOOLEAN,
+		"truncated": _TRUNCATED,
+		**_PROVENANCE,
 	},
 }
 
 GET_DOCUMENT = {
 	"type": "object",
-	"required": ["document"],
-	"properties": {"document": {"type": "object"}},
+	"required": ["document", "truncated", *_PROVENANCE_KEYS],
+	"properties": {
+		"document": {
+			"type": "object",
+			"description": "Field name to value. A child table is a list of row objects, at most 200 rows.",
+		},
+		"truncated": _TRUNCATED,
+		**_PROVENANCE,
+	},
 }
 
 RUN_REPORT = {
 	"type": "object",
-	"required": ["columns", "rows", "truncated"],
-	"properties": {"columns": {"type": "array"}, "rows": {"type": "array"}, "truncated": _BOOLEAN},
+	"required": ["columns", "rows", "truncated", *_PROVENANCE_KEYS],
+	"properties": {
+		"columns": {
+			"type": "array",
+			"description": "A column is an object with fieldname, label and fieldtype, or the text Label:Type:Width.",
+			"items": {"type": ["object", "string"]},
+		},
+		"rows": {
+			"type": "array",
+			"description": "A row is an object keyed by fieldname, or a list in column order.",
+			"items": {"type": ["object", "array"]},
+		},
+		"truncated": _TRUNCATED,
+		**_PROVENANCE,
+	},
 }
 
 APPROVAL_REQUIRED = {
 	"type": "object",
-	"required": ["status", "proposal_id", "preview", "expires_at"],
+	"required": ["status", "proposal_id", "preview", "expires_at", "created_at"],
 	"properties": {
 		"status": {"type": "string", "enum": ["approval_required"]},
 		"proposal_id": _STRING,
 		"preview": PREVIEW,
-		"expires_at": _STRING,
+		"expires_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},
+		"created_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},
 	},
 }
 
@@ -141,6 +184,7 @@ PROPOSAL_STATE = {
 		"billable",
 		"preview",
 		"expires_at",
+		"created_at",
 	],
 	"properties": {
 		"proposal_id": _STRING,
@@ -152,7 +196,8 @@ PROPOSAL_STATE = {
 		"destructive": _BOOLEAN,
 		"billable": _BOOLEAN,
 		"preview": PREVIEW,
-		"expires_at": _STRING,
+		"expires_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},
+		"created_at": {"type": "string", "description": "ISO 8601 with a UTC offset."},
 		"result_document": _NULLABLE_STRING,
 		"error": _NULLABLE_STRING,
 	},

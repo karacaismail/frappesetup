@@ -219,6 +219,8 @@ class TestStaticRules(YzTestCase):
 
 	def test_every_field_of_the_layer_doctypes_has_a_description(self):
 		for doctype in ("AI Action Log", "AI Action Proposal"):
+			# The AI reads the DocType's own description first (D-9, the AI readiness gate).
+			self.assertTrue((frappe.get_meta(doctype).description or "").strip(), doctype)
 			for field in frappe.get_meta(doctype).fields:
 				if field.fieldtype not in ("Section Break", "Column Break", "Tab Break"):
 					self.assertTrue(field.description, f"{doctype}.{field.fieldname}")

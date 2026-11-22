@@ -12,6 +12,11 @@ from pydantic import Field
 from platform_core.yapay_zeka import fields as field_rules
 from platform_core.yapay_zeka import policy
 from platform_core.yapay_zeka.errors import ToolDenied
+from platform_core.yapay_zeka.tools import envelope
+
+# The limits live in `envelope`. They are named here so that a test can lower them for this module.
+MAX_CHILD_ROWS = envelope.MAX_CHILD_ROWS
+MAX_RESULT_BYTES = envelope.MAX_RESULT_BYTES
 
 OPERATORS = frozenset({"=", "!=", ">", "<", ">=", "<=", "like", "not like", "in", "not in", "between", "is"})
 ORDER_BY = re.compile(r"^\s*(\w+)(?:\s+(asc|desc))?\s*$", re.IGNORECASE)
@@ -84,7 +89,9 @@ def list_documents(
 		limit_start=start,
 		limit_page_length=limit + 1,
 	)
-	return {"documents": rows[:limit], "has_next_page": len(rows) > limit}
+	documents, cut = envelope.fit_rows(rows[:limit], MAX_RESULT_BYTES)
+	result = {"documents": documents, "has_next_page": cut or len(rows) > limit, "truncated": cut}
+	return envelope.stamp(result, f"DocType: {doctype}")
 
 
 def get_document(doctype: str, name: str) -> dict:
@@ -92,7 +99,8 @@ def get_document(doctype: str, name: str) -> dict:
 	doc = frappe.get_doc(doctype, name)
 	doc.check_permission("read")
 	doc.apply_fieldlevel_read_permissions()
-	return {"document": field_rules.clean(doc.as_dict(), meta)}
+	document, cut = envelope.fit_document(field_rules.clean(doc.as_dict(), meta), MAX_RESULT_BYTES)
+	return envelope.stamp({"document": document, "truncated": cut}, f"DocType: {doctype}")
 
 
 def run_report(report: str, filters: dict[str, Any] | None = None, limit: int = 100) -> dict:
@@ -136,7 +144,9 @@ def run_report(report: str, filters: dict[str, Any] | None = None, limit: int = 
 			rows.append({name: row.get(name) for _index, name in keep if name in row})
 		elif isinstance(row, list | tuple):
 			rows.append([row[index] for index, _name in keep if index < len(row)])
-	return {"columns": columns, "rows": rows, "truncated": truncated}
+	rows, cut = envelope.fit_rows(rows, MAX_RESULT_BYTES)
+	result = {"columns": columns, "rows": rows, "truncated": truncated or cut}
+	return envelope.stamp(result, f"Report: {report}")
 
 
 def _report_guard():

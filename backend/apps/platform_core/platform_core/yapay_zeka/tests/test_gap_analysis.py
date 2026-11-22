@@ -187,14 +187,14 @@ class TestProposalListQuery(YzTestCase):
 			rejected = self.human(client, "GET", "list_proposals", query={"status": "rejected", "limit": 50})
 
 		self.assertEqual(everything.status_code, 200, everything.get_data(as_text=True))
-		self.assertEqual(len(everything.json["message"]), 3)
-		listed = lambda response: {row["proposal_id"] for row in response.json["message"]}  # noqa: E731
+		self.assertEqual(len(everything.json["message"]["proposals"]), 3)
+		listed = lambda response: {row["proposal_id"] for row in response.json["message"]["proposals"]}  # noqa: E731
 		self.assertLessEqual({ids[2], ids[3]}, listed(pending))
 		self.assertFalse({ids[0], ids[1]} & listed(pending))
 		self.assertIn(ids[0], listed(expired))
 		self.assertNotIn(ids[2], listed(expired))
 		self.assertIn(ids[1], listed(rejected))
-		self.assertEqual({row["status"] for row in expired.json["message"]}, {"expired"})
+		self.assertEqual({row["status"] for row in expired.json["message"]["proposals"]}, {"expired"})
 
 
 class TestPermissionBypassIsNotLeftBehind(YzTestCase):

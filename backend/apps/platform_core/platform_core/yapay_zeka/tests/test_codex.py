@@ -488,7 +488,8 @@ class TestHumanCallLog(YzTestCase):
 		log = self.last_log(tool="issue_agent_token", user=USER_A)
 		self.assertEqual((log.decision, log.stage, log.principal), ("allowed", "auth", "human_session"))
 
-	def test_reading_and_listing_proposals_is_logged(self):
+	def test_reading_and_listing_proposals_leaves_no_log_row(self):
+		"""Backlog item 8 changed this rule: a successful GET writes nothing. A denied GET is logged."""
 		name = self.make_record(USER_A)
 		client = self.login(USER_A)
 		proposal_id = self.propose_update(client, name, title="Yeni")["proposal_id"]
@@ -496,9 +497,8 @@ class TestHumanCallLog(YzTestCase):
 		self.human(client, "GET", "get_proposal", query={"proposal_id": proposal_id})
 		self.human(client, "GET", "list_proposals")
 
-		read = self.last_log(tool="get_proposal", user=USER_A, proposal=proposal_id)
-		self.assertEqual(read.decision, "allowed")
-		self.assertEqual(self.last_log(tool="list_proposals", user=USER_A).decision, "allowed")
+		self.assertIsNone(self.last_log(tool="get_proposal", user=USER_A))
+		self.assertIsNone(self.last_log(tool="list_proposals", user=USER_A))
 
 	def test_reading_rejecting_and_resolving_another_users_proposal_is_logged(self):
 		name = self.make_record(USER_A)

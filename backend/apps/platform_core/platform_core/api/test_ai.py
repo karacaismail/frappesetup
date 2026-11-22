@@ -64,7 +64,9 @@ class TestAiEndpoints(YzTestCase):
 	def test_list_proposals_foreign_data_denied(self):
 		_name, proposal_id, _digest = self.proposal_of_a()
 
-		listed = self.human(self.login(USER_B), "GET", "list_proposals", query={"limit": 100}).json["message"]
+		listed = self.human(self.login(USER_B), "GET", "list_proposals", query={"limit": 100}).json[
+			"message"
+		]["proposals"]
 
 		self.assertNotIn(proposal_id, [row["proposal_id"] for row in listed])
 

@@ -12,7 +12,7 @@ from frappe.utils import add_to_date, get_datetime, now_datetime, strip_html
 from frappe.utils.response import json_handler
 from pydantic import Field
 
-from platform_core.yapay_zeka import access, registry, store, versioning
+from platform_core.yapay_zeka import access, registry, store, timestamps, versioning
 from platform_core.yapay_zeka.errors import ToolDenied
 
 TTL_SECONDS = 600
@@ -61,11 +61,48 @@ def _digest(
 	return hashlib.sha256("\n".join(parts).encode()).hexdigest()
 
 
+PREVIEW_ACTIONS = frozenset({"create", "update", "submit", "cancel", "delete", "app_tool", "admin"})
+CHANGE_KEYS = frozenset({"fieldname", "label", "old", "new"})
+
+
+def preview_problems(spec: dict) -> list[str]:
+	"""Check a preview against the preview schema of the contract. Return what is wrong with it."""
+	problems = []
+	if not isinstance(spec.get("summary"), str) or not spec["summary"].strip():
+		problems.append("summary must be a text")
+	if spec.get("action", "app_tool") not in PREVIEW_ACTIONS:
+		problems.append("action is not known")
+	if spec.get("details") is not None and not isinstance(spec["details"], dict):
+		problems.append("details must be an object")
+	changes = spec.get("changes")
+	if changes is None:
+		return problems
+	if not isinstance(changes, list):
+		return [*problems, "changes must be a list"]
+	for index, change in enumerate(changes):
+		if not isinstance(change, dict):
+			problems.append(f"changes[{index}] must be an object")
+		elif set(change) - CHANGE_KEYS:
+			problems.append(
+				f"changes[{index}] has unknown keys: {', '.join(sorted(set(change) - CHANGE_KEYS))}"
+			)
+		elif not isinstance(change.get("fieldname"), str) or "new" not in change:
+			problems.append(f"changes[{index}] needs fieldname and new")
+	return problems
+
+
 def _run_preview(tool: registry.AiTool, arguments: dict) -> dict:
 	spec = tool.preview(**arguments)
-	if not isinstance(spec, dict) or not isinstance(spec.get("summary"), str):
-		raise ToolDenied("internal_error", _("The preview of tool {0} is not valid.").format(tool.name))
+	if not isinstance(spec, dict):
+		raise ToolDenied("invalid_preview", _("The preview of tool {0} must be an object.").format(tool.name))
 	spec.setdefault("action", "app_tool")
+	# The preview is what the human approves. It is stored only if it follows the preview schema.
+	problems = preview_problems(spec)
+	if problems:
+		raise ToolDenied(
+			"invalid_preview",
+			_("The preview of tool {0} is not valid: {1}").format(tool.name, "; ".join(problems)),
+		)
 	if tool.tool_class == "app" and tool.versioned:
 		# The tool asked the layer to guard the target's version. Without all three values the
 		# layer could neither lock the row nor compare versions, so the action stops here.
@@ -120,7 +157,8 @@ def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 		"status": "approval_required",
 		"proposal_id": doc.name,
 		"preview": json.loads(preview_json),
-		"expires_at": str(doc.expires_at),
+		"expires_at": timestamps.iso(doc.expires_at),
+		"created_at": timestamps.iso(doc.creation),
 	}
 	return result, doc
 
@@ -140,7 +178,8 @@ def public(doc, *, with_digest: bool = True) -> dict:
 		"destructive": bool(doc.destructive),
 		"billable": bool(doc.billable),
 		"preview": json.loads(doc.preview_json),
-		"expires_at": str(doc.expires_at),
+		"expires_at": timestamps.iso(doc.expires_at),
+		"created_at": timestamps.iso(doc.creation),
 		"result_document": doc.result_document,
 		"error": doc.error,
 	}
@@ -168,14 +207,19 @@ def read_for_human(proposal_id: str) -> dict:
 	return access.human_call("call", "get_proposal", lambda: public(_own(proposal_id)), proposal=proposal_id)
 
 
-def list_for_human(status: str | None = None, limit: int = 20) -> list[dict]:
-	def rows() -> list[dict]:
+def list_for_human(status: str | None = None, limit: int = 20, start: int = 0) -> dict:
+	"""One page of the user's proposals, newest first. The database filters and pages."""
+
+	def page() -> dict:
 		if status and status not in STATUS_FILTERS:
 			frappe.throw(_("Unknown status."), frappe.ValidationError)
+		if int(start) < 0:
+			frappe.throw(_("start cannot be negative."), frappe.ValidationError)
 		count = min(max(int(limit), 1), 100)
-		return [public(row) for row in store.proposals_of(frappe.session.user, status or None, count)]
+		rows = store.proposals_of(frappe.session.user, status or None, int(start), count + 1)
+		return {"proposals": [public(row) for row in rows[:count]], "has_next_page": len(rows) > count}
 
-	return access.human_call("call", "list_proposals", rows)
+	return access.human_call("call", "list_proposals", page)
 
 
 def _log(stage: str, doc, *, decision: str, deny_reason: str | None = None, **extra) -> None:

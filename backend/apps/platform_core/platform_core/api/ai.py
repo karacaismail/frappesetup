@@ -31,9 +31,9 @@ def issue_agent_token() -> dict:
 
 # Checked in `access.human_call`. The query in `store.proposals_of` is limited to the session user.
 @frappe.whitelist(methods=["GET"])  # nosemgrep: frappe-missing-permission
-def list_proposals(status: str | None = None, limit: int = 20) -> list[dict]:
-	"""Oturumdaki kullanıcının yazma önerilerini listeler."""
-	return proposals.list_for_human(status, limit)
+def list_proposals(status: str | None = None, limit: int = 20, start: int = 0) -> dict:
+	"""Oturumdaki kullanıcının yazma önerilerini sayfa sayfa listeler."""
+	return proposals.list_for_human(status, limit, start)
 
 
 # Checked in `proposals._own`: the proposal must belong to the session user.

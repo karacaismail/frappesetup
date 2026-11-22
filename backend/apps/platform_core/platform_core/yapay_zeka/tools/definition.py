@@ -8,6 +8,7 @@ from pydantic import Field
 
 from platform_core.yapay_zeka import fields, policy
 from platform_core.yapay_zeka.errors import ToolDenied
+from platform_core.yapay_zeka.tools import envelope
 
 LAYOUT_FIELDTYPES = NO_VALUE_FIELDS - {"Table", "Table MultiSelect"}
 PERMISSION_TYPES = ("read", "write", "create", "delete", "submit", "cancel")
@@ -30,7 +31,7 @@ def search_doctypes(query: str | None = None, limit: int = 50) -> dict:
 		for name in frappe.get_user().get_can_read()
 		if name not in policy.READ_BLOCKED and needle in name.lower()
 	)
-	return {"doctypes": names[:limit]}
+	return envelope.stamp({"doctypes": names[:limit]}, "DocType list")
 
 
 def get_doctype_schema(doctype: str) -> dict:
@@ -52,6 +53,13 @@ def get_doctype_schema(doctype: str) -> dict:
 	can_read = fields.readable(meta)
 	can_write = fields.writable(meta)
 	write_closed = doctype in policy.WRITE_BLOCKED or doctype in policy.ADMIN_DOCTYPES
+	return envelope.stamp(
+		_schema(doctype, meta, permissions, can_read, can_write, write_closed),
+		f"DocType definition: {doctype}",
+	)
+
+
+def _schema(doctype: str, meta, permissions: dict, can_read: set, can_write: set, write_closed: bool) -> dict:
 	return {
 		"doctype": doctype,
 		"description": meta.description,

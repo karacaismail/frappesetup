@@ -109,14 +109,10 @@ def human_call(stage: str, tool: str, action, *, proposal: str | None = None, lo
 		code = next(code for kind, code in codes if isinstance(error, kind))
 		record_denial(stage, code, tool=tool, proposal=_existing(proposal))
 		raise
-	if frappe.request.method == "GET":
-		# Frappe rolls a GET request back. A read has no writes of its own to keep, so the
-		# transaction is emptied first and the commit carries only the log row.
-		frappe.db.rollback()
-	if log_success:
+	# A read request (GET) writes to the log only when it is denied. A successful read leaves no
+	# row and makes no commit, so another site cannot make the browser fill the log.
+	if log_success and frappe.request.method != "GET":
 		record(stage, decision="allowed", tool=tool, proposal=_existing(proposal))
-	if frappe.request.method == "GET":
-		commit_own_writes()
 	return result
 
 

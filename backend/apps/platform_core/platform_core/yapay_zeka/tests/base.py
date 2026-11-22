@@ -144,6 +144,11 @@ class YzTestCase(IntegrationTestCase):
 		frappe.set_user("Administrator")
 		ensure_fixtures()
 		cls.site = frappe.local.site
+		# Every run adds thousands of log rows. A test site keeps none of them between classes,
+		# so the database of the shared container host does not grow with each run.
+		frappe.db.delete("AI Action Log")
+		frappe.db.delete("AI Action Proposal")
+		frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup on a test site
 
 	def setUp(self):
 		super().setUp()

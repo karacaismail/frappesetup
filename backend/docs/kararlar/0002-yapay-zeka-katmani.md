@@ -514,6 +514,23 @@ Rapor için bir sınır kalır. Frappe'nin rapor işlevi sonucun tamamını kend
 
 Resmî Python MCP istemcisiyle (sürüm 2.3.0) gerçek oturum açıldı. İstemci `2025-11-25` ve `2026-07-28` sürümleriyle bağlandı. Araç listesi, okuma aracı, öneri ve insan onayı çalıştı. Belirteçsiz istek, süresi dolmuş belirteç ve çerezle birlikte belirteç reddedildi. Oturum bir sözleşme hatası gösterdi: kimliksiz istek 401 değil 403 alıyor. Sözleşme düzeltildi.
 
+### Altıncı tur: eksik işler listesi
+
+`docs/gap-backlog.md` dosyasındaki sekiz madde kapatıldı (O-28):
+
+1. Öneri zamanları saat farkıyla ISO 8601 biçiminde döner. Örneğin `2026-11-22T12:41:57+03:00`.
+2. Süresi dolmuş oturum 401, oturumsuz istek 403 alır. Sözleşme bütün uçlarda 401 yanıtını yazar. Kaynak `frappe/__init__.py:483` satırıdır.
+3. Önizleme saklanmadan önce şemayla denetlenir. Değişiklik satırının anahtarları `fieldname`, `label`, `old` ve `new` olur. Uymayan önizleme `invalid_preview` döner.
+4. `ai_write_closed_doctypes` kancası sınanır. Kancadaki ve güvenlik listelerindeki her DocType'ın sitede var olduğu da sınanır.
+5. Okuma sonuçları `as_of`, `site` ve `source` taşır. Öneri `created_at` taşır.
+6. Okuma sonucunun satır ve bayt sınırı vardır. Alt tablo en çok 200 satır döner. Sonucun verisi en çok 262.144 bayttır. Sınır aşılınca `truncated` doğru olur.
+7. Öneri listesi veritabanında süzülür ve sayfalanır. Uç `start` parametresini alır ve `has_next_page` döner.
+8. GET isteği günlüğe yalnız reddi yazar. Başarılı okuma satır yazmaz ve kesinleştirme yapmaz.
+
+Sekizinci madde, B6 bulgusuyla gelen bir kuralı daraltır. Önceden başarılı öneri okuması da günlüğe düşüyordu. Artık düşmüyor. Neden şudur: Oturum çerezi başka siteden gelen GET isteğiyle de gider. Böyle bir istek günlüğü doldurabilirdi.
+
+İki DocType'a açıklama yazıldı. Yapay zekâ uygunluk kapısı bunu istedi (D-9).
+
 ## 13. Karar sitesiyle çelişkiler
 
 | Konu | Karar sitesi | Bu karar | Neden |

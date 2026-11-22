@@ -57,6 +57,7 @@ def save_proposal(doc: Document) -> None:
 
 PROPOSAL_LIST_FIELDS = (
 	"name",
+	"creation",
 	"status",
 	"result",
 	"tool",
@@ -72,7 +73,7 @@ PROPOSAL_LIST_FIELDS = (
 )
 
 
-def proposals_of(user: str, status: str | None, limit: int) -> list[dict]:
+def proposals_of(user: str, status: str | None, start: int, limit: int) -> list[dict]:
 	"""Return the user's proposals in one bounded query, newest first.
 
 	A pending proposal past its time counts as expired, so the time is part of the query.
@@ -92,7 +93,8 @@ def proposals_of(user: str, status: str | None, limit: int) -> list[dict]:
 		filters=filters,
 		or_filters=or_filters,
 		fields=list(PROPOSAL_LIST_FIELDS),
-		order_by="creation desc",
+		order_by="creation desc, name desc",
+		limit_start=start,
 		limit=limit,
 	)
 

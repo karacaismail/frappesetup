@@ -258,3 +258,26 @@ def declare_strict() -> list[dict]:
 			"preview": PATH + "preview_version_sometimes",
 		},
 	]
+
+
+def preview_with_wrong_keys(name: str, title: str) -> dict:
+	"""Preview whose change rows use keys the contract does not know."""
+	doc = frappe.get_doc(DOCTYPE, name)
+	doc.check_permission("write")
+	return {
+		"summary": f"Set the title of {name}",
+		"changes": [{"field": "title", "before": doc.title, "after": title}],
+	}
+
+
+def declare_wrong_preview() -> list[dict]:
+	return [
+		{
+			"name": "wrong_preview_keys",
+			"description": "Its preview does not follow the preview schema.",
+			"arguments": PATH + "TitleArguments",
+			"kind": "write",
+			"handler": PATH + "set_title",
+			"preview": PATH + "preview_with_wrong_keys",
+		}
+	]
