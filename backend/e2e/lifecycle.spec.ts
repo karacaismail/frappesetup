@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 import { localUrl, required } from './local';
 import { previewMobileToken } from './mobile-fixture';
-import { mobileHeaders } from './mobile-request';
+import { postMobile } from './mobile-request';
 
 const fullPreview = process.env.E2E_FULL_BROWSER_FIXTURES === '1';
 
@@ -74,11 +74,8 @@ async function loggedUser(request: APIRequestContext) {
   return (await response.json()).message;
 }
 
-function mobilePull(request: APIRequestContext, token: string, installation: string) {
-  return request.post(sites().tenant + '/api/method/platform_core.api.mobile.v1_pull', {
-    headers: { ...mobileHeaders(token, installation), Cookie: 'sid=Guest' },
-    data: { installation_id: installation }, maxRedirects: 0,
-  });
+function mobilePull(token: string, installation: string) {
+  return postMobile(sites().tenant + '/api/method/', 'pull', token, installation);
 }
 
 async function lifecycleMobile(browser: Browser, request: APIRequestContext, scenario: 'DELETE' | 'REVOKE') {
@@ -88,10 +85,8 @@ async function lifecycleMobile(browser: Browser, request: APIRequestContext, sce
   }
   const tokens = await previewMobileToken(browser, request, required(`E2E_${scenario}_EMAIL`), required(`E2E_${scenario}_PASSWORD`));
   const installation = randomUUID();
-  const registered = await request.post(sites().tenant + '/api/method/platform_core.api.mobile.v1_register', {
-    headers: { ...mobileHeaders(tokens.access, installation), Cookie: 'sid=Guest' }, data: { installation_id: installation }, maxRedirects: 0,
-  });
-  expect(registered.status(), 'preview mobile installation').toBe(200);
+  const registered = await postMobile(sites().tenant + '/api/method/', 'register', tokens.access, installation);
+  expect(registered.status, 'preview mobile installation').toBe(200);
   return { ...tokens, installation };
 }
 
@@ -147,7 +142,7 @@ test.describe('Press account deletion', () => {
     const pressSession = await pressAccess();
     expect(pressSession.status()).toBe(200);
     expect((await pressSession.json()).message?.user?.name === email).toBe(true);
-    expect((await mobilePull(request, mobileToken, installation)).status()).toBe(200);
+    expect((await mobilePull(mobileToken, installation)).status).toBe(200);
     const before = await readBusinessValue();
     const anonymous = JSON.parse(business.anonymous);
     expect(before).not.toEqual(anonymous);
@@ -192,7 +187,7 @@ test.describe('Press account deletion', () => {
       expect(previous.status()).toBe(404);
     }
     expect([401, 403]).toContain((await pressAccess()).status());
-    expect([401, 403]).toContain((await mobilePull(request, mobileToken, installation)).status());
+    expect([401, 403]).toContain((await mobilePull(mobileToken, installation)).status);
     expect(await readBusinessValue()).toEqual(anonymous);
   });
 });
@@ -219,7 +214,7 @@ test('administrator revocation also terminates the Keycloak mobile session', asy
     maxRedirects: 0,
   });
   expect(await sessions()).toBe(true);
-  expect((await mobilePull(request, token, installation)).status()).toBe(200);
+  expect((await mobilePull(token, installation)).status).toBe(200);
   const rotated = await refresh(refreshToken);
   expect(rotated.status()).toBe(200);
   const next = (await rotated.json()).refresh_token;
@@ -253,7 +248,7 @@ test('administrator revocation also terminates the Keycloak mobile session', asy
   expect(approved.status()).toBe(200);
   expect((await approved.json()).message.executed).toBe(true);
   await expect.poll(sessions, { timeout: 30_000 }).toBe(false);
-  expect([401, 403]).toContain((await mobilePull(request, token, installation)).status());
+  expect([401, 403]).toContain((await mobilePull(token, installation)).status);
   const denied = await refresh(next);
   expect(denied.status()).toBe(400);
   expect((await denied.json()).error).toBe('invalid_grant');

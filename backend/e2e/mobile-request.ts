@@ -1,6 +1,6 @@
 import { request } from '@playwright/test';
 
-export function mobileHeaders(token: string | undefined, installation: string) {
+function mobileHeaders(token: string | undefined, installation: string) {
   return {
     ...(token ? { Authorization: 'Bearer ' + token } : {}),
     'X-Platform-Installation': installation,
