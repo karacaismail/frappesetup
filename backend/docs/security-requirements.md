@@ -39,7 +39,7 @@ Zamanlanmış tarama kurulmaz (D-6). Asıl dosya bazı taramaları her gece ya d
 | Eski webhook, belirteç ya da işlem kanıtı yeniden kullanılamaz. | identity-sync, kimlik-realm | Olay imzası zaman damgası taşır. |
 | Kullanıcı girdisi veritabanı komutuna dönüşmez. Tehlikeli sorgu otomatik bulunur. | security-tooling, ai-readiness-gate | Ham SQL yasağı kapıdadır. |
 | SQL ve XSS saldırı testleri yapılır. | Her uç sahibi ve security-tooling | |
-| Sunucu iç ağa istek atmaz. | platform-core-gecit | Özel ağ adresi bağlantı anında reddedilir. |
+| Sunucu iç ağa istek atmaz. Tek istisna, site ayarında adresi yazılı yerel model sunucusudur. | platform-core-gecit | Özel ağ adresi bağlantı anında reddedilir. Yerel sunucunun adresi sabit listede olmalıdır. Bağlantı yerel adresi, meta veri adresi ve çoklu yayın adresi her zaman reddedilir. |
 
 ## Giriş ve oturum
 
