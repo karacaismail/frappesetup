@@ -197,6 +197,17 @@ Adres biçimi `/api/method/<yol>` olur.
 - Yönetici kurtarma yolu yalnız site ayarıyla açılır. Ayarı sunucuya erişen yönetici yazar. Yol README'de anlatılır.
 - `/panel` sayfası `platform_core/www/` altında durur. Sayfa CSRF belirtecini taşır (G-45). Sahibi platform-core-kabuk işidir.
 
+### Kabuk yanıt boyutu
+
+- Açılış ve DocType tanımı uçları en çok 262.144 bayt döner.
+- Sunucu, sıkıştırılmamış JSON gövdesini ölçer. Frappe'nin eklediği alanları da sayar.
+- Tam yanıt sınırı aşarsa sunucu HTTP 200 ve `truncated: true` döner.
+- Kısa açılış yanıtında kullanıcı kimliği ve biçim ayarları kalır.
+- Sunucu rol, uygulama ve menü listelerini boş olarak gönderir.
+- Kısa tanımda DocType kimliği ve sürüm bilgileri kalır.
+- Sunucu alanları ve alt tablo tanımlarını çıkarır. Telefon bu tanımı çevrimdışı saklayamaz.
+- Sunucu `ETag` değerini dönecek veriden üretir.
+
 ### Website User için yöntem izin listesi
 
 - Website User yalnız izin listesindeki yöntemleri çağırabilir. Öteki her yöntem 403 döner. Kural `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsine uygulanır.

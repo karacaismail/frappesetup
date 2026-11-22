@@ -3,6 +3,7 @@
 import frappe
 from frappe.rate_limiter import rate_limit
 
+from platform_core.kabuk.bootstrap import compact_bootstrap
 from platform_core.kabuk.bootstrap import get_bootstrap as read_bootstrap
 from platform_core.kabuk.http import conditional_response, require_session
 from platform_core.kabuk.request_policy import BootstrapQuery, validate_query
@@ -17,4 +18,4 @@ def get_bootstrap() -> dict | None:
 	user = require_session()
 	validate_query(BootstrapQuery)
 	payload = read_bootstrap(user)
-	return conditional_response(payload, user, payload["perm_version"])
+	return conditional_response(payload, user, compact_bootstrap)

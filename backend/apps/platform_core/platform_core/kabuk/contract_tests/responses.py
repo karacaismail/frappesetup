@@ -141,6 +141,33 @@ class TestContractParsing(unittest.TestCase):
 			with self.subTest(constant=constant), self.assertRaisesRegex(ValueError, "Nonfinite JSON number"):
 				parse_json(f'{{"field": {constant}}}')
 
+	def test_truncated_schemas_require_safe_shapes(self):
+		contract = parse_json(CONTRACT.read_bytes())
+		for path, schema_name in ((BOOTSTRAP, "Bootstrap"), (METADATA, "Meta")):
+			with self.subTest(schema=schema_name):
+				validator = Draft202012Validator(
+					{
+						"$ref": f"#/components/schemas/{schema_name}",
+						"components": contract["components"],
+					}
+				)
+				success = contract["paths"][path]["get"]["responses"]["200"]["content"]["application/json"]
+				payload = {**success["example"]["message"], "truncated": True}
+				self.assertFalse(validator.is_valid(payload))
+				if schema_name == "Bootstrap":
+					payload.update(workspaces=[], sidebars=[], installed_apps=[])
+					payload["user"] = {**payload["user"], "roles": []}
+				else:
+					payload["schema"] = {
+						**payload["schema"],
+						"fields": [],
+						"title_field": None,
+						"search_fields": "",
+						"sort_field": None,
+					}
+					payload.update(child_tables={}, mobile_cache_allowed=False)
+				validator.validate(payload)
+
 
 if __name__ == "__main__":
 	unittest.main()
