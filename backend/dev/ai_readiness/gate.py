@@ -30,6 +30,7 @@ from source import (
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "guvenlik"))
+# Reuse the sibling endpoint checker after adding its directory for direct CLI execution.
 from endpoints import definitions, frappe_names, is_whitelist  # noqa: E402
 
 PROVIDERS = {
