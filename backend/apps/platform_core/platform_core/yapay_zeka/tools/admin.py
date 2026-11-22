@@ -508,10 +508,11 @@ def preview_purge(older_than_days: int = retention.MIN_DAYS) -> dict:
 		"summary": (
 			f"Delete AI Action Log records older than {older_than_days} days, AI Usage Log records "
 			f"older than {retention.MIN_DAYS} days, and proposals {retention.PROPOSAL_DAYS} days after "
-			"their decision or expiry. Cannot be undone."
+			f"their decision or expiry. One run deletes at most {retention.BATCH_SIZE} records of each "
+			"kind, oldest first. Cannot be undone."
 		),
-		# The numbers are what one run deletes. For the usage log the gateway reports how many
-		# records wait (`eligible`). It deletes them in batches.
+		# `logs` and `proposals` are what one run deletes. The `_waiting` numbers are all records
+		# past their period. The gateway deletes the usage log in batches of its own.
 		"details": counts,
 	}
 

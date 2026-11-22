@@ -117,20 +117,21 @@ class TestRetentionPeriods(YzTestCase):
 		"""Put a purge function on the gateway's public interface for one test."""
 		from platform_core.model_gecidi import api
 
-		return patch.object(api, "purge_usage", purge, create=True)
+		return patch.object(api, "purge_usage_logs", purge, create=True)
 
 	def without_gateway_purge(self):
 		from platform_core.model_gecidi import api
 
-		return patch.object(api, "purge_usage", None, create=True)
+		return patch.object(api, "purge_usage_logs", None, create=True)
 
 	def test_usage_log_is_cleaned_by_the_gateways_shared_function(self):
+		"""Contract, section 10: `purge_usage_logs(*, dry_run)` returns `eligible` and `deleted`."""
 		manager = self.login(MANAGER)
 		calls = []
 
-		def fake(dry_run=True):
+		def fake(*, dry_run=False):
 			calls.append((dry_run, frappe.session.user))
-			return {"eligible": 501, "deleted": 0 if dry_run else 500, "dry_run": dry_run}
+			return {"eligible": 501, "deleted": 0 if dry_run else 500}
 
 		with self.gateway(fake):
 			dry = self.count_only(manager)
@@ -152,7 +153,7 @@ class TestRetentionPeriods(YzTestCase):
 		manager = self.login(MANAGER)
 		old = self.proposal(manager, status="rejected", decided_at=ago(31))
 
-		def refuse(dry_run=True):
+		def refuse(*, dry_run=False):
 			raise frappe.PermissionError("leak-marker in a gateway error")
 
 		with self.gateway(refuse):
@@ -171,17 +172,20 @@ class TestRetentionPeriods(YzTestCase):
 
 		calls = []
 
-		def fake(dry_run=True):
+		def fake(*, dry_run=False):
 			calls.append(dry_run)
-			return {"eligible": 2, "deleted": 2, "dry_run": dry_run}
+			return {"eligible": 2, "deleted": 0 if dry_run else 2}
 
 		frappe.set_user(MANAGER)
 		with self.gateway(fake):
+			counted = retention.purge()
 			result = retention.purge(365, dry_run=False)
 		with self.without_gateway_purge():
-			missing = retention.purge(365, dry_run=True)
+			missing = retention.purge(365, dry_run=False)
 
-		self.assertEqual(calls, [False])
+		# V-10: without `dry_run` the command only counts, and the gateway is asked to count too.
+		self.assertEqual(calls, [True, False])
+		self.assertEqual(counted["usage_logs"], {"status": "ok", "eligible": 2, "deleted": 0})
 		self.assertEqual(result["usage_logs"], {"status": "ok", "eligible": 2, "deleted": 2})
 		self.assertEqual(missing["usage_logs"]["status"], "not_run")
 
@@ -204,21 +208,30 @@ class TestRetentionPeriods(YzTestCase):
 			result["usage_logs"]["status"], schema["properties"]["usage_logs"]["properties"]["status"]["enum"]
 		)
 
-	def test_purge_preview_states_both_periods_and_counts_per_run(self):
+	def test_purge_preview_states_both_periods_and_the_limit_of_one_run(self):
+		from platform_core.yapay_zeka import retention
+
 		manager = self.login(MANAGER)
+		for _ in range(4):
+			self.proposal(manager, status="rejected", decided_at=ago(31))
 
-		def fake(dry_run=True):
-			return {"eligible": 501, "deleted": 0, "dry_run": dry_run}
+		def fake(*, dry_run=False):
+			return {"eligible": 501, "deleted": 0}
 
-		with self.gateway(fake):
+		with self.gateway(fake), patch.object(retention, "BATCH_SIZE", 3):
 			result = self.call_tool(manager, "purge_action_log", {"older_than_days": 800})
 
 		preview = result["structuredContent"]["preview"]
-		self.assertIn("800 days", preview["summary"])
-		self.assertIn("365 days", preview["summary"])
-		self.assertIn("30 days", preview["summary"])
-		self.assertEqual(preview["details"]["usage_logs"], {"status": "ok", "eligible": 501, "deleted": 0})
-		self.assertEqual(preview["details"]["older_than_days"], 800)
+		details = preview["details"]
+		for text in ("800 days", "365 days", "30 days", "at most 3 records of each kind"):
+			self.assertIn(text, preview["summary"])
+		self.assertEqual(details["batch_size"], 3)
+		# What one run deletes and what waits are two numbers.
+		self.assertEqual(details["proposals"], 3)
+		self.assertGreaterEqual(details["proposals_waiting"], 4)
+		self.assertEqual(details["older_than_days"], 800)
+		# For the usage log `eligible` is what waits. The gateway deletes it in batches.
+		self.assertEqual(details["usage_logs"], {"status": "ok", "eligible": 501, "deleted": 0})
 
 	def test_approved_purge_counts_again_when_it_runs(self):
 		"""Records that became old after the preview stop the approval: the human saw another count."""

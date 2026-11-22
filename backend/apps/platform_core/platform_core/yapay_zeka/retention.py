@@ -51,6 +51,7 @@ def purge(older_than_days: int = MIN_DAYS, dry_run: bool = True) -> dict:
 		"dry_run": bool(dry_run),
 		"older_than_days": days,
 		"proposal_days": PROPOSAL_DAYS,
+		"batch_size": BATCH_SIZE,
 		**counts,
 		"usage_logs": _purge_usage_logs(bool(dry_run)),
 	}
@@ -59,8 +60,9 @@ def purge(older_than_days: int = MIN_DAYS, dry_run: bool = True) -> dict:
 def _purge_usage_logs(dry_run: bool) -> dict:
 	"""Clean the "AI Usage Log" through the model gateway's shared function. Say plainly what happened.
 
-	The gateway owns that log. Its function checks the caller's permission itself and applies the
-	365 days of the project record, from the web and from the command line alike. It deletes in
+	The gateway owns that log. Its function `purge_usage_logs(*, dry_run)` checks the caller's
+	permission itself and applies the 365 days of the project record, from the web and from the
+	command line alike (contract, section 10). With `dry_run` it only counts. It deletes in
 	batches, so `eligible` may be larger than `deleted`.
 
 	The result is `ok` with both counts, `not_run` if the gateway offers no such function, or
@@ -68,7 +70,7 @@ def _purge_usage_logs(dry_run: bool) -> dict:
 	"""
 	import platform_core.model_gecidi.api as gateway
 
-	purge = getattr(gateway, "purge_usage", None)
+	purge = getattr(gateway, "purge_usage_logs", None)
 	if purge is None:
 		return {"status": "not_run", "reason": "gateway_purge_unavailable"}
 	try:
@@ -76,6 +78,6 @@ def _purge_usage_logs(dry_run: bool) -> dict:
 		return {"status": "ok", "eligible": int(result["eligible"]), "deleted": int(result["deleted"])}
 	except Exception as error:
 		# The text of the gateway's error may carry a value. Only its type is returned.
-		log_tool_error("purge_usage", error)
+		log_tool_error("purge_usage_logs", error)
 		frappe.clear_messages()
 		return {"status": "error", "reason": type(error).__name__}

@@ -331,7 +331,7 @@ paths:
         - An "AI Action Proposal" goes 30 days after its decision or its expiry, whichever comes first. That period is fixed.
           Every proposal has an expiry, so none stays forever. A proposal with an unknown result goes by the same rule.
         - "AI Usage Log" records go after 365 days. The model gateway owns that log. This endpoint calls the gateway's shared
-          function `platform_core.model_gecidi.api.purge_usage`, which checks permission and deletes in batches.
+          function `platform_core.model_gecidi.api.purge_usage_logs`, which checks permission and deletes in batches.
           The `usage_logs` field says plainly whether that ran: `ok`, `not_run` or `error`. Other records are still cleaned.
         The counting mode (`dry_run`) counts exactly the records the delete would remove.
         There is no scheduled job. This endpoint is started by hand. The command for the same action is this:
@@ -547,16 +547,17 @@ components:
 
     PurgeResult:
       type: object
-      required: [dry_run, older_than_days, proposal_days, logs, logs_waiting, usage_logs, proposals, proposals_waiting]
+      required: [dry_run, older_than_days, proposal_days, batch_size, logs, logs_waiting, usage_logs, proposals, proposals_waiting]
       properties:
         dry_run: {type: boolean}
         older_than_days: {type: integer, description: Retention period of the AI Action Log in days.}
         proposal_days: {type: integer, description: "Retention period of proposals in days, counted from the decision or the expiry. Fixed at 30."}
+        batch_size: {type: integer, description: "Most records of each kind one run deletes. It is 500. A preview shows it, so the human sees that one run may not delete everything that waits."}
         logs: {type: integer, description: "Number of AI Action Log records this run deletes. One run takes at most 500 records of each kind, oldest first."}
         logs_waiting: {type: integer, description: Number of AI Action Log records past their period when the run started.}
         usage_logs:
           type: object
-          description: "What happened to the AI Usage Log. The model gateway owns that log and cleans it with its shared function `platform_core.model_gecidi.api.purge_usage`. The function checks the caller's permission and applies 365 days from the web and from the command line alike. This field is never null."
+          description: "What happened to the AI Usage Log. The model gateway owns that log and cleans it with its shared function `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run)`. The function checks the caller's permission, applies 365 days from the web and from the command line alike, and deletes for good. This field is never null."
           required: [status]
           properties:
             status:
@@ -565,7 +566,7 @@ components:
               description: "`ok`: the gateway ran. `not_run`: the gateway offers no such function. `error`: the gateway refused."
             eligible: {type: integer, description: "With `ok`: number of records past 365 days that waited when the run started."}
             deleted: {type: integer, description: "With `ok`: number of records this run deleted. The gateway deletes in batches, so it may be smaller than `eligible`. Zero in the counting mode."}
-            reason: {type: string, description: "With `not_run` or `error`: a fixed code or the type of the error. Never the text of the error."}
+            reason: {type: string, description: "With `not_run`: `gateway_purge_unavailable`. With `error`: the type of the error, never its text."}
         proposals: {type: integer, description: Number of AI Action Proposal records this run deletes.}
         proposals_waiting: {type: integer, description: Number of AI Action Proposal records past their period when the run started.}
 
