@@ -6,14 +6,14 @@ Bu dosya backend'in seviyesini, sürümlerini ve kararlarını tutar. Kod standa
 
 - Seviye MVP'dir. MVP, ilk kullanılabilir sürümdür.
 - Bütün modüller aynı seviyededir.
-- Gerçek kişi verisi yine kullanılmaz. Bunun nedeni aşağıdaki A-9 maddesidir.
+- Gerçek kişi verisi yine kullanılmaz. Bunun nedeni “Değişmeyen sınırlar” bölümündeki Karar 27'dir.
 
 ## Sürümler
 
 | Bileşen | Hedef | Durum |
 | --- | --- | --- |
 | Kiracı sitesi | Frappe 16 ve ERPNext 16 | Yerelde `frappe/erpnext:v16.55.0` imajı var. Çalışan sürümü dev-ortam işi doğrular. |
-| Press sitesi | Frappe 16, Press v0.154.1 ve Python 3.14 | Bu Mac'teki deneme kurulumunda bu sürümler çalışıyor. Press bu sürümde yalnız yamalarla açılır (A-11). |
+| Press sitesi | Frappe 16, Press v0.154.1 ve Python 3.14 | Bu Mac'teki deneme kurulumunda bu sürümler çalışıyor. Press bu sürümde yalnız yamalarla açılır (O-9). |
 | Keycloak | 26.8 serisi | Son sürümü kimlik-realm işi resmî kaynaktan doğrular. |
 | Container | Colima, `colima-factory` profili | Docker Desktop kullanılmaz. |
 
@@ -81,7 +81,9 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
 - **D-12. Yeni kod İngilizce adlarla yazılır.** Proje sahibi şöyle yazdı: “yeni dosya oluşturursen, türkçe değil, codebase ingilizce olsun, dosya adları ingilizce olsun”. Sonra şunu ekledi: “bundan sonrası için öylemiştim, geçmiş için değil.” Bu kararın uygulanışı şudur:
   - Bundan sonra oluşturulan dosya, klasör, modül, DocType, işlev ve değişken adları İngilizce olur.
   - Yeni yazılan koddaki yorumlar, hata iletileri ve günlük metinleri İngilizce olur.
-  - Var olan dosya, klasör ve modül adları değişmez. Örneğin `kimlik`, `kabuk` ve `PROJE-KAYDI.md` adları kalır.
+  - Bu madde Karar 40 ile değişti (proje sahibinin karar dosyası). Eski adlar da kurallara göre düzeltilir. Düzeltmeyi yalnız naming-history-fix işinin ortak betiği yapar (D-14). Öteki işçiler adları elle değiştirmez.
+  - Bütün kod adları İngilizce ve yalnız ASCII olur. Değişken, sabit, `class`, `id`, DocType, modül, alan, Select seçeneği, iş akışı durumu, çeviri anahtarı, API alanı ve dosya adı bu kapsamdadır.
+  - Görünen metnin kaynağı İngilizcedir. Python'da `frappe._`, JavaScript'te `__()` zorunludur. DocType JSON etiketleri de İngilizce yazılır. Türkçesi çeviri dosyasındadır.
   - Var olan bir klasörün içine yeni dosya eklenince yalnız yeni dosyanın adı İngilizce olur.
   - Kullanıcıya görünen yeni metnin kaynağı İngilizcedir. Türkçesi çeviri dosyasında durur (V-2).
 - **D-13. Başka bir projenin ürün adı bu depoda yasaktır.** Proje sahibi bu kararı 22 Kasım 2026 Pazar günü verdi. Ad bu projeyle ilgili değildir. Ad bir ajan tarafından yanlışlıkla belgelere eklenmişti.
@@ -109,7 +111,7 @@ Proje sahibi bu konularda karar vermedi. Orkestratör şu varsayılanları seçt
 
 - **V-1. Ad dili.** Koddaki adlar İngilizcedir. Frappe ekosistemi bu dili kullanır.
 - **V-2. Mesaj dili.** Kaynak metin İngilizce yazılır. Türkçesi çeviri dosyasında durur (G-73).
-- **V-3. Modül adları.** Var olan modül adları Türkçedir. Yeni modül adları D-12 gereği İngilizcedir. Örneğin `kimlik` ve `kabuk` modülleri vardır.
+- **V-3. Modül adları.** Modül adları İngilizcedir (Karar 40). Var olan Türkçe modül adlarını naming-history-fix işi değiştirir.
 - **V-4. Ortak kitaplık.** Belirteç doğrulama tek kitaplıkta durur. `platform_core` ve `press_tr` aynı kodu kullanır (H-8).
 - **V-5. Container profili.** Geliştirme `colima-factory` profilinde yürür. Bu profilde daha çok bellek var.
 
@@ -134,6 +136,55 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-14. Kayıt önce kiracı sitesindedir.** Her kiracı kendi sağlayıcılarını, hesaplarını ve API'lerini ekleyebilir. Platformun ortak hesapları sonraki turda Press'ten site ayarına gelir.
 - **O-15. Sağlık denetimi zamanlanmaz.** API'nin sağlığı gerçek çağrıların sonucundan çıkar. Elle başlatılan bağlantı denetimi de vardır (D-6).
 
+- **O-16. `hrms_tr` lisansı GPL-3.0 olur.** `hrms_tr`, GPL-3.0 lisanslı `hrms` uygulamasını aynı süreçte kullanır. En güvenli seçim budur. Hukuk görüşü alınmadı.
+- **O-17. Yapay zekâ katmanı her sitede çalışacak.** Press ve operasyon sitesi de aynı katmanı kullanmalı. Katmanın ayrı bir uygulamaya bölünmesi sonraki turda karara bağlanır.
+- **O-18. Press'in geliştirme yaması geçici bir istisnadır.** `dev/press/patch-py314.sh` betiği Press'in kurulu kodunu değiştirir. Bu, M-4 kuralına aykırıdır. Press v0.154.1 başka yolla Python 3.14 üzerinde açılmıyor. Yama yalnız geliştirme imajında çalışır. Üretim imajına girmez. Kapanma koşulu borç tablosundadır.
+- **O-19. Dallar sırayla birleşir.** Sıra şudur: kimlik-realm, platform-core-kimlik, identity-sync, press-tr, platform-core-kabuk, platform-core-yz, platform-core-gecit, erisim-kurali, platform-core-mobil, ilk-dikey-dilim, kimlik-tema, integration-e2e.
+  - Her birleştirmeden önce bağımsız inceleme `pass` olur.
+  - `hooks.py` dosyasını orkestratör birleştirir. Liste değerleri birleşir, hiçbiri silinmez. Örneğin iki dalın `override_whitelisted_methods` satırları yan yana kalır.
+  - Birleştirmede kurulum testinin modül listesi güncellenir. `oidc_verify` kiracı imajına eklenir.
+- **O-20. Ad düzeltmesi geliştirme sitelerini yeniden kurar.** Sitelerde gerçek veri yok. Bu yüzden veri taşıma yaması yazılmaz. `frappe.rename_doc` da kullanılmaz.
+  - Kiracı sitesi, Press sitesi ve Keycloak realm'i silinir ve yeniden kurulur.
+  - Betikten önce eski compose projesi eski adıyla kapatılır.
+  - Salt okunur bir denetim `.env` ve site ayarında eski anahtar arar. Eski anahtar kalırsa uyarı verir.
+  - İlk yayından sonra bu yol kapanır. O zaman her ad değişikliği veri taşıma yamasıyla yapılır (AV-26).
+- **O-21. Ad ile serbest metin ayrı işlerdir.** Ad eşleşmesini yalnız naming-history-fix betiği uygular. Betik cümleye, yoruma ve Türkçe belge içeriğine dokunmaz.
+  - Türkçe etiket, ileti, açıklama ve sözleşme açıklamasını her işin sahibi İngilizceye çevirir. Örneğin `mobile_change.json` etiketlerini platform-core-mobil işi çevirir.
+  - Eski Türkçe metin çeviri dosyasına girer. Böylece ekran Türkçe kalır.
+  - Çeviri betik çalıştıktan sonra yapılır. Bir ad kapısı kalan Türkçe adı ve etiketi bulur.
+- **O-22. İki belge eski adıyla bir yönlendirme dosyası bırakır.** `PROJE-KAYDI.md` ve `docs/sozlesmeler.md` dosyalarının adı değişir. Proje sahibinin karar dosyası bu iki yolu anar. Bu yüzden eski yolda tek satırlık bir dosya kalır. Dosya yeni adı gösterir.
+- **O-23. Çeviri dosyası bağlam sütunu taşır.** Biçim Frappe 16'nın CSV biçimidir: kaynak, çeviri, bağlam. Aynı İngilizce sözcük iki anlam taşıyorsa bağlam sütunu doldurulur. `tr.csv` ortak dosyadır ve orkestratör birleştirir.
+- **O-24. DocType JSON dosyaları Frappe'nin dışa aktarma biçimindedir.** Dosyayı Frappe'nin kendi yazdığı biçimde tutun. Anahtarlar sıralı, girinti bir boşluktur. Elle yazılan dosya bu biçime çevrilir.
+- **O-25. Karar 19 süreleri bu turda uygulanır.** Bu karar O-5'in ikinci cümlesinin yerine geçer. Mobil iş başladı. Süreler şunlardır:
+
+  | Ayar | Çalışan | Müşteri |
+  | --- | --- | --- |
+  | Erişim belirtecinin ömrü | 5 dakika | 5 dakika |
+  | Yenileme belirteci | Her kullanımda değişir | Her kullanımda değişir |
+  | Keycloak'ta boşta kalma | 1 saat | 7 gün |
+  | Keycloak'ta toplam süre | 24 saat | 30 gün |
+  | PWA'da Frappe çerezinin boşta kalma süresi | 1 saat | 1 saat |
+  | Paket arka plandayken yerel kilit | 2 dakika | 5 dakika |
+  | Pakette bağlantısız erişim | 24 saat | 72 saat |
+  | PWA'da bağlantısız erişim | 8 saat | 24 saat |
+  | Çıkıştan sonra taslak saklama | 7 gün | 7 gün |
+
+  - Keycloak ayarlarını kimlik-realm işi kurar. Frappe çerez süresini platform-core-kimlik işi kurar. Paket ve PWA sürelerini sunucu tarafında platform-core-mobil işi denetler.
+  - Çalışan 1 saat boşta kalırsa yeniden kimlik doğrular. Keycloak'ın açık çerezi bu adımı atlatmaz. Bunu canlı test gösterir.
+  - Arka plan eşitlemesi süreleri uzatmaz. Sunucu gerçek kullanıcı işlemini ayrıca sayar.
+- **O-26. Telefon paketi bu turda yazılmaz.** Sunucu tarafı MVP düzeyinde kurulur. Paket işi açılınca `mobile.md` MVP koşulları o işe yazılır. Mağaza hesapları proje sahibindedir.
+- **O-27. Müşteri kendi hesabını açabilir. Bu yüzden hesap silme yolu MVP'dedir.** Deneme akışı Keycloak kayıt sayfasıyla başlar (G-79). Kuralın dayanağı karar dosyasındaki hesap silme kuralı ve CK-6'dır.
+  - Çalışan kendi hesabını açamaz. Çalışan yalnız davetle gelir.
+  - Kullanıcı silme isteğini Keycloak hesap ekranından ya da bir web adresinden verir.
+  - identity-sync isteği kaydeder. Sonra Keycloak kullanıcısını kapatır ve siler. Press kullanıcısını kapatır ve API anahtarlarını geçersiz kılar. Kiracı sitelerindeki kullanıcıyı kapatır. Telefon kurulumlarını ve bildirim bağlarını siler (CK-7).
+  - İş kayıtları silinmez. Kişiyi gösteren alanlar anonim yapılır. Örneğin izin talebi kalır, çalışanın adı silinir. Proje sahibi bu varsayılanı değiştirebilir.
+- **O-28. Yapay zekâ katmanı genel Frappe erişimi değildir.** D-9 her şeyin yapay zekâyla yönetilmesini ister. AX-2 modele genel Frappe erişimi vermeyi yasaklar. İki kural şöyle birleşir:
+  - Model yalnız kayıtlı araçları çağırır. Her araç kullanıcının yetkisiyle çalışır.
+  - Yazma önce öneri olur. İnsan ayrı uçtan onay verir.
+  - Hassas DocType'lar genel yazma araçlarına kapalıdır. Bunlar kimlik bağı, erişim kuralı, AI API, AI Account ve telefon kurulumudur. Her sahip kendi DocType'ını `ai_write_closed_doctypes` kancasına ekler. Bu kayıtlar yalnız kendi özel araçlarıyla değişir.
+- **O-29. Güvenlik taramaları elle başlatılan komutlardır.** Zamanlanmış tarama kurulmaz (D-6). Komutları security-tooling işi yazar. Bandit, gizli bilgi taraması, sözleşme tabanlı API testi ve yerel DAST taraması bu kapsamdadır. CI kurulumunun teknik sahibi DevOps sorumlusudur. Ajanlar CI dosyasını değiştirmez, devir notu yazar.
+
+
 ## Karar sitesine işlenecek farklar
 
 Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bir işte, kendi denetimleriyle güncellenir. Farklar şunlardır:
@@ -148,9 +199,6 @@ Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bi
 | G-57: Kiracıda kullanıcı “System User” olur. | Son kullanıcı “Website User” olur. | D-5, O-3 |
 | G-80: Tema Keycloakify ile yapılır. | Tema Keycloak'ın kendi tema yapısıyla yapılır. | O-4 |
 | Rail 4: Saatlik yoklama ve gece mutabakatı | Zamanlanmış iş yok. Mutabakat elle başlar. | D-6, O-11 |
-
-- **O-16. `hrms_tr` lisansı GPL-3.0 olur.** `hrms_tr`, GPL-3.0 lisanslı `hrms` uygulamasını aynı süreçte kullanır. En güvenli seçim budur. Hukuk görüşü alınmadı.
-- **O-17. Yapay zekâ katmanı her sitede çalışacak.** Press ve operasyon sitesi de aynı katmanı kullanmalı. Katmanın ayrı bir uygulamaya bölünmesi sonraki turda karara bağlanır.
 
 ## Değişmeyen sınırlar
 
@@ -167,6 +215,8 @@ Bu turda gerçek kişisel veri yoktur. Saklama süresi ve silme yolu MVP yayın�
 | “User” ve kimlik bağı | E-posta, ad, Keycloak kimliği | Hesap açık kaldıkça | Hesap silme isteği |
 | “AI Action Log” | Kullanıcı adı, IP adresi | 365 gün (Rail 5) | Elle başlatılan silme komutu. Komut henüz yok. |
 | “AI Usage Log” | Kullanıcı adı | Belirlenmedi | Belirlenmedi |
+| “AI Action Proposal” | Kullanıcı adı ve önizlemedeki kişi bilgisi. Örneğin çalışan adı ve izin tarihleri | Belirlenmedi | Belirlenmedi. Önizleme yalnız gerekli bilgiyi tutar |
+| Hesap silme isteği (O-27) | E-posta ve Keycloak kimliği | İş bitene kadar | İş bitince kayıt anonim yapılır |
 
 Mesaj içeriği ve araç girdisi günlüğe yazılmaz. Günlük yalnız girdinin özetini tutar.
 
@@ -177,3 +227,6 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
+| `BORC(mvp)`: Press geliştirme imajı `patch-py314.sh` ile Press kodunu değiştiriyor (O-18) | M-4 kuralına aykırı. Press yükseltmesinde yama bozulabilir | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da yama Press'e gönderilip kabul edilir |
+| `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
+| `BORC(mvp)`: Telefon paketi yok (O-26) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |
