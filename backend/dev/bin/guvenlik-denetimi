@@ -3,8 +3,9 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../../.."
 rules=backend/dev/guvenlik/fixtures
-semgrep=(uvx --python 3.12 semgrep@1.186.0)
-gitleaks=ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+source backend/dev/security/container-settings
+semgrep=(uvx --python 3.12 --exclude-newer "$TOOL_CUTOFF" "semgrep@$SEMGREP_VERSION")
+export SEMGREP_ENABLE_VERSION_CHECK=0
 
 scan_secrets() {
     # Colima cannot mount this checkout. Transfer a read-only source snapshot.
@@ -15,19 +16,39 @@ scan_secrets() {
             fi
         done |
         tar --null -T - -cf - |
-        docker --context colima-factory run --rm -i --network none --entrypoint /bin/sh \
-            "$gitleaks" -ec 'mkdir /scan
-                tar -xf - -C /scan
-                exec gitleaks dir --redact=100 /scan/backend'
+        "${docker_command[@]}" run "${container_flags[@]}" "$gitleaks_image" -ec 'mkdir /tmp/scan
+                tar -xf - -C /tmp/scan
+                exec gitleaks dir --redact=100 /tmp/scan/backend'
 }
+
+scan_rules() (
+    local report before scan_status=0
+    report="$(mktemp "${PANE_SCRATCH_DIR:-${TMPDIR:-/tmp}}/semgrep-review.XXXXXX")" || exit 1
+    trap 'rm -f -- "$report"' EXIT
+    before="$(python3 -B backend/dev/guvenlik/semgrep_exceptions.py --snapshot)" || exit 1
+    "${semgrep[@]}" scan --error --strict --metrics=off --json \
+        --config "$rules" \
+        --exclude 'backend/dev/guvenlik/fixtures/' --exclude 'backend/dev/security/fixtures/' backend \
+        > "$report" || scan_status=$?
+    python3 -B backend/dev/guvenlik/semgrep_exceptions.py "$report" "$scan_status" "$before"
+)
 
 status=0
 "${semgrep[@]}" --test --strict --metrics=off "$rules" || status=1
-"${semgrep[@]}" scan --error --strict --metrics=off \
-    --config "$rules/rules.yaml" --config "$rules/jinja.yaml" \
-    --exclude 'backend/dev/guvenlik/fixtures/' backend || status=1
-scan_secrets || status=1
+scan_rules || status=1
+python3 -B -m unittest discover -s backend/dev/guvenlik -p test_semgrep_exceptions.py || status=1
+if backend/dev/security/history-scan --self-test; then
+    scan_secrets || status=1
+else
+    status=1
+fi
 python3 -B -m unittest discover -s backend/dev/guvenlik -p test_endpoints.py || status=1
 python3 -B backend/dev/guvenlik/endpoints.py backend || status=1
-(backend/dev/bin/ai-readiness --self-test && backend/dev/bin/ai-readiness) || status=1
+backend/dev/bin/ai-readiness --self-test || status=1
+if commit_base="$(git merge-base HEAD refs/heads/backend)"; then
+    backend/dev/bin/ai-readiness --commit-base "$commit_base" || status=1
+else
+    printf '%s\n' 'Cannot find the common ancestor of HEAD and refs/heads/backend.' >&2
+    status=1
+fi
 exit "$status"

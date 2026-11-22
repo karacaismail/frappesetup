@@ -9,7 +9,7 @@ paths:
       description: >
         Selects an eligible API for the active tenant and route. Checks permissions, quota,
         and the route data policy before dispatch. External dispatch masks content when the route permits it. Attempts may incur provider charges.
-        Tool calls are returned as data for the caller to authorize and execute.
+        Tool calls are returned as data for the caller to authorize and execute. Selection and provider attempts share a 60-second deadline.
       operationId: complete
       security:
         - session: []
@@ -20,6 +20,12 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Completion'
+            example:
+              route: fixture-route
+              messages:
+                - role: user
+                  content: Count the three imaginary moons.
+              limit: 64
       responses:
         '200':
           $ref: '#/components/responses/Result'
@@ -40,7 +46,7 @@ paths:
       summary: Test one configured API
       description: >
         Requires an authenticated AI Manager or System Manager. Sends one short model
-        request and may incur a charge. Records the attempt and returns no credentials.
+        request and may incur a charge. Records the attempt and returns no credentials. The gateway deadline is 60 seconds.
       operationId: test_api
       security:
         - session: []
@@ -61,6 +67,9 @@ paths:
                   type: string
                   minLength: 1
                   description: AI Model document name
+            example:
+              api: fixture-api
+              model: fixture-model-record
       responses:
         '200':
           $ref: '#/components/responses/Result'
@@ -101,6 +110,11 @@ paths:
                   type: string
                   maxLength: 240
                   description: Optional single-line reconciliation note.
+            example:
+              log: fixture-attempt
+              cost: '0.125000001'
+              currency: USD
+              note: Checked against a synthetic invoice.
       responses:
         '200':
           description: Reconciled usage record
@@ -136,10 +150,50 @@ paths:
           $ref: '#/components/responses/QuotaError'
         '503':
           $ref: '#/components/responses/Unavailable'
+  /api/method/platform_core.api.model.reconcile_stale_pending:
+    post:
+      summary: Reconcile expired pending reservations
+      description: Requires a manager session. Changes up to 500 expired pending reservations to unknown and retains their reserved cost.
+      operationId: reconcile_stale_pending
+      security:
+        - session: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
+      responses:
+        '200':
+          description: Reservations changed to unknown
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [closed, targets]
+                    properties:
+                      closed: {type: integer, minimum: 0, maximum: 500}
+                      targets:
+                        type: array
+                        maxItems: 500
+                        uniqueItems: true
+                        items: {type: string}
+              example:
+                message: {closed: 1, targets: [672234b3-483c-4364-a40a-82a484a88173]}
+        '401':
+          $ref: '#/components/responses/AuthenticationError'
+        '403':
+          $ref: '#/components/responses/PermissionError'
   /api/method/platform_core.api.model.purge_usage:
     post:
       summary: Preview or purge old usage records
-      description: This destructive manager operation defaults to preview. Execution deletes up to 500 closed records past the retention window.
+      description: Requires a System Manager session. Retention is fixed at 365 days. Preview returns the exact batch of up to 500 closed records. The same manager must confirm it within five minutes. O-32 permanently deletes the confirmed records without a Deleted Document copy. Recovery requires a database backup.
       operationId: purge_usage
       security:
         - session: []
@@ -152,9 +206,26 @@ paths:
               additionalProperties: false
               properties:
                 dry_run: {type: boolean, default: true}
+                preview_token: {type: string, pattern: '^[0-9a-f]{64}$'}
+              if:
+                required: [dry_run]
+                properties:
+                  dry_run: {const: false}
+              then:
+                required: [preview_token]
+              else:
+                not:
+                  required: [preview_token]
+            examples:
+              preview:
+                value: {dry_run: true}
+              confirm:
+                value:
+                  dry_run: false
+                  preview_token: '0000000000000000000000000000000000000000000000000000000000000000'
       responses:
         '200':
-          description: Eligible and deleted counts
+          description: Eligible and deleted counts, exact batch and preview token
           content:
             application/json:
               schema:
@@ -163,13 +234,34 @@ paths:
                 properties:
                   message:
                     type: object
-                    required: [eligible, deleted, dry_run]
+                    required: [eligible, deleted, dry_run, targets, preview_token]
                     properties:
                       eligible: {type: integer, minimum: 0}
                       deleted: {type: integer, minimum: 0, maximum: 500}
                       dry_run: {type: boolean}
-              example:
-                message: {eligible: 3, deleted: 0, dry_run: true}
+                      targets:
+                        type: array
+                        maxItems: 500
+                        uniqueItems: true
+                        items: {type: string}
+                      preview_token: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
+              examples:
+                preview:
+                  value:
+                    message:
+                      eligible: 1
+                      deleted: 0
+                      dry_run: true
+                      targets: [672234b3-483c-4364-a40a-82a484a88173]
+                      preview_token: '0000000000000000000000000000000000000000000000000000000000000000'
+                confirm:
+                  value:
+                    message:
+                      eligible: 1
+                      deleted: 1
+                      dry_run: false
+                      targets: [672234b3-483c-4364-a40a-82a484a88173]
+                      preview_token: null
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -201,6 +293,7 @@ paths:
               required: [api]
               properties:
                 api: {type: string, minLength: 1, maxLength: 140}
+            example: {api: fixture-api}
       responses:
         '200':
           description: Credential cleared
@@ -265,14 +358,14 @@ components:
             expiredSession:
               value: {exc_type: SessionExpired}
     PermissionError:
-      description: Permission denied by the gateway or Frappe
+      description: Frappe permission denial or a gateway data-policy restriction
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
           examples:
-            gateway:
-              value: {message: {error: permission_denied}}
+            dataPolicy:
+              value: {message: {error: data_policy_denied}}
             framework:
               value: {exc_type: PermissionError}
     Conflict:
@@ -347,9 +440,9 @@ components:
                 error:
                   type: string
                   enum: [invalid_request, invalid_route, invalid_target, invalid_cost, invalid_currency, currency_mismatch,
-                    invalid_note, output_limit_exceeds_deadline, authentication_required, permission_denied, data_policy_denied,
+                    invalid_note, output_limit_exceeds_deadline, authentication_required, data_policy_denied,
                     transaction_active, attempt_in_progress, attempt_already_settled, quota_exceeded, gateway_busy,
-                    endpoint_unavailable, gateway_unavailable, provider_unavailable, invalid_retention]
+                    endpoint_unavailable, gateway_unavailable, provider_unavailable, provider_timeout, preview_required, preview_invalid]
         - type: object
           required: [exc_type]
           properties:

@@ -162,11 +162,13 @@ Her sayfada kayıtların güncel okuma izni denetlenir.
 İlk kopyadan sonra değişiklikler başlangıçtaki sıra numarasından okunur.
 Yeni kayıt ilk kopya sınırını aşarsa sonraki değişiklik sayfasında gelir.
 
-Sunucu sıra numarası üretirken site sıra satırını kilitler.
-Salt okuma site sıra satırını kilitlemez.
-İşlem bu kilidi kesinleşene kadar tutar.
+Sunucu önce iş kayıtlarını ve işlem sonuçlarını yazar.
+Sonra MariaDB sayacı, grubun sıra numaralarını tek adımda ayırır.
+Sayaç, MariaDB 11.8 üzerinde satırın güncel değerini kullanır.
+Sayaç ayarı yalnız sayaç komutunda geçerlidir.
+Salt okuma sayacı kilitlemez.
 Sistem sıra numarasını değişiklik kaydıyla aynı işlemde yazar (AU-10).
-Sonraki yazma ilk yazma kesinleşene kadar yeni sıra numarası alamaz.
+Sonraki grup, önceki grup kesinleşene kadar sıra numarası alamaz.
 Örneğin 8 numaralı kayıt beklerse 9 numaralı kayıt önce kesinleşemez.
 Telefon bu yüzden geç kesinleşen 8 numaralı kaydı atlamaz.
 Geri alınan yazma kayıt ve sıra ilerlemesini birlikte geri alır.
@@ -292,8 +294,15 @@ Eski kurulumda oturum kimliği varsa çağrı yapılır.
 Oturuma bağlanmamış eski kurulum için yönetici kimlik tarafını kullanır.
 
 Servis adresi `mobile_identity_sync_url` ayarında bulunur.
-Belirteç adresi `mobile_identity_sync_token_url` ayarından okunur.
-Servis hesabı `mobile_identity_sync_client_id` ve `mobile_identity_sync_client_secret` kullanır.
+Mobil modül belirteci kimlik modülünün servis istemcisinden alır.
+Kimlik modülü Keycloak adresini ve realm adını site ayarından alır.
+İç adres varsa kimlik modülü o adresi kullanır. Yoksa genel adresi kullanır.
+Servis belirteci almak için seçilen adres HTTPS olmalıdır.
+Geliştirme sitesi HTTP kullanırsa uzak kapatma isteği gitmez.
+Uzak kapatma beklemede kalır. Sistem bu durumu `delivery_pending` alanında saklar.
+Yerel oturum reddi geçerli kalır.
+Servis hesabı `keycloak_service_client_id` ve `keycloak_service_client_secret` kullanır.
+Kiracı servis istemcisinin adı, tarayıcı istemcisinin adına `-service` eklenerek oluşturulur.
 Kiracı servis hesabı belirteci `aud-identity-sync` kapsamıyla ister.
 Sunucu bu ayarları güvenli site yapılandırmasından okur.
 Canlı servis için kimlik ekibi servis hesabını ve kapsamı tanımlar.

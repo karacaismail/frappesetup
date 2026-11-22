@@ -1,0 +1,806 @@
+CP2 belge yaması
+
+Taban Git kaydı: 946cd5f
+Uygulama sırası: Önce bu yamayı uygulayın. Sonra ad değiştirme betiğini çalıştırın.
+Yama belge içindeki güncel modül ve yol atıflarını günceller.
+Dosyaların eski yolları yama başlığında yer alır. Ad betiği dosyaları yeni yollarına taşır.
+
+Korunan tarihsel atıflar
+
+- backend/PROJE-KAYDI.md:138   O-13 metnindeki model_gecidi adı.
+- backend/PROJE-KAYDI.md:155   O-21 metnindeki mobile_change.json adı.
+- backend/PROJE-KAYDI.md:158   O-22 metnindeki PROJE-KAYDI.md ve docs/sozlesmeler.md yolları.
+- backend/docs/isler/naming-history-fix.md:26   D-14 eski modül adları.
+  kimlik, kabuk, yapay_zeka, model_gecidi, erisim, mobil.
+- backend/docs/kararlar/0002-yapay-zeka-katmani.md:7   İlk karardaki yapay_zeka adı.
+- backend/docs/kararlar/0002-yapay-zeka-katmani.md:322   G-64 karşılaştırmasındaki model_gecidi adı.
+- backend/docs/kararlar/0007-mobil-esitleme.md:7   İlk kapsam metnindeki mobil adı.
+
+AGENTS.md ve CLAUDE.md yamanın kapsamı dışındadır.
+
+diff --git a/backend/PROJE-KAYDI.md b/backend/PROJE-KAYDI.md
+index ac0c2b80d71e75c37317f7899ccd99449908a34f..3e21ed834bac61b3002a5fd0829e41d8a2c69333 100644
+--- a/backend/PROJE-KAYDI.md
++++ b/backend/PROJE-KAYDI.md
+@@ -23,26 +23,26 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
+
+ | Uygulama | Modül | Görevi |
+ | --- | --- | --- |
+-| `platform_core` | `kimlik` | Keycloak ile giriş, çıkış, kimlik bağı ve servis belirteci |
+-| `platform_core` | `kabuk` | Açılış verisi, kenar çubuğu verisi ve DocType tanımı uçları |
+-| `platform_core` | `yapay_zeka` | Yapay zekâ erişim katmanı: araç kaydı, MCP ucu, önizleme ve onay, işlem günlüğü |
+-| `platform_core` | `mobil` | Telefon eşitlemesi: sürümlü mobil uçlar, işlem kimliği, imleç ve kaldırma işareti |
+-| `platform_core` | `erisim` | Erişim kuralı motoru: kayıt kuralı, hiyerarşi ve alan düzeyi (K8) |
+-| `platform_core` | `model_gecidi` | Sağlayıcı, hesap, API ve model kaydı. Yönlendirme, model çağrısı ve kullanım kaydı. |
+-| `press_tr` | `kimlik` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
++| `platform_core` | `identity` | Keycloak ile giriş, çıkış, kimlik bağı ve servis belirteci |
++| `platform_core` | `shell` | Açılış verisi, kenar çubuğu verisi ve DocType tanımı uçları |
++| `platform_core` | `ai` | Yapay zekâ erişim katmanı: araç kaydı, MCP ucu, önizleme ve onay, işlem günlüğü |
++| `platform_core` | `mobile` | Telefon eşitlemesi: sürümlü mobil uçlar, işlem kimliği, imleç ve kaldırma işareti |
++| `platform_core` | `access` | Erişim kuralı motoru: kayıt kuralı, hiyerarşi ve alan düzeyi (K8) |
++| `platform_core` | `model_gateway` | Sağlayıcı, hesap, API ve model kaydı. Yönlendirme, model çağrısı ve kullanım kaydı. |
++| `press_tr` | `press_identity` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
+ | `identity_sync` | Yok | Keycloak ile Press ve kiracı siteleri arasında kullanıcı eşitleme |
+ | `oidc_verify` | Yok | Belirteç doğrulama. Frappe'ye bağlı değildir. |
+
+ ## Bağımlılık yönü
+
+-- `platform_core.kimlik` ve `press_tr.kimlik` yalnız `oidc_verify` kitaplığını kullanır.
+-- `platform_core.kabuk` ile `platform_core.kimlik` birbirini çağırmaz.
+-- `platform_core.mobil` yalnız `kimlik` modülünün açık doğrulama işlevini çağırabilir. Öteki modüller `mobil` modülünü çağırmaz.
+-- `platform_core.erisim` öteki modülleri çağırmaz. Motor Frappe'nin izin kancalarıyla çalışır.
+-  - Öteki modüller yalnız `platform_core.erisim.api` yolunu çağırabilir. Örneğin `yapay_zeka` modülü `platform_core.erisim.api.report_guard` işlevini çağırır.
+-  - `kabuk` modülü “Access Rule” kayıt olaylarını `doc_events` kancasıyla dinler. Bu yüzden kuralı değiştiren kod kaydı `save` ile yazar. `frappe.db.set_value` kayıt olaylarını çalıştırmaz.
+-- `platform_core.model_gecidi` öteki modülleri çağırmaz. `yapay_zeka` modülü `model_gecidi` modülünün açık işlevlerini çağırabilir.
+-- `platform_core.yapay_zeka` öteki modüllerin açık işlevlerini çağırabilir. Öteki modüller `yapay_zeka` modülünü çağırmaz. Uygulamalar araçlarını `ai_tools` kancasıyla bildirir.
++- `platform_core.identity` ve `press_tr.press_identity` yalnız `oidc_verify` kitaplığını kullanır.
++- `platform_core.shell` ile `platform_core.identity` birbirini çağırmaz.
++- `platform_core.mobile` yalnız `identity` modülünün açık doğrulama işlevini çağırabilir. Öteki modüller `mobile` modülünü çağırmaz.
++- `platform_core.access` öteki modülleri çağırmaz. Motor Frappe'nin izin kancalarıyla çalışır.
++  - Öteki modüller yalnız `platform_core.access.api` yolunu çağırabilir. Örneğin `ai` modülü `platform_core.access.api.report_guard` işlevini çağırır.
++  - `shell` modülü “Access Rule” kayıt olaylarını `doc_events` kancasıyla dinler. Bu yüzden kuralı değiştiren kod kaydı `save` ile yazar. `frappe.db.set_value` kayıt olaylarını çalıştırmaz.
++- `platform_core.model_gateway` öteki modülleri çağırmaz. `ai` modülü `model_gateway` modülünün açık işlevlerini çağırabilir.
++- `platform_core.ai` öteki modüllerin açık işlevlerini çağırabilir. Öteki modüller `ai` modülünü çağırmaz. Uygulamalar araçlarını `ai_tools` kancasıyla bildirir.
+ - `identity_sync` sitelerin açık uçlarını HTTP ile çağırır. Siteler `identity_sync` kodunu çağırmaz.
+ - Döngü yasaktır. MVP'de bu yönler otomatik denetlenir (B-10).
+
+@@ -54,7 +54,7 @@ Ortam komutları Pane'in verdiği `PANE_PORT` değerini kullanır.
+ | --- | --- | --- |
+ | Frappe kurulum testleri | `backend/dev/bin/test platform_core` | Depo kökü |
+ | Python kod ve biçim denetimi | `backend/dev/bin/ruff` | Depo kökü |
+-| Modül sınırları | `backend/dev/bin/modul-sinirlari` | Depo kökü |
++| Modül sınırları | `backend/dev/bin/module-boundaries` | Depo kökü |
+ | Ortam betiklerinin Python testleri | `python3 -m unittest discover -s backend/dev/tests` | Depo kökü |
+ | Atonota giriş teması | Komut ve dosya listesi `backend/identity/keycloak/themes/atonota/README.md` dosyasındadır. Her sayfaya yüklenen stil ve betik ile ileti dosyalarının yolu da oradadır. | Depo kökü |
+
+@@ -210,7 +210,7 @@ Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bi
+ | --- | --- | --- |
+ | K1: Press Frappe 15 üzerinde çalışır. | Press de Frappe 16 üzerinde çalışır. | D-7, O-9 |
+ | K9: Claude Agent SDK ve adı yazılı Claude modelleri | Sağlayıcıdan bağımsız ajan servisi ve model geçidi | D-9, D-11, O-10 |
+-| G-84: Kiracı MCP'si `frappe_mcp` ile kurulur. | `frappe/mcp` deposu arşivlendi. Katmanı `platform_core.yapay_zeka` kurar. | Karar notu 0002 |
++| G-84: Kiracı MCP'si `frappe_mcp` ile kurulur. | `frappe/mcp` deposu arşivlendi. Katmanı `platform_core.ai` kurar. | Karar notu 0002 |
+ | Rail 5: Onay `confirm=true` alanıyla verilir. | Modelde onay alanı yoktur. Onay insan oturumundaki ayrı uçtan gelir. | Sözleşme 10. bölüm |
+ | G-64: Günlük model, token ve maliyet tutar. | Bu alanlar “AI Usage Log” kaydındadır. | Karar notu 0002 |
+ | G-57: Kiracıda kullanıcı “System User” olur. | Son kullanıcı “Website User” olur. | D-5, O-3 |
+diff --git a/backend/docs/isler/ai-readiness-gate.md b/backend/docs/isler/ai-readiness-gate.md
+index 9ef87a7ded874aec85ef7d29b1832f12ba94ea30..404ef9f67e1ff0eb7234652295f5c219f8e489ff 100644
+--- a/backend/docs/isler/ai-readiness-gate.md
++++ b/backend/docs/isler/ai-readiness-gate.md
+@@ -5,16 +5,16 @@ Bu iş otomatik bir kapı yazar. Kapı, yapay zekâ kurallarının bütün backe
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`, özellikle “Yapay zekâ erişimi” ve “Ad dili” bölümleri
+-2. `backend/PROJE-KAYDI.md`, özellikle D-9 ve O-13
+-3. `backend/docs/sozlesmeler.md`, 10. ve 11. bölüm
+-4. `backend/dev/check_boundaries.py` ve `backend/dev/guvenlik/`. Yeni kapı bu iki denetimin biçimini izlesin.
++2. `backend/PROJECT-RECORD.md`, özellikle D-9 ve O-13
++3. `backend/docs/contracts.md`, 10. ve 11. bölüm
++4. `backend/dev/check_boundaries.py` ve `backend/dev/security/`. Yeni kapı bu iki denetimin biçimini izlesin.
+
+ ## Sahip olduğunuz yerler
+
+ - `backend/dev/ai_readiness/` (yeni klasör)
+ - `backend/dev/bin/ai-readiness` (yeni komut)
+-- `backend/dev/bin/guvenlik-denetimi` içinde yalnız yeni kapıyı çağıran satır
+-- `backend/docs/kararlar/0010-ai-readiness-gate.md` (yeni karar notu)
++- `backend/dev/bin/security-audit` içinde yalnız yeni kapıyı çağıran satır
++- `backend/docs/decisions/0010-ai-readiness-gate.md` (yeni karar notu)
+
+ Yeni dosya, işlev ve değişken adları İngilizce olur (D-12). Yeni koddaki yorum ve iletiler de İngilizce olur.
+
+@@ -27,7 +27,7 @@ Kapı yalnız Python standart kitaplığıyla yazılır. Kapı `backend/apps/` a
+ 3. **Sağlayıcı kitaplığı yok.** Kod sağlayıcı kitaplığı içe aktarmamalı. Örnekler `openai`, `anthropic`, `google.generativeai`, `mistralai`, `cohere`, `ollama` ve `langchain` kitaplıklarıdır.
+ 4. **Kodda model adı yok.** Kodda bilinen model adı kalıbı geçmemeli. Model adları yalnız kayıtta durur (O-13). Test dosyalarındaki uydurma adlar bu kurala girmez.
+ 5. **Zamanlanmış iş yok.** `hooks.py` içinde `scheduler_events` olmamalı. Proje sahibi `cron` istemedi.
+-6. **Ham SQL yolu yok.** Yapay zekâ araçlarında `frappe.db.sql` çağrısı olmamalı. Kapsam `yapay_zeka` modülü ve `ai_tools` kancasıyla bildirilen araçlardır.
++6. **Ham SQL yolu yok.** Yapay zekâ araçlarında `frappe.db.sql` çağrısı olmamalı. Kapsam `ai` modülü ve `ai_tools` kancasıyla bildirilen araçlardır.
+ 7. **Yasaklı ad yok (D-13).** Bu denetim `backend/` ile sınırlı değildir. Depodaki bütün izlenen dosyaları tarar (`git ls-files`). Dosya ve klasör adlarını da tarar.
+    - Adın kendisi kapıya yazılmaz. Kapı yalnız şu SHA-256 özetini taşır: `17618b2344e07d3418e161912308ad63a118158bf4e3f1307329b5543b5fd743`.
+    - Kapı metni küçük harfe çevirir. Sonra harf ve rakam dışındaki işaretleri siler. Böylece boşluk, alt çizgi, tire ve nokta ile yazılan biçimler de yakalanır.
+@@ -50,7 +50,7 @@ Her denetim ihlali dosya ve satırla yazar. Çıkış kodu ihlal varsa 1, yoksa
+ 1. Kapıyı öteki işlerin dallarında salt okunur olarak çalıştırın. Dallar `/Users/w6x/Documents/frappesetup/worktrees/` altındadır.
+ 2. Başka dalda dosya değiştirmeyin ve commit atmayın.
+ 3. Her dal için ihlal sayısını ve ilk beş ihlali durum dosyasına yazın.
+-4. `guvenlik-denetimi` komutuna yeni kapıyı çağıran satırı ekleyin.
++4. `security-audit` komutuna yeni kapıyı çağıran satırı ekleyin.
+ 5. Commit atın ve `done` raporlayın. Orkestratör ihlalleri ilgili işçilere iletir.
+
+ ## Sınırlar
+diff --git a/backend/docs/isler/dev-ortam.md b/backend/docs/isler/dev-ortam.md
+index 6b65f7eec905420aea9aee2facb778ca96e9bd46..369fe2209e6b5b414e309e1de3d8013ee024873c 100644
+--- a/backend/docs/isler/dev-ortam.md
++++ b/backend/docs/isler/dev-ortam.md
+@@ -2,13 +2,13 @@
+
+ Bu iş geliştirme ortamını kurar. `platform_core` uygulamasının iskeletini de üretir. Öteki işler bu ortamda test çalıştırır. Bu yüzden ilk kontrol noktası önemlidir.
+
+-Önce `backend/AGENTS.md`, `backend/PROJE-KAYDI.md` ve `backend/docs/sozlesmeler.md` dosyalarını okuyun.
++Önce `backend/AGENTS.md`, `backend/PROJECT-RECORD.md` ve `backend/docs/contracts.md` dosyalarını okuyun.
+
+ ## Sahip olduğunuz yerler
+
+ - `backend/dev/` klasörü. Yalnız `compose.keycloak.yaml` ve `compose.press.yaml` başka işlerindir.
+ - `backend/apps/platform_core/` iskeleti: `pyproject.toml`, `hooks.py`, `modules.txt`, `patches.txt`, uygulama `__init__.py`, `.gitignore` ve araç ayarları.
+-- `backend/PROJE-KAYDI.md` dosyasında yalnız “Denetim komutları” bölümü.
++- `backend/PROJECT-RECORD.md` dosyasında yalnız “Denetim komutları” bölümü.
+ - `backend/README.md` dosyasında kurulum bölümü.
+
+ ## Kontrol noktası 1: iskelet ve kiracı sitesi
+@@ -20,14 +20,14 @@ Bu iş geliştirme ortamını kurar. `platform_core` uygulamasının iskeletini
+    docker --context colima save frappe/erpnext:v16.55.0 | docker --context colima-factory load
+    ```
+
+-3. `backend/dev/compose.kiraci.yaml` dosyasını yazın. Dosyada Frappe 16, MariaDB ve Redis olsun.
++3. `backend/dev/compose.tenant.yaml` dosyasını yazın. Dosyada Frappe 16, MariaDB ve Redis olsun.
+    - MariaDB sürümünü Frappe 16'nın resmî kurulum belgesinden doğrulayın.
+    - Web portu `PANE_PORT+1`, anlık bağlantı portu `PANE_PORT+2` olsun.
+    - Web servisi ağda `kiraci1.localhost` takma adını taşısın. Sözleşmenin 9. bölümündeki adres yolunu deneyin.
+ 4. Container içinde `bench new-app platform_core --no-git` ile iskeleti üretin. Lisans MIT olsun. Yayıncı e-postası olarak `noreply@example.test` yazın. Kişisel e-posta yazmayın.
+ 5. Üretilen iskeleti `backend/apps/platform_core/` klasörüne alın. Uygulama klasörünü container'a bağlayın. Uygulamayı düzenlenebilir kurulumla kurun.
+ 6. `pyproject.toml` içinde Frappe aralığını `[tool.bench.frappe-dependencies]` bölümüne yazın. Aralık `>=16.0.0,<17.0.0` olsun.
+-7. Modül olarak `Kimlik` ve `Kabuk` ekleyin. Klasör adları `kimlik` ve `kabuk` olsun. Varsayılan modülü bırakmak gerekirse nedenini yazın.
++7. Modül olarak `Identity` ve `Shell` ekleyin. Klasör adları `identity` ve `shell` olsun. Varsayılan modülü bırakmak gerekirse nedenini yazın.
+ 8. `kiraci1.localhost` sitesini açın ve `platform_core` uygulamasını kurun.
+ 9. İlk duman testini yazın. Test uygulamanın kurulu olduğunu doğrulasın. Testi `bench run-tests` ile çalıştırın.
+ 10. Commit atın ve `ready` raporlayın. Raporda şu bilgiler olsun:
+@@ -48,7 +48,7 @@ Bu iş geliştirme ortamını kurar. `platform_core` uygulamasının iskeletini
+    - izin listesinde olmayan modül bağı,
+    - bağımlılık döngüsü,
+    - başka modülün DocType'ına doğrudan yazma çağrısı.
+-5. İzin listesini `backend/dev/modul-sinirlari.json` dosyasında tutun. Proje kaydındaki bağımlılık yönünü kullanın.
++5. İzin listesini `backend/dev/module-boundaries.json` dosyasında tutun. Proje kaydındaki bağımlılık yönünü kullanın.
+ 6. Denetimi önce test edin. Bilerek bozuk bir örnek hazırlayın. Denetimin bu örneği reddettiğini gösterin (N-5).
+ 7. `backend/dev/compose.yaml` dosyasını yazın. Dosya şimdilik yalnız kiracı dosyasını içersin. Öteki dosyaları orkestratör birleştirmede ekler.
+ 8. “Denetim komutları” tablosunu doldurun. README'ye kurulum adımlarını yazın.
+diff --git a/backend/docs/isler/erisim-kurali.md b/backend/docs/isler/erisim-kurali.md
+index dde7bbe6be36721534d37d29221079fbed11bfbb..bcb89e98126bde1ee563560089560b249e12c4e4 100644
+--- a/backend/docs/isler/erisim-kurali.md
++++ b/backend/docs/isler/erisim-kurali.md
+@@ -5,18 +5,18 @@ Bu iş `platform_core` içinde erişim kuralı motorunu kurar. Karar sitesinin K
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`
+-2. `backend/PROJE-KAYDI.md`
+-3. `backend/docs/sozlesmeler.md`
++2. `backend/PROJECT-RECORD.md`
++3. `backend/docs/contracts.md`
+ 4. Karar sitesinde `kararlar.md` (K8), `rail-2-gelistirme.md`, `rail-2-yapilandirma.md` ve `yol-haritasi.md`. G-60, G-61, G-62, G-104 ve G-121 maddelerini bulun.
+ 5. `docs/standartlar/frappe-python-standartlari.md`, özellikle G-2, G-3 ve G-12
+
+ ## Sahip olduğunuz yerler
+
+-- `backend/apps/platform_core/platform_core/erisim/`
++- `backend/apps/platform_core/platform_core/access/`
+ - `backend/apps/platform_core/platform_core/api/access.py`
+-- `backend/contracts/platform_core-erisim.openapi.yaml`
+-- `backend/docs/kararlar/0006-erisim-kurali.md`
+-- `modules.txt` dosyasında yalnız `Erisim` satırı
++- `backend/contracts/platform_core-access.openapi.yaml`
++- `backend/docs/decisions/0006-access-rule.md`
++- `modules.txt` dosyasında yalnız `Access` satırı
+ - `hooks.py` içinde yalnız bu işin satırları
+
+ ## Kontrol noktası 1: tasarım notu
+diff --git a/backend/docs/isler/guvenlik-kapisi.md b/backend/docs/isler/guvenlik-kapisi.md
+index 68c5535075d64c8608a525b29ecce285505e3863..a8cca2f1744932f1ceddb0801a142e0f16bbc131 100644
+--- a/backend/docs/isler/guvenlik-kapisi.md
++++ b/backend/docs/isler/guvenlik-kapisi.md
+@@ -5,16 +5,16 @@ Bu iş backend için otomatik bir güvenlik kapısı kurar. Kapı her değişikl
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`
+-2. `backend/PROJE-KAYDI.md`
+-3. `backend/docs/sozlesmeler.md`
++2. `backend/PROJECT-RECORD.md`
++3. `backend/docs/contracts.md`
+ 4. `docs/standartlar/frappe-python-standartlari.md`, özellikle 6. bölüm (G-1 ile G-16)
+ 5. Karar sitesinde `src/content/docs/kalite-kurallari.md`
+
+ ## Sahip olduğunuz yerler
+
+-- `backend/dev/guvenlik/`
+-- `backend/dev/bin/guvenlik-denetimi`
+-- `backend/docs/kararlar/0005-guvenlik-kapisi.md`
++- `backend/dev/security/`
++- `backend/dev/bin/security-audit`
++- `backend/docs/decisions/0005-security-gate.md`
+
+ ## Ekibin önerdiği önlemler
+
+@@ -60,9 +60,9 @@ Her kural için bir hatalı ve bir doğru örnek dosya yazın. Test, kuralın ha
+ 1. Bütün `@frappe.whitelist` uçlarını listeleyen bir betik yazın. Python'un `ast` modülü yeterlidir.
+ 2. Betik misafire açık uçları ayrı bir raporda göstersin.
+ 3. Her uç için iki testin varlığını denetleyin: girişsiz ret ve başka kullanıcının verisi. Test yoksa denetim başarısız olsun.
+-4. Testlerin adlandırma kuralını `backend/dev/guvenlik/README.md` dosyasına yazın.
++4. Testlerin adlandırma kuralını `backend/dev/security/README.md` dosyasına yazın.
+ 5. Yeni özellik için kötüye kullanım kartı şablonunu yazın. Kart üç soru sorar: Kim yapabilir? Veri kimin? Girişsiz biri neyi görür?
+-6. Bütün denetimleri `backend/dev/bin/guvenlik-denetimi` komutunda toplayın.
++6. Bütün denetimleri `backend/dev/bin/security-audit` komutunda toplayın.
+ 7. Commit atın ve `done` raporlayın.
+
+ ## Sınırlar
+diff --git a/backend/docs/isler/identity-sync.md b/backend/docs/isler/identity-sync.md
+index 4810c48e240191f2db7716af0339b8afc7cbd73c..ffd7fd6f237c01b8ba12f33531ab63c94056fb88 100644
+--- a/backend/docs/isler/identity-sync.md
++++ b/backend/docs/isler/identity-sync.md
+@@ -2,13 +2,13 @@
+
+ Bu iş kullanıcı eşitleme servisinin teknoloji kararını hazırlar. Servisin çekirdek mantığını da yazar. Servis Keycloak'taki kullanıcı değişikliklerini Press'e ve kiracı sitelerine taşır (G-81).
+
+-Önce `backend/AGENTS.md`, `backend/PROJE-KAYDI.md` ve `backend/docs/sozlesmeler.md` dosyalarını okuyun. Sonra karar sitesinin `rail-4-keycloak.md` sayfasının 4. bölümünü okuyun.
++Önce `backend/AGENTS.md`, `backend/PROJECT-RECORD.md` ve `backend/docs/contracts.md` dosyalarını okuyun. Sonra karar sitesinin `rail-4-keycloak.md` sayfasının 4. bölümünü okuyun.
+
+ ## Sahip olduğunuz yerler
+
+ - `backend/identity/identity_sync/`
+ - `backend/contracts/identity_sync.openapi.yaml`
+-- `backend/docs/kararlar/0001-identity-sync.md`
++- `backend/docs/decisions/0001-identity-sync.md`
+
+ ## Önemli kısıt
+
+@@ -16,7 +16,7 @@ Zamanlanmış iş yasaktır (Proje kaydı D-6). Karar sitesi saatlik yoklama ve
+
+ ## Kontrol noktası 1: teknoloji kararı
+
+-1. T-2 karar notunu `backend/docs/kararlar/0001-identity-sync.md` dosyasına yazın.
++1. T-2 karar notunu `backend/docs/decisions/0001-identity-sync.md` dosyasına yazın.
+ 2. Notta şu soruları cevaplayın:
+    - Servis hangi dilde ve sürümde yazılır? Python 3.11 ve sonrası önerilir. Ekip ikinci dil eklemesin (T-1).
+    - HTTP sunucusu için yeni paket gerekir mi? Python'un kendi kitaplığı yeter mi?
+diff --git a/backend/docs/isler/ilk-dikey-dilim.md b/backend/docs/isler/ilk-dikey-dilim.md
+index 62aa3e4bd7a7c84bf4435b3e6fd62f323e1b5fb8..021533d19b60d917dd84ccf18495fd44d9a9ed72 100644
+--- a/backend/docs/isler/ilk-dikey-dilim.md
++++ b/backend/docs/isler/ilk-dikey-dilim.md
+@@ -5,8 +5,8 @@ Bu iş yol haritasındaki ilk dikey dilimin backend'ini hazırlar. Dilim “İzi
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`
+-2. `backend/PROJE-KAYDI.md`
+-3. `backend/docs/sozlesmeler.md`
++2. `backend/PROJECT-RECORD.md`
++3. `backend/docs/contracts.md`
+ 4. Karar sitesinde `yol-haritasi.md`, `app-cercevesi.md` ve `kararlar.md` (K10)
+
+ ## Sahip olduğunuz yerler
+@@ -14,7 +14,7 @@ Bu iş yol haritasındaki ilk dikey dilimin backend'ini hazırlar. Dilim “İzi
+ - `backend/apps/hrms_tr/`
+ - `backend/dev/hrms/`
+ - `backend/contracts/hrms_tr.openapi.yaml`
+-- `backend/docs/kararlar/0008-ilk-dikey-dilim.md`
++- `backend/docs/decisions/0008-ilk-dikey-dilim.md`
+
+ ## Kararlar
+
+@@ -30,7 +30,7 @@ Bu iş yol haritasındaki ilk dikey dilimin backend'ini hazırlar. Dilim “İzi
+    - `leave_balance` alanı izin seviyesiyle nasıl kapanır?
+    - Kenar çubuğu “Workspace” kaydından nasıl türer (G-94)?
+    - Yapay zekâ aracı `hrms_tr_approve_leave` nasıl çalışır? Araç önizleme üretir ve insan onayı ister (G-129).
+-2. `backend/dev/hrms/` altında hrms'i ekleyen geliştirme imajını yazın. Temel imaj `backend/dev/Dockerfile.kiraci` dosyasının ürettiği imajdır. hrms sürümünü tam etiketle sabitleyin.
++2. `backend/dev/hrms/` altında hrms'i ekleyen geliştirme imajını yazın. Temel imaj `backend/dev/Dockerfile.tenant` dosyasının ürettiği imajdır. hrms sürümünü tam etiketle sabitleyin.
+ 3. Diski ölçün. Boş yer 5 GB'ın altındaysa raporlayın.
+ 4. Commit atın ve `ready` raporlayın.
+
+@@ -39,7 +39,7 @@ Bu iş yol haritasındaki ilk dikey dilimin backend'ini hazırlar. Dilim “İzi
+ 1. `hrms_tr` iskeletini `bench new-app hrms_tr --no-git` ile üretin. `required_apps` listesine `hrms` ekleyin.
+ 2. Rolleri ve “Role Profile” kayıtlarını ön ekli fixture olarak yazın.
+ 3. Erişim kuralı şablonlarını yazın. Şablonlar erisim-kurali işinin “Access Rule” DocType'ını kullanır. O iş birleşmediyse şablonları ayrı dosyada hazırlayın ve testi `not_run` yazın.
+-4. `hrms_tr_approve_leave` aracını `ai_tools` kancasıyla bildirin. Biçim `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir. platform-core-yz birleşmediyse aracı hazırlayın ve testi `not_run` yazın.
++4. `hrms_tr_approve_leave` aracını `ai_tools` kancasıyla bildirin. Biçim `contracts/platform_core-ai.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir. platform-core-yz birleşmediyse aracı hazırlayın ve testi `not_run` yazın.
+ 5. Testler gerçek HTTP isteğiyle şunları göstersin:
+    - çalışan yalnız kendi izin talebini görür,
+    - yönetici ekibinin taleplerini görür ve onaylayabilir,
+diff --git a/backend/docs/isler/integration-e2e.md b/backend/docs/isler/integration-e2e.md
+index 2606af55391cdace29443a535ccee4a14aec77db..8530e4555cf4aacd100a444e9da4c910bcaed3b3 100644
+--- a/backend/docs/isler/integration-e2e.md
++++ b/backend/docs/isler/integration-e2e.md
+@@ -5,8 +5,8 @@ Bu iş bütün backend parçalarını birlikte çalıştırır ve uçtan uca sı
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`. Yeni dosya ve kod adları İngilizce olur (D-12).
+-2. `backend/PROJE-KAYDI.md`
+-3. `backend/docs/sozlesmeler.md`
++2. `backend/PROJECT-RECORD.md`
++3. `backend/docs/contracts.md`
+ 4. `backend/README.md` ve `backend/dev/` klasörü
+
+ ## Sahip olduğunuz yerler
+diff --git a/backend/docs/isler/kimlik-realm.md b/backend/docs/isler/kimlik-realm.md
+index 1486331381e12ff1a18c36d1fddc11ca87a4d7a2..2440504e209b46f90e183bc5a76439ae7e7a2c94 100644
+--- a/backend/docs/isler/kimlik-realm.md
++++ b/backend/docs/isler/kimlik-realm.md
+@@ -2,7 +2,7 @@
+
+ Bu iş Keycloak'ı geliştirme ortamında kurar. `platform` realm'ini kod olarak yazar. Ortak belirteç doğrulama kitaplığını da yazar. Kimlik markası Atonota'dır.
+
+-Önce `backend/AGENTS.md`, `backend/PROJE-KAYDI.md` ve `backend/docs/sozlesmeler.md` dosyalarını okuyun. Sonra karar sitesinin `src/content/docs/rail-4-keycloak.md` sayfasını okuyun.
++Önce `backend/AGENTS.md`, `backend/PROJECT-RECORD.md` ve `backend/docs/contracts.md` dosyalarını okuyun. Sonra karar sitesinin `src/content/docs/rail-4-keycloak.md` sayfasını okuyun.
+
+ ## Sahip olduğunuz yerler
+
+@@ -61,7 +61,7 @@ Bu iş Keycloak'ı geliştirme ortamında kurar. `platform` realm'ini kod olarak
+
+ 1. Bu iki yol MVP'ye girer (O-6). Keycloak ikisini hazır sunmaz.
+ 2. Açık kaynak eklentileri karşılaştırın. Lisans Apache-2.0 ya da MIT olsun. Keycloak 26.8 uyumunu ve bakımı yazın.
+-3. T-2 notunu `backend/docs/kararlar/0003-keycloak-eklentileri.md` dosyasına yazın. Seçimi gerekçesiyle yapın. Soru sormayın.
++3. T-2 notunu `backend/docs/decisions/0003-keycloak-extensions.md` dosyasına yazın. Seçimi gerekçesiyle yapın. Soru sormayın.
+ 4. Eklentiyi compose kurulumuna ekleyin. Apple için gerçek anahtar yoktur. Sağlayıcıyı kapalı hazırlayın.
+ 5. Sihirli bağlantının kısa ömrünü ve tek kullanımını test edin.
+ 6. Commit atın ve `done` raporlayın.
+diff --git a/backend/docs/isler/kimlik-tema.md b/backend/docs/isler/kimlik-tema.md
+index 6ceb00c72f5af8c40449957a654dfc287f9f42ce..de06cfee4266d7c4a280a6157a093ef58f32e3bc 100644
+--- a/backend/docs/isler/kimlik-tema.md
++++ b/backend/docs/isler/kimlik-tema.md
+@@ -5,8 +5,8 @@ Bu iş Keycloak'ın giriş ve e-posta ekranlarını Atonota markasıyla yeniden
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`
+-2. `backend/PROJE-KAYDI.md`, özellikle O-1 ve O-4
+-3. `backend/docs/sozlesmeler.md`, 1 ve 2. bölümler
++2. `backend/PROJECT-RECORD.md`, özellikle O-1 ve O-4
++3. `backend/docs/contracts.md`, 1 ve 2. bölümler
+ 4. `docs/standartlar/headless-frontend-standartlari.md` içindeki güvenlik ve erişilebilirlik kuralları
+ 5. Ortak arayüz rehberleri: `~/.claude/skills/coding-standards/references/adaptive-ui.md`, `adaptive-qa.md`, `ui-motion.md` ve `ai-first-ui.md`
+
+diff --git a/backend/docs/isler/naming-history-fix.md b/backend/docs/isler/naming-history-fix.md
+index 178e437c706e8bbc25f7921856dc378737fdba44..fc438821325d51b3701ac5ac7dc87b0e4144fc61 100644
+--- a/backend/docs/isler/naming-history-fix.md
++++ b/backend/docs/isler/naming-history-fix.md
+@@ -6,8 +6,8 @@ Bu iş var olan adları adlandırma kurallarına göre düzeltir. Kurallar ayrı
+
+ 1. `/Users/w6x/Documents/rules ai/naming_rules_report.md`. Dosyanın son hâlini okuyun. Rapor sonradan güncellenebilir.
+ 2. `backend/AGENTS.md`, özellikle “Ad dili” bölümü
+-3. `backend/PROJE-KAYDI.md`, özellikle D-12
+-4. `backend/docs/sozlesmeler.md`
++3. `backend/PROJECT-RECORD.md`, özellikle D-12
++4. `backend/docs/contracts.md`
+
+ ## Raporda önce okunacak yerler
+
+@@ -45,7 +45,7 @@ Aynı anda on bir işçi kendi dalında çalışıyor. Adlar yalnız `backend` d
+ ## Sahip olduğunuz yerler
+
+ - `backend/dev/naming/` (yeni klasör)
+-- `backend/docs/kararlar/` altında yeni karar notu: `0009-naming-history-fix.md`
++- `backend/docs/decisions/` altında yeni karar notu: `0009-naming-history-fix.md`
+ - Ad değişikliğinin `backend` dalındaki uygulaması
+
+ ## Kontrol noktası 1: eşleşme dosyası ve betik
+diff --git a/backend/docs/isler/platform-core-gecit.md b/backend/docs/isler/platform-core-gecit.md
+index 2574e171cea1ee54106e46703b9c727383cdb43c..cfc1b01f6403034ee49368a769e3b72f667dda61 100644
+--- a/backend/docs/isler/platform-core-gecit.md
++++ b/backend/docs/isler/platform-core-gecit.md
+@@ -5,16 +5,16 @@ Bu iş model geçidini ve sağlayıcı kaydını kurar. Proje sahibinin kararı
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`
+-2. `backend/PROJE-KAYDI.md`, özellikle D-9, D-11, O-13, O-14 ve O-15
+-3. `backend/docs/sozlesmeler.md`, özellikle 10 ve 11. bölümler
++2. `backend/PROJECT-RECORD.md`, özellikle D-9, D-11, O-13, O-14 ve O-15
++3. `backend/docs/contracts.md`, özellikle 10 ve 11. bölümler
+ 4. Karar sitesinde `src/content/docs/rail-5-ai.md`. G-90 ve G-92 kurallarını bulun.
+
+ ## Sahip olduğunuz yerler
+
+-- `backend/apps/platform_core/platform_core/model_gecidi/`
++- `backend/apps/platform_core/platform_core/model_gateway/`
+ - `backend/apps/platform_core/platform_core/api/model.py`
+-- `backend/contracts/platform_core-model-gecidi.openapi.yaml`
+-- `backend/docs/kararlar/0004-model-gecidi.md`
++- `backend/contracts/platform_core-model-gateway.openapi.yaml`
++- `backend/docs/decisions/0004-model-gateway.md`
+ - `hooks.py` içinde yalnız bu işin satırları
+
+ ## Kontrol noktası 1: bağdaştırıcılar ve yönlendirme
+diff --git a/backend/docs/isler/platform-core-kabuk.md b/backend/docs/isler/platform-core-kabuk.md
+index 3211ba412a469edd2ed484223c195cfaf49c0a3a..2b1ebb0c97b123aeec51d06eb569d44ac769a432 100644
+--- a/backend/docs/isler/platform-core-kabuk.md
++++ b/backend/docs/isler/platform-core-kabuk.md
+@@ -5,16 +5,16 @@ Bu iş ayrı arayüzün sunucudan aldığı verileri hazırlar. Açılış veris
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`
+-2. `backend/PROJE-KAYDI.md`
+-3. `backend/docs/sozlesmeler.md`, özellikle 5 ve 10. bölümler
++2. `backend/PROJECT-RECORD.md`
++3. `backend/docs/contracts.md`, özellikle 5 ve 10. bölümler
+ 4. Karar sitesinde `rail-2-gelistirme.md`, `rail-3-frontend.md` ve `admin-shell.md` sayfaları. G-45, G-63 ve G-94 kurallarını bulun.
+
+ ## Sahip olduğunuz yerler
+
+-- `backend/apps/platform_core/platform_core/kabuk/`
++- `backend/apps/platform_core/platform_core/shell/`
+ - `backend/apps/platform_core/platform_core/api/shell.py`, `api/meta.py`
+ - `backend/apps/platform_core/platform_core/www/panel.*`
+-- `backend/contracts/platform_core-kabuk.openapi.yaml`
++- `backend/contracts/platform_core-shell.openapi.yaml`
+ - `hooks.py` içinde yalnız bu işin satırları
+
+ ## Önkoşul
+diff --git a/backend/docs/isler/platform-core-kimlik.md b/backend/docs/isler/platform-core-kimlik.md
+index aecca7366618a18759286b0455a117787f506eca..65644b111fac0b97f0179ed2847d94a1e727b08b 100644
+--- a/backend/docs/isler/platform-core-kimlik.md
++++ b/backend/docs/isler/platform-core-kimlik.md
+@@ -5,16 +5,16 @@ Bu iş kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis belir
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`
+-2. `backend/PROJE-KAYDI.md`
+-3. `backend/docs/sozlesmeler.md`, özellikle 2, 3, 4, 5 ve 8. bölümler
++2. `backend/PROJECT-RECORD.md`
++3. `backend/docs/contracts.md`, özellikle 2, 3, 4, 5 ve 8. bölümler
+ 4. Karar sitesinde `src/content/docs/rail-4-keycloak.md`
+ 5. `docs/standartlar/mobile.md` içindeki AU-3, AU-4, AU-5 ve AU-19 kuralları
+
+ ## Sahip olduğunuz yerler
+
+-- `backend/apps/platform_core/platform_core/kimlik/`
++- `backend/apps/platform_core/platform_core/identity/`
+ - `backend/apps/platform_core/platform_core/api/__init__.py`, `api/auth.py`, `api/identity.py`
+-- `backend/contracts/platform_core-kimlik.openapi.yaml`
++- `backend/contracts/platform_core-identity.openapi.yaml`
+ - `hooks.py` içinde yalnız bu işin satırları
+
+ ## Önkoşullar
+diff --git a/backend/docs/isler/platform-core-mobil.md b/backend/docs/isler/platform-core-mobil.md
+index 738358c4effacef519afb782f07dd60e5227be74..dec7ddca475210cfca17df985944211c1f35389d 100644
+--- a/backend/docs/isler/platform-core-mobil.md
++++ b/backend/docs/isler/platform-core-mobil.md
+@@ -5,17 +5,17 @@ Bu iş telefon uygulamasının sunucu tarafını kurar. Telefon uygulaması inte
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`
+-2. `backend/PROJE-KAYDI.md`
+-3. `backend/docs/sozlesmeler.md`
++2. `backend/PROJECT-RECORD.md`
++3. `backend/docs/contracts.md`
+ 4. `docs/standartlar/mobile.md`. Özellikle 7. bölüm (eşitleme) ve 13. bölüm (sunucu önlemleri) önemlidir. Ek B'deki Frappe davranışlarını da okuyun.
+
+ ## Sahip olduğunuz yerler
+
+-- `backend/apps/platform_core/platform_core/mobil/`
++- `backend/apps/platform_core/platform_core/mobile/`
+ - `backend/apps/platform_core/platform_core/api/mobile.py`
+-- `backend/contracts/platform_core-mobil.openapi.yaml`
+-- `backend/docs/kararlar/0007-mobil-esitleme.md`
+-- `modules.txt` dosyasında yalnız `Mobil` satırı
++- `backend/contracts/platform_core-mobile.openapi.yaml`
++- `backend/docs/decisions/0007-mobile-sync.md`
++- `modules.txt` dosyasında yalnız `Mobile` satırı
+ - `hooks.py` içinde yalnız bu işin satırları
+
+ ## Bağlı işler
+diff --git a/backend/docs/isler/platform-core-yz.md b/backend/docs/isler/platform-core-yz.md
+index 1309278294c2168ebf17682c9214f2d7ab2793e8..3eceaceb7bfa12e6b8ea0101ca359402c51c3d8b 100644
+--- a/backend/docs/isler/platform-core-yz.md
++++ b/backend/docs/isler/platform-core-yz.md
+@@ -5,17 +5,17 @@ Bu iş `platform_core` içinde yapay zekâ erişim katmanını kurar. Proje sahi
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`
+-2. `backend/PROJE-KAYDI.md`
+-3. `backend/docs/sozlesmeler.md`, özellikle 10. bölüm
++2. `backend/PROJECT-RECORD.md`
++3. `backend/docs/contracts.md`, özellikle 10. bölüm
+ 4. Karar sitesinde `src/content/docs/rail-5-ai.md` ve `ai-*.md` sayfaları
+ 5. Depodaki `packages/press-ai/INTERFACE.md` dosyası. Onay ve “unknown” kuralları orada uygulanmıştır.
+
+ ## Sahip olduğunuz yerler
+
+-- `backend/apps/platform_core/platform_core/yapay_zeka/`
++- `backend/apps/platform_core/platform_core/ai/`
+ - `backend/apps/platform_core/platform_core/api/ai.py`
+-- `backend/contracts/platform_core-yapay-zeka.openapi.yaml`
+-- `backend/docs/kararlar/0002-yapay-zeka-katmani.md`
++- `backend/contracts/platform_core-ai.openapi.yaml`
++- `backend/docs/decisions/0002-ai-layer.md`
+ - `hooks.py` içinde yalnız bu işin satırları
+
+ ## Kontrol noktası 1: karar notu
+@@ -25,7 +25,7 @@ Bu iş `platform_core` içinde yapay zekâ erişim katmanını kurar. Proje sahi
+    - `frappe/mcp` deposu ne sunuyor? Lisansı ne? Son sürümü ve bakımı nasıl?
+    - Bu depo Frappe 16 ile çalışıyor mu?
+ 2. MCP'nin güncel sürümünü ve HTTP taşıma biçimini resmî kaynaktan doğrulayın.
+-3. Karar notunu `backend/docs/kararlar/0002-yapay-zeka-katmani.md` dosyasına yazın. Notta şu tasarımlar olsun:
++3. Karar notunu `backend/docs/decisions/0002-ai-layer.md` dosyasına yazın. Notta şu tasarımlar olsun:
+    - Araçlar DocType tanımından nasıl üretilir?
+    - Kimlik nasıl taşınır? İnsan oturumu ve aracı belirteci ayrı ele alınır (G-148).
+    - Yetki eşitliği nasıl sağlanır (G-85)?
+@@ -63,10 +63,10 @@ Bu bölüm `platform_core` iskeletini ister. Orkestratör iskeleti `backend` dal
+
+ ## Model geçidiyle ilişki
+
+-- Sağlayıcı, hesap ve API kaydını platform-core-gecit işi kurar. Kayıt `model_gecidi` modülündedir.
++- Sağlayıcı, hesap ve API kaydını platform-core-gecit işi kurar. Kayıt `model_gateway` modülündedir.
+ - Bu kayıt da DocType olduğu için genel araçlardan görünür. Gizli anahtar hiçbir araçtan dönmez.
+ - Yapay zekâ kaydı yönetim araçlarıyla değiştirebilir. Her değişiklik önizleme ve insan onayı ister.
+-- Bu katman model çağırmaz. Model çağrısı gerekirse `model_gecidi` modülünün açık işlevini kullanın.
++- Bu katman model çağırmaz. Model çağrısı gerekirse `model_gateway` modülünün açık işlevini kullanın.
+
+ ## Kapsam dışı
+
+diff --git a/backend/docs/isler/press-tr.md b/backend/docs/isler/press-tr.md
+index ac2706c77e91e6768491d18531a9912bfb8d8d36..af46ba7be54e1803111cbeb4c959573f4ff1f748 100644
+--- a/backend/docs/isler/press-tr.md
++++ b/backend/docs/isler/press-tr.md
+@@ -2,7 +2,7 @@
+
+ Bu iş Press'i geliştirme ortamında kurar. `press_tr` uygulamasının kimlik bölümünü de yazar. Press, kiracı sitelerini yöneten kontrol düzlemidir.
+
+-Önce `backend/AGENTS.md`, `backend/PROJE-KAYDI.md` ve `backend/docs/sozlesmeler.md` dosyalarını okuyun. Sonra karar sitesinin `rail-1-press.md` ve `rail-4-keycloak.md` sayfalarını okuyun. Rail 4 sayfasının 6. bölümü Press girişini anlatır (G-12).
++Önce `backend/AGENTS.md`, `backend/PROJECT-RECORD.md` ve `backend/docs/contracts.md` dosyalarını okuyun. Sonra karar sitesinin `rail-1-press.md` ve `rail-4-keycloak.md` sayfalarını okuyun. Rail 4 sayfasının 6. bölümü Press girişini anlatır (G-12).
+
+ ## Güncelleme: 22 Kasım 2026 Pazar
+
+@@ -32,7 +32,7 @@ Proje sahibi iki karar verdi. Bu bölüm aşağıdaki Frappe 15 bilgilerinin yer
+ 4. Press'in kendi ajanını, sunucularını ve Ansible kurulumunu bu turda kurmayın. Yalnız Press uygulaması ve sitesi yeterlidir.
+ 5. Container içinde `bench new-app press_tr --no-git` ile iskeleti üretin. Lisans AGPL-3.0 olsun (O-8). Uygulama klasörüne lisans dosyasını koyun. Yayıncı e-postası olarak `noreply@example.test` yazın.
+ 6. `required_apps` listesine `press` ekleyin. Frappe aralığı `>=15.0.0,<16.0.0` olsun.
+-7. Modül olarak `Kimlik` ekleyin. Klasör adı `kimlik` olsun.
++7. Modül olarak `Press Identity` ekleyin. Klasör adı `press_identity` olsun.
+ 8. `press.localhost` sitesini açın. Press'i ve `press_tr` uygulamasını kurun.
+ 9. Duman testini yazın ve çalıştırın.
+ 10. Commit atın ve `ready` raporlayın. Raporda çalışan sürümleri ve komutları yazın.
+diff --git a/backend/docs/isler/security-tooling.md b/backend/docs/isler/security-tooling.md
+index 1a202fa08a60a8d839d759ad911752d14cef0aa8..e673a86d83e08487d42113861dc7cc94fcd35b1a 100644
+--- a/backend/docs/isler/security-tooling.md
++++ b/backend/docs/isler/security-tooling.md
+@@ -5,18 +5,18 @@ Bu iş güvenlik taramalarını elle başlatılan komutlar olarak yazar. Proje s
+ Önce şu dosyaları okuyun:
+
+ 1. `backend/AGENTS.md`, özellikle “Container kuralları” ve “Bilinen ortam sorunları”
+-2. `backend/PROJE-KAYDI.md`, özellikle D-6, D-15 ve O-29
++2. `backend/PROJECT-RECORD.md`, özellikle D-6, D-15 ve O-29
+ 3. `backend/docs/security-requirements.md`. Bu liste proje sahibinin güvenlik önlemlerinden çıkarıldı.
+-4. `backend/dev/bin/guvenlik-denetimi` ve `backend/dev/guvenlik/`. Bu var olan kapıdır. Yeni komutlar onun biçimini izler.
++4. `backend/dev/bin/security-audit` ve `backend/dev/security/`. Bu var olan kapıdır. Yeni komutlar onun biçimini izler.
+ 5. `backend/docs/gap-backlog.md`
+
+ ## Sahip olduğunuz yerler
+
+ - `backend/dev/security/` (yeni klasör)
+ - `backend/dev/bin/security-full`, `backend/dev/bin/dast-scan`, `backend/dev/bin/release-report`, `backend/dev/bin/security-scorecard` (yeni komutlar)
+-- `backend/dev/guvenlik/` ve `backend/dev/bin/guvenlik-denetimi`. Önceki iş bitti. Bu yerler artık sizindir.
++- `backend/dev/security/` ve `backend/dev/bin/security-audit`. Önceki iş bitti. Bu yerler artık sizindir.
+ - `backend/docs/handoff/ci-security.md` (yeni devir notu)
+-- `backend/docs/kararlar/0011-security-tooling.md` (yeni karar notu)
++- `backend/docs/decisions/0011-security-tooling.md` (yeni karar notu)
+
+ Yeni dosya, işlev ve değişken adları İngilizce olur (D-12).
+
+diff --git a/backend/docs/kararlar/0002-yapay-zeka-katmani.md b/backend/docs/kararlar/0002-yapay-zeka-katmani.md
+index b34100ea00cec1bef277a9d8849030807cd16679..b7d8f52e574650154a4f35429a6a5d8dd9313a4c 100644
+--- a/backend/docs/kararlar/0002-yapay-zeka-katmani.md
++++ b/backend/docs/kararlar/0002-yapay-zeka-katmani.md
+@@ -355,7 +355,7 @@ Model geçidinin “AI API” kaydı bu kurala örnektir. Yapay zekâ kaydın ad
+
+ ## 10. Uçlar
+
+-Bütün uçlar `platform_core/api/ai.py` dosyasındadır. Dosya ince kalır. İş kuralı `yapay_zeka` modülündedir.
++Bütün uçlar `platform_core/api/ai.py` dosyasındadır. Dosya ince kalır. İş kuralı `ai` modülündedir.
+
+ | Yol | Yöntem | Kimlik | İşi |
+ | --- | --- | --- | --- |
+@@ -367,7 +367,7 @@ Bütün uçlar `platform_core/api/ai.py` dosyasındadır. Dosya ince kalır. İ
+ | `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
+ | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
+
+-Ayrıntılı biçim `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasına yazılır. Bu dosya ikinci kontrol noktasında, koddan önce yazılır.
++Ayrıntılı biçim `contracts/platform_core-ai.openapi.yaml` dosyasına yazılır. Bu dosya ikinci kontrol noktasında, koddan önce yazılır.
+
+ ## 11. Karar sitesiyle çelişkiler
+
+diff --git a/backend/docs/kararlar/0004-model-gecidi.md b/backend/docs/kararlar/0004-model-gecidi.md
+index b12079ee2938debe74049de9c26c91982aceeb3d..cf05ea9a2a9c64da31eb6092fcec7f8ca02f4420 100644
+--- a/backend/docs/kararlar/0004-model-gecidi.md
++++ b/backend/docs/kararlar/0004-model-gecidi.md
+@@ -34,13 +34,13 @@ Alt tablo erişimini bağlı olduğu yol kaydından alır.
+
+ | Kayıt türü | İzin seviyesi | Rol | İşlemler |
+ | --- | --- | --- | --- |
+-| `AI Account` | 0 | AI Manager, System Manager | create, delete, read, write |
+-| `AI API` | 0 | AI Manager, System Manager | create, delete, read, write |
+-| `AI API` | 1 | AI Manager, System Manager | write |
+-| `AI Model` | 0 | AI Manager, System Manager | create, delete, read, write |
+-| `AI Provider` | 0 | AI Manager, System Manager | create, delete, read, write |
+-| `AI Route` | 0 | AI Manager, System Manager | create, delete, read, write |
+-| `AI Usage Log` | 0 | AI Manager, System Manager | read |
++| `PLT AI Account` | 0 | PLT AI Manager, System Manager | create, delete, read, write |
++| `PLT AI API` | 0 | PLT AI Manager, System Manager | create, delete, read, write |
++| `PLT AI API` | 1 | PLT AI Manager, System Manager | write |
++| `PLT AI Model` | 0 | PLT AI Manager, System Manager | create, delete, read, write |
++| `PLT AI Provider` | 0 | PLT AI Manager, System Manager | create, delete, read, write |
++| `PLT AI Route` | 0 | PLT AI Manager, System Manager | create, delete, read, write |
++| `PLT AI Usage Log` | 0 | PLT AI Manager, System Manager | read |
+ | `PLT AI Route Target` | 0 | Yok | Yok |
+
+ Orkestratör, D-10, 22 Kasım 2026 Pazar
+@@ -49,19 +49,19 @@ Orkestratör, D-10, 22 Kasım 2026 Pazar
+
+ | Tür | Açık işlev veya olay | Görevi |
+ | --- | --- | --- |
+-| Python | `platform_core.model_gecidi.api.complete` | Yetkili yol üzerinden model çağrısı yapar. |
+-| Python ve Bench | `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False)` | Yalnız “System Manager” çağırabilir. İşlev uygun kayıt sayısını `eligible`, silinen kayıt sayısını `deleted` alanında döndürür. |
++| Python | `platform_core.model_gateway.api.complete` | Yetkili yol üzerinden model çağrısı yapar. |
++| Python ve Bench | `platform_core.model_gateway.api.purge_usage_logs(*, dry_run=False)` | Yalnız “System Manager” çağırabilir. İşlev uygun kayıt sayısını `eligible`, silinen kayıt sayısını `deleted` alanında döndürür. |
+ | HTTP | `platform_core.api.model.complete` | Oturum veya kullanıcı anahtarıyla model çağrısı yapar. |
+ | HTTP | `platform_core.api.model.test_api` | Yöneticiye bağlantı denemesi sunar. |
+ | HTTP | `platform_core.api.model.resolve_usage` | Yöneticinin doğruladığı tutarı kullanım kaydına işler. |
+ | HTTP | `platform_core.api.model.reconcile_stale_pending` | Yönetici oturumuyla takılı kayıt grubunu kapatır. |
+ | HTTP | `platform_core.api.model.purge_usage` | Silinecek kayıtları gösterir veya onaylı önizlemeye göre siler. |
+ | HTTP | `platform_core.api.model.clear_api_credential` | Kapalı bağlantının anahtarını siler. |
+-| Bench | `platform_core.model_gecidi.maintenance.reconcile_stale_pending` | Takılı kullanım kayıtlarını elle başlatılan işlemle kapatır. |
++| Bench | `platform_core.model_gateway.maintenance.reconcile_stale_pending` | Takılı kullanım kayıtlarını elle başlatılan işlemle kapatır. |
+ | Kanca | `ai_tools` | `create_ai_api`, `update_ai_api`, `create_ai_account`, `update_ai_account` ve `reconcile_stale_pending` araçlarını bildirir. |
+ | Yapay zekâ aracı | `reconcile_stale_pending` | İnsan onayından sonra seçilen takılı kaydı kapatır. |
+-| Kanca | `ai_write_closed_doctypes` | Genel yapay zekâ yazmasını `AI API` ve `AI Account` için kapatır. |
+-| Kayıt olayı | `validate` | `AI API`, `AI Model`, `AI Provider` ve `AI Route` kayıtlarını yazmadan önce denetler. |
++| Kanca | `ai_write_closed_doctypes` | Genel yapay zekâ yazmasını `PLT AI API` ve `PLT AI Account` için kapatır. |
++| Kayıt olayı | `validate` | `PLT AI API`, `PLT AI Model`, `PLT AI Provider` ve `PLT AI Route` kayıtlarını yazmadan önce denetler. |
+ | Şema olayı | `on_doctype_update` | `PLT AI Route Target` için aynı hedefin ikinci kez yazılmasını engeller. |
+
+ ## Ortak istek ve yanıt
+@@ -173,12 +173,12 @@ Araç yazımdan önce insan onayı ister.
+ İşletim komutu aşağıdadır.
+
+ ```sh
+-bench --site SITE execute platform_core.model_gecidi.maintenance.reconcile_stale_pending
++bench --site SITE execute platform_core.model_gateway.maintenance.reconcile_stale_pending
+ ```
+
+ Model çağrısı insan oturumunu ve Frappe kullanıcı anahtarını kabul eder.
+ Aracı, çağrıyı yapay zekâ katmanından başlatır.
+-Arka plan işi `platform_core.model_gecidi.api.complete` işlevini kullanır.
++Arka plan işi `platform_core.model_gateway.api.complete` işlevini kullanır.
+ Geçit bu işlevde kullanıcının yetkisini denetler.
+ Arka plan işi, model çağrısından önce kendi veritabanı yazısını bitirir.
+
+@@ -212,9 +212,9 @@ Aşağıdaki terminal komutları önce önizler, sonra en çok 500 kaydı kalıc
+ Önizleme sonucunu silme komutunu çalıştırmadan önce kontrol edin.
+
+ ```sh
+-bench --site SITE execute platform_core.model_gecidi.api.purge_usage_logs --kwargs '{"dry_run":True}'
++bench --site SITE execute platform_core.model_gateway.api.purge_usage_logs --kwargs '{"dry_run":True}'
+ ```
+
+ ```sh
+-bench --site SITE execute platform_core.model_gecidi.api.purge_usage_logs
++bench --site SITE execute platform_core.model_gateway.api.purge_usage_logs
+ ```
+diff --git a/backend/docs/kararlar/0007-mobil-esitleme.md b/backend/docs/kararlar/0007-mobil-esitleme.md
+index 5d8b2608b07da31e1838902f977768268539b652..22f9ace2188647629d0c4854bbcfb5d189b14e17 100644
+--- a/backend/docs/kararlar/0007-mobil-esitleme.md
++++ b/backend/docs/kararlar/0007-mobil-esitleme.md
+@@ -221,7 +221,7 @@ Bir yanıt kaybolursa telefon aynı imleçle kaldırma işaretini yeniden alabil
+ Temizlikten sonra sunucu eksik değişiklik içeren eski imleçleri reddeder.
+ Eski imlece dayanan güvenli bir değişiklik listesi kalmazsa ilk kopya istenir.
+ Yetkili görevli temizliği elle başlatır.
+-Görevli komut satırında `bench --site <site> execute platform_core.mobil.store.cleanup` komutunu çalıştırır.
++Görevli komut satırında `bench --site <site> execute platform_core.mobile.store.cleanup` komutunu çalıştırır.
+ Görevli HTTP üzerinden `v1_cleanup` ucunu çağırır.
+ HTTP ucu Frappe içindeki `System Manager` rolünü arar.
+ Komut ve HTTP ucu aynı temizlik işlevini kullanır.
+diff --git a/backend/docs/security-requirements.md b/backend/docs/security-requirements.md
+index 2523a975d05b677c36516ddc575e9c539ee140ab..d624c5b17abbe1ddfa18570a492254dc82a93375 100644
+--- a/backend/docs/security-requirements.md
++++ b/backend/docs/security-requirements.md
+@@ -26,7 +26,7 @@ Zamanlanmış tarama kurulmaz (D-6). Asıl dosya bazı taramaları her gece ya d
+ | Her rolün izinli ve yasak işlemleri yazılır. Kullanıcı kendini yönetici yapamaz. | erisim-kurali, platform-core-kimlik | Rol kaynağı Keycloak'tır. |
+ | Kullanıcı isteğe fazladan alan ekleyerek rolünü değiştiremez. | Her uç sahibi | Tür ipuçlu whitelist ve `extra=forbid` kullanılır. |
+ | Bir müşteri başka müşterinin verisini göremez. Bunu veritabanı engeller. | Press ve kiracı yapısı | Her kiracının ayrı veritabanı vardır. |
+-| Ortak güvenlik kapısı her uca uygulanır. Kapı varsayılan olarak açıktır. | security-tooling | Uç denetimi `dev/guvenlik/endpoints.py` dosyasındadır. |
++| Ortak güvenlik kapısı her uca uygulanır. Kapı varsayılan olarak açıktır. | security-tooling | Uç denetimi `dev/security/endpoints.py` dosyasındadır. |
+ | Her işe başlamadan üç soru cevaplanır: kim yapabilir, veri kimin, girişsiz biri ne görür. | Her iş | Cevap görev dosyasına ya da karar notuna yazılır. |
+
+ ## İşlem güvenliği
+@@ -58,7 +58,7 @@ Zamanlanmış tarama kurulmaz (D-6). Asıl dosya bazı taramaları her gece ya d
+ | Bulunan her açık bir teste dönüşür. | Her iş | Önce test yazılır. |
+ | Korumayı silip test koşulur. Test kırmızı vermiyorsa yeniden yazılır. | Her iş | Kırmızı kanıtı durum dosyasına yazılır. |
+ | Her uçta iki zorunlu test vardır: girişsiz çağrı reddedilir, yabancı hesabın verisi görünmez. | Her uç sahibi | |
+-| Kötüye kullanım senaryoları işten önce yazılır. | Her iş | Örnek kart `dev/guvenlik/kotuye-kullanim-karti.md` dosyasındadır. |
++| Kötüye kullanım senaryoları işten önce yazılır. | Her iş | Örnek kart `dev/security/abuse-case-card.md` dosyasındadır. |
+ | Dağıtımdan önce dışarıya açılan uçların listesi çıkar. | security-tooling | `release-report` komutu |
+ | Dağıtımdan sonra canlıda kısa saldırı seti koşar. | DevOps sorumlusu | Canlı ortam kurulunca başlar. |
+ | Güvenlik sayıları düzenli raporlanır. | security-tooling | Elle başlatılan karne komutu. Zamanlanmış iş yoktur. |
+diff --git a/backend/docs/sozlesmeler.md b/backend/docs/sozlesmeler.md
+index 425e893e7461028f9bc53b867f1325d8d80472d8..909c8aab49ed38b2dc93aed3c1fc9c57284fd4a9 100644
+--- a/backend/docs/sozlesmeler.md
++++ b/backend/docs/sozlesmeler.md
+@@ -6,12 +6,12 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
+
+ | Dosya | Sahip iş |
+ | --- | --- |
+-| `contracts/platform_core-kimlik.openapi.yaml` | platform-core-kimlik |
+-| `contracts/platform_core-kabuk.openapi.yaml` | platform-core-kabuk |
++| `contracts/platform_core-identity.openapi.yaml` | platform-core-kimlik |
++| `contracts/platform_core-shell.openapi.yaml` | platform-core-kabuk |
+ | `contracts/press_tr.openapi.yaml` | press-tr |
+ | `contracts/identity_sync.openapi.yaml` | identity-sync |
+-| `contracts/platform_core-model-gecidi.openapi.yaml` | platform-core-gecit |
+-| `contracts/platform_core-yapay-zeka.openapi.yaml` | platform-core-yz |
++| `contracts/platform_core-model-gateway.openapi.yaml` | platform-core-gecit |
++| `contracts/platform_core-ai.openapi.yaml` | platform-core-yz |
+
+ ## 1. Marka
+
+@@ -370,7 +370,7 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
+ | Keycloak sunucusu | `kimlik.localhost` |
+ | Compose proje adı | `fs-<iş adı>` |
+ | Ana compose dosyası | `dev/compose.yaml` |
+-| Kiracı compose dosyası | `dev/compose.kiraci.yaml` |
++| Kiracı compose dosyası | `dev/compose.tenant.yaml` |
+ | Keycloak compose dosyası | `dev/compose.keycloak.yaml` |
+ | Press compose dosyası | `dev/compose.press.yaml` |
+ | Örnek kullanıcıların alan adı | `example.test` |
+@@ -449,9 +449,9 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
+
+ ### Sahiplik
+
+-- `platform_core` içinde katmanı platform-core-yz işi kurar. Modül klasörü `yapay_zeka` olur.
++- `platform_core` içinde katmanı platform-core-yz işi kurar. Modül klasörü `ai` olur.
+ - Önce Frappe'nin hazır MCP yolunu inceleyin (T-1). Karar sitesi bunu `frappe_mcp` olarak anar (G-84).
+-- Ayrıntılı tasarım `docs/kararlar/0002-yapay-zeka-katmani.md` dosyasındadır.
++- Ayrıntılı tasarım `docs/decisions/0002-ai-layer.md` dosyasındadır.
+ - Frappe 16'nın hazır MCP ucu (`/api/v2/mcp`) kiracı sitesinde kapatılır. Bu uç önizleme, onay ve günlük taşımaz.
+
+ ### Uçlar
+@@ -493,7 +493,7 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
+
+ ### Öteki modüllerin araç bildirimi
+
+-Her modül elle başlatılan komutlarını ve yazma işlerini `ai_tools` kancasıyla araç olarak bildirir. Bildirim biçimi `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir. Yazma araçları önizleme işlevi taşır. Bu bölüm platform-core-yz dalı birleşince geçerli olur.
++Her modül elle başlatılan komutlarını ve yazma işlerini `ai_tools` kancasıyla araç olarak bildirir. Bildirim biçimi `contracts/platform_core-ai.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir. Yazma araçları önizleme işlevi taşır. Bu bölüm platform-core-yz dalı birleşince geçerli olur.
+
+ ## 11. Model geçidi ve sağlayıcı kaydı
+
+@@ -501,7 +501,7 @@ Altyapı yapay zekâ tabanlıdır. Sisteme n tane sağlayıcı, her sağlayıcı
+
+ ### DocType'lar
+
+-Bütün DocType'lar `model_gecidi` modülündedir. Her alan açıklama taşır (D-9).
++Bütün DocType'lar `model_gateway` modülündedir. Her alan açıklama taşır (D-9).
+
+ | DocType | Görevi | Önemli alanlar |
+ | --- | --- | --- |
+@@ -527,7 +527,7 @@ Kimlik türleri şunlardır: API anahtarı, taşıyıcı belirteç, OAuth istemc
+
+ ### Ortak çağrı
+
+-`model_gecidi` dışarıya tek bir işlev açar. İşlev bir yol adı ve mesajları alır. Araç tanımı ve yanıt biçimi isteğe bağlıdır. Yanıt sağlayıcıdan bağımsız tek biçimdedir: metin, araç çağrıları, kullanım ve hangi model ile API'nin kullanıldığı.
++`model_gateway` dışarıya tek bir işlev açar. İşlev bir yol adı ve mesajları alır. Araç tanımı ve yanıt biçimi isteğe bağlıdır. Yanıt sağlayıcıdan bağımsız tek biçimdedir: metin, araç çağrıları, kullanım ve hangi model ile API'nin kullanıldığı.
+
+ ### Yönlendirme
+
+@@ -558,8 +558,8 @@ Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinde
+ - Mesaj içeriği varsayılan olarak günlüğe yazılmaz.
+ - Yol kaydının veri kısıtı, model çağrısından önce veri seçimini ve maskelemeyi ister (G-90).
+ - Dış sağlayıcıya giden içerik her zaman maskelenir. Yolun veri kısıtını “AI Manager” rolü seçer. Kısıt `masked` ise maskelenmiş içerik dış sağlayıcıya gidebilir. Ayrıca içerik bazında ön onay istenmez.
+-- Aracı belirteci model ucunda geçmez. Aracı modele `yapay_zeka` katmanı üzerinden ulaşır. Bu katman `platform_core.model_gecidi.api.complete` işlevini çağırır. Böylece belirtecin biçimi tek yerde, `yapay_zeka` modülünde kalır.
+-- `model_gecidi` modülünün açık çağrı işlevi arka plan işinde de çalışır. İşlev o anki kullanıcının yetkisini denetler. Misafir kullanıcı çağıramaz.
++- Aracı belirteci model ucunda geçmez. Aracı modele `ai` katmanı üzerinden ulaşır. Bu katman `platform_core.model_gateway.api.complete` işlevini çağırır. Böylece belirtecin biçimi tek yerde, `ai` modülünde kalır.
++- `model_gateway` modülünün açık çağrı işlevi arka plan işinde de çalışır. İşlev o anki kullanıcının yetkisini denetler. Misafir kullanıcı çağıramaz.
+
+ ### Uç
+
+--
+CP2 belge yamasının sonu.

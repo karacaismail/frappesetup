@@ -16,12 +16,17 @@ APP = "apps/sample_app/sample_app"
 DOCTYPE = f"{APP}/records/doctype/contact_card/contact_card.json"
 CONTRACT = "contracts/sample_app.openapi.yaml"
 
+READ_REGISTRATION = (
+    'def declare():\n    "Register tools."\n'
+    '    return [{"description": "Read a card.", "kind": "read", "handler": "sample_app.tools.run"}]\n'
+)
+
 
 class GateTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(dir=SCRATCH if SCRATCH.is_dir() else None)
         self.addCleanup(temporary.cleanup)
-        self.repository = Path(temporary.name)
+        self.repository = Path(temporary.name).resolve()
         subprocess.run(["git", "init", "--quiet", self.repository], check=True)
         self.root = self.repository / "backend"
         self.write(f"{APP}/__init__.py", "")
@@ -42,7 +47,7 @@ class GateTests(unittest.TestCase):
         self.assertEqual(result.returncode, int(bool(rules)), result.stderr)
         self.assertTrue(result.stdout, result.stderr)
         violations = json.loads(result.stdout)["findings"]
-        self.assertCountEqual([item["rule"] for item in violations], rules)
+        self.assertCountEqual([item["rule"] for item in violations], rules, violations)
         for item in violations:
             self.assertTrue(item["message"])
             self.assertFalse(Path(item["path"]).is_absolute())
@@ -206,16 +211,283 @@ class GateTests(unittest.TestCase):
                     (self.root / path).unlink()
                     (self.root / "dev" / policy).unlink()
 
+    def test_duplicate_decision_number_reports_later_note(self):
+        self.write("docs/kararlar/0010-one.md", "# One")
+        self.write("docs/kararlar/0010-two.MD", "# Two")
+        self.write("docs/kararlar/00101-three.md", "# Three")
+        self.write("docs/kararlar/0011-four.md", "# Four")
+        self.write("docs/elsewhere/0010-other.md", "# Elsewhere")
+        (finding,) = self.scan("decision-number")
+        self.assertEqual(finding["path"], "docs/kararlar/0010-two.MD")
+        self.assertIn("0010-one.md", finding["message"])
+
+    def test_website_user_methods_require_real_same_app_whitelisted_functions(self):
+        self.write(
+            f"{APP}/api.py",
+            "import frappe\n@frappe.whitelist()\ndef run(): pass\ndef private(): pass",
+        )
+        self.write_contract()
+        allowed = [
+            "sample_app.api.run",
+            "frappe.auth.get_logged_user",
+            "logout",
+            "frappe.desk.search.search_link",
+        ]
+        self.write(f"{APP}/hooks.py", f"website_user_allowed_methods = {allowed!r}")
+        self.scan()
+        for method in (
+            "sample_app.api.missing",
+            "sample_app.api.private",
+            "frappe.auth.login",
+            "other_app.api.run",
+        ):
+            with self.subTest(method=method):
+                self.write(f"{APP}/hooks.py", f"website_user_allowed_methods = [{method!r}]")
+                (finding,) = self.scan("website-user")
+                self.assertIn(method, finding["message"])
+
+    def test_website_user_accepts_non_manager_role_alternative(self):
+        self.write(f"{APP}/hooks.py", 'website_user_allowed_methods = ["sample_app.api.run"]')
+        self.write(
+            f"{APP}/api.py",
+            'import frappe\n@frappe.whitelist()\ndef run(): frappe.only_for(["Customer", "System Manager"])',
+        )
+        self.write_contract()
+        self.scan()
+
+    def test_website_user_rejects_privileged_endpoints(self):
+        methods = (
+            ("platform_core.api.mobile", "v1_cleanup", "pass"),
+            ("platform_core.api.mobile", "revoke_user_installations", "pass"),
+            ("press_tr.api.identity", "ensure_team", "pass"),
+            ("press_tr.api.identity", "remove_team_member", "pass"),
+            ("sample_app.api", "manage", 'frappe.only_for("System Manager")'),
+            ("sample_app.api", "manage", 'frappe.only_for(roles="System Manager")'),
+        )
+        for module, method, body in methods:
+            with self.subTest(method=method):
+                app = module.split(".")[0]
+                package = f"apps/{app}/{app}"
+                source_path = f"{package}/{module.partition('.')[2].replace('.', '/')}.py"
+                self.write(source_path, f"import frappe\n@frappe.whitelist()\ndef {method}(): {body}")
+                self.write(f"{package}/hooks.py", f"website_user_allowed_methods = ['{module}.{method}']")
+                self.write_contract(function=method)
+                contract = self.root / CONTRACT
+                contract.write_text(
+                    contract.read_text().replace(f"sample_app.api.{method}", f"{module}.{method}")
+                )
+                if app == "platform_core":
+                    self.write(
+                        "dev/module-boundaries.json",
+                        '{"path_owners": {"platform_core.api.ai": "platform_core.ai"}}',
+                    )
+                    self.write(f"{package}/ai/__init__.py", "")
+                try:
+                    (finding,) = self.scan("website-user")
+                    self.assertIn(f"{module}.{method}", finding["message"])
+                finally:
+                    for path in (contract, self.root / f"{package}/hooks.py", self.root / source_path):
+                        path.unlink()
+
+    def test_website_user_rejects_rebound_whitelisted_name(self):
+        self.write(f"{APP}/hooks.py", 'website_user_allowed_methods = ["sample_app.api.run"]')
+        self.write_contract()
+        for rebind in ("run = None", "def run(): pass", "if enabled: run = None"):
+            with self.subTest(rebind=rebind):
+                self.write(
+                    f"{APP}/api.py",
+                    "import frappe\n@frappe.whitelist()\ndef run(): pass\n" + rebind,
+                )
+                rules = ("website-user", "endpoint") if rebind.startswith("def") else ("website-user",)
+                findings = self.scan(*rules)
+                finding = next(item for item in findings if item["rule"] == "website-user")
+                self.assertIn("sample_app.api.run", finding["message"])
+
+    def test_website_user_rejects_rebound_package_export(self):
+        self.write(f"{APP}/hooks.py", 'website_user_allowed_methods = ["sample_app.run"]')
+        self.write(f"{APP}/api.py", "import frappe\n@frappe.whitelist()\ndef run(): pass")
+        self.write_contract()
+        self.write(f"{APP}/__init__.py", "from .api import run\nrun = None")
+        (finding,) = self.scan("website-user")
+        self.assertIn("sample_app.run", finding["message"])
+
+    def test_website_user_rejects_dynamic_hook_construction(self):
+        self.write(
+            f"{APP}/hooks.py", 'website_user_allowed_methods = []\nwebsite_user_allowed_methods += ["logout"]'
+        )
+        (finding,) = self.scan("website-user")
+        self.assertEqual(finding["line"], 2)
+
+    def test_website_user_rejects_mutable_alias_for_list(self):
+        self.write(
+            f"{APP}/hooks.py",
+            'METHODS = []\nwebsite_user_allowed_methods = METHODS\nMETHODS.append("frappe.auth.login")',
+        )
+        (finding,) = self.scan("website-user")
+        self.assertEqual(finding["line"], 2)
+
+    def test_website_user_rejects_privileged_override_of_core_method(self):
+        self.write(
+            f"{APP}/hooks.py",
+            """
+            website_user_allowed_methods = ["frappe.desk.search.search_link"]
+            override_whitelisted_methods = {"frappe.desk.search.search_link": "sample_app.api.run"}
+            """,
+        )
+        self.write(
+            f"{APP}/api.py",
+            'import frappe\n@frappe.whitelist()\ndef run(): frappe.only_for("System Manager")',
+        )
+        self.write_contract()
+        contract = self.root / CONTRACT
+        contract.write_text(
+            contract.read_text().replace(
+                "responses:",
+                "x-frappe-original: frappe.desk.search.search_link\n      responses:",
+            )
+        )
+        (finding,) = self.scan("website-user")
+        self.assertIn("sample_app.api.run", finding["message"])
+
+    def test_website_user_checks_all_override_candidates(self):
+        self.write(
+            f"{APP}/hooks.py",
+            """
+            website_user_allowed_methods = ["frappe.desk.search.search_link"]
+            override_whitelisted_methods = {
+                "frappe.desk.search.search_link": ["sample_app.api.manage", "sample_app.api.run"],
+            }
+            """,
+        )
+        self.write(
+            f"{APP}/api.py",
+            """
+            import frappe
+
+            @frappe.whitelist()
+            def manage():
+                frappe.only_for("System Manager")
+
+            @frappe.whitelist()
+            def run():
+                pass
+            """,
+        )
+        self.write(
+            CONTRACT,
+            json.dumps(
+                {
+                    "paths": {
+                        "/api/method/sample_app.api.manage": {
+                            "post": {"summary": "Manage", "description": "Manage."}
+                        },
+                        "/api/method/sample_app.api.run": {
+                            "post": {
+                                "summary": "Read",
+                                "description": "Read.",
+                                "x-frappe-original": "frappe.desk.search.search_link",
+                            }
+                        },
+                    }
+                }
+            ),
+        )
+        (finding,) = self.scan("website-user")
+        self.assertIn("sample_app.api.manage", finding["message"])
+
+    def write_naming_findings(self, *rules):
+        records = [
+            {"path": f"backend/{APP}/hooks.py", "line": 1, "rule": rule, "message": f"Review {rule}."}
+            for rule in rules
+        ]
+        self.write(
+            "dev/naming/check_names.py",
+            f"print({json.dumps(records)!r})\nraise SystemExit({int(bool(records))})",
+        )
+
+    def run_gate(self, *args):
+        return subprocess.run(
+            [sys.executable, "-B", GATE, "--root", self.root, *args], capture_output=True, text=True
+        )
+
+    def test_naming_advisory_preserves_findings_without_failing_gate(self):
+        self.write("dev/naming/enforcement.json", '{"mode": "advisory"}')
+        self.write_naming_findings("legacy-name", "source-text")
+        result = self.run_gate("--json")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["checks"]["naming"], "warn")
+        self.assertEqual(payload["checks"]["naming_mode"], "advisory")
+        self.assertEqual(payload["checks"]["naming_mode_source"], "file")
+        self.assertEqual(
+            [(finding["rule"], finding["severity"]) for finding in payload["findings"]],
+            [("naming.legacy-name", "warning"), ("naming.source-text", "warning")],
+        )
+        self.write("docs/kararlar/0010-first.md", "# First")
+        self.write("docs/kararlar/0010-second.md", "# Second")
+        self.assertEqual(self.run_gate("--json").returncode, 1)
+
+    def test_naming_enforce_blocks_only_four_rule_codes(self):
+        self.write("dev/naming/enforcement.json", '{"mode": "enforce"}')
+        blocking = ("legacy-name", "module-name", "translation-binding", "turkish-name")
+        for rule in blocking:
+            with self.subTest(rule=rule):
+                self.write_naming_findings(rule, "source-text")
+                result = self.run_gate("--json")
+                self.assertEqual(result.returncode, 1, result.stdout)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["checks"]["naming_mode"], "enforce")
+                self.assertEqual(payload["checks"]["naming"], "fail")
+                severity = {finding["rule"]: finding["severity"] for finding in payload["findings"]}
+                self.assertEqual(severity, {f"naming.{rule}": "error", "naming.source-text": "warning"})
+        self.write_naming_findings("source-text")
+        self.assertEqual(self.run_gate("--json").returncode, 0)
+
+    def test_naming_defaults_to_advisory_and_reports_missing_policy(self):
+        self.write_naming_findings("module-name")
+        result = self.run_gate("--json")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        checks = json.loads(result.stdout)["checks"]
+        self.assertEqual(checks["naming_mode"], "advisory")
+        self.assertEqual(checks["naming_mode_source"], "default")
+        text_result = self.run_gate()
+        self.assertEqual(text_result.returncode, 0, text_result.stderr)
+        self.assertIn("enforcement.json missing", text_result.stderr)
+        self.assertIn("Warning: ", text_result.stdout)
+
+    def test_invalid_naming_mode_is_a_configuration_error(self):
+        self.write("dev/naming/enforcement.json", '{"mode": "typo"}')
+        result = self.run_gate("--json")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["checks"]["naming_mode_source"], "invalid")
+        self.assertEqual([finding["rule"] for finding in payload["findings"]], ["naming-config"])
+
     def test_missing_naming_checker_reports_not_run(self):
         result = subprocess.run(
             [sys.executable, "-B", GATE, "--root", self.root, "--json"], capture_output=True, text=True
         )
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(json.loads(result.stdout), {"findings": [], "checks": {"naming": "not_run"}})
+        self.assertEqual(
+            json.loads(result.stdout),
+            {
+                "findings": [],
+                "checks": {
+                    "naming": "not_run",
+                    "naming_mode": "advisory",
+                    "naming_mode_source": "default",
+                    "translation_core": "not_run",
+                    "dependency_core": "not_run",
+                    "dependency_apps": "pass",
+                    "shellcheck": "not_run",
+                },
+            },
+        )
         self.assertEqual(result.stderr, "")
 
     def test_naming_checker_reports_findings_and_execution_errors(self):
         checker = "dev/naming/check_names.py"
+        self.write("dev/naming/enforcement.json", '{"mode": "enforce"}')
         self.write("apps/example.py", "# Example\n")
         self.write(
             checker,
@@ -317,6 +589,7 @@ class GateTests(unittest.TestCase):
             f"{APP}/declarations.py",
             """
             def tools():
+                "Register tools."
                 return [{
                     "name": "read_card",
                     "description": "Read a card.",
@@ -337,26 +610,34 @@ class GateTests(unittest.TestCase):
             """
             import frappe
             PATH = "sample_app.tools."
-            BASE = {"handler": PATH + "run"}
+            BASE = {"description": "Write a card.", "kind": "write", "handler": PATH + "run"}
 
             def declare():
-                return [{**BASE, "prepare": f"{PATH}prepare"}]
+                "Register tools."
+                return [{**BASE, "prepare": f"{PATH}prepare", "preview": f"{PATH}preview"}]
 
             def run():
                 frappe.db.sql("SELECT 1")
 
             def prepare():
                 frappe.db.sql("SELECT 1")
+
+            def preview():
+                pass
             """,
         )
         self.scan("sql", "sql")
 
     def test_unresolved_and_empty_tool_declarations(self):
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
-        for result in ('[{"handler": build_path()}]', '[{"name": "read"}]', "[]"):
+        for result in (
+            '[{"description": "Read a card.", "kind": "read", "handler": build_path()}]',
+            '[{"name": "read"}]',
+            "[]",
+        ):
             with self.subTest(result=result):
-                self.write(f"{APP}/tools.py", f"def declare():\n    return {result}\n")
-                self.scan("sql")
+                self.write(f"{APP}/tools.py", f'def declare():\n    "Register tools."\n    return {result}\n')
+                self.scan("ai-tool")
 
     def test_nested_whitelist_and_external_overrides(self):
         self.write(
@@ -415,6 +696,8 @@ class GateTests(unittest.TestCase):
             ("frappe.tests.test_api", "FrappeAPITestCase"),
             ("frappe.tests.classes", "IntegrationTestCase"),
             ("frappe.tests.classes", "UnitTestCase"),
+            ("frappe.tests.classes.unit_test_case", "UnitTestCase"),
+            ("frappe.tests.classes.integration_test_case", "IntegrationTestCase"),
         ):
             with self.subTest(module=module, base=base):
                 self.write(
@@ -508,7 +791,8 @@ class GateTests(unittest.TestCase):
             """
             from . import service as helpers
             def declare():
-                return [{"handler": "sample_app.tools.run"}]
+                "Register tools."
+                return [{"description": "Read a card.", "kind": "read", "handler": "sample_app.tools.run"}]
             def run():
                 helpers.read()
         """,
@@ -538,7 +822,7 @@ class GateTests(unittest.TestCase):
             with self.subTest(body=body):
                 self.write(
                     f"{APP}/tools.py",
-                    'def declare(): return [{"handler": "sample_app.tools.run"}]\ndef run():\n' + body,
+                    READ_REGISTRATION + "def run():\n" + body,
                 )
                 (finding,) = self.scan("sql")
                 self.assertEqual(finding["path"], f"{APP}/queries.py")
@@ -547,7 +831,7 @@ class GateTests(unittest.TestCase):
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.declarations.declare"]')
         self.write(
             f"{APP}/declarations.py",
-            'def declare(): return [{"handler": "sample_app.tools.run"}]',
+            READ_REGISTRATION,
         )
         self.write(
             f"{APP}/tools.py",
@@ -581,7 +865,8 @@ class GateTests(unittest.TestCase):
             """
             import frappe
             def declare():
-                return [{"handler": "sample_app.tools.run"}]
+                "Register tools."
+                return [{"description": "Read a card.", "kind": "read", "handler": "sample_app.tools.run"}]
             def run():
                 frappe.db.sql("SELECT 1")
             """,
@@ -593,7 +878,7 @@ class GateTests(unittest.TestCase):
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.declarations.declare"]')
         self.write(
             f"{APP}/declarations.py",
-            'def declare(): return [{"handler": "sample_app.tools.run"}]',
+            READ_REGISTRATION,
         )
         self.write(f"{APP}/__init__.py", "from .helpers import read")
         self.write(f"{APP}/helpers/__init__.py", "from .queries import query as read")
@@ -616,7 +901,8 @@ class GateTests(unittest.TestCase):
             """
             from .service import raw as read
             def declare():
-                return [{"handler": "sample_app.tools.run"}]
+                "Register tools."
+                return [{"description": "Read a card.", "kind": "read", "handler": "sample_app.tools.run"}]
             def run():
                 read()
             def unrelated():
@@ -764,6 +1050,7 @@ class GateTests(unittest.TestCase):
             f"{APP}/tools.py",
             """
             def declare():
+                "Register tools."
                 return [{"handler": "sample_app.tools.run", role(): "sample_app.tools.prepare"}]
             def run():
                 pass
@@ -771,7 +1058,7 @@ class GateTests(unittest.TestCase):
                 pass
             """,
         )
-        self.scan("sql")
+        self.scan("ai-tool")
 
     def test_tool_declaration_rejects_conditional_path(self):
         self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
@@ -779,17 +1066,18 @@ class GateTests(unittest.TestCase):
             f"{APP}/tools.py",
             """
             def declare():
+                "Register tools."
                 PATH = "sample_app.tools.first"
                 if enabled():
                     PATH = "sample_app.tools.second"
-                return [{"handler": PATH}]
+                return [{"description": "Read a card.", "kind": "read", "handler": PATH}]
             def first():
                 pass
             def second():
                 pass
             """,
         )
-        self.scan("sql")
+        self.scan("ai-tool")
 
     def test_model_scan_preserves_numeric_suffix_names(self):
         self.write(f"{APP}/api.py", 'MODEL = "gpt-oss-20b"\nOTHER = "deepseek-r1"')
@@ -893,6 +1181,108 @@ class GateTests(unittest.TestCase):
         self.write(f"{APP}/broken.py", chr(0))
         self.scan("input", "input")
 
+    def test_tool_registry_reports_missing_entry_and_description(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.missing", "sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            def declare():
+                return [{"kind": "read", "handler": "sample_app.tools.read"}]
+            def read():
+                pass
+            """,
+        )
+        findings = self.scan("ai-tool", "ai-tool", "ai-tool")
+        self.assertTrue(any("missing" in row["message"] for row in findings))
+        self.assertTrue(any("docstring" in row["message"] for row in findings))
+        self.assertTrue(any("description" in row["message"] for row in findings))
+
+    def test_write_tool_requires_distinct_preview_and_shared_approval(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        for fields, expected in (
+            ({}, ("ai-tool",)),
+            ({"preview": "sample_app.tools.write"}, ("ai-tool",)),
+            ({"preview": "sample_app.tools.missing"}, ("ai-tool",)),
+            ({"preview": "sample_app.tools.show", "requires_approval": False}, ("ai-tool",)),
+            ({"preview": "sample_app.tools.show"}, ()),
+        ):
+            with self.subTest(fields=fields):
+                entry = {
+                    "description": "Write a card.",
+                    "kind": "write",
+                    "handler": "sample_app.tools.write",
+                    **fields,
+                }
+                self.write(
+                    f"{APP}/tools.py",
+                    f'def declare():\n    "Register tools."\n    return [{entry!r}]\n'
+                    "def write(): pass\ndef show(): pass",
+                )
+                self.scan(*expected)
+
+    def test_write_tool_preview_cannot_call_execution_function(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            def declare():
+                "Register tool."
+                return [{
+                    "description": "Write a card.", "kind": "write",
+                    "handler": "sample_app.tools.run", "preview": "sample_app.tools.show",
+                }]
+            def run():
+                pass
+            def show():
+                return run()
+            """,
+        )
+        self.scan("ai-tool")
+
+    def test_write_tool_preview_can_reuse_preparation(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(
+            f"{APP}/tools.py",
+            """
+            def declare():
+                "Register tool."
+                return [{
+                    "description": "Write a card.", "kind": "write",
+                    "handler": "sample_app.tools.run", "preview": "sample_app.tools.show",
+                    "prepare": "sample_app.tools.prepare",
+                }]
+            def run():
+                pass
+            def prepare():
+                return {"summary": "Plan a card update."}
+            def show():
+                return prepare()
+            """,
+        )
+        self.scan()
+
+    def test_write_tool_rejects_whitelisted_execution_function(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.api.declare"]')
+        self.write(
+            f"{APP}/api.py",
+            """
+            import frappe
+            def declare():
+                "Register tool."
+                return [{
+                    "description": "Write a card.", "kind": "write",
+                    "handler": "sample_app.api.run", "preview": "sample_app.api.show",
+                }]
+            @frappe.whitelist()
+            def run():
+                pass
+            def show():
+                pass
+            """,
+        )
+        self.write_contract()
+        self.scan("ai-tool")
+
     def test_supported_python_version(self):
         from unittest.mock import patch
 
@@ -934,6 +1324,50 @@ class GateTests(unittest.TestCase):
             json.dumps([{"doctype": "Server Script", "script_type": "Scheduler Event"}]),
         )
         self.scan("scheduler", "scheduler")
+
+    def test_opaque_hook_registrations_are_findings(self):
+        for syntax in (
+            "from .extra import *",
+            "globals()['ai_tools'] = []",
+            "globals().update(ai_tools=[])",
+            "vars()['ai_tools'] = []",
+            "locals().update(ai_tools=[])",
+            "setattr(module, 'ai_tools', [])",
+        ):
+            with self.subTest(syntax=syntax):
+                self.write(f"{APP}/hooks.py", syntax)
+                self.scan("hook-dynamic")
+
+    def test_sql_in_helpers_referenced_from_nested_syntax(self):
+        self.write(f"{APP}/hooks.py", 'ai_tools = ["sample_app.tools.declare"]')
+        self.write(f"{APP}/queries.py", "import frappe\ndef read(): frappe.db.sql('SELECT 1')")
+        for prefix, body in (
+            ("def run():", "    task = lambda: read()"),
+            ("def run():", "    class Reader:\n        def read(self): read()"),
+            ("def run(value=read()):", "    pass"),
+            ("@read()\ndef run():", "    pass"),
+        ):
+            with self.subTest(prefix=prefix, body=body):
+                self.write(
+                    f"{APP}/tools.py",
+                    "from .queries import read\n" + READ_REGISTRATION + prefix + "\n" + body,
+                )
+                self.scan("sql")
+
+    def test_website_user_rejects_constant_and_helper_role_guards(self):
+        self.write(f"{APP}/hooks.py", 'website_user_allowed_methods = ["sample_app.api.run"]')
+        self.write_contract()
+        for guard, body in (
+            ('ROLES = ["System Manager"]', "frappe.only_for(ROLES)"),
+            ('def _guard(): frappe.only_for("System Manager")', "_guard()"),
+        ):
+            with self.subTest(body=body):
+                self.write(f"{APP}/api.py", f"import frappe\n{guard}\n@frappe.whitelist()\ndef run(): {body}")
+                self.scan("website-user")
+
+    def test_naming_enforce_requires_checker(self):
+        self.write("dev/naming/enforcement.json", '{"mode": "enforce"}')
+        self.scan("naming-config")
 
 
 if __name__ == "__main__":

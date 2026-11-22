@@ -40,12 +40,14 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 | --- | --- | --- | --- | --- |
 | `site-kiraci1` | Gizli sırlı | Yetkilendirme kodu ve PKCE (S256) | `<kiracı adresi>/api/method/platform_core.api.auth.keycloak_callback` | `<kiracı adresi>/api/method/platform_core.api.keycloak_backchannel_logout` |
 | `press` | Gizli sırlı | Yetkilendirme kodu | `<Press adresi>/api/method/press_tr.api.auth.keycloak_callback` | `<Press adresi>/api/method/press_tr.api.keycloak_backchannel_logout` |
+| `site-kiraci1-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 
 - Dönüş adresini tam adresle kaydedin. Joker karakter kullanmayın.
 - Çıkış bildiriminde “oturum gerekli” ayarını açın.
 - Yeni kiracı için aynı biçimi kullanın. Örneğin `site-kiraci2` yazın.
+- Her kiracının iki istemcisi vardır. `site-<kiracı>` yalnız tarayıcı girişi içindir. Servis hesabı kapalıdır ve isteğe bağlı servis kapsamı taşımaz. `site-<kiracı>-service` yalnız servis hesabıdır. Tarayıcı akışı kapalıdır. `aud-identity-sync` kapsamını yalnız bu istemci isteyebilir. Böylece tarayıcı girişi servis hedefli belirteç alamaz. Press'teki `press` ve `press-service` ayrımı da böyledir.
 - `agent-service`, `ops-bff` ve `site-ops` bu turda yoktur.
 
 ### Hedef kapsamları
@@ -56,7 +58,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 | --- | --- | --- |
 | `aud-site-kiraci1` | `site-kiraci1` | `identity-sync`, `press-service` |
 | `aud-press` | `press` | `identity-sync` |
-| `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri. Örnek: `site-kiraci1` |
+| `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri. Örnek: `site-kiraci1-service` |
 
 - Bu kapsamlar varsayılan değildir. İstekte `scope` ile istenir.
 - Servis belirteci yalnız bir `aud` değeri taşır.
@@ -64,7 +66,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - `identity-sync` Admin API belirtecini ayrı ister. İstekte `scope=admin-api kc-admin-api` olur. Bu belirtecin `aud` değeri `realm-management` ve Admin API adresidir. Keycloak 26.8 Admin API'si bu kapsamı ister.
 - `press-service` istemcisi `aud-press` kapsamını isteyemez. Keycloak bu isteği `invalid_scope` ile reddeder.
 - `identity-sync` servis hesabı davet ve kuruluş hazırlama için Keycloak'a yazar. Bu yüzden şu rolleri taşır: `view-users`, `query-users`, `manage-users`. Kuruluş ve üyelik için gereken en az ek rol Keycloak 26.8 kaynağında doğrulanır ve realm dosyasına yazılır.
-- Bu roller yalnız `scope=admin-api kc-admin-api` ile istenen belirtece girer. Kiracıya ve Press'e giden belirteç bu rolleri taşımaz. Canlı test bunu sınar: kiracı hedefli belirteç Admin API'de 403 alır.
+- Bu roller yalnız `scope=admin-api kc-admin-api` ile istenen belirtece girer. Kiracıya ve Press'e giden belirteç bu rolleri taşımaz. Canlı test bunu sınar: kiracı hedefli belirteç Admin API'de reddedilir. Keycloak 26.8.2 bu durumda 401 döner, çünkü önce belirtecin hedefini denetler. Test 401 ya da 403 kabul eder, 2xx kabul etmez.
 - Sihirli bağlantı eklentisinin bağlantı üreten yönetim ucu kapalıdır. Bu uç, belirteçteki rolü değil hesabın kayıtlı rolünü denetliyordu. Kapalı olduğu canlı testle (404) gösterilir.
 
 ### Politikalar
@@ -197,6 +199,17 @@ Adres biçimi `/api/method/<yol>` olur.
 - Yönetici kurtarma yolu yalnız site ayarıyla açılır. Ayarı sunucuya erişen yönetici yazar. Yol README'de anlatılır.
 - `/panel` sayfası `platform_core/www/` altında durur. Sayfa CSRF belirtecini taşır (G-45). Sahibi platform-core-kabuk işidir.
 
+### Kabuk yanıt boyutu
+
+- Açılış ve DocType tanımı uçları en çok 262.144 bayt döner.
+- Sunucu, sıkıştırılmamış JSON gövdesini ölçer. Frappe'nin eklediği alanları da sayar.
+- Tam yanıt sınırı aşarsa sunucu HTTP 200 ve `truncated: true` döner.
+- Kısa açılış yanıtında kullanıcı kimliği ve biçim ayarları kalır.
+- Sunucu rol, uygulama ve menü listelerini boş olarak gönderir.
+- Kısa tanımda DocType kimliği ve sürüm bilgileri kalır.
+- Sunucu alanları ve alt tablo tanımlarını çıkarır. Telefon bu tanımı çevrimdışı saklayamaz.
+- Sunucu `ETag` değerini dönecek veriden üretir.
+
 ### Website User için yöntem izin listesi
 
 - Website User yalnız izin listesindeki yöntemleri çağırabilir. Öteki her yöntem 403 döner. Kural `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsine uygulanır.
@@ -325,7 +338,13 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
 5. Frappe'nin tam adı bütün satırlarda arayan değiştirmesi kullanılmaz. Yalnız kullanıcıya bağlı alanlar değişir. Böylece aynı adı taşıyan başka bir kişinin verisi değişmez.
 6. Fatura kayıtları değişmez. Fatura yasal kayıttır ve kesildiği hâliyle saklanır. Bu istisna proje kaydında yazılıdır.
 7. Kullanıcı bir takımın tek üyesiyse takım kapatılır ve siteleri askıya alınır. Siteler silinmez.
-- `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır.
+- `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır. Listede yalnız `site-<kiracı>-service` istemcileri bulunur.
+- Onaylı işlem yürütme ucunu da kiracı sitesinin servis istemcisi çağırır. Onay kiracı sitesindeki yapay zekâ katmanında verilir. Bu yüzden `IDENTITY_SYNC_EXECUTE_AZP` ayarı kiracı servis istemcilerinin listesidir. Liste `IDENTITY_SYNC_SESSION_AZP` ile aynı istemcileri taşır.
+- Mutabakat için Press ve kiracı sitesi `list_identities` ucunu sunar. Uç yalnız identity-sync servis belirtecini kabul eder. Yanıt sayfalıdır ve her satırda yalnız `issuer`, `subject` ve hesabın açık ya da kapalı durumu bulunur. E-posta ve ad dönmez. Uç adları `press_tr.api.identity.list_identities` ve `platform_core.api.identity.list_identities` olur.
+  - Uç `GET` ile çağrılır. İstek `start` ve `page_length` sorgu alanlarını alır. `cursor` ve `limit` alanları kullanılmaz. `start` varsayılan 0 olur. `page_length` en çok 500, varsayılan 500 olur. Sıra `subject` değerine göre artandır.
+  - Yanıt `{"identities": [...], "has_next_page": true|false}` biçimindedir.
+  - identity-sync bütün sayfaları toplar. Farkları ancak son sayfadan sonra hesaplar.
+- identity-sync, Keycloak'ta istemci açmaz. Servis hesabı `manage-clients` rolünü almaz. Yeni kiracının Keycloak istemcisini kimlik-realm işinin elle başlatılan komutu açar. Komut insan onayıyla çalışır.
 - Hesap silme akışının 3. ve 4. adımı şu uçları çağırır: `platform_core.api.mobile.revoke_user_installations`, `platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user`.
 
 ## 8. Site ayarları
@@ -339,6 +358,8 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `keycloak_realm` | `platform` | |
 | `keycloak_client_id` | `site-kiraci1` ya da `press` | |
 | `keycloak_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
+| `keycloak_service_client_id` | `site-kiraci1-service` ya da `press-service` | Servis belirteci için |
+| `keycloak_service_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
 | `kimlik_marka_adi` | `Atonota` | Düğme metni bundan üretilir |
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 
@@ -454,6 +475,17 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 - Öneri `created_at` ve `expires_at` taşır. Zaman sitenin saat dilimiyle ve farkıyla ISO 8601 biçiminde döner.
 - Okuma araçlarının sonucu `as_of`, `site` ve `source` taşır. Sonuç sınırı aşarsa `truncated: true` döner. Alt tablo en çok 200 satır, sonuç verisi en çok 262.144 bayttır.
 - Oturumsuz istek 403, süresi dolmuş oturum 401 alır.
+
+#### Kullanım günlüğü temizliğinin modül arayüzü
+
+- “AI Usage Log” kaydının sahibi model geçididir. Temizlik işlevi `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False, names=None)` olur.
+- İşlev yetkiyi kendisi denetler. Yalnız “System Manager” çağırabilir. Öteki kullanıcı `frappe.PermissionError` alır.
+- Süre 365 gündür. Ayar bu süreyi değiştiremez. Kayıtlar O-32'ye göre kalıcı silinir.
+- `dry_run=True` iken işlev hiçbir kaydı silmez. `{"eligible": <sayı>, "deleted": 0, "names": [...]}` döner. `names` bu çalıştırmada silinecek kayıtların adlarıdır, en çok 500 tanedir.
+- `dry_run=False` iken çağıran taraf önizlemedeki `names` listesini verir. İşlev yalnız bu kayıtları siler. Kayıtları kilit altında yeniden doğrular. Bir kayıt artık uygun değilse ya da listede olmayan bir kayıt seçilirse işlev hiçbir şey silmez ve `frappe.ValidationError` verir. Çağıran taraf yeni önizleme ister.
+- Silme tek bir veritabanı işlemi ve geri dönüş noktası içinde yapılır. Bir kayıt silinemezse hiçbir kayıt silinmez ve hata çağırana iletilir. Başarılı yanıt `{"eligible": <sayı>, "deleted": <sayı>, "names": [...]}` olur.
+- İşlev önizleme belirteci istemez. İnsan onayını çağıran taraf yönetir. Örneğin `platform_core.api.ai.purge_logs` kendi önizleme ve onay yolunu kullanır ve onaya `names` listesini bağlar. Geçidin kendi HTTP ucu da kendi önizleme belirtecini kullanabilir.
+
 
 ### Genel araçlar
 

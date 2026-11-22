@@ -2,8 +2,11 @@
 
 import json
 import time
+from functools import partial
 
 import frappe
+from frappe.core.doctype.installed_applications.installed_applications import update_installed_apps_order
+from platform_core.api.mobile import _pull, _push
 from platform_core.mobil.protocol import (
 	UUID_PATTERN,
 	Command,
@@ -12,10 +15,13 @@ from platform_core.mobil.protocol import (
 	unavailable_record,
 	uuid4_id,
 )
+from platform_core.mobil.request import endpoint_response
 
 from .load_accounts import LOAD_ACCOUNTS
 
 SITE = "test-mobile.localhost"
+WEBSITE = "mobile-website@example.test"
+SERVICE_TARGET = "mobile-service-target@example.test"
 FIRST = "mobile-first@example.test"
 SECOND = "mobile-second@example.test"
 RATE = "mobile-rate@example.test"
@@ -38,6 +44,7 @@ MOBILE_PATHS = frozenset(
 PROBE_PATH = "/api/method/mobile_test_app.fixture.commit_probe"
 TOKENS = {
 	**LOAD_ACCOUNTS,
+	"Bearer fixture-website": WEBSITE,
 	"Bearer fixture-first": FIRST,
 	"Bearer fixture-second": SECOND,
 	"Bearer fixture-rate": RATE,
@@ -53,9 +60,34 @@ def _require_test_site():
 
 
 def setup():
-	_require_test_site()
+	performance_site = frappe.local.site != SITE
+	if performance_site:
+		from .performance_data import require_performance_site
+
+		require_performance_site(frappe.local.site, frappe.local.sites_path)
+	else:
+		_require_test_site()
+	apps = list(frappe.get_installed_apps())
+	if "mobile_test_app" in apps and apps.index("mobile_test_app") > apps.index("platform_core"):
+		apps.remove("mobile_test_app")
+		apps.insert(apps.index("platform_core"), "mobile_test_app")
+		update_installed_apps_order(apps)
+		frappe.clear_cache()
+
+	_setup_record_type()
+	if performance_site:
+		return
+	if not frappe.db.exists("User", WEBSITE):
+		frappe.get_doc(
+			doctype="User",
+			email=WEBSITE,
+			first_name="Mobile Website Test",
+			user_type="Website User",
+			send_welcome_email=0,
+		).insert()
 	for user, name in (
 		(FIRST, "First Test"),
+		(SERVICE_TARGET, "Mobile Service Target"),
 		(SECOND, "Second Test"),
 		(RATE, "Rate Test"),
 		(REVOKE, "Revocation Test"),
@@ -68,10 +100,16 @@ def setup():
 					"doctype": "User",
 					"email": user,
 					"first_name": name,
-					"user_type": "System User",
+					"roles": [{"role": "Desk User"}],
 					"send_welcome_email": 0,
 				}
 			).insert()
+		elif frappe.db.get_value("User", user, "user_type") != "System User":
+			# Drive the legacy override tests with their intended Desk accounts.
+			frappe.get_doc("User", user).add_roles("Desk User")
+
+
+def _setup_record_type():
 	if not frappe.db.exists("DocType", RECORD):
 		frappe.get_doc(
 			{
@@ -116,10 +154,19 @@ def _hold_commit(record_id):
 
 def authenticate():
 	_require_test_site()
+	_authenticate()
+
+
+def _authenticate():
 	request = frappe.local.request
 	if frappe.session.user != "Guest" or any(request.args.getlist("cmd")) or frappe.form_dict.get("cmd"):
 		return
 	header = request.headers.get("Authorization")
+	expires_at = request.headers.get("X-Mobile-Test-Expires")
+	if expires_at is not None and (
+		not expires_at.isascii() or not expires_at.isdecimal() or int(expires_at) <= time.time()
+	):
+		raise frappe.AuthenticationError
 	if request.path == PROBE_PATH and header == "Bearer fixture-control":
 		frappe.set_user(FIRST)
 		return
@@ -127,6 +174,8 @@ def authenticate():
 		"Bearer fixture-service",
 		"Bearer fixture-service-other",
 	):
+		if request.headers.get("X-Mobile-Test-Identity-Mismatch") == "site":
+			raise frappe.AuthenticationError
 		frappe.set_user("Administrator")
 		frappe.local.kimlik_service_claims = {
 			"iss": "fixture",
@@ -136,6 +185,8 @@ def authenticate():
 	if request.path not in MOBILE_PATHS:
 		return
 	account = TOKENS.get(header)
+	if header == "Bearer fixture-cleanup" and request.path.endswith(".v1_cleanup"):
+		account = "Administrator"
 	if not account:
 		return
 
@@ -152,7 +203,7 @@ def authenticate():
 	issued_at = int(request.headers.get("X-Mobile-Test-Iat", time.time()))
 	frappe.set_user(account)
 	frappe.local.mobile_identity = {
-		"site": SITE,
+		"site": frappe.local.site,
 		"account": account,
 		"scope": "mobile",
 		"installation": installation,
@@ -166,15 +217,28 @@ def authenticate():
 	if mismatch in {"site", "scope", "account"}:
 		frappe.local.mobile_identity[mismatch] = "invalid-fixture-value"
 
-	frappe.local.mobile_commands = {
-		f"fixture.{action}": FixtureCommand(action)
-		for action in ("create", "create_bad_scope", "update", "delete", "transfer")
-	}
-	frappe.local.mobile_projections = {"fixture": projection}
-	frappe.local.mobile_inventories = {"fixture": scan_inventory}
 	writer = request.headers.get("X-Mobile-Test-Writer")
 	if writer:
 		_signal(writer, "entered")
+
+
+# The production request guard and the action check the bound installation and command access.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
+def fixture_push():
+	_require_test_site()
+	commands = {
+		f"fixture.{action}": FixtureCommand(action)
+		for action in ("create", "create_bad_scope", "update", "delete", "transfer")
+	}
+	return endpoint_response("v1_push", partial(_push, commands=commands))
+
+
+# The production request guard and the action check the bound installation and command access.
+@frappe.whitelist(methods=["POST"])  # nosemgrep: frappe-missing-permission
+def fixture_pull():
+	_require_test_site()
+	action = partial(_pull, projections={"fixture": projection}, inventories={"fixture": scan_inventory})
+	return endpoint_response("v1_pull", action)
 
 
 @frappe.whitelist(methods=["POST"])

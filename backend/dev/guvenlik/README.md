@@ -39,7 +39,16 @@ Eksik test adı kapıyı durdurur. Betik testin içeriğini veya sonucunu ölçm
 
 ## Kuralların kapsamı
 
-Semgrep kodda tanımlı kalıpları arar. Yardımcı işlevlerin içini izleyerek karar vermez.
+Semgrep kodda tanımlı kalıpları arar.
+Yeni kurallar aynı işlev içinde verinin kaynaktan kullanıldığı yere akışını izler.
+Kurallar, yardımcı işlevler ve dosyalar arasındaki akışı kapsamaz.
+
+- Ham istek adresi ve yanıt gövdesi günlükte görünmemeli.
+- Testin hata iletisi ham yanıt içermemeli. Durum kodu yeterliyse onu kullanın.
+- İşletim sistemine verilen komut argümanında gizli değer bulunmamalı.
+  Aracın desteklediği korumalı giriş yolunu kullanın.
+
+Olumlu ve olumsuz denemeler `backend/dev/guvenlik/fixtures/` altındadır.
 Misafir uçta Frappe'nin `rate_limit` işaretini kullanın.
 `rate_limit` satırını `whitelist` satırının altına yazın.
 Uç listesi bu sırayı ve işaretin içe aktarıldığı yeri denetler.
@@ -47,6 +56,12 @@ Her uçta HTTP yöntemlerini boş olmayan bir liste veya demetle yazın.
 Çağrının içine doğrudan yazılan sorgu ve süre seçenekleri denetlenir.
 Kod incelemesinde değişkene taşınan seçenekleri de denetleyin.
 Zorunlu bir istisnayı ilgili işin karar kaydında açıklayın.
+
+Press istisnalarının gerekçeleri `semgrep-exceptions.json` dosyasındadır.
+Kapı, Press uygulamasının ve ilgili Semgrep kural dosyasının özetini karşılaştırır.
+Özet taramadan önce veya sonra farklıysa kapı istisnayı uygulamaz.
+Dosya, satır ve kural kimliği de birebir eşleşmelidir.
+Dış doğrulayıcı güncellenirse Press istisnalarını yeniden inceleyin.
 
 Uç listesi `backend/apps/<uygulama>/<paket>/` altındaki Python kaynaklarını okur.
 Çalışırken eklenen uçlar için Frappe yapılandırmasını ayrıca inceleyin.

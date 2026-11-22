@@ -34,6 +34,7 @@ def push(store, commands, site, account, operations, *, principal, disabled_comm
 		pending.append((operation, key, digest))
 
 	results = []
+	changes = []
 	for operation, key, digest in pending:
 		saved = store.get_operation(key)
 		if saved is not None:
@@ -58,13 +59,15 @@ def push(store, commands, site, account, operations, *, principal, disabled_comm
 
 		handler.apply(account, record_id, operation.get("fields", {}))
 		kind = "remove" if command.action == "delete" else "upsert"
-		store.append_change(handler.record_type, record_id, kind)
+		changes.append((handler.record_type, record_id, kind))
 
 		# Replays disclose only acceptance of this same account's submitted operation.
 		result = {"operation_id": operation["operation_id"], "status": "applied"}
 		store.remember_operation(key, digest, result)
 		results.append(result)
 
+	if changes:
+		store.append_changes(changes)
 	return {"operations": results}
 
 
@@ -106,7 +109,7 @@ def pull(store, projections, secret, scope, cursor, limit, *, account, now, inve
 	if type(limit) is not int or not 1 <= limit <= PAGE_SIZE:
 		raise MobileError("invalid_page_size")
 
-	_, _, installation, _ = scope
+	_unused, _unused, installation, _unused = scope
 	if cursor is None:
 		after, ceiling, snapshot, delivery_after, snapshot_after = 0, store.sequence, True, None, None
 	else:

@@ -3,24 +3,26 @@
 import json
 import time
 from datetime import UTC, datetime, timedelta
+from itertools import batched
 
 import frappe
+from frappe.utils import now_datetime
 
+from .metadata import insert_metadata
 from .protocol import DELIVERY_AUDIT_SIZE, MobileError, content_digest
 
 SEQUENCE_DOCTYPE = "Mobile Sequence"
 SEQUENCE_NAME = "site"
 DELIVERY_AUDIT_INTERVAL = timedelta(minutes=5)
-INTERNAL_TYPES = frozenset(
-	{
-		SEQUENCE_DOCTYPE,
-		"Mobile Account State",
-		"Mobile Installation",
-		"Mobile Revoked Session",
-		"Mobile Operation",
-		"Mobile Change",
-		"Mobile Delivery",
-	}
+REVOCATION_BATCH_SIZE = 100
+REVOCATION_FIELDS = (
+	"name",
+	"revoked",
+	"session_id",
+	"session_subject",
+	"account",
+	"principal",
+	"notification_token",
 )
 
 
@@ -43,21 +45,7 @@ def _stored_session_subject(row):
 def seed_sequence():
 	"""Create the lock row after Frappe has synchronized the schema."""
 	if not frappe.db.exists(SEQUENCE_DOCTYPE, SEQUENCE_NAME):
-		_insert(SEQUENCE_DOCTYPE, sequence_key=SEQUENCE_NAME, ignore_duplicate=True)
-
-
-def _insert(doctype, *, ignore_duplicate=False, **fields):
-	if doctype not in INTERNAL_TYPES:
-		raise ValueError("Only mobile metadata may be inserted here")
-	doc = frappe.get_doc({"doctype": doctype, **fields})
-	previous = doc.flags.ignore_permissions
-	try:
-		# The approved operation creates server-owned metadata, never a business record.
-		return doc.insert(  # nosemgrep: frappe-ignore-permissions
-			ignore_permissions=True, ignore_if_duplicate=ignore_duplicate
-		)
-	finally:
-		doc.flags.ignore_permissions = previous
+		insert_metadata(SEQUENCE_DOCTYPE, sequence_key=SEQUENCE_NAME, ignore_duplicate=True)
 
 
 def _select(doctype, fields, filters, *, limit=None, order_by=None, for_update=False):
@@ -84,6 +72,24 @@ def _sequence_row(*, for_update=False):
 	return row
 
 
+def _reserve_sequences(count):
+	"""Increment the commit-ordered counter against the current version of its row."""
+	# Other statements retain the connection's regular snapshot isolation.
+	frappe.db.sql(
+		"""
+		SET STATEMENT innodb_snapshot_isolation=OFF FOR
+		UPDATE `tabMobile Sequence`
+		SET sequence = LAST_INSERT_ID(sequence + %s)
+		WHERE name = %s AND sequence <= %s
+		""",
+		(count, SEQUENCE_NAME, 2_147_483_647 - count),
+	)
+	updated, end = frappe.db.sql("SELECT ROW_COUNT(), LAST_INSERT_ID()")[0]
+	if not updated:
+		raise MobileError("mobile_sequence_exhausted", 503)
+	return end
+
+
 class MobileStore:
 	def __init__(self):
 		row = _sequence_row()
@@ -102,7 +108,7 @@ class MobileStore:
 		if current is None:
 			if check_new is not None:
 				check_new(identity)
-			_insert(
+			insert_metadata(
 				"Mobile Installation",
 				installation_id=installation_id,
 				account=identity.account,
@@ -200,24 +206,33 @@ class MobileStore:
 			scope=identity.scope,
 			principal=identity.principal,
 			include_revoked=installation_id is not None,
+			fields=REVOCATION_FIELDS,
 		)
-		return {"revoked": self.revoke_targets(row.name for row in rows)}
+		return {"revoked": self._revoke_rows(rows)}
 
 	def revoke_account_installations(self, account):
-		rows = self.revocation_targets(account, include_revoked=True)
-		changed = self.revoke_targets((row.name for row in rows), remote=False)
-
-		# Update only rows with a binding so a repeated call does not change them.
-		frappe.db.set_value(
-			"Mobile Installation",
-			{"account": account, "notification_token": ["is", "set"]},
-			"notification_token",
-			None,
-		)
-		return len(rows), changed
+		total = changed = 0
+		after = None
+		while True:
+			rows = self.revocation_targets(
+				account, include_revoked=True, after=after, fields=REVOCATION_FIELDS
+			)
+			total += len(rows)
+			changed += self._revoke_rows(rows, remote=False)
+			if len(rows) < REVOCATION_BATCH_SIZE:
+				return total, changed
+			after = rows[-1].name
 
 	def revocation_targets(
-		self, account, installation_id=None, *, scope=None, principal=None, include_revoked=False
+		self,
+		account,
+		installation_id=None,
+		*,
+		scope=None,
+		principal=None,
+		include_revoked=False,
+		after=None,
+		fields=("name", "revoked", "session_id"),
 	):
 		filters = {"account": account}
 		if not include_revoked:
@@ -228,36 +243,46 @@ class MobileStore:
 			filters["principal"] = principal
 		if installation_id is not None:
 			filters["name"] = installation_id
+		elif after is not None:
+			filters["name"] = [">", after]
 		return _select(
 			"Mobile Installation",
-			["name", "revoked", "session_id"],
+			fields,
 			filters,
+			limit=REVOCATION_BATCH_SIZE,
 			order_by="name asc",
 			for_update=True,
 		)
 
 	def revoke_targets(self, installation_ids, *, remote=True):
-		from .sessions import revoke_after_commit
-
 		count = 0
-		sessions = set()
-		for installation_id in installation_ids:
-			row = frappe.db.get_value(
+		for names in batched(installation_ids, REVOCATION_BATCH_SIZE, strict=False):
+			rows = _select(
 				"Mobile Installation",
-				installation_id,
-				["revoked", "session_id", "session_subject", "account", "principal", "notification_token"],
-				as_dict=True,
+				REVOCATION_FIELDS,
+				{"name": ["in", names]},
+				order_by="name asc",
 				for_update=True,
 			)
-			if row is None:
-				continue
+			count += self._revoke_rows(rows, remote=remote)
+		return count
+
+	def _revoke_rows(self, rows, *, remote=True):
+		from .sessions import revoke_after_commit
+
+		sessions = set()
+		updates = []
+		count = 0
+		for row in rows:
 			if row.session_id:
 				sessions.add((row.session_id, _stored_session_subject(row) if remote else None))
 			if not row.revoked or row.notification_token is not None:
-				frappe.db.set_value(
-					"Mobile Installation", installation_id, {"revoked": 1, "notification_token": None}
-				)
+				updates.append(row.name)
 				count += int(not row.revoked)
+		if updates:
+			frappe.db.set_value(
+				"Mobile Installation", {"name": ["in", updates]}, {"revoked": 1, "notification_token": None}
+			)
 		revoke_after_commit(sessions, remote=remote)
 		return count
 
@@ -275,30 +300,34 @@ class MobileStore:
 		return None
 
 	def remember_operation(self, key, digest, result):
-		_insert("Mobile Operation", operation_key=key, content_digest=digest, result=result)
+		insert_metadata("Mobile Operation", operation_key=key, content_digest=digest, result=result)
 
 	def append_change(self, record_type, record_id, kind, *, target_installation=None):
-		# Keep allocation and insertion under the same transaction lock.
-		current = _sequence_row(for_update=True).sequence
-		if current == 2_147_483_647:
-			raise MobileError("mobile_sequence_exhausted", 503)
-		sequence = current + 1
-		_insert(
-			"Mobile Change",
-			sequence=sequence,
-			record_type=record_type,
-			record_id=record_id,
-			kind=kind,
-			target_installation=target_installation,
-		)
-		frappe.db.set_value(SEQUENCE_DOCTYPE, SEQUENCE_NAME, "sequence", sequence)
-		# A locking read can see commits outside the caller's read snapshot.
-		# Keep the cursor below any events the snapshot cannot yet read.
-		if current == self.sequence:
-			self.sequence = sequence
+		return self.append_changes([(record_type, record_id, kind)], target_installation=target_installation)
+
+	def append_changes(self, changes, *, target_installation=None):
+		if not changes:
+			return self.sequence
+
+		# Reserve at the end of the batch. Commit order must match sequence order,
+		# or a cursor could pass a lower event that another transaction still holds.
+		count = len(changes)
+		end = _reserve_sequences(count)
+		for sequence, (record_type, record_id, kind) in enumerate(changes, end - count + 1):
+			insert_metadata(
+				"Mobile Change",
+				sequence=sequence,
+				record_type=record_type,
+				record_id=record_id,
+				kind=kind,
+				target_installation=target_installation,
+			)
+		# The counter sees current commits. An earlier read snapshot may not.
+		if end - count == self.sequence:
+			self.sequence = end
 		else:
 			self.pending_events = True
-		return sequence
+		return end
 
 	def read_events(self, installation, after, ceiling, limit):
 		event = frappe.qb.DocType("Mobile Change")
@@ -328,14 +357,17 @@ class MobileStore:
 			order_by="name asc",
 			for_update=True,
 		)
+		changes = []
 		for row in rows[:DELIVERY_AUDIT_SIZE]:
 			projection = projections.get(row.record_type)
 			visible = projection is not None and projection(account, row.record_id) is not None
 			if visible != bool(row.visible):
 				kind = "upsert" if visible else "remove"
-				self.append_change(row.record_type, row.record_id, kind, target_installation=installation)
+				changes.append((row.record_type, row.record_id, kind))
 				frappe.db.set_value("Mobile Delivery", row.name, "visible", int(visible))
 
+		if changes:
+			self.append_changes(changes, target_installation=installation)
 		if len(rows) > DELIVERY_AUDIT_SIZE:
 			return rows[DELIVERY_AUDIT_SIZE - 1].name
 		return None
@@ -346,17 +378,21 @@ class MobileStore:
 
 	def record_delivery(self, installation, record_type, record_id):
 		key = content_digest([installation, record_type, record_id])
-		row = frappe.db.get_value("Mobile Delivery", key, ["name", "visible"], as_dict=True, for_update=True)
-		if row is not None:
-			if not row.visible:
-				frappe.db.set_value("Mobile Delivery", row.name, "visible", 1)
-			return
-		_insert(
-			"Mobile Delivery",
-			delivery_key=key,
-			installation_id=installation,
-			record_type=record_type,
-			record_id=record_id,
+		# Insert directly so a missing key never acquires a range lock before insert.
+		user = frappe.session.user
+		timestamp = now_datetime()
+		frappe.db.sql(
+			"""
+			INSERT INTO `tabMobile Delivery`
+				(name, delivery_key, installation_id, record_type, record_id, visible,
+				 creation, modified, owner, modified_by)
+			VALUES (%s, %s, %s, %s, %s, 1, %s, %s, %s, %s)
+			ON DUPLICATE KEY UPDATE
+				modified = IF(visible = 0, VALUES(modified), modified),
+				modified_by = IF(visible = 0, VALUES(modified_by), modified_by),
+				visible = 1
+			""",
+			(key, key, installation, record_type, record_id, timestamp, timestamp, user, user),
 		)
 
 	def audit_due(self, installation, now):

@@ -116,7 +116,7 @@ def require_user(*, managers_only=False):
 	if user in (None, "", "Guest") or not frappe.db.get_value("User", user, "enabled"):
 		raise Denied(401, "authentication_required")
 	if managers_only and MANAGERS.isdisjoint(frappe.get_roles()):
-		raise Denied(403, "permission_denied")
+		raise frappe.PermissionError
 
 
 def require_session(*, allow_api_key=False):
@@ -141,7 +141,7 @@ def require_session(*, allow_api_key=False):
 def require_route(route):
 	roles = set(frappe.get_roles())
 	if not route.enabled or (MANAGERS.isdisjoint(roles) and route.required_role not in roles):
-		raise Denied(403, "permission_denied")
+		raise frappe.PermissionError
 
 
 def connection_policy(base, oauth_url):
@@ -183,7 +183,7 @@ def connection_policy(base, oauth_url):
 
 def outbound(base, oauth_url, route, request):
 	"""Use deployment-approved destinations and mask all external requests."""
-	kind, _, _ = connection_policy(base, oauth_url)
+	kind = connection_policy(base, oauth_url)[0]
 	if kind == "local":
 		return request
 	if route is not None and route.data_policy != "masked":

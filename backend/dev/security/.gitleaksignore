@@ -1,0 +1,29 @@
+# Owner identity-sync. Synthetic configuration CLI test value.
+37327e9c5b6709e392c7b4f4cfae23effcc01d23:backend/identity/identity_sync/tests/test_config_cli.py:generic-api-key:27
+
+# Owner identity-sync. Synthetic service double value.
+37327e9c5b6709e392c7b4f4cfae23effcc01d23:backend/identity/identity_sync/tests/fakes.py:generic-api-key:463
+
+# Owner kimlik-realm. Synthetic second-factor test value.
+dea386a1f62fea46da6928e8d385e120bd45b528:backend/identity/keycloak/tests/test_second_factor.py:generic-api-key:22
+
+# Owner platform-core-kimlik. Example token in the API contract.
+2ec928f16cf6174585ec3ba382c3e69bbbca97d0:backend/contracts/platform_core-kimlik.openapi.yaml:jwt:331
+
+# Owner kimlik-tema. Synthetic theme test value.
+6fede6542a96431a9dbe99146da15976d6f5c719:backend/identity/keycloak/themes/atonota/test/tests/helpers.ts:generic-api-key:19
+
+# Owner kimlik-realm. Placeholder in the sample environment file.
+b85303a73c5f16c0660df2d841ca243d69cd063c:backend/identity/keycloak/.env.example:generic-api-key:26
+
+# Owner kimlik-realm. Local JDBC service address without credentials.
+783aceeade4939819ebf493c4e7516c72bcb4797:backend/dev/compose.keycloak.yaml:generic-api-key:25
+
+# Owner press-ai. Synthetic server test value.
+6d599fdca55013d29599f0f461796c22975d3700:packages/press-ai/tests/fake_press.py:generic-api-key:13
+
+# Owner press-ai. Synthetic response test value.
+6d599fdca55013d29599f0f461796c22975d3700:packages/press-ai/tests/fake_press.py:generic-api-key:93
+
+# Owner press-ai. Synthetic client unit test value.
+6d599fdca55013d29599f0f461796c22975d3700:packages/press-ai/tests/test_press.py:generic-api-key:75

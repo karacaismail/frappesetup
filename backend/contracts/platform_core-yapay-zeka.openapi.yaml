@@ -1,0 +1,1076 @@
+openapi: 3.1.0
+info:
+  title: platform_core AI access layer
+  version: 0.1.0
+  summary: MCP endpoint, agent token and human approval endpoints.
+  description: |
+    This contract describes the endpoints of the `platform_core.yapay_zeka` module.
+    The decision note is the file `docs/kararlar/0002-yapay-zeka-katmani.md`.
+
+    Identity types:
+
+    - Human session: the Frappe session cookie and the `X-Frappe-CSRF-Token` header.
+      A request that carries an `Authorization` header does not count as a human session.
+    - Agent token: the `Authorization: Bearer fsat_...` header. It is valid only on the MCP endpoint.
+
+    API keys and OAuth tokens are not accepted on these endpoints.
+    A request that carries both a cookie and an `Authorization` header is denied.
+
+    No schema has a `confirm`, `approved` or `force` field.
+    Approval comes only from the `approve_proposal` endpoint and only from a human session.
+
+    An approval is valid only for the preview the human saw. At approval the server previews again
+    and compares the whole preview and its target with what it stored. If they differ, nothing runs,
+    the answer is `document_changed`, and a new proposal with a new human approval is needed.
+
+    What is written to the AI Action Log:
+
+    - every tool call on the MCP endpoint, allowed or denied;
+    - every denial of a request whose user is known, on every endpoint;
+    - every approval, rejection, execution and resolution.
+
+    What is not written to the AI Action Log:
+
+    - a successful GET request (`list_proposals`, `get_proposal`). A read writes no row and commits nothing;
+    - a request without a known user: a guest, or an unknown or expired token;
+    - a request that Frappe refuses before the endpoint runs, for example an expired session (401) or a
+      guest (403). The evidence for those is the web server's access log, not this log.
+servers:
+  - url: /api/method
+    description: Frappe endpoint root of the tenant site
+tags:
+  - name: mcp
+    description: The MCP endpoint the model uses
+  - name: token
+    description: Agent token
+  - name: proposal
+    description: Write proposals and human approval
+  - name: admin
+    description: Maintenance commands started by hand
+
+paths:
+  /platform_core.api.ai.mcp:
+    post:
+      tags: [mcp]
+      operationId: mcp
+      summary: MCP endpoint (Streamable HTTP, single JSON response).
+      description: |
+        Takes a JSON-RPC 2.0 request. The supported methods are `initialize` (2025-11-25 only),
+        `server/discover` (2026-07-28 only), `ping`, `tools/list` and `tools/call`.
+        The endpoint keeps no session. The response is a single JSON, not a stream. A notification returns 202.
+
+        Read tools run with the user's permission. Write tools do not change the document.
+        A write tool opens a proposal and returns the `approval_required` status.
+        A tool error is not an HTTP error. A tool error is a result that carries `isError: true`.
+        Every call and every denial is written to an "AI Action Log" record.
+      security:
+        - humanSession: []
+        - agentToken: []
+      parameters:
+        - name: MCP-Protocol-Version
+          in: header
+          required: false
+          description: Required in version 2026-07-28. If it is missing, 2025-11-25 is assumed.
+          schema: {type: string, enum: ["2026-07-28", "2025-11-25"]}
+        - name: Mcp-Method
+          in: header
+          required: false
+          description: Required in version 2026-07-28. It must be the same as `method` in the body.
+          schema: {type: string}
+        - name: Mcp-Name
+          in: header
+          required: false
+          description: Required for `tools/call` in version 2026-07-28. It must be the same as the tool name.
+          schema: {type: string}
+        - name: Mcp-Conversation-Id
+          in: header
+          required: false
+          description: "The client's conversation id. The log stores its SHA-256 in the `session_id` field, never the id itself. The client's own name and version are never stored. The log stores a fixed name for a client the layer knows and `other` for every other client."
+          schema: {type: string, maxLength: 140}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/JsonRpcRequest"}
+      responses:
+        "200":
+          description: JSON-RPC result or JSON-RPC error.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/JsonRpcResponse"}
+        "202": {description: Notification accepted. There is no body.}
+        "400": {description: "Invalid JSON-RPC body, header mismatch or unsupported version. The early denial of a user whose identity is known is written to the log with the code `protocol_error` or `origin_not_allowed`."}
+        "401": {description: "The token is unknown, has expired, its bound session has ended or its call allowance is used up."}
+        "403": {description: "The request carries no identity, the origin is not allowed, the identity type is not accepted or a cookie came together with a token. The endpoint is not open to guests. Frappe denies a request without identity with 403."}
+        "404": {description: Unknown method or unknown tool.}
+        "406": {description: "The `Accept` header does not allow the value `application/json`."}
+        "415": {description: "The `Content-Type` value is not `application/json`."}
+
+  /platform_core.api.ai.issue_agent_token:
+    post:
+      tags: [token]
+      operationId: issueAgentToken
+      summary: Issues a short-lived agent token from a human session.
+      description: |
+        The token is valid for 300 seconds and at most 20 tool calls. The token is valid only on the MCP endpoint.
+        The token is bound to the Frappe session that made the request. When the session ends, the token becomes invalid.
+        The server stores only the digest of the token. The token is visible only in this response.
+        Do not write the token to browser storage. Keep it only in memory (G-148).
+      security: [{humanSession: []}]
+      responses:
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
+        "200":
+          description: The token was issued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/AgentToken"}
+        "403": {description: The request did not come from a human session.}
+
+  /platform_core.api.ai.list_proposals:
+    get:
+      tags: [proposal]
+      operationId: listProposals
+      summary: Lists the write proposals of the session user page by page.
+      description: |
+        Only the user's own proposals are returned. The newest proposal comes first.
+        Filtering and paging are done in the database. For the next page, increase `start` by `limit`.
+        A successful read is not written to the log. A denied read is written.
+      security: [{humanSession: []}]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: {$ref: "#/components/schemas/ProposalStatus"}
+        - name: limit
+          in: query
+          required: false
+          schema: {type: integer, minimum: 1, maximum: 100, default: 20}
+        - name: start
+          in: query
+          required: false
+          description: Number of proposals to skip.
+          schema: {type: integer, minimum: 0, maximum: 10000, default: 0}
+      responses:
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
+        "200":
+          description: List of proposals.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [proposals, has_next_page]
+                    properties:
+                      proposals:
+                        type: array
+                        items: {$ref: "#/components/schemas/Proposal"}
+                      has_next_page: {type: boolean}
+        "403": {description: The request did not come from a human session.}
+
+  /platform_core.api.ai.get_proposal:
+    get:
+      tags: [proposal]
+      operationId: getProposal
+      summary: Returns the preview, digest and status of a proposal.
+      description: |
+        The human reads the preview in this response. The approval request carries the `digest` value from this response.
+        A successful read is not written to the log. A denied read is written.
+      security: [{humanSession: []}]
+      parameters:
+        - name: proposal_id
+          in: query
+          required: true
+          schema: {type: string}
+      responses:
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
+        "200":
+          description: The proposal.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/Proposal"}
+        "403": {description: The request did not come from a human session or the proposal belongs to another user.}
+        "404": {description: The proposal does not exist.}
+
+  /platform_core.api.ai.approve_proposal:
+    post:
+      tags: [proposal]
+      operationId: approveProposal
+      summary: Approves the proposal and executes the action in this request.
+      description: |
+        CAN BE DESTRUCTIVE. This endpoint creates, changes, submits, cancels or deletes a document.
+        An application tool can also start a billable action. Check the `destructive` and `billable` fields of the proposal.
+
+        Every human request that writes carries the `X-Frappe-CSRF-Token` header. If the session has no CSRF token, the request is denied.
+        An approval can be used only once. The server checks these in order: human session, same user,
+        `pending` status, expiry, digest match, that the document has not changed, current permission and
+        an action with an unknown result on the same target.
+        If a check fails, the action does not run and the response carries `executed: false` and the deny reason.
+
+        Before executing, the server records the result as `unknown`. If the process is cut off midway, the result stays `unknown`.
+        If execution raises an error, the result becomes `failed` only in this case: the error occurred in the layer's own check.
+        Every error after the layer's check has finished becomes `unknown`. In this part Frappe's document methods
+        (`insert`, `save`, `submit`, `cancel`, delete), its hooks and all functions of the application tool run.
+        The application tool's own `prepare` function is also in this part.
+        The tool locks the target just before writing it and compares its version with the one in the preview.
+        If the application tool raises an error, the result still stays `unknown`. The tool may have touched an external system.
+        No blind retry is made on the same target. The human closes the state with `resolve_proposal`.
+      security: [{humanSession: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [proposal_id, digest]
+              properties:
+                proposal_id: {type: string}
+                digest:
+                  type: string
+                  description: Digest of the preview the human saw. It is taken from the `get_proposal` response.
+                  pattern: "^[0-9a-f]{64}$"
+      responses:
+        "200":
+          description: Approval outcome. A denial also returns 200 and `executed` is false.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/ApprovalOutcome"}
+        "401": {description: "The request carries an agent token. The token is valid only on the MCP endpoint. The denial is written to the log with the code `token_out_of_scope`."}
+        "403": {description: "The request did not come from a human session, the session has no CSRF token or the proposal belongs to another user. Another user's proposal is not returned in the response."}
+        "404": {description: The proposal does not exist.}
+
+  /platform_core.api.ai.reject_proposal:
+    post:
+      tags: [proposal]
+      operationId: rejectProposal
+      summary: Rejects a pending proposal.
+      description: Nothing is written to the document. A rejected proposal cannot be approved later. If the proposal is not `pending`, 417 is returned.
+      security: [{humanSession: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [proposal_id]
+              properties:
+                proposal_id: {type: string}
+      responses:
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
+        "200":
+          description: The new state of the proposal.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/Proposal"}
+        "403": {description: The request did not come from a human session or the proposal belongs to another user.}
+
+  /platform_core.api.ai.resolve_proposal:
+    post:
+      tags: [proposal]
+      operationId: resolveProposal
+      summary: Closes a proposal with an unknown result by human decision.
+      description: |
+        The human checks the target document with their own eyes. Then they report whether the action was applied.
+        This endpoint does not write to the document. It only sets the result of the proposal to `succeeded` or `failed`.
+        After that a new proposal can be opened for the same target.
+      security: [{humanSession: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [proposal_id, outcome]
+              properties:
+                proposal_id: {type: string}
+                outcome: {type: string, enum: [succeeded, failed]}
+      responses:
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
+        "200":
+          description: The new state of the proposal.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/Proposal"}
+        "403": {description: The request did not come from a human session or the proposal belongs to another user.}
+
+  /platform_core.api.ai.purge_logs:
+    post:
+      tags: [admin]
+      operationId: purgeLogs
+      summary: Deletes log and proposal records whose retention period has passed.
+      description: |
+        DESTRUCTIVE. Cannot be undone. Only the "System Manager" role and a human session can call it.
+        If `dry_run` is true, nothing is deleted. The response returns the number of records that would be deleted and a
+        `confirmation_token`. This is the default, and it is the preview a human reads.
+        A delete (`dry_run` false) must carry that `confirmation_token`. The token lives 10 minutes and works once. It is bound
+        to the user, the period, the records the preview chose and every number of the preview, the waiting totals included.
+        The delete removes exactly the records the preview chose. It never chooses records again.
+        Without a valid token nothing is deleted and the answer is 417 with the deny reason `preview_required`.
+        The same answer comes if any number changed after the preview, for example if one more record waits. Ask for a new preview then.
+        The AI tool `purge_action_log` follows the same rule: its approval is bound to the chosen records and the numbers.
+        A delete is all or nothing. If the gateway refuses the chosen usage records at the delete, nothing is deleted
+        anywhere: the web answer is 417 with `preview_required`, and the AI tool's action does not succeed.
+        If the delete breaks off for an unexpected reason, also after the gateway deleted something, the whole request is
+        rolled back and the web answer is 417 with `purge_failed`. A refusal for a missing role stays 403.
+        Retention periods:
+        - "AI Action Log" records go after `older_than_days`, at least 365 days.
+        - An "AI Action Proposal" goes 30 days after its decision or its expiry, whichever comes first. That period is fixed.
+          Every proposal has an expiry, so none stays forever. A proposal with an unknown result goes by the same rule.
+        - "AI Usage Log" records go after 365 days. The model gateway owns that log. This endpoint calls the gateway's shared
+          function `platform_core.model_gecidi.api.purge_usage_logs`, which checks permission and deletes in batches.
+          The `usage_logs` field says plainly whether that ran: `ok`, `not_run` or `error`. Other records are still cleaned.
+        The counting mode (`dry_run`) counts exactly the records the delete would remove.
+        There is no scheduled job. This endpoint is started by hand. The command for the same action is this:
+        `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs "{'older_than_days': 365, 'dry_run': False}"`, run in the bench folder.
+        One run deletes at most 500 records of each kind. `logs_waiting` and `proposals_waiting` say how many waited. Run it again until they reach zero.
+        The AI starts the same action with the `purge_action_log` tool, with a preview and human approval.
+      security: [{humanSession: []}]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                older_than_days: {type: integer, minimum: 365, maximum: 36500, default: 365}
+                dry_run: {type: boolean, default: true}
+                confirmation_token: {type: string, maxLength: 128, description: "Token of the preview the human confirmed. Required when `dry_run` is false."}
+      responses:
+        "401": {description: "The session has expired. Frappe denies the request before calling the endpoint. The client asks for a new login."}
+        "200":
+          description: Numbers of records deleted or to be deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/PurgeResult"}
+        "403": {description: "The request did not come from a human session, the user is not an administrator, or a permission error stopped the delete. In the last case nothing was deleted and the message is the fixed text `You do not have permission for this action.`"}
+        "417": {description: "Nothing was deleted. The response carries one fixed message in `_server_messages`, also when the site hides error details: `Ask for a preview first, then send its confirmation token. Nothing was deleted.` or `The delete failed and was rolled back. Nothing was deleted.` The text of the real error and messages collected during the delete are never sent. Either the retention period is out of range, or the delete came without a valid confirmation token (`preview_required`), or the delete broke off for an unexpected reason and was rolled back (`purge_failed`). The answer carries a fixed text, never the text of the error. The deny reason is in the AI Action Log."}
+
+components:
+  securitySchemes:
+    humanSession:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Frappe session cookie. A POST request also carries the `X-Frappe-CSRF-Token` header.
+    agentToken:
+      type: http
+      scheme: bearer
+      description: "The token with the `fsat_` prefix that the `issue_agent_token` endpoint issues."
+
+  schemas:
+    JsonRpcRequest:
+      type: object
+      required: [jsonrpc, method]
+      properties:
+        jsonrpc: {const: "2.0"}
+        id:
+          description: Not present in a notification.
+          oneOf: [{type: string}, {type: integer}]
+        method:
+          type: string
+          enum: [initialize, server/discover, ping, tools/list, tools/call, notifications/initialized]
+        params:
+          type: object
+          description: "Carries `name` and `arguments` for `tools/call`."
+
+    JsonRpcResponse:
+      type: object
+      required: [jsonrpc]
+      properties:
+        jsonrpc: {const: "2.0"}
+        id:
+          oneOf: [{type: string}, {type: integer}, {type: "null"}]
+        result:
+          description: "ToolResult for `tools/call`, tool definitions for `tools/list`."
+          type: object
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: integer}
+            message: {type: string}
+
+    ToolResult:
+      type: object
+      description: MCP tool result.
+      required: [content, isError]
+      properties:
+        content:
+          type: array
+          items:
+            type: object
+            required: [type, text]
+            properties:
+              type: {const: text}
+              text: {type: string}
+        structuredContent:
+          type: object
+          description: On success, the result of the tool. On denial, the `error` object.
+        isError: {type: boolean}
+
+    ToolError:
+      type: object
+      description: Content of `structuredContent` on denial or error.
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {$ref: "#/components/schemas/DenyReason"}
+            message: {type: string}
+
+    DenyReason:
+      type: string
+      description: Code of the deny reason. It is the same as the `deny_reason` field of the AI Action Log record.
+      enum:
+        - invalid_arguments
+        - unknown_doctype
+        - permission
+        - field_not_permitted
+        - secret_field
+        - blocked_doctype
+        - admin_only
+        - role_required
+        - protected_role
+        - not_found
+        - not_human_session
+        - token_out_of_scope
+        - credential_not_accepted
+        - session_ended
+        - cookie_with_token
+        - report_gate_unavailable
+        - invalid_preview
+        - origin_not_allowed
+        - protocol_error
+        - desk_role_for_end_user
+        - report_too_large
+        - transaction_active
+        - token_call_limit
+        - unknown_tool
+        - preview_required
+        - purge_failed
+        - not_owner
+        - not_pending
+        - expired
+        - digest_mismatch
+        - document_changed
+        - unresolved_unknown
+        - execution_failed
+        - internal_error
+
+    AgentToken:
+      type: object
+      required: [token, expires_in, max_calls, audience]
+      properties:
+        token: {type: string, description: "Token with the `fsat_` prefix. It is visible only in this response."}
+        expires_in: {type: integer, description: Lifetime in seconds., examples: [300]}
+        max_calls: {type: integer, description: Number of allowed tool calls., examples: [20]}
+        audience: {type: string, description: "The target service of the token. It comes from the `ai_agent_audience` site setting."}
+
+    ProposalStatus:
+      type: string
+      enum: [pending, rejected, expired, consumed]
+      description: |
+        `pending`: waits for the human decision. `rejected`: the human rejected it or the approval check failed permanently.
+        `expired`: the time ran out. `consumed`: it was approved and execution started. The outcome is in the `result` field.
+
+    ProposalResult:
+      type: string
+      enum: ["", unknown, succeeded, failed]
+      description: An empty value shows that execution has not started. `unknown` shows that no blind retry will be made.
+
+    Proposal:
+      type: object
+      required: [proposal_id, status, result, tool, preview, digest, expires_at, created_at, destructive, billable]
+      properties:
+        proposal_id: {type: string}
+        status: {$ref: "#/components/schemas/ProposalStatus"}
+        result: {$ref: "#/components/schemas/ProposalResult"}
+        tool: {type: string}
+        target_doctype: {type: [string, "null"]}
+        target_name: {type: [string, "null"]}
+        destructive: {type: boolean}
+        billable: {type: boolean}
+        preview: {$ref: "#/components/schemas/Preview"}
+        digest: {type: string, pattern: "^[0-9a-f]{64}$"}
+        expires_at: {type: string, format: date-time, description: "Expiry time. ISO 8601, with a UTC offset."}
+        created_at: {type: string, format: date-time, description: "The time the proposal was opened. ISO 8601, with a UTC offset."}
+        result_document:
+          type: [string, "null"]
+          description: Name of the affected document if execution succeeded.
+        error: {type: [string, "null"], description: "Fixed error code if execution failed, for example `validation_error`, `permission`, `document_changed` or `internal_error`. The text of a tool's error is never stored or returned."}
+
+    Preview:
+      type: object
+      description: Summary of the change the human will approve. It carries no secret field value.
+      required: [action, summary]
+      properties:
+        action: {type: string, enum: [create, update, submit, cancel, delete, app_tool, admin]}
+        summary: {type: string}
+        changes:
+          type: array
+          items:
+            type: object
+            required: [fieldname, new]
+            properties:
+              fieldname: {type: string}
+              label: {type: [string, "null"]}
+              old: {}
+              new: {}
+        details: {type: object, description: Extra data from the preview function of the application tool.}
+
+    ApprovalOutcome:
+      type: object
+      required: [executed, proposal]
+      properties:
+        executed: {type: boolean}
+        deny_reason:
+          oneOf: [{$ref: "#/components/schemas/DenyReason"}, {type: "null"}]
+        proposal: {$ref: "#/components/schemas/Proposal"}
+
+    PurgeResult:
+      type: object
+      required: [dry_run, older_than_days, proposal_days, batch_size, logs, logs_waiting, usage_logs, proposals, proposals_waiting]
+      properties:
+        dry_run: {type: boolean}
+        older_than_days: {type: integer, description: Retention period of the AI Action Log in days.}
+        proposal_days: {type: integer, description: "Retention period of proposals in days, counted from the decision or the expiry. Fixed at 30."}
+        confirmation_token: {type: string, description: "Only in the counting mode: the single-use token a delete must send back."}
+        batch_size: {type: integer, description: "Most records of each kind one run deletes. It is 500. A preview shows it, so the human sees that one run may not delete everything that waits."}
+        logs: {type: integer, description: "Number of AI Action Log records this run deletes. One run takes at most 500 records of each kind, oldest first."}
+        logs_waiting: {type: integer, description: Number of AI Action Log records past their period when the run started.}
+        usage_logs:
+          type: object
+          description: "What happened to the AI Usage Log. The model gateway owns that log and cleans it with its shared function `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run, names)`. The counting call returns the names it would delete. This layer binds those names to the confirmation or the approval and hands exactly them back at the delete. The gateway deletes all of them or none. This field is never null."
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [ok, not_run, error]
+              description: "`ok`: the gateway ran. `not_run`: nothing was asked of the gateway, see `reason`. `error`: the gateway refused the counting call."
+            eligible: {type: integer, description: "With `ok`: number of records past 365 days that wait."}
+            to_delete: {type: integer, description: "With `ok`: number of records this run deletes, at most 500. A preview shows this number."}
+            deleted: {type: integer, description: "With `ok`: number of records this run deleted. Zero in the counting mode."}
+            reason: {type: string, description: "With `not_run`: `gateway_purge_unavailable` if the gateway offers no such function, or `gateway_purge_outdated` if its function does not take `names`. With `error`: the type of the error, never its text."}
+        proposals: {type: integer, description: Number of AI Action Proposal records this run deletes.}
+        proposals_waiting: {type: integer, description: Number of AI Action Proposal records past their period when the run started.}
+
+    ApprovalRequired:
+      type: object
+      description: The result a write tool returns to the model side. The document has not changed yet.
+      required: [status, proposal_id, preview, expires_at, created_at]
+      properties:
+        status: {const: approval_required}
+        proposal_id: {type: string}
+        preview: {$ref: "#/components/schemas/Preview"}
+        expires_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+
+# Tool schema. `tools/list` returns these names and input schemas.
+# Every input schema carries `additionalProperties: false`. An unknown field makes the call be denied.
+x-mcp-tools:
+  - name: search_doctypes
+    class: definition
+    annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/SearchDoctypes"}
+    description: Search DocType names the user may read. Child tables are left out.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        query: {type: string, minLength: 1}
+        limit: {type: integer, minimum: 1, maximum: 100, default: 50}
+  - name: get_doctype_schema
+    class: definition
+    annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/DoctypeSchema"}
+    description: >-
+      Get the fields of a DocType with their descriptions, and what the user may do with it.
+      Secret fields are listed with secret=true and never carry a value.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype]
+      properties:
+        doctype: {type: string, minLength: 1}
+  - name: list_documents
+    class: read
+    annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ListDocuments"}
+    description: "List documents the user may read. A filter is a value or an [operator, value] pair."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype]
+      properties:
+        doctype: {type: string, minLength: 1}
+        filters: {type: object, description: "Field name to value, or to an [operator, value] pair."}
+        fields: {type: array, items: {type: string}}
+        order_by: {type: string, description: "A field name, optionally followed by asc or desc."}
+        start: {type: integer, minimum: 0, default: 0}
+        limit: {type: integer, minimum: 1, maximum: 100, default: 20}
+  - name: get_document
+    class: read
+    annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/GetDocument"}
+    description: Get one document with its child tables. Fields the user may not read are left out.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, name]
+      properties:
+        doctype: {type: string, minLength: 1}
+        name: {type: string, minLength: 1}
+  - name: run_report
+    class: read
+    annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/RunReport"}
+    description: Run a report the user may run and return its columns and rows.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [report]
+      properties:
+        report: {type: string, minLength: 1}
+        filters: {type: object}
+        limit: {type: integer, minimum: 1, maximum: 500, default: 100}
+  - name: create_document
+    class: write
+    annotations: {readOnlyHint: false, destructiveHint: false}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: Propose a new document. Nothing is written until a human approves the proposal.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, data]
+      properties:
+        doctype: {type: string, minLength: 1}
+        data: {type: object}
+  - name: update_document
+    class: write
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: Propose changes to a document. Nothing is written until a human approves the proposal.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, name, data]
+      properties:
+        doctype: {type: string, minLength: 1}
+        name: {type: string, minLength: 1}
+        data: {type: object}
+  - name: submit_document
+    class: write
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: "Propose submitting a draft document. Nothing is written until a human approves the proposal."
+    inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
+  - name: cancel_document
+    class: write
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: "Propose cancelling a submitted document. Nothing is written until a human approves the proposal."
+    inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
+  - name: delete_document
+    class: write
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: "Propose deleting a document. Nothing is written until a human approves the proposal."
+    inputSchema: {$ref: "#/x-mcp-schemas/DocumentTarget"}
+  - name: get_proposal
+    class: flow
+    annotations: {readOnlyHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ProposalState"}
+    description: >-
+      Read the status and result of a proposal the user opened. A result of unknown means
+      the outcome is not known. Do not repeat the action. Ask the user to check and resolve it.
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [proposal_id]
+      properties:
+        proposal_id: {type: string, minLength: 1}
+
+  # Admin tools. Visible only to the "System Manager" role. All of them require a preview and human approval.
+  - name: add_custom_field
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: false}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: "Propose a new custom field on a DocType. A description is required. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, fieldname, label, fieldtype, description]
+      properties:
+        doctype: {type: string, minLength: 1}
+        fieldname: {type: string, pattern: "^[a-z][a-z0-9_]{1,60}$"}
+        label: {type: string, minLength: 1}
+        fieldtype:
+          type: string
+          enum: [Data, Small Text, Text, Long Text, Int, Float, Currency, Percent, Check, Date, Datetime, Time, Select, Link, Password]
+        description: {type: string, minLength: 1}
+        options: {type: string}
+        reqd: {type: boolean, default: false}
+        insert_after: {type: string}
+        permlevel: {type: integer, minimum: 0, maximum: 9, default: 0}
+  - name: set_field_property
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: "Propose a change to one display or validation property of a field. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, fieldname, property, value]
+      properties:
+        doctype: {type: string, minLength: 1}
+        fieldname: {type: string, minLength: 1}
+        property:
+          type: string
+          enum: [label, description, reqd, hidden, read_only, in_list_view, in_standard_filter, bold, permlevel, options, default, allow_on_submit, print_hide]
+        value: {type: [string, integer, boolean]}
+  - name: set_role_permission
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: "Propose a change to what a role may do with a DocType at one permission level. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      required: [doctype, role, permissions]
+      properties:
+        doctype: {type: string, minLength: 1}
+        role: {type: string, minLength: 1}
+        permlevel: {type: integer, minimum: 0, maximum: 9, default: 0}
+        permissions:
+          type: object
+          description: "Permission type to true or false. Types: read, write, create, delete, submit, cancel, amend, report, export, import, print, email, share, select, if_owner."
+  - name: assign_role
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: "Propose giving a role to a user. Protected roles cannot be given through AI. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema: {$ref: "#/x-mcp-schemas/UserRole"}
+  - name: remove_role
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: "Propose taking a role away from a user. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema: {$ref: "#/x-mcp-schemas/UserRole"}
+  - name: purge_action_log
+    class: admin
+    annotations: {readOnlyHint: false, destructiveHint: true}
+    outputSchema: {$ref: "#/x-mcp-results/ApprovalRequired"}
+    description: "Propose deleting AI action logs and proposals older than the retention period. Cannot be undone. Admin only. Nothing is written until a human approves the proposal."
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        older_than_days: {type: integer, minimum: 365, maximum: 36500, default: 365}
+
+# Result schema of the tools. A successful call returns this shape in `structuredContent`.
+# `tools/list` publishes the same schema as `outputSchema`. A test ties the code to this section.
+# A denied call does not follow this schema. That call returns `isError: true` and the `ToolError` object.
+# All write and admin tools return `ApprovalRequired`. So do the write tools of applications.
+x-mcp-results:
+  SearchDoctypes:
+    type: object
+    required: [doctypes, as_of, site, source]
+    properties:
+      doctypes:
+        type: array
+        items: {type: string}
+      as_of: {type: string, description: 'Time of the read, ISO 8601 with a UTC offset.'}
+      site: {type: string}
+      source: {type: string, description: 'What the data was read from, for example a DocType or a report.'}
+  DoctypeSchema:
+    type: object
+    required: [doctype, module, is_submittable, is_single, is_child_table, generic_write_tools, permissions, fields,
+      truncated, as_of, site, source]
+    properties:
+      as_of: {type: string, description: 'Time of the read, ISO 8601 with a UTC offset.'}
+      site: {type: string}
+      source: {type: string, description: 'What the data was read from, for example a DocType or a report.'}
+      truncated: {type: boolean, description: True when rows or values were left out to stay within the limits.}
+      doctype: {type: string}
+      description:
+        type: [string, 'null']
+      module: {type: string}
+      is_submittable: {type: boolean}
+      is_single: {type: boolean}
+      is_child_table: {type: boolean}
+      title_field:
+        type: [string, 'null']
+      generic_write_tools:
+        type: string
+        enum: [open, closed]
+      permissions:
+        type: object
+        required: [read, write, create, delete, submit, cancel]
+        properties:
+          read: {type: boolean}
+          write: {type: boolean}
+          create: {type: boolean}
+          delete: {type: boolean}
+          submit: {type: boolean}
+          cancel: {type: boolean}
+      fields:
+        type: array
+        items:
+          type: object
+          required: [fieldname, fieldtype, reqd, read_only, permlevel, secret, readable, writable]
+          properties:
+            fieldname: {type: string}
+            fieldtype: {type: string}
+            label: {type: string}
+            description: {type: string}
+            options: {type: string}
+            reqd: {type: boolean}
+            read_only: {type: boolean}
+            permlevel: {type: integer}
+            secret: {type: boolean}
+            readable: {type: boolean}
+            writable: {type: boolean}
+  ListDocuments:
+    type: object
+    required: [documents, has_next_page, next_start, truncated, as_of, site, source]
+    properties:
+      documents:
+        type: array
+        items: {type: object}
+      has_next_page: {type: boolean}
+      next_start:
+        type: [integer, 'null']
+        description: Value of start for the next page. Null on the last page.
+      truncated: {type: boolean, description: True when rows or values were left out to stay within the limits.}
+      as_of: {type: string, description: 'Time of the read, ISO 8601 with a UTC offset.'}
+      site: {type: string}
+      source: {type: string, description: 'What the data was read from, for example a DocType or a report.'}
+  GetDocument:
+    type: object
+    required: [document, truncated, as_of, site, source]
+    properties:
+      document: {type: object, description: 'Field name to value. A child table is a list of row objects, at most
+          200 rows.'}
+      truncated: {type: boolean, description: True when rows or values were left out to stay within the limits.}
+      as_of: {type: string, description: 'Time of the read, ISO 8601 with a UTC offset.'}
+      site: {type: string}
+      source: {type: string, description: 'What the data was read from, for example a DocType or a report.'}
+  RunReport:
+    type: object
+    required: [columns, rows, truncated, as_of, site, source]
+    properties:
+      columns:
+        type: array
+        description: A column is an object with fieldname, label and fieldtype, or the text Label:Type:Width.
+        items:
+          type: [object, string]
+      rows:
+        type: array
+        description: A row is an object keyed by fieldname, or a list in column order.
+        items:
+          type: [object, array]
+      truncated: {type: boolean, description: True when rows or values were left out to stay within the limits.}
+      as_of: {type: string, description: 'Time of the read, ISO 8601 with a UTC offset.'}
+      site: {type: string}
+      source: {type: string, description: 'What the data was read from, for example a DocType or a report.'}
+  ApprovalRequired:
+    type: object
+    required: [status, proposal_id, preview, expires_at, created_at]
+    properties:
+      status:
+        type: string
+        enum: [approval_required]
+      proposal_id: {type: string}
+      preview:
+        type: object
+        required: [action, summary]
+        properties:
+          action:
+            type: string
+            enum: [create, update, submit, cancel, delete, app_tool, admin]
+          summary: {type: string}
+          changes:
+            type: array
+            items:
+              type: object
+              required: [fieldname, new]
+              properties:
+                fieldname: {type: string}
+                label:
+                  type: [string, 'null']
+                old: {}
+                new: {}
+          details: {type: object, description: 'Extra facts of the tool for the human, as plain values.'}
+      expires_at: {type: string, description: ISO 8601 with a UTC offset.}
+      created_at: {type: string, description: ISO 8601 with a UTC offset.}
+  ProposalState:
+    type: object
+    required: [proposal_id, status, result, tool, destructive, billable, preview, expires_at, created_at]
+    properties:
+      proposal_id: {type: string}
+      status:
+        type: string
+        enum: [pending, rejected, expired, consumed]
+      result:
+        type: string
+        enum: ['', unknown, succeeded, failed]
+      tool: {type: string}
+      target_doctype:
+        type: [string, 'null']
+      target_name:
+        type: [string, 'null']
+      destructive: {type: boolean}
+      billable: {type: boolean}
+      preview:
+        type: object
+        required: [action, summary]
+        properties:
+          action:
+            type: string
+            enum: [create, update, submit, cancel, delete, app_tool, admin]
+          summary: {type: string}
+          changes:
+            type: array
+            items:
+              type: object
+              required: [fieldname, new]
+              properties:
+                fieldname: {type: string}
+                label:
+                  type: [string, 'null']
+                old: {}
+                new: {}
+          details: {type: object, description: 'Extra facts of the tool for the human, as plain values.'}
+      expires_at: {type: string, description: ISO 8601 with a UTC offset.}
+      created_at: {type: string, description: ISO 8601 with a UTC offset.}
+      result_document:
+        type: [string, 'null']
+      error:
+        type: [string, 'null']
+
+x-mcp-schemas:
+  DocumentTarget:
+    type: object
+    additionalProperties: false
+    required: [doctype, name]
+    properties:
+      doctype: {type: string, minLength: 1}
+      name: {type: string, minLength: 1}
+  UserRole:
+    type: object
+    additionalProperties: false
+    required: [user, role]
+    properties:
+      user: {type: string, minLength: 1}
+      role: {type: string, minLength: 1}
+
+# Rules for child table rows. The `create_document` and `update_document` tools apply them.
+x-child-table-rules:
+  - The row list replaces the whole table. A row that is not in the list is deleted. The preview shows the old rows.
+  - The `name` value of a row can only be the name of a row in the same table of the document being updated.
+  - No `name` is sent for a new document or a new row. The server generates the name.
+  - A row cannot carry the `parent`, `parenttype`, `parentfield`, `owner`, `docstatus` and `idx` fields.
+  - Field-level write permission is also required for row fields. A secret field cannot be written in a row either.
+  - These checks are made at preview and at execution.
+
+# Before running the report, the `run_report` tool calls the report gate of the access engine.
+x-report-gate:
+  - The gate is the function `platform_core.erisim.api.report_guard(report_name)`. This is the public path of the access engine.
+  - If the gate denies the user, the tool returns `permission` and the report does not run.
+  - If the gate is not installed, the tool returns `report_gate_unavailable`. The report tool stays closed.
+  - A report that is prepared in the background is not run inside the request. The tool returns `report_too_large`.
+  - The tool reads and copies at most `limit` rows.
+
+# A report column is removed from the `run_report` response in these cases.
+x-report-secret-rules:
+  - The column type is "Password".
+  - The field name or label of the column matches the secret name pattern.
+  - The field with the same name in the report's source DocType is secret.
+  - The author of the report marks a secret value that comes from another source in one of these three ways.
+
+# An application can close a DocType to the generic write tools.
+x-ai-write-closed-hook:
+  description: |
+    The application writes `ai_write_closed_doctypes = ["DocType name"]` in its `hooks.py` file.
+    The generic write tools return `blocked_doctype` for a DocType in the list.
+    For example, a DocType that holds an identity link or an access rule is closed this way.
+
+# The shape of a tool that applications declare with the `ai_tools` hook (G-105).
+x-ai-tools-hook:
+  description: |
+    The application writes `ai_tools = ["app.path.function"]` in its `hooks.py` file.
+    The function returns a list in the shape below. The layer validates the declaration when it loads it.
+
+    Errors of a tool: the text of a Frappe error (`ValidationError`, `PermissionError`,
+    `DoesNotExistError`) is never returned or stored. The caller gets a fixed code and a fixed text.
+    The server log gets the tool name and the error type. A tool that raises `ToolDenied` writes
+    the returned text itself and must not put a field value into it.
+  declaration:
+    type: object
+    additionalProperties: false
+    required: [name, description, arguments, kind, handler]
+    properties:
+      name:
+        type: string
+        pattern: "^[a-z][a-z0-9_]{2,63}$"
+        description: Tool name. The layer puts the application name in front. An example result is `hrms_tr_approve_leave`.
+      description: {type: string, description: English description. The Turkish text is in the translation file.}
+      arguments: {type: string, description: "Path of the input model. The model is a `pydantic.BaseModel` class and carries the `extra=\"forbid\"` setting. Field names such as `confirm`, `approved` and `force` are rejected."}
+      kind: {type: string, enum: [read, write]}
+      roles: {type: array, items: {type: string}, description: "Roles that can see the tool. If empty, every logged-in user sees it."}
+      destructive: {type: boolean, default: false}
+      billable: {type: boolean, default: false}
+      handler: {type: string, description: "Path of the function that does the work. The function makes its own permission check. For a write tool it returns the name of the affected document under the `name` key."}
+      prepare:
+        type: string
+        description: |
+          Optional. Path of the write tool's own pre-check function. `handler` receives only the value this function returns.
+          This function is the application's code, not the layer's own check. Every error after the function has started
+          gives the `unknown` result. The function may have touched an external system.
+      versioned:
+        type: boolean
+        default: false
+        description: |
+          Optional. If true, the layer locks the target row just before executing and runs the preview again.
+          If `target_version` has changed, the action does not run. The result becomes `failed` and the error `document_changed`.
+          The preview must return `target_doctype`, `target_name` and `target_version`. If one is missing, the tool returns `invalid_preview`.
+          This check is made before the proposal is opened, at approval time and just before execution.
+      preview:
+        type: string
+        description: |
+          Path of the function that produces the preview. Required for `kind: write`. The function checks permission and returns a dict.
+          If the function raises `frappe.ValidationError`, the tool returns `invalid_arguments`. If it raises it at approval time, the proposal becomes `rejected`.
+          In the dict `summary` is required. `target_doctype`, `target_name`, `target_version`, `changes` and `details` are optional.
+          The layer runs the preview again at approval time. If `target_version` has changed, it denies the approval.

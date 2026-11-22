@@ -34,10 +34,11 @@ paths:
         required: true
         content:
           application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
             schema: { $ref: '#/components/schemas/Device' }
       responses:
         '200': { $ref: '#/components/responses/DeviceSuccess' }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -58,6 +59,11 @@ paths:
         required: true
         content:
           application/json:
+            examples:
+              singleInstallation:
+                value: { installation_id: 20000000-0000-4000-8000-000000000001 }
+              allInstallations:
+                value: { all: true }
             schema:
               oneOf:
                 - { $ref: '#/components/schemas/Device' }
@@ -68,7 +74,7 @@ paths:
                     all: { const: true }
       responses:
         '200': { $ref: '#/components/responses/RevokedSuccess' }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -87,12 +93,14 @@ paths:
         required: true
         content:
           application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
             schema: { $ref: '#/components/schemas/Device' }
       responses:
         '200':
           description: The server returns the last activity time in Unix seconds.
           content:
             application/json:
+              example: { server_time: 1795340000, message: { last_user_activity_at: 1795340000 } }
               schema:
                 type: object
                 required: [message, server_time]
@@ -103,7 +111,7 @@ paths:
                     required: [last_user_activity_at]
                     properties:
                       last_user_activity_at: { type: integer }
-        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -123,6 +131,17 @@ paths:
         required: true
         content:
           application/json:
+            examples:
+              sampleUpdate:
+                summary: Illustrative command. The production command allowlist starts empty.
+                value:
+                  installation_id: 20000000-0000-4000-8000-000000000001
+                  operations:
+                    - operation_id: 40000000-0000-4000-8000-000000000001
+                      command: sample.leave.update
+                      record_id: 50000000-0000-4000-8000-000000000001
+                      version: "1"
+                      fields: { title: Sample leave request }
             schema:
               type: object
               additionalProperties: false
@@ -137,7 +156,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
         '409': { $ref: '#/components/responses/Error', description: The operation content changed or the record version is stale. }
-        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
         '403': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
@@ -157,6 +176,7 @@ paths:
         required: true
         content:
           application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001, limit: 20 }
             schema:
               type: object
               additionalProperties: false
@@ -168,7 +188,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Page' }
         '410': { $ref: '#/components/responses/Error', description: The cursor is invalid or has expired. Request a full copy. }
-        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
         '403': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
@@ -186,6 +206,7 @@ paths:
         required: true
         content:
           application/json:
+            example: { dry_run: true }
             schema:
               type: object
               additionalProperties: false
@@ -193,7 +214,7 @@ paths:
                 dry_run: { type: boolean, default: false }
       responses:
         '200': { $ref: '#/components/responses/CleanupResultSuccess' }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -212,6 +233,7 @@ paths:
         required: true
         content:
           application/json:
+            example: { issuer: 'https://identity.example.test/realms/sample', subject: sample-user }
             schema:
               type: object
               additionalProperties: false
@@ -224,6 +246,7 @@ paths:
           description: The number of revoked installations for the user.
           content:
             application/json:
+              example: { server_time: 1795340000, message: { revoked: 2 } }
               schema:
                 type: object
                 required: [message, server_time]
@@ -232,7 +255,7 @@ paths:
                   message: { $ref: '#/components/schemas/Revoked' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/IdentitySyncAuthorizationError' }
         '404':
           description: The identity link was not found. The exc_type field is IdentityNotFound.
           content:
@@ -257,10 +280,11 @@ paths:
         required: true
         content:
           application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
             schema: { $ref: '#/components/schemas/Device' }
       responses:
         '200': { $ref: '#/components/responses/DeviceSuccess' }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -285,6 +309,11 @@ paths:
         required: true
         content:
           application/json:
+            examples:
+              singleInstallation:
+                value: { installation_id: 20000000-0000-4000-8000-000000000001 }
+              allInstallations:
+                value: { all: true }
             schema:
               oneOf:
                 - { $ref: '#/components/schemas/Device' }
@@ -295,7 +324,7 @@ paths:
                     all: { const: true }
       responses:
         '200': { $ref: '#/components/responses/RevokedSuccess' }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError' }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -318,12 +347,14 @@ paths:
         required: true
         content:
           application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
             schema: { $ref: '#/components/schemas/Device' }
       responses:
         '200':
           description: The server returns the last activity time in Unix seconds.
           content:
             application/json:
+              example: { server_time: 1795340000, message: { last_user_activity_at: 1795340000 } }
               schema:
                 type: object
                 required: [message, server_time]
@@ -334,7 +365,7 @@ paths:
                     required: [last_user_activity_at]
                     properties:
                       last_user_activity_at: { type: integer }
-        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -357,6 +388,17 @@ paths:
         required: true
         content:
           application/json:
+            examples:
+              sampleUpdate:
+                summary: Illustrative command. The production command allowlist starts empty.
+                value:
+                  installation_id: 20000000-0000-4000-8000-000000000001
+                  operations:
+                    - operation_id: 40000000-0000-4000-8000-000000000001
+                      command: sample.leave.update
+                      record_id: 50000000-0000-4000-8000-000000000001
+                      version: "1"
+                      fields: { title: Sample leave request }
             schema:
               type: object
               additionalProperties: false
@@ -371,7 +413,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AppliedOperationsSuccess' }
         '409': { $ref: '#/components/responses/Error', description: The operation content changed or the record version is stale. }
-        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -392,6 +434,7 @@ paths:
         required: true
         content:
           application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001, limit: 20 }
             schema:
               type: object
               additionalProperties: false
@@ -403,7 +446,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Page' }
         '410': { $ref: '#/components/responses/Error', description: The cursor is invalid or has expired. Request a full copy. }
-        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
         '413': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         '503': { $ref: '#/components/responses/Unavailable' }
@@ -412,7 +455,9 @@ paths:
     post:
       summary: List your mobile installations
       operationId: mobileV1ListInstallations
-      description: Lists installations for the verified account, ordered by installation ID.
+      description: |
+        Lists installations for the verified account, ordered by installation ID.
+        The calling phone installation must be active and within its idle limit.
       parameters:
         - { $ref: '#/components/parameters/AppVersion' }
         - { $ref: '#/components/parameters/ContractVersion' }
@@ -420,10 +465,11 @@ paths:
         required: true
         content:
           application/json:
+            example: { after: 10000000-0000-4000-8000-000000000001 }
             schema: { $ref: '#/components/schemas/InstallationListRequest' }
       responses:
         '200': { $ref: '#/components/responses/InstallationListSuccess' }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError' }
         '429': { $ref: '#/components/responses/Throttled' }
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile.v1_revoke_installation:
@@ -440,10 +486,11 @@ paths:
         required: true
         content:
           application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
             schema: { $ref: '#/components/schemas/Device' }
       responses:
         '200': { $ref: '#/components/responses/RevokedSuccess' }
-        '401': { $ref: '#/components/responses/Error', description: Authentication is required or the installation timed out with reauthentication_required. }
+        '401': { $ref: '#/components/responses/MobileAuthenticationError', description: Authentication is required or the installation timed out with reauthentication_required. }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
@@ -464,10 +511,11 @@ paths:
         required: true
         content:
           application/json:
+            example: { after: 10000000-0000-4000-8000-000000000001 }
             schema: { $ref: '#/components/schemas/InstallationListRequest' }
       responses:
         '200': { $ref: '#/components/responses/InstallationListSuccess' }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError' }
         '429': { $ref: '#/components/responses/Throttled' }
         default: { $ref: '#/components/responses/Error' }
   /platform_core.api.mobile_pwa.v1_revoke_installation:
@@ -488,10 +536,11 @@ paths:
         required: true
         content:
           application/json:
+            example: { installation_id: 20000000-0000-4000-8000-000000000001 }
             schema: { $ref: '#/components/schemas/Device' }
       responses:
         '200': { $ref: '#/components/responses/RevokedSuccess' }
-        '401': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/PwaAuthenticationError' }
         '404': { $ref: '#/components/responses/Error' }
         '429': { $ref: '#/components/responses/Throttled' }
         default: { $ref: '#/components/responses/Error' }
@@ -654,6 +703,13 @@ components:
       description: A page of installations for the authenticated account.
       content:
         application/json:
+          example:
+            server_time: 1795340000
+            message:
+              installations:
+                - { installation_id: 20000000-0000-4000-8000-000000000001, scope: mobile, revoked: false }
+                - { installation_id: 30000000-0000-4000-8000-000000000001, scope: pwa, revoked: false }
+              next_after: null
           schema:
             type: object
             required: [message, server_time]
@@ -681,6 +737,7 @@ components:
       description: The request completed.
       content:
         application/json:
+          example: { server_time: 1795340000, message: { installation_id: 20000000-0000-4000-8000-000000000001 } }
           schema:
             type: object
             required: [message, server_time]
@@ -691,6 +748,7 @@ components:
       description: The request completed.
       content:
         application/json:
+          example: { server_time: 1795340000, message: { revoked: 1 } }
           schema:
             type: object
             required: [message, server_time]
@@ -701,6 +759,11 @@ components:
       description: The request completed.
       content:
         application/json:
+          example:
+            server_time: 1795340000
+            message:
+              operations:
+                - { operation_id: 40000000-0000-4000-8000-000000000001, status: applied }
           schema:
             type: object
             required: [message, server_time]
@@ -711,6 +774,18 @@ components:
       description: The request completed.
       content:
         application/json:
+          example:
+            server_time: 1795340000
+            message:
+              dry_run: true
+              removed: 0
+              operations_removed: 0
+              eligible_changes: 12
+              eligible_operations: 3
+              deliveries_removed: 0
+              eligible_deliveries: 2
+              eligible_revoked_sessions: 1
+              revoked_sessions_removed: 0
           schema:
             type: object
             required: [message, server_time]
@@ -721,6 +796,17 @@ components:
       description: A page of records and the cursor for the next request.
       content:
         application/json:
+          example:
+            server_time: 1795340000
+            message:
+              changes:
+                - kind: upsert
+                  record_type: sample_leave
+                  record_id: 50000000-0000-4000-8000-000000000001
+                  version: "2"
+                  fields: { title: Sample leave request }
+              cursor: e1.sample-page-cursor
+              has_more: false
           schema:
             type: object
             required: [message, server_time]
@@ -733,6 +819,24 @@ components:
                   changes: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/Change' } }
                   cursor: { type: string, maxLength: 2048 }
                   has_more: { type: boolean }
+    MobileAuthenticationError:
+      description: The request was rejected.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { server_time: 1795340000, code: mobile_token_required }
+    PwaAuthenticationError:
+      description: The request was rejected.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { server_time: 1795340000, code: pwa_session_required }
+    IdentitySyncAuthorizationError:
+      description: The request was rejected.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { server_time: 1795340000, code: service_token_required }
     Error:
       description: The request was rejected.
       content:

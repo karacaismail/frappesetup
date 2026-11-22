@@ -1,13 +1,32 @@
 import ast
 from pathlib import Path
+from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from werkzeug.datastructures import Headers
+from werkzeug.wrappers import Response
 
 from platform_core.hooks import doc_events
 
 
 class TestShellPermissionHooks(IntegrationTestCase):
+	def test_security_header_hook_is_installed_once(self):
+		hook = "platform_core.kabuk.headers.add_security_headers"
+		self.assertEqual(frappe.get_hooks("after_request").count(hook), 1)
+
+	def test_security_header_hook_preserves_existing_values(self):
+		from platform_core.kabuk.headers import add_security_headers
+
+		response = Response(headers={"X-Frame-Options": "DENY"})
+		pending = Headers({"Referrer-Policy": "no-referrer"})
+		with patch.object(frappe.local, "response_headers", pending, create=True):
+			add_security_headers(response)
+		self.assertEqual(response.headers.getlist("X-Frame-Options"), ["DENY"])
+		self.assertEqual(response.headers.getlist("X-Content-Type-Options"), ["nosniff"])
+		self.assertNotIn("Referrer-Policy", response.headers)
+		self.assertEqual(pending.getlist("Referrer-Policy"), ["no-referrer"])
+
 	def test_installed_auth_guard_follows_credentials_hooks(self):
 		hooks = frappe.get_hooks("auth_hooks")
 		guard = "platform_core.kabuk.native_metadata.guard_native_metadata"
@@ -37,6 +56,7 @@ class TestShellPermissionHooks(IntegrationTestCase):
 		for name in (
 			"auth_hooks",
 			"after_build",
+			"after_request",
 			"clear_cache",
 			"before_request",
 			"doc_events",

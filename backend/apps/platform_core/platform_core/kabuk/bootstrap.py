@@ -11,6 +11,8 @@ from frappe.utils import cint, get_system_timezone
 from platform_core.kabuk.cache import permission_version
 from platform_core.kabuk.serialization import digest
 
+BOOTSTRAP_CACHE_SECONDS = 60
+
 SIDEBAR_FIELDS = (
 	"name",
 	"module",
@@ -90,6 +92,29 @@ def get_bootstrap(user: str) -> dict:
 		frappe.throw(
 			frappe._("Log in to access this resource.", context="shell.session"), frappe.PermissionError
 		)
+	version = permission_version()
+	language = frappe.local.lang or frappe.get_cached_value("User", user, "language") or "en"
+	roles = sorted(frappe.get_roles(user))
+	key = _bootstrap_cache_key(version, language, roles)
+	cached = frappe.cache.get_value(key, user=user, expires=True)
+	if cached is not None:
+		return cached
+
+	payload = _build_bootstrap(user, version, language, roles)
+	# A concurrent permission commit can retire this generation while the build runs.
+	# Store only under the generation read before the build, never under the new one.
+	frappe.cache.set_value(key, payload, user=user, expires_in_sec=BOOTSTRAP_CACHE_SECONDS)
+	return payload
+
+
+def _bootstrap_cache_key(version: str, language: str, roles: list[str]) -> str:
+	scope = digest(
+		[language, roles, cint(frappe.conf.developer_mode), frappe.conf.get("shell_navigation_hosts")]
+	)
+	return f"platform_core:shell:bootstrap:v1:{version}:{scope}"
+
+
+def _build_bootstrap(user: str, version: str, language: str, roles: list[str]) -> dict:
 	context = SidebarContext.for_modules(get_navigable_modules(), user)
 	pages = [
 		page
@@ -125,8 +150,8 @@ def get_bootstrap(user: str) -> dict:
 		"user": {
 			"name": user,
 			"full_name": user_doc.full_name,
-			"language": frappe.local.lang or user_doc.language or "en",
-			"roles": sorted(frappe.get_roles(user)),
+			"language": language,
+			"roles": roles,
 		},
 		"installed_apps": apps,
 		"formatting": {
@@ -148,7 +173,7 @@ def get_bootstrap(user: str) -> dict:
 			if not page.get("app") or page.get("app") in apps
 		],
 		"sidebars": sidebars,
-		"perm_version": permission_version(),
+		"perm_version": version,
 	}
 	payload["meta_hash"] = digest(payload)
 	return payload
@@ -163,3 +188,17 @@ def workspace_target_allowed(page: dict, context) -> bool:
 			return safe_url(page.get("external_link"))
 		return bool(page.get("link_to")) and is_item_allowed(page["link_to"], link_type, context)
 	return True
+
+
+def compact_bootstrap(payload: dict) -> dict:
+	"""Keep identity and formatting without returning a broken navigation tree."""
+	summary = {
+		"user": {**payload["user"], "roles": []},
+		"formatting": payload["formatting"],
+		"installed_apps": [],
+		"workspaces": [],
+		"sidebars": [],
+		"perm_version": payload["perm_version"],
+		"truncated": True,
+	}
+	return {**summary, "meta_hash": digest(summary)}

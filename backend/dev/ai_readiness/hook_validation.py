@@ -2,7 +2,11 @@
 
 import ast
 
-CHECKED_HOOKS = {"ai_tools", "override_whitelisted_methods"}
+HOOK_RULES = {
+    "ai_tools": "sql",
+    "override_whitelisted_methods": "endpoint",
+    "website_user_allowed_methods": "website-user",
+}
 
 
 def node_names(node):
@@ -28,7 +32,7 @@ def invalid_hook_uses(tree):
         if not isinstance(statement, ast.Assign) or len(statement.targets) != 1:
             continue
         target = statement.targets[0]
-        if isinstance(target, ast.Name) and target.id in CHECKED_HOOKS:
+        if isinstance(target, ast.Name) and target.id in HOOK_RULES:
             first_assignments.setdefault(target.id, target)
 
     valid_targets = set(first_assignments.values())
@@ -37,6 +41,25 @@ def invalid_hook_uses(tree):
         for node in ast.walk(tree)
         if node not in valid_targets
         for name in node_names(node)
-        if name in CHECKED_HOOKS
+        if name in HOOK_RULES
     }
     return sorted(findings, key=lambda finding: (finding[1], finding[0]))
+
+
+def opaque_hook_lines(tree):
+    return {
+        node.lineno
+        for node in ast.walk(tree)
+        if (isinstance(node, ast.ImportFrom) and any(alias.name == "*" for alias in node.names))
+        or (
+            isinstance(node, ast.Call)
+            and (
+                isinstance(node.func, ast.Name)
+                and node.func.id in {"globals", "vars", "locals", "setattr"}
+                or isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "builtins"
+                and node.func.attr in {"globals", "vars", "locals", "setattr"}
+            )
+        )
+    }

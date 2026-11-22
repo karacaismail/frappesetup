@@ -12,13 +12,14 @@ from uuid import uuid4
 
 import frappe
 from frappe.utils import add_days, now_datetime
-from frappe.utils.password import get_decrypted_password
+from frappe.utils.password import get_decrypted_password, set_encrypted_password
 
 from platform_core.model_gecidi import adapters, gateway, policy
 
 
 class TestModelHTTP(unittest.TestCase):
 	fixture = None
+	D6_ACTORS = ("guest", "desk_no_gateway_role", "regular", "manager", "system_manager")
 
 	@classmethod
 	def setUpClass(cls):
@@ -87,6 +88,11 @@ class TestModelHTTP(unittest.TestCase):
 
 	def test_test_api_foreign_data_denied(self):
 		self.assertEqual(self._test_api_request("regular").status_code, 403)
+
+	def test_non_manager_desk_user_receives_native_permission_error(self):
+		response = self._test_api_request("authorized")
+		self.assertEqual(response.status_code, 403)
+		self.assertEqual(response.json().get("exc_type"), "PermissionError")
 
 	def test_regular_user_cannot_list_or_read_provider_credentials(self):
 		for name in ("", self.fixture["credential_api"]):
@@ -358,6 +364,99 @@ class TestModelHTTP(unittest.TestCase):
 	def _maintenance(self, actor, endpoint, payload):
 		return self.request(actor, "POST", f"/api/method/platform_core.api.model.{endpoint}", json=payload)
 
+	def _assert_d6_access(self, operation, request, *, allowed=("manager", "system_manager")):
+		for actor in self.D6_ACTORS:
+			with self.subTest(operation=operation, actor=actor):
+				response = request(actor)
+				print(f"D6 {operation} {actor} {response.status_code}", flush=True)
+				expected = 200 if actor in allowed else 403
+				self.assertEqual(response.status_code, expected, response.json().get("exc_type"))
+				if expected == 403:
+					self.assertEqual(response.json().get("exc_type"), "PermissionError")
+
+	def test_d6_fixture_identities(self):
+		users = self.fixture["users"]
+		actor_types = {
+			"desk_no_gateway_role": "System User",
+			"regular": "Website User",
+			"manager": "System User",
+			"system_manager": "System User",
+		}
+		for actor, user_type in actor_types.items():
+			with self.subTest(actor=actor):
+				self.assertEqual(frappe.db.get_value("User", users[actor], "user_type"), user_type)
+		route_role = frappe.db.get_value("AI Route", self.fixture["role_route"], "required_role")
+		desk_roles = set(frappe.get_roles(users["desk_no_gateway_role"]))
+		self.assertTrue(desk_roles.isdisjoint({route_role, "AI Manager", "System Manager"}))
+		self.assertIn("AI Manager", frappe.get_roles(users["manager"]))
+		self.assertNotIn("System Manager", frappe.get_roles(users["manager"]))
+		self.assertIn("System Manager", frappe.get_roles(users["system_manager"]))
+
+	def test_d6_complete(self):
+		self._assert_d6_access("complete", lambda actor: self.complete(actor, self.fixture["role_route"]))
+
+	def test_d6_test_api(self):
+		self._assert_d6_access("test_api", self._test_api_request)
+
+	def test_d6_resolve_usage(self):
+		def request(actor):
+			log = self._probe_log()
+			frappe.db.set_value("AI Usage Log", log, {"result": "unknown", "cost_known": 0})
+			frappe.db.commit()
+			return self._maintenance(actor, "resolve_usage", {"log": log, "cost": "0.125", "currency": "USD"})
+
+		self._assert_d6_access("resolve_usage", request)
+
+	def test_d6_reconcile_stale_pending(self):
+		def request(actor):
+			log = self._probe_log()
+			frappe.db.set_value(
+				"AI Usage Log", log, {"result": "pending", "attempted_at": add_days(now_datetime(), -1)}
+			)
+			frappe.db.commit()
+			return self._maintenance(actor, "reconcile_stale_pending", {})
+
+		self._assert_d6_access("reconcile_stale_pending", request)
+
+	def test_d6_purge_preview(self):
+		self._assert_d6_access(
+			"purge_usage_preview",
+			lambda actor: self._maintenance(actor, "purge_usage", {"dry_run": True}),
+			allowed=("system_manager",),
+		)
+
+	def test_d6_purge_execute(self):
+		log = self._probe_log()
+		frappe.db.set_value("AI Usage Log", log, "attempted_at", add_days(now_datetime(), -366))
+		frappe.db.commit()
+		preview = self._maintenance("system_manager", "purge_usage", {"dry_run": True}).json()["message"]
+		self.assertEqual(preview["targets"], [log])
+		self._assert_d6_access(
+			"purge_usage_execute",
+			lambda actor: self._maintenance(
+				actor, "purge_usage", {"dry_run": False, "preview_token": preview["preview_token"]}
+			),
+			allowed=("system_manager",),
+		)
+		frappe.db.rollback()
+		audit = frappe.db.exists(
+			"Activity Log",
+			{"subject": "Model gateway usage logs purged", "user": self.fixture["users"]["system_manager"]},
+		)
+		if audit:
+			self.addCleanup(self._delete_activity_log, audit)
+
+	def test_d6_clear_api_credential(self):
+		api_name = self.fixture["d6_clearable_api"]
+
+		def request(actor):
+			frappe.db.set_value("AI API", api_name, "enabled", 0)
+			set_encrypted_password("AI API", api_name, self.fixture["credential"], "api_key")
+			frappe.db.commit()
+			return self._maintenance(actor, "clear_api_credential", {"api": api_name})
+
+		self._assert_d6_access("clear_api_credential", request)
+
 	def test_resolve_usage_guest_denied(self):
 		response = self._maintenance(
 			"guest", "resolve_usage", {"log": "missing", "cost": "0", "currency": "USD"}
@@ -373,6 +472,39 @@ class TestModelHTTP(unittest.TestCase):
 	def test_purge_usage_guest_denied(self):
 		response = self._maintenance("guest", "purge_usage", {"dry_run": True})
 		self.assertEqual(response.status_code, 403)
+
+	def test_reconcile_stale_pending_guest_denied(self):
+		response = self._maintenance("guest", "reconcile_stale_pending", {})
+		self.assertEqual(response.status_code, 403)
+
+	def test_reconcile_stale_pending_foreign_data_denied(self):
+		for actor in ("regular", "authorized"):
+			with self.subTest(actor=actor):
+				response = self._maintenance(actor, "reconcile_stale_pending", {})
+				self.assertEqual(response.status_code, 403)
+				self.assertEqual(response.json().get("exc_type"), "PermissionError")
+
+	def test_manager_can_reconcile_a_stale_pending_reservation(self):
+		log = self._probe_log()
+		frappe.db.set_value(
+			"AI Usage Log",
+			log,
+			{
+				"result": "pending",
+				"attempted_at": add_days(now_datetime(), -1),
+				"reservation_known": 1,
+				"reserved_cost": "0.125",
+			},
+		)
+		frappe.db.commit()
+		response = self._maintenance("manager", "reconcile_stale_pending", {})
+		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
+		self.assertEqual(response.json()["message"], {"closed": 1, "targets": [log]})
+		frappe.db.rollback()
+		record = frappe.get_doc("AI Usage Log", log)
+		self.assertEqual(
+			(record.result, record.failure_code, record.reserved_cost), ("unknown", "pending_recovery", 0.125)
+		)
 
 	def test_purge_usage_foreign_data_denied(self):
 		response = self._maintenance("regular", "purge_usage", {"dry_run": True})
@@ -442,17 +574,25 @@ class TestModelHTTP(unittest.TestCase):
 
 	def test_retention_preserves_old_unknown_attempts(self):
 		closed, unknown = self._probe_log(), self._probe_log()
-		baseline = self._maintenance("manager", "purge_usage", {"dry_run": True})
+		baseline = self._maintenance("system_manager", "purge_usage", {"dry_run": True})
 		self.assertEqual(baseline.status_code, 200, baseline.json().get("exc_type"))
 		eligible = baseline.json()["message"]["eligible"]
-		old = add_days(now_datetime(), -int(frappe.conf.get("model_gateway_usage_retention_days") or 365) - 1)
+		old = add_days(now_datetime(), -366)
 		frappe.db.set_value("AI Usage Log", closed, {"attempted_at": old, "result": "success"})
 		frappe.db.set_value("AI Usage Log", unknown, {"attempted_at": old, "result": "unknown"})
 		frappe.db.commit()
-		response = self._maintenance("manager", "purge_usage", {"dry_run": True})
+		response = self._maintenance("system_manager", "purge_usage", {"dry_run": True})
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
+		preview = response.json()["message"]
 		self.assertEqual(
-			response.json()["message"], {"eligible": eligible + 1, "deleted": 0, "dry_run": True}
+			preview,
+			{
+				"eligible": eligible + 1,
+				"deleted": 0,
+				"dry_run": True,
+				"targets": [closed],
+				"preview_token": preview["preview_token"],
+			},
 		)
 		frappe.db.rollback()
 		self.assertTrue(frappe.db.exists("AI Usage Log", closed))
@@ -461,18 +601,33 @@ class TestModelHTTP(unittest.TestCase):
 		audit_filters = {
 			"reference_doctype": "AI Usage Log",
 			"subject": "Model gateway usage logs purged",
-			"user": self.fixture["users"]["manager"],
+			"user": self.fixture["users"]["system_manager"],
 		}
 		self.assertFalse(frappe.db.exists("Activity Log", audit_filters))
-		response = self._maintenance("manager", "purge_usage", {"dry_run": False})
+		without_preview = self._maintenance("system_manager", "purge_usage", {"dry_run": False})
+		self.assertEqual(without_preview.status_code, 400)
+		self.assertEqual(without_preview.json()["message"]["error"], "preview_required")
+		response = self._maintenance(
+			"system_manager", "purge_usage", {"dry_run": False, "preview_token": preview["preview_token"]}
+		)
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
-		self.assertEqual(response.json()["message"], {"eligible": 1, "deleted": 1, "dry_run": False})
+		self.assertEqual(
+			response.json()["message"],
+			{"eligible": 1, "deleted": 1, "dry_run": False, "targets": [closed], "preview_token": None},
+		)
 		frappe.db.rollback()
 		self.assertFalse(frappe.db.exists("AI Usage Log", closed))
 		audit = frappe.db.exists("Activity Log", audit_filters)
 		self.assertTrue(audit)
 		self.addCleanup(self._delete_activity_log, audit)
 		self.assertTrue(frappe.db.exists("AI Usage Log", unknown))
+
+	def test_purge_rejects_an_ai_manager_for_preview_and_execution(self):
+		for dry_run in (True, False):
+			with self.subTest(dry_run=dry_run):
+				response = self._maintenance("manager", "purge_usage", {"dry_run": dry_run})
+				self.assertEqual(response.status_code, 403)
+				self.assertEqual(response.json().get("exc_type"), "PermissionError")
 
 	def _delete_activity_log(self, name):
 		frappe.db.delete("Activity Log", {"name": name})

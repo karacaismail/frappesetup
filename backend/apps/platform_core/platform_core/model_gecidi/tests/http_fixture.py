@@ -4,7 +4,8 @@ import json
 import unittest
 from contextlib import ExitStack, contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from threading import Thread
+from threading import Event, Thread
+from time import monotonic
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -30,6 +31,9 @@ class ProviderHandler(BaseHTTPRequestHandler):
 		payload = self.rfile.read(int(self.headers["Content-Length"]))
 		self.server.attempts.append(self.path)
 		self.server.provider_payloads.append(payload)
+		if self.server.stall_headers is not None:
+			self._stall_headers(self.server.stall_headers)
+			return
 		if self.server.provider_gate is not None:
 			self.server.provider_gate(self.path)
 		status = self.server.provider_status.get(self.path)
@@ -51,17 +55,35 @@ class ProviderHandler(BaseHTTPRequestHandler):
 		self.send_header("Content-Type", "application/json")
 		self.send_header("Content-Length", str(len(payload)))
 		self.end_headers()
-		self.wfile.write(payload)
+		try:
+			self.wfile.write(payload)
+		except (BrokenPipeError, ConnectionResetError):
+			# A deadline test intentionally disconnects before the provider replies.
+			pass
+
+	def _stall_headers(self, release):
+		"""Keep the socket active while leaving the HTTP headers incomplete."""
+		try:
+			self.wfile.write(b"HTTP/1.0 200 OK\r\n")
+			while not release.wait(1):
+				self.wfile.write(b"X-Fixture-Pulse: 1\r\n")
+		except (BrokenPipeError, ConnectionResetError):
+			pass
 
 
 def _insert(doctype, **fields):
 	return frappe.get_doc({"doctype": doctype, **fields}).insert().name
 
 
-def _identities(suffix, password, role, auth, cleanup):
+def _identities(suffix, password, role, desk_role, auth, cleanup):
 	users = {}
-	roles = {"manager": "AI Manager", "system_manager": "System Manager", "authorized": role}
-	for actor in ("manager", "regular", "authorized", "system_manager"):
+	roles = {
+		"manager": "AI Manager",
+		"system_manager": "System Manager",
+		"authorized": role,
+		"desk_no_gateway_role": desk_role,
+	}
+	for actor in ("manager", "regular", "authorized", "system_manager", "desk_no_gateway_role"):
 		credentials = {"api_key": auth[actor][0], "api_secret": auth[actor][1]} if actor in auth else {}
 		users[actor] = _insert(
 			"User",
@@ -132,6 +154,7 @@ def _seed(suffix, credential, role, cleanup):
 	credential_read_api = credential_api("Private")
 	editable_api = credential_api("Editable")
 	clearable_api = credential_api("Clearable")
+	d6_clearable_api = credential_api("D6 clearable")
 
 	for api in apis:
 		cleanup.callback(_remove_usage, api)
@@ -146,6 +169,7 @@ def _seed(suffix, credential, role, cleanup):
 		"credential_api": credential_read_api,
 		"editable_api": editable_api,
 		"clearable_api": clearable_api,
+		"d6_clearable_api": d6_clearable_api,
 		"credential": credential,
 	}
 
@@ -158,7 +182,7 @@ def _remove_usage(api):
 def _session(base, user=None, password=None):
 	session = requests.Session()
 	session.trust_env = False
-	session.headers["Host"] = TEST_SITE
+	session.headers["Host"] = frappe.local.site
 	if user:
 		login = session.post(
 			base + "/api/method/login",
@@ -210,15 +234,18 @@ class QuietRequestHandler(WSGIRequestHandler):
 
 
 @contextmanager
-def _fixture_webserver():
+def _fixture_webserver(wrap_app=None):
 	"""Test the real WSGI entry point without a development-server policy bypass."""
 
+	application = frappe.app.application
+	if wrap_app is not None:
+		application = wrap_app(application)
 	with (
 		patch.object(frappe.app, "_sites_path", frappe.local.sites_path),
 		make_server(
 			"127.0.0.1",
 			0,
-			frappe.app.application,
+			application,
 			threaded=True,
 			request_handler=QuietRequestHandler,
 		) as web,
@@ -232,10 +259,17 @@ def _fixture_webserver():
 			thread.join()
 
 
-def run():
-	"""Run via bench execute on an isolated test site's own web container."""
+@contextmanager
+def _configured_fixture(wrap_app=None):
 	if frappe.local.site != TEST_SITE or not frappe.conf.get("allow_tests"):
 		raise RuntimeError("The HTTP fixture requires the isolated test site")
+
+	with _gateway_fixture(wrap_app) as fixture:
+		yield fixture
+
+
+@contextmanager
+def _gateway_fixture(wrap_app=None):
 	if any(
 		frappe.conf.get("model_gateway_endpoints", {}).get(url)
 		!= {"kind": "local", "addresses": ["127.0.0.1"]}
@@ -250,9 +284,12 @@ def run():
 	frappe.set_user("Administrator")
 	try:
 		with ExitStack() as cleanup:
-			role = _insert("Role", role_name=f"Gateway fixture caller {suffix}", desk_access=0)
+			# Direct gateway RPC is exercised with a non-manager Desk user.
+			role = _insert("Role", role_name=f"Gateway fixture caller {suffix}", desk_access=1)
 			cleanup.callback(frappe.delete_doc, "Role", role)
-			users = _identities(suffix, password, role, auth, cleanup)
+			desk_role = _insert("Role", role_name=f"Gateway fixture Desk {suffix}", desk_access=1)
+			cleanup.callback(frappe.delete_doc, "Role", desk_role)
+			users = _identities(suffix, password, role, desk_role, auth, cleanup)
 			fixture = _seed(suffix, credential, role, cleanup)
 			frappe.db.commit()
 			with ExitStack() as connections:
@@ -263,11 +300,12 @@ def run():
 				server.provider_status = {}
 				server.provider_gate = None
 				server.provider_payloads = []
+				server.stall_headers = None
 				thread = Thread(target=server.serve_forever, daemon=True)
 				thread.start()
 				connections.callback(thread.join)
 				connections.callback(server.shutdown)
-				base = connections.enter_context(_fixture_webserver())
+				base = connections.enter_context(_fixture_webserver(wrap_app))
 				fixture.update(
 					base=base,
 					users=users,
@@ -288,13 +326,60 @@ def run():
 					session = connections.enter_context(_session(base))
 					session.headers["Authorization"] = f"token {key}:{secret}"
 					fixture["sessions"][session_name] = session
-				TestModelHTTP.fixture = fixture
-				try:
-					suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestModelHTTP)
-					result = unittest.TextTestRunner(verbosity=2).run(suite)
-				finally:
-					TestModelHTTP.fixture = None
+				yield fixture
 	finally:
 		frappe.db.commit()
+
+
+def run():
+	"""Run via bench execute on an isolated test site's own web container."""
+	with _configured_fixture() as fixture:
+		TestModelHTTP.fixture = fixture
+		try:
+			suite = unittest.defaultTestLoader.loadTestsFromTestCase(TestModelHTTP)
+			result = unittest.TextTestRunner(verbosity=2).run(suite)
+		finally:
+			TestModelHTTP.fixture = None
 	if not result.wasSuccessful():
 		raise RuntimeError("Model gateway HTTP checks failed")
+
+
+def run_deadline():
+	"""Measure a complete real Frappe HTTP request against a stalled loopback provider."""
+	with _configured_fixture() as fixture:
+		frappe.db.set_value(
+			"AI Account", fixture["second_account"], {"has_monthly_budget": 1, "monthly_budget": 1}
+		)
+		frappe.db.set_value("AI Model", fixture["model"], {"prices_known": 1, "output_price": 1})
+		frappe.db.commit()
+		release = Event()
+		fixture["provider_server"].stall_headers = release
+		started = monotonic()
+		try:
+			response = fixture["sessions"]["manager"].post(
+				fixture["base"] + "/api/method/platform_core.api.model.complete",
+				json={
+					"route": fixture["role_route"],
+					"messages": [{"role": "user", "content": "Deadline fixture"}],
+					"limit": 1380,
+				},
+				timeout=65,
+			)
+		finally:
+			release.set()
+		elapsed = monotonic() - started
+		evidence = {
+			"elapsed_seconds": round(elapsed, 3),
+			"status": response.status_code,
+			"error": response.json().get("message"),
+			"provider_attempts": len(fixture["attempts"]),
+		}
+		print(json.dumps(evidence))
+		if not (
+			59 <= elapsed <= 60
+			and response.status_code == 503
+			and evidence["error"] == {"error": "provider_timeout"}
+			and evidence["provider_attempts"] == 1
+		):
+			raise RuntimeError("Gateway deadline regression failed")
+		return evidence
