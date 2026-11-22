@@ -8,10 +8,9 @@ import math
 
 import frappe
 from frappe import _
+from frappe.utils.caching import request_cache
 
 RULE_DOCTYPE = "Access Rule"
-CACHE_KEY = "platform_core:erisim:rules"
-CACHE_SECONDS = 60
 
 SCOPES = ("own", "team", "department", "company", "all")
 OPERATIONS = ("read", "write", "create", "delete", "submit", "cancel")
@@ -79,16 +78,15 @@ def operation_of(ptype: str | None) -> str:
 
 
 def active_rules() -> dict[str, list[dict]]:
-	"""Etkin kuralları kayıt türüne göre döner. Sonuç önbellekte durur ve kullanıcıya özel değildir."""
+	"""Return the active rules grouped by document type.
+
+	The rules are kept for the current request only. A cache shared between requests would let
+	a request holding an old database snapshot put removed permissions back for everyone.
+	"""
 	if frappe.flags.in_install or frappe.flags.in_migrate:
-		# Kurulumda tablo henüz olmayabilir. Kurulum yönetici kimliğiyle çalışır.
+		# The table may not exist yet. Installation runs as Administrator.
 		return {}
-	grouped = frappe.cache.get_value(CACHE_KEY)
-	if grouped is None:
-		grouped = _load()
-		# Süre bir güvenlik ağıdır. Eşzamanlı bir istek eski kuralı önbelleğe yazabilir.
-		frappe.cache.set_value(CACHE_KEY, grouped, expires_in_sec=CACHE_SECONDS)
-	return grouped
+	return _request_rules()
 
 
 def _load() -> dict[str, list[dict]]:
@@ -108,14 +106,14 @@ def _load() -> dict[str, list[dict]]:
 	return grouped
 
 
+_request_rules = request_cache(_load)
+
+
 def clear_cache(*_args, **_kwargs) -> None:
-	"""Kural, rol ya da kayıt türü değişince çağrılır. Kayıt kesinleşince bir kez daha siler."""
-	frappe.cache.delete_value(CACHE_KEY)
-	frappe.db.after_commit.add(_delete_cached_rules)
-
-
-def _delete_cached_rules() -> None:
-	frappe.cache.delete_value(CACHE_KEY)
+	"""Forget the rules read in this request. Called when a rule, role or document type changes."""
+	cache = getattr(frappe.local, "request_cache", None)
+	if cache is not None:
+		cache.pop(_load, None)
 
 
 def rules_for(doctype: str) -> list[dict]:

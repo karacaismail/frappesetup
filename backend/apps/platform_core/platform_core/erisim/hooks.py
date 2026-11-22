@@ -7,13 +7,18 @@ Frappe 16'da `has_permission` kancası `None` dönerse erişim reddedilir
 
 import frappe
 
-from platform_core.erisim import engine, rules
+from platform_core.erisim import engine, reports, rules
 
 
 def has_permission(doc, ptype: str | None = None, user: str | None = None, debug: bool = False) -> bool:
 	"""Tek kayıt kancası. Motor yalnız daraltır: `True` izin vermez, rol izni ayrıca aranır."""
 	user = user or frappe.session.user
-	if user == "Administrator" or not rules.is_governed(doc.doctype):
+	if user == "Administrator":
+		return True
+	if doc.doctype == "Prepared Report":
+		# A stored report result is as sensitive as running the report now.
+		return not reports.denial(doc.report_name, user)
+	if not rules.is_governed(doc.doctype):
 		return True
 	return engine.decide(doc, ptype, user)
 

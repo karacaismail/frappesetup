@@ -22,34 +22,54 @@ def sees_every_record(doctype: str, user: str) -> bool:
 	)
 
 
-def guard(report_name: str | None, user: str | None = None) -> None:
-	"""Rapor kuralı uygulayamıyorsa ve kullanıcı daraltılmışsa izin hatası verir."""
+def reads_every_field(doctype: str, user: str) -> bool:
+	"""Does the user hold read access at every permission level the document type uses?
+
+	A query report returns whatever its SQL selects. Frappe does not remove fields by permission
+	level there (`frappe/desk/query_report.py:980` only masks fields).
+	"""
+	meta = frappe.get_meta(doctype)
+	fields = list(meta.fields)
+	for table_field in meta.get_table_fields():
+		fields += frappe.get_meta(table_field.options).fields
+	used = {df.permlevel for df in fields if df.permlevel}
+	return used <= set(meta.get_permlevel_access("read", user=user))
+
+
+def denial(report_name: str | None, user: str | None = None) -> str | None:
+	"""Return why the user may not get this report's data, or None when the report is allowed."""
 	user = user or frappe.session.user
 	if user == "Administrator" or not report_name:
-		return
+		return None
 	report = frappe.db.get_value(
 		"Report", report_name, ["ref_doctype", "report_type", "reference_report"], as_dict=True
 	)
 	if not report:
-		return
+		return None
 	if report.reference_report:
-		# Özel rapor başka raporun verisini kullanır. Karar asıl rapora göre verilir.
-		return guard(report.reference_report, user)
+		# A custom report uses the data of another report. That report decides.
+		return denial(report.reference_report, user)
 	if report.report_type == "Report Builder":
-		# Bu rapor türü veriyi `frappe.get_list` ile okur. Liste kancası çalışır.
-		return
-	if not rules.is_governed(report.ref_doctype):
-		return
+		# This report type reads through `frappe.get_list`, so the query hook and field levels apply.
+		return None
 	if report_name in (frappe.get_hooks(AWARE_REPORTS_HOOK) or []):
-		return
-	if sees_every_record(report.ref_doctype, user):
-		return
-	frappe.throw(
-		_("Report {0} cannot apply the Access Rules of {1}.").format(
+		return None
+	if not reads_every_field(report.ref_doctype, user):
+		return _("Report {0} cannot apply the field levels of {1}.").format(
 			frappe.bold(report_name), frappe.bold(report.ref_doctype)
-		),
-		frappe.PermissionError,
-	)
+		)
+	if rules.is_governed(report.ref_doctype) and not sees_every_record(report.ref_doctype, user):
+		return _("Report {0} cannot apply the Access Rules of {1}.").format(
+			frappe.bold(report_name), frappe.bold(report.ref_doctype)
+		)
+	return None
+
+
+def guard(report_name: str | None, user: str | None = None) -> None:
+	"""Raise a permission error when the report cannot honour the user's record and field limits."""
+	reason = denial(report_name, user)
+	if reason:
+		frappe.throw(reason, frappe.PermissionError)
 
 
 def guard_prepared_report(doc, method=None) -> None:

@@ -1,8 +1,9 @@
 """Sorgu sayısı: kural yüzünden kayıt başına sorgu açılmaz (P-1)."""
 
+from collections import defaultdict
+
 import frappe
 
-from platform_core.erisim.rules import CACHE_KEY
 from platform_core.erisim.tests.base import DOCTYPE, EMPLOYEE_2, MANAGER_1, ErisimTestCase
 
 EXTRA_RECORDS = 40
@@ -21,8 +22,9 @@ class TestQueryCount(ErisimTestCase):
 		frappe.set_user(user)
 		# İlk okuma kayıt türü tanımını ve rolleri önbelleğe alır. Ölçüm ikinci okumadır.
 		frappe.get_list(DOCTYPE, fields=["name", "title"], limit=1000)
-		# Kural önbelleği silinir. Böylece motorun kendi sorguları ölçüme girer.
-		frappe.cache.delete_value(CACHE_KEY)
+		# A real request starts with an empty request cache, so the engine's own queries are counted.
+		frappe.local.request_cache = defaultdict(dict)
+		self.addCleanup(self.drop_request_cache)
 		frappe.db.__class__.sql = counting_sql
 		try:
 			rows = frappe.get_list(DOCTYPE, fields=["name", "title"], limit=1000)
@@ -30,6 +32,10 @@ class TestQueryCount(ErisimTestCase):
 			frappe.db.__class__.sql = original
 			frappe.set_user("Administrator")
 		return len(queries), len(rows)
+
+	def drop_request_cache(self) -> None:
+		if hasattr(frappe.local, "request_cache"):
+			del frappe.local.request_cache
 
 	def test_list_query_count_does_not_grow_with_record_count(self):
 		before, visible_before = self.count_list_queries(MANAGER_1)

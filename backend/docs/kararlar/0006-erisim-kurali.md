@@ -277,6 +277,7 @@ Motor öznenin çalışan kaydını `user_id` alanından bulur. Motor şu değer
 
 - Listede kural yüzünden kayıt başına sorgu açılmaz. Koşul listenin kendi sorgusuna girer.
 - Özne için istek başına en çok 2 sorgu açılır. Biri çalışan, biri bölüm içindir.
+- Kural listesi için istek başına 1 sorgu açılır.
 - Tek kayıt denetimi kayıt başına 1 sorgu açar. Yazmada 1 sorgu daha açılır.
 
 ### Ölçüm
@@ -285,10 +286,11 @@ Motor öznenin çalışan kaydını `user_id` alanından bulur. Motor şu değer
 
 | İşlem | Kuralsız | Kurallı | Fark nereden gelir |
 | --- | --- | --- | --- |
-| Liste | 1 sorgu | 3 sorgu | Özne için 1 sorgu. Frappe'nin paylaşım sorgusu için 1 sorgu. |
-| Liste, kural önbelleği boşken | 1 sorgu | 4 sorgu | Kural listesi için 1 sorgu daha. |
-| Tek kayıt denetimi | 1 sorgu | 3 sorgu | Özne için 1 sorgu. Saklı kayıt sınaması için 1 sorgu. |
-| 10 kayıt denetimi | 10 sorgu | 21 sorgu | Kayıt başına 1 sorgu. Özne için toplam 1 sorgu. |
+| Liste | 2 sorgu | 4 sorgu | Özne için 1 sorgu. Frappe'nin paylaşım sorgusu için 1 sorgu. |
+| Tek kayıt denetimi | 2 sorgu | 4 sorgu | Özne için 1 sorgu. Saklı kayıt sınaması için 1 sorgu. |
+| 10 kayıt denetimi | 11 sorgu | 22 sorgu | Kayıt başına 1 sorgu. Özne için toplam 1 sorgu. |
+
+Her sütundaki sorgulardan biri kural listesinin okunmasıdır. Motor bu okumayı istek başına bir kez yapar. Kuralsız kayıt türünde de yapar.
 
 - Listenin sorgu sayısı kayıt sayısıyla artmaz. Test 40 kayıt ekler ve sayının aynı kaldığını görür.
 - Paylaşım sorgusunu Frappe açar. Frappe bu sorguyu her koşullu listede açar (`database/query.py:1681`).
@@ -347,14 +349,17 @@ Sorgu raporu (“Query Report” ve “Script Report”) veriyi kendi SQL'iyle o
 
 Karar şudur: Motor bu raporlara bir kapı koyar. Kapı güvenli tarafta kalır.
 
-1. Raporun ana kayıt türü kurallı değilse kapı karışmaz.
-2. Öznenin o türde `all` kapsamlı ve süzgeçsiz bir okuma kuralı varsa kapı karışmaz. Özne zaten bütün kayıtları görür.
-3. Öteki durumda kapı raporu izin hatasıyla reddeder.
-4. Bir uygulama raporunu kurala uyumlu yazabilir. Örneğin rapor veriyi `frappe.get_list` ile okur. Uygulama bu raporu `access_rule_aware_reports` kancasıyla bildirir. Kapı bildirilen raporu geçirir.
+1. Kapı önce alan seviyesine bakar. Öznenin ana kayıt türündeki bütün izin seviyelerinde okuma izni olmalıdır. Yoksa kapı raporu reddeder. Bu denetim kuralsız kayıt türünde de çalışır.
+2. Raporun ana kayıt türü kurallı değilse kapı kayıt kuralına bakmaz.
+3. Öznenin o türde `all` kapsamlı ve süzgeçsiz bir okuma kuralı varsa kapı raporu geçirir. Özne zaten bütün kayıtları görür.
+4. Öteki durumda kapı raporu izin hatasıyla reddeder.
+5. Bir uygulama raporunu kurala uyumlu yazabilir. Örneğin rapor veriyi `frappe.get_list` ile okur. Uygulama bu raporu `access_rule_aware_reports` kancasıyla bildirir. Kapı bildirilen raporu geçirir. Bildiren uygulama kayıt kuralını ve alan seviyesini birlikte üstlenir.
+
+Alan seviyesi denetiminin nedeni şudur: Sorgu raporu SQL'in seçtiği her sütunu döner. Frappe bu yolda alanı izin seviyesine göre çıkarmaz. Bütün kayıtları gören kullanıcı maaş alanını okuyamayabilir. Rapor o alanı yine de dönerdi.
 
 Kapı Frappe'nin `override_whitelisted_methods` kancasıyla bağlanır. Bu kanca bir ucun yerine başka işlev koyar (`__init__.py:1577`). Kapı `frappe.desk.query_report.run` ve `frappe.desk.query_report.export_query` uçlarını sarar. Frappe'nin kodu değişmez (M-4).
 
-Hazır rapor (“Prepared Report”) arka planda üretilir ve uçtaki kapıdan geçmez. Bu yüzden kapı “Prepared Report” kaydı açılırken de çalışır. Zamanlanmış e-posta raporu (“Auto Email Report”) kaydı doğrulanırken de çalışır. İkisi `doc_events` kancasıyla bağlanır.
+Hazır rapor (“Prepared Report”) arka planda üretilir ve uçtaki kapıdan geçmez. Bu yüzden kapı “Prepared Report” kaydı açılırken de çalışır. Kapı o kayıt okunurken de çalışır. Böylece başkasının hazırladığı rapor da indirilemez. Rapora bağlı dosya da aynı denetimden geçer (`core/doctype/file/file.py:1108`). Zamanlanmış e-posta raporu (“Auto Email Report”) kaydı doğrulanırken de çalışır. İkisi `doc_events` kancasıyla bağlanır.
 
 Kapının iki sınırı vardır:
 
@@ -430,19 +435,21 @@ Yapay zekâ katmanı ayrı bir yetki yolu kurmaz. Katman kullanıcının kimliğ
 
 ## 12. Önbellek
 
-Kanca her izin denetiminde çalışır. Kural listesi her seferinde veritabanından okunursa her denetime 1 sorgu eklenir.
+Kanca her izin denetiminde çalışır. Motor kural listesini istek başına bir kez okur. Liste yalnız o istek boyunca saklanır.
 
-Bu yüzden etkin kurallar önbellekte tutulur. Önbellek, sık istenen sonucu geçici olarak saklar.
+İstekler arasında ortak önbellek yoktur. İlk tasarımda vardı. İkinci bağımsız inceleme şu yarışı gösterdi ve bir test onu doğruladı:
 
-- Anahtar bütün etkin kuralları kayıt türüne göre taşır. Kullanıcıya özel veri taşımaz.
-- “Access Rule” kaydı eklenince, değişince ve silinince önbellek silinir. Silme, kayıt kesinleşince bir kez daha yapılır.
-- “Role” ve “DocType” adı değişince ya da silinince de önbellek silinir.
-- Önbellek 60 saniye sonra kendiliğinden silinir. Bu süre bir güvenlik ağıdır. Eşzamanlı bir istek eski kuralı önbelleğe yazabilir. Süre bu durumu 60 saniyeyle sınırlar.
-- Özne değerleri önbelleğe girmez. Yalnız istek boyunca saklanır. Böylece `reports_to` değişikliği hemen etki eder.
+1. Birinci istek eski, geniş kuralı okur.
+2. Yönetici ikinci istekte kuralı daraltır. Değişiklik kesinleşir ve önbellek silinir.
+3. Birinci istek eski kuralı ortak önbelleğe geri yazar.
+4. Sonraki istekler kaldırılmış yetkiyle çalışır.
 
-Kural değişince sonuç sonraki istekte değişir. Bu davranış testle sınanır.
+Ortak önbellek kaldırılınca bu yol kapandı. Bedeli istek başına 1 sorgudur. Ölçüm 7. bölümdedir.
 
-P-5 kuralı önbelleği ölçümle gerekçelendirmeyi ister. Ölçüm 7. bölümdedir. Önbellek her istekte 1 sorgu kazandırır. Kazanç kuralsız kayıt türlerinde de geçerlidir. Önbellek olmasa motor her izin denetiminde kural tablosunu okurdu.
+- Kural değişince sonuç sonraki istekte değişir. Bu davranış testle sınanır.
+- Kuralı değiştiren istek kendi sakladığı listeyi de siler.
+- Özne değerleri de yalnız istek boyunca saklanır. Böylece `reports_to` değişikliği sonraki istekte etki eder.
+- Süren bir istek kendi veritabanı görüntüsünü kullanır. O istek bitene kadar eski kuralı görebilir. Bu, veritabanı işlemlerinin olağan davranışıdır.
 
 ## 13. Uçlar
 
@@ -482,6 +489,7 @@ Beklenen sonuçlar bu nottan, sözleşmeden ve karar sitesinden gelir (D-1).
 | `test_uclar.py` | Dört ucun izni, girdisi ve çıktısı. | Sözleşme |
 | `test_sorgu_sayisi.py` | Liste sorgu sayısı kayıt sayısıyla artmaz. | P-1 |
 | `test_inceleme.py` | Bağımsız incelemenin bulguları, bölüm ve şirket kapsamları, işleçler. | R-9 |
+| `test_second_review.py` | İkinci incelemenin üç bulgusu. | R-9 |
 
 Güvenlik kapısı uç testlerini modülün yanında ister. Bu yüzden iki dosya daha vardır:
 
@@ -498,18 +506,30 @@ Motor yetki kodudur. Bu yüzden kod bağımsız bir incelemeden geçti (R-9). İ
 | --- | --- |
 | İstemci kaydın adını değiştirerek başkasının kaydına ulaşabilir. | Doğrulanmadı. Üç test bu yolu gerçek istekle sınar ve yol kapalıdır. Testler kalıcıdır. |
 | Hazır rapor yolu kapıyı atlar. | Doğrulandı ve kapatıldı. |
-| Eski kural önbellekte süresiz kalabilir. | Önbelleğe 60 saniye süre verildi. |
+| Eski kural önbellekte süresiz kalabilir. | Önce 60 saniye süre verildi. İkinci inceleme bunu yetersiz buldu. Ortak önbellek kaldırıldı. |
 | Sayı değeri kuralı geçer. Liste değeri sunucu hatası verir. | Doğrulandı ve kapatıldı. |
 | Sonsuz sayı süzgeç değeri olarak kabul edilir. | Doğrulandı ve kapatıldı. |
 | Açıklama ucu olağan kullanıcıya iki ret nedeni döner. | Kapatıldı. Tek neden döner. |
 | Alan düzeyi uçları korumalı türleri ayırmaz. | Doğrulandı ve kapatıldı. |
 | Çalışan kendi bölüm ya da şirket alanını değiştirip kapsamını genişletebilir. | Aşağıdaki koşul yazıldı. |
 
+### İkinci inceleme
+
+Orkestratör ikinci bir bağımsız inceleme yaptırdı. İnceleme üç engelleyici bulgu verdi. Üçü de testle doğrulandı ve kapatıldı. Testler `tests/test_second_review.py` dosyasındadır.
+
+| Bulgu | Düzeltme |
+| --- | --- |
+| Hazır raporun indirme yolu kuralı aşıyor. | Kapı “Prepared Report” kaydı okunurken de çalışıyor. |
+| `all` kuralı gizli alanı raporda açıyor. | Kapı alan seviyesini de denetliyor. |
+| Eşzamanlı istek kaldırılmış yetkiyi önbelleğe geri koyuyor. | Ortak önbellek kaldırıldı. |
+
+İnceleme dört uçta istek sayısı sınırı olmadığını da yazdı. Uçlar oturum ister ve misafire kapalıdır. Sınır bu turda eklenmedi.
+
 ### Özne alanlarını koruyun
 
 Motor özneyi “Employee” kaydından okur. Bu kayıttaki `user_id`, `reports_to`, `department` ve `company` alanları kapsamı belirler. Çalışan bu alanları değiştirebilirse kendi kapsamını genişletir.
 
-Bu yüzden şu koşul zorunludur: Çalışana kendi “Employee” kaydında yazma izni veren uygulama bu dört alanı izin seviyesiyle kapatır. Bu koşul kural şablonları turunda testle denetlenir (G-104).
+Bu yüzden bir koşul zorunludur. Uygulama çalışana kendi “Employee” kaydında yazma izni verebilir. O uygulama bu dört alanı izin seviyesiyle kapatır. Bu koşul kural şablonları turunda testle denetlenir (G-104).
 
 ### Frappe'nin bilinen iki davranışı
 
