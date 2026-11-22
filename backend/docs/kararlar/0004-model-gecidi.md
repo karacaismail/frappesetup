@@ -50,6 +50,7 @@ Orkestratör, D-10, 22 Kasım 2026 Pazar
 | Tür | Açık işlev veya olay | Görevi |
 | --- | --- | --- |
 | Python | `platform_core.model_gecidi.api.complete` | Yetkili yol üzerinden model çağrısı yapar. |
+| Python ve Bench | `platform_core.model_gecidi.api.purge_usage_logs(*, preview_token: str \| None = None) -> int` | Yalnız “System Manager” çağırabilir. En çok 500 kapanmış kaydı kalıcı siler. Silinen kayıt sayısını döndürür. |
 | HTTP | `platform_core.api.model.complete` | Oturum veya kullanıcı anahtarıyla model çağrısı yapar. |
 | HTTP | `platform_core.api.model.test_api` | Yöneticiye bağlantı denemesi sunar. |
 | HTTP | `platform_core.api.model.resolve_usage` | Yöneticinin doğruladığı tutarı kullanım kaydına işler. |
@@ -191,9 +192,10 @@ Yönetici yeni anahtarı Desk ekranında girer.
 Kayıtlı anahtarlar varsa geçit, onları etkileyen sağlayıcı adresi değişikliğini reddeder.
 Geçit bağlantı kaydına silme notu ekler.
 Boş anahtar alanıyla form kaydetmek mevcut anahtarı korur.
-Kullanım günlükleri varsayılan olarak 365 gün tutulur.
-Site yöneticisi süreyi `model_gateway_usage_retention_days` ayarında belirler.
-Yönetici önce silinecek kayıtları önizler.
+Kapanmış kullanım günlükleri 365 gün tutulur.
+Bu süre sabittir.
+Temizliği yalnız “System Manager” rolü başlatabilir.
+HTTP isteğinde yönetici önce silinecek kayıtları önizler.
 Geçit önizleme kodunu `preview_token` alanında döner.
 Yönetici silmeyi aynı kodla elle başlatır.
 Temizlik yalnız kapanmış kayıtları siler. Her çağrı en çok 500 kayıt siler.
@@ -201,3 +203,10 @@ O-32 kararı gereği saklama temizliği kayıtları kalıcı siler.
 Frappe “Deleted Document” tablosuna kopya yazmaz.
 Geri dönüş için silme öncesi alınan veritabanı yedeği kullanılır.
 Geçit temizliği “Activity Log” kaydına yazar.
+
+Terminalden temizlik komutu aşağıdadır.
+Komut en çok 500 kayıt siler ve silinen sayıyı döndürür.
+
+```sh
+bench --site SITE execute platform_core.model_gecidi.api.purge_usage_logs
+```

@@ -480,14 +480,14 @@ class TestModelHTTP(unittest.TestCase):
 
 	def test_retention_preserves_old_unknown_attempts(self):
 		closed, unknown = self._probe_log(), self._probe_log()
-		baseline = self._maintenance("manager", "purge_usage", {"dry_run": True})
+		baseline = self._maintenance("system_manager", "purge_usage", {"dry_run": True})
 		self.assertEqual(baseline.status_code, 200, baseline.json().get("exc_type"))
 		eligible = baseline.json()["message"]["eligible"]
-		old = add_days(now_datetime(), -int(frappe.conf.get("model_gateway_usage_retention_days") or 365) - 1)
+		old = add_days(now_datetime(), -366)
 		frappe.db.set_value("AI Usage Log", closed, {"attempted_at": old, "result": "success"})
 		frappe.db.set_value("AI Usage Log", unknown, {"attempted_at": old, "result": "unknown"})
 		frappe.db.commit()
-		response = self._maintenance("manager", "purge_usage", {"dry_run": True})
+		response = self._maintenance("system_manager", "purge_usage", {"dry_run": True})
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
 		preview = response.json()["message"]
 		self.assertEqual(
@@ -507,14 +507,14 @@ class TestModelHTTP(unittest.TestCase):
 		audit_filters = {
 			"reference_doctype": "AI Usage Log",
 			"subject": "Model gateway usage logs purged",
-			"user": self.fixture["users"]["manager"],
+			"user": self.fixture["users"]["system_manager"],
 		}
 		self.assertFalse(frappe.db.exists("Activity Log", audit_filters))
-		without_preview = self._maintenance("manager", "purge_usage", {"dry_run": False})
+		without_preview = self._maintenance("system_manager", "purge_usage", {"dry_run": False})
 		self.assertEqual(without_preview.status_code, 400)
 		self.assertEqual(without_preview.json()["message"]["error"], "preview_required")
 		response = self._maintenance(
-			"manager", "purge_usage", {"dry_run": False, "preview_token": preview["preview_token"]}
+			"system_manager", "purge_usage", {"dry_run": False, "preview_token": preview["preview_token"]}
 		)
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
 		self.assertEqual(
@@ -527,6 +527,13 @@ class TestModelHTTP(unittest.TestCase):
 		self.assertTrue(audit)
 		self.addCleanup(self._delete_activity_log, audit)
 		self.assertTrue(frappe.db.exists("AI Usage Log", unknown))
+
+	def test_purge_rejects_an_ai_manager_for_preview_and_execution(self):
+		for dry_run in (True, False):
+			with self.subTest(dry_run=dry_run):
+				response = self._maintenance("manager", "purge_usage", {"dry_run": dry_run})
+				self.assertEqual(response.status_code, 403)
+				self.assertEqual(response.json().get("exc_type"), "PermissionError")
 
 	def _delete_activity_log(self, name):
 		frappe.db.delete("Activity Log", {"name": name})
