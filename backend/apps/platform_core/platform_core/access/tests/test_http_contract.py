@@ -5,6 +5,7 @@ import json
 import time
 from pathlib import Path
 from threading import Thread
+from unittest import TestCase
 from unittest.mock import patch
 from urllib.parse import urlencode
 
@@ -17,18 +18,44 @@ from werkzeug.serving import make_server
 from platform_core.access.tests.base import ADMIN, DESK_ONLY, DOCTYPE, AccessRuleTestCase
 
 
+class TestContractLookup(TestCase):
+	def test_missing_contract_reports_the_searched_locations(self):
+		with (
+			patch.object(AccessRuleTestCase, "setUpClass") as fixture_setup,
+			patch.object(Path, "is_file", return_value=False),
+			self.assertRaisesRegex(
+				AssertionError, "Access HTTP contract not found.*platform_core-access"
+			) as failure,
+		):
+			TestGetAuthenticationContract.setUpClass()
+		fixture_setup.assert_not_called()
+		self.assertIn(str(Path(__file__).resolve().parents[5] / "contracts"), str(failure.exception))
+		self.assertIn(
+			str(Path(frappe.get_app_path("platform_core")).resolve().parents[2] / "contracts"),
+			str(failure.exception),
+		)
+
+
 class TestGetAuthenticationContract(AccessRuleTestCase):
 	@classmethod
 	def setUpClass(cls):
-		super().setUpClass()
 		checkout = Path(__file__).resolve().parents[5] / "contracts"
 		installed = Path(frappe.get_app_path("platform_core")).resolve().parents[2] / "contracts"
 		contract = next(
-			folder / "platform_core-access.openapi.yaml"
-			for folder in (checkout, installed)
-			if (folder / "platform_core-access.openapi.yaml").is_file()
+			(
+				folder / "platform_core-access.openapi.yaml"
+				for folder in (checkout, installed)
+				if (folder / "platform_core-access.openapi.yaml").is_file()
+			),
+			None,
 		)
+		if contract is None:
+			raise AssertionError(
+				"Access HTTP contract not found: expected platform_core-access.openapi.yaml "
+				f"in {checkout} or {installed}."
+			)
 		cls.contract = yaml.safe_load(contract.read_text())
+		super().setUpClass()
 		cls.server = make_server("127.0.0.1", 0, application, threaded=True)
 		cls.addClassCleanup(cls.server.server_close)
 		worker = Thread(target=cls.server.serve_forever, daemon=True)
@@ -106,7 +133,9 @@ class TestGetAuthenticationContract(AccessRuleTestCase):
 					csrf_token = frappe.parse_json(stored[0][0]).get("csrf_token")
 					if method == "POST":
 						self.assertTrue(csrf_token, "The idle POST must carry the real session's CSRF token.")
-					# Identity's activity fixture. The 3600-second limit comes from O-25.
+					# Identity owns this key format in identity/session_policy.py::_session_key.
+					# module-boundaries.json forbids importing identity here; update this fixture with its owner.
+					# The 3600-second limit comes from O-25, not from the implementation.
 					frappe.cache.set_value(
 						f"kimlik_activity:sid:{sid}", int(time.time()) - 3601, expires_in_sec=3600
 					)

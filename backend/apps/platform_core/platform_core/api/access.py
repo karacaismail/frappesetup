@@ -1,6 +1,6 @@
-"""Access rule endpoints. The business rule is in the `platform_core.erisim` module.
+"""Access rule endpoints. The business rule is in the `platform_core.access` module.
 
-Contract: `backend/contracts/platform_core-erisim.openapi.yaml`.
+Contract: `backend/contracts/platform_core-access.openapi.yaml`.
 """
 
 import frappe
@@ -13,7 +13,7 @@ from platform_core.access import explain, field_level
 def explain_permission(doctype: str, name: str, ptype: str = "read", user: str | None = None) -> dict:
 	"""Explains the reason for the permission on a record. Changes no record."""
 	if not doctype or not frappe.db.exists("DocType", doctype) or not frappe.has_permission(doctype, "read"):
-		frappe.throw(_("No permission to read {0}.").format(doctype), frappe.PermissionError)
+		frappe.throw(_("No permission to read this document type."), frappe.PermissionError)
 	return explain.explain(doctype, name, ptype, user)
 
 
@@ -21,7 +21,7 @@ def explain_permission(doctype: str, name: str, ptype: str = "read", user: str |
 def get_access_summary(doctype: str) -> dict:
 	"""Returns the rule scopes of the session user in a document type."""
 	if not doctype or not frappe.db.exists("DocType", doctype) or not frappe.has_permission(doctype, "read"):
-		frappe.throw(_("No permission to read {0}.").format(doctype), frappe.PermissionError)
+		frappe.throw(_("No permission to read this document type."), frappe.PermissionError)
 	return explain.summary(doctype)
 
 
