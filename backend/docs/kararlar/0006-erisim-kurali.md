@@ -951,6 +951,21 @@ Bu bölüm motorun öteki modüllere ve Frappe'ye açtığı her bağı sayar (B
 | `platform_core.api.access.set_field_level` | POST | “System Manager” |
 | `platform_core.api.access.set_level_access` | POST | “System Manager” |
 
+### Website User için kapalı uçlar
+
+Karar: Website User için `validate_link_and_fetch` ucu kapalı kalır. Portal formları bağlantı alanını kendi uçlarıyla doğrular. Karar orkestratörün kararıdır ve 22 Kasım 2026 Pazar günü verildi.
+
+| Uç | Website User | Neden |
+| --- | --- | --- |
+| `get_access_summary` | Açık | Kullanıcı yalnız kendi kapsamlarını görür. |
+| `frappe.desk.search.search_link` | Açık | Liste sahibi kabuk işidir. Arama kuraldan geçer. |
+| `explain_permission` | Kapalı | Yanıt kural ayrıntısı taşıyabilir. |
+| `frappe.desk.search.search_widget` | Kapalı | Portal bu ucu kullanmaz. |
+| `frappe.client.validate_link_and_fetch` | Kapalı | Portal formları kendi uçlarını kullanır. |
+| `set_field_level`, `set_level_access` | Kapalı | Yalnız “System Manager” çağırır. |
+
+Giriş matrisi testi bu tabloyu gerçek istekle sınar (`erisim/tests/test_entry_matrix.py`).
+
 ### Frappe kancaları
 
 | Kanca | Motorun değeri | Etkisi |
