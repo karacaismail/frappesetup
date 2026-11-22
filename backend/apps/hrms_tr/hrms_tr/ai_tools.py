@@ -15,6 +15,7 @@ class ApprovalArguments(BaseModel):
 
 
 def declarations() -> list[dict]:
+	"""Register the leave approval tool with a preview and required human approval."""
 	return [
 		{
 			"name": "approve_leave",

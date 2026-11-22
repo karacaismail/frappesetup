@@ -11,6 +11,12 @@ from hrms_tr import ai_tools
 
 
 class ApprovalToolTest(unittest.TestCase):
+	def test_registration_and_tools_are_documented(self):
+		self.assertTrue((ai_tools.declarations.__doc__ or "").strip())
+		for tool in ai_tools.declarations():
+			with self.subTest(tool=tool["name"]):
+				self.assertTrue(tool["description"].strip())
+
 	def test_has_preview_and_separate_handler(self):
 		(tool,) = ai_tools.declarations()
 		self.assertEqual(tool["name"], "approve_leave")
