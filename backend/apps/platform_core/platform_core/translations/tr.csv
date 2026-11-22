@@ -78,15 +78,4 @@ Explain why a user may or may not read or change one record. Details about rules
 Propose a new Access Rule from structured fields. The first rule on a document type removes access for every role without a rule. This only opens a proposal. A human must approve it before anything changes.,"Yapılandırılmış alanlardan yeni bir erişim kuralı önerir. Bir kayıt türüne yazılan ilk kural, kuralı olmayan bütün rollerin erişimini kaldırır. Bu araç yalnız bir öneri açar. Bir insan onaylamadan hiçbir şey değişmez.",
 "Propose a change to a saved Access Rule, including switching it off. Narrowing a rule removes access. This only opens a proposal. A human must approve it before anything changes.",Kayıtlı bir erişim kuralında değişiklik önerir. Kuralı kapatmak da buna dahildir. Kuralı daraltmak erişimi kaldırır. Bu araç yalnız bir öneri açar. Bir insan onaylamadan hiçbir şey değişmez.,
 Report {0} reads data with its own code. Only a System Manager may run it while Access Rules exist.,{0} raporu veriyi kendi koduyla okuyor. Erişim kuralı varken bu raporu yalnız System Manager çalıştırabilir.,
-Only a System Manager may use Auto Email Report for {0}: it reads data governed by Access Rules.,{0} için zamanlanmış e-posta raporunu yalnız System Manager kullanabilir. Rapor erişim kuralı olan veriyi okuyor.,
-Auto Email Report Approval,Zamanlanmış E-posta Raporu Onayı,Auto Email Report Approval
-Approval of one Auto Email Report that touches data governed by Access Rules. The engine writes it when a System Manager saves the record. Without a matching approval the record does not run.,Erişim kuralı olan veriye dokunan bir zamanlanmış e-posta raporunun onayı. Motor bu kaydı System Manager raporu kaydedince yazar. Eşleşen onay yoksa rapor çalışmaz.,Auto Email Report Approval
-Auto Email Report,Zamanlanmış E-posta Raporu,Auto Email Report Approval
-Name of the Auto Email Report record this approval belongs to.,Bu onayın ait olduğu zamanlanmış e-posta raporu kaydının adı.,Auto Email Report Approval
-Approved By,Onaylayan,Auto Email Report Approval
-System Manager who saved the record by hand. Saving is the approval.,Kaydı elle kaydeden System Manager. Kaydetmek onaydır.,Auto Email Report Approval
-Approved On,Onay Zamanı,Auto Email Report Approval
-When the System Manager saved the record.,System Manager'ın kaydı kaydettiği zaman.,Auto Email Report Approval
-Settings Digest,Ayar Özeti,Auto Email Report Approval
-"Fingerprint of the record's settings at approval: report, user, recipients, filters and the rest. The record runs only while its settings still match.","Kaydın onay anındaki ayarlarının izi: rapor, kullanıcı, alıcılar, süzgeçler ve ötekiler. Kayıt yalnız ayarları hâlâ eşleşiyorsa çalışır.",Auto Email Report Approval
-Auto Email Report {0} is not approved. A System Manager must save it before it can run.,{0} zamanlanmış e-posta raporu onaylı değil. Çalışması için bir System Manager kaydı kaydetmelidir.,
+Auto Email Report is switched off for {0}: the report reads data governed by Access Rules.,{0} için zamanlanmış e-posta raporu kapalıdır. Rapor erişim kuralı olan veriyi okuyor.,

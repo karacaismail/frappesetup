@@ -27,7 +27,7 @@ FLAGS = tuple(f"allow_{operation}" for operation in rules.OPERATIONS)
 LIST_LIMIT = 200
 # Document types the generic AI write tools may not touch (O-28). They change only through the
 # tools declared below, which validate a rule and warn about roles that lose access.
-WRITE_CLOSED_DOCTYPES = (RULE, "Auto Email Report Approval")
+WRITE_CLOSED_DOCTYPES = (RULE,)
 
 Scope = Literal["own", "team", "department", "company", "all"]
 Operator = Literal["=", "!=", "in", "not in"]

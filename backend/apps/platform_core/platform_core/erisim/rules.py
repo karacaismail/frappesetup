@@ -57,7 +57,6 @@ PROTECTED_DOCTYPES = frozenset(
 		"Property Setter",
 		"DocShare",
 		"Module Def",
-		"Auto Email Report Approval",
 	}
 )
 

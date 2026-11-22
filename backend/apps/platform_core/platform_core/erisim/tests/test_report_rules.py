@@ -370,19 +370,26 @@ class TestPreparedReportClosed(ReportRulesTestCase):
 
 
 class TestQueuedPreparedReport(ReportRulesTestCase):
-	"""Review O3: a Prepared Report queued before the rule existed is refused when its job runs."""
+	"""A Prepared Report queued before the rule existed is refused when its job starts.
+
+	The check runs before Frappe's job function, for every report type. A list report never
+	reaches the gate inside the Report document (`frappe/desk/query_report.py:93`).
+	"""
 
 	JOB = "frappe.core.doctype.prepared_report.prepared_report.generate_report"
+	QUEUED_REPORTS = (NAME_REPORT, SCRIPT_REPORT, BUILDER_REPORT)
 
 	def setUp(self):
 		super().setUp()
 		self.addCleanup(self.cleanup)
-		doc = frappe.get_doc(doctype="Prepared Report", report_name=NAME_REPORT, status="Queued")
+
+	def queued(self, report: str) -> str:
+		doc = frappe.get_doc(doctype="Prepared Report", report_name=report, status="Queued")
 		doc.name = frappe.generate_hash(length=10)
 		doc.owner = ADMIN
 		doc.db_insert()
-		self.prepared = doc.name
 		frappe.db.commit()  # nosemgrep: the job reads committed data
+		return doc.name
 
 	def cleanup(self) -> None:
 		frappe.set_user("Administrator")
@@ -390,35 +397,80 @@ class TestQueuedPreparedReport(ReportRulesTestCase):
 		if hasattr(frappe.local, "job"):
 			del frappe.local.job
 		frappe.db.delete("File", {"attached_to_doctype": "Prepared Report"})
-		frappe.db.delete("Prepared Report", {"report_name": NAME_REPORT})
+		frappe.db.delete("Prepared Report")
 		frappe.db.commit()  # nosemgrep
 
-	def run_job(self) -> None:
+	def run_job(self, prepared: str) -> None:
 		"""Run the queued job the way a worker does, as the System Manager who queued it."""
 		execute_job(
 			frappe.local.site,
 			self.JOB,
 			None,
 			"ar-test-prepared-report",
-			{"prepared_report": self.prepared},
+			{"prepared_report": prepared},
 			user=ADMIN,
 			is_async=False,
 		)
 
-	def test_job_ends_without_running_the_report_or_writing_a_file(self):
-		with patch.object(Report, "execute_query_report") as execute:
-			self.run_job()
-
-		execute.assert_not_called()
+	def set_rules_active(self, active: int) -> None:
 		frappe.set_user("Administrator")
-		self.assertEqual(frappe.db.get_value("Prepared Report", self.prepared, "status"), "Error")
-		self.assertFalse(
-			frappe.db.exists(
-				"File", {"attached_to_doctype": "Prepared Report", "attached_to_name": self.prepared}
-			)
+		for name in self.rules.values():
+			rule = frappe.get_doc("Access Rule", name)
+			rule.is_active = active
+			rule.save()
+		frappe.db.commit()  # nosemgrep: the job reads committed data
+
+	def files_of(self, prepared: str) -> int:
+		return frappe.db.count(
+			"File", {"attached_to_doctype": "Prepared Report", "attached_to_name": prepared}
 		)
 
-	def test_live_run_by_the_same_system_manager_still_works(self):
+	def test_before_job_hook_is_registered(self):
+		self.assertIn(
+			"platform_core.erisim.reports.refuse_prepared_report_job", frappe.get_hooks("before_job")
+		)
+
+	def test_job_is_refused_before_frappe_starts_it(self):
+		for report in self.QUEUED_REPORTS:
+			prepared = self.queued(report)
+			with self.subTest(report=report):
+				with (
+					patch.object(prepared_report, "generate_report") as generate,
+					patch.object(Report, "execute_query_report") as query,
+					patch.object(Report, "execute_script_report") as script,
+				):
+					self.assertRaises(frappe.PermissionError, self.run_job, prepared)
+				generate.assert_not_called()
+				query.assert_not_called()
+				script.assert_not_called()
+				frappe.set_user("Administrator")
+				self.assertEqual(self.files_of(prepared), 0)
+				self.assertEqual(frappe.db.get_value("Prepared Report", prepared, "status"), "Error")
+
+	def test_direct_call_of_the_job_function_writes_no_file(self):
+		"""Code that calls Frappe's function without a worker still cannot store a result."""
+		for report in self.QUEUED_REPORTS:
+			prepared = self.queued(report)
+			with self.subTest(report=report):
+				frappe.set_user(ADMIN)
+				with patch.object(Report, "execute_script"):
+					prepared_report.generate_report(prepared)
+				frappe.set_user("Administrator")
+				self.assertEqual(self.files_of(prepared), 0)
+				self.assertNotEqual(frappe.db.get_value("Prepared Report", prepared, "status"), "Completed")
+
+	def test_job_for_ungoverned_data_is_not_refused(self):
+		self.addCleanup(self.set_rules_active, 1)
+		self.set_rules_active(0)
+		prepared = self.queued(NAME_REPORT)
+
+		self.run_job(prepared)
+
+		frappe.set_user("Administrator")
+		self.assertEqual(frappe.db.get_value("Prepared Report", prepared, "status"), "Completed")
+		self.assertEqual(self.files_of(prepared), 1)
+
+	def test_live_run_by_a_system_manager_still_works(self):
 		"""Only the prepared path is closed. The System Manager can still run the report directly."""
 		frappe.set_user(ADMIN)
 

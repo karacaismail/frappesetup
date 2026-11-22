@@ -33,7 +33,9 @@ doc_events = {
 # AI tools of the access rule engine (D-9). Format: contracts/platform_core-yapay-zeka.openapi.yaml
 ai_tools = ["platform_core.erisim.ai_tools.declare"]
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
-ai_write_closed_doctypes = ["Access Rule", "Auto Email Report Approval"]
-# Auto Email Reports on governed data are switched off until a System Manager approves them.
-after_install = "platform_core.erisim.reports.switch_off_unapproved_auto_email_reports"
-after_migrate = ["platform_core.erisim.reports.switch_off_unapproved_auto_email_reports"]
+ai_write_closed_doctypes = ["Access Rule"]
+# Auto Email Reports on governed data are switched off; existing ones are disabled here.
+after_install = "platform_core.erisim.reports.switch_off_governed_auto_email_reports"
+after_migrate = ["platform_core.erisim.reports.switch_off_governed_auto_email_reports"]
+# A Prepared Report queued before a rule existed is refused when its job starts.
+before_job = ["platform_core.erisim.reports.refuse_prepared_report_job"]
