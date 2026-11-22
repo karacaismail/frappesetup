@@ -367,6 +367,11 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `keycloak_service_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
 | `kimlik_marka_adi` | `Atonota` | Düğme metni bundan üretilir |
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
+| `hrms_tr_retention_days` | Ayar verilmez | Hukuk sorumlusu süreyi gün olarak belirler. |
+
+| Kişisel veri | Silme yolu |
+| --- | --- |
+| HRMS TR çalışan ve izin kayıtları | Hesap silme, çalışanın kişisel alanlarını anonim yapar. `hrms_tr.retention.purge` süresi dolan izin kayıtlarını O-39 kapsamında siler. |
 
 ## 9. Geliştirme ortamı
 
