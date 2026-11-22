@@ -304,11 +304,11 @@ Her araç çağrısı bir kayıt açar. Ret de kayıt açar. Onay, ret ve yürü
 | --- | --- |
 | `user` | İşlemi yapan kullanıcı |
 | `principal` | Kimlik türü: insan oturumu ya da aracı belirteci |
-| `session_id` | İstemcinin verdiği konuşma kimliği |
-| `client_info` | MCP istemcisinin adı ve sürümü. Güvenilmeyen metindir. |
-| `stage` | Adım: çağrı, önizleme, onay, ret, yürütme ya da kapatma |
+| `session_id` | İstemcinin verdiği konuşma kimliğinin SHA-256 özeti |
+| `client_info` | Tanınan istemcinin sabit adı ya da `other` |
+| `stage` | Adım: kimlik (`auth`), çağrı, önizleme, onay, ret, yürütme ya da kapatma |
 | `tool` | Araç adı |
-| `tool_class` | Araç türü: tanım, okuma, yazma, yönetim ya da uygulama |
+| `tool_class` | Araç türü: tanım, okuma, yazma, yönetim, uygulama ya da akış (`flow`) |
 | `target_doctype` | Hedef DocType |
 | `target_name` | Hedef kaydın adı |
 | `args_hash` | Girdinin SHA-256 özeti |
@@ -323,7 +323,7 @@ Her araç çağrısı bir kayıt açar. Ret de kayıt açar. Onay, ret ve yürü
 
 - Zaman, Frappe'nin hazır `creation` alanındadır.
 - Günlük girdinin kendisini tutmaz. Yalnız özetini tutar. Böylece günlüğe kişisel veri ve gizli değer girmez.
-- Günlük yalnız eklenir. Kayıt değişmez ve silinmez. Controller bunu engeller.
+- Günlük yalnız eklenir. Kayıt değişmez. Kaydı yalnız saklama komutu, süresi dolunca siler. Controller öteki her silmeyi engeller.
 - Günlüğü yalnız “System Manager” rolü okur.
 - Ret durumunda istek hata vermez. Araç `isError` taşıyan sonuç döner. Böylece günlük yazısı geri alınmaz.
 - Beklenmeyen hatada sunucu yazıları geri alır. Sonra günlüğü yazar ve kesinleştirir.
@@ -338,7 +338,7 @@ G-64 `model`, token ve maliyet alanlarını da sayar. Bu alanlar bu kayıtta yok
 
 Günlüğün saklama süresi 365 gündür (Rail 5). Eski kaydı elle başlatılan bir komut siler. Komut `retention.purge` işlevidir. Komutun HTTP ucu `purge_logs`, aracı `purge_action_log` olur. Zamanlanmış iş yoktur (D-6). Sonucu bilinmeyen öneriler silinmez.
 
-Günlük kullanıcı adını ve adresini tutar. Bunlar kişisel veridir. Proje kaydının “Kişisel veri” bölümüne eklenmelidir (G-15). Bunu raporda isteyeceğiz.
+Günlük kullanıcı adını ve adresini tutar. Bunlar kişisel veridir. Proje kaydının “Kişisel veri” bölümü bu kaydı sayar (G-15). Rol araçlarında `target_name` alanı kullanıcının e-posta adresini de taşır.
 
 ## 9. Gizli alanlar nasıl dışarıda kalır
 
@@ -382,7 +382,7 @@ Bütün uçlar `platform_core/api/ai.py` dosyasındadır. Dosya ince kalır. İ�
 | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
 | `platform_core.api.ai.purge_logs` | POST | İnsan oturumu ve yönetici rolü | Saklama süresi dolan kayıtları siler. Yıkıcıdır. Varsayılan yalnız sayar. |
 
-Ayrıntılı biçim `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasına yazılır. Bu dosya ikinci kontrol noktasında, koddan önce yazılır.
+Ayrıntılı biçim `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasına yazılır. Bu dosya ikinci kontrol noktasında, koddan önce yazıldı.
 
 ## 11. Yönetim araçları
 
@@ -404,7 +404,7 @@ Yönetim araçları yalnız “System Manager” rolüne görünür. Her biri ö
 
 ### Elle başlatılan komutlar
 
-Bu katmanın tek komutu günlük temizliğidir. Komut üç yoldan başlar: `bench execute`, HTTP ucu ve araç.
+Bu katmanın tek komutu günlük temizliğidir. Komut üç yoldan başlar: `bench execute`, HTTP ucu ve araç. `bench` komutu bench klasöründe çalışır. Komut `dry_run` verilmezse yalnız sayar.
 
 Öteki modüller kendi komut uçlarını `ai_tools` kancasıyla araç olarak bildirir. Bildirim `yapay_zeka` modülünü içe aktarmayı gerektirmez. Böylece bağımlılık yönü korunur. Bu turda öteki modüllerin kodu bu dalda yoktur. Onların bildirimi kendi işlerine kalır.
 
@@ -582,7 +582,7 @@ Son kullanıcı panelde Website User olarak çalışır. Katmanın yedi ucu `web
 
 - **Öneri 30 gün sonra silinir.** Süre karar tarihinden ya da süre dolumundan başlar. Hangisi önceyse o geçerlidir. Her önerinin `expires_at` değeri vardır. Bu yüzden sonucu `unknown` olan öneri de aynı kuralla silinir.
 - **“AI Action Log” 365 gün kalır.** `older_than_days` girdisi yalnız bu günlüğün süresidir. En az 365 olabilir.
-- **“AI Usage Log” 365 gün kalır.** Bu günlük model geçidi modülünündür. Silme komutu geçidin ortak işlevini çağırır: `platform_core.model_gecidi.api.purge_usage`. İşlev yetkiyi kendisi denetler. Terminal ve web girişi aynı işlevi çağırır.
+- **“AI Usage Log” 365 gün kalır.** Bu günlük model geçidi modülünündür. Silme komutu geçidin ortak işlevini çağırır: `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run)`. İşlev yetkiyi kendisi denetler. Terminal ve web girişi aynı işlevi çağırır.
 - **Kullanım günlüğünün sonucu açıktır.** `usage_logs` alanı boş dönmez. Durum `ok`, `not_run` ya da `error` olur. İşlev henüz yoksa durum `not_run` olur. Geçit reddederse durum `error` olur ve yalnız hata türü döner.
 - **Sayım kipi silinecek kayıtları sayar.** `dry_run` ile gelen sayı, silmenin kaldırdığı sayıya eşittir.
 - **Silme kopya bırakmaz (O-32).** Komut her kaydı `delete_permanently=True` ile siler. “Deleted Document” tablosunda kopya kalmaz. Günlük kaydının denetleyicisi öteki her silmeyi yine reddeder.
@@ -593,6 +593,32 @@ Son kullanıcı panelde Website User olarak çalışır. Katmanın yedi ucu `web
 - Testler `tests/test_retention.py` ve `tests/test_client_text.py` dosyalarındadır.
 
 Frappe'nin liste süzgeci boş tarihi çok eski bir tarih sayar. Kaynak Frappe 16.56.0 sürümünde `frappe/database/query.py` dosyasının 745. satırıdır. Bu yüzden komut önce karar tarihi dolu olan önerileri ister.
+
+### On birinci tur: kural öz denetimi
+
+Katman `docs/standartlar/` dosyalarındaki kurallara göre denetlendi. Üç yardımcı ajan kodu kural kural okudu. Bulguların testleri `tests/test_standards.py` dosyasındadır.
+
+Düzeltilen kurallar şunlardır:
+
+- **V-3.** Onayda hata veren önizlemenin yazdığı geri alınır. Önceki kodda bu yazı kalıcı olabiliyordu.
+- **V-10.** Silme komutu `dry_run` verilmezse yalnız sayar.
+- **M-1.** Öneri kaydı kendi kuralını korur. Onaylanan içerik ve karar verilmiş durum hiçbir yazma yolunda değişmez.
+- **G-8.** Girdilerin üst sınırı vardır. Örneğin saklama süresi en çok 36.500 gündür ve ad en çok 140 karakterdir.
+- **G-12.** Paylaşılan kayıt testleri eklendi.
+- **P-1 ve P-3.** Silme bir çalıştırmada her türden en çok 500 kayıt alır. Yanıt bekleyen toplamı ayrı yazar. Liste sıralaması ad alanıyla kesinleşir.
+- **A-5.** Yalnız testin çağırdığı on bir sarmalayıcı işlev kaldırıldı.
+- **R-7.** Doğrudan veritabanı okumaları `store.py` dosyasına taşındı.
+- **H-3.** İki DocType dosyası Frappe'nin dışa aktarım biçimindedir.
+- **H-10.** Sözleşmedeki etiket ve güvenlik şeması adları İngilizcedir.
+
+Bilerek bırakılan yerler şunlardır:
+
+- **G-3 ve G-4.** Katman kendi kayıtlarını sistem kipinde yazar ve listeler. Yalnız “System Manager” bu DocType'ları okuyabilir. Sahiplik her okumada ayrıca denetlenir. Bayrak yalnız `store.py` dosyasındadır ve `finally` içinde geri döner.
+- **V-1.** `setup.py` hazır MCP ucunu `set_single_value` ile kapatır. Bu adım kurulum ve geçiş kancasıdır. “System Settings” doğrulaması bu ayar için gerekmez.
+- **M-5.** İki DocType dosyası elle tutulur. İlk izinleri bu notun 8. bölümü açıklar.
+- **M-8.** Önizleme özetleri ve MCP protokol hataları İngilizce kalır. Özet saklanır ve onay özetine girer. Çevrilirse özet dile göre değişir.
+- **F-4.** Select seçenekleri çevrilmez. Bu değerler API'nin döndürdüğü kodlardır. Örneğin `human_session` ve `consumed` böyledir.
+- **S-1.** Katmanda tek sorumluluk şöyle bölünür: `access.py` kimlik ve günlük, `proposals.py` öneri akışı, `store.py` kayıt, `tools/` araçlar.
 
 ## 13. Karar sitesiyle çelişkiler
 
