@@ -300,7 +300,27 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 - `platform_core` içinde katmanı platform-core-yz işi kurar. Modül klasörü `yapay_zeka` olur.
 - Önce Frappe'nin hazır MCP yolunu inceleyin (T-1). Karar sitesi bunu `frappe_mcp` olarak anar (G-84).
-- Uç adresi ve araç adları o işin raporundan sonra bu dosyaya yazılır.
+- Ayrıntılı tasarım `docs/kararlar/0002-yapay-zeka-katmani.md` dosyasındadır.
+- Frappe 16'nın hazır MCP ucu (`/api/v2/mcp`) kiracı sitesinde kapatılır. Bu uç önizleme, onay ve günlük taşımaz.
+
+### Uçlar
+
+| Yol | Yöntem | Kimlik | İşi |
+| --- | --- | --- | --- |
+| `platform_core.api.ai.mcp` | POST | İnsan oturumu ya da aracı belirteci | MCP ucu: araç listesi ve araç çağrısı |
+| `platform_core.api.ai.issue_agent_token` | POST | İnsan oturumu | 300 saniyelik, 20 çağrılık aracı belirteci üretir. |
+| `platform_core.api.ai.list_proposals` | GET | İnsan oturumu | Kullanıcının önerilerini listeler. |
+| `platform_core.api.ai.get_proposal` | GET | İnsan oturumu | Önerinin önizlemesini ve özetini döner. |
+| `platform_core.api.ai.approve_proposal` | POST | İnsan oturumu | Öneriyi onaylar ve yürütür. |
+| `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
+| `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
+
+### Genel araçlar
+
+`search_doctypes`, `get_doctype_schema`, `list_documents`, `get_document`, `run_report`, `create_document`, `update_document`, `submit_document`, `cancel_document`, `delete_document` ve `get_proposal`.
+
+- Yazma araçları yalnız öneri açar. Öneri 10 dakika geçerlidir.
+- Uygulama araçlarının adı `<uygulama>_<araç>` biçimindedir. Uygulama araçlarını `ai_tools` kancasıyla bildirir.
 
 ## 11. Model geçidi ve sağlayıcı kaydı
 
