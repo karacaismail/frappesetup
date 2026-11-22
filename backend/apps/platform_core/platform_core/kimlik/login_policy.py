@@ -21,7 +21,11 @@ def before_login(login_manager=None) -> None:
 	"""Runs at the start of `LoginManager.login`. Stops password sign-in while the gate is on."""
 	if site_settings.keycloak_only():
 		frappe.throw(
-			_("Password sign-in is disabled. Sign in with the identity provider."), frappe.AuthenticationError
+			_(
+				"Password sign-in is disabled. Sign in with the identity provider.",
+				context="platform_core.kimlik",
+			),
+			frappe.AuthenticationError,
 		)
 
 
@@ -30,7 +34,10 @@ def before_request() -> None:
 	if request is None:
 		return
 	if _is_end_user() and _is_portal_path(helpers.normalize_path(request.path)):
-		frappe.throw(_("This page is not available. Use the application."), frappe.PermissionError)
+		frappe.throw(
+			_("This page is not available. Use the application.", context="platform_core.kimlik"),
+			frappe.PermissionError,
+		)
 
 
 def _is_end_user() -> bool:
@@ -47,7 +54,13 @@ def _is_portal_path(path: str) -> bool:
 def _call_gated(original: str, args: tuple, kwargs: dict):
 	"""403 while the gate is on, otherwise the original Frappe function with the same arguments."""
 	if site_settings.keycloak_only():
-		frappe.throw(_(GATE_MESSAGE), frappe.PermissionError)
+		frappe.throw(
+			_(
+				"Local sign-in is disabled. Sign in with the identity provider.",
+				context="platform_core.kimlik",
+			),
+			frappe.PermissionError,
+		)
 	return frappe.call(frappe.get_attr(original), *args, **kwargs)
 
 

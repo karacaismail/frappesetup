@@ -35,12 +35,12 @@ def validate() -> None:
 		return
 	token = parts[1].strip()
 	if len(token) > helpers.MAX_TOKEN_LENGTH:
-		_refuse(_("Service token rejected: {0}").format("malformed"))
+		_refuse(_("Service token rejected: {0}", context="platform_core.kimlik").format("malformed"))
 
 	if frappe.form_dict.get("cmd"):
-		_refuse(_("Service requests must not carry a cmd field."))
+		_refuse(_("Service requests must not carry a cmd field.", context="platform_core.kimlik"))
 	if frappe.session.user not in ("", "Guest"):
-		_refuse(_("Service requests must not carry a session cookie."))
+		_refuse(_("Service requests must not carry a session cookie.", context="platform_core.kimlik"))
 
 	if mobile:
 		kimlik_api.authenticate_mobile_request(token)
@@ -59,12 +59,15 @@ def validate() -> None:
 			leeway=LEEWAY,
 		)
 	except TokenError as error:
-		_refuse(_("Service token rejected: {0}").format(error.code))
+		_refuse(_("Service token rejected: {0}", context="platform_core.kimlik").format(error.code))
 	except Exception as error:
 		if not jwks.is_keys_unavailable(error):
 			raise
 		jwks.report_keys_unavailable(settings.jwks_url)
-		frappe.throw(_("Identity provider keys are not available."), KeycloakKeysUnavailable)
+		frappe.throw(
+			_("Identity provider keys are not available.", context="platform_core.kimlik"),
+			KeycloakKeysUnavailable,
+		)
 
 	# `frappe.set_user` resets `form_dict` (frappe/__init__.py:388); keep the request arguments.
 	form_dict = frappe.local.form_dict
@@ -78,7 +81,9 @@ def require_service(*azp: str) -> dict:
 	claims = getattr(frappe.local, CLAIMS_ATTR, None)
 	if not claims or claims.get("azp") not in azp:
 		frappe.throw(
-			_("This endpoint accepts only the {0} service token.").format(", ".join(azp)),
+			_("This endpoint accepts only the {0} service token.", context="platform_core.kimlik").format(
+				", ".join(azp)
+			),
 			frappe.PermissionError,
 		)
 	return claims

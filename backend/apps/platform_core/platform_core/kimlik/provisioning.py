@@ -41,19 +41,32 @@ def provision(data: dict) -> dict:
 	user = _linked_user(issuer, subject)
 	if user:
 		if user != email:
-			frappe.throw(_("E-mail differs from the linked user. Use change_email."), EmailMismatch)
+			frappe.throw(
+				_("E-mail differs from the linked user. Use change_email.", context="platform_core.kimlik"),
+				EmailMismatch,
+			)
 		doc = frappe.get_doc("User", user)
 	else:
 		if not email_verified:
-			frappe.throw(_("The first link requires a verified e-mail address."), EmailNotVerified)
+			frappe.throw(
+				_("The first link requires a verified e-mail address.", context="platform_core.kimlik"),
+				EmailNotVerified,
+			)
 		if frappe.db.exists(LINK, {"issuer": issuer, "user": email}):
-			frappe.throw(_("This e-mail is already linked to a different identity."), IdentityConflict)
+			frappe.throw(
+				_("This e-mail is already linked to a different identity.", context="platform_core.kimlik"),
+				IdentityConflict,
+			)
 		if frappe.db.exists("User", email):
 			doc = frappe.get_doc("User", email)
 			# End-user provisioning never takes over a desk account (O-3 in the security review).
 			if doc.user_type != WEBSITE_USER or doc.has_desk_access():
 				frappe.throw(
-					_("This e-mail belongs to a desk user and cannot be provisioned."), IdentityConflict
+					_(
+						"This e-mail belongs to a desk user and cannot be provisioned.",
+						context="platform_core.kimlik",
+					),
+					IdentityConflict,
 				)
 		else:
 			doc = frappe.new_doc("User")
@@ -91,7 +104,9 @@ def change_email(data: dict) -> dict:
 	if user == new_email:
 		return {"user": user}
 	if frappe.db.exists("User", new_email):
-		frappe.throw(_("The new e-mail address belongs to another user."), EmailInUse)
+		frappe.throw(
+			_("The new e-mail address belongs to another user.", context="platform_core.kimlik"), EmailInUse
+		)
 	rename_doc("User", user, new_email, show_alert=False)
 	return {"user": new_email}
 
@@ -103,24 +118,34 @@ def _linked_user(issuer: str, subject: str) -> str | None:
 def _linked_user_or_404(issuer: str, subject: str) -> str:
 	user = _linked_user(issuer, subject)
 	if not user:
-		frappe.throw(_("No user is linked to this identity."), IdentityNotFound)
+		frappe.throw(
+			_("No user is linked to this identity.", context="platform_core.kimlik"), IdentityNotFound
+		)
 	return user
 
 
 def _issuer(data: dict) -> str:
 	issuer = _text(data, "issuer", MAX_ISSUER)
 	if issuer != site_settings.issuer():
-		frappe.throw(_("Issuer is not the configured identity provider."), UnknownIssuer)
+		frappe.throw(
+			_("Issuer is not the configured identity provider.", context="platform_core.kimlik"),
+			UnknownIssuer,
+		)
 	return issuer
 
 
 def _text(data: dict, field: str, max_length: int | None = None) -> str:
 	value = data.get(field)
 	if not isinstance(value, str) or not value.strip():
-		frappe.throw(_("Field {0} is required.").format(field), InvalidInput)
+		frappe.throw(_("Field {0} is required.", context="platform_core.kimlik").format(field), InvalidInput)
 	value = value.strip()
 	if max_length and len(value) > max_length:
-		frappe.throw(_("Field {0} is longer than {1} characters.").format(field, max_length), InvalidInput)
+		frappe.throw(
+			_("Field {0} is longer than {1} characters.", context="platform_core.kimlik").format(
+				field, max_length
+			),
+			InvalidInput,
+		)
 	return value
 
 
@@ -129,16 +154,18 @@ def _optional_text(data: dict, field: str) -> str:
 	if value is None:
 		return ""
 	if not isinstance(value, str):
-		frappe.throw(_("Field {0} must be text.").format(field), InvalidInput)
+		frappe.throw(_("Field {0} must be text.", context="platform_core.kimlik").format(field), InvalidInput)
 	return value.strip()
 
 
 def _email(value: object) -> str:
 	if not isinstance(value, str) or not value.strip():
-		frappe.throw(_("Field {0} is required.").format("email"), InvalidInput)
+		frappe.throw(
+			_("Field {0} is required.", context="platform_core.kimlik").format("email"), InvalidInput
+		)
 	email = value.strip().lower()
 	if validate_email_address(email) != email:
-		frappe.throw(_("E-mail address is not valid."), InvalidInput)
+		frappe.throw(_("E-mail address is not valid.", context="platform_core.kimlik"), InvalidInput)
 	return email
 
 
@@ -150,7 +177,9 @@ def _bool(data: dict, field: str, default: bool | None = None) -> bool:
 		return bool(value)
 	if isinstance(value, str) and value.strip().lower() in ("true", "false", "1", "0"):
 		return value.strip().lower() in ("true", "1")
-	frappe.throw(_("Field {0} must be true or false.").format(field), InvalidInput)
+	frappe.throw(
+		_("Field {0} must be true or false.", context="platform_core.kimlik").format(field), InvalidInput
+	)
 
 
 def _role_profiles(value: object) -> list[str] | None:
@@ -160,12 +189,18 @@ def _role_profiles(value: object) -> list[str] | None:
 		value = frappe.parse_json(value) if value.strip().startswith("[") else [value]
 	if not isinstance(value, list) or not all(isinstance(name, str) and name.strip() for name in value):
 		frappe.throw(
-			_("Field {0} must be a list of role profile names.").format("role_profiles"), InvalidInput
+			_("Field {0} must be a list of role profile names.", context="platform_core.kimlik").format(
+				"role_profiles"
+			),
+			InvalidInput,
 		)
 	names = sorted({name.strip() for name in value})
 	for name in names:
 		if not frappe.db.exists("Role Profile", name):
-			frappe.throw(_("Role profile {0} does not exist.").format(name), InvalidInput)
+			frappe.throw(
+				_("Role profile {0} does not exist.", context="platform_core.kimlik").format(name),
+				InvalidInput,
+			)
 	_no_desk_role(names)
 	return names
 
@@ -186,4 +221,7 @@ def _no_desk_role(profiles: list[str]) -> None:
 		"Role", filters={"name": ("in", roles), "desk_access": 1}, pluck="name", limit=1
 	)
 	if desk_roles:
-		frappe.throw(_("Role profile grants desk access: {0}").format(desk_roles[0]), DeskRoleNotAllowed)
+		frappe.throw(
+			_("Role profile grants desk access: {0}", context="platform_core.kimlik").format(desk_roles[0]),
+			DeskRoleNotAllowed,
+		)

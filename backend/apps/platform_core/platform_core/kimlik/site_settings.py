@@ -27,7 +27,10 @@ def issuer() -> str:
 	public_url = frappe.conf.get("keycloak_public_url")
 	if not public_url:
 		frappe.throw(
-			_("Keycloak settings are missing: {0}").format("keycloak_public_url"), KeycloakSettingsMissing
+			_("Keycloak settings are missing: {0}", context="platform_core.kimlik").format(
+				"keycloak_public_url"
+			),
+			KeycloakSettingsMissing,
 		)
 	return helpers.issuer_url(public_url, realm())
 
@@ -42,7 +45,10 @@ def get() -> frappe._dict:
 	missing = [key for key in REQUIRED if not conf.get(key)]
 	if missing:
 		frappe.throw(
-			_("Keycloak settings are missing: {0}").format(", ".join(missing)), KeycloakSettingsMissing
+			_("Keycloak settings are missing: {0}", context="platform_core.kimlik").format(
+				", ".join(missing)
+			),
+			KeycloakSettingsMissing,
 		)
 	public_url = conf.keycloak_public_url.rstrip("/")
 	internal_url = (conf.get("keycloak_internal_url") or public_url).rstrip("/")

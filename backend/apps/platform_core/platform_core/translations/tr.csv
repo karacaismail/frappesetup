@@ -1,49 +1,66 @@
-Sign in with {0},{0} ile oturum aç
-Sign in with {0} is not configured.,{0} ile oturum açma kurulu değil.
-Redirect target must be a relative path on this site.,Yönlendirme hedefi bu sitede göreli bir yol olmalıdır.
-Keycloak settings are missing: {0},Keycloak ayarları eksik: {0}
-The identity provider did not send a subject.,Kimlik sunucusu kullanıcı kimliğini göndermedi.
-This identity is linked to a different user.,Bu kimlik başka bir kullanıcıya bağlı.
-This user is already linked to a different identity.,Bu kullanıcı zaten başka bir kimliğe bağlı.
-The e-mail address is not verified by the identity provider.,E-posta adresi kimlik sunucusunda doğrulanmadı.
-Back-channel logout must not carry a session cookie.,Arka kanal çıkış isteği oturum çerezi taşıyamaz.
-Logout token is missing.,Çıkış belirteci eksik.
-Logout token rejected: {0},Çıkış belirteci reddedildi: {0}
-Identity provider keys are not available.,Kimlik sunucusunun anahtarları alınamadı.
-Issuer and subject are required.,Veren ve kullanıcı kimliği zorunludur.
-Service requests must not carry a cmd field.,Servis isteği cmd alanı taşıyamaz.
-Service requests must not carry a session cookie.,Servis isteği oturum çerezi taşıyamaz.
-Service token rejected: {0},Servis belirteci reddedildi: {0}
-This endpoint accepts only the {0} service token.,Bu uç yalnız {0} servis belirtecini kabul eder.
-E-mail differs from the linked user. Use change_email.,E-posta bağlı kullanıcıdan farklı. change_email ucunu kullanın.
-The first link requires a verified e-mail address.,İlk bağ için doğrulanmış e-posta gerekir.
-This e-mail is already linked to a different identity.,Bu e-posta zaten başka bir kimliğe bağlı.
-No user is linked to this identity.,Bu kimliğe bağlı kullanıcı yok.
-The new e-mail address belongs to another user.,Yeni e-posta adresi başka bir kullanıcıya ait.
-Issuer is not the configured identity provider.,Veren ayarlı kimlik sunucusu değil.
-Field {0} is required.,{0} alanı zorunludur.
-E-mail address is not valid.,E-posta adresi geçerli değil.
-Field {0} must be true or false.,{0} alanı doğru ya da yanlış olmalıdır.
-Field {0} must be a list of role profile names.,{0} alanı rol profili adlarının listesi olmalıdır.
-Role profile {0} does not exist.,{0} rol profili yok.
-Role profile grants desk access: {0},Rol profili masaüstü erişimi veriyor: {0}
-Password sign-in is disabled. Sign in with the identity provider.,Parola ile giriş kapalı. Kimlik sunucusu ile oturum açın.
-E-mail link sign-in is disabled. Sign in with the identity provider.,E-posta bağlantısıyla giriş kapalı. Kimlik sunucusu ile oturum açın.
-This page is not available. Use the application.,Bu sayfa kullanılamaz. Uygulamayı kullanın.
-Sign in with the identity provider is not configured.,Kimlik sunucusu ile oturum açma kurulu değil.
-The identity provider refused or cancelled the sign-in.,Kimlik sunucusu girişi reddetti ya da iptal etti.
-The sign-in response is incomplete.,Giriş yanıtı eksik.
-"This sign-in attempt is unknown, expired or already used. Please try again.","Bu giriş denemesi bilinmiyor, süresi dolmuş ya da kullanılmış. Yeniden deneyin."
-The sign-in cookie is missing. Please start again in this browser.,Giriş çerezi yok. Bu tarayıcıda yeniden başlayın.
-This sign-in was started in a different browser.,Bu giriş başka bir tarayıcıda başlatıldı.
-The identity provider could not be reached.,Kimlik sunucusuna ulaşılamadı.
-The identity provider did not return an identity token.,Kimlik sunucusu kimlik belirteci göndermedi.
-The identity token is not valid ({0}).,Kimlik belirteci geçerli değil ({0}).
-The identity provider keys are not available.,Kimlik sunucusunun anahtarları alınamadı.
-There is no account for this e-mail address. Sign-up is closed.,Bu e-posta için hesap yok. Kayıt kapalı.
-This user is disabled.,Bu kullanıcı kapalı.
-Sign-in failed,Giriş başarısız
-Local sign-in is disabled. Sign in with the identity provider.,Yerel giriş kapalı. Kimlik sunucusu ile oturum açın.
-This e-mail belongs to a desk user and cannot be provisioned.,Bu e-posta bir yönetim kullanıcısına ait. Eşitleme ile açılamaz.
-Field {0} is longer than {1} characters.,{0} alanı {1} karakterden uzun.
-Field {0} must be text.,{0} alanı metin olmalıdır.
+Sign in with {0},{0} ile oturum aç,platform_core.kimlik
+Redirect target must be a relative path on this site.,Yönlendirme hedefi bu sitede göreli bir yol olmalıdır.,platform_core.kimlik
+Keycloak settings are missing: {0},Keycloak ayarları eksik: {0},platform_core.kimlik
+The identity provider did not send a subject.,Kimlik sunucusu kullanıcı kimliğini göndermedi.,platform_core.kimlik
+This identity is linked to a different user.,Bu kimlik başka bir kullanıcıya bağlı.,platform_core.kimlik
+This user is already linked to a different identity.,Bu kullanıcı zaten başka bir kimliğe bağlı.,platform_core.kimlik
+The e-mail address is not verified by the identity provider.,E-posta adresi kimlik sunucusunda doğrulanmadı.,platform_core.kimlik
+Back-channel logout must not carry a session cookie.,Arka kanal çıkış isteği oturum çerezi taşıyamaz.,platform_core.kimlik
+Logout token is missing.,Çıkış belirteci eksik.,platform_core.kimlik
+Logout token rejected: {0},Çıkış belirteci reddedildi: {0},platform_core.kimlik
+Identity provider keys are not available.,Kimlik sunucusunun anahtarları alınamadı.,platform_core.kimlik
+Issuer and subject are required.,Veren ve kullanıcı kimliği zorunludur.,platform_core.kimlik
+Service requests must not carry a cmd field.,Servis isteği cmd alanı taşıyamaz.,platform_core.kimlik
+Service requests must not carry a session cookie.,Servis isteği oturum çerezi taşıyamaz.,platform_core.kimlik
+Service token rejected: {0},Servis belirteci reddedildi: {0},platform_core.kimlik
+This endpoint accepts only the {0} service token.,Bu uç yalnız {0} servis belirtecini kabul eder.,platform_core.kimlik
+E-mail differs from the linked user. Use change_email.,E-posta bağlı kullanıcıdan farklı. change_email ucunu kullanın.,platform_core.kimlik
+The first link requires a verified e-mail address.,İlk bağ için doğrulanmış e-posta gerekir.,platform_core.kimlik
+This e-mail is already linked to a different identity.,Bu e-posta zaten başka bir kimliğe bağlı.,platform_core.kimlik
+No user is linked to this identity.,Bu kimliğe bağlı kullanıcı yok.,platform_core.kimlik
+The new e-mail address belongs to another user.,Yeni e-posta adresi başka bir kullanıcıya ait.,platform_core.kimlik
+Issuer is not the configured identity provider.,Veren ayarlı kimlik sunucusu değil.,platform_core.kimlik
+Field {0} is required.,{0} alanı zorunludur.,platform_core.kimlik
+E-mail address is not valid.,E-posta adresi geçerli değil.,platform_core.kimlik
+Field {0} must be true or false.,{0} alanı doğru ya da yanlış olmalıdır.,platform_core.kimlik
+Field {0} must be a list of role profile names.,{0} alanı rol profili adlarının listesi olmalıdır.,platform_core.kimlik
+Role profile {0} does not exist.,{0} rol profili yok.,platform_core.kimlik
+Role profile grants desk access: {0},Rol profili masaüstü erişimi veriyor: {0},platform_core.kimlik
+Password sign-in is disabled. Sign in with the identity provider.,Parola ile giriş kapalı. Kimlik sunucusu ile oturum açın.,platform_core.kimlik
+This page is not available. Use the application.,Bu sayfa kullanılamaz. Uygulamayı kullanın.,platform_core.kimlik
+Sign in with the identity provider is not configured.,Kimlik sunucusu ile oturum açma kurulu değil.,platform_core.kimlik
+The identity provider refused or cancelled the sign-in.,Kimlik sunucusu girişi reddetti ya da iptal etti.,platform_core.kimlik
+The sign-in response is incomplete.,Giriş yanıtı eksik.,platform_core.kimlik
+"This sign-in attempt is unknown, expired or already used. Please try again.","Bu giriş denemesi bilinmiyor, süresi dolmuş ya da kullanılmış. Yeniden deneyin.",platform_core.kimlik
+The sign-in cookie is missing. Please start again in this browser.,Giriş çerezi yok. Bu tarayıcıda yeniden başlayın.,platform_core.kimlik
+This sign-in was started in a different browser.,Bu giriş başka bir tarayıcıda başlatıldı.,platform_core.kimlik
+The identity provider could not be reached.,Kimlik sunucusuna ulaşılamadı.,platform_core.kimlik
+The identity provider did not return an identity token.,Kimlik sunucusu kimlik belirteci göndermedi.,platform_core.kimlik
+The identity token is not valid ({0}).,Kimlik belirteci geçerli değil ({0}).,platform_core.kimlik
+The identity provider keys are not available.,Kimlik sunucusunun anahtarları alınamadı.,platform_core.kimlik
+There is no account for this e-mail address. Sign-up is closed.,Bu e-posta için hesap yok. Kayıt kapalı.,platform_core.kimlik
+This user is disabled.,Bu kullanıcı kapalı.,platform_core.kimlik
+Sign-in failed,Giriş başarısız,platform_core.kimlik
+Local sign-in is disabled. Sign in with the identity provider.,Yerel giriş kapalı. Kimlik sunucusu ile oturum açın.,platform_core.kimlik
+This e-mail belongs to a desk user and cannot be provisioned.,Bu e-posta bir yönetim kullanıcısına ait. Eşitleme ile açılamaz.,platform_core.kimlik
+Field {0} is longer than {1} characters.,{0} alanı {1} karakterden uzun.,platform_core.kimlik
+Field {0} must be text.,{0} alanı metin olmalıdır.,platform_core.kimlik
+This account cannot be anonymized.,Bu hesap anonim yapılamaz.,platform_core.kimlik
+Mobile token rejected: {0},Telefon belirteci reddedildi: {0},platform_core.kimlik
+Request body is too large.,İstek gövdesi çok büyük.,platform_core.kimlik
+The identity provider did not confirm a fresh sign-in.,Kimlik sunucusu yeni bir giriş doğrulamadı.,platform_core.kimlik
+Sign in,Oturum aç,platform_core.kimlik
+Use your {0} account to continue.,Devam etmek için {0} hesabınızı kullanın.,platform_core.kimlik
+Sign in with password,Parola ile oturum aç,platform_core.kimlik
+E-mail,E-posta,platform_core.kimlik
+Password,Parola,platform_core.kimlik
+Sign-in failed. Check your e-mail and password.,Giriş başarısız. E-postanızı ve parolanızı denetleyin.,platform_core.kimlik
+The server could not be reached. Try again.,Sunucuya ulaşılamadı. Yeniden deneyin.,platform_core.kimlik
+Platform Identity Link,Kimlik Bağı
+Issuer,Veren,Platform Identity Link
+Subject,Kullanıcı kimliği,Platform Identity Link
+User,Kullanıcı,Platform Identity Link
+Links one identity at the identity provider (issuer and subject) to one Frappe user. The pair is the permanent key of the user. The e-mail address is only contact data and may change.,Kimlik sunucusundaki bir kimliği (veren ve kullanıcı kimliği) bir Frappe kullanıcısına bağlar. Bu çift kullanıcının kalıcı anahtarıdır. E-posta adresi yalnız iletişim bilgisidir ve değişebilir.,Platform Identity Link
+"Identity provider address as written in the token's iss claim, for example http://kimlik.localhost:8660/realms/platform. Together with Subject it is unique.",Belirtecin iss alanındaki kimlik sunucusu adresi. Örnek: http://kimlik.localhost:8660/realms/platform. Kullanıcı kimliğiyle birlikte tekildir.,Platform Identity Link
+Stable user identifier at the identity provider (the sub claim). Together with Issuer it is unique. It never changes when the e-mail changes.,Kimlik sunucusundaki değişmeyen kullanıcı kimliği (sub alanı). Verenle birlikte tekildir. E-posta değişince bu değer değişmez.,Platform Identity Link
+The Frappe user this identity signs in as. One user has at most one link.,Bu kimliğin oturum açtığı Frappe kullanıcısı. Bir kullanıcının en çok bir bağı olur.,Platform Identity Link

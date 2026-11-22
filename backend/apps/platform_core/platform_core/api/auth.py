@@ -24,7 +24,10 @@ def start_login(redirect_to: str | None = None) -> None:
 		result = sign_in.build_login_url(redirect_to)
 	except (InvalidRedirect, KeycloakLoginNotConfigured) as error:
 		frappe.respond_as_web_page(
-			_("Sign-in failed"), str(error), http_status_code=error.http_status_code, indicator_color="red"
+			_("Sign-in failed", context="platform_core.kimlik"),
+			str(error),
+			http_status_code=error.http_status_code,
+			indicator_color="red",
 		)
 		return
 	frappe.local.response["type"] = "redirect"
@@ -45,7 +48,10 @@ def keycloak_callback(
 		target = sign_in.complete_callback(code, state, error)
 	except sign_in.SignInRefused as refusal:
 		frappe.respond_as_web_page(
-			_("Sign-in failed"), refusal.message, http_status_code=refusal.status, indicator_color="red"
+			_("Sign-in failed", context="platform_core.kimlik"),
+			refusal.message,
+			http_status_code=refusal.status,
+			indicator_color="red",
 		)
 		return
 	frappe.local.response["type"] = "redirect"

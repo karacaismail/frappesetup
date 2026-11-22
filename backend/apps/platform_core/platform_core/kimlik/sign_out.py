@@ -42,11 +42,11 @@ def handle_logout_token(logout_token: object) -> dict:
 	frappe.local.response_headers["Cache-Control"] = "no-store"
 	sign_in.guard_guest_request()
 	if frappe.session.user != "Guest":
-		_reject(_("Back-channel logout must not carry a session cookie."))
+		_reject(_("Back-channel logout must not carry a session cookie.", context="platform_core.kimlik"))
 	if not isinstance(logout_token, str) or not logout_token:
-		_reject(_("Logout token is missing."))
+		_reject(_("Logout token is missing.", context="platform_core.kimlik"))
 	if len(logout_token) > helpers.MAX_TOKEN_LENGTH:
-		_reject(_("Logout token rejected: {0}").format("malformed"))
+		_reject(_("Logout token rejected: {0}", context="platform_core.kimlik").format("malformed"))
 
 	from oidc_verify import TokenError, verify_logout_token
 
@@ -60,12 +60,15 @@ def handle_logout_token(logout_token: object) -> dict:
 			leeway=LEEWAY,
 		)
 	except TokenError as error:
-		_reject(_("Logout token rejected: {0}").format(error.code))
+		_reject(_("Logout token rejected: {0}", context="platform_core.kimlik").format(error.code))
 	except Exception as error:
 		if not jwks.is_keys_unavailable(error):
 			raise
 		jwks.report_keys_unavailable(settings.jwks_url)
-		frappe.throw(_("Identity provider keys are not available."), KeycloakKeysUnavailable)
+		frappe.throw(
+			_("Identity provider keys are not available.", context="platform_core.kimlik"),
+			KeycloakKeysUnavailable,
+		)
 
 	_validate_logout_claims(claims)
 	_mark_used_or_reject(claims)
@@ -94,15 +97,15 @@ def _validate_logout_claims(claims: dict) -> None:
 	"""OpenID Connect Back-Channel Logout 1.0, section 2.4: exp and jti are required, the event value
 	is a JSON object and sid, when present, is a string. The shared library does not enforce these yet."""
 	if not isinstance(claims.get("exp"), int | float) or isinstance(claims.get("exp"), bool):
-		_reject(_("Logout token rejected: {0}").format("missing_exp"))
+		_reject(_("Logout token rejected: {0}", context="platform_core.kimlik").format("missing_exp"))
 	jti = claims.get("jti")
 	if not isinstance(jti, str) or not jti.strip():
-		_reject(_("Logout token rejected: {0}").format("missing_jti"))
+		_reject(_("Logout token rejected: {0}", context="platform_core.kimlik").format("missing_jti"))
 	events = claims.get("events")
 	if not isinstance(events, dict) or not isinstance(events.get(LOGOUT_EVENT), dict):
-		_reject(_("Logout token rejected: {0}").format("not_logout_token"))
+		_reject(_("Logout token rejected: {0}", context="platform_core.kimlik").format("not_logout_token"))
 	if "sid" in claims and not isinstance(claims["sid"], str):
-		_reject(_("Logout token rejected: {0}").format("malformed"))
+		_reject(_("Logout token rejected: {0}", context="platform_core.kimlik").format("malformed"))
 
 
 def _mark_used_or_reject(claims: dict) -> None:
@@ -110,7 +113,7 @@ def _mark_used_or_reject(claims: dict) -> None:
 	ttl = max(int(claims["exp"] - time.time()) + LEEWAY, 1)
 	key = frappe.cache.make_key(f"{JTI_PREFIX}:{helpers.sha256_hex(claims['jti'])}")
 	if not frappe.cache.set(key, "1", ex=ttl, nx=True):
-		_reject(_("Logout token rejected: {0}").format("replayed"))
+		_reject(_("Logout token rejected: {0}", context="platform_core.kimlik").format("replayed"))
 
 
 def _close(finder, *args) -> int:

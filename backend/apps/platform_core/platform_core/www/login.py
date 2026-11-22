@@ -35,13 +35,15 @@ def get_context(context):
 
 	context.no_cache = 1
 	context.lang = frappe.local.lang or "en"
-	context.title = _("Sign in")
+	context.title = _("Sign in", context="platform_core.kimlik")
 	context.redirect_to = redirect_to
 	context.keycloak_only = site_settings.keycloak_only()
 	context.configured = settings is not None
 	context.brand_name = settings.brand_name if settings else ""
 	context.start_url = START_PATH + ("?" + urlencode({"redirect_to": redirect_to}) if redirect_to else "")
-	context.button_label = _("Sign in with {0}").format(context.brand_name) if settings else ""
+	context.button_label = (
+		_("Sign in with {0}", context="platform_core.kimlik").format(context.brand_name) if settings else ""
+	)
 	context.after_login = redirect_to or (settings.panel_url if settings else "/")
 	context.login_endpoint = "/api/method/login"
 	return context

@@ -55,7 +55,7 @@ def guard_guest_request(max_bytes: int = helpers.MAX_GUEST_BODY_BYTES) -> None:
 	request = getattr(frappe.local, "request", None)
 	length = getattr(request, "content_length", None) if request is not None else None
 	if length and length > max_bytes:
-		frappe.throw(_("Request body is too large."), PayloadTooLarge)
+		frappe.throw(_("Request body is too large.", context="platform_core.kimlik"), PayloadTooLarge)
 
 
 def build_login_url(redirect_to: str | None = None, force_login: bool = False) -> dict:
@@ -65,11 +65,17 @@ def build_login_url(redirect_to: str | None = None, force_login: bool = False) -
 	"""
 	guard_guest_request()
 	if redirect_to and not helpers.is_safe_redirect(redirect_to):
-		frappe.throw(_("Redirect target must be a relative path on this site."), InvalidRedirect)
+		frappe.throw(
+			_("Redirect target must be a relative path on this site.", context="platform_core.kimlik"),
+			InvalidRedirect,
+		)
 	try:
 		settings = site_settings.get()
 	except KeycloakSettingsMissing:
-		frappe.throw(_("Sign in with the identity provider is not configured."), KeycloakLoginNotConfigured)
+		frappe.throw(
+			_("Sign in with the identity provider is not configured.", context="platform_core.kimlik"),
+			KeycloakLoginNotConfigured,
+		)
 
 	browser_token = secrets.token_urlsafe(32)
 	state = secrets.token_urlsafe(32)
@@ -100,7 +106,7 @@ def build_login_url(redirect_to: str | None = None, force_login: bool = False) -
 			prompt="login" if force_login else None,
 		),
 		"brand_name": settings.brand_name,
-		"label": _("Sign in with {0}").format(settings.brand_name),
+		"label": _("Sign in with {0}", context="platform_core.kimlik").format(settings.brand_name),
 	}
 
 
@@ -108,35 +114,55 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 	"""Finishes the sign-in. Returns the redirect target. Raises `SignInRefused` on any refusal."""
 	guard_guest_request()
 	if error:
-		raise SignInRefused(400, _("The identity provider refused or cancelled the sign-in."))
+		raise SignInRefused(
+			400, _("The identity provider refused or cancelled the sign-in.", context="platform_core.kimlik")
+		)
 	if not isinstance(state, str) or not state or not isinstance(code, str) or not code:
-		raise SignInRefused(400, _("The sign-in response is incomplete."))
+		raise SignInRefused(400, _("The sign-in response is incomplete.", context="platform_core.kimlik"))
 	if len(state) > helpers.MAX_STATE_LENGTH or len(code) > helpers.MAX_CODE_LENGTH:
-		raise SignInRefused(400, _("The sign-in response is incomplete."))
+		raise SignInRefused(400, _("The sign-in response is incomplete.", context="platform_core.kimlik"))
 
 	record = _pop_state(state)
 	if record is None:
 		raise SignInRefused(
-			400, _("This sign-in attempt is unknown, expired or already used. Please try again.")
+			400,
+			_(
+				"This sign-in attempt is unknown, expired or already used. Please try again.",
+				context="platform_core.kimlik",
+			),
 		)
 	browser_token = frappe.request.cookies.get(_cookie_name()) if frappe.request else None
 	if not browser_token:
-		raise SignInRefused(400, _("The sign-in cookie is missing. Please start again in this browser."))
+		raise SignInRefused(
+			400,
+			_(
+				"The sign-in cookie is missing. Please start again in this browser.",
+				context="platform_core.kimlik",
+			),
+		)
 	if not hmac.compare_digest(helpers.sha256_hex(browser_token), record.get("browser", "")):
-		raise SignInRefused(403, _("This sign-in was started in a different browser."))
+		raise SignInRefused(
+			403, _("This sign-in was started in a different browser.", context="platform_core.kimlik")
+		)
 
 	try:
 		settings = site_settings.get()
 	except KeycloakSettingsMissing as error:
-		raise SignInRefused(503, _("Sign in with the identity provider is not configured.")) from error
+		raise SignInRefused(
+			503, _("Sign in with the identity provider is not configured.", context="platform_core.kimlik")
+		) from error
 
 	try:
 		tokens = exchange_code(settings, code, record["verifier"], callback_url())
 	except ExchangeFailed as error:
-		raise SignInRefused(503, _("The identity provider could not be reached.")) from error
+		raise SignInRefused(
+			503, _("The identity provider could not be reached.", context="platform_core.kimlik")
+		) from error
 	id_token = tokens.get("id_token") if isinstance(tokens, dict) else None
 	if not isinstance(id_token, str) or not id_token:
-		raise SignInRefused(400, _("The identity provider did not return an identity token."))
+		raise SignInRefused(
+			400, _("The identity provider did not return an identity token.", context="platform_core.kimlik")
+		)
 
 	from oidc_verify import TokenError, verify_id_token
 
@@ -150,17 +176,25 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 			leeway=LEEWAY,
 		)
 	except TokenError as error:
-		raise SignInRefused(400, _("The identity token is not valid ({0}).").format(error.code)) from error
+		raise SignInRefused(
+			400,
+			_("The identity token is not valid ({0}).", context="platform_core.kimlik").format(error.code),
+		) from error
 	except Exception as error:
 		if not jwks.is_keys_unavailable(error):
 			raise
-		raise SignInRefused(503, _("The identity provider keys are not available.")) from error
+		raise SignInRefused(
+			503, _("The identity provider keys are not available.", context="platform_core.kimlik")
+		) from error
 
 	user = resolve_user(settings.issuer, claims)
 	if session_policy.needs_fresh_authentication(user, claims):
 		# O-25: an employee idle for the limit authenticates again; the open Keycloak cookie does not count.
 		if record.get("force_login"):
-			raise SignInRefused(403, _("The identity provider did not confirm a fresh sign-in."))
+			raise SignInRefused(
+				403,
+				_("The identity provider did not confirm a fresh sign-in.", context="platform_core.kimlik"),
+			)
 		return build_login_url(record.get("redirect_to") or None, force_login=True)["login_url"]
 	frappe.local.login_manager.login_as(user)
 	frappe.local.session.data.update(helpers.session_claims(claims, settings.issuer))
@@ -179,28 +213,46 @@ def resolve_user(issuer: str, claims: dict) -> str:
 	"""Finds the Frappe user for `(iss, sub)`. Creates the first link only with a verified e-mail."""
 	subject = claims.get("sub")
 	if not isinstance(subject, str) or not subject.strip():
-		raise SignInRefused(400, _("The identity provider did not send a subject."))
+		raise SignInRefused(
+			400, _("The identity provider did not send a subject.", context="platform_core.kimlik")
+		)
 	subject = subject.strip()
 	email = (claims.get("email") or "").strip().lower() if isinstance(claims.get("email"), str) else ""
 
 	user = frappe.db.get_value(LINK_DOCTYPE, {"issuer": issuer, "subject": subject}, "user")
 	if not user:
 		if not email or not frappe.db.exists("User", email):
-			raise SignInRefused(403, _("There is no account for this e-mail address. Sign-up is closed."))
+			raise SignInRefused(
+				403,
+				_(
+					"There is no account for this e-mail address. Sign-up is closed.",
+					context="platform_core.kimlik",
+				),
+			)
 		if frappe.db.exists(LINK_DOCTYPE, {"issuer": issuer, "user": email}):
-			raise SignInRefused(403, _("This user is already linked to a different identity."))
+			raise SignInRefused(
+				403, _("This user is already linked to a different identity.", context="platform_core.kimlik")
+			)
 		if not helpers.email_verified(claims):
-			raise SignInRefused(403, _("The e-mail address is not verified by the identity provider."))
+			raise SignInRefused(
+				403,
+				_(
+					"The e-mail address is not verified by the identity provider.",
+					context="platform_core.kimlik",
+				),
+			)
 		if not frappe.db.get_value("User", email, "enabled"):
-			raise SignInRefused(403, _("This user is disabled."))
+			raise SignInRefused(403, _("This user is disabled.", context="platform_core.kimlik"))
 		create_link(issuer, subject, email)
 		return email
 
 	if email and email != user.lower():
 		# The identity is linked, but the provider now reports another user's address (AU-4: refuse on mismatch).
-		raise SignInRefused(403, _("This identity is linked to a different user."))
+		raise SignInRefused(
+			403, _("This identity is linked to a different user.", context="platform_core.kimlik")
+		)
 	if not frappe.db.get_value("User", user, "enabled"):
-		raise SignInRefused(403, _("This user is disabled."))
+		raise SignInRefused(403, _("This user is disabled.", context="platform_core.kimlik"))
 	return user
 
 

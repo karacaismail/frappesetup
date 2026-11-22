@@ -24,7 +24,9 @@ class PlatformIdentityLink(Document):
 		self.issuer = (self.issuer or "").strip()
 		self.subject = (self.subject or "").strip()
 		if not self.issuer or not self.subject:
-			frappe.throw(_("Issuer and subject are required."), frappe.MandatoryError)
+			frappe.throw(
+				_("Issuer and subject are required.", context="platform_core.kimlik"), frappe.MandatoryError
+			)
 
 
 def on_doctype_update():

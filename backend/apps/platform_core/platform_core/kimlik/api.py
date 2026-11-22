@@ -48,24 +48,27 @@ def verify_mobile_token(token: str) -> dict:
 			leeway=LEEWAY,
 		)
 	except TokenError as error:
-		_refuse(_("Mobile token rejected: {0}").format(error.code))
+		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format(error.code))
 	except Exception as error:
 		if not jwks.is_keys_unavailable(error):
 			raise
 		jwks.report_keys_unavailable(settings.jwks_url)
-		frappe.throw(_("Identity provider keys are not available."), KeycloakKeysUnavailable)
+		frappe.throw(
+			_("Identity provider keys are not available.", context="platform_core.kimlik"),
+			KeycloakKeysUnavailable,
+		)
 
 	scopes = str(claims.get("scope") or "").split()
 	if MOBILE_SCOPE not in scopes:
-		_refuse(_("Mobile token rejected: {0}").format("missing_scope"))
+		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("missing_scope"))
 	subject = claims.get("sub")
 	if not isinstance(subject, str) or not subject.strip():
-		_refuse(_("Mobile token rejected: {0}").format("malformed"))
+		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("malformed"))
 	user = frappe.db.get_value(LINK, {"issuer": settings.issuer, "subject": subject.strip()}, "user")
 	if not user:
-		_refuse(_("Mobile token rejected: {0}").format("unknown_identity"))
+		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("unknown_identity"))
 	if not frappe.db.get_value("User", user, "enabled"):
-		_refuse(_("Mobile token rejected: {0}").format("user_disabled"))
+		_refuse(_("Mobile token rejected: {0}", context="platform_core.kimlik").format("user_disabled"))
 	sid = claims.get("sid") if helpers.is_session_id(claims.get("sid")) else None
 	return {
 		"user": user,

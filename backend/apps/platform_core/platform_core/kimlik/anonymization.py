@@ -39,9 +39,13 @@ def anonymize_user(data: dict) -> dict:
 		provisioning.LINK, {"issuer": issuer, "subject": subject}, "user", for_update=True
 	)
 	if not user:
-		frappe.throw(_("No user is linked to this identity."), IdentityNotFound)
+		frappe.throw(
+			_("No user is linked to this identity.", context="platform_core.kimlik"), IdentityNotFound
+		)
 	if user in PROTECTED_USERS:
-		frappe.throw(_("This account cannot be anonymized."), IdentityConflict)
+		frappe.throw(
+			_("This account cannot be anonymized.", context="platform_core.kimlik"), IdentityConflict
+		)
 	if frappe.db.get_value(REQUEST, user, "status", for_update=True) == DELETED:
 		# Repeated request: the link already points to the anonymous user.
 		return _result(user)

@@ -23,18 +23,18 @@
 	<main class="login" aria-labelledby="login-title">
 		<h1 id="login-title" class="login__title">{{ title }}</h1>
 		{% if configured %}
-			<p class="login__lead">{{ _("Use your {0} account to continue.").format(brand_name) }}</p>
+			<p class="login__lead">{{ _("Use your {0} account to continue.", context="platform_core.kimlik").format(brand_name) }}</p>
 			<a class="button button--primary" href="{{ start_url }}" rel="nofollow">{{ button_label }}</a>
 			{% if not keycloak_only %}
 				<section class="login__local" aria-labelledby="local-title">
-					<h2 id="local-title" class="login__subtitle">{{ _("Sign in with password") }}</h2>
+					<h2 id="local-title" class="login__subtitle">{{ _("Sign in with password", context="platform_core.kimlik") }}</h2>
 					<form class="form" method="post" action="{{ login_endpoint }}" data-login-endpoint="{{ login_endpoint }}" data-after-login="{{ after_login }}" novalidate>
-						<label class="form__label" for="usr">{{ _("E-mail") }}</label>
+						<label class="form__label" for="usr">{{ _("E-mail", context="platform_core.kimlik") }}</label>
 						<input class="form__input" id="usr" name="usr" type="email" autocomplete="username" required>
-						<label class="form__label" for="pwd">{{ _("Password") }}</label>
+						<label class="form__label" for="pwd">{{ _("Password", context="platform_core.kimlik") }}</label>
 						<input class="form__input" id="pwd" name="pwd" type="password" autocomplete="current-password" required>
 						<p class="form__error" id="login-error" role="alert" aria-live="assertive" hidden></p>
-						<button class="button button--secondary" type="submit">{{ _("Sign in") }}</button>
+						<button class="button button--secondary" type="submit">{{ _("Sign in", context="platform_core.kimlik") }}</button>
 					</form>
 				</section>
 				<script>
@@ -52,10 +52,10 @@
 								credentials: "same-origin"
 							}).then(function (response) {
 								if (response.ok) { window.location.assign(form.dataset.afterLogin); return; }
-								error.textContent = {{ _("Sign-in failed. Check your e-mail and password.") | tojson }};
+								error.textContent = {{ _("Sign-in failed. Check your e-mail and password.", context="platform_core.kimlik") | tojson }};
 								error.hidden = false;
 							}).catch(function () {
-								error.textContent = {{ _("The server could not be reached. Try again.") | tojson }};
+								error.textContent = {{ _("The server could not be reached. Try again.", context="platform_core.kimlik") | tojson }};
 								error.hidden = false;
 							});
 						});
@@ -63,7 +63,7 @@
 				</script>
 			{% endif %}
 		{% else %}
-			<p class="login__lead" role="alert">{{ _("Sign in with the identity provider is not configured.") }}</p>
+			<p class="login__lead" role="alert">{{ _("Sign in with the identity provider is not configured.", context="platform_core.kimlik") }}</p>
 		{% endif %}
 	</main>
 </body>
