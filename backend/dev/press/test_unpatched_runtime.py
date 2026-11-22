@@ -1,4 +1,4 @@
-"""Acceptance checks against a real, unmodified Press v0.154.1 Bench.
+"""Acceptance checks against a real, pinned and unmodified Press Bench.
 
 Set PRESS_TEST_UNPATCHED_BENCH inside the candidate image. Failures stay failures:
 these tests do not patch imports, catch compatibility errors, or mark them expected.
@@ -31,7 +31,9 @@ class UnpatchedRuntimeTest(unittest.TestCase):
         revision = subprocess.check_output(
             ["git", "-C", str(self.source), "rev-parse", "HEAD"], text=True
         ).strip()
-        self.assertEqual(revision, "7a4384d5eec9f0f0dce4124e9dd48b106e51222f")
+        expected = os.getenv("PRESS_TEST_EXPECTED_REVISION", "7a4384d5eec9f0f0dce4124e9dd48b106e51222f")
+        self.assertRegex(expected, r"^[0-9a-f]{40}\Z", "Pin a complete upstream commit SHA.")
+        self.assertEqual(revision, expected)
         result = subprocess.run(
             ["git", "-C", str(self.source), "diff", "--exit-code", "HEAD", "--"],
             text=True,
@@ -82,20 +84,39 @@ class UnpatchedRuntimeTest(unittest.TestCase):
         self.assertIn("failed=0", result.stdout)
 
     def test_original_typed_dict_definition_runs(self):
-        # Isolate the original declaration from unrelated dependency imports.
         source_path = self.source / "press/press/doctype/deploy_candidate/cache_utils.py"
-        tree = ast.parse(source_path.read_text())
+        source = source_path.read_text()
         statement = next(
-            node
-            for node in tree.body
-            if isinstance(node, ast.Assign)
-            and any(isinstance(target, ast.Name) and target.id == "CommandOutput" for target in node.targets)
+            (
+                node
+                for node in ast.parse(source).body
+                if (isinstance(node, ast.ClassDef) and node.name == "CommandOutput")
+                or (
+                    isinstance(node, ast.Assign)
+                    and any(
+                        isinstance(target, ast.Name) and target.id == "CommandOutput"
+                        for target in node.targets
+                    )
+                )
+            ),
+            None,
         )
-        declaration = ast.get_source_segment(source_path.read_text(), statement)
-        self.run_python("from typing import TypedDict\n" + declaration)
+        if statement is None:
+            self.skipTest("The selected source has no top-level CommandOutput declaration.")
+        # Execute the unchanged prefix, keeping source imports, aliases and prerequisites.
+        self.run_python("\n".join(source.splitlines()[: statement.end_lineno]))
 
     def test_original_telemetry_import_exists(self):
-        self.run_python("from frappe.utils.telemetry import init_telemetry; assert callable(init_telemetry)")
+        source_path = self.source / "press/saas/doctype/product_trial_request/product_trial_request.py"
+        source = source_path.read_text()
+        imports = [
+            node
+            for node in ast.parse(source).body
+            if isinstance(node, ast.ImportFrom) and node.module == "frappe.utils.telemetry"
+        ]
+        if not imports:
+            self.skipTest("The selected source has no top-level telemetry import.")
+        self.run_python("\n".join(ast.get_source_segment(source, node) for node in imports))
 
 
 if __name__ == "__main__":

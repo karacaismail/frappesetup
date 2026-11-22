@@ -8,7 +8,11 @@ Ayrıntılar ve önerilen düzeltmeler [Press önerisindedir](../../docs/press-p
 
 `Dockerfile.unpatched`, mevcut `frappe/erpnext:v16.55.0` imajını kullanır.
 Bu temel imajda Python 3.14.10 ve Frappe 16.56.0 gözlendi.
-Press etiketi `v0.154.1` olarak sabittir. Kaynak commit kodu da denetlenir.
+Varsayılan kaynak `v0.154.1` commit kodudur. Tam kaynak kodu da denetlenir.
+`PRESS_REVISION` derleme değişkeni başka bir tam commit kodunu seçebilir.
+Test, beklenen kodu `PRESS_TEST_EXPECTED_REVISION` değişkeninden alır.
+Bu değer imaja derleme sırasında yazılır. Dal adı kabul edilmez.
+[Sürüm taraması](../../docs/press-python314-version-audit.md) son develop denemesini ve kesin kaynakları kaydeder.
 `probe-requirements.txt` yalnız ilgili import denemelerinin paketlerini kurar.
 Press'in bütün bağımlılıkları bu imajda yoktur.
 Bu imaj çalışan site veya üretim imajı değildir.
@@ -53,9 +57,14 @@ PANE_PORT=47320 docker --context colima-factory compose \
   -f backend/dev/press/compose.unpatched.yaml down --volumes --remove-orphans
 ```
 
-Görev C için `fs-pd-press-py314:probe` etiketi bırakılır.
-Bu etiket yalnız hata kanıtını yeniden üretir. Çalışan Press ortamı değildir.
-Gerekmeyen eski deneme etiketleri silinir. Başka işlerin imajlarına dokunulmaz.
+Deneme bitince bu görevin imaj etiketi de silinir.
+
+```sh
+docker --context colima-factory image rm fs-pd-press-py314:probe
+```
+
+Görev C için çalışan yamasız Press ortamı sağlanamadı.
+Başka işlerin imajlarına dokunulmaz.
 
 ## Mevcut aday kapısı
 

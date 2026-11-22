@@ -58,9 +58,29 @@ Ansible için Press üzerinden hazırlık sunucusu testi de gerekir.
 
 Bu değişiklik ayrı Dockerfile ve ayrı Compose dosyası kullanır.
 Mevcut `install.sh`, `patch-py314.sh` ve `uv-overrides.txt` değişmedi.
-Deneme bitince Compose birimleri silinir. Görev C için yalnız imaj etiketi bırakılır.
+Deneme bitince Compose birimleri ve bu görevin imaj etiketleri silinir.
+Görev C için çalışan yamasız ortam sağlanamadı.
 Orkestratör denemeyi kaldırırsa eski kurulum aynı şekilde kullanılabilir.
 O-18 borcu, sonuç olumlu olmadığı için açık tutulur.
+
+## Yeni sürüm seçimi
+
+Orkestratör, v0.154.1 sonrasının incelenmesini istedi.
+162 yeni etiket ve iki dalın ilgili geçmişi tarandı.
+İki kaynak engelini birlikte kaldıran kayıt bulunmadı.
+Bu nedenle çalışan Press sürümü yükseltilmedi.
+
+Yeni deneme `develop` dalının sabit commit koduyla yapıldı.
+Bu kod `d7d1cd2ae8352b8a78f0aefb210f9ea6d83cc410` oldu.
+Bu seçim üretim veya geliştirme yükseltmesi değildir. Güncel kaynağın doğrulama denemesidir.
+Aynı iki engel korunuyordu. On kabul testinin dördü başarısız oldu.
+Son etiket ve master aynı iki dosyayı taşıdığı için ayrıca derlenmedi.
+
+Dockerfile artık `PRESS_REVISION` ile tam commit kodu alır.
+Varsayılan değer önceki v0.154.1 kodunu korur.
+Kaynak testi bu kodu doğrular. Boş kaynak farkı şartı da korunur.
+Sürüm taramasının ayrıntıları [kanıt raporundadır](../press-python314-version-audit.md).
+O-18 açık tutulur. Bu araştırma kolu kapatılır.
 
 ## Kaynaklar
 

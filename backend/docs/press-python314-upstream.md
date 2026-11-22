@@ -158,7 +158,9 @@ Kabul edilen yeni kaynak, kurulum ve masa testleriyle ayrıca doğrulanmalıdır
 Mevcut geliştirme yaması ancak bu sonuçtan sonra kaldırılabilir.
 
 Görev C, bu deneme imajını çalışan Press sitesi olarak kullanmamalıdır.
-İmaj, aynı iki engeli yeniden göstermek için bırakıldı.
+Sonraki sürümler de [ayrı taramada](press-python314-version-audit.md) incelendi.
+Yamasız yol bulunamadığı için araştırma kolu kapatıldı.
+Deneme imajının etiketi iş bitince silinir.
 Çalıştırma ve kapatma komutları [deneme rehberindedir](../dev/press/unpatched-runtime.md).
 
 Gerçek okurla denenmedi.
