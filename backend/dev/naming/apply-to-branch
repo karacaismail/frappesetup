@@ -6,8 +6,13 @@ fail() {
     exit 1
 }
 
+commit_changes=true
+if [[ ${1:-} == --no-commit ]]; then
+    commit_changes=false
+    shift
+fi
 if [[ ${1:-} != -- || $# -lt 2 ]]; then
-    printf 'Usage: %s -- PYTHON_TEST_COMMAND [ARG ...]\n' "$0" >&2
+    printf 'Usage: %s [--no-commit] -- PYTHON_TEST_COMMAND [ARG ...]\n' "$0" >&2
     exit 2
 fi
 shift
@@ -31,13 +36,15 @@ git show-ref --verify --quiet "$backend_ref" || fail "The local backend branch i
 git merge-base --is-ancestor "$backend_ref" "$initial_head" ||
     fail "Merge the local backend branch before applying renames."
 
-unset GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
-identity='karacaismail <35493655+karacaismail@users.noreply.github.com>'
-for role in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
-    effective_identity="$(git var "$role")"
-    [[ "$effective_identity" == "$identity "* ]] ||
-        fail "Git author and committer must use the configured personal identity."
-done
+if [[ "$commit_changes" == true ]]; then
+    unset GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+    identity='karacaismail <35493655+karacaismail@users.noreply.github.com>'
+    for role in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+        effective_identity="$(git var "$role")"
+        [[ "$effective_identity" == "$identity "* ]] ||
+            fail "Git author and committer must use the configured personal identity."
+    done
+fi
 
 python_bin="${PYTHON:-python3.14}"
 "$python_bin" -B "$naming_dir/apply_renames.py"
@@ -65,6 +72,10 @@ git merge-base --is-ancestor "$backend_ref" "$initial_head" ||
 
 if git diff --cached --quiet --; then
     printf 'No naming changes to commit.\n'
+    exit 0
+fi
+if [[ "$commit_changes" == false ]]; then
+    printf 'Dry run complete. No commit was created.\n'
     exit 0
 fi
 git commit -m "refactor(naming): D-14 ad eşleşmesini uygula"

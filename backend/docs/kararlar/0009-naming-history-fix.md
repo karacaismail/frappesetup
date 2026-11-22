@@ -148,6 +148,28 @@ Kendi düzenlemeniz varsa bu komutu çalıştırmayın.
 `git status` altında kalan izlenmeyen dosyaları tek tek inceleyin.
 Çalışma ağacı temiz olunca uygulama komutunu tekrar çalıştırın.
 
+## Bütün çalışma ağaçlarında önizleme
+
+Komutu depo kökünde çalıştırın. Sürücü her çalışma ağacının Git kaydını kopyalar.
+Sürücü geçici kopyalarda ad geçişini ve testleri çalıştırır.
+Sürücü sonuçları tek JSON raporuna yazar. Hata varsa 1 koduyla çıkar.
+Varsayılan kip yeni Git kaydı oluşturmaz. Sürücü kopyaları sonunda kaldırır.
+
+```sh
+python3.14 -B backend/dev/naming/run_cp2.py
+```
+
+Sürücü varsayılan olarak `backend/dev/tests` testlerini çalıştırır.
+Başka bir test komutu vermek için komutu `--` sonrasına yazın.
+Bir dal güncel `backend` kaydını içermiyorsa geçiş komutu durur.
+Sürücü bu sonucu rapora yazar ve diğer kopyalara geçer.
+
+Orkestratör Pane oturumunda `--apply` seçeneğini kullanabilir.
+Bu kip Git kayıtlarını yalnız geçici kopyalarda oluşturur.
+Sürücü yazar korumasının çalıştığını denetler.
+Rapor, Git kaydı oluşan kopyanın yolunu gösterir.
+Sürücü `backend` ve `main` kopyalarını yalnız önizler.
+
 ## Uygunluk kapısında ad denetimi
 
 O-30 gereği kapı, ad denetimi kipini `backend/dev/naming/enforcement.json` dosyasından okur.
