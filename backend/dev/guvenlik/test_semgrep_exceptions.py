@@ -29,6 +29,7 @@ class SemgrepExceptionsTests(unittest.TestCase):
             other = {**finding, "start": {"line": 2}}
             self.assertEqual(reviewed_findings(root, config, [finding, other], before), [other])
             self.assertEqual(reviewed_findings(root, config, [finding], "different"), [finding])
+            self.assertEqual(reviewed_findings(root, config, [finding], None), [finding])
             rule_file.write_text("rules: changed")
             self.assertEqual(reviewed_findings(root, config, [finding], before), [finding])
             rule_file.write_text("rules: []")

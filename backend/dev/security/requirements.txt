@@ -1,5 +1,5 @@
 # Regenerate with backend/dev/security/compile-lock.
-# Manifest SHA256: a2939d0b0a054bca7e989dfcbf1bd347d218b9267a08150f14f7a71e6a645352
+# Manifest SHA256: 2c13dad68aae9b8bb51715e284f904eb105238b179dfd49287bb43aa0c6b3476
 annotated-types==0.8.0
 certifi==2026.11.20
 cffi==2.1.1 ; platform_python_implementation != 'PyPy'
@@ -7,6 +7,7 @@ charset-normalizer==3.5.2
 cryptography==50.0.2
 idna==3.20
 markupsafe==3.0.4
+packaging==26.3
 pycparser==3.12 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy'
 pydantic==2.12.5
 pydantic-core==2.41.5

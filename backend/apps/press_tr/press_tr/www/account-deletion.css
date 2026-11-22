@@ -1,0 +1,27 @@
+.account-deletion-content {
+	--deletion-control-size: 2.75rem;
+}
+
+.account-deletion-content :is(p, button, a) {
+	font-size: 1rem;
+}
+
+#account-deletion :is(button, a:not([hidden])) {
+	display: inline-flex;
+	align-items: center;
+	min-block-size: var(--deletion-control-size);
+}
+
+#account-deletion :is(button, a):focus-visible {
+	outline: none;
+	box-shadow: none;
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+}
+
+@media (forced-colors: active) {
+	#account-deletion :is(button, a):focus-visible {
+		outline: 2px solid CanvasText;
+		text-decoration: none;
+	}
+}
