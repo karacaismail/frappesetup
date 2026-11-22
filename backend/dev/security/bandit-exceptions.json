@@ -3060,7 +3060,7 @@
     "file": "backend/e2e/stack",
     "code": "return subprocess.run(command, env=environment, check=check, **kwargs)",
     "statementSha256": "b39adb97283adbc7abcff1672f50d7e56a45966a3e9e270371f909f3587cd752",
-    "reason": "Runs internal argument lists with no shell; validates text arguments, the in-repository environment file, and Docker-returned container IDs at their input boundary.",
+    "reason": "Command lists are built inside this file and run without a shell. The wrapper checks that arguments are strings without NUL bytes and validates the Compose environment file path. Docker container IDs are checked before use.",
     "owner": "e2e-ortam",
     "ignoreUntil": "2027-02-22"
   },

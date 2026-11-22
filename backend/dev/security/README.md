@@ -20,7 +20,7 @@ Gitleaks Git'in izlediği ve dışlamadığı yeni backend dosyalarını tarar.
 Tarama, Git geçmişini kapsamaz.
 Gitleaks sonucu gösterirken gizli değerleri örter.
 Bandit önce bilinen hatalı örneği sınar. Ardından örnek klasörlerini kapsam dışında tutar.
-Bandit, Python ile başlayan uzantısız betikleri de tarar.
+Bandit, uzantısına bakmadan Python ile başlayan betikleri de tarar.
 `# nosec` yorumu tarama sonucunu değiştirmez.
 Kullanılmayan Bandit istisnası ya da açık bulgu kapıyı durdurur.
 

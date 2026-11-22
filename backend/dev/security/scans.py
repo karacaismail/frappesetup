@@ -180,8 +180,8 @@ def bandit_findings(command, paths):
 def is_python_source(path):
     if not path.is_file() or path.is_symlink():
         return False
-    if path.suffix:
-        return path.suffix == ".py"
+    if path.suffix == ".py":
+        return True
     with path.open("rb") as source:
         shebang = source.readline(512)
     return bool(re.match(
