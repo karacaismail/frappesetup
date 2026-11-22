@@ -220,7 +220,10 @@ class TestMergeReview(FrappeAPITestCase):
 			lambda: h.request(client.get, "/", query_string={"cmd": method}),
 			lambda: h.request(client.post, "/", json={"cmd": method}, headers=h.csrf_headers(client)),
 		):
-			call()
+			# Merge review 3: the request must really run. A refused request would not renew the time either.
+			answer = call()
+			self.assertEqual(answer.status_code, 200, answer.data[:200])
+			self.assertEqual(answer.json.get("message", answer.json.get("data")), FAKE_EMAIL)
 			self.assertEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), 123)
 
 	# --- Ö3 -----------------------------------------------------------------------------------------

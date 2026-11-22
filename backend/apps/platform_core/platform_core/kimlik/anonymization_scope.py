@@ -16,7 +16,7 @@ The caller renames the user afterwards; Frappe then rewrites every Link, `owner`
 
 import json
 import re
-from email.utils import parseaddr
+from email.utils import getaddresses, parseaddr
 
 import frappe
 
@@ -46,8 +46,9 @@ def anonymize(user: str, anon: str) -> None:
 def _ownership(user: str) -> frappe._dict:
 	"""Separates the person's own Contact and Address records from shared ones (merge review 2, E3).
 
-	A Contact is the person's own when every e-mail row is the person's exact address, or when it has no
-	e-mail row and its `user` field is the person. A Contact that also lists another address is shared. An Address is the
+	A Contact is the person's own when it is linked to no business record and every e-mail row is the
+	person's exact address (or it has no e-mail row and its `user` field is the person). A Contact that also
+	lists another address, or that is linked to a business record, is shared. An Address is the
 	person's own when every link points to the person's own Contacts, or when it has no link and its
 	e-mail is the person's address. Shared records keep the other people's data.
 	"""
@@ -61,8 +62,14 @@ def _ownership(user: str) -> frappe._dict:
 		# Frappe fills `user` from the primary e-mail by itself, so that field is not an explicit tie.
 		# The e-mail rows decide: every address is the person's, or there is no address and `user` points
 		# to the person.
-		if (addresses and all(_same_address(address, user) for address in addresses)) or (
-			not addresses and frappe.db.get_value("Contact", name, "user") == user
+		# Merge review 3: a Contact linked to a business record (Customer, Supplier, any document) is shared,
+		# even with one e-mail. The company phone and the record's files belong to that business record.
+		linked = frappe.db.exists(
+			"Dynamic Link", {"parent": name, "parenttype": "Contact", "link_doctype": ("!=", "User")}
+		)
+		if not linked and (
+			(addresses and all(_same_address(address, user) for address in addresses))
+			or (not addresses and frappe.db.get_value("Contact", name, "user") == user)
 		):
 			own_contacts.add(name)
 		else:
@@ -154,11 +161,47 @@ def _same_address(value, user: str) -> bool:
 
 
 def _replace_in_address_list(value, user: str, anon: str):
-	"""Address fields are parsed one by one. Only an entry whose address equals the user's changes."""
+	"""Merge review 3: the list is read with e-mail header rules (`email.utils.getaddresses`), so a quoted
+	name with a comma is one recipient. Only the matching recipient changes, name and address. The other
+	recipients keep their exact text, spaces included.
+	"""
 	if not isinstance(value, str) or not value:
 		return value
-	parts = [part.strip() for part in value.split(",")]
-	return ", ".join(anon if _same_address(part, user) else part for part in parts)
+	parts = _split_recipients(value)
+	changed = False
+	for index, part in enumerate(parts):
+		if part.strip() and any(_same_address(address, user) for _name, address in getaddresses([part])):
+			lead = part[: len(part) - len(part.lstrip())]
+			parts[index] = f"{lead}{anon}"
+			changed = True
+	return ",".join(parts) if changed else value
+
+
+def _split_recipients(value: str) -> list[str]:
+	"""Splits on commas outside quotes, comments and angle brackets. Each part keeps its own spacing."""
+	parts, current, quoted, depth, angle, escaped = [], [], False, 0, False, False
+	for char in value:
+		if escaped:
+			escaped = False
+		elif char == "\\" and quoted:
+			escaped = True
+		elif char == '"' and depth == 0:
+			quoted = not quoted
+		elif not quoted and char == "(":
+			depth += 1
+		elif not quoted and char == ")" and depth:
+			depth -= 1
+		elif not quoted and depth == 0 and char == "<":
+			angle = True
+		elif not quoted and depth == 0 and char == ">":
+			angle = False
+		elif char == "," and not quoted and depth == 0 and not angle:
+			parts.append("".join(current))
+			current = []
+			continue
+		current.append(char)
+	parts.append("".join(current))
+	return parts
 
 
 def _scrub(text, user: str, anon: str, full_name: str):

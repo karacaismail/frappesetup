@@ -100,8 +100,9 @@ def verify_mobile_token(token: str) -> dict:
 def _installation() -> str:
 	"""Installation id from the `X-Platform-Installation` header. Text in a fixed shape, otherwise empty.
 
-	The contract names the field but not its source. The header is the smallest safe choice: it carries no
-	authority, the mobile module checks the installation against its own records.
+	docs/sozlesmeler.md section 3 (phone identity): the header is `X-Platform-Installation`, 1 to 128
+	characters of `A-Z`, `a-z`, `0-9`, `_` and `-`. A missing or malformed header gives an empty text.
+	The value carries no authority; the mobile module checks the installation against its own records.
 	"""
 	value = frappe.get_request_header(INSTALLATION_HEADER) or ""
 	return value if INSTALLATION_PATTERN.fullmatch(value) else ""

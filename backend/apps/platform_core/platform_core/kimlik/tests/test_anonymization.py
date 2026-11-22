@@ -329,6 +329,67 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		self.assertEqual(row.cc, other)
 		self.assertIn(other, row.content)
 
+	def test_contact_linked_to_a_business_record_is_shared(self):
+		# Merge review 3: one e-mail does not prove the record is the person's. A Contact linked to a
+		# business record is shared: only the person's e-mail goes, the company phone and file stay.
+		contact = frappe.get_doc(
+			{
+				"doctype": "Contact",
+				"first_name": "Sirket",
+				"last_name": "Iletisim",
+				"email_ids": [{"email_id": DELETED, "is_primary": 1}],
+				"phone_nos": [{"phone": "+90 000 000 00 02", "is_primary_phone": 1}],
+				"links": [{"link_doctype": "ToDo", "link_name": self.todo.name}],
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.commit()
+		self.addCleanup(
+			frappe.delete_doc,
+			"Contact",
+			contact.name,
+			force=True,
+			ignore_permissions=True,
+			ignore_missing=True,
+		)
+		attached = self._file("sirket.txt", "Contact", contact.name)
+		self.assertEqual(self.call().status_code, 200)
+		h.refresh()
+		kept = frappe.get_doc("Contact", contact.name)
+		self.assertEqual((kept.first_name, kept.last_name), ("Sirket", "Iletisim"))
+		self.assertEqual([row.phone for row in kept.phone_nos], ["+90 000 000 00 02"])
+		self.assertEqual(kept.email_ids, [])
+		self.assertNotEqual(kept.email_id, DELETED)
+		self.assertTrue(frappe.db.exists("File", attached))
+
+	def test_recipient_name_with_a_comma_is_one_recipient(self):
+		other = f'"Diger,  Kisi"  <{NAMESAKE}>'
+		recipients = f'"Ornekoglu, Ayse" <{DELETED}>, {other}'
+		communication = frappe.get_doc(
+			{
+				"doctype": "Communication",
+				"communication_type": "Communication",
+				"communication_medium": "Email",
+				"subject": "Virgullu ad",
+				"sender": NAMESAKE,
+				"recipients": recipients,
+				"content": "Ornek ileti",
+			}
+		).insert(ignore_permissions=True)
+		frappe.db.set_value(
+			"Communication", communication.name, "recipients", recipients, update_modified=False
+		)
+		frappe.db.commit()
+		self.addCleanup(frappe.db.delete, "Communication", {"name": communication.name})
+		response = self.call()
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		anon = response.json["message"]["user"]
+		h.refresh()
+		value = frappe.db.get_value("Communication", communication.name, "recipients")
+		self.assertNotIn(DELETED, value)
+		self.assertNotIn("Ornekoglu", value)
+		self.assertIn(anon, value)
+		self.assertTrue(value.endswith(other), value)
+
 	def _file(self, name: str, doctype: str, docname: str) -> str:
 		doc = frappe.get_doc(
 			{

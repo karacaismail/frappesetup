@@ -125,6 +125,4 @@ doc_events = {
 }
 
 
-
-
 after_build = ["platform_core.kabuk.assets.remove_panel_source_maps"]
