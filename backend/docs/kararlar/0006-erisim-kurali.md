@@ -495,7 +495,27 @@ Yapay zekâ katmanı ayrı bir yetki yolu kurmaz. Katman kullanıcının kimliğ
 - `erisim` modülü `yapay_zeka` modülünü içe aktarmaz. `yapay_zeka` da `erisim` modülünü içe aktarmaz. İki modül yalnız Frappe'nin kancalarında buluşur.
 - Yapay zekâ kuralları genel kayıt araçlarıyla yönetir. “Access Rule” olağan bir kayıt türüdür. Yazma yine öneri ve insan onayı ister.
 - Yapay zekâ alan seviyesini `yapay_zeka` modülünün yönetim araçlarıyla değiştirir. O dalda `set_field_property` ve `set_role_permission` araçları vardır.
-- Açıklama ucu henüz yapay zekâ aracı değildir. `ai_tools` kancasının biçimi `backend` dalına girince araç bildirilir. Uç o zamana kadar HTTP ile çağrılır.
+### Motorun kendi araçları
+
+Motor dört aracı `ai_tools` kancasıyla bildirir (D-9). Kod `erisim/ai_tools.py` dosyasındadır. Bildirim biçimi yapay zekâ sözleşmesinin `x-ai-tools-hook` bölümünden alındı.
+
+| Araç | Türü | İşi |
+| --- | --- | --- |
+| `list_access_rules` | Okuma | Kuralları listeler. Yalnız “System Manager” görür. |
+| `explain_access` | Okuma | Bir kullanıcının bir kayda neden eriştiğini ya da erişemediğini açıklar. |
+| `propose_access_rule` | Yazma | Yeni kural önerir. |
+| `propose_access_rule_change` | Yazma | Kayıtlı kuralda değişiklik önerir. Kuralı kapatmak da buradadır. |
+
+- Yazan iki araç önizleme döner. Kaydı ancak insan onayından sonra katman yazar.
+- Yazan iki araç `destructive` bayrağını taşır. Kural eklemek ve daraltmak erişimi kaldırabilir.
+- Önizleme erişimi kaybedecek rolleri sayar.
+- Değişiklik aracı `versioned` bayrağını taşır. Sürüm kaydın `modified` değeridir.
+- Yeni kural önerisinin sürümü o kayıt türünün bütün kurallarının özetidir. Araya başka kural girerse onay reddedilir.
+- Araçlar yalnız yapılandırılmış alan alır. SQL metni ya da ham koşul alan girdi yoktur. Girdi modeli bilinmeyen alanı reddeder.
+- Süzgeç satırları elle yazılan kuralla aynı doğrulamadan geçer.
+- Her araç iznini kendisi denetler. Araç `ignore_permissions` kullanmaz.
+
+Yapay zekâ katmanı henüz `backend` dalında değildir. Testler araçları sözleşmenin anlattığı gibi çağırır: kullanıcı kimliğiyle ve doğrulanmış girdiyle. Araçlar gerçek MCP ucundan sınanmadı.
 
 ## 12. Önbellek
 
@@ -554,6 +574,7 @@ Beklenen sonuçlar bu nottan, sözleşmeden ve karar sitesinden gelir (D-1).
 | `test_sorgu_sayisi.py` | Liste sorgu sayısı kayıt sayısıyla artmaz. | P-1 |
 | `test_inceleme.py` | Bağımsız incelemenin bulguları, bölüm ve şirket kapsamları, işleçler. | R-9 |
 | `test_second_review.py` | İkinci incelemenin üç bulgusu. | R-9 |
+| `test_ai_tools.py` | Dört yapay zekâ aracının bildirimi, izni, önizlemesi ve sürümü. | D-9, yapay zekâ sözleşmesi |
 | `test_third_review.py` | Hazır rapor dosyası, zamanlanmış e-posta raporu, rapor kapsamı, arka plan dışa aktarması. | R-9 |
 
 Güvenlik kapısı uç testlerini modülün yanında ister. Bu yüzden iki dosya daha vardır:

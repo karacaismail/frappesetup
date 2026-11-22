@@ -39,11 +39,13 @@ class AccessRule(Document):
 				)
 			)
 
-	def warn_about_roles_without_rule(self):
-		"""Kurallı türde kuralı olmayan rol erişimi kaybeder. Uyarı kaydı durdurmaz."""
-		if not self.is_active:
-			return
-		# Rol listesi sistem verisidir (G-3 istisnası).
+	def roles_without_rule(self) -> list[str]:
+		"""Roles that may read the document type by role permission but have no active rule.
+
+		The result describes the state after this rule is saved. It is empty when the document
+		type would not be governed at all.
+		"""
+		# The role list is system data (exception to G-3).
 		covered = set(
 			frappe.get_all(
 				rules.RULE_DOCTYPE,
@@ -55,9 +57,18 @@ class AccessRule(Document):
 				pluck="role",
 			)
 		)
-		covered.add(self.role)
+		if self.is_active:
+			covered.add(self.role)
+		if not covered:
+			return []
 		with_permission = set(frappe.permissions.get_doctype_roles(self.document_type))
-		uncovered = sorted(with_permission - covered - {"Administrator"})
+		return sorted(with_permission - covered - {"Administrator"})
+
+	def warn_about_roles_without_rule(self):
+		"""Kurallı türde kuralı olmayan rol erişimi kaybeder. Uyarı kaydı durdurmaz."""
+		if not self.is_active:
+			return
+		uncovered = self.roles_without_rule()
 		if uncovered:
 			frappe.msgprint(
 				_("Roles without an active Access Rule have no access to {0}: {1}").format(

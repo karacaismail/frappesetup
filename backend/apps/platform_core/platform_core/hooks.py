@@ -30,3 +30,5 @@ doc_events = {
 	},
 	"Prepared Report": {"before_insert": "platform_core.erisim.reports.guard_prepared_report"},
 }
+# AI tools of the access rule engine (D-9). Format: contracts/platform_core-yapay-zeka.openapi.yaml
+ai_tools = ["platform_core.erisim.ai_tools.declare"]

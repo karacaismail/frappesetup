@@ -325,6 +325,53 @@ paths:
             Seviye 1 ile 9 arasında değil ya da yazma okumasız istendi.
             İzin sistemini tutan kayıt türü de bu yanıtı alır.
 
+x-ai-tools:
+  description: |
+    Motor dört yapay zekâ aracını `ai_tools` kancasıyla bildirir.
+    Bildirim biçimi `platform_core-yapay-zeka.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir.
+    Katman araç adının başına uygulama adını ekler. Örneğin `platform_core_list_access_rules` olur.
+    Bildirim işlevi `platform_core.erisim.ai_tools.declare` olur.
+
+    Araçlar yalnız yapılandırılmış alan alır. Hiçbir araç SQL metni ya da ham koşul almaz.
+    Girdi modelleri bilinmeyen alanı reddeder. Süzgeç satırları kural kaydıyla aynı doğrulamadan geçer.
+    Yazan araçlar kaydı değiştirmez. Araç bir öneri açar. İnsan önizlemeyi onaylar.
+  tools:
+    - name: list_access_rules
+      kind: read
+      roles: [System Manager]
+      description: |
+        Erişim kurallarını listeler. Girdiler `document_type`, `role` ve `include_inactive` olur.
+        Çağıranın “Access Rule” türünde okuma izni olmalıdır. En çok 200 kural döner.
+    - name: explain_access
+      kind: read
+      description: |
+        Bir kullanıcının bir kayıtta bir işlemi neden yapabildiğini ya da yapamadığını açıklar.
+        Davranışı `explain_permission` ucuyla aynıdır. Olağan kullanıcı yalnız kendini sorar
+        ve tek ret nedeni görür. Kural ayrıntısı yalnız “System Manager” rolüne döner.
+    - name: propose_access_rule
+      kind: write
+      destructive: true
+      roles: [System Manager]
+      description: |
+        Yeni kural önerir. Girdiler `AccessRule` şemasındaki alanlardır. `filters` alanı
+        `{field, operator, value}` satırlarının listesidir.
+        Önizleme özeti, alan değişikliklerini ve erişimi kaybedecek rolleri döner.
+        Bir kayıt türüne ilk kural yazılınca kuralı olmayan roller erişimi kaybeder.
+        Bu yüzden araç `destructive` bayrağını taşır.
+        Önizlemenin `target_version` değeri o kayıt türünün bütün kurallarının özetidir.
+        Onaydan önce başka bir kural değişirse katman onayı reddeder.
+    - name: propose_access_rule_change
+      kind: write
+      destructive: true
+      versioned: true
+      roles: [System Manager]
+      description: |
+        Kayıtlı bir kuralda değişiklik önerir. Kuralı kapatmak da bu araçla yapılır.
+        Girdi kuralın `name` değeri ve değişecek alanlardır. Verilmeyen alan değişmez.
+        Önizleme `target_name` ve `target_version` döner. `target_version` kaydın `modified` değeridir.
+        Katman yürütmeden hemen önce sürümü yeniden karşılaştırır.
+        Kuralı daraltmak erişimi kaldırır. Bu yüzden araç `destructive` bayrağını taşır.
+
 components:
   securitySchemes:
     oturum:
