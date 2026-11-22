@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="{{ panel_language | e }}">
+<html class="platform-shell-panel" lang="{{ panel_language | default('en', true) | e }}">
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<meta name="csrf-token" content="{{ panel_csrf_token | e }}">
+	<meta name="csrf-token" content="{{ panel_csrf_token | default('', true) | e }}">
 	{{ include_style('panel.bundle.css') }}
 	<title>{{ _("Admin panel", context="shell.panel") | e }}</title>
 </head>

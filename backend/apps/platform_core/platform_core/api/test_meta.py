@@ -214,6 +214,10 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		status, _, _ = self.metadata(self.reader_sid)
 		self.assertEqual(status, 200)
 
+	def test_website_user_cannot_open_desk(self):
+		status, _, _ = self.request("/desk", self.reader_sid)
+		self.assertEqual(status, 403)
+
 	def test_website_user_cannot_read_native_form_rpc_or_alias(self):
 		method = "frappe.desk.form.load.getdoctype"
 		alias = "frappe.tests.test_form_load.getdoctype"
@@ -273,6 +277,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		with (
 			patch.object(frappe.local, "request", request, create=True),
 			patch.object(frappe.local, "response_headers", {}, create=True),
+			patch.object(frappe.local, "form_dict", frappe._dict(), create=True),
 		):
 			self.assertEqual(
 				frappe.get_attr("platform_core.api.meta.validate_mobile_policy")(),
