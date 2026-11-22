@@ -411,6 +411,13 @@ Bu testler canlı ortam denemesinin yerine geçmez. Canlı ortam bu çalışma s
 `tests.test_server.SessionRevokeTest` sınıfı kendi üyeliğini, başka kiracıyı ve başka kullanıcının oturumunu sınar.
 Kapalı oturum için tekrar istek 200 alır. Başka kiracıya ait kullanıcı için istek 403 alır.
 
+### Hesap silme
+
+`POST /v1/account-deletions` ucu uygulanmıştır. Yalnız Press bu uca erişir.
+Servis yeni giriş zamanını doğrular. İşi ilk yazmadan önce kaydeder.
+`tests.test_server.AccountDeletionEndpointTest` sınıfı bu kuralları sınar.
+`tests.test_deletion_paths.DeletionPathsTest` sınıfı hata sonrası devam etmeyi ve tekrarlanan isteği sınar.
+
 ## Testler
 
 Testleri `backend/identity/identity_sync` klasöründe çalıştırın:
