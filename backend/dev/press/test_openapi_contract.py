@@ -34,10 +34,14 @@ class PressOpenAPIContractTest(unittest.TestCase):
         self.assertEqual(code["schema"].get("maxLength"), 2048)
 
     def test_identity_inventory_documents_private_service_pagination(self):
-        operation = self.spec["paths"]["/api/method/press_tr.api.identity.list_identities"]["post"]
+        path = self.spec["paths"]["/api/method/press_tr.api.identity.list_identities"]
+        self.assertNotIn("post", path)
+        operation = path["get"]
         self.assertEqual(operation["security"], [{"identitySync": []}])
         self.assertIn("403", operation["responses"])
-        request = operation["requestBody"]["content"]["application/json"]["schema"]["properties"]
+        self.assertNotIn("requestBody", operation)
+        self.assertTrue(all(parameter["in"] == "query" for parameter in operation["parameters"]))
+        request = {parameter["name"]: parameter["schema"] for parameter in operation["parameters"]}
         self.assertCountEqual(request, ["start", "page_length"])
         self.assertEqual(request["start"]["default"], 0)
         self.assertEqual(request["start"]["maximum"], (1 << 64) - 1)

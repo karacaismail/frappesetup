@@ -16,7 +16,7 @@ from press_tr.kimlik.oidc import issuer as configured_issuer
 from press_tr.kimlik.service import require_service
 
 IDENTITY_PAGE_SIZE = 500
-# Frappe's JSON decoder and MariaDB offsets support unsigned 64-bit integers.
+# MariaDB offsets support unsigned 64-bit integers.
 MAX_IDENTITY_START = (1 << 64) - 1
 
 
@@ -197,19 +197,32 @@ class InvalidIdentityPage(frappe.ValidationError):
 	http_status_code = 400
 
 
-@frappe.whitelist(methods=["POST"])
+def parse_page_number(value: Any) -> int | None:
+	if type(value) is int:
+		return value
+	if isinstance(value, str) and value.isascii() and value.isdecimal():
+		digits = value.lstrip("0") or "0"
+		if len(digits) <= len(str(MAX_IDENTITY_START)):
+			return int(digits)
+	return None
+
+
+@frappe.whitelist(methods=["GET"])
 def list_identities(start: Any = 0, page_length: Any = IDENTITY_PAGE_SIZE) -> dict:
 	issuer = configured_issuer()
 	require_service(issuer)
+	start = parse_page_number(start)
+	page_length = parse_page_number(page_length)
 	if (
-		type(start) is not int
+		start is None
 		or not 0 <= start <= MAX_IDENTITY_START
-		or type(page_length) is not int
+		or page_length is None
 		or not 1 <= page_length <= IDENTITY_PAGE_SIZE
 	):
 		frappe.throw(
 			_("Send a valid identity page start and length.", context="press_tr"), InvalidIdentityPage
 		)
+	frappe.local.response_headers["Cache-Control"] = "private, no-store"
 	links = frappe.qb.DocType(IDENTITY_LINK)
 	users = frappe.qb.DocType("User")
 	# This verified service operation inventories one issuer and excludes anonymous tombstones.

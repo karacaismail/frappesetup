@@ -3,8 +3,9 @@ import frappe
 from press_tr.kimlik.oidc import client_id, reject, verify
 from press_tr.kimlik.oidc import issuer as configured_issuer
 
+IDENTITY_INVENTORY_METHOD = "press_tr.api.identity.list_identities"
 SERVICE_PARAMETERS = {
-	"press_tr.api.identity.list_identities": {"start", "page_length"},
+	IDENTITY_INVENTORY_METHOD: {"start", "page_length"},
 	"press_tr.api.identity.anonymize_user": {"issuer", "subject"},
 	"press_tr.api.identity.ensure_team": {
 		"issuer",
@@ -22,8 +23,11 @@ def authorize_identity_sync() -> None:
 	method = frappe.request.path.rstrip("/").removeprefix("/api/method/")
 	if method not in SERVICE_PARAMETERS:
 		return
-	if frappe.request.method != "POST":
+	expected_method = "GET" if method == IDENTITY_INVENTORY_METHOD else "POST"
+	if frappe.request.method != expected_method:
 		return
+	if method == IDENTITY_INVENTORY_METHOD and frappe.request.get_data():
+		reject()
 	session = getattr(frappe.local, "session_obj", None)
 	cookie_sid = frappe.request.cookies.get("sid")
 	has_user_session = bool(cookie_sid and session and session.sid == cookie_sid and session.user != "Guest")

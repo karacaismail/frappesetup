@@ -23,6 +23,7 @@ ISSUER = "http://keycloak.example.test/realms/platform"
 KID = uuid4().hex
 ACCOUNT_ROUTE = "/api/method/press.api.account.get"
 DELETION_ROUTE = "/api/method/press_tr.api.account.request_deletion"
+IDENTITY_INVENTORY_ROUTE = "/api/method/press_tr.api.identity.list_identities"
 
 
 class IdentityHttpTest(PressHttpClient, unittest.TestCase):
@@ -267,6 +268,16 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 					status, _ = self.call(method, body, self.token())
 					self.assertEqual(status, 403)
 
+	def identity_inventory(self, query, token=None, extra_headers=None):
+		headers = dict(extra_headers or {})
+		if token:
+			headers["Authorization"] = f"Bearer {token}"
+		path = IDENTITY_INVENTORY_ROUTE + (f"?{urlencode(query)}" if query else "")
+		status, response_headers, response = self.exchange("GET", path, headers)
+		if status == 200:
+			self.assertIn("no-store", response_headers["Cache-Control"])
+		return status, json.loads(response) if response.startswith(b"{") else response.decode()
+
 	def test_list_identities_returns_only_current_issuer_and_public_row_fields(self):
 		prefix = f"zz-inventory-{uuid4().hex}"
 		open_subject, closed_subject = f"{prefix}-1", f"{prefix}-3"
@@ -296,7 +307,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			frappe.destroy()
 
 		token = self.token()
-		status, inventory = self.call("list_identities", {}, token)
+		status, inventory = self.identity_inventory({}, token)
 		self.assertEqual(status, 200, inventory)
 		subjects = [row["subject"] for row in inventory["message"]["identities"]]
 		self.assertEqual(subjects, sorted(subjects))
@@ -306,7 +317,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			all(set(row) == {"issuer", "subject", "enabled"} for row in inventory["message"]["identities"])
 		)
 		start = subjects.index(open_subject)
-		status, first = self.call("list_identities", {"start": start, "page_length": 1}, token)
+		status, first = self.identity_inventory({"start": start, "page_length": 1}, token)
 		self.assertEqual(status, 200, first)
 		self.assertEqual(
 			first,
@@ -317,17 +328,17 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 				},
 			},
 		)
-		status, second = self.call("list_identities", {"start": start + 1, "page_length": 500}, token)
+		status, second = self.identity_inventory({"start": start + 1, "page_length": 500}, token)
 		self.assertEqual(status, 200, second)
 		self.assertEqual(
 			second["message"]["identities"][0],
 			{"issuer": ISSUER, "subject": closed_subject, "enabled": False},
 		)
 		self.assertFalse(second["message"]["has_next_page"])
-		status, final = self.call("list_identities", {"start": len(subjects)}, token)
+		status, final = self.identity_inventory({"start": len(subjects)}, token)
 		self.assertEqual(status, 200, final)
 		self.assertEqual(final, {"message": {"identities": [], "has_next_page": False}})
-		status, distant = self.call("list_identities", {"start": (1 << 64) - 1}, token)
+		status, distant = self.identity_inventory({"start": (1 << 64) - 1}, token)
 		self.assertEqual(status, 200, distant)
 		self.assertEqual(distant, final)
 
@@ -344,11 +355,11 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			)
 			frappe.db.commit()
 			token = self.token()
-			status, first = self.call("list_identities", {}, token)
+			status, first = self.identity_inventory({}, token)
 			self.assertEqual(status, 200, first)
 			self.assertEqual(len(first["message"]["identities"]), 500)
 			self.assertTrue(first["message"]["has_next_page"])
-			status, second = self.call("list_identities", {"start": 500}, token)
+			status, second = self.identity_inventory({"start": 500}, token)
 			self.assertEqual(status, 200, second)
 			self.assertFalse(second["message"]["has_next_page"])
 			rows = first["message"]["identities"] + second["message"]["identities"]
@@ -377,22 +388,27 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			("human_session", self.token(), session),
 		):
 			with self.subTest(caller=name):
-				status, payload = self.call("list_identities", {}, token, headers)
+				status, payload = self.identity_inventory({}, token, headers)
 				self.assertEqual(status, 403)
 				self.assertNotIn("message", payload if isinstance(payload, dict) else {})
-		self.assertEqual(self.call("list_identities", {"issuer": ISSUER}, self.token())[0], 403)
-		self.assertEqual(self.call("list_identities", {"cursor": "legacy"}, self.token())[0], 403)
+		self.assertEqual(self.identity_inventory({"issuer": ISSUER}, self.token())[0], 403)
+		self.assertEqual(self.identity_inventory({"cursor": "legacy"}, self.token())[0], 403)
+		self.assertEqual(self.identity_inventory({"limit": 2}, self.token())[0], 403)
+		self.assertIn(self.call("list_identities", {}, self.token())[0], {401, 403, 405})
+		headers = {"Authorization": f"Bearer {self.token()}", "Content-Type": "application/json"}
+		status, _, _ = self.exchange("GET", IDENTITY_INVENTORY_ROUTE, headers, json.dumps({"start": 1}))
+		self.assertEqual(status, 403)
 		for body in (
 			{"start": True},
 			{"start": -1},
-			{"start": "2"},
+			{"start": "2.0"},
 			{"start": 1 << 64},
 			{"page_length": True},
 			{"page_length": 0},
 			{"page_length": 501},
 		):
 			with self.subTest(body=body):
-				self.assertEqual(self.call("list_identities", body, self.token())[0], 400)
+				self.assertEqual(self.identity_inventory(body, self.token())[0], 400)
 
 	def test_first_binding_requires_verified_email_and_rejects_conflicts(self):
 		subject = uuid4().hex
