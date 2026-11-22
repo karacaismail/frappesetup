@@ -1,7 +1,14 @@
+/*
+ * Modified by this project from sashyo/keycloak-webhook-listener (Apache-2.0),
+ * commit 5f23e5530db15c9042d8977c46a19758aa0ede97. Changes: the secret and the URL are checked at
+ * start, the sender signs with a timestamp and retries a bounded number of times. See NOTICE.
+ */
 package au.com.ais.keycloak.webhook;
 
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
+import org.jboss.logging.Logger;
 import org.keycloak.Config;
 import org.keycloak.events.EventListenerProvider;
 import org.keycloak.events.EventListenerProviderFactory;
@@ -10,24 +17,43 @@ import org.keycloak.models.KeycloakSessionFactory;
 
 public class WebhookEventListenerProviderFactory implements EventListenerProviderFactory {
 
+    private static final Logger LOG = Logger.getLogger(WebhookEventListenerProviderFactory.class);
+
     // the name you pick in Realm settings -> Events -> Event listeners
     public static final String ID = "webhook";
 
-    private HttpClient http;
-    private String url;
-    private String secret;
+    private static final int MAX_ATTEMPTS = 3;
+    private static final Duration FIRST_RETRY_DELAY = Duration.ofSeconds(1);
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
+
+    private WebhookSender sender;
 
     @Override
     public void init(Config.Scope config) {
-        // read from KC_SPI_EVENTS_LISTENER_WEBHOOK_URL / _SECRET
-        url = config.get("url");
-        secret = config.get("secret");
-        http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+        // read from KC_SPI_EVENTS_LISTENER__WEBHOOK__URL / __SECRET
+        String url = config.get("url");
+        String secret = config.get("secret");
+        if (url == null || url.isBlank()) {
+            LOG.warn("Webhook listener has no URL. Events are not sent.");
+            return;
+        }
+        URI target = URI.create(url);
+        if (!"https".equals(target.getScheme()) && !"http".equals(target.getScheme())) {
+            throw new IllegalArgumentException("webhook URL must use http or https");
+        }
+        // A missing or short secret stops Keycloak from starting. An unsigned request is never sent.
+        WebhookSigner signer = new WebhookSigner(secret);
+        HttpClient http = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(3))
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
+        sender = new WebhookSender(http, target, signer, () -> System.currentTimeMillis() / 1000L,
+                MAX_ATTEMPTS, FIRST_RETRY_DELAY, REQUEST_TIMEOUT);
     }
 
     @Override
     public EventListenerProvider create(KeycloakSession session) {
-        return new WebhookEventListenerProvider(session, http, url, secret);
+        return new WebhookEventListenerProvider(session, sender);
     }
 
     @Override
