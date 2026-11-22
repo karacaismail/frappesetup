@@ -87,7 +87,7 @@ def lock_identity(
 
 def refuse_if_deleted(issuer: str, subject: str, *, candidate_user: str | None = None) -> frappe._dict | None:
 	"""For provisioning, enabling and e-mail changes. Returns the locked link, or raises 410."""
-	link, record = _lock_identity_with_retry(issuer, subject, candidate_user=candidate_user)
+	link, record = lock_identity(issuer, subject, candidate_user=candidate_user)
 	if record:
 		frappe.throw(
 			_("This identity was deleted and cannot be used again.", context="platform_core.identity"),
@@ -113,20 +113,29 @@ def anonymize_user(data: dict) -> dict:
 	return _with_retry(anonymize_step, issuer, subject)
 
 
-def _with_retry(step, issuer: str, subject: str):
-	"""Run each repeatable deletion step in a fresh transaction.
+def _with_retry(step, *args):
+	"""Run a repeatable identity change in a fresh transaction.
 
 	MariaDB can refuse a locking read if a row changed after the transaction's snapshot
 	(error 1020, exposed as QueryDeadlockError by Frappe). Starting a fresh transaction
 	before the step lets the next attempt see the other call's committed changes.
+	Native Frappe hooks can commit during the step. A later error must stay visible to the caller.
 	"""
+	committed = False
+
+	def record_commit():
+		nonlocal committed
+		committed = True
+
 	for attempt in range(3):
 		frappe.db.commit()
+		committed = False
+		frappe.db.after_commit.add(record_commit)
 		try:
-			return step(issuer, subject)
+			return step(*args)
 		except frappe.QueryDeadlockError:
 			frappe.db.rollback()
-			if attempt == 2:
+			if committed or attempt == 2:
 				raise
 
 
