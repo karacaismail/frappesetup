@@ -59,8 +59,10 @@ class SessionDeliveryTest(TestCase):
 		self.send.side_effect = identity_sync_client.send_session_revocations
 		with (
 			patch.object(identity_sync_client, "frappe", SimpleNamespace(logger=self.logger)),
-			patch.object(identity_sync_client, "_configured_url", return_value="https://sync.example.test"),
-			patch.object(identity_sync_client, "_service_bearer", return_value="fixture-bearer"),
+			patch.object(
+				identity_sync_client, "_identity_sync_origin", return_value="https://sync.example.test"
+			),
+			patch.object(identity_sync_client, "identity_sync_bearer", return_value="fixture-bearer"),
 			patch.object(
 				identity_sync_client._OPENER, "open", side_effect=HTTPError("", 403, "Forbidden", None, None)
 			),
