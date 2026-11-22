@@ -180,7 +180,9 @@ class ProvisionTest(PipelineCase):
 
         result = self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
 
-        self.assertEqual(result.actions, ("press.remove_team_member", "tenant.set_enabled"))
+        self.assertEqual(
+            result.actions, ("press.remove_team_member", "tenant.set_enabled", "tenant.revoke_user_installations")
+        )
         (removed,) = self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)
         self.assertEqual(removed.json()["organization_id"], ORG_ID)
 
@@ -288,9 +290,10 @@ class AmbiguousReadTest(PipelineCase):
 
     def test_confirmed_missing_user_is_deprovisioned(self) -> None:
         # Kullanıcı ucu 404 döner. Realm kullanıcı sayısını verir. Bu silinme kanıtıdır.
+        # An administrator deleted the user. This event type reads the user's state.
         self.stack.keycloak.remove_user(SUBJECT)
 
-        result = self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+        result = self.stack.app.processor.handle(event("USER_DELETE", "admin"))
 
         self.assertEqual(result.status, "processed")
         self.assertEqual(len(self.stack.keycloak.calls("GET", f"{self.stack.keycloak.admin}/users/count")), 1)
@@ -318,7 +321,7 @@ class FanOutTest(unittest.TestCase):
         self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
 
         (letter,) = self.stack.app.store.dead_letters()
-        self.assertEqual(letter.error, "press.remove_team_member press: HTTP 403; tenant.set_enabled kiraci1: HTTP 404")
+        self.assertIn("press.remove_team_member press: HTTP 403; tenant.set_enabled kiraci1: HTTP 404", letter.error)
         self.assertEqual(len(self.stack.tenant2.calls("POST", fakes.TENANT_SET_ENABLED)), 1)
 
 
@@ -359,6 +362,19 @@ class TargetContractTest(PipelineCase):
 
         self.assertEqual(result.status, "processed")
         self.assert_closed_everywhere()
+
+    def test_disabled_user_loses_the_phone_installations(self) -> None:
+        # Gap list, item 4: a closed user's phone installations are revoked too.
+        self.seed_everywhere()
+        self.stack.tenant.installations[(self.stack.issuer, SUBJECT)] = ["phone-1", "phone-2"]
+        self.add_member(enabled=False)
+
+        result = self.stack.app.processor.handle(event("USER_UPDATE", "admin"))
+
+        self.assertEqual(result.status, "processed")
+        self.assertNotIn((self.stack.issuer, SUBJECT), self.stack.tenant.installations)
+        (revoked,) = self.stack.tenant.calls("POST", fakes.TENANT_REVOKE_INSTALLATIONS)
+        self.assertEqual(revoked.json(), {"issuer": self.stack.issuer, "subject": SUBJECT})
 
     def test_user_unknown_to_a_tenant_does_not_block_the_event(self) -> None:
         # The tenant answers 404 IdentityNotFound to set_enabled for a user it never had.
@@ -426,6 +442,148 @@ class TargetContractTest(PipelineCase):
         self.stack.tenant.on("POST", fakes.TENANT_SET_ENABLED, reply)
 
         self.assertEqual(self.stack.app.processor.handle(event("DELETE_ACCOUNT")).status, "unknown")
+
+
+class AccountDeletionTest(PipelineCase):
+    """The deletion flow (docs/sozlesmeler.md, section 7; PROJE-KAYDI.md, O-27).
+
+    The tenant and Press endpoints for installations and anonymizing are proposals.
+    The fakes follow the Target schemas of this service's contract.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        issuer = self.stack.issuer
+        self.add_member()
+        self.stack.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID, api_keys=1)
+        self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
+        self.stack.tenant.users["ayse@example.test"].update(first_name="Ayşe", last_name="Örnek")
+        self.stack.tenant.installations[(issuer, SUBJECT)] = ["phone-1"]
+
+    def request(self, id_: str = "onay-s1") -> Event:
+        return Event(id=id_, kind="request", type="ACCOUNT_DELETION", realm="platform", time=1, user_id=SUBJECT)
+
+    def test_all_five_steps_run_in_order(self) -> None:
+        result = self.stack.app.processor.handle(self.request())
+
+        self.assertEqual(result.status, "processed")
+        self.assertEqual(
+            result.actions,
+            (
+                "keycloak.disable_user",
+                "press.remove_team_member",
+                "tenant.set_enabled",
+                "tenant.revoke_user_installations",
+                "press.anonymize_user",
+                "tenant.anonymize_user",
+                "keycloak.delete_user",
+            ),
+        )
+        issuer, keycloak = self.stack.issuer, self.stack.keycloak
+        self.assertNotIn(SUBJECT, keycloak.users)
+        self.assertEqual(keycloak.logged_out, [SUBJECT])
+        press_user = self.stack.press.user_of(issuer, SUBJECT)
+        self.assertEqual((press_user["enabled"], press_user["api_keys"], press_user["anonymized"]), (False, [], True))
+        tenant_user = self.stack.tenant.user_of(issuer, SUBJECT)
+        self.assertEqual((tenant_user["enabled"], tenant_user["first_name"], tenant_user["anonymized"]), (False, "", True))
+        self.assertNotIn((issuer, SUBJECT), self.stack.tenant.installations)
+
+    def test_keycloak_user_is_disabled_before_it_is_deleted(self) -> None:
+        keycloak = self.stack.keycloak
+
+        self.stack.app.processor.handle(self.request())
+
+        writes = [(r.method, r.path.rsplit("/", 2)[-2:]) for r in keycloak.requests if r.method != "GET" and "/admin/" in r.path]
+        self.assertEqual(
+            writes, [("PUT", ["users", SUBJECT]), ("POST", [SUBJECT, "logout"]), ("DELETE", ["users", SUBJECT])]
+        )
+        disable = keycloak.calls("PUT", f"{keycloak.admin}/users/{SUBJECT}")[0].json()
+        self.assertIs(disable["enabled"], False)
+        # The full representation is sent back, so no other field is wiped.
+        self.assertEqual(disable["email"], "ayse@example.test")
+
+    def test_record_keeps_no_personal_data_after_the_flow(self) -> None:
+        import sqlite3
+
+        self.stack.app.processor.handle(self.request())
+
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+        self.assertTrue(self.stack.app.store.is_processed("onay-s1"))
+        dump = "\n".join(self.stack.app.store._db.iterdump())
+        self.assertNotIn("example.test", dump)
+        self.assertNotIn(SUBJECT, dump)
+        self.assertIsInstance(self.stack.app.store._db, sqlite3.Connection)
+
+    def test_failed_step_keeps_the_keycloak_user_and_queues_the_request(self) -> None:
+        # Anonymizing fails on the tenant. The Keycloak user must not be deleted yet.
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+
+        result = self.stack.app.processor.handle(self.request())
+
+        self.assertEqual(result.status, "dead_lettered")
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+        self.assertEqual(self.stack.keycloak.calls("DELETE", f"{self.stack.keycloak.admin}/users/{SUBJECT}"), [])
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertIn("tenant.anonymize_user kiraci1: HTTP 503", letter.error)
+        self.assertIn("keycloak.delete_user keycloak: skipped", letter.error)
+        # The steps before the failed one still ran.
+        self.assertFalse(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["enabled"])
+
+    def test_replay_finishes_a_failed_deletion(self) -> None:
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+        self.stack.app.processor.handle(self.request())
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, fakes.DONE)
+
+        results = self.stack.app.processor.replay_dead_letters()
+
+        self.assertEqual([r.status for _i, r in results], ["processed"])
+        self.assertNotIn(SUBJECT, self.stack.keycloak.users)
+        self.assertTrue(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["anonymized"])
+
+    def test_unknown_outcome_also_keeps_the_keycloak_user(self) -> None:
+        self.stack.press.on("POST", fakes.PRESS_ANONYMIZE, (202, {"message": {"status": "queued"}}))
+
+        result = self.stack.app.processor.handle(self.request())
+
+        self.assertEqual(result.status, "unknown")
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+
+    def test_flow_is_repeatable_when_everything_is_already_gone(self) -> None:
+        self.stack.app.processor.handle(self.request("onay-s1"))
+
+        again = self.stack.app.processor.handle(self.request("onay-s2"))
+
+        self.assertEqual(again.status, "processed")
+
+    def test_user_unknown_to_the_targets_is_not_an_error(self) -> None:
+        stack = Stack()
+        self.addCleanup(stack.close)
+        stack.keycloak.add_user(keycloak_user(), [])
+
+        result = stack.app.processor.handle(self.request())
+
+        self.assertEqual(result.status, "processed")
+        self.assertNotIn(SUBJECT, stack.keycloak.users)
+
+    def test_keycloak_delete_account_event_starts_the_same_flow(self) -> None:
+        # Keycloak already deleted the user. Steps 1 and 5 have nothing to do.
+        self.stack.keycloak.remove_user(SUBJECT)
+
+        result = self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+
+        self.assertEqual(result.status, "processed")
+        self.assertIn("tenant.anonymize_user", result.actions)
+        self.assertTrue(self.stack.tenant.user_of(self.stack.issuer, SUBJECT)["anonymized"])
+        self.assertFalse(self.stack.press.user_of(self.stack.issuer, SUBJECT)["enabled"])
+
+    def test_preview_writes_nothing(self) -> None:
+        result = self.stack.app.processor.handle(self.request(), dry_run=True)
+
+        self.assertEqual(result.status, "preview")
+        self.assertEqual(len(result.previews), 7)
+        self.assertEqual(self.stack.press.writes() + self.stack.tenant.writes(), [])
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
 
 
 class IdempotencyTest(PipelineCase):
@@ -1129,9 +1287,11 @@ class CrossProcessTest(unittest.TestCase):
         enable.join(10)
         disable.join(10)
 
-        last_write = tenant.writes()[-1]
-        self.assertEqual(last_write.path, fakes.TENANT_SET_ENABLED)
-        self.assertEqual(last_write.json()["enabled"], False)
+        # The disable ran after the provision, so the user ends up closed.
+        paths = [write.path for write in tenant.writes()]
+        self.assertLess(paths.index(fakes.TENANT_PROVISION), paths.index(fakes.TENANT_SET_ENABLED))
+        self.assertEqual(tenant.calls("POST", fakes.TENANT_SET_ENABLED)[-1].json()["enabled"], False)
+        self.assertFalse(tenant.user_of(self.server_side.issuer, SUBJECT)["enabled"])
 
 
 class PreviewTest(PipelineCase):
@@ -1141,7 +1301,10 @@ class PreviewTest(PipelineCase):
         result = self.stack.app.processor.handle(event("USER_UPDATE", "admin"), dry_run=True)
 
         self.assertEqual(result.status, "preview")
-        self.assertEqual([p.operation for p in result.previews], ["press.remove_team_member", "tenant.set_enabled"])
+        self.assertEqual(
+            [p.operation for p in result.previews],
+            ["press.remove_team_member", "tenant.set_enabled", "tenant.revoke_user_installations"],
+        )
         self.assertTrue(all(p.destructive for p in result.previews))
         self.assertEqual(self.stack.press.writes() + self.stack.tenant.writes(), [])
         self.assertEqual(self.stack.app.processor.handle(event("USER_UPDATE", "admin")).status, "processed")

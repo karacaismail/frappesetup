@@ -327,7 +327,7 @@ class SchemaTest(ServerCase):
         stale = {**execute, "preview_digest": "0" * 64, "approval_id": "onay-m0"}
         self.assert_response(self.post_json(path, stale), "POST", path, 409)
         done = self.assert_response(self.post_json(path, execute), "POST", path, 200)
-        self.assertEqual([r["status"] for r in done["results"]], ["done"])
+        self.assertEqual([r["status"] for r in done["results"]], ["done", "done"])
         self.assert_response(self.post_json(path, execute), "POST", path, 409)
         for rejected in ({}, {"dry_run": False}, {"dry_run": "true"}):
             with self.subTest(rejected=rejected):
@@ -373,6 +373,53 @@ class SchemaTest(ServerCase):
         self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
         kc.on("DELETE", f"{kc.admin}/sessions/{sid}", (500, None))
         self.assert_response(self.post_json(path, request, SESSION_TOKEN), "POST", path, 502)
+
+    def test_account_deletion(self) -> None:
+        path = "/v1/account-deletions"
+        issuer = self.stack.issuer
+        self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+        preview_request = {"subject": SUBJECT, "dry_run": True}
+
+        self.assert_request(preview_request, "POST", path)
+        preview = self.assert_response(self.post_json(path, preview_request, PREVIEW_TOKEN), "POST", path, 200)
+        execute = {**preview_request, "dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-s1"}
+        self.assert_request(execute, "POST", path)
+        self.assert_response(self.post_json(path, execute, PREVIEW_TOKEN), "POST", path, 403)
+        stale = {**execute, "preview_digest": "0" * 64, "approval_id": "onay-s0"}
+        self.assert_response(self.post_json(path, stale), "POST", path, 409)
+        queued = self.assert_response(self.post_json(path, execute), "POST", path, 200)
+        self.assertEqual(queued["status"], "dead_lettered")
+        self.assert_response(self.post_json(path, execute), "POST", path, 409)
+        for rejected in ({}, {"subject": SUBJECT}, {"subject": "..", "dry_run": True}, {"subject": SUBJECT, "dry_run": False}):
+            with self.subTest(rejected=rejected):
+                self.assertNotEqual(schema_errors(rejected, request_schema("POST", path), CONTRACT), [])
+                self.assert_response(self.post_json(path, rejected), "POST", path, 400)
+        self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
+        # The queued request is listed with its own event kind.
+        self.assert_response(
+            self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN)), "GET", "/v1/dead-letters", 200
+        )
+
+    def test_proposed_target_replies_match_the_target_schemas(self) -> None:
+        tenant, press = fakes.FakeTenant(), fakes.FakePress()
+        self.addCleanup(tenant.close)
+        self.addCleanup(press.close)
+        issuer = self.stack.issuer
+        tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
+        press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID)
+        identity = {"issuer": issuer, "subject": SUBJECT}
+        cases = (
+            (tenant, fakes.TENANT_REVOKE_INSTALLATIONS, "TargetRevokeUserInstallationsResult"),
+            (tenant, fakes.TENANT_ANONYMIZE, "TargetAnonymizeUserResult"),
+            (press, fakes.PRESS_ANONYMIZE, "TargetAnonymizeUserResult"),
+        )
+        for site, target_path, schema_name in cases:
+            with self.subTest(path=target_path):
+                self.assertIn(target_path.rsplit(".", 1)[-1], ("revoke_user_installations", "anonymize_user"))
+                status, body = TargetReplyTest.post(self, site, target_path, identity)
+                self.assertEqual(status, 200)
+                self.assertEqual(schema_errors(body, CONTRACT["components"]["schemas"][schema_name], CONTRACT), [])
 
     def test_operations(self) -> None:
         kc = self.stack.keycloak

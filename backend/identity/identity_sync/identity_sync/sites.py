@@ -14,11 +14,14 @@ from dataclasses import asdict
 
 from identity_sync.httpjson import ConnectFailed, HttpError, Response, TransportError, UnknownOutcome, request_json
 from identity_sync.mapping import (
+    PressAnonymizeUser,
     PressEnsureTeam,
     PressRemoveTeamMember,
     Tenant,
+    TenantAnonymizeUser,
     TenantChangeEmail,
     TenantProvision,
+    TenantRevokeUserInstallations,
     TenantSetEnabled,
 )
 from identity_sync.reconcile import Identity
@@ -102,6 +105,17 @@ def _is_team(message: object) -> bool:
     return _text(message, "team") is not None and isinstance(message.get("created"), bool)  # type: ignore[union-attr]
 
 
+def _is_anonymized(message: object) -> bool:
+    """anonymize_user: `anonymized` is true. The shared contract does not define this body yet."""
+    return isinstance(message, Mapping) and message.get("anonymized") is True
+
+
+def _is_revoked(message: object) -> bool:
+    """revoke_user_installations: `revoked` is the number of removed installations, 0 or more."""
+    revoked = message.get("revoked") if isinstance(message, Mapping) else None
+    return isinstance(revoked, int) and not isinstance(revoked, bool) and revoked >= 0
+
+
 def _is_removed(message: object) -> bool:
     """remove_team_member (press_tr contract): `member` is false. `team` is a name or null."""
     return isinstance(message, Mapping) and message.get("member") is False and "team" in message
@@ -142,11 +156,30 @@ class PressClient:
         self._timeout = timeout
 
     def _call(
-        self, method_path: str, body: Mapping[str, object] | None = None, is_success: Success | None = None
+        self,
+        method_path: str,
+        body: Mapping[str, object] | None = None,
+        is_success: Success | None = None,
+        missing_identity_is_success: bool = False,
     ) -> object:
         return _call_method(
-            self._base_url, method_path, self._tokens, PRESS_SCOPE, timeout=self._timeout, body=body, is_success=is_success
+            self._base_url,
+            method_path,
+            self._tokens,
+            PRESS_SCOPE,
+            timeout=self._timeout,
+            body=body,
+            is_success=is_success,
+            missing_identity_is_success=missing_identity_is_success,
         )
+
+    def anonymize_user(self, action: PressAnonymizeUser) -> None:
+        """Close the Press user, revoke the API keys and anonymize the personal fields (docs/sozlesmeler.md, section 6).
+
+        A user Press does not know has nothing to anonymize, so that counts as done.
+        """
+        body = {"issuer": action.issuer, "subject": action.subject}
+        self._call("press_tr.api.identity.anonymize_user", body, _is_anonymized, missing_identity_is_success=True)
 
     def ensure_team(self, action: PressEnsureTeam) -> None:
         body = asdict(action)
@@ -246,6 +279,26 @@ class TenantClient:
             "platform_core.api.identity.change_email",
             self._body(action),
             lambda message: _text(message, "user") == action.new_email,
+            missing_identity_is_success=True,
+        )
+
+    def revoke_user_installations(self, action: TenantRevokeUserInstallations) -> None:
+        """Revoke every phone installation of the user (docs/sozlesmeler.md, section 5). No link: nothing to revoke."""
+        self._call(
+            action.tenant,
+            "platform_core.api.mobile.revoke_user_installations",
+            self._body(action),
+            _is_revoked,
+            missing_identity_is_success=True,
+        )
+
+    def anonymize_user(self, action: TenantAnonymizeUser) -> None:
+        """Close the tenant user and anonymize the personal fields. No link: nothing to anonymize."""
+        self._call(
+            action.tenant,
+            "platform_core.api.identity.anonymize_user",
+            self._body(action),
+            _is_anonymized,
             missing_identity_is_success=True,
         )
 

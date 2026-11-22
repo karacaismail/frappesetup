@@ -20,8 +20,8 @@ from identity_sync.mapping import (
     Tenant,
     TenantChangeEmail,
     TenantProvision,
-    TenantSetEnabled,
     UserSnapshot,
+    close_on_tenant,
 )
 
 PRESS = "press"
@@ -232,5 +232,5 @@ def plan_repairs(
                     ),
                 )
             elif difference.kind in _DISABLE_KINDS and not _is_open_member(user, difference.target, tenants):
-                add(TenantSetEnabled(tenant=difference.target, issuer=issuer, subject=subject, enabled=False))
+                add(*close_on_tenant(difference.target, issuer, subject))
     return tuple(actions)

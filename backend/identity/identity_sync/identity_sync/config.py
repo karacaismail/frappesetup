@@ -15,6 +15,8 @@ from identity_sync.mapping import Tenant
 PREFIX = "IDENTITY_SYNC_"
 DEFAULT_ADMIN_SCOPE = "admin-api kc-admin-api"
 MIN_DIGEST_KEY_LENGTH = 16
+# The Keycloak event listener refuses a shorter secret too.
+MIN_WEBHOOK_SECRET_LENGTH = 16
 _TENANT_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 
 
@@ -143,6 +145,8 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         raise ConfigError(
             f"a client can be in only one of {PREFIX}EXECUTE_AZP, {PREFIX}PREVIEW_AZP and {PREFIX}SESSION_AZP"
         )
+    if len(get("WEBHOOK_SECRET")) < MIN_WEBHOOK_SECRET_LENGTH:
+        raise ConfigError(f"{PREFIX}WEBHOOK_SECRET must be at least {MIN_WEBHOOK_SECRET_LENGTH} characters long")
     if len(get("DIGEST_KEY")) < MIN_DIGEST_KEY_LENGTH:
         raise ConfigError(f"{PREFIX}DIGEST_KEY must be at least {MIN_DIGEST_KEY_LENGTH} characters long")
     internal = get("KEYCLOAK_INTERNAL_URL")

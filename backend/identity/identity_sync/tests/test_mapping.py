@@ -11,6 +11,11 @@ import unittest
 from identity_sync.events import Event
 from identity_sync.mapping import (
     EnsureOrganization,
+    KeycloakDeleteUser,
+    KeycloakDisableUser,
+    PressAnonymizeUser,
+    TenantAnonymizeUser,
+    TenantRevokeUserInstallations,
     Organization,
     PressEnsureTeam,
     PressRemoveTeamMember,
@@ -83,10 +88,29 @@ PROVISION = TenantProvision(
 CHANGE_EMAIL = TenantChangeEmail(tenant="kiraci1", issuer=ISSUER, subject=SUB, new_email="ayse@example.test")
 # Source: docs/sozlesmeler.md, section 6. Press disables the user and revokes the API keys
 # when it gets all_organizations. So a deleted user and a disabled user get the same single request.
+def close_on(tenant: str) -> tuple:
+    """Closing a user on a tenant also revokes the phone installations there (gap list, item 4)."""
+    return (
+        TenantSetEnabled(tenant=tenant, issuer=ISSUER, subject=SUB, enabled=False),
+        TenantRevokeUserInstallations(tenant=tenant, issuer=ISSUER, subject=SUB),
+    )
+
+
 DEPROVISION_EVERYWHERE = (
     PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=None),
-    TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject=SUB, enabled=False),
-    TenantSetEnabled(tenant="kiraci2", issuer=ISSUER, subject=SUB, enabled=False),
+    *close_on("kiraci1"),
+    *close_on("kiraci2"),
+)
+# Source: docs/sozlesmeler.md, section 7, and PROJE-KAYDI.md, O-27. The order is fixed.
+ACCOUNT_DELETION = (
+    KeycloakDisableUser(subject=SUB),
+    PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=None),
+    *close_on("kiraci1"),
+    *close_on("kiraci2"),
+    PressAnonymizeUser(issuer=ISSUER, subject=SUB),
+    TenantAnonymizeUser(tenant="kiraci1", issuer=ISSUER, subject=SUB),
+    TenantAnonymizeUser(tenant="kiraci2", issuer=ISSUER, subject=SUB),
+    KeycloakDeleteUser(subject=SUB),
 )
 
 
@@ -131,9 +155,37 @@ class EmailChangeTest(unittest.TestCase):
 
 
 class RemovalTest(unittest.TestCase):
-    def test_deleted_account_is_disabled_everywhere(self) -> None:
-        # Silme: bütün sitelerde kullanıcı kapanır ve Press üyeliği kalkar (X-11).
-        self.assertEqual(plan(event("user", "DELETE_ACCOUNT"), None), DEPROVISION_EVERYWHERE)
+    def test_account_deletion_event_runs_the_full_deletion_flow(self) -> None:
+        # Keycloak's own account deletion starts the same flow as the request endpoint.
+        self.assertEqual(plan(event("user", "DELETE_ACCOUNT"), None), ACCOUNT_DELETION)
+
+    def test_account_deletion_request_runs_the_full_deletion_flow(self) -> None:
+        self.assertEqual(plan(event("request", "ACCOUNT_DELETION"), None), ACCOUNT_DELETION)
+
+    def test_account_deletion_plan_does_not_depend_on_the_keycloak_state(self) -> None:
+        # The user may still be enabled, already disabled or already gone. The steps are the same.
+        request = event("request", "ACCOUNT_DELETION")
+        for snapshot in (user(), user(enabled=False), user(verified=False, orgs=()), None):
+            with self.subTest(snapshot=snapshot):
+                self.assertEqual(plan(request, snapshot), ACCOUNT_DELETION)
+
+    def test_keycloak_user_is_deleted_last(self) -> None:
+        # Everything else is keyed by (issuer, subject) and must finish before the user disappears.
+        actions = plan(event("request", "ACCOUNT_DELETION"), None)
+        self.assertIsInstance(actions[0], KeycloakDisableUser)
+        self.assertIsInstance(actions[-1], KeycloakDeleteUser)
+        first_anonymize = min(i for i, a in enumerate(actions) if isinstance(a, (PressAnonymizeUser, TenantAnonymizeUser)))
+        last_close = max(i for i, a in enumerate(actions) if isinstance(a, (TenantSetEnabled, TenantRevokeUserInstallations)))
+        self.assertLess(last_close, first_anonymize)
+
+    def test_every_deletion_step_is_destructive(self) -> None:
+        for action in plan(event("request", "ACCOUNT_DELETION"), None):
+            with self.subTest(action=type(action).__name__):
+                self.assertTrue(action.preview().destructive)
+                self.assertNotIn("@", action.preview().summary)
+
+    def test_request_kind_with_another_type_is_not_handled(self) -> None:
+        self.assertEqual(plan(event("request", "VERIFY_EMAIL"), user()), ())
 
     def test_admin_deleted_user_is_disabled_everywhere(self) -> None:
         self.assertEqual(plan(event("admin", "USER_DELETE"), None), DEPROVISION_EVERYWHERE)
@@ -180,7 +232,7 @@ class MembershipTest(unittest.TestCase):
             plan(ev, user(orgs=(OTHER_ORG,)), ORG),
             (
                 PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=ORG.id),
-                TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject=SUB, enabled=False),
+                *close_on("kiraci1"),
             ),
         )
 
@@ -197,7 +249,7 @@ class MembershipTest(unittest.TestCase):
             plan(ev, user(orgs=(kiraci2,)), None),
             (
                 PressRemoveTeamMember(issuer=ISSUER, subject=SUB, organization_id=ORG.id),
-                TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject=SUB, enabled=False),
+                *close_on("kiraci1"),
             ),
         )
 

@@ -154,6 +154,7 @@ class FakeKeycloak(FakeServer):
         self.users: dict[str, dict[str, object]] = {}
         self.memberships: dict[str, list[dict[str, object]]] = {}
         self.organizations: dict[str, dict[str, object]] = {}
+        self.logged_out: list[str] = []
         self.on("POST", f"/realms/{ISSUER_REALM}/protocol/openid-connect/token", self._token)
         self.on("GET", f"/admin/realms/{ISSUER_REALM}/users/count", lambda _r: (200, len(self.users)))
 
@@ -180,11 +181,32 @@ class FakeKeycloak(FakeServer):
         self.users[subject] = user
         self.memberships[subject] = list(organizations or [])
         self.on("GET", f"{self.admin}/users/{subject}", lambda _r: self._user(subject))
+        self.on("PUT", f"{self.admin}/users/{subject}", lambda req: self._update_user(subject, req))
+        self.on("POST", f"{self.admin}/users/{subject}/logout", lambda _r: self._logout(subject))
+        self.on("DELETE", f"{self.admin}/users/{subject}", lambda _r: self._delete_user(subject))
         self.on(
             "GET",
             f"{self.admin}/organizations/members/{subject}/organizations",
             lambda _r: (200, self.memberships.get(subject, [])),
         )
+
+    def _update_user(self, subject: str, req: Recorded) -> Reply:
+        if subject not in self.users:
+            return 404, {"error": "User not found"}
+        self.users[subject] = {**self.users[subject], **req.json()}
+        return 204, None
+
+    def _logout(self, subject: str) -> Reply:
+        if subject not in self.users:
+            return 404, {"error": "User not found"}
+        self.logged_out.append(subject)
+        return 204, None
+
+    def _delete_user(self, subject: str) -> Reply:
+        if self.users.pop(subject, None) is None:
+            return 404, {"error": "User not found"}
+        self.memberships.pop(subject, None)
+        return 204, None
 
     def _user(self, subject: str) -> Reply:
         user = self.users.get(subject)
@@ -236,6 +258,12 @@ TENANT_PROVISION = "/api/method/platform_core.api.identity.provision"
 TENANT_SET_ENABLED = "/api/method/platform_core.api.identity.set_enabled"
 TENANT_CHANGE_EMAIL = "/api/method/platform_core.api.identity.change_email"
 TENANT_LIST = "/api/method/platform_core.api.identity.list_identities"
+# Proposed target endpoints. They are not in the tenant or Press contracts yet.
+# The fakes follow the Target schemas in contracts/identity_sync.openapi.yaml.
+TENANT_REVOKE_INSTALLATIONS = "/api/method/platform_core.api.mobile.revoke_user_installations"
+TENANT_ANONYMIZE = "/api/method/platform_core.api.identity.anonymize_user"
+PRESS_ANONYMIZE = "/api/method/press_tr.api.identity.anonymize_user"
+ANONYMOUS = "anonymized"
 WEBHOOK_SECRET = "test-webhook-secret"
 # Sentinel: passing DONE to FakeSite.on() restores the site's own contract behaviour for that path.
 DONE = (-1, None)
@@ -290,6 +318,33 @@ class FakeTenant(FakeSite):
         self.default("POST", TENANT_SET_ENABLED, self._set_enabled)
         self.default("POST", TENANT_CHANGE_EMAIL, self._change_email)
         self.default("GET", TENANT_LIST, self._list)
+        self.installations: dict[tuple[str, str], list[str]] = {}
+        self.default("POST", TENANT_REVOKE_INSTALLATIONS, self._revoke_installations)
+        self.default("POST", TENANT_ANONYMIZE, self._anonymize)
+
+    def _identity(self, req: Recorded) -> tuple[tuple[str, str] | None, Reply | None]:
+        body = req.json()
+        if not _has_only(body, {"issuer", "subject"}, set()):
+            return None, frappe_error(400, "InvalidInput")
+        key = (body["issuer"], body["subject"])
+        if key not in self.links:
+            return None, frappe_error(404, "IdentityNotFound")
+        return key, None
+
+    def _revoke_installations(self, req: Recorded) -> Reply:
+        key, error = self._identity(req)
+        if error:
+            return error
+        revoked = len(self.installations.pop(key, []))
+        return 200, {"message": {"revoked": revoked}}
+
+    def _anonymize(self, req: Recorded) -> Reply:
+        key, error = self._identity(req)
+        if error:
+            return error
+        # Personal fields are blanked. The record itself stays: business records are not deleted.
+        self.users[self.links[key]].update(first_name="", last_name="", anonymized=True)
+        return 200, {"message": {"anonymized": True}}
 
     def _list(self, _req: Recorded) -> Reply:
         rows = [
@@ -374,6 +429,17 @@ class FakePress(FakeSite):
         self.default("POST", PRESS_ENSURE_TEAM, self._ensure_team)
         self.default("POST", PRESS_REMOVE_MEMBER, self._remove_team_member)
         self.default("GET", PRESS_LIST, self._list)
+        self.default("POST", PRESS_ANONYMIZE, self._anonymize)
+
+    def _anonymize(self, req: Recorded) -> Reply:
+        body = req.json()
+        if not _has_only(body, {"issuer", "subject"}, set()):
+            return frappe_error(400, "ValidationError")
+        email = self.links.get((body["issuer"], body["subject"]))
+        if email is None:
+            return frappe_error(404, "IdentityNotFound")
+        self.users[email]["anonymized"] = True
+        return 200, {"message": {"anonymized": True}}
 
     def _list(self, _req: Recorded) -> Reply:
         rows = [

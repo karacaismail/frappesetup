@@ -334,6 +334,30 @@ class KeycloakAdmin:
         response = _expect(self._call("POST", "/clients", json_body=body), 201)
         return Outcome(preview, executed=True, value=_id_from_location(response))
 
+    def disable_user(self, subject: str) -> None:
+        """Disable the user and end the user's sessions. Repeatable. A missing user counts as done.
+
+        The full representation is sent back with `enabled` set to false, so no other field is lost.
+        """
+        user = self.get_user(subject)
+        if user is None:
+            return
+        if user.get("enabled") is not False:
+            _expect(self._call("PUT", f"/users/{_quote(subject)}", json_body={**user, "enabled": False}), 200, 204)
+        _expect(self._call("POST", f"/users/{_quote(subject)}/logout"), 200, 204)
+
+    def delete_user(self, subject: str) -> None:
+        """Delete the user. This cannot be undone. Repeatable: a user that is already gone counts as done.
+
+        A 404 alone does not prove that, because a wrong address answers 404 too, so the realm must answer.
+        """
+        try:
+            _expect(self._call("DELETE", f"/users/{_quote(subject)}"), 200, 204)
+        except HttpError as error:
+            if error.status != 404:
+                raise
+            self._confirm_realm_answers()
+
     def delete_session(self, session_id: str) -> None:
         """End one Keycloak session. Its refresh token stops working too.
 

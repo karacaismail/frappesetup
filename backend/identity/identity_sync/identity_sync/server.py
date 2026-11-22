@@ -28,7 +28,16 @@ from urllib.parse import parse_qs, urlsplit
 
 from identity_sync.app import App
 from identity_sync.auth import TokenRejected, Verifier
-from identity_sync.events import RESOURCE_ID, EventError, from_keycloak, looks_like_keycloak, parse_event
+from identity_sync.events import (
+    ACCOUNT_DELETION,
+    REQUEST_KIND,
+    RESOURCE_ID,
+    Event,
+    EventError,
+    from_keycloak,
+    looks_like_keycloak,
+    parse_event,
+)
 from identity_sync.httpjson import HttpError, TransportError
 from identity_sync.keycloak_admin import InviteResult, PlanChanged
 from identity_sync.pipeline import PreviewChanged, replay_report
@@ -294,6 +303,46 @@ class _Api:
         self._audit("invite_user", payload, azp, "executed")
         return 200, {"subject": result.subject, "previews": [item.to_dict() for item in result.previews]}
 
+    # --- account deletion (docs/sozlesmeler.md, section 7; PROJE-KAYDI.md, O-27) ---
+
+    def post_account_deletion(self, body: bytes, azp: str, now: float) -> Reply:
+        """Preview or run the account deletion flow for one user.
+
+        The run is recorded as a request event whose id is the approval id. It goes through the
+        same pipeline as a Keycloak event: recorded before work starts, queued when a step fails,
+        replayed by hand. The record holds the user's `sub` only, never an e-mail.
+        """
+        payload = _json_object(body)
+        dry_run = _flag(payload, "dry_run")
+        subject = _text(payload, "subject", required=True, max_length=128)
+        if not RESOURCE_ID.fullmatch(subject):
+            raise _BadRequest
+        processor = self._app.processor
+        realm = self._settings.realm
+
+        def request(event_id: str) -> Event:
+            return Event(
+                id=event_id, kind=REQUEST_KIND, type=ACCOUNT_DELETION, realm=realm, time=int(now * 1000), user_id=subject
+            )
+
+        preview = processor.handle(request("preview"), dry_run=True)
+        current = self._app.digest({"operation": "delete_account", "subject": subject, "plan": preview.plan_digest})
+        if dry_run:
+            previews = [item.to_dict() for item in preview.previews]
+            return 200, {"status": "preview", "previews": previews, "preview_digest": current}
+        digest = self._approval("delete_account", payload, azp)
+        request_id = str(payload["approval_id"])
+        if digest != current:
+            self._audit("delete_account", payload, azp, "preview_changed")
+            return 409, {"error": "preview_changed"}
+        try:
+            result = processor.handle(request(request_id), approved_digest=preview.plan_digest)
+        except PreviewChanged:
+            self._audit("delete_account", payload, azp, "preview_changed")
+            return 409, {"error": "preview_changed"}
+        self._audit("delete_account", payload, azp, result.status)
+        return 200, {"status": result.status, "request_id": request_id, "actions": list(result.actions)}
+
     # --- sessions: called by platform_core sites, not by the approval flow ---
 
     def post_revoke_session(self, body: bytes, azp: str) -> Reply:
@@ -366,6 +415,7 @@ def make_server(
         "/v1/invitations": ("POST", api.post_invitation),
         "/v1/operations": ("GET", api.get_operations),
         "/v1/sessions/revoke": ("POST", api.post_revoke_session),
+        "/v1/account-deletions": ("POST", lambda body, azp: api.post_account_deletion(body, azp, clock())),
     }
     # Routes for platform_core site clients. Every other token route is for the preview and approval flow.
     session_routes = frozenset({"/v1/sessions/revoke"})

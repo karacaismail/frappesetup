@@ -171,6 +171,32 @@ Sunucu ve `replay-dead-letters` komutu ayrı süreçlerdir. İkisi aynı kayıt 
 
 Servis ayarları ve sırları ortam değişkeninden okur. Örnek değerler `.env.example` dosyasındadır. O dosyadaki bütün değerler sahtedir. Gerçek sırrı depoya yazmayın.
 
+## Hesap silme
+
+Kullanıcı kendi hesabının silinmesini isteyebilir (Proje kaydı O-27). Uç `POST /v1/account-deletions` adresidir. Akış beş adımdır ve sırası sabittir:
+
+1. Servis Keycloak kullanıcısını kapatır ve oturumlarını sonlandırır.
+2. Servis Press'e `all_organizations: true` isteği gönderir. Press kullanıcıyı kapatır ve API anahtarlarını geçersiz yapar.
+3. Servis kullanıcıyı her kiracıda kapatır ve telefon kurulumlarını iptal ettirir.
+4. Servis kişiyi gösteren alanları Press'te ve her kiracıda anonim yaptırır. İş kayıtları silinmez.
+5. Servis Keycloak kullanıcısını siler.
+
+- Her adım tekrar edilebilir.
+- Bir adım başarısız olursa istek bekleme kuyruğuna girer. Servis o zaman 5. adımı atlar. Yani Keycloak kullanıcısını silmez.
+- İnsan isteği `replay-dead-letters` komutuyla yeniden işletir.
+- Bu iş geri alınamaz. Bu yüzden önizleme ve onay akışından geçer. Buradaki onay, hesabın sahibinin kendi onayıdır.
+- Servis e-postayı hiç saklamaz. İş bitince kayıtta yalnız isteğin kimliği kalır.
+- Keycloak'ın hesap silme olayı da aynı akışı başlatır.
+
+Keycloak'ta kapatılan kullanıcının telefon kurulumları da iptal edilir. Bu iş kapatma planının parçasıdır.
+
+## Olay dinleyici eklentisi
+
+Keycloak olayları kimlik-realm işinin kurduğu eklentiden gelir. Eklenti olayı imzalar ve `POST /v1/events` ucuna gönderir.
+
+- Eklentinin imza kodu bu servisin alıcısıyla denendi. `tests/test_server.py` içindeki `ForkedListenerTest` sınıfı eklentinin ürettiği bir imzayı sabit veri olarak taşır.
+- İmza anahtarı en az 16 karakter olmalıdır. Eklenti de daha kısa anahtarı reddeder.
+
 ## Oturum kapatma
 
 Kullanıcı bir telefon kurulumunu iptal edince kiracı sitesi `POST /v1/sessions/revoke` ucunu çağırır. Gövde oturumun `sid` değerini taşır.
@@ -226,4 +252,6 @@ Bu komutta hiçbir test atlanmamalıdır. Testler RSA anahtarını kendisi üret
 - Onay katmanının istemci adı ortak sözleşmede henüz yok.
 - Bu dalda Press'in ve kiracının sözleşme dosyaları yok. Testler o dosyalara göre yazılmış sahte hedefler kullanır. Gerçek bütünleşme testi `integration-e2e` işindedir.
 - Mutabakat Press'te ve kiracıda kullanıcı listesi veren uç ister. Bu uçlar o sözleşmelerde henüz yok.
+- Hesap silme ve kapatma üç hedef ucu çağırır: `revoke_user_installations` ve iki `anonymize_user` ucu. Ortak sözleşme bu uçların adını verir ama yanıt gövdesini tanımlamaz. Bu servis `Target` şemalarındaki gövdeyi bekler. Uçlar yazılana kadar bu adımlar başarısız olur.
+- Eklenti canlı Keycloak üzerinde bu servisle denenmedi. Yalnız eklentinin imza kodu denendi.
 - `ensure_site_client` işlevi Keycloak'ta `manage-clients` rolünü ister. Ortak sözleşme servis hesabına bu rolü vermez.

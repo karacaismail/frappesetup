@@ -91,11 +91,12 @@ info:
     Keycloak'ta kapatılan kullanıcı için servis telefon kurulumlarını da iptal ettirir.
     Bu iş kapatma planının parçasıdır.
 
-    3. ve 4. adım kiracıda ve Press'te üç yeni uç ister. Bu uçlar o sözleşmelerde henüz yoktur.
-    Adları `platform_core.api.identity.revoke_installations`,
-    `platform_core.api.identity.anonymize` ve `press_tr.api.identity.anonymize` olur.
-    Beklenen yanıtlar bu dosyanın sonundaki `Target` şemalarındadır.
-    Bu uçlar gelene kadar o adımlar başarısız olur ve istek bekleme kuyruğunda kalır.
+    3. ve 4. adım kiracıda ve Press'te üç ucu çağırır. Adlar ortak sözleşmenin 5., 6. ve 7. bölümündedir.
+    Uçlar `platform_core.api.mobile.revoke_user_installations`,
+    `platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user` adını taşır.
+    Ortak sözleşme bu uçların yanıt gövdesini tanımlamaz.
+    Servisin beklediği yanıtlar bu dosyanın sonundaki `Target` şemalarındadır. Bu şemalar bir öneridir.
+    Bu uçlar yazılana kadar o adımlar başarısız olur ve istek bekleme kuyruğunda kalır.
 
     ## Bütün uçların ortak hataları
 
@@ -550,7 +551,8 @@ paths:
         Çünkü yanlış adres de 404 döner.
 
         Ucu yalnız `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci çağırabilir.
-        Bu liste `platform_core` sitelerinin servis istemcilerini taşır.
+        Bu liste `platform_core` sitelerinin servis istemcilerini taşır. Örnek: `site-kiraci1`.
+        Site belirteci `aud-identity-sync` kapsamıyla ister (ortak sözleşme, 2. bölüm).
         Önizleme ve yürütme listelerindeki istemciler bu ucu çağıramaz.
         Bu uç insan onayı istemez. Çünkü işi kullanıcının kendi iptal işlemi başlatır.
         Bu uç yıkıcıdır: kapanan oturum geri açılamaz. Kullanıcı yeniden giriş yapar.
@@ -605,7 +607,7 @@ paths:
         Servis isteği işe başlamadan önce kaydeder. İsteğin kimliği `approval_id` değeridir.
         Bir adım başarısız olursa yanıt yine 200 olur ve durum `dead_lettered` ya da `unknown` olur.
         İstek o zaman bekleme kuyruğundadır. İnsan isteği `POST /v1/dead-letters/replay` ile yeniden işletir.
-      x-durum: planlandi
+      x-durum: uygulandi
       x-yikici: true
       x-yurutme: yalniz-onay-katmani
       security:
@@ -860,6 +862,29 @@ components:
         organization_id:
           $ref: "#/components/schemas/ResourceId"
       additionalProperties: true
+    QueuedEvent:
+      type: object
+      description: |
+        Bekleme kuyruğundaki bir kayıt. Kayıt bir Keycloak olayı ya da servisin kendi isteği olabilir.
+        `kind` değeri `request` ise kayıt bir hesap silme isteğidir. O zaman `type` değeri `ACCOUNT_DELETION` olur.
+        `request` türü olay ucundan gelemez. Yalnız `/v1/account-deletions` ucu üretir.
+      required: [id, kind, type, realm, time]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [user, admin, request]
+        type:
+          type: string
+        realm:
+          type: string
+        time:
+          type: integer
+        user_id:
+          $ref: "#/components/schemas/ResourceId"
+        organization_id:
+          $ref: "#/components/schemas/ResourceId"
     KeycloakUserEvent:
       type: object
       description: |
@@ -965,9 +990,9 @@ components:
             - keycloak.create_site_client
             - keycloak.disable_user
             - keycloak.delete_user
-            - press.anonymize
-            - tenant.revoke_installations
-            - tenant.anonymize
+            - press.anonymize_user
+            - tenant.revoke_user_installations
+            - tenant.anonymize_user
             - press.ensure_team
             - press.remove_team_member
             - tenant.provision
@@ -1004,7 +1029,7 @@ components:
       required: [event, error, state, attempts, first_failed_at, last_failed_at]
       properties:
         event:
-          $ref: "#/components/schemas/Event"
+          $ref: "#/components/schemas/QueuedEvent"
         error:
           type: string
           description: |
@@ -1510,11 +1535,12 @@ components:
             enabled:
               type: boolean
           additionalProperties: true
-    TargetRevokeInstallationsResult:
+    TargetRevokeUserInstallationsResult:
       type: object
       description: |
-        `platform_core.api.identity.revoke_installations` ucundan beklenen yanıt. Bu uç bir öneridir.
-        Uç kiracının sözleşmesinde henüz yoktur.
+        `platform_core.api.mobile.revoke_user_installations` ucundan beklenen yanıt.
+        Ucun adı ortak sözleşmenin 5. bölümündedir. Sahibi platform-core-mobil işidir.
+        Ortak sözleşme yanıt gövdesini tanımlamaz. Bu şema bir öneridir.
         Uç kullanıcının bütün telefon kurulumlarını ve bildirim bağlarını siler.
         İstek `issuer` ve `subject` alanlarını taşır. Uç tekrar edilebilir olmalıdır.
         Bağ yoksa uç 404 ve `IdentityNotFound` döner. Servis bu yanıtı başarı sayar.
@@ -1528,12 +1554,14 @@ components:
               type: integer
               description: Bu istekte silinen kurulum sayısı. Kurulum kalmadıysa 0 olur.
           additionalProperties: true
-    TargetAnonymizeResult:
+    TargetAnonymizeUserResult:
       type: object
       description: |
-        `platform_core.api.identity.anonymize` ve `press_tr.api.identity.anonymize` uçlarından beklenen yanıt.
-        Bu uçlar bir öneridir. Kiracının ve Press'in sözleşmelerinde henüz yoktur.
-        Uç kişiyi gösteren alanları anonim yapar. İş kayıtlarını silmez.
+        `platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user` uçlarından beklenen yanıt.
+        Uçların adı ortak sözleşmenin 5. ve 6. bölümündedir.
+        Ortak sözleşme yanıt gövdesini tanımlamaz. Bu şema bir öneridir.
+        Uç kullanıcıyı kapatır ve kişiyi gösteren alanları anonim yapar. İş kayıtlarını silmez.
+        Press'teki uç API anahtarlarını da geçersiz yapar.
         İstek `issuer` ve `subject` alanlarını taşır. Uç tekrar edilebilir olmalıdır.
         Bağ yoksa uç 404 ve `IdentityNotFound` döner. Servis bu yanıtı başarı sayar.
       required: [message]

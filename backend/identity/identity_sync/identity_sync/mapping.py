@@ -15,7 +15,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 
-from identity_sync.events import MEMBERSHIP_TYPES, Event, is_handled
+from identity_sync.events import DELETION_TYPES, MEMBERSHIP_TYPES, Event, is_handled
 
 # Kendi kaydolan kullanıcıya Organization açan olaylar.
 _SELF_REGISTRATION_TYPES = frozenset({"REGISTER", "VERIFY_EMAIL"})
@@ -206,9 +206,123 @@ class TenantChangeEmail:
         )
 
 
+@dataclass(frozen=True)
+class TenantRevokeUserInstallations:
+    """Revoke every phone installation of the user on a tenant and delete the notification bindings (CK-7)."""
+
+    tenant: str
+    issuer: str
+    subject: str
+
+    def preview(self) -> Preview:
+        return Preview(
+            operation="tenant.revoke_user_installations",
+            target=self.tenant,
+            summary=f"Revoke every phone installation of user {self.subject} on tenant {self.tenant}.",
+            destructive=True,
+        )
+
+
+@dataclass(frozen=True)
+class TenantAnonymizeUser:
+    """Anonymize the personal fields of the user on a tenant. Business records stay (O-27)."""
+
+    tenant: str
+    issuer: str
+    subject: str
+
+    def preview(self) -> Preview:
+        return Preview(
+            operation="tenant.anonymize_user",
+            target=self.tenant,
+            summary=f"Close user {self.subject} on tenant {self.tenant} and anonymize the personal fields.",
+            destructive=True,
+        )
+
+
+@dataclass(frozen=True)
+class PressAnonymizeUser:
+    issuer: str
+    subject: str
+
+    def preview(self) -> Preview:
+        return Preview(
+            operation="press.anonymize_user",
+            target="press",
+            summary=f"Close user {self.subject} on Press, revoke the API keys and anonymize the personal fields.",
+            destructive=True,
+        )
+
+
+@dataclass(frozen=True)
+class KeycloakDisableUser:
+    subject: str
+
+    def preview(self) -> Preview:
+        return Preview(
+            operation="keycloak.disable_user",
+            target="keycloak",
+            summary=f"Disable Keycloak user {self.subject} and end the user's sessions.",
+            destructive=True,
+        )
+
+
+@dataclass(frozen=True)
+class KeycloakDeleteUser:
+    """Delete the Keycloak user. This is the last step and cannot be undone."""
+
+    subject: str
+
+    def preview(self) -> Preview:
+        return Preview(
+            operation="keycloak.delete_user",
+            target="keycloak",
+            summary=f"Delete Keycloak user {self.subject}. This cannot be undone.",
+            destructive=True,
+        )
+
+
 Action = (
-    EnsureOrganization | PressEnsureTeam | PressRemoveTeamMember | TenantProvision | TenantSetEnabled | TenantChangeEmail
+    EnsureOrganization
+    | PressEnsureTeam
+    | PressRemoveTeamMember
+    | TenantProvision
+    | TenantSetEnabled
+    | TenantChangeEmail
+    | TenantRevokeUserInstallations
+    | TenantAnonymizeUser
+    | PressAnonymizeUser
+    | KeycloakDisableUser
+    | KeycloakDeleteUser
 )
+
+
+def close_on_tenant(tenant: str, issuer: str, subject: str) -> list[Action]:
+    """Disable the user on a tenant and revoke the phone installations there."""
+    return [
+        TenantSetEnabled(tenant=tenant, issuer=issuer, subject=subject, enabled=False),
+        TenantRevokeUserInstallations(tenant=tenant, issuer=issuer, subject=subject),
+    ]
+
+
+def plan_account_deletion(subject: str, *, issuer: str, tenants: Sequence[Tenant]) -> tuple[Action, ...]:
+    """The account deletion flow (docs/sozlesmeler.md, section 7; PROJE-KAYDI.md, O-27).
+
+    The order is fixed and every step is repeatable:
+    1. disable the Keycloak user, 2. close the Press user, 3. close the user on every tenant
+    and revoke the phone installations, 4. anonymize the personal fields, 5. delete the Keycloak user.
+    The plan does not depend on the user's current state.
+    """
+    actions: list[Action] = [
+        KeycloakDisableUser(subject=subject),
+        PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=None),
+    ]
+    for tenant in tenants:
+        actions += close_on_tenant(tenant.name, issuer, subject)
+    actions.append(PressAnonymizeUser(issuer=issuer, subject=subject))
+    actions += [TenantAnonymizeUser(tenant=tenant.name, issuer=issuer, subject=subject) for tenant in tenants]
+    actions.append(KeycloakDeleteUser(subject=subject))
+    return tuple(actions)
 
 
 def plan_actions(
@@ -228,14 +342,17 @@ def plan_actions(
         return ()
     subject = event.user_id
 
+    if event.type in DELETION_TYPES:
+        return plan_account_deletion(subject, issuer=issuer, tenants=tenants)
+
     if snapshot is None or not snapshot.enabled:
         # Deleted or disabled: the user is disabled on every tenant and leaves every Press team (X-11).
         # One all_organizations request covers both cases. Press also disables the user and revokes
         # the API keys when it gets that request (docs/sozlesmeler.md, section 6).
-        return (
-            PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=None),
-            *(TenantSetEnabled(tenant=t.name, issuer=issuer, subject=subject, enabled=False) for t in tenants),
-        )
+        closing: list[Action] = [PressRemoveTeamMember(issuer=issuer, subject=subject, organization_id=None)]
+        for tenant in tenants:
+            closing += close_on_tenant(tenant.name, issuer, subject)
+        return tuple(closing)
 
     if event.type in MEMBERSHIP_TYPES:
         return _plan_membership(event, snapshot, issuer=issuer, tenants=tenants, organization=organization)
@@ -273,14 +390,11 @@ def _plan_membership(
     if organization is None:
         # Organization silindi. Takma adı bilinmez. Kullanıcı üyesi olmadığı her kiracıda kapanır.
         aliases = {org.alias for org in snapshot.organizations}
-        return (
-            PressRemoveTeamMember(issuer=issuer, subject=snapshot.subject, organization_id=org_id),
-            *(
-                TenantSetEnabled(tenant=t.name, issuer=issuer, subject=snapshot.subject, enabled=False)
-                for t in tenants
-                if t.organization not in aliases
-            ),
-        )
+        removal: list[Action] = [PressRemoveTeamMember(issuer=issuer, subject=snapshot.subject, organization_id=org_id)]
+        for tenant in tenants:
+            if tenant.organization not in aliases:
+                removal += close_on_tenant(tenant.name, issuer, snapshot.subject)
+        return tuple(removal)
     org_tenants = [t for t in tenants if t.organization == organization.alias]
     if any(org.id == organization.id for org in snapshot.organizations):
         if not snapshot.email_verified:
@@ -289,10 +403,12 @@ def _plan_membership(
         for tenant in org_tenants:
             actions += _sync_on_tenant(snapshot, issuer, tenant.name)
         return tuple(actions)
-    return (
-        PressRemoveTeamMember(issuer=issuer, subject=snapshot.subject, organization_id=organization.id),
-        *(TenantSetEnabled(tenant=t.name, issuer=issuer, subject=snapshot.subject, enabled=False) for t in org_tenants),
-    )
+    leaving: list[Action] = [
+        PressRemoveTeamMember(issuer=issuer, subject=snapshot.subject, organization_id=organization.id)
+    ]
+    for tenant in org_tenants:
+        leaving += close_on_tenant(tenant.name, issuer, snapshot.subject)
+    return tuple(leaving)
 
 
 def _team(snapshot: UserSnapshot, issuer: str, organization: Organization) -> PressEnsureTeam:

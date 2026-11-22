@@ -56,6 +56,13 @@ class ConfigTest(unittest.TestCase):
         # docs/sozlesmeler.md, section 2: the Admin API token is requested with this scope.
         self.assertEqual(load_settings(self.ENV).admin_scope, "admin-api kc-admin-api")
 
+    def test_webhook_secret_must_be_long_enough(self) -> None:
+        # The event listener fork also refuses a secret shorter than 16 characters.
+        with self.assertRaises(ConfigError) as caught:
+            load_settings({**self.ENV, "IDENTITY_SYNC_WEBHOOK_SECRET": "kisa-anahtar"})
+        self.assertIn("IDENTITY_SYNC_WEBHOOK_SECRET", str(caught.exception))
+        self.assertNotIn("kisa-anahtar", str(caught.exception))
+
     def test_digest_key_is_required_and_hidden(self) -> None:
         missing = {k: v for k, v in self.ENV.items() if k != "IDENTITY_SYNC_DIGEST_KEY"}
         with self.assertRaises(ConfigError) as caught:

@@ -16,6 +16,7 @@ from identity_sync.mapping import (
     Tenant,
     TenantChangeEmail,
     TenantProvision,
+    TenantRevokeUserInstallations,
     TenantSetEnabled,
     UserSnapshot,
 )
@@ -188,7 +189,11 @@ class RepairPlanTest(unittest.TestCase):
                 self.assertEqual(actions, self.sync_actions())
 
     def test_closed_or_unexpected_tenant_user_is_disabled(self) -> None:
-        disable = (TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject="a", enabled=False),)
+        # Closing a user on a tenant also revokes the phone installations there.
+        disable = (
+            TenantSetEnabled(tenant="kiraci1", issuer=ISSUER, subject="a", enabled=False),
+            TenantRevokeUserInstallations(tenant="kiraci1", issuer=ISSUER, subject="a"),
+        )
         self.assertEqual(self.repairs([Difference("kiraci1", "a", "closed_in_keycloak")], []), disable)
         self.assertEqual(self.repairs([Difference("kiraci1", "a", "unexpected")], [user("a", orgs=(OTHER,))]), disable)
 

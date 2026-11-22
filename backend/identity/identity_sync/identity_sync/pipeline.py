@@ -20,18 +20,23 @@ from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, replace
 from typing import TypeVar
 
-from identity_sync.events import MEMBERSHIP_TYPES, Event, is_handled
+from identity_sync.events import DELETION_TYPES, MEMBERSHIP_TYPES, Event, is_handled
 from identity_sync.httpjson import HttpError, TransportError, UnknownOutcome
 from identity_sync.keycloak_admin import KeycloakAdmin
 from identity_sync.mapping import (
     Action,
     EnsureOrganization,
+    KeycloakDeleteUser,
+    KeycloakDisableUser,
+    PressAnonymizeUser,
     PressEnsureTeam,
     PressRemoveTeamMember,
     Preview,
     Tenant,
+    TenantAnonymizeUser,
     TenantChangeEmail,
     TenantProvision,
+    TenantRevokeUserInstallations,
     TenantSetEnabled,
     digest_of,
     plan_actions,
@@ -124,12 +129,22 @@ class Processor:
         self._max_attempts = max_attempts
         self._sleep = sleep
 
-    def handle(self, event: Event, *, dry_run: bool = False, allow_unknown: bool = False) -> EventResult:
+    def handle(
+        self,
+        event: Event,
+        *,
+        dry_run: bool = False,
+        allow_unknown: bool = False,
+        approved_digest: str | None = None,
+    ) -> EventResult:
         """Process one event.
 
         `dry_run`: only read and return the preview.
         `allow_unknown`: permission to run an event whose earlier outcome is unknown.
         That is a human's explicit decision.
+        `approved_digest`: the `plan_digest` a human approved. The plan is built under the work
+        lock. If it differs, `PreviewChanged` is raised and nothing is written. Otherwise exactly
+        that plan is written.
         """
         if not is_handled(event) or event.realm != self._realm:
             return EventResult("ignored")
@@ -137,7 +152,12 @@ class Processor:
             return self._preview(event)[0]
         # The duplicate check, the external writes and the record are under one work lock.
         with self._store.work_lock():
-            return self._handle_locked(event, allow_unknown, planned=None)
+            planned = None
+            if approved_digest is not None:
+                preview, planned = self._preview(event)
+                if planned is None or preview.plan_digest != approved_digest:
+                    raise PreviewChanged
+            return self._handle_locked(event, allow_unknown, planned)
 
     def _preview(self, event: Event) -> tuple[EventResult, tuple[Action, ...] | None]:
         """Plan the event and describe the plan. Reads only. The second value is None when planning failed."""
@@ -256,6 +276,9 @@ class Processor:
 
     def _plan(self, event: Event) -> tuple[Action, ...]:
         subject = event.user_id or ""
+        if event.type in DELETION_TYPES:
+            # The deletion flow is the same whatever the user's state is. It needs no read.
+            return plan_actions(event, None, issuer=self._issuer, tenants=self._tenants)
         snapshot = self._retry("keycloak.read", lambda: self._keycloak.get_user_snapshot(subject))
         organization = None
         # A deleted or disabled account is closed everywhere. That plan does not use the
@@ -303,6 +326,11 @@ class Processor:
             for action in actions:
                 preview = action.preview()
                 label = f"{preview.operation} {preview.target}"
+                if isinstance(action, KeycloakDeleteUser) and failures:
+                    # Deleting the Keycloak user is the last, irreversible step. It waits until
+                    # every earlier step is done. The request stays in the queue for a replay.
+                    failures.append(f"{label}: skipped because an earlier step is not done")
+                    continue
                 # A failed step does not stop the others. For example the user is still disabled
                 # on every tenant when Press does not answer. The steps are repeatable.
                 try:
@@ -334,6 +362,16 @@ class Processor:
             self._tenant_client.set_enabled(action)
         elif isinstance(action, TenantChangeEmail):
             self._tenant_client.change_email(action)
+        elif isinstance(action, TenantRevokeUserInstallations):
+            self._tenant_client.revoke_user_installations(action)
+        elif isinstance(action, TenantAnonymizeUser):
+            self._tenant_client.anonymize_user(action)
+        elif isinstance(action, PressAnonymizeUser):
+            self._press.anonymize_user(action)
+        elif isinstance(action, KeycloakDisableUser):
+            self._keycloak.disable_user(action.subject)
+        elif isinstance(action, KeycloakDeleteUser):
+            self._keycloak.delete_user(action.subject)
         else:  # pragma: no cover - a new action type shows up here
             raise TypeError(f"unknown action: {type(action).__name__}")
 

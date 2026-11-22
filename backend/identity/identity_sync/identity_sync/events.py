@@ -17,6 +17,12 @@ from dataclasses import asdict, dataclass
 USER_TYPES = frozenset({"REGISTER", "VERIFY_EMAIL", "UPDATE_EMAIL", "DELETE_ACCOUNT"})
 MEMBERSHIP_TYPES = frozenset({"ORGANIZATION_MEMBERSHIP_CREATE", "ORGANIZATION_MEMBERSHIP_DELETE"})
 ADMIN_TYPES = frozenset({"USER_CREATE", "USER_UPDATE", "USER_DELETE"}) | MEMBERSHIP_TYPES
+# A request the service records itself. It never arrives through the event endpoint:
+# `parse_event` accepts only the kinds `user` and `admin`.
+REQUEST_KIND = "request"
+ACCOUNT_DELETION = "ACCOUNT_DELETION"
+# Event types that start the account deletion flow (docs/sozlesmeler.md, section 7).
+DELETION_TYPES = frozenset({"DELETE_ACCOUNT", ACCOUNT_DELETION})
 
 MAX_ID_LENGTH = 128
 # Kimlikler adres yoluna girer. Bu yüzden yalnız güvenli karakterler kabul edilir.
@@ -46,6 +52,8 @@ def is_handled(event: Event) -> bool:
     """Servis bu olay için iş yapar mı?"""
     if event.kind == "user":
         return event.type in USER_TYPES
+    if event.kind == REQUEST_KIND:
+        return event.type == ACCOUNT_DELETION
     return event.kind == "admin" and event.type in ADMIN_TYPES
 
 

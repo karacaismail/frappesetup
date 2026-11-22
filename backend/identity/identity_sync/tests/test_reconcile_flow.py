@@ -71,6 +71,7 @@ class ReportTest(ReconcileFlowCase):
                 ("press.remove_team_member", True),
                 ("press.ensure_team", False),
                 ("tenant.set_enabled", True),
+                ("tenant.revoke_user_installations", True),
                 ("tenant.change_email", False),
                 ("tenant.provision", False),
             ],
@@ -100,7 +101,7 @@ class RepairTest(ReconcileFlowCase):
 
         result = self.stack.app.reconcile_execute(digest)
 
-        self.assertEqual([r["status"] for r in result["results"]], ["done"] * 5)
+        self.assertEqual([r["status"] for r in result["results"]], ["done"] * 6)
         closed_on_press = self.stack.press.user_of(issuer, CLOSED)
         self.assertEqual((closed_on_press["enabled"], closed_on_press["api_keys"]), (False, []))
         self.assertFalse(self.stack.tenant.user_of(issuer, CLOSED)["enabled"])

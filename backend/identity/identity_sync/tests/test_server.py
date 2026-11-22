@@ -286,6 +286,53 @@ class SignatureTest(ServerCase):
         self.assertEqual(status, 401)
 
 
+class ForkedListenerTest(ServerCase):
+    """The Keycloak event listener fork of the kimlik-realm job (gap list, item 1).
+
+    FORK_BODY is built the way the fork's EventPayloads builds a user event. FORK_SIGNATURE was
+    produced by the fork's own WebhookSigner.java (kimlik-realm branch, commit 750e384) for
+    the secret "test-webhook-secret", the timestamp 1795000000 and the mode "execute".
+    It is not computed by this code base, so it is an independent expected value.
+    """
+
+    FORK_BODY = b'{"id":"k-fork-1","time":1795000000000,"type":"VERIFY_EMAIL","realmId":"7c9e6679-7425-40de-944b-e07fc1f90ae7","clientId":"press","userId":"11111111-1111-4111-8111-111111111111"}'
+    FORK_SIGNATURE = "sha256=164ff260a1cd1aa8e32a399124f096ce4b759a43dee1c0aa4fe3aa8832c18e30"
+
+    def send(self, body: bytes, signature: str, timestamp: int = NOW) -> tuple[int, object]:
+        headers = {
+            "Content-Type": "application/json",
+            "X-Identity-Sync-Timestamp": str(timestamp),
+            "X-Identity-Sync-Signature": signature,
+        }
+        return self.call("POST", "/v1/events", body, headers)
+
+    def test_signature_made_by_the_fork_is_accepted(self) -> None:
+        status, body = self.send(self.FORK_BODY, self.FORK_SIGNATURE)
+
+        self.assertEqual((status, body["status"]), (202, "processed"))
+
+    def test_python_helper_and_fork_agree(self) -> None:
+        self.assertEqual(sign(self.FORK_BODY, NOW, "execute"), self.FORK_SIGNATURE)
+
+    def test_broken_fork_signature_is_rejected(self) -> None:
+        broken = self.FORK_SIGNATURE[:-1] + ("0" if self.FORK_SIGNATURE[-1] != "0" else "1")
+
+        self.assertEqual(self.send(self.FORK_BODY, broken), (401, {"error": "bad_signature"}))
+        self.assertEqual(self.downstream_writes(), [])
+
+    def test_old_fork_timestamp_is_rejected(self) -> None:
+        # The fork signed at NOW. The server clock is 301 seconds later.
+        self.now = float(NOW + 301)
+
+        self.assertEqual(self.send(self.FORK_BODY, self.FORK_SIGNATURE), (401, {"error": "bad_signature"}))
+        self.assertEqual(self.downstream_writes(), [])
+
+    def test_fork_signature_does_not_fit_a_changed_body(self) -> None:
+        changed = self.FORK_BODY.replace(b"k-fork-1", b"k-fork-2")
+
+        self.assertEqual(self.send(changed, self.FORK_SIGNATURE), (401, {"error": "bad_signature"}))
+
+
 class KeycloakFormatTest(ServerCase):
     """Keycloak'ın kendi olay biçimi. `realmId` realm'in iç kimliğidir, adı değildir."""
 
@@ -729,6 +776,136 @@ class SessionRevokeTest(ServerCase):
         self.assertEqual(self.revoke(), (502, {"error": "upstream_failed"}))
 
 
+class AccountDeletionEndpointTest(ServerCase):
+    """POST /v1/account-deletions (docs/sozlesmeler.md, section 7; PROJE-KAYDI.md, O-27)."""
+
+    PATH = "/v1/account-deletions"
+
+    def setUp(self) -> None:
+        super().setUp()
+        issuer = self.stack.issuer
+        self.stack.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID, api_keys=1)
+        self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")
+        self.stack.tenant.installations[(issuer, SUBJECT)] = ["phone-1"]
+
+    def preview(self, token: str = PREVIEW_TOKEN) -> dict[str, object]:
+        status, body = self.post_json(self.PATH, {"subject": SUBJECT, "dry_run": True}, token)
+        self.assertEqual(status, 200)
+        return body
+
+    def execute(self, digest: object, token: str = EXECUTE_TOKEN, approval_id: str = "onay-s1"):
+        payload = {"subject": SUBJECT, "dry_run": False, "preview_digest": digest, "approval_id": approval_id}
+        return self.post_json(self.PATH, payload, token)
+
+    def test_preview_lists_the_destructive_plan_and_writes_nothing(self) -> None:
+        body = self.preview()
+
+        self.assertEqual(body["status"], "preview")
+        self.assertEqual(
+            [p["operation"] for p in body["previews"]],
+            [
+                "keycloak.disable_user",
+                "press.remove_team_member",
+                "tenant.set_enabled",
+                "tenant.revoke_user_installations",
+                "press.anonymize_user",
+                "tenant.anonymize_user",
+                "keycloak.delete_user",
+            ],
+        )
+        self.assertTrue(all(p["destructive"] for p in body["previews"]))
+        self.assertRegex(body["preview_digest"], r"^[0-9a-f]{64}$")
+        self.assertNotIn("example.test", json.dumps(body))
+        self.assertEqual(self.downstream_writes() + self.keycloak_writes(), [])
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+
+    def test_agent_cannot_delete_an_account(self) -> None:
+        digest = self.preview()["preview_digest"]
+
+        self.assertEqual(self.execute(digest, token=PREVIEW_TOKEN), (403, {"error": "forbidden"}))
+        self.assertEqual(self.downstream_writes() + self.keycloak_writes(), [])
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+
+    def test_approval_layer_deletes_the_account(self) -> None:
+        digest = self.preview()["preview_digest"]
+
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            status, body = self.execute(digest)
+
+        self.assertEqual(status, 200)
+        self.assertEqual((body["status"], body["request_id"]), ("processed", "onay-s1"))
+        self.assertEqual(body["actions"][0], "keycloak.disable_user")
+        self.assertEqual(body["actions"][-1], "keycloak.delete_user")
+        issuer = self.stack.issuer
+        self.assertNotIn(SUBJECT, self.stack.keycloak.users)
+        self.assertFalse(self.stack.press.user_of(issuer, SUBJECT)["enabled"])
+        self.assertTrue(self.stack.tenant.user_of(issuer, SUBJECT)["anonymized"])
+        self.assertNotIn((issuer, SUBJECT), self.stack.tenant.installations)
+        audit = "\n".join(logs.output)
+        self.assertIn("operation=delete_account", audit)
+        self.assertIn("outcome=processed", audit)
+        self.assertNotIn("example.test", audit)
+
+    def test_approval_works_once(self) -> None:
+        digest = self.preview()["preview_digest"]
+        self.assertEqual(self.execute(digest)[0], 200)
+
+        self.assertEqual(self.execute(digest), (409, {"error": "approval_used"}))
+
+    def test_digest_of_another_user_is_refused(self) -> None:
+        other = self.post_json(self.PATH, {"subject": "baska-kullanici", "dry_run": True})[1]["preview_digest"]
+
+        self.assertEqual(self.execute(other), (409, {"error": "preview_changed"}))
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+        self.assertEqual(self.downstream_writes(), [])
+
+    def test_bad_requests(self) -> None:
+        digest = self.preview()["preview_digest"]
+        for payload in (
+            {},
+            {"subject": SUBJECT},
+            {"subject": "..", "dry_run": True},
+            {"subject": 5, "dry_run": True},
+            {"dry_run": True},
+            {"subject": SUBJECT, "dry_run": False},
+            {"subject": SUBJECT, "dry_run": False, "preview_digest": digest},
+        ):
+            with self.subTest(payload=payload):
+                self.assertEqual(self.post_json(self.PATH, payload), (400, {"error": "bad_request"}))
+        self.assertEqual(self.downstream_writes() + self.keycloak_writes(), [])
+
+    def test_failed_step_queues_the_request_and_replay_finishes_it(self) -> None:
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+        digest = self.preview()["preview_digest"]
+
+        status, body = self.execute(digest)
+
+        self.assertEqual((status, body["status"]), (200, "dead_lettered"))
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+        _status, listing = self.call("GET", "/v1/dead-letters", None, self.bearer(PREVIEW_TOKEN))
+        (letter,) = listing["dead_letters"]
+        self.assertEqual((letter["event"]["id"], letter["event"]["kind"], letter["event"]["type"]), ("onay-s1", "request", "ACCOUNT_DELETION"))
+
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, DONE)
+        _status, preview = self.post_json("/v1/dead-letters/replay", {"dry_run": True})
+        replay = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": "onay-s2"}
+        status, body = self.post_json("/v1/dead-letters/replay", replay)
+
+        self.assertEqual((status, body["results"][0]["status"]), (200, "processed"))
+        self.assertNotIn(SUBJECT, self.stack.keycloak.users)
+
+    def test_deletion_cannot_be_injected_through_the_event_endpoint(self) -> None:
+        # The event endpoint takes Keycloak events only. A request kind must come through the approval flow.
+        forged = {"id": "x-1", "kind": "request", "type": "ACCOUNT_DELETION", "realm": "platform", "time": 1, "user_id": SUBJECT}
+
+        self.assertEqual(self.post_event(forged), (400, {"error": "bad_request"}))
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+
+    def test_needs_a_service_token(self) -> None:
+        self.assertEqual(self.call("POST", self.PATH, b"{}")[0], 401)
+        self.assertEqual(self.post_json(self.PATH, {"subject": SUBJECT, "dry_run": True}, SESSION_TOKEN)[0], 403)
+
+
 class OperationJournalTest(ServerCase):
     """An invitation writes to Keycloak in three steps. Each step is recorded before it runs."""
 
@@ -882,7 +1059,10 @@ class ReconcileEndpointTest(ServerCase):
                 {"target": "kiraci1", "subject": self.CLOSED, "kind": "closed_in_keycloak"},
             ],
         )
-        self.assertEqual([p["operation"] for p in body["previews"]], ["press.remove_team_member", "tenant.set_enabled"])
+        self.assertEqual(
+            [p["operation"] for p in body["previews"]],
+            ["press.remove_team_member", "tenant.set_enabled", "tenant.revoke_user_installations"],
+        )
         self.assertTrue(all(p["destructive"] for p in body["previews"]))
         self.assertRegex(body["preview_digest"], r"^[0-9a-f]{64}$")
         self.assertNotIn("example.test", json.dumps(body))
@@ -910,7 +1090,11 @@ class ReconcileEndpointTest(ServerCase):
         self.assertEqual(status, 200)
         self.assertEqual(
             [(r["operation"], r["target"], r["status"]) for r in body["results"]],
-            [("press.remove_team_member", "press", "done"), ("tenant.set_enabled", "kiraci1", "done")],
+            [
+                ("press.remove_team_member", "press", "done"),
+                ("tenant.set_enabled", "kiraci1", "done"),
+                ("tenant.revoke_user_installations", "kiraci1", "done"),
+            ],
         )
         closed_on_press = self.stack.press.user_of(issuer, self.CLOSED)
         self.assertEqual((closed_on_press["enabled"], closed_on_press["api_keys"]), (False, []))
