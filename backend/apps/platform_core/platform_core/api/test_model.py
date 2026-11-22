@@ -88,6 +88,11 @@ class TestModelHTTP(unittest.TestCase):
 	def test_test_api_foreign_data_denied(self):
 		self.assertEqual(self._test_api_request("regular").status_code, 403)
 
+	def test_non_manager_desk_user_receives_native_permission_error(self):
+		response = self._test_api_request("authorized")
+		self.assertEqual(response.status_code, 403)
+		self.assertEqual(response.json().get("exc_type"), "PermissionError")
+
 	def test_regular_user_cannot_list_or_read_provider_credentials(self):
 		for name in ("", self.fixture["credential_api"]):
 			with self.subTest(detail=bool(name)):
@@ -451,8 +456,16 @@ class TestModelHTTP(unittest.TestCase):
 		frappe.db.commit()
 		response = self._maintenance("manager", "purge_usage", {"dry_run": True})
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
+		preview = response.json()["message"]
 		self.assertEqual(
-			response.json()["message"], {"eligible": eligible + 1, "deleted": 0, "dry_run": True}
+			preview,
+			{
+				"eligible": eligible + 1,
+				"deleted": 0,
+				"dry_run": True,
+				"targets": [closed],
+				"preview_token": preview["preview_token"],
+			},
 		)
 		frappe.db.rollback()
 		self.assertTrue(frappe.db.exists("AI Usage Log", closed))
@@ -464,9 +477,17 @@ class TestModelHTTP(unittest.TestCase):
 			"user": self.fixture["users"]["manager"],
 		}
 		self.assertFalse(frappe.db.exists("Activity Log", audit_filters))
-		response = self._maintenance("manager", "purge_usage", {"dry_run": False})
+		without_preview = self._maintenance("manager", "purge_usage", {"dry_run": False})
+		self.assertEqual(without_preview.status_code, 400)
+		self.assertEqual(without_preview.json()["message"]["error"], "preview_required")
+		response = self._maintenance(
+			"manager", "purge_usage", {"dry_run": False, "preview_token": preview["preview_token"]}
+		)
 		self.assertEqual(response.status_code, 200, response.json().get("exc_type"))
-		self.assertEqual(response.json()["message"], {"eligible": 1, "deleted": 1, "dry_run": False})
+		self.assertEqual(
+			response.json()["message"],
+			{"eligible": 1, "deleted": 1, "dry_run": False, "targets": [closed], "preview_token": None},
+		)
 		frappe.db.rollback()
 		self.assertFalse(frappe.db.exists("AI Usage Log", closed))
 		audit = frappe.db.exists("Activity Log", audit_filters)

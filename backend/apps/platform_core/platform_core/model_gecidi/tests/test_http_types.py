@@ -2,6 +2,7 @@
 
 import inspect
 import unittest
+from types import SimpleNamespace
 from typing import get_type_hints
 from unittest.mock import Mock, patch
 
@@ -50,10 +51,18 @@ class ModelHttpTypesTests(unittest.TestCase):
 				self.assertEqual(frappe.local.response.http_status_code, 400)
 
 	def test_http_denial_rolls_back_only_the_current_transaction(self):
-		denial = model.policy.Denied(403, "permission_denied")
+		denial = model.policy.Denied(400, "invalid_request")
 		with patch.object(model.maintenance, "purge_usage", side_effect=denial):
-			self.assertEqual(model.purge_usage(), {"error": "permission_denied"})
+			self.assertEqual(model.purge_usage(), {"error": "invalid_request"})
 
 		frappe.db.rollback.assert_called_once_with(chain=True)
 		frappe.db.commit.assert_not_called()
-		self.assertEqual(frappe.local.response.http_status_code, 403)
+		self.assertEqual(frappe.local.response.http_status_code, 400)
+
+	def test_route_permission_failure_uses_frappe_error(self):
+		route = SimpleNamespace(enabled=True, required_role="AI Caller")
+		with (
+			patch.object(frappe, "get_roles", return_value=["Other"]),
+			self.assertRaises(frappe.PermissionError),
+		):
+			model.policy.require_route(route)

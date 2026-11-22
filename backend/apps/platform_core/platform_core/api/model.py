@@ -50,6 +50,8 @@ class PurgedUsage(TypedDict):
 	eligible: int
 	deleted: int
 	dry_run: bool
+	targets: list[str]
+	preview_token: str | None
 
 
 class ClearedCredential(TypedDict):
@@ -104,9 +106,9 @@ def resolve_usage(
 
 
 @frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
-def purge_usage(dry_run: bool = True) -> PurgedUsage | ErrorResponse:
+def purge_usage(dry_run: bool = True, preview_token: str | None = None) -> PurgedUsage | ErrorResponse:
 	"""Preview or delete closed usage records beyond the configured retention window."""
-	return _respond(maintenance.purge_usage, dry_run)
+	return _respond(maintenance.purge_usage, dry_run, preview_token)
 
 
 @frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission

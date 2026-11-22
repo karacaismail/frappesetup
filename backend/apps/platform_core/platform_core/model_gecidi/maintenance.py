@@ -3,6 +3,7 @@
 import re
 from datetime import timedelta
 from decimal import Decimal
+from secrets import token_hex
 from uuid import uuid4
 
 import frappe
@@ -13,6 +14,8 @@ from platform_core.model_gecidi.doctype.ai_api.ai_api import clear_api_credentia
 
 DEFAULT_RETENTION_DAYS = 365
 DELETE_BATCH_SIZE = 500
+PREVIEW_TTL_SECONDS = 300
+USAGE_LOG = "AI Usage Log"
 
 
 def _cost(value):
@@ -25,9 +28,9 @@ def _usage_log(name, *, for_update=False):
 	if not isinstance(name, str) or not 0 < len(name) <= 140:
 		raise policy.Denied(400, "invalid_request")
 	try:
-		return frappe.get_doc("AI Usage Log", name, for_update=for_update)
+		return frappe.get_doc(USAGE_LOG, name, for_update=for_update)
 	except frappe.DoesNotExistError:
-		raise policy.Denied(403, "permission_denied") from None
+		raise frappe.PermissionError from None
 
 
 def resolve_usage(log, cost, currency, note=None):
@@ -71,44 +74,113 @@ def resolve_usage(log, cost, currency, note=None):
 	return {"name": log, "result": "resolved", "cost": format(verified_cost, "f"), "currency": currency}
 
 
-def purge_usage(dry_run=True):
+def reconcile_stale_pending():
+	"""Close one batch of expired reservations as unknown from the site console."""
 	policy.require_user(managers_only=True)
-	if type(dry_run) is not bool:
+	cutoff = now_datetime() - timedelta(seconds=gateway.STALE_ATTEMPT_SECONDS)
+	filters = {"result": "pending", "attempted_at": ["<=", cutoff]}
+	targets = frappe.qb.get_query(
+		USAGE_LOG,
+		filters=filters,
+		fields=["name"],
+		order_by="attempted_at asc, name asc",
+		limit=DELETE_BATCH_SIZE,
+		for_update=True,
+	).run(pluck=True)
+	if targets:
+		# The locking read excludes attempts already settled by the request owner.
+		# A late finisher will only update rows whose result is still pending.
+		frappe.db.set_value(
+			USAGE_LOG,
+			{**filters, "name": ["in", targets]},
+			{"result": "unknown", "failure_code": "pending_recovery"},
+		)
+	return {"closed": len(targets), "targets": targets}
+
+
+def _purge_batch(filters, *, for_update=False):
+	return frappe.qb.get_query(
+		USAGE_LOG,
+		filters=filters,
+		fields=["name", "modified"],
+		order_by="attempted_at asc, name asc",
+		limit=DELETE_BATCH_SIZE,
+		for_update=for_update,
+	).run(as_dict=True)
+
+
+def _purge_preview_key(token):
+	return f"model_gateway:purge_preview:{token}"
+
+
+def purge_usage(dry_run=True, preview_token=None):
+	policy.require_user(managers_only=True)
+	if type(dry_run) is not bool or (dry_run and preview_token is not None):
 		raise policy.Denied(400, "invalid_request")
+	if not dry_run:
+		if preview_token is None:
+			raise policy.Denied(400, "preview_required")
+		if not isinstance(preview_token, str) or not re.fullmatch(r"[0-9a-f]{64}", preview_token):
+			raise policy.Denied(409, "preview_invalid")
+		key = _purge_preview_key(preview_token)
+		preview = frappe.cache.get_value(key, expires=True, use_local_cache=False)
+		if not preview or preview["user"] != frappe.session.user:
+			raise policy.Denied(409, "preview_invalid")
 	days = frappe.conf.get("model_gateway_usage_retention_days", DEFAULT_RETENTION_DAYS)
 	if type(days) is not int or not 32 <= days <= 36500:
 		raise policy.Denied(503, "invalid_retention")
+	now = now_datetime()
+	cutoff = now - timedelta(days=days) if dry_run else preview["cutoff"]
 	filters = {
-		"attempted_at": ["<", now_datetime() - timedelta(days=days)],
+		"attempted_at": ["<", cutoff],
 		"result": ["not in", ledger.UNSETTLED],
 	}
-	eligible = frappe.db.count("AI Usage Log", filters)
+	rows = _purge_batch(filters, for_update=not dry_run)
+	batch = [(row.name, row.modified) for row in rows]
+	targets = [name for name, _ in batch]
+	eligible = frappe.db.count(USAGE_LOG, filters)
 	deleted = 0
-	if not dry_run:
-		names = frappe.get_all(
-			"AI Usage Log",
-			filters=filters,
-			order_by="attempted_at asc, name asc",
-			limit=DELETE_BATCH_SIZE,
-			pluck="name",
+	if dry_run:
+		preview_token = token_hex(32)
+		frappe.cache.set_value(
+			_purge_preview_key(preview_token),
+			{"user": frappe.session.user, "days": days, "cutoff": cutoff, "batch": batch},
+			expires_in_sec=PREVIEW_TTL_SECONDS,
 		)
-		if names:
-			frappe.db.delete("AI Usage Log", {**filters, "name": ["in", names]})
-			deleted = len(names)
+	else:
+		if preview["days"] != days or preview["batch"] != batch:
+			raise policy.Denied(409, "preview_invalid")
+		# Claim at most once, including empty batches with no database rows to lock.
+		if frappe.cache.getdel(frappe.cache.make_key(key)) is None:
+			raise policy.Denied(409, "preview_invalid")
+		for name in targets:
+			# The gateway operation checks manager permissions before taking the row locks.
+			# Regular document deletion stays closed; this controlled path keeps a recovery copy.
+			frappe.delete_doc(  # nosemgrep: frappe-ignore-permissions
+				USAGE_LOG, name, ignore_permissions=True, ignore_missing=False
+			)
+		deleted = len(targets)
 		# The management operation writes a fixed audit record in the same transaction.
 		frappe.get_doc(
 			{
 				"doctype": "Activity Log",
 				"name": uuid4().hex,
-				"reference_doctype": "AI Usage Log",
+				"reference_doctype": USAGE_LOG,
 				"subject": "Model gateway usage logs purged",
 				"content": f"Deleted usage records: {deleted}",
 				"status": "Success",
 				"user": frappe.session.user,
-				"communication_date": now_datetime(),
+				"communication_date": now,
 			}
 		).db_insert()
-	return {"eligible": eligible, "deleted": deleted, "dry_run": dry_run}
+		preview_token = None
+	return {
+		"eligible": eligible,
+		"deleted": deleted,
+		"dry_run": dry_run,
+		"targets": targets,
+		"preview_token": preview_token,
+	}
 
 
 def clear_api_credential(api):

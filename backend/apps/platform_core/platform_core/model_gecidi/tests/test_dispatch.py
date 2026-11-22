@@ -11,8 +11,13 @@ from platform_core.model_gecidi import adapters, gateway, ledger, routing
 
 class DispatchTests(unittest.TestCase):
 	def test_output_speed_controls_provider_read_time(self):
-		self.assertEqual(gateway.read_timeout(4096, 50), 90)
-		self.assertEqual(gateway.read_timeout(16384, 200), 90)
+		self.assertEqual(gateway.read_timeout(2350, 50), 55)
+		self.assertEqual(gateway.read_timeout(9400, 200), 55)
+
+	def test_provider_read_and_connection_must_fit_sixty_seconds(self):
+		with self.assertRaises(gateway.Denied) as failure:
+			gateway.read_timeout(2351, 50)
+		self.assertEqual(failure.exception.code, "output_limit_exceeds_deadline")
 
 	def test_output_that_cannot_fit_in_route_is_rejected(self):
 		with self.assertRaises(gateway.Denied) as failure:

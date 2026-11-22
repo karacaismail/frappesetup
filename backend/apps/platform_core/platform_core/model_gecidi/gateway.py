@@ -16,7 +16,7 @@ from platform_core.model_gecidi import adapters, ledger, policy, routing
 from platform_core.model_gecidi.policy import Denied
 
 COOLDOWN = 60
-MAX_ROUTE_SECONDS = 105
+MAX_ROUTE_SECONDS = 60
 LOCK_SECONDS = 10
 STALE_ATTEMPT_SECONDS = 135
 RESPONSE_OVERHEAD_SECONDS = 8
@@ -78,7 +78,7 @@ def _document(doctype, name):
 	try:
 		return frappe.get_doc(doctype, name)
 	except frappe.DoesNotExistError:
-		raise Denied(403, "permission_denied") from None
+		raise frappe.PermissionError from None
 
 
 def _target(api_id, model_id):
@@ -119,7 +119,7 @@ def _selection_row(rows, name):
 		raise Denied(400, "invalid_request")
 	row = rows.get(_record_key(name))
 	if row is None:
-		raise Denied(403, "permission_denied")
+		raise frappe.PermissionError
 	return row
 
 
@@ -372,6 +372,10 @@ def _dispatch(route, targets, request, deadline):
 			continue
 		try:
 			current = _target(target.api.name, target.model.name)
+		except (Denied, frappe.PermissionError) as failure:
+			last_denial = failure
+			continue
+		try:
 			choices = _choose([current], route, request)
 			if not choices:
 				continue
@@ -405,9 +409,9 @@ def _require_clean_transaction():
 
 
 def complete(route, messages, tools=None, schema=None, limit=1024):
+	deadline = monotonic() + MAX_ROUTE_SECONDS
 	policy.require_user()
 	_require_clean_transaction()
-	deadline = monotonic() + MAX_ROUTE_SECONDS
 	request = policy.parse(messages, tools, schema, limit)
 	route = _document("AI Route", route)
 	policy.require_route(route)
@@ -421,9 +425,9 @@ def complete(route, messages, tools=None, schema=None, limit=1024):
 
 
 def test_api(api, model):
+	deadline = monotonic() + MAX_ROUTE_SECONDS
 	policy.require_user(managers_only=True)
 	_require_clean_transaction()
-	deadline = monotonic() + MAX_ROUTE_SECONDS
 	target = _target(api, model)
 	request = policy.Request([{"role": "user", "content": "Reply with OK."}], [], None, 8)
 	try:

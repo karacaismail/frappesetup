@@ -42,6 +42,17 @@ class GatewayContractTests(unittest.TestCase):
                 payloads = [entry["value"] for entry in media.get("examples", {}).values()]
                 self.assertIn({"exc_type": expected}, payloads)
 
+    def test_permission_denial_uses_the_native_frappe_envelope(self):
+        path = "/api/method/platform_core.api.model.complete"
+        with self.assertRaises(ValidationError):
+            self.contract.validate_response(path, "post", 403, {"message": {"error": "permission_denied"}})
+
+    def test_retention_preview_declares_the_exact_batch_and_token(self):
+        path = "/api/method/platform_core.api.model.purge_usage"
+        media, _ = self.contract.response(path, "post", 200)
+        self.assertIn("preview_token", media["schema"]["properties"]["message"]["required"])
+        self.assertIn("targets", media["schema"]["properties"]["message"]["required"])
+
     def test_reconciliation_accepts_exact_decimal_text_and_currency(self):
         for amount, currency in [("0", "USD"), ("999999999999.123456789", "EUR")]:
             self.contract.validate_completion_cost({"log": "sample", "cost": amount, "currency": currency})

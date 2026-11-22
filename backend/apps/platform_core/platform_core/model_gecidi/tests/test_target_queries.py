@@ -53,10 +53,12 @@ class TargetQueryTests(unittest.TestCase):
 			patch.object(gateway.policy, "require_user"),
 			patch.object(gateway.policy, "require_route") as authorization,
 			patch.object(gateway, "_require_clean_transaction"),
+			patch.object(gateway, "monotonic", return_value=10),
 			patch.object(gateway, "_dispatch", return_value={"ok": True}) as dispatch,
 		):
 			result = gateway.complete("route", [{"role": "user", "content": "fixture"}])
 		authorization.assert_called_once_with(route)
+		self.assertEqual(dispatch.call_args.args[3], 70)
 		self.assertEqual(result, {"ok": True})
 		return docs, batches, dispatch
 
@@ -81,9 +83,8 @@ class TargetQueryTests(unittest.TestCase):
 	def test_preserves_first_missing_target_error(self):
 		del self.rows["AI API"]["api-0"]
 		self.rows["AI Model"]["model-1"].provider = "elsewhere"
-		with self.assertRaises(gateway.Denied) as failure:
+		with self.assertRaises(gateway.frappe.PermissionError):
 			self._complete(self.names)
-		self.assertEqual((failure.exception.status, failure.exception.code), (403, "permission_denied"))
 
 	def test_rejects_disallowed_model_before_missing_later_target(self):
 		self.rows["AI API"]["api-0"].allowed_models = '["another-model"]'
@@ -105,10 +106,8 @@ class TargetQueryTests(unittest.TestCase):
 			patch.object(gateway.frappe, "get_doc", return_value=route),
 			patch.object(gateway.frappe, "get_all") as batches,
 			patch.object(gateway.policy, "require_user"),
-			patch.object(
-				gateway.policy, "require_route", side_effect=gateway.Denied(403, "permission_denied")
-			),
-			self.assertRaises(gateway.Denied),
+			patch.object(gateway.policy, "require_route", side_effect=gateway.frappe.PermissionError),
+			self.assertRaises(gateway.frappe.PermissionError),
 		):
 			gateway.complete("route", [{"role": "user", "content": "fixture"}])
 		batches.assert_not_called()

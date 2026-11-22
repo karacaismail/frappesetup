@@ -9,7 +9,7 @@ paths:
       description: >
         Selects an eligible API for the active tenant and route. Checks permissions, quota,
         and the route data policy before dispatch. External dispatch masks content when the route permits it. Attempts may incur provider charges.
-        Tool calls are returned as data for the caller to authorize and execute.
+        Tool calls are returned as data for the caller to authorize and execute. Selection and provider attempts share a 60-second deadline.
       operationId: complete
       security:
         - session: []
@@ -40,7 +40,7 @@ paths:
       summary: Test one configured API
       description: >
         Requires an authenticated AI Manager or System Manager. Sends one short model
-        request and may incur a charge. Records the attempt and returns no credentials.
+        request and may incur a charge. Records the attempt and returns no credentials. The gateway deadline is 60 seconds.
       operationId: test_api
       security:
         - session: []
@@ -139,7 +139,7 @@ paths:
   /api/method/platform_core.api.model.purge_usage:
     post:
       summary: Preview or purge old usage records
-      description: This destructive manager operation defaults to preview. Execution deletes up to 500 closed records past the retention window.
+      description: Preview returns the exact batch of up to 500 closed records. The same manager must confirm it within five minutes. Deleted records can be restored through Frappe Deleted Document.
       operationId: purge_usage
       security:
         - session: []
@@ -152,9 +152,19 @@ paths:
               additionalProperties: false
               properties:
                 dry_run: {type: boolean, default: true}
+                preview_token: {type: string, pattern: '^[0-9a-f]{64}$'}
+              if:
+                required: [dry_run]
+                properties:
+                  dry_run: {const: false}
+              then:
+                required: [preview_token]
+              else:
+                not:
+                  required: [preview_token]
       responses:
         '200':
-          description: Eligible and deleted counts
+          description: Eligible and deleted counts, exact batch and preview token
           content:
             application/json:
               schema:
@@ -163,13 +173,24 @@ paths:
                 properties:
                   message:
                     type: object
-                    required: [eligible, deleted, dry_run]
+                    required: [eligible, deleted, dry_run, targets, preview_token]
                     properties:
                       eligible: {type: integer, minimum: 0}
                       deleted: {type: integer, minimum: 0, maximum: 500}
                       dry_run: {type: boolean}
+                      targets:
+                        type: array
+                        maxItems: 500
+                        uniqueItems: true
+                        items: {type: string}
+                      preview_token: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
               example:
-                message: {eligible: 3, deleted: 0, dry_run: true}
+                message:
+                  eligible: 1
+                  deleted: 0
+                  dry_run: true
+                  targets: [672234b3-483c-4364-a40a-82a484a88173]
+                  preview_token: '0000000000000000000000000000000000000000000000000000000000000000'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -265,14 +286,14 @@ components:
             expiredSession:
               value: {exc_type: SessionExpired}
     PermissionError:
-      description: Permission denied by the gateway or Frappe
+      description: Frappe permission denial or a gateway data-policy restriction
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
           examples:
-            gateway:
-              value: {message: {error: permission_denied}}
+            dataPolicy:
+              value: {message: {error: data_policy_denied}}
             framework:
               value: {exc_type: PermissionError}
     Conflict:
@@ -347,9 +368,9 @@ components:
                 error:
                   type: string
                   enum: [invalid_request, invalid_route, invalid_target, invalid_cost, invalid_currency, currency_mismatch,
-                    invalid_note, output_limit_exceeds_deadline, authentication_required, permission_denied, data_policy_denied,
+                    invalid_note, output_limit_exceeds_deadline, authentication_required, data_policy_denied,
                     transaction_active, attempt_in_progress, attempt_already_settled, quota_exceeded, gateway_busy,
-                    endpoint_unavailable, gateway_unavailable, provider_unavailable, invalid_retention]
+                    endpoint_unavailable, gateway_unavailable, provider_unavailable, invalid_retention, preview_required, preview_invalid]
         - type: object
           required: [exc_type]
           properties:
