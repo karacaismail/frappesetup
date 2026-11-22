@@ -10,8 +10,8 @@ Two steps, both safe to repeat:
    identity link, so the raw `sub` is gone. No session is left, so no Frappe call commits early.
 
 The deletion record keeps only the HMAC-SHA256 digest of `(iss, sub)` (`identity_hash`). Provisioning,
-enabling and e-mail changes check it first and take the same row locks in the same order:
-identity link first, deletion record second.
+enabling and e-mail changes check it before altering data. All paths use the same lock order:
+existing User first, then the identity link and the deletion record.
 
 Frappe's “Personal Data Deletion Request” is not used. Its engine replaces the full name in every row of
 some tables (personal_data_deletion_request.py:317), which could change another person's text.
@@ -48,7 +48,9 @@ def identity_hash(issuer: str, subject: str) -> str:
 	key = frappe.conf.get(KEY_SETTING)
 	if not key:
 		frappe.throw(
-			_("The deletion key is not configured: {0}", context="platform_core.identity").format(KEY_SETTING),
+			_("The deletion key is not configured: {0}", context="platform_core.identity").format(
+				KEY_SETTING
+			),
 			DeletionKeyMissing,
 		)
 	message = f"{issuer}\n{subject}".encode()
@@ -85,7 +87,7 @@ def lock_identity(
 
 def refuse_if_deleted(issuer: str, subject: str, *, candidate_user: str | None = None) -> frappe._dict | None:
 	"""For provisioning, enabling and e-mail changes. Returns the locked link, or raises 410."""
-	link, record = lock_identity(issuer, subject, candidate_user=candidate_user)
+	link, record = _lock_identity_with_retry(issuer, subject, candidate_user=candidate_user)
 	if record:
 		frappe.throw(
 			_("This identity was deleted and cannot be used again.", context="platform_core.identity"),
@@ -104,33 +106,29 @@ def is_deleted(issuer: str, subject: str) -> bool:
 def anonymize_user(data: dict) -> dict:
 	issuer = provisioning._issuer(data)
 	subject = provisioning._text(data, "subject", provisioning.MAX_SUBJECT)
-	record = _with_retry(disable_step, issuer, subject)
+	record = disable_step(issuer, subject)
 	if record.state == ANONYMIZED:
 		return _result(record.user)
 	close_sessions(record.user)
-	return _with_retry(anonymize_step, issuer, subject)
+	return anonymize_step(issuer, subject)
 
 
-def _with_retry(step, issuer: str, subject: str, attempts: int = 3):
-	"""Runs a step in a fresh transaction. Retries when a parallel call changed the locked rows.
-
-	MariaDB refuses a locking read of a row that changed after the transaction's snapshot
-	(error 1020, `QueryDeadlockError` in Frappe). Starting a new transaction just before the lock and
-	retrying makes the second of two parallel calls see the first call's committed result.
-	"""
-	for attempt in range(attempts):
-		frappe.db.commit()
+def _lock_identity_with_retry(
+	issuer: str, subject: str, *, candidate_user: str | None = None
+) -> tuple[frappe._dict | None, frappe._dict | None]:
+	"""Retry a changed snapshot before any write or irreversible side effect."""
+	for attempt in range(3):
 		try:
-			return step(issuer, subject)
+			return lock_identity(issuer, subject, candidate_user=candidate_user)
 		except frappe.QueryDeadlockError:
 			frappe.db.rollback()
-			if attempt == attempts - 1:
+			if attempt == 2:
 				raise
 
 
 def disable_step(issuer: str, subject: str) -> frappe._dict:
 	"""Step 1. Records the deletion and closes the account. Commits before any session is closed."""
-	link, record = lock_identity(issuer, subject)
+	link, record = _lock_identity_with_retry(issuer, subject)
 	if record:
 		frappe.db.commit()
 		return record
@@ -179,7 +177,7 @@ def close_sessions(user: str) -> None:
 
 def anonymize_step(issuer: str, subject: str) -> dict:
 	"""Step 2. Removes personal data, renames the user and deletes the identity link (raw `sub`)."""
-	link, record = lock_identity(issuer, subject)
+	link, record = _lock_identity_with_retry(issuer, subject)
 	if not record:
 		frappe.throw(
 			_("No user is linked to this identity.", context="platform_core.identity"), IdentityNotFound
