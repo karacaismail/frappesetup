@@ -223,7 +223,7 @@ class NoRawResponseInMessagesTest(unittest.TestCase):
     def test_safe_detail_keeps_status_and_error_code_only(self):
         from yardimci import HttpYanit, safe_detail
 
-        token_body = b'{"access_token":"eyJhbGciOiJSUzI1NiJ9.secret","error":"invalid_grant"}'
+        token_body = b'{"access_token":"eyJhbGciOiJSUzI1NiJ9.secret","error":"invalid_grant"}'  # gitleaks:allow (synthetic token)
         detail = safe_detail(HttpYanit(400, token_body, {}))
         self.assertEqual(detail, "HTTP 400 invalid_grant")
         self.assertEqual(safe_detail(HttpYanit(200, b'{"access_token":"eyJ.x.y"}', {})), "HTTP 200")
