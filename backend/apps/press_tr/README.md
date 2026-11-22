@@ -59,6 +59,14 @@ The request hook adds only documented RPC paths to Press's in-memory
 preserves native machine checks. The test suite requires Press tag `v0.154.1` so
 an upgrade reopens review of the allowlist and webhook credentials.
 
+`press_tr.ansible_bridge` lets Press's unchanged Ansible runner work on ansible-core 2.19
+and later: it initialises the plugin loader and forwards playbook events to Press's own
+callback through the `press_tr_bridge` stdout callback plugin. The `before_job` and
+`before_request` hooks activate it. For `bench` commands that run plays directly, export
+`ANSIBLE_STDOUT_CALLBACK=press_tr_bridge` and point `ANSIBLE_CALLBACK_PLUGINS` at
+`press_tr/ansible_bridge/callback_plugins`. Plays with `async` tasks still fail inside Press;
+see `backend/docs/decisions/0018-press-ansible-python314.md`.
+
 A System Manager can run `press_tr.api.maintenance.cleanup_expired_sessions` with
 an authenticated POST to remove expired Press session mappings.
 

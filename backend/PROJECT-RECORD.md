@@ -30,12 +30,14 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 | `platform_core` | `access` | Erişim kuralı motoru: kayıt kuralı, hiyerarşi ve alan düzeyi (K8) |
 | `platform_core` | `model_gateway` | Sağlayıcı, hesap, API ve model kaydı. Yönlendirme, model çağrısı ve kullanım kaydı. |
 | `press_tr` | `press_identity` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
+| `press_tr` | `ansible_bridge` | Press ile Ansible arasında görev sonuçlarını iletir. |
 | `identity_sync` | Yok | Keycloak ile Press ve kiracı siteleri arasında kullanıcı eşitleme |
 | `oidc_verify` | Yok | Belirteç doğrulama. Frappe'ye bağlı değildir. |
 
 ## Bağımlılık yönü
 
 - `platform_core.identity` ve `press_tr.press_identity` yalnız `oidc_verify` kitaplığını kullanır.
+- `press_tr.ansible_bridge` depo içindeki öteki modülleri çağırmaz. Bu modül başka modülün DocType kayıtlarına yazmaz.
 - `platform_core.shell` ile `platform_core.identity` birbirini çağırmaz.
 - `platform_core.mobile` yalnız `identity` modülünün açık doğrulama işlevini çağırabilir. Öteki modüller `mobile` modülünü çağırmaz.
 - `platform_core.access` öteki modülleri çağırmaz. Motor Frappe'nin izin kancalarıyla çalışır.
@@ -154,7 +156,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 
 - **O-16. `hrms_tr` lisansı GPL-3.0 olur.** `hrms_tr`, GPL-3.0 lisanslı `hrms` uygulamasını aynı süreçte kullanır. En güvenli seçim budur. Hukuk görüşü alınmadı.
 - **O-17. Yapay zekâ katmanı her sitede çalışacak.** Press ve operasyon sitesi de aynı katmanı kullanmalı. Katmanın ayrı bir uygulamaya bölünmesi sonraki turda karara bağlanır.
-- **O-18. Press'in geliştirme yaması geçici bir istisnadır.** `dev/press/patch-py314.sh` betiği Press'in kurulu kodunu değiştirir. Bu, M-4 kuralına aykırıdır. Press v0.154.1 başka yolla Python 3.14 üzerinde açılmıyor. Yama yalnız geliştirme imajında çalışır. Üretim imajına girmez. Kapanma koşulu borç tablosundadır.
+- **O-18. Press'in geliştirme yaması geçici bir istisnadır.** `dev/press/patch-py314.sh` betiği Press'in kurulu kodunu değiştirir. Bu, M-4 kuralına aykırıdır. Yama yalnız geliştirme imajında çalışır. Üretim imajına girmez. 22 Kasım 2026 Pazar günü temiz Press v0.154.1 kaynağı denendi. Python 3.14.10 ve Frappe 16.56.0 kullanıldı. Ansible, Telegram ve Stripe paket adayları içe aktarıldı. Press kaynak farkı boştu. Eski `TypedDict` tanımı ve kaldırılan `init_telemetry` işlevi modül açılışını engelledi. İnceleme, `press/api/cookies.py:7` satırında üçüncü kaynak engelini doğruladı. Frappe 16, `get_cookie_dict_from_headers` işlevini sunmuyor. `pyproject.toml` bağımlılık şartları da aday paketlerle karşılanmadı. `--no-deps` tanı kurulumu tam çözüm veya bağımlılık kilidi değildir. İnceleme sonrası başlangıç kaynağında 13 test çalıştı. Yedi test geçti ve altı test başarısız oldu. Kaynak bütünlüğü ve yama izi denetimleri geçti. `uv pip check`, 177 pakette 32 uyumsuzluk buldu. Site ve masa denemeleri çalıştırılmadı. Yama kaldırılmadı ve borç açık kaldı. [Press değişiklik önerisi](docs/press-python314-upstream.md) hazırlandı. Öneri henüz gönderilmedi. Ardından 162 yeni etikette iki kaynak dosyası tarandı. İki dalın aynı dosyalara ait geçmişi de tarandı. `TypedDict` ve telemetri engelleri hepsinde korundu. Bu tarama çerez dosyasını veya bağımlılık çözümünü kapsamadı. Son develop commit koduyla ilk dar kapsamlı kabul testleri de başarısız oldu. [Sürüm taramasının kanıtı](docs/press-python314-version-audit.md) kaydedildi. Bu araştırma kolu kapatıldı. Kapanma koşulu borç tablosundadır.
 - **O-19. Dallar sırayla birleşir.** Sıra şudur: kimlik-realm, platform-core-kimlik, identity-sync, press-tr, platform-core-kabuk, platform-core-yz, platform-core-gecit, erisim-kurali, platform-core-mobil, ilk-dikey-dilim, kimlik-tema, integration-e2e.
   - Her birleştirmeden önce bağımsız inceleme `pass` olur.
   - `hooks.py` dosyasını orkestratör birleştirir. Liste değerleri birleşir, hiçbiri silinmez. Örneğin iki dalın `override_whitelisted_methods` satırları yan yana kalır.
@@ -315,7 +317,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Çalışan fotoğrafı dosyası kalıyor (O-41) | Fotoğraf alanı boşalır. Karta yüklenen fotoğraf dosyası şimdilik kalır. | platform-core-kimlik | Hesap silme, çalışan fotoğrafı dosyasını temizler. |
 | `BORC(mvp)`: Çalışan kartı geçmişi kalıyor (O-41) | Çalışan kartının değişiklik geçmişi eski değerleri şimdilik tutar. | platform-core-kimlik | Hesap silme, kart geçmişindeki kişisel değerleri temizler. |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
-| `BORC(mvp)`: Press geliştirme imajı `patch-py314.sh` ile Press kodunu değiştiriyor (O-18) | M-4 kuralına aykırı. Press yükseltmesinde yama bozulabilir | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da yama Press'e gönderilip kabul edilir |
+| `BORC(mvp)`: Press geliştirme yaması açık kaldı (O-18) | M-4 ihlali sürüyor. Temiz v0.154.1 kaynağında `TypedDict`, telemetri ve çerez import'u başarısız. Tam bağımlılık çözümü ve kilidi de eksik. [Öneri ve test kanıtı](docs/press-python314-upstream.md) hazırlandı. [162 yeni etiketin iki dosyalık taraması](docs/press-python314-version-audit.md) ilk iki engeli kaldıramadı. | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da düzeltmeler Press'e kabul edilir. Üç kaynak engeli giderilir. Tam bağımlılık denetimi, kaynak bütünlüğü, site ve masa testleri geçer. |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |
 | Bandit istisnaları 22 Şubat 2027 Pazartesi günü sona erer | Süresi dolan istisna taramayı durdurur | dev-ortam ve security-tooling | Sahipler her istisnayı yeniden inceler |
 | `BORC(mvp)`: Telefon paketi yok (O-26) | Mağaza koşulları sınanmadı | Proje sahibi ve sonraki tur | Paket işi açılır ve `mobile.md` MVP koşulları geçer |
