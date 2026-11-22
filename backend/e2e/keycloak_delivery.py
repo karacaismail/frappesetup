@@ -6,6 +6,7 @@ The successful event is emitted by Keycloak, never posted by this test.
 
 import hashlib
 import hmac
+import http.client
 import json
 import os
 from pathlib import Path
@@ -13,27 +14,40 @@ import runpy
 import sqlite3
 import sys
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 import uuid
 
 
-def request(url, *, method="GET", data=None, token=None, headers=None):
+def request(origin, path, *, method="GET", data=None, token=None, headers=None):
+    target = urllib.parse.urlsplit(origin)
+    if (
+        target.scheme not in ("http", "https")
+        or not target.hostname
+        or target.username is not None
+        or target.query
+        or target.fragment
+    ):
+        raise ValueError("Expected an HTTP or HTTPS service address.")
+    if not path.startswith("/") or path.startswith("//") or "#" in path:
+        raise ValueError("Expected a service-relative request path.")
+
     headers = dict(headers or {})
     if token:
         headers["Authorization"] = "Bearer " + token
     if isinstance(data, dict):
         data = json.dumps(data).encode()
         headers["Content-Type"] = "application/json"
-    call = urllib.request.Request(url, data=data, method=method, headers=headers)
+
+    connection_type = http.client.HTTPSConnection if target.scheme == "https" else http.client.HTTPConnection
+    connection = connection_type(target.hostname, target.port, timeout=15)
     try:
-        response = urllib.request.urlopen(call, timeout=15)
-    except urllib.error.HTTPError as error:
-        response = error
-    with response:
-        raw = response.read()
-        return response.status, response.headers, json.loads(raw) if raw else None
+        connection.request(method, target.path.rstrip("/") + path, body=data, headers=headers)
+        with connection.getresponse() as response:
+            raw = response.read()
+            body = json.loads(raw) if raw and not 300 <= response.status < 400 else None
+            return response.status, response.headers, body
+    finally:
+        connection.close()
 
 
 def inside():
@@ -43,7 +57,7 @@ def inside():
     settings = load_settings(os.environ)
     origin = settings.keycloak_base_url
     status, _, auth = request(
-        origin + "/realms/master/protocol/openid-connect/token",
+        origin, "/realms/master/protocol/openid-connect/token",
         method="POST",
         data=urllib.parse.urlencode(
             {
@@ -57,10 +71,10 @@ def inside():
     )
     assert status == 200, f"Admin authentication returned {status}"
     token = auth["access_token"]
-    root = origin + "/admin/realms/platform"
+    root = "/admin/realms/platform"
     email = "delivery-" + uuid.uuid4().hex + "@example.test"
     status, headers, _ = request(
-        root + "/users",
+        origin, root + "/users",
         method="POST",
         token=token,
         data={
@@ -74,14 +88,15 @@ def inside():
     )
     assert status == 201, f"User creation returned {status}"
     subject = headers["Location"].rsplit("/", 1)[1]
-    status, _, _ = request(root + "/users/" + subject, method="PUT", token=token, data={"lastName": "After"})
+    user_path = root + "/users/" + urllib.parse.quote(subject, safe="")
+    status, _, _ = request(origin, user_path, method="PUT", token=token, data={"lastName": "After"})
     assert status == 204, f"User update returned {status}"
     query = urllib.parse.urlencode({"resourcePath": "users/" + subject, "operationTypes": "UPDATE"})
     deadline = time.monotonic() + 60
     event_id = None
     with sqlite3.connect("file:" + os.environ["IDENTITY_SYNC_DB"] + "?mode=ro", uri=True) as database:
         while time.monotonic() < deadline:
-            status, _, events = request(root + "/admin-events?" + query, token=token)
+            status, _, events = request(origin, root + "/admin-events?" + query, token=token)
             assert status == 200, f"Admin event lookup returned {status}"
             for payload in events:
                 if (
@@ -125,7 +140,7 @@ def inside():
                 secret.encode(), str(timestamp).encode() + b".execute." + body, hashlib.sha256
             ).hexdigest()
             status, _, reply = request(
-                "http://127.0.0.1:6115/v1/events",
+                "http://127.0.0.1:6115", "/v1/events",
                 method="POST",
                 data=body,
                 headers={
