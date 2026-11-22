@@ -31,7 +31,7 @@ class TestShellResponses(unittest.TestCase):
 		cls.target = urlsplit(os.environ["PANEL_TEST_URL"])
 		if cls.target.scheme != "http" or cls.target.hostname != "127.0.0.1":
 			raise ValueError("Use the dedicated test site on HTTP loopback.")
-		status, headers, _ = cls.request(
+		status, headers, _unused_body = cls.request(
 			"/api/method/login",
 			method="POST",
 			form={"usr": os.environ["PANEL_TEST_USERNAME"], "pwd": os.environ["PANEL_TEST_PASSWORD"]},
@@ -114,7 +114,7 @@ class TestShellResponses(unittest.TestCase):
 
 	def test_rate_limit_response_matches_the_contract(self):
 		# The synthetic account starts with its own bucket on the isolated site.
-		for _ in range(121):
+		for _unused_attempt in range(121):
 			result = self.request(BOOTSTRAP, sid=self.sid)
 			if result[0] == 429:
 				self.validate(BOOTSTRAP, 429, result)

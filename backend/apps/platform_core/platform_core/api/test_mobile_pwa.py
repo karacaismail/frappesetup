@@ -169,8 +169,8 @@ class MobilePwaTest(IntegrationTestCase):
 		self.assertIn(response.status_code, (401, 403))
 
 	def foreign_data_denied(self, operation):
-		owner, _, owner_headers = self.login()
-		other, _, other_headers = self.login()
+		owner, _unused, owner_headers = self.login()
+		other, _unused, other_headers = self.login()
 		body = {"installation_id": str(uuid4())}
 		self.assertEqual(self.post(owner, "v1_register", body, owner_headers).status_code, 200)
 		if operation == "v1_push":
@@ -185,8 +185,8 @@ class MobilePwaTest(IntegrationTestCase):
 		self.guest_denied("v1_list_installations")
 
 	def test_v1_list_installations_foreign_data_denied(self):
-		owner, _, owner_headers = self.login()
-		other, _, other_headers = self.login()
+		owner, _unused, owner_headers = self.login()
+		other, _unused, other_headers = self.login()
 		body = {"installation_id": str(uuid4())}
 		self.assertEqual(self.post(owner, "v1_register", body, owner_headers).status_code, 200)
 		response = self.post(other, "v1_list_installations", {}, other_headers)
@@ -197,8 +197,8 @@ class MobilePwaTest(IntegrationTestCase):
 		self.guest_denied("v1_revoke_installation")
 
 	def test_v1_revoke_installation_foreign_data_denied(self):
-		owner, _, headers = self.login()
-		other, _, other_headers = self.login()
+		owner, _unused, headers = self.login()
+		other, _unused, other_headers = self.login()
 		body = {"installation_id": str(uuid4())}
 		self.assertEqual(self.post(owner, "v1_register", body, headers).status_code, 200)
 		result = self.post(other, "v1_revoke_installation", body, other_headers)
