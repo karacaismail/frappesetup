@@ -40,6 +40,7 @@ from .test_server import sign
 
 READ_LIMIT_MS, WRITE_LIMIT_MS = 500, 1000
 DEFAULT_SAMPLES, DEFAULT_CONCURRENCY, DEFAULT_USERS = 50, 20, 200
+OPERATOR = "identity-sync-operator"
 SITE, AGENT, PRESS = "site-tenant1-service", "ai-agent", "press-service"
 
 
@@ -79,6 +80,7 @@ class _Bench:
         self.stack.app.settings = dataclasses.replace(
             settings,
             preview_azp=frozenset({AGENT}),
+            operator_azp=frozenset({OPERATOR}),
             execute_azp=sites,
             session_azp=sites,
             deletion_azp=frozenset({PRESS}),
@@ -205,16 +207,16 @@ class _Bench:
         return self.call("POST", "/v1/account-deletions", body, PRESS)
 
     def preview_reconcile(self) -> Callable[[], int]:
-        return self.call("POST", "/v1/reconcile", {"dry_run": True}, AGENT)
+        return self.call("POST", "/v1/reconcile", {"dry_run": True}, OPERATOR)
 
     def execute_reconcile(self) -> Callable[[], int]:
         # One drift per call: a member of Keycloak who has no record on the tenant yet.
         subject = self.fresh("drift")
         self.keycloak.add_user(keycloak_user(subject=subject, email=f"{subject}@example.test"), [self.org])
         self.serve_users()
-        _status, preview = self.request("POST", "/v1/reconcile", {"dry_run": True}, AGENT)
+        _status, preview = self.request("POST", "/v1/reconcile", {"dry_run": True}, OPERATOR)
         body = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": self.fresh("onay")}
-        return self.call("POST", "/v1/reconcile", body, SITE)
+        return self.call("POST", "/v1/reconcile", body, OPERATOR)
 
     def queue_event(self) -> None:
         subject = self.subjects[self.counter % len(self.subjects)]
@@ -222,16 +224,16 @@ class _Bench:
         self.stack.app.store.add_dead_letter(failed, "tenant.provision tenant1: HTTP 503")
 
     def list_dead_letters(self) -> Callable[[], int]:
-        return self.call("GET", "/v1/dead-letters", None, AGENT)
+        return self.call("GET", "/v1/dead-letters", None, OPERATOR)
 
     def preview_replay(self) -> Callable[[], int]:
-        return self.call("POST", "/v1/dead-letters/replay", {"dry_run": True}, AGENT)
+        return self.call("POST", "/v1/dead-letters/replay", {"dry_run": True}, OPERATOR)
 
     def execute_replay(self) -> Callable[[], int]:
         self.queue_event()
-        _status, preview = self.request("POST", "/v1/dead-letters/replay", {"dry_run": True}, AGENT)
+        _status, preview = self.request("POST", "/v1/dead-letters/replay", {"dry_run": True}, OPERATOR)
         body = {"dry_run": False, "preview_digest": preview["preview_digest"], "approval_id": self.fresh("onay")}
-        return self.call("POST", "/v1/dead-letters/replay", body, SITE)
+        return self.call("POST", "/v1/dead-letters/replay", body, OPERATOR)
 
     def open_operation(self) -> str:
         operation_id = self.fresh("op")
@@ -239,7 +241,7 @@ class _Bench:
         return operation_id
 
     def list_operations(self) -> Callable[[], int]:
-        return self.call("GET", "/v1/operations", None, AGENT)
+        return self.call("GET", "/v1/operations", None, OPERATOR)
 
     def resolve_operation(self) -> Callable[[], int]:
         return self.call("POST", f"/v1/operations/{self.open_operation()}/resolve", {"resolution": "abandoned"}, SITE)
