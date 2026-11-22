@@ -52,6 +52,8 @@ type UserOptions = {
   webauthn?: boolean;
   locale?: string;
   emailVerified?: boolean;
+  /** Grants the account client role that lets the user delete the own account. */
+  canDeleteAccount?: boolean;
 };
 
 /** Uydurma bir kullanıcı açar. E-posta alanı `ornek.test` ayrılmış deneme alanıdır. */
@@ -97,6 +99,7 @@ export async function createUser(options: UserOptions = {}): Promise<string> {
     },
   });
   if (res.status !== 201) throw new Error(`Kullanıcı açılamadı: ${res.status} ${await res.text()}`);
+  if (options.canDeleteAccount) await grantDeleteAccount(res.headers.get('location')!.split('/').pop()!);
   return email;
 }
 
@@ -291,3 +294,29 @@ export const screen = (name: string): Screen => {
   if (!found) throw new Error(`Ekran yok: ${name}`);
   return found;
 };
+
+/**
+ * Turns on the "delete_account" required action in the test realm.
+ * The account console shows its delete section only when this action is enabled
+ * and the user holds the "delete-account" role of the "account" client.
+ */
+export async function enableDeleteAccount(): Promise<void> {
+  const action = (await (await admin('/authentication/required-actions/delete_account')).json()) as { enabled: boolean };
+  if (action.enabled) return;
+  const res = await admin('/authentication/required-actions/delete_account', { method: 'PUT', body: { ...action, enabled: true } });
+  if (!res.ok) throw new Error(`Could not enable delete_account: ${res.status}`);
+}
+
+async function grantDeleteAccount(userId: string): Promise<void> {
+  await enableDeleteAccount();
+  const [client] = (await (await admin('/clients?clientId=account')).json()) as { id: string }[];
+  const role = await (await admin(`/clients/${client.id}/roles/delete-account`)).json();
+  const res = await admin(`/users/${userId}/role-mappings/clients/${client.id}`, { method: 'POST', body: [role] });
+  if (!res.ok) throw new Error(`Could not grant delete-account: ${res.status}`);
+}
+
+/** Returns true when a user with this email still exists in the test realm. */
+export async function userExists(email: string): Promise<boolean> {
+  const users = (await (await admin(`/users?exact=true&email=${encodeURIComponent(email)}`)).json()) as unknown[];
+  return users.length > 0;
+}

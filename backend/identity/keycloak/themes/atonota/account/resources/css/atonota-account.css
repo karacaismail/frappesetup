@@ -539,6 +539,20 @@ body[data-page-id="account"] {
   overflow: visible;
 }
 
+/* ---------- Expandable section (for example "Delete account") ---------- */
+
+[data-page-id="account"] .pf-v5-c-expandable-section__toggle {
+  min-block-size: var(--at-hit);
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-md);
+  font-weight: var(--at-weight-medium);
+  color: var(--at-color-link);
+}
+
+[data-page-id="account"] .pf-v5-c-expandable-section__toggle:hover {
+  color: var(--at-color-link-hover);
+}
+
 /* ---------- Menu toggle and menu ---------- */
 
 [data-page-id="account"] .pf-v5-c-menu-toggle {

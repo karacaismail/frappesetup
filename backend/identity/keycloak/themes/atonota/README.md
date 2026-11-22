@@ -92,8 +92,27 @@ Tema yalnız Keycloak'ın desteklediği ayarları kullanır. Bu ayarlar Keycloak
 - Outfit yazı tipi dosyaları `account/resources/fonts/` klasöründe de durur. Keycloak her tema türüne ayrı kaynak klasörü verir.
 - Geçerli sayfa kalın yazı ve yüzey tonuyla gösterilir. Temel temanın renkli kenar çizgisi kapatıldı.
 
+### Hesap silme
+
+Kullanıcı hesabını hesap konsolundan silebilir (proje kaydı O-27).
+
+1. Kullanıcı “Kişisel bilgiler” sayfasında “Hesabı silin” bölümünü açar.
+2. Kullanıcı “Silin” düğmesine basar.
+3. Keycloak onay ekranını açar. Bu ekran giriş temasına aittir.
+4. Kullanıcı “Silmeyi onaylayın” düğmesine basar. Keycloak hesabı siler.
+
+Bölümün görünmesi için realm'de iki ayar gerekir. Bu ayarlar kimlik-realm işindedir:
+
+- `delete_account` adlı gerekli işlem açık olmalıdır.
+- Müşteri, `account` istemcisinin `delete-account` rolünü taşımalıdır.
+
+Konsol bölümü rolü olmayan kullanıcıya da gösterir. Keycloak o kullanıcının isteğini reddeder ve “Bu hesabı silme izniniz yok.” der. Bu yüzden rolü her müşteriye verin.
+
+Uyarı metni O-27 kararını anlatır: hesap silinir, iş kayıtları kalır ve kayıtlardan ad silinir. Keycloak'ın hazır metni “bütün veriler silinir” der. Bu metin İngilizcede de değiştirildi (`account/messages/messages_en.properties`).
+
 Hesap konsolunun bilinen sınırları şunlardır:
 
+- Hesap silme uyarısının başlığı `h4` öğesidir ve `h1` başlığından hemen sonra gelir. Tema bu sırayı değiştiremez. axe testi bu bölümde `heading-order` kuralını muaf tutar.
 - Keycloak bazı “daha fazla” düğmelerine erişilebilir ad vermez. Tema uygulamanın HTML'ini değiştiremez. axe testi bu düğmeleri bilerek dışarıda bırakır.
 - Yükleme yazısı İngilizcedir. Bu metin Keycloak'ın şablonunda sabit durur.
 - Sayfa başlığı İngilizcedir. Başlık `title` ayarıyla değişir ama tek dilli kalır. Bu yüzden başlık değiştirilmedi.
@@ -150,6 +169,7 @@ npx playwright test
 | `tests/eposta.spec.ts` | E-posta şablonları ve Mailpit |
 | `tests/account.spec.ts` | Hesap konsolu: yerleşim, odak, hareket, axe, Türkçe iletiler ve token eşliği |
 | `tests/focus-diff.ts` | Odak çizgisini ölçen ortak yardımcı |
+| `tests/delete-account.spec.ts` | Hesap silme bölümü, onay ekranı ve silme akışı |
 | `tests/gorsel.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi |
 
 Yerleşim testleri yedi görünümde koşar: 320, 360, 375, 390, yatay telefon, tablet ve masaüstü. Öteki testler 320 ve masaüstü görünümünde koşar.
