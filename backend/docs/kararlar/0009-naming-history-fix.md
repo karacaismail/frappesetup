@@ -150,6 +150,8 @@ Kendi düzenlemeniz varsa bu komutu çalıştırmayın.
 
 ## Bütün çalışma ağaçlarında önizleme
 
+[Orkestratörün çalışma ve geri dönüş adımları](../../dev/naming/README.md#ikinci-kontrol-noktası) README dosyasındadır.
+
 Komutu depo kökünde çalıştırın. Sürücü her çalışma ağacının Git kaydını kopyalar.
 Sürücü geçici kopyalarda ad geçişini ve testleri çalıştırır.
 Sürücü sonuçları tek JSON raporuna yazar. Hata varsa 1 koduyla çıkar.

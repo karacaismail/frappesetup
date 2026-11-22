@@ -12,6 +12,25 @@ from pathlib import Path
 NAMING = Path(__file__).resolve().parents[1]
 
 
+class DriverReadmeTests(unittest.TestCase):
+    def test_orchestrator_readme_documents_driver_sequence_and_rollback(self):
+        readme = NAMING / "README.md"
+        self.assertTrue(readme.is_file(), "The CP2 operator README is missing.")
+        instructions = readme.read_text(encoding="utf-8")
+        dry_run = "python3.14 -B backend/dev/naming/run_cp2.py >"
+        apply = "python3.14 -B backend/dev/naming/run_cp2.py --apply >"
+        fetch = 'git fetch --no-tags "$cp2_copy" "$cp2_commit"'
+        pick = 'env -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL git cherry-pick "$cp2_commit"'
+        rollback = 'env -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL git revert "$cp2_target_commit"'
+        steps = [instructions.index(step) for step in (dry_run, apply, fetch, pick, rollback)]
+        self.assertEqual(steps, sorted(steps))
+        self.assertIn('test "$(git rev-parse HEAD)" = "$cp2_head"', instructions)
+        self.assertIn("git cherry-pick --abort", instructions)
+        self.assertIn("git revert --abort", instructions)
+        for key in ("head", "copy", "commit", "copies"):
+            self.assertIn(f"`{key}`", instructions)
+
+
 class DriverTests(unittest.TestCase):
     def setUp(self):
         scratch = NAMING.parents[2] / ".pane/scratch"
