@@ -56,6 +56,24 @@ Kapı aynı dilin CSV ve PO dosyalarını okur.
 Bir dilin çekirdek kataloğu yoksa `translation_core` sonucu `not_run` olur.
 Bu durumda da sütun ve tekrar denetimleri çalışır.
 
+## Bağımlılık sürümü denetimi
+
+Kapı her uygulamanın `pyproject.toml` dosyasını okur.
+Olağan ve isteğe bağlı Python bağımlılıklarını denetler.
+Farklı uygulamalar aynı paket için farklı sürüm veya paket adresi yazarsa kapı bulgu verir.
+Paket adının büyük harf ve ayırıcı farkı ayrı paket sayılmaz.
+
+Kapı uygulama kurallarını Frappe 16.56.0'ın kesin sürüm sabitleriyle karşılaştırır.
+Örneğin Frappe `Werkzeug==3.1.9` ister. Uygulama `Werkzeug~=3.1.9` yazabilir.
+`Werkzeug>=4` bu sürümü dışarıda bıraktığı için kapı bulgu verir.
+Kapı Frappe'nin sürüm aralıklarını veya dolaylı bağımlılıkları çözmez.
+
+Frappe kaynağı başka yerdeyse `--frappe-root <yol>` kullanın.
+İstenen sürümün kaynağı yoksa `dependency_core` sonucu `not_run` olur.
+Uygulamalar arası karşılaştırma bu durumda da çalışır.
+Kapı Python sürüm kurallarını okumak için `packaging` kullanır.
+Bu paket yoksa kapı, mevcut `pip` içindeki kopyayı kullanır.
+
 ## Kapsam
 
 - Kapı karar notlarının dosya adındaki dört haneli sayıyı denetler.

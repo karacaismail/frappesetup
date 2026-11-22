@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from contracts import METHOD_PATH, operations
+from dependencies import FRAPPE_VERSION, dependency_checks
 from forbidden_name import find_path_code, match_lines, redact_path, require_git_executable, tracked_findings
 from hook_validation import HOOK_RULES, invalid_hook_uses, node_names
 from source import (
@@ -685,6 +686,7 @@ def scan(root, commit_base=None, frappe_root=None):
     endpoints = {}
     sources = {}
     translation_paths = []
+    app_manifests = []
     registered = {}
     overrides = {}
     override_candidates = {}
@@ -709,6 +711,8 @@ def scan(root, commit_base=None, frappe_root=None):
     frappe_checkout = frappe_root or default_frappe_checkout
     frappe_package = frappe_checkout / "frappe" if (frappe_checkout / "frappe").is_dir() else frappe_checkout
     for path in source_files(root / "apps", emit, exclude={default_frappe_checkout}):
+        if path.name == "pyproject.toml" and path.parent.parent == root / "apps":
+            app_manifests.append(path)
         if (
             path.suffix == ".csv"
             and path.parent.name == "translations"
@@ -851,6 +855,14 @@ def scan(root, commit_base=None, frappe_root=None):
         findings.add(Finding(path, line, "forbidden-name", message))
     checks = naming_checks(root, findings)
     checks["translation_core"] = translation_checks(translation_paths, frappe_package, emit)
+    frappe_manifest = frappe_checkout / "pyproject.toml"
+    if (
+        not frappe_manifest.is_file()
+        and frappe_checkout == frappe_package
+        and (frappe_package / "__init__.py").is_file()
+    ):
+        frappe_manifest = frappe_package.parent / "pyproject.toml"
+    checks.update(dependency_checks(app_manifests, frappe_manifest, frappe_package, root, emit))
     return sorted(findings), checks
 
 
@@ -868,7 +880,9 @@ def main():
     parser.add_argument("--path-code", help="Locate a redacted path by its Git index slot.")
     parser.add_argument("--commit-base", help="Check commit messages after this revision through HEAD.")
     parser.add_argument(
-        "--frappe-root", type=Path, help="Read core translation catalogs from this Frappe checkout."
+        "--frappe-root",
+        type=Path,
+        help="Read core translation catalogs and dependency pins from this Frappe checkout.",
     )
     args = parser.parse_args()
     if args.list_interfaces and (args.json or args.path_code or args.commit_base or args.frappe_root):
@@ -921,6 +935,8 @@ def main():
             print("naming mode: advisory (enforcement.json missing)", file=sys.stderr)
         if checks["translation_core"] == "not_run":
             print("translation_core: not_run (Frappe core catalog unavailable)", file=sys.stderr)
+        if checks["dependency_core"] == "not_run":
+            print(f"dependency_core: not_run (Frappe {FRAPPE_VERSION} manifest unavailable)", file=sys.stderr)
         for finding in findings:
             prefix = "Warning: " if finding.severity == "warning" else ""
             print(f"{prefix}{finding.path}:{finding.line} [{finding.rule}] {finding.message}")
