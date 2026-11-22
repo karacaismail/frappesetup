@@ -47,12 +47,12 @@ class TestResponseBudgetHTTP(ShellHTTPFixture):
 			]
 
 		with temporary_values(route_options("")):
-			status, _, baseline = self.request(BOOTSTRAP, self.reader_sid)
+			status, _unused_headers, baseline = self.request(BOOTSTRAP, self.reader_sid)
 			self.assertEqual(status, 200)
 		label = "x" * (LIMIT - len(baseline))
 		for increment in (0, 1):
 			with self.subTest(increment=increment), temporary_values(route_options(label + "x" * increment)):
-				status, _, body = self.request(BOOTSTRAP, self.reader_sid)
+				status, _unused_headers, body = self.request(BOOTSTRAP, self.reader_sid)
 				self.assertEqual(status, 200)
 				self.assertLessEqual(len(body), LIMIT)
 				if increment == 0:
@@ -91,7 +91,9 @@ class TestResponseBudgetHTTP(ShellHTTPFixture):
 					self.assertLessEqual(len(body), LIMIT)
 					self.assertEqual(json.loads(body)[key], payload)
 					self.assertEqual(response_headers["ETag"], headers["ETag"])
-		status, _, body = self.request(BOOTSTRAP, self.reader_sid, headers={"If-None-Match": headers["ETag"]})
+		status, _unused_headers, body = self.request(
+			BOOTSTRAP, self.reader_sid, headers={"If-None-Match": headers["ETag"]}
+		)
 		self.assertEqual(status, 200)
 		self.assertIsNot(json.loads(body)["message"].get("truncated"), True)
 
@@ -114,7 +116,7 @@ class TestResponseBudgetHTTP(ShellHTTPFixture):
 				),
 			]
 		):
-			status, _, body = self.metadata(self.reader_sid)
+			status, _unused_headers, body = self.metadata(self.reader_sid)
 			self.assertEqual(status, 200)
 			self.assertLessEqual(len(body), LIMIT)
 			payload = json.loads(body)["message"]
@@ -126,7 +128,7 @@ class TestResponseBudgetHTTP(ShellHTTPFixture):
 			components = parse_json(SCHEMA_FILE.read_bytes())
 			self.assertTrue(matches(payload, components["Meta"], components))
 			path = METADATA.replace("/api/", "/api/v2/", 1) + "?" + urlencode({"doctype": DOCTYPE})
-			status, _, body = self.request(path, self.reader_sid)
+			status, _unused_headers, body = self.request(path, self.reader_sid)
 			self.assertEqual(status, 200)
 			self.assertLessEqual(len(body), LIMIT)
 			self.assertEqual(json.loads(body)["data"], payload)
