@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+set -euo pipefail
+exec uv run --no-project --offline --python 3.12 python -B "$(dirname "${BASH_SOURCE[0]}")/scans.py" compile-lock

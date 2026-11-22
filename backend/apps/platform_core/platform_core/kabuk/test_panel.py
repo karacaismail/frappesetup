@@ -11,10 +11,13 @@ class PanelMetadata(HTMLParser):
 	def __init__(self, body: bytes):
 		super().__init__()
 		self.token = None
+		self.language = None
 		self.feed(body.decode("utf-8"))
 
 	def handle_starttag(self, tag, attrs):
 		attributes = dict(attrs)
+		if tag == "html":
+			self.language = attributes.get("lang")
 		if tag == "meta" and attributes.get("name") == "csrf-token":
 			self.token = attributes.get("content")
 
@@ -69,5 +72,5 @@ class TestPanelHTTP(ShellHTTPFixture):
 			with self.subTest(language=language):
 				status, _, body = self.request(f"/panel?_lang={language}", self.reader_sid)
 				self.assertEqual(status, 200)
-				self.assertIn(f'<html lang="{language}">', body.decode("utf-8"))
+				self.assertEqual(PanelMetadata(body).language, language)
 				self.assertIn(f"<title>{title}</title>", body.decode("utf-8"))
