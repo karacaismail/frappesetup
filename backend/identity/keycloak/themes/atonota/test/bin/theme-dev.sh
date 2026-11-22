@@ -40,6 +40,8 @@ write_env() {
   if [[ -f "$env_file" ]]; then
     ensure_env IDENTITY_BRAND_NAME "Sample Brand"
     ensure_env IDENTITY_ACCOUNT_DELETION_URL "http://press.localhost:$(( $(env_value KC_PORT) + 3 ))/account/delete"
+    ensure_env IDENTITY_TEST_PASSWORD "$(openssl rand -hex 16)"
+    ensure_env IDENTITY_TEST_TOTP_SECRET "$(openssl rand -hex 16)"
     return
   fi
   local base="${PANE_PORT:-3950}"
@@ -54,6 +56,22 @@ write_env() {
     echo "IDENTITY_BRAND_NAME=Sample Brand"
     # The deletion page belongs to Press. In this environment the address is only a link target.
     echo "IDENTITY_ACCOUNT_DELETION_URL=http://press.localhost:$((base + 3))/account/delete"
+    # Secrets of the made-up test users. The tests read them from this file. They are never printed.
+    echo "IDENTITY_TEST_PASSWORD=$(openssl rand -hex 16)"
+    echo "IDENTITY_TEST_TOTP_SECRET=$(openssl rand -hex 16)"
+  } > "$env_file"
+}
+
+# Writes new random secrets for the made-up test users. Each start of the environment gets its own values.
+# The values go only into the .env file (mode 600). They are never printed.
+rotate_test_secrets() {
+  local kept
+  kept="$(grep -v -E '^IDENTITY_TEST_(PASSWORD|TOTP_SECRET)=' "$env_file" || true)"
+  umask 077
+  {
+    printf '%s\n' "$kept"
+    echo "IDENTITY_TEST_PASSWORD=$(openssl rand -hex 16)"
+    echo "IDENTITY_TEST_TOTP_SECRET=$(openssl rand -hex 16)"
   } > "$env_file"
 }
 
@@ -115,6 +133,7 @@ case "${1:-}" in
     ;;
   up)
     write_env
+    rotate_test_secrets
     # The image is reused when it exists. Building needs disk space, so it is a separate, explicit command.
     compose up -d --no-build --wait
     ;;

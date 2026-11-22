@@ -214,6 +214,8 @@ Ortamı `colima` profilinde açmak için komutun önüne `FS_COLIMA_PROFILE=defa
 
 Betik ilk çalışmada `test/.env` dosyasını üretir. Bu dosya Git'e girmez. Port tabanı `PANE_PORT` değişkeninden gelir. Keycloak taban portu, Mailpit ekranı bir sonraki portu kullanır. Mailpit, gönderilen e-postaları yakalayan deneme posta kutusudur.
 
+Depoda sabit deneme parolası ve TOTP gizli değeri yoktur. Betik `up` komutunda iki rastgele değer üretir ve `test/.env` dosyasına yazar. Değişkenlerin adı `IDENTITY_TEST_PASSWORD` ve `IDENTITY_TEST_TOTP_SECRET` olur. Değer yoksa testler açık bir hatayla durur.
+
 Deneme realm'inin adı `theme-test` olur. Tema yalnız bu realm'de seçilidir.
 
 ## Testler
