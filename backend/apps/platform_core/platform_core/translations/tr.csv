@@ -542,7 +542,7 @@ How the caller proved its identity: a human session or an agent token.,Çağıra
 Session ID,Konuşma kimliği,AI Action Log
 SHA-256 of the conversation id the client sent. The id itself is not stored. Rows of one conversation share this value.,İstemcinin gönderdiği konuşma kimliğinin SHA-256 özeti. Kimliğin kendisi saklanmaz. Aynı konuşmanın satırları bu değeri paylaşır.,AI Action Log
 Client Info,İstemci bilgisi,AI Action Log
-"Name and version the MCP client reported, stored only if they have the allowed shape.",MCP istemcisinin bildirdiği ad ve sürüm. Yalnız izinli biçimdeyse saklanır.,AI Action Log
+"Fixed name of the MCP client if the layer knows it, otherwise ""other"". The client's own text is not stored.","Katman istemciyi tanıyorsa istemcinin sabit adı, tanımıyorsa ""other"". İstemcinin kendi metni saklanmaz.",AI Action Log
 Stage,Adım,AI Action Log
 Step of the flow this row records.,Bu satırın kaydettiği akış adımı.,AI Action Log
 Tool,Araç,AI Action Log

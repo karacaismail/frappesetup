@@ -582,11 +582,14 @@ Son kullanıcı panelde Website User olarak çalışır. Katmanın yedi ucu `web
 
 - **Öneri 30 gün sonra silinir.** Süre karar tarihinden ya da süre dolumundan başlar. Hangisi önceyse o geçerlidir. Her önerinin `expires_at` değeri vardır. Bu yüzden sonucu `unknown` olan öneri de aynı kuralla silinir.
 - **“AI Action Log” 365 gün kalır.** `older_than_days` girdisi yalnız bu günlüğün süresidir. En az 365 olabilir.
-- **“AI Usage Log” 365 gün kalır.** Bu günlük model geçidi modülünündür. Silme komutu geçidin kendi komutunu çağırır: `platform_core.api.model.purge_usage`. Geçit kayıtları 500'lük gruplarla siler. Geçit kapanmamış denemeleri silmez.
+- **“AI Usage Log” 365 gün kalır.** Bu günlük model geçidi modülünündür. Silme komutu geçidin ortak işlevini çağırır: `platform_core.model_gecidi.api.purge_usage`. İşlev yetkiyi kendisi denetler. Terminal ve web girişi aynı işlevi çağırır.
+- **Kullanım günlüğünün sonucu açıktır.** `usage_logs` alanı boş dönmez. Durum `ok`, `not_run` ya da `error` olur. İşlev henüz yoksa durum `not_run` olur. Geçit reddederse durum `error` olur ve yalnız hata türü döner.
 - **Sayım kipi silinecek kayıtları sayar.** `dry_run` ile gelen sayı, silmenin kaldırdığı sayıya eşittir.
 - **Silme kopya bırakmaz (O-32).** Komut her kaydı `delete_permanently=True` ile siler. “Deleted Document” tablosunda kopya kalmaz. Günlük kaydının denetleyicisi öteki her silmeyi yine reddeder.
 - **Konuşma kimliğinin yalnız özeti saklanır.** `session_id` alanı kimliğin SHA-256 özetini tutar. Aynı konuşmanın satırları aynı özeti taşır.
-- **İstemci adı ve sürümü yalnız izinli biçimde saklanır.** Ad en çok 40 karakterdir ve düz kelimelerden oluşur. Bir kelime en çok 24 karakter olabilir. Sürüm bir sayıyla başlar. Biçime uymayan ad hiç saklanmaz. Biçime uymayan sürüm atılır.
+- **İstemcinin kendi metni saklanmaz.** Katman tanıdığı istemci için kendi sabit adını yazar. Tanınan istemciler `policy.KNOWN_CLIENTS` listesindedir. Öteki her istemci `other` adıyla yazılır. Sürüm hiç saklanmaz.
+- **Tanınmayan araç adı saklanmaz.** Yanıt sabit metin döner: “Unknown tool.” Günlük satırı araç adı taşımaz, yalnız `unknown_tool` nedenini taşır.
+- **Silme önizlemesi iki süreyi ayrı yazar.** Özet, işlem günlüğünün süresini ve kullanım günlüğünün 365 gününü ayrı söyler. Onayda sayım yeniden yapılır. Sayı değiştiyse sonuç `document_changed` olur.
 - Testler `tests/test_retention.py` ve `tests/test_client_text.py` dosyalarındadır.
 
 Frappe'nin liste süzgeci boş tarihi çok eski bir tarih sayar. Kaynak Frappe 16.56.0 sürümünde `frappe/database/query.py` dosyasının 745. satırıdır. Bu yüzden komut önce karar tarihi dolu olan önerileri ister.

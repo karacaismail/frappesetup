@@ -113,38 +113,124 @@ class TestRetentionPeriods(YzTestCase):
 
 		self.assertFalse(self.exists(old))
 
-	def test_usage_log_period_is_applied_by_the_gateways_own_command(self):
-		from platform_core.api import model
+	def gateway(self, purge):
+		"""Put a purge function on the gateway's public interface for one test."""
+		from platform_core.model_gecidi import api
 
+		return patch.object(api, "purge_usage", purge, create=True)
+
+	def without_gateway_purge(self):
+		from platform_core.model_gecidi import api
+
+		return patch.object(api, "purge_usage", None, create=True)
+
+	def test_usage_log_is_cleaned_by_the_gateways_shared_function(self):
 		manager = self.login(MANAGER)
 		calls = []
 
 		def fake(dry_run=True):
-			calls.append(dry_run)
-			return {"eligible": 7, "deleted": 0 if dry_run else 7, "dry_run": dry_run}
+			calls.append((dry_run, frappe.session.user))
+			return {"eligible": 501, "deleted": 0 if dry_run else 500, "dry_run": dry_run}
 
-		with patch.object(model, "purge_usage", fake):
+		with self.gateway(fake):
 			dry = self.count_only(manager)
 			real = self.purge(manager)
 
-		self.assertEqual(calls, [True, False])
-		self.assertEqual((dry["usage_logs"], real["usage_logs"]), (7, 7))
+		self.assertEqual(calls, [(True, MANAGER), (False, MANAGER)])
+		self.assertEqual(dry["usage_logs"], {"status": "ok", "eligible": 501, "deleted": 0})
+		self.assertEqual(real["usage_logs"], {"status": "ok", "eligible": 501, "deleted": 500})
 
-	def test_usage_log_command_runs_for_a_system_manager(self):
+	def test_missing_gateway_function_is_reported_as_not_run(self):
 		manager = self.login(MANAGER)
 
-		result = self.purge(manager)
+		with self.without_gateway_purge():
+			result = self.purge(manager)
 
-		self.assertIsInstance(result["usage_logs"], int)
+		self.assertEqual(result["usage_logs"], {"status": "not_run", "reason": "gateway_purge_unavailable"})
 
-	def test_result_follows_the_contract(self):
+	def test_refusal_of_the_gateway_is_reported_as_an_error(self):
+		manager = self.login(MANAGER)
+		old = self.proposal(manager, status="rejected", decided_at=ago(31))
+
+		def refuse(dry_run=True):
+			raise frappe.PermissionError("leak-marker in a gateway error")
+
+		with self.gateway(refuse):
+			response = self.human(manager, "POST", "purge_logs", body={"dry_run": False})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(
+			response.json["message"]["usage_logs"], {"status": "error", "reason": "PermissionError"}
+		)
+		self.assertNotIn("leak-marker", response.get_data(as_text=True))
+		self.assertFalse(self.exists(old))
+
+	def test_terminal_call_uses_the_same_function(self):
+		"""The command line has no session cookie. The same shared function is called there."""
+		from platform_core.yapay_zeka import retention
+
+		calls = []
+
+		def fake(dry_run=True):
+			calls.append(dry_run)
+			return {"eligible": 2, "deleted": 2, "dry_run": dry_run}
+
+		frappe.set_user(MANAGER)
+		with self.gateway(fake):
+			result = retention.purge(365, dry_run=False)
+		with self.without_gateway_purge():
+			missing = retention.purge(365, dry_run=True)
+
+		self.assertEqual(calls, [False])
+		self.assertEqual(result["usage_logs"], {"status": "ok", "eligible": 2, "deleted": 2})
+		self.assertEqual(missing["usage_logs"]["status"], "not_run")
+
+	def test_result_has_the_fields_the_contract_requires(self):
+		import yaml
+
+		from platform_core.yapay_zeka.tests.test_registry import APP_ROOT
+
+		contract = APP_ROOT.parents[2] / "contracts" / "platform_core-yapay-zeka.openapi.yaml"
+		if not contract.exists():
+			self.skipTest(f"Contract file is missing in this environment: {contract}")
+		schema = yaml.safe_load(contract.read_text())["components"]["schemas"]["PurgeResult"]
 		manager = self.login(MANAGER)
 
 		result = self.count_only(manager)
 
-		self.assertEqual(
-			sorted(result), ["dry_run", "logs", "older_than_days", "proposal_days", "proposals", "usage_logs"]
+		self.assertEqual(sorted(result), sorted(schema["required"]))
+		self.assertEqual(sorted(schema["properties"]), sorted(schema["required"]))
+		self.assertIn(
+			result["usage_logs"]["status"], schema["properties"]["usage_logs"]["properties"]["status"]["enum"]
 		)
+
+	def test_purge_preview_states_both_periods_and_counts_per_run(self):
+		manager = self.login(MANAGER)
+
+		def fake(dry_run=True):
+			return {"eligible": 501, "deleted": 0, "dry_run": dry_run}
+
+		with self.gateway(fake):
+			result = self.call_tool(manager, "purge_action_log", {"older_than_days": 800})
+
+		preview = result["structuredContent"]["preview"]
+		self.assertIn("800 days", preview["summary"])
+		self.assertIn("365 days", preview["summary"])
+		self.assertIn("30 days", preview["summary"])
+		self.assertEqual(preview["details"]["usage_logs"], {"status": "ok", "eligible": 501, "deleted": 0})
+		self.assertEqual(preview["details"]["older_than_days"], 800)
+
+	def test_approved_purge_counts_again_when_it_runs(self):
+		"""Records that became old after the preview stop the approval: the human saw another count."""
+		manager = self.login(MANAGER)
+		with self.without_gateway_purge():
+			result = self.call_tool(manager, "purge_action_log", {})
+			proposal_id = result["structuredContent"]["proposal_id"]
+			digest = self.digest_of(manager, proposal_id)
+			self.proposal(manager, status="rejected", decided_at=ago(31))
+			outcome = self.approve(manager, proposal_id, digest).json["message"]
+
+		self.assertEqual((outcome["executed"], outcome["deny_reason"]), (False, "document_changed"))
 
 	def test_delete_leaves_no_copy_behind(self):
 		"""Decision O-32: a retention delete is permanent. No "Deleted Document" copy is kept."""

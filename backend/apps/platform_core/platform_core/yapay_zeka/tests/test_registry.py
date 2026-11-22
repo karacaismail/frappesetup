@@ -135,8 +135,9 @@ class TestAiToolsHook(YzTestCase):
 		response = self.rpc(client, "tools/call", {"name": "call_method", "arguments": {}})
 
 		self.assertEqual(response.status_code, 404)
-		log = self.last_log(tool="call_method")
-		self.assertEqual((log.decision, log.deny_reason), ("denied", "unknown_tool"))
+		# The unknown name itself is not stored. The row carries the fixed deny reason.
+		log = self.last_log(deny_reason="unknown_tool")
+		self.assertEqual((log.decision, log.tool), ("denied", None))
 
 	def test_app_write_tool_is_denied_for_another_users_record(self):
 		name = self.make_record(USER_A, title="Eski")

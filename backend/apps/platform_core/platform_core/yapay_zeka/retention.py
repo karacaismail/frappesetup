@@ -11,7 +11,7 @@ import frappe
 from frappe import _
 
 from platform_core.yapay_zeka import store
-from platform_core.yapay_zeka.errors import CONTEXT
+from platform_core.yapay_zeka.errors import CONTEXT, log_tool_error
 
 # Retention periods of the project record, personal data section.
 # "AI Action Log" and "AI Usage Log": at least this many days.
@@ -25,6 +25,7 @@ def purge(older_than_days: int = MIN_DAYS, dry_run: bool = False) -> dict:
 
 	`older_than_days` is the period of the action log. The period of proposals is fixed.
 	The usage log belongs to the model gateway, which applies its own 365 day rule.
+	The counts are taken in the same transaction as the delete.
 	"""
 	frappe.only_for("System Manager")
 	days = int(older_than_days)
@@ -43,23 +44,26 @@ def purge(older_than_days: int = MIN_DAYS, dry_run: bool = False) -> dict:
 	}
 
 
-def _purge_usage_logs(dry_run: bool) -> int | None:
-	"""Start the model gateway's own command for the "AI Usage Log". Return the number of records.
+def _purge_usage_logs(dry_run: bool) -> dict:
+	"""Clean the "AI Usage Log" through the model gateway's shared function. Say plainly what happened.
 
-	The gateway owns that log and its 365 day rule. Its command deletes in batches, so a large
-	backlog needs more than one run. None means the gateway refused or is not installed.
+	The gateway owns that log. Its function checks the caller's permission itself and applies the
+	365 days of the project record, from the web and from the command line alike. It deletes in
+	batches, so `eligible` may be larger than `deleted`.
+
+	The result is `ok` with both counts, `not_run` if the gateway offers no such function, or
+	`error` with the error type if the gateway refused. It is never empty.
 	"""
+	import platform_core.model_gecidi.api as gateway
+
+	purge = getattr(gateway, "purge_usage", None)
+	if purge is None:
+		return {"status": "not_run", "reason": "gateway_purge_unavailable"}
 	try:
-		# The gateway's public endpoint module. It is looked up at call time.
-		from platform_core.api.model import purge_usage
-	except ImportError:
-		return None
-	status = frappe.local.response.get("http_status_code")
-	result = purge_usage(dry_run=dry_run)
-	if not isinstance(result, dict) or "error" in result:
-		# The gateway reports a refusal through the response status. This command's own answer stands.
-		frappe.local.response["http_status_code"] = status
-		if status is None:
-			frappe.local.response.pop("http_status_code", None)
-		return None
-	return int(result["eligible"] if dry_run else result["deleted"])
+		result = purge(dry_run=dry_run)
+		return {"status": "ok", "eligible": int(result["eligible"]), "deleted": int(result["deleted"])}
+	except Exception as error:
+		# The text of the gateway's error may carry a value. Only its type is returned.
+		log_tool_error("purge_usage", error)
+		frappe.clear_messages()
+		return {"status": "error", "reason": type(error).__name__}

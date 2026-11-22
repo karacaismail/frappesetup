@@ -85,7 +85,7 @@ paths:
         - name: Mcp-Conversation-Id
           in: header
           required: false
-          description: "The client's conversation id. The log stores its SHA-256 in the `session_id` field, never the id itself. The client's name and version are stored only if they have the allowed shape: a short name of plain words and a version that starts with a number."
+          description: "The client's conversation id. The log stores its SHA-256 in the `session_id` field, never the id itself. The client's own name and version are never stored. The log stores a fixed name for a client the layer knows and `other` for every other client."
           schema: {type: string, maxLength: 140}
       requestBody:
         required: true
@@ -330,8 +330,9 @@ paths:
         - "AI Action Log" records go after `older_than_days`, at least 365 days.
         - An "AI Action Proposal" goes 30 days after its decision or its expiry, whichever comes first. That period is fixed.
           Every proposal has an expiry, so none stays forever. A proposal with an unknown result goes by the same rule.
-        - "AI Usage Log" records go after 365 days. The model gateway owns that log. This endpoint starts the gateway's own
-          command (`platform_core.api.model.purge_usage`), which deletes in batches and keeps unsettled attempts.
+        - "AI Usage Log" records go after 365 days. The model gateway owns that log. This endpoint calls the gateway's shared
+          function `platform_core.model_gecidi.api.purge_usage`, which checks permission and deletes in batches.
+          The `usage_logs` field says plainly whether that ran: `ok`, `not_run` or `error`. Other records are still cleaned.
         The counting mode (`dry_run`) counts exactly the records the delete would remove.
         There is no scheduled job. This endpoint is started by hand. The command for the same action is this:
         `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs "{'older_than_days': 365}"`.
@@ -548,10 +549,21 @@ components:
       required: [dry_run, older_than_days, proposal_days, logs, usage_logs, proposals]
       properties:
         dry_run: {type: boolean}
-        older_than_days: {type: integer, description: Retention period of the two logs in days.}
+        older_than_days: {type: integer, description: Retention period of the AI Action Log in days.}
         proposal_days: {type: integer, description: "Retention period of proposals in days, counted from the decision or the expiry. Fixed at 30."}
         logs: {type: integer, description: Number of AI Action Log records deleted or to be deleted.}
-        usage_logs: {type: [integer, "null"], description: "Number of AI Usage Log records deleted or to be deleted by the model gateway's command. Null if the gateway refused or is not installed."}
+        usage_logs:
+          type: object
+          description: "What happened to the AI Usage Log. The model gateway owns that log and cleans it with its shared function `platform_core.model_gecidi.api.purge_usage`. The function checks the caller's permission and applies 365 days from the web and from the command line alike. This field is never null."
+          required: [status]
+          properties:
+            status:
+              type: string
+              enum: [ok, not_run, error]
+              description: "`ok`: the gateway ran. `not_run`: the gateway offers no such function. `error`: the gateway refused."
+            eligible: {type: integer, description: "With `ok`: number of records past 365 days that waited when the run started."}
+            deleted: {type: integer, description: "With `ok`: number of records this run deleted. The gateway deletes in batches, so it may be smaller than `eligible`. Zero in the counting mode."}
+            reason: {type: string, description: "With `not_run` or `error`: a fixed code or the type of the error. Never the text of the error."}
         proposals: {type: integer, description: Number of AI Action Proposal records deleted or to be deleted.}
 
     ApprovalRequired:

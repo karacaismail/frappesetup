@@ -164,3 +164,12 @@ def is_secret_fieldname(fieldname: str) -> bool:
 
 def is_secret_field(field: "DocField") -> bool:
 	return field.fieldtype in SECRET_FIELDTYPES or is_secret_fieldname(field.fieldname)
+
+
+# Clients the log names. The key is the name a client reports, in lower case. The value is the
+# fixed text that is stored. Every other client is stored as `OTHER_CLIENT`.
+KNOWN_CLIENTS = {
+	"mcp-inspector": "mcp-inspector",
+	"mcp": "mcp-sdk",
+}
+OTHER_CLIENT = "other"

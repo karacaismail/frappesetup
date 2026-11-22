@@ -185,7 +185,8 @@ class TestIdentity(YzTestCase):
 		self.assertIn(LATEST, discover.json["result"]["supportedVersions"])
 		# The conversation id is stored as its SHA-256.
 		log = self.last_log(tool="search_doctypes", session_id=hashlib.sha256(b"konusma-1").hexdigest())
-		self.assertEqual(log.client_info, "sahte-istemci 1.0")
+		# An unknown client is stored under one common name, not under its own text.
+		self.assertEqual(log.client_info, "other")
 
 	def test_transport_rules(self):
 		client = self.login(USER_A)

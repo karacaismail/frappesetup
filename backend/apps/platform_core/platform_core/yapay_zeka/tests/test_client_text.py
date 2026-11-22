@@ -79,16 +79,18 @@ class TestClientText(YzTestCase):
 		self.assertNotIn(FAKE_TOKEN, stored_text())
 		self.assertGreaterEqual(len(self.new_logs()), 5)
 
-	def test_client_name_and_version_of_the_allowed_shape_are_stored(self):
+	def test_only_a_fixed_name_of_a_known_client_is_stored(self):
+		"""Free text of the client is never stored, even when it looks harmless."""
 		client = self.login(USER_A)
 		cases = {
-			("mcp-inspector", "0.14.2"): "mcp-inspector 0.14.2",
-			("Visual Studio Code", "1.99.0-insider"): "Visual Studio Code 1.99.0-insider",
-			("client", "not a version"): "client",
-			("client", ""): "client",
-			("bad\nname", "1.0"): None,
-			("x" * 41, "1.0"): None,
-			("a-word-that-is-longer-than-24-chars", "1.0"): None,
+			("mcp-inspector", "0.14.2"): "mcp-inspector",
+			("MCP-Inspector", "1.0"): "mcp-inspector",
+			("mcp", "2.3.0"): "mcp-sdk",
+			# Made-up personal data and a short secret that fit every shape rule.
+			("Jane Example", "1.0"): "other",
+			("client", "1.0-s3cr3t"): "other",
+			("mcp-inspector for Jane Example", "1.0"): "other",
+			("x" * 41, "1.0"): "other",
 		}
 
 		for index, ((name, version), expected) in enumerate(cases.items()):
@@ -96,6 +98,34 @@ class TestClientText(YzTestCase):
 			self.call(client, "search_doctypes", {}, conversation=conversation, name=name, version=version)
 			log = self.last_log(session_id=hashlib.sha256(conversation.encode()).hexdigest())
 			self.assertEqual(log.client_info, expected, (name, version))
+
+		text = stored_text()
+		for leaked in ("Jane Example", "s3cr3t", "0.14.2", "2.3.0"):
+			self.assertNotIn(leaked, text)
+
+	def test_unknown_tool_name_leaves_no_trace_in_records_or_responses(self):
+		client = self.login(USER_A)
+		token = self.issue_token(client)
+		name = "tool for Jane Example " + FAKE_TOKEN
+
+		by_session = self.rpc(client, "tools/call", {"name": name, "arguments": {}})
+		for _ in range(21):
+			by_token = self.rpc(self.anonymous(), "tools/call", {"name": name, "arguments": {}}, token=token)
+
+		self.assertEqual((by_session.status_code, by_token.status_code), (404, 401))
+		self.assertEqual(by_session.json["error"]["message"], "Unknown tool.")
+		for response in (by_session, by_token):
+			self.assertNotIn("Jane Example", response.get_data(as_text=True))
+			self.assertNotIn(FAKE_TOKEN, response.get_data(as_text=True))
+		text = stored_text()
+		self.assertNotIn("Jane Example", text)
+		self.assertNotIn(FAKE_TOKEN, text)
+		reasons = {
+			row.deny_reason
+			for row in frappe.get_all("AI Action Log", fields=["name", "deny_reason", "tool"])
+			if row.name not in self.known_logs and not row.tool
+		}
+		self.assertLessEqual({"unknown_tool", "token_call_limit"}, reasons)
 
 	def new_logs(self) -> list[str]:
 		frappe.db.rollback()

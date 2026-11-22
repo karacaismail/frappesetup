@@ -6,7 +6,6 @@ Decision: docs/kararlar/0002-yapay-zeka-katmani.md.
 """
 
 import json
-import re
 import time
 from typing import Any
 
@@ -20,7 +19,7 @@ from frappe.utils.response import json_handler
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
-from platform_core.yapay_zeka import access, agent_token, proposals, registry
+from platform_core.yapay_zeka import access, agent_token, policy, proposals, registry
 from platform_core.yapay_zeka.errors import CONTEXT, ToolDenied, log_tool_error, traceback_without_text
 
 LIST_TTL_MS = 60000
@@ -102,28 +101,19 @@ def _check_principal() -> None:
 		)
 
 
-# What a client may say about itself in the log: a short name of plain words, and a version that
-# starts with a number. A long unbroken word is refused, since a credential looks like one.
-CLIENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(?: [A-Za-z0-9][A-Za-z0-9._-]*){0,5}", re.ASCII)
-CLIENT_VERSION = re.compile(r"\d{1,5}(?:\.\d{1,5}){0,3}(?:[-+][A-Za-z0-9.]{1,16})?", re.ASCII)
-CLIENT_NAME_CHARS = 40
-CLIENT_WORD_CHARS = 24
-
-
 def _client_info(params: dict) -> str | None:
+	"""A fixed name for the client: its own entry in `policy.KNOWN_CLIENTS`, or one common name.
+
+	The client's own text is never stored. A name or a version may carry personal data or a
+	credential sent by mistake, and no shape rule can tell that apart.
+	"""
 	meta = params.get("_meta")
 	info = (meta.get(protocol.META_CLIENT) if isinstance(meta, dict) else None) or params.get("clientInfo")
 	if not isinstance(info, dict):
 		return None
-	name, version = info.get("name"), info.get("version")
-	# Only text of the allowed shape is stored. Anything else may be a credential sent by mistake.
-	if not isinstance(name, str) or len(name) > CLIENT_NAME_CHARS or not CLIENT_NAME.fullmatch(name):
-		return None
-	if any(len(word) > CLIENT_WORD_CHARS for word in name.split()):
-		return None
-	if isinstance(version, str) and CLIENT_VERSION.fullmatch(version):
-		return f"{name} {version}"
-	return name
+	name = info.get("name")
+	known = policy.KNOWN_CLIENTS.get(name.strip().lower()) if isinstance(name, str) else None
+	return known or policy.OTHER_CLIENT
 
 
 def dispatch(method: str, params: dict[str, Any], version: str) -> dict:
@@ -174,13 +164,16 @@ def call_tool(params: dict) -> dict:
 	started = time.monotonic()
 	name = params.get("name")
 	# A call is spent before the tool is looked up. An unknown tool name spends one too.
-	if not agent_token.spend_call():
-		access.record_denial("call", "token_call_limit", tool=str(name)[:140], started=started)
-		raise _logged(McpError(protocol.INVALID_REQUEST, "The agent token has no calls left", status=401))
 	tool = registry.find(name) if isinstance(name, str) else None
+	# Only the name of a registered tool is stored or returned. An unknown name is the caller's
+	# own text and may carry anything.
+	known_name = tool.name if tool else None
+	if not agent_token.spend_call():
+		access.record_denial("call", "token_call_limit", tool=known_name, started=started)
+		raise _logged(McpError(protocol.INVALID_REQUEST, "The agent token has no calls left", status=401))
 	if tool is None:
-		access.record_denial("call", "unknown_tool", tool=str(name)[:140], started=started)
-		raise _logged(McpError(METHOD_NOT_FOUND, f"Unknown MCP tool: {name}", status=404))
+		access.record_denial("call", "unknown_tool", started=started)
+		raise _logged(McpError(METHOD_NOT_FOUND, "Unknown tool.", status=404))
 
 	raw = params.get("arguments", {})
 	context = {"tool": tool.name, "tool_class": tool.tool_class, "started": started}
