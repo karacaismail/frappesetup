@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 import os
+import re
 from contextlib import closing, contextmanager
 from http.client import HTTPConnection
 from http.cookies import SimpleCookie
@@ -15,7 +16,7 @@ from threading import Thread
 from time import perf_counter_ns
 from urllib.parse import urlencode
 
-SITE = "test-kabuk.localhost"
+SITE = "perf-kabuk.localhost"
 ACCOUNT = "shell-o31@example.test"
 EMPLOYEES = 200
 LEAVE_PER_EMPLOYEE = 10
@@ -45,13 +46,18 @@ def summarize(samples, *, limit_ms=LIMIT_MS):
 
 
 @contextmanager
-def test_database():
+def test_database(site):
 	import frappe
 
-	frappe.init(SITE)
+	if not re.fullmatch(r"perf-[a-z0-9-]+(?:\.[a-z0-9-]+)*\.localhost", site):
+		raise RuntimeError("Use a site whose name starts with perf- and ends with .localhost.")
+
+	config = json.loads((Path(site) / "site_config.json").read_text(encoding="utf-8"))
+	if str(config.get("allow_performance_fixture")) != "1":
+		raise RuntimeError("Set allow_performance_fixture to 1 on the disposable site.")
+
+	frappe.init(site)
 	try:
-		if not frappe.conf.allow_tests:
-			raise RuntimeError("Use the disposable test-kabuk.localhost site with allow_tests enabled.")
 		frappe.connect()
 		frappe.set_user("Administrator")
 		yield frappe
@@ -59,23 +65,37 @@ def test_database():
 		frappe.destroy()
 
 
-def seed_site():
+def seed_site(site, records):
 	from frappe.utils import now_datetime
+	from frappe.utils.background_jobs import get_queues
+	from frappe.utils.password import update_password
 
-	with test_database() as frappe:
+	with test_database(site) as frappe:
+		if any(queue.count for queue in get_queues()):
+			raise RuntimeError("The benchmark requires empty background queues.")
 		if not {"erpnext", "hrms", "platform_core"} <= set(frappe.get_installed_apps()):
 			raise RuntimeError("Install ERPNext, HRMS and platform_core on the disposable site.")
 		if any(frappe.db.count(doctype) for doctype in ("Employee", "Leave Application")):
 			raise RuntimeError("The benchmark requires empty Employee and Leave Application tables.")
+		if frappe.db.exists("__Auth", {"doctype": "User", "name": ACCOUNT, "fieldname": "password"}):
+			raise RuntimeError("The benchmark account already has a password record.")
 		password = token_urlsafe(32)
-		frappe.get_doc(
-			doctype="User",
-			email=ACCOUNT,
-			first_name="O31 Shell Reader",
-			send_welcome_email=0,
-			new_password=password,
-			roles=[{"role": "HR User"}],
-		).insert()
+		# Raw fixture inserts avoid the contact and notification jobs in User hooks.
+		account = frappe.new_doc("User")
+		account.update(
+			{
+				"name": ACCOUNT,
+				"email": ACCOUNT,
+				"first_name": "O31 Shell Reader",
+				"full_name": "O31 Shell Reader",
+				"enabled": 1,
+				"user_type": "System User",
+			}
+		)
+		account.db_insert()
+		role = account.append("roles", {"role": "HR User"})
+		role.db_insert()
+		update_password(ACCOUNT, password)
 		timestamp = now_datetime()
 		common = ["creation", "modified", "owner", "modified_by"]
 		audit = (timestamp, timestamp, "Administrator", "Administrator")
@@ -138,15 +158,38 @@ def seed_site():
 			frappe.db.rollback()
 			raise RuntimeError("The benchmark dataset has unexpected row counts.")
 		frappe.db.commit()
+		records.extend(
+			[
+				("User", account.name),
+				("Has Role", role.name),
+				("Company", company),
+				("Leave Type", leave_type),
+				*(("Employee", row[len(common)]) for row in employees),
+				*(("Leave Application", row[len(common)]) for row in leave),
+			]
+		)
 		return password
 
 
+def cleanup_fixture(site, records):
+	if not records:
+		return
+	with test_database(site) as frappe:
+		for doctype, name in reversed(records):
+			frappe.db.delete(doctype, {"name": name})
+			if doctype == "User":
+				frappe.db.delete("__Auth", {"doctype": doctype, "name": name, "fieldname": "password"})
+		frappe.db.commit()
+
+
 @contextmanager
-def benchmark_server():
+def benchmark_server(site):
 	from frappe.app import application
 	from werkzeug.serving import make_server
 
 	def timed_application(environ, start_response):
+		environ["HTTP_HOST"] = site
+		environ["HTTP_X_FRAPPE_SITE_NAME"] = site
 		started = perf_counter_ns()
 
 		def timed_response(status, headers, exc_info=None):
@@ -167,8 +210,8 @@ def benchmark_server():
 		server.server_close()
 
 
-def request(port, path, *, sid=None, form=None):
-	headers = {"Host": SITE, "Accept": "application/json"}
+def request(site, port, path, *, sid=None, form=None):
+	headers = {"Host": site, "Accept": "application/json"}
 	method = "GET"
 	body = None
 	if form is not None:
@@ -186,34 +229,50 @@ def request(port, path, *, sid=None, form=None):
 		return response.headers, json.loads(payload)
 
 
-def clear_caches():
+def clear_caches(site):
 	from frappe.config import clear_site_config_cache
 
-	with test_database() as frappe:
+	with test_database(site) as frappe:
 		frappe.clear_cache()
 		clear_site_config_cache()
 
 
-def measure(port, password):
-	headers, _unused_payload = request(port, "/api/method/login", form={"usr": ACCOUNT, "pwd": password})
+@contextmanager
+def benchmark_session(site, port, password):
+	from frappe.sessions import delete_session
+
+	headers, _unused_payload = request(
+		site, port, "/api/method/login", form={"usr": ACCOUNT, "pwd": password}
+	)
 	cookies = SimpleCookie()
 	for value in headers.get_all("Set-Cookie", []):
 		cookies.load(value)
 	sid = cookies["sid"].value
+	try:
+		yield sid
+	finally:
+		with test_database(site):
+			delete_session(sid=sid, user=ACCOUNT, reason="Benchmark finished")
+
+
+def measure(site, port, password):
 	rows = []
-	for endpoint, path, identity_key, identity_name in ENDPOINTS:
-		request(port, path, sid=sid)
-		for mode in (WARM_MODE, COLD_MODE):
-			samples = []
-			for sample_index in range(SAMPLES):
-				if mode == COLD_MODE:
-					clear_caches()
-				headers, payload = request(port, path, sid=sid)
-				message = payload["message"]
-				if message.get("truncated") or message[identity_key]["name"] != identity_name:
-					raise RuntimeError(f"{path} returned an unexpected payload at sample {sample_index + 1}.")
-				samples.append(int(headers[TIMING_HEADER]) / 1e6)
-			rows.append((endpoint, mode, samples))
+	with benchmark_session(site, port, password) as sid:
+		for endpoint, path, identity_key, identity_name in ENDPOINTS:
+			request(site, port, path, sid=sid)
+			for mode in (WARM_MODE, COLD_MODE):
+				samples = []
+				for sample_index in range(SAMPLES):
+					if mode == COLD_MODE:
+						clear_caches(site)
+					headers, payload = request(site, port, path, sid=sid)
+					message = payload["message"]
+					if message.get("truncated") or message[identity_key]["name"] != identity_name:
+						raise RuntimeError(
+							f"{path} returned an unexpected payload at sample {sample_index + 1}."
+						)
+					samples.append(int(headers[TIMING_HEADER]) / 1e6)
+				rows.append((endpoint, mode, samples))
 	return rows
 
 
@@ -251,14 +310,19 @@ def report(rows):
 
 def main():
 	parser = argparse.ArgumentParser(description=__doc__)
+	parser.add_argument("--site", default=SITE)
 	parser.add_argument("--status-file", type=Path, required=True)
 	args = parser.parse_args()
 	destination = args.status_file.resolve()
 	logging.getLogger("werkzeug").setLevel(logging.WARNING)
 	os.chdir("sites")
-	password = seed_site()
-	with benchmark_server() as port:
-		rows = measure(port, password)
+	records = []
+	try:
+		password = seed_site(args.site, records)
+		with benchmark_server(args.site) as port:
+			rows = measure(args.site, port, password)
+	finally:
+		cleanup_fixture(args.site, records)
 	summary, passed = report(rows)
 	with destination.open("a", encoding="utf-8") as output:
 		output.write(f"\n\n{summary}\n")

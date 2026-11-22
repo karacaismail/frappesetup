@@ -130,11 +130,25 @@ class MobileHTTPTest(unittest.TestCase):
 
 	def test_v1_list_installations_foreign_data_denied(self):
 		body = self.register()
-		status, payload, _unused = self.post("v1_list_installations", {}, token=OTHER_TOKEN)
+		caller = self.register(token=OTHER_TOKEN)
+		status, payload, _unused = self.post(
+			"v1_list_installations",
+			{},
+			token=OTHER_TOKEN,
+			extra_headers={"X-Mobile-Test-Installation": caller["installation_id"]},
+		)
 		self.assertEqual(status, 200, http_diagnostic(status, payload))
 		self.assertNotIn(
 			body["installation_id"], [row["installation_id"] for row in payload["message"]["installations"]]
 		)
+
+	@unittest.skipUnless(FIXTURE, "Synthetic authentication timestamps are required")
+	def test_v1_list_installations_requires_recent_activity(self):
+		headers = {"X-Mobile-Test-Auth-Time": str(int(time()) - 3600)}
+		body = self.register(extra_headers=headers)
+		headers["X-Mobile-Test-Installation"] = body["installation_id"]
+		status, payload, _unused = self.post("v1_list_installations", {}, extra_headers=headers)
+		self.assertEqual((status, safe_http_error_code(payload)), (401, "reauthentication_required"))
 
 	def test_v1_revoke_installation_guest_denied(self):
 		self.guest_denied("v1_revoke_installation", {"installation_id": str(uuid4())})

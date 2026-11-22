@@ -25,10 +25,32 @@ class PreviewRequiredTests(unittest.TestCase):
 		):
 			framework.get_roles.return_value = ["System Manager"]
 			framework.db.count.return_value = 3
-			self.assertEqual(api.purge_usage_logs(dry_run=True), {"eligible": 3, "deleted": 0})
+			framework.qb.get_query.return_value.run.return_value = [SimpleNamespace(name="approved")]
+			self.assertEqual(
+				api.purge_usage_logs(dry_run=True), {"eligible": 3, "deleted": 0, "names": ["approved"]}
+			)
 			framework.delete_doc.assert_not_called()
 			framework.get_doc.assert_not_called()
 			self.assertEqual(framework.cache.mock_calls, [])
+
+	def test_public_purge_propagates_deadlock_after_database_aborts_transaction(self):
+		with (
+			patch.object(policy, "require_user"),
+			patch.object(frappe, "get_roles", return_value=["System Manager"]),
+			patch.object(frappe.local, "db", Mock(), create=True) as database,
+			patch.object(maintenance, "now_datetime", return_value=datetime(2026, 1, 1)),
+			patch.object(maintenance, "_purge_batch", side_effect=frappe.QueryDeadlockError),
+		):
+			database.after_commit = frappe.utils.CallbackManager()
+
+			def rollback(**kwargs):
+				if kwargs:
+					raise RuntimeError("Savepoint no longer exists")
+
+			database.rollback.side_effect = rollback
+			with self.assertRaises(frappe.QueryDeadlockError):
+				api.purge_usage_logs(names=["approved"])
+			database.rollback.assert_called_once_with()
 
 	def test_public_purge_rejects_an_ai_manager(self):
 		with (
@@ -151,9 +173,13 @@ class TestUsageMaintenance(IntegrationTestCase):
 		recent = self._usage("success", now - timedelta(days=364))
 		pending = self._usage("pending", now - timedelta(days=366))
 		with patch.dict(frappe.conf, {"model_gateway_usage_retention_days": 36500}):
-			self.assertEqual(api.purge_usage_logs(dry_run=True), {"eligible": 1, "deleted": 0})
+			self.assertEqual(
+				api.purge_usage_logs(dry_run=True), {"eligible": 1, "deleted": 0, "names": [old.name]}
+			)
 			self.assertTrue(frappe.db.exists("AI Usage Log", old.name))
-			self.assertEqual(api.purge_usage_logs(), {"eligible": 1, "deleted": 1})
+			self.assertEqual(
+				api.purge_usage_logs(names=[old.name]), {"eligible": 1, "deleted": 1, "names": [old.name]}
+			)
 		self.assertFalse(frappe.db.exists("AI Usage Log", old.name))
 		self.assertTrue(frappe.db.exists("AI Usage Log", recent.name))
 		self.assertTrue(frappe.db.exists("AI Usage Log", pending.name))
@@ -163,6 +189,55 @@ class TestUsageMaintenance(IntegrationTestCase):
 				{"deleted_doctype": "AI Usage Log", "deleted_name": old.name},
 			)
 		)
+
+	def test_public_purge_leaves_newly_eligible_record_outside_approval(self):
+		now = now_datetime()
+		approved = self._usage("success", now - timedelta(days=366))
+		later = self._usage("success", now - timedelta(days=364))
+		with patch.object(maintenance, "now_datetime", return_value=now):
+			preview = api.purge_usage_logs(dry_run=True)
+		self.assertEqual(preview["names"], [approved.name])
+		with patch.object(maintenance, "now_datetime", return_value=now + timedelta(days=2)):
+			result = api.purge_usage_logs(names=preview["names"])
+		self.assertEqual(result["names"], [approved.name])
+		self.assertEqual(result["deleted"], 1)
+		self.assertTrue(frappe.db.exists("AI Usage Log", later.name))
+
+	def test_public_purge_rejects_entire_batch_when_a_record_becomes_ineligible(self):
+		now = now_datetime()
+		first = self._usage("success", now - timedelta(days=367))
+		second = self._usage("success", now - timedelta(days=366))
+		preview = api.purge_usage_logs(dry_run=True)
+		frappe.db.set_value("AI Usage Log", second.name, "result", "unknown")
+		with self.assertRaises(frappe.ValidationError):
+			api.purge_usage_logs(names=preview["names"])
+		self.assertTrue(frappe.db.exists("AI Usage Log", first.name))
+		self.assertEqual(frappe.db.get_value("AI Usage Log", second.name, "result"), "unknown")
+
+	def test_public_purge_rolls_back_first_delete_if_second_fails(self):
+		now = now_datetime()
+		first = self._usage("success", now - timedelta(days=367))
+		second = self._usage("success", now - timedelta(days=366))
+		preview = api.purge_usage_logs(dry_run=True)
+		delete_doc = frappe.delete_doc
+		commit_callbacks = len(frappe.db.after_commit)
+
+		def fail_on_second(doctype, name, **kwargs):
+			if name == second.name:
+				self.assertFalse(frappe.db.exists("AI Usage Log", first.name))
+				raise frappe.ValidationError("Second deletion failed")
+			frappe.db.after_commit.add(lambda: None)
+			return delete_doc(doctype, name, **kwargs)
+
+		with (
+			patch.object(frappe, "delete_doc", side_effect=fail_on_second),
+			self.assertRaisesRegex(frappe.ValidationError, "Second deletion failed"),
+		):
+			api.purge_usage_logs(names=preview["names"])
+
+		self.assertEqual(len(frappe.db.after_commit), commit_callbacks)
+		for record in (first, second):
+			self.assertTrue(frappe.db.exists("AI Usage Log", record.name))
 
 	def _usage(self, outcome, attempted_at):
 		suffix = uuid4().hex
@@ -188,7 +263,7 @@ class TestUsageMaintenance(IntegrationTestCase):
 			model_id=f"retention-fixture-{suffix}",
 			context_size=1024,
 		).insert()
-		return frappe.get_doc(
+		log = frappe.get_doc(
 			doctype="AI Usage Log",
 			name=str(uuid4()),
 			attempted_at=attempted_at,
@@ -204,6 +279,8 @@ class TestUsageMaintenance(IntegrationTestCase):
 			reservation_known=1,
 			reserved_cost=Decimal("0.125"),
 		).insert()
+		self.addCleanup(frappe.db.delete, "AI Usage Log", {"name": log.name})
+		return log
 
 	def test_confirmed_purge_leaves_no_deleted_document_copy(self):
 		old = now_datetime() - timedelta(days=366)

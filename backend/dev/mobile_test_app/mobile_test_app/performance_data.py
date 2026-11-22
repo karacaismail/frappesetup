@@ -1,14 +1,20 @@
 """Create O-31 data only on a disposable HRMS test site."""
 
+import re
+from collections import defaultdict
 from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 from time import time
 from types import SimpleNamespace
 from uuid import uuid4
 
 import frappe
 from frappe.utils import now_datetime
-from platform_core.mobil.store import MobileStore
+from frappe.utils.background_jobs import get_queues
+from platform_core.mobil.metadata import insert_metadata
+from platform_core.mobil.protocol import operation_key
+from platform_core.mobil.store import SEQUENCE_DOCTYPE, SEQUENCE_NAME, MobileStore
 
 from . import fixture
 
@@ -20,39 +26,103 @@ RECORD_TYPE = "fixture"
 
 @dataclass(frozen=True)
 class Phone:
+    site: str
     account: str
     token: str
     installation: str
     sid: str
     record: str
     version: str
+    operation_id: str
+
+
+def require_performance_site(site, sites_path="."):
+    if not re.fullmatch(r"perf-[a-z0-9-]+\.localhost", site):
+        raise SystemExit("Use a perf-*.localhost site for the benchmark.")
+    config_path = Path(sites_path) / site / "site_config.json"
+    config = frappe.get_file_json(config_path)
+    enabled = config.get("allow_performance_fixture")
+    if type(enabled) is not int or enabled != 1:
+        raise SystemExit("Set allow_performance_fixture to 1 in the site's configuration.")
 
 
 @contextmanager
-def test_database():
-    frappe.init(fixture.SITE)
+def test_database(site):
+    require_performance_site(site)
+    frappe.init(site)
     try:
-        fixture._require_test_site()
         frappe.connect()
         yield
     finally:
         frappe.destroy()
 
 
-def _insert_rows(doctype, columns, rows, timestamp):
-    # Synthetic benchmark rows must never run HR workflows, notifications or approvals.
+def require_empty_queue():
+    # Read queue state. Do not run workers, remove jobs or clean Redis registries.
+    for queue in get_queues():
+        if queue.count or any(
+            queue.connection.zcard(registry.key)
+            for registry in (
+                queue.started_job_registry,
+                queue.deferred_job_registry,
+                queue.scheduled_job_registry,
+            )
+        ):
+            raise SystemExit("The bench queue must be empty before the benchmark.")
+
+
+def _insert_rows(doctype, columns, rows, timestamp, created):
+    # Raw fixture rows avoid business workflows and background jobs, including User contact creation.
     fields = ["creation", "modified", "owner", "modified_by", *columns]
-    values = ((timestamp, timestamp, owner, "Administrator", *cells) for owner, *cells in rows)
+    values = [(timestamp, timestamp, owner, "Administrator", *cells) for owner, *cells in rows]
     frappe.db.bulk_insert(doctype, fields, values)
+    created.extend((doctype, row[4]) for row in values)
 
 
-def _leave_documents(phone, number, company, leave_type):
+def delete_records(records):
+    by_type = defaultdict(list)
+    for doctype, name in records:
+        by_type[doctype].append(name)
+    for doctype, names in by_type.items():
+        frappe.db.delete(doctype, {"name": ["in", names]})
+
+
+@contextmanager
+def performance_fixture(site, samples):
+    created = []
+    phones = seed_site(site, samples, created)
+    try:
+        yield phones, created
+    finally:
+        with test_database(site):
+            installations = [phone.installation for phone in phones]
+            record_ids = [name for doctype, name in created if doctype == fixture.RECORD]
+            for doctype, field, values in (
+                ("Mobile Delivery", "installation_id", installations),
+                ("Mobile Change", "record_id", record_ids),
+            ):
+                for name in frappe.get_all(doctype, filters={field: ["in", values]}, pluck="name"):
+                    created.append((doctype, name))
+            for phone in phones:
+                principal = fixture.content_digest(["fixture", fixture._subject(phone.account)])
+                created.extend(
+                    (
+                        ("Mobile Operation", operation_key(site, principal, phone.operation_id)),
+                        ("Mobile Installation", phone.installation),
+                        ("Mobile Account State", phone.account),
+                    )
+                )
+            delete_records(reversed(created))
+            frappe.db.commit()  # nosemgrep: frappe-request-commit
+
+
+def _leave_documents(phone, employee, number, company, leave_type):
     for index in range(LEAVE_PER_EMPLOYEE):
         day = f"2025-06-{index + 1:02d}"
         yield (
             phone.account,
-            f"O31-LV-{number:03d}-{index:02d}",
-            f"O31-EMP-{number:03d}",
+            f"{employee}-LV-{index:02d}",
+            employee,
             f"O31 Employee {number}",
             company,
             leave_type,
@@ -67,8 +137,9 @@ def _record_row(account, record_id, title):
     return account, record_id, record_id, title, fixture._scope_key(account, record_id)
 
 
-def seed_site(samples):
-    with test_database():
+def seed_site(site, samples, created):
+    with test_database(site):
+        require_empty_queue()
         installed = set(frappe.get_installed_apps())
         if not {"erpnext", "hrms", "platform_core", "mobile_test_app"} <= installed:
             raise SystemExit("Use a disposable test site with ERPNext, HRMS and mobile_test_app installed.")
@@ -79,36 +150,46 @@ def seed_site(samples):
         phones = []
         leave = []
         projections = []
-        company = "O31 Test Company"
-        leave_type = "O31 Test Leave"
+        run = uuid4().hex
+        company = f"O31 Company {run}"
+        leave_type = f"O31 Leave {run}"
         _insert_rows(
             "Company",
             ["name", "company_name", "abbr", "default_currency"],
-            [("Administrator", company, company, "O31", "USD")],
+            [("Administrator", company, company, run[:5], "USD")],
             timestamp,
+            created,
         )
         _insert_rows(
             "Leave Type",
             ["name", "leave_type_name"],
             [("Administrator", leave_type, leave_type)],
             timestamp,
+            created,
         )
 
         employees = []
-        frappe.flags.in_import = True
+        users = []
         for number in range(1, EMPLOYEES + 1):
-            account = f"o31-employee-{number:03d}@example.test"
-            frappe.get_doc(
-                doctype="User", email=account, first_name=f"O31 {number}", enabled=1, send_welcome_email=0
-            ).insert()
+            account = f"o31-{run}-{number:03d}@example.test"
+            employee = f"O31-{run}-{number:03d}"
+            full_name = f"O31 Employee {number}"
+            users.append(("Administrator", account, account, full_name, full_name, "Website User", 1))
             phone = Phone(
-                account, f"fixture-o31-{number:03d}", str(uuid4()), str(uuid4()), str(uuid4()), str(timestamp)
+                site,
+                account,
+                f"fixture-{uuid4().hex}",
+                str(uuid4()),
+                str(uuid4()),
+                str(uuid4()),
+                str(timestamp),
+                str(uuid4()),
             )
             phones.append(phone)
             employees.append(
                 (
                     account,
-                    f"O31-EMP-{number:03d}",
+                    employee,
                     f"O31 {number}",
                     f"O31 Employee {number}",
                     company,
@@ -116,15 +197,23 @@ def seed_site(samples):
                     "Active",
                 )
             )
-            leave.extend(_leave_documents(phone, number, company, leave_type))
+            leave.extend(_leave_documents(phone, employee, number, company, leave_type))
             for index in range(LEAVE_PER_EMPLOYEE):
                 record_id = phone.record if index == 0 else str(uuid4())
                 projections.append(_record_row(account, record_id, f"Test leave {index + 1}"))
+        _insert_rows(
+            "User",
+            ["name", "email", "first_name", "full_name", "user_type", "enabled"],
+            users,
+            timestamp,
+            created,
+        )
         _insert_rows(
             "Employee",
             ["name", "first_name", "employee_name", "company", "user_id", "status"],
             employees,
             timestamp,
+            created,
         )
         _insert_rows(
             "Leave Application",
@@ -141,9 +230,15 @@ def seed_site(samples):
             ],
             leave,
             timestamp,
+            created,
         )
-        _insert_rows(fixture.RECORD, ["name", "record_id", "title", "scope_key"], projections, timestamp)
+        _insert_rows(
+            fixture.RECORD, ["name", "record_id", "title", "scope_key"], projections, timestamp, created
+        )
 
+        if not frappe.db.exists(SEQUENCE_DOCTYPE, SEQUENCE_NAME):
+            insert_metadata(SEQUENCE_DOCTYPE, sequence_key=SEQUENCE_NAME)
+            created.append((SEQUENCE_DOCTYPE, SEQUENCE_NAME))
         store = MobileStore()
         started = int(time())
         for phone in phones[samples:]:
@@ -161,8 +256,8 @@ def seed_site(samples):
         return phones
 
 
-def seed_backlog(phone):
-    with test_database():
+def seed_backlog(phone, created):
+    with test_database(phone.site):
         records = [str(uuid4()) for _unused in range(BACKLOG)]
         timestamp = now_datetime()
         _insert_rows(
@@ -170,6 +265,7 @@ def seed_backlog(phone):
             ["name", "record_id", "title", "scope_key"],
             (_record_row(phone.account, record_id, "Pending test leave change") for record_id in records),
             timestamp,
+            created,
         )
         store = MobileStore()
         for record_id in records:
@@ -178,8 +274,8 @@ def seed_backlog(phone):
         frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 
-def verify_counts():
-    with test_database():
+def verify_counts(site):
+    with test_database(site):
         counts = tuple(
             frappe.db.count(table) for table in ("Employee", "Leave Application", "Mobile Installation")
         )

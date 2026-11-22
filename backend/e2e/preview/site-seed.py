@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+from hashlib import sha256
 from pathlib import Path
 from secrets import token_urlsafe
 
@@ -77,9 +78,35 @@ def seed_tenant(provider_urls):
     }
 
 
+def seed_lifecycle_identities(identities, issuer, tenant):
+    if tenant:
+        from platform_core.kimlik.provisioning import provision
+
+        for account in identities.values():
+            provision({
+                "issuer": issuer, "subject": account["subject"], "email": account["email"],
+                "email_verified": True, "enabled": True, "first_name": "Preview",
+            })
+        return {}
+
+    from frappe.core.doctype.user.user import generate_keys
+    from press_tr.kimlik.identity import bind_identity
+
+    account = identities["delete"]
+    link = bind_identity({
+        "iss": issuer, "sub": account["subject"], "email": account["email"], "email_verified": True,
+    })
+    keys = generate_keys(account["email"])
+    return {
+        "E2E_DELETE_PRESS_AUTHORIZATION": f"token {keys['api_key']}:{keys['api_secret']}",
+        "E2E_DELETE_PRESS_ANONYMOUS_USER": f"deleted-{sha256(link.name.encode()).hexdigest()[:32]}@invalid.example",
+    }
+
+
 def main():
     port = int(os.environ["PANE_PORT"])
     tenant = sys.argv[1] == "kiraci-web"
+    lifecycle = json.loads(os.environ["E2E_LIFECYCLE_IDENTITIES"])
     site = "kiraci1.localhost" if tenant else "press.localhost"
     config_file = Path("sites") / site / "site_config.json"
     config = json.loads(config_file.read_text())
@@ -97,7 +124,12 @@ def main():
         config.update(
             keycloak_client_id="site-kiraci1",
             keycloak_client_secret=os.environ["E2E_KEYCLOAK_CLIENT_SECRET"],
+            keycloak_service_client_id="site-kiraci1-service",
+            keycloak_service_client_secret=os.environ["E2E_KEYCLOAK_SERVICE_CLIENT_SECRET"],
             kimlik_marka_adi="Atonota",
+            kimlik_mobil_azp=["mobile-app"],
+            kimlik_deletion_hmac_key=token_urlsafe(32),
+            mobile_cursor_key=token_urlsafe(32),
             model_gateway_endpoints={
                 url: {"kind": "local", "addresses": [os.environ["E2E_PROVIDER_IP"]]}
                 for url in provider_urls.values()
@@ -110,17 +142,36 @@ def main():
             keycloak_client_id="press",
             keycloak_client_secret=os.environ["E2E_PRESS_CLIENT_SECRET"],
             press_identity_sync_user=service_email,
+            press_anonymization_hmac_key=token_urlsafe(32),
+            identity_sync_url=os.environ["E2E_PREVIEW_SYNC_ORIGIN"],
+            press_service_client_secret=os.environ["E2E_PRESS_SERVICE_SECRET"],
         )
     config_file.write_text(json.dumps(config))
     os.chdir("sites")
     frappe.init(site=site, sites_path=".")
     frappe.connect()
     frappe.set_user("Administrator")
-    if tenant:
-        fixture = seed_tenant(provider_urls)
-    else:
+    if not tenant:
         ensure_website_user(service_email)
-        fixture = {}
+    issuer = f"http://kimlik.localhost:{port}/realms/platform"
+    fixture = seed_lifecycle_identities(lifecycle, issuer, tenant)
+    if tenant:
+        from platform_core.kimlik.anonymization import identity_hash
+
+        fixture.update(seed_tenant(provider_urls))
+        delete_account = lifecycle["delete"]
+        doctype = fixture["E2E_DOCTYPE"]
+        digest = identity_hash(issuer, delete_account["subject"])
+        anonymous = f"deleted-user-{digest[:16]}@deleted.invalid"
+        fixture.update(
+            E2E_DELETE_RECORD_DOCTYPE=doctype,
+            E2E_DELETE_RECORD_NAME=insert(
+                doctype, title="Retained lifecycle request", request_user=delete_account["email"],
+            ),
+            E2E_DELETE_RECORD_PERSON_FIELD="request_user",
+            E2E_DELETE_RECORD_ANONYMOUS_VALUE=json.dumps(anonymous),
+            E2E_DELETE_TENANT_ANONYMOUS_USER=anonymous,
+        )
     frappe.db.commit()
     print(json.dumps(fixture))
 
