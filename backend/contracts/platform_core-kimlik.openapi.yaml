@@ -1,152 +1,154 @@
 openapi: 3.1.0
 info:
-  title: platform_core kimlik uçları
+  title: platform_core identity endpoints
   version: 0.5.0
-  summary: Keycloak ile giriş, dönüş, çıkış ve kullanıcı eşitleme uçları.
+  summary: Endpoints for Keycloak sign-in, callback, sign-out and user sync.
   description: |
-    Bu sözleşme `platform_core.kimlik` modülünün uçlarını tarif eder.
-    Kurallar `backend/docs/sozlesmeler.md` dosyasının 3, 4, 5 ve 8. bölümlerindedir.
+    This contract describes the endpoints of the `platform_core.kimlik` module.
+    The rules are in sections 3, 4, 5 and 8 of the `backend/docs/sozlesmeler.md` file.
 
-    İşin amacı şudur. Kiracı sitesinin kullanıcısı Keycloak ile oturum açar.
-    Keycloak kimlik sunucusudur. Parola ve kullanıcı kaydı orada durur.
-    Kullanıcının kalıcı anahtarı `(iss, sub)` çiftidir. E-posta yalnız iletişim bilgisidir.
-    Eşitleme servisi (`identity_sync`) kullanıcıyı bu uçlarla açar, kapatır ve günceller.
+    The goal is this. A user of the tenant site signs in with Keycloak.
+    Keycloak is the identity server. Passwords and user records live there.
+    The permanent key of a user is the `(iss, sub)` pair. The e-mail is only contact information.
+    The sync service (`identity_sync`) creates, disables and updates users through these endpoints.
 
-    Kiracı girişi kendi dönüş ucunu kullanır. Dönüş ucu `keycloak_callback` ucudur.
-    Frappe'nin hazır `login_via_keycloak` ucu kullanılmaz. Nedeni şudur.
-    Hazır uç `state` değerini tarayıcıya bağlamaz. Hazır uç kimlik belirtecini de saklamaz.
-    Bu yüzden Keycloak oturum kimliği (`sid`) bulunmaz.
-    Bu dosyada yalnız platform-core-kimlik işinin yazdığı uçlar vardır.
+    Tenant sign-in uses its own callback endpoint. The callback endpoint is `keycloak_callback`.
+    The built-in Frappe endpoint `login_via_keycloak` is not used. The reason is this.
+    The built-in endpoint does not bind `state` to the browser. The built-in endpoint also does not keep the ID token.
+    So the Keycloak session id (`sid`) is not available.
+    This file holds only the endpoints written by the platform-core-kimlik work.
 
-    Üç kimlik türü vardır.
+    There are three kinds of identity.
 
-    - Misafir uçlar kimlik istemez. `get_login_url`, `start_login`, `keycloak_callback` ve `keycloak_backchannel_logout` böyledir.
-      Bu dört uç istek sınırlıdır. Sınır aşılınca 429 döner.
-    - Oturum uçları `sid` çerezini ve `X-Frappe-CSRF-Token` başlığını birlikte ister.
-      `logout` ve `setup_keycloak_login` böyledir.
-    - Servis uçları `Authorization: Bearer <JWT>` başlığını ister. `identity.*` uçları böyledir.
-      Belirteç kuralları `serviceToken` şemasının açıklamasındadır.
+    - Guest endpoints need no identity. `get_login_url`, `start_login`, `keycloak_callback` and `keycloak_backchannel_logout` are guest endpoints.
+      These four endpoints are rate limited. Over the limit they return 429.
+    - Session endpoints need the `sid` cookie and the `X-Frappe-CSRF-Token` header together.
+      `logout` and `setup_keycloak_login` are session endpoints.
+    - Service endpoints need the `Authorization: Bearer <JWT>` header. The `identity.*` endpoints are service endpoints.
+      The token rules are in the description of the `serviceToken` scheme.
 
-    Yol `/api/method/<python yolu>` biçimindedir. Bu Frappe'nin RPC yoludur.
-    `start_login` ve `keycloak_callback` GET ister. Öteki uçlar POST ister.
+    The path has the form `/api/method/<python path>`. This is the Frappe RPC path.
+    `start_login` and `keycloak_callback` need GET. The other endpoints need POST.
 
-    Giriş akışı şöyledir.
+    The sign-in flow is as follows.
 
-    1. Giriş iki yoldan başlar. Giriş sayfasındaki düğme `start_login` ucuna gider.
-       Panel ise `get_login_url` ucunu çağırır ve dönen adrese gider.
-       İki uç aynı işi yapar. Sunucu `state`, PKCE doğrulayıcısı ve `nonce` üretir.
-       Sunucu bir tarayıcı değeri de üretir. Değer `kimlik_login` çerezine yazılır.
-       Sunucu `state` kaydında bu değerin SHA-256 özetini, PKCE doğrulayıcısını, `nonce` değerini ve dönüş yolunu saklar. Kayıt 600 saniye yaşar.
-    2. Tarayıcı Keycloak yetki adresine gider. Kullanıcı Keycloak'ta oturum açar.
-    3. Keycloak tarayıcıyı `keycloak_callback` ucuna döndürür. Sunucu `state` kaydını tek bölünmez işlemle okur ve siler.
-       Sunucu çerezi ve kimlik belirtecini doğrular. Sunucu Frappe oturumu açar ve tarayıcıyı dönüş yoluna yönlendirir.
+    1. Sign-in starts in one of two ways. The button on the sign-in page goes to the `start_login` endpoint.
+       The panel calls the `get_login_url` endpoint and goes to the returned address.
+       Both endpoints do the same work. The server generates `state`, a PKCE verifier and `nonce`.
+       The server also generates a browser value. The value is written to the `kimlik_login` cookie.
+       In the `state` record the server keeps the SHA-256 hash of this value, the PKCE verifier, the `nonce` value and the return path. The record lives for 600 seconds.
+    2. The browser goes to the Keycloak authorization address. The user signs in at Keycloak.
+    3. Keycloak sends the browser back to the `keycloak_callback` endpoint. The server reads and deletes the `state` record in one atomic operation.
+       The server checks the cookie and the ID token. The server opens a Frappe session and redirects the browser to the return path.
 
-    Giriş sayfası şöyledir.
+    The sign-in page is as follows.
 
-    `platform_core` kiracının `/login` sayfasını kendi `www/login` sayfasıyla geçersiz kılar.
-    Sayfada marka düğmesi vardır. Düğme metni `kimlik_marka_adi` ayarından gelir: “{marka} ile oturum aç”.
-    Düğme `start_login` ucuna gider.
-    `kimlik_yalniz_keycloak` ayarı açıkken sayfada yalnız bu düğme vardır. Parola formu yoktur.
-    Ayar kapalıyken sayfada ayrıca yalın bir parola formu vardır. Form Frappe'nin `/api/method/login` ucunu kullanır.
-    Sayfa `redirect-to` sorgu alanını alır. Değer güvenliyse sayfa onu `start_login` ucuna `redirect_to` olarak geçirir.
+    `platform_core` overrides the tenant `/login` page with its own `www/login` page.
+    The page has a brand button. The button label is built from the `kimlik_marka_adi` setting.
+    The English source text of the label is “Sign in with {0}”. The brand name fills `{0}`.
+    The Turkish text comes from `translations/tr.csv` with the context `platform_core.kimlik`.
+    The button goes to the `start_login` endpoint.
+    While the `kimlik_yalniz_keycloak` setting is on, the page has only this button. There is no password form.
+    While the setting is off, the page also has a plain password form. The form uses the Frappe `/api/method/login` endpoint.
+    The page takes the `redirect-to` query field. If the value is safe, the page passes it to `start_login` as `redirect_to`.
 
-    Başarı gövdesi Frappe sarmalıdır: `{"message": <sonuç>}`.
-    `start_login` ve `keycloak_callback` uçları bunun dışındadır. Bu iki uç tarayıcı akışıdır.
-    Yanıtları HTML sayfa ya da yönlendirmedir.
+    The success body is the Frappe wrapper: `{"message": <result>}`.
+    The `start_login` and `keycloak_callback` endpoints are exceptions. These two endpoints are browser flows.
+    Their responses are HTML pages or redirects.
 
-    Hata gövdesi Frappe'nin olağan biçimidir. Şeması `FrappeError` altındadır.
-    İstemci hatayı `exc_type` alanından tanır. Her hata yanıtında beklenen `exc_type` değerleri yazılıdır.
-    `identity.*` uçlarında eksik ya da yanlış biçimli alan 400 ve `InvalidInput` döner.
-    Gövde JSON olarak ayrıştırılamazsa Frappe uca gelmeden 417 ve `DataError` döner.
-    Bu durum uçtaki `InvalidInput` denetiminden önce olur. Bu yanıt her JSON gövdeli uçta olabilir.
-    Keycloak anahtar listesi alınamazsa belirteç doğrulanamaz. O zaman uç 503 ve `KeycloakKeysUnavailable` döner.
+    The error body is the usual Frappe format. Its schema is under `FrappeError`.
+    The client recognizes the error from the `exc_type` field. Each error response lists the expected `exc_type` values.
+    On the `identity.*` endpoints, a missing or malformed field returns 400 and `InvalidInput`.
+    If the body cannot be parsed as JSON, Frappe returns 417 and `DataError` before the endpoint runs.
+    This happens before the `InvalidInput` check in the endpoint. This response can occur on every endpoint with a JSON body.
+    If the Keycloak key list cannot be fetched, the token cannot be verified. Then the endpoint returns 503 and `KeycloakKeysUnavailable`.
 
-    `x-yikici` alanı ucun oturum kapatan ya da kullanıcıyı kapatan iş yapıp yapmadığını söyler.
-    Hiçbir uç ücretli iş yapmaz.
+    The `x-yikici` field says whether the endpoint closes sessions or disables users.
+    No endpoint does paid work.
 
-    Site ayarları `x-site-settings` uzantısındadır. Sır değerleri bu dosyada yoktur.
-    Yerel giriş kapısının kapsamı `x-yerel-giris-kapisi` uzantısındadır.
+    Site settings are in the `x-site-settings` extension. Secret values are not in this file.
+    The scope of the local sign-in gate is in the `x-yerel-giris-kapisi` extension.
   license:
     name: MIT
     identifier: MIT
 
 servers:
   - url: "{site_url}/api/method"
-    description: Kiracı sitesinin Frappe uç kökü.
+    description: Frappe endpoint root of the tenant site.
     variables:
       site_url:
         default: http://kiraci1.localhost:8661
-        description: Kiracı sitesinin kök adresi. Sonunda eğik çizgi olmaz.
+        description: Root address of the tenant site. It has no trailing slash.
 
 tags:
   - name: yerel-giris-kapisi
-    description: Kapalı yerel giriş işlevleri. Kapı açıkken hepsi 403 döner.
+    description: Closed local sign-in functions. While the gate is on, all of them return 403.
   - name: giris
-    description: Tarayıcının giriş, dönüş ve çıkış uçları.
+    description: Browser endpoints for sign-in, callback and sign-out.
   - name: kurulum
-    description: Sitede Keycloak girişini açan yönetim ucu.
+    description: Admin endpoint that turns on Keycloak sign-in on the site.
   - name: eşitleme
-    description: Eşitleme servisinin kullanıcı uçları. Servis belirteci ister.
+    description: User endpoints of the sync service. They need a service token.
 
 x-site-settings:
   description: |
-    Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
-    `iss` değeri `<keycloak_public_url>/realms/<keycloak_realm>` olur.
-    Anahtar listesi adresi `<keycloak_internal_url ya da keycloak_public_url>/realms/<keycloak_realm>/protocol/openid-connect/certs` olur.
+    The settings live in the `site_config.json` file. A setting that holds a secret does not go into the repository.
+    The `iss` value is `<keycloak_public_url>/realms/<keycloak_realm>`.
+    The key list address is `<keycloak_internal_url or keycloak_public_url>/realms/<keycloak_realm>/protocol/openid-connect/certs`.
   settings:
     - key: keycloak_public_url
       example: http://kimlik.localhost:8660
       required: true
-      note: Tarayıcının gördüğü Keycloak adresi.
+      note: Keycloak address that the browser sees.
     - key: keycloak_internal_url
       example: ""
       required: false
-      note: Sunucunun ulaştığı Keycloak adresi. Boşsa `keycloak_public_url` kullanılır.
+      note: Keycloak address that the server reaches. If it is empty, `keycloak_public_url` is used.
     - key: keycloak_realm
       example: platform
       required: false
-      note: Varsayılan `platform`.
+      note: The default is `platform`.
     - key: keycloak_client_id
       example: site-kiraci1
       required: true
-      note: Bu sitenin Keycloak istemcisi. Servis belirtecinde `aud` bu değerdir.
+      note: The Keycloak client of this site. In the service token, `aud` is this value.
     - key: keycloak_client_secret
-      example: "(sır, bu dosyada yazılmaz)"
+      example: "(secret, not written in this file)"
       required: true
-      note: Yalnız site ayarında ve `.env` dosyasında durur.
+      note: It lives only in the site setting and in the `.env` file.
     - key: kimlik_marka_adi
       example: Atonota
       required: true
-      note: Giriş düğmesinin metni bundan üretilir.
+      note: The sign-in button label is built from this value.
     - key: platform_panel_url
       example: http://kiraci1.localhost:8661/panel
       required: true
-      note: Çıkıştan sonra tarayıcının döneceği adres. Girişte `redirect_to` yoksa dönüş adresi de budur.
+      note: The address the browser returns to after sign-out. If sign-in has no `redirect_to`, this is also the return address.
     - key: kimlik_yalniz_keycloak
       example: 0
       required: false
-      note: Varsayılan 0. Değer 1 olunca yerel giriş kapanır (AU-19). Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+      note: The default is 0. When the value is 1, local sign-in is closed (AU-19). The scope is in the `x-yerel-giris-kapisi` extension.
     - key: kimlik_servis_azp
       example: ["identity-sync"]
       required: false
-      note: Servis belirtecinde kabul edilen `azp` listesi. Varsayılan `["identity-sync"]`.
+      note: List of `azp` values accepted in the service token. The default is `["identity-sync"]`.
 
 x-yerel-giris-kapisi:
   description: |
-    `kimlik_yalniz_keycloak` ayarı 1 iken Frappe'nin yerel giriş işlevleri kapanır.
-    Kapatma adrese değil, çağrılan işleve uygulanır. Bunun için `override_whitelisted_methods` kancası kullanılır.
-    `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi kapsamdadır.
-    `start_login`, `keycloak_callback` ve bu dosyadaki öteki uçlar etkilenmez.
-    Kapı açıkken `/login` sayfasında yalnız marka düğmesi vardır. Düğme `start_login` ucuna gider. Parola formu yoktur.
-    Yönetici kurtarma yolu yalnız site ayarıyla açılır. Ayarı sunucuya erişen yönetici yazar.
+    While the `kimlik_yalniz_keycloak` setting is 1, the Frappe local sign-in functions are closed.
+    The closing applies to the called function, not to the address. The `override_whitelisted_methods` hook is used for this.
+    The `/api/method`, `/api/v1/method`, `/api/v2/method` and `cmd` forms are all covered.
+    `start_login`, `keycloak_callback` and the other endpoints in this file are not affected.
+    While the gate is on, the `/login` page has only the brand button. The button goes to the `start_login` endpoint. There is no password form.
+    The admin recovery path opens only through the site setting. An admin with server access writes the setting.
   parola_girisi:
-    description: Parola girişi 401 ve `AuthenticationError` döner.
+    description: Password sign-in returns 401 and `AuthenticationError`.
     yollar:
       - /api/method/login
       - /api/v2/method/login
       - cmd=login
   kapatilan_islevler:
-    description: Şu işlevler 403 ve `PermissionError` döner.
+    description: These functions return 403 and `PermissionError`.
     islevler:
       - frappe.core.doctype.user.user.reset_password
       - frappe.core.doctype.user.user.update_password
@@ -154,39 +156,39 @@ x-yerel-giris-kapisi:
       - frappe.www.login.send_login_link
       - frappe.www.login.login_via_key
       - frappe.www.login.login_via_token
-      - frappe.integrations.oauth2_logins.* (hazır sosyal giriş uçları)
+      - frappe.integrations.oauth2_logins.* (built-in social sign-in endpoints)
 
 paths:
   /platform_core.api.auth.get_login_url:
     post:
       tags: [giris]
       operationId: getLoginUrl
-      summary: Keycloak giriş adresini üretir ve tarayıcı çerezini verir.
+      summary: Builds the Keycloak sign-in address and gives the browser cookie.
       description: |
-        Panel sayfası bu ucu çağırır. Kullanıcı henüz oturum açmamıştır.
-        Uç Keycloak'ın yetki adresini üretir ve döner.
+        The panel page calls this endpoint. The user has not signed in yet.
+        The endpoint builds the Keycloak authorization address and returns it.
 
-        `login_url` içinde şunlar bulunur: `state`, `nonce`, `code_challenge`,
-        `code_challenge_method=S256` ve `redirect_uri`.
-        `redirect_uri` değeri `<site>/api/method/platform_core.api.auth.keycloak_callback` olur.
-        `state`, `nonce` ve PKCE doğrulayıcısını sunucu üretir. Sunucu bunları 600 saniye saklar.
+        `login_url` contains these: `state`, `nonce`, `code_challenge`,
+        `code_challenge_method=S256` and `redirect_uri`.
+        The `redirect_uri` value is `<site>/api/method/platform_core.api.auth.keycloak_callback`.
+        The server generates `state`, `nonce` and the PKCE verifier. The server keeps them for 600 seconds.
 
-        Yanıt `Set-Cookie` başlığıyla bir tarayıcı değeri verir. Çerezin adı geliştirmede `kimlik_login` olur.
-        HTTPS'te adı `__Host-kimlik_login` olur. Çerez `HttpOnly` ve `SameSite=Lax` olur.
-        HTTPS'te `Secure` de olur. Ömrü 600 saniyedir.
-        Sunucu `state` kaydında bu değerin SHA-256 özetini saklar. Dönüş ucu çerezi bu özetle karşılaştırır.
+        The response gives a browser value with the `Set-Cookie` header. In development the cookie name is `kimlik_login`.
+        On HTTPS the name is `__Host-kimlik_login`. The cookie is `HttpOnly` and `SameSite=Lax`.
+        On HTTPS it is also `Secure`. Its lifetime is 600 seconds.
+        The server keeps the SHA-256 hash of this value in the `state` record. The callback endpoint compares the cookie with this hash.
 
-        `redirect_to` isteğe bağlıdır. Giriş bitince tarayıcı bu yola döner.
-        Yalnız `/` ile başlayan göreli yol kabul edilir. `//` ile başlayan yol reddedilir.
-        Ters eğik çizgi hiçbir yerde kabul edilmez. Boşluk ya da denetim karakteri de kabul edilmez.
-        En çok 2048 karakter olabilir. Uygun olmayan yol 400 ve `InvalidRedirect` döner.
-        `redirect_to` yoksa dönüş adresi `platform_panel_url` ayarıdır.
+        `redirect_to` is optional. After sign-in the browser returns to this path.
+        Only a relative path that starts with `/` is accepted. A path that starts with `//` is rejected.
+        A backslash is not accepted anywhere. A space or a control character is not accepted either.
+        It can be at most 2048 characters. An unsuitable path returns 400 and `InvalidRedirect`.
+        If there is no `redirect_to`, the return address is the `platform_panel_url` setting.
 
-        Zorunlu site ayarlarından biri eksikse uç 503 döner.
-        Zorunlu anahtarlar `x-site-settings` uzantısında yazılıdır.
+        If one of the required site settings is missing, the endpoint returns 503.
+        The required keys are listed in the `x-site-settings` extension.
 
-        Aynı IP adresinden dakikada en çok 20 istek kabul edilir. Fazlası 429 alır.
-        Uç kalıcı kayıt değiştirmez. Uç kişisel veri dönmez.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The endpoint does not change stored records. The endpoint does not return personal data.
       x-yikici: false
       security: []
       requestBody:
@@ -197,20 +199,20 @@ paths:
               $ref: "#/components/schemas/LoginUrlRequest"
             examples:
               panelAnaSayfa:
-                summary: Giriş bitince panele dön.
+                summary: Return to the panel after sign-in.
                 value: {redirect_to: /panel}
               gövdesiz:
-                summary: Dönüş yolu verilmedi. Dönüş adresi `platform_panel_url` olur.
+                summary: No return path is given. The return address is `platform_panel_url`.
                 value: {}
       responses:
         "200":
-          description: Giriş adresi, düğme metni ve tarayıcı çerezi.
+          description: Sign-in address, button label and browser cookie.
           headers:
             Set-Cookie:
               description: |
-                Giriş akışını tarayıcıya bağlayan çerez. Adı geliştirmede `kimlik_login`, HTTPS'te `__Host-kimlik_login` olur.
-                Öznitelikleri `HttpOnly`, `SameSite=Lax`, `Path=/` ve `Max-Age=600` olur. HTTPS'te `Secure` de olur.
-                Değer rastgeledir. Sunucu yalnız özetini saklar.
+                Cookie that binds the sign-in flow to the browser. In development its name is `kimlik_login`. On HTTPS it is `__Host-kimlik_login`.
+                Its attributes are `HttpOnly`, `SameSite=Lax`, `Path=/` and `Max-Age=600`. On HTTPS it is also `Secure`.
+                The value is random. The server keeps only its hash.
               schema:
                 type: string
               examples:
@@ -231,9 +233,9 @@ paths:
                     message:
                       login_url: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?client_id=site-kiraci1&response_type=code&scope=openid+profile+email&redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fapi%2Fmethod%2Fplatform_core.api.auth.keycloak_callback&state=a1b2c3d4e5f6a7b8&nonce=c9d8e7f6a5b4c3d2&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
                       brand_name: Atonota
-                      label: Atonota ile oturum aç
+                      label: Sign in with Atonota
         "400":
-          description: "`redirect_to` güvenli değil. `exc_type` değeri `InvalidRedirect` olur."
+          description: "`redirect_to` is not safe. The `exc_type` value is `InvalidRedirect`."
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -242,15 +244,15 @@ paths:
                   value:
                     exc_type: InvalidRedirect
                     exception: "platform_core.kimlik.hatalar.InvalidRedirect: redirect_to"
-                    _server_messages: '["{\"message\": \"Dönüş yolu güvenli değil.\"}"]'
+                    _server_messages: '["{\"message\": \"Redirect target must be a relative path on this site.\"}"]'
         "417":
           $ref: "#/components/responses/GovdeBozuk"
         "429":
           $ref: "#/components/responses/IstekSiniri"
         "503":
           description: |
-            Keycloak girişi bu sitede kurulu değil. `exc_type` değeri `KeycloakLoginNotConfigured` olur.
-            Zorunlu site ayarlarından biri eksik. Hata iletisi eksik anahtarın adını söyler. Değerini söylemez.
+            Keycloak sign-in is not set up on this site. The `exc_type` value is `KeycloakLoginNotConfigured`.
+            One of the required site settings is missing. The error message does not name the missing key.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -259,31 +261,31 @@ paths:
                   value:
                     exc_type: KeycloakLoginNotConfigured
                     exception: "platform_core.kimlik.hatalar.KeycloakLoginNotConfigured: keycloak_client_id"
-                    _server_messages: '["{\"message\": \"Keycloak girişi bu sitede kurulu değil: keycloak_client_id\"}"]'
+                    _server_messages: '["{\"message\": \"Sign in with the identity provider is not configured.\"}"]'
 
   /platform_core.api.auth.start_login:
     get:
       tags: [giris]
       operationId: startLogin
-      summary: Giriş akışını başlatır ve tarayıcıyı Keycloak'a yönlendirir.
+      summary: Starts the sign-in flow and redirects the browser to Keycloak.
       description: |
-        Giriş sayfasındaki “{marka} ile oturum aç” düğmesi bu uca gider. Kullanıcı henüz oturum açmamıştır.
-        Bu uç tarayıcı akışıdır. Yanıt yönlendirme ya da HTML sayfadır.
-        Hata yanıtları JSON değildir. Bu yüzden `exc_type` yoktur. Sayfa bir başlık ve kısa bir açıklama gösterir.
+        The “Sign in with {0}” button on the sign-in page goes to this endpoint. The user has not signed in yet.
+        This endpoint is a browser flow. The response is a redirect or an HTML page.
+        Error responses are not JSON. So there is no `exc_type`. The page shows a title and a short explanation.
 
-        Uç `get_login_url` ile aynı işi yapar. Sunucu `state`, PKCE doğrulayıcısı ve `nonce` üretir.
-        Sunucu tarayıcı değerini `kimlik_login` çerezine yazar. Çerez kuralları `get_login_url` ucundaki gibidir.
-        Sunucu `state` kaydını 600 saniye saklar.
-        Sonra uç tarayıcıyı Keycloak yetki adresine 302 ile yönlendirir. Adres `get_login_url` ucunun döndürdüğü adresle aynı biçimdedir.
+        The endpoint does the same work as `get_login_url`. The server generates `state`, a PKCE verifier and `nonce`.
+        The server writes the browser value to the `kimlik_login` cookie. The cookie rules are the same as on the `get_login_url` endpoint.
+        The server keeps the `state` record for 600 seconds.
+        Then the endpoint redirects the browser to the Keycloak authorization address with 302. The address has the same form as the one `get_login_url` returns.
 
-        `redirect_to` isteğe bağlıdır. Kuralı `get_login_url` ucundaki ile aynıdır.
-        Yalnız `/` ile başlayan göreli yol kabul edilir. `//` ile başlayan yol reddedilir.
-        Ters eğik çizgi hiçbir yerde kabul edilmez. Uygun olmayan yol 400 döner.
-        `redirect_to` yoksa dönüş adresi `platform_panel_url` ayarıdır.
+        `redirect_to` is optional. Its rule is the same as on the `get_login_url` endpoint.
+        Only a relative path that starts with `/` is accepted. A path that starts with `//` is rejected.
+        A backslash is not accepted anywhere. An unsuitable path returns 400.
+        If there is no `redirect_to`, the return address is the `platform_panel_url` setting.
 
-        Zorunlu site ayarlarından biri eksikse uç 503 döner.
-        Aynı IP adresinden dakikada en çok 20 istek kabul edilir. Fazlası 429 alır.
-        Uç kalıcı kayıt değiştirmez. Uç oturum açmaz. Oturumu `keycloak_callback` ucu açar.
+        If one of the required site settings is missing, the endpoint returns 503.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The endpoint does not change stored records. The endpoint does not open a session. The `keycloak_callback` endpoint opens the session.
       x-yikici: false
       security: []
       parameters:
@@ -291,9 +293,9 @@ paths:
           in: query
           required: false
           description: |
-            Giriş bitince dönülecek göreli yol. `/` ile başlar. `//` ile başlayamaz.
-            Ters eğik çizgi hiçbir yerde olamaz. Boşluk ve denetim karakteri içeremez.
-            En çok 2048 karakter olur. Verilmezse dönüş adresi `platform_panel_url` olur.
+            Relative path to return to after sign-in. It starts with `/`. It cannot start with `//`.
+            It cannot contain a backslash anywhere. It cannot contain a space or a control character.
+            It is at most 2048 characters. If it is not given, the return address is `platform_panel_url`.
           schema:
             type: string
             maxLength: 2048
@@ -303,40 +305,40 @@ paths:
               value: /panel
       responses:
         "302":
-          description: Akış başlatıldı. Tarayıcı Keycloak yetki adresine gider.
+          description: The flow has started. The browser goes to the Keycloak authorization address.
           headers:
             Location:
               description: |
-                Keycloak yetki adresi. Adres `state`, `nonce`, `code_challenge`, `code_challenge_method=S256` ve `redirect_uri` taşır.
-                `redirect_uri` değeri bu sitenin `keycloak_callback` ucudur.
+                Keycloak authorization address. The address carries `state`, `nonce`, `code_challenge`, `code_challenge_method=S256` and `redirect_uri`.
+                The `redirect_uri` value is the `keycloak_callback` endpoint of this site.
               schema: {type: string, format: uri}
               examples:
                 atonota:
                   value: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?client_id=site-kiraci1&response_type=code&scope=openid+profile+email&redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fapi%2Fmethod%2Fplatform_core.api.auth.keycloak_callback&state=a1b2c3d4e5f6a7b8&nonce=c9d8e7f6a5b4c3d2&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
             Set-Cookie:
               description: |
-                Giriş akışını tarayıcıya bağlayan çerez. Adı geliştirmede `kimlik_login`, HTTPS'te `__Host-kimlik_login` olur.
-                Öznitelikleri `HttpOnly`, `SameSite=Lax`, `Path=/` ve `Max-Age=600` olur. HTTPS'te `Secure` de olur.
+                Cookie that binds the sign-in flow to the browser. In development its name is `kimlik_login`. On HTTPS it is `__Host-kimlik_login`.
+                Its attributes are `HttpOnly`, `SameSite=Lax`, `Path=/` and `Max-Age=600`. On HTTPS it is also `Secure`.
               schema: {type: string}
               examples:
                 gelistirme:
                   value: "kimlik_login=9f3b2c1d8e7a6b5c4d3e2f1a0b9c8d7e; Path=/; Max-Age=600; HttpOnly; SameSite=Lax"
         "400":
           description: |
-            `redirect_to` güvenli değil. Sayfa başlığı “Dönüş yolu güvenli değil” olur.
-            Sayfa kullanıcıya giriş sayfasına dönmesini söyler.
+            `redirect_to` is not safe. The page title is “Sign-in failed”. The page body says the return path is not safe.
+            The page tells the user to go back to the sign-in page.
           content:
             text/html:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}
         "429":
-          description: İstek sınırı aşıldı. Sınır IP adresine göre sayılır. Yanıt HTML sayfadır.
+          description: The rate limit was exceeded. The limit is counted per IP address. The response is an HTML page.
           content:
             text/html:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}
         "503":
           description: |
-            Keycloak girişi bu sitede kurulu değil. Zorunlu site ayarlarından biri eksik.
-            Sayfa başlığı “Giriş bu sitede kurulu değil” olur. Sayfa eksik anahtarın adını göstermez.
+            Keycloak sign-in is not set up on this site. One of the required site settings is missing.
+            The page title is “Sign-in failed”. The page body says sign-in is not set up on this site. The page does not show the name of the missing key.
           content:
             text/html:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}
@@ -345,125 +347,125 @@ paths:
     get:
       tags: [giris]
       operationId: keycloakCallback
-      summary: Keycloak'tan dönen tarayıcıyı karşılar ve Frappe oturumu açar.
+      summary: Receives the browser that returns from Keycloak and opens a Frappe session.
       description: |
-        Keycloak tarayıcıyı bu uca döndürür. Kullanıcı Keycloak'ta oturum açmıştır.
-        Bu uç tarayıcı akışıdır. Yanıt HTML sayfa ya da yönlendirmedir.
-        Hata yanıtları JSON değildir. Bu yüzden `exc_type` yoktur. Sayfa bir başlık ve kısa bir açıklama gösterir.
+        Keycloak sends the browser back to this endpoint. The user has signed in at Keycloak.
+        This endpoint is a browser flow. The response is an HTML page or a redirect.
+        Error responses are not JSON. So there is no `exc_type`. The page shows a title and a short explanation.
 
-        Sunucu şu sırayla çalışır.
+        The server works in this order.
 
-        1. Sunucu `state` kaydını tek bölünmez işlemle okur ve siler. Örneğin Redis `GETDEL` kullanılır.
-           Kayıt yoksa, süresi dolmuşsa ya da daha önce kullanılmışsa 400 döner.
-        2. Sunucu `kimlik_login` çerezini okur. Çerez yoksa 400 döner.
-           Çerezdeki değerin SHA-256 özeti kayıttaki özetle eşleşmezse 403 döner.
-        3. Keycloak `error` döndürmüşse sunucu 400 döner. Kod değişimi yapılmaz.
-        4. Sunucu kodu Keycloak token ucunda PKCE `code_verifier` ile belirteçle değiştirir.
-           Değişim başarısız olursa 400 döner.
-        5. Sunucu kimlik belirtecini `oidc_verify.verify_id_token` ile doğrular. `nonce` da denetlenir.
-           Belirteç geçersizse 400 döner.
-        6. Sunucu kullanıcıyı `(iss, sub)` bağıyla bulur.
-           Bağ yoksa ve e-posta doğrulanmışsa aynı e-postalı kullanıcıya ilk bağ kurulur.
-           Doğrulanmamış e-postayla ilk bağ kurulmaz. Bu durumda 403 döner.
-           Bilinmeyen e-posta 403 alır. Kayıt açılmaz. Kullanıcıyı eşitleme servisi açar.
-           Bağ başka kullanıcıya aitse 403 döner. Aynı e-posta başka `sub` değerine bağlıysa 403 döner.
-           Kapalı kullanıcı 403 alır.
-        7. Kullanıcı çalışansa sunucu kimlik belirtecinin `auth_time` değerine bakar (O-25).
-           Çalışan, masaüstü rolü olan “System User” kullanıcısıdır.
-           Değer yoksa ya da 3600 saniyeden eskiyse oturum açılmaz.
-           Sunucu yeni bir `state` üretir ve tarayıcıyı `prompt=login` ile Keycloak'a geri yollar. Yanıt 302 olur.
-           Böylece açık Keycloak çerezi yeniden kimlik doğrulamayı atlatmaz.
-           Bu ikinci denemede de değer eskiyse 403 döner. Müşteri bu adımdan geçmez.
-        8. Sunucu Frappe oturumu açar. Keycloak oturum kimliği (`sid`) oturum verisine yazılır.
-           Arka kanal çıkışı bu değerle eşleşir.
-           Oturum 1 saat işlem olmazsa kapanır. Süre oturum verisinde `session_expiry` olarak durur.
-        9. Sunucu tarayıcıyı `redirect_to` yoluna yönlendirir. Yol kayıtta yoksa `platform_panel_url` adresine yönlendirir.
+        1. The server reads and deletes the `state` record in one atomic operation. For example Redis `GETDEL` is used.
+           If the record does not exist, has expired or was used before, it returns 400.
+        2. The server reads the `kimlik_login` cookie. If there is no cookie, it returns 400.
+           If the SHA-256 hash of the cookie value does not match the hash in the record, it returns 403.
+        3. If Keycloak returned `error`, the server returns 400. No code exchange is done.
+        4. The server exchanges the code for tokens at the Keycloak token endpoint with the PKCE `code_verifier`.
+           If the exchange fails, it returns 400.
+        5. The server verifies the ID token with `oidc_verify.verify_id_token`. `nonce` is also checked.
+           If the token is not valid, it returns 400.
+        6. The server finds the user by the `(iss, sub)` link.
+           If there is no link and the e-mail is verified, a first link is made to the user with the same e-mail.
+           No first link is made with an unverified e-mail. In this case it returns 403.
+           An unknown e-mail gets 403. No record is created. The sync service creates the user.
+           If the link belongs to another user, it returns 403. If the same e-mail is linked to another `sub` value, it returns 403.
+           A disabled user gets 403.
+        7. If the user is an employee, the server checks the `auth_time` value of the ID token (O-25).
+           An employee is a “System User” user with a desk role.
+           If the value is missing or older than 3600 seconds, no session is opened.
+           The server generates a new `state` and sends the browser back to Keycloak with `prompt=login`. The response is 302.
+           So an open Keycloak cookie does not skip re-authentication.
+           If the value is still old on this second try, it returns 403. A customer does not go through this step.
+        8. The server opens a Frappe session. The Keycloak session id (`sid`) is written to the session data.
+           Back-channel logout matches on this value.
+           The session closes after 1 hour without activity. The duration is kept in the session data as `session_expiry`.
+        9. The server redirects the browser to the `redirect_to` path. If the record has no path, it redirects to the `platform_panel_url` address.
 
-        Keycloak'a ulaşılamazsa ya da anahtar listesi alınamazsa 503 döner.
-        Aynı IP adresinden dakikada en çok 20 istek kabul edilir. Fazlası 429 alır.
+        If Keycloak cannot be reached or the key list cannot be fetched, it returns 503.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
 
-        Uç oturum açar. Uç oturum kapatmaz. Uç kullanıcı kaydı açmaz.
+        The endpoint opens a session. The endpoint does not close sessions. The endpoint does not create user records.
       x-yikici: false
       security: []
       parameters:
         - name: code
           in: query
           required: true
-          description: Keycloak'ın verdiği yetki kodu. Tek kullanımlıktır.
+          description: Authorization code given by Keycloak. It can be used only once.
           schema: {type: string, minLength: 1, maxLength: 4096}
         - name: state
           in: query
           required: true
-          description: "`get_login_url` ucunun ürettiği `state` değeri. Kayıt bu değerle bulunur."
+          description: "The `state` value generated by the `get_login_url` endpoint. The record is found by this value."
           schema: {type: string, minLength: 1, maxLength: 255}
         - name: error
           in: query
           required: false
-          description: Keycloak giriş başarısız olunca bunu gönderir. Örneğin `access_denied`. Varsa sunucu 400 döner.
+          description: Keycloak sends this when sign-in fails. For example `access_denied`. If it is present, the server returns 400.
           schema: {type: string, maxLength: 255}
         - name: error_description
           in: query
           required: false
-          description: Keycloak'ın hata açıklaması. Sayfada kullanıcıya gösterilmez. Günlüğe kısaltılarak yazılır.
+          description: Error description from Keycloak. It is not shown to the user on the page. It is written to the log in shortened form.
           schema: {type: string, maxLength: 1024}
         - name: kimlik_login
           in: cookie
           required: true
           description: |
-            `get_login_url` ucunun verdiği tarayıcı çerezi. HTTPS'te adı `__Host-kimlik_login` olur.
-            Çerez yoksa 400 döner. Özeti kayıtla eşleşmezse 403 döner.
+            Browser cookie given by the `get_login_url` endpoint. On HTTPS its name is `__Host-kimlik_login`.
+            If there is no cookie, it returns 400. If its hash does not match the record, it returns 403.
           schema: {type: string, minLength: 1, maxLength: 255}
       responses:
         "302":
-          description: Giriş başarılı. Frappe oturumu açıldı. Tarayıcı dönüş yoluna gider.
+          description: Sign-in succeeded. A Frappe session is open. The browser goes to the return path.
           headers:
             Location:
-              description: "`redirect_to` yolu. Kayıtta yol yoksa `platform_panel_url` adresi."
+              description: "The `redirect_to` path. If the record has no path, the `platform_panel_url` address."
               schema: {type: string}
               examples:
                 panel:
                   value: /panel
             Set-Cookie:
-              description: Frappe oturum çerezleri. `sid` bunlardan biridir. Giriş çerezi `kimlik_login` silinir.
+              description: Frappe session cookies. `sid` is one of them. The sign-in cookie `kimlik_login` is deleted.
               schema: {type: string}
         "400":
           description: |
-            Giriş tamamlanamadı. Sayfa başlığı “Giriş tamamlanamadı” olur. Nedenlerden biri şudur:
+            Sign-in could not be completed. The page title is “Sign-in failed”. The reason is one of these:
 
-            - `state` eksik, süresi dolmuş ya da daha önce kullanılmış,
-            - `kimlik_login` çerezi eksik,
-            - Keycloak `error` döndürmüş,
-            - kod değişimi başarısız,
-            - kimlik belirteci geçersiz. `nonce` uyuşmazlığı da buna girer.
+            - `state` is missing, expired or used before,
+            - the `kimlik_login` cookie is missing,
+            - Keycloak returned `error`,
+            - the code exchange failed,
+            - the ID token is not valid. A `nonce` mismatch also counts here.
 
-            Sayfa kullanıcıya girişi yeniden başlatmasını söyler.
+            The page tells the user to start sign-in again.
           content:
             text/html:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}
         "403":
           description: |
-            Giriş reddedildi. Sayfa başlığı “Giriş reddedildi” olur. Nedenlerden biri şudur:
+            Sign-in was refused. The page title is “Sign-in failed”. The reason is one of these:
 
-            - çerez özeti kayıtla uyuşmuyor,
-            - kimlik bağı başka kullanıcıya ait,
-            - aynı e-posta başka bir `sub` değerine bağlı,
-            - e-posta doğrulanmamış,
-            - kullanıcı bu sitede yok,
-            - kullanıcı kapalı.
+            - the cookie hash does not match the record,
+            - the identity link belongs to another user,
+            - the same e-mail is linked to another `sub` value,
+            - the e-mail is not verified,
+            - the user does not exist on this site,
+            - the user is disabled.
 
-            Sayfa nedeni ayrıntılı yazmaz. Sayfa kullanıcıya yöneticisine başvurmasını söyler.
+            The page does not give the reason in detail. The page tells the user to contact their admin.
           content:
             text/html:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}
         "429":
-          description: İstek sınırı aşıldı. Sınır IP adresine göre sayılır. Yanıt HTML sayfadır.
+          description: The rate limit was exceeded. The limit is counted per IP address. The response is an HTML page.
           content:
             text/html:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}
         "503":
           description: |
-            Keycloak'a ulaşılamadı ya da anahtar listesi alınamadı. Sayfa başlığı “Kimlik sunucusuna ulaşılamadı” olur.
-            Sayfa kullanıcıya biraz sonra yeniden denemesini söyler.
+            Keycloak could not be reached or the key list could not be fetched. The page title is “Sign-in failed”. The page body says the identity provider could not be reached.
+            The page tells the user to try again a little later.
           content:
             text/html:
               schema: {$ref: "#/components/schemas/HtmlSayfa"}
@@ -472,28 +474,28 @@ paths:
     post:
       tags: [giris]
       operationId: logout
-      summary: Frappe oturumunu kapatır ve Keycloak çıkış adresini döner.
+      summary: Closes the Frappe session and returns the Keycloak logout address.
       description: |
-        Panel sayfası bu ucu çağırır. Kullanıcı çıkış düğmesine basmıştır.
+        The panel page calls this endpoint. The user has pressed the sign-out button.
 
-        **Bu uç oturum kapatır.** Uç çağıranın Frappe oturumunu hemen kapatır.
-        `sid` çerezi bundan sonra geçersizdir. Geri alınamaz.
+        **This endpoint closes a session.** The endpoint closes the Frappe session of the caller at once.
+        After this the `sid` cookie is not valid. This cannot be undone.
 
-        Uç Keycloak çıkış adresini döner. Panel tarayıcıyı bu adrese yönlendirir.
-        Keycloak oturumu ancak o zaman kapanır.
-        Adres `client_id` ve `post_logout_redirect_uri` taşır. Dönüş adresi `platform_panel_url` ayarıdır.
+        The endpoint returns the Keycloak logout address. The panel redirects the browser to this address.
+        Only then does the Keycloak session close.
+        The address carries `client_id` and `post_logout_redirect_uri`. The return address is the `platform_panel_url` setting.
 
-        Bilinen sınır: Adreste `id_token_hint` yoktur. Sunucu kimlik belirtecini saklamaz.
-        Bu yüzden Keycloak bir onay ekranı gösterebilir.
+        Known limit: The address has no `id_token_hint`. The server does not keep the ID token.
+        So Keycloak may show a confirmation screen.
 
-        İstek gövdesizdir. Misafir isteği 403 alır. Süresi biten oturum 401 alır.
+        The request has no body. A guest request gets 403. An expired session gets 401.
       x-yikici: true
       security:
         - frappeSession: []
           csrfToken: []
       responses:
         "200":
-          description: Frappe oturumu kapandı. Tarayıcı `logout_url` adresine gitmelidir.
+          description: The Frappe session is closed. The browser should go to the `logout_url` address.
           content:
             application/json:
               schema:
@@ -508,12 +510,12 @@ paths:
                       logout_url: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/logout?client_id=site-kiraci1&post_logout_redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fpanel"
         "403":
           description: |
-            Misafir isteği. Çerez hiç yoktur. `exc_type` değeri `PermissionError` olur.
+            Guest request. There is no cookie at all. The `exc_type` value is `PermissionError`.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
         "400":
-          description: CSRF başlığı yok ya da yanlış. `exc_type` değeri `CSRFTokenError` olur.
+          description: The CSRF header is missing or wrong. The `exc_type` value is `CSRFTokenError`.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -524,28 +526,28 @@ paths:
     post:
       tags: [kurulum]
       operationId: setupKeycloakLogin
-      summary: Sitede Keycloak girişini açar.
+      summary: Turns on Keycloak sign-in on the site.
       description: |
-        Site yöneticisi bu ucu çağırır. Yalnız “System Manager” rolü çağırabilir.
+        The site admin calls this endpoint. Only the “System Manager” role can call it.
 
-        Uç “Social Login Key” kaydı `keycloak` yoksa kaydı açar. Kayıt varsa kaydı günceller.
-        Kayıt `provider_name` alanında marka adını taşır. Kullanıcı kimliği `sub` alanından okunur.
-        Kayıt yalnız yönetim ekranında görünürlük içindir. Giriş akışı bu kayıttan geçmez.
-        Giriş akışı `get_login_url` ve `keycloak_callback` uçlarındadır.
+        If the “Social Login Key” record `keycloak` does not exist, the endpoint creates it. If the record exists, the endpoint updates it.
+        The record carries the brand name in the `provider_name` field. The user identity is read from the `sub` field.
+        The record exists only for visibility in the admin screen. The sign-in flow does not go through this record.
+        The sign-in flow is in the `get_login_url` and `keycloak_callback` endpoints.
 
-        Uç aynı isteği iki kez alırsa aynı sonucu döner. İkinci çağrı bir şey bozmaz.
+        If the endpoint gets the same request twice, it returns the same result. The second call breaks nothing.
 
-        Site ayarlarında zorunlu bir anahtar eksikse uç 400 döner.
-        Zorunlu anahtarlar `x-site-settings` uzantısında yazılıdır.
+        If a required key is missing in the site settings, the endpoint returns 400.
+        The required keys are listed in the `x-site-settings` extension.
 
-        İstek gövdesizdir. Uç oturum kapatmaz. Uç ücretli iş yapmaz.
+        The request has no body. The endpoint does not close sessions. The endpoint does not do paid work.
       x-yikici: false
       security:
         - frappeSession: []
           csrfToken: []
       responses:
         "200":
-          description: Keycloak girişi açık.
+          description: Keycloak sign-in is on.
           content:
             application/json:
               schema:
@@ -562,8 +564,8 @@ paths:
                       provider_name: Atonota
         "400":
           description: |
-            Site ayarı eksik. `exc_type` değeri `KeycloakSettingsMissing` olur.
-            Hata iletisi eksik anahtarın adını söyler. Değerini söylemez.
+            A site setting is missing. The `exc_type` value is `KeycloakSettingsMissing`.
+            The error message names the missing key. It does not give its value.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -572,10 +574,10 @@ paths:
                   value:
                     exc_type: KeycloakSettingsMissing
                     exception: "platform_core.kimlik.hatalar.KeycloakSettingsMissing: kimlik_marka_adi"
-                    _server_messages: '["{\"message\": \"Site ayarı eksik: kimlik_marka_adi\"}"]'
+                    _server_messages: '["{\"message\": \"Keycloak settings are missing: kimlik_marka_adi\"}"]'
         "403":
           description: |
-            Çağıran “System Manager” değil ya da misafir. `exc_type` değeri `PermissionError` olur.
+            The caller is not a “System Manager” or is a guest. The `exc_type` value is `PermissionError`.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -586,34 +588,34 @@ paths:
     post:
       tags: [giris]
       operationId: keycloakBackchannelLogout
-      summary: Keycloak'ın çıkış belirteciyle eşleşen Frappe oturumlarını kapatır.
+      summary: Closes the Frappe sessions that match the Keycloak logout token.
       description: |
-        Keycloak bu ucu çağırır. Kullanıcı Keycloak'ta çıkış yapınca Keycloak `logout_token` gönderir.
-        Bu uç OpenID Connect “Back-Channel Logout” ucudur. Tarayıcı bu ucu çağırmaz.
+        Keycloak calls this endpoint. When the user signs out at Keycloak, Keycloak sends `logout_token`.
+        This endpoint is the OpenID Connect “Back-Channel Logout” endpoint. The browser does not call this endpoint.
 
-        **Bu uç oturum kapatır.** Eşleşen bütün Frappe oturumları hemen kapanır. Geri alınamaz.
+        **This endpoint closes sessions.** All matching Frappe sessions close at once. This cannot be undone.
 
-        Belirteç şöyle doğrulanır: imza, `iss`, `aud`, `iat`, `exp`, `jti`, çıkış olayı anahtarı,
-        `sid` ya da `sub` varlığı ve `nonce` yokluğu. Saat payı 30 saniyedir.
-        `events` içindeki çıkış olayının değeri JSON nesnesi olmalıdır. `sid` varsa metin olmalıdır.
-        Sunucu işlenen `jti` değerini belirtecin ömrü boyunca saklar. Aynı `jti` yeniden gelirse reddedilir.
-        Kurallar `docs/sozlesmeler.md` 3. bölümdedir.
+        The token is verified like this: signature, `iss`, `aud`, `iat`, `exp`, `jti`, the logout event key,
+        presence of `sid` or `sub` and absence of `nonce`. The clock skew allowance is 30 seconds.
+        The value of the logout event in `events` must be a JSON object. If `sid` is present, it must be text.
+        The server keeps each processed `jti` value for the lifetime of the token. If the same `jti` comes again, it is rejected.
+        The rules are in section 3 of `docs/sozlesmeler.md`.
 
-        Eşleşme sırası:
+        Match order:
 
-        1. Belirteçte `sid` varsa oturum verisinde aynı `keycloak_sid` değerini taşıyan oturumlar kapanır.
-        2. Eşleşme yoksa ve `sub` varsa `(iss, sub)` bağındaki kullanıcının oturumları kapanır.
-           Bu yedek yol yalnız belirtecin `iat` değerinden önce açılmış oturumları kapatır.
-           Bildiriden sonra açılan oturumlar açık kalır.
+        1. If the token has `sid`, the sessions whose session data carries the same `keycloak_sid` value close.
+        2. If there is no match and `sub` is present, the sessions of the user in the `(iss, sub)` link close.
+           This fallback path closes only sessions opened before the `iat` value of the token.
+           Sessions opened after the notice stay open.
 
-        Eşleşen oturum yoksa yanıt yine 200 olur. `closed_sessions` değeri 0 olur.
-        Yanıt `Cache-Control: no-store` başlığı taşır.
+        If no session matches, the response is still 200. The `closed_sessions` value is 0.
+        The response carries the `Cache-Control: no-store` header.
 
-        İstek misafir olmalıdır. İstek Guest dışı bir oturum çerezi taşırsa 400 döner.
-        Belirteç eksik ya da geçersizse 400 döner. Uç nedeni ayrıntılı yazmaz.
-        Keycloak anahtar listesi alınamazsa 503 döner. Keycloak isteği sonra yeniden gönderir.
+        The request must be a guest request. If the request carries a non-Guest session cookie, it returns 400.
+        If the token is missing or not valid, it returns 400. The endpoint does not give the reason in detail.
+        If the Keycloak key list cannot be fetched, it returns 503. Keycloak sends the request again later.
 
-        Aynı IP adresinden dakikada en çok 300 istek kabul edilir. Fazlası 429 alır.
+        At most 300 requests per minute are accepted from the same IP address. Extra requests get 429.
       x-yikici: true
       security: []
       requestBody:
@@ -624,15 +626,15 @@ paths:
               $ref: "#/components/schemas/LogoutTokenForm"
             examples:
               keycloak:
-                summary: Keycloak'ın gönderdiği form.
+                summary: The form that Keycloak sends.
                 value:
                   logout_token: eyJhbGciOiJSUzI1NiIsImtpZCI6Im9ybmVrIn0.eyJpc3MiOiJodHRwOi8va2ltbGlrLmxvY2FsaG9zdDo4NjYwL3JlYWxtcy9wbGF0Zm9ybSJ9.ornek-imza
       responses:
         "200":
-          description: İstek işlendi. Kapanan oturum sayısı döner.
+          description: The request was processed. The number of closed sessions is returned.
           headers:
             Cache-Control:
-              description: Her zaman `no-store` olur.
+              description: It is always `no-store`.
               schema:
                 type: string
                 const: no-store
@@ -650,20 +652,20 @@ paths:
                   value: {message: {closed_sessions: 0}}
         "400":
           description: |
-            Belirteç kabul edilmedi. `exc_type` değeri `InvalidLogoutToken` olur. Nedenlerden biri şudur:
+            The token was not accepted. The `exc_type` value is `InvalidLogoutToken`. The reason is one of these:
 
-            - `logout_token` eksik,
-            - imza, `iss` ya da `aud` yanlış,
-            - `iat`, `exp` ya da `jti` eksik,
-            - `exp` geçmiş ya da `iat` ileride,
-            - `events` içinde çıkış olayı yok ya da değeri JSON nesnesi değil,
-            - `sid` ve `sub` ikisi de yok,
-            - `sid` var ama metin değil,
-            - `nonce` var,
-            - aynı `jti` daha önce işlenmiş (tekrar gönderim),
-            - istek Guest dışı oturum çerezi taşıyor.
+            - `logout_token` is missing,
+            - the signature, `iss` or `aud` is wrong,
+            - `iat`, `exp` or `jti` is missing,
+            - `exp` is in the past or `iat` is in the future,
+            - `events` has no logout event or its value is not a JSON object,
+            - both `sid` and `sub` are missing,
+            - `sid` is present but is not text,
+            - `nonce` is present,
+            - the same `jti` was processed before (replay),
+            - the request carries a non-Guest session cookie.
 
-            İleti nedeni ayrıntılı yazmaz.
+            The message does not give the reason in detail.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -672,7 +674,7 @@ paths:
                   value:
                     exc_type: InvalidLogoutToken
                     exception: "platform_core.kimlik.hatalar.InvalidLogoutToken: logout_token"
-                    _server_messages: '["{\"message\": \"Çıkış belirteci geçersiz.\"}"]'
+                    _server_messages: '["{\"message\": \"Logout token rejected: malformed\"}"]'
         "429":
           $ref: "#/components/responses/IstekSiniri"
         "503":
@@ -682,33 +684,33 @@ paths:
     post:
       tags: [eşitleme]
       operationId: identityProvision
-      summary: Kullanıcıyı açar ya da günceller ve kimlik bağını kurar.
+      summary: Creates or updates the user and makes the identity link.
       description: |
-        Eşitleme servisi bu ucu çağırır. Servis belirteci `azp=identity-sync` taşımalıdır.
+        The sync service calls this endpoint. The service token must carry `azp=identity-sync`.
 
-        Uç önce girdiyi denetler. `issuer`, `subject`, `email`, `email_verified` ve `enabled` zorunludur.
-        `email_verified` ve `enabled` doğru ya da yanlış olmalıdır. `first_name` ve `last_name` metin olmalıdır.
-        `role_profiles` içindeki her rol profili sitede var olmalıdır. Aksi durumda 400 ve `InvalidInput` döner.
+        The endpoint first checks the input. `issuer`, `subject`, `email`, `email_verified` and `enabled` are required.
+        `email_verified` and `enabled` must be true or false. `first_name` and `last_name` must be text.
+        Each role profile in `role_profiles` must exist on the site. Otherwise it returns 400 and `InvalidInput`.
 
-        Uç sonra `issuer` değerini sitenin `iss` değeriyle karşılaştırır. Farklıysa 400 döner.
+        The endpoint then compares the `issuer` value with the `iss` value of the site. If they differ, it returns 400.
 
-        Bağ `(issuer, subject)` varsa kullanıcı bulunmuştur. Uç ad, soyad, `enabled` ve
-        `role_profiles` alanlarını günceller. `email` kullanıcının adından farklıysa 409 döner.
-        E-posta değişikliği yalnız `change_email` ucundan yapılır.
+        If the `(issuer, subject)` link exists, the user is found. The endpoint updates the first name, last name, `enabled` and
+        `role_profiles` fields. If `email` differs from the user name, it returns 409.
+        An e-mail change is made only through the `change_email` endpoint.
 
-        Bağ yoksa uç yeni bağ kurar. Bunun için `email_verified` doğru olmalıdır.
-        Aynı e-postalı kullanıcı aynı `issuer` ile başka bir `subject` değerine bağlıysa 409 döner.
-        Aynı e-postalı kullanıcı var ama “Website User” değilse 409 döner.
-        Aynı e-postalı kullanıcının masaüstü erişimi açık bir rolü varsa da 409 döner.
-        Yönetim hesapları eşitlemeyle sahiplenilmez.
-        Kullanıcı yoksa uç “Website User” türünde kullanıcı açar. Hoş geldin e-postası gönderilmez.
-        Yeni kullanıcıya rol verilmez.
+        If there is no link, the endpoint makes a new link. For this `email_verified` must be true.
+        If the user with the same e-mail is linked to another `subject` value with the same `issuer`, it returns 409.
+        If a user with the same e-mail exists but is not a “Website User”, it returns 409.
+        If the user with the same e-mail has a role with desk access, it also returns 409.
+        Admin accounts are not taken over by sync.
+        If there is no user, the endpoint creates a user of type “Website User”. No welcome e-mail is sent.
+        The new user gets no role.
 
-        `role_profiles` içindeki bir rolün `desk_access` değeri 1 ise 400 döner.
-        Masaüstü erişimi bu uçtan verilmez.
+        If a role in `role_profiles` has a `desk_access` value of 1, it returns 400.
+        Desk access is not granted through this endpoint.
 
-        Uç aynı istekte aynı gövdeyi döner. İkinci çağrı bir şey değiştirmez.
-        `enabled` yanlış gelirse kullanıcı kapanır. Bu bakımdan uç yıkıcı iş yapabilir.
+        For the same request the endpoint returns the same body. The second call changes nothing.
+        If `enabled` comes as false, the user is disabled. In this respect the endpoint can do destructive work.
       x-yikici: true
       security:
         - serviceToken: []
@@ -720,7 +722,7 @@ paths:
               $ref: "#/components/schemas/ProvisionRequest"
             examples:
               yeniKullanici:
-                summary: Doğrulanmış e-postalı yeni kullanıcı.
+                summary: New user with a verified e-mail.
                 value:
                   issuer: http://kimlik.localhost:8660/realms/platform
                   subject: 11111111-1111-4111-8111-111111111111
@@ -732,7 +734,7 @@ paths:
                   role_profiles: [Portal Kullanıcısı]
       responses:
         "200":
-          description: Kullanıcı açık ya da güncel. İki çağrıda aynı gövde döner.
+          description: The user exists or is up to date. Two calls return the same body.
           content:
             application/json:
               schema:
@@ -750,13 +752,13 @@ paths:
                       user_type: Website User
         "400":
           description: |
-            Girdi kabul edilmedi. `exc_type` değeri şunlardan biri olur.
+            The input was not accepted. The `exc_type` value is one of these.
 
-            - `issuer` sitenin `iss` değerinden farklıysa `UnknownIssuer` döner.
-            - `role_profiles` içinde masaüstü erişimi veren rol varsa `DeskRoleNotAllowed` döner.
-            - Alan eksikse ya da yanlış biçimliyse `InvalidInput` döner. Örnekler şunlardır.
-              `email` eksik. `email_verified` eksik. `enabled` doğru ya da yanlış değil.
-              `first_name` metin değil. `role_profiles` içinde var olmayan rol profili var.
+            - If `issuer` differs from the `iss` value of the site, it returns `UnknownIssuer`.
+            - If `role_profiles` has a role that grants desk access, it returns `DeskRoleNotAllowed`.
+            - If a field is missing or malformed, it returns `InvalidInput`. Examples are these.
+              `email` is missing. `email_verified` is missing. `enabled` is not true or false.
+              `first_name` is not text. `role_profiles` has a role profile that does not exist.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -765,25 +767,25 @@ paths:
                   value:
                     exc_type: UnknownIssuer
                     exception: "platform_core.kimlik.hatalar.UnknownIssuer: issuer"
-                    _server_messages: '["{\"message\": \"issuer bu sitenin kimlik sunucusu değil.\"}"]'
+                    _server_messages: '["{\"message\": \"Issuer is not the configured identity provider.\"}"]'
                 dogrulamaEksik:
                   value:
                     exc_type: InvalidInput
                     exception: "platform_core.kimlik.hatalar.InvalidInput: email_verified"
-                    _server_messages: '["{\"message\": \"email_verified alanı zorunlu.\"}"]'
+                    _server_messages: '["{\"message\": \"Field email_verified is required.\"}"]'
         "401":
           $ref: "#/components/responses/ServisBelirteciReddi"
         "403":
           $ref: "#/components/responses/ServisYetkisiYok"
         "409":
           description: |
-            İstek sitedeki durumla çelişiyor. `exc_type` değeri şunlardan biri olur.
+            The request conflicts with the state on the site. The `exc_type` value is one of these.
 
-            - Bağ var ama `email` kullanıcının adından farklıysa `EmailMismatch` döner. E-postayı `change_email` ile değiştirin.
-            - Bağ yok ve `email_verified` yanlışsa `EmailNotVerified` döner. İlk bağ kurulmaz.
-            - Aynı e-postalı kullanıcı aynı `issuer` ile başka bir `subject` değerine bağlıysa `IdentityConflict` döner.
-            - Bağsız var olan kullanıcı “Website User” değilse `IdentityConflict` döner.
-            - Bağsız var olan kullanıcının masaüstü erişimi açık bir rolü varsa `IdentityConflict` döner.
+            - If the link exists but `email` differs from the user name, it returns `EmailMismatch`. Change the e-mail with `change_email`.
+            - If there is no link and `email_verified` is false, it returns `EmailNotVerified`. No first link is made.
+            - If the user with the same e-mail is linked to another `subject` value with the same `issuer`, it returns `IdentityConflict`.
+            - If an existing user without a link is not a “Website User”, it returns `IdentityConflict`.
+            - If an existing user without a link has a role with desk access, it returns `IdentityConflict`.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -792,12 +794,12 @@ paths:
                   value:
                     exc_type: EmailNotVerified
                     exception: "platform_core.kimlik.hatalar.EmailNotVerified: email_verified"
-                    _server_messages: '["{\"message\": \"E-posta doğrulanmadan ilk bağ kurulmaz.\"}"]'
+                    _server_messages: '["{\"message\": \"The first link requires a verified e-mail address.\"}"]'
                 yonetimHesabi:
                   value:
                     exc_type: IdentityConflict
                     exception: "platform_core.kimlik.hatalar.IdentityConflict: email"
-                    _server_messages: '["{\"message\": \"Bu e-posta eşitlemeyle sahiplenilemeyen bir hesaba ait.\"}"]'
+                    _server_messages: '["{\"message\": \"This e-mail belongs to a desk user and cannot be provisioned.\"}"]'
         "417":
           $ref: "#/components/responses/GovdeBozuk"
         "503":
@@ -807,15 +809,15 @@ paths:
     post:
       tags: [eşitleme]
       operationId: identitySetEnabled
-      summary: Bağlı kullanıcıyı açar ya da kapatır.
+      summary: Enables or disables the linked user.
       description: |
-        Eşitleme servisi bu ucu çağırır. Servis belirteci `azp=identity-sync` taşımalıdır.
+        The sync service calls this endpoint. The service token must carry `azp=identity-sync`.
 
-        **Bu uç kullanıcıyı kapatabilir.** `enabled` yanlış gelince kullanıcı kapanır.
-        Kapalı kullanıcı oturum açamaz. Aynı uç `enabled` doğru ile çağrılınca kullanıcı yeniden açılır.
+        **This endpoint can disable the user.** When `enabled` comes as false, the user is disabled.
+        A disabled user cannot sign in. When the same endpoint is called with `enabled` true, the user is enabled again.
 
-        Bağ `(issuer, subject)` yoksa 404 döner. Uç yeni kullanıcı açmaz.
-        Uç aynı istekte aynı gövdeyi döner.
+        If the `(issuer, subject)` link does not exist, it returns 404. The endpoint does not create a new user.
+        For the same request the endpoint returns the same body.
       x-yikici: true
       security:
         - serviceToken: []
@@ -827,14 +829,14 @@ paths:
               $ref: "#/components/schemas/SetEnabledRequest"
             examples:
               kapat:
-                summary: Kullanıcıyı kapat.
+                summary: Disable the user.
                 value:
                   issuer: http://kimlik.localhost:8660/realms/platform
                   subject: 11111111-1111-4111-8111-111111111111
                   enabled: false
       responses:
         "200":
-          description: Kullanıcının son durumu.
+          description: The latest state of the user.
           content:
             application/json:
               schema:
@@ -863,19 +865,19 @@ paths:
     post:
       tags: [eşitleme]
       operationId: identityChangeEmail
-      summary: Bağlı kullanıcının e-postasını değiştirir.
+      summary: Changes the e-mail of the linked user.
       description: |
-        Eşitleme servisi bu ucu çağırır. Servis belirteci `azp=identity-sync` taşımalıdır.
+        The sync service calls this endpoint. The service token must carry `azp=identity-sync`.
 
-        **Bu uç kullanıcının adını değiştirir.** Frappe'de kullanıcının adı e-postasıdır.
-        Uç kaydı `rename_doc` ile yeniden adlandırır. Kullanıcıya bağlı bütün kayıtlar yeni ada taşınır.
-        Eski e-postayla açık oturumlar kapanabilir. İşlem geri alınmaz.
-        Geri almak için uç eski e-postayla yeniden çağrılır.
+        **This endpoint changes the user name.** In Frappe the user name is the e-mail.
+        The endpoint renames the record with `rename_doc`. All records linked to the user move to the new name.
+        Open sessions with the old e-mail may close. The operation is not undone.
+        To undo it, the endpoint is called again with the old e-mail.
 
-        Bağ `(issuer, subject)` yoksa 404 döner.
-        `new_email` başka bir kullanıcıya aitse 409 döner.
-        `new_email` kullanıcının şimdiki e-postasıysa hiçbir şey değişmez ve 200 döner.
-        Uç aynı istekte aynı gövdeyi döner.
+        If the `(issuer, subject)` link does not exist, it returns 404.
+        If `new_email` belongs to another user, it returns 409.
+        If `new_email` is the current e-mail of the user, nothing changes and it returns 200.
+        For the same request the endpoint returns the same body.
       x-yikici: true
       security:
         - serviceToken: []
@@ -893,7 +895,7 @@ paths:
                   new_email: kiraci1.kullanici1.yeni@example.test
       responses:
         "200":
-          description: Kullanıcının yeni adı.
+          description: The new name of the user.
           content:
             application/json:
               schema:
@@ -914,7 +916,7 @@ paths:
         "404":
           $ref: "#/components/responses/BagYok"
         "409":
-          description: "`new_email` başka bir kullanıcıya ait. `exc_type` değeri `EmailInUse` olur."
+          description: "`new_email` belongs to another user. The `exc_type` value is `EmailInUse`."
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -923,7 +925,7 @@ paths:
                   value:
                     exc_type: EmailInUse
                     exception: "platform_core.kimlik.hatalar.EmailInUse: new_email"
-                    _server_messages: '["{\"message\": \"Bu e-posta başka bir kullanıcıya ait.\"}"]'
+                    _server_messages: '["{\"message\": \"The new e-mail address belongs to another user.\"}"]'
         "417":
           $ref: "#/components/responses/GovdeBozuk"
         "503":
@@ -933,29 +935,29 @@ paths:
     post:
       tags: [eşitleme]
       operationId: identityAnonymizeUser
-      summary: Bağlı kullanıcıyı kapatır ve kişiyi gösteren alanları anonim yapar.
+      summary: Disables the linked user and anonymizes the fields that identify the person.
       description: |
-        Eşitleme servisi bu ucu hesap silme akışının 4. adımında çağırır (Proje kaydı O-27).
-        Servis belirteci `azp=identity-sync` taşımalıdır.
+        The sync service calls this endpoint in step 4 of the account deletion flow (project record O-27).
+        The service token must carry `azp=identity-sync`.
 
-        **Bu uç geri alınamaz.** Kullanıcı kapanır. Kullanıcının bütün oturumları kapanır.
-        Kullanıcının adı `deleted-user-<sıra>@<site>` biçiminde anonim bir ada çevrilir.
-        Kişiyi gösteren alanlar anonim yapılır. Örneğin ad, soyad, telefon ve e-posta böyledir.
-        İş kayıtları silinmez. Örneğin izin talebi kalır. Talepteki kişi alanı anonim ada döner.
+        **This endpoint cannot be undone.** The user is disabled. All sessions of the user close.
+        The user name is changed to an anonymous name of the form `deleted-user-<number>@<site>`.
+        The fields that identify the person are anonymized. For example first name, last name, phone and e-mail.
+        Business records are not deleted. For example a leave request stays. The person field in the request changes to the anonymous name.
 
-        Uç Frappe 16'nın hazır anonimleştirme yolunu kullanır.
-        Anonim yapılacak alanları her uygulama kendi `user_data_fields` kancasında yazar.
-        Frappe, ERPNext ve öteki kurulu uygulamaların kancaları birlikte uygulanır.
-        Sunucu her istek için bir “Personal Data Deletion Request” kaydı açar.
-        Kayıt işin izini tutar. İş bitince kaydın durumu “Deleted” olur. Kayıtta özgün e-posta kalmaz.
-        Frappe'nin e-posta onayı ve yönetici onayı adımları kullanılmaz. Kullanıcıya e-posta gitmez.
-        Onayı hesap silme isteğiyle eşitleme servisi almıştır.
+        The endpoint uses the built-in anonymization path of Frappe 16.
+        Each app lists the fields to anonymize in its own `user_data_fields` hook.
+        The hooks of Frappe, ERPNext and the other installed apps are applied together.
+        The server creates one “Personal Data Deletion Request” record for each request.
+        The record keeps a trace of the work. When the work is done, the record status is “Deleted”. The original e-mail does not stay in the record.
+        The Frappe e-mail confirmation and admin approval steps are not used. No e-mail goes to the user.
+        The sync service got the consent with the account deletion request.
 
-        Kimlik bağı silinmez. Bağ anonim kullanıcıyı gösterir.
-        Aynı istek ikinci kez gelirse uç bir şey değiştirmez. Uç ilk istekteki gövdeyi döner.
-        Bağ `(issuer, subject)` yoksa 404 döner. Eşitleme servisi 404 yanıtını “bu sitede kullanıcı yok” diye okur.
-        `Administrator` ve `Guest` hesapları anonim yapılamaz. Bu durumda 409 döner.
-        İstek gövdesi en çok 16 KB olur.
+        The identity link is not deleted. The link points to the anonymous user.
+        If the same request comes a second time, the endpoint changes nothing. The endpoint returns the body of the first request.
+        If the `(issuer, subject)` link does not exist, it returns 404. The sync service reads the 404 response as “no user on this site”.
+        The `Administrator` and `Guest` accounts cannot be anonymized. In this case it returns 409.
+        The request body is at most 16 KB.
       x-yikici: true
       security:
         - serviceToken: []
@@ -967,13 +969,13 @@ paths:
               $ref: "#/components/schemas/AnonymizeUserRequest"
             examples:
               sil:
-                summary: Kullanıcıyı anonim yap.
+                summary: Anonymize the user.
                 value:
                   issuer: http://kimlik.localhost:8660/realms/platform
                   subject: 11111111-1111-4111-8111-111111111111
       responses:
         "200":
-          description: Kullanıcı kapandı ve anonim yapıldı. İkinci istek de aynı gövdeyi alır.
+          description: The user is disabled and anonymized. A second request gets the same body.
           content:
             application/json:
               schema:
@@ -997,12 +999,12 @@ paths:
         "404":
           $ref: "#/components/responses/BagYok"
         "409":
-          description: "Bağlı hesap `Administrator` ya da `Guest`. `exc_type` değeri `IdentityConflict` olur."
+          description: "The linked account is `Administrator` or `Guest`. The `exc_type` value is `IdentityConflict`."
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
         "413":
-          description: İstek gövdesi 16 KB'tan büyük. `exc_type` değeri `PayloadTooLarge` olur.
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FrappeError"}
@@ -1015,17 +1017,17 @@ paths:
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedResetPassword
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.core.doctype.user.user.reset_password` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.core.doctype.user.user.reset_password` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.core.doctype.user.user.reset_password` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Parola sıfırlama e-postası ister.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.core.doctype.user.user.reset_password` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.reset_password`. The original function does this. It requests a password reset e-mail.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.core.doctype.user.user.reset_password` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.core.doctype.user.user.reset_password
       security: []
@@ -1033,22 +1035,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.update_password:
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedUpdatePassword
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.core.doctype.user.user.update_password` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.core.doctype.user.user.update_password` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.core.doctype.user.user.update_password` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Yeni parolayı yazar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.core.doctype.user.user.update_password` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.update_password`. The original function does this. It writes the new password.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.core.doctype.user.user.update_password` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.core.doctype.user.user.update_password
       security: []
@@ -1056,22 +1058,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.sign_up:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedSignUpGet
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.core.doctype.user.user.sign_up` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.core.doctype.user.user.sign_up` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.core.doctype.user.user.sign_up` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Yeni hesap açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.core.doctype.user.user.sign_up` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.sign_up`. The original function does this. It creates a new account.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.core.doctype.user.user.sign_up` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.core.doctype.user.user.sign_up
       security: []
@@ -1079,21 +1081,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedSignUpPost
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.core.doctype.user.user.sign_up` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.core.doctype.user.user.sign_up` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.core.doctype.user.user.sign_up` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Yeni hesap açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.core.doctype.user.user.sign_up` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.sign_up`. The original function does this. It creates a new account.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.core.doctype.user.user.sign_up` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.core.doctype.user.user.sign_up
       security: []
@@ -1101,22 +1103,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.send_login_link:
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedSendLoginLink
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.www.login.send_login_link` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.www.login.send_login_link` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.www.login.send_login_link` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: E-postayla giriş bağlantısı yollar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.www.login.send_login_link` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.send_login_link`. The original function does this. It sends a sign-in link by e-mail.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.www.login.send_login_link` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.www.login.send_login_link
       security: []
@@ -1124,22 +1126,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.login_via_key:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaKey
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.www.login.login_via_key` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.www.login.login_via_key` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.www.login.login_via_key` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: E-postadaki anahtarla oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.www.login.login_via_key` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.login_via_key`. The original function does this. It signs in with the key from the e-mail.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.www.login.login_via_key` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.www.login.login_via_key
       security: []
@@ -1147,22 +1149,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.login_via_token:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaTokenGet
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.www.login.login_via_token` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.www.login.login_via_token` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.www.login.login_via_token` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Giriş belirteciyle oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.www.login.login_via_token` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.login_via_token`. The original function does this. It signs in with a login token.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.www.login.login_via_token` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.www.login.login_via_token
       security: []
@@ -1170,21 +1172,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaTokenPost
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.www.login.login_via_token` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.www.login.login_via_token` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.www.login.login_via_token` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Giriş belirteciyle oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.www.login.login_via_token` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.login_via_token`. The original function does this. It signs in with a login token.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.www.login.login_via_token` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.www.login.login_via_token
       security: []
@@ -1192,22 +1194,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.login_via_google:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaGoogleGet
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_google` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_google` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_google` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Google ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_google` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_google`. The original function does this. It signs in with Google.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_google` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_google
       security: []
@@ -1215,21 +1217,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaGooglePost
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_google` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_google` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_google` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Google ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_google` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_google`. The original function does this. It signs in with Google.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_google` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_google
       security: []
@@ -1237,22 +1239,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.login_via_github:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaGithubGet
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_github` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_github` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_github` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: GitHub ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_github` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_github`. The original function does this. It signs in with GitHub.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_github` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_github
       security: []
@@ -1260,21 +1262,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaGithubPost
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_github` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_github` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_github` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: GitHub ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_github` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_github`. The original function does this. It signs in with GitHub.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_github` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_github
       security: []
@@ -1282,22 +1284,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.login_via_facebook:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFacebookGet
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_facebook` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_facebook` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_facebook` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Facebook ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_facebook` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_facebook`. The original function does this. It signs in with Facebook.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_facebook` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_facebook
       security: []
@@ -1305,21 +1307,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFacebookPost
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_facebook` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_facebook` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_facebook` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Facebook ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_facebook` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_facebook`. The original function does this. It signs in with Facebook.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_facebook` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_facebook
       security: []
@@ -1327,22 +1329,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.login_via_frappe:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFrappeGet
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_frappe` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_frappe` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_frappe` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Frappe hesabıyla oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_frappe` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_frappe`. The original function does this. It signs in with a Frappe account.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_frappe` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_frappe
       security: []
@@ -1350,21 +1352,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFrappePost
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_frappe` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_frappe` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_frappe` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Frappe hesabıyla oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_frappe` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_frappe`. The original function does this. It signs in with a Frappe account.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_frappe` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_frappe
       security: []
@@ -1372,22 +1374,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.login_via_office365:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaOffice365Get
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_office365` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_office365` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_office365` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Office 365 ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_office365` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_office365`. The original function does this. It signs in with Office 365.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_office365` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_office365
       security: []
@@ -1395,21 +1397,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaOffice365Post
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_office365` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_office365` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_office365` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Office 365 ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_office365` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_office365`. The original function does this. It signs in with Office 365.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_office365` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_office365
       security: []
@@ -1417,22 +1419,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.login_via_salesforce:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaSalesforceGet
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_salesforce` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_salesforce` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_salesforce` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Salesforce ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_salesforce` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_salesforce`. The original function does this. It signs in with Salesforce.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_salesforce` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_salesforce
       security: []
@@ -1440,21 +1442,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaSalesforcePost
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_salesforce` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_salesforce` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_salesforce` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Salesforce ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_salesforce` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_salesforce`. The original function does this. It signs in with Salesforce.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_salesforce` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_salesforce
       security: []
@@ -1462,22 +1464,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.login_via_fairlogin:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFairloginGet
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_fairlogin` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_fairlogin` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_fairlogin` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: FairLogin ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_fairlogin` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_fairlogin`. The original function does this. It signs in with FairLogin.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_fairlogin` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_fairlogin
       security: []
@@ -1485,21 +1487,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFairloginPost
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_fairlogin` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_fairlogin` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_fairlogin` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: FairLogin ile oturum açar.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_fairlogin` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_fairlogin`. The original function does this. It signs in with FairLogin.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_fairlogin` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_fairlogin
       security: []
@@ -1507,22 +1509,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.login_via_keycloak:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaKeycloakGet
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_keycloak` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_keycloak` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_keycloak` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Frappe'nin hazır Keycloak dönüş ucudur.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_keycloak`. The original function does this. It is the built-in Frappe Keycloak callback endpoint.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_keycloak
       security: []
@@ -1530,21 +1532,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaKeycloakPost
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.login_via_keycloak` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_keycloak` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.login_via_keycloak` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Frappe'nin hazır Keycloak dönüş ucudur.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_keycloak`. The original function does this. It is the built-in Frappe Keycloak callback endpoint.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.login_via_keycloak
       security: []
@@ -1552,22 +1554,22 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
   /platform_core.kimlik.login_policy.custom:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedCustomGet
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.custom` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.custom` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.custom` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Özel sağlayıcı dönüş ucudur.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.custom` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.custom`. The original function does this. It is the callback endpoint of a custom provider.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.custom` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.custom
       security: []
@@ -1575,21 +1577,21 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedCustomPost
-      summary: Kapalı yerel giriş işlevi. Özgün işlev `frappe.integrations.oauth2_logins.custom` ucudur.
+      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.custom` endpoint.
       description: |
-        Bu uç Frappe'nin `frappe.integrations.oauth2_logins.custom` işlevinin kapılı sarmalayıcısıdır. Özgün işlev şunu yapar: Özel sağlayıcı dönüş ucudur.
-        `override_whitelisted_methods` kancası Frappe'nin yolunu bu işleve yönlendirir.
-        Bu yüzden `/api/method/frappe.integrations.oauth2_logins.custom` çağrısı da aynı yanıtı alır.
-        `/api/v1/method`, `/api/v2/method` ve `cmd` biçimleri de kapsamdadır.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.custom`. The original function does this. It is the callback endpoint of a custom provider.
+        The `override_whitelisted_methods` hook routes the Frappe path to this function.
+        So a call to `/api/method/frappe.integrations.oauth2_logins.custom` also gets the same response.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
 
-        `kimlik_yalniz_keycloak` ayarı 1 iken uç her çağrıda 403 ve `PermissionError` döner.
-        Girişsiz ve girişli çağrı aynı yanıtı alır. Uç hiçbir kaydı değiştirmez.
-        Ayar 0 iken uç özgün Frappe işlevini aynı parametrelerle çağırır. Yanıt Frappe'nin yanıtıdır.
-        Kapsam `x-yerel-giris-kapisi` uzantısındadır.
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
       x-frappe-original: frappe.integrations.oauth2_logins.custom
       security: []
@@ -1597,7 +1599,7 @@ paths:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
         default:
-          description: Kapı kapalıyken özgün Frappe işlevinin yanıtı. Bu sözleşme o yanıtı tanımlamaz.
+          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
 
 components:
   securitySchemes:
@@ -1606,41 +1608,41 @@ components:
       in: cookie
       name: sid
       description: |
-        Frappe oturum çerezi. Tek başına yetmez. POST isteği `csrfToken` başlığını da taşır.
-        Bu çerezle birlikte `Authorization` başlığı gönderilmez.
+        Frappe session cookie. It is not enough on its own. A POST request also carries the `csrfToken` header.
+        No `Authorization` header is sent together with this cookie.
     csrfToken:
       type: apiKey
       in: header
       name: X-Frappe-CSRF-Token
       description: |
-        Frappe'nin CSRF belirteci. `/panel` sayfası bu değeri taşır.
-        Başlık yoksa ya da yanlışsa Frappe 403 döner.
+        The Frappe CSRF token. The `/panel` page carries this value.
+        If the header is missing or wrong, Frappe returns 403.
     serviceToken:
       type: http
       scheme: bearer
       bearerFormat: JWT
       description: |
-        Keycloak'ın verdiği servis belirteci. Yalnız `platform_core.api.identity.*` yollarında aranır.
-        Sunucu belirteci `libs/oidc_verify` kitaplığıyla doğrular. Kurallar şunlardır:
+        Service token issued by Keycloak. It is looked for only on the `platform_core.api.identity.*` paths.
+        The server verifies the token with the `libs/oidc_verify` library. The rules are these:
 
-        - Yalnız RS256 imzası kabul edilir.
-        - `iss` sitenin `iss` değeriyle tam eşleşir.
-        - `aud` tek değerdir. Değer sitenin `keycloak_client_id` ayarıdır.
-        - `azp` değeri `kimlik_servis_azp` listesinde olmalıdır. Varsayılan liste `["identity-sync"]` olur.
-        - `exp` zorunludur. Saat payı 30 saniyedir.
-        - İstekte `cmd` alanı varsa istek reddedilir.
-        - İstek hem Guest dışı oturum çerezi hem belirteç taşıyorsa istek reddedilir.
+        - Only an RS256 signature is accepted.
+        - `iss` matches the `iss` value of the site exactly.
+        - `aud` is a single value. The value is the `keycloak_client_id` setting of the site.
+        - The `azp` value must be in the `kimlik_servis_azp` list. The default list is `["identity-sync"]`.
+        - `exp` is required. The clock skew allowance is 30 seconds.
+        - If the request has a `cmd` field, the request is rejected.
+        - If the request carries both a non-Guest session cookie and a token, the request is rejected.
 
-        Red yanıtı 401 ve `ServiceTokenRejected` olur. İleti ret nedeninin kodunu taşır.
-        İleti belirteci taşımaz. Sunucu belirteci günlüğe yazmaz.
-        Belirteç hiç yoksa uç 403 ve `PermissionError` döner.
-        Keycloak anahtar listesi alınamazsa uç 503 ve `KeycloakKeysUnavailable` döner.
+        The rejection response is 401 and `ServiceTokenRejected`. The message carries the code of the rejection reason.
+        The message does not carry the token. The server does not write the token to the log.
+        If there is no token at all, the endpoint returns 403 and `PermissionError`.
+        If the Keycloak key list cannot be fetched, the endpoint returns 503 and `KeycloakKeysUnavailable`.
 
   responses:
     YerelGirisKapali:
       description: |
-        Yerel giriş kapalı. `kimlik_yalniz_keycloak` ayarı 1. `exc_type` değeri `PermissionError` olur.
-        Kullanıcı giriş sayfasındaki marka düğmesiyle oturum açar.
+        Local sign-in is closed. The `kimlik_yalniz_keycloak` setting is 1. The `exc_type` value is `PermissionError`.
+        The user signs in with the brand button on the sign-in page.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
@@ -1651,17 +1653,17 @@ components:
                 exception: "frappe.exceptions.PermissionError: Local sign-in is disabled. Sign in with the identity provider."
     IstekSiniri:
       description: |
-        İstek sınırı aşıldı. Sınır IP adresine göre sayılır.
-        `exc_type` değeri Frappe'nin `RateLimitExceededError` değeridir.
+        The rate limit was exceeded. The limit is counted per IP address.
+        The `exc_type` value is the Frappe value `RateLimitExceededError`.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
     OturumBitti:
       description: |
-        Oturumun süresi bitti. Kullanıcı 1 saat işlem yapmadı ya da oturum kapatıldı (O-25).
-        `exc_type` değeri Frappe'nin `SessionExpired` değeridir. Frappe `sid` çerezini siler.
-        Bu yanıt yetki reddi değildir. İstemci kullanıcıyı giriş sayfasına yollar (SZ-8).
-        Çerez hiç yoksa bu yanıt dönmez. O durumda 403 ve `PermissionError` döner.
+        The session has expired. The user did nothing for 1 hour or the session was closed (O-25).
+        The `exc_type` value is the Frappe value `SessionExpired`. Frappe deletes the `sid` cookie.
+        This response is not a permission denial. The client sends the user to the sign-in page (SZ-8).
+        If there is no cookie at all, this response is not returned. In that case it returns 403 and `PermissionError`.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
@@ -1672,18 +1674,18 @@ components:
                 exception: "frappe.exceptions.SessionExpired"
     GovdeBozuk:
       description: |
-        Gövde JSON olarak ayrıştırılamadı. Frappe isteği uca iletmeden reddetti.
-        `exc_type` değeri Frappe'nin `DataError` değeridir.
+        The body could not be parsed as JSON. Frappe rejected the request before passing it to the endpoint.
+        The `exc_type` value is the Frappe value `DataError`.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
     ServisBelirteciReddi:
       description: |
-        Servis belirteci geçersiz. `exc_type` değeri `ServiceTokenRejected` olur. İleti ret kodunu taşır.
-        Kodlar `malformed`, `invalid_signature`, `unknown_kid`, `wrong_issuer`, `wrong_audience`,
-        `wrong_azp`, `expired` ve `not_yet_valid` olabilir.
-        İstekte `cmd` alanı varsa ya da Guest dışı çerez de varsa aynı hata döner.
-        Belirteç hiç yoksa bu yanıt dönmez. O durumda 403 döner.
+        The service token is not valid. The `exc_type` value is `ServiceTokenRejected`. The message carries the rejection code.
+        The codes can be `malformed`, `invalid_signature`, `unknown_kid`, `wrong_issuer`, `wrong_audience`,
+        `wrong_azp`, `expired` and `not_yet_valid`.
+        If the request has a `cmd` field or also a non-Guest cookie, the same error is returned.
+        If there is no token at all, this response is not returned. In that case it returns 403.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
@@ -1692,21 +1694,21 @@ components:
               value:
                 exc_type: ServiceTokenRejected
                 exception: "platform_core.kimlik.hatalar.ServiceTokenRejected: expired"
-                _server_messages: '["{\"message\": \"Servis belirteci reddedildi: expired\"}"]'
+                _server_messages: '["{\"message\": \"Service token rejected: expired\"}"]'
     ServisYetkisiYok:
       description: |
-        Çağıranın bu uca yetkisi yok. `exc_type` değeri `PermissionError` olur. İki durumda döner.
+        The caller has no permission for this endpoint. The `exc_type` value is `PermissionError`. It is returned in two cases.
 
-        - İstek servis belirteci taşımıyor. Örneğin yalnız oturum çerezi var ya da hiç kimlik yok.
-        - Belirteç geçerli ama `azp` değeri `identity-sync` değil.
+        - The request carries no service token. For example there is only a session cookie or no identity at all.
+        - The token is valid but the `azp` value is not `identity-sync`.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
     GirdiGecersiz:
       description: |
-        Alan eksik ya da yanlış biçimli. `exc_type` değeri `InvalidInput` olur.
-        Örneğin `subject` eksik, `enabled` doğru ya da yanlış değil, `new_email` e-posta biçiminde değil.
-        İleti hatalı alanın adını söyler.
+        A field is missing or malformed. The `exc_type` value is `InvalidInput`.
+        For example `subject` is missing, `enabled` is not true or false, or `new_email` is not in e-mail form.
+        The message names the wrong field.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
@@ -1715,11 +1717,11 @@ components:
               value:
                 exc_type: InvalidInput
                 exception: "platform_core.kimlik.hatalar.InvalidInput: enabled"
-                _server_messages: '["{\"message\": \"enabled alanı doğru ya da yanlış olmalı.\"}"]'
+                _server_messages: '["{\"message\": \"Field enabled must be true or false.\"}"]'
     AnahtarListesiYok:
       description: |
-        Keycloak anahtar listesi alınamadı. Belirteç doğrulanamadı. `exc_type` değeri `KeycloakKeysUnavailable` olur.
-        Sunucu isteği işlemedi. Çağıran isteği sonra yeniden gönderir.
+        The Keycloak key list could not be fetched. The token could not be verified. The `exc_type` value is `KeycloakKeysUnavailable`.
+        The server did not process the request. The caller sends the request again later.
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
@@ -1728,9 +1730,9 @@ components:
               value:
                 exc_type: KeycloakKeysUnavailable
                 exception: "platform_core.kimlik.hatalar.KeycloakKeysUnavailable: jwks"
-                _server_messages: '["{\"message\": \"Keycloak anahtar listesi alınamadı.\"}"]'
+                _server_messages: '["{\"message\": \"Identity provider keys are not available.\"}"]'
     BagYok:
-      description: "`(issuer, subject)` bağı yok. `exc_type` değeri `IdentityNotFound` olur."
+      description: "The `(issuer, subject)` link does not exist. The `exc_type` value is `IdentityNotFound`."
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
@@ -1739,7 +1741,7 @@ components:
               value:
                 exc_type: IdentityNotFound
                 exception: "platform_core.kimlik.hatalar.IdentityNotFound: subject"
-                _server_messages: '["{\"message\": \"Bu kimlik için bağ yok.\"}"]'
+                _server_messages: '["{\"message\": \"No user is linked to this identity.\"}"]'
 
   schemas:
     Issuer:
@@ -1748,9 +1750,9 @@ components:
       minLength: 1
       maxLength: 255
       description: |
-        Kimlik sunucusunun `iss` değeri. Sitenin `iss` değeriyle tam eşleşmelidir.
-        Biçim `<keycloak_public_url>/realms/<keycloak_realm>` olur.
-        En çok 255 karakter olur. “Platform Identity Link” kaydının `issuer` alanı da bu uzunluktadır.
+        The `iss` value of the identity server. It must match the `iss` value of the site exactly.
+        The form is `<keycloak_public_url>/realms/<keycloak_realm>`.
+        It is at most 255 characters. The `issuer` field of the “Platform Identity Link” record has the same length.
       examples:
         - http://kimlik.localhost:8660/realms/platform
     Subject:
@@ -1758,23 +1760,23 @@ components:
       minLength: 1
       maxLength: 140
       description: |
-        Kullanıcının Keycloak'taki `sub` değeri. Kalıcı anahtarın ikinci parçasıdır.
-        En çok 140 karakter olur. “Platform Identity Link” kaydının `subject` alanı da bu uzunluktadır.
+        The `sub` value of the user in Keycloak. It is the second part of the permanent key.
+        It is at most 140 characters. The `subject` field of the “Platform Identity Link” record has the same length.
       examples:
         - 11111111-1111-4111-8111-111111111111
     Email:
       type: string
       format: email
       maxLength: 140
-      description: Kullanıcının e-postası. Frappe'de kullanıcının adı bu değerdir.
+      description: The e-mail of the user. In Frappe the user name is this value.
       examples:
         - kiraci1.kullanici1@example.test
 
     HtmlSayfa:
       type: string
       description: |
-        Tarayıcıya gösterilen HTML sayfa. Sayfanın bir başlığı ve kısa bir açıklaması vardır.
-        Sayfa `exc_type` taşımaz. Sayfa belirteç, kod ya da kişisel veri göstermez.
+        HTML page shown in the browser. The page has a title and a short explanation.
+        The page does not carry `exc_type`. The page does not show tokens, codes or personal data.
 
     LoginUrlRequest:
       type: object
@@ -1785,9 +1787,9 @@ components:
           maxLength: 2048
           pattern: '^/(?!/)[^\\\s\x00-\x1f\x7f]*$'
           description: |
-            Giriş bitince dönülecek göreli yol. `/` ile başlar. `//` ile başlayamaz.
-            Ters eğik çizgi hiçbir yerde olamaz. Boşluk ve denetim karakteri içeremez.
-            En çok 2048 karakter olur. Verilmezse dönüş adresi `platform_panel_url` olur.
+            Relative path to return to after sign-in. It starts with `/`. It cannot start with `//`.
+            It cannot contain a backslash anywhere. It cannot contain a space or a control character.
+            It is at most 2048 characters. If it is not given, the return address is `platform_panel_url`.
           examples:
             - /panel
             - /panel/kayitlar?durum=acik
@@ -1800,15 +1802,17 @@ components:
           type: string
           format: uri
           description: |
-            Keycloak yetki adresi. Tarayıcı bu adrese gider.
-            Adres `state`, `nonce`, `code_challenge`, `code_challenge_method=S256` ve `redirect_uri` taşır.
-            `redirect_uri` değeri bu sitenin `keycloak_callback` ucudur.
+            Keycloak authorization address. The browser goes to this address.
+            The address carries `state`, `nonce`, `code_challenge`, `code_challenge_method=S256` and `redirect_uri`.
+            The `redirect_uri` value is the `keycloak_callback` endpoint of this site.
         brand_name:
           type: string
-          description: Marka adı. `kimlik_marka_adi` ayarından gelir.
+          description: Brand name. It comes from the `kimlik_marka_adi` setting.
         label:
           type: string
-          description: Giriş düğmesinin metni. Biçim `<marka> ile oturum aç` olur.
+          description: |
+            Label of the sign-in button. The English source text is `Sign in with {0}`. The brand name fills `{0}`.
+            The Turkish text comes from `translations/tr.csv` with the context `platform_core.kimlik`.
 
     LogoutUrl:
       type: object
@@ -1818,8 +1822,8 @@ components:
           type: string
           format: uri
           description: |
-            Keycloak çıkış adresi. `client_id` ve `post_logout_redirect_uri` taşır.
-            `id_token_hint` taşımaz.
+            Keycloak logout address. It carries `client_id` and `post_logout_redirect_uri`.
+            It does not carry `id_token_hint`.
 
     LogoutTokenForm:
       type: object
@@ -1828,7 +1832,7 @@ components:
         logout_token:
           type: string
           minLength: 1
-          description: Keycloak'ın imzaladığı çıkış belirteci (JWT). `exp` ve `jti` alanları zorunludur.
+          description: Logout token (JWT) signed by Keycloak. The `exp` and `jti` fields are required.
 
     BackchannelLogoutResult:
       type: object
@@ -1837,7 +1841,7 @@ components:
         closed_sessions:
           type: integer
           minimum: 0
-          description: Kapanan Frappe oturumu sayısı. Eşleşme yoksa 0 olur.
+          description: Number of closed Frappe sessions. If there is no match, it is 0.
 
     SetupResult:
       type: object
@@ -1846,14 +1850,14 @@ components:
         social_login_key:
           type: string
           const: keycloak
-          description: “Social Login Key” kaydının adı.
+          description: Name of the “Social Login Key” record.
         enabled:
           type: boolean
           const: true
-          description: Kayıt açık.
+          description: The record is enabled.
         provider_name:
           type: string
-          description: Kayıttaki marka adı. `kimlik_marka_adi` ayarından gelir.
+          description: Brand name in the record. It comes from the `kimlik_marka_adi` setting.
 
     ProvisionRequest:
       type: object
@@ -1865,18 +1869,18 @@ components:
         email: {$ref: "#/components/schemas/Email"}
         email_verified:
           type: boolean
-          description: Keycloak e-postayı doğruladı mı? Zorunludur. Yanlışsa ilk bağ kurulmaz.
+          description: Did Keycloak verify the e-mail? It is required. If it is false, no first link is made.
         first_name:
           type: string
           maxLength: 140
-          description: Ad. İsteğe bağlı. Verilirse metin olmalıdır.
+          description: First name. It is optional. If it is given, it must be text.
         last_name:
           type: string
           maxLength: 140
-          description: Soyad. İsteğe bağlı. Verilirse metin olmalıdır.
+          description: Last name. It is optional. If it is given, it must be text.
         enabled:
           type: boolean
-          description: Kullanıcı açık mı? Zorunludur. Yanlışsa kullanıcı kapanır.
+          description: Is the user enabled? It is required. If it is false, the user is disabled.
         role_profiles:
           type: array
           uniqueItems: true
@@ -1884,8 +1888,8 @@ components:
             type: string
             maxLength: 140
           description: |
-            Kullanıcıya verilecek rol profilleri. İsteğe bağlı.
-            Her rol profili sitede var olmalıdır. Masaüstü erişimi veren rol içeremez.
+            Role profiles to give to the user. It is optional.
+            Each role profile must exist on the site. It cannot contain a role that grants desk access.
 
     ProvisionResult:
       type: object
@@ -1894,15 +1898,15 @@ components:
         user: {$ref: "#/components/schemas/Email"}
         enabled:
           type: boolean
-          description: Kullanıcının son durumu.
+          description: The latest state of the user.
         linked:
           type: boolean
           const: true
-          description: Bağ kurulu.
+          description: The link is in place.
         user_type:
           type: string
           const: Website User
-          description: Kullanıcının türü. Bu uç yalnız “Website User” açar.
+          description: The type of the user. This endpoint creates only “Website User” users.
 
     SetEnabledRequest:
       type: object
@@ -1913,7 +1917,7 @@ components:
         subject: {$ref: "#/components/schemas/Subject"}
         enabled:
           type: boolean
-          description: Doğru ise kullanıcı açılır. Yanlış ise kullanıcı kapanır.
+          description: If it is true, the user is enabled. If it is false, the user is disabled.
 
     SetEnabledResult:
       type: object
@@ -1922,7 +1926,7 @@ components:
         user: {$ref: "#/components/schemas/Email"}
         enabled:
           type: boolean
-          description: Kullanıcının son durumu.
+          description: The latest state of the user.
 
     ChangeEmailRequest:
       type: object
@@ -1934,7 +1938,7 @@ components:
         new_email:
           allOf:
             - $ref: "#/components/schemas/Email"
-          description: Kullanıcının yeni e-postası. Başka kullanıcıya ait olamaz.
+          description: The new e-mail of the user. It cannot belong to another user.
 
     AnonymizeUserRequest:
       type: object
@@ -1952,15 +1956,15 @@ components:
         user:
           type: string
           maxLength: 140
-          description: Kullanıcının anonim adı. Biçimi `deleted-user-<sıra>@<site>` olur. Kişiyi göstermez.
+          description: The anonymous name of the user. Its form is `deleted-user-<number>@<site>`. It does not identify the person.
         enabled:
           type: boolean
           const: false
-          description: Kullanıcı her zaman kapalıdır.
+          description: The user is always disabled.
         status:
           type: string
           const: Deleted
-          description: “Personal Data Deletion Request” kaydının son durumu.
+          description: The latest status of the “Personal Data Deletion Request” record.
 
     ChangeEmailResult:
       type: object
@@ -1969,29 +1973,29 @@ components:
         user:
           allOf:
             - $ref: "#/components/schemas/Email"
-          description: Kullanıcının yeni adı. Değişiklik yoksa eski ad döner.
+          description: The new name of the user. If nothing changed, the old name is returned.
 
     FrappeError:
       type: object
       description: |
-        Frappe'nin olağan hata gövdesi. İstemci hatayı `exc_type` alanından tanır.
-        Bu dosyadaki özel değerler şunlardır: `InvalidRedirect`, `KeycloakLoginNotConfigured`,
+        The usual Frappe error body. The client recognizes the error from the `exc_type` field.
+        The custom values in this file are these: `InvalidRedirect`, `KeycloakLoginNotConfigured`,
         `InvalidLogoutToken`, `ServiceTokenRejected`, `UnknownIssuer`, `EmailMismatch`,
         `EmailNotVerified`, `IdentityConflict`, `DeskRoleNotAllowed`, `IdentityNotFound`,
-        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput` ve `KeycloakKeysUnavailable`.
-        Frappe'nin genel değerleri `PermissionError`, `AuthenticationError`, `CSRFTokenError`,
-        `DataError` ve `RateLimitExceededError` olabilir.
-        `start_login` ve `keycloak_callback` uçları bu gövdeyi dönmez. Bu iki uç HTML sayfa döner.
+        `EmailInUse`, `KeycloakSettingsMissing`, `InvalidInput` and `KeycloakKeysUnavailable`.
+        The general Frappe values can be `PermissionError`, `AuthenticationError`, `CSRFTokenError`,
+        `DataError` and `RateLimitExceededError`.
+        The `start_login` and `keycloak_callback` endpoints do not return this body. These two endpoints return an HTML page.
       required: [exc_type]
       properties:
         exc_type:
           type: string
-          description: Hata sınıfının adı.
+          description: Name of the error class.
         exception:
           type: string
-          description: Hata sınıfının tam yolu ve kısa ileti. Belirteç ya da sır taşımaz.
+          description: Full path of the error class and a short message. It does not carry tokens or secrets.
         _server_messages:
           type: string
           description: |
-            JSON dizisi metni. Her öğe bir JSON nesnesi metnidir ve `message` alanı taşır.
-            İleti kullanıcıya gösterilebilir.
+            Text of a JSON array. Each item is the text of a JSON object and carries a `message` field.
+            The message can be shown to the user.
