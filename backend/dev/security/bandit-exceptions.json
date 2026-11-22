@@ -2883,5 +2883,68 @@
     "reason": "The command performs a read-only image inspect without a shell. Its image name comes from checked-in Compose definitions with a validated generated project tag or from the same tag plus a fixed service name.",
     "owner": "integration-e2e",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/tests/test_release_residue.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "Import only; all subprocess calls in this test are reviewed separately.",
+    "owner": "yayin-duzeltme",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_release_residue.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "e13a2478c76ec164bdd53d05f97ecb22c82889e6c8a35d992602aedeff7e897e",
+    "reason": "Runs the fixed rev-parse, ls-files, ls-tree, and cat-file subcommands against the resolved local Git root without a shell. Revision and object data use dedicated arguments or stdin.",
+    "owner": "yayin-duzeltme",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_release_residue.py",
+    "code": "subprocess.run([\"git\", \"-C\", str(root), *args], check=True, capture_output=True)",
+    "statementSha256": "569f4f48bc767dcf0fd0bcb7c10373ad8edcdac9f1d7a58cadb0e496ad19938d",
+    "reason": "Initializes or stages files in a test-owned temporary Git repository with a fixed init or add command and no shell.",
+    "owner": "yayin-duzeltme",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/tests/test_release_residue.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "2e8e315bade8d49a745e34650562ca586204719fbf7721909ea421988fd88021",
+    "reason": "Runs the fixed Git write-tree command in the test-owned temporary repository without a shell.",
+    "owner": "yayin-duzeltme",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/tests/test_release_residue.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "e13a2478c76ec164bdd53d05f97ecb22c82889e6c8a35d992602aedeff7e897e",
+    "reason": "Runs the fixed rev-parse, ls-files, ls-tree, and cat-file subcommands against the resolved local Git root without a shell. Revision and object data use dedicated arguments or stdin. Git is resolved from the trusted release test runner PATH.",
+    "owner": "yayin-duzeltme",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/tests/test_release_residue.py",
+    "code": "subprocess.run([\"git\", \"-C\", str(root), *args], check=True, capture_output=True)",
+    "statementSha256": "569f4f48bc767dcf0fd0bcb7c10373ad8edcdac9f1d7a58cadb0e496ad19938d",
+    "reason": "Initializes or stages files in a test-owned temporary Git repository with a fixed init or add command and no shell. Git is resolved from the trusted release test runner PATH.",
+    "owner": "yayin-duzeltme",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B607",
+    "file": "backend/dev/tests/test_release_residue.py",
+    "code": "return subprocess.run(",
+    "statementSha256": "2e8e315bade8d49a745e34650562ca586204719fbf7721909ea421988fd88021",
+    "reason": "Runs the fixed Git write-tree command in the test-owned temporary repository without a shell. Git is resolved from the trusted release test runner PATH.",
+    "owner": "yayin-duzeltme",
+    "ignoreUntil": "2027-02-22"
   }
 ]
