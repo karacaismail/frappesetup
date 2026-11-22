@@ -71,20 +71,22 @@ class ReviewTests(unittest.TestCase):
             direct = "backend/direct-python"
             root_python = "backend/root-python"
             env_long = "backend/env-long-python"
-            shell = "backend/shell-script"
+            python_sh = "backend/python-script.sh"
+            shell = "backend/shell-script.sh"
             (root / script).write_text("#!/usr/bin/env -S python3.14 -I\nassert False\n")
             (root / direct).write_text("#! /usr/bin/python3\nassert False\n")
             (root / root_python).write_text("#!/python3\n")
             (root / env_long).write_text("#!/usr/bin/env --split-string=python3 -I\n")
+            (root / python_sh).write_text("#!/usr/bin/env python3\nassert False\n")
             (root / shell).write_text("#!/bin/sh\n")
             (root / "backend/symlink").symlink_to(script.rsplit("/", 1)[1])
-            tracked = "\0".join((target, script, direct, root_python, env_long, shell, "backend/symlink", ""))
+            tracked = "\0".join((target, script, direct, root_python, env_long, python_sh, shell, "backend/symlink", ""))
             fixture = [{"test_id": "B101", "line_number": 1}]
             finding = {**fixture[0], "filename": target}
             with patch.object(scans, "ROOT", root), patch.object(scans, "git", return_value=tracked), \
                     patch.object(scans, "bandit_findings", side_effect=[fixture, [finding]]) as scan:
                 result = scans.scan_bandit()
-            self.assertEqual(scan.call_args.args[1], [target, script, direct, root_python, env_long])
+            self.assertEqual(scan.call_args.args[1], [target, script, direct, root_python, env_long, python_sh])
             for call in scan.call_args_list:
                 self.assertIn("--ignore-nosec", call.args[0])
             self.assertEqual(result.status, "fail")
