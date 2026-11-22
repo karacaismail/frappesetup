@@ -294,6 +294,7 @@ class LeaveHttpTest(unittest.TestCase):
             {"from_date": day, "to_date": day},
             {"leave_type": self.data["allocated_leave_type"]},
             {"description": "Unauthorized manager edit"},
+            {"owner": self.data["users"]["manager"]},
         ):
             with self.subTest(changes=changes):
                 code, result = manager.send(

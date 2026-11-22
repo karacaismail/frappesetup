@@ -50,13 +50,10 @@ def validate_manager_fields(doc, method=None):
 		return
 	if frappe.db.get_value("Employee", before.employee, "user_id") == frappe.session.user:
 		return
-	columns = set(doc.meta.get_valid_columns())
-	if any(
-		field.fieldname in columns
-		and field.fieldname not in {"status", "docstatus"}
-		and doc.has_value_changed(field.fieldname)
-		for field in doc.meta.fields
-	):
+	# Frappe sets these audit columns before validation. The manager cannot set their values.
+	status_and_audit_fields = {"status", "docstatus", "modified", "modified_by"}
+	protected_fields = set(doc.meta.get_valid_columns()) - status_and_audit_fields
+	if any(doc.has_value_changed(fieldname) for fieldname in protected_fields):
 		frappe.throw(
 			_("Managers can only change the status of a team leave application."), frappe.PermissionError
 		)

@@ -46,7 +46,7 @@ HRMS TR hesapları masaüstü erişimi veren başka rol alamaz.
 Yönetici ve çalışan rolleri, başka bir kişinin `Employee` kaydını okuyamaz.
 Kaydedilen talepte çalışan değiştirilemez. Düzeltme kopyasında aynı çalışan kalır.
 Yönetici, ekip üyesinin talebinde yalnız durum alanlarını değiştirebilir.
-Sunucu tarih, izin türü ve açıklama değişikliklerini reddeder.
+Sunucu tarih, izin türü, açıklama ve kayıt sahibi değişikliklerini reddeder.
 Yönetici ve İK kendi taleplerini onaylayamaz.
 
 HRMS TR, eski HRMS bakiye ve takvim uçlarını kiracı sitesinde kapatır.
@@ -60,6 +60,9 @@ Birinci seviye durum alanını okuyup yazabilirler. İzin bakiyesi ikinci seviye
 HRMS TR, “HR User”, “Employee” ve “Leave Approver” rollerine özel izin eklemez.
 Erişim motoru bu roller için izin talebi kuralı bulamaz.
 HRMS'in daha önce kurduğu standart özel izin kayıtlarına dokunulmaz.
+Employee için özel izin yoksa Frappe standart izinleri özel satırlara kopyalar.
+Bu kopyalar HRMS TR kaldırıldığında kalır. HRMS TR kendi okuma satırını kaldırır.
+Frappe sonraki standart izin değişikliklerini bu kopyalara kendiliğinden eklemez.
 Frappe’nin “Administrator” hesabı kendi yönetim yetkisini korur.
 
 Frappe, alan ayarlarına standart ad verir. HRMS TR bu adları korur.
