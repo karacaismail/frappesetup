@@ -1339,5 +1339,41 @@
     "reason": "The test starts Git through the runner PATH to prepare or inspect its fixture repository.",
     "owner": "naming-history-fix",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/guvenlik/semgrep_exceptions.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no process; the Git call is reviewed separately.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B404",
+    "file": "backend/dev/guvenlik/test_semgrep_exceptions.py",
+    "code": "import subprocess",
+    "statementSha256": "51fb82e631da1ad4601b6eb0680fdf522b8d498c85382f7601aa0d97124d6193",
+    "reason": "The import alone starts no process; the fixture Git call is reviewed separately.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/guvenlik/semgrep_exceptions.py",
+    "code": "listing = subprocess.run(",
+    "statementSha256": "21caf1cad401f2bdf4b597eeb30e928055b0fc391631cb7106487ec2e2fea9bf",
+    "reason": "Executes absolute Git without a shell and limits file listing to a literal path after the argument separator.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/guvenlik/test_semgrep_exceptions.py",
+    "code": "subprocess.run([shutil.which(\"git\"), \"-C\", str(root), *arguments], check=True)",
+    "statementSha256": "74a564fec9d36ba6f0e296315d8225a73e618c5ac26896c1a1b2576f31fe14ed",
+    "reason": "Executes Git without a shell to initialize and stage files in a temporary test repository.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
   }
 ]
