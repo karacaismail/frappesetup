@@ -3,11 +3,12 @@
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import Mock, patch
+from urllib.error import HTTPError
 
 import frappe
 from frappe.utils import CallbackManager
 
-from platform_core.mobil import sessions
+from platform_core.mobil import identity_sync_client, sessions
 
 
 class SessionDeliveryTest(TestCase):
@@ -53,6 +54,26 @@ class SessionDeliveryTest(TestCase):
 		self.db.after_commit.run()
 
 		later.assert_called_once_with()
+
+	def test_forbidden_response_clears_pending_without_removing_local_revocation(self):
+		self.send.side_effect = identity_sync_client.send_session_revocations
+		with (
+			patch.object(identity_sync_client, "frappe", SimpleNamespace(logger=self.logger)),
+			patch.object(identity_sync_client, "_configured_url", return_value="https://sync.example.test"),
+			patch.object(identity_sync_client, "_service_bearer", return_value="fixture-bearer"),
+			patch.object(
+				identity_sync_client._OPENER, "open", side_effect=HTTPError("", 403, "Forbidden", None, None)
+			),
+		):
+			sessions._deliver_committed(self.targets)
+		self.db.set_value.assert_called_once_with(
+			sessions.REVOKED_SESSION,
+			{"name": ["in", [sessions._session_key("session")]]},
+			"delivery_pending",
+			0,
+		)
+		self.db.commit.assert_called_once_with()
+		self.db.delete.assert_not_called()
 
 	def test_unexpected_delivery_error_surfaces(self):
 		self.send.side_effect = TypeError("Unexpected delivery value")
