@@ -64,7 +64,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - `identity-sync` Admin API belirtecini ayrı ister. İstekte `scope=admin-api kc-admin-api` olur. Bu belirtecin `aud` değeri `realm-management` ve Admin API adresidir. Keycloak 26.8 Admin API'si bu kapsamı ister.
 - `press-service` istemcisi `aud-press` kapsamını isteyemez. Keycloak bu isteği `invalid_scope` ile reddeder.
 - `identity-sync` servis hesabı davet ve kuruluş hazırlama için Keycloak'a yazar. Bu yüzden şu rolleri taşır: `view-users`, `query-users`, `manage-users`. Kuruluş ve üyelik için gereken en az ek rol Keycloak 26.8 kaynağında doğrulanır ve realm dosyasına yazılır.
-- Bu roller yalnız `scope=admin-api kc-admin-api` ile istenen belirtece girer. Kiracıya ve Press'e giden belirteç bu rolleri taşımaz. Canlı test bunu sınar: kiracı hedefli belirteç Admin API'de 403 alır.
+- Bu roller yalnız `scope=admin-api kc-admin-api` ile istenen belirtece girer. Kiracıya ve Press'e giden belirteç bu rolleri taşımaz. Canlı test bunu sınar: kiracı hedefli belirteç Admin API'de reddedilir. Keycloak 26.8.2 bu durumda 401 döner, çünkü önce belirtecin hedefini denetler. Test 401 ya da 403 kabul eder, 2xx kabul etmez.
 - Sihirli bağlantı eklentisinin bağlantı üreten yönetim ucu kapalıdır. Bu uç, belirteçteki rolü değil hesabın kayıtlı rolünü denetliyordu. Kapalı olduğu canlı testle (404) gösterilir.
 
 ### Politikalar
@@ -471,6 +471,15 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 - Öneri `created_at` ve `expires_at` taşır. Zaman sitenin saat dilimiyle ve farkıyla ISO 8601 biçiminde döner.
 - Okuma araçlarının sonucu `as_of`, `site` ve `source` taşır. Sonuç sınırı aşarsa `truncated: true` döner. Alt tablo en çok 200 satır, sonuç verisi en çok 262.144 bayttır.
 - Oturumsuz istek 403, süresi dolmuş oturum 401 alır.
+
+#### Kullanım günlüğü temizliğinin modül arayüzü
+
+- “AI Usage Log” kaydının sahibi model geçididir. Temizlik işlevi `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False)` olur.
+- İşlev yetkiyi kendisi denetler. Yalnız “System Manager” çağırabilir. Öteki kullanıcı `frappe.PermissionError` alır.
+- Süre 365 gündür. Ayar bu süreyi değiştiremez. Kayıtlar O-32'ye göre kalıcı silinir.
+- İşlev `{"eligible": <sayı>, "deleted": <sayı>}` döner. `dry_run=True` iken hiçbir kayıt silinmez ve `deleted` 0 olur.
+- İşlev önizleme belirteci istemez. İnsan onayını çağıran taraf yönetir. Örneğin `platform_core.api.ai.purge_logs` kendi önizleme ve onay yolunu kullanır. Geçidin kendi HTTP ucu da kendi önizleme belirtecini kullanabilir.
+
 
 ### Genel araçlar
 

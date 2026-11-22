@@ -162,11 +162,13 @@ Her sayfada kayıtların güncel okuma izni denetlenir.
 İlk kopyadan sonra değişiklikler başlangıçtaki sıra numarasından okunur.
 Yeni kayıt ilk kopya sınırını aşarsa sonraki değişiklik sayfasında gelir.
 
-Sunucu sıra numarası üretirken site sıra satırını kilitler.
-Salt okuma site sıra satırını kilitlemez.
-İşlem bu kilidi kesinleşene kadar tutar.
+Sunucu önce iş kayıtlarını ve işlem sonuçlarını yazar.
+Sonra MariaDB sayacı, grubun sıra numaralarını tek adımda ayırır.
+Sayaç, MariaDB 11.8 üzerinde satırın güncel değerini kullanır.
+Sayaç ayarı yalnız sayaç komutunda geçerlidir.
+Salt okuma sayacı kilitlemez.
 Sistem sıra numarasını değişiklik kaydıyla aynı işlemde yazar (AU-10).
-Sonraki yazma ilk yazma kesinleşene kadar yeni sıra numarası alamaz.
+Sonraki grup, önceki grup kesinleşene kadar sıra numarası alamaz.
 Örneğin 8 numaralı kayıt beklerse 9 numaralı kayıt önce kesinleşemez.
 Telefon bu yüzden geç kesinleşen 8 numaralı kaydı atlamaz.
 Geri alınan yazma kayıt ve sıra ilerlemesini birlikte geri alır.

@@ -527,10 +527,10 @@
             "description": "Frappe metadata for a System User."
           },
           "403": {
-            "description": "Native metadata is unavailable to this user. Website Users receive this status whether or not the DocType exists."
+            "description": "Native metadata is unavailable to this user. Website Users receive this status whether or not the DocType exists. For a missing DocType, Frappe also returns this status to System Users without read permission on the DocType registry."
           },
           "404": {
-            "description": "The DocType does not exist. This status is available to System Users.",
+            "description": "The DocType does not exist. Frappe returns this status to System Users with read permission on the DocType registry.",
             "content": {
               "application/json": {
                 "schema": {

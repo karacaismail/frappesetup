@@ -21,7 +21,7 @@ Kurallar şunlardır:
 8. Passkey kayıt adımı zorunlu adımlar listesinde açık olsun. Kapalı sağlayıcılar giriş ekranında görünmesin.
 9. `oidc_verify` anahtar indirirken yönlendirme izlemesin ve yalnız HTTPS kullansın (G-13). Geliştirme adresi açık bir istisna olur.
 10. Görünen marka adı bir değişkenden gelsin (D-4).
-11. Müşteri için Keycloak'ın hesap silme adımını açın (O-27). Çalışan kendi hesabını açamaz.
+11. Keycloak'ın kendi `delete_account` adımı kapalı kalır (O-27, sözleşme 7. bölüm). Müşteri hesap ekranındaki bağlantıyla Press'in silme sayfasına gider. Bu madde böylece kapandı.
 
 ## platform-core-kimlik
 

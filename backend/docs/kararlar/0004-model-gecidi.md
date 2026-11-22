@@ -50,6 +50,7 @@ Orkestratör, D-10, 22 Kasım 2026 Pazar
 | Tür | Açık işlev veya olay | Görevi |
 | --- | --- | --- |
 | Python | `platform_core.model_gecidi.api.complete` | Yetkili yol üzerinden model çağrısı yapar. |
+| Python ve Bench | `platform_core.model_gecidi.api.purge_usage_logs(*, dry_run=False)` | Yalnız “System Manager” çağırabilir. İşlev uygun kayıt sayısını `eligible`, silinen kayıt sayısını `deleted` alanında döndürür. |
 | HTTP | `platform_core.api.model.complete` | Oturum veya kullanıcı anahtarıyla model çağrısı yapar. |
 | HTTP | `platform_core.api.model.test_api` | Yöneticiye bağlantı denemesi sunar. |
 | HTTP | `platform_core.api.model.resolve_usage` | Yöneticinin doğruladığı tutarı kullanım kaydına işler. |
@@ -57,7 +58,7 @@ Orkestratör, D-10, 22 Kasım 2026 Pazar
 | HTTP | `platform_core.api.model.purge_usage` | Silinecek kayıtları gösterir veya onaylı önizlemeye göre siler. |
 | HTTP | `platform_core.api.model.clear_api_credential` | Kapalı bağlantının anahtarını siler. |
 | Bench | `platform_core.model_gecidi.maintenance.reconcile_stale_pending` | Takılı kullanım kayıtlarını elle başlatılan işlemle kapatır. |
-| Kanca | `ai_tools` | `create_ai_api`, `update_ai_api`, `create_ai_account`, `update_ai_account` araçlarını bildirir. |
+| Kanca | `ai_tools` | `create_ai_api`, `update_ai_api`, `create_ai_account`, `update_ai_account` ve `reconcile_stale_pending` araçlarını bildirir. |
 | Yapay zekâ aracı | `reconcile_stale_pending` | İnsan onayından sonra seçilen takılı kaydı kapatır. |
 | Kanca | `ai_write_closed_doctypes` | Genel yapay zekâ yazmasını `AI API` ve `AI Account` için kapatır. |
 | Kayıt olayı | `validate` | `AI API`, `AI Model`, `AI Provider` ve `AI Route` kayıtlarını yazmadan önce denetler. |
@@ -191,9 +192,10 @@ Yönetici yeni anahtarı Desk ekranında girer.
 Kayıtlı anahtarlar varsa geçit, onları etkileyen sağlayıcı adresi değişikliğini reddeder.
 Geçit bağlantı kaydına silme notu ekler.
 Boş anahtar alanıyla form kaydetmek mevcut anahtarı korur.
-Kullanım günlükleri varsayılan olarak 365 gün tutulur.
-Site yöneticisi süreyi `model_gateway_usage_retention_days` ayarında belirler.
-Yönetici önce silinecek kayıtları önizler.
+Kapanmış kullanım günlükleri 365 gün tutulur.
+Bu süre sabittir.
+Temizliği yalnız “System Manager” rolü başlatabilir.
+HTTP isteğinde yönetici önce silinecek kayıtları önizler.
 Geçit önizleme kodunu `preview_token` alanında döner.
 Yönetici silmeyi aynı kodla elle başlatır.
 Temizlik yalnız kapanmış kayıtları siler. Her çağrı en çok 500 kayıt siler.
@@ -201,3 +203,18 @@ O-32 kararı gereği saklama temizliği kayıtları kalıcı siler.
 Frappe “Deleted Document” tablosuna kopya yazmaz.
 Geri dönüş için silme öncesi alınan veritabanı yedeği kullanılır.
 Geçit temizliği “Activity Log” kaydına yazar.
+
+Python işlevi 365 günden eski kapanmış kayıtları sayar.
+`dry_run=True` ise işlev kayıt silmez.
+İşlev önizleme belirteci istemez. Onayı çağıran taraf yönetir.
+
+Aşağıdaki terminal komutları önce önizler, sonra en çok 500 kaydı kalıcı siler.
+Önizleme sonucunu silme komutunu çalıştırmadan önce kontrol edin.
+
+```sh
+bench --site SITE execute platform_core.model_gecidi.api.purge_usage_logs --kwargs '{"dry_run":True}'
+```
+
+```sh
+bench --site SITE execute platform_core.model_gecidi.api.purge_usage_logs
+```
