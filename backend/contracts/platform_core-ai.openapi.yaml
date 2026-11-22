@@ -200,7 +200,7 @@ paths:
                 properties:
                   message: {$ref: "#/components/schemas/Proposal"}
         "403": {description: The request did not come from a human session or the proposal belongs to another user.}
-        "404": {description: The proposal does not exist.}
+        "404": {description: The proposal ID is empty or the proposal does not exist.}
 
   /platform_core.api.ai.approve_proposal:
     post:

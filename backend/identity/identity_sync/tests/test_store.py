@@ -1,4 +1,4 @@
-"""Kalıcı kaydın testleri: işlenen olaylar ve bekleme kuyruğu."""
+"""Persistent store tests: processed events and the pending queue."""
 
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ class StoreTest(unittest.TestCase):
         store = self.open()
         store.claim_signature("abc", now=1000.0, expires_at=1300.0)
         self.assertTrue(store.claim_signature("def", now=1301.0, expires_at=1601.0))
-        # Süresi dolan kayıt silindi. Zaman penceresi bu imzayı artık zaten reddeder.
+        # The expired record was deleted. The timestamp window already rejects this signature.
         self.assertTrue(store.claim_signature("abc", now=1301.0, expires_at=1601.0))
 
     def test_work_lock_blocks_a_second_connection(self) -> None:
@@ -112,7 +112,7 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(run_child(), 0)
 
     def test_records_written_under_the_work_lock_survive_an_interrupted_run(self) -> None:
-        # Yeniden işleme yarıda kesilirse biten olayların kaydı kaybolmaz.
+        # Completed event records survive an interrupted replay.
         store = self.open()
         with self.assertRaises(KeyboardInterrupt):
             with store.work_lock():
@@ -126,7 +126,7 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(reopened.dead_letters()[0].state, "unknown")
 
     def test_other_connection_can_write_records_while_work_lock_is_held(self) -> None:
-        # İmza kaydı uzun süren bir işi beklemez.
+        # Recording a signature does not wait for a long-running operation.
         first, second = self.open(), Store(self.path, lock_timeout=0.2)
         self.addCleanup(second.close)
         with first.work_lock():

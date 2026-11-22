@@ -204,7 +204,13 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 	frappe.local.login_manager.login_as(user)
 	# Frappe commits right after it inserts the session row (frappe/sessions.py:301), which ends the lock.
 	# Take it again and check once more: a deletion that ran in between has closed this session too.
-	_lock_identity_for_sign_in(settings.issuer, claims, user, session_open=True)
+	try:
+		_lock_identity_for_sign_in(settings.issuer, claims, user)
+	except Exception:
+		# The failed recheck cannot roll back the session that login_as already committed.
+		frappe.db.rollback()
+		_close_new_session()
+		raise
 	frappe.local.session.data.update(helpers.session_claims(claims, settings.issuer))
 	frappe.local.session.data["session_expiry"] = session_policy.IDLE_TIMEOUT
 	remember_keycloak_session(claims.get("sid"), frappe.session.sid)
@@ -218,7 +224,7 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 	return record.get("redirect_to") or settings.panel_url
 
 
-def _lock_identity_for_sign_in(issuer: str, claims: dict, user: str, session_open: bool = False) -> None:
+def _lock_identity_for_sign_in(issuer: str, claims: dict, user: str) -> None:
 	"""Merge review E1: sign-in and deletion take the same identity lock.
 
 	The lock is held until the callback commits, so the session row exists before a deletion can run.
@@ -233,8 +239,6 @@ def _lock_identity_for_sign_in(issuer: str, claims: dict, user: str, session_ope
 	if not refused and not frappe.db.get_value("User", user, "enabled", for_update=True):
 		refused = True
 	if refused:
-		if session_open:
-			_close_new_session()
 		raise SignInRefused(403, _("This user is disabled.", context="platform_core.identity"))
 
 
@@ -242,9 +246,9 @@ def _close_new_session() -> None:
 	from frappe.sessions import delete_session
 
 	sid = getattr(frappe.session, "sid", None)
-	if sid and sid != "Guest":
-		delete_session(sid, reason="Account deleted during sign-in")
 	frappe.local.cookie_manager.delete_cookie("sid")
+	if sid and sid != "Guest":
+		delete_session(sid, reason="Sign-in identity recheck failed")
 
 
 def resolve_user(issuer: str, claims: dict) -> str:

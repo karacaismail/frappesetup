@@ -53,7 +53,7 @@ Bir Frappe imajının kurulu paketlerini ayrı listelemek için `--runtime-image
 ## Yerel site ve kabul
 
 Kendi sitenizi hazırlayın. Sitenin web portu `PANE_PORT + 1` olur.
-Gerekirse `FS_COLIMA_PROFILE=default backend/dev/bin/tunel ac` komutuyla tüneli açın.
+Gerekirse `FS_COLIMA_PROFILE=default backend/dev/bin/tunnel open` komutuyla tüneli açın.
 Site kurulumu için gereken sırlar `MARIADB_ROOT_PASSWORD` ve `ADMIN_PASSWORD` değerleridir.
 Sözleşme denetimi için gereken sır `FS_API_TEST_PASSWORD` değeridir.
 

@@ -1,8 +1,8 @@
-"""Küçük JSON HTTP istemcisi. Yalnız Python'un kendi kitaplığını kullanır.
+"""Small JSON HTTP client using only the Python standard library.
 
-Her isteğin süre sınırı vardır (G-13). İstemci yönlendirmeyi izlemez.
-Böylece belirteç ayardaki hedefin dışına gitmez.
-Hata metni yanıt gövdesini taşımaz. Gövde kişisel veri içerebilir.
+Each request has a timeout (G-13). The client does not follow redirects.
+This prevents tokens from being sent outside the configured target.
+Error messages omit response bodies, which may contain personal data.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ _MAX_ERROR_BYTES = 65536
 
 
 class HttpError(Exception):
-    """Sunucu 2xx dışında yanıt verdi.
+    """The server returned a non-2xx response.
 
     `code` is the target's error name (Frappe's `exc_type`), and only when it is one of
     `KNOWN_ERROR_CODES`. Every other name and the rest of the body are dropped because they may
@@ -61,20 +61,20 @@ class HttpError(Exception):
 
 
 class UnknownOutcome(Exception):
-    """Hedef kesin başarı yanıtı vermedi. İşin bitip bitmediği bilinmiyor.
+    """The target did not confirm success. Completion is unknown.
 
-    Örneğin hedef işi kuyruğa aldı ve 202 döndü. Bu durumda kör tekrar yapılmaz.
+    For example, the target queued the work and returned 202. Do not retry blindly.
     """
 
 
 class TransportError(Exception):
-    """İstek sunucuya ulaşmadı ya da yanıt okunamadı."""
+    """The request did not reach the server, or the response could not be read."""
 
     transient = True
 
 
 class ConnectFailed(TransportError):
-    """Bağlantı hiç kurulamadı. İstek sunucuya gitmedi."""
+    """No connection was established. The request was not sent to the server."""
 
 
 @dataclass(frozen=True)
@@ -113,9 +113,9 @@ def request_json(
     has_body: bool = False,
     form: Mapping[str, str] | None = None,
 ) -> Response:
-    """İsteği gönderir ve JSON yanıtı çözer.
+    """Send the request and decode the JSON response.
 
-    `has_body` doğruysa `json_body` değeri `None` olsa bile gövde olarak gider.
+    When `has_body` is true, send `json_body` even if its value is `None`.
     """
     if not url.startswith(("http://", "https://")):
         raise ValueError("only http and https URLs are allowed")
@@ -144,7 +144,7 @@ def request_json(
             raise ConnectFailed("connection failed") from None
         raise TransportError(type(error.reason).__name__) from None
     except (TimeoutError, ConnectionError, OSError) as error:
-        # İstek gitmiş olabilir. Yanıt okunamadı.
+        # The request may have been sent. The response could not be read.
         raise TransportError(type(error).__name__) from None
     if len(payload) > _MAX_RESPONSE_BYTES:
         raise TransportError("response too large")

@@ -9,6 +9,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+if sys.version_info < (3, 14):
+    raise unittest.SkipTest("Naming tests require Python 3.14 or newer. Run them with python3.14.")
+
 NAMING = Path(__file__).resolve().parents[1]
 
 

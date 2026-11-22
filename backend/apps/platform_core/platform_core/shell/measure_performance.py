@@ -24,13 +24,13 @@ SAMPLES = 50
 LIMIT_MS = 500
 WARM_BOOTSTRAP_LIMIT_MS = 200
 TIMING_HEADER = "X-Shell-Test-Server-Ns"
-BOOTSTRAP_LABEL = "Aç\u0131l\u0131ş verisi"
-WARM_MODE = "Önbellekli"
-COLD_MODE = "Önbelleksiz"
+BOOTSTRAP_LABEL = "Bootstrap data"
+WARM_MODE = "Warm cache"
+COLD_MODE = "Cold cache"
 ENDPOINTS = (
 	(BOOTSTRAP_LABEL, "/api/method/platform_core.api.shell.get_bootstrap", "user", ACCOUNT),
 	(
-		"DocType tan\u0131m\u0131",
+		"DocType metadata",
 		"/api/method/platform_core.api.meta.get_doctype?" + urlencode({"doctype": "Leave Application"}),
 		"schema",
 		"Leave Application",
@@ -281,19 +281,30 @@ def report(rows):
 	import frappe
 	import hrms
 
+	context = "shell.performance"
 	summary = [
-		"### O-31 kabuk ölçümü",
+		"### " + frappe._("O-31 shell benchmark", context=context),
 		"",
 		f"Frappe {frappe.__version__}, ERPNext {erpnext.__version__}, HRMS {hrms.__version__}.",
-		f"Örnek veri {EMPLOYEES} çal\u0131şan ve {EMPLOYEES * LEAVE_PER_EMPLOYEE:,} izin kayd\u0131.".replace(
-			",", "."
+		frappe._("Sample data contains {0} employees and {1} leave records.", context=context).format(
+			EMPLOYEES, EMPLOYEES * LEAVE_PER_EMPLOYEE
 		),
-		"İstekler yerel HTTP üzerinden s\u0131rayla gitti. Hesapta HR User rolü vard\u0131.",
-		"Sunucu süresi isteğin al\u0131nmas\u0131ndan yan\u0131t başl\u0131klar\u0131n\u0131n haz\u0131r olmas\u0131na kadar ölçüldü.",
-		"Önbelleksiz koşudan önce her istek için Frappe site ve işlem önbelleği temizlendi.",
-		"Veritaban\u0131 ve işletim sistemi önbellekleri bu ölçümde temizlenmedi.",
+		frappe._(
+			"Requests ran sequentially over local HTTP. The account had the HR User role.", context=context
+		),
+		frappe._(
+			"Server timing starts when the server receives the request and ends when response headers are ready.",
+			context=context,
+		),
+		frappe._(
+			"The benchmark cleared the Frappe site and process caches before each cold-cache request.",
+			context=context,
+		),
+		frappe._("The benchmark kept the database and operating system caches intact.", context=context),
 		"",
-		"| Uç | Durum | İstek | p50 (ms) | p95 (ms) | S\u0131n\u0131r (ms) | Sonuç |",
+		frappe._(
+			"| Endpoint | Cache | Requests | p50 (ms) | p95 (ms) | Limit (ms) | Result |", context=context
+		),
 		"| --- | --- | ---: | ---: | ---: | ---: | --- |",
 	]
 	passed = True
@@ -302,8 +313,10 @@ def report(rows):
 		p95, within_budget = summarize(samples, limit_ms=limit_ms)
 		passed &= within_budget
 		outcome = "pass" if within_budget else "fail"
+		endpoint_label = frappe._(endpoint, context=context)
+		cache_label = frappe._(mode, context=context)
 		summary.append(
-			f"| {endpoint} | {mode} | {len(samples)} | {median(samples):.3f} | {p95:.3f} | {limit_ms} | {outcome} |"
+			f"| {endpoint_label} | {cache_label} | {len(samples)} | {median(samples):.3f} | {p95:.3f} | {limit_ms} | {outcome} |"
 		)
 	return "\n".join(summary), passed
 
@@ -323,7 +336,8 @@ def main():
 			rows = measure(args.site, port, password)
 	finally:
 		cleanup_fixture(args.site, records)
-	summary, passed = report(rows)
+	with test_database(args.site):
+		summary, passed = report(rows)
 	with destination.open("a", encoding="utf-8") as output:
 		output.write(f"\n\n{summary}\n")
 	print(summary)
