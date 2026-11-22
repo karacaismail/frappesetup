@@ -1,5 +1,5 @@
 # Regenerate with backend/dev/security/compile-lock.
-# Manifest SHA256: 6ce7a28f48e624491d60296814f8fe8f4928c33b9aa92c200de19a4851303444
+# Manifest SHA256: 1f8b773f585fe72f1ac6160b4bc1cfeb9d2eae3483037c62e7263fb350eea7b4
 annotated-types==0.8.0
 certifi==2026.11.20
 charset-normalizer==3.5.2
