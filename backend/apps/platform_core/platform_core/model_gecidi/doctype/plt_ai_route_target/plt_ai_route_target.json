@@ -22,7 +22,7 @@
    "fieldname": "api",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "API",
+   "label": "API Connection",
    "options": "AI API",
    "reqd": 1
   }

@@ -222,3 +222,8 @@ class TestGatewayRegistry(IntegrationTestCase):
 		self.assertEqual(route.data_policy, "masked")
 		route.data_policy = "local_only"
 		route.save()
+
+	def test_route_target_label_uses_requested_language(self):
+		field = frappe.get_meta("PLT AI Route Target").get_field("api")
+		self.assertEqual(frappe._(field.label, lang="tr"), "API Bağlant\u0131s\u0131")
+		self.assertEqual(frappe._(field.label, lang="en"), "API Connection")
