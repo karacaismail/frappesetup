@@ -533,28 +533,56 @@ class StackTests(unittest.TestCase):
             namespace["credentials"](target)
         return seen
 
-    def test_staging_file_for_default_and_custom_targets_is_ignored_by_git(self):
-        folder = ROOT / "backend/e2e" / ("staging-test-" + os.urandom(4).hex())
-        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
-        folder.mkdir()
-        for target in (folder / ".env", Path(self.env["E2E_ENV_FILE"])):
-            with self.subTest(target=target):
-                seen = self.written_staging_paths(target)
+    def test_staging_name_does_not_depend_on_the_target_name(self):
+        target = ROOT / "backend/e2e/.env.production"
+        if target.exists() or target.is_symlink():
+            self.skipTest("A developer file already uses this path.")
+        self.addCleanup(target.unlink, missing_ok=True)
+        for candidate in (target, Path(self.env["E2E_ENV_FILE"])):
+            with self.subTest(target=candidate):
+                seen = self.written_staging_paths(candidate)
                 self.assertEqual(len(seen), 1)
+                self.assertRegex(seen[0].name, r"\A\.fs-stack-env\.[0-9a-f]{16}\.tmp\Z")
                 self.assertFalse(seen[0].exists())
-                self.assertEqual(target.stat().st_mode & 0o777, 0o600)
-                self.assertEqual(sorted(path.name for path in target.parent.iterdir()), [target.name])
+                self.assertEqual(candidate.stat().st_mode & 0o777, 0o600)
+
+    def test_first_run_creates_a_custom_ignored_target_and_removes_staging(self):
+        target = ROOT / "backend/e2e/.env.production"
+        if target.exists() or target.is_symlink():
+            self.skipTest("A developer file already uses this path.")
+        self.addCleanup(target.unlink, missing_ok=True)
+        staging_before = set((ROOT / "backend/e2e").glob(".fs-stack-env.*"))
+        result = self.run_stack("config", E2E_ENV_FILE=str(target))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(target.is_file())
+        self.assertEqual(target.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(set((ROOT / "backend/e2e").glob(".fs-stack-env.*")), staging_before)
 
     def test_refuses_a_staging_path_that_git_could_track(self):
         folder = ROOT / "backend/e2e" / ("staging-test-" + os.urandom(4).hex())
         self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
         folder.mkdir()
-        target = folder / ".env.production"
+        target = folder / ".env"
         namespace = runpy.run_path(str(STACK))
         namespace["assert_ignored"](target)
         with self.assertRaisesRegex(ValueError, "ignored by Git"):
             namespace["credentials"](target)
         self.assertEqual(list(folder.iterdir()), [])
+
+    def test_staging_ignore_rule_is_narrow(self):
+        namespace = runpy.run_path(str(STACK))
+        namespace["assert_ignored"](ROOT / "backend/e2e/.fs-stack-env.0123456789abcdef.tmp")
+        for near in (
+            "backend/e2e/.fs-stack-env.0123456789abcdef.tmp.md",
+            "backend/e2e/.fs-stack-env.notes.tmp",
+            "backend/e2e/docs/.fs-stack-env.0123456789abcdef.tmp",
+            "src/.fs-stack-env.0123456789abcdef.tmp",
+            "backend/e2e/.env.tmp-review.md",
+            "src/.env.tmp-review",
+        ):
+            with self.subTest(path=near):
+                with self.assertRaisesRegex(ValueError, "ignored by Git"):
+                    namespace["assert_ignored"](ROOT / near)
 
     def test_git_ignore_check_cannot_be_redirected_by_git_variables(self):
         path = ROOT / "backend/e2e/stack-candidate.env"

@@ -97,7 +97,8 @@ def credentials(path):
                 values[key] = value
         path.parent.mkdir(parents=True, exist_ok=True)
         # The staging file holds secrets too, so Git must ignore its name before it exists.
-        staging = path.with_name(f"{path.name}.tmp-{secrets.token_hex(8)}")
+        # The name is independent of the target so one narrow .gitignore rule covers it.
+        staging = path.parent / f".fs-stack-env.{secrets.token_hex(8)}.tmp"
         assert_ignored(staging)
         descriptor = os.open(staging, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         try:
