@@ -56,6 +56,7 @@ Ortam komutları Pane'in verdiği `PANE_PORT` değerini kullanır.
 | Python kod ve biçim denetimi | `backend/dev/bin/ruff` | Depo kökü |
 | Modül sınırları | `backend/dev/bin/modul-sinirlari` | Depo kökü |
 | Ortam betiklerinin Python testleri | `python3 -m unittest discover -s backend/dev/tests` | Depo kökü |
+| Atonota giriş teması | Komut ve dosya listesi `backend/identity/keycloak/themes/atonota/README.md` dosyasındadır. Her sayfaya yüklenen stil ve betik ile ileti dosyalarının yolu da oradadır. | Depo kökü |
 
 ## Proje sahibinin kararları
 
@@ -237,6 +238,9 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
+| `BORC(mvp)`: Tema derleme adımının iki kopyası var | Bir kopya değişince öteki eski kalabilir | kimlik-tema | Derleme adımı tek yerde durur ve test bunu denetler |
+| `BORC(mvp)`: Bazı tema ekranları sınanmadı | Görünüm hatası fark edilmeyebilir | kimlik-tema | Sınanmamış ekranların listesi boşalır |
+| `BORC(mvp)`: Geçiş anahtarı testleri yük altında zaman aşımına uğruyor | Test sonucu güvenilmez olur | kimlik-tema | Testler yük altında da kararlı geçer |
 | `BORC(mvp)`: Performans ölçümü yalnız elle yapılır (O-31) | Canlı darboğaz görülmez | DevOps sorumlusu | P1'de Grafana ve gerçek kullanıcı ölçümü kurulur (G-149) |
 | `BORC(mvp)`: HRMS TR kayıtlarının yasal saklama süresi yok | Silme zamanı belli değil | Hukuk sorumlusu | Süre proje kaydına yazılır ve silme komutu bu süreyi uygular |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
