@@ -119,6 +119,8 @@ Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_id
 | `auth_time` | tamsayı | Belirteçteki son kimlik doğrulama zamanı (Unix saniyesi) |
 
 Kabuk ve mobil modülü bu değeri okur. Değer yoksa ya da biçimi tutmazsa istek telefon isteği sayılmaz.
+Kabuk, `installation` ve `sid` alanlarında boş olmayan metin ister.
+Yalnız boşluk içeren metin de geçersizdir.
 
 `X-Platform-Installation` başlığı yalnız harf, rakam, `_` ve `-` taşır. Uzunluğu 1 ile 128 karakter arasındadır. Başlık yoksa ya da biçimi tutmazsa `installation` boş metin olur. Başlık yetki vermez. Mobil modülü kurulumu kendi kaydıyla karşılaştırır.
 
@@ -202,6 +204,7 @@ Adres biçimi `/api/method/<yol>` olur.
 - Liste `website_user_allowed_methods` kancasından gelir. Her uygulama yalnız kendi yöntemlerini ekler. Örneğin `platform_core.api.shell.get_bootstrap` ve `platform_core.api.meta.get_doctype` bu listededir.
 - Frappe'nin yöntemlerinden yalnız şunlar listededir: `frappe.auth.get_logged_user`, `logout` ve kurallı aramayı saran `frappe.desk.search.search_link`. Yeni bir Frappe yöntemi listeye ancak testle girer.
 - REST kayıt uçları (`/api/resource`, `/api/v2/document`) bu kuralın dışındadır. Bu uçlar Frappe'nin kayıt izinleriyle ve erişim kuralı motoruyla denetlenir.
+- `/api/v2/document/<doctype>/<name>/method/<method>/` yolu ve eski `run_method` biçimi yöntem izin listesinin dışındadır. Frappe bu çağrılarda belge izinlerini denetler.
 - Sahibi platform-core-kabuk işidir. Masaüstü kullanıcısı bu kuraldan etkilenmez.
 - `api/__init__.py`, `api/auth.py` ve `api/identity.py` dosyaları platform-core-kimlik işinindir.
 - `api/shell.py` ve `api/meta.py` dosyaları platform-core-kabuk işinindir.
