@@ -3,6 +3,8 @@
 import argparse
 import os
 import re
+import sys
+from contextlib import redirect_stdout
 from math import ceil
 from time import perf_counter
 from urllib.parse import quote
@@ -217,10 +219,11 @@ def main():
         parser.error("Pass the Git revision of the test image.")
     password = os.environ["HRMS_TR_TEST_PASSWORD"]
     os.chdir("sites")
-    data, drafts, employees, attendance = make_workload(args.site, password)
-    return report(
-        args.revision, measure(args.site, data, drafts, employees, attendance, password)
-    )
+    # Frappe prints tracebacks for the expected 403 responses. Only the report goes to stdout.
+    with redirect_stdout(sys.stderr):
+        data, drafts, employees, attendance = make_workload(args.site, password)
+        operations = measure(args.site, data, drafts, employees, attendance, password)
+    return report(args.revision, operations)
 
 
 if __name__ == "__main__":
