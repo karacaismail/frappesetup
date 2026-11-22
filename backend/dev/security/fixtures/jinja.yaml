@@ -2,7 +2,7 @@ rules:
   - id: jinja-safe-filter
     languages: [generic]
     severity: ERROR
-    message: "Şablonun güvenli metin dönüşümünü koruyun."
+    message: "Preserve safe text escaping in the template."
     paths:
       include: ['**/*.html', '**/*.jinja', '**/*.jinja2', '**/*.j2']
     pattern-regex: '(?s)\{(?:\{|%)(?:(?!\}\}|%\}).)*?\|\s*safe\b'

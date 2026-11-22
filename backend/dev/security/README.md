@@ -1,6 +1,6 @@
 # Backend güvenlik denetimi
 
-Depo kökünde `backend/dev/bin/guvenlik-denetimi` komutunu çalıştırın.
+Depo kökünde `backend/dev/bin/security-audit` komutunu çalıştırın.
 Komut için Python 3.9 veya üstü, `uvx` ve çalışan Colima gerekir.
 İlk çalıştırmada araç paketlerinin ve Gitleaks imajının indirilmesi gerekebilir.
 
@@ -48,7 +48,7 @@ Kurallar, yardımcı işlevler ve dosyalar arasındaki akışı kapsamaz.
 - İşletim sistemine verilen komut argümanında gizli değer bulunmamalı.
   Aracın desteklediği korumalı giriş yolunu kullanın.
 
-Olumlu ve olumsuz denemeler `backend/dev/guvenlik/fixtures/` altındadır.
+Olumlu ve olumsuz denemeler `backend/dev/security/fixtures/` altındadır.
 Misafir uçta Frappe'nin `rate_limit` işaretini kullanın.
 `rate_limit` satırını `whitelist` satırının altına yazın.
 Uç listesi bu sırayı ve işaretin içe aktarıldığı yeri denetler.
@@ -61,7 +61,16 @@ Press istisnalarının gerekçeleri `semgrep-exceptions.json` dosyasındadır.
 Kapı, Press uygulamasının ve ilgili Semgrep kural dosyasının özetini karşılaştırır.
 Özet taramadan önce veya sonra farklıysa kapı istisnayı uygulamaz.
 Dosya, satır ve kural kimliği de birebir eşleşmelidir.
-Dış doğrulayıcı güncellenirse Press istisnalarını yeniden inceleyin.
+Press kodu veya kural değişirse istisnaları yeniden inceleyin.
+İnceleme bitince depo kökünde şu komutu çalıştırın.
+
+```sh
+python3 -B backend/dev/security/semgrep_exceptions.py --snapshot
+```
+
+Komut boş çıktı verirse şimdiki özeti koruyun.
+Komut bir özet verirse değeri `semgrep-exceptions.json` dosyasındaki `sha256` alanına yazın.
+Ardından `backend/dev/bin/security-audit` komutunu çalıştırın.
 
 Uç listesi `backend/apps/<uygulama>/<paket>/` altındaki Python kaynaklarını okur.
 Çalışırken eklenen uçlar için Frappe yapılandırmasını ayrıca inceleyin.
