@@ -26,6 +26,7 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 | `platform_core` | `kimlik` | Keycloak ile giriş, çıkış, kimlik bağı ve servis belirteci |
 | `platform_core` | `kabuk` | Açılış verisi, kenar çubuğu verisi ve DocType tanımı uçları |
 | `platform_core` | `yapay_zeka` | Yapay zekâ erişim katmanı: araç kaydı, MCP ucu, önizleme ve onay, işlem günlüğü |
+| `platform_core` | `erisim` | Erişim kuralı motoru: kayıt kuralı, hiyerarşi ve alan düzeyi (K8) |
 | `platform_core` | `model_gecidi` | Sağlayıcı, hesap, API ve model kaydı. Yönlendirme, model çağrısı ve kullanım kaydı. |
 | `press_tr` | `kimlik` | Press'te Keycloak ile giriş, takım açma ve servis uçları |
 | `identity_sync` | Yok | Keycloak ile Press ve kiracı siteleri arasında kullanıcı eşitleme |
@@ -35,6 +36,7 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 
 - `platform_core.kimlik` ve `press_tr.kimlik` yalnız `oidc_verify` kitaplığını kullanır.
 - `platform_core.kabuk` ile `platform_core.kimlik` birbirini çağırmaz.
+- `platform_core.erisim` öteki modülleri çağırmaz. Öteki modüller onu içe aktarmaz. Motor Frappe'nin izin kancalarıyla çalışır.
 - `platform_core.model_gecidi` öteki modülleri çağırmaz. `yapay_zeka` modülü `model_gecidi` modülünün açık işlevlerini çağırabilir.
 - `platform_core.yapay_zeka` öteki modüllerin açık işlevlerini çağırabilir. Öteki modüller `yapay_zeka` modülünü çağırmaz. Uygulamalar araçlarını `ai_tools` kancasıyla bildirir.
 - `identity_sync` sitelerin açık uçlarını HTTP ile çağırır. Siteler `identity_sync` kodunu çağırmaz.
