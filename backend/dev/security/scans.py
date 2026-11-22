@@ -101,16 +101,16 @@ def report(directory):
         record = read_record(directory, name)
         if record:
             state = {True: "dirty", False: "clean"}.get(record.get("dirty"), "unknown")
-            lines.append(f"- `{name}` · `{record.get('commit', '—')}` · `{record.get('branch', '—')}` · "
-                         f"`{record.get('utc', '—')}` · Working tree: {state}.")
+            lines.append(f"- {markdown_code(name)} · {markdown_code(record.get('commit', '—'))} · "
+                         f"{markdown_code(record.get('branch', '—'))} · {markdown_code(record.get('utc', '—'))} · Working tree: {state}.")
     lines.extend(["", "| Tool | Version | Command | Result |", "| --- | --- | --- | --- |"])
     results = list(load_results(directory))
     for result in results:
-        lines.append(f"| {result.tool} | {result.version} | `{result.command}` | `{result.status}` |")
+        lines.append(markdown_result(result))
     for result in results:
         if result.findings:
-            lines.extend(["", f"## {result.tool}", ""])
-            lines.extend(f"- {finding}" for finding in result.findings)
+            lines.extend(["", f"## {markdown_text(result.tool)}", ""])
+            lines.extend(f"- {markdown_text(finding)}" for finding in result.findings)
     return "\n".join(lines)
 
 
@@ -182,7 +182,7 @@ def scan_bandit():
         fixture = bandit_findings(command, [str(FIXTURES / "bandit.py")])
         if not any(item["test_id"] == "B101" and item["line_number"] == 1 for item in fixture):
             raise ValueError("Bandit missed its fixture.")
-        entries = json.loads((ROOT / SECURITY / "bandit-exceptions.json").read_text())
+        entries = json.loads((ROOT / SECURITY / "bandit-exceptions.json").read_text(), object_pairs_hook=unique_json_object)
         today = datetime.now(timezone.utc).date()
         if any(not valid_exception(item, today) for item in entries):
             raise ValueError("Invalid or expired Bandit exception.")
@@ -667,6 +667,37 @@ def main():
     else:
         print(report(RESULTS))
     return 0
+
+
+def markdown_text(value):
+    line = " ".join(str(value).splitlines())
+    return re.sub(r"[&<>\\`*_{}\[\]|~!#+$-]", lambda match: f"&#{ord(match[0])};", line)
+
+
+def markdown_code(value):
+    line = " ".join(str(value).splitlines()) or "—"
+    if "|" in line:
+        return markdown_text(line)
+    ticks = re.findall(r"`+", line)
+    if not ticks:
+        return f"`{line}`"
+    fence = "`" * (max(map(len, ticks)) + 1)
+    return f"{fence} {line} {fence}"
+
+
+def markdown_result(result):
+    fields = (markdown_text(result.tool), markdown_text(result.version),
+              markdown_code(result.command), markdown_code(result.status))
+    return "| " + " | ".join(fields) + " |"
+
+
+def unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate key in Bandit exception JSON.")
+        result[key] = value
+    return result
 
 
 if __name__ == "__main__":
