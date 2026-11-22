@@ -159,7 +159,7 @@ def scan(root):
                 aliases[alias] = name if alias != name.split(".")[0] or "." not in name else alias
                 if any(name == provider or name.startswith(provider + ".") for provider in PROVIDERS):
                     emit(path, item.lineno, "provider", f"Provider import is forbidden: {name}.")
-        sources[module] = path, tree, aliases
+        sources[module] = path, aliases
         for name, fn in definitions(tree):
             qualified = f"{module}.{name}"
             functions[qualified] = module, fn
@@ -193,8 +193,7 @@ def scan(root):
                 if isinstance(item, ast.AnnAssign) and dotted(item.target) == "ai_tools" and item.value:
                     registered.update((name, (path, item.lineno)) for name in tool_references(item.value, ()))
 
-    for module, (path, tree, aliases) in sources.items():
-        if "yapay_zeka" in module.split("."):
+        if not is_test and "yapay_zeka" in module.split("."):
             for line in sql_calls(tree, aliases):
                 emit(path, line, "sql", "Raw SQL is forbidden in AI tools.")
     targets = dict(registered)
@@ -207,7 +206,7 @@ def scan(root):
             emit(hook, line, "sql", f"Cannot inspect registered AI tool {target}.")
             continue
         module, fn = functions[target]
-        path, _, aliases = sources[module]
+        path, aliases = sources[module]
         for sql_line in sql_calls(fn, aliases):
             emit(path, sql_line, "sql", "Raw SQL is forbidden in AI tools.")
 

@@ -174,6 +174,7 @@ class GateTests(unittest.TestCase):
     def test_sql_in_ai_module_and_registered_tool(self):
         command = 'import frappe\n\ndef run():\n    return frappe.db.sql("SELECT 1")\n'
         self.write(f"{APP}/tools.py", command)
+        self.write(f"{APP}/yapay_zeka/tests/test_setup.py", command)
         self.write(
             f"{APP}/declarations.py",
             """

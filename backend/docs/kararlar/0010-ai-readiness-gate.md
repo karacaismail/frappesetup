@@ -26,6 +26,8 @@ Programın okuyacağı çıktı için `--json` ekleyin.
 - Kapı ham SQL çağrılarını yapay zekâ modülünde ve kayıtlı araç işlevlerinde arar.
   Ham SQL, veritabanına doğrudan gönderilen sorgudur.
   Kapı sabit araç bildirimlerindeki iş ve önizleme işlevlerine de bakar.
+  Kapı araç olarak bildirilmemiş test kodundaki sorguları dışarıda bırakır.
+  Örneğin testte oturumu süresi geçmiş duruma getiren sorguyu araç saymaz.
 
 Kapı uygulama kodunu çalıştırmaz ve dosyaları değiştirmez.
 Kapı düz YAML eşlemelerini ve JSON biçimindeki OpenAPI dosyalarını okur.
