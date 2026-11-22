@@ -155,4 +155,12 @@ Bu iş yeni açıldı (O-29). Maddeler görev dosyasındadır.
 2. Modüller arası izinli işlev ve kanca listesi.
 3. Sunucu saatleri NTP ile eşitlenir. Fark en çok 30 saniye olur.
 4. Geliştirme ortamında biriken veri birimlerinin listesi.
-5. İki karar notu aynı 0008 numarasını taşıyor. Birleştirmede kimlik bağı notu 0012 numarasını alır.
+5. Karar notu numaraları çakışıyor. Numaraları orkestratör şöyle verdi:
+   - `0008-hrms-tr-first-vertical-slice.md` numarasını korur.
+   - `0009-naming-history-fix.md` numarasını korur.
+   - `0010-ai-readiness-gate.md` numarasını korur.
+   - `0011-security-tooling.md` numarasını korur.
+   - platform-core-kimlik işinin kimlik bağı notu `0012` olur.
+   - platform-core-kimlik işinin hesap anonimleştirme notu `0013` olur.
+   - kimlik-tema işinin silme bağlantısı notu `0014` olur.
+   - Yeni karar notu sıradaki boş numarayı alır. Sıradaki boş numara `0015` olur.

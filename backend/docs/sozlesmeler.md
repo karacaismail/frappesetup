@@ -114,14 +114,20 @@ Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_id
 | `account` | metin | Frappe kullanıcısının adı |
 | `scope` | metin | Her zaman `mobile` |
 | `site` | metin | İsteğin geldiği site |
-| `installation` | metin | Telefon kurulumunun kimliği |
+| `installation` | metin | Telefon kurulumunun kimliği. Telefon bu değeri `X-Platform-Installation` başlığında gönderir. |
 | `sid` | metin | Keycloak oturum kimliği |
 | `auth_time` | tamsayı | Belirteçteki son kimlik doğrulama zamanı (Unix saniyesi) |
 
 Kabuk ve mobil modülü bu değeri okur. Değer yoksa ya da biçimi tutmazsa istek telefon isteği sayılmaz.
 
+`X-Platform-Installation` başlığı yalnız harf, rakam, `_` ve `-` taşır. Uzunluğu 1 ile 128 karakter arasındadır. Başlık yoksa ya da biçimi tutmazsa `installation` boş metin olur. Başlık yetki vermez. Mobil modülü kurulumu kendi kaydıyla karşılaştırır.
+
 - Kiracı sitesinde ve telefon paketinde bütün kullanıcılar çalışan süresini alır: 1 saat boşta kalma, 24 saat toplam süre. Realm bu istemcilerde `employee` düzeyini ister. Müşteri süreleri yalnız Press'e uygulanır.
 - Sunucu boşta kalma sayacını `auth_time` değeri sayaç başlangıcından yeni olunca sıfırlar. Böylece aynı `sid` ile yeniden giriş de telefonu açar.
+- Süre dolunca sunucu 401 durumunu ve `reauthentication_required` kodunu döndürür.
+- Uygulama bu yanıtı alınca eşitlemeyi durdurur. Kullanıcıdan Keycloak ile yeniden giriş ister.
+- Uygulama yeni belirteçle aynı kurulumu kaydeder. Ardından bekleyen işlemleri aynı kimliklerle yeniden gönderir.
+- Oturum kimliği değişirse uygulama önce kurulumu kaydeder. Kayıttan önce eşitleme 403 ve `installation_unavailable` döndürür.
 
 ### Kitaplığın arayüzü
 
@@ -406,6 +412,7 @@ Proje sahibinin kararı şudur: Her şey yapay zekâyla yönetilebilir olacak. K
 
 - Yazdığınız her DocType alanına `description` verin. Açıklama İngilizce yazılır. Türkçesi çeviri dosyasındadır. Yapay zekâ alanı bu açıklamadan anlar.
 - Yazdığınız her uca OpenAPI dosyasında özet ve açıklama yazın.
+- Bir Frappe adresini değiştirirseniz eski adresi hedef işlemin `x-frappe-original` alanına yazın.
 - Ucu yıkıcı ya da ücretli bir iş yapıyorsa bunu sözleşmede belirtin.
 - Elle başlatılan her komut için bir HTTP ucu da yazın. Böylece yapay zekâ da komutu başlatabilir. Örneğin mutabakat komutu böyledir.
 - `press_tr` aynı kuralları uygular. Press işlemleri için depodaki `packages/press-ai` sözleşmesi temel alınır.
