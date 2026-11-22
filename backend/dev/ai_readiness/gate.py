@@ -15,6 +15,7 @@ from contracts import METHOD_PATH, operations
 from dependencies import FRAPPE_VERSION, dependency_checks
 from forbidden_name import find_path_code, match_lines, redact_path, require_git_executable, tracked_findings
 from hook_validation import HOOK_RULES, invalid_hook_uses, node_names, opaque_hook_lines
+from shellcheck_step import run_shellcheck
 from source import (
     FUNCTIONS,
     assignments,
@@ -87,6 +88,7 @@ class Finding:
     rule: str
     message: str
     severity: str = "error"
+    owner: str | None = None
 
 
 def has_text(value):
@@ -828,6 +830,26 @@ def website_method_checks(entries, endpoints, functions, sources, reexports, ove
                 break
 
 
+def shellcheck_checks(root, excluded_roots, findings):
+    diagnostics = run_shellcheck(root, source_files(root, lambda *_: None, exclude=excluded_roots))
+    if diagnostics is None:
+        return "not_run"
+    if not diagnostics:
+        return "pass"
+
+    from interfaces import folder_owner, folder_owners
+
+    try:
+        apps = {path.name for path in (root / "apps").iterdir()} if (root / "apps").is_dir() else set()
+        owners = folder_owners(root / "AGENTS.md", apps)
+    except (OSError, UnicodeError):
+        owners = {}
+    for path, line, rule, message in diagnostics:
+        relative = path.relative_to(root).as_posix()
+        findings.add(Finding(relative, line, rule, message, "warning", folder_owner(relative, owners)))
+    return "warn"
+
+
 def scan(root, commit_base=None, frappe_root=None):
     findings = set()
     functions = {}
@@ -1003,7 +1025,8 @@ def scan(root, commit_base=None, frappe_root=None):
     checks = naming_checks(root, findings)
     checks["translation_core"] = translation_checks(translation_paths, frappe_package, emit)
     checks.update(dependency_checks(app_manifests, frappe_manifest, frappe_package, root, emit))
-    return sorted(findings), checks
+    checks["shellcheck"] = shellcheck_checks(root, excluded_roots, findings)
+    return sorted(findings, key=lambda item: (item.owner is not None, item.owner or "", item)), checks
 
 
 def supports_python():
@@ -1064,11 +1087,16 @@ def main():
             finding.rule if next(match_lines([finding.rule]), None) is None else "redacted",
             finding.message if next(match_lines([finding.message]), None) is None else "Details redacted.",
             finding.severity,
+            redact_path(finding.owner) if finding.owner is not None else None,
         )
         for finding in raw_findings
     ]
     if args.json:
-        print(json.dumps({"findings": [asdict(finding) for finding in findings], "checks": checks}))
+        records = [
+            {key: value for key, value in asdict(finding).items() if value is not None}
+            for finding in findings
+        ]
+        print(json.dumps({"findings": records, "checks": checks}))
     else:
         if checks["naming"] == "not_run":
             print("naming: not_run (checker unavailable)", file=sys.stderr)
@@ -1078,7 +1106,13 @@ def main():
             print("translation_core: not_run (Frappe core catalog unavailable)", file=sys.stderr)
         if checks["dependency_core"] == "not_run":
             print(f"dependency_core: not_run (Frappe {FRAPPE_VERSION} manifest unavailable)", file=sys.stderr)
+        if checks["shellcheck"] == "not_run":
+            print("shellcheck: not_run (pinned container unavailable or no shell scripts)", file=sys.stderr)
+        owner = None
         for finding in findings:
+            if finding.owner is not None and finding.owner != owner:
+                owner = finding.owner
+                print(f"ShellCheck [{owner}]")
             prefix = "Warning: " if finding.severity == "warning" else ""
             print(f"{prefix}{finding.path}:{finding.line} [{finding.rule}] {finding.message}")
     return int(any(finding.severity == "error" for finding in findings))

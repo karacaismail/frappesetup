@@ -187,3 +187,29 @@ Kapı, varsa `dev/naming/check_names.py` betiğini ayrı bir Python sürecinde �
 Betik yoksa kapı `not_run` durumunu bildirir.
 Bu durumda diğer bulgular ve çıkış kodu aynen kalır.
 Betik çalışamazsa kapı bulgu yazar.
+
+## Ek. ShellCheck araç kararı (T-2)
+
+Kapı kabuk betiklerini çalıştırmadan denetler.
+`bash -n` söz dizimini denetler. ShellCheck tırnak ve taşınabilirlik sorunlarını da arar.
+Bilgisayara ayrı ShellCheck kurulumu yerine resmî container imajı seçildi.
+Böylece mevcut Colima ve güvenlik komutu kullanılır.
+
+- Sürüm `v0.11.0`. İmaj `koalaman/shellcheck-alpine`.
+- Çok mimarili özet `sha256:9955be09ea7f0dbf7ae942ac1f2094355bb30d96fffba0ec09f5432207544002`.
+- Yayıncı bu özette Linux ARM64 ve AMD64 imajları sunuyor.
+- ShellCheck GPL-3.0 lisanslıdır. Kapı aracı ayrı bir süreçte çalıştırır.
+- Yayıncının güvenlik sayfasında yayımlanmış bildirim bulunmadı. İmaj açık taraması yapılmadı.
+
+[Resmî imaj](https://hub.docker.com/layers/koalaman/shellcheck-alpine/v0.11.0/images/sha256-9248c850f66526c40cd80c42b841c7975c59f4c37efc0884f699510471fb2e06)
+[ShellCheck sürümü](https://github.com/koalaman/shellcheck/releases/tag/v0.11.0)
+[ShellCheck lisansı](https://github.com/koalaman/shellcheck/blob/v0.11.0/LICENSE)
+[Güvenlik bildirimleri](https://github.com/koalaman/shellcheck/security/advisories)
+
+Kapı yalnız kabuk betiklerini container içindeki geçici alana aktarır.
+Container ağı kapalıdır. Ana makine klasörleri bağlanmaz.
+Kapı eksik imajı kendi başına indirmez.
+Docker veya imaj yoksa `shellcheck` sonucu `not_run` olur.
+Kapı bulguları `AGENTS.md` tablosundaki sahip işe göre sıralar.
+Bu bulgular uyarıdır. Kapının çıkış kodunu değiştirmez.
+Geri dönüş için ShellCheck çağrısı kaldırılır. Mevcut söz dizimi denetimi kalır.

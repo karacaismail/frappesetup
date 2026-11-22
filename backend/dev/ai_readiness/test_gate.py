@@ -479,6 +479,7 @@ class GateTests(unittest.TestCase):
                     "translation_core": "not_run",
                     "dependency_core": "not_run",
                     "dependency_apps": "pass",
+                    "shellcheck": "not_run",
                 },
             },
         )
