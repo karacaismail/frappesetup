@@ -185,12 +185,19 @@ class RealmFileTest(unittest.TestCase):
 
 class ComposeFileTest(unittest.TestCase):
     def test_image_tag_is_unique_per_pane(self):
-        # Parallel Panes build the same image. The tag must include the Pane port (KC_PORT = PANE_PORT).
+        # Shared stacks use the worktree namespace. Standalone runs use the Pane port.
         compose = (DIRECTORY.parents[1] / "dev" / "compose.keycloak.yaml").read_text(encoding="utf-8")
-        self.assertRegex(compose, r"image: fs-keycloak-atonota:dev-\$\{KC_PORT:\?\}")
+        self.assertIn("    image: fs-keycloak-atonota:dev-${FS_STACK_IMAGE_TAG:-${KC_PORT:?}}", compose.splitlines())
+        self.assertIn("    image: fs-kimlik-realm-event-sink:${FS_STACK_IMAGE_TAG:-dev}", compose.splitlines())
 
 
 class ExampleUserTest(unittest.TestCase):
+    def test_imported_users_receive_the_same_default_role_as_new_users(self):
+        default_role = read_realm()["defaultRole"]["name"]
+        for user in read_users()["users"]:
+            with self.subTest(username=user["username"]):
+                self.assertEqual(user.get("realmRoles"), [default_role])
+
     def test_example_users_are_in_separate_file_with_example_test_domain(self):
         request_body = read_users()
         self.assertEqual(request_body["realm"], "platform")
