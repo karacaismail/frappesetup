@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from contracts import METHOD_PATH, operations
-from forbidden_name import find_path_code, match_lines, redact_path, tracked_findings
+from forbidden_name import find_path_code, match_lines, redact_path, require_git_executable, tracked_findings
 from hook_validation import HOOK_RULES, invalid_hook_uses, node_names
 from source import (
     FUNCTIONS,
@@ -850,6 +850,11 @@ def main():
     args = parser.parse_args()
     if not supports_python():
         print("ai-readiness requires Python 3.14 or newer.", file=sys.stderr)
+        return 2
+    try:
+        require_git_executable()
+    except FileNotFoundError as error:
+        print(str(error), file=sys.stderr)
         return 2
     root = args.root.resolve()
     if args.path_code:

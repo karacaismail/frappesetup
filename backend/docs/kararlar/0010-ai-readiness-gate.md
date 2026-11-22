@@ -9,6 +9,8 @@ Komut önce `python3.14` adını arar. Bu ad yoksa `python3` kullanır.
 Komut her bulguda dosyayı ve satırı gösterir.
 Bir hata bulgusu varsa komut 1 döndürür. Hata yoksa 0 döndürür.
 Python sürümü yetersizse komut 2 döndürür.
+Kapı Git aracını başta bir kez arar. Yol kök klasörden başlamalıdır.
+Kapı Git'i bulamazsa veya yol göreliyse hata yazar ve 2 döndürür.
 
 Başka bir arka uç klasörünü taramak için `--root` kullanın.
 Programın okuyacağı çıktı için `--json` ekleyin.
