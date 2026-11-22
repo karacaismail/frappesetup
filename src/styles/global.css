@@ -495,7 +495,8 @@ body {
      satırına sığan kodu da bölüyor. Satırdan uzun dizileri kod kutuları çözer. */
   overflow-wrap: normal;
 }
-[data-code-measured] :is(.req-card-detail, .req-detail) > code:not(.req-code-wrap) {
+[data-code-measured] :is(.req-card-detail, .req-detail) > code:not(.req-code-wrap),
+:is(.req-card-detail, .req-detail) > code[data-scroll="single-line"] {
   white-space: nowrap;
 }
 .prose :not(pre, a) > code[data-scroll],

@@ -959,6 +959,21 @@ async function codeOutsideLine(page: Page) {
 }
 
 test.describe('long inline code', () => {
+  test('requirement code tab stops are named and capped at 320px @touch', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    await page.evaluate(() => document.fonts.ready);
+    const codes = page.locator('.req-cards .req-card-detail > code');
+    const stops = codes.and(page.locator('[tabindex="0"]'));
+    const namedStops = stops.and(page.getByRole('group', { name: 'Kaydırılabilir kod', exact: true }));
+    await expect.poll(() => stops.count()).toBeGreaterThan(0);
+    const count = await stops.count();
+    console.log(`[kod durakları] ${test.info().project.name}: ${count}`);
+    expect(count, '320 px kod durakları').toBeLessThanOrEqual(194);
+    await expect(namedStops).toHaveCount(count);
+    await expect(codes.and(page.locator('[role="group"]:not([tabindex="0"])'))).toHaveCount(0);
+  });
+
   test('all requirement cards fit plain text without emergency breaks at 320px @touch', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('gereksinimler/');
@@ -1005,10 +1020,13 @@ test.describe('long inline code', () => {
     for (const { id, text } of examples) {
       const code = page.locator(`#req-${id} code`).filter({ hasText: text });
       await expect(code).toHaveText(text);
-      await expect(code).toHaveAttribute('data-scroll', '');
+      await expect(code).toHaveAttribute('data-scroll', 'single-line');
       await expect(code).toHaveAttribute('tabindex', '0');
       expect(await code.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
     }
+    const longCall = page.locator('#req-G-30 code').filter({ hasText: /^press\.api\.client\.run_doc_method\(/ });
+    await expect(longCall).toHaveAttribute('data-scroll', 'single-line');
+    await expect(longCall).toHaveCSS('white-space', 'nowrap');
     await noHorizontalOverflow(page);
   });
 
@@ -1067,6 +1085,8 @@ test.describe('long inline code', () => {
     await page.locator('#icerik').focus();
     await expect.poll(() => mismatched(page), '1366 px: yalnız taşan kod Tab sırasında').toBe(0);
     await expect.poll(() => code.evaluate((el) => el.hasAttribute('tabindex')), '1366 px: sığan kod Tab sırasında değil').toBe(false);
+    await expect(code).not.toHaveAttribute('role', 'group');
+    await expect(code).not.toHaveAttribute('aria-label', 'Kaydırılabilir kod');
   });
 
   test('requirement card code stays keyboard reachable after filtering re-renders the cards', async ({ page }) => {

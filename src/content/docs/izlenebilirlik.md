@@ -106,25 +106,25 @@ Her satır 2026-10-08'de doğrulandı. Hareketli dal tek başına kanıt sayılm
 
 ## Bu sitenin QA kanıtı
 
-Tablo `pass`, `fail` ve `not_run` durumlarını kullanır. Kayıt numarası biliniyorsa tabloda yer alır. Yerel test sonucu GitHub Actions sonucundan ayrıdır. iPhone 13 benzetimi gerçek cihazı kapsamaz.
+Tablo `pass`, `fail` ve `not_run` durumlarını kullanır. Tablo, denetlenen değişikliğin Git commit kodunu gösterir. Yerel test sonucu GitHub Actions sonucundan ayrıdır. iPhone 13 benzetimi gerçek cihazı kapsamaz.
 
 | Kontrol | Kapsam | Durum |
 | --- | --- | --- |
-| Derleme | `npm run build` | pass (yerel Linux, bu düzeltme). Önceki Actions koşusu 37797285107. |
-| Playwright kapısı | Chromium ve WebKit tüm ekran profillerini denetler. Telefon benzetimi yalnız `@touch` testlerini çalıştırır. | pass (Linux). 378 test geçti. 28 test atlandı. Firefox bu koşuda çalışmadı. |
+| Derleme | `npm run build` | pass (1637b9d, yerel Linux, Actions değil). 837f2e4 için Actions koşusu 37797285107. |
+| Playwright kapısı | Testler 320 ile 1366 px arasındaki ekranları kapsar. iPhone 13 benzetimi yalnız `@touch` testlerini çalıştırır. | pass (1637b9d, yerel Linux, Actions değil). 378 test geçti. 28 test atlandı. Bu koşuda Chromium ve WebKit çalıştı. 3bcc006 koşusu Firefox dahil üç motoru kapsadı. 396 test geçti ve 44 test atlandı. c41294c ve e20d576 hedefli denetimlerdi. 837f2e4 kapanışında 262 test geçti ve 20 test atlandı. |
 | axe | Tüm sayfalar × açık/koyu tema; WCAG 2.0/2.1/2.2 A ve AA + best-practice kuralları; her etki düzeyi başarısızlıktır | pass (yerel, üç motor; tüm sayfalar 3bcc006, değişen sayfalar c41294c ve 837f2e4); otomatik kural kapsamıdır, tam AA uyumu iddiası değildir |
 | Odak | Klavye odağında belgede tek gerçek görünür outline, odaklanan öğede (görünmez Switch girdisinde izdeki görsel vekil); süzgeç bölümü klavyeyle açılır; kenarlık ve gölge ikinci çerçeve üretmez; fare tıklaması gösterge üretmez | pass (yerel, üç motor, 837f2e4) |
 | Dokunma hedefi | Tek başına duran kontrollerin etkili alanı ince işaretçide ≥ 44, kaba işaretçide ≥ 48 CSS px (`--fs-hit`); metin içi bağlantılar istisna; 320 px başlıkta marka adı tam görünür, eylem düğmeleri görünür alanda | pass (yerel, üç motor): 44/48 px 3bcc006; 320 px başlık 837f2e4 |
-| Satır kırılımı | 320 px genişlikte tüm gereksinim kartlarının düz metni, zorunlu satır kırma kuralı olmadan sığar. Sığan sözcük ve model adı ortadan bölünmez. | pass (Linux, Chromium, WebKit ve iPhone 13 benzetimi) |
-| Uzun satır içi kod | Boşluklu kod satırlara yayılabilir. Satıra sığmayan kesintisiz kod kendi kutusunda kayar. Yalnız taşan kutu Tab sırasına girer. Kutuyu ok tuşuyla kaydırabilirsiniz. | pass (Linux, Chromium, WebKit ve iPhone 13 benzetimi) |
+| Satır kırılımı | Satıra sığan sözcük, başlık, kimlik ve model adı ortadan bölünmez. Test `overflow-wrap: anywhere` ve `word-break: break-all` kurallarını reddeder. Satırdan uzun düz metin yalnız satır sonunda kırılır. 320 px genişlikte tüm gereksinim kartları bu yedek kurala ihtiyaç duymadan sığar. | pass (1637b9d, yerel Linux, Actions değil). Temel denetim 837f2e4 kaydında da geçti. |
+| Uzun satır içi kod | Boşluklu kod satırlara yayılabilir. Satıra sığmayan kesintisiz kod kendi kutusunda kayar. Yalnız taşan kutu Tab sırasına girer. Kutuyu ok tuşuyla kaydırabilirsiniz. Kodun tüm karakterleri korunur. | pass (1637b9d, yerel Linux, Actions değil). Temel denetim 837f2e4 kaydında da geçti. |
 | WCAG 2.2 | Standart WCAG 2.2 AA. axe-core 4.13.0'da 2.2'ye özgü otomatik kural yalnız `target-size` (wcag22aa); 2.4.11 odak örtülmemesi, 2.5.7, 3.2.6, 3.3.7 ve 3.3.8 elle denetlenir | otomatik kısım axe satırında; elle denetim not\_run |
 | Yazı boyutları ve yazı tipi | Okunabilir metin en az 1rem olur. Site önce Outfit yazı tipini dener. | pass (Linux, Chromium ve WebKit, `5dbf79e`). Playwright alt sınırı ve ortak ölçüleri doğruladı. Chromium, Türkçe harfleri ve kullanılan yazı kalınlıklarını Outfit ile gösterdi. Yedek yazı tipleri, WCAG metin aralığı (1.4.12) ve gerçek cihazlar `not_run`. |
 | Tema | İşletim sistemi koyu, kayıtlı tercih yokken düğme "Açık temaya geç" der ve tek tıklama açığa geçirir; kayıtlı tercih hidrasyondan önce uygulanır | pass (yerel, üç motor, 3bcc006) |
 | Tutarlılık | Gereksinim kimlikleri, G/SA/K atıfları, iç bağlantılar ve derlenmiş HTML'deki çapalar, faz sırası ve zaman çizelgesi, paragrafa dönüşen tablo satırı, eski adlar (kaçışlı yazımlar dahil), README sayıları | pass (Chromium, 837f2e4) |
-| Yazı ölçeği | Metin en az 1rem kalır. Düğmeler %150 yazıda 320 px genişliğe sığar. Test %200 yazıyı 320, 360 ve 412 px genişlikte de denetler. Düğmeler kutuya sığdı. | pass (Linux, Chromium, WebKit ve iPhone 13 benzetimi) |
-| Ağ bütçesi | İlk açılışta kabuk en çok 100 KB JavaScript indirir. Gezgin en çok 30 KB ek JavaScript indirir. Gereksinimler sayfası en çok 200 KB HTML indirir. Ölçüm sıkıştırılmış dosya boyutuna bakar. Diyagramsız bölüm ek JavaScript indirmez. İstekler tamamlanır. | pass (Linux, Chromium). Kabuk 97,4 KB, gezgin 17,4 KB ve Gereksinimler HTML 199,1 KB. |
+| Yazı ölçeği | Test kök yazı boyutunu ve 1rem alt sınırını denetler. Test görünür başlık düğmelerini ve yatay taşmayı da denetler. Temel kapsam %100 yazıyı içerir. Test %125 yazıyı 320 px genişlikte denetler. Kapsam %200 yazıda 390 ve 1366 px genişliği içerir. Bu denetim Mermaid hata çıktısını da denetler. Ana sayfa testi %150 yazıyı 320 px genişlikte denetler. Aynı test %200 yazıyı 320, 360 ve 412 px genişlikte denetler. | pass (1637b9d, yerel Linux, Actions değil). Temel kapsam 837f2e4 kaydında da geçti. |
+| Ağ bütçesi | İlk açılışta kabuk en çok 100 KB JavaScript indirir. Gezgin en çok 30 KB ek JavaScript indirir. Gereksinimler sayfası en çok 200 KB HTML indirir. Ölçüm sıkıştırılmış dosya boyutuna bakar. Diyagramsız bölüm ek JavaScript indirmez. İstekler tamamlanır. | pass (1637b9d, yerel Linux, Actions değil). Kabuk 97,4 KB, gezgin 17,4 KB ve Gereksinimler HTML 199,1 KB. 837f2e4 ölçümünde ilk açılış yazı tipleri 88,0 KB tuttu. |
 | Hidrasyon | Ada JS'i bekletilip bir kez yazılan metin korunur (masaüstü ve 320 px dokunma); düzeltme olmadan test başarısız | pass (yerel, üç motor, 837f2e4) |
-| Görsel regresyon | Ubuntu 24.04 ortamında üç tarayıcı için yedişer görüntü karşılaştırılır. | not\_run (bu düzeltme). Önceki referansları bağımsız inceleme onayladı. Kanıt Actions koşuları 37792505431 ve 37797285107 içindedir. |
+| Görsel regresyon | Ubuntu 24.04 ortamında üç tarayıcı için yedişer görüntü karşılaştırılır. | not\_run. ProPR akışı görsel karşılaştırmayı çalıştıracak. Önceki referanslar 3bcc006 ve 837f2e4 için onaylandı. Kanıt Actions koşuları 37792505431 ve 37797285107 içindedir. |
 | Gerçek macOS/iOS Safari, Android | — | not\_run |
 
 ## Onay bekleyen işler
@@ -138,9 +138,8 @@ Tablo `pass`, `fail` ve `not_run` durumlarını kullanır. Kayıt numarası bili
 
 | İş | Gerekçe | Kabul | Sahip |
 | --- | --- | --- | --- |
-| Gereksinimler sayfası HTML payı | Sayfa 200 KB sınırının 199,1 KB kadarını kullanır. Sunucu kart ve tablo görünümünü hazırlar. Tarayıcı başlarken aynı veriyi bir kez daha alır. Önceki düzenleme satırların toplam boyutunu 3,6 KB azalttı. | Sunucu tek görünüm hazırlarsa tarayıcı diğer görünümü hazırlar. Veri tek kopyayla da taşınabilir. Son ölçüm en çok 180 KB olur. | Depo sahibi |
-| Düz metindeki uzun tanımlayıcılar | Kapatıldı. Gereksinimlerdeki uzun dosya yolları, uç adları ve ayar anahtarları kod biçiminde. | 320 px genişlikte tüm kartların düz metni, güvenlik ağı olmadan satırına sığar. Uzun kod kendi kutusunda kayar. | Depo sahibi |
-| Dar ekranda büyük yazı | Kapatıldı. Ana sayfadaki düğme etiketleri gerektiğinde birden çok satıra yayılır. | Düğme yazılarının tamamı görünür. Sayfa ve düğmeler yatay taşmaz. | Depo sahibi |
+| Gereksinimler sayfası HTML payı | Son yerel ölçüm 199,0 KB. Sayfa sınırı 200 KB. Sunucu kart ve tablo görünümünü hazırlar. Tarayıcı başlarken aynı veriyi bir kez daha alır. Önceki düzenleme satırların toplam boyutunu 3,6 KB azalttı. | Sunucu tek görünüm hazırlarsa tarayıcı diğer görünümü hazırlar. Veri tek kopyayla da taşınabilir. Kabul için ölçüm en çok 180 KB olmalı. | Depo sahibi |
 | Gerçek cihaz doğrulaması | WebKit ve iPhone 13 emülasyondur | Gerçek macOS/iOS Safari ve Android'de odak, dokunma, kaydırma ve tema senaryoları `pass/fail` kaydıyla | Depo sahibi |
+| 320 px genişlikte %300 yazı | İnceleme, ana sayfanın yatay taştığını gördü. Bu ölçek mevcut kabul aralığı dışında. | Ana sayfa taşmadan okunur. | Depo sahibi |
 | Görsel referans kapsamı | Referanslar yedi görünüm içindir; mobil gezinme çekmecesi ve Teslim grubu gezinmesi görüntüde yok (davranış testleri var) | Gerekirse ek referans, bağımsız onayla | Depo sahibi |
 | Action güncellemeleri | Action'lar commit SHA'sına sabittir; otomatik güncelleme işi kurulmadı (zamanlanmış iş kurma kararı kullanıcıdadır) | Güncellemede etiket → SHA eşleşmesi doğrulanır, CI geçer | Hüseyin Cengiz |

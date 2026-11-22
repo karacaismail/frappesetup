@@ -379,10 +379,10 @@ function useDocumentColorScheme(): MantineColorScheme | undefined {
   return scheme;
 }
 
-export default function RequirementsExplorer({ rows }: { rows: RequirementRow[] }) {
-  const items = useMemo(() => rows.map(([id, title, detail, rail, priority, phase, source, owner]) => ({
+export default function RequirementsExplorer({ rowsJson }: { rowsJson: string }) {
+  const items = useMemo(() => (JSON.parse(rowsJson) as RequirementRow[]).map(([id, title, detail, rail, priority, phase, source, owner]) => ({
     id, title, detail, rail, priority, phase, source, owner,
-  })), [rows]);
+  })), [rowsJson]);
   const scheme = useDocumentColorScheme();
   return (
     <MantineProvider

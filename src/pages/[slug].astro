@@ -99,7 +99,7 @@ const embeds = EMBEDS[entry.id] ?? [];
     {
       entry.id === 'gereksinimler' && (
         <div class="explorer">
-          <RequirementsExplorer client:visible rows={requirements.map(toRequirementRow)} />
+          <RequirementsExplorer client:visible rowsJson={JSON.stringify(requirements.map(toRequirementRow))} />
         </div>
       )
     }
@@ -192,7 +192,7 @@ const embeds = EMBEDS[entry.id] ?? [];
     const boxes = codes.map(lineBox);
     const unique = Array.from(new Set(boxes));
     const scrolled = codes.map((c) => c.scrollLeft);
-    const was = codes.map((c) => c.hasAttribute('data-scroll'));
+    const was = codes.map((c) => c.getAttribute('data-scroll'));
     const focused = document.activeElement;
     for (const c of codes) c.removeAttribute('data-scroll');
     for (const b of unique) b.style.setProperty('overflow-wrap', 'normal');
@@ -215,7 +215,8 @@ const embeds = EMBEDS[entry.id] ?? [];
       if (!b.getAttribute('style')) b.removeAttribute('style');
     }
     codes.forEach((c, i) => {
-      if (long[i] || (c === focused && was[i])) c.setAttribute('data-scroll', '');
+      if (c === focused && was[i] !== null) c.setAttribute('data-scroll', was[i]);
+      else if (long[i]) c.setAttribute('data-scroll', '');
     });
     const overflows = codes.map((c, i) => long[i] && c.scrollWidth > c.clientWidth);
     codes.forEach((c, i) => {
@@ -224,9 +225,18 @@ const embeds = EMBEDS[entry.id] ?? [];
         c.scrollLeft = scrolled[i];
         c.addEventListener('blur', schedule, { once: true });
       } else if (overflows[i]) {
+        if (c.matches(':is(.req-card-detail, .req-detail) > code')) {
+          c.setAttribute('data-scroll', 'single-line');
+        }
         c.setAttribute('tabindex', '0');
+        c.setAttribute('role', 'group');
+        c.setAttribute('aria-label', 'Kaydırılabilir kod');
         c.scrollLeft = scrolled[i];
-      } else c.removeAttribute('tabindex');
+      } else {
+        c.removeAttribute('tabindex');
+        c.removeAttribute('role');
+        c.removeAttribute('aria-label');
+      }
     });
   };
   let frame = 0;
