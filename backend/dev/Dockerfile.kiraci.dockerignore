@@ -4,6 +4,8 @@
 !apps/platform_core/**
 !dev/
 !dev/**
+!contracts/
+!contracts/platform_core-model-gecidi.openapi.yaml
 **/.git
 **/.env*
 **/__pycache__
