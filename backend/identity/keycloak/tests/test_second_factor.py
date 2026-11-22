@@ -69,6 +69,8 @@ class SecondFactorTest(unittest.TestCase):
         cls.admin_token = yonetici_belirteci()
 
     def setUp(self):
+        # The master admin token lives 60 seconds. A long test run outlives the one from setUpClass.
+        self.admin_token = yonetici_belirteci()
         # Brute force detection locks a user who logs in twice within quickLoginCheckMilliSeconds.
         # Clear the counter so earlier attempts (or an earlier test) do not lock the sample user.
         user = admin(f"/users?email={TOTP_USER}&exact=true", self.admin_token).json()[0]

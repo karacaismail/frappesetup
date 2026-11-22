@@ -51,6 +51,17 @@ class AccountBacklogFileTest(unittest.TestCase):
         self.assertTrue({"view-profile", "manage-account"} <= set(role["composites"]["client"]["account"]))
         self.assertTrue({"offline_access", "uma_authorization"} <= set(role["composites"]["realm"]))
 
+    def test_employee_role_has_no_delete_account(self):
+        # O-27: employees come only by invitation and do not get delete-account. identity-sync gives an
+        # invited employee the "employee" role in place of the default role.
+        role = next(r for r in self.realm["roles"]["realm"] if r["name"] == "employee")
+        self.assertTrue(role["composite"])
+        account = set(role["composites"]["client"]["account"])
+        self.assertNotIn("delete-account", account)
+        self.assertTrue({"view-profile", "manage-account"} <= account)
+        self.assertTrue({"offline_access", "uma_authorization"} <= set(role["composites"]["realm"]))
+        self.assertNotIn(self.realm["defaultRole"]["name"], role["composites"]["realm"])
+
     def test_refresh_token_changes_on_every_use(self):
         self.assertTrue(self.realm["revokeRefreshToken"])
         self.assertEqual(self.realm["refreshTokenMaxReuse"], 0)
@@ -69,6 +80,11 @@ def _login(authorize_url: str):
     _, _, html = _ac(opener, _form_hedefi(html), form)
     _pause()
     status, headers, html = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+    if status == 200 and 'name="otp"' in html:
+        # Keycloak refused a code that an earlier run had already used. Wait for the next period once.
+        time.sleep(30 - time.time() % 30 + 1)
+        status, headers, html = _ac(opener, _form_hedefi(html),
+                                    urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
     return opener, status, headers, html
 
 
@@ -81,6 +97,7 @@ class AccountBacklogLiveTest(unittest.TestCase):
         cls.token_url = f"{cls.kc}/realms/platform/protocol/openid-connect/token"
 
     def setUp(self):
+        self.admin_token = yonetici_belirteci()  # the master admin token lives 60 seconds
         user = admin(f"/users?email={TOTP_USER}&exact=true", self.admin_token).json()[0]
         admin(f"/attack-detection/brute-force/users/{user['id']}", self.admin_token, yontem="DELETE")
 
@@ -119,7 +136,8 @@ class AccountBacklogLiveTest(unittest.TestCase):
 
     def test_new_customer_gets_the_delete_account_role(self):
         username = f"customer-{uuid.uuid4().hex[:10]}"
-        created = admin("/users", self.admin_token, "POST", {"username": username, "enabled": True})
+        created = admin("/users", self.admin_token, "POST",
+                        {"username": username, "email": f"{username}@example.test", "enabled": True})
         self.assertEqual(created.durum, 201, created.govde[:200])
         user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
         self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
@@ -127,12 +145,36 @@ class AccountBacklogLiveTest(unittest.TestCase):
         roles = admin(f"/users/{user_id}/role-mappings/clients/{account}/composite", self.admin_token).json()
         self.assertIn("delete-account", {r["name"] for r in roles})
 
+    def test_employee_does_not_get_the_delete_account_role(self):
+        username = f"employee-{uuid.uuid4().hex[:10]}"
+        created = admin("/users", self.admin_token, "POST",
+                        {"username": username, "email": f"{username}@example.test", "enabled": True})
+        self.assertEqual(created.durum, 201, created.govde[:200])
+        user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
+        self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
+        roles = {r["name"]: r for r in admin("/roles", self.admin_token).json()}
+        # The invitation step identity-sync runs: employee role in, default role out.
+        added = admin(f"/users/{user_id}/role-mappings/realm", self.admin_token, "POST", [roles["employee"]])
+        self.assertEqual(added.durum, 204, added.govde[:200])
+        removed = istek("DELETE", f"{self.kc}/admin/realms/platform/users/{user_id}/role-mappings/realm",
+                        belirtec=self.admin_token, govde=[roles["default-roles-platform"]])
+        self.assertEqual(removed.durum, 204, removed.govde[:200])
+        account = admin("/clients?clientId=account", self.admin_token).json()[0]["id"]
+        effective = {r["name"] for r in admin(
+            f"/users/{user_id}/role-mappings/clients/{account}/composite", self.admin_token).json()}
+        self.assertNotIn("delete-account", effective)
+        self.assertIn("manage-account", effective)
+
     def test_delete_account_step_opens_for_a_signed_in_customer(self):
         # Only the confirmation page is opened. The sample user is not deleted.
         url = tenant_authorize_url() + "&kc_action=delete_account"
-        _, status, headers, html = _login(url)
-        self.assertNotIn("code=", headers.get("Location", ""), "the step must ask before it returns a code")
-        self.assertEqual(status, 200)
+        opener, status, headers, html = _login(url)
+        location = headers.get("Location", "")
+        self.assertNotIn("code=", location, "the step must ask before it returns a code")
+        if status in (302, 303) and location.startswith(self.kc):
+            # Keycloak may move to its own required action page first.
+            status, headers, html = _ac(opener, location)
+        self.assertEqual(status, 200, location)
         # Keycloak 26.8.2 delete-account-confirm.ftl (keycloak.v2 and base): the form posts to the login
         # action and carries a cancel button named "cancel-aia".
         self.assertIn('name="cancel-aia"', html, html[:400])

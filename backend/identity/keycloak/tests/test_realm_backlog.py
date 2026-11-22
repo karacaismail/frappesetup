@@ -86,10 +86,21 @@ class RealmBacklogFileTest(unittest.TestCase):
 
     # Item 10: the visible brand name comes from a variable (D-4).
     def test_brand_name_comes_from_a_variable(self):
-        self.assertEqual(self.realm["displayName"], "${ATONOTA_BRAND_NAME}")
-        self.assertEqual(self.realm["displayNameHtml"], "${ATONOTA_BRAND_NAME}")
-        self.assertEqual(self.realm["smtpServer"]["fromDisplayName"], "${ATONOTA_BRAND_NAME}")
-        self.assertEqual(self.dev_env["ATONOTA_BRAND_NAME"], "Atonota")
+        self.assertEqual(self.realm["displayName"], "${IDENTITY_BRAND_NAME}")
+        self.assertEqual(self.realm["displayNameHtml"], "${IDENTITY_BRAND_NAME}")
+        self.assertEqual(self.realm["smtpServer"]["fromDisplayName"], "${IDENTITY_BRAND_NAME}")
+        self.assertEqual(self.dev_env["IDENTITY_BRAND_NAME"], "Atonota")
+        # The account console theme reads the same variable from the Keycloak container (kimlik-tema request).
+        self.assertIn("IDENTITY_BRAND_NAME: ${IDENTITY_BRAND_NAME:?}", self.compose)
+
+    # kimlik-tema request 4: the account console uses the atonota theme; the image copies the whole theme.
+    def test_account_theme_is_atonota_and_copied(self):
+        self.assertEqual(self.realm["accountTheme"], "atonota")
+        dockerfile = (KLASOR / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("COPY --chown=1000:0 themes/ /opt/keycloak/themes/", dockerfile)
+        ignore = (KLASOR / ".dockerignore").read_text(encoding="utf-8").splitlines()
+        self.assertIn("!themes/**", ignore)
+        self.assertFalse([line for line in ignore if "account" in line], ignore)
 
     # Item 12: aud-identity-sync adds only aud=identity-sync; only tenant service clients may ask for it.
     def test_identity_sync_audience_scope(self):
@@ -139,12 +150,12 @@ class RealmBacklogLiveTest(unittest.TestCase):
         cls.realm = admin("", cls.admin_token).json()
 
     def test_resolved_values_come_from_the_environment(self):
-        self.assertEqual(self.realm["displayName"], ortam("ATONOTA_BRAND_NAME"))
+        self.assertEqual(self.realm["displayName"], ortam("IDENTITY_BRAND_NAME"))
         self.assertEqual(self.realm["sslRequired"], ortam("ATONOTA_SSL_REQUIRED"))
         smtp = self.realm["smtpServer"]
         self.assertEqual(smtp["auth"], ortam("ATONOTA_SMTP_AUTH"))
         self.assertEqual(smtp["starttls"], ortam("ATONOTA_SMTP_STARTTLS"))
-        self.assertEqual(smtp["fromDisplayName"], ortam("ATONOTA_BRAND_NAME"))
+        self.assertEqual(smtp["fromDisplayName"], ortam("IDENTITY_BRAND_NAME"))
         self.assertNotIn("${", str(smtp))
 
     def test_mobile_client_refuses_login_without_pkce(self):

@@ -62,7 +62,7 @@ Tünel Colima'nın kendi bağlantısına dokunmaz. `bin/kc-dev.sh down` tüneli 
 
 ## Realm dosyaları imajın içindedir
 
-Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzden compose dosyası bind mount kullanmaz. `Dockerfile` realm dosyasını ve parola listesini imaja kopyalar. `dev` hedefi örnek kullanıcıları da ekler. Üretim imajı `prod` hedefinden alınır. `bin/kc-dev.sh up` her çalışmada imajı yeniden derler. İmaj etiketi `fs-keycloak-atonota:dev-<PANE_PORT>` biçimindedir. Böylece paralel Pane'ler birbirinin imajını ezmez.
+Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzden compose dosyası bind mount kullanmaz. `Dockerfile` realm dosyasını ve parola listesini imaja kopyalar. `dev` hedefi örnek kullanıcıları da ekler. Üretim imajı `prod` hedefinden alınır. `bin/kc-dev.sh up` imaj varsa onu yeniden kullanır. Realm ya da eklenti değişince imajı `bin/kc-dev.sh build` derler. Disk dar olduğu için factory profilinde yeni derleme yapılmaz. Gerekirse `FS_COLIMA_PROFILE=default` ile colima profili seçilir. İmaj etiketi `fs-keycloak-atonota:dev-<PANE_PORT>` biçimindedir. Böylece paralel Pane'ler birbirinin imajını ezmez.
 
 ## Eklentiler
 

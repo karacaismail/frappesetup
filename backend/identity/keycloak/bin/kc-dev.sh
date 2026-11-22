@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Keycloak geliştirme ortamını yönetir. Sahibi kimlik-realm işidir.
-# Kullanım: bin/kc-dev.sh <config|up|down|restart|logs|ps|exec|test|realm-sil|tunel|tunel-kapat>
+# Kullanım: bin/kc-dev.sh <config|build|up|down|restart|logs|ps|exec|test|realm-sil|tunel|tunel-kapat>
 # Portlar PANE_PORT değişkeninden türer. Keycloak P, Mailpit ekranı P+6 portunu alır.
 set -euo pipefail
 
@@ -9,7 +9,14 @@ BACKEND="$(cd "$KLASOR/../.." && pwd)"
 COMPOSE_DOSYASI="$BACKEND/dev/compose.keycloak.yaml"
 ENV_DOSYASI="$KLASOR/.env"
 PROJE="${COMPOSE_PROJECT_NAME:-fs-kimlik-realm}"
-BAGLAM="${DOCKER_CONTEXT:-colima-factory}"
+# Profil FS_COLIMA_PROFILE değişkeninden seçilir (backend/AGENTS.md, "Disk dar"). Değer "default" ise colima profili kullanılır.
+if [ "${FS_COLIMA_PROFILE:-factory}" = "default" ]; then
+  BAGLAM="${DOCKER_CONTEXT:-colima}"
+  LIMA_VARSAYILAN="colima"
+else
+  BAGLAM="${DOCKER_CONTEXT:-colima-factory}"
+  LIMA_VARSAYILAN="colima-factory"
+fi
 
 if [ -z "${PANE_PORT:-}" ]; then
   echo "PANE_PORT boş. Örnek: PANE_PORT=5070 $0 up" >&2
@@ -71,7 +78,7 @@ tunel_ac() {
   # Colima'nın port yönlendirmesi bozulursa yeni portlar ana makineye açılmaz.
   # Bu komut sanal makineye ayrı bir ssh bağlantısı açar ve iki portu ana makineye taşır.
   # Colima'nın kendi bağlantısına dokunmaz. Yalnız bu Mac'teki Colima kurulumu için geçerlidir.
-  local lima_ad="${COLIMA_LIMA_AD:-colima-factory}"
+  local lima_ad="${COLIMA_LIMA_AD:-$LIMA_VARSAYILAN}"
   local ssh_conf="$HOME/.colima/_lima/$lima_ad/ssh.config"
   if [ ! -f "$ssh_conf" ]; then
     echo "Colima ssh ayarı yok: $ssh_conf" >&2
@@ -113,7 +120,9 @@ ortam_yukle
 
 case "$komut" in
   config) compose config "$@" ;;
-  up) compose up -d --build --wait "$@" ;;
+  # İmaj varsa yeniden kullanılır. Realm ya da eklenti değişince imajı "build" komutuyla derleyin.
+  up) compose up -d --wait "$@" ;;
+  build) compose build "$@" ;;
   down) tunel_kapat; compose down "$@" ;;
   restart) compose restart "$@" ;;
   logs) compose logs "$@" ;;
@@ -122,8 +131,39 @@ case "$komut" in
   test) (cd "$KLASOR/tests" && python3 -I -m unittest discover -s . -v "$@") ;;
   tunel) tunel_ac ;;
   tunel-kapat) tunel_kapat ;;
+  realm-yenile)
+    # Disk dar olduğu için imaj derlenmez (backend/AGENTS.md, "Disk dar"). Realm dosyası çalışan container'a
+    # kopyalanır, realm silinir ve container yeniden başlar. --import-realm dosyayı yeniden içe alır.
+    # Bu komut geliştirme realm'indeki bütün veriyi siler. Onay bayrağı zorunludur.
+    if [ "${1:-}" != "--evet" ]; then
+      echo "Bu komut platform realm'ini ve içindeki bütün veriyi siler. Onaylamak için: $0 realm-yenile --evet" >&2
+      exit 2
+    fi
+    # Ortam değişkeni değiştiyse container önce yeni ayarla kurulur. Kopyalama ondan sonra yapılır.
+    compose up -d --wait keycloak
+    kc_kimlik="$(compose ps -q keycloak)"
+    if [ -z "$kc_kimlik" ]; then
+      echo "Keycloak çalışmıyor. Önce: $0 up" >&2
+      exit 1
+    fi
+    docker --context "$BAGLAM" cp "$KLASOR/realm/platform-realm.json" "$kc_kimlik:/opt/keycloak/data/import/platform-realm.json"
+    docker --context "$BAGLAM" cp "$KLASOR/realm/dev-users/platform-users-0.json" "$kc_kimlik:/opt/keycloak/data/import/platform-users-0.json"
+    "$0" realm-sil-yalniz --evet
+    # The container must not be recreated: a new container would import the realm file baked into the image.
+    compose restart keycloak
+    compose up -d --wait --no-recreate keycloak
+    ;;
+  realm-sil-yalniz)
+    [ "${1:-}" = "--evet" ] || { echo "Onay bayrağı gerekli: --evet" >&2; exit 2; }
+    belirtec="$(printf 'data-urlencode = "username=%s"\ndata-urlencode = "password=%s"\n' "$KC_BOOTSTRAP_ADMIN_USERNAME" "$KC_BOOTSTRAP_ADMIN_PASSWORD" \
+      | curl -fsS -K - -X POST "$KC_PUBLIC_URL/realms/master/protocol/openid-connect/token" \
+      -d grant_type=password -d client_id=admin-cli | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
+    printf 'header = "Authorization: Bearer %s"\n' "$belirtec" \
+      | curl -fsS -K - -o /dev/null -w 'realm silindi: %{http_code}\n' -X DELETE "$KC_PUBLIC_URL/admin/realms/platform"
+    ;;
   realm-sil)
-    # Realm'i siler, imajı yeniden derler ve Keycloak'ı yeniden kurar. Böylece realm dosyası yeniden içe alınır.
+    # Realm'i siler ve Keycloak'ı var olan imajla yeniden kurar. Böylece imajdaki realm dosyası yeniden içe alınır.
+    # Realm dosyası değiştiyse önce "build" komutunu çalıştırın.
     # Bu komut geliştirme realm'indeki bütün veriyi siler. Onay bayrağı zorunludur.
     if [ "${1:-}" != "--evet" ]; then
       echo "Bu komut platform realm'ini ve içindeki bütün veriyi siler. Onaylamak için: $0 realm-sil --evet" >&2
@@ -136,10 +176,10 @@ case "$komut" in
     # The admin token is passed through a curl config on stdin so it never appears in the process list.
     printf 'header = "Authorization: Bearer %s"\n' "$belirtec" \
       | curl -fsS -K - -o /dev/null -w 'realm silindi: %{http_code}\n' -X DELETE "$KC_PUBLIC_URL/admin/realms/platform"
-    compose up -d --build --force-recreate --wait keycloak
+    compose up -d --force-recreate --wait keycloak
     ;;
   *)
-    echo "Kullanım: $0 <config|up|down|restart|logs|ps|exec|test|realm-sil|tunel|tunel-kapat>" >&2
+    echo "Kullanım: $0 <config|build|up|down|restart|logs|ps|exec|test|realm-sil|realm-yenile|tunel|tunel-kapat>" >&2
     exit 2
     ;;
 esac

@@ -1,8 +1,8 @@
 {
   "realm": "platform",
   "enabled": true,
-  "displayName": "${ATONOTA_BRAND_NAME}",
-  "displayNameHtml": "${ATONOTA_BRAND_NAME}",
+  "displayName": "${IDENTITY_BRAND_NAME}",
+  "displayNameHtml": "${IDENTITY_BRAND_NAME}",
   "sslRequired": "${ATONOTA_SSL_REQUIRED}",
   "organizationsEnabled": true,
   "internationalizationEnabled": true,
@@ -12,7 +12,7 @@
   ],
   "defaultLocale": "tr",
   "loginTheme": "atonota",
-  "accountTheme": "keycloak.v3",
+  "accountTheme": "atonota",
   "adminTheme": "keycloak.v2",
   "emailTheme": "atonota",
   "registrationAllowed": true,
@@ -87,7 +87,7 @@
     "host": "${ATONOTA_SMTP_HOST}",
     "port": "${ATONOTA_SMTP_PORT}",
     "from": "${ATONOTA_SMTP_FROM}",
-    "fromDisplayName": "${ATONOTA_BRAND_NAME}",
+    "fromDisplayName": "${IDENTITY_BRAND_NAME}",
     "auth": "${ATONOTA_SMTP_AUTH}",
     "ssl": "${ATONOTA_SMTP_SSL}",
     "starttls": "${ATONOTA_SMTP_STARTTLS}",
@@ -1318,6 +1318,23 @@
       {
         "name": "uma_authorization",
         "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "employee",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "offline_access",
+            "uma_authorization"
+          ],
+          "client": {
+            "account": [
+              "view-profile",
+              "manage-account"
+            ]
+          }
+        },
         "clientRole": false
       }
     ]

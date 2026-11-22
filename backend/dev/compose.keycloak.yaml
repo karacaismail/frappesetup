@@ -6,7 +6,7 @@
 # container'lar aynı adresi kullanır ve belirteçteki iss değeri tutar (sözleşme 9. bölüm).
 # Realm dosyaları imaja derleme sırasında kopyalanır (../identity/keycloak/Dockerfile).
 # Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzden bind mount kullanılmaz.
-# Realm dosyası değişince `kc-dev.sh up` imajı yeniden derler.
+# İmaj varsa `kc-dev.sh up` onu yeniden kullanır. Realm dosyası değişince `kc-dev.sh build` çalıştırın.
 services:
   keycloak:
     # The tag carries the Pane port so parallel Panes do not overwrite each other's image.
@@ -15,7 +15,7 @@ services:
       context: ../identity/keycloak
       dockerfile: Dockerfile
       target: dev
-    pull_policy: build
+    pull_policy: missing
     command: ["start", "--import-realm"]
     environment:
       KC_HTTP_ENABLED: "true"
@@ -55,7 +55,7 @@ services:
       ATONOTA_SMTP_STARTTLS: ${ATONOTA_SMTP_STARTTLS:?}
       ATONOTA_SMTP_USER: ${ATONOTA_SMTP_USER:?}
       ATONOTA_SMTP_PASSWORD: ${ATONOTA_SMTP_PASSWORD:?}
-      ATONOTA_BRAND_NAME: ${ATONOTA_BRAND_NAME:?}
+      IDENTITY_BRAND_NAME: ${IDENTITY_BRAND_NAME:?}
       ATONOTA_SSL_REQUIRED: ${ATONOTA_SSL_REQUIRED:?}
       ATONOTA_MOBILE_REDIRECT_URI: ${ATONOTA_MOBILE_REDIRECT_URI:?}
     ports:
@@ -98,7 +98,7 @@ services:
       context: ../identity/keycloak
       dockerfile: Dockerfile
       target: event-sink
-    pull_policy: build
+    pull_policy: missing
 
   mailpit:
     image: axllent/mailpit:v1.34.0
