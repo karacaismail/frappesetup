@@ -13,6 +13,7 @@ Backend ve işçi commit'lerini başlangıçta sabitler.
 Birleşmeleri ayrı bir worktree ve dal içinde yapar.
 Çakışma tablosu dosyayı ve iki dalı gösterir.
 Komut, tanımadığı bir çakışmada durur ve nedeni rapora yazar.
+Werkzeug için onaylı çözüm `Werkzeug~=3.1.9` yazmaktır. Frappe 16.56.0, Werkzeug 3.1.9 kullanır.
 Birleşen `hooks.py` dosyasında aynı üst düzey ad yeniden atanırsa komut durur.
 Rapor, Git çakışması olmasa bile adı ve satırları gösterir.
 

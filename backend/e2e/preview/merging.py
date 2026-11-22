@@ -18,6 +18,11 @@ DEPENDENCIES = f"{APP}/pyproject.toml"
 MISSING = object()
 GIT_PATH = shutil.which("git")
 
+# Frappe 16.56.0 pins Werkzeug 3.1.9. Preview uses the approved app constraint.
+DEPENDENCY_RESOLUTIONS = {
+    frozenset(("Werkzeug>=3.1.9,<4", "Werkzeug~=3.1.9")): "Werkzeug~=3.1.9",
+}
+
 
 class MergeError(Exception):
     pass
@@ -181,10 +186,13 @@ def merge_dependencies(base, left, right):
     names = {}
     for value in values:
         name = re.split(r"[\s[<>=!~;@]", value, maxsplit=1)[0].lower().replace("_", "-")
-        if name in names and names[name] != value:
-            raise MergeError(f"Different version constraints: {name}")
+        previous = names.get(name)
+        if previous is not None and previous != value:
+            value = DEPENDENCY_RESOLUTIONS.get(frozenset((previous, value)))
+            if value is None:
+                raise MergeError(f"Different version constraints: {name}")
         names[name] = value
-    replacement = "dependencies = [\n" + "".join(f"    {json.dumps(value)},\n" for value in values) + "]"
+    replacement = "dependencies = [\n" + "".join(f"    {json.dumps(value)},\n" for value in names.values()) + "]"
     return pattern.sub(lambda _match: replacement, template, count=1)
 
 
