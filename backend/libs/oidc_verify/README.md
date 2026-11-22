@@ -19,8 +19,11 @@ claims = verify_logout_token(token, cache=cache, issuer=iss, client_id="press", 
 - `iss` tam eşleşir. `aud` tek değerdir ve beklenen istemcidir. `azp` izin listesinde olmalıdır.
 - `exp` zorunludur. Saat payı varsayılan 30 saniyedir.
 - Anahtar listesi `ttl_seconds` süresince saklanır. Bilinmeyen `kid` gelince liste bir kez yenilenir. Art arda gelen bilinmeyen `kid` istekleri listeyi 5 saniyede en çok bir kez yeniletir.
+- Liste çekilemezse önbellekteki eski anahtarlar kullanılmaya devam eder. Yeni deneme en erken 5 saniye sonra yapılır. Listedeki tek bir bozuk anahtar kaydı atlanır, öteki anahtarlar yüklenir.
+- Kimlik belirtecinde `nonce=None` verilirse `nonce` denetimi atlanır. Bu yalnız `nonce` göndermeyen akışlar içindir. Giriş akışı `nonce` gönderdiyse çağıran değeri vermek zorundadır.
 - Çıkış belirtecinde imza, `iss`, `aud`, `iat`, `events` anahtarı, `sid` ya da `sub` varlığı ve `nonce` yokluğu denetlenir.
 - Geçersiz belirteçte `TokenError` yükselir. `code` alanı nedeni söyler: `malformed`, `invalid_signature`, `unknown_kid`, `wrong_issuer`, `wrong_audience`, `wrong_azp`, `expired`, `not_yet_valid`, `wrong_nonce`, `not_logout_token`.
+- Anahtar listesi alınamazsa ve önbellekte hiç anahtar yoksa `JwksUnavailable` yükselir. Bu hata `TokenError` değildir. Belirteç geçersiz sayılmaz. Çağıran uç bu hatayı 503 benzeri geçici hata yanıtıyla karşılar. `JwksUnavailable` da `oidc_verify` paketinden içe aktarılır.
 - Kitaplık belirteci günlüğe yazmaz. Hata mesajı belirteç içeriği taşımaz.
 
 İstek düzeyindeki iki kural kitaplığın dışındadır. Çağıran uç bu iki isteği kendisi reddeder. Birincisi `cmd` alanı taşıyan istektir. İkincisi hem oturum çerezi hem belirteç taşıyan istektir.

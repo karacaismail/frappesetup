@@ -92,12 +92,21 @@ def cikis_govdesi(**degisiklik) -> dict:
 
 
 class SahteJwks:
-    """JwksCache için ağ yerine geçen sağlayıcı. Çağrı sayısını sayar."""
+    """JwksCache için ağ yerine geçen sağlayıcı. Çağrı sayısını sayar.
+
+    `hata` doluysa her çağrı o hatayı yükseltir. `ham` listesi listeye ek ham JWK kaydı ekler.
+    """
 
     def __init__(self, *anahtarlar: Anahtar):
         self.anahtarlar = list(anahtarlar)
+        self.ham: list[dict] = []
+        self.hata: Exception | None = None
         self.cagri = 0
 
     def __call__(self) -> dict:
         self.cagri += 1
-        return jwks(*self.anahtarlar)
+        if self.hata is not None:
+            raise self.hata
+        veri = jwks(*self.anahtarlar)
+        veri["keys"] = list(self.ham) + veri["keys"]
+        return veri

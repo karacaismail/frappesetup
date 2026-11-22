@@ -3,12 +3,22 @@
 Anahtarlar yerelde üretilir. Ağ yoktur. JwksCache sahte sağlayıcıyla beslenir.
 """
 
+import re
 import time
 import unittest
+from pathlib import Path
+from urllib.error import URLError
 
 from anahtarlar import ISSUER, LOGOUT_EVENT, Anahtar, SahteJwks, cikis_govdesi, erisim_govdesi, kimlik_govdesi
 
-from oidc_verify import JwksCache, TokenError, verify_access_token, verify_id_token, verify_logout_token
+from oidc_verify import (
+    JwksCache,
+    JwksUnavailable,
+    TokenError,
+    verify_access_token,
+    verify_id_token,
+    verify_logout_token,
+)
 
 JWKS_URL = f"{ISSUER}/protocol/openid-connect/certs"
 
@@ -144,6 +154,11 @@ class ErisimBelirteciTesti(Temel):
         self.assertEqual(self.hata_kodu(self.erisim, yabanci.imzala(erisim_govdesi())), "unknown_kid")
         self.assertEqual(self.saglayici.cagri, 2)
 
+    def test_soguk_onbellekte_bilinmeyen_kid_tek_cekim(self):
+        yabanci = Anahtar("kid-yok")
+        self.assertEqual(self.hata_kodu(self.erisim, yabanci.imzala(erisim_govdesi())), "unknown_kid")
+        self.assertEqual(self.saglayici.cagri, 1)
+
     def test_liste_ttl_dolunca_yenilenir(self):
         zaman = [1000.0]
         cache = JwksCache(JWKS_URL, ttl_seconds=600, fetcher=self.saglayici, clock=lambda: zaman[0])
@@ -177,6 +192,13 @@ class KimlikBelirteciTesti(Temel):
         self.assertEqual(self.hata_kodu(self.kimlik, token), "wrong_nonce")
         token = self.anahtar.imzala(kimlik_govdesi(nonce=None))
         self.assertEqual(self.hata_kodu(self.kimlik, token), "wrong_nonce")
+
+    def test_nonce_none_denetimi_atlar(self):
+        # Çağıran nonce göndermediyse None verir. Belirteçteki nonce varlığı sonucu değiştirmez.
+        alanlar = self.kimlik(self.anahtar.imzala(kimlik_govdesi()), nonce=None)
+        self.assertEqual(alanlar["nonce"], "n-123")
+        alanlar = self.kimlik(self.anahtar.imzala(kimlik_govdesi(nonce=None)), nonce=None)
+        self.assertNotIn("nonce", alanlar)
 
     def test_yanlis_aud_ve_azp(self):
         token = self.anahtar.imzala(kimlik_govdesi(aud="site-kiraci1", azp="site-kiraci1"))
@@ -241,6 +263,28 @@ class CikisBelirteciTesti(Temel):
 
 
 class JwksCacheTesti(unittest.TestCase):
+    def setUp(self):
+        self.anahtar = Anahtar("kid-1")
+        self.saglayici = SahteJwks(self.anahtar)
+        self.zaman = [1000.0]
+        self.cache = JwksCache(
+            JWKS_URL,
+            ttl_seconds=600,
+            fetcher=self.saglayici,
+            clock=lambda: self.zaman[0],
+            min_refresh_seconds=5.0,
+        )
+
+    def erisim(self, token):
+        return verify_access_token(
+            token,
+            cache=self.cache,
+            issuer=ISSUER,
+            audience="site-kiraci1",
+            allowed_azp={"identity-sync"},
+            leeway=30,
+        )
+
     def test_yalniz_http_ve_https_adresi(self):
         with self.assertRaises(ValueError):
             JwksCache("file:///etc/passwd")
@@ -248,6 +292,84 @@ class JwksCacheTesti(unittest.TestCase):
     def test_varsayilan_sure_600(self):
         cache = JwksCache("https://kimlik.example/certs")
         self.assertEqual(cache.ttl_seconds, 600)
+
+    def test_yenileme_basarisizsa_eski_anahtarlar_kullanilir(self):
+        token = self.anahtar.imzala(erisim_govdesi())
+        self.assertEqual(self.erisim(token)["azp"], "identity-sync")
+        self.assertEqual(self.saglayici.cagri, 1)
+        self.saglayici.hata = URLError("bağlantı yok")
+        self.zaman[0] += 601
+        # Süre doldu. Çekim başarısız. Eski anahtar yine de doğrular.
+        self.assertEqual(self.erisim(token)["azp"], "identity-sync")
+        self.assertEqual(self.saglayici.cagri, 2)
+        # Aynı pencere içinde yeniden denenmez.
+        self.zaman[0] += 2
+        self.assertEqual(self.erisim(token)["azp"], "identity-sync")
+        self.assertEqual(self.saglayici.cagri, 2)
+        # Pencere geçince bir kez daha denenir.
+        self.zaman[0] += 4
+        self.assertEqual(self.erisim(token)["azp"], "identity-sync")
+        self.assertEqual(self.saglayici.cagri, 3)
+        # Sağlayıcı düzelince liste yenilenir ve yeni anahtar bulunur.
+        self.saglayici.hata = None
+        yeni = Anahtar("kid-2")
+        self.saglayici.anahtarlar.append(yeni)
+        self.zaman[0] += 10
+        self.assertEqual(self.erisim(yeni.imzala(erisim_govdesi()))["azp"], "identity-sync")
+
+    def test_bozuk_json_ve_bozuk_govde_de_eski_anahtari_korur(self):
+        token = self.anahtar.imzala(erisim_govdesi())
+        self.erisim(token)
+        for hata in (ValueError("bozuk json"), OSError("yanıt 500"), TimeoutError()):
+            self.saglayici.hata = hata
+            self.zaman[0] += 601
+            self.assertEqual(self.erisim(token)["azp"], "identity-sync")
+
+    def test_soguk_onbellekte_cekim_basarisizsa_jwks_unavailable(self):
+        self.saglayici.hata = URLError("bağlantı yok")
+        token = self.anahtar.imzala(erisim_govdesi())
+        with self.assertRaises(JwksUnavailable):
+            self.erisim(token)
+        self.assertEqual(self.saglayici.cagri, 1)
+        # Aynı pencere içinde sağlayıcı yeniden yorulmaz. Hata yine yükselir.
+        self.zaman[0] += 1
+        with self.assertRaises(JwksUnavailable):
+            self.erisim(token)
+        self.assertEqual(self.saglayici.cagri, 1)
+        # Pencere geçince yeniden denenir ve sağlayıcı düzelmişse doğrulama geçer.
+        self.saglayici.hata = None
+        self.zaman[0] += 5
+        self.assertEqual(self.erisim(token)["azp"], "identity-sync")
+        self.assertEqual(self.saglayici.cagri, 2)
+
+    def test_jwks_unavailable_token_error_degildir(self):
+        self.assertFalse(issubclass(JwksUnavailable, TokenError))
+        self.assertTrue(issubclass(JwksUnavailable, Exception))
+
+    def test_bozuk_jwk_kaydi_atlanir(self):
+        self.saglayici.ham = [
+            {"kty": "RSA", "kid": "kid-bozuk", "alg": "RS256", "use": "sig", "n": "!!!", "e": "AQAB"},
+            {"kty": "RSA", "kid": "kid-eksik", "alg": "RS256", "use": "sig", "e": "AQAB"},
+            {"kty": "RSA", "kid": "kid-tur", "alg": "RS256", "use": "sig", "n": 5, "e": "AQAB"},
+            "dizi-degil",
+        ]
+        token = self.anahtar.imzala(erisim_govdesi())
+        self.assertEqual(self.erisim(token)["azp"], "identity-sync")
+        yabanci = Anahtar("kid-bozuk")
+        with self.assertRaises(TokenError) as yakalanan:
+            self.erisim(yabanci.imzala(erisim_govdesi()))
+        self.assertEqual(yakalanan.exception.code, "unknown_kid")
+
+
+class FrappeBagimsizligiTesti(unittest.TestCase):
+    def test_kaynak_frappe_icermez(self):
+        kaynak = Path(__file__).resolve().parent.parent / "src" / "oidc_verify"
+        desen = re.compile(r"^\s*(import\s+frappe\b|from\s+frappe\b)")
+        dosyalar = sorted(kaynak.glob("*.py"))
+        self.assertTrue(dosyalar)
+        for dosya in dosyalar:
+            for numara, satir in enumerate(dosya.read_text(encoding="utf-8").splitlines(), 1):
+                self.assertIsNone(desen.match(satir), f"{dosya.name}:{numara} frappe içe aktarıyor")
 
 
 if __name__ == "__main__":

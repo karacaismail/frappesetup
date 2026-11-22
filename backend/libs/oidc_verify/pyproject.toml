@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools>=69"]
+# PEP 639 lisans dizesi (`license = "MIT"`) setuptools 77 ve sonrasını ister.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
