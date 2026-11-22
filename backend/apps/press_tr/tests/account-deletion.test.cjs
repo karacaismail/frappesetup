@@ -21,7 +21,7 @@ function browserFixture() {
 	const form = {
 		addEventListener: (_event, handler) => { submit = handler; },
 		action: "https://press.example.test/api/method/fixture.deletion",
-		dataset: { confirm: "true", error: "Failure", success: "Success" },
+		dataset: { confirm: "true", error: "Failure", success: "Success", pending: "In progress", refresh: "Refresh" },
 		elements: { csrf_token: { value: "fixture" } },
 		querySelector: () => button,
 	};
@@ -110,4 +110,15 @@ test("follows an absolute Keycloak HTTP or HTTPS destination", async () => {
 
 test("the script accepts a page without a deletion form", () => {
 	vm.runInNewContext(script, { document: { getElementById: () => null } });
+});
+
+test("shows progress and allows a refresh on a pending deletion", async () => {
+	const { button, status, restart, submit, respond } = browserFixture();
+	const pending = submit();
+	respond({ ok: true, json: async () => ({ message: { pending: true } }) });
+	await pending;
+	assert.equal(status.textContent, "In progress");
+	assert.equal(restart.hidden, false);
+	assert.equal(restart.textContent, "Refresh");
+	assert.equal(button.disabled, true);
 });
