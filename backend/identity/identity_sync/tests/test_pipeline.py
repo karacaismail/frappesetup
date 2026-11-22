@@ -8,6 +8,7 @@ from __future__ import annotations
 import unittest
 
 from identity_sync.events import Event
+from identity_sync.pipeline import PreviewChanged
 
 from . import fakes
 from .fakes import ORG_ID, SUBJECT, Stack, keycloak_user
@@ -760,6 +761,128 @@ class AccountDeletionTest(PipelineCase):
                 ((_id, preview),) = self.stack.app.processor.replay_dead_letters(dry_run=True)
                 text = " ".join(f"{p.operation} {p.target} {p.summary}" for p in preview.previews)
                 self.assertNotIn(SUBJECT, text)
+
+    # --- an approved replay stays bound to the record it was approved for ---
+
+    def user_reads(self, *answers: str) -> None:
+        """Answer the user reads in order: "open", "closed" or "gone". The last answer repeats."""
+        keycloak = self.stack.keycloak
+        left = list(answers)
+
+        def read(_req: fakes.Recorded) -> fakes.Reply:
+            answer = left.pop(0) if len(left) > 1 else left[0]
+            if answer == "gone":
+                return 404, {"error": "User not found"}
+            return 200, keycloak_user(enabled=answer == "open")
+
+        keycloak.on("GET", f"{keycloak.admin}/users/{SUBJECT}", read)
+
+    def approved_replay(self) -> list[tuple[str, str]]:
+        from identity_sync.mapping import digest_of
+        from identity_sync.pipeline import replay_report
+
+        processor = self.stack.app.processor
+        digest = digest_of(replay_report(processor.replay_dead_letters(dry_run=True)), self.stack.app.digest_key)
+        return [(id_, result.status) for id_, result in self.replay_with(digest)]
+
+    def replay_with(self, digest: str):
+        return self.stack.app.processor.replay_dead_letters(expected_digest=digest)
+
+    def anonymize_calls(self) -> int:
+        press = self.stack.press.calls("POST", fakes.PRESS_ANONYMIZE)
+        return len(press) + len(self.stack.tenant.calls("POST", fakes.TENANT_ANONYMIZE))
+
+    def test_approved_close_plan_is_not_recorded_as_the_deletion_job(self) -> None:
+        # The queued delete event was previewed while Keycloak still had the user, closed.
+        # The human approved "close everywhere". Right after the check Keycloak says the user is
+        # gone. The approved plan must stay the event's plan. It must not finish the deletion job.
+        self.user_reads("closed")
+        self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, (503, None))
+        self.assertEqual(self.stack.app.processor.handle(event("USER_DELETE", "admin")).status, "dead_lettered")
+        self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, fakes.DONE)
+        store, job = self.stack.app.store, self.job()
+        # Preview: 2 reads. Check at execution: 2 reads. Every later read says "gone".
+        self.user_reads("closed", "closed", "closed", "closed", "gone")
+
+        results = self.approved_replay()
+
+        self.assertEqual(results, [("e-1", "processed")])
+        self.assertEqual(self.anonymize_calls(), 0)
+        self.assertTrue(store.is_processed("e-1"))
+        self.assertFalse(store.is_processed(job.id))
+        # The deletion is still open. The next delete event runs it, including the anonymization.
+        late = Event(id="e-9", kind="admin", type="USER_DELETE", realm="platform", time=9, user_id=SUBJECT)
+        result = self.stack.app.processor.handle(late)
+        self.assertEqual(result.status, "processed")
+        self.assertIn("tenant.anonymize_user", result.actions)
+        self.assertTrue(store.is_processed(job.id))
+
+    def test_approved_deletion_plan_is_recorded_as_the_deletion_job(self) -> None:
+        # The other direction. The event is in the queue because Keycloak could not be read.
+        # The preview saw the user gone and the human approved the deletion steps. Right after
+        # the check a read answers with a user again. The plan must stay the job's plan.
+        self.flaky_user_read(99)
+        self.assertEqual(self.stack.app.processor.handle(event("USER_DELETE", "admin")).status, "dead_lettered")
+        store, job = self.stack.app.store, self.job()
+        # Preview: 1 read. Check at execution: 1 read. Every later read answers with a user.
+        self.user_reads("gone", "gone", "open")
+
+        results = self.approved_replay()
+
+        self.assertEqual(results, [("e-1", "processed")])
+        self.assertEqual(self.anonymize_calls(), 2)
+        self.assertTrue(store.is_processed(job.id))
+        self.assertFalse(store.is_processed("e-1"))
+        self.assertEqual(store.dead_letters(), [])
+        # The job is done: the same account's request is a duplicate and writes nothing.
+        before = self.target_writes()
+        self.assertEqual(self.stack.app.processor.handle(self.job()).status, "duplicate")
+        self.assertEqual(self.target_writes(), before)
+
+    def test_approval_is_bound_to_the_record_not_only_to_the_steps(self) -> None:
+        # Two events of the same closed user have the same steps. An approval for one is not
+        # an approval for the other.
+        self.user_reads("closed")
+        processor = self.stack.app.processor
+        first = event("USER_UPDATE", "admin")
+        second = Event(id="e-2", kind="admin", type="USER_UPDATE", realm="platform", time=2, user_id=SUBJECT)
+        approved = processor.handle(first, dry_run=True)
+        other = processor.handle(second, dry_run=True)
+        self.assertEqual(approved.previews, other.previews)
+        self.assertNotEqual(approved.plan_digest, other.plan_digest)
+
+        with self.assertRaises(PreviewChanged):
+            processor.handle(second, approved_digest=approved.plan_digest)
+
+        self.assertEqual(self.target_writes(), 0)
+        self.assertEqual(processor.handle(first, approved_digest=approved.plan_digest).status, "processed")
+
+    def test_changed_keycloak_answer_needs_a_new_preview(self) -> None:
+        # The answer changed between the approval and the execution, in both directions.
+        from identity_sync.mapping import digest_of
+        from identity_sync.pipeline import replay_report
+
+        for first, then in (("closed", "gone"), ("gone", "closed")):
+            with self.subTest(first=first, then=then):
+                stack = Stack()
+                self.addCleanup(stack.close)
+                keycloak = stack.keycloak
+                path = f"{keycloak.admin}/users/{SUBJECT}"
+                keycloak.on("GET", path, (500, None))
+                self.assertEqual(stack.app.processor.handle(event("USER_DELETE", "admin")).status, "dead_lettered")
+                answers = {"closed": (200, keycloak_user(enabled=False)), "gone": (404, {"error": "User not found"})}
+                keycloak.on("GET", path, answers[first])
+                preview = stack.app.processor.replay_dead_letters(dry_run=True)
+                digest = digest_of(replay_report(preview), stack.app.digest_key)
+                keycloak.on("GET", path, answers[then])
+
+                with self.assertRaises(PreviewChanged):
+                    stack.app.processor.replay_dead_letters(expected_digest=digest)
+
+                self.assertEqual(stack.press.writes() + stack.tenant.writes(), [])
+                self.assertFalse(stack.app.store.is_processed("e-1"))
+                self.assertFalse(stack.app.store.is_processed(stack.app.processor.account_job(SUBJECT, time=1).id))
+                self.assertEqual([letter.event.id for letter in stack.app.store.dead_letters()], ["e-1"])
 
     def test_retry_preview_names_the_job_not_the_account(self) -> None:
         self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))

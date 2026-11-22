@@ -18,7 +18,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, replace
-from typing import TypeVar
+from typing import NamedTuple, TypeVar
 
 from identity_sync.events import (
     ACCOUNT_DELETION,
@@ -103,6 +103,19 @@ def replay_report(results: ReplayResults) -> list[dict[str, object]]:
 
 class PreviewChanged(Exception):
     """The plan is not the approved one. The approval belongs to the old plan. Nothing is written."""
+
+
+class _Planned(NamedTuple):
+    """A plan together with the record it belongs to.
+
+    `record` is the event itself, or the account job a delete event was turned into. A plan
+    that was checked against an approval is written under exactly this record. The execution
+    never asks Keycloak again which record it is: the answer could differ from the one the
+    human saw, and the approved steps would be booked under the wrong record.
+    """
+
+    record: Event
+    actions: tuple[Action, ...]
 
 
 class _Failed(Exception):
@@ -221,8 +234,12 @@ class Processor:
         summary = preview.summary.replace(f"user {event.user_id}", f"the user of deletion job {event.id}")
         return replace(preview, summary=summary.replace(event.user_id, event.id))
 
-    def _preview(self, event: Event) -> tuple[EventResult, tuple[Action, ...] | None]:
-        """Plan the event and describe the plan. Reads only. The second value is None when planning failed."""
+    def _preview(self, event: Event) -> tuple[EventResult, _Planned | None]:
+        """Plan the event and describe the plan. Reads only. The second value is None when planning failed.
+
+        The digest covers the record the plan belongs to, not only its steps. If Keycloak answers
+        differently at execution time, the record or the steps differ and the digest does not match.
+        """
         try:
             event = self._as_job(event)
             actions = self._plan(event)
@@ -233,9 +250,9 @@ class Processor:
         result = EventResult(
             "preview",
             previews=tuple(self._describe(event, action) for action in pending),
-            plan_digest=plan_digest(pending, self._digest_key),
+            plan_digest=digest_of({"record": event.id, "steps": plan_digest(pending, self._digest_key)}, self._digest_key),
         )
-        return result, actions
+        return result, _Planned(event, actions)
 
     def removal_preview(self, subject: str) -> EventResult:
         """Preview the job for an account that Keycloak no longer has. Used by reconcile. Reads only."""
@@ -259,11 +276,17 @@ class Processor:
             return {**result, "status": "unknown", "error": "a step has an unknown outcome; see the dead-letter queue"}
         return {**result, "status": "failed", "error": "a step failed; see the dead-letter queue"}
 
-    def _handle_locked(self, event: Event, allow_unknown: bool, planned: tuple[Action, ...] | None) -> EventResult:
+    def _handle_locked(self, event: Event, allow_unknown: bool, planned: _Planned | None) -> EventResult:
         """Run one event. The caller holds the work lock.
 
-        `planned` is a plan that was already checked against an approval. It is written as it is.
+        `planned` is a plan that was already checked against an approval. It is written as it
+        is, under the record it was planned for. Keycloak is not asked again.
         """
+        if planned is not None:
+            result = self._handle_job(planned.record, allow_unknown, planned.actions)
+            if planned.record.id != event.id:
+                self._store.remove_dead_letter(event.id)
+            return result
         try:
             job = self._as_job(event)
         except _Failed as failure:
@@ -274,7 +297,7 @@ class Processor:
             self._store.begin(event)
             self._store.add_dead_letter(event, str(failure))
             return EventResult("dead_lettered")
-        result = self._handle_job(job, allow_unknown, planned)
+        result = self._handle_job(job, allow_unknown, None)
         if job.id != event.id:
             # The event is now the account job. A queued copy of the event itself is a leftover.
             self._store.remove_dead_letter(event.id)
@@ -346,15 +369,15 @@ class Processor:
                 letters.append(letter)
         return letters, skipped
 
-    def _replay_previews(self, include_unknown: bool) -> tuple[ReplayResults, dict[str, tuple[Action, ...]]]:
+    def _replay_previews(self, include_unknown: bool) -> tuple[ReplayResults, dict[str, _Planned]]:
         letters, skipped = self._letters(include_unknown)
         previews: ReplayResults = []
-        plans: dict[str, tuple[Action, ...]] = {}
+        plans: dict[str, _Planned] = {}
         for letter in letters:
-            result, actions = self._preview(letter.event)
+            result, planned = self._preview(letter.event)
             previews.append((letter.event.id, result))
-            if actions is not None:
-                plans[letter.event.id] = actions
+            if planned is not None:
+                plans[letter.event.id] = planned
         return previews + skipped, plans
 
     def _ordered(self, results: ReplayResults) -> ReplayResults:
