@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { focusDiff } from './focus-diff';
-import { ACCOUNT_DELETION_URL, createUser, ensureKeycloakDeleteActionOff, grantStockDeleteRole, KC, loginUrl, REALM, submitPassword, userExists } from './helpers';
+import { ACCOUNT_DELETION_URL, createUser, grantStockDeleteRole, KC, keycloakDeleteActionEnabled, loginUrl, REALM, submitPassword, userExists } from './helpers';
 
 // Account deletion path (project record O-27, contract section 7).
 // - Keycloak's own "delete_account" action is switched off. It deletes the user in the first step.
@@ -17,8 +17,8 @@ const LINK = '#at-account-deletion-link';
 const SECTION = '#at-account-deletion';
 
 async function signIn(page: Page, options: { customer: boolean }): Promise<string> {
-  const email = await createUser({ canDeleteAccount: options.customer });
-  await ensureKeycloakDeleteActionOff();
+  // The identity settings are not touched here. A test must see the realm as it is configured.
+  const email = await createUser({ customer: options.customer });
   await page.goto(`${KC}/realms/${REALM}/account/`);
   await submitPassword(page, email);
   await expect(page.locator('#save-btn')).toBeVisible({ timeout: 20_000 });
@@ -176,8 +176,7 @@ test('an open menu does not change the page layout', async ({ page }) => {
 });
 
 test('customer with English as the language reads the link in English', async ({ page }) => {
-  const email = await createUser({ canDeleteAccount: true, locale: 'en' });
-  await ensureKeycloakDeleteActionOff();
+  const email = await createUser({ customer: true, locale: 'en' });
   await page.goto(`${KC}/realms/${REALM}/account/`);
   await submitPassword(page, email);
   await expect(page.locator('#save-btn')).toBeVisible({ timeout: 20_000 });
@@ -221,19 +220,27 @@ for (const scheme of ['light', 'dark'] as const) {
   });
 }
 
-test("Keycloak's own delete action stays off, also for a customer", async ({ page }) => {
+test("the realm keeps Keycloak's own delete action switched off", async () => {
+  // This test only reads the setting. It never repairs it. A realm with the action on must fail here.
+  expect(await keycloakDeleteActionEnabled(), 'required action "delete_account" in the realm').toBe(false);
+});
+
+test("Keycloak's own delete action is not offered and a direct request does nothing", async ({ page }) => {
   const email = await signIn(page, { customer: true });
   const html = await serverPage(page);
   expect(/"deleteAccountAllowed":\s*false/.test(html), 'the stock delete feature is off in the server page').toBe(true);
   await expect(page.locator('[data-testid="delete-account"]')).toHaveCount(0);
   await expect(page.locator('#delete-account-btn')).toHaveCount(0);
 
-  // A direct request for the Keycloak action does not open a delete confirmation and deletes nothing.
+  // A direct request for the Keycloak action: with the action switched off Keycloak ignores the request
+  // and signs the user in normally. No confirmation, no error screen, and the account stays.
   await page.context().clearCookies();
   await page.goto(`${loginUrl()}&kc_action=delete_account`);
   await submitPassword(page, email);
-  await expect(page.locator('#save-btn, #kc-error-message').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page).toHaveURL(new RegExp(`${KC}/realms/${REALM}/account/`));
+  await expect(page.locator('#save-btn')).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('#kc-deleteaccount-form')).toHaveCount(0);
+  await expect(page.locator('#kc-error-message')).toHaveCount(0);
   expect(await userExists(email)).toBe(true);
 });
 
@@ -241,7 +248,6 @@ test("Keycloak's own delete-account role does not show the link", async ({ page 
   // The customer marker is a separate role. Granting Keycloak's role alone must change nothing.
   const email = await createUser();
   await grantStockDeleteRole(email);
-  await ensureKeycloakDeleteActionOff();
   await page.goto(`${KC}/realms/${REALM}/account/`);
   await submitPassword(page, email);
   await expect(page.locator('#save-btn')).toBeVisible({ timeout: 20_000 });

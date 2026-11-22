@@ -34,7 +34,7 @@
 }
 
 :root {
-  
+
   --at-color-page: #f3f1ec;
   --at-color-surface: #ffffff;
   --at-color-surface-sunken: #eef0f5;
@@ -60,7 +60,7 @@
   --at-color-on-masthead: #ffffff;
   --at-shadow-card: 0 1px 2px rgb(22 29 51 / 0.06), 0 12px 32px rgb(22 29 51 / 0.1);
 
-  
+
   --at-font-text: "Outfit Variable", "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
   --at-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --at-text-sm: 0.875rem;
@@ -74,7 +74,7 @@
   --at-weight-medium: 500;
   --at-weight-bold: 600;
 
-  
+
   --at-space-1: 0.25rem;
   --at-space-2: 0.5rem;
   --at-space-3: 0.75rem;
@@ -85,15 +85,15 @@
   --at-card-padding: 1.25rem;
   --at-card-width: 27rem;
 
-  
+
   --at-radius-card: 1rem;
   --at-radius-control: 0.625rem;
   --at-border-control: 1px;
 
-  
+
   --at-hit: 2.75rem;
 
-  
+
   --at-focus-thickness: 3px;
   --at-focus-gap: 2px;
   --at-focus-underline-offset: 4px;
@@ -103,7 +103,7 @@
     0 calc(var(--at-radius-control) + var(--at-focus-gap)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-surface),
     0 calc(var(--at-radius-control) + var(--at-focus-gap) + var(--at-focus-thickness)) 0 calc(-1 * var(--at-radius-control)) var(--at-color-focus);
 
-  
+
   --at-motion-duration: 160ms;
   --at-motion-ease: cubic-bezier(.65, 0, .35, 1);
   --at-motion-none: 0s;

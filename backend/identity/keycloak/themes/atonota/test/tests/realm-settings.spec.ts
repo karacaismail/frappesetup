@@ -12,8 +12,7 @@ test.afterAll(async () => {
 });
 
 test('with the Keycloak delete action switched on, the console still does not offer it', async ({ page }) => {
-  // Creating a customer keeps the action off, so the action is switched on after the user exists.
-  const email = await createUser({ canDeleteAccount: true });
+    const email = await createUser({ customer: true });
   await setKeycloakDeleteAction(true);
   try {
     // The stock console would now show its delete section to every user of the console.
@@ -33,14 +32,16 @@ test('with the Keycloak delete action switched on, the console still does not of
 });
 
 test('with the Keycloak delete action switched on, a customer cannot delete the account in Keycloak', async ({ page }) => {
-  const email = await createUser({ canDeleteAccount: true });
+  const email = await createUser({ customer: true });
   await setKeycloakDeleteAction(true);
   try {
     // The customer role is not Keycloak's "delete-account" role, so Keycloak refuses its own delete action.
     await page.goto(`${loginUrl()}&kc_action=delete_account`);
     await submitPassword(page, email);
-    await expect(page.locator('#kc-error-message')).toBeVisible({ timeout: 20_000 });
+    // The refusal must be Keycloak's "not allowed to delete" answer, not just any error screen.
+    await expect(page.locator('#kc-error-message')).toContainText('Bu hesabı silme izniniz yok.', { timeout: 20_000 });
     await expect(page.locator('#kc-deleteaccount-form')).toHaveCount(0);
+    await expect(page.locator('#kc-submit')).toHaveCount(0);
     expect(await userExists(email), 'the account stays').toBe(true);
   } finally {
     await setKeycloakDeleteAction(false);
