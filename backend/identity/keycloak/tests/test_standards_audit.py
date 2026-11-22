@@ -72,7 +72,7 @@ class EnglishNamesTest(unittest.TestCase):
         names = [f["alias"] for f in realm["authenticationFlows"]]
         names += [c["alias"] for c in realm["authenticatorConfig"]]
         names += [e.get("flowAlias", "") for f in realm["authenticationFlows"] for e in f["authenticationExecutions"]]
-        for word in ("sihirli", "method", "duzey", "baglanti"):
+        for word in ("sihirli", "yontem", "duzey", "baglanti"):
             self.assertFalse([n for n in names if word in n], word)
 
     def test_realm_source_text_is_english(self):
