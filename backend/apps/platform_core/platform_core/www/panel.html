@@ -4,16 +4,16 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="csrf-token" content="{{ panel_csrf_token | e }}">
-	<link rel="stylesheet" href="/assets/platform_core/panel/panel.css">
-	<script src="/assets/platform_core/panel/focus.js" defer></script>
+	{{ include_style('panel.bundle.css') }}
 	<title>{{ _("Admin panel") | e }}</title>
 </head>
 <body>
-	<a class="skip-link" tabindex="0" href="#panel">{{ _("Skip to main content") | e }}</a>
+	<a class="skip-link" href="#panel">{{ _("Skip to main content") | e }}</a>
 	<main id="panel" tabindex="-1">
 		<h1>{{ _("Admin panel") | e }}</h1>
 		<p>{{ _("The panel is not available yet.") | e }}</p>
-		<a tabindex="0" href="/">{{ _("Go to site home") | e }}</a>
+		<a href="/">{{ _("Go to site home") | e }}</a>
 	</main>
+	{{ include_script('panel-focus.bundle.js') }}
 </body>
 </html>

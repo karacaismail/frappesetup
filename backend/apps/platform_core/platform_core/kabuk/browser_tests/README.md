@@ -15,3 +15,6 @@ node_modules/.bin/playwright test --config backend/apps/platform_core/platform_c
 The suite runs Chromium and WebKit. It saves screenshots under
 `.pane/scratch/panel-browser-results` unless `PANEL_TEST_OUTPUT` is set.
 The axe checks cover automated WCAG 2.2 AA rules.
+
+The WebKit keyboard tests use Option+Tab to reach links with macOS's default
+link-navigation preference. Chromium uses Tab.

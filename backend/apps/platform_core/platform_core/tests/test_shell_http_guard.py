@@ -32,3 +32,15 @@ class TestShellHTTPGuard(unittest.TestCase):
 					ShellHTTPFixture.setUpClass()
 			frappe.set_user.assert_not_called()
 			frappe.db.exists.assert_not_called()
+
+	def test_explicit_opt_in_refuses_an_existing_frappe_context(self):
+		with (
+			patch.dict("os.environ", {"KABUK_TEST_SITE": SITE}),
+			patch("platform_core.tests.shell_http_fixture.frappe") as frappe,
+		):
+			frappe.local.site = "already-active.localhost"
+			with self.assertRaisesRegex(RuntimeError, "no active Frappe site"):
+				ShellHTTPFixture.setUpClass()
+			frappe.init.assert_not_called()
+			frappe.connect.assert_not_called()
+			frappe.destroy.assert_not_called()

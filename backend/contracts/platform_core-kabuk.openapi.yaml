@@ -488,7 +488,7 @@
             ]
           },
           "options": {
-            "description": "Native field options. Treat HTML field options as untrusted content and sanitize them before rendering.",
+            "description": "Native field options. Dynamic Link options are omitted when their target-type field is unreadable. Treat HTML field options as untrusted content and sanitize them before rendering.",
             "type": [
               "string",
               "number",
@@ -533,7 +533,7 @@
             ]
           },
           "depends_on": {
-            "description": "Native visibility expression. Consumers must not execute it as code.",
+            "description": "Native visibility expression. Omitted when it references an unreadable field. Consumers must not execute it as code.",
             "type": [
               "string",
               "number",
@@ -542,7 +542,7 @@
             ]
           },
           "mandatory_depends_on": {
-            "description": "Native conditional required expression.",
+            "description": "Native conditional required expression. Omitted when it references an unreadable field.",
             "type": [
               "string",
               "number",
@@ -551,7 +551,7 @@
             ]
           },
           "read_only_depends_on": {
-            "description": "Native conditional read-only expression.",
+            "description": "Native conditional read-only expression. Omitted when it references an unreadable field.",
             "type": [
               "string",
               "number",
@@ -560,7 +560,7 @@
             ]
           },
           "fetch_from": {
-            "description": "Native source field path.",
+            "description": "Native source field path. Omitted when the local source link field is unreadable.",
             "type": [
               "string",
               "number",
@@ -650,7 +650,7 @@
             ]
           },
           "collapsible_depends_on": {
-            "description": "Native collapse expression.",
+            "description": "Native collapse expression. Omitted when it references an unreadable field.",
             "type": [
               "string",
               "number",
