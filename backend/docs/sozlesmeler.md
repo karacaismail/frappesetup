@@ -408,6 +408,11 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
 | `platform_core.api.ai.purge_logs` | POST | “System Manager” rolü | Saklama süresi dolan günlükleri elle siler. Yıkıcıdır. |
 
+- `list_proposals` yanıtı bir nesnedir: `proposals` ve `has_next_page`. İstek `start` alır. Süzme ve sayfalama veritabanında yapılır.
+- Öneri `created_at` ve `expires_at` taşır. Zaman sitenin saat dilimiyle ve farkıyla ISO 8601 biçiminde döner.
+- Okuma araçlarının sonucu `as_of`, `site` ve `source` taşır. Sonuç sınırı aşarsa `truncated: true` döner. Alt tablo en çok 200 satır, sonuç verisi en çok 262.144 bayttır.
+- Oturumsuz istek 403, süresi dolmuş oturum 401 alır.
+
 ### Genel araçlar
 
 `search_doctypes`, `get_doctype_schema`, `list_documents`, `get_document`, `run_report`, `create_document`, `update_document`, `submit_document`, `cancel_document`, `delete_document` ve `get_proposal`.
