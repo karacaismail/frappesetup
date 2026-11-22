@@ -9,6 +9,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 from collections.abc import Mapping, Sequence
 from typing import TextIO
@@ -16,11 +17,13 @@ from typing import TextIO
 from identity_sync.app import App, build_app
 from identity_sync.auth import build_verifier, reject_all
 from identity_sync.config import ConfigError, load_settings
+from identity_sync.events import RESOURCE_ID
 from identity_sync.httpjson import HttpError, TransportError
 from identity_sync.pipeline import PreviewChanged, replay_report
 from identity_sync.store import Busy
 
 EXIT_OK, EXIT_FOUND, EXIT_ERROR = 0, 1, 2
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -42,8 +45,14 @@ def _parser() -> argparse.ArgumentParser:
     )
     resolve.add_argument("operation_id")
     resolve.add_argument("--resolution", required=True, choices=("completed", "abandoned"))
-    replay = commands.add_parser("replay-dead-letters", help="Process the waiting failed events once.")
-    replay.add_argument("--dry-run", action="store_true", help="Show the planned actions without running them.")
+    replay = commands.add_parser(
+        "replay-dead-letters",
+        help="Process the waiting failed events once. Previews by default.",
+    )
+    replay.add_argument("--dry-run", action="store_true", help="Only show the planned actions. This is the default.")
+    replay.add_argument("--execute", action="store_true", help="Run the previewed work. Needs the two options below.")
+    replay.add_argument("--preview-digest", help="The preview_digest of the preview a human approved.")
+    replay.add_argument("--approval-id", help="The id of that approval. It works once.")
     replay.add_argument(
         "--include-unknown",
         action="store_true",
@@ -53,11 +62,14 @@ def _parser() -> argparse.ArgumentParser:
 
     def parse(argv: Sequence[str] | None = None) -> argparse.Namespace:
         args = args_check(argv)
-        if args.command == "reconcile" and args.execute:
-            if args.dry_run or not args.preview_digest or not args.approval_id:
-                parser.error("reconcile --execute needs --preview-digest and --approval-id, and no --dry-run")
+        if args.command in ("reconcile", "replay-dead-letters") and args.execute:
+            # Work that cannot be undone runs only after a preview a human approved.
+            well_formed = _DIGEST.fullmatch(args.preview_digest or "") and RESOURCE_ID.fullmatch(args.approval_id or "")
+            if args.dry_run or not well_formed:
+                parser.error(f"{args.command} --execute needs --preview-digest and --approval-id, and no --dry-run")
         return args
 
+    # argparse has no hook for checks across arguments, so the parser's own method is wrapped.
     parser.parse_args = parse  # type: ignore[method-assign]
     return parser
 
@@ -133,10 +145,28 @@ def _run(args: argparse.Namespace, app: App) -> int:
     if args.command == "dead-letters":
         _print({"dead_letters": [letter.to_dict() for letter in app.store.dead_letters()]})
         return EXIT_OK
-    results = app.processor.replay_dead_letters(dry_run=args.dry_run, include_unknown=args.include_unknown)
+    return _replay(args, app)
+
+
+def _replay(args: argparse.Namespace, app: App) -> int:
+    if not args.execute:
+        results = app.processor.replay_dead_letters(dry_run=True, include_unknown=args.include_unknown)
+        report = replay_report(results)
+        _print({"results": report, "preview_digest": app.digest(report)})
+        return EXIT_OK if all(result.status == "preview" for _id, result in results) else EXIT_FOUND
+    # The same rule as the HTTP endpoint: one approval, bound to one preview.
+    if not app.store.claim_approval(args.approval_id, args.preview_digest, "replay_dead_letters"):
+        print("approval was already used; get a new preview and a new approval", file=sys.stderr)
+        return EXIT_ERROR
+    try:
+        results = app.processor.replay_dead_letters(
+            include_unknown=args.include_unknown, expected_digest=args.preview_digest
+        )
+    except PreviewChanged:
+        print("preview changed; nothing was written. Preview again and get a new approval", file=sys.stderr)
+        return EXIT_ERROR
     _print({"results": replay_report(results)})
-    wanted = "preview" if args.dry_run else "processed"
-    return EXIT_OK if all(result.status == wanted for _id, result in results) else EXIT_FOUND
+    return EXIT_OK if all(result.status == "processed" for _id, result in results) else EXIT_FOUND
 
 
 def main(argv: Sequence[str] | None = None, *, env: Mapping[str, str] | None = None) -> int:

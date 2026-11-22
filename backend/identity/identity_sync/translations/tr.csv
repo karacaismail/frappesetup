@@ -13,7 +13,7 @@ Hata kodu `approval_used` ise bu `approval_id` daha önce kullanıldı.
 The service token is missing or invalid. The error code is `unauthorized`.,Servis belirteci yok ya da geçersiz. Hata kodu `unauthorized` olur.,identity_sync.openapi.yaml: components.responses.Unauthorized.description
 "Keycloak, Press or the tenant site did not respond or rejected the request.","Keycloak, Press ya da kiracı sitesi yanıt vermedi ya da isteği reddetti.",identity_sync.openapi.yaml: components.responses.UpstreamFailed.description
 The issuer of the realm. It must be equal to the issuer in the service settings.,Realm'in yayıncı adresi. Servis ayarındaki yayıncı adresine eşit olmalıdır.,identity_sync.openapi.yaml: components.schemas.AccountDeletionRequest.properties.issuer.description
-The time when Press authenticated the customer again in Keycloak. The unit is seconds since 1970.,Press'in müşteriyi Keycloak'ta yeniden doğruladığı zaman. Birim 1970'ten beri geçen saniyedir.,identity_sync.openapi.yaml: components.schemas.AccountDeletionRequest.properties.reauthenticated_at.description
+The time when Press authenticated the customer again in Keycloak. The unit is seconds since 1970-01-01 00.00 UTC (Unix time). It is the `auth_time` value of the token.,Press'in müşteriyi Keycloak'ta yeniden doğruladığı zaman. Birim 1970-01-01 00.00 UTC anından beri geçen saniyedir (Unix zamanı). Değer belirteçteki `auth_time` değeridir.,identity_sync.openapi.yaml: components.schemas.AccountDeletionRequest.properties.reauthenticated_at.description
 The names of the steps that finished with definite success in this call.,Bu çağrıda kesin başarıyla biten adımların adları.,identity_sync.openapi.yaml: components.schemas.AccountDeletionResult.properties.actions.description
 "The id of the request. It is a keyed digest of the account, so it does not show the user.","İsteğin kimliği. Hesabın anahtarlı özetidir, bu yüzden kullanıcıyı göstermez.",identity_sync.openapi.yaml: components.schemas.AccountDeletionResult.properties.request_id.description
 "`processed` shows that every step that was left finished.
@@ -36,8 +36,8 @@ The response body is not stored. An example is `tenant.provision kiraci1: HTTP 5
 ","Başarısız adımlar ve durum kodları. Adımlar noktalı virgülle ayrılır.
 Yanıt gövdesi saklanmaz. Örnek: `tenant.provision kiraci1: HTTP 503`.
 ",identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.error.description
-The time of the first failure. The unit is seconds (Unix time).,İlk hatanın zamanı. Birim saniyedir (Unix zamanı).,identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.first_failed_at.description
-The time of the last failure. The unit is seconds (Unix time).,Son hatanın zamanı. Birim saniyedir (Unix zamanı).,identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.last_failed_at.description
+The time of the first failure. The unit is seconds since 1970-01-01 00.00 UTC (Unix time).,İlk hatanın zamanı. Birim 1970-01-01 00.00 UTC anından beri geçen saniyedir (Unix zamanı).,identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.first_failed_at.description
+The time of the last failure. The unit is seconds since 1970-01-01 00.00 UTC (Unix time).,Son hatanın zamanı. Birim 1970-01-01 00.00 UTC anından beri geçen saniyedir (Unix zamanı).,identity_sync.openapi.yaml: components.schemas.DeadLetter.properties.last_failed_at.description
 "`failed` shows that the target rejected the operation or could not be reached.
 If the attempt count is 0, the service accepted the event but stopped before it could start the work.
 `unknown` shows that it is not known whether the operation finished.
@@ -398,7 +398,7 @@ No endpoint does paid work.
 The value that names the approval layer means this. Only the approval layer starts the real execution.
 `otomatik` means the endpoint needs no human approval. For example, the event endpoint is like this.
 `yalniz-okur` means the endpoint changes no record.
-`yalniz-press` means only the Press service client starts the work. The account deletion endpoint is like this.
+`press-only` means only the Press service client starts the work. The account deletion endpoint is like this.
 
 ## AI and human approval
 
@@ -568,7 +568,7 @@ Hiçbir uç ücretli iş yapmaz.
 `yalniz-onay-katmani` değeri şunu söyler: gerçek yürütmeyi yalnız onay katmanı başlatır.
 `otomatik` değeri ucun insan onayı istemediğini söyler. Örneğin olay ucu böyledir.
 `yalniz-okur` değeri ucun hiçbir kaydı değiştirmediğini söyler.
-`yalniz-press` değeri işi yalnız Press servis istemcisinin başlattığını söyler. Hesap silme ucu böyledir.
+`press-only` değeri işi yalnız Press servis istemcisinin başlattığını söyler. Hesap silme ucu böyledir.
 
 ## Yapay zekâ ve insan onayı
 

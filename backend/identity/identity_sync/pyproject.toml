@@ -6,6 +6,11 @@ requires-python = ">=3.11"
 license = "MIT"
 dependencies = []
 
+# The token check uses the project's own library (backend/libs/oidc_verify). It is installed from
+# the repository, not from a package index. Without it the service refuses every token endpoint.
+[project.optional-dependencies]
+verify = ["oidc_verify"]
+
 [project.scripts]
 identity-sync = "identity_sync.cli:main"
 

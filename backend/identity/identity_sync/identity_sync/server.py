@@ -92,6 +92,7 @@ class _DeadlineReader(io.RawIOBase):
     def readable(self) -> bool:
         return True
 
+    # RawIOBase declares a wider buffer type. This reader only ever gets these two.
     def readinto(self, buffer: bytearray | memoryview) -> int:  # type: ignore[override]
         remaining = self._deadline - time.monotonic()
         if remaining <= 0:

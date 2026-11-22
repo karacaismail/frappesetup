@@ -194,6 +194,7 @@ def schema_errors(value: object, schema: dict, root: dict, path: str = "$") -> l
     if "$ref" in schema:
         target: object = root
         for part in schema["$ref"].removeprefix("#/").split("/"):
+            # The contract is plain parsed YAML. The path inside a `$ref` is known to exist.
             target = target[part]  # type: ignore[index]
         return schema_errors(value, target, root, path)  # type: ignore[arg-type]
     errors: list[str] = []

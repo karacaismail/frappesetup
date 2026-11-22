@@ -27,6 +27,7 @@ from .fakes import Stack
 
 try:
     import jwt
+    # Imported only to learn whether the library is installed.
     import oidc_verify  # noqa: F401
     from cryptography.hazmat.primitives.asymmetric import rsa
 except ImportError:

@@ -1,7 +1,15 @@
-"""Kalıcı kayıt: işlenen olaylar, bekleme kuyruğu ve kullanılmış imzalar.
+"""Persistent record: processed events, the dead-letter queue, used signatures and approvals,
+and the journal of multi-step operations.
 
-Kayıt SQLite dosyasında durur. SQLite Python'un kendi kitaplığındadır.
-Kayıt kişisel veri taşımaz. Olayın yalnız kimlik alanları saklanır.
+The record is a SQLite file. SQLite is in Python's own library.
+The record holds no e-mail and no name. It does hold the Keycloak user id (`sub`), which the
+project record counts as personal data. The id is kept only while the work needs it:
+
+- a queued event keeps it until the event is processed, then the row is deleted,
+- an operation journal row drops it when the operation is done or resolved,
+- when an account deletion job finishes, every remaining row of that user drops it.
+
+The id of a finished event or job stays as a duplicate guard. A job id is a keyed digest.
 
 İki ayrı koruma vardır:
 
@@ -323,6 +331,14 @@ class Store:
                 "UPDATE operations SET state = ?, updated_at = ? WHERE operation_id = ?",
                 (state, self._clock(), operation_id),
             )
+            if state == "done":
+                # Nothing is left to settle, so the row no longer needs to name the user.
+                self._db.execute("UPDATE operations SET subject = '' WHERE operation_id = ?", (operation_id,))
+
+    def forget_subject(self, subject: str) -> None:
+        """Remove a user's id from the operation journal. Called when the account deletion is done."""
+        with self._transaction():
+            self._db.execute("UPDATE operations SET subject = '' WHERE subject = ?", (subject,))
 
     def operations(self) -> list[dict[str, object]]:
         """Unfinished operations, oldest first. A human checks the target and resolves each one."""
@@ -354,7 +370,7 @@ class Store:
         """Close an unfinished operation after a human settled it on the target. False if there is none."""
         with self._transaction():
             cursor = self._db.execute(
-                "UPDATE operations SET state = 'resolved', resolution = ?, updated_at = ? "
+                "UPDATE operations SET state = 'resolved', resolution = ?, subject = '', updated_at = ? "
                 "WHERE operation_id = ? AND state NOT IN ('done', 'resolved')",
                 (resolution, self._clock(), operation_id),
             )

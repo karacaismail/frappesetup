@@ -298,6 +298,9 @@ class Processor:
             self._store.add_dead_letter(event, str(failure), state=state)
             return EventResult("unknown" if failure.unknown else "dead_lettered")
         self._store.mark_processed(event.id, "processed")
+        if event.type in JOB_TYPES and event.user_id:
+            # The account is gone. No record keeps its id (the job's own id is a keyed digest).
+            self._store.forget_subject(event.user_id)
         return EventResult("processed", actions=tuple(names))
 
     def replay_dead_letters(
@@ -483,7 +486,8 @@ class Processor:
             self._keycloak.disable_user(action.subject)
         elif isinstance(action, KeycloakDeleteUser):
             self._keycloak.delete_user(action.subject)
-        else:  # pragma: no cover - a new action type shows up here
+        # Not reachable while every action type has a branch above.
+        else:  # pragma: no cover
             raise TypeError(f"unknown action: {type(action).__name__}")
 
     def _retry(self, label: str, call: Callable[[], T]) -> T:

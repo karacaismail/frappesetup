@@ -393,6 +393,10 @@ class KeycloakAdmin:
         self.add_organization_member(organization_id, subject)
         return organization_id
 
+    # BORC(mvp): no entry point calls this yet, and it needs the `manage-clients` role that the
+    # shared contract does not grant. Effect: a new tenant's client cannot be opened by this service.
+    # Owner: the orchestrator and the kimlik-realm job. Closes when the role is decided and the
+    # contract says how the secret reaches Press.
     def ensure_site_client(self, tenant: str, base_url: str) -> SiteClient:
         """`site-<kiracı>` istemcisi yoksa açar. İstemciyi ve sırrını döner."""
         client_id = site_client_id(tenant)

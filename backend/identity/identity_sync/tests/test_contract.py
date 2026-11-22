@@ -56,7 +56,7 @@ class DocumentationTest(unittest.TestCase):
                 self.assertIn(operation.get("x-durum"), ("uygulandi", "planlandi"))
                 self.assertIsInstance(operation.get("x-yikici"), bool)
                 self.assertIn(
-                    operation.get("x-yurutme"), ("yalniz-okur", "otomatik", "yalniz-onay-katmani", "yalniz-press")
+                    operation.get("x-yurutme"), ("yalniz-okur", "otomatik", "yalniz-onay-katmani", "press-only")
                 )
 
     def test_write_operations_are_reserved_for_the_approval_layer(self) -> None:

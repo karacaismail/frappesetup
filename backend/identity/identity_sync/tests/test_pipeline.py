@@ -625,6 +625,17 @@ class AccountDeletionTest(PipelineCase):
     def target_writes(self) -> int:
         return len(self.stack.press.writes() + self.stack.tenant.writes())
 
+    def test_finished_job_leaves_no_trace_of_the_account_id(self) -> None:
+        # An invitation of this user stopped earlier. Its journal row names the user.
+        store = self.stack.app.store
+        store.operation_begin("o-1", "invite_user", ORG_ID, ["s1"])
+        store.operation_subject("o-1", SUBJECT)
+
+        self.assertEqual(self.stack.app.processor.handle(self.job()).status, "processed")
+
+        dump = "\n".join(self.stack.app.store._db.iterdump())
+        self.assertNotIn(SUBJECT, dump)
+
     def test_job_id_is_a_keyed_digest_of_the_account(self) -> None:
         job = self.job()
 

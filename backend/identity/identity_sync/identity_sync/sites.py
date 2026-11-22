@@ -109,6 +109,7 @@ def _text(message: object, name: str) -> str | None:
 
 def _is_team(message: object) -> bool:
     """ensure_team (press_tr contract): a team name and a `created` flag."""
+    # `_text` returned a value, so `message` is a mapping here. The type checker cannot see that.
     return _text(message, "team") is not None and isinstance(message.get("created"), bool)  # type: ignore[union-attr]
 
 
@@ -259,6 +260,7 @@ class TenantClient:
 
     @staticmethod
     def _body(action: object) -> dict[str, object]:
+        # Every action is a dataclass. The union type hides that from `asdict`.
         body = asdict(action)  # type: ignore[call-overload]
         del body["tenant"]
         return body
@@ -269,6 +271,7 @@ class TenantClient:
         def done(message: object) -> bool:
             return (
                 _text(message, "user") is not None
+                # `_text` returned a value, so `message` is a mapping here. The type checker cannot see that.
                 and message.get("linked") is True  # type: ignore[union-attr]
                 and message.get("enabled") is action.enabled  # type: ignore[union-attr]
             )
@@ -283,6 +286,7 @@ class TenantClient:
         """
 
         def done(message: object) -> bool:
+            # `_text` returned a value, so `message` is a mapping here. The type checker cannot see that.
             return _text(message, "user") is not None and message.get("enabled") is action.enabled  # type: ignore[union-attr]
 
         self._call(

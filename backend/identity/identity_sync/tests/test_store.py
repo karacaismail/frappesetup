@@ -216,6 +216,34 @@ class StoreTest(unittest.TestCase):
         self.assertEqual(self.open().progress(EVENT.id), frozenset({"a" * 64, "b" * 64}))
         self.assertEqual(self.open().progress("yok"), frozenset())
 
+    def test_finished_operation_no_longer_names_the_user(self) -> None:
+        # frappe-python-standartlari.md, G-15: the Keycloak id is personal data. It is kept only while needed.
+        store = self.open()
+        for operation_id, end in (("o-done", "done"), ("o-resolved", "resolved"), ("o-open", None)):
+            store.operation_begin(operation_id, "invite_user", "org-1", ["s1"])
+            store.operation_subject(operation_id, "u-1")
+            if end == "done":
+                store.operation_finish(operation_id, "done")
+            elif end == "resolved":
+                store.operation_finish(operation_id, "failed")
+                store.operation_resolve(operation_id, "completed")
+
+        self.assertEqual(self.subjects(store), {"o-done": "", "o-resolved": "", "o-open": "u-1"})
+
+    def test_forgetting_a_subject_clears_every_operation_of_that_user(self) -> None:
+        store = self.open()
+        for operation_id, subject in (("o-1", "u-1"), ("o-2", "u-2")):
+            store.operation_begin(operation_id, "invite_user", "org-1", ["s1"])
+            store.operation_subject(operation_id, subject)
+
+        store.forget_subject("u-1")
+
+        self.assertEqual(self.subjects(store), {"o-1": "", "o-2": "u-2"})
+
+    @staticmethod
+    def subjects(store) -> dict[str, str]:
+        return dict(store._db.execute("SELECT operation_id, subject FROM operations").fetchall())
+
     def test_account_job_is_listed_without_the_user_id(self) -> None:
         from identity_sync.events import Event
 

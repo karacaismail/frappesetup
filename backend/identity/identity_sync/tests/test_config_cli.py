@@ -165,17 +165,18 @@ class CliTest(unittest.TestCase):
 
     def run_cli(self, *args: str) -> tuple[int, object]:
         out = io.StringIO()
-        with contextlib.redirect_stdout(out):
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
             code = cli.main(list(args), env=self.env)
-        return code, json.loads(out.getvalue())
+        # A refused command prints its reason to stderr and nothing to stdout.
+        return code, json.loads(out.getvalue() or "null")
 
-    def queue_failed_event(self) -> None:
+    def queue_failed_event(self, event_id: str = "e-1") -> None:
         from identity_sync.app import build_app
         from identity_sync.events import Event
 
         self.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
         app = build_app(load_settings(self.env), sleep=lambda _s: None)
-        app.processor.handle(Event(id="e-1", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT))
+        app.processor.handle(Event(id=event_id, kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT))
         app.close()
         self.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
 
@@ -195,13 +196,65 @@ class CliTest(unittest.TestCase):
         self.assertEqual((code, body["results"][0]["status"]), (0, "preview"))
         self.assertEqual(self.run_cli("dead-letters")[1]["dead_letters"][0]["attempts"], 1)
 
+    def replay(self, *extra: str, approval: str = "onay-r1") -> tuple[int, dict]:
+        """Preview, then execute with the digest of that preview, like a human would."""
+        _code, preview = self.run_cli("replay-dead-letters", *extra)
+        return self.run_cli(
+            "replay-dead-letters", "--execute", "--preview-digest", preview["preview_digest"], "--approval-id", approval, *extra
+        )
+
     def test_replay_empties_queue(self) -> None:
         self.queue_failed_event()
 
-        code, body = self.run_cli("replay-dead-letters")
+        code, body = self.replay()
 
         self.assertEqual((code, body["results"][0]["status"]), (0, "processed"))
         self.assertEqual(self.run_cli("dead-letters")[1], {"dead_letters": []})
+
+    def test_replay_only_previews_by_default(self) -> None:
+        # frappe-python-standartlari.md, V-10: work that cannot be undone is tried without writing first.
+        self.queue_failed_event()
+        before = len(self.writes())
+
+        code, body = self.run_cli("replay-dead-letters")
+
+        self.assertEqual((code, body["results"][0]["status"]), (0, "preview"))
+        self.assertRegex(body["preview_digest"], r"^[0-9a-f]{64}$")
+        self.assertEqual(len(self.writes()), before)
+
+    def test_replay_execute_needs_the_preview_digest_and_an_approval(self) -> None:
+        self.queue_failed_event()
+        before = len(self.writes())
+        for arguments in (
+            ("--execute",),
+            ("--execute", "--preview-digest", "0" * 64),
+            ("--execute", "--approval-id", "onay-r2"),
+            ("--execute", "--dry-run", "--preview-digest", "0" * 64, "--approval-id", "onay-r2"),
+        ):
+            with self.subTest(arguments=arguments):
+                with self.assertRaises(SystemExit) as stopped, contextlib.redirect_stderr(io.StringIO()):
+                    cli.main(["replay-dead-letters", *arguments], env=self.env)
+                self.assertEqual(stopped.exception.code, 2)
+        self.assertEqual(len(self.writes()), before)
+
+    def test_replay_with_a_stale_digest_writes_nothing(self) -> None:
+        self.queue_failed_event()
+        before = len(self.writes())
+
+        code, _body = self.run_cli("replay-dead-letters", "--execute", "--preview-digest", "0" * 64, "--approval-id", "onay-r3")
+
+        self.assertEqual(code, 2)
+        self.assertEqual(len(self.writes()), before)
+
+    def test_replay_approval_works_once(self) -> None:
+        self.queue_failed_event()
+        self.assertEqual(self.replay(approval="onay-r4")[0], 0)
+        self.queue_failed_event("e-2")
+
+        code, _body = self.replay(approval="onay-r4")
+
+        self.assertEqual(code, 2)
+        self.assertEqual(len(self.run_cli("dead-letters")[1]["dead_letters"]), 1)
 
     def test_replay_leaves_unknown_events_unless_asked(self) -> None:
         self.tenant.on("POST", fakes.TENANT_PROVISION, (202, {"message": {"status": "queued"}}))
@@ -213,17 +266,17 @@ class CliTest(unittest.TestCase):
         app.close()
         self.tenant.on("POST", fakes.TENANT_PROVISION, fakes.DONE)
 
-        code, body = self.run_cli("replay-dead-letters")
+        code, body = self.replay(approval="onay-u1")
         self.assertEqual((code, body["results"][0]["status"]), (1, "unknown"))
 
-        code, body = self.run_cli("replay-dead-letters", "--include-unknown")
+        code, body = self.replay("--include-unknown", approval="onay-u2")
         self.assertEqual((code, body["results"][0]["status"]), (0, "processed"))
 
     def test_replay_fails_when_event_still_fails(self) -> None:
         self.queue_failed_event()
         self.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
 
-        code, _body = self.run_cli("replay-dead-letters")
+        code, _body = self.replay()
 
         self.assertEqual(code, 1)
 

@@ -23,7 +23,7 @@ info:
     The value that names the approval layer means this. Only the approval layer starts the real execution.
     `otomatik` means the endpoint needs no human approval. For example, the event endpoint is like this.
     `yalniz-okur` means the endpoint changes no record.
-    `yalniz-press` means only the Press service client starts the work. The account deletion endpoint is like this.
+    `press-only` means only the Press service client starts the work. The account deletion endpoint is like this.
 
     ## AI and human approval
 
@@ -640,7 +640,7 @@ paths:
         Press can also send the same request again. The service continues from the first step that is not finished.
       x-durum: uygulandi
       x-yikici: true
-      x-yurutme: yalniz-press
+      x-yurutme: press-only
       security:
         - serviceToken: []
       requestBody:
@@ -1084,10 +1084,10 @@ components:
           description: How many times the event failed.
         first_failed_at:
           type: number
-          description: The time of the first failure. The unit is seconds (Unix time).
+          description: The time of the first failure. The unit is seconds since 1970-01-01 00.00 UTC (Unix time).
         last_failed_at:
           type: number
-          description: The time of the last failure. The unit is seconds (Unix time).
+          description: The time of the last failure. The unit is seconds since 1970-01-01 00.00 UTC (Unix time).
     DeadLetterList:
       type: object
       required: [dead_letters]
@@ -1321,7 +1321,7 @@ components:
           $ref: "#/components/schemas/ResourceId"
         reauthenticated_at:
           type: integer
-          description: The time when Press authenticated the customer again in Keycloak. The unit is seconds since 1970.
+          description: The time when Press authenticated the customer again in Keycloak. The unit is seconds since 1970-01-01 00.00 UTC (Unix time). It is the `auth_time` value of the token.
       additionalProperties: false
     AccountDeletionResult:
       type: object

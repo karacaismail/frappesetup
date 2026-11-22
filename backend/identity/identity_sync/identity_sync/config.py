@@ -134,7 +134,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         return env.get(f"{PREFIX}{name}", default)
 
     try:
-        port = int(get("PORT", "8085"))
+        port = int(get("PORT", "6115"))
         timeout = float(get("HTTP_TIMEOUT", "10"))
         lock_timeout = float(get("LOCK_TIMEOUT", "10"))
     except ValueError:
