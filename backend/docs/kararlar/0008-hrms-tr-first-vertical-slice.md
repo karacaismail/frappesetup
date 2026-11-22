@@ -163,7 +163,10 @@ Tarayıcıya paket gönderilmez. Geri dönüş için önce eşdeğer testler haz
 
 İzin kaydı çalışana olan bağı, izin tarihlerini ve talep açıklamasını tutar.
 Öneri ayrıntısı yalnız kayıt adını tutar.
-Saklama süresi ve silme yolu MVP yayını öncesinde proje kaydında karara bağlanır.
+Çalışan ve izin kayıtları, iş ilişkisi sürdükçe tutulur.
+Hesap silme, kişiyi gösteren alanları anonim yapar. İş kayıtları kalır.
+Hukuk sorumlusu yasal saklama süresini belirler. Bu madde teknik borçtur.
+Bu kararlar proje kaydındaki “Kişisel veri” tablosunda yer alır.
 Temiz kurulumda “Module Def” kaydı doğrulandı.
 Eski rolü eksik olan test hesabı, yükseltmeyle çalışan rolünü aldı.
 İki yükseltme de devre dışı kuralı ve mevcut izin kaydını korudu.

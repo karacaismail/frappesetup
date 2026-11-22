@@ -73,3 +73,20 @@ backend/dev/hrms/compose exec -T web bench worker --queue long --burst
 ```
 
 İkinci yükseltme denemesinden önce ilk kuyruğun bitmesini bekleyin.
+
+## O-31 performans ölçümü
+
+Güncel HRMS TR imajıyla ayrı ve boş bir test sitesi kurun.
+Bu siteye başka test verisi eklemeyin.
+Ölçüm komutu 200 çalışan ve 2.000 izin kaydı üretir.
+
+```sh
+backend/dev/hrms/measure test-hrms-tr.localhost .pane/prompts/durum.md
+```
+
+Komut her yolu 50 kez çağırır. Onay ve iptal aynı 50 test kaydında çalışır.
+Ölçüm Frappe’nin yanıtı üretme süresini kapsar. Ağ ve hazırlık süreleri dışarıda kalır.
+Okuma sınırı 500 ms, yazma sınırı 1.000 ms’dir. Sınırlar p95 için geçerlidir.
+p95, ölçülen çağrıların yüzde 95’inin tamamlandığı süredir.
+Komut tabloyu durum dosyasına ekler. Bir sınır aşılırsa komut başarısız olur.
+Tekrar ölçüm için yeni ve boş bir site kullanın.

@@ -8,7 +8,7 @@ RUN git clone --depth 1 --branch v16.54.1 https://github.com/frappe/hrms.git app
 
 FROM hrms AS hrms_tr
 COPY --chown=frappe:frappe apps/hrms_tr apps/hrms_tr
-COPY --chown=frappe:frappe dev/hrms/seed.py dev/hrms/test_http.py /workspace/hrms/
+COPY --chown=frappe:frappe dev/hrms/seed.py dev/hrms/test_http.py dev/hrms/measure.py /workspace/hrms/
 COPY --chown=frappe:frappe contracts/hrms_tr.openapi.yaml /workspace/hrms/
 RUN uv pip install --python env/bin/python --no-deps -e apps/hrms_tr \
     && uv pip install --python env/bin/python PyYAML==6.0.3 jsonschema==4.26.0 \
