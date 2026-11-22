@@ -531,6 +531,32 @@ Sekizinci madde, B6 bulgusuyla gelen bir kuralı daraltır. Önceden başarılı
 
 İki DocType'a açıklama yazıldı. Yapay zekâ uygunluk kapısı bunu istedi (D-9).
 
+### Yedinci tur: Codex'in dördüncü incelemesi
+
+Codex dördüncü incelemede bir engel, dört önemli ve iki küçük bulgu yazdı. Katman hepsini düzeltti. Her düzeltmenin testi `tests/test_fourth_review.py` dosyasındadır.
+
+- **Onay önizlemenin tamamına bağlıdır.** Katman öneriyi açarken önizlemenin ve hedefin özetini `preview_digest` alanına yazar. Katman onayda önizlemeyi yeniden üretir ve özeti karşılaştırır. Özet farklıysa katman hiçbir şey yürütmez ve `document_changed` döner. O zaman yeni öneri ve yeni insan onayı gerekir. Bu kural sürümlü ve sürümsüz araçta aynıdır.
+- **Aynı karşılaştırma yürütmeden hemen önce yinelenir.** Bu denetim katmanın kendi ön denetimidir ve yazma sınırından öncedir. Bu yüzden sonuç `failed` olur.
+- **Sürümlü uygulama aracında katman saklanan hedefi kilitler.** Katman hedef satırın `modified` değerini aynı kilitli okumadan alır. Kilitli okuma en son kaydedilmiş satırı verir. Kilitsiz okuma tekrarlanabilir okuma kipinde eski satırı gösterebilir. Bu yüzden katman karşılaştırmada kilitsiz okumanın sonucunu kullanmaz.
+- **Önizleme yayımlanan şemaya uyar.** Katman önizlemeyi `tools/results.py` dosyasındaki şemayla denetler. Örneğin `label` alanı sayı ise öneri açılmaz ve yanıt `invalid_preview` olur.
+- **Bayt sınırı sonucun tamamını sayar.** Rapor aracı sütun tanımlarını da sayar. Sütunlar tek başına sınırı aşarsa sütun ve satır listesi boş döner. `get_doctype_schema` alan listesini sınırda keser ve `truncated` değerini döner.
+- **Kesilen liste devam yerini söyler.** `list_documents` yanıtı `next_start` alanını taşır. Son sayfada bu alan boştur. İlk kayıt tek başına sınıra sığmazsa katman o kaydı kırparak döner. Böylece istemci aynı boş sayfayı yeniden almaz.
+- **Öneri listesinin başlangıç değeri sınırlıdır.** `start` en çok 10.000 olabilir. Daha büyük değer 417 döner.
+- **Model adı testi geri geldi.** Test model ailesi adlarını düz yazıyla taşımaz, özetleriyle arar. Uygunluk kapısı `backend` dalına birleşince bu test kaldırılabilir.
+- **Günlüğe yazılmayanlar sözleşmededir.** Başarılı GET isteği, kimliği bilinmeyen istek ve Frappe'nin uçtan önce reddettiği istek günlüğe yazılmaz. Sonuncusunun kanıtı web sunucusunun erişim günlüğüdür.
+
+Veritabanı MariaDB 11.8.9 sürümüdür. Yalıtım kipi `REPEATABLE-READ` ve `innodb_snapshot_isolation` ayarı açıktır. Bu ayar açıkken veritabanı, anlık görüntüden sonra değişmiş satırı kilitlemeyi reddeder. Katman bu ayara güvenmez ve kilitli okumanın sonucunu kullanır.
+
+Aynı kalıp `tools/admin.py` dosyasında alan ayarı aracında da vardır. Araç “Property Setter” satırını kilitler, sonra önizlemeyi kilitsiz okur. Bu yer bu turda değişmedi. Açık iş olarak 14. bölüme yazıldı.
+
+### Çeviri (O-21 ve O-23)
+
+Katmanın yorumları, docstring'leri, iletileri ve OpenAPI açıklamaları İngilizcedir. Türkçe metin `translations/tr.csv` dosyasındadır. Her ileti `platform_core.yapay_zeka` bağlamını taşır. DocType etiketleri ve açıklamaları bağlam olarak DocType adını kullanır. Kuralı `tests/test_translations.py` sınar.
+
+### Website User yöntemleri
+
+Son kullanıcı panelde Website User olarak çalışır. Katmanın yedi ucu `website_user_allowed_methods` kancasındadır. `purge_logs` ucu listede yoktur, çünkü bu uç “System Manager” rolü ister. Kuralı `tests/test_website_user_methods.py` sınar.
+
 ## 13. Karar sitesiyle çelişkiler
 
 | Konu | Karar sitesi | Bu karar | Neden |
@@ -546,3 +572,4 @@ Sekizinci madde, B6 bulgusuyla gelen bir kuralı daraltır. Önceden başarılı
 - Gerçek bir MCP istemcisiyle oturum açılmadı. Testler istemciyi taklit edecek.
 - Sürecin yürütme ortasında ölmesi testle denenmedi. Bu durumda sonuç `unknown` kalır. Kod okunarak incelendi.
 - GitHub'daki `version-16` dalı 16.60.2 sürümündedir. İmajdaki sürüm 16.56.0'dır. Aradaki fark incelenmedi.
+- Alan ayarı aracı “Property Setter” satırını kilitledikten sonra önizlemeyi kilitsiz okur. Tekrarlanabilir okuma kipindeki eski okuma olasılığı bu araçta testle denenmedi.
