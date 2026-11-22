@@ -442,7 +442,7 @@ components:
       properties:
         name:
           type: string
-          description: Opaque leave application identifier. New portal requests use UUIDv7. Existing record names stay valid.
+          description: Opaque leave application identifier. New original portal requests use UUIDv7 by default. Existing and amended record names remain valid.
         employee: {type: [string, "null"], description: Employee record linked to the request.}
         employee_name: {type: [string, "null"], description: Employee display name.}
         company: {type: [string, "null"], description: Company responsible for the leave request.}
