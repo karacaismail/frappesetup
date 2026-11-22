@@ -6,6 +6,16 @@ order: 24
 
 Soru: [Press kılavuzundaki](https://karacaismail.github.io/pressguide/) işlemlerden hangisi hangi araçla yapılabilir ve hangi kural nerede zorlanır? Kapsam tablosu paketin operasyon kontratından (`packages/press-ai/contracts/`) üretilir; elle yazılmaz. Kaynaklar: frappe/press develop `ebf3e22` (statik), pressguide `2b83441` (67 adım: 54 canlı, 13 tarihsel). Kurulu Press'in commit'i bilinmiyor; canlı uyum `unknown`, canlı Press doğrulaması `not_run`.
 
+## Backend dalındaki Press kanıtı
+
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `5c8d7fe` kaydını inceler.
+
+Proje kaydı yerel deneme kurulumunda üç sürüm bildirir. Bunlar Press 0.154.1, Frappe 16 ve Python 3.14'tür. Press bu kurulumda yamalarla açılır. Frappe 16'da sunucu kurma akışı açık iş olarak kalır.
+
+Yerel kurulum kaydı aşağıdaki paket kapsamını değiştirmez. Canlı Press üzerinde paket işlemleri ve gerçek MCP istemci oturumu denenmedi (`not_run`). Canlı Keycloak ile kullanıcı eşitlemesi de denenmedi (`not_run`).
+
+Kaynak `backend/PROJE-KAYDI.md` içindeki “Sürümler”, O-9 ve “Teknik borç” kayıtlarıdır.
+
 ## Statüler
 
 - `implemented` (uygulandı): runtime işlemi yürütür (öneri, insan onayı, yürütme, izleme) ya da okumayı yapar; fixture testi vardır.

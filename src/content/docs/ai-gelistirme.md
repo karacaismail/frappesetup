@@ -6,6 +6,23 @@ order: 25
 
 Bu sayfa [Press yetkinliğindeki](/frappesetup/ai-press-yetkinlik/) boşlukları kapatan `packages/press-ai` paketinin kararlarını, kurulumunu, kabul ölçütlerini ve kalan sınırlarını verir. Kural: hazır olanı kullan, eksik olanı küçük ve denetlenebilir parçalarla yaz. Mimari [Rail 5](/frappesetup/rail-5-ai/) ile uyumludur; bütün SaaS mimarisi bu pakette koda çevrilmez. Durum: kod taslakları var; bağımsız statik inceleme yapıldı, bulguların düzeltmeleri test sonuçlarıyla son koşuda doğrulanır; canlı Press doğrulaması `not_run`.
 
+## Backend geliştirme durumu
+
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `5c8d7fe` kaydını inceler.
+
+| Alan | Dalda görülen kanıt | Kalan doğrulama |
+| --- | --- | --- |
+| Model geçidi | `model_gecidi` kodu, HTTP uçları, OpenAPI sözleşmesi ve test dosyaları | Canlı sağlayıcı sonucu bu kayıtta yok |
+| Kiracı MCP | Karar notu 0002 ve sözleşme 10. bölüm | Kiracı ucu ve gerçek istemci oturumu |
+| Kimlik | Proje kaydı ve Keycloak sözleşmesi | Canlı Keycloak, Press ve kiracıyla uçtan uca eşitleme |
+| Kod denetimi | `ai-readiness` ve elle başlatılan güvenlik komutları dalda yer alır | CI güvenlik kapısı açık iş olarak durur (O-29) |
+
+Model geçidinde OpenAI uyumlu, Anthropic, Gemini ve Ollama bağlantı biçimleri belgelenir. Geçit, sağlayıcı ve modeli yapılandırılan sıradan seçer. Kullanım kaydı model, token ve maliyeti tutar. Kiracı MCP için işlem ve onay günlüğü ayrı tasarlanır. Sözleşme, kullanım günlüğünü model geçidine bağlar. Yönetici, süresi 365 günü aşan kayıtları elle temizler. Önizleme kayıt silmez. Onaydan sonra silinen kayıtlar kalıcı olarak kaldırılır (O-32).
+
+Test dosyalarının varlığı bu incelemede test sonucu olarak sayılmadı. Canlı Keycloak ve gerçek MCP istemci oturumu `not_run` durumundadır.
+
+Kaynaklar `backend/PROJE-KAYDI.md`, sözleşmenin 10. ve 11. bölümleri ile karar notları 0002, 0004, 0010 ve 0011'dir.
+
 ## Ne hazır alınır, ne yazılır
 
 | Alan | Hazır kullan | Yaz | Gerekçe |

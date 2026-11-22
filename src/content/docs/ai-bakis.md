@@ -4,7 +4,19 @@ nav: "Genel bakış"
 order: 20
 ---
 
-Bu bölüm Frappe ve Press için AI araçlarında üç kararı kayda geçirir: hazır depolardan ne alınır, depodaki `packages/press-ai` paketinde ne yazılır, hangi iş insanda kalır. Kanıt 8 Ekim 2026 tarihli statik okumadır: hazır depolar yüzeysel klonlardan, Press davranışı frappe/press develop `ebf3e22` kaynağından, kurulum sırası [Press kılavuzundan](https://karacaismail.github.io/pressguide/) okundu. Paket taslak aşamasındadır: bağımsız statik inceleme yapıldı, bulguların düzeltmeleri test sonuçlarıyla son koşuda doğrulanır; canlı Press doğrulaması `not_run`.
+Bu bölüm kiracı yapay zekâ katmanını ve Press araç paketini belgeler. Hazır depo tabloları 8 Ekim 2026 tarihli kaynak incelemesine dayanır.
+
+## Backend durumu
+
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `5c8d7fe` kaydını inceler.
+
+Backend'in hedefi ilk kullanılabilir sürümdür. Model geçidinin kodu ve testleri dalda yer alır. Kiracı MCP katmanı bu kayıtta tasarım aşamasındadır. Dalda `yapay_zeka` modülünün yalnız başlangıç dosyası vardır.
+
+Ajan servisi sağlayıcıdan bağımsız tasarlanır. Sağlayıcı ve model ayardan gelir. İnsan, yazma önerisini kendi oturumundan onaylar. Modelin onay aracı yoktur.
+
+Canlı Keycloak doğrulaması ve gerçek MCP istemci oturumu denenmedi (`not_run`). Model geçidi için burada canlı sağlayıcı sonucu yoktur.
+
+Proje kaydı D-9, D-11, O-10 ve açık işleri içerir. Tasarım sözleşmenin 10. ve 11. bölümlerinde açıklanır. Karar notları 0002 ve 0004 ayrıntıları verir.
 
 ## Kararlar
 
