@@ -9,6 +9,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 MODULE = Path(__file__).resolve().parents[1] / "keycloak_delivery.py"
+# A fixed fake bearer value. It is not a credential.
+FAKE_BEARER = "synthetic"
 
 
 class Recorder(http.server.BaseHTTPRequestHandler):
@@ -55,7 +57,7 @@ class KeycloakDeliveryTests(unittest.TestCase):
 
     def test_allows_a_configured_origin(self):
         server, origin = self.start()
-        status, _, body = self.module["request"](origin + "/ok", origins={origin}, token="synthetic")
+        status, _, body = self.module["request"](origin + "/ok", origins={origin}, token=FAKE_BEARER)
         self.assertEqual((status, body), (200, {"ok": True}))
         self.assertEqual(server.seen, [("/ok", "Bearer synthetic")])
 
@@ -72,7 +74,7 @@ class KeycloakDeliveryTests(unittest.TestCase):
         ):
             with self.subTest(url=url):
                 with self.assertRaisesRegex(ValueError, "not allowed"):
-                    self.module["request"](url, origins={origin}, token="synthetic")
+                    self.module["request"](url, origins={origin}, token=FAKE_BEARER)
         self.assertEqual(server.seen, [])
 
     def test_does_not_follow_redirects_or_forward_credentials(self):
@@ -82,7 +84,7 @@ class KeycloakDeliveryTests(unittest.TestCase):
                 source, origin = self.start(location)
                 with self.assertRaisesRegex(ValueError, "redirect"):
                     self.module["request"](
-                        origin + "/token", origins={origin, target_origin}, token="synthetic"
+                        origin + "/token", origins={origin, target_origin}, token=FAKE_BEARER
                     )
                 self.assertEqual(source.seen, [("/token", "Bearer synthetic")])
         self.assertEqual(target.seen, [])
@@ -93,7 +95,7 @@ class KeycloakDeliveryTests(unittest.TestCase):
         proxies = {name: proxy_origin for name in ("http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY")}
         with patch.dict(os.environ, {**proxies, "no_proxy": "", "NO_PROXY": ""}):
             module = runpy.run_path(str(MODULE))
-            module["request"](origin + "/ok", origins={origin}, token="synthetic")
+            module["request"](origin + "/ok", origins={origin}, token=FAKE_BEARER)
         self.assertEqual(proxy.seen, [])
         self.assertEqual(server.seen, [("/ok", "Bearer synthetic")])
 
