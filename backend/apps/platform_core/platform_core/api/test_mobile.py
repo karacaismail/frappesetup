@@ -6,9 +6,10 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from time import monotonic, sleep, time
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request
 from uuid import uuid4
+
+from platform_core.mobil.tests.loopback_http import open_loopback, validate_loopback_url
 
 FIXTURE = os.environ.get("MOBILE_TEST_FIXTURE") == "1"
 BASE = os.environ.get("MOBILE_TEST_URL")
@@ -22,9 +23,7 @@ OTHER_TOKEN = os.environ.get("MOBILE_TEST_OTHER_BEARER")
 class MobileHTTPTest(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):
-		host = urlsplit(BASE).hostname
-		if host not in {"localhost", "127.0.0.1", "::1"}:
-			raise ValueError("HTTP tests are restricted to loopback")
+		validate_loopback_url(BASE)
 
 	def post(self, endpoint, data, token=TOKEN, *, suffix="", extra_headers=None):
 		return self.post_method(
@@ -47,11 +46,12 @@ class MobileHTTPTest(unittest.TestCase):
 			method="POST",
 		)
 		try:
-			with urlopen(request, timeout=15) as response:
+			with open_loopback(request, timeout=15) as response:
 				return response.status, json.load(response), response.headers
 		except HTTPError as error:
 			with error:
-				return error.code, json.load(error), error.headers
+				result = {"code": "redirect_rejected"} if 300 <= error.code < 400 else json.load(error)
+				return error.code, result, error.headers
 
 	def register(self, *, token=TOKEN, extra_headers=None):
 		body = {"installation_id": str(uuid4())}

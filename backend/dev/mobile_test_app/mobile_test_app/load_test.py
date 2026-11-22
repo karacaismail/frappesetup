@@ -6,8 +6,10 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
 from uuid import uuid4
+
+from platform_core.mobil.tests.loopback_http import open_loopback
 
 from .load_accounts import LOAD_ACCOUNTS
 
@@ -25,14 +27,17 @@ def call(port, token, operation, payload):
 		method="POST",
 	)
 	try:
-		with urlopen(request, timeout=15) as response:
+		with open_loopback(request, timeout=15) as response:
 			return response.status, json.load(response)
 	except HTTPError as error:
 		with error:
-			try:
-				result = json.load(error)
-			except ValueError:
-				result = {"code": "invalid_error_response"}
+			if 300 <= error.code < 400:
+				result = {"code": "redirect_rejected"}
+			else:
+				try:
+					result = json.load(error)
+				except ValueError:
+					result = {"code": "invalid_error_response"}
 		return error.code, result
 	except (TimeoutError, URLError) as error:
 		return None, {"code": type(error).__name__}
