@@ -2,6 +2,7 @@
 
 import os
 from contextlib import contextmanager
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import frappe
@@ -40,10 +41,18 @@ def protect_database_import_credentials():
             database.get_command = original
 
 
+def read_site_password(environment: str, secret_name: str) -> str:
+    secret = Path("/run/secrets") / secret_name
+    if secret.is_file():
+        return secret.read_text(encoding="utf-8").rstrip("\r\n")
+    return os.environ[environment]
+
+
+
 def main() -> None:
     site = "press.localhost"
-    database_password = os.environ["PRESS_DB_PASSWORD"]
-    administrator_password = os.environ["PRESS_ADMIN_PASSWORD"]
+    database_password = read_site_password("PRESS_DB_PASSWORD", "press_db_password")
+    administrator_password = read_site_password("PRESS_ADMIN_PASSWORD", "press_admin_password")
     if not database_password or not administrator_password:
         raise SystemExit("Both Press development passwords are required.")
 

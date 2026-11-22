@@ -3,7 +3,9 @@ services:
   mariadb:
     image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     environment:
-      MARIADB_ROOT_PASSWORD: ${PRESS_DB_PASSWORD:?Set PRESS_DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/press_db_password
+    secrets:
+      - press_db_password
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 5s
@@ -29,10 +31,11 @@ services:
         condition: service_started
     environment:
       CI: "Yes"
-      PRESS_DB_PASSWORD: ${PRESS_DB_PASSWORD:?Set PRESS_DB_PASSWORD}
-      PRESS_ADMIN_PASSWORD: ${PRESS_ADMIN_PASSWORD:?Set PRESS_ADMIN_PASSWORD}
       PRESS_WEB_PORT: ${PRESS_WEB_PORT:?Set to PANE_PORT plus 3}
       PRESS_SOCKET_PORT: ${PRESS_SOCKET_PORT:?Set to PANE_PORT plus 4}
+    secrets:
+      - press_db_password
+      - press_admin_password
     networks:
       default:
         aliases:
@@ -46,3 +49,9 @@ services:
 volumes:
   db:
   bench:
+
+secrets:
+  press_db_password:
+    environment: PRESS_DB_PASSWORD
+  press_admin_password:
+    environment: PRESS_ADMIN_PASSWORD

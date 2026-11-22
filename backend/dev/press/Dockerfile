@@ -6,7 +6,7 @@ RUN /home/frappe/.local/bin/uv build --wheel --out-dir /opt/press-local/wheels /
 	&& rm -rf /tmp/press-oidc-source
 USER frappe
 
-FROM runtime AS production
+FROM runtime AS runtime-check
 
 FROM runtime AS development
 
@@ -14,9 +14,15 @@ USER root
 # `dockerfile==3.2.0` (pinned by press) has no linux-arm64 wheel; its sdist builds with GOPATH-mode
 # `go get`, which was removed in Go 1.22. Go 1.21 is installed only for that build.
 ARG GO_VERSION=1.21.13
-ARG GO_SHA256=2ca2d70dc9c84feef959eb31f2a5aac33eefd8c97fe48f1548886d737bffabd4
-RUN curl -fsSLo /tmp/go.tgz "https://go.dev/dl/go${GO_VERSION}.linux-arm64.tar.gz" \
-	&& echo "${GO_SHA256}  /tmp/go.tgz" | sha256sum -c - \
+ARG TARGETARCH
+RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" \
+	&& case "$arch" in \
+		arm64) checksum=2ca2d70dc9c84feef959eb31f2a5aac33eefd8c97fe48f1548886d737bffabd4 ;; \
+		amd64) checksum=502fc16d5910562461e6a6631fb6377de2322aad7304bf2bcd23500ba9dab4a7 ;; \
+		*) echo "Unsupported Go architecture: $arch" >&2; exit 2 ;; \
+	esac \
+	&& curl -fsSLo /tmp/go.tgz "https://go.dev/dl/go${GO_VERSION}.linux-$arch.tar.gz" \
+	&& echo "${checksum}  /tmp/go.tgz" | sha256sum -c - \
 	&& mkdir -p /usr/local/go1.21 \
 	&& tar -xzf /tmp/go.tgz -C /usr/local/go1.21 --strip-components=1 \
 	&& rm /tmp/go.tgz

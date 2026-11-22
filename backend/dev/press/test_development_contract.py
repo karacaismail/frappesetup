@@ -25,6 +25,21 @@ class ImageContractTest(unittest.TestCase):
         self.assertIn("--wheel", dockerfile)
         self.assertIn("/opt/press-local/wheels/oidc_verify-*.whl", install)
 
+    def test_runtime_artifact_is_named_for_its_contents(self):
+        dockerfile = (PRESS_DEV / "Dockerfile").read_text()
+        self.assertIn("AS runtime-check", dockerfile)
+        self.assertNotIn("AS production", dockerfile)
+
+    def test_runtime_oidc_install_is_offline_and_requires_hash(self):
+        installer = PRESS_DEV / "install_runtime_oidc.sh"
+        self.assertTrue(installer.is_file())
+        text = installer.read_text()
+        for option in ("--no-index", "--find-links", "--require-hashes"):
+            self.assertIn(option, text)
+
+    def test_compose_profile_is_configurable(self):
+        self.assertIn("FS_COLIMA_PROFILE", (PRESS_DEV / "compose.sh").read_text())
+
     def test_direct_runtime_dependencies_are_declared(self):
         metadata = (REPO / "backend/apps/press_tr/pyproject.toml").read_text()
         dependencies = re.search(r"(?ms)^dependencies = \[(.*?)^\]", metadata).group(1)
@@ -40,21 +55,24 @@ class ImageContractTest(unittest.TestCase):
 
     def test_patch_is_excluded_from_production_stage(self):
         dockerfile = (PRESS_DEV / "Dockerfile").read_text()
-        self.assertIn("AS production", dockerfile)
+        self.assertIn("AS runtime-check", dockerfile)
         self.assertIn("AS development", dockerfile)
         production, development = dockerfile.split("AS development", 1)
         self.assertNotIn("patch-py314.sh", production)
         self.assertIn("patch-py314.sh", development)
+        if Path("/opt/press-local/development-image").is_file():
+            self.skipTest("The patch must not be executed in a development image.")
         result = subprocess.run(
             ["bash", str(PRESS_DEV / "patch-py314.sh")], capture_output=True, text=True, check=False
         )
         self.assertEqual(result.returncode, 78, result.stderr)
         self.assertIn("development image", result.stderr)
 
-    @unittest.skipUnless(os.getenv("PRESS_TEST_PRODUCTION_IMAGE"), "Set PRESS_TEST_PRODUCTION_IMAGE")
-    def test_production_image_rejects_the_patch(self):
-        image = os.environ["PRESS_TEST_PRODUCTION_IMAGE"]
-        docker = ["docker", "--context", "colima-factory", "run", "--rm", "--network", "none"]
+    @unittest.skipUnless(os.getenv("PRESS_TEST_RUNTIME_IMAGE"), "Set PRESS_TEST_RUNTIME_IMAGE")
+    def test_runtime_check_image_rejects_the_patch(self):
+        image = os.environ["PRESS_TEST_RUNTIME_IMAGE"]
+        context = {"factory": "colima-factory", "default": "colima"}[os.getenv("FS_COLIMA_PROFILE", "factory")]
+        docker = ["docker", "--context", context, "run", "--rm", "--network", "none"]
         self.assertEqual(subprocess.run([
             *docker, "--entrypoint", "sh", image, "-ec",
             "test ! -e /opt/press-local/development-image; "
@@ -71,12 +89,27 @@ class ImageContractTest(unittest.TestCase):
         self.assertEqual(result.returncode, 78, result.stderr)
         self.assertIn("development image", result.stderr)
 
+    @unittest.skipUnless(os.getenv("PRESS_TEST_CLEAN_SOURCE"), "Set PRESS_TEST_CLEAN_SOURCE")
+    def test_release_press_source_contains_no_development_patch(self):
+        source = Path(os.environ["PRESS_TEST_CLEAN_SOURCE"])
+        result = subprocess.run(
+            ["git", "-C", str(source), "grep", "--untracked", "-n", "press-local:"],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_passwords_are_mounted_as_compose_secrets(self):
+        compose = (PRESS_DEV.parent / "compose.press.yaml").read_text()
+        self.assertIn("MARIADB_ROOT_PASSWORD_FILE: /run/secrets/press_db_password", compose)
+        self.assertNotRegex(compose, r"(?m)^ +PRESS_(?:DB|ADMIN)_PASSWORD:")
+        self.assertIn("environment: PRESS_DB_PASSWORD", compose)
+
     def test_bootstrap_does_not_pass_passwords_on_the_command_line(self):
         install = (PRESS_DEV / "install.sh").read_text()
         self.assertNotRegex(install, r"--(?:mariadb-root|db-root|admin)-password")
         create_site = (PRESS_DEV / "create_site.py").read_text()
         for variable in ("PRESS_DB_PASSWORD", "PRESS_ADMIN_PASSWORD"):
-            self.assertIn(f'os.environ["{variable}"]', create_site)
+            self.assertIn(f'read_site_password("{variable}"', create_site)
         self.assertNotRegex(create_site, r"subprocess|sys\.argv")
 
     def test_site_bootstrap_hands_environment_credentials_to_frappe(self):

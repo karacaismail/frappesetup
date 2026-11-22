@@ -14,7 +14,7 @@ Yalnız yerel denemede örnek parolaları kullanın.
 
 ```sh
 export PRESS_ENV_FILE="$PWD/backend/dev/press/.env.example"
-bash backend/dev/press/compose.sh up -d --build
+bash backend/dev/press/compose.sh up -d
 bash backend/dev/press/compose.sh exec -T --user root web \
   install -d -o frappe -g frappe /home/frappe/benches /home/frappe/benches/source
 bash backend/dev/press/compose.sh cp backend/apps/press_tr web:/home/frappe/benches/source/
@@ -24,7 +24,7 @@ bash backend/dev/press/compose.sh exec -d web bash -lc \
 ```
 
 Press web portu `PANE_PORT + 3` olur. Socket.IO portu `PANE_PORT + 4` olur.
-Kurulum parolaları ortamdan okunur. Parolalar komut satırına yazılmaz.
+Kurulum parolaları Compose gizli dosyalarından okunur. Parolalar komut satırına yazılmaz.
 MariaDB içe aktarımı, site parolasını geçici ve özel bir dosyadan okur.
 
 Site ayarları [Press TR kurulumunda](../../apps/press_tr/README.md) yer alır.
@@ -43,14 +43,28 @@ bash backend/dev/press/compose.sh down
 
 `patch-py314.sh` Press kaynaklarına uyum yaması uygular.
 Bu yama yalnız `development` imajında bulunur ve çalışır (O-18).
-`production` hedefinde yama ve geliştirme işareti yoktur.
+`runtime-check` hedefinde yama ve geliştirme işareti yoktur.
 Bu hedef dağıtım için hazır bir Press kurulumu içermez.
 
 Birleşik kaynaktan üretim hedefini oluşturup yama engelini sınayın.
 
 ```sh
-docker --context colima-factory build --target production \
-  -f backend/dev/press/Dockerfile -t press-production-check .
-PRESS_TEST_PRODUCTION_IMAGE=press-production-check \
+docker --context colima-factory build --target runtime-check \
+  -f backend/dev/press/Dockerfile -t press-runtime-check .
+PRESS_TEST_RUNTIME_IMAGE=press-runtime-check \
   python3 -B -m unittest discover -s backend/dev/press
 ```
+
+Üretim kurulumunda paket ve doğrulama özeti onaylı sürümden gelir.
+Betik paketi internetten indirmez. Özeti denetleyip belirttiğiniz Python ortamına kurar.
+
+```sh
+bash backend/dev/press/install_runtime_oidc.sh /path/to/release-wheels /path/to/bench/env/bin/python
+```
+
+Betik `PRESS_OIDC_WHEEL_SHA256` değişkenini okur. Bu değeri güvenilir sürüm bildiriminden alın.
+Testte `PRESS_TEST_CLEAN_SOURCE` değerine temiz Press kaynak klasörünü yazın.
+
+Frappe 16.50 içe aktarım sırasında site parolasını komut satırına ekler.
+Yerel kurulum betiği yalnız içe aktarım boyunca bu çağrıyı sarar.
+MariaDB parolayı geçici dosyadan okur. Üretim kurulumu bu betiği kullanmaz.

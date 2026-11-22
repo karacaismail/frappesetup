@@ -9,6 +9,12 @@ fi
 export PRESS_WEB_PORT="$((PANE_PORT + 3))"
 export PRESS_SOCKET_PORT="$((PANE_PORT + 4))"
 
-exec docker --context colima-factory compose \
+case "${FS_COLIMA_PROFILE:-factory}" in
+	factory) press_context=colima-factory ;;
+	default) press_context=colima ;;
+	*) printf '%s\n' 'FS_COLIMA_PROFILE must be factory or default.' >&2; exit 2 ;;
+esac
+
+exec docker --context "$press_context" compose \
 	--env-file "${PRESS_ENV_FILE:-$press_dir/.env}" \
 	--file "$press_dir/../compose.press.yaml" "$@"

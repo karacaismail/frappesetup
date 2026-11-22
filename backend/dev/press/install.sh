@@ -38,6 +38,9 @@ elif ! grep -qxF press sites/apps.txt; then
 	grep -qxF press sites/apps.txt || printf '\n%s\n' press >> sites/apps.txt
 fi
 
+test "$(git -C apps/frappe rev-parse HEAD)" = f20f92d29706510551b4438cc196b0323a7f1a92
+test "$(git -C apps/press rev-parse HEAD)" = 7a4384d5eec9f0f0dce4124e9dd48b106e51222f
+
 bash /opt/press-local/scripts/patch-py314.sh
 bench build --app frappe
 # The site-less Press after_build hook can fail after emitting the dashboard.
