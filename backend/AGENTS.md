@@ -44,10 +44,15 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 | `dev/guvenlik/`, `dev/bin/guvenlik-denetimi` | Güvenlik kapısı | guvenlik-kapisi |
 | `apps/platform_core/platform_core/mobil/`, `api/mobile.py` | Telefon eşitlemesinin sunucu tarafı | platform-core-mobil |
 | `apps/cronhr/`, `dev/hrms/` | CronHR uygulaması ve ilk dikey dilim | ilk-dikey-dilim |
+| `e2e/` | Uçtan uca entegrasyon testleri | integration-e2e |
+| `dev/naming/` | Geçmiş adların düzeltilmesi | naming-history-fix |
+| `dev/ai_readiness/`, `dev/bin/ai-readiness` | Yapay zekâ uygunluk kapısı | ai-readiness-gate |
 | `contracts/` | Uçların OpenAPI sözleşmeleri | Her uç kendi sahibinde |
 | `docs/`, `AGENTS.md`, `PROJE-KAYDI.md` | Talimat, kayıt ve sözleşme | Orkestratör |
 
 `hooks.py` ortak bir dosyadır. Yalnız kendi işinizin satırlarını ekleyin. Var olan satırları değiştirmeyin.
+
+`platform_core/translations/tr.csv` de ortak bir dosyadır. Kullanıcıya görünen metnin kaynağı İngilizcedir. Türkçesini bu dosyaya ekleyin. Yalnız kendi satırlarınızı ekleyin. Çakışmayı orkestratör birleştirmede çözer.
 
 ## Zorunlu çalışma kuralları
 
