@@ -1,5 +1,6 @@
 {
   "doctype": "DocType",
+  "description": "Maps a Keycloak session to a Press session so that Press can revoke it on logout.",
   "name": "Press Keycloak Session",
   "module": "Kimlik",
   "autoname": "hash",

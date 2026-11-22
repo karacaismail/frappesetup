@@ -1,5 +1,6 @@
 {
   "doctype": "DocType",
+  "description": "Links a verified Keycloak issuer and subject to a Press user account.",
   "name": "Press Identity Link",
   "module": "Kimlik",
   "autoname": "hash",
