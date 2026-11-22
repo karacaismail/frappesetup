@@ -117,13 +117,6 @@ class RequestGuardsTest(unittest.TestCase):
 				service.authorize_identity_sync()
 			reject.assert_called_once()
 
-	def test_proxy_overwrites_forwarded_client_address(self):
-		from pathlib import Path
-
-		config = Path(__file__).with_name("forwarded-client.conf")
-		directives = [line.strip() for line in config.read_text().splitlines() if not line.startswith("#")]
-		self.assertEqual(directives, ["proxy_set_header X-Forwarded-For $remote_addr;"])
-
 	def test_team_invitation_dispatch_is_denied_by_callable(self):
 		from press.api.account import accept_team_invite
 		from press.api.client import run_doc_method
@@ -166,3 +159,27 @@ class RequestGuardsTest(unittest.TestCase):
 			active.delete.assert_not_called()
 			expired.delete.assert_called_once_with(ignore_permissions=True)
 			orphan.delete.assert_called_once_with(ignore_permissions=True)
+
+	def test_frappe_1656_does_not_rewrite_the_rate_limit_command(self):
+		form = {"cmd": "original"}
+		with (
+			patch.object(api, "frappe", SimpleNamespace(__version__="16.56.0", form_dict=form)),
+			patch.object(api, "_count_rejected_logout") as count,
+		):
+			count.side_effect = lambda: self.assertEqual(form, {"cmd": "original"})
+			api.count_rejected_logout()
+			count.assert_called_once()
+
+	def test_unknown_rpc_app_is_not_resolved(self):
+		import frappe
+
+		with (
+			patch.object(request_policy, "frappe") as facade,
+			patch.object(request_policy, "get_server_script_map", return_value={}),
+			patch.object(request_policy, "get_attr", side_effect=frappe.ValidationError),
+		):
+			facade.override_whitelisted_method.return_value = "fixture.method"
+			facade.DoesNotExistError = frappe.DoesNotExistError
+			facade.PermissionError = frappe.PermissionError
+			facade.ValidationError = frappe.ValidationError
+			self.assertIsNone(request_policy.resolve_method("fixture.method"))

@@ -8,9 +8,11 @@ container=fs-press-tr-web-1
 repo_app=backend/apps/press_tr
 container_app=/home/frappe/benches/source/press_tr
 
+python3 -B -m unittest discover -s backend/dev/press -p test_forwarded_client.py
+
 docker --context colima-factory cp "$repo_app/press_tr/." "$container:$container_app/press_tr/"
 docker --context colima-factory cp "$repo_app/tests/." "$container:$container_app/tests/"
-docker --context colima-factory cp backend/dev/press/forwarded-client.conf "$container:$container_app/tests/"
+docker --context colima-factory cp backend/contracts/press_tr.openapi.yaml "$container:$container_app/tests/"
 docker --context colima-factory exec -i -e PRESS_TEST_PORT -e PRESS_TEST_PANEL_URL "$container" bash -s <<'BENCH'
 set -euo pipefail
 bench_root=/home/frappe/benches/frappe-bench

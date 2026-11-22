@@ -274,3 +274,4 @@ auth_hooks = [
 before_login = "press_tr.kimlik.request_policy.block_native_login"
 on_logout = "press_tr.kimlik.sessions.remove_mapping"
 doc_events = {"User": {"on_update": "press_tr.kimlik.accounts.revoke_disabled_user_keys"}}
+extend_doctype_class = {"Account Request": ["press_tr.kimlik.accounts.AccountRequestPolicy"]}

@@ -363,6 +363,52 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		finally:
 			frappe.destroy()
 
+	def test_signed_in_user_cannot_call_local_login_or_team_invitation(self):
+		subject = uuid4().hex
+		session = self.sign_in(subject, f"{subject}@example.test", uuid4().hex)
+		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, session)
+		self.assertEqual(status, 200)
+		team = json.loads(payload)["message"]["team"]["name"]
+		self.assertEqual(
+			self.exchange("GET", "/api/method/press.api.account.send_login_link", session)[0], 403
+		)
+		arguments = urlencode({"dt": "Team", "dn": team, "method": "invite_team_member"})
+		status, _, _ = self.exchange(
+			"GET", f"/api/method/press.api.client.run_doc_method?{arguments}", session
+		)
+		self.assertEqual(status, 403)
+
+	def test_ensure_team_adds_member_when_recorded_owner_is_disabled(self):
+		owner, member, organization = uuid4().hex, uuid4().hex, uuid4().hex
+		token = self.token()
+
+		def ensure(subject):
+			return self.call(
+				"ensure_team",
+				{
+					"issuer": ISSUER,
+					"subject": subject,
+					"email": f"{subject}@example.test",
+					"email_verified": True,
+					"organization_id": organization,
+				},
+				token,
+			)
+
+		status, result = ensure(owner)
+		self.assertEqual(status, 200, result)
+		team = result["message"]["team"]
+		body = {"issuer": ISSUER, "subject": owner, "all_organizations": True}
+		self.assertEqual(self.call("remove_team_member", body, token)[0], 200)
+		for _ in range(2):
+			status, result = ensure(member)
+			self.assertEqual(status, 200, result)
+			self.assertEqual(result["message"], {"team": team, "created": False, "owner_disabled": True})
+		session = self.sign_in(member, f"{member}@example.test", uuid4().hex)
+		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, session)
+		self.assertEqual(status, 200)
+		self.assertIn(team, {row["name"] for row in json.loads(payload)["message"]["teams"]})
+
 	def start_login(self):
 		status, headers, payload = self.exchange("POST", "/api/method/press_tr.api.auth.get_login_url")
 		self.assertEqual(status, 200)

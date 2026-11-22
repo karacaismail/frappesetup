@@ -3,10 +3,12 @@ from frappe import _
 from frappe.api import API_URL_MAP, v1, v2
 from frappe.core.doctype.server_script.server_script_utils import get_server_script_map
 from frappe.handler import get_attr, run_doc_method
+from frappe.integrations import oauth2_logins
 from frappe.modules.utils import load_doctype_module
 from werkzeug.exceptions import Forbidden, HTTPException
 from werkzeug.utils import redirect
 
+from press_tr.kimlik.machine_routes import MACHINE_METHODS, MONITORING_ALERT, machine_targets
 from press_tr.kimlik.service import SERVICE_PARAMETERS
 
 LEGACY_PAGES = frozenset({"/login", "/signup", "/dashboard/login"})
@@ -15,6 +17,40 @@ GUEST_METHODS = (
 	"press_tr.api.auth.get_login_url",
 	"press_tr.api.auth.keycloak_callback",
 	"press_tr.api.keycloak_backchannel_logout",
+)
+LOCAL_IDENTITY_METHODS = (
+	"frappe.core.doctype.user.user.sign_up",
+	"frappe.core.doctype.user.user.reset_password",
+	"frappe.core.doctype.user.user.update_password",
+	"frappe.www.login.login_via_token",
+	"frappe.www.login.login_via_key",
+	"frappe.www.login.send_login_link",
+	"press.api.account.signup",
+	"press.api.account.setup_account",
+	"press.api.account.send_otp",
+	"press.api.account.verify_otp",
+	"press.api.account.verify_otp_and_login",
+	"press.api.account.send_login_link",
+	"press.api.account.login_using_key",
+	"press.api.account.send_reset_password_email",
+	"press.api.account.get_user_for_reset_password_key",
+	"press.api.account.reset_password",
+	"press.api.account.enable_2fa",
+	"press.api.account.verify_2fa",
+	"press.api.product_trial.send_verification_code_for_login",
+	"press.api.product_trial.setup_account",
+	"press.api.developer.saas.send_verification_code",
+	"press.api.developer.saas.verify_verification_code",
+	"press.api.developer.saas.login_to_fc",
+	"press.api.saas.account_request",
+	"press.api.saas.setup_account",
+	"press.api.saas.headless_setup_account",
+	"press.api.saas.get_site_url_and_sid",
+	"press.api.google.login",
+	"press.api.google.callback",
+	"press.api.oauth.callback",
+	"press.api.oauth.saas_setup",
+	"press.api.marketplace.login_via_token",
 )
 API_PREFIXES = ("/api/method/", "/api/v1/method/", "/api/v2/method/")
 ADMIN_METHOD = "press_tr.api.maintenance.cleanup_expired_sessions"
@@ -33,7 +69,14 @@ def resolve_method(name):
 			return None
 		target = get_attr(name)
 		return target if callable(target) else None
-	except AttributeError, ImportError, KeyError, frappe.DoesNotExistError, frappe.PermissionError:
+	except (
+		AttributeError,
+		ImportError,
+		KeyError,
+		frappe.DoesNotExistError,
+		frappe.PermissionError,
+		frappe.ValidationError,
+	):
 		return None
 
 
@@ -61,6 +104,16 @@ def request_target():
 
 def allowed_guest_targets():
 	return {frappe.ping, *(frappe.get_attr(name) for name in GUEST_METHODS if name != "ping")}
+
+
+def blocked_identity_targets():
+	local = {frappe.get_attr(name) for name in LOCAL_IDENTITY_METHODS}
+	social = {
+		value
+		for value in vars(oauth2_logins).values()
+		if callable(value) and getattr(value, "__module__", None) == oauth2_logins.__name__
+	}
+	return local | social
 
 
 def block_team_invitation(target, arguments):
@@ -106,13 +159,18 @@ def before_request():
 	if arguments is None:
 		return
 	frappe.local.press_request_target = (target, arguments)
+	if target in blocked_identity_targets():
+		raise Forbidden()
+	machine_method = machine_targets().get(target)
+	if machine_method == MONITORING_ALERT and not frappe.request.args.get("webhook_token"):
+		raise Forbidden()
 	block_team_invitation(target, arguments)
 
 	# Keep Press's allowlist bounded to the documented routes.
 	from press.auth import ALLOWED_PATHS
 
 	routes = {prefix + name for prefix in API_PREFIXES for name in GUEST_METHODS}
-	routes.update(f"/api/method/{name}" for name in (*SERVICE_PARAMETERS, ADMIN_METHOD))
+	routes.update(f"/api/method/{name}" for name in (*SERVICE_PARAMETERS, *MACHINE_METHODS, ADMIN_METHOD))
 	if path in routes and path not in ALLOWED_PATHS:
 		ALLOWED_PATHS.append(path)
 
@@ -122,5 +180,7 @@ def before_request():
 
 def enforce_guest_allowlist():
 	target = getattr(frappe.local, "press_request_target", None)
-	if target is not None and frappe.session.user == "Guest" and target[0] not in allowed_guest_targets():
+	if target is None or frappe.session.user != "Guest":
+		return
+	if target[0] not in allowed_guest_targets() and target[0] not in machine_targets():
 		frappe.throw(_("Guest access is denied."), frappe.PermissionError)

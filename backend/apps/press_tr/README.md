@@ -30,7 +30,7 @@ Press creates a team at sign-in only if the user has no team membership.
 Press assigns the first member as the owner of a new team. Single-team removal
 requires an ownership transfer before removing an owner. Bulk deactivation removes
 memberships and credentials while preserving the recorded team owner. A System Manager
-can transfer ownership. Re-enable a disabled Press account separately if needed.
+can transfer ownership. Provisioning can add members and returns `owner_disabled: true` when the recorded owner is disabled. Re-enable a disabled Press account separately if needed.
 
 ## Operations
 
@@ -39,7 +39,14 @@ on the Press host. This opens an Administrator session without enabling password
 
 Keep direct backend access private. Include
 [`forwarded-client.conf`](../../dev/press/forwarded-client.conf) in the public proxy
-location so request limits use the address seen by that proxy.
+location so request limits use the address seen by that proxy. If a load balancer
+sits in front of Nginx, configure real-IP handling for the explicit trusted balancer
+addresses first. Do not use a forwarding header from an untrusted client.
+
+The request hook adds only documented RPC paths to Press's in-memory
+`press.auth.ALLOWED_PATHS` before Press runs its own authentication hook. This
+preserves native machine checks. The test suite requires Press tag `v0.154.1` so
+an upgrade reopens review of the allowlist and webhook credentials.
 
 A System Manager can run `press_tr.api.maintenance.cleanup_expired_sessions` with
 an authenticated POST to remove expired Press session mappings.

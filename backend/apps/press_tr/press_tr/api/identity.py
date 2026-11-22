@@ -61,6 +61,9 @@ def ensure_team(
 
 	try:
 		result = provision_team(issuer, subject, email, email_verified, organization_id, title)
+	except frappe.QueryDeadlockError, frappe.QueryTimeoutError:
+		release_lock()
+		raise Conflict(_("Another request is updating this organization. Try again."))
 	except Exception:
 		release_lock()
 		raise
@@ -78,10 +81,15 @@ def provision_team(
 	link = bind_identity({"iss": issuer, "sub": subject, "email": email, "email_verified": email_verified})
 	if doc is None:
 		return {"team": create_team(link.user, title, organization_id), "created": True}
+	owner_disabled = not frappe.db.get_value("User", doc.user, "enabled")
 	if not any(member.user == link.user for member in doc.team_members):
-		with as_press_user(doc.user):
+		# Provisioning uses the recorded owner context without opening a session.
+		with as_press_user(doc.user, allow_disabled=owner_disabled):
 			doc.create_user_for_member(email=link.user)
-	return {"team": doc.name, "created": False}
+	result = {"team": doc.name, "created": False}
+	if owner_disabled:
+		result["owner_disabled"] = True
+	return result
 
 
 class InvalidTeamSelector(frappe.ValidationError):

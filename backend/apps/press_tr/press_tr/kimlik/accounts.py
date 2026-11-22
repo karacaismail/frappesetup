@@ -1,4 +1,5 @@
 import frappe
+from frappe import _
 from frappe.utils.password import remove_encrypted_password
 
 
@@ -17,3 +18,10 @@ def disable_user(user: str) -> None:
 		doc.save(ignore_permissions=True)
 	else:
 		revoke_disabled_user_keys(doc)
+
+
+class AccountRequestPolicy:
+	def before_insert(self) -> None:
+		if self.invited_by:
+			frappe.throw(_("Press team invitations are disabled."), frappe.PermissionError)
+		super().before_insert()

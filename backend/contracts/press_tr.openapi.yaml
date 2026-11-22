@@ -133,6 +133,9 @@ paths:
                         type: string
                       created:
                         type: boolean
+                      owner_disabled:
+                        type: boolean
+                        description: True when the recorded team owner is disabled.
         "403":
           description: Service identity or user binding was rejected.
         "409":
@@ -220,3 +223,143 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: A Keycloak access token with only press as audience and identity-sync as authorized party.
+
+x-press-machine-routes:
+  /api/method/press.press.doctype.stripe_webhook_log.stripe_webhook_log.stripe_webhook_handler:
+    credential: stripe
+    description: Stripe signature verified before webhook insertion.
+  /api/method/press.api.github.hook:
+    credential: github
+    description: GitHub signature verified by the webhook document controller before insertion.
+  /api/method/press.api.monitoring.targets:
+    credential: monitoringTargets
+    description: Configured monitor token required before loading target inventory.
+  /api/method/press.api.monitoring.alert:
+    credential: monitoringAlert
+    description: Nonempty callback token required and compared to the configured monitor server token.
+  /api/method/press.api.email.send_mime_mail:
+    credential: email
+    description: Active mail subscription key required before message delivery.
+  /api/method/press.api.site_backup.create_snapshot:
+    credential: backup
+    description: Snapshot request key must match the named backup.
+  /api/method/press.saas.api.auth.is_access_token_valid:
+    credential: saasValidation
+    description: Compares the supplied access token against its stored credential and returns a boolean.
+  /api/method/press.saas.api.auth.generate_access_token:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.country_list:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_information:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.update_information:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.validate_gst:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.change_payment_mode:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_publishable_key_and_setup_intent:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.setup_intent_success:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.create_payment_intent_for_micro_debit:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.create_payment_intent_for_buying_credits:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.create_razorpay_order:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.handle_razorpay_payment_failed:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_invoices:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.upcoming_invoice:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_unpaid_invoices:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.total_unpaid_amount:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_invoice:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.download_invoice:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_stripe_payment_url_for_invoice:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.get_payment_methods:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.set_as_default:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.billing.remove_payment_method:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.get_domains:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.check_dns:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.add_domain:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.remove_domain:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.retry_add_domain:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.set_host_name:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.set_redirect:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.unset_redirect:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.domain.get_inbound_ip:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.site.info:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.site.change_plan:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.site.get_plans:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.site.get_first_support_plan:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+  /api/method/press.saas.api.team.info:
+    credential: saas
+    description: Press SaaS wrapper validates a site secret or site access token before dispatch.
+x-press-withheld-machine-routes:
+  /api/method/press.api.callbacks.callback:
+    reason: The handler checks origin address and job ID. It has no request signature or key.
+  /api/method/press.api.email.event_log:
+    reason: The handler can fall back to message metadata without validating a subscription key or webhook signature.
+  /api/method/press.api.email.email_ping:
+    reason: The handler has no credential check. Use the standard Press ping route.
+  /api/method/press.api.email.get_analytics:
+    reason: The key is a result filter. The handler does not independently authenticate an active subscription.

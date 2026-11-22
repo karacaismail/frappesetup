@@ -1,6 +1,7 @@
 import frappe
 from frappe.rate_limiter import rate_limit
 from frappe.sessions import delete_session
+from packaging.version import Version
 
 from press_tr.kimlik.identity import find_identity
 from press_tr.kimlik.oidc import claim, client_id, reject, verify
@@ -18,7 +19,12 @@ def _count_rejected_logout() -> None:
 
 
 def count_rejected_logout() -> None:
-	# Frappe derives the cache namespace from cmd, which v2 does not populate.
+	# Frappe 16.56 derives the namespace from the function, regardless of the API version.
+	if Version(frappe.__version__) >= Version("16.56.0"):
+		_count_rejected_logout()
+		return
+
+	# The pinned Press bench uses Frappe 16.50, where v2 does not populate cmd.
 	command = frappe.form_dict.get("cmd")
 	frappe.form_dict.cmd = "press_tr.rejected_logout"
 	try:
