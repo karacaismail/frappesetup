@@ -140,6 +140,23 @@ class TestInputBounds(AiTestCase):
 		for result in results:
 			self.assert_denied(result, "invalid_arguments")
 
+	def test_empty_and_unknown_proposal_ids_follow_the_not_found_contract(self):
+		import yaml
+
+		contract = yaml.safe_load(CONTRACT.read_text())
+		responses = contract["paths"]["/platform_core.api.ai.get_proposal"]["get"]["responses"]
+		self.assertIn("404", responses)
+		client = self.login(USER_A)
+		for proposal_id in ("", "nope"):
+			with self.subTest(proposal_id=proposal_id):
+				response = self.human(client, "GET", "get_proposal", query={"proposal_id": proposal_id})
+				self.assertEqual(response.status_code, 404)
+				self.assertEqual(response.json["exc_type"], "DoesNotExistError")
+				self.assertEqual(
+					self.last_log(tool="plt_get_proposal", user=USER_A, deny_reason="not_found").decision,
+					"denied",
+				)
+
 	def test_long_proposal_id_and_digest_are_refused(self):
 		client = self.login(USER_A)
 

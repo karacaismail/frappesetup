@@ -1,0 +1,28 @@
+# Real event receiver for the shared development stack.
+services:
+  identity-sync:
+    image: fs-e2e-identity-sync:${PANE_PORT:?}
+    build:
+      context: ..
+      dockerfile: identity/identity_sync/Dockerfile
+    environment:
+      IDENTITY_SYNC_KEYCLOAK_PUBLIC_URL: ${KC_PUBLIC_URL:?}
+      IDENTITY_SYNC_CLIENT_SECRET: ${ATONOTA_IDENTITY_SYNC_SECRET:?}
+      IDENTITY_SYNC_WEBHOOK_SECRET: ${IDENTITY_SYNC_WEBHOOK_SECRET:?}
+      IDENTITY_SYNC_DIGEST_KEY: ${IDENTITY_SYNC_DIGEST_KEY:?}
+      IDENTITY_SYNC_REALM: platform
+      IDENTITY_SYNC_REALM_ID: ${IDENTITY_SYNC_REALM_ID:-}
+      IDENTITY_SYNC_PRESS_URL: ${ATONOTA_PRESS_URL:?}
+      IDENTITY_SYNC_TENANTS: '[{"name":"tenant1","base_url":"${ATONOTA_SITE_TENANT1_URL:?}","organization":"tenant1"}]'
+      IDENTITY_SYNC_SESSION_AZP: site-tenant1-service
+      IDENTITY_SYNC_EXECUTE_AZP: site-tenant1-service
+    ports:
+      - "127.0.0.1:${IDENTITY_SYNC_PORT:?}:6115"
+    networks:
+      default:
+        aliases:
+          - identity-sync.localhost
+    volumes:
+      - identity-sync-data:/data
+volumes:
+  identity-sync-data:

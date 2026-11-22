@@ -1,4 +1,4 @@
-"""platform_core endpoints. This file belongs to the platform-core-kimlik task (docs/sozlesmeler.md, section 5)."""
+"""platform_core endpoints. Identity endpoints follow section 5 of the service contract."""
 
 import frappe
 from frappe.rate_limiter import rate_limit

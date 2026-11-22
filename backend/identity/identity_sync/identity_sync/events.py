@@ -1,10 +1,10 @@
-"""Olay zarfı ve Keycloak biçiminden çeviri.
+"""Event envelope and conversion from the Keycloak format.
 
-Bu modül saftır. Ağa ve diske dokunmaz.
-Zarfın sözleşmesi `backend/contracts/identity_sync.openapi.yaml` dosyasındadır.
+This module is pure. It performs no network or disk operations.
+The envelope contract is in `backend/contracts/identity_sync.openapi.yaml`.
 
-Zarf kişisel veri taşımaz. Servis e-posta gibi alanları olaydan almaz.
-Servis kullanıcının güncel durumunu Keycloak'tan okur.
+The envelope contains no personal data. The service does not read fields such as email from events.
+The service reads the current user state from Keycloak.
 """
 
 from __future__ import annotations
@@ -30,13 +30,13 @@ ACCOUNT_REMOVAL = "ACCOUNT_REMOVAL"
 JOB_TYPES = frozenset({ACCOUNT_DELETION, ACCOUNT_REMOVAL})
 
 MAX_ID_LENGTH = 128
-# Kimlikler adres yoluna girer. Bu yüzden yalnız güvenli karakterler kabul edilir.
+# IDs appear in URL paths, so only safe characters are accepted.
 RESOURCE_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 _MAX_FIELD_LENGTH = 255
 
 
 class EventError(ValueError):
-    """Olay zarfı sözleşmeye uymuyor."""
+    """The event envelope does not match the contract."""
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,7 @@ class Event:
 
 
 def is_handled(event: Event) -> bool:
-    """Servis bu olay için iş yapar mı?"""
+    """Whether the service handles this event."""
     if event.kind == "user":
         return event.type in USER_TYPES
     if event.kind == REQUEST_KIND:
@@ -81,7 +81,7 @@ def _resource_id(payload: Mapping[str, object], name: str) -> str | None:
 
 
 def parse_event(payload: object) -> Event:
-    """Zarfı doğrular ve `Event` üretir. Gereksiz alanları atar."""
+    """Validate the envelope and build an `Event`. Discard unused fields."""
     if not isinstance(payload, Mapping):
         raise EventError("event must be an object")
     kind = _text(payload, "kind", required=True)
@@ -108,7 +108,7 @@ def parse_event(payload: object) -> Event:
 
 
 def looks_like_keycloak(payload: object) -> bool:
-    """Gövde Keycloak'ın kendi olay biçiminde mi?"""
+    """Whether the body uses the native Keycloak event format."""
     return isinstance(payload, Mapping) and "kind" not in payload and "realmId" in payload
 
 
@@ -116,14 +116,14 @@ OTHER_REALM = "(other realm)"
 
 
 def from_keycloak(payload: Mapping[str, object], *, realm_id: str, realm: str) -> dict[str, object]:
-    """Keycloak'ın olay gösterimini servis zarfına çevirir.
+    """Convert a Keycloak event representation to the service envelope.
 
-    Kullanıcı olayı `type` ve `userId` taşır. Yönetici olayı `operationType`,
-    `resourceType` ve `resourcePath` taşır. Kaynak: Keycloak 26.8.2 Admin REST API.
+    User events contain `type` and `userId`. Admin events contain `operationType`,
+    `resourceType`, and `resourcePath`. Source: Keycloak 26.8.2 Admin REST API.
 
-    Keycloak `realmId` alanına realm'in iç kimliğini yazar, adını yazmaz
-    (EventBuilder.java, 26.8.2). `realm_id` ayardan gelen güvenilir kimliktir.
-    Olayın kimliği bu değere eşitse zarf `realm` adını taşır. Değilse olay başka realm'indir.
+    Keycloak writes the internal realm ID to `realmId`, not the realm name
+    (EventBuilder.java, 26.8.2). `realm_id` is the trusted ID from configuration.
+    If the event realm ID matches it, the envelope uses the `realm` name. Otherwise the event belongs to another realm.
     """
     if not isinstance(payload, Mapping) or "realmId" not in payload:
         raise EventError("not a Keycloak event")
@@ -142,7 +142,7 @@ def from_keycloak(payload: Mapping[str, object], *, realm_id: str, realm: str) -
             envelope["user_id"] = parts[1]
         elif resource == "ORGANIZATION_MEMBERSHIP" and len(parts) >= 3 and parts[0] == "organizations":
             envelope["organization_id"] = parts[1]
-            # Keycloak üye ekleme olayında yola kullanıcı kimliğini yazmaz.
+            # Keycloak omits the user ID from the path in member-addition events.
             if len(parts) >= 4 and parts[2] == "members":
                 envelope["user_id"] = parts[3]
         envelope["id"] = payload.get("id") or _derived_id(payload.get("time"), resource, operation, path)

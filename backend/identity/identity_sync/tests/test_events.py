@@ -1,7 +1,7 @@
-"""Olay zarfının ve Keycloak biçiminden çevirinin testleri.
+"""Tests for the event envelope and conversion from the Keycloak format.
 
-Zarfın kaynağı `contracts/identity_sync.openapi.yaml` dosyasıdır.
-Keycloak alan adlarının kaynağı Keycloak 26.8.2 Admin REST API belgesidir.
+The envelope is defined in `contracts/identity_sync.openapi.yaml`.
+Keycloak field names come from the Keycloak 26.8.2 Admin REST API documentation.
 """
 
 from __future__ import annotations
@@ -92,7 +92,7 @@ class ParseEventTest(unittest.TestCase):
         self.assertFalse(is_handled(parsed))
 
     def test_kind_and_type_must_match(self) -> None:
-        # USER_DELETE bir yönetici olayıdır. `user` türüyle gelirse servis işlemez.
+        # USER_DELETE is an admin event. The service does not process it with kind `user`.
         parsed = parse_event(
             {"id": "e-1", "kind": "user", "type": "USER_DELETE", "realm": "platform", "time": 5, "user_id": SUB}
         )
@@ -158,7 +158,7 @@ class FromKeycloakTest(unittest.TestCase):
         self.assertEqual(envelope["organization_id"], ORG)
 
     def test_admin_membership_create_has_no_user(self) -> None:
-        # Keycloak 26.8.2 üye ekleme olayında yola kullanıcı kimliğini yazmaz.
+        # Keycloak 26.8.2 omits the user ID from the path in member-addition events.
         # Kaynak: OrganizationMemberResource.java, `resourcePath(session.getContext().getUri())`.
         envelope = translate(
             {
@@ -188,7 +188,7 @@ class FromKeycloakTest(unittest.TestCase):
         self.assertNotEqual(first["id"], translate({**payload, "time": 10})["id"])
 
     def test_realm_id_is_mapped_to_configured_realm_name(self) -> None:
-        # Keycloak `realmId` alanına iç kimliği yazar. Ad `platform` olur (EventBuilder.java, 26.8.2).
+        # Keycloak puts the internal ID in `realmId`. The name is `platform` (EventBuilder.java, 26.8.2).
         envelope = translate({"id": "k-1", "time": 1, "type": "REGISTER", "realmId": REALM_ID, "userId": SUB})
         self.assertEqual(envelope["realm"], "platform")
 

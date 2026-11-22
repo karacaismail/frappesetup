@@ -10,11 +10,12 @@ Expected behaviour comes from docs/sozlesmeler.md sections 4 and 5 (D-1):
 
 import base64
 import hashlib
+from unittest.mock import patch
 
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
-from platform_core.identity import provider_setup
+from platform_core.identity import anonymization, provider_setup
 from platform_core.identity.tests import helpers as h
 
 SID = "11111111-1111-4111-8111-111111111111"
@@ -150,6 +151,24 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		# The state was consumed by the failed attempt, so the attacker cannot complete it either.
 		response = h.finish_login(self.client, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE)))
 		self.assertEqual(response.status_code, 400)
+
+	def test_browser_rate_limit_returns_the_requested_response_format(self):
+		for endpoint, query in (
+			("start_login", {"redirect_to": "//external.example"}),
+			("keycloak_callback", {}),
+		):
+			path = f"/api/method/platform_core.api.auth.{endpoint}"
+			for _attempt in range(20):
+				answer = h.request(self.client.get, path, query_string=query)
+				self.assertEqual(answer.status_code, 400, answer.data[:200])
+				self.assertEqual(answer.mimetype, "text/html")
+			for accept in ("application/json", "text/html"):
+				with self.subTest(endpoint=endpoint, accept=accept):
+					answer = h.request(self.client.get, path, query_string=query, headers={"Accept": accept})
+					self.assertEqual(answer.status_code, 429, answer.data[:200])
+					self.assertEqual(answer.mimetype, accept)
+					if accept == "application/json":
+						self.assertEqual(answer.json.get("exc_type"), "RateLimitExceededError")
 
 	def test_callback_without_cookie_is_refused(self):
 		_started, query = h.start_login(self.client)
@@ -301,6 +320,30 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 			)
 		self.assertEqual(response.status_code, 503, response.data[:300])
 		self.assertEqual(response.json.get("exc_type"), "KeycloakLoginNotConfigured")
+
+	def test_lock_failure_after_login_closes_the_new_session(self):
+		lock_identity = anonymization.lock_identity
+		for error_type in (frappe.QueryDeadlockError, frappe.QueryTimeoutError):
+			with self.subTest(error=error_type.__name__):
+				attempts = 0
+
+				def fail_second_lock(*args, **kwargs):
+					nonlocal attempts
+					attempts += 1
+					if attempts == 2:
+						raise error_type("Test lock failure after the session commit")
+					return lock_identity(*args, **kwargs)
+
+				client = h.new_client()
+				with patch.object(anonymization, "lock_identity", side_effect=fail_second_lock):
+					response = h.login_with_keycloak(client, h.userinfo("sub-ayse", h.AYSE))
+
+				self.assertEqual(attempts, 2)
+				self.assertEqual(response.status_code, 500)
+				self.assertEqual(response.json.get("exc_type"), "IdentityInternalError")
+				h.refresh()
+				self.assertEqual(h.session_count(h.AYSE), 0)
+				self.assertEqual(h.logged_user(client), "Guest")
 
 	def test_logout_is_closed_to_guests(self):
 		response = h.request(self.client.post, "/api/method/platform_core.api.auth.logout")

@@ -6,6 +6,10 @@
 - an end user cannot open the desk.
 """
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+from unittest.mock import patch
+
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
 
@@ -218,6 +222,76 @@ class TestIdentityEndpoints(FrappeAPITestCase):
 		client = h.new_client()
 		h.login_with_keycloak(client, h.userinfo("sub-new", NEW_2))
 		self.assertEqual(h.logged_user(client), NEW_2)
+
+	def test_change_email_after_disabling_user_is_repeatable(self):
+		created = self.call(PROVISION, provision_body())
+		self.assertEqual(created.status_code, 200, created.data[:300])
+		identity = {"issuer": h.ISSUER, "subject": "sub-new"}
+		disabled = self.call(SET_ENABLED, {**identity, "enabled": False})
+		self.assertEqual(disabled.status_code, 200, disabled.data[:300])
+		self.assertEqual(disabled.json["message"], {"user": NEW, "enabled": False})
+
+		body = {**identity, "new_email": NEW_2}
+		for _attempt in range(2):
+			response = self.call(CHANGE_EMAIL, body)
+			self.assertEqual(response.status_code, 200, response.data[:300])
+			self.assertEqual(response.json["message"], {"user": NEW_2})
+		h.refresh()
+		self.assertFalse(frappe.db.exists("User", NEW))
+		self.assertEqual(frappe.db.get_value("User", NEW_2, "enabled"), 0)
+
+	def test_change_email_uses_the_same_lock_order_as_frappe(self):
+		created = self.call(PROVISION, provision_body())
+		self.assertEqual(created.status_code, 200, created.data[:300])
+		identity = {"issuer": h.ISSUER, "subject": "sub-new"}
+		disabled = self.call(SET_ENABLED, {**identity, "enabled": False})
+		self.assertEqual(disabled.status_code, 200, disabled.data[:300])
+
+		site = frappe.local.site
+		user_locked = Event()
+		rename_needs_user = Event()
+		database = type(frappe.local.db)
+		query = database.sql
+
+		def observe_user_lock(connection, statement, *args, **kwargs):
+			request = getattr(frappe.local, "request", None)
+			sql = str(statement).upper()
+			if (
+				request
+				and request.path == CHANGE_EMAIL
+				and "`TABUSER`" in sql
+				and (sql.startswith("UPDATE ") or "FOR UPDATE" in sql)
+			):
+				rename_needs_user.set()
+			return query(connection, statement, *args, **kwargs)
+
+		def lock_user_then_link():
+			frappe.init(site=site)
+			frappe.connect()
+			try:
+				# Frappe renames the User row before updating the fields that link to it.
+				frappe.db.get_value("User", NEW, "name", for_update=True)
+				user_locked.set()
+				if not rename_needs_user.wait(timeout=15):
+					raise AssertionError("The e-mail request did not try to lock the User row.")
+				frappe.db.get_value("PLT Identity Link", identity, "name", for_update=True)
+			finally:
+				frappe.db.rollback()
+				frappe.destroy()
+
+		body = {**identity, "new_email": NEW_2}
+		with ThreadPoolExecutor(max_workers=1) as executor:
+			worker = executor.submit(lock_user_then_link)
+			self.assertTrue(user_locked.wait(timeout=15))
+			with patch.object(database, "sql", observe_user_lock):
+				response = self.call(CHANGE_EMAIL, body)
+			self.assertEqual(response.status_code, 200, response.data[:300])
+			worker.result(timeout=15)
+
+		self.assertEqual(response.json["message"], {"user": NEW_2})
+		repeated = self.call(CHANGE_EMAIL, body)
+		self.assertEqual(repeated.status_code, 200, repeated.data[:300])
+		self.assertEqual(response.json["message"], repeated.json["message"])
 
 	def test_change_email_to_used_address_is_409(self):
 		self.call(PROVISION, provision_body())

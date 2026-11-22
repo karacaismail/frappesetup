@@ -1,1 +1,1 @@
-"""Keycloak ile Press ve kiracı siteleri arasında kullanıcı eşitleme servisi."""
+"""User synchronization service between Keycloak, Press, and tenant sites."""

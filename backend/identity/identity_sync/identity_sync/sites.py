@@ -1,7 +1,7 @@
-"""Press ve kiracı sitelerinin kimlik uçlarını çağıran istemciler.
+"""Clients for the identity endpoints of Press and tenant sites.
 
-Uç adlarının kaynağı `docs/sozlesmeler.md` dosyasının 5. ve 6. bölümüdür.
-Her hedefe yalnız o hedefin `aud` değerini taşıyan belirteç gider.
+Endpoint names come from sections 5 and 6 of `docs/sozlesmeler.md`.
+Each target receives a token containing only that target's `aud` value.
 
 The `list_identities` endpoints and their paging are defined in the shared contract
 (docs/sozlesmeler.md, section 7). A row carries only issuer, subject and the enabled state.

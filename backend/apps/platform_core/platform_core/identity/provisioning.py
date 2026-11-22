@@ -38,7 +38,7 @@ def provision(data: dict) -> dict:
 	last_name = _optional_text(data, "last_name")
 	role_profiles = _role_profiles(data.get("role_profiles"))
 
-	user = _locked_user(issuer, subject)
+	user = _locked_user(issuer, subject, candidate_user=email)
 	if user:
 		if user != email:
 			frappe.throw(
@@ -114,11 +114,11 @@ def change_email(data: dict) -> dict:
 	return {"user": new_email}
 
 
-def _locked_user(issuer: str, subject: str) -> str | None:
+def _locked_user(issuer: str, subject: str, *, candidate_user: str | None = None) -> str | None:
 	"""Contract section 7 rule 3: check the deletion record first, under the same row locks as deletion."""
 	from platform_core.identity import anonymization
 
-	link = anonymization.refuse_if_deleted(issuer, subject)
+	link = anonymization.refuse_if_deleted(issuer, subject, candidate_user=candidate_user)
 	return link.user if link else None
 
 

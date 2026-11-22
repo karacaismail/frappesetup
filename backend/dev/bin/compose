@@ -15,4 +15,4 @@ export FS_TENANT_SOCKET_PORT="$((PANE_PORT + 2))"
 exec docker --context "$DOCKER_CONTEXT_NAME" compose \
     --project-name "fs-dev-ortam-${PANE_PORT}" \
     --env-file "${DEV_ENV_FILE:-$DEV_DIR/.env}" \
-    --file "$DEV_DIR/compose.yaml" "$@"
+    --file "$DEV_DIR/compose.tenant.yaml" "$@"

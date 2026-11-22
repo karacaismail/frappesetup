@@ -392,7 +392,8 @@ def naming_findings(root: Path) -> list[Finding] | None:
         return [Finding(relative, 1, "naming", "Naming checker must be a regular in-tree file.")]
     try:
         result = subprocess.run(
-            [sys.executable, "-I", "-B", str(checker), "--root", str(root.parent), "--json"],
+            [sys.executable, "-I", "-B", str(checker), "--root", str(root.parent),
+             "--json", "--include-source-text"],
             cwd=root.parent,
             capture_output=True,
             text=True,

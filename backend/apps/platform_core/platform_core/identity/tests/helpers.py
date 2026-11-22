@@ -340,7 +340,7 @@ def access_payload(**overrides) -> dict:
 
 
 def jwks_patch(signing_key: "Key | None" = None):
-	"""Patch that feeds `platform_core.kimlik.jwks.jwks_cache` with the local key."""
+	"""Patch that feeds `platform_core.identity.jwks.jwks_cache` with the local key."""
 	from oidc_verify import JwksCache
 
 	signing_key = signing_key or key()
