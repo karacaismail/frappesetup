@@ -110,6 +110,27 @@ class TestFieldPropertyUnderLock(YzTestCase):
 		self.assert_stopped(outcome)
 		self.assertEqual(self.setter_values(), ["From rival"])
 
+	def test_field_definition_changed_by_another_transaction_stops_the_write(self):
+		"""The lock also covers the field's own definition row, not only its "Property Setter" rows."""
+		field_row = {"parent": DOCTYPE, "fieldname": FIELD}
+		original = frappe.db.get_value("DocField", field_row, PROPERTY)
+
+		def restore():
+			frappe.db.set_value("DocField", field_row, PROPERTY, original)
+			frappe.db.commit()  # nosemgrep: frappe-request-commit -- test setup, the request reads on another connection
+			frappe.clear_cache(doctype=DOCTYPE)
+
+		self.addCleanup(restore)
+		manager = self.login(MANAGER)
+		proposal_id = self.propose(manager, "From AI")
+
+		outcome = self.approve_while(
+			manager, proposal_id, lambda: frappe.db.set_value("DocField", field_row, PROPERTY, "From rival")
+		)
+
+		self.assert_stopped(outcome)
+		self.assertEqual(self.setter_values(), [])
+
 	def test_unchanged_property_is_written(self):
 		manager = self.login(MANAGER)
 

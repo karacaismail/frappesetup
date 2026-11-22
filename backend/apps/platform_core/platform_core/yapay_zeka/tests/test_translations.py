@@ -96,17 +96,12 @@ class TestTranslations(YzTestCase):
 				self.assertTrue(table.get((text, doctype), "").strip(), f"{doctype}: {text}")
 			self.assertTrue(table.get((doctype, ""), "").strip(), doctype)
 
-	def test_only_the_doctype_names_are_context_free(self):
+	def test_no_message_of_the_layer_is_context_free(self):
+		"""Other modules own the other context-free rows of this shared file."""
 		mine = {message for _path, _line, message, _context in message_calls()}
-		labels = {
-			text
-			for doctype in DOCTYPES
-			for field in frappe.get_meta(doctype).fields
-			for text in (field.label, field.description)
-		}
 		context_free = [row[0] for row in rows() if len(row) < 3 or not row[2]]
 
-		self.assertEqual(sorted(set(context_free) & (mine | labels)), [])
+		self.assertEqual(sorted(set(context_free) & mine), [])
 		self.assertLessEqual(set(DOCTYPES), set(context_free))
 
 	def test_a_message_reaches_the_user_in_turkish(self):
