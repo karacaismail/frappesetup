@@ -1,20 +1,22 @@
 """Measure O-31 on an isolated Frappe site with a real loopback HTTP provider."""
 
 import json
+from contextlib import ExitStack
 from contextvars import ContextVar
 from datetime import date, timedelta
 from math import ceil
+from pathlib import Path
 from time import perf_counter
 from unittest.mock import patch
 from urllib.parse import quote
 from uuid import uuid4
 
 import frappe
-from frappe.utils import now_datetime
+from frappe.utils import background_jobs, now_datetime
 from frappe.utils.password import set_encrypted_password
 
 from platform_core.model_gecidi import adapters
-from platform_core.model_gecidi.tests.http_fixture import TEST_SITE, _configured_fixture
+from platform_core.model_gecidi.tests.http_fixture import _gateway_fixture
 
 SAMPLES = 50
 READ_MS = 500
@@ -84,7 +86,12 @@ def _measure_transport(post):
 	return measured
 
 
-def _prepare_load():
+def _delete_named(doctype, names):
+	if names:
+		frappe.db.delete(doctype, {"name": ["in", names]})
+
+
+def _prepare_load(cleanup):
 	if not frappe.db.exists("DocType", "Leave Application"):
 		raise RuntimeError("Install HRMS on the disposable benchmark site first.")
 	if frappe.db.count("Employee") or frappe.db.count("Leave Application"):
@@ -97,15 +104,18 @@ def _prepare_load():
 		["name", "first_name", "employee_name", "status"],
 		[(name, name, name, "Active") for name in employees],
 	)
+	cleanup.callback(_delete_named, "Employee", employees)
+	leave_rows = [
+		(f"{employee}-{index:02d}", employee, employee, day, day, "Open", 0)
+		for employee in employees
+		for index, day in enumerate(days)
+	]
 	frappe.db.bulk_insert(
 		"Leave Application",
 		["name", "employee", "employee_name", "from_date", "to_date", "status", "docstatus"],
-		[
-			(f"{employee}-{index:02d}", employee, employee, day, day, "Open", 0)
-			for employee in employees
-			for index, day in enumerate(days)
-		],
+		leave_rows,
 	)
+	cleanup.callback(_delete_named, "Leave Application", [row[0] for row in leave_rows])
 	frappe.db.commit()
 	return employees
 
@@ -146,7 +156,6 @@ def _collect(fixture):
 	old = now_datetime() - timedelta(days=366)
 	rpc = "/api/method/platform_core.api.model."
 	samples = {}
-	purged = []
 
 	def record(group, operation, method, path, payload=None, *, actor="manager"):
 		body, sample = _sample(fixture, method, path, payload, actor=actor)
@@ -208,7 +217,6 @@ def _collect(fixture):
 			]
 			if preview["targets"] != [expired]:
 				raise RuntimeError("The benchmark may only delete its own fixture record.")
-			purged.append(expired)
 			record(
 				"write",
 				"purge_usage",
@@ -230,17 +238,15 @@ def _collect(fixture):
 				},
 			)
 	finally:
-		frappe.db.delete(
+		audit_records = frappe.get_all(
 			"Activity Log",
-			{
+			filters={
 				"user": fixture["users"]["system_manager"],
 				"subject": "Model gateway usage logs purged",
 			},
+			pluck="name",
 		)
-		if purged:
-			frappe.db.delete(
-				"Deleted Document", {"deleted_doctype": "AI Usage Log", "deleted_name": ["in", purged]}
-			)
+		_delete_named("Activity Log", audit_records)
 		frappe.db.commit()
 	return {
 		f"{group}:{operation}": summarize(timings, limit_ms=READ_MS if group == "read" else WRITE_MS)
@@ -250,21 +256,25 @@ def _collect(fixture):
 
 def run():
 	"""Run the manual benchmark. Emit JSON and fail if any p95 threshold is exceeded."""
-	if frappe.local.site != TEST_SITE or not frappe.conf.get("allow_tests"):
-		raise RuntimeError("Use the disposable gateway test site.")
+	site = frappe.local.site
+	if not site.startswith("perf-") or not site.endswith(".localhost"):
+		raise RuntimeError("Use a perf-*.localhost site with allow_performance_fixture=1.")
+	config = json.loads((Path(frappe.local.site_path) / "site_config.json").read_text(encoding="utf-8"))
+	opt_in = config.get("allow_performance_fixture")
+	if type(opt_in) is not int or opt_in != 1:
+		raise RuntimeError("Use a perf-*.localhost site with allow_performance_fixture=1.")
+	if any(queue.count for queue in background_jobs.get_queues()):
+		raise RuntimeError("The benchmark requires an empty job queue.")
 	if frappe.conf.get("model_gateway_user_requests_per_minute", 30) <= 2 * SAMPLES:
 		raise RuntimeError("Increase the gateway quota on the disposable site for the measurement.")
-	employees = _prepare_load()
-	try:
+	with ExitStack() as cleanup:
+		cleanup.callback(frappe.db.commit)
+		employees = _prepare_load(cleanup)
 		with (
 			patch.object(adapters, "_post_json", _measure_transport(adapters._post_json)),
-			_configured_fixture(_measure_http) as fixture,
+			_gateway_fixture(_measure_http) as fixture,
 		):
 			results = _collect(fixture)
-	finally:
-		frappe.db.delete("Leave Application", {"employee": ["in", employees]})
-		frappe.db.delete("Employee", {"name": ["in", employees]})
-		frappe.db.commit()
 	report = {"employees": len(employees), "leave_records": 10 * len(employees), "operations": results}
 	print(json.dumps(report))
 	if any(not result["pass"] for result in results.values()):

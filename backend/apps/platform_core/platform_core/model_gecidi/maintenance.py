@@ -152,18 +152,50 @@ def _load_purge_preview(token):
 	return preview
 
 
-def purge_usage_logs(*, dry_run: bool = False) -> dict[str, int]:
-	"""Count or permanently delete expired, settled logs as a System Manager."""
+def purge_usage_logs(*, dry_run: bool = False, names: list[str] | None = None) -> dict[str, int | list[str]]:
+	"""Preview expired logs or permanently delete the approved names."""
 	_require_retention_manager()
 	if type(dry_run) is not bool:
-		raise policy.Denied(400, "invalid_request")
+		raise frappe.ValidationError("Expected a boolean dry_run value.")
 	now = now_datetime()
 	filters = _retention_filters(now - timedelta(days=RETENTION_DAYS))
 	if dry_run:
-		return {"eligible": frappe.db.count(USAGE_LOG, filters), "deleted": 0}
-	batch = [(row.name, row.modified) for row in _purge_batch(filters, for_update=True)]
-	deleted = _delete_usage_batch(batch, now)
-	return {"eligible": deleted + frappe.db.count(USAGE_LOG, filters), "deleted": deleted}
+		return {
+			"eligible": frappe.db.count(USAGE_LOG, filters),
+			"deleted": 0,
+			"names": [row.name for row in _purge_batch(filters)],
+		}
+	if (
+		not isinstance(names, list)
+		or len(names) > DELETE_BATCH_SIZE
+		or any(not isinstance(name, str) or not name for name in names)
+		or len(set(names)) != len(names)
+	):
+		raise frappe.ValidationError("Provide the unique record names from the purge preview.")
+	if not names:
+		return {"eligible": frappe.db.count(USAGE_LOG, filters), "deleted": 0, "names": []}
+
+	point = f"gateway_purge_{uuid4().hex}"
+	frappe.db.savepoint(point)
+	commit_callbacks = len(frappe.db.after_commit)
+	try:
+		rows = _purge_batch({**filters, "name": ["in", names]}, for_update=True)
+		if {row.name for row in rows} != set(names):
+			raise frappe.ValidationError("Purge eligibility changed. Preview the records again.")
+		deleted = _delete_usage_batch([(row.name, row.modified) for row in rows], now)
+		eligible = deleted + frappe.db.count(USAGE_LOG, filters)
+	except frappe.QueryDeadlockError:
+		# MariaDB already aborted the transaction and discarded the savepoint.
+		frappe.db.rollback()
+		raise
+	except Exception:
+		# Rolling back to a savepoint does not discard queued file and link cleanup.
+		frappe.db.after_commit.truncate(commit_callbacks)
+		frappe.db.rollback(save_point=point)
+		frappe.db.release_savepoint(point)
+		raise
+	frappe.db.release_savepoint(point)
+	return {"eligible": eligible, "deleted": deleted, "names": names}
 
 
 def _delete_usage_batch(batch, now):
