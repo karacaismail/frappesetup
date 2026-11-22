@@ -1,59 +1,66 @@
 import frappe
 from frappe import _
 
-from press_tr.kimlik.identity import as_press_user, bind_identity, ensure_personal_team, find_identity
+from press_tr.kimlik.identity import as_press_user, bind_identity, create_team, find_identity
 from press_tr.kimlik.oidc import claim, reject
 from press_tr.kimlik.service import require_service
 
 
-def lock_team(team: str):
-	team = claim({"team": team}, "team")
+def lock_team(organization_id: str):
+	name = frappe.db.get_value("Team", {"keycloak_org_id": organization_id}, "name")
+	if not name:
+		return None
 	try:
-		return frappe.get_doc("Team", team, for_update=True)
+		doc = frappe.get_doc("Team", name, for_update=True)
 	except frappe.QueryDeadlockError:
-		# This runs before writes. Refresh the snapshot if MariaDB saw a newer team.
+		# Team lookup precedes domain writes, so refreshing the snapshot is safe.
 		frappe.db.rollback()
-		return frappe.get_doc("Team", team, for_update=True)
+		doc = frappe.get_doc("Team", name, for_update=True)
+	if doc.keycloak_org_id != organization_id:
+		reject()
+	return doc
 
 
 @frappe.whitelist(methods=["POST"])
 def ensure_team(
-	issuer: str, subject: str, email: str | None = None, email_verified: bool = False, team: str | None = None
-) -> dict[str, str]:
+	issuer: str, subject: str, email: str, organization_id: str, organization_name: str | None = None
+) -> dict[str, str | bool]:
 	require_service(issuer)
+	organization_id = claim({"organization_id": organization_id}, "organization_id")
+	title = organization_name if organization_name is not None else organization_id
+	title = claim({"organization_name": title}, "organization_name")
+	email = claim({"email": email}, "email")
 	try:
-		return provision_team(issuer, subject, email, email_verified, team)
+		return provision_team(issuer, subject, email, organization_id, title)
 	except frappe.DuplicateEntryError, frappe.UniqueValidationError, frappe.QueryDeadlockError:
 		# A competing first request may have created the identity and team.
 		frappe.db.rollback()
 		try:
-			return provision_team(issuer, subject, email, email_verified, team)
+			return provision_team(issuer, subject, email, organization_id, title)
 		except frappe.DuplicateEntryError, frappe.UniqueValidationError:
 			reject()
 
 
-def provision_team(issuer, subject, email, email_verified, team):
-	doc = lock_team(team) if team is not None else None
-	link = bind_identity({"iss": issuer, "sub": subject, "email": email, "email_verified": email_verified})
+def provision_team(issuer: str, subject: str, email: str, organization_id: str, title: str):
+	doc = lock_team(organization_id)
+	# The authorized Identity Sync client sends emails from verified Keycloak users.
+	link = bind_identity({"iss": issuer, "sub": subject, "email": email, "email_verified": True})
 	if doc is None:
-		team = ensure_personal_team(link.user)
-	elif not any(member.user == link.user for member in doc.team_members):
+		return {"team": create_team(link.user, title, organization_id), "created": True}
+	if not any(member.user == link.user for member in doc.team_members):
 		with as_press_user(doc.user):
 			doc.create_user_for_member(email=link.user)
-	return {"team": team, "user": link.user}
+	return {"team": doc.name, "created": False}
 
 
 @frappe.whitelist(methods=["POST"])
-def remove_team_member(issuer: str, subject: str, team: str) -> dict[str, str | bool]:
+def remove_team_member(issuer: str, subject: str, organization_id: str) -> dict[str, str | bool | None]:
 	require_service(issuer)
+	organization_id = claim({"organization_id": organization_id}, "organization_id")
 	link = find_identity(issuer, claim({"subject": subject}, "subject"))
-	if not link:
-		return {"team": team, "member": False}
-
-	try:
-		doc = lock_team(team)
-	except frappe.DoesNotExistError:
-		return {"team": team, "member": False}
+	doc = lock_team(organization_id)
+	if doc is None or not link:
+		return {"team": doc.name if doc else None, "member": False}
 	if doc.user == link.user:
 		frappe.throw(_("Change team ownership before removing the owner."), frappe.PermissionError)
 	if any(member.user == link.user for member in doc.team_members):
@@ -61,4 +68,4 @@ def remove_team_member(issuer: str, subject: str, team: str) -> dict[str, str | 
 		with as_press_user(doc.user):
 			doc.remove_team_member(link.user)
 
-	return {"team": team, "member": False}
+	return {"team": doc.name, "member": False}

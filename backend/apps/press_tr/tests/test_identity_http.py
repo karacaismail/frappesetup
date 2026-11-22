@@ -102,12 +102,15 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			):
 				with self.subTest(method=method, headers=headers):
 					status, _ = self.call(
-						method, {"issuer": ISSUER, "subject": "example", "team": "example"}, token, headers
+						method,
+						{"issuer": ISSUER, "subject": "example", "organization_id": "example"},
+						token,
+						headers,
 					)
 					self.assertEqual(status, 403)
-			for extra in ({"cmd": "ping"}, {"organization_id": "unmapped"}):
+			for extra in ({"cmd": "ping"}, {"team": "legacy"}):
 				with self.subTest(method=method, extra=extra):
-					body = {"issuer": ISSUER, "subject": "example", "team": "example", **extra}
+					body = {"issuer": ISSUER, "subject": "example", "organization_id": "example", **extra}
 					status, _ = self.call(method, body, self.token())
 					self.assertEqual(status, 403)
 
@@ -115,6 +118,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		token = self.token()
 		owner = uuid4().hex
 		members = [uuid4().hex for _ in range(2)]
+		organization_id = uuid4().hex
 
 		def ensure(subject, **options):
 			status, result = self.call(
@@ -123,7 +127,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 					"issuer": ISSUER,
 					"subject": subject,
 					"email": f"{subject}@example.test",
-					"email_verified": True,
+					"organization_id": organization_id,
 					**options,
 				},
 				token,
@@ -132,36 +136,38 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			return result["message"]
 
 		with ThreadPoolExecutor(max_workers=2) as pool:
-			first = pool.submit(ensure, owner)
-			same = pool.submit(ensure, owner)
-			personal_team = first.result()
-			self.assertEqual(same.result(), personal_team)
-		self.assertEqual(ensure(owner), personal_team)
-		# Bind first so the concurrent requests contend on the same Team.
-		for member in members:
-			ensure(member)
+			first = pool.submit(ensure, owner, organization_name="Example Organization")
+			same = pool.submit(ensure, owner, organization_name="Example Organization")
+			team_results = [first.result(), same.result()]
+		team = team_results[0]["team"]
+		self.assertEqual(team_results[1]["team"], team)
+		self.assertEqual(sum(result["created"] for result in team_results), 1)
+		self.assertEqual(ensure(owner), {"team": team, "created": False})
+		unmapped = {"issuer": ISSUER, "subject": owner, "organization_id": uuid4().hex}
+		status, result = self.call("remove_team_member", unmapped, token)
+		self.assertEqual(status, 200)
+		self.assertEqual(result["message"], {"team": None, "member": False})
 		with ThreadPoolExecutor(max_workers=len(members)) as pool:
-			futures = [pool.submit(ensure, member, team=personal_team["team"]) for member in members]
+			futures = [pool.submit(ensure, member) for member in members]
 			memberships = [future.result() for future in futures]
 		owner_cookie = self.sign_in(owner, f"{owner}@example.test", uuid4().hex)
 		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, owner_cookie)
 		self.assertEqual(status, 200)
+		self.assertEqual(json.loads(payload)["message"]["team"]["team_title"], "Example Organization")
 		stored_members = {user["email"] for user in json.loads(payload)["message"]["team_members"]}
 		self.assertEqual(stored_members, {f"{subject}@example.test" for subject in [owner, *members]})
 		for member, membership in zip(members, memberships, strict=True):
-			self.assertEqual(ensure(member, team=personal_team["team"]), membership)
-			body = {"issuer": ISSUER, "subject": member, "team": personal_team["team"]}
+			self.assertEqual(ensure(member), membership)
+			body = {"issuer": ISSUER, "subject": member, "organization_id": organization_id}
 			for _ in range(2):
 				status, result = self.call("remove_team_member", body, token)
 				self.assertEqual(status, 200, result)
-				self.assertEqual(result["message"], {"team": personal_team["team"], "member": False})
+				self.assertEqual(result["message"], {"team": team, "member": False})
 		member = members[0]
 		member_cookie = self.sign_in(member, f"{member}@example.test", uuid4().hex)
 		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, member_cookie)
 		self.assertEqual(status, 200)
-		self.assertNotIn(
-			personal_team["team"], {team["name"] for team in json.loads(payload)["message"]["teams"]}
-		)
+		self.assertNotIn(team, {row["name"] for row in json.loads(payload)["message"]["teams"]})
 
 	def sign_in(self, subject, email, keycloak_sid):
 		status, _, payload = self.exchange("POST", "/api/method/press_tr.api.auth.get_login_url")

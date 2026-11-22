@@ -10,3 +10,5 @@ Keycloak Session ID,Keycloak oturum kimliği
 Keycloak session identifier used to match logout requests.,Press çıkış isteğini bu Keycloak oturumuyla eşler.
 Press Session ID,Press oturum kimliği
 Secret Press session identifier used only to revoke the session.,Press bu gizli değeri yalnızca oturumu kapatmak için kullanır.
+Keycloak Organization ID,Keycloak kuruluş kimliği
+Unique identifier of the Keycloak organization mapped to this Press team.,Bu Press takımı bu Keycloak kuruluş kimliğine bağlıdır.

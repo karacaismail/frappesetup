@@ -82,18 +82,22 @@ def as_press_user(user):
 def ensure_personal_team(user):
 	# Lock the owner before checking for an existing personal team.
 	frappe.db.get_value("User", user, "name", for_update=True)
-	# Follow Press install.py: use its Team controller and insert owner and membership together.
-	# Team.create_new also creates a Stripe customer, which is outside the login flow.
 	team = frappe.db.get_value(
 		"Team", {"user": user, "parent_team": ["is", "not set"]}, "name", for_update=True
 	)
 	if team:
 		return team
+	return create_team(user, "Parent Team")
+
+
+def create_team(user: str, title: str, organization_id: str | None = None) -> str:
+	# The Press Team controller creates the team without starting billing.
 	doc = frappe.get_doc(
 		{
 			"doctype": "Team",
 			"user": user,
-			"team_title": "Parent Team",
+			"team_title": title,
+			"keycloak_org_id": organization_id,
 			"enabled": 1,
 			"free_account": 1,
 			"team_members": [{"user": user}],

@@ -76,7 +76,7 @@ paths:
     post:
       operationId: ensureTeam
       summary: Ensure a Press team and membership.
-      description: Identity Sync provisions a verified user and their personal team, or adds the user to an existing team. Repeating the request returns the same team and user. This operation does not start billing.
+      description: Identity Sync sends an email it verified in Keycloak. Press creates a team for the organization or adds the user to its existing team. This operation does not start billing.
       security:
         - identitySync: []
       requestBody:
@@ -86,7 +86,7 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [issuer, subject]
+              required: [issuer, subject, email, organization_id]
               properties:
                 issuer:
                   type: string
@@ -97,19 +97,31 @@ paths:
                   type: string
                   format: email
                   description: Required for the first identity binding.
-                email_verified:
-                  type: boolean
-                  description: Must be true for the first identity binding.
-                team:
+                organization_id:
                   type: string
-                  description: Existing team name. Omit to ensure the user's personal team.
+                  description: Keycloak organization identifier.
+                organization_name:
+                  type: string
+                  description: Display name used only when Press creates the team. The organization identifier is used if omitted.
       responses:
         "200":
-          description: Team and user names in the message object.
+          description: Press team name and whether this request created the team.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [team, created]
+                    properties:
+                      team:
+                        type: string
+                      created:
+                        type: boolean
         "403":
           description: Service identity or user binding was rejected.
-        "404":
-          description: The named team does not exist.
   /api/method/press_tr.api.identity.remove_team_member:
     post:
       operationId: removeTeamMember
@@ -124,18 +136,33 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [issuer, subject, team]
+              required: [issuer, subject, organization_id]
               properties:
                 issuer:
                   type: string
                   format: uri
                 subject:
                   type: string
-                team:
+                organization_id:
                   type: string
+                  description: Keycloak organization identifier.
       responses:
         "200":
-          description: The user has no team membership, including a repeated request.
+          description: The user has no membership in the mapped team, including on retry. The team is null if no mapping exists.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [team, member]
+                    properties:
+                      team:
+                        type: [string, "null"]
+                      member:
+                        const: false
         "403":
           description: Service identity or owner removal was rejected.
 components:

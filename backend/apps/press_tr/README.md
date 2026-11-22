@@ -19,6 +19,16 @@ Configure these site settings before starting the web process:
 Register the exact callback and logout notification addresses in the
 [OpenAPI contract](../../contracts/press_tr.openapi.yaml).
 
+## Organization mapping
+
+Run `bench --site <site> migrate` to add the unique `Team.keycloak_org_id` field.
+The same customization expresses Press v0.154.1's disabled performance-tuning default
+as `0`, the value Frappe 16 accepts for a Check field.
+
+Identity Sync must only send verified Keycloak email addresses to `ensure_team`.
+Press assigns the first member as the owner of a new team. An existing owner must
+transfer ownership before Identity Sync can remove that member.
+
 ## Local HTTP tests
 
 Run these tests only on a disposable bench. They create example users, teams and sessions.

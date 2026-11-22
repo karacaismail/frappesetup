@@ -4,8 +4,14 @@ from press_tr.kimlik.oidc import issuer as configured_issuer
 from press_tr.kimlik.oidc import reject, verify
 
 SERVICE_PARAMETERS = {
-	"press_tr.api.identity.ensure_team": {"issuer", "subject", "email", "email_verified", "team"},
-	"press_tr.api.identity.remove_team_member": {"issuer", "subject", "team"},
+	"press_tr.api.identity.ensure_team": {
+		"issuer",
+		"subject",
+		"email",
+		"organization_id",
+		"organization_name",
+	},
+	"press_tr.api.identity.remove_team_member": {"issuer", "subject", "organization_id"},
 }
 
 
