@@ -1,0 +1,287 @@
+"""Olayın uçtan uca işlenmesinin testleri. Ağ çağrıları sahte sunucuya gider.
+
+Beklenen uç adları ve alanlar `docs/sozlesmeler.md` dosyasının 2., 5. ve 6. bölümünden gelir.
+"""
+
+from __future__ import annotations
+
+import unittest
+
+from identity_sync.events import Event
+
+from . import fakes
+from .fakes import ORG_ID, SUBJECT, Stack, keycloak_user
+
+
+def event(type_: str = "VERIFY_EMAIL", kind: str = "user", id_: str = "e-1", org: str | None = None) -> Event:
+    return Event(id=id_, kind=kind, type=type_, realm="platform", time=1, user_id=SUBJECT, organization_id=org)
+
+
+class PipelineCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.stack = Stack()
+        self.addCleanup(self.stack.close)
+        self.org = {"id": ORG_ID, "name": "kiraci1", "alias": "kiraci1"}
+
+    def add_member(self, **overrides: object) -> None:
+        self.stack.keycloak.add_user(keycloak_user(**overrides), [self.org])
+
+
+class ProvisionTest(PipelineCase):
+    def test_verified_member_is_sent_to_press_and_tenant(self) -> None:
+        self.add_member()
+
+        result = self.stack.app.processor.handle(event())
+
+        self.assertEqual(result.status, "processed")
+        self.assertEqual(result.actions, ("press.ensure_team", "tenant.provision"))
+        (team,) = self.stack.press.calls("POST", fakes.PRESS_ENSURE_TEAM)
+        self.assertEqual(
+            team.json(),
+            {
+                "issuer": self.stack.issuer,
+                "subject": SUBJECT,
+                "email": "ayse@example.test",
+                "email_verified": True,
+                "first_name": "Ayşe",
+                "last_name": "Örnek",
+                "organization_id": ORG_ID,
+            },
+        )
+        (provision,) = self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)
+        # Alanlar sözleşmenin 5. bölümündeki `provision` tablosundan gelir.
+        self.assertEqual(
+            provision.json(),
+            {
+                "issuer": self.stack.issuer,
+                "subject": SUBJECT,
+                "email": "ayse@example.test",
+                "email_verified": True,
+                "first_name": "Ayşe",
+                "last_name": "Örnek",
+                "enabled": True,
+            },
+        )
+
+    def test_each_target_gets_a_token_with_only_its_own_audience(self) -> None:
+        # Servis belirteci yalnız bir `aud` değeri taşır (sözleşme, 2. bölüm).
+        self.add_member()
+
+        self.stack.app.processor.handle(event())
+
+        (team,) = self.stack.press.calls("POST", fakes.PRESS_ENSURE_TEAM)
+        (provision,) = self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)
+        self.assertEqual(team.headers["authorization"], "Bearer token-for:aud-press")
+        self.assertEqual(provision.headers["authorization"], "Bearer token-for:aud-site-kiraci1")
+        admin_reads = self.stack.keycloak.calls("GET", f"{self.stack.keycloak.admin}/users/{SUBJECT}")
+        self.assertEqual(admin_reads[0].headers["authorization"], "Bearer token-for:admin-api")
+
+    def test_token_request_uses_client_credentials(self) -> None:
+        self.add_member()
+
+        self.stack.app.processor.handle(event())
+
+        token_calls = self.stack.keycloak.calls("POST", "/realms/platform/protocol/openid-connect/token")
+        scopes = sorted(call.form()["scope"][0] for call in token_calls)
+        self.assertEqual(scopes, ["admin-api", "aud-press", "aud-site-kiraci1"])
+        form = token_calls[0].form()
+        self.assertEqual(form["grant_type"], ["client_credentials"])
+        self.assertEqual(form["client_id"], ["identity-sync"])
+        self.assertEqual(form["client_secret"], ["test-client-secret"])
+
+    def test_token_is_reused_until_it_expires(self) -> None:
+        self.add_member()
+
+        self.stack.app.processor.handle(event(id_="e-1"))
+        self.stack.app.processor.handle(event(id_="e-2"))
+
+        token_calls = self.stack.keycloak.calls("POST", "/realms/platform/protocol/openid-connect/token")
+        self.assertEqual(len(token_calls), 3)
+
+    def test_registration_creates_organization_then_team(self) -> None:
+        keycloak = self.stack.keycloak
+        keycloak.add_user(keycloak_user(), [])
+        alias = f"t-{SUBJECT}"
+
+        def create_org(req: fakes.Recorded) -> fakes.Reply:
+            self.assertEqual(req.json(), {"name": alias, "alias": alias, "enabled": True})
+            return 201, None, {"Location": f"{keycloak.url}{keycloak.admin}/organizations/{ORG_ID}"}
+
+        def add_member(req: fakes.Recorded) -> fakes.Reply:
+            self.assertEqual(req.json(), SUBJECT)
+            keycloak.memberships[SUBJECT] = [{"id": ORG_ID, "name": alias, "alias": alias}]
+            return 201, None
+
+        keycloak.on("GET", f"{keycloak.admin}/organizations", (200, []))
+        keycloak.on("POST", f"{keycloak.admin}/organizations", create_org)
+        keycloak.on("POST", f"{keycloak.admin}/organizations/{ORG_ID}/members", add_member)
+
+        result = self.stack.app.processor.handle(event())
+
+        self.assertEqual(result.status, "processed")
+        self.assertEqual(result.actions, ("keycloak.ensure_organization", "press.ensure_team"))
+        (team,) = self.stack.press.calls("POST", fakes.PRESS_ENSURE_TEAM)
+        self.assertEqual(team.json()["organization_id"], ORG_ID)
+
+    def test_deleted_user_is_disabled_and_removed(self) -> None:
+        self.stack.keycloak.remove_user(SUBJECT)
+
+        result = self.stack.app.processor.handle(event("DELETE_ACCOUNT"))
+
+        self.assertEqual(result.status, "processed")
+        (removed,) = self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)
+        self.assertEqual(removed.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "organization_id": None})
+        (disabled,) = self.stack.tenant.calls("POST", fakes.TENANT_SET_ENABLED)
+        self.assertEqual(disabled.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "enabled": False})
+
+    def test_email_change_calls_change_email(self) -> None:
+        self.add_member(email="yeni@example.test")
+
+        self.stack.app.processor.handle(event("UPDATE_EMAIL"))
+
+        (changed,) = self.stack.tenant.calls("POST", fakes.TENANT_CHANGE_EMAIL)
+        self.assertEqual(
+            changed.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "new_email": "yeni@example.test"}
+        )
+
+    def test_membership_delete_resolves_organization(self) -> None:
+        self.stack.keycloak.add_user(keycloak_user(), [])
+        self.stack.keycloak.add_organization(ORG_ID, "kiraci1")
+
+        result = self.stack.app.processor.handle(event("ORGANIZATION_MEMBERSHIP_DELETE", "admin", org=ORG_ID))
+
+        self.assertEqual(result.actions, ("press.remove_team_member", "tenant.set_enabled"))
+        (removed,) = self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)
+        self.assertEqual(removed.json()["organization_id"], ORG_ID)
+
+    def test_other_realm_is_ignored(self) -> None:
+        self.add_member()
+        other = Event(id="e-9", kind="user", type="VERIFY_EMAIL", realm="baska", time=1, user_id=SUBJECT)
+
+        result = self.stack.app.processor.handle(other)
+
+        self.assertEqual(result.status, "ignored")
+        self.assertEqual(self.stack.press.writes(), [])
+
+    def test_unhandled_type_is_ignored_without_any_call(self) -> None:
+        result = self.stack.app.processor.handle(event("LOGIN"))
+
+        self.assertEqual(result.status, "ignored")
+        self.assertEqual(self.stack.keycloak.requests, [])
+
+
+class IdempotencyTest(PipelineCase):
+    def test_same_event_twice_changes_nothing(self) -> None:
+        self.add_member()
+
+        first = self.stack.app.processor.handle(event())
+        writes_after_first = len(self.stack.press.writes()) + len(self.stack.tenant.writes())
+        second = self.stack.app.processor.handle(event())
+
+        self.assertEqual(first.status, "processed")
+        self.assertEqual(second.status, "duplicate")
+        self.assertEqual(len(self.stack.press.writes()) + len(self.stack.tenant.writes()), writes_after_first)
+
+    def test_same_change_under_new_id_sends_the_same_requests(self) -> None:
+        self.add_member()
+
+        self.stack.app.processor.handle(event(id_="e-1"))
+        self.stack.app.processor.handle(event(id_="e-2"))
+
+        first, second = self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)
+        self.assertEqual(first.json(), second.json())
+
+
+class FailureTest(PipelineCase):
+    def test_failing_tenant_sends_event_to_dead_letters_after_retries(self) -> None:
+        self.add_member()
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, {"exc": "down"}))
+
+        result = self.stack.app.processor.handle(event())
+
+        self.assertEqual(result.status, "dead_lettered")
+        self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)), 3)
+        self.assertEqual(len(self.stack.sleeps), 2)
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual(letter.event, event())
+        self.assertEqual(letter.error, "tenant.provision kiraci1: HTTP 503")
+        self.assertEqual(letter.attempts, 1)
+
+    def test_rejected_request_is_not_retried(self) -> None:
+        self.add_member()
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (403, {"exc": "no"}))
+
+        result = self.stack.app.processor.handle(event())
+
+        self.assertEqual(result.status, "dead_lettered")
+        self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)), 1)
+
+    def test_dead_letter_does_not_store_personal_data(self) -> None:
+        self.add_member()
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (500, {"exc": "ayse@example.test bulunamadı"}))
+
+        self.stack.app.processor.handle(event())
+
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertNotIn("example.test", repr(letter))
+
+    def test_keycloak_failure_goes_to_dead_letters(self) -> None:
+        self.stack.keycloak.on("GET", f"{self.stack.keycloak.admin}/users/{SUBJECT}", (500, None))
+
+        result = self.stack.app.processor.handle(event())
+
+        self.assertEqual(result.status, "dead_lettered")
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual(letter.error, "keycloak.read: HTTP 500")
+
+    def test_replay_processes_dead_letter_and_empties_queue(self) -> None:
+        self.add_member()
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
+        self.stack.app.processor.handle(event())
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (200, {"message": {"ok": True}}))
+
+        results = self.stack.app.processor.replay_dead_letters()
+
+        self.assertEqual([(event_id, r.status) for event_id, r in results], [("e-1", "processed")])
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+        self.assertEqual(self.stack.app.processor.handle(event()).status, "duplicate")
+
+    def test_replay_keeps_event_that_still_fails(self) -> None:
+        self.add_member()
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
+        self.stack.app.processor.handle(event())
+
+        results = self.stack.app.processor.replay_dead_letters()
+
+        self.assertEqual([r.status for _id, r in results], ["dead_lettered"])
+        (letter,) = self.stack.app.store.dead_letters()
+        self.assertEqual(letter.attempts, 2)
+
+
+class PreviewTest(PipelineCase):
+    def test_dry_run_writes_nothing_and_remembers_nothing(self) -> None:
+        self.add_member(enabled=False)
+
+        result = self.stack.app.processor.handle(event("USER_UPDATE", "admin"), dry_run=True)
+
+        self.assertEqual(result.status, "preview")
+        self.assertEqual([p.operation for p in result.previews], ["press.remove_team_member", "tenant.set_enabled"])
+        self.assertTrue(all(p.destructive for p in result.previews))
+        self.assertEqual(self.stack.press.writes() + self.stack.tenant.writes(), [])
+        self.assertEqual(self.stack.app.processor.handle(event("USER_UPDATE", "admin")).status, "processed")
+
+    def test_replay_dry_run_keeps_queue(self) -> None:
+        self.add_member()
+        self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
+        self.stack.app.processor.handle(event())
+        calls_before = len(self.stack.tenant.writes())
+
+        results = self.stack.app.processor.replay_dead_letters(dry_run=True)
+
+        self.assertEqual([r.status for _id, r in results], ["preview"])
+        self.assertEqual(len(self.stack.tenant.writes()), calls_before)
+        self.assertEqual(len(self.stack.app.store.dead_letters()), 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
