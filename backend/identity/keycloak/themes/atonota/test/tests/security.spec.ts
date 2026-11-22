@@ -109,7 +109,11 @@ test('GV-1, GV-2, GV-7: theme scripts hold no secret, no HTML injection and no c
     expect(code, `${file}: innerHTML`).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function/);
     expect(code, `${file}: console output`).not.toMatch(/console\.(log|debug|info|warn|error)/);
     expect(code, `${file}: storage`).not.toMatch(/localStorage|sessionStorage|document\.cookie|indexedDB/);
-    expect(code, `${file}: network`).not.toMatch(/fetch\(|XMLHttpRequest|sendBeacon|WebSocket|import\(/);
+    // One request is allowed: the account script reads the theme message bundle from the same server.
+    const requests = code.match(/fetch\([^)]*\)/g) ?? [];
+    expect(requests.filter((call) => !call.startsWith('fetch(messagesUrl')), `${file}: network`).toEqual([]);
+    expect(code, `${file}: network`).not.toMatch(/XMLHttpRequest|sendBeacon|WebSocket|import\(/);
+    if (requests.length > 0) expect(code, `${file}: the bundle address is built from the server page data`).toContain('const messagesUrl = `${environment.serverBaseUrl}/resources/${environment.realm}/account/${environment.locale}`;');
   }
   for (const file of sourceFiles(/\.(ftl|properties|css|js|svg)$/)) {
     const text = readFileSync(file, 'utf8');

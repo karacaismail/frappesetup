@@ -173,6 +173,34 @@ test('IC-3: the Turkish bundle has the same keys and placeholders as the English
   expect([...en.keys()].filter((key) => !tr.has(key))).toEqual([]);
 });
 
+for (const target of pages) {
+  test(`@matris account ${target.name}: every button and link has an accessible name`, async ({ page }) => {
+    await openAccount(page, target);
+    // The names are checked through the accessibility tree, the way a screen reader reads them.
+    const unnamed = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>('button, a[href], [role="button"]')]
+        .filter((element) => element.checkVisibility())
+        .filter((element) => {
+          const labelledBy = (element.getAttribute('aria-labelledby') ?? '')
+            .split(/\s+/)
+            .map((id) => document.getElementById(id)?.textContent ?? '')
+            .join('');
+          const imageAlt = [...element.querySelectorAll('img')].map((image) => image.alt).join('');
+          const name = `${element.getAttribute('aria-label') ?? ''}${labelledBy}${element.textContent ?? ''}${imageAlt}${element.getAttribute('title') ?? ''}`;
+          return name.trim() === '';
+        })
+        .map((element) => element.outerHTML.slice(0, 120)),
+    );
+    expect(unnamed).toEqual([]);
+    // The stock overflow toggles get a Turkish name that says what they open.
+    for (const toggle of await page.locator('button.pf-v5-c-menu-toggle.pf-m-plain:visible').all()) {
+      const name = (await toggle.getAttribute('aria-label')) ?? (await toggle.innerText());
+      expect(name.trim(), 'overflow toggle name').not.toBe('');
+      expect(name).not.toMatch(/^(more|options|actions|kebab)/i);
+    }
+  });
+}
+
 test('saving personal info still works with the theme', async ({ page }) => {
   await openAccount(page, byName('personal-info'));
   await page.locator('#firstName').fill('Örnek');
@@ -345,18 +373,9 @@ for (const scheme of ['light', 'dark'] as const) {
       await openAccount(page, target);
       if (scheme === 'dark') await expect(page.locator('html')).toHaveClass(/pf-v5-theme-dark/);
       await settle(page);
-      // Known upstream defect: the stock console renders these overflow-menu toggles without an accessible name.
-      // A theme cannot change the console markup. The defect is listed in the README.
-      // Only the "button-name" rule is waived, and only for those toggles. Every other rule still applies to them.
+      // No rule is waived. The theme script gives the stock overflow-menu toggles an accessible name.
       const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze();
-      const waived = await page.evaluate(() =>
-        [...document.querySelectorAll('button.pf-v5-c-menu-toggle.pf-m-plain:not([aria-label])')].map((element) => element.outerHTML.slice(0, 80)),
-      );
-      const summary = results.violations.flatMap((violation) =>
-        violation.nodes
-          .filter((node) => !(violation.id === 'button-name' && waived.some((html) => node.html.startsWith(html.slice(0, 60)))))
-          .map((node) => `${violation.id}: ${node.target.join(' ')}`),
-      );
+      const summary = results.violations.flatMap((violation) => violation.nodes.map((node) => `${violation.id}: ${node.target.join(' ')}`));
       expect(summary).toEqual([]);
     });
   }

@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { focusDiff } from './focus-diff';
-import { createUser, enableDeleteAccount, KC, PASSWORD, REALM, submitPassword, userExists } from './helpers';
+import { createUser, enableDeleteAccount, KC, loginUrl, PASSWORD, REALM, submitPassword, userExists } from './helpers';
 
 // Account deletion path (project record O-27): the account console shows a delete section,
 // and the confirmation screen of the login theme finishes the request.
@@ -104,34 +104,98 @@ for (const scheme of ['light', 'dark'] as const) {
       .include('[data-testid="delete-account"]')
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
       .analyze();
-    // Known upstream detail: the stock alert title is an h4 right after an h1. A theme cannot change the markup.
-    // "heading-order" is a best-practice rule, not a WCAG A or AA rule. It is waived for this section only.
-    const summary = results.violations
-      .filter((violation) => violation.id !== 'heading-order')
-      .map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(' | ')}`);
-    expect(summary).toEqual([]);
+    // No rule is waived. The theme script gives the stock alert title the right heading level.
+    expect(results.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(' | ')}`)).toEqual([]);
   });
 }
 
-// The stock console shows the delete section whenever the realm action is enabled, also for a user without the role.
-// Keycloak then refuses the deletion. The realm must grant the "delete-account" role to customers (see README).
-test('a user without the delete role is refused with a plain message', async ({ page }) => {
+// Project record O-27: only a customer may delete the own account. An employee is invited and must not see the path.
+// A customer holds the "delete-account" role of the "account" client. An employee does not.
+// The decision is made on the server: the page that Keycloak sends to an employee has the feature switched off,
+// so the console never creates the section. Hiding it with CSS would not be enough.
+
+/** Reads the feature flag from the page that the server sent, before any script runs. */
+async function serverSaysDeleteAllowed(page: Page): Promise<boolean> {
+  const html = await (await page.request.get(`${KC}/realms/${REALM}/account/`)).text();
+  const json = html.slice(html.indexOf('<script id="environment"'));
+  const match = /"deleteAccountAllowed":\s*(true|false)/.exec(json);
+  expect(match, 'the page carries the deleteAccountAllowed flag').not.toBeNull();
+  return match![1] === 'true';
+}
+
+test('@matris employee: the server switches the delete feature off and the section is never created', async ({ page }) => {
+  // An employee can use the account console (default roles, including "manage-account") but has no "delete-account" role.
   const email = await createUser();
+  await enableDeleteAccount();
   await page.goto(`${KC}/realms/${REALM}/account/`);
   await submitPassword(page, email);
   await expect(page.locator('#save-btn')).toBeVisible();
+
+  expect(await serverSaysDeleteAllowed(page), 'server flag for an employee').toBe(false);
+  await expect(page.locator('[data-testid="delete-account"]')).toHaveCount(0);
+  await expect(page.locator('#delete-account-btn')).toHaveCount(0);
+  await expect(page.getByText('Hesabı silin')).toHaveCount(0);
+
+  // The rest of the console still works for the employee.
+  await page.locator('#firstName').fill('Calisan');
+  await page.locator('#save-btn').click();
+  await expect(page.locator('.pf-v5-c-alert.pf-m-success')).toBeVisible();
+});
+
+test('customer: the server switches the delete feature on', async ({ page }) => {
+  await openPersonalInfo(page);
+  expect(await serverSaysDeleteAllowed(page), 'server flag for a customer').toBe(true);
+  await expect(page.locator('[data-testid="delete-account"]')).toHaveCount(1);
+});
+
+test('signed-out visitor: the server keeps the delete feature off', async ({ page }) => {
   await enableDeleteAccount();
-  await page.reload();
-  await openSection(page);
-  await page.locator('#delete-account-btn').click();
-  await expect(page.locator('#kc-form-login, #kc-error-message').first()).toBeVisible();
-  if (await page.locator('#kc-form-login').isVisible()) {
-    await page.locator('#password').fill(PASSWORD);
-    await page.locator('#kc-login').click();
-  }
+  expect(await serverSaysDeleteAllowed(page)).toBe(false);
+});
+
+test('employee: a direct delete request is refused and the account stays', async ({ page }) => {
+  const email = await createUser();
+  await enableDeleteAccount();
+  // The employee skips the console and asks Keycloak for the delete action directly.
+  await page.goto(`${loginUrl()}&kc_action=delete_account`);
+  await submitPassword(page, email);
   await expect(page.locator('#kc-error-message')).toContainText('Bu hesabı silme izniniz yok.');
+  await expect(page.locator('#kc-deleteaccount-form')).toHaveCount(0);
   expect(await userExists(email)).toBe(true);
 });
+
+for (const scheme of ['light', 'dark'] as const) {
+  test(`delete confirmation screen (${scheme}): the deleting button takes its colour from the shared danger token`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
+    await openPersonalInfo(page);
+    if (scheme === 'dark') await expect(page.locator('html')).toHaveClass(/pf-v5-theme-dark/);
+    await openSection(page);
+    const resolve = (target: Page) =>
+      target.evaluate(() => {
+        const probe = document.createElement('span');
+        document.body.append(probe);
+        probe.style.backgroundColor = 'var(--at-color-danger)';
+        const danger = getComputedStyle(probe).backgroundColor;
+        probe.style.backgroundColor = 'var(--at-color-action)';
+        const action = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return { danger, action };
+      });
+    // The console button and the final button use the same token, so both show the same colour.
+    const consoleTokens = await resolve(page);
+    const consoleButton = await page.locator('#delete-account-btn').evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(consoleButton, 'console delete button').toBe(consoleTokens.danger);
+    await page.locator('#delete-account-btn').click();
+    await reachConfirmation(page);
+    if (scheme === 'dark') await expect(page.locator('html')).toHaveClass(/pf-v5-theme-dark/);
+    const tokens = await resolve(page);
+    const submit = await page.locator('#kc-submit').evaluate((element) => getComputedStyle(element).backgroundColor);
+    expect(tokens.danger, 'the two themes share the danger token').toBe(consoleTokens.danger);
+    expect(submit, 'final delete button').toBe(tokens.danger);
+    expect(submit).not.toBe(tokens.action);
+    await expect(page.locator('#kc-cancel')).toBeVisible();
+  });
+}
 
 test('@matris delete confirmation screen: plain Turkish, no overflow, readable text', async ({ page }) => {
   await openPersonalInfo(page);
