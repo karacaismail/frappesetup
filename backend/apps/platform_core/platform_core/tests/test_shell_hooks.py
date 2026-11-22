@@ -27,6 +27,20 @@ class TestShellPermissionHooks(IntegrationTestCase):
 		self.assertNotIn("Referrer-Policy", response.headers)
 		self.assertEqual(pending.getlist("Referrer-Policy"), ["no-referrer"])
 
+	def test_security_header_hook_preserves_existing_csp(self):
+		from platform_core.shell.headers import add_security_headers
+
+		name = "Content-Security-Policy"
+		policy = "default-src 'none'"
+		for apply_pending in (False, True):
+			with self.subTest(apply_pending=apply_pending):
+				response = Response(headers={} if apply_pending else {name: policy})
+				pending = Headers({name.lower(): policy} if apply_pending else {})
+				with patch.object(frappe.local, "response_headers", pending, create=True):
+					add_security_headers(response)
+				self.assertEqual(response.headers.getlist(name), [] if apply_pending else [policy])
+				self.assertEqual(pending.getlist(name), [policy] if apply_pending else [])
+
 	def test_installed_auth_guard_follows_credentials_hooks(self):
 		hooks = frappe.get_hooks("auth_hooks")
 		guard = "platform_core.shell.native_metadata.guard_native_metadata"
