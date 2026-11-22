@@ -56,11 +56,11 @@ export const theme = createTheme({
   fontSizes: {
     xs: '1rem',
     sm: '1rem',
-    md: '1.0625rem',
+    md: '1rem',
     lg: '1.125rem',
     xl: '1.25rem',
   },
-  lineHeights: { xs: '1.5', sm: '1.5', md: '1.6', lg: '1.65', xl: '1.7' },
+  lineHeights: { xs: '1.5', sm: '1.5', md: '1.5', lg: '1.65', xl: '1.7' },
   radius: { xs: '4px', sm: '6px', md: '10px', lg: '14px', xl: '20px' },
   defaultRadius: 'md',
   spacing: { xs: '0.5rem', sm: '0.75rem', md: '1rem', lg: '1.5rem', xl: '2.25rem' },

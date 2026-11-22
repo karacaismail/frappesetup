@@ -1,4 +1,4 @@
-"""The reason for the permission and the scope summary. Contract: `contracts/platform_core-erisim.openapi.yaml`."""
+"""The reason for the permission and the scope summary. Contract: `contracts/platform_core-access.openapi.yaml`."""
 
 import frappe
 import frappe.share

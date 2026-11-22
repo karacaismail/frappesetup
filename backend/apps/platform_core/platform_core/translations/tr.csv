@@ -458,6 +458,8 @@ This e-mail belongs to a desk user and cannot be provisioned.,Bu e-posta bir yö
 Field {0} is longer than {1} characters.,{0} alanı {1} karakterden uzun.,platform_core.identity
 Field {0} must be text.,{0} alanı metin olmalıdır.,platform_core.identity
 This account cannot be anonymized.,Bu hesap anonim yapılamaz.,platform_core.identity
+Remove required field {0} from clear_fields.,Zorunlu {0} alanını clear_fields listesinden çıkarın.,platform_core.identity
+Repair Version record {0} before account deletion.,Hesap silmeden önce {0} adlı Version kaydını düzeltin.,platform_core.identity
 Mobile token rejected: {0},Telefon belirteci reddedildi: {0},platform_core.identity
 Request body is too large.,İstek gövdesi çok büyük.,platform_core.identity
 The identity provider did not confirm a fresh sign-in.,Kimlik sunucusu yeni bir giriş doğrulamadı.,platform_core.identity
@@ -806,3 +808,5 @@ Send either a session cookie or a bearer token.,Oturum çerezi veya belirteç g�
 MCP call counters are internal.,MCP çağrı sayacını yalnız sistem değiştirebilir.,platform_core.ai
 Authentication required,Kimlik doğrulaması gerekli.,platform_core.ai
 MCP call allowance unavailable.,MCP çağrı sınırı denetlenemiyor.,platform_core.ai
+No permission to read this document type.,Bu kayıt türünü okuma izniniz yok.,
+No permission to search this document type.,Bu kayıt türünde arama izniniz yok.,

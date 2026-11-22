@@ -24,6 +24,14 @@
   --fs-shadow-2: 0 2px 4px rgba(10, 30, 28, 0.08), 0 20px 40px -20px rgba(10, 30, 28, 0.3);
   --fs-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   --fs-dur: 160ms;
+  --fs-font-body: var(--mantine-font-size-md);
+  --fs-font-brand-name: var(--mantine-font-size-lg);
+  --fs-leading-body: var(--mantine-line-height-md);
+  --fs-font-page-title: clamp(1.75rem, 1.2rem + 1.8vw, var(--mantine-h1-font-size));
+  --fs-leading-page-title: var(--mantine-h1-line-height);
+  --fs-font-section-title: clamp(1.4rem, 1.2rem + 0.8vw, 1.75rem);
+  --fs-font-card-title: 1.0625rem;
+  --fs-font-stat: 1.85rem;
   --fs-content-max: 76ch;
   --fs-gutter: 1rem;
   --fs-header-h: 60px;
@@ -33,10 +41,13 @@
   /* Başlığın kenar simge düğmelerinin görsel kutusu (önceki Mantine ActionIcon lg). Etkili alan (--fs-hit) bundan
      büyüktür; fark başlığın iç boşluğuna taşar, simgeler kenar boşluğuna göre aynı hizada kalır. */
   --fs-icon-box: 34px;
+  --fs-hero-pad: min(clamp(1.25rem, 1rem + 2vw, 2.5rem), 8vw);
   /* Düğme biçimli kontrol (indirme bağlantıları): iç boşluk, öğe arası, kenar, hover kalkışı ve ağırlık.
-     Ölçüler ana sayfanın .btn görünümüyle aynıdır; odak yalnız global :focus-visible kuralıdır. */
+     Ana sayfa düğmeleri dar alanda yatay iç boşluğu azaltır. */
   --fs-control-pad-block: 0.55rem;
   --fs-control-pad-inline: 1.1rem;
+  --fs-hero-control-pad-inline: min(var(--fs-control-pad-inline), 6cqi);
+  --fs-hero-control-pad-inline-narrow: 0.25rem;
   --fs-control-gap: 0.4rem;
   --fs-control-edge: inset 0 0 0 1px var(--fs-grid);
   --fs-control-lift: -1px;
@@ -186,12 +197,12 @@ body {
   background: var(--fs-accent);
   color: var(--fs-on-accent);
   font-weight: 800;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   box-shadow: var(--fs-shadow-1);
 }
 .brand-name {
   font-weight: 700;
-  font-size: 1.125rem;
+  font-size: var(--fs-font-brand-name);
   letter-spacing: -0.015em;
   min-width: 0;
   overflow: hidden;
@@ -205,7 +216,7 @@ body {
 .nav-group {
   margin: 0 0 0.35rem;
   padding: 0 0.75rem;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -221,8 +232,8 @@ body {
   border-radius: var(--mantine-radius-sm);
   color: var(--mantine-color-text);
   text-decoration: none;
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
   transition:
     background-color var(--fs-dur) var(--fs-ease),
     color var(--fs-dur) var(--fs-ease);
@@ -314,8 +325,8 @@ body {
   border-radius: var(--mantine-radius-sm);
   color: var(--fs-quiet);
   text-decoration: none;
-  font-size: 1rem;
-  line-height: 1.4;
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
   box-shadow: inset 2px 0 0 var(--fs-grid);
   transition:
     color var(--fs-dur) var(--fs-ease),
@@ -379,8 +390,8 @@ body {
 /* Metin satır uzunluğu 76ch ile sınırlı; tablo, diyagram ve kod blokları sütunun tamamını kullanır */
 .prose {
   max-width: 100%;
-  font-size: 1.0625rem;
-  line-height: 1.65;
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
 }
 .prose > p,
 .prose > ul,
@@ -404,8 +415,8 @@ body {
 }
 .prose h2 {
   position: relative;
-  font-size: 1.5rem;
-  line-height: 1.3;
+  font-size: var(--mantine-h2-font-size);
+  line-height: var(--mantine-h2-line-height);
   letter-spacing: -0.01em;
   margin: 2.75rem 0 0.75rem;
   padding-top: 0.25rem;
@@ -413,8 +424,8 @@ body {
 }
 .prose h3 {
   position: relative;
-  font-size: 1.2rem;
-  line-height: 1.35;
+  font-size: var(--mantine-h3-font-size);
+  line-height: var(--mantine-h3-line-height);
   margin: 1.75rem 0 0.5rem;
   scroll-margin-top: calc(var(--fs-header-h) + 1rem);
 }
@@ -467,7 +478,7 @@ body {
 }
 .prose code {
   font-family: var(--mantine-font-family-monospace);
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   background: var(--fs-tint);
   padding: 0.1em 0.35em;
   border-radius: 4px;
@@ -478,20 +489,27 @@ body {
    girer (WebKit taşan kutuyu kendiliğinden odaklamaz). Betik çalışmadan önce ya da hiç çalışmazsa `.page`'in break-word
    ağı uzun kodu satır sonunda kırar, sayfa taşmaz. Tablo hücresindeki kod sarılmaz (sütun genişler, tablo kendi
    kapsayıcısında kayar); bağlantı içindeki kod satır içi kalır. */
+[data-code-measuring] .page {
+  overflow-wrap: normal;
+}
 [data-code-measured] .prose code,
-[data-code-measured] .req-code {
+[data-code-measured] :is(.req-card-detail, .req-detail) > code {
   /* Betik ölçtükten sonra ağ satır içi kodda kapanır: Gecko ağ açıkken kodun bitiş dolgusunu sığma hesabına katıp
      satırına sığan kodu da bölüyor. Satırdan uzun dizileri kod kutuları çözer. */
   overflow-wrap: normal;
 }
+[data-code-measured] :is(.req-card-detail, .req-detail) > code:not(.req-code-wrap),
+code[data-scroll="single-line"] {
+  white-space: nowrap;
+}
 .prose :not(pre, a) > code[data-scroll],
-.req-code[data-scroll] {
+:is(.req-card-detail, .req-detail) > code[data-scroll] {
   display: inline-block;
   max-width: 100%;
   overflow: auto hidden;
   overflow-wrap: normal;
   vertical-align: bottom;
-  line-height: 1.5;
+  line-height: var(--fs-leading-body);
   scrollbar-width: thin;
 }
 .prose pre {
@@ -499,14 +517,14 @@ body {
   padding: 1rem 1.1rem;
   border-radius: var(--mantine-radius-md);
   overflow-x: auto;
-  font-size: 1rem;
-  line-height: 1.55;
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
   background: var(--fs-surface-2);
 }
 .prose pre code {
   background: none;
   padding: 0;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
 }
 /* Shiki çift tema: koyu şemada --shiki-dark değişkenleri uygulanır */
 [data-mantine-color-scheme='dark'] .astro-code,
@@ -555,8 +573,8 @@ body {
   border-collapse: separate;
   border-spacing: 0;
   margin: 0;
-  font-size: 1rem;
-  line-height: 1.5;
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
 }
 .prose thead th {
   text-align: left;
@@ -621,7 +639,7 @@ body {
 }
 .mermaid-details {
   margin: -0.75rem 0 1.5rem;
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
 }
 .mermaid-details summary {
   cursor: pointer;
@@ -660,7 +678,7 @@ body {
 }
 .diagram-note {
   color: var(--fs-quiet);
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   margin: 0.75rem 0.25rem 0;
   max-width: var(--fs-content-max);
 }
@@ -701,7 +719,7 @@ body {
 }
 .req-explorer .mantine-Button-label {
   white-space: normal;
-  line-height: 1.25;
+  line-height: var(--fs-leading-body);
   text-align: center;
 }
 /* Öncelik rozeti hiçbir genişlikte kısalmaz: Mantine Badge taşmayı gizlediği için içerik katkısı ~0'dır ve sütun ya da
@@ -737,7 +755,7 @@ body {
   gap: 0.35rem;
 }
 .req-toggle-label {
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
   color: var(--fs-quiet);
 }
 .req-bar {
@@ -749,9 +767,9 @@ body {
   margin-bottom: 0.75rem;
 }
 .req-id,
-.req-code {
+:is(.req-card-detail, .req-detail) > code {
   font-family: var(--mantine-font-family-monospace);
-  font-size: 1rem;
+  font-size: var(--fs-font-body);
 }
 .req-id {
   font-weight: 600;
@@ -761,7 +779,7 @@ body {
   border-radius: 4px;
   white-space: nowrap;
 }
-.req-code {
+:is(.req-card-detail, .req-detail) > code {
   background: var(--fs-tint);
   padding: 0.05em 0.3em;
   border-radius: 4px;
@@ -775,8 +793,8 @@ body {
 .req-detail,
 .req-owner {
   margin: 0;
-  font-size: var(--mantine-font-size-md);
-  line-height: var(--mantine-line-height-md);
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
 }
 .req-card-title,
 .req-title {
@@ -830,19 +848,13 @@ body {
   justify-content: space-between;
   gap: 0.5rem;
 }
-.req-card-title {
-  line-height: 1.4;
-}
-.req-card-detail {
-  line-height: 1.5;
-}
 .req-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem 0.5rem;
   color: var(--fs-quiet);
-  font-size: 1rem;
-  line-height: 1.4;
+  font-size: var(--fs-font-body);
+  line-height: var(--fs-leading-body);
 }
 /* Uzun sahip adı gibi öğe satırdan genişse satır genişliğine iner ve sözcük aralarından sarılır (kart taşmaz). */
 .req-meta > * {

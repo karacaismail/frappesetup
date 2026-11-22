@@ -1,6 +1,6 @@
 """Reading of the active rules, their cache and the constants of the rule language.
 
-Decision note: `docs/kararlar/0006-erisim-kurali.md`, sections 3 and 12.
+Decision note: `docs/decisions/0006-access-rule.md`, sections 3 and 12.
 """
 
 import json

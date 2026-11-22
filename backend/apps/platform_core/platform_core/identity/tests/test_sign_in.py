@@ -348,13 +348,15 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 				user_key = session_policy._user_key(h.AYSE)
 				previous_activity = int(time.time()) - 60
 				frappe.cache.set_value(user_key, previous_activity, expires_in_sec=3600)
+				frappe.cache.hset("redirect_after_login", h.AYSE, "/account-start")
+				self.addCleanup(frappe.cache.hdel, "redirect_after_login", h.AYSE)
 				with patch.object(anonymization, "lock_identity", side_effect=fail_second_lock):
 					response = h.login_with_keycloak(client, h.userinfo("sub-ayse", h.AYSE))
 
 				self.assertEqual(attempts, 4 if error_type is frappe.QueryDeadlockError else 2)
 				self.assertEqual(response.status_code, 500)
 				self.assertEqual(response.json.get("exc_type"), "IdentityInternalError")
-				self.assertFalse({"message", "home_page", "full_name"} & response.json.keys())
+				self.assertFalse({"message", "home_page", "full_name", "redirect_to"} & response.json.keys())
 				h.refresh()
 				self.assertEqual(h.session_count(h.AYSE), 0)
 				for name in ("sid", "user_id", "full_name", "system_user", "user_image", "user_lang"):

@@ -9,6 +9,7 @@ from press_tr.press_identity.deletion import (
 	clear_reauthentication,
 	fresh_reauthentication,
 	human_identity,
+	mark_deletion_status,
 	send_deletion_request,
 )
 from press_tr.press_identity.oidc import reject
@@ -34,6 +35,9 @@ def request_deletion(confirm: bool = False) -> dict[str, str | bool]:
 			_("Verify your identity again before deleting your account.", context="press_tr"),
 			frappe.PermissionError,
 		)
-	send_deletion_request(link, authenticated_at)
+	if not send_deletion_request(link, authenticated_at):
+		mark_deletion_status("pending")
+		return {"pending": True}
+	mark_deletion_status("submitted")
 	clear_reauthentication()
 	return {"submitted": True}

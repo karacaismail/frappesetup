@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, startTransition, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Badge,
   Box,
@@ -9,6 +9,7 @@ import {
   Table,
   Text,
   TextInput,
+  useMantineTheme,
   type MantineColorScheme,
 } from '@mantine/core';
 import { IconFilterOff, IconSearch } from '@tabler/icons-react';
@@ -23,6 +24,28 @@ export interface Requirement {
   phase: string;
   source: string;
   owner?: string;
+}
+
+type RequirementRow = [
+  id: string, title: string, detail: string, rail: string,
+  priority: string, phase: string, source: string, owner?: string | null,
+];
+
+// Ada verisinde her gereksinim için alan adlarını yinelemeyin.
+export function toRequirementRow({ id, title, detail, rail, priority, phase, source, owner }: Requirement): RequirementRow {
+  return [id, title, detail, rail, priority, phase, source, owner];
+}
+
+let decodedRows: { source: string; items: Requirement[] } | undefined;
+
+function decodeRequirements(source: string) {
+  if (decodedRows?.source === source) return decodedRows.items;
+  const rows: RequirementRow[] = JSON.parse(source);
+  const items = rows.map(([id, title, detail, rail, priority, phase, source, owner]) => ({
+    id, title, detail, rail, priority, phase, source, owner: owner ?? undefined,
+  }));
+  decodedRows = { source, items };
+  return items;
 }
 
 interface Props {
@@ -69,7 +92,7 @@ function byId(a: Requirement, b: Requirement) {
 function inlineCode(text: string): ReactNode[] {
   return text.split('`').map((part, i) =>
     i % 2 === 1 ? (
-      <code key={i} className="req-code">
+      <code key={i} className={/\s/.test(part) ? 'req-code-wrap' : undefined}>
         {part}
       </code>
     ) : (
@@ -130,8 +153,12 @@ function Explorer({ items }: Props) {
   const [rail, setRail] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [showDetail, setShowDetail] = useState(true);
+  const [hasTable, setHasTable] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const detailRef = useRef<HTMLInputElement>(null);
+  const cardsRef = useRef<HTMLUListElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const { sm } = useMantineTheme().breakpoints;
 
   // Ada JS'i inmeden önce sunucu HTML'ine yazılan metin DOM'da kalır, ama React durumu boş başlar:
   // React 19 hidrasyonda DOM değerini korur, değer izleyicisini bu değerle başlatır ve değişikliği
@@ -140,6 +167,70 @@ function Explorer({ items }: Props) {
     if (searchRef.current) setQ(searchRef.current.value);
     if (detailRef.current) setShowDetail(detailRef.current.checked);
   }, []);
+
+  useEffect(() => {
+    const desktop = window.matchMedia(`(min-width: ${sm})`);
+    const cards = cardsRef.current;
+    let cancelPending: (() => void) | undefined;
+    let switching = false;
+    let disposed = false;
+    const canShowTable = () => desktop.matches && cards &&
+      !cards.contains(document.activeElement) && cards.getBoundingClientRect().top >= 0;
+
+    const updateLayout = () => {
+      if (disposed) return;
+      if (!desktop.matches) {
+        cancelPending?.();
+        cancelPending = undefined;
+        if (tableRef.current?.contains(document.activeElement)) {
+          searchRef.current?.focus({ preventScroll: true });
+        }
+        if (hasTable || switching) setHasTable(false);
+        switching = false;
+        return;
+      }
+      if (hasTable) return;
+      if (!canShowTable()) {
+        if (switching) {
+          switching = false;
+          setHasTable(false);
+        }
+        return;
+      }
+      if (cancelPending || switching) return;
+
+      const showTable = () => {
+        cancelPending = undefined;
+        if (!canShowTable()) return;
+        switching = true;
+        startTransition(() => setHasTable(true));
+      };
+      if (typeof window.requestIdleCallback === 'function') {
+        const id = window.requestIdleCallback(showTable, { timeout: 1500 });
+        cancelPending = () => window.cancelIdleCallback(id);
+      } else {
+        const id = window.setTimeout(showTable, 32);
+        cancelPending = () => window.clearTimeout(id);
+      }
+    };
+
+    updateLayout();
+    desktop.addEventListener('change', updateLayout);
+    if (cards) window.addEventListener('scroll', updateLayout, { passive: true });
+    const handleBlur = () => {
+      queueMicrotask(updateLayout);
+    };
+    cards?.addEventListener('focusin', updateLayout);
+    cards?.addEventListener('focusout', handleBlur);
+    return () => {
+      disposed = true;
+      cancelPending?.();
+      desktop.removeEventListener('change', updateLayout);
+      window.removeEventListener('scroll', updateLayout);
+      cards?.removeEventListener('focusin', updateLayout);
+      cards?.removeEventListener('focusout', handleBlur);
+    };
+  }, [hasTable, sm]);
 
   const sorted = useMemo(() => [...items].sort(byId), [items]);
 
@@ -151,7 +242,7 @@ function Explorer({ items }: Props) {
       if (rail && r.rail !== rail) return false;
       if (source && r.source !== source) return false;
       if (!needle) return true;
-      const hay = `${r.id} ${r.title} ${r.detail} ${r.owner ?? ''}`.toLocaleLowerCase('tr');
+      const hay = `${r.id} ${r.title} ${r.detail.replaceAll('`', '')} ${r.owner ?? ''}`.toLocaleLowerCase('tr');
       return hay.includes(needle);
     });
   }, [sorted, q, priority, phase, rail, source]);
@@ -276,78 +367,87 @@ function Explorer({ items }: Props) {
         )}
       </div>
 
-      {/* Dar ekran: kart listesi */}
-      <Box hiddenFrom="sm" component="ul" className="req-cards" aria-label="Gereksinimler (kart görünümü)">
-        {filtered.map((r) => (
-          <li key={r.id} className="req-card" id={`req-${r.id}`}>
-            <div className="req-card-top">
-              <code className="req-id">{r.id}</code>
-              <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
-            </div>
-            {/* Liste satırlarında Mantine Text yerine sade <p>: aynı görünüm global.css'teki sınıf kurallarından. */}
-            <p className="req-card-title">{r.title}</p>
-            {showDetail && <p className="req-card-detail">{inlineCode(r.detail)}</p>}
-            <div className="req-meta">{meta(r)}</div>
-          </li>
-        ))}
-        {filtered.length === 0 && (
-          <li className="req-card">
-            <Text c="dimmed">Bu filtrelerle eşleşen gereksinim yok.</Text>
-          </li>
-        )}
-      </Box>
+      {/* Sunucu önce kartları gönderir. Tablo tarayıcıda hazırlanır. */}
+      {!hasTable && (
+        <Box
+          ref={cardsRef}
+          component="ul"
+          className="req-cards"
+          aria-label="Gereksinimler (kart görünümü)"
+        >
+          {filtered.map((r) => (
+            <li key={r.id} className="req-card" id={`req-${r.id}`}>
+              <div className="req-card-top">
+                <code className="req-id">{r.id}</code>
+                <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
+              </div>
+              {/* Liste satırlarında Mantine Text yerine sade <p>: aynı görünüm global.css'teki sınıf kurallarından. */}
+              <p className="req-card-title">{r.title}</p>
+              {showDetail && <p className="req-card-detail">{inlineCode(r.detail)}</p>}
+              <div className="req-meta">{meta(r)}</div>
+            </li>
+          ))}
+          {filtered.length === 0 && (
+            <li className="req-card">
+              <Text c="dimmed">Bu filtrelerle eşleşen gereksinim yok.</Text>
+            </li>
+          )}
+        </Box>
+      )}
 
       {/* Geniş ekran: tablo, kendi kapsayıcısında yatay kayar */}
-      <Box visibleFrom="sm">
-        <Table.ScrollContainer
-          minWidth={showDetail ? 936 : 808}
-          type="native"
-          tabIndex={0}
-          role="region"
-          aria-label="Gereksinim tablosu (yatay kaydırılabilir)"
-        >
-          <Table highlightOnHover withRowBorders data-testid="req-table" className="req-table">
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th style={{ minWidth: '5.5rem' }}>ID</Table.Th>
-                <Table.Th style={{ minWidth: showDetail ? '24rem' : '16rem' }}>Gereksinim</Table.Th>
-                <Table.Th style={{ minWidth: '10rem' }}>Ray</Table.Th>
-                <Table.Th style={{ minWidth: '7rem' }}>Öncelik</Table.Th>
-                <Table.Th style={{ minWidth: '5rem' }}>Faz</Table.Th>
-                <Table.Th style={{ minWidth: '7rem' }}>Kaynak</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {filtered.map((r) => (
-                <Table.Tr key={r.id}>
-                  <Table.Td>
-                    <code className="req-id">{r.id}</code>
-                  </Table.Td>
-                  <Table.Td>
-                    <p className="req-title">{r.title}</p>
-                    {showDetail && <p className="req-detail">{inlineCode(r.detail)}</p>}
-                    {/* Sahip ayrı sütun değil, kart görünümündeki gibi gereksinim hücresindedir; içerik sığmazsa tablo kendi kapsayıcısında kayar. */}
-                    {r.owner && <p className="req-owner">Sahip: {r.owner}</p>}
-                  </Table.Td>
-                  <Table.Td>{r.rail}</Table.Td>
-                  <Table.Td>
-                    <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
-                  </Table.Td>
-                  <Table.Td>{r.phase}</Table.Td>
-                  <Table.Td>{r.source}</Table.Td>
-                </Table.Tr>
-              ))}
-              {filtered.length === 0 && (
+      {hasTable && (
+        <Box ref={tableRef}>
+          <Table.ScrollContainer
+            minWidth={showDetail ? 936 : 808}
+            type="native"
+            tabIndex={0}
+            role="region"
+            aria-label="Gereksinim tablosu (yatay kaydırılabilir)"
+          >
+            <Table highlightOnHover withRowBorders data-testid="req-table" className="req-table">
+              <Table.Thead>
                 <Table.Tr>
-                  <Table.Td colSpan={6}>
-                    <Text c="dimmed">Bu filtrelerle eşleşen gereksinim yok.</Text>
-                  </Table.Td>
+                  <Table.Th style={{ minWidth: '5.5rem' }}>ID</Table.Th>
+                  <Table.Th style={{ minWidth: showDetail ? '24rem' : '16rem' }}>Gereksinim</Table.Th>
+                  <Table.Th style={{ minWidth: '10rem' }}>Ray</Table.Th>
+                  <Table.Th style={{ minWidth: '7rem' }}>Öncelik</Table.Th>
+                  <Table.Th style={{ minWidth: '5rem' }}>Faz</Table.Th>
+                  <Table.Th style={{ minWidth: '7rem' }}>Kaynak</Table.Th>
                 </Table.Tr>
-              )}
-            </Table.Tbody>
-          </Table>
-        </Table.ScrollContainer>
-      </Box>
+              </Table.Thead>
+              <Table.Tbody>
+                {filtered.map((r) => (
+                  <Table.Tr key={r.id}>
+                    <Table.Td>
+                      <code className="req-id">{r.id}</code>
+                    </Table.Td>
+                    <Table.Td>
+                      <p className="req-title">{r.title}</p>
+                      {showDetail && <p className="req-detail">{inlineCode(r.detail)}</p>}
+                      {/* Sahip ayrı sütun değil, kart görünümündeki gibi gereksinim hücresindedir; içerik sığmazsa tablo kendi kapsayıcısında kayar. */}
+                      {r.owner && <p className="req-owner">Sahip: {r.owner}</p>}
+                    </Table.Td>
+                    <Table.Td>{r.rail}</Table.Td>
+                    <Table.Td>
+                      <Badge color={PRIORITY_COLOR[r.priority] ?? 'gray.7'}>{r.priority}</Badge>
+                    </Table.Td>
+                    <Table.Td>{r.phase}</Table.Td>
+                    <Table.Td>{r.source}</Table.Td>
+                  </Table.Tr>
+                ))}
+                {filtered.length === 0 && (
+                  <Table.Tr>
+                    <Table.Td colSpan={6}>
+                      <Text c="dimmed">Bu filtrelerle eşleşen gereksinim yok.</Text>
+                    </Table.Td>
+                  </Table.Tr>
+                )}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        </Box>
+      )}
     </Box>
   );
 }
@@ -369,7 +469,8 @@ function useDocumentColorScheme(): MantineColorScheme | undefined {
   return scheme;
 }
 
-export default function RequirementsExplorer(props: Props) {
+export default function RequirementsExplorer({ rowsJson }: { rowsJson: string }) {
+  const items = decodeRequirements(rowsJson);
   const scheme = useDocumentColorScheme();
   return (
     <MantineProvider
@@ -379,7 +480,7 @@ export default function RequirementsExplorer(props: Props) {
       withCssVariables={false}
       withGlobalClasses={false}
     >
-      <Explorer {...props} />
+      <Explorer items={items} />
     </MantineProvider>
   );
 }
