@@ -20,6 +20,20 @@ class GatewayContractTests(unittest.TestCase):
     def setUp(self):
         self.contract = GatewayContract()
 
+    def test_each_operation_has_schema_valid_request_examples(self):
+        for path, definition in self.contract.spec["paths"].items():
+            with self.subTest(path=path):
+                body = definition["post"].get("requestBody", {})
+                media = body.get("content", {}).get("application/json", {})
+                examples = (
+                    [media["example"]]
+                    if "example" in media
+                    else [entry["value"] for entry in media.get("examples", {}).values()]
+                )
+                self.assertTrue(examples, "Missing request example")
+                for example in examples:
+                    self.contract.validate_request(path, "post", example)
+
     def test_declarations_include_schema_valid_examples(self):
         for path, definition in self.contract.spec["paths"].items():
             for status in definition["post"]["responses"]:
@@ -54,12 +68,14 @@ class GatewayContractTests(unittest.TestCase):
         self.assertIn("targets", media["schema"]["properties"]["message"]["required"])
 
     def test_reconciliation_accepts_exact_decimal_text_and_currency(self):
+        path = "/api/method/platform_core.api.model.resolve_usage"
         for amount, currency in [("0", "USD"), ("999999999999.123456789", "EUR")]:
-            self.contract.validate_completion_cost({"log": "sample", "cost": amount, "currency": currency})
+            payload = {"log": "sample", "cost": amount, "currency": currency}
+            self.contract.validate_request(path, "post", payload)
         for amount, currency in [(0.125, "USD"), ("1e-3", "USD"), ("0.0000000001", "USD"), ("1", "usd")]:
             with self.assertRaises(ValidationError):
-                self.contract.validate_completion_cost(
-                    {"log": "sample", "cost": amount, "currency": currency}
+                self.contract.validate_request(
+                    path, "post", {"log": "sample", "cost": amount, "currency": currency}
                 )
         with self.assertRaises(ValidationError):
-            self.contract.validate_completion_cost({"log": "sample", "cost": "0.5"})
+            self.contract.validate_request(path, "post", {"log": "sample", "cost": "0.5"})

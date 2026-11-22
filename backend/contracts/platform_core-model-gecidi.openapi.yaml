@@ -20,6 +20,12 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Completion'
+            example:
+              route: fixture-route
+              messages:
+                - role: user
+                  content: Count the three imaginary moons.
+              limit: 64
       responses:
         '200':
           $ref: '#/components/responses/Result'
@@ -61,6 +67,9 @@ paths:
                   type: string
                   minLength: 1
                   description: AI Model document name
+            example:
+              api: fixture-api
+              model: fixture-model-record
       responses:
         '200':
           $ref: '#/components/responses/Result'
@@ -101,6 +110,11 @@ paths:
                   type: string
                   maxLength: 240
                   description: Optional single-line reconciliation note.
+            example:
+              log: fixture-attempt
+              cost: '0.125000001'
+              currency: USD
+              note: Checked against a synthetic invoice.
       responses:
         '200':
           description: Reconciled usage record
@@ -143,6 +157,14 @@ paths:
       operationId: reconcile_stale_pending
       security:
         - session: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+            example: {}
       responses:
         '200':
           description: Reservations changed to unknown
@@ -194,6 +216,13 @@ paths:
               else:
                 not:
                   required: [preview_token]
+            examples:
+              preview:
+                value: {dry_run: true}
+              confirm:
+                value:
+                  dry_run: false
+                  preview_token: '0000000000000000000000000000000000000000000000000000000000000000'
       responses:
         '200':
           description: Eligible and deleted counts, exact batch and preview token
@@ -216,13 +245,23 @@ paths:
                         uniqueItems: true
                         items: {type: string}
                       preview_token: {type: [string, 'null'], pattern: '^[0-9a-f]{64}$'}
-              example:
-                message:
-                  eligible: 1
-                  deleted: 0
-                  dry_run: true
-                  targets: [672234b3-483c-4364-a40a-82a484a88173]
-                  preview_token: '0000000000000000000000000000000000000000000000000000000000000000'
+              examples:
+                preview:
+                  value:
+                    message:
+                      eligible: 1
+                      deleted: 0
+                      dry_run: true
+                      targets: [672234b3-483c-4364-a40a-82a484a88173]
+                      preview_token: '0000000000000000000000000000000000000000000000000000000000000000'
+                confirm:
+                  value:
+                    message:
+                      eligible: 1
+                      deleted: 1
+                      dry_run: false
+                      targets: [672234b3-483c-4364-a40a-82a484a88173]
+                      preview_token: null
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -254,6 +293,7 @@ paths:
               required: [api]
               properties:
                 api: {type: string, minLength: 1, maxLength: 140}
+            example: {api: fixture-api}
       responses:
         '200':
           description: Credential cleared
