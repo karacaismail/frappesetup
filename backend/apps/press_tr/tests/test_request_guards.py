@@ -7,7 +7,7 @@ from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
 from press_tr import api, hooks
 from press_tr.api import auth, identity
-from press_tr.kimlik import oidc, request_policy, service, sessions
+from press_tr.press_identity import oidc, request_policy, service, sessions
 
 
 class RequestGuardsTest(unittest.TestCase):
@@ -15,7 +15,7 @@ class RequestGuardsTest(unittest.TestCase):
 		closed = request_policy.CLOSED_METHODS | request_policy.SOCIAL_METHODS
 		self.assertEqual(set(hooks.override_whitelisted_methods), closed)
 		for handler in hooks.override_whitelisted_methods.values():
-			self.assertEqual(handler, "press_tr.kimlik.request_policy.deny_legacy_method")
+			self.assertEqual(handler, "press_tr.press_identity.request_policy.deny_legacy_method")
 		with self.assertRaises(Forbidden):
 			request_policy.deny_legacy_method()
 

@@ -6,11 +6,20 @@ from urllib.parse import urlencode
 
 import frappe
 import requests
+from frappe import _
 from frappe.rate_limiter import rate_limit
 from werkzeug.exceptions import Conflict
 
-from press_tr.kimlik.identity import bind_identity, ensure_personal_team
-from press_tr.kimlik.oidc import callback_url, claim, client_id, issuer, reject, server_endpoint, verify
+from press_tr.press_identity.identity import bind_identity, ensure_personal_team
+from press_tr.press_identity.oidc import (
+	callback_url,
+	claim,
+	client_id,
+	issuer,
+	reject,
+	server_endpoint,
+	verify,
+)
 
 STATE_TTL = 300
 STATE_COOKIE = "press_tr_login"
@@ -111,7 +120,7 @@ def keycloak_callback(state: str | None = None, code: str | None = None) -> None
 		link = bind_identity(claims)
 		ensure_personal_team(link.user)
 	except frappe.QueryDeadlockError:
-		raise Conflict("Concurrent account update. Start sign-in again.")
+		raise Conflict(_("Concurrent account update. Start sign-in again."))
 	except frappe.DuplicateEntryError, frappe.UniqueValidationError:
 		reject()
 

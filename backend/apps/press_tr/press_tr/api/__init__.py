@@ -2,8 +2,8 @@ import frappe
 from frappe.rate_limiter import rate_limit
 from frappe.sessions import delete_session
 
-from press_tr.kimlik.identity import find_identity
-from press_tr.kimlik.oidc import claim, client_id, reject, verify
+from press_tr.press_identity.identity import find_identity
+from press_tr.press_identity.oidc import claim, client_id, reject, verify
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])

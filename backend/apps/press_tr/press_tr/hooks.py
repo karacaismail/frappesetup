@@ -264,16 +264,16 @@ required_apps = ["press"]
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
-before_request = ["press_tr.kimlik.request_policy.before_request"]
+before_request = ["press_tr.press_identity.request_policy.before_request"]
 
-auth_hooks = ["press_tr.kimlik.service.authorize_identity_sync"]
+auth_hooks = ["press_tr.press_identity.service.authorize_identity_sync"]
 
 
-from press_tr.kimlik import request_policy
+from press_tr.press_identity import request_policy
 
-before_login = "press_tr.kimlik.request_policy.block_native_login"
-on_logout = "press_tr.kimlik.sessions.remove_mapping"
+before_login = "press_tr.press_identity.request_policy.block_native_login"
+on_logout = "press_tr.press_identity.sessions.remove_mapping"
 override_whitelisted_methods = dict.fromkeys(
 	request_policy.CLOSED_METHODS | request_policy.SOCIAL_METHODS,
-	"press_tr.kimlik.request_policy.deny_legacy_method",
+	"press_tr.press_identity.request_policy.deny_legacy_method",
 )

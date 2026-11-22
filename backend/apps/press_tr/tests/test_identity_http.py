@@ -96,7 +96,7 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		for method in ("ensure_team", "remove_team_member"):
 			for token, headers in (
 				(None, {}),
-				(self.token(audience="site-kiraci1"), {}),
+				(self.token(audience="site-tenant1"), {}),
 				(self.token(authorized_party="press-service"), {}),
 			):
 				with self.subTest(method=method, headers=headers):
