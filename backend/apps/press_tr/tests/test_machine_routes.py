@@ -90,7 +90,7 @@ class MachineRoutesTest(PressHttpClient, unittest.TestCase):
 		self.assertTrue(tested)
 
 	def test_saas_token_validation_returns_false_for_unknown_credentials(self):
-		status, _, payload = self.exchange(
+		status, _headers, payload = self.exchange(
 			"POST",
 			"/api/method/press.saas.api.auth.is_access_token_valid",
 			{"Content-Type": "application/json"},

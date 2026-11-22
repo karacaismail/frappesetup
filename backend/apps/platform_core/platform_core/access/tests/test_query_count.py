@@ -4,12 +4,12 @@ from collections import defaultdict
 
 import frappe
 
-from platform_core.access.tests.base import DOCTYPE, EMPLOYEE_2, MANAGER_1, ErisimTestCase
+from platform_core.access.tests.base import DOCTYPE, EMPLOYEE_2, MANAGER_1, AccessRuleTestCase
 
 EXTRA_RECORDS = 40
 
 
-class TestQueryCount(ErisimTestCase):
+class TestQueryCount(AccessRuleTestCase):
 	def count_list_queries(self, user: str) -> tuple[int, int]:
 		"""Reads the list of the user. Returns the query count and the number of records returned."""
 		queries = []

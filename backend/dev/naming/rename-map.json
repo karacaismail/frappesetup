@@ -6439,5 +6439,129 @@
     "old": "platform_core.mobil.doctype.mobile_revoked_session.mobile_revoked_session",
     "new": "platform_core.mobile.doctype.plt_mobile_revoked_session.plt_mobile_revoked_session",
     "type": "reference"
+  },
+  {
+    "old": "ErisimTestCase",
+    "new": "AccessRuleTestCase",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/access/*.py",
+      "backend/apps/platform_core/platform_core/api/test_access.py"
+    ]
+  },
+  {
+    "old": "kimlik_api",
+    "new": "identity_api",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/identity/service_token.py",
+      "backend/apps/platform_core/platform_core/identity/tests/test_python_rules.py"
+    ]
+  },
+  {
+    "old": "KIMLIK",
+    "new": "IDENTITY_DIRECTORY",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/identity/tests/test_web_rules.py"
+    ]
+  },
+  {
+    "old": "KIMLIK_E2E_BASE_URL",
+    "new": "IDENTITY_E2E_BASE_URL",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/identity/tests/e2e/playwright.config.ts"
+    ]
+  },
+  {
+    "old": "SIHIRLI",
+    "new": "MAGIC_LINK_AUTHENTICATOR",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_extensions.py"
+    ]
+  },
+  {
+    "old": "_form_hedefi",
+    "new": "_form_action",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_extensions.py",
+      "backend/identity/keycloak/tests/test_account_backlog.py",
+      "backend/identity/keycloak/tests/test_magic_link.py",
+      "backend/identity/keycloak/tests/test_second_factor.py"
+    ]
+  },
+  {
+    "old": "_keycloak_icinde_izle",
+    "new": "_follow_keycloak_redirect",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_extensions.py",
+      "backend/identity/keycloak/tests/test_magic_link.py"
+    ]
+  },
+  {
+    "old": "kurulus",
+    "new": "organization_response",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_live_keycloak.py"
+    ]
+  },
+  {
+    "old": "veri",
+    "new": "jwks_payload",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
+      "backend/libs/oidc_verify/tests/keys.py",
+      "backend/libs/oidc_verify/tests/test_live_keycloak.py"
+    ]
+  },
+  {
+    "old": "cagri",
+    "new": "call_count",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/keys.py",
+      "backend/libs/oidc_verify/tests/test_jwks_download_deadline.py",
+      "backend/libs/oidc_verify/tests/test_jwks_total_deadline.py",
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py",
+      "backend/libs/oidc_verify/tests/test_security_findings.py"
+    ]
+  },
+  {
+    "old": "kaynak",
+    "new": "source_directory",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_pay_sifirken_dolmus_sayilir",
+    "new": "test_token_expires_without_clock_leeway",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_soguk_onbellekte_cekim_basarisizsa_jwks_unavailable",
+    "new": "test_failed_cold_cache_fetch_raises_jwks_unavailable",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_suresi_dolmus",
+    "new": "test_rejects_expired_token",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
   }
 ]

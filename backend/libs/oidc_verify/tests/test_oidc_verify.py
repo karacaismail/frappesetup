@@ -109,7 +109,7 @@ class AccessTokenTest(Temel):
         fields = self.access(token, allowed_azp={"identity-sync", "press-service"})
         self.assertEqual(fields["azp"], "press-service")
 
-    def test_suresi_dolmus(self):
+    def test_rejects_expired_token(self):
         simdi = int(time.time())
         token = self.anahtar.sign(access_payload(iat=simdi - 400, exp=simdi - 60))
         self.assertEqual(self.error_code(self.access, token), "expired")
@@ -121,7 +121,7 @@ class AccessTokenTest(Temel):
         token = self.anahtar.sign(access_payload(iat=simdi - 300, exp=simdi - 40))
         self.assertEqual(self.error_code(self.access, token), "expired")
 
-    def test_pay_sifirken_dolmus_sayilir(self):
+    def test_token_expires_without_clock_leeway(self):
         simdi = int(time.time())
         token = self.anahtar.sign(access_payload(iat=simdi - 300, exp=simdi - 20))
         self.assertEqual(self.error_code(self.access, token, leeway=0), "expired")
@@ -139,35 +139,35 @@ class AccessTokenTest(Temel):
 
     def test_unknown_key_id_refreshes_list_once(self):
         self.access(self.anahtar.sign(access_payload()))
-        self.assertEqual(self.provider.cagri, 1)
+        self.assertEqual(self.provider.call_count, 1)
         yeni = Anahtar("kid-2")
         self.provider.keys.append(yeni)
         self.assertEqual(self.access(yeni.sign(access_payload()))["azp"], "identity-sync")
-        self.assertEqual(self.provider.cagri, 2)
+        self.assertEqual(self.provider.call_count, 2)
 
     def test_kid_still_unknown_after_refresh(self):
         self.access(self.anahtar.sign(access_payload()))
         yabanci = Anahtar("kid-yok")
         self.assertEqual(self.error_code(self.access, yabanci.sign(access_payload())), "unknown_kid")
-        self.assertEqual(self.provider.cagri, 2)
+        self.assertEqual(self.provider.call_count, 2)
         # Art arda gelen bilinmeyen kid listeyi yeniden çektirmez.
         self.assertEqual(self.error_code(self.access, yabanci.sign(access_payload())), "unknown_kid")
-        self.assertEqual(self.provider.cagri, 2)
+        self.assertEqual(self.provider.call_count, 2)
 
     def test_cold_cache_unknown_kid_single_fetch(self):
         yabanci = Anahtar("kid-yok")
         self.assertEqual(self.error_code(self.access, yabanci.sign(access_payload())), "unknown_kid")
-        self.assertEqual(self.provider.cagri, 1)
+        self.assertEqual(self.provider.call_count, 1)
 
     def test_key_list_refreshes_after_expiration(self):
         time_now = [1000.0]
         cache = JwksCache(JWKS_URL, ttl_seconds=600, fetcher=self.provider, clock=lambda: time_now[0])
         self.access(self.anahtar.sign(access_payload()), cache=cache)
         self.access(self.anahtar.sign(access_payload()), cache=cache)
-        self.assertEqual(self.provider.cagri, 1)
+        self.assertEqual(self.provider.call_count, 1)
         time_now[0] += 601
         self.access(self.anahtar.sign(access_payload()), cache=cache)
-        self.assertEqual(self.provider.cagri, 2)
+        self.assertEqual(self.provider.call_count, 2)
 
     def test_error_message_excludes_token(self):
         token = self.anahtar.sign(access_payload(aud="press"))
@@ -296,20 +296,20 @@ class JwksCacheTest(unittest.TestCase):
     def test_old_keys_used_when_refresh_fails(self):
         token = self.anahtar.sign(access_payload())
         self.assertEqual(self.access(token)["azp"], "identity-sync")
-        self.assertEqual(self.provider.cagri, 1)
+        self.assertEqual(self.provider.call_count, 1)
         self.provider.error = URLError("bağlantı yok")
         self.time_now[0] += 601
         # Süre doldu. Çekim başarısız. Eski anahtar yine de doğrular.
         self.assertEqual(self.access(token)["azp"], "identity-sync")
-        self.assertEqual(self.provider.cagri, 2)
+        self.assertEqual(self.provider.call_count, 2)
         # Aynı pencere içinde yeniden denenmez.
         self.time_now[0] += 2
         self.assertEqual(self.access(token)["azp"], "identity-sync")
-        self.assertEqual(self.provider.cagri, 2)
+        self.assertEqual(self.provider.call_count, 2)
         # Pencere geçince bir kez daha denenir.
         self.time_now[0] += 4
         self.assertEqual(self.access(token)["azp"], "identity-sync")
-        self.assertEqual(self.provider.cagri, 3)
+        self.assertEqual(self.provider.call_count, 3)
         # Sağlayıcı düzelince liste yenilenir ve yeni anahtar bulunur.
         self.provider.error = None
         yeni = Anahtar("kid-2")
@@ -325,22 +325,22 @@ class JwksCacheTest(unittest.TestCase):
             self.time_now[0] += 601
             self.assertEqual(self.access(token)["azp"], "identity-sync")
 
-    def test_soguk_onbellekte_cekim_basarisizsa_jwks_unavailable(self):
+    def test_failed_cold_cache_fetch_raises_jwks_unavailable(self):
         self.provider.error = URLError("bağlantı yok")
         token = self.anahtar.sign(access_payload())
         with self.assertRaises(JwksUnavailable):
             self.access(token)
-        self.assertEqual(self.provider.cagri, 1)
+        self.assertEqual(self.provider.call_count, 1)
         # Aynı pencere içinde sağlayıcı yeniden yorulmaz. Hata yine yükselir.
         self.time_now[0] += 1
         with self.assertRaises(JwksUnavailable):
             self.access(token)
-        self.assertEqual(self.provider.cagri, 1)
+        self.assertEqual(self.provider.call_count, 1)
         # Pencere geçince yeniden denenir ve sağlayıcı düzelmişse doğrulama geçer.
         self.provider.error = None
         self.time_now[0] += 5
         self.assertEqual(self.access(token)["azp"], "identity-sync")
-        self.assertEqual(self.provider.cagri, 2)
+        self.assertEqual(self.provider.call_count, 2)
 
     def test_jwks_unavailable_token_error_degildir(self):
         self.assertFalse(issubclass(JwksUnavailable, TokenError))
@@ -363,9 +363,9 @@ class JwksCacheTest(unittest.TestCase):
 
 class FrappeIndependenceTest(unittest.TestCase):
     def test_source_has_no_frappe(self):
-        kaynak = Path(__file__).resolve().parent.parent / "src" / "oidc_verify"
+        source_directory = Path(__file__).resolve().parent.parent / "src" / "oidc_verify"
         desen = re.compile(r"^\s*(import\s+frappe\b|from\s+frappe\b)")
-        files = sorted(kaynak.glob("*.py"))
+        files = sorted(source_directory.glob("*.py"))
         self.assertTrue(files)
         for file in files:
             for numara, line in enumerate(file.read_text(encoding="utf-8").splitlines(), 1):

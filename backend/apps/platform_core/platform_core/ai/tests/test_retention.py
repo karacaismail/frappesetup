@@ -152,7 +152,7 @@ class TestRetentionPeriods(AiTestCase):
 		from platform_core.ai import retention
 
 		manager = self.login(MANAGER)
-		for _ in range(4):
+		for _iteration in range(4):
 			self.proposal(manager, status="rejected", decided_at=ago(31))
 
 		from platform_core.ai.tests.test_usage_selection import Gateway, installed

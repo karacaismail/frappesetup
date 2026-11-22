@@ -24,7 +24,7 @@ from platform_core.access.tests.base import (
 	HR,
 	PORTAL,
 	ROLE_PORTAL,
-	ErisimTestCase,
+	AccessRuleTestCase,
 )
 
 ACCESS = "/api/method/platform_core.api.access."
@@ -60,9 +60,9 @@ RULE_EXPECTED = {
 }
 
 
-class TestEntryMatrix(ErisimTestCase):
+class TestEntryMatrix(AccessRuleTestCase):
 	RULES = (
-		*ErisimTestCase.RULES,
+		*AccessRuleTestCase.RULES,
 		{
 			"title": "Portal own records",
 			"role": ROLE_PORTAL,
