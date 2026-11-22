@@ -54,6 +54,8 @@ Her klasörün tek sahibi vardır. Başka işin klasörünü değiştirmeyin. De
 
 `hooks.py` ortak bir dosyadır. Yalnız kendi işinizin satırlarını ekleyin. Var olan satırları değiştirmeyin.
 
+Her liste kancası dosyada yalnız bir kez atanır. Örneğin `auth_hooks` ya da `ai_write_closed_doctypes` böyledir. Kanca dosyada varsa kendi değerinizi o listeye ekleyin. Yeni bir atama satırı yazmayın. Python'da son atama öncekileri siler ve Git bunu çakışma saymaz. Birleştirme önizlemesi aynı adın iki kez atanmasını yakalar.
+
 `platform_core/translations/tr.csv` de ortak bir dosyadır. Kullanıcıya görünen metnin kaynağı İngilizcedir. Türkçesini bu dosyaya ekleyin. Yalnız kendi satırlarınızı ekleyin. Çakışmayı orkestratör birleştirmede çözer.
 
 ## Zorunlu çalışma kuralları
