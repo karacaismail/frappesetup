@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Response } from '@playwright/test';
 import { ACCOUNT_DELETION_URL, admin, BRAND, createUser, endSessions, KC, loginUrl, openLogin, REALM, submitPassword } from './helpers';
 
 // Access is tested on the real sign-in path, and the refusal is tested too (backend/AGENTS.md, D-6).
@@ -62,16 +62,22 @@ test.describe('signed in', () => {
     await expect(page.locator('#kc-form-login')).toHaveCount(0);
   });
 
-  test('the account API answers a signed-in user with the own profile only', async ({ page }) => {
-    const email = await signIn(page, { customer: false });
+  test('the account data request answers a signed-in user with the own account only', async ({ page }) => {
+    // A second account exists in the same realm. Its data must not reach this user.
     const other = await createUser();
-    const token = await page.evaluate(async () => {
-      const entry = performance.getEntriesByType('resource').find((item) => item.name.includes('/account/?userProfileMetadata'));
-      return Boolean(entry);
-    });
-    expect(token, 'the console asked the account API').toBe(true);
-    const html = await (await page.request.get(ACCOUNT)).text();
-    expect(html).not.toContain(other);
+    const email = await signIn(page, { customer: false });
+    // The console asks the server for the account data as JSON. This is that request, made by the browser itself.
+    const isAccountData = (response: Response) =>
+      response.request().method() === 'GET' &&
+      response.url().startsWith(`${ACCOUNT}?`) &&
+      (response.headers()['content-type'] ?? '').includes('application/json');
+    const [response] = await Promise.all([page.waitForResponse(isAccountData, { timeout: 20_000 }), page.reload()]);
+    expect(response.status(), 'status of the account data request').toBe(200);
+    const text = await response.text();
+    const data = JSON.parse(text) as { email?: string; username?: string };
+    expect(data.email, 'the answer belongs to the signed-in user').toBe(email);
+    expect(data.username).toBe(email);
+    expect(text.includes(other), 'data of the second account in the answer').toBe(false);
     await expect(page.locator('#email')).toHaveValue(email);
   });
 
