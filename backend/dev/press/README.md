@@ -52,6 +52,9 @@ sh backend/apps/press_tr/tests/smoke.sh
 bash backend/dev/press/compose.sh down
 ```
 
+Yamasız adayın sonucu [uyum denemesinde](unpatched-runtime.md) açıklanır.
+İki kaynak engeli sürdüğü için O-18 borcu açıktır.
+
 `patch-py314.sh` Press kaynaklarına uyum yaması uygular.
 Bu yama yalnız `development` imajında bulunur ve çalışır (O-18).
 `runtime-check` hedefinde yama ve geliştirme işareti yoktur.
