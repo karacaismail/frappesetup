@@ -655,7 +655,10 @@ x-report-rules:
     - A script report (“Script Report”) runs only for the “System Manager” role. Everyone else gets 403.
     - What the SQL of a query report or the code of a script report reads cannot be verified. No declaration opens such a report.
     - The gate decides on the report Frappe really runs. Frappe follows `reference_report` only for a report of type “Custom Report”, and so does the gate. A report of another type is judged by its own type, also when that field still holds an old value.
-    - A custom report whose reference cannot be found, or whose references form a loop, is refused. On a site with a governed document type it also counts as touching governed data.
+    - "A custom report whose references form a loop: running it, exporting it and reading its script return 403 for every user. Frappe follows the references before it asks the gate, so the engine counts how often one request loads the same custom report and refuses past 10 loads. Without this the request would end in a server error."
+    - "A custom report whose reference cannot be found: running it and exporting it return 404 for every user. This is Frappe's own answer for the missing report, given before any data is read."
+    - "A report with a loop or a missing reference can still be opened and saved, so that an administrator can repair it."
+    - "The gate function itself (`report_guard`, Prepared Report, Auto Email Report) refuses both cases with a permission error. On a site with a governed document type such a report also counts as touching governed data."
     - For a report that touches governed data the prepared report (“Prepared Report”) is closed. Creating one, reading a stored result, downloading its file alone or in a ZIP, and converting it to CSV are refused.
     - A prepared report queued before a rule existed is refused when its job starts, before any report code runs. This holds for list, query and script reports. The record ends in status Error and no file is written.
     - A scheduled email report (“Auto Email Report”) that touches governed data is switched off for everyone, the “System Manager” role and the “Administrator” user included.

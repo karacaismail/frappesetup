@@ -263,13 +263,18 @@ class TestWhichReportRuns(ReportRulesTestCase):
 				allowed = self.run_report(self.login(ADMIN), report)
 				self.assertEqual(allowed.status_code, 200, allowed.get_data(as_text=True)[:300])
 
+	def export_report(self, client, report: str):
+		body = {"report_name": report, "file_format_type": "CSV", "filters": "{}"}
+		return self.send(client, "POST", EXPORT, body=body)
+
 	def test_missing_reference_is_refused(self):
+		"""Frappe looks for the missing report first and answers 404. No data is read."""
 		for user in (EMPLOYEE_1, HR, ADMIN):
 			with self.subTest(user=user):
 				self.assertTrue(self.denied(self.BROKEN, user))
-		response = self.run_report(self.login(HR), self.BROKEN)
-		self.assertNotEqual(response.status_code, 200, response.get_data(as_text=True)[:300])
-		self.assert_refused(response, (403, 404, 417))
+				client = self.login(user)
+				self.assert_refused(self.run_report(client, self.BROKEN), (404,))
+				self.assert_refused(self.export_report(client, self.BROKEN), (404,))
 		self.assertTrue(reports.touches_governed(self.BROKEN))
 
 	def test_reference_loop_is_refused_without_hanging(self):
@@ -278,6 +283,46 @@ class TestWhichReportRuns(ReportRulesTestCase):
 				with self.subTest(report=report, user=user):
 					self.assertTrue(self.denied(report, user))
 			self.assertTrue(reports.touches_governed(report))
+
+	def test_running_a_reference_loop_is_refused_not_a_server_error(self):
+		"""Frappe follows the references before it reaches the gate (`frappe/desk/query_report.py:37`).
+
+		Without a check of its own it would follow the loop until Python gives up, and answer 500.
+		"""
+		for report in (self.LOOP_A, self.LOOP_B):
+			for user in (EMPLOYEE_1, HR, ADMIN):
+				with self.subTest(report=report, user=user):
+					client = self.login(user)
+					self.assert_refused(self.run_report(client, report))
+					self.assert_refused(self.export_report(client, report))
+
+	def test_script_of_a_reference_loop_is_refused_too(self):
+		response = self.send(
+			self.login(ADMIN),
+			"POST",
+			"/api/method/frappe.desk.query_report.get_script",
+			body={"report_name": self.LOOP_A},
+		)
+
+		self.assert_refused(response)
+
+	def test_a_report_in_a_loop_can_still_be_opened_and_repaired(self):
+		"""Reading the record once is not following the loop. An administrator must be able to fix it."""
+		client = self.login(ADMIN)
+		opened = self.send(client, "GET", f"/api/v2/document/Report/{self.LOOP_A}")
+		self.assertEqual(opened.status_code, 200, opened.get_data(as_text=True)[:300])
+
+		self.addCleanup(self.restore_loop)
+		saved = self.send(
+			client, "PUT", f"/api/v2/document/Report/{self.LOOP_A}", body={"reference_report": NAME_REPORT}
+		)
+		self.assertEqual(saved.status_code, 200, saved.get_data(as_text=True)[:300])
+		self.assertEqual(self.run_report(client, self.LOOP_A).status_code, 200)
+
+	def restore_loop(self) -> None:
+		frappe.db.set_value("Report", self.LOOP_A, "reference_report", self.LOOP_B)
+		# Committed on purpose: the request uses another connection.
+		frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 	def test_prepared_report_gate_uses_the_report_that_runs(self):
 		for report in (self.STALE, self.CUSTOM, self.BROKEN, self.LOOP_A):

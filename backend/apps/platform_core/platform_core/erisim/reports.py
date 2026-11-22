@@ -188,8 +188,43 @@ def refuse_inside_prepared_report_job(report_name: str) -> None:
 		refuse_prepared_report(report_name)
 
 
+LOADED_IN_REQUEST = "platform_core.erisim.reports.custom_reports_loaded"
+# Opening or saving a report loads it a few times. Following a loop loads it without end.
+MAX_LOADS_IN_REQUEST = 10
+
+
+def refuse_reference_loop(report_name: str) -> None:
+	"""Stop Frappe from following a loop of custom reports.
+
+	Frappe resolves `reference_report` before the gate is asked
+	(`frappe/desk/query_report.py:37`): it loads each custom report in the chain, one after the
+	other, and in a loop it does so until Python gives up. The request then ends in a server
+	error. So the loads of one custom report are counted for the request. Past the limit the
+	references are checked, and a report that cannot be resolved is refused.
+
+	A report that resolves is never refused here, however often it is loaded. A broken one can
+	still be opened and saved, so an administrator can repair it.
+	"""
+	loads = frappe.local.request_cache.setdefault(LOADED_IN_REQUEST, {})
+	loads[report_name] = loads.get(report_name, 0) + 1
+	if loads[report_name] <= MAX_LOADS_IN_REQUEST:
+		return
+	_record, resolved = report_record(report_name)
+	if not resolved:
+		frappe.throw(
+			_("Report {0} refers to a report that cannot be found.").format(frappe.bold(report_name)),
+			frappe.PermissionError,
+		)
+
+
 class GuardedReport:
 	"""Extension of Report: no data is read before the gate agrees."""
+
+	def load_from_db(self, *args, **kwargs):
+		loaded = super().load_from_db(*args, **kwargs)
+		if self.get("report_type") == CUSTOM_REPORT:
+			refuse_reference_loop(self.name)
+		return loaded
 
 	def execute_query_report(self, filters):
 		refuse_inside_prepared_report_job(self.name)

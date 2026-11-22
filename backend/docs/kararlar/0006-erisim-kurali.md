@@ -367,6 +367,17 @@ Kapı Frappe'nin gerçekten çalıştırdığı rapora bakar. Frappe başvuru al
 
 Başvuru bulunamazsa ya da başvurular döngü kurarsa kapı raporu reddeder. Hazır rapor ve e-posta raporu kapıları da aynı çözümlemeyi kullanır.
 
+Frappe başvuruları kapıya sormadan önce izler (`desk/query_report.py:37`). Bu yüzden iki durumun HTTP yanıtı farklıdır:
+
+| Durum | Çalıştırma ve dışa aktarma yanıtı | Yanıtı kim verir |
+| --- | --- | --- |
+| Başvurulan rapor yok | 404 | Frappe. Olmayan raporu arar ve bulamaz. Veri okunmaz. |
+| Başvurular döngü kuruyor | 403 | Motor. |
+
+Döngüde Frappe aynı kayıtları Python çağrı sınırına kadar yükler ve sunucu hatası verir. Birleşme öncesi inceleme bunu buldu ve bir test doğruladı. Motor bu yüzden bir istekte aynı özel raporun kaç kez yüklendiğini sayar. Sayı 10'u geçerse motor başvuruları denetler. Başvuru çözülemiyorsa motor isteği reddeder.
+
+Çözülen bir rapor burada hiç reddedilmez. Bozuk bir rapor da açılabilir ve kaydedilebilir. Böylece yönetici bozuk başvuruyu düzeltebilir. Bir test bunu sınar.
+
 Başka modüller kapıyı `platform_core.erisim.api.report_guard` işleviyle de sorabilir. Yapay zekâ katmanı raporu çalıştırmadan önce bu işlevi çağırır. Bu erken bir cevaptır. Asıl denetim rapor çalışırken yine yapılır.
 
 #### Kurallar
