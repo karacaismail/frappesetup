@@ -18,6 +18,7 @@ compose=(docker --context colima-factory compose --project-name "$project"
 
 case "${1:-}" in
     up)
+        trap 'printf "%s\n" "Startup stopped. Run environment.sh down to close this test environment." >&2' ERR
         python3 "$dev_dir/init_env.py"
         "${compose[@]}" config --quiet
         "${compose[@]}" build kiraci-web
@@ -25,17 +26,20 @@ case "${1:-}" in
         "${compose[@]}" run --rm --no-deps kiraci-web \
             env/bin/python /workspace/dev/bootstrap.py kiraci1.localhost --app erpnext --app platform_core
         "${compose[@]}" up -d kiraci-web kiraci-socket
+        "$dev_dir/bin/tunel" kapat
         "$dev_dir/bin/tunel" ac "$KIRACI_WEB_PORT" "$KIRACI_SOCKET_PORT" "$provider_port"
         printf 'Tenant URL: http://kiraci1.localhost:%s\n' "$KIRACI_WEB_PORT"
         ;;
     down)
-        if [[ -f "$DEV_ENV_FILE" ]]; then
-            if docker --context colima-factory container inspect "$project-provider" >/dev/null 2>&1; then
-                docker --context colima-factory stop "$project-provider"
-            fi
-            "${compose[@]}" down
-            "$dev_dir/bin/tunel" kapat
+        if [[ ! -f "$DEV_ENV_FILE" ]]; then
+            printf '%s\n' 'Cannot close the test environment: the local environment file is missing.' >&2
+            exit 2
         fi
+        if docker --context colima-factory container inspect "$project-provider" >/dev/null 2>&1; then
+            docker --context colima-factory stop "$project-provider"
+        fi
+        "${compose[@]}" down
+        "$dev_dir/bin/tunel" kapat
         ;;
     provider)
         docker --context colima-factory run --detach --rm --name "$project-provider" \

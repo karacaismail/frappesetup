@@ -1,25 +1,57 @@
 import { createHmac, randomUUID } from 'node:crypto';
-import { expect, test, type APIRequestContext } from '@playwright/test';
-import { localUrl, required, syncAccount } from './local';
+import { expect, test, request as apiRequest, type APIRequestContext } from '@playwright/test';
+import { localUrl, required } from './local';
 
 function sessionHeaders(role: 'operator' | 'reader') {
   const prefix = `E2E_${role.toUpperCase()}`;
   return { Cookie: required(`${prefix}_COOKIE`), 'X-Frappe-CSRF-Token': required(`${prefix}_CSRF`) };
 }
 
-async function mcp(request: APIRequestContext, token: string, name: string, args: object) {
-  const id = randomUUID();
-  const response = await request.post(`${localUrl('kiraci1.localhost', 1)}/api/method/platform_core.api.ai.mcp`, {
-    maxRedirects: 0,
-    headers: { Authorization: `Bearer ${token}`, 'Mcp-Conversation-Id': randomUUID() },
-    data: { jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } },
+const aiMethod = (method: string) =>
+  `${localUrl('kiraci1.localhost', 1)}/api/method/platform_core.api.ai.${method}`;
+
+async function issueAgentToken(request: APIRequestContext, role: 'operator' | 'reader') {
+  const response = await request.post(aiMethod('issue_agent_token'), {
+    headers: sessionHeaders(role), maxRedirects: 0,
   });
   expect(response.status()).toBe(200);
-  const body = await response.json();
-  expect(body.jsonrpc).toBe('2.0');
-  expect(body.id).toBe(id);
-  expect(body.error).toBeUndefined();
-  return body.result;
+  const { token } = (await response.json()).message;
+  expect(typeof token).toBe('string');
+  return token as string;
+}
+
+function bearer(token: string) {
+  return { Authorization: `Bearer ${token}` };
+}
+
+function mcpCall(name: string, args: object) {
+  return { jsonrpc: '2.0', id: randomUUID(), method: 'tools/call', params: { name, arguments: args } };
+}
+
+async function withFreshRequest<T>(run: (request: APIRequestContext) => Promise<T>): Promise<T> {
+  const request = await apiRequest.newContext();
+  try {
+    return await run(request);
+  } finally {
+    await request.dispose();
+  }
+}
+
+async function mcp(token: string, name: string, args: object) {
+  return withFreshRequest(async (request) => {
+    const data = mcpCall(name, args);
+    const response = await request.post(aiMethod('mcp'), {
+      maxRedirects: 0,
+      headers: { ...bearer(token), 'Mcp-Conversation-Id': randomUUID() },
+      data,
+    });
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.jsonrpc).toBe('2.0');
+    expect(body.id).toBe(data.id);
+    expect(body.error).toBeUndefined();
+    return body.result;
+  });
 }
 
 function fixtures() {
@@ -30,15 +62,20 @@ function fixtures() {
   };
 }
 
-async function resource(request: APIRequestContext, doctype: string, name?: string, role: 'operator' | 'reader' = 'reader') {
+async function resource(request: APIRequestContext, doctype: string, name?: string, role: 'operator' | 'reader' = 'reader', params?: Record<string, string | number>) {
   const path = [doctype, ...(name ? [name] : [])].map(encodeURIComponent).join('/');
   return request.get(`${localUrl('kiraci1.localhost', 1)}/api/resource/${path}`, {
     headers: sessionHeaders(role),
+    params,
     maxRedirects: 0,
   });
 }
 
 test('identity sync provisions a Website User', async ({ request }) => {
+  const syncAccount = required('E2E_SYNC_EMAIL');
+  if (!/^e2e-sync(?:-[a-z0-9-]+)?@example\.test$/.test(syncAccount)) {
+    throw new Error('E2E_SYNC_EMAIL must be a synthetic identity sync account.');
+  }
   const before = await resource(request, 'User', syncAccount, 'operator');
   expect(before.status()).toBe(404);
   const now = Date.now();
@@ -66,26 +103,31 @@ test('identity sync provisions a Website User', async ({ request }) => {
 
 test('agent token lists permitted records only', async ({ request }) => {
   const { doctype, visible, hidden } = fixtures();
-  const response = await request.post(
-    `${localUrl('kiraci1.localhost', 1)}/api/method/platform_core.api.ai.issue_agent_token`,
-    { headers: sessionHeaders('reader'), maxRedirects: 0 },
-  );
-  expect(response.status()).toBe(200);
-  const { token } = (await response.json()).message;
-  const result = await mcp(request, token, 'list_documents', {
+  const token = await issueAgentToken(request, 'reader');
+  const result = await mcp(token, 'list_documents', {
     doctype, filters: { name: ['in', [visible, hidden]] }, fields: ['name'],
   });
   expect(result.isError).toBe(false);
+  // The list_documents result schema is pending in the owning contract.
   expect(result.structuredContent.documents).toEqual([{ name: visible }]);
-  const denied = await mcp(request, token, 'get_document', { doctype, name: hidden });
+  const denied = await mcp(token, 'get_document', { doctype, name: hidden });
   expect(denied.isError).toBe(true);
 });
 
-test('an update takes effect only after human approval', async ({ request }) => {
+test('MCP rejects an agent token sent with a session cookie', async ({ request }) => {
+  const token = await issueAgentToken(request, 'reader');
+  const response = await request.post(aiMethod('mcp'), {
+    headers: { ...sessionHeaders('reader'), ...bearer(token), 'Mcp-Conversation-Id': randomUUID() },
+    data: mcpCall('list_documents', { doctype: fixtures().doctype }),
+    maxRedirects: 0,
+  });
+  expect(response.status()).toBe(403);
+});
+
+test('an update takes effect only after one valid human approval', async ({ request }) => {
   const { doctype, visible: name } = fixtures();
   const field = required('E2E_UPDATE_FIELD');
   const value = `Integration ${randomUUID()}`;
-  const base = `${localUrl('kiraci1.localhost', 1)}/api/method/platform_core.api.ai.`;
   const headers = sessionHeaders('operator');
   const readValue = async () => {
     const record = await resource(request, doctype, name, 'operator');
@@ -94,25 +136,40 @@ test('an update takes effect only after human approval', async ({ request }) => 
   };
   const before = await readValue();
   expect(before).toBeDefined();
-  const rpc = await request.post(`${base}mcp`, {
-    headers: { ...headers, 'Mcp-Conversation-Id': randomUUID() },
-    maxRedirects: 0,
-    data: { jsonrpc: '2.0', id: 1, method: 'tools/call',
-      params: { name: 'update_document', arguments: { doctype, name, data: { [field]: value } } } },
-  });
-  expect(rpc.status()).toBe(200);
-  const { result } = await rpc.json();
+  const token = await issueAgentToken(request, 'operator');
+  const result = await mcp(token, 'update_document', { doctype, name, data: { [field]: value } });
   expect(result.isError).toBe(false);
+  expect(result.structuredContent.status).toBe('approval_required');
   const { proposal_id } = result.structuredContent;
   expect(await readValue()).toBe(before);
 
-  const preview = await request.get(`${base}get_proposal`, { headers, params: { proposal_id }, maxRedirects: 0 });
+  const preview = await request.get(aiMethod('get_proposal'), { headers, params: { proposal_id }, maxRedirects: 0 });
   expect(preview.status()).toBe(200);
   const { digest } = (await preview.json()).message;
-  const approved = await request.post(`${base}approve_proposal`, {
-    headers, data: { proposal_id, digest }, maxRedirects: 0,
+  expect(digest).toMatch(/^[a-f0-9]{64}$/);
+
+  await withFreshRequest(async (agent) => {
+    const denied = await agent.post(aiMethod('approve_proposal'), {
+      headers: bearer(token), data: { proposal_id, digest }, maxRedirects: 0,
+    });
+    expect(denied.status()).toBe(401);
   });
-  expect(approved.status()).toBe(200);
+  expect(await readValue()).toBe(before);
+
+  const approve = async (approvalDigest: string) => {
+    const response = await request.post(aiMethod('approve_proposal'), {
+      headers, data: { proposal_id, digest: approvalDigest }, maxRedirects: 0,
+    });
+    expect(response.status()).toBe(200);
+    return (await response.json()).message;
+  };
+  const wrongDigest = (digest[0] === '0' ? '1' : '0') + digest.slice(1);
+  expect(await approve(wrongDigest)).toMatchObject({ executed: false, deny_reason: 'digest_mismatch' });
+  expect(await readValue()).toBe(before);
+
+  expect(await approve(digest)).toMatchObject({ executed: true });
+  expect(await readValue()).toBe(value);
+  expect(await approve(digest)).toMatchObject({ executed: false, deny_reason: 'not_pending' });
   expect(await readValue()).toBe(value);
 });
 
@@ -136,7 +193,21 @@ test('model gateway falls back after the first provider returns 429', async ({ r
 
 test('access rule applies equally to list and detail', async ({ request }) => {
   const { doctype, visible, hidden } = fixtures();
-  const list = await resource(request, doctype);
+  const summary = await request.get(
+    `${localUrl('kiraci1.localhost', 1)}/api/method/platform_core.api.access.get_access_summary`,
+    { headers: sessionHeaders('reader'), params: { doctype }, maxRedirects: 0 },
+  );
+  expect(summary.status()).toBe(200);
+  expect((await summary.json()).message).toMatchObject({ doctype, governed: true });
+  const params = {
+    filters: JSON.stringify([['name', 'in', [visible, hidden]]]),
+    limit_page_length: 0,
+  };
+  const baseline = await resource(request, doctype, undefined, 'operator', params);
+  expect(baseline.status()).toBe(200);
+  const baselineNames = (await baseline.json()).data.map((record: { name: string }) => record.name);
+  expect(baselineNames.sort()).toEqual([visible, hidden].sort());
+  const list = await resource(request, doctype, undefined, 'reader', params);
   expect(list.status()).toBe(200);
   const names = (await list.json()).data.map((record: { name: string }) => record.name);
   expect(names).toContain(visible);

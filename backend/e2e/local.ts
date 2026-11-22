@@ -13,4 +13,3 @@ export function required(name: string): string {
 }
 
 export const account = 'e2e-user@example.test';
-export const syncAccount = 'e2e-sync@example.test';

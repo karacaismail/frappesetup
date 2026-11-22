@@ -4,10 +4,14 @@ import { account, localUrl, required } from './local';
 async function login(page: Page) {
   const site = localUrl('kiraci1.localhost', 1);
   const identity = localUrl('kimlik.localhost', 0);
+  const blockedOrigins = new Set<string>();
   await page.route('**/*', async (route) => {
     const origin = new URL(route.request().url()).origin;
     if (origin === site || origin === identity) await route.continue();
-    else await route.abort();
+    else {
+      blockedOrigins.add(origin);
+      await route.abort();
+    }
   });
 
   await page.goto(`${site}/panel`);
@@ -28,17 +32,19 @@ async function login(page: Page) {
     return (await response.json()).message;
   };
   expect(await currentUser()).toBe(account);
-  return { identity, currentUser };
+  return { identity, currentUser, blockedOrigins };
 }
 
 test('tenant session opens through Keycloak', async ({ page }) => {
-  await login(page);
+  const { blockedOrigins } = await login(page);
+  expect([...blockedOrigins]).toEqual([]);
 });
 
 test('Keycloak logout closes the tenant session within 60 seconds', async ({ page }) => {
   test.setTimeout(90_000);
-  const { identity, currentUser } = await login(page);
+  const { identity, currentUser, blockedOrigins } = await login(page);
   await page.goto(`${identity}/realms/platform/protocol/openid-connect/logout`);
   await page.locator('#kc-logout').click();
   await expect.poll(currentUser, { timeout: 60_000 }).toBe('Guest');
+  expect([...blockedOrigins]).toEqual([]);
 });
