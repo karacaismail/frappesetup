@@ -21,6 +21,9 @@ RESTRICTED_ROLE = "YZ Kisitli"
 USER_A = "yz.a@example.test"
 USER_B = "yz.b@example.test"
 MANAGER = "yz.yonetici@example.test"
+# A desk user without the System Manager role. A Website User is stopped before the endpoint runs.
+DESK_USER = "yz.desk@example.test"
+DESK_ROLE = "YZ Desk"
 PASSWORD = "Sahte-Parola-7391-yz!"
 
 
@@ -120,7 +123,10 @@ def ensure_fixtures() -> None:
 				{"role": "System Manager", "permlevel": 1, "read": 1, "write": 1},
 			],
 		).insert()
+	if not frappe.db.exists("Role", DESK_ROLE):
+		frappe.get_doc(doctype="Role", role_name=DESK_ROLE, desk_access=1).insert()
 	for email, roles in (
+		(DESK_USER, [DESK_ROLE]),
 		(USER_A, [RESTRICTED_ROLE]),
 		(USER_B, [RESTRICTED_ROLE]),
 		(MANAGER, ["System Manager"]),

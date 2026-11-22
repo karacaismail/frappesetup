@@ -507,7 +507,7 @@ components:
         result_document:
           type: [string, "null"]
           description: Name of the affected document if execution succeeded.
-        error: {type: [string, "null"], description: Error text if execution failed.}
+        error: {type: [string, "null"], description: "Fixed error code if execution failed, for example `validation_error`, `permission`, `document_changed` or `internal_error`. The text of a tool's error is never stored or returned."}
 
     Preview:
       type: object
@@ -992,6 +992,11 @@ x-ai-tools-hook:
   description: |
     The application writes `ai_tools = ["app.path.function"]` in its `hooks.py` file.
     The function returns a list in the shape below. The layer validates the declaration when it loads it.
+
+    Errors of a tool: the text of a Frappe error (`ValidationError`, `PermissionError`,
+    `DoesNotExistError`) is never returned or stored. The caller gets a fixed code and a fixed text.
+    The server log gets the tool name and the error type. A tool that raises `ToolDenied` writes
+    the returned text itself and must not put a field value into it.
   declaration:
     type: object
     additionalProperties: false

@@ -20,7 +20,7 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from platform_core.yapay_zeka import access, agent_token, proposals, registry
-from platform_core.yapay_zeka.errors import CONTEXT, ToolDenied
+from platform_core.yapay_zeka.errors import CONTEXT, ToolDenied, log_tool_error, traceback_without_text
 
 LIST_TTL_MS = 60000
 
@@ -199,17 +199,21 @@ def call_tool(params: dict) -> dict:
 	except ToolDenied as error:
 		return _deny(context, error.code, str(error))
 	except frappe.PermissionError as error:
-		return _deny(context, "permission", str(error) or "Not permitted")
+		# The text of a Frappe error may carry a field value. The answer is a fixed text.
+		log_tool_error(tool.name, error)
+		return _deny(context, "permission", _("You do not have permission for this action.", context=CONTEXT))
 	except frappe.DoesNotExistError as error:
-		return _deny(context, "not_found", str(error) or "Not found")
+		log_tool_error(tool.name, error)
+		return _deny(context, "not_found", _("The record was not found.", context=CONTEXT))
 	except frappe.ValidationError as error:
 		# A tool, most often the preview of an app tool, refused the input.
-		return _deny(context, "invalid_arguments", str(error) or "Not valid")
+		log_tool_error(tool.name, error)
+		return _deny(context, "invalid_arguments", _("The tool refused the input.", context=CONTEXT))
 	except McpError:
 		raise
-	except Exception:
+	except Exception as error:
 		frappe.db.rollback()
-		frappe.log_error(title=f"AI tool {tool.name} failed")
+		frappe.log_error(title=f"AI tool {tool.name} failed", message=traceback_without_text(error))
 		frappe.clear_messages()
 		access.record("call", decision="error", deny_reason="internal_error", **context)
 		return _error("internal_error", "The tool failed. The error was recorded.")

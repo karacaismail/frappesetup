@@ -8,12 +8,12 @@ from typing import Any
 import frappe
 from frappe import _
 from frappe.mcp.tools import ToolArguments
-from frappe.utils import add_to_date, get_datetime, now_datetime, strip_html
+from frappe.utils import add_to_date, get_datetime, now_datetime
 from frappe.utils.response import json_handler
 from pydantic import Field
 
 from platform_core.yapay_zeka import access, registry, schema_check, store, timestamps, versioning
-from platform_core.yapay_zeka.errors import CONTEXT, ToolDenied
+from platform_core.yapay_zeka.errors import CONTEXT, ToolDenied, log_tool_error, traceback_without_text
 from platform_core.yapay_zeka.tools import results
 
 TTL_SECONDS = 600
@@ -446,12 +446,23 @@ def _execution_error(doc, tool: registry.AiTool, error: Exception, *, result: st
 
 
 def _error_text(tool: registry.AiTool, error: Exception) -> str:
-	"""Error text returned to the user. Details of an unexpected error go only to the error log."""
+	"""A fixed code that is stored and returned. The text of the error is never stored or returned.
+
+	The text may carry a field value. The server log gets the tool name and the error type.
+	"""
 	if isinstance(error, ToolDenied):
 		return error.code
-	if isinstance(error, frappe.ValidationError | frappe.PermissionError):
-		return strip_html(str(error) or type(error).__name__)[:300]
-	frappe.log_error(title=f"AI tool {tool.name} failed during execution")
+	if isinstance(error, frappe.PermissionError):
+		log_tool_error(tool.name, error)
+		return "permission"
+	if isinstance(error, frappe.ValidationError):
+		log_tool_error(tool.name, error)
+		return "validation_error"
+	# The traceback names the place of the failure. The error's own text is left out.
+	frappe.log_error(
+		title=f"AI tool {tool.name} failed during execution",
+		message=traceback_without_text(error),
+	)
 	return "internal_error"
 
 

@@ -8,6 +8,7 @@ from frappe.utils import add_to_date, now_datetime
 from platform_core.yapay_zeka.tests.base import (
 	API,
 	CHILD_DOCTYPE,
+	DESK_USER,
 	DOCTYPE,
 	MANAGER,
 	RESTRICTED_ROLE,
@@ -519,12 +520,13 @@ class TestHumanCallLog(YzTestCase):
 		)
 
 	def test_purge_by_a_non_admin_is_logged(self):
-		client = self.login(USER_A)
+		"""A desk user reaches the endpoint. The shell stops a Website User before it, with no log row."""
+		client = self.login(DESK_USER)
 
 		response = self.human(client, "POST", "purge_logs", body={})
 
 		self.assertEqual(response.status_code, 403)
-		log = self.last_log(tool="purge_logs", user=USER_A)
+		log = self.last_log(tool="purge_logs", user=DESK_USER)
 		self.assertEqual((log.decision, log.deny_reason), ("denied", "role_required"))
 
 	def test_rejecting_a_proposal_in_the_wrong_state_is_logged(self):

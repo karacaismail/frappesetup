@@ -556,6 +556,18 @@ Birleştirme öncesi inceleme bir engel, bir önemli ve bir küçük bulgu yazd�
 - **DocType açıklaması bayt sınırına girer.** `get_doctype_schema` önce üst bilgiyi ölçer, sonra alanları kalan yere sığdırır. Açıklama tek başına sınırı aşarsa araç açıklamayı kısaltır ve `truncated` değerini doğru döner.
 - **Çeviri dosyası LF satır sonu kullanır.**
 
+### Dokuzuncu tur: birleştirme öncesi ikinci inceleme
+
+İkinci inceleme bir engel ve bir önemli bulgu yazdı. Katman ikisini de düzeltti.
+
+- **Alanın kendi tanımı da aynı kilitle korunur.** Araç ön denetimde alanın “DocField” ve “Custom Field” satırlarını da kilitli okur. Araç sürümü bu satırların değerinden ve `modified` alanından da üretir. Tanım arada değiştiyse sonuç `document_changed` olur ve ayar kaydı oluşmaz. Test `tests/test_merge_review.py` dosyasındadır.
+- **Aracın hata metni dışarı çıkmaz.** Bir araç hata metnine alan değeri koyabilir. Bu değer kişisel veri olabilir. Katman bu metni yanıta, öneri kaydına ve günlüğe yazmaz.
+- MCP yanıtı sabit ve çevrilmiş bir metin döner. Kodlar `permission`, `not_found` ve `invalid_arguments` kodlarıdır.
+- Öneri kaydının `error` alanı sabit kod taşır. Kodlar `validation_error`, `permission`, `document_changed` ve `internal_error` kodlarıdır.
+- Sunucu günlüğü yalnız aracın adını ve hata türünü yazar. Günlük dosyası `logs/platform_core.yapay_zeka.log` dosyasıdır. “Error Log” kaydı hatanın yerini ve türünü taşır, hata metnini taşımaz.
+- Katmanın kendi `ToolDenied` iletileri yanıtta kalır. Bu iletileri katman ya da aracın sahibi bilerek yazar. Uygulama aracı bu iletiye alan değeri koymamalıdır. Kural `ai_tools` kancasının sözleşmesine yazıldı.
+- Testler `tests/test_error_text.py` dosyasındadır.
+
 ### Çeviri (O-21 ve O-23)
 
 Katmanın yorumları, docstring'leri, iletileri ve OpenAPI açıklamaları İngilizcedir. Türkçe metin `translations/tr.csv` dosyasındadır. Her ileti `platform_core.yapay_zeka` bağlamını taşır. DocType etiketleri ve açıklamaları bağlam olarak DocType adını kullanır. Kuralı `tests/test_translations.py` sınar.
@@ -579,4 +591,4 @@ Son kullanıcı panelde Website User olarak çalışır. Katmanın yedi ucu `web
 - Gerçek bir MCP istemcisiyle oturum açılmadı. Testler istemciyi taklit edecek.
 - Sürecin yürütme ortasında ölmesi testle denenmedi. Bu durumda sonuç `unknown` kalır. Kod okunarak incelendi.
 - GitHub'daki `version-16` dalı 16.60.2 sürümündedir. İmajdaki sürüm 16.56.0'dır. Aradaki fark incelenmedi.
-- Alan ayarı aracının kilidi yalnız “Property Setter” satırlarını korur. Alanın kendi tanımı aynı anda değişirse araç bunu kilitle görmez. Bu durum testle denenmedi.
+- Katman uygulama aracının `ToolDenied` iletisini denetlemez. Aracın sahibi bu iletiye alan değeri koyarsa değer yanıta girer.

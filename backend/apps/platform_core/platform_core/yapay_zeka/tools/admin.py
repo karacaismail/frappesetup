@@ -250,19 +250,39 @@ def _property_state(doctype: str, fieldname: str, property: str, *, for_update: 
 	If the database refuses the lock because a row changed after this transaction's snapshot,
 	the target has changed and the action stops.
 	"""
+	if property not in PROPERTY_TYPES:
+		raise ToolDenied("invalid_arguments", _("Unknown field: {0}", context=CONTEXT).format(property))
 	key = {"doc_type": doctype, "field_name": fieldname, "property": property}
 	try:
 		rows = frappe.db.get_values(
 			"Property Setter", key, ["name", "value", "modified"], for_update=for_update, as_dict=True
 		)
+		field_rows = _field_rows(doctype, fieldname, property, for_update=for_update)
 	except frappe.QueryDeadlockError:
 		raise ToolDenied(
 			"document_changed", _("The target changed after the preview.", context=CONTEXT)
 		) from None
-	return sorted([row.name, row.value, str(row.modified)] for row in rows)
+	return [sorted([row.name, row.value, str(row.modified)] for row in rows), field_rows]
+
+
+def _field_rows(doctype: str, fieldname: str, property: str, *, for_update: bool) -> list:
+	"""The field's own definition rows: the property's value and `modified` of each.
+
+	A standard field is a "DocField" row of the DocType, a custom one is a "Custom Field" record.
+	`property` is a key of `PROPERTY_TYPES`, so it is a known column name.
+	"""
+	found = []
+	for table, key in (
+		("DocField", {"parent": doctype, "parenttype": "DocType", "fieldname": fieldname}),
+		("Custom Field", {"dt": doctype, "fieldname": fieldname}),
+	):
+		rows = frappe.db.get_values(table, key, ["name", property, "modified"], for_update=for_update)
+		found += sorted([table, row[0], row[1], str(row[2])] for row in rows)
+	return found
 
 
 def preview_field_property(doctype: str, fieldname: str, property: str, value: str | int | bool) -> dict:
+	_admin_meta(doctype)
 	return _field_property_spec(
 		doctype, fieldname, property, value, _property_state(doctype, fieldname, property)
 	)
@@ -307,7 +327,8 @@ def prepare_field_property(
 	key = {"doc_type": doctype, "field_name": fieldname, "property": property}
 	frappe.clear_cache(doctype=doctype)
 	_verify(_field_property_spec(doctype, fieldname, property, value, state), expected_version)
-	return {"existing": state[0][0] if state else None, "value": new, "key": key}
+	setters = state[0]
+	return {"existing": setters[0][0] if setters else None, "value": new, "key": key}
 
 
 def write_field_property(prepared: dict) -> dict:

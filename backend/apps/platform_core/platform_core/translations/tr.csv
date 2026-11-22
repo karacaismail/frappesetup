@@ -328,3 +328,6 @@ Decided At,Karar zamanı,AI Action Proposal
 "When a human approved, rejected or resolved the proposal.","İnsanın öneriyi onayladığı, reddettiği ya da kapattığı zaman.",AI Action Proposal
 Preview Digest,Önizleme özeti,AI Action Proposal
 SHA-256 of the whole preview and its target. The server previews again at approval and compares.,Önizlemenin tamamının ve hedefinin SHA-256 özeti. Sunucu onayda önizlemeyi yeniden üretir ve karşılaştırır.,AI Action Proposal
+You do not have permission for this action.,Bu işlem için izniniz yok.,platform_core.yapay_zeka
+The record was not found.,Kayıt bulunamadı.,platform_core.yapay_zeka
+The tool refused the input.,Araç girdiyi kabul etmedi.,platform_core.yapay_zeka

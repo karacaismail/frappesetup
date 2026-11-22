@@ -45,7 +45,8 @@ class TestAppToolValidation(YzTestCase):
 			result = self.call_tool(client, "platform_core_checked_title", {"name": name, "title": "New"})
 
 		self.assert_denied(result, "invalid_arguments")
-		self.assertIn("frozen", result["structuredContent"]["error"]["message"])
+		# The tool's own text is not returned. It may carry a field value.
+		self.assertEqual(result["structuredContent"]["error"]["message"], "The tool refused the input.")
 		log = self.last_log(tool="platform_core_checked_title")
 		self.assertEqual((log.decision, log.deny_reason), ("denied", "invalid_arguments"))
 		self.assertEqual(frappe.db.count("AI Action Proposal", {"target_name": name}), 0)
@@ -81,7 +82,7 @@ class TestAppToolValidation(YzTestCase):
 		# An app tool's `prepare` is app code, not the layer's own check. Its errors stay unknown.
 		self.assertFalse(outcome["executed"])
 		self.assertEqual(outcome["proposal"]["result"], "unknown")
-		self.assertIn("refused", outcome["proposal"]["error"])
+		self.assertEqual(outcome["proposal"]["error"], "validation_error")
 		self.assertEqual(frappe.db.get_value(DOCTYPE, name, "title"), "Old")
 
 	def test_app_tool_with_a_pre_check_executes(self):
