@@ -1682,7 +1682,7 @@
  {
   "id": "SA-15",
   "title": "AI kredi ölçümü: AI Credit Plan ve Agent servisinden Usage Record",
-  "detail": "Yeni 'AI Credit Plan' (Plan alt sınıfı, price_try/unit) tanımlanır; Agent servisi her ücretli çağrıyı System User servis hesabıyla Usage Record (plan_type 'AI Credit Plan', interval Daily) olarak yazar ve Balance Transaction source listesine 'AI Consumption' eklenir. Kredi atomik rezervasyonla düşülür: reserve (tahmini üst sınır, idempotensi anahtarı = tur kimliği) → consume (gerçek kullanım) → release (artan); işlem koşullu güncelleme veya satır kilidiyle yarışa dayanıklıdır, eşzamanlı iki çağrı aynı bakiyeyi harcayamaz, zaman aşımında rezervasyon düşer, tekrar teslim çift faturalamaz; Team.get_balance ve `apply_limits` ve `spending_limit` rezervasyonda kontrol edilir; eşik altında ücretli araçlar intent→preview→confirm ile kilitlenir ve `receive_budget_alerts` akışı SPA'da ayarlanabilir olur. Kabul: eşzamanlılık, zaman aşımı ve tekrar teslim testleri.",
+  "detail": "Ajan servisi ücretli çağrıları Press Usage Record kaydına yazar. Servis System User hesabıyla yazar. AI Credit Plan fiyatı birim başına TRY olarak belirlenir. Balance Transaction kaynağı AI Consumption olur. Servis tur başında tahmini üst tutarı ayırır. Tur kimliği aynı tutarın ikinci kez ayrılmasını önler. Servis gerçek tutarı düşer ve artanı bırakır. Satır kilidi veya koşullu güncelleme aynı bakiyenin iki kez harcanmasını önler. Zaman aşımında ayrılan tutar bırakılır. Tekrar teslim çift fatura çıkarmaz. Servis tutarı ayırmadan önce Team.get_balance ve apply_limits/spending_limit değerlerini denetler. Bakiye yetersizse ücretli araçlar kilitlenir. Ücretli yazma işlemleri öneri, önizleme ve insan onayı gerektirir. Kullanıcı panelde receive_budget_alerts ayarını değiştirebilir. Testler eşzamanlı çağrıyı, zaman aşımını ve tekrar teslimi sınar.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P3",
@@ -1862,7 +1862,7 @@
  {
   "id": "SA-33",
   "title": "iyzico hak ediş mutabakatı ve elle başlatılan mutabakat raporu",
-  "detail": "Zamanlanmış SFTP çekimi (report.iyzipay.com; transaction/cutoff günlük 01:00 TRT, settlement payout döngüsünde) → 'Iyzico Settlement Line' → ödeme başına komisyon kesintili Payment Entry, payout toplamı Bank Transaction ile eşleşir (anahtar conversationId → Press Invoice). Gece işi Press Paid Invoice ↔ Sales Invoice, Balance Transaction ↔ Payment Entry/avans, Iyzico Payment Record ↔ settlement farklarını Error Log + panel uyarısı olarak üretir; BillingAudit kontrolleri korunur.",
+  "detail": "Operatör SFTP rapor çekimini ve mutabakatı elle başlatır (D-6). İşlem report.iyzipay.com üzerinden ödeme, kesim ve hak ediş raporlarını alır. Sistem Iyzico Settlement Line kayıtlarını oluşturur. Her ödeme için komisyonu düşerek Payment Entry oluşturur. Hak ediş toplamını Bank Transaction ile eşleştirir. Sistem conversationId ile Press faturasını bulur. Mutabakat Press ve satış faturalarını karşılaştırır. Kredi hareketlerini ödeme veya avans kayıtlarıyla karşılaştırır. iyzico ödeme kayıtlarını hak edişlerle karşılaştırır. Sistem farkları Error Log kaydında ve panelde gösterir. BillingAudit kontrolleri korunur.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P6",
@@ -1942,7 +1942,7 @@
  {
   "id": "SA-41",
   "title": "Finans olay–belge matrisi ve tek kayıt kuralı",
-  "detail": "Hizmet tahakkuku, Press faturasının kesinleşmesi, kart tahsilatı, EFT, kredi yükleme, kredi tüketimi, iade/kısmi iade ve itiraz için tek tablo: Press kaydı, operasyon sitesi belgesi, tetik, idempotensi anahtarı ve karar sahibi. Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi ya satış faturası ya avans kaydı olur, ikisi birden olmaz; aynı ekonomik olay iki yoldan kaydedilmez. Vergi ve belge zamanlaması (yükleme anında fatura mı, tüketimde mi; ödenmemiş faturanın e-belge zamanı) mali müşavirle kapanır (K-13); G-22, SA-19 ve SA-21 bu matrise göre uygulanır. Bu doküman yeni vergi veya muhasebe politikası seçmez. Kabul: her satır için çift kayıt ve eksik kayıt testi; elle başlatılan mutabakatında fark sıfır.",
+  "detail": "Hizmet tahakkuku, Press faturasının kesinleşmesi, kart tahsilatı, EFT, kredi yükleme, kredi tüketimi, iade/kısmi iade ve itiraz için tek tablo: Press kaydı, operasyon sitesi belgesi, tetik, idempotensi anahtarı ve karar sahibi. Değişmezler: bir Press Invoice'a en çok bir Sales Invoice; kredi yüklemesi ya satış faturası ya avans kaydı olur, ikisi birden olmaz; aynı ekonomik olay iki yoldan kaydedilmez. Vergi ve belge zamanlaması (yükleme anında fatura mı, tüketimde mi; ödenmemiş faturanın e-belge zamanı) mali müşavirle kapanır (K-13); G-22, SA-19 ve SA-21 bu matrise göre uygulanır. Bu doküman yeni vergi veya muhasebe politikası seçmez. Kabul: her satır için çift kayıt ve eksik kayıt testi; elle başlatılan mutabakatta fark sıfır.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P2",
