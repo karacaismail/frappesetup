@@ -1,0 +1,464 @@
+openapi: 3.1.0
+info:
+  title: platform_core erişim kuralı motoru
+  version: 0.1.0
+  summary: İznin nedeni, kapsam özeti ve alan düzeyi yönetimi uçları.
+  description: |
+    Bu sözleşme `platform_core.erisim` modülünün uçlarını tarif eder.
+    Karar notu `docs/kararlar/0006-erisim-kurali.md` dosyasıdır.
+
+    Motor kayıtları daraltır. İzni rol izni verir. Alanı izin seviyesi kapatır.
+
+    Kural ekleme, değiştirme ve silme için ayrı uç yoktur.
+    Bu işler Frappe'nin hazır ucundan yapılır: `/api/v2/document/Access Rule`.
+    “Access Rule” kaydının alanları aşağıda `AccessRule` şemasındadır.
+
+    Kimlik: Frappe oturum çerezi. POST isteği `X-Frappe-CSRF-Token` başlığı ister.
+    Misafir hiçbir uca erişemez.
+
+    Hata yanıtı Frappe'nin olağan biçimindedir. İzin hatası 403 döner.
+    Geçersiz girdi 417 döner. Bulunamayan kayıt 404 döner.
+servers:
+  - url: /api/method
+    description: Kiracı sitesinin Frappe uç kökü
+tags:
+  - name: aciklama
+    description: Salt okunur uçlar. Kayıt değiştirmez.
+  - name: alan-duzeyi
+    description: Alan düzeyi yönetimi. Site ayarını değiştirir.
+
+paths:
+  /platform_core.api.access.explain_permission:
+    get:
+      tags: [aciklama]
+      operationId: explainPermission
+      summary: Bir kayıtta iznin nedenini açıklar.
+      description: |
+        Uç bir kullanıcının bir kayıtta bir işlemi yapıp yapamadığını söyler.
+        Uç nedeni de söyler. Uç kayıt değiştirmez.
+
+        Olağan kullanıcı yalnız kendi iznini sorabilir.
+        Olağan kullanıcıya ret nedeni tek değerdir: `not_permitted_or_missing`.
+        Kayıt yoksa da aynı değer döner. Böylece uç kayıt varlığını ele vermez.
+        Olağan kullanıcının yanıtında `rules` listesi boş gelir.
+
+        “System Manager” rolü başka kullanıcıyı da sorabilir.
+        Bu rol kuralları tek tek görür. Kayıt yoksa 404 alır.
+
+        `allowed` değeri Frappe'nin son kararıdır. Rol izni, kullanıcı izni,
+        erişim kuralı ve paylaşım bu karara birlikte girer.
+      security:
+        - oturum: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Kayıt türünün adı. Örneğin `Employee`.
+          schema: {type: string, maxLength: 140}
+        - name: name
+          in: query
+          required: true
+          description: Kaydın adı.
+          schema: {type: string, maxLength: 140}
+        - name: ptype
+          in: query
+          required: false
+          description: İşlem adı. Verilmezse `read` sayılır.
+          schema:
+            type: string
+            enum: [read, write, create, delete, submit, cancel]
+            default: read
+        - name: user
+          in: query
+          required: false
+          description: |
+            İzni sorulan kullanıcı. Verilmezse oturum sahibi sayılır.
+            Başka kullanıcıyı yalnız “System Manager” rolü sorabilir.
+          schema: {type: string, maxLength: 140}
+      responses:
+        "200":
+          description: Karar ve nedeni.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/Explanation"}
+              examples:
+                calisanReddedildi:
+                  summary: Çalışan başkasının kaydını soruyor.
+                  value:
+                    message:
+                      doctype: ER Test Talep
+                      name: a1b2c3d4e5
+                      ptype: read
+                      user: er.calisan1@example.test
+                      allowed: false
+                      reason: not_permitted_or_missing
+                      governed: true
+                      layers: {role: true, access_rule: false, share: false}
+                      rules: []
+        "403":
+          description: |
+            Misafir isteği. Ya da olağan kullanıcı başka kullanıcıyı sordu.
+        "404":
+          description: Kayıt yok. Yalnız “System Manager” rolüne döner.
+        "417":
+          description: Girdi geçersiz. Örneğin `ptype` izinli değerlerden biri değil.
+
+  /platform_core.api.access.get_access_summary:
+    get:
+      tags: [aciklama]
+      operationId: getAccessSummary
+      summary: Oturum sahibinin bir kayıt türündeki kapsamlarını döner.
+      description: |
+        Uç oturum sahibine uyan etkin kuralların özetini döner.
+        Arayüz bu özetle hangi kayıtların görüneceğini kullanıcıya anlatır.
+        Uç kayıt değiştirmez.
+
+        Özet yalnız erişim kurallarını taşır. Rol iznini ve alan iznini taşımaz.
+        Alan izinleri `platform_core.api.meta.get_doctype` ucundadır.
+
+        Kayıt türü kurallı değilse `governed` yanlış döner ve listeler boş gelir.
+        O durumda rol izni tek başına geçerlidir.
+        Kayıt türü kurallıysa boş liste o işlemde erişim olmadığını gösterir.
+
+        Kullanıcının kayıt türünde okuma rol izni yoksa uç 403 döner.
+      security:
+        - oturum: []
+      parameters:
+        - name: doctype
+          in: query
+          required: true
+          description: Kayıt türünün adı.
+          schema: {type: string, maxLength: 140}
+      responses:
+        "200":
+          description: Kapsam özeti.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {$ref: "#/components/schemas/AccessSummary"}
+              examples:
+                yonetici:
+                  summary: Hem çalışan hem yönetici rolü taşıyan kullanıcı.
+                  value:
+                    message:
+                      doctype: ER Test Talep
+                      governed: true
+                      operations:
+                        read: [own, team]
+                        write: [own]
+                        create: [own]
+                        delete: []
+                        submit: []
+                        cancel: []
+        "403":
+          description: Misafir isteği ya da kayıt türünde okuma rol izni yok.
+        "404":
+          description: Kayıt türü yok.
+
+  /platform_core.api.access.set_field_level:
+    post:
+      tags: [alan-duzeyi]
+      operationId: setFieldLevel
+      summary: Bir alanın izin seviyesini değiştirir.
+      description: |
+        Uç alanın `permlevel` değerini değiştirir. Değişiklik “Property Setter”
+        kaydıyla tutulur. Frappe'nin kayıt türü tanımı değişmez.
+
+        **Bu uç site ayarını değiştirir.** Seviye 1 ve üstü alan, o seviyede
+        izni olmayan bütün rollere kapanır. Alan listede, kayıtta ve dışa
+        aktarmada dönmez. Etki hemen başlar.
+
+        İşlem geri alınabilir. Aynı uç eski seviyeyle yeniden çağrılır.
+        Yanıttaki `previous_permlevel` eski seviyeyi verir.
+
+        Uç yalnız “System Manager” rolüne açıktır.
+        Uç standart alanlara dokunmaz. Örneğin `name` ve `owner` değişmez.
+        Uç ücretli bir iş başlatmaz.
+      security:
+        - oturum: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doctype, fieldname, permlevel]
+              additionalProperties: false
+              properties:
+                doctype:
+                  type: string
+                  maxLength: 140
+                  description: Kayıt türünün adı.
+                fieldname:
+                  type: string
+                  maxLength: 140
+                  description: Alanın adı. Alan kayıt türünde tanımlı olmalıdır.
+                permlevel:
+                  type: integer
+                  minimum: 0
+                  maximum: 9
+                  description: Yeni izin seviyesi. 0 herkese açık seviyedir.
+            examples:
+              maas:
+                value: {doctype: ER Test Talep, fieldname: salary_amount, permlevel: 1}
+      responses:
+        "200":
+          description: Alanın yeni ve eski seviyesi.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [doctype, fieldname, permlevel, previous_permlevel]
+                    properties:
+                      doctype: {type: string}
+                      fieldname: {type: string}
+                      permlevel: {type: integer, minimum: 0, maximum: 9}
+                      previous_permlevel: {type: integer, minimum: 0, maximum: 9}
+        "403":
+          description: Kullanıcı “System Manager” değil ya da misafir.
+        "404":
+          description: Kayıt türü yok.
+        "417":
+          description: Alan yok, alan standart ya da seviye 0 ile 9 arasında değil.
+
+  /platform_core.api.access.set_level_access:
+    post:
+      tags: [alan-duzeyi]
+      operationId: setLevelAccess
+      summary: Bir role bir izin seviyesinde okuma ve yazma izni verir.
+      description: |
+        Uç rolün bir kayıt türündeki seviye iznini ayarlar. Değişiklik
+        “Custom DocPerm” kaydıyla tutulur.
+
+        **Bu uç site ayarını değiştirir.** `read` ve `write` ikisi de yanlışsa
+        rolün o seviyedeki izni silinir. Rol o seviyedeki alanları artık göremez.
+        Etki hemen başlar.
+
+        Uç seviye 0'a dokunmaz. Seviye 0 temel erişimdir.
+        Temel erişim Frappe'nin rol izni ekranından ya da ucundan yönetilir.
+
+        İşlem geri alınabilir. Aynı uç eski değerlerle yeniden çağrılır.
+        Uç yalnız “System Manager” rolüne açıktır.
+        Uç ücretli bir iş başlatmaz.
+      security:
+        - oturum: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doctype, role, permlevel, read, write]
+              additionalProperties: false
+              properties:
+                doctype:
+                  type: string
+                  maxLength: 140
+                  description: Kayıt türünün adı.
+                role:
+                  type: string
+                  maxLength: 140
+                  description: Rolün adı. Rol sitede tanımlı olmalıdır.
+                permlevel:
+                  type: integer
+                  minimum: 1
+                  maximum: 9
+                  description: İzin seviyesi. Seviye 0 kabul edilmez.
+                read:
+                  type: boolean
+                  description: Rol bu seviyedeki alanları okuyabilir.
+                write:
+                  type: boolean
+                  description: |
+                    Rol bu seviyedeki alanları değiştirebilir.
+                    Yazma izni okuma izni olmadan verilemez.
+            examples:
+              ik:
+                value: {doctype: ER Test Talep, role: ER IK, permlevel: 1, read: true, write: true}
+      responses:
+        "200":
+          description: Rolün o seviyedeki son izni.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [doctype, role, permlevel, read, write]
+                    properties:
+                      doctype: {type: string}
+                      role: {type: string}
+                      permlevel: {type: integer, minimum: 1, maximum: 9}
+                      read: {type: boolean}
+                      write: {type: boolean}
+        "403":
+          description: Kullanıcı “System Manager” değil ya da misafir.
+        "404":
+          description: Kayıt türü ya da rol yok.
+        "417":
+          description: Seviye 1 ile 9 arasında değil ya da yazma okumasız istendi.
+
+components:
+  securitySchemes:
+    oturum:
+      type: apiKey
+      in: cookie
+      name: sid
+      description: Frappe oturum çerezi. POST isteği `X-Frappe-CSRF-Token` başlığı da ister.
+
+  schemas:
+    Scope:
+      type: string
+      enum: [own, team, department, company, all]
+      description: |
+        Kuralın özneye göre seçtiği kayıt kümesi.
+        `own` öznenin kendi kayıtlarıdır. `team` öznenin ve ona `reports_to`
+        zinciriyle bağlı çalışanların kayıtlarıdır. `department` öznenin
+        bölümündeki ve alt bölümlerindeki kayıtlardır. `company` öznenin
+        şirketindeki kayıtlardır. `all` bütün kayıtlardır.
+
+    Explanation:
+      type: object
+      required: [doctype, name, ptype, user, allowed, reason, governed, layers, rules]
+      properties:
+        doctype: {type: string}
+        name: {type: string}
+        ptype: {type: string, enum: [read, write, create, delete, submit, cancel]}
+        user: {type: string, description: İzni sorulan kullanıcı.}
+        allowed:
+          type: boolean
+          description: Frappe'nin son kararı. Bütün katmanlar bu karara girer.
+        reason:
+          type: string
+          enum:
+            - allowed
+            - allowed_by_share
+            - no_role_permission
+            - no_matching_rule
+            - user_permission
+            - not_permitted_or_missing
+          description: |
+            `allowed`: Rol izni var ve kural kaydı seçiyor.
+            `allowed_by_share`: Kayıt kullanıcıyla paylaşılmış. Paylaşım kuralı aşar.
+            `no_role_permission`: Rolün bu işlem için izni yok.
+            `no_matching_rule`: Kayıt türü kurallı ve hiçbir kural kaydı seçmiyor.
+            `user_permission`: Frappe'nin kullanıcı izni kaydı engelliyor.
+            `not_permitted_or_missing`: Olağan kullanıcıya dönen tek ret nedeni.
+        governed:
+          type: boolean
+          description: Kayıt türünün en az bir etkin kuralı var.
+        layers:
+          type: object
+          required: [role, access_rule, share]
+          properties:
+            role:
+              type: boolean
+              description: Rol izni bu işlemi açıyor.
+            access_rule:
+              type: boolean
+              description: Motorun kararı. Kayıt türü kurallı değilse doğru döner.
+            share:
+              type: boolean
+              description: Kayıt bu işlem için kullanıcıyla paylaşılmış.
+        rules:
+          type: array
+          description: |
+            Kayıt türünün etkin kuralları, `priority` sırasıyla.
+            Yalnız “System Manager” rolüne dolu döner.
+          items:
+            type: object
+            required: [name, title, role, scope, applies, matches]
+            properties:
+              name: {type: string, description: Kural kaydının adı.}
+              title: {type: string}
+              role: {type: string}
+              scope: {$ref: "#/components/schemas/Scope"}
+              applies:
+                type: boolean
+                description: Kullanıcı rolü taşıyor ve kural bu işlemi kapsıyor.
+              matches:
+                type: boolean
+                description: Kural bu kaydı seçiyor. `applies` yanlışsa yanlış döner.
+
+    AccessSummary:
+      type: object
+      required: [doctype, governed, operations]
+      properties:
+        doctype: {type: string}
+        governed:
+          type: boolean
+          description: Kayıt türünün en az bir etkin kuralı var.
+        operations:
+          type: object
+          description: Her işlem için oturum sahibine uyan kuralların kapsamları.
+          required: [read, write, create, delete, submit, cancel]
+          additionalProperties: false
+          properties:
+            read: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+            write: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+            create: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+            delete: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+            submit: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+            cancel: {type: array, uniqueItems: true, items: {$ref: "#/components/schemas/Scope"}}
+
+    AccessRule:
+      type: object
+      description: |
+        “Access Rule” kaydı. Kayıt `/api/v2/document/Access Rule` ucundan yönetilir.
+        Kaydı yalnız “System Manager” rolü okur ve yazar.
+        Kural kaydedilince etkisi sonraki istekte başlar.
+
+        Bir kayıt türüne ilk kural yazılınca kuralı olmayan roller o türde
+        erişimi kaybeder. Yanıt bu rolleri bir uyarı iletisiyle sayar.
+      required: [title, document_type, role, scope]
+      properties:
+        name: {type: string, readOnly: true, description: Kaydın adı. Sunucu üretir.}
+        title: {type: string, maxLength: 140, description: Kuralın kısa adı.}
+        is_active: {type: integer, enum: [0, 1], default: 1, description: "Kural etkin mi?"}
+        document_type:
+          type: string
+          description: |
+            Kuralın daralttığı kayıt türü. Alt tablo, tek kayıtlı tür, sanal tür
+            ve izin sistemini tutan türler kabul edilmez.
+        role: {type: string, description: Kuralın uygulandığı rol.}
+        scope: {$ref: "#/components/schemas/Scope"}
+        match_field:
+          type: string
+          description: |
+            Kaydı özneye bağlayan alan. Kapsam `all` değilse zorunludur.
+            `owner` kullanıcıyı gösterir. `name` kaydın kendisini gösterir.
+            Bağlantı alanı hedef türünü gösterir. Hedef kullanıcı, çalışan,
+            bölüm ya da şirket olabilir. Kapsama uymayan hedef reddedilir.
+        filters:
+          type: string
+          description: |
+            Ek koşulların JSON metni. Her satır `[alan, işleç, değer]` olur.
+            İşleçler `=`, `!=`, `in` ve `not in` olur. Koşulların hepsi sağlanmalıdır.
+            Değer sabit ya da şu değişkenlerden biri olur: `$user`,
+            `$user.employee`, `$user.department`, `$user.company`.
+          examples:
+            - '[["status", "=", "Open"], ["company", "=", "$user.company"]]'
+        allow_read: {type: integer, enum: [0, 1], default: 0}
+        allow_write: {type: integer, enum: [0, 1], default: 0}
+        allow_create: {type: integer, enum: [0, 1], default: 0}
+        allow_delete: {type: integer, enum: [0, 1], default: 0}
+        allow_submit: {type: integer, enum: [0, 1], default: 0}
+        allow_cancel: {type: integer, enum: [0, 1], default: 0}
+        priority:
+          type: integer
+          default: 0
+          description: Açıklama ucundaki sıra. Küçük sayı önce gelir. Sonucu değiştirmez.
+        description: {type: string, description: Kuralın neden var olduğu.}
