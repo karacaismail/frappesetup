@@ -343,7 +343,7 @@ def paged_identities(req: Recorded, rows: list[dict[str, object]]) -> Reply:
 class FakeTenant(FakeSite):
     """A tenant site that behaves like `contracts/platform_core-kimlik.openapi.yaml` (0.2.0).
 
-    Source of the behaviour: that contract and `platform_core/kimlik/provisioning.py`.
+    Source of the behaviour: that contract and `platform_core/identity/provisioning.py`.
     State: identity links `(issuer, subject) -> user` and users keyed by e-mail.
     """
 
