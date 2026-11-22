@@ -40,8 +40,14 @@ class RequestGuardsTest(unittest.TestCase):
 				request_policy.enforce_guest_allowlist()
 
 	def test_native_password_recovery_cannot_be_enabled(self):
-		with self.assertRaises(Forbidden):
+		with (
+			patch.object(request_policy, "_", side_effect=lambda message, **_: message),
+			patch.object(request_policy.frappe, "throw", side_effect=frappe.PermissionError) as throw,
+			self.assertRaises(frappe.PermissionError),
+		):
 			request_policy.block_native_login()
+		throw.assert_called_once()
+		self.assertIs(throw.call_args.args[1], frappe.PermissionError)
 
 	def test_anonymization_selects_only_the_accounts_files(self):
 		from press_tr.kimlik.anonymization import get_personal_files
@@ -75,16 +81,16 @@ class RequestGuardsTest(unittest.TestCase):
 			framework.db.exists.return_value = False
 			framework.db.get_value.return_value = user
 			framework.get_all.side_effect = [
-				["single", "shared"],
-				["owned-without-members"],
+				[SimpleNamespace(parent="single"), SimpleNamespace(parent="shared")],
+				[SimpleNamespace(name="owned-without-members")],
 				[],
 				[],
-				["owned-site"],
-				[user, "another@example.test"],
+				[SimpleNamespace(name="owned-site")],
+				[SimpleNamespace(user=user), SimpleNamespace(user="another@example.test")],
 				[],
-				[user],
+				[SimpleNamespace(user=user)],
 				[],
-				["sole-site"],
+				[SimpleNamespace(name="sole-site")],
 			]
 			owned_site, sole_site = Mock(), Mock()
 			framework.get_doc.side_effect = [owned_site, sole_site]
@@ -211,18 +217,18 @@ class RequestGuardsTest(unittest.TestCase):
 				oidc.issuer()
 
 	def test_local_logout_removes_only_current_session_mapping(self):
-		with patch.object(sessions, "frappe") as facade:
+		with (
+			patch.object(sessions, "frappe") as facade,
+			patch.object(sessions, "read_press_session_id", side_effect=["old", "current"]),
+		):
 			facade.session.user = "website@example.test"
 			facade.session.sid = "current"
 			facade.db.get_value.return_value = "identity"
 			facade.get_all.return_value = ["old", "current"]
-			old, current = Mock(), Mock()
-			old.get_password.return_value = "old"
-			current.get_password.return_value = "current"
-			facade.get_doc.side_effect = [old, current]
 			sessions.remove_mapping()
-			old.delete.assert_not_called()
-			current.delete.assert_called_once_with(ignore_permissions=True)
+			facade.delete_doc.assert_called_once_with(
+				"Press Keycloak Session", "current", ignore_permissions=True
+			)
 
 	def test_callback_redacts_fields_before_rate_limiting(self):
 		import frappe.rate_limiter
@@ -281,13 +287,15 @@ class RequestGuardsTest(unittest.TestCase):
 		from press.api.account import accept_team_invite
 		from press.api.client import run_doc_method
 
-		with patch.object(
-			request_policy,
-			"frappe",
-			SimpleNamespace(form_dict={"dt": "Team", "method": "invite_team_member"}),
+		with (
+			patch.object(request_policy, "_", side_effect=lambda message, **_: message),
+			patch.object(request_policy, "frappe") as framework,
 		):
+			framework.form_dict = {"dt": "Team", "method": "invite_team_member"}
+			framework.PermissionError = frappe.PermissionError
+			framework.throw.side_effect = frappe.PermissionError
 			for target in (accept_team_invite, run_doc_method):
-				with self.assertRaises(Forbidden):
+				with self.assertRaises(frappe.PermissionError):
 					request_policy.block_team_invitation(target, {})
 
 	def test_server_script_cannot_replace_an_allowed_python_target(self):

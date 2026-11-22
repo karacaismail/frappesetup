@@ -5,7 +5,7 @@ from frappe.core.doctype.server_script.server_script_utils import get_server_scr
 from frappe.handler import get_attr, run_doc_method
 from frappe.integrations import oauth2_logins
 from frappe.modules.utils import load_doctype_module
-from werkzeug.exceptions import Forbidden, HTTPException
+from werkzeug.exceptions import HTTPException
 from werkzeug.utils import redirect
 
 from press_tr.kimlik.deletion import ACCOUNT_DELETION_PAGE
@@ -58,8 +58,12 @@ ADMIN_METHOD = "press_tr.api.maintenance.cleanup_expired_sessions"
 ACCOUNT_METHOD = "press_tr.api.account.request_deletion"
 
 
+def deny_request():
+	frappe.throw(_("This Press request is not allowed.", context="press_tr"), frappe.PermissionError)
+
+
 def block_native_login(login_manager=None):
-	raise Forbidden()
+	deny_request()
 
 
 def resolve_method(name):
@@ -124,7 +128,7 @@ def block_team_invitation(target, arguments):
 	from press.press.doctype.team.team import Team
 
 	if target in {accept_team_invite, setup_account, Team.invite_team_member}:
-		raise Forbidden()
+		deny_request()
 
 	form = frappe.form_dict
 	if target in {run_press_doc_method, run_doc_method}:
@@ -146,7 +150,7 @@ def block_team_invitation(target, arguments):
 		and isinstance(method, str)
 		and getattr(Team, method, None) is Team.invite_team_member
 	):
-		raise Forbidden()
+		deny_request()
 
 
 def before_request():
@@ -157,7 +161,7 @@ def before_request():
 	if path in LEGACY_PAGES:
 		panel_url = frappe.conf.platform_panel_url
 		if not panel_url:
-			raise Forbidden()
+			deny_request()
 		raise HTTPException(response=redirect(panel_url))
 
 	target, arguments = request_target()
@@ -165,10 +169,10 @@ def before_request():
 		return
 	frappe.local.press_request_target = (target, arguments)
 	if target in blocked_identity_targets():
-		raise Forbidden()
+		deny_request()
 	machine_method = machine_targets().get(target)
 	if machine_method == MONITORING_ALERT and not frappe.request.args.get("webhook_token"):
-		raise Forbidden()
+		deny_request()
 	block_team_invitation(target, arguments)
 
 	# Keep Press's allowlist bounded to the documented routes.

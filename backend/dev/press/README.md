@@ -9,6 +9,7 @@ Sunucu kurma ve Ansible bu kurulumda çalışmaz.
 Komutları depo kökünde çalıştırın. Birleşik kaynakta `backend/libs/oidc_verify` bulunmalı.
 Press imajı bu kitaplığı bir Python kurulum paketi olarak taşır.
 Kurulum betiği paketi Bench ortamına kurar.
+Yerel kurulum, Press test paketlerini `apps/press_tr[test]` seçeneğiyle kurar.
 
 Yalnız yerel denemede örnek parolaları kullanın.
 
@@ -28,6 +29,14 @@ Kurulum parolaları Compose gizli dosyalarından okunur. Parolalar komut satır�
 MariaDB içe aktarımı, site parolasını geçici ve özel bir dosyadan okur.
 
 Site ayarları [Press TR kurulumunda](../../apps/press_tr/README.md) yer alır.
+
+Anonim yapma süresini yalnız geçici test sitesinde ölçün.
+Betik 50 ayrı hesap kullanır. İlk çağrıların yüzde 95'i 1 saniyede bitmelidir.
+
+```sh
+PRESS_TEST_MEASURE_ANONYMIZATION=1 PRESS_TEST_PANEL_URL=http://kiraci1.localhost:3201/panel \
+  sh backend/apps/press_tr/tests/run.sh
+```
 
 Duman testi, sitenin yanıtını ve kurulu uygulamaları denetler.
 

@@ -3,6 +3,8 @@
 import logging
 from email.utils import formataddr, getaddresses
 from hashlib import sha256
+from itertools import batched, groupby
+from operator import itemgetter
 from time import monotonic
 
 import frappe
@@ -10,6 +12,7 @@ from frappe import _
 from frappe.model.rename_doc import get_link_fields, rename_parent_and_child
 from frappe.utils.password import remove_encrypted_password
 
+from press_tr.kimlik.accounts import save_authorized_document
 from press_tr.kimlik.identity import DELETED_IDENTITY_ISSUER, deleted_identity_subject, find_identity
 from press_tr.kimlik.oidc import reject
 
@@ -21,6 +24,7 @@ PROFILE_FIELDS = (
 )
 COMMUNICATION_BODIES = ("content", "text_content")
 PRIVATE_CHILDREN = ("User Social Login", "User Email")
+RECORD_PAGE_SIZE = 100
 
 
 def anonymize_linked_user(issuer: str, subject: str) -> bool:
@@ -76,10 +80,8 @@ def close_account(identity_link: str, user: str) -> None:
 		frappe.db.delete("Sessions", {"sid": ["in", sessions]})
 		frappe.db.after_commit.add(lambda sids=tuple(sessions): clear_session_cache(user, sids))
 	frappe.db.after_commit.add(lambda: clear_session_cache(user, ()))
-	for name in frappe.get_all(
-		"Press Keycloak Session", filters={"identity_link": identity_link}, pluck="name"
-	):
-		remove_encrypted_password("Press Keycloak Session", name, "press_sid")
+	for row in iter_named_rows("Press Keycloak Session", {"identity_link": identity_link}):
+		remove_encrypted_password("Press Keycloak Session", row.name, "press_sid")
 	frappe.db.delete("Press Keycloak Session", {"identity_link": identity_link})
 
 
@@ -149,9 +151,9 @@ def redact_profile(profile, placeholder: str) -> None:
 	for field in ("totp_secret", "otp_secret"):
 		remove_encrypted_password("User", user, field)
 	if frappe.db.exists("DocType", "User 2FA"):
-		for name in frappe.get_all("User 2FA", filters={"user": user}, pluck="name"):
-			remove_encrypted_password("User 2FA", name, "totp_secret")
-			frappe.db.delete("User 2FA", {"name": name})
+		for row in iter_named_rows("User 2FA", {"user": user}):
+			remove_encrypted_password("User 2FA", row.name, "totp_secret")
+			frappe.db.delete("User 2FA", {"name": row.name})
 
 	frappe.db.set_value(
 		"Activity Log",
@@ -191,24 +193,31 @@ def get_personal_files(user: str, image: str | None) -> set[str]:
 	if image:
 		queries.append({"owner": user, "file_url": image, "attached_to_doctype": ["is", "not set"]})
 	# Frappe flattens or_filters into individual OR terms. Each scope needs AND.
-	return {
-		name
-		for filters in queries
-		for name in frappe.get_all("File", {"is_folder": 0, **filters}, pluck="name")
-	}
+	return {row.name for filters in queries for row in iter_named_rows("File", {"is_folder": 0, **filters})}
 
 
 def redact_address_lists(
 	doctype: str, field: str, email: str, placeholder: str, redactions: dict | None = None
 ) -> set[str]:
 	matched = set()
-	for row in frappe.get_all(doctype, {field: ["like", f"%{email}%"]}, ["name", field]):
+	for row in iter_named_rows(doctype, {field: ["like", f"%{email}%"]}, (field,)):
 		if redacted := replace_mailbox(row[field], email, placeholder):
 			frappe.db.set_value(
 				doctype, row.name, {**(redactions or {}), field: redacted}, update_modified=False
 			)
 			matched.add(row.name)
 	return matched
+
+
+def iter_named_rows(doctype: str, filters: dict, fields: tuple[str, ...] = ()):
+	while rows := frappe.get_all(
+		doctype, filters=filters, fields=["name", *fields], order_by="name asc", limit=RECORD_PAGE_SIZE
+	):
+		yield from rows
+		if len(rows) < RECORD_PAGE_SIZE:
+			return
+		# The key cursor remains valid when consumers change or delete a returned row.
+		filters = {**filters, "name": [">", rows[-1].name]}
 
 
 def replace_mailbox(value: str, email: str, placeholder: str) -> str | None:
@@ -225,10 +234,10 @@ def replace_mailbox(value: str, email: str, placeholder: str) -> str | None:
 def redact_email_queue(email: str, placeholder: str) -> None:
 	queues = redact_address_lists("Email Queue", "sender", email, placeholder)
 	queues.update(redact_address_lists("Email Queue", "show_as_cc", email, placeholder))
-	for row in frappe.get_all(
+	for row in iter_named_rows(
 		"Email Queue Recipient",
 		{"parenttype": "Email Queue", "recipient": ["like", f"%{email}%"]},
-		["name", "parent", "recipient"],
+		("parent", "recipient"),
 	):
 		if redacted := replace_mailbox(row.recipient, email, placeholder):
 			frappe.db.set_value(
@@ -252,18 +261,21 @@ def redact_email_queue(email: str, placeholder: str) -> None:
 def redact_user_contacts(
 	user: str, email: str, placeholder: str, fields: set[str], address_fields: set[str]
 ) -> None:
-	contacts = set(frappe.get_all("Contact", or_filters={"user": user, "email_id": email}, pluck="name"))
+	contacts = {row.name for row in iter_named_rows("Contact", {"user": user})}
+	contacts.update(row.name for row in iter_named_rows("Contact", {"email_id": email}))
 	contacts.update(
-		frappe.get_all("Contact Email", {"email_id": email, "parenttype": "Contact"}, pluck="parent")
+		row.parent
+		for row in iter_named_rows("Contact Email", {"email_id": email, "parenttype": "Contact"}, ("parent",))
 	)
-	addresses = set(frappe.get_all("Address", {"email_id": email}, pluck="name"))
-	for link_doctype, names in (("User", [user]), ("Contact", contacts)):
-		if names:
+	addresses = {row.name for row in iter_named_rows("Address", {"email_id": email})}
+	for link_doctype, names in (("User", [user]), ("Contact", sorted(contacts))):
+		for batch in batched(names, RECORD_PAGE_SIZE, strict=False):
 			addresses.update(
-				frappe.get_all(
+				row.parent
+				for row in iter_named_rows(
 					"Dynamic Link",
-					{"parenttype": "Address", "link_doctype": link_doctype, "link_name": ["in", list(names)]},
-					pluck="parent",
+					{"parenttype": "Address", "link_doctype": link_doctype, "link_name": ["in", list(batch)]},
+					("parent",),
 				)
 			)
 	for address in sorted(addresses):
@@ -312,21 +324,25 @@ def clean_press_ownership(user: str) -> None:
 				update_modified=False,
 			)
 	if frappe.db.exists("DocType", "User SSH Key"):
-		for name in frappe.get_all("User SSH Key", {"user": user}, pluck="name"):
-			frappe.delete_doc("User SSH Key", name, ignore_permissions=True)
+		for row in iter_named_rows("User SSH Key", {"user": user}):
+			frappe.delete_doc("User SSH Key", row.name, ignore_permissions=True)
 
-	teams = set(frappe.get_all("Team Member", {"user": user, "parenttype": "Team"}, pluck="parent"))
-	teams.update(frappe.get_all("Team", {"user": user}, pluck="name"))
+	teams = {
+		row.parent
+		for row in iter_named_rows("Team Member", {"user": user, "parenttype": "Team"}, ("parent",))
+	}
+	teams.update(row.name for row in iter_named_rows("Team", {"user": user}))
 	for team in sorted(teams):
 		owner = frappe.db.get_value("Team", team, "user", for_update=True)
-		members = frappe.get_all("Team Member", {"parenttype": "Team", "parent": team}, pluck="user")
+		members = {
+			row.user
+			for row in iter_named_rows("Team Member", {"parenttype": "Team", "parent": team}, ("user",))
+		}
 		if owner == user:
 			frappe.db.set_value(
 				"Team", team, {"billing_name": None, "phone_number": None}, update_modified=False
 			)
-			for version in frappe.get_all(
-				"Version", {"ref_doctype": "Team", "docname": team}, ["name", "data"]
-			):
+			for version in iter_named_rows("Version", {"ref_doctype": "Team", "docname": team}, ("data",)):
 				data = frappe.parse_json(version.data)
 				changes = data.get("changed", [])
 				cleaned = [change for change in changes if change[0] not in {"billing_name", "phone_number"}]
@@ -336,14 +352,15 @@ def clean_press_ownership(user: str) -> None:
 						"Version", version.name, "data", frappe.as_json(data), update_modified=False
 					)
 
-		if set(members) == {user} or (not members and owner == user):
+		if members == {user} or (not members and owner == user):
 			frappe.db.set_value("Team", team, "enabled", 0, update_modified=False)
-			for name in frappe.get_all(
-				"Site", {"team": team, "status": ["not in", ["Archived", "Suspended"]]}, pluck="name"
+			for row in iter_named_rows(
+				"Site", {"team": team, "status": ["not in", ["Archived", "Suspended"]]}
 			):
-				site = frappe.get_doc("Site", name, for_update=True)
+				site = frappe.get_doc("Site", row.name, for_update=True)
 				site.suspend(reason="Account anonymized")
-				site.save(ignore_permissions=True)
+				# Account deletion authorizes suspension only for this sole-member team's sites.
+				save_authorized_document(site)
 
 
 def rename_linked_record(doctype: str, old: str, new: str) -> None:
@@ -370,7 +387,7 @@ def rename_linked_record(doctype: str, old: str, new: str) -> None:
 def redact_record_ownership(user: str, placeholder: str) -> None:
 	# Standard ownership columns are physical columns, not Frappe Link fields.
 	columns = frappe.qb.Schema("information_schema").columns
-	for table, field in (
+	ownership_columns = (
 		frappe.qb.from_(columns)
 		.select(columns.table_name, columns.column_name)
 		.where(columns.table_schema == frappe.db.cur_db_name)
@@ -379,8 +396,37 @@ def redact_record_ownership(user: str, placeholder: str) -> None:
 		.where(columns.column_name.isin(("owner", "modified_by")))
 		.orderby(columns.table_name, columns.column_name)
 		.run()
-	):
-		replace_link_by_primary_key(table.removeprefix("tab"), {field: user}, field, placeholder)
+	)
+	for table_name, rows in groupby(ownership_columns, key=itemgetter(0)):
+		table = frappe.qb.Table(table_name)
+		fields = [table[field] for _, field in rows]
+		matches = fields[0] == user
+		for field in fields[1:]:
+			matches |= field == user
+		# Check both columns in one scan. Physical metadata avoids fetching each DocType.
+		query = (
+			frappe.qb.from_(table)
+			.select(table.name)
+			.where(matches)
+			.orderby(table.name)
+			.limit(RECORD_PAGE_SIZE)
+		)
+		page = query
+		names = page.run(pluck=True)
+		if not names:
+			continue
+		frappe.clear_document_cache(table_name.removeprefix("tab"))
+		while names:
+			for field in fields:
+				(
+					frappe.qb.update(table)
+					.set(field, placeholder)
+					.where((field == user) & table.name.isin(names))
+					.run()
+				)
+			if len(names) < RECORD_PAGE_SIZE:
+				break
+			names = query.where(table.name > names[-1]).run(pluck=True)
 
 
 def replace_link_by_primary_key(doctype: str, filters: dict, field: str, value: str) -> None:

@@ -48,7 +48,6 @@ def read_site_password(environment: str, secret_name: str) -> str:
     return os.environ[environment]
 
 
-
 def main() -> None:
     site = "press.localhost"
     database_password = read_site_password("PRESS_DB_PASSWORD", "press_db_password")

@@ -4,6 +4,7 @@ set -eu
 # Run from the repository root against the disposable fs-press-tr environment.
 export PRESS_TEST_PANEL_URL="${PRESS_TEST_PANEL_URL:?Set platform_panel_url for the test site}"
 export PRESS_TEST_PORT="${PRESS_TEST_PORT:-3363}"
+export PRESS_TEST_MEASURE_ANONYMIZATION="${PRESS_TEST_MEASURE_ANONYMIZATION:-0}"
 case "${FS_COLIMA_PROFILE:-factory}" in
 	factory) press_context=colima-factory ;;
 	default) press_context=colima ;;
@@ -18,7 +19,8 @@ python3 -B -m unittest discover -s backend/dev/press
 docker --context "$press_context" cp "$repo_app/press_tr/." "$container:$container_app/press_tr/"
 docker --context "$press_context" cp "$repo_app/tests/." "$container:$container_app/tests/"
 docker --context "$press_context" cp backend/contracts/press_tr.openapi.yaml "$container:$container_app/tests/"
-docker --context "$press_context" exec -i -e PRESS_TEST_PORT -e PRESS_TEST_PANEL_URL "$container" bash -s <<'BENCH'
+docker --context "$press_context" exec -i -e PRESS_TEST_PORT -e PRESS_TEST_PANEL_URL \
+    -e PRESS_TEST_MEASURE_ANONYMIZATION "$container" bash -s <<'BENCH'
 set -euo pipefail
 bench_root=/home/frappe/benches/frappe-bench
 cd "$bench_root/sites"
@@ -71,5 +73,11 @@ if [ "$ready" != yes ]; then
     exit 1
 fi
 
-PANE_PORT="$((PRESS_TEST_PORT - 3))" "$bench_root/env/bin/python" -B -m unittest discover -s /home/frappe/benches/source/press_tr/tests
+export PANE_PORT="$((PRESS_TEST_PORT - 3))"
+tests=/home/frappe/benches/source/press_tr/tests
+if [ "$PRESS_TEST_MEASURE_ANONYMIZATION" = 1 ]; then
+    "$bench_root/env/bin/python" -B "$tests/measure_anonymization.py"
+else
+    "$bench_root/env/bin/python" -B -m unittest discover -s "$tests"
+fi
 BENCH

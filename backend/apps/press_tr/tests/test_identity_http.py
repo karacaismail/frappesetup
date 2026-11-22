@@ -116,6 +116,13 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		)
 		return status, json.loads(response) if response.startswith(b"{") else response.decode()
 
+	def test_press_guest_post_respects_frappe_request_body_limit(self):
+		path = "/api/method/press_tr.api.auth.get_login_url"
+		headers = {"Content-Type": "application/json"}
+		body = b"{}".ljust(32768)
+		self.assertEqual(self.exchange("POST", path, headers, body)[0], 200)
+		self.assertEqual(self.exchange("POST", path, headers, body + b" ")[0], 413)
+
 	def test_account_deletion_requires_reauthentication(self):
 		subject = uuid4().hex
 		session = self.sign_in(subject, f"{subject}@example.test", uuid4().hex)
@@ -812,6 +819,18 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 			)
 		finally:
 			frappe.destroy()
+
+	def test_press_website_user_cannot_open_frappe_desk(self):
+		subject = uuid4().hex
+		session = self.sign_in(subject, f"{subject}@example.test", uuid4().hex)
+		self.assertEqual(self.exchange("GET", ACCOUNT_ROUTE, session)[0], 200)
+
+		status, headers, _ = self.exchange("GET", "/app", session)
+		self.assertIn(status, {301, 302, 307, 308})
+		self.assertEqual(urlsplit(headers["Location"]).path, "/desk")
+		for path in ("/desk", "/desk/build"):
+			with self.subTest(path=path):
+				self.assertEqual(self.exchange("GET", path, session)[0], 403)
 
 	def test_signed_in_user_cannot_call_local_login_or_team_invitation(self):
 		subject = uuid4().hex

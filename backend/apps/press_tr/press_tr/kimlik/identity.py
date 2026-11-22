@@ -10,6 +10,7 @@ from press.press.doctype.team.team import Team
 from werkzeug.exceptions import ServiceUnavailable
 
 from press_tr.kimlik.oidc import claim, reject
+from press_tr.kimlik.sessions import SESSION_MAPPING_DOCTYPE, read_press_session_id, session_mapping_pages
 
 IDENTITY_LINK = "Press Identity Link"
 
@@ -42,14 +43,12 @@ def find_identity(issuer, subject, *, for_update=False):
 
 def remember_press_session(identity_link: str, keycloak_sid: str) -> None:
 	sid = frappe.session.sid
-	for name in frappe.get_all(
-		"Press Keycloak Session", {"identity_link": identity_link, "keycloak_sid": keycloak_sid}, pluck="name"
-	):
-		if frappe.get_doc("Press Keycloak Session", name).get_password("press_sid") == sid:
+	for names in session_mapping_pages({"identity_link": identity_link, "keycloak_sid": keycloak_sid}):
+		if any(read_press_session_id(name) == sid for name in names):
 			return
 	frappe.get_doc(
 		{
-			"doctype": "Press Keycloak Session",
+			"doctype": SESSION_MAPPING_DOCTYPE,
 			"identity_link": identity_link,
 			"keycloak_sid": keycloak_sid,
 			"press_sid": sid,

@@ -1,4 +1,4 @@
-"""Point the disposable Press test server at the local deletion fixture."""
+"""Configure the disposable Press test server and restore its prior settings."""
 
 import json
 import os
@@ -9,6 +9,7 @@ from tempfile import NamedTemporaryFile
 SETTINGS = {
 	"identity_sync_url": "http://127.0.0.1:3205",
 	"press_service_client_secret": "press-test-fixture",
+	"max_file_size": 32768,
 }
 SITE_CONFIG = Path("press.localhost/site_config.json")
 

@@ -2,9 +2,13 @@ import frappe
 from frappe.rate_limiter import rate_limit
 from frappe.sessions import delete_session
 from packaging.version import Version
+from werkzeug.exceptions import ServiceUnavailable
 
 from press_tr.kimlik.identity import find_identity
 from press_tr.kimlik.oidc import claim, client_id, reject, verify
+from press_tr.kimlik.sessions import SESSION_MAPPING_DOCTYPE, read_press_session_id, session_mapping_pages
+
+MAX_LOGOUT_TOKEN_LENGTH = 8192
 
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
@@ -40,7 +44,7 @@ def _revoke_keycloak_sessions(logout_token: str | None) -> None:
 	from oidc_verify import verify_logout_token
 
 	try:
-		if not isinstance(logout_token, str) or not logout_token:
+		if not isinstance(logout_token, str) or not 1 <= len(logout_token) <= MAX_LOGOUT_TOKEN_LENGTH:
 			reject()
 		claims = verify(verify_logout_token, logout_token, client_id=client_id())
 	except frappe.PermissionError:
@@ -57,11 +61,26 @@ def _revoke_keycloak_sessions(logout_token: str | None) -> None:
 	if not filters:
 		reject()
 
-	for name in frappe.get_all("Press Keycloak Session", filters=filters, pluck="name"):
-		record = frappe.get_doc("Press Keycloak Session", name)
-		sid = record.get_password("press_sid")
-		user = frappe.db.get_value("Sessions", {"sid": sid}, "user", order_by=None)
-		if user:
-			delete_session(sid=sid, user=user, reason="Keycloak logout")
-		# A verified logout notification may revoke only its matched internal mappings.
-		record.delete(ignore_permissions=True)
+	try:
+		_revoke_matching_sessions(filters)
+	except Exception as error:
+		# The batch contains decrypted session credentials. Keep its locals out of error logs.
+		frappe.logger("press_tr").warning("Keycloak session revocation failed: %s", type(error).__name__)
+		raise ServiceUnavailable() from None
+
+
+def _revoke_matching_sessions(filters: dict) -> None:
+	sessions = frappe.qb.DocType("Sessions")
+	for names in session_mapping_pages(filters):
+		mappings = {name: read_press_session_id(name) for name in names}
+		users = dict(
+			frappe.qb.from_(sessions)
+			.select(sessions.sid, sessions.user)
+			.where(sessions.sid.isin(list(mappings.values())))
+			.run()
+		)
+		for name, sid in mappings.items():
+			if user := users.pop(sid, None):
+				delete_session(sid=sid, user=user, reason="Keycloak logout")
+			# A verified logout notification may revoke only its matched internal mappings.
+			frappe.delete_doc(SESSION_MAPPING_DOCTYPE, name, ignore_permissions=True)

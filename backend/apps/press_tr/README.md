@@ -21,6 +21,15 @@ Configure these site settings before starting the web process:
 Register the exact callback and logout notification addresses in the
 [OpenAPI contract](../../contracts/press_tr.openapi.yaml).
 
+## Owned identity records and events
+
+- `Press Identity Link` connects a verified Keycloak issuer and subject to a local Press user.
+  The application keeps a digest in the link when it anonymizes the account.
+- `Press Keycloak Session` links each Keycloak session to the Press session it may revoke.
+  The Press session ID is encrypted.
+- `User.on_update` revokes local API credentials when a user becomes disabled.
+- `on_logout` removes the current Press session's identity mappings.
+
 ## Organization mapping
 
 Run `bench --site <site> migrate` to add the unique `Team.keycloak_org_id` field.

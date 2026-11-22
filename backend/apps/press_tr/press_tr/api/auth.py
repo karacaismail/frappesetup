@@ -17,6 +17,7 @@ from press_tr.kimlik.oidc import callback_url, claim, client_id, issuer, reject,
 
 STATE_TTL = 600
 STATE_COOKIE = "press_tr_login"
+MAX_AUTHORIZATION_CODE_LENGTH = 2048
 
 
 def state_cookie():
@@ -141,7 +142,7 @@ def redact_login_callback_fields(callback):
 @rate_limit(limit=10, seconds=60)
 def keycloak_callback(state: str | None = None, code: str | None = None) -> None:
 	login = consume_login(state)
-	if not isinstance(code, str) or not code:
+	if not isinstance(code, str) or not 1 <= len(code) <= MAX_AUTHORIZATION_CODE_LENGTH:
 		reject()
 
 	from oidc_verify import verify_id_token

@@ -49,7 +49,7 @@ class ImageContractTest(unittest.TestCase):
 
     def test_bootstrap_uses_the_pinned_image_python(self):
         self.assertIn(
-            '.pyenv/versions/3.14.10/bin/python3',
+            ".pyenv/versions/3.14.10/bin/python3",
             (PRESS_DEV / "install.sh").read_text(),
         )
 
@@ -71,14 +71,26 @@ class ImageContractTest(unittest.TestCase):
     @unittest.skipUnless(os.getenv("PRESS_TEST_RUNTIME_IMAGE"), "Set PRESS_TEST_RUNTIME_IMAGE")
     def test_runtime_check_image_rejects_the_patch(self):
         image = os.environ["PRESS_TEST_RUNTIME_IMAGE"]
-        context = {"factory": "colima-factory", "default": "colima"}[os.getenv("FS_COLIMA_PROFILE", "factory")]
+        context = {"factory": "colima-factory", "default": "colima"}[
+            os.getenv("FS_COLIMA_PROFILE", "factory")
+        ]
         docker = ["docker", "--context", context, "run", "--rm", "--network", "none"]
-        self.assertEqual(subprocess.run([
-            *docker, "--entrypoint", "sh", image, "-ec",
-            "test ! -e /opt/press-local/development-image; "
-            "test ! -e /opt/press-local/scripts/patch-py314.sh; "
-            "test -r /opt/press-local/wheels/oidc_verify-0.1.0-py3-none-any.whl",
-        ], check=False).returncode, 0)
+        self.assertEqual(
+            subprocess.run(
+                [
+                    *docker,
+                    "--entrypoint",
+                    "sh",
+                    image,
+                    "-ec",
+                    "test ! -e /opt/press-local/development-image; "
+                    "test ! -e /opt/press-local/scripts/patch-py314.sh; "
+                    "test -r /opt/press-local/wheels/oidc_verify-0.1.0-py3-none-any.whl",
+                ],
+                check=False,
+            ).returncode,
+            0,
+        )
         result = subprocess.run(
             [*docker, "-i", "--entrypoint", "bash", image, "-s"],
             input=(PRESS_DEV / "patch-py314.sh").read_text(),
@@ -94,7 +106,9 @@ class ImageContractTest(unittest.TestCase):
         source = Path(os.environ["PRESS_TEST_CLEAN_SOURCE"])
         result = subprocess.run(
             ["git", "-C", str(source), "grep", "--untracked", "-n", "press-local:"],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
 

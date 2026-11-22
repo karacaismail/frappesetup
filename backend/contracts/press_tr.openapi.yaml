@@ -44,14 +44,16 @@ paths:
           required: true
           schema:
             type: string
+            minLength: 1
+            maxLength: 2048
       responses:
         "302":
-          description: Signed in and redirected to the Press dashboard.
+          description: Redirected to the Press dashboard after sign-in or to account deletion after reauthentication.
           headers:
             Location:
               schema:
                 type: string
-                const: /dashboard
+                enum: [/dashboard, /account-deletion]
         "403":
           description: State, token or identity binding was rejected.
         "409":
@@ -75,6 +77,8 @@ paths:
               properties:
                 logout_token:
                   type: string
+                  minLength: 1
+                  maxLength: 8192
       responses:
         "200":
           description: Logout processed, including a repeated logout.

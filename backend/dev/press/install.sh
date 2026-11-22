@@ -56,7 +56,7 @@ if (( ${#identity_wheels[@]} != 1 )) || [[ ! -f "${identity_wheels[0]}" ]]; then
 	echo "The Press image must provide exactly one oidc_verify wheel." >&2
 	exit 1
 fi
-uv pip install --python env/bin/python -e apps/press_tr "${identity_wheels[0]}"
+uv pip install --python env/bin/python -e 'apps/press_tr[test]' "${identity_wheels[0]}"
 grep -qxF press_tr sites/apps.txt || printf '\n%s\n' press_tr >> sites/apps.txt
 bench --site press.localhost install-app press_tr
 bench --site press.localhost disable-scheduler

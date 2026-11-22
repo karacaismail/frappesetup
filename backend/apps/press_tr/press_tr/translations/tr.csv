@@ -32,7 +32,7 @@ Login URL request limit reached.,Giriş adresi istek sınırına ulaşıldı.,pr
 The Keycloak client or issuer is not configured.,Keycloak istemcisi veya kimlik sunucusu ayarlanmamış.,press_tr.openapi
 Exchange the authorization code and open a Press session.,Yetki kodunu değiştirip Press oturumu açın.,press_tr.openapi
 Requires the initiating browser cookie and consumes the matching state record atomically before verifying Keycloak identity. May create a local user and a team. Does not start billing.,Girişi başlatan tarayıcının çerezini ister. Keycloak kimliğini doğrulamadan önce eşleşen kaydı tek işlemde kullanıp siler. Yerel kullanıcı ve takım açabilir. Faturalamayı başlatmaz.,press_tr.openapi
-Signed in and redirected to the Press dashboard.,Press oturumu açıldı. Tarayıcı Press paneline yönlendirildi.,press_tr.openapi
+Redirected to the Press dashboard after sign-in or to account deletion after reauthentication.,Girişten sonra Press paneli açılır. Kimlik yeniden doğrulanınca hesap silme sayfası açılır.,press_tr.openapi
 "State, token or identity binding was rejected.","Press giriş kaydını, belirteci veya kimlik bağını kabul etmedi.",press_tr.openapi
 A concurrent account update interrupted sign-in. Start a new login.,Başka bir hesap güncellemesi girişi kesti. Girişi yeniden başlatın.,press_tr.openapi
 Keycloak configuration or verification keys are unavailable.,"Press, Keycloak ayarına veya doğrulama anahtarlarına ulaşamadı.",press_tr.openapi
@@ -100,3 +100,4 @@ The account deletion service or Keycloak verification keys are unavailable.,Hesa
 A human Press browser session with a Frappe CSRF token.,Frappe istek koruma belirteci olan bir Press tarayıcı oturumu gerekir.,press_tr.openapi
 Configure a stable site key for Press anonymization.,Press hesap silme işlemi için kalıcı bir site anahtarı ayarlayın.,press_tr
 Message cleared after account anonymization.,Hesap anonim yapıldı. İleti metni silindi.,press_tr
+This Press request is not allowed.,Press bu isteğe izin vermiyor.,press_tr
