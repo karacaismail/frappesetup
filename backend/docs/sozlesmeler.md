@@ -339,7 +339,7 @@ Bu kurallar kiracı sitesinde (`platform_core.api.identity.anonymize_user`) ve P
 - `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır.
 - Onaylı işlem yürütme ucunu da kiracı sitesinin servis istemcisi çağırır. Onay kiracı sitesindeki yapay zekâ katmanında verilir. Bu yüzden `IDENTITY_SYNC_EXECUTE_AZP` ayarı kiracı servis istemcilerinin listesidir. Liste `IDENTITY_SYNC_SESSION_AZP` ile aynı istemcileri taşır.
 - Mutabakat için Press ve kiracı sitesi `list_identities` ucunu sunar. Uç yalnız identity-sync servis belirtecini kabul eder. Yanıt sayfalıdır ve her satırda yalnız `issuer`, `subject` ve hesabın açık ya da kapalı durumu bulunur. E-posta ve ad dönmez. Uç adları `press_tr.api.identity.list_identities` ve `platform_core.api.identity.list_identities` olur.
-  - İstek `start` ve `page_length` alır. `start` varsayılan 0 olur. `page_length` en çok 500, varsayılan 500 olur. Sıra `subject` değerine göre artandır.
+  - Uç `GET` ile çağrılır. İstek `start` ve `page_length` sorgu alanlarını alır. `cursor` ve `limit` alanları kullanılmaz. `start` varsayılan 0 olur. `page_length` en çok 500, varsayılan 500 olur. Sıra `subject` değerine göre artandır.
   - Yanıt `{"identities": [...], "has_next_page": true|false}` biçimindedir.
   - identity-sync bütün sayfaları toplar. Farkları ancak son sayfadan sonra hesaplar.
 - identity-sync, Keycloak'ta istemci açmaz. Servis hesabı `manage-clients` rolünü almaz. Yeni kiracının Keycloak istemcisini kimlik-realm işinin elle başlatılan komutu açar. Komut insan onayıyla çalışır.
