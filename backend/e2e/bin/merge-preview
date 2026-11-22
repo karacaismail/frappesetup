@@ -15,7 +15,10 @@ from pathlib import Path
 SUITE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SUITE / "preview"))
 
-from merging import HOOKS, MergeError, duplicate_hook_assignments, git, hook_values, resolve, verify_hook_lists
+from merging import (
+    HOOKS, TRANSLATIONS, MergeError, duplicate_hook_assignments, git, hook_values,
+    resolve, translation_rows, verify_hook_lists,
+)
 
 IDENTITY = "karacaismail <35493655+karacaismail@users.noreply.github.com>"
 GIT_ROUTING = (
@@ -41,10 +44,10 @@ def snapshot(repo, order):
 
 def merge_inputs(worktree, inputs, branch, report, base):
     report.write("\n## Çakışmalar\n\n| Dosya | Alan dal | Gelen dal | Sonuç |\n| --- | --- | --- | --- |\n")
-    sources = [base]
+    sources = [("backend", base)]
     for name, sha in inputs:
         if git(worktree, "merge-base", "--is-ancestor", sha, "HEAD", check=False).returncode == 0:
-            sources.append(sha)
+            sources.append((name, sha))
             continue
         result = git(worktree, "merge", "--no-commit", "--no-ff", sha, check=False)
         conflicts = git(worktree, "diff", "--name-only", "--diff-filter=U", "-z").stdout.rstrip("\0")
@@ -71,7 +74,7 @@ def merge_inputs(worktree, inputs, branch, report, base):
                 (Path(report.name).parent / "git-merge.log").write_text(quality.stdout + quality.stderr)
                 raise MergeError(f"A conflict resolution has whitespace errors: {name}")
         git(worktree, "commit", "-m", f"{name} dalını önizlemeye al")
-        sources.append(sha)
+        sources.append((name, sha))
 
     merged = git(worktree, "show", f"HEAD:{HOOKS}", check=False).stdout
     duplicates = duplicate_hook_assignments(merged)
@@ -81,10 +84,17 @@ def merge_inputs(worktree, inputs, branch, report, base):
             report.write(f"| `{HOOKS}` | `{name}` | {', '.join(map(str, lines))} |\n")
         raise MergeError("Duplicate top-level hook assignments. See the report.")
     merged_values = hook_values(merged)
-    for sha in sources:
+    if "scheduler_events" in merged_values:
+        raise MergeError(f"scheduler_events is not allowed in {HOOKS}.")
+    for name, sha in sources:
         source = git(worktree, "show", f"{sha}:{HOOKS}", check=False).stdout
         if source:
-            verify_hook_lists(hook_values(source), merged_values)
+            try:
+                verify_hook_lists(hook_values(source), merged_values)
+            except MergeError as error:
+                raise MergeError(f"{error} (source: {name})") from error
+    translations = git(worktree, "show", f"HEAD:{TRANSLATIONS}", check=False).stdout
+    translation_rows(translations)
     report.write("\nKanca listeleri korundu.\n")
 
 

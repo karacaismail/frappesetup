@@ -51,6 +51,18 @@ def duplicate_hook_assignments(source):
     return {name: lines for name, lines in assignments.items() if len(lines) > 1}
 
 
+def verify_dictionary_keys(value, hook):
+    for dictionary in (node for node in ast.walk(value) if isinstance(node, ast.Dict)):
+        lines = {}
+        for key in dictionary.keys:
+            literal = ast.literal_eval(key)
+            if literal in lines:
+                raise MergeError(
+                    f"Duplicate hook dictionary key: {literal} in {hook}, lines {lines[literal]}, {key.lineno}"
+                )
+            lines[literal] = key.lineno
+
+
 def hook_values(source):
     values = {}
     for node in ast.parse(source).body:
@@ -62,10 +74,15 @@ def hook_values(source):
         if name in values:
             raise MergeError(f"Duplicate hook assignment: {name}")
         try:
+            verify_dictionary_keys(node.value, name)
             values[name] = ast.literal_eval(node.value)
-        except ValueError as error:
+        except (TypeError, ValueError) as error:
             raise MergeError(f"Hook is not a literal: {name}") from error
     return values
+
+
+def supports_string_shorthand(location):
+    return location.startswith("hooks.doc_events.") or location in {"hooks.after_install", "hooks.after_migrate"}
 
 
 def hook_union(base, left, right, location="hooks"):
@@ -82,9 +99,8 @@ def hook_union(base, left, right, location="hooks"):
             )
             for key in ordered_union(left, right)
         }
-    list_shorthand = location.startswith("hooks.doc_events.") or location in {"hooks.after_install", "hooks.after_migrate"}
     if isinstance(left, (str, list)) and isinstance(right, (str, list)) and (
-        list_shorthand or isinstance(left, list) or isinstance(right, list)
+        supports_string_shorthand(location) or isinstance(left, list) or isinstance(right, list)
     ):
         return ordered_union(left if isinstance(left, list) else [left], right if isinstance(right, list) else [right])
     if left == base:
@@ -102,6 +118,9 @@ def verify_hook_lists(source, merged, location="hooks"):
                 raise MergeError(f"Hook list lost an entry: {location}.{key}")
         elif isinstance(value, dict):
             verify_hook_lists(value, result if isinstance(result, dict) else {}, f"{location}.{key}")
+        elif isinstance(value, str) and supports_string_shorthand(f"{location}.{key}"):
+            if result != value and not (isinstance(result, list) and value in result):
+                raise MergeError(f"Hook string lost: {location}.{key}")
 
 
 def translation_rows(content):
