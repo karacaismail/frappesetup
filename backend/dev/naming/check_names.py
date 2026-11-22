@@ -23,6 +23,32 @@ FIELD_NAME = re.compile(r"[a-z][a-z0-9_]{0,63}")
 RECORD_NAME = re.compile(r"[A-Za-z][A-Za-z0-9 _-]{0,60}")
 MODULE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9]*(?: [A-Za-z][A-Za-z0-9]*)*")
 TURKISH_LETTER = re.compile(r"[çÇğĞıİöÖşŞüÜ]")
+TURKISH_WORD = re.compile(
+    r"\b(?:acik|aciklamasi|alan|baslik|belge|cihaz|degisiklik|durum|esitleme|gecerli|"
+    r"giris|getir|hesap|islem|izin|kapali|kaydi|kayit|kimlik|kullanici|onay|parola|"
+    r"saglayici|secenek|tanim|uygulama|yapin|yok|yetki)\b",
+    re.IGNORECASE,
+)
+COPY_KEYS = {"label", "description", "title"}
+SOURCE_SKIP = {
+    "tests",
+    "test",
+    "testdata",
+    "test_data",
+    "test-data",
+    "__tests__",
+    "fixtures",
+    "locale",
+    "translations",
+    "__snapshots__",
+}
+PYTHON_COPY_CALLS = {"frappe._", "__", "frappe.throw", "frappe.msgprint", "msgprint"}
+JSON_STRING = re.compile(r'"(?:\\.|[^"\\])*"')
+JS_STRING = r"""(?:"(?:\\.|[^"\\\r\n])*"|'(?:\\.|[^'\\\r\n])*'|`(?:\\.|[^`\\])*`)"""
+JS_TOKENS = re.compile(
+    rf"//[^\n]*|/\*[\s\S]*?\*/|{JS_STRING}|"
+    r"(?P<call>(?<![\w$.])(?:__|frappe\._|frappe\.throw|(?:frappe\.)?msgprint)\s*\(\s*)"
+)
 DISCOURAGED = set(
     "data info item obj value result temp tmp stuff misc manager helper utils handler process".split()
 )
@@ -309,16 +335,154 @@ def scan(root: Path, *, legacy: bool = False, map_path: Path = DEFAULT_MAP) -> l
     return sorted(findings, key=lambda finding: (finding.path, finding.line, finding.rule, finding.message))
 
 
+def turkish_text(value: str) -> bool:
+    value = re.sub(r"\{[\w.]+\}", "", value)
+    return bool(TURKISH_LETTER.search(value) or TURKISH_WORD.search(value))
+
+
+def json_source_text(source: str, keys: set[str], *, doctype: bool):
+    document = json.loads(source)
+    if doctype and (not isinstance(document, dict) or document.get("doctype") != "DocType"):
+        return
+    positions = iter(
+        match.start()
+        for match in JSON_STRING.finditer(source)
+        if source[match.end() :].lstrip().startswith(":")
+    )
+
+    def walk(node):
+        if isinstance(node, list):
+            for element in node:
+                yield from walk(element)
+        elif isinstance(node, dict):
+            for key, field in node.items():
+                line = source.count("\n", 0, next(positions)) + 1
+                if isinstance(field, str):
+                    if key in keys:
+                        yield line, key, field
+                    elif doctype and key == "options" and node.get("fieldtype") == "Select":
+                        for option in field.splitlines():
+                            yield line, "Select option", option
+                yield from walk(field)
+
+    yield from walk(document)
+
+
+def python_source_text(source: str, path: Path):
+    for node in ast.walk(ast.parse(source, filename=str(path))):
+        if not isinstance(node, ast.Call):
+            continue
+        function = node.func
+        if isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name):
+            name = f"{function.value.id}.{function.attr}"
+        elif isinstance(function, ast.Name):
+            name = function.id
+        else:
+            continue
+        if name not in PYTHON_COPY_CALLS:
+            continue
+        message = (
+            node.args[0]
+            if node.args
+            else next((keyword.value for keyword in node.keywords if keyword.arg in {"msg", "message"}), None)
+        )
+        if isinstance(message, ast.Constant) and isinstance(message.value, str):
+            yield message.lineno, name, message.value
+        elif isinstance(message, ast.JoinedStr):
+            value = "".join(
+                part.value if isinstance(part, ast.Constant) else "{…}" for part in message.values
+            )
+            yield message.lineno, name, value
+
+
+def js_source_text(source: str):
+    for match in JS_TOKENS.finditer(source):
+        if not match["call"]:
+            continue
+        literal = re.compile(JS_STRING).match(source, match.end())
+        if literal:
+            value = re.sub(r"\\u([0-9a-fA-F]{4})", lambda item: chr(int(item[1], 16)), literal[0][1:-1])
+            value = re.sub(r"\$\{[^}]*\}", "{…}", value)
+            yield source.count("\n", 0, literal.start()) + 1, match["call"].partition("(")[0].strip(), value
+
+
+def yaml_source_text(source: str):
+    lines = source.splitlines()
+    key_pattern = re.compile(r"""^( *)(?:- +)?["']?(summary|description)["']?:\s*(.*)$""")
+    consumed = 0
+    for index, line in enumerate(lines):
+        if index < consumed:
+            continue
+        heading = key_pattern.match(line)
+        if not heading:
+            continue
+        indent, key, value = heading.groups()
+        position = index + 1
+        if value.startswith(("|", ">")):
+            chunks = []
+            for offset, following in enumerate(lines[index + 1 :], start=index + 2):
+                if not following.strip():
+                    continue
+                if len(following) - len(following.lstrip()) <= len(indent):
+                    break
+                if position == index + 1 and turkish_text(following):
+                    position = offset
+                chunks.append(following.strip())
+                consumed = offset
+            value = " ".join(chunks)
+        else:
+            token = re.match(JS_STRING, value)
+            value = token[0][1:-1] if token else re.split(r"\s+#", value, maxsplit=1)[0]
+        yield position, key, value
+
+
+def scan_source_text(root: Path) -> list[Finding]:
+    root = root.resolve()
+    if root.name == "backend":
+        root = root.parent
+    findings = []
+    for path in tree_files(root):
+        relative = path.relative_to(root)
+        if path.is_symlink() or not path.is_file() or SOURCE_SKIP.intersection(relative.parts):
+            continue
+        if path.stem.startswith("test_") or path.stem.endswith(("_test", ".test", ".spec", "_fixture")):
+            continue
+        contract = len(relative.parts) > 2 and relative.parts[1] == "contracts"
+        if path.suffix == ".json" and ("doctype" in relative.parts or contract):
+            keys = {"summary", "description"} if contract else COPY_KEYS
+            texts = json_source_text(path.read_text(encoding="utf-8"), keys, doctype=not contract)
+        elif path.suffix in {".yaml", ".yml"} and contract:
+            texts = yaml_source_text(path.read_text(encoding="utf-8"))
+        elif path.suffix == ".py":
+            texts = python_source_text(path.read_text(encoding="utf-8"), path)
+        elif path.suffix in {".js", ".jsx", ".ts", ".tsx", ".mjs"}:
+            texts = js_source_text(path.read_text(encoding="utf-8"))
+        else:
+            continue
+        for line, field, value in texts:
+            if turkish_text(value):
+                example = " ".join(value.split())
+                if len(example) > 100:
+                    example = example[:97] + "..."
+                findings.append(Finding(relative.as_posix(), line, "source-text", f"{field}: {example}"))
+    return sorted(findings, key=lambda finding: (finding.path, finding.line, finding.message))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
-    parser.add_argument("--legacy", action="store_true", help="Recognize explicitly mapped legacy names.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--legacy", action="store_true", help="Recognize explicitly mapped legacy names.")
+    mode.add_argument("--source-text", action="store_true", help="Find Turkish in visible source text.")
     parser.add_argument("--map", type=Path, default=DEFAULT_MAP)
     parser.add_argument("--json", action="store_true")
     arguments = parser.parse_args()
     try:
-        findings = scan(arguments.root, legacy=arguments.legacy, map_path=arguments.map)
-    except (OSError, ValueError) as error:
+        if arguments.source_text:
+            findings = scan_source_text(arguments.root)
+        else:
+            findings = scan(arguments.root, legacy=arguments.legacy, map_path=arguments.map)
+    except (OSError, ValueError, SyntaxError) as error:
         parser.exit(2, f"Naming check could not finish: {error}\n")
     if arguments.json:
         print(json.dumps([asdict(finding) for finding in findings]))

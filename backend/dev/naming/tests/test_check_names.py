@@ -34,6 +34,10 @@ class NamingGateTests(unittest.TestCase):
         self.write(self.package / path, json.dumps(document))
 
     def run_gate(self, *arguments):
+        status, findings = self.gate_findings(*arguments)
+        return status, {finding["rule"] for finding in findings}
+
+    def gate_findings(self, *arguments):
         subprocess.run(["git", "-C", str(self.root), "add", "backend"], check=True)
         result = subprocess.run(
             [sys.executable, str(CHECK), "--root", str(self.root), "--json", *arguments],
@@ -42,7 +46,51 @@ class NamingGateTests(unittest.TestCase):
             check=False,
         )
         self.assertIn(result.returncode, (0, 1), result.stderr)
-        return result.returncode, {finding["rule"] for finding in json.loads(result.stdout)}
+        return result.returncode, json.loads(result.stdout)
+
+    def test_source_text_reports_turkish_source_with_line_and_example(self):
+        self.write(
+            self.package / "doctype/example/example.json",
+            '{\n  "doctype": "DocType",\n  "title": "Baslik",\n  "fields": [\n'
+            '    {"label": "Kayıt", "description": "Alan aciklamasi", "fieldtype": "Select", '
+            '"options": "Open\\nKapali"},\n'
+            '    {"fieldtype": "Link", "options": "Kullanici"}\n  ]\n}\n',
+        )
+        self.write(
+            self.package / "view.py",
+            'import frappe\nfrappe._("Giris yapin")\nfrappe.throw(frappe._("Kayıt yok"))\n'
+            'frappe.msgprint(msg="İşlem tamamlandı")\nfrappe.throw("Record is missing.")\n',
+        )
+        self.write(
+            self.package / "view.js",
+            "// __('Giriş')\nconst caption = __('Giris yapin');\n",
+        )
+        self.write(
+            self.root / "backend/contracts/example.openapi.yaml",
+            "openapi: 3.1.0\ninfo:\n  summary: Kayit getir\n  description: >-\n"
+            "    Alan bilgisi dönülür.\n  title: Giriş\n",
+        )
+        for relative in ("tests/test_view.py", "fixtures/view.js", "translations/view.js", "README.md"):
+            self.write(self.package / relative, 'frappe._("Kayıt yok")\n')
+        status, findings = self.gate_findings("--source-text")
+        self.assertEqual(status, 1)
+        self.assertEqual({finding["rule"] for finding in findings}, {"source-text"})
+        self.assertEqual(
+            [(Path(finding["path"]).name, finding["line"]) for finding in findings],
+            [
+                ("example.json", 3),
+                ("example.json", 5),
+                ("example.json", 5),
+                ("example.json", 5),
+                ("view.js", 2),
+                ("view.py", 2),
+                ("view.py", 3),
+                ("view.py", 4),
+                ("example.openapi.yaml", 3),
+                ("example.openapi.yaml", 5),
+            ],
+        )
+        self.assertTrue(any("Kayıt yok" in finding["message"] for finding in findings))
 
     def test_accepts_descriptive_english_name(self):
         self.record(
