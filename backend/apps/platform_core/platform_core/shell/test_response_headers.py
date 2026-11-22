@@ -1,8 +1,14 @@
 """Check the security headers on actual Frappe HTTP responses."""
 
-from platform_core.tests.shell_http_fixture import ShellHTTPFixture
+from http.cookies import SimpleCookie
+
+from platform_core.tests.shell_http_fixture import DESK, ShellHTTPFixture
 
 BOOTSTRAP = "/api/method/platform_core.api.shell.get_bootstrap"
+CSP = "Content-Security-Policy"
+BASE_POLICY = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+LOGIN_POLICY = "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+PANEL_POLICY = f"default-src 'self'; script-src 'self'; {LOGIN_POLICY}"
 EXPECTED_HEADERS = {
 	"X-Content-Type-Options": "nosniff",
 	"Referrer-Policy": "strict-origin-when-cross-origin",
@@ -11,10 +17,10 @@ EXPECTED_HEADERS = {
 
 
 class TestShellResponseHeaders(ShellHTTPFixture):
-	def assert_security_headers(self, headers):
-		for name, expected in EXPECTED_HEADERS.items():
+	def assert_security_headers(self, headers, policy=BASE_POLICY):
+		for name, expected in {**EXPECTED_HEADERS, CSP: policy}.items():
 			with self.subTest(header=name):
-				actual = [value for key, value in headers if key.lower() == name.lower()]
+				actual = [header_value for key, header_value in headers if key.lower() == name.lower()]
 				self.assertEqual(actual, [expected])
 
 	def test_headers_on_success_and_not_modified(self):
@@ -38,8 +44,32 @@ class TestShellResponseHeaders(ShellHTTPFixture):
 			with self.subTest(path=path):
 				status, headers, _unused_body = self.request(path, response_header_type=list)
 				self.assertEqual(status, expected)
-				self.assert_security_headers(headers)
-				if path == "/panel":
-					self.assertEqual(
-						dict(headers)["Content-Security-Policy"], "default-src 'self'; frame-ancestors 'none'"
-					)
+				policy = {"/panel": PANEL_POLICY, "/login": LOGIN_POLICY}.get(path, BASE_POLICY)
+				self.assert_security_headers(headers, policy)
+
+	def test_desk_and_panel_keep_their_script_delivery(self):
+		for path, sid, policy, prepared_body in (
+			("/desk", self.desk_sid, BASE_POLICY, b"frappe.boot ="),
+			("/panel", self.reader_sid, PANEL_POLICY, b'name="csrf-token"'),
+		):
+			with self.subTest(path=path):
+				status, headers, body = self.request(path, sid, response_header_type=list)
+				self.assertEqual(status, 200)
+				self.assert_security_headers(headers, policy)
+				self.assertIn(prepared_body, body)
+
+	def test_login_session_cookie_is_http_only(self):
+		status, headers, _unused_body = self.request(
+			"/api/method/login",
+			method="POST",
+			data={"usr": DESK, "pwd": self.password},
+			response_header_type=list,
+		)
+		self.assertEqual(status, 200)
+		cookies = SimpleCookie()
+		for name, header_value in headers:
+			if name.lower() == "set-cookie":
+				cookies.load(header_value)
+		self.assertTrue(cookies["sid"]["httponly"])
+		for name in ("user_id", "full_name"):
+			self.assertFalse(cookies[name]["httponly"])

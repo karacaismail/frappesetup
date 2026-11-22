@@ -3,6 +3,7 @@
 import frappe
 from frappe.sessions import get_csrf_token
 
+from platform_core.shell.headers import PANEL_CSP
 from platform_core.shell.http import has_session_cookie
 
 no_cache = 1
@@ -14,7 +15,7 @@ def get_context(context):
 		{
 			"Cache-Control": "private, no-store",
 			"Vary": "Cookie",
-			"Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'",
+			"Content-Security-Policy": PANEL_CSP,
 			"X-Content-Type-Options": "nosniff",
 		}
 	)
