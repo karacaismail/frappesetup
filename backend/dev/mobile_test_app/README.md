@@ -1,19 +1,25 @@
 # O-31 mobil ölçümü
 
-Frappe 16 ile boş ve yalıtılmış bir `test-mobile.localhost` sitesi hazırlayın.
+Frappe 16 ile boş ve yalıtılmış bir `perf-mobile.localhost` sitesi hazırlayın.
 Sitede ERPNext, HRMS, `platform_core` ve `mobile_test_app` kurulu olmalı.
-Site ayarında `allow_tests` açık olmalı.
+Önce site ayarında `allow_performance_fixture` değerini 1 yapın.
+Bu ayarı `mobile_test_app` kurulumundan önce yazın.
+
+```bash
+bench --site perf-mobile.localhost set-config --parse allow_performance_fixture 1
+```
+
+Bench kuyruğu doluysa komut veri oluşturmadan durur.
 İmleç anahtarı için `mobile_cursor_key` ayarına test değeri verin.
 
 Bench klasöründen komutu çalıştırın. Test uygulaması Python yolunda olmalı.
 
 ```bash
-env/bin/python -m mobile_test_app.measure_performance --status-file /yol/durum.md
+env/bin/python -m mobile_test_app.measure_performance --site perf-mobile.localhost --status-file /yol/durum.md
 ```
 
 Komut sonuç tablosunu durum dosyasına ekler. Sınır aşılırsa komut 1 döndürür.
-Yeni ölçüm için yeni bir boş site hazırlayın.
-Komut mevcut çalışan, izin ve telefon kayıtlarını silmez.
+Komut ölçüm sonunda oluşturduğu kayıtları tür ve ad ile siler.
 
 - Ölçüm 200 çalışan ve 2.000 izin kaydı oluşturur.
 - İlk 50 telefon HTTP üzerinden kaydolur. Diğer 150 kurulum önceden hazırlanır.
@@ -38,7 +44,7 @@ uv run --no-project --with-requirements backend/dev/requirements-contract-tests.
 Aynı boş site koşullarını kullanın. MariaDB, bu test sitesine ayrılmış olmalı.
 
 ```bash
-env/bin/python -m mobile_test_app.measure_concurrent --workers 4 --status-file /yol/durum.md
+env/bin/python -m mobile_test_app.measure_concurrent --site perf-mobile.localhost --workers 4 --status-file /yol/durum.md
 ```
 
 50 telefon birlikte 50 gönderme ve 50 çekme isteği açar.

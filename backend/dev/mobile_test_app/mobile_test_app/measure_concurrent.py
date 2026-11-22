@@ -10,13 +10,12 @@ from pathlib import Path
 from threading import Barrier
 from time import perf_counter_ns
 from urllib.error import HTTPError, URLError
-from uuid import uuid4
 
 import frappe
 from platform_core.mobil.tests.loopback_http import open_loopback
 
 from .measure_performance import LIMITS_MS, TIMING_HEADER, benchmark_server, call, mobile_request, p95
-from .performance_data import EMPLOYEES, LEAVE_PER_EMPLOYEE, seed_site, test_database, verify_counts
+from .performance_data import EMPLOYEES, LEAVE_PER_EMPLOYEE, performance_fixture, test_database, verify_counts
 
 PHONES = 50
 ENDPOINTS = ("v1_push", "v1_pull")
@@ -33,8 +32,8 @@ class Sample:
     db_failures: tuple[str, ...] = ()
 
 
-def lock_counters():
-    with test_database():
+def lock_counters(site):
+    with test_database(site):
         # These fixed MariaDB status counters describe real InnoDB row-lock waits.
         rows = frappe.db.sql(
             "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_row_lock_waits', 'Innodb_row_lock_time')"
@@ -78,7 +77,7 @@ def measure(url, phones):
     requests = []
     for phone in phones:
         operation = {
-            "operation_id": str(uuid4()),
+            "operation_id": phone.operation_id,
             "command": "fixture.update",
             "record_id": phone.record,
             "version": phone.version,
@@ -100,11 +99,11 @@ def measure(url, phones):
         return endpoint, exchange(request, expected)
 
     samples = {method: [] for method in ENDPOINTS}
-    before = lock_counters()
+    before = lock_counters(phones[0].site)
     with ThreadPoolExecutor(max_workers=len(requests)) as pool:
         for endpoint, sample in pool.map(send, requests):
             samples[endpoint].append(sample)
-    after = lock_counters()
+    after = lock_counters(phones[0].site)
     return samples, (after[0] - before[0], after[1] - before[1])
 
 
@@ -160,6 +159,7 @@ def render(samples, locks):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--site", required=True)
     parser.add_argument("--status-file", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
@@ -167,14 +167,14 @@ def main():
         parser.error("--workers must be zero or greater")
     destination = args.status_file.resolve()
     os.chdir("sites")
-    phones = seed_site(PHONES)
-    with benchmark_server(phones[:PHONES], workers=args.workers) as url:
-        for phone in phones[:PHONES]:
-            message, _unused = call(url, phone, "v1_register")
-            if message != {"installation_id": phone.installation}:
-                raise RuntimeError("Registration did not bind the expected installation.")
-        verify_counts()
-        samples, locks = measure(url, phones[:PHONES])
+    with performance_fixture(args.site, PHONES) as (phones, _created):
+        with benchmark_server(phones[:PHONES], site=args.site, workers=args.workers) as url:
+            for phone in phones[:PHONES]:
+                message, _unused = call(url, phone, "v1_register")
+                if message != {"installation_id": phone.installation}:
+                    raise RuntimeError("Registration did not bind the expected installation.")
+            verify_counts(args.site)
+            samples, locks = measure(url, phones[:PHONES])
     report, passed = render(samples, locks)
     with destination.open("a", encoding="utf-8") as output:
         output.write(f"\n\n{report}\n")
