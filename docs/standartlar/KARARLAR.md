@@ -67,6 +67,7 @@ Bu dosyanın iki kopyası var. Biri `rules ai` klasöründe, öteki frappesetup 
 20. Her şey yapay zekâyla yönetilebilir olur. Katman model sağlayıcısından bağımsızdır.
 21. Proje sahibi kararları Claude'a bıraktı. Claude açık kararları kapatır ve kayda yazar.
 22. Sisteme n tane yapay zekâ sağlayıcısı, hesabı ve API'si eklenebilir.
+23. Yeni kod İngilizce adlarla yazılır. Var olan adlar değişmez.
 
 ## 20 Kasım 2026 Cuma günü
 
@@ -811,6 +812,24 @@ Sonuç şudur:
 - Her kiracı kendi sağlayıcılarını ekleyebilir. Platformun ortak hesapları sonraki turdadır.
 - Sağlık denetimi zamanlanmaz. Sağlık gerçek çağrıların sonucundan çıkar.
 - Ayrıntı `backend/docs/sozlesmeler.md` dosyasının 11. bölümündedir.
+
+### Karar 39. Yeni kod İngilizce adlarla yazılacak
+
+Proje sahibi şunu yazdı:
+
+> yeni dosya oluşturursen, türkçe değil, codebase ingilizce olsun, dosya adları ingilizce olsun
+
+Claude bu isteği var olan adlara da uyguladı ve eski adları İngilizceye çevirdi. Proje sahibi şöyle düzeltti:
+
+> bundan sonrası için öylemiştim, geçmiş için değil.
+
+Sonuç şudur:
+
+- Claude ad değişikliğini geri aldı. Var olan adlar yerinde kaldı.
+- Bundan sonra oluşturulan dosya, klasör, modül ve kod adları İngilizce olur.
+- Yeni yazılan koddaki yorumlar ve hata iletileri İngilizce olur.
+- Kullanıcıya görünen yeni metnin kaynağı İngilizcedir. Türkçesi çeviri dosyasında durur.
+- İşçilere önce ad değiştirme, sonra iptal mesajı gitti. Bir işçi dosya taşıdıysa eski adlara geri döner.
 
 ## Modellerin kararları
 
