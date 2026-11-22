@@ -8,12 +8,12 @@ Kararlar `KARARLAR.md` dosyasındadır. Bekleyen işler `ACIK-ISLER.md` dosyası
 
 | Dosya | Kapsam | Boyut | Sınır | Kural |
 |---|---|---:|---:|---:|
-| `frappe-python-standartlari.md` | Frappe'deki Python kodu | 38.000 | 38.000 | 93 |
-| `frappe-python-disi-standartlari.md` | Frappe'deki öteki dosyalar | 32.345 | 32.768 | 110 |
-| `headless-frontend-standartlari.md` | Ayrı arayüz | 29.967 | 32.768 | 110 |
+| `frappe-python-standartlari.md` | Frappe'deki Python kodu | 38.067 | 39.000 | 93 |
+| `frappe-python-disi-standartlari.md` | Frappe'deki öteki dosyalar | 32.497 | 36.000 | 111 |
+| `headless-frontend-standartlari.md` | Ayrı arayüz | 30.201 | 36.000 | 111 |
 | `mobile.md` | PWA ve Capacitor uygulaması | 35.989 | 36.000 | 114 |
 
-Boyut ve sınır bayt cinsindendir. Boyut `wc -c` komutuyla ölçüldü.
+Boyut ve sınır bayt cinsindendir. Boyut `wc -c` komutuyla ölçüldü. Tablo 22 Kasım 2026 Pazar günü güncellendi. Sınırlar Karar 41'e göredir.
 
 Her dosyanın kural kodu harfleri farklıdır:
 
@@ -220,3 +220,17 @@ Proje sahibi 36.000 baytın ne demek olduğunu sordu. Claude'un cevabı şuydu:
 - Yalın dil için uluslararası standart ISO 24495-1'dir. Standart okurla sınamayı da önerir.
 
 Bir kural dosyası `AGENTS.md` olarak kullanılacaksa sınır 32.768 bayt olmalıdır.
+
+Proje sahibi 22 Kasım 2026 Pazar günü sınırı yeniden belirledi. Varsayılan sınır 36.000 bayttır. Özel durumda sınır en çok 39.000 bayttır. Ayrıntı `KARARLAR.md` dosyasındaki Karar 41'dedir.
+
+## Ad verme raporu nasıl hazırlandı?
+
+Rapor 22 Kasım 2026 Pazar günü `naming_rules_report.md` adıyla yazıldı. Yol şuydu:
+
+1. Claude, Codex ve Gemini aynı görevi ayrı ayrı araştırdı.
+2. Claude üç taslağı birleştirdi. Frappe iddialarını Frappe 16.56.0 kaynak kodunda doğruladı.
+3. Codex ve Gemini birleşik metni iki turda inceledi ve onayladı.
+4. Claude ad kararını üç kural dosyasına işledi.
+5. Codex ve Gemini kural dosyası değişikliğini iki turda inceledi.
+
+Araştırma turları çalışma klasöründe durur. Yerleri `YEREL-NOTLAR.md` dosyasındadır.

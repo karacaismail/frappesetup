@@ -53,7 +53,7 @@ Bu iş kiracı sitesinde Keycloak ile girişi ve çıkışı kurar. Servis belir
 1. `auth_hooks` kancasıyla servis belirtecini doğrulayın. Kuralları sözleşmenin 3. bölümü verir.
 2. `identity.provision`, `identity.set_enabled` ve `identity.change_email` uçlarını yazın. Uçlar yalnız `identity-sync` belirtecini kabul etsin.
 3. Açılan kullanıcı “Website User” olsun (O-3). Masaüstü erişimi açık rol verilmesin (G-16).
-4. Son kullanıcıya hazır portal sayfalarını kapatın (A-7).
+4. Son kullanıcıya hazır portal sayfalarını kapatın (O-3).
 5. Keycloak girişi yöneticide de çalışınca Frappe'nin parola girişini ve e-posta bağlantısıyla girişi kapatın (AU-19). Kapatmayı bir ayarla yapın. İki girişin reddedildiğini sınayın. Yönetici erişimini kaybetmeyin. Geri açma yolunu README'ye yazın.
 6. Testler şunları göstersin:
    - yanlış `aud`, yanlış `azp`, süresi dolmuş ve imzasız belirteç reddedilir,
