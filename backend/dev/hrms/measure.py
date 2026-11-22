@@ -12,9 +12,8 @@ from urllib.parse import quote
 import frappe
 from frappe.app import application
 from frappe.utils import add_days, today
-from werkzeug.test import Client
-
 from seed import COMPANY, LEAVE_TYPE, insert, seed
+from werkzeug.test import Client
 
 EMPLOYEES = 200
 LEAVES = 2_000
@@ -156,26 +155,18 @@ def measure(site, data, draft_names, employees, attendance, password):
             },
         )
         if len(response.json["data"]) != 100:
-            raise SystemExit(
-                "The HR session did not see the expected page of leave records."
-            )
+            raise SystemExit("The HR session did not see the expected page of leave records.")
         operations["GET", RESOURCE, READ_LIMIT_MS].append(elapsed)
         response, elapsed = hr.call("GET", read_name)
         operations["GET", f"{RESOURCE}/{{name}}", READ_LIMIT_MS].append(elapsed)
         version = {"name": name, "version": response.json["data"]["modified"]}
-        _, elapsed = hr.call(
-            "GET", f"{METHOD}get_leave_approver", query={"employee": employees[ordinal]}
-        )
+        _, elapsed = hr.call("GET", f"{METHOD}get_leave_approver", query={"employee": employees[ordinal]})
         operations["GET", f"{METHOD}get_leave_approver", READ_LIMIT_MS].append(elapsed)
         _, elapsed = hr.call("POST", f"{METHOD}approve_leave", body=version)
         operations["POST", f"{METHOD}approve_leave", WRITE_LIMIT_MS].append(elapsed)
-        _, elapsed = hr.call(
-            "POST", f"{METHOD}cancel_leave", body=record_version(hr, name)
-        )
+        _, elapsed = hr.call("POST", f"{METHOD}cancel_leave", body=record_version(hr, name))
         operations["POST", f"{METHOD}cancel_leave", WRITE_LIMIT_MS].append(elapsed)
-    attendance_path = (
-        "/api/v2/document/Attendance%20Request/{name}/method/get_attendance_warnings/"
-    )
+    attendance_path = "/api/v2/document/Attendance%20Request/{name}/method/get_attendance_warnings/"
     for method in ("GET", "POST"):
         for route, path in (
             (DENIAL, DENIAL),
@@ -191,9 +182,7 @@ def report(revision, operations):
     print("\n## HRMS TR O-31 ölçümü\n")
     print(f"Git kaydı `{revision}`.")
     print(f"Test verisi {EMPLOYEES} çalışan ve {LEAVES} izin kaydı içerir.")
-    print(
-        "Ölçüm, Frappe sunucusunun isteği işlemesi ve yanıtı üretmesi için geçen süreyi kapsar."
-    )
+    print("Ölçüm, Frappe sunucusunun isteği işlemesi ve yanıtı üretmesi için geçen süreyi kapsar.")
     print("İstekler sırayla gönderildi. Ağ, oturum açma ve hazırlık ölçüme girmedi.")
     print("Engelli yollar 403 döndürdü. Bu yollar için okuma sınırı kullanıldı.\n")
     print("| Yöntem ve yol | Çağrı | p95 (ms) | Sınır (ms) | Sonuç |")

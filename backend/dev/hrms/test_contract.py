@@ -49,25 +49,19 @@ class TestOpenApiExamples(unittest.TestCase):
     def validate_example(self, entry):
         self.assertIn("example", entry)
         schema = {**entry["schema"], "components": self.contract["components"]}
-        Draft202012Validator(
-            schema, format_checker=Draft202012Validator.FORMAT_CHECKER
-        ).validate(entry["example"])
+        Draft202012Validator(schema, format_checker=Draft202012Validator.FORMAT_CHECKER).validate(
+            entry["example"]
+        )
 
     def test_each_operation_has_a_request_example(self):
         for path, method, operation, parameters in self.operations():
             body = operation.get("requestBody")
             for parameter in parameters:
-                with self.subTest(
-                    path=path, method=method, parameter=parameter["name"]
-                ):
-                    self.validate_example(
-                        parameter.get("content", {}).get("application/json", parameter)
-                    )
+                with self.subTest(path=path, method=method, parameter=parameter["name"]):
+                    self.validate_example(parameter.get("content", {}).get("application/json", parameter))
             if body:
                 with self.subTest(path=path, method=method, request_body=True):
-                    self.validate_example(
-                        self.resolved(body)["content"]["application/json"]
-                    )
+                    self.validate_example(self.resolved(body)["content"]["application/json"])
             if not parameters and not body:
                 with self.subTest(path=path, method=method):
                     self.assertEqual(
@@ -132,11 +126,7 @@ class TestApprovalContract(unittest.TestCase):
                         for key, value in documented["properties"][name].items()
                         if key != "description"
                     },
-                    {
-                        key: value
-                        for key, value in schema.items()
-                        if key not in {"description", "title"}
-                    },
+                    {key: value for key, value in schema.items() if key not in {"description", "title"}},
                 )
 
     def test_human_approval_matches_field_constraints(self):
@@ -151,10 +141,7 @@ class TestApprovalContract(unittest.TestCase):
                 runtime = TypeAdapter(field_type).json_schema()
                 property_schema = documented["properties"][name]
                 self.assertEqual(
-                    {
-                        key: property_schema[key]
-                        for key in ("type", "minLength", "maxLength")
-                    },
+                    {key: property_schema[key] for key in ("type", "minLength", "maxLength")},
                     runtime,
                 )
 

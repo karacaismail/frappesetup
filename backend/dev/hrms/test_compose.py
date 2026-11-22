@@ -9,6 +9,12 @@ from pathlib import Path
 COMPOSE = Path(__file__).with_name("compose")
 
 
+class MeasurementImageTest(unittest.TestCase):
+    def test_measurement_script_is_included_in_build_context(self):
+        dockerignore = Path(__file__).with_name("Dockerfile.dockerignore")
+        self.assertIn("!dev/hrms/measure.py", dockerignore.read_text(encoding="utf-8").splitlines())
+
+
 class ComposeProfileTest(unittest.TestCase):
     def run_compose(self, profile=None):
         with tempfile.TemporaryDirectory() as directory:

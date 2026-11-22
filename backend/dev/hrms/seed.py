@@ -12,10 +12,7 @@ from frappe.utils import add_days, today
 COMPANY = "HRMS TR Synthetic"
 LEAVE_TYPE = "HRMS TR Synthetic Unpaid"
 ALLOCATED_LEAVE_TYPE = "HRMS TR Synthetic Annual"
-USERS = {
-    actor: f"hrms-tr-{actor}@example.test"
-    for actor in ("employee", "manager", "outsider", "hr")
-}
+USERS = {actor: f"hrms-tr-{actor}@example.test" for actor in ("employee", "manager", "outsider", "hr")}
 OPERATIONS_ROLES = ("System Manager", "HR Manager")
 LEGACY_ROLES = ("HR User", "Leave Approver", "Employee")
 ROLES = {
@@ -57,12 +54,8 @@ def seed(password):
         holiday_list=holiday_list.name,
         from_date=holiday_list.from_date,
     ).submit()
-    leave_type = insert(
-        "Leave Type", leave_type_name=LEAVE_TYPE, is_lwp=1, include_holiday=1
-    )
-    allocated_type = insert(
-        "Leave Type", leave_type_name=ALLOCATED_LEAVE_TYPE, include_holiday=1
-    )
+    leave_type = insert("Leave Type", leave_type_name=LEAVE_TYPE, is_lwp=1, include_holiday=1)
+    allocated_type = insert("Leave Type", leave_type_name=ALLOCATED_LEAVE_TYPE, include_holiday=1)
     frappe.db.set_single_value(
         "HR Settings",
         {
@@ -188,9 +181,7 @@ def seed(password):
     )
 
     # Recreate an attachment saved before the report was disabled.
-    attachment.db_set(
-        {"attached_to_doctype": "Prepared Report", "attached_to_name": prepared.name}
-    )
+    attachment.db_set({"attached_to_doctype": "Prepared Report", "attached_to_name": prepared.name})
 
     return {
         "prepared_report": prepared.name,

@@ -8,4 +8,5 @@
 !dev/hrms/
 !dev/hrms/seed.py
 !dev/hrms/test_http.py
+!dev/hrms/measure.py
 **/__pycache__

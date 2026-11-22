@@ -29,9 +29,7 @@ class Client:
         self.site = case.site
         self.opener = build_opener(HTTPCookieProcessor(CookieJar()))
         if user is not None:
-            status, _ = self.send(
-                "/api/method/login", {"usr": user, "pwd": password or case.password}
-            )
+            status, _ = self.send("/api/method/login", {"usr": user, "pwd": password or case.password})
             case.assertEqual(status, 200, f"Synthetic login failed for {user}")
 
     def page(self, path):
@@ -46,18 +44,12 @@ class Client:
     def csrf_token(self):
         status, body = self.page("/panel")
         match = re.search(rb'<meta name="csrf-token" content="([^"]+)"', body)
-        match = match or re.search(
-            rb'(?:frappe\.csrf_token\s*=|["]csrf_token["]\s*:)\s*"([^"]+)"', body
-        )
+        match = match or re.search(rb'(?:frappe\.csrf_token\s*=|["]csrf_token["]\s*:)\s*"([^"]+)"', body)
         if status != 200 or match is None or match[1] in (b"None", b"null"):
-            raise AssertionError(
-                f"The portal did not provide a CSRF token (HTTP {status})."
-            )
+            raise AssertionError(f"The portal did not provide a CSRF token (HTTP {status}).")
         return match[1].decode()
 
-    def send(
-        self, path, data=None, csrf_token=None, *, method=None, authorization=None
-    ):
+    def send(self, path, data=None, csrf_token=None, *, method=None, authorization=None):
         headers = {"Accept": "application/json", "X-Frappe-Site-Name": self.site}
         if authorization:
             headers["Authorization"] = authorization
@@ -94,9 +86,7 @@ class LeaveHttpTest(unittest.TestCase):
         return result.get("data")
 
     def listed(self, client):
-        query = urlencode(
-            {"fields": json.dumps(["name", "employee"]), "limit_page_length": 100}
-        )
+        query = urlencode({"fields": json.dumps(["name", "employee"]), "limit_page_length": 100})
         code, result = client.send(f"{LEAVE_PATH}?{query}")
         self.assertEqual(code, 200, result.get("exc_type"))
         self.contract_validators["list"].validate(result)
@@ -105,9 +95,7 @@ class LeaveHttpTest(unittest.TestCase):
     def leave_ledger_entries(self, client, name):
         query = urlencode(
             {
-                "filters": json.dumps(
-                    {"transaction_type": "Leave Application", "transaction_name": name}
-                ),
+                "filters": json.dumps({"transaction_type": "Leave Application", "transaction_name": name}),
                 "fields": json.dumps(["name"]),
                 "limit_page_length": 100,
             }
@@ -123,11 +111,7 @@ class LeaveHttpTest(unittest.TestCase):
         self.assertLessEqual(set(records.values()), allowed)
 
     def leaves_owned_by(self, *actors):
-        return {
-            name
-            for key, name in self.data["leaves"].items()
-            if self.data["leave_owners"][key] in actors
-        }
+        return {name for key, name in self.data["leaves"].items() if self.data["leave_owners"][key] in actors}
 
     def simultaneous_posts(self, path, requests):
         start = Barrier(len(requests))
@@ -165,21 +149,14 @@ class LeaveHttpTest(unittest.TestCase):
                     f"/api/method/hrms_tr.api.{action}_leave",
                     [(hr, body), (other_hr, body)],
                 )
-                outcomes = sorted(
-                    (status, payload.get("exc_type", ""))
-                    for status, payload, _ in results
-                )
+                outcomes = sorted((status, payload.get("exc_type", "")) for status, payload, _ in results)
                 print(f"Concurrency {action}: {outcomes}")
                 self.assertEqual(outcomes, [(200, ""), (417, "TimestampMismatchError")])
                 for status, payload, _ in results:
                     if status == 200:
                         self.assertEqual(payload["message"], {"name": name})
-                self.assertEqual(
-                    self.document(hr, "concurrent")["docstatus"], expected_docstatus
-                )
-                self.assertEqual(
-                    len(self.leave_ledger_entries(admin, name)), ledger_count
-                )
+                self.assertEqual(self.document(hr, "concurrent")["docstatus"], expected_docstatus)
+                self.assertEqual(len(self.leave_ledger_entries(admin, name)), ledger_count)
                 status, listed = hr.send(f"{LEAVE_PATH}?{query}")
                 self.assertEqual(status, 200, listed.get("exc_type"))
                 self.assertEqual(listed["data"], [{"name": name}])
@@ -206,18 +183,13 @@ class LeaveHttpTest(unittest.TestCase):
             for actor, employee in zip(actors, employees, strict=True)
         ]
         results = self.simultaneous_posts(LEAVE_PATH, requests)
-        errors = Counter(
-            (status, payload.get("exc_type"))
-            for status, payload, _ in results
-            if status != 200
-        )
+        errors = Counter((status, payload.get("exc_type")) for status, payload, _ in results if status != 200)
         sample_count = len(results)
-        p95 = sorted(elapsed for _, _, elapsed in results)[
-            ceil(sample_count * 0.95) - 1
-        ]
+        p95 = sorted(elapsed for _, _, elapsed in results)[ceil(sample_count * 0.95) - 1]
         error_count = sum(errors.values())
         print(
-            f"Concurrency employees: requests={sample_count} errors={error_count} error_rate={error_count / sample_count:.0%} p95_ms={p95:.2f} details={dict(errors)}"
+            f"Concurrency employees: requests={sample_count} errors={error_count} "
+            f"error_rate={error_count / sample_count:.0%} p95_ms={p95:.2f} details={dict(errors)}"
         )
         self.assertEqual(errors, {})
         expected = {
@@ -240,9 +212,7 @@ class LeaveHttpTest(unittest.TestCase):
         )
         status, payload = hr.send(f"{LEAVE_PATH}?{query}")
         self.assertEqual(status, 200, payload.get("exc_type"))
-        self.assertEqual(
-            {row["name"]: row["employee"] for row in payload["data"]}, expected
-        )
+        self.assertEqual({row["name"]: row["employee"] for row in payload["data"]}, expected)
 
     def test_d6_http_permission_matrix(self):
         fixture = self.data["d6"]
@@ -273,18 +243,10 @@ class LeaveHttpTest(unittest.TestCase):
                     self.assertIn(status, (200, 403), payload.get("exc_type"))
                     if status == 200:
                         self.assertEqual(payload["data"], [])
-                outcome = (
-                    f"{status} empty"
-                    if status == 200 and not payload["data"]
-                    else str(status)
-                )
+                outcome = f"{status} empty" if status == 200 and not payload["data"] else str(status)
                 print(f"D-6 list {actor}: {outcome}")
 
-            employee = (
-                fixture["roleless_employee"]
-                if actor == "roleless"
-                else draft["employee"]
-            )
+            employee = fixture["roleless_employee"] if actor == "roleless" else draft["employee"]
             approver_query = urlencode({"employee": employee})
             scenarios = (
                 ("detail", "GET", detail, 200 if allowed else 403),
@@ -321,18 +283,14 @@ class LeaveHttpTest(unittest.TestCase):
                 else:
                     self.assertEqual(current, initial)
 
-    def check_d6_response(
-        self, actor, client, endpoint, method, path, expected, *, body=None
-    ):
+    def check_d6_response(self, actor, client, endpoint, method, path, expected, *, body=None):
         with self.subTest(endpoint=endpoint, actor=actor):
             status, payload = client.send(path, body, method=method)
             print(f"D-6 {endpoint} {actor}: {status}")
             self.assertEqual(status, expected, payload.get("exc_type"))
             if expected == 403:
                 error_type = (
-                    payload["errors"][0]["type"]
-                    if path.startswith("/api/v2/")
-                    else payload.get("exc_type")
+                    payload["errors"][0]["type"] if path.startswith("/api/v2/") else payload.get("exc_type")
                 )
                 self.assertEqual(error_type, "PermissionError")
 
@@ -340,9 +298,7 @@ class LeaveHttpTest(unittest.TestCase):
         client = self.login("employee")
         names = sorted(self.leaves_owned_by("employee"))[:2]
         filters = json.dumps([["name", "in", names]])
-        query = urlencode(
-            {"filters": filters, "order_by": "name asc", "limit_page_length": 1}
-        )
+        query = urlencode({"filters": filters, "order_by": "name asc", "limit_page_length": 1})
         code, result = client.send(f"{LEAVE_PATH}?{query}")
         self.assertEqual(code, 200, result.get("exception"))
         self.contract_validators["list"].validate(result)
@@ -386,9 +342,7 @@ class LeaveHttpTest(unittest.TestCase):
             ),
         )
 
-        query = urlencode(
-            {"filters": json.dumps({"employee": self.data["employees"]["outsider"]})}
-        )
+        query = urlencode({"filters": json.dumps({"employee": self.data["employees"]["outsider"]})})
         code, result = client.send(f"{LEAVE_PATH}?{query}")
         self.assertEqual(code, 200, result.get("exception"))
         self.contract_validators["list"].validate(result)
@@ -439,15 +393,9 @@ class LeaveHttpTest(unittest.TestCase):
         for actor in ("outsider", "guest"):
             with self.subTest(actor=actor):
                 caller = self.login(actor) if actor != "guest" else Client(self, None)
-                code, error = caller.send(
-                    f"{lookup}?{urlencode({'employee': own['employee']})}"
-                )
-                self.assertEqual(
-                    (code, error.get("exc_type")), (403, "PermissionError")
-                )
-        status, result = client.send(
-            f"{lookup}?{urlencode({'employee': own['employee']})}"
-        )
+                code, error = caller.send(f"{lookup}?{urlencode({'employee': own['employee']})}")
+                self.assertEqual((code, error.get("exc_type")), (403, "PermissionError"))
+        status, result = client.send(f"{lookup}?{urlencode({'employee': own['employee']})}")
         self.assertEqual(status, 200, result.get("exc_type"))
         self.contract_validators["approver"].validate(result)
         self.assertEqual(result["message"], {"approver": self.data["users"]["manager"]})
@@ -473,9 +421,7 @@ class LeaveHttpTest(unittest.TestCase):
             self.assertEqual(created["leave_approver"], self.data["users"]["manager"])
             self.assertNotIn("leave_balance", created)
             path = f"{LEAVE_PATH}/{quote(created['name'], safe='')}"
-            status, updated = client.send(
-                path, {"description": "Updated synthetic request"}, method="PUT"
-            )
+            status, updated = client.send(path, {"description": "Updated synthetic request"}, method="PUT")
             self.assertEqual(status, 200, updated.get("exception"))
             self.assertNotIn("leave_balance", updated["data"])
         finally:
@@ -496,9 +442,7 @@ class LeaveHttpTest(unittest.TestCase):
                     "status": "Open",
                 }
                 code, result = self.login(actor).send(LEAVE_PATH, draft)
-                self.assertEqual(
-                    (code, result.get("exc_type")), (403, "PermissionError")
-                )
+                self.assertEqual((code, result.get("exc_type")), (403, "PermissionError"))
 
     def test_hr_can_read_employee_records_with_read_only_permission(self):
         employee = self.data["employees"]["outsider"]
@@ -507,16 +451,12 @@ class LeaveHttpTest(unittest.TestCase):
         code, result = hr.send(path)
         self.assertEqual(code, 200, result.get("exc_type"))
         self.assertEqual(result["data"]["name"], employee)
-        code, result = hr.send(
-            path, {"first_name": "Unauthorized synthetic update"}, method="PUT"
-        )
+        code, result = hr.send(path, {"first_name": "Unauthorized synthetic update"}, method="PUT")
         self.assertEqual((code, result.get("exc_type")), (403, "PermissionError"))
         for actor in ("manager", "employee"):
             with self.subTest(actor=actor):
                 code, result = self.login(actor).send(path)
-                self.assertEqual(
-                    (code, result.get("exc_type")), (403, "PermissionError")
-                )
+                self.assertEqual((code, result.get("exc_type")), (403, "PermissionError"))
 
     def test_manager_cannot_edit_team_leave_details(self):
         manager = self.login("manager")
@@ -529,12 +469,8 @@ class LeaveHttpTest(unittest.TestCase):
             {"owner": self.data["users"]["manager"]},
         ):
             with self.subTest(changes=changes):
-                code, result = manager.send(
-                    self.leave_path("manager_edit"), changes, method="PUT"
-                )
-                self.assertEqual(
-                    (code, result.get("exc_type")), (403, "PermissionError")
-                )
+                code, result = manager.send(self.leave_path("manager_edit"), changes, method="PUT")
+                self.assertEqual((code, result.get("exc_type")), (403, "PermissionError"))
                 after = self.document(manager, "manager_edit")
                 for field in (*changes, "modified"):
                     self.assertEqual(after.get(field), before.get(field), field)
@@ -605,16 +541,12 @@ class LeaveHttpTest(unittest.TestCase):
                 self.assertEqual(initial["status"], "Open")
                 self.assertEqual(initial["docstatus"], 0)
                 description = "Reviewed by a synthetic operations user"
-                code, result = client.send(
-                    self.leave_path(key), {"description": description}, method="PUT"
-                )
+                code, result = client.send(self.leave_path(key), {"description": description}, method="PUT")
                 self.assertEqual(code, 200, result.get("exception"))
                 self.assertEqual(result["data"]["description"], description)
 
                 draft = {**result["data"], "status": "Approved"}
-                code, result = client.send(
-                    "/api/method/frappe.client.submit", {"doc": draft}
-                )
+                code, result = client.send("/api/method/frappe.client.submit", {"doc": draft})
                 self.assertEqual(code, 200, result.get("exception"))
                 approved = self.document(client, key)
                 self.assertEqual(approved["status"], "Approved")
@@ -635,9 +567,7 @@ class LeaveHttpTest(unittest.TestCase):
                 code, payload = client.send(f"{prefix}?{query}")
                 self.assertEqual(code, 200, payload.get("exception"))
                 self.assertTrue(payload["data"])
-                self.assertTrue(
-                    all("leave_balance" not in row for row in payload["data"])
-                )
+                self.assertTrue(all("leave_balance" not in row for row in payload["data"]))
 
         name = quote(self.data["leaves"]["employee"], safe="")
         code, payload = client.send(f"/api/v2/document/Leave%20Application/{name}")
@@ -653,9 +583,7 @@ class LeaveHttpTest(unittest.TestCase):
                 code, payload = client.send(f"{LEAVE_PATH}?{urlencode(arguments)}")
                 if "balance_total" in arguments.get("fields", "") and code == 200:
                     self.assertTrue(payload["data"])
-                    self.assertTrue(
-                        all(set(row) == {"name"} for row in payload["data"])
-                    )
+                    self.assertTrue(all(set(row) == {"name"} for row in payload["data"]))
                 else:
                     self.assertIn(code, (403, 417), payload.get("exception"))
 
@@ -737,9 +665,7 @@ class LeaveHttpTest(unittest.TestCase):
         for actor in ("manager", "employee"):
             with self.subTest(actor=actor):
                 status, result = self.login(actor).send(cancel, args)
-                self.assertEqual(
-                    (status, result.get("exc_type")), (403, "PermissionError")
-                )
+                self.assertEqual((status, result.get("exc_type")), (403, "PermissionError"))
         for invalid_args in (
             {"name": name},
             {"version": args["version"]},
@@ -750,22 +676,15 @@ class LeaveHttpTest(unittest.TestCase):
                 status, result = hr.send(cancel, invalid_args)
                 self.assertEqual(status, 417, result.get("exc_type"))
         status, result = hr.send(cancel, self.approval_payload(target))
-        self.assertEqual(
-            (status, result.get("exc_type")), (417, "TimestampMismatchError")
-        )
-        self.assertEqual(
-            self.document(hr, "hr_approve")["modified"], submitted["modified"]
-        )
+        self.assertEqual((status, result.get("exc_type")), (417, "TimestampMismatchError"))
+        self.assertEqual(self.document(hr, "hr_approve")["modified"], submitted["modified"])
         status, result = hr.send(cancel, args)
         self.assertEqual(status, 200, result.get("exc_type"))
         self.contract_validators["cancel"].validate(result)
         self.assertEqual(result["message"], {"name": name})
         old = self.document(hr, "hr_approve")
         self.assertEqual(old["docstatus"], 2)
-        amendment = {
-            key: old[key]
-            for key in ("employee", "company", "leave_type", "from_date", "to_date")
-        }
+        amendment = {key: old[key] for key in ("employee", "company", "leave_type", "from_date", "to_date")}
         amendment.update(amended_from=name, status="Open")
         status, result = self.login("outsider").send(LEAVE_PATH, amendment)
         self.assertIn(status, (403, 417), result.get("exception"))
@@ -809,9 +728,7 @@ class LeaveHttpTest(unittest.TestCase):
         path = "/api/resource/Access%20Rule"
         query = urlencode(
             {
-                "filters": json.dumps(
-                    {"document_type": "Leave Application", "is_active": 1}
-                ),
+                "filters": json.dumps({"document_type": "Leave Application", "is_active": 1}),
                 "fields": json.dumps(["name", "role"]),
             }
         )
@@ -897,13 +814,9 @@ class LeaveHttpTest(unittest.TestCase):
                             json.loads(message)["message"]
                             for message in json.loads(result["_server_messages"])
                         ]
-                    self.assertIn(
-                        "You are not permitted to call this method.", messages
-                    )
+                    self.assertIn("You are not permitted to call this method.", messages)
 
-        code, result = manager.send(
-            "/api/method/hrms_tr.api.approve_leave", self.approval_payload(doc)
-        )
+        code, result = manager.send("/api/method/hrms_tr.api.approve_leave", self.approval_payload(doc))
         self.assertEqual(code, 200, result.get("exc_type"))
         self.assertEqual(result["message"]["name"], doc["name"])
         approved = self.document(manager, "website_approval")
@@ -912,24 +825,16 @@ class LeaveHttpTest(unittest.TestCase):
     def test_guest_cannot_approve_or_call_legacy_replacement(self):
         guest = Client(self, None)
         outsider = self.document(self.login("hr"), "outsider")
-        code, _ = guest.send(
-            "/api/method/hrms_tr.api.approve_leave", self.approval_payload(outsider)
-        )
+        code, _ = guest.send("/api/method/hrms_tr.api.approve_leave", self.approval_payload(outsider))
         self.assertEqual(code, 403)
-        code, _ = guest.send(
-            "/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
-        )
+        code, _ = guest.send("/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query")
         self.assertEqual(code, 403)
-        code, _ = self.login("manager").send(
-            "/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query"
-        )
+        code, _ = self.login("manager").send("/api/method/hrms_tr.hrms_endpoints.deny_legacy_leave_query")
         self.assertEqual(code, 403)
 
     def test_invalid_api_token_is_unauthorized(self):
         guest = Client(self, None)
-        code, result = guest.send(
-            LEAVE_PATH, authorization="token missing-test-key:missing-test-secret"
-        )
+        code, result = guest.send(LEAVE_PATH, authorization="token missing-test-key:missing-test-secret")
         self.assertEqual(code, 401, result.get("exc_type"))
 
     def test_approval_rejects_invalid_verb_version_and_client_role(self):
@@ -1022,9 +927,7 @@ class LeaveHttpTest(unittest.TestCase):
                             "file_format_type": "CSV",
                         }
                     )
-                    status, _ = client.page(
-                        f"/api/method/frappe.desk.query_report.{method}?{query}"
-                    )
+                    status, _ = client.page(f"/api/method/frappe.desk.query_report.{method}?{query}")
                     self.assertEqual(status, 403)
 
     def test_stored_legacy_report_downloads_are_closed(self):
@@ -1062,12 +965,8 @@ class LeaveHttpTest(unittest.TestCase):
             self.assertEqual(set(change), {"fieldname", "label", "old", "new"})
             self.assertIsInstance(change["label"], str)
             self.assertTrue(change["label"])
-        transitions = {
-            change["fieldname"]: (change["old"], change["new"]) for change in changes
-        }
-        self.assertEqual(
-            transitions, {"status": ("Open", "Approved"), "docstatus": (0, 1)}
-        )
+        transitions = {change["fieldname"]: (change["old"], change["new"]) for change in changes}
+        self.assertEqual(transitions, {"status": ("Open", "Approved"), "docstatus": (0, 1)})
         return proposal
 
     def ai_approval(self, client, proposal):
@@ -1093,9 +992,7 @@ class LeaveHttpTest(unittest.TestCase):
                 code, response = self.ai_call(self.login(actor), before["name"])
                 if code == 200:
                     result = response.get("result", {})
-                    self.assertTrue(
-                        "error" in response or result.get("isError"), response
-                    )
+                    self.assertTrue("error" in response or result.get("isError"), response)
                 else:
                     self.assertIn(code, (403, 404, 417), response)
                 after = self.document(hr, key)
@@ -1118,9 +1015,7 @@ class LeaveHttpTest(unittest.TestCase):
         changed = self.document(employee, "ai_stale")
         self.assertNotEqual(changed["modified"], before["modified"])
         approval = self.ai_approval(manager, proposal)
-        code, result = manager.send(
-            f"{AI_PATH}.approve_proposal", approval, csrf_token=manager.csrf_token()
-        )
+        code, result = manager.send(f"{AI_PATH}.approve_proposal", approval, csrf_token=manager.csrf_token())
         self.assertEqual(code, 200, result.get("exception"))
         self.assertFalse(result["message"]["executed"])
         self.assertEqual(result["message"]["deny_reason"], "document_changed")
@@ -1153,9 +1048,7 @@ class LeaveHttpTest(unittest.TestCase):
 
         code, response = client.send(endpoint, approval, csrf_token=csrf)
         self.assertEqual(code, 200, response.get("exc_type"))
-        self.assertTrue(
-            response["message"]["executed"], response["message"].get("deny_reason")
-        )
+        self.assertTrue(response["message"]["executed"], response["message"].get("deny_reason"))
         doc = self.document(client, "ai")
         self.assertEqual((doc["status"], doc["docstatus"]), ("Approved", 1))
 
@@ -1169,9 +1062,9 @@ def load_contract_validators(path):
         response: Draft202012Validator(
             {
                 **contract,
-                **contract["paths"][path][method]["responses"]["200"]["content"][
-                    "application/json"
-                ]["schema"],
+                **contract["paths"][path][method]["responses"]["200"]["content"]["application/json"][
+                    "schema"
+                ],
             }
         )
         for response, path, method in (
@@ -1190,9 +1083,7 @@ if __name__ == "__main__":
     parser.add_argument("--manifest", type=Path, required=True)
     contract_path = Path(__file__).resolve().with_name("hrms_tr.openapi.yaml")
     if not contract_path.is_file():
-        contract_path = (
-            Path(__file__).resolve().parents[2] / "contracts/hrms_tr.openapi.yaml"
-        )
+        contract_path = Path(__file__).resolve().parents[2] / "contracts/hrms_tr.openapi.yaml"
     parser.add_argument("--contract", type=Path, default=contract_path)
     parser.add_argument("--with-ai", action="store_true")
     parser.add_argument("tests", nargs="*")
