@@ -111,9 +111,9 @@ def main():
     config_file = Path("sites") / site / "site_config.json"
     config = json.loads(config_file.read_text())
     config.update(
-        keycloak_public_url=f"http://kimlik.localhost:{port}",
-        keycloak_internal_url=f"http://kimlik.localhost:{port}",
-        platform_panel_url=f"http://kiraci1.localhost:{port + 1}/panel",
+        keycloak_public_url=f"http://identity.localhost:{port}",
+        keycloak_internal_url=f"http://identity.localhost:{port}",
+        platform_panel_url=f"http://tenant1.localhost:{port + 1}/panel",
     )
     service_email = "e2e-service@example.test"
     provider_urls = {}
@@ -154,7 +154,7 @@ def main():
     frappe.set_user("Administrator")
     if not tenant:
         ensure_website_user(service_email)
-    issuer = f"http://kimlik.localhost:{port}/realms/platform"
+    issuer = f"http://identity.localhost:{port}/realms/platform"
     fixture = seed_lifecycle_identities(lifecycle, issuer, tenant)
     if tenant:
         from platform_core.identity.anonymization import identity_hash

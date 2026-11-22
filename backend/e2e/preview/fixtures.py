@@ -18,26 +18,60 @@ PRESS_BENCH = "/home/frappe/benches/frappe-bench"
 
 
 def keycloak_request(port, path, *, token=None, data=None, form=False, expect_denial=False):
-    headers = {"Host": f"kimlik.localhost:{port}"}
+    headers = {"Host": f"identity.localhost:{port}"}
     body = None
     if token:
         headers["Authorization"] = "Bearer " + token
     if data is not None:
         headers["Content-Type"] = "application/x-www-form-urlencoded" if form else "application/json"
         body = urlencode(data) if form else json.dumps(data)
-    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-    try:
-        connection.request("POST" if data is not None else "GET", path, body=body, headers=headers)
-        response = connection.getresponse()
-        raw = response.read()
-        if expect_denial and response.status in (400, 401):
-            return json.loads(raw)
-        if not 200 <= response.status < 300:
-            # Do not print HTTP headers or bodies. They can contain tokens.
-            raise RuntimeError(f"Keycloak fixture request returned HTTP {response.status} on {path}")
-        return json.loads(raw) if raw else response.getheader("Location")
-    finally:
-        connection.close()
+    method = "POST" if data is not None else "GET"
+    if os.environ.get("E2E_BROWSER_RUNTIME") == "container":
+        status, location, raw = container_keycloak_request(port, method, path, body, headers)
+    else:
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        try:
+            connection.request(method, path, body=body, headers=headers)
+            response = connection.getresponse()
+            status, location, raw = response.status, response.getheader("Location"), response.read()
+        finally:
+            connection.close()
+    if expect_denial and status in (400, 401):
+        return json.loads(raw)
+    if not 200 <= status < 300:
+        # Do not print HTTP headers or bodies. They can contain tokens.
+        raise RuntimeError(f"Keycloak fixture request returned HTTP {status} on {path}")
+    return json.loads(raw) if raw else location
+
+
+def docker_context():
+    profile = os.environ.get("FS_COLIMA_PROFILE", "default")
+    return {"default": "colima", "factory": "colima-factory"}[profile]
+
+
+def container_keycloak_request(port, method, path, body, headers):
+    project = os.environ["PREVIEW_PROJECT"]
+    script = """
+import http.client
+import json
+import sys
+
+request = json.load(sys.stdin)
+connection = http.client.HTTPConnection("keycloak", request["port"], timeout=10)
+try:
+    connection.request(request["method"], request["path"], body=request["body"], headers=request["headers"])
+    response = connection.getresponse()
+    print(json.dumps([response.status, response.getheader("Location"), response.read().decode("utf-8")]))
+finally:
+    connection.close()
+"""
+    result = subprocess.run(
+        ["docker", "--context", docker_context(), "exec", "-i", f"{project}-tenant-web-1",
+         "env/bin/python", "-c", script],
+        input=json.dumps(dict(port=port, method=method, path=path, body=body, headers=headers)),
+        text=True, stdout=subprocess.PIPE, check=True, timeout=20,
+    )
+    return json.loads(result.stdout)
 
 
 def check_tenant_clients(port):
@@ -134,7 +168,7 @@ def seed_keycloak(port, password):
 
 def seed_site(project, service, bench, environment):
     source = Path(__file__).with_name("site-seed.py")
-    command = ["docker", "--context", "colima", "exec", "-i", "--workdir", bench]
+    command = ["docker", "--context", docker_context(), "exec", "-i", "--workdir", bench]
     for name in environment:
         command.extend(("--env", name))
     command.extend((f"{project}-{service}-1", "env/bin/python", "-", service))
