@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 import tokenize
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from contracts import METHOD_PATH, operations
@@ -84,6 +84,7 @@ class Finding:
     line: int
     rule: str
     message: str
+    severity: str = "error"
 
 
 def has_text(value):
@@ -313,7 +314,55 @@ def boundary_policy(root):
     return policy, ai_paths, set(providers)
 
 
-def naming_findings(root: Path) -> list[Finding]:
+ENFORCED_NAMING_RULES = {
+    "naming.legacy-name",
+    "naming.module-name",
+    "naming.translation-binding",
+    "naming.turkish-name",
+}
+
+
+def naming_checks(root, findings):
+    policy = root / "dev/naming/enforcement.json"
+    try:
+        if policy.resolve() != policy:
+            raise ValueError("Naming enforcement policy must be an in-tree file.")
+        config = json.loads(policy.read_text(encoding="utf-8"))
+        mode = config.get("mode") if isinstance(config, dict) else None
+        if mode not in ("advisory", "enforce"):
+            raise ValueError("Invalid naming enforcement mode.")
+        source = "file"
+    except FileNotFoundError:
+        mode, source = "advisory", "default"
+    except (OSError, RuntimeError, ValueError):
+        findings.add(
+            Finding(
+                "dev/naming/enforcement.json",
+                1,
+                "naming-config",
+                "Cannot read naming enforcement mode. Expected advisory or enforce.",
+            )
+        )
+        return {"naming": "fail", "naming_mode": None, "naming_mode_source": "invalid"}
+
+    naming = naming_findings(root)
+    checks = {"naming": "not_run", "naming_mode": mode, "naming_mode_source": source}
+    if naming is None:
+        return checks
+
+    checks["naming"] = "pass"
+    for finding in naming:
+        if finding.rule == "naming" or (mode == "enforce" and finding.rule in ENFORCED_NAMING_RULES):
+            findings.add(finding)
+            checks["naming"] = "fail"
+        else:
+            findings.add(replace(finding, severity="warning"))
+            if checks["naming"] == "pass":
+                checks["naming"] = "warn"
+    return checks
+
+
+def naming_findings(root: Path) -> list[Finding] | None:
     checker = root / "dev/naming/check_names.py"
     relative = checker.relative_to(root).as_posix()
     if not checker.exists() and not checker.is_symlink():
@@ -784,10 +833,8 @@ def scan(root, commit_base=None):
 
     for path, line, message in tracked_findings(root, commit_base):
         findings.add(Finding(path, line, "forbidden-name", message))
-    naming = naming_findings(root)
-    if naming:
-        findings.update(naming)
-    return sorted(findings), {"naming": "not_run" if naming is None else "fail" if naming else "pass"}
+    checks = naming_checks(root, findings)
+    return sorted(findings), checks
 
 
 def supports_python():
@@ -822,6 +869,7 @@ def main():
             finding.line,
             finding.rule if next(match_lines([finding.rule]), None) is None else "redacted",
             finding.message if next(match_lines([finding.message]), None) is None else "Details redacted.",
+            finding.severity,
         )
         for finding in raw_findings
     ]
@@ -830,9 +878,12 @@ def main():
     else:
         if checks["naming"] == "not_run":
             print("naming: not_run (checker unavailable)", file=sys.stderr)
+        if checks["naming_mode_source"] == "default":
+            print("naming mode: advisory (enforcement.json missing)", file=sys.stderr)
         for finding in findings:
-            print(f"{finding.path}:{finding.line} [{finding.rule}] {finding.message}")
-    return int(bool(findings))
+            prefix = "Warning: " if finding.severity == "warning" else ""
+            print(f"{prefix}{finding.path}:{finding.line} [{finding.rule}] {finding.message}")
+    return int(any(finding.severity == "error" for finding in findings))
 
 
 if __name__ == "__main__":

@@ -390,16 +390,95 @@ class GateTests(unittest.TestCase):
         (finding,) = self.scan("website-user")
         self.assertIn("sample_app.api.manage", finding["message"])
 
+    def write_naming_findings(self, *rules):
+        records = [
+            {"path": f"backend/{APP}/hooks.py", "line": 1, "rule": rule, "message": f"Review {rule}."}
+            for rule in rules
+        ]
+        self.write(
+            "dev/naming/check_names.py",
+            f"print({json.dumps(records)!r})\nraise SystemExit({int(bool(records))})",
+        )
+
+    def run_gate(self, *args):
+        return subprocess.run(
+            [sys.executable, "-B", GATE, "--root", self.root, *args], capture_output=True, text=True
+        )
+
+    def test_naming_advisory_preserves_findings_without_failing_gate(self):
+        self.write("dev/naming/enforcement.json", '{"mode": "advisory"}')
+        self.write_naming_findings("legacy-name", "source-text")
+        result = self.run_gate("--json")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["checks"]["naming"], "warn")
+        self.assertEqual(payload["checks"]["naming_mode"], "advisory")
+        self.assertEqual(payload["checks"]["naming_mode_source"], "file")
+        self.assertEqual(
+            [(finding["rule"], finding["severity"]) for finding in payload["findings"]],
+            [("naming.legacy-name", "warning"), ("naming.source-text", "warning")],
+        )
+        self.write("docs/kararlar/0010-first.md", "# First")
+        self.write("docs/kararlar/0010-second.md", "# Second")
+        self.assertEqual(self.run_gate("--json").returncode, 1)
+
+    def test_naming_enforce_blocks_only_four_rule_codes(self):
+        self.write("dev/naming/enforcement.json", '{"mode": "enforce"}')
+        blocking = ("legacy-name", "module-name", "translation-binding", "turkish-name")
+        for rule in blocking:
+            with self.subTest(rule=rule):
+                self.write_naming_findings(rule, "source-text")
+                result = self.run_gate("--json")
+                self.assertEqual(result.returncode, 1, result.stdout)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["checks"]["naming_mode"], "enforce")
+                self.assertEqual(payload["checks"]["naming"], "fail")
+                severity = {finding["rule"]: finding["severity"] for finding in payload["findings"]}
+                self.assertEqual(severity, {f"naming.{rule}": "error", "naming.source-text": "warning"})
+        self.write_naming_findings("source-text")
+        self.assertEqual(self.run_gate("--json").returncode, 0)
+
+    def test_naming_defaults_to_advisory_and_reports_missing_policy(self):
+        self.write_naming_findings("module-name")
+        result = self.run_gate("--json")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        checks = json.loads(result.stdout)["checks"]
+        self.assertEqual(checks["naming_mode"], "advisory")
+        self.assertEqual(checks["naming_mode_source"], "default")
+        text_result = self.run_gate()
+        self.assertEqual(text_result.returncode, 0, text_result.stderr)
+        self.assertIn("enforcement.json missing", text_result.stderr)
+        self.assertIn("Warning: ", text_result.stdout)
+
+    def test_invalid_naming_mode_is_a_configuration_error(self):
+        self.write("dev/naming/enforcement.json", '{"mode": "typo"}')
+        result = self.run_gate("--json")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["checks"]["naming_mode_source"], "invalid")
+        self.assertEqual([finding["rule"] for finding in payload["findings"]], ["naming-config"])
+
     def test_missing_naming_checker_reports_not_run(self):
         result = subprocess.run(
             [sys.executable, "-B", GATE, "--root", self.root, "--json"], capture_output=True, text=True
         )
         self.assertEqual(result.returncode, 0)
-        self.assertEqual(json.loads(result.stdout), {"findings": [], "checks": {"naming": "not_run"}})
+        self.assertEqual(
+            json.loads(result.stdout),
+            {
+                "findings": [],
+                "checks": {
+                    "naming": "not_run",
+                    "naming_mode": "advisory",
+                    "naming_mode_source": "default",
+                },
+            },
+        )
         self.assertEqual(result.stderr, "")
 
     def test_naming_checker_reports_findings_and_execution_errors(self):
         checker = "dev/naming/check_names.py"
+        self.write("dev/naming/enforcement.json", '{"mode": "enforce"}')
         self.write("apps/example.py", "# Example\n")
         self.write(
             checker,

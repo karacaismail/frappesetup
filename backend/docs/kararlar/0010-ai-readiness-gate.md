@@ -7,16 +7,37 @@ Depo kökünde `backend/dev/bin/ai-readiness` komutunu çalıştırın.
 Kapı Python 3.14 veya üstünü ister.
 Komut önce `python3.14` adını arar. Bu ad yoksa `python3` kullanır.
 Komut her bulguda dosyayı ve satırı gösterir.
-Bir bulgu varsa komut 1 döndürür. Bulgu yoksa 0 döndürür.
+Bir hata bulgusu varsa komut 1 döndürür. Hata yoksa 0 döndürür.
 Python sürümü yetersizse komut 2 döndürür.
 
 Başka bir arka uç klasörünü taramak için `--root` kullanın.
 Programın okuyacağı çıktı için `--json` ekleyin.
-JSON çıktısında `findings` bulguları, `checks.naming` ad denetiminin durumunu içerir.
+JSON çıktısında `findings` bulguları içerir.
+Her bulgunun `severity` alanı `error` veya `warning` olur.
+`checks.naming` ad denetiminin sonucunu gösterir.
 Testleri çalıştırmak için `backend/dev/bin/ai-readiness --self-test` kullanın.
 Güvenlik komutu da bu testleri çalıştırır.
 Güvenlik komutu da Python 3.14 veya üstünü ister.
 Kapı sürüm hatası verirse güvenlik komutu 1 döndürür.
+
+## Ad denetimi kipi
+
+Kapı `dev/naming/enforcement.json` dosyasındaki `mode` alanını okur.
+Kip `advisory` ise kapı ad bulgularını uyarı olarak yazar.
+Kapı yalnız uyarı varsa 0 döndürür.
+Kip `enforce` ise şu ad bulguları kapıyı durdurur.
+
+- `legacy-name`
+- `turkish-name`
+- `module-name`
+- `translation-binding`
+
+Öteki ad bulguları iki kipte de uyarıdır.
+Kip dosyası yoksa kapı `advisory` kullanır ve bunu çıktıda belirtir.
+JSON çıktısı kipi `checks.naming_mode` alanında gösterir.
+`checks.naming_mode_source` kipi dosyadan mı aldığını belirtir.
+Kip dosyası geçersizse veya ad betiği çalışmazsa kapı hata verir.
+Ad betiği yoksa kapı `not_run` yazar.
 
 ## Kapsam
 
