@@ -227,7 +227,8 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Dosyayı platform-core-mobil dalı yazdı. Orkestratör bu yazımı bir kez onayladı. Mobil dal birleşene kadar dosyayı mobil çalışanı düzeltir. Birleşmeden sonra dosyanın sahibi platform-core-kimlik işidir.
   - Modülün açık yolu `platform_core.kimlik.service_client` olur. Yol `dev/modul-sinirlari.json` dosyasına eklendi.
   - Belirteç adresi Keycloak ayarlarından türetilir. Önce `keycloak_internal_url`, yoksa `keycloak_public_url` kullanılır. `mobile_identity_sync_token_url` ayarı kullanılmaz.
-  - Adres HTTPS olmalıdır. Bu yüzden geliştirme sitesinde uzak oturum kapatma `delivery_pending` durumunda kalır. Gerçek deneme için integration-e2e işi Keycloak'a HTTPS iç adres verir.
+  - Keycloak belirteç adresi her zaman HTTPS olmalıdır. integration-e2e işi geliştirme yığınında HTTPS iç adresi sağlar.
+  - T-5. Kimlik servisi adresi üretimde HTTPS olmalıdır. Yerel HTTP için `developer_mode` ve `mobile_allow_development_http` birlikte açılır. Yeni ayar varsayılan olarak kapalıdır. Mobil modül adresi ve ayarları denetler.
   - platform-core-kimlik dalı mobil dosyalarındaki değişikliklerini geri alır. Bu dosyalar `mobil/identity_sync_client.py`, onun testi ve `0007-mobil-esitleme.md` notudur.
 - **O-37. Birleştirmede ortak dosya ve bağımlılık kuralları.** 22 Kasım 2026 Pazar günü bütün backend dalları birleşti. Kurallar şunlardır:
   - `oidc_verify` kitaplığı iki uygulamada da `oidc_verify==0.1.0` kuralıyla istenir. Kitaplık depodadır ve sürüm paketiyle birlikte kurulur. Kural değişince güvenlik kilidi `backend/dev/security/compile-lock` ile yeniden üretilir.

@@ -29,7 +29,6 @@ class IdentitySyncClientTest(TestCase):
 		self.open = patch.object(client._OPENER, "open").start()
 		patch.object(service_client._OPENER, "open", self.open).start()
 		self.local_open = patch.object(client._LOCAL_OPENER, "open").start()
-		patch.object(service_client._LOCAL_OPENER, "open", self.local_open).start()
 
 	@staticmethod
 	def response(body=b"", status=200):
@@ -150,6 +149,32 @@ class IdentitySyncClientTest(TestCase):
 		self.assertEqual(client.send_session_revocations([target]), ())
 		self.assertEqual(self.open.call_args.args[0].get_header("Authorization"), "Bearer new-bearer")
 
+	def test_unauthorized_closure_refreshes_for_the_rest_of_the_batch(self):
+		targets = [("first", "subject"), ("second", "subject"), ("third", "subject")]
+		self.open.side_effect = [
+			self.response(b'{"access_token":"old-bearer","expires_in":60}'),
+			self.response(status=401),
+			self.response(b'{"access_token":"new-bearer","expires_in":60}'),
+			self.response(status=401),
+			self.response(),
+		]
+		self.assertEqual(client.send_session_revocations(targets), tuple(targets[:2]))
+		self.assertEqual(
+			[call.args[0].get_header("Authorization") for call in self.open.call_args_list],
+			[None, "Bearer old-bearer", None, "Bearer new-bearer", "Bearer new-bearer"],
+		)
+
+	def test_failed_refresh_leaves_remaining_targets_pending(self):
+		targets = [("first", "subject"), ("second", "subject"), ("third", "subject")]
+		self.open.side_effect = [
+			self.response(b'{"access_token":"old-bearer","expires_in":60}'),
+			self.response(status=401),
+			URLError("unavailable"),
+		]
+		self.assertEqual(client.send_session_revocations(targets), tuple(targets))
+		self.assertEqual(self.open.call_count, 3)
+		self.assertIsNone(self.open.call_args.args[0].get_header("Authorization"))
+
 	def test_reuses_service_bearer_until_expiry(self):
 		self.open.side_effect = [
 			self.response(b'{"access_token":"fixture-bearer","expires_in":60}'),
@@ -181,40 +206,63 @@ class IdentitySyncClientTest(TestCase):
 		self.open.assert_not_called()
 
 	def test_development_stack_can_revoke_over_local_http(self):
-		self.conf.update(
-			developer_mode=1,
-			mobile_identity_sync_url="http://identity-sync.localhost:6115",
-			keycloak_internal_url="http://identity.localhost:3850",
-		)
-		self.local_open.side_effect = [self.response(b'{"access_token":"fixture-bearer"}'), self.response()]
-		self.assertEqual(client.send_session_revocations([("session", "subject")]), ())
-		self.assertEqual(
-			[call.args[0].full_url for call in self.local_open.call_args_list],
-			[
-				"http://identity.localhost:3850/realms/platform/protocol/openid-connect/token",
-				"http://identity-sync.localhost:6115/v1/sessions/revoke",
-			],
-		)
+		for host in ("identity-sync.localhost", "localhost", "127.0.0.1", "[::1]"):
+			with self.subTest(host=host):
+				address = f"http://{host}:6115"
+				self.conf.update(
+					developer_mode=1,
+					mobile_allow_development_http=1,
+					mobile_identity_sync_url=address,
+				)
+				self.open.return_value = self.response(b'{"access_token":"fixture-bearer"}')
+				self.local_open.return_value = self.response()
+				self.assertEqual(client.send_session_revocations([("session", "subject")]), ())
+				self.assertTrue(self.open.call_args.args[0].full_url.startswith("https://"))
+				self.assertEqual(self.local_open.call_args.args[0].full_url, address + "/v1/sessions/revoke")
 
-	def test_plaintext_is_rejected_outside_the_expected_development_hosts(self):
-		for key, address, development in (
-			("mobile_identity_sync_url", "http://identity-sync.localhost:6115", 0),
-			("keycloak_internal_url", "http://identity.localhost:3850", 0),
-			("mobile_identity_sync_url", "http://identity-sync.localhost:6115", "0"),
-			("mobile_identity_sync_url", "http://identity-sync.localhost.example.test", 1),
-			("mobile_identity_sync_url", "http://identity.localhost:3850", 1),
-			("mobile_identity_sync_url", "http://user:secret@identity-sync.localhost:6115", 1),
-			("mobile_identity_sync_url", "http://identity-sync.localhost:bad", 1),
-			("keycloak_internal_url", "http://identity-sync.localhost:6115", 1),
-			("mobile_identity_sync_url", "http://192.168.1.99:6115", 1),
+	def test_development_http_requires_both_flags(self):
+		self.conf["mobile_identity_sync_url"] = "http://localhost:6115"
+		for flags in (
+			{"developer_mode": 1},
+			{"mobile_allow_development_http": 1},
+			{"developer_mode": 1, "mobile_allow_development_http": "0"},
+			{"developer_mode": "0", "mobile_allow_development_http": 1},
 		):
-			with (
-				self.subTest(key=key, address=address, development=development),
-				patch.dict(self.conf, {key: address, "developer_mode": development}),
-			):
+			with self.subTest(flags=flags), patch.dict(self.conf, flags):
 				self.assertEqual(
 					client.send_session_revocations([("session", "subject")]), (("session", "subject"),)
 				)
+		self.open.assert_not_called()
+		self.local_open.assert_not_called()
+
+	def test_development_http_rejects_other_hosts_and_invalid_authorities(self):
+		self.conf.update(developer_mode=1, mobile_allow_development_http=1)
+		for authority in (
+			"0.0.0.0:6115",
+			"[::]:6115",
+			"[::ffff:127.0.0.1]:6115",
+			"192.168.1.99:6115",
+			"event-sink.localhost:6115",
+			"identity-sync.localhost.example.test:6115",
+			"user:secret@identity-sync.localhost:6115",
+			"identity-sync.localhost:bad",
+			"identity-sync.localhost:0",
+		):
+			with self.subTest(authority=authority):
+				self.conf["mobile_identity_sync_url"] = f"http://{authority}"
+				self.assertEqual(
+					client.send_session_revocations([("session", "subject")]), (("session", "subject"),)
+				)
+		self.open.assert_not_called()
+		self.local_open.assert_not_called()
+
+	def test_keycloak_requires_https_even_with_both_development_flags(self):
+		self.conf.update(
+			developer_mode=1,
+			mobile_allow_development_http=1,
+			keycloak_internal_url="http://identity.localhost:3850",
+		)
+		self.assertEqual(client.send_session_revocations([("session", "subject")]), (("session", "subject"),))
 		self.open.assert_not_called()
 		self.local_open.assert_not_called()
 

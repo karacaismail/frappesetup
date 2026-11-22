@@ -52,6 +52,10 @@ Ayarlar `site_config.json` dosyasında durur. Sır depoya girmez.
 | `keycloak_client_secret` | Evet | Tarayıcı istemcisinin sırrı |
 | `keycloak_service_client_id` | Servis çağrısında | Servis istemcisi. Örnek `site-tenant1-service`. |
 | `keycloak_service_client_secret` | Servis çağrısında | Servis istemcisinin sırrı |
+| `mcp_oauth_enabled` | İsteğe bağlı | Dış MCP erişimini açar. Bu erişim varsayılan olarak kapalıdır. |
+| `mcp_oauth_resource` | Dış MCP erişiminde | MCP ucunun tam HTTPS adresi. |
+| `mcp_oauth_client_ids` | Dış MCP erişiminde | İzin verilen açık Keycloak istemcilerinin kimlik listesi. |
+| `mcp_oauth_introspection_secret` | Dış MCP erişiminde | Keycloak belirtecini denetleyen istemcinin sırrı. Yalnız site ayarında saklanır. |
 | `identity_brand_name` | Evet | Düğme metni bundan üretilir, örneğin `Atonota` |
 | `platform_panel_url` | Evet | Girişten ve çıkıştan sonra dönülen adres |
 | `identity_keycloak_only` | Hayır | `1` ise Frappe'nin yerel giriş yolları kapanır |

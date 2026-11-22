@@ -58,7 +58,7 @@ for table in ("PLT Mobile Installation", "PLT Mobile Operation", "Mobile Fixture
     assert count == 0
 frappe.destroy()
 PY
-"${dock[@]}" exec -d "$web" sh -c 'bench --site test-mobile.localhost serve --port "$KIRACI_WEB_PORT" --noreload > logs/mobile-http-review.log 2>&1'
+"${dock[@]}" exec -d "$web" sh -c 'bench --site test-mobile.localhost serve --port "$FS_TENANT_WEB_PORT" --noreload > logs/mobile-http-review.log 2>&1'
 "${dock[@]}" exec "$web" env/bin/python -c 'import os,socket,time
 for _ in range(50):
     try:
