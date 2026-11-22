@@ -83,8 +83,8 @@ paths:
               schema: {$ref: "#/components/schemas/JsonRpcResponse"}
         "202": {description: Bildirim kabul edildi. Gövde yoktur.}
         "400": {description: Geçersiz JSON-RPC gövdesi, başlık uyuşmazlığı ya da desteklenmeyen sürüm.}
-        "401": {description: Kimlik yok, belirteç geçersiz, süresi dolmuş ya da çağrı sınırı aşılmış.}
-        "403": {description: Köken izinli değil, kimlik türü kabul edilmiyor ya da çerezle belirteç birlikte geldi.}
+        "401": {description: "Belirteç bilinmiyor, süresi dolmuş, bağlı oturumu bitmiş ya da çağrı hakkı tükenmiş."}
+        "403": {description: "İstek kimlik taşımıyor, köken izinli değil, kimlik türü kabul edilmiyor ya da çerezle belirteç birlikte geldi. Uç misafire açık değildir. Frappe kimliksiz isteği 403 ile reddeder."}
         "404": {description: Bilinmeyen yöntem ya da bilinmeyen araç.}
         "406": {description: "`Accept` başlığı `application/json` değerine izin vermiyor."}
         "415": {description: "`Content-Type` değeri `application/json` değil."}

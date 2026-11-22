@@ -57,6 +57,8 @@ def handle() -> Response:
 def _check_principal() -> None:
 	kind = access.principal()
 	if kind == access.GUEST:
+		# Not reachable today: Frappe refuses a guest with 403 before this code runs, because the
+		# endpoint does not allow guests. The check stays as a second guard.
 		raise McpError(protocol.INVALID_REQUEST, "Authentication required", status=401)
 	if kind == access.OTHER:
 		# API anahtarı ve OAuth belirteci uzun ömürlüdür ve G-148 sınırlarını taşımaz.

@@ -21,7 +21,9 @@ class TestIdentity(YzTestCase):
 	def test_guest_is_rejected(self):
 		response = self.rpc(self.anonymous(), "tools/list")
 
-		self.assertIn(response.status_code, (401, 403))
+		# Frappe refuses a guest on a whitelisted method with 403 before the layer runs. The endpoint
+		# is not opened to guests, so the contract states 403 for a request without credentials.
+		self.assertEqual(response.status_code, 403)
 
 	def test_agent_token_acts_as_the_user_on_mcp_only(self):
 		name = self.make_record(USER_A, title="Belirtecle")
