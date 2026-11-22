@@ -6,9 +6,10 @@ import { join, resolve } from 'node:path';
 const worktree = resolve(process.argv[2]);
 const previewDir = process.env.PREVIEW_DIR;
 const require = createRequire(join(worktree, 'package.json'));
-const { request } = require('@playwright/test');
+const { chromium, request, webkit } = require('@playwright/test');
 const fixture = readFixture(join(previewDir, 'fixtures.json'));
 const tenant = 'http://kiraci1.localhost:' + (Number(process.env.PANE_PORT) + 1);
+const credentialName = /(?:^|_)(?:AUTHORIZATION|COOKIE|CSRF|PASSWORD|SECRET|SEED|TOKEN)(?:_|$)/;
 
 const env = {
   ...process.env,
@@ -18,6 +19,7 @@ const env = {
 for (const name of [
   'E2E_ADMIN_PASSWORD', 'E2E_KEYCLOAK_ADMIN_PASSWORD', 'E2E_KEYCLOAK_CLIENT_SECRET',
   'ATONOTA_SITE_KIRACI1_SERVICE_SECRET', 'E2E_KEYCLOAK_SERVICE_CLIENT_SECRET', 'E2E_PREVIEW_READER_PASSWORD', 'E2E_PRESS_ADMIN_PASSWORD', 'E2E_PRESS_CLIENT_SECRET',
+  'E2E_CHROMIUM_UNAVAILABLE',
 ]) delete env[name];
 
 function readFixture(path) {
@@ -58,7 +60,6 @@ async function openTenantSession(role, username, password) {
 }
 
 function sanitize(raw) {
-  const credentialName = /(?:^|_)(?:AUTHORIZATION|COOKIE|CSRF|PASSWORD|SECRET|SEED|TOKEN)(?:_|$)/;
   const credentials = new Set();
   for (const settings of [process.env, fixture, env]) {
     for (const [name, value] of Object.entries(settings)) {
@@ -75,6 +76,21 @@ function sanitize(raw) {
     .replace(/([?&](?:code|state|session_state)=)[^&\s"']+/gi, '$1[redacted]')
     .replace(/(authorization:\s*(?:Bearer|Basic|token)\s+)[^\s"']+/gi, '$1[redacted]')
     .replace(/(\bsid=|x-frappe-csrf-token:\s*)[^;\s"']+/gi, '$1[redacted]');
+}
+
+async function browserAvailable(engine, browserType) {
+  let browser;
+  const browserEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => !credentialName.test(name)));
+  try {
+    browser = await browserType.launch({ timeout: 10000, env: browserEnv });
+  } catch (error) {
+    const output = sanitize(String(error));
+    writeFileSync(join(previewDir, engine + '-launch.log'), output + '\n', { mode: 0o600 });
+    process.stdout.write(`not_run ${engine} (browser launch failed)\n`);
+    return false;
+  }
+  await browser.close();
+  return true;
 }
 
 async function runPlaywright(label, args, reporter = 'list') {
@@ -121,7 +137,15 @@ async function runPlaywright(label, args, reporter = 'list') {
 
 try {
   const results = [];
-  results.push(await runPlaywright('browser', ['--project=chromium', '--project=webkit', 'browser.spec.ts']));
+  const projects = [];
+  if (await browserAvailable('chromium', chromium)) projects.push('--project=chromium');
+  else env.E2E_CHROMIUM_UNAVAILABLE = '1';
+  if (await browserAvailable('webkit', webkit)) projects.push('--project=webkit');
+  if (projects.length) {
+    results.push(await runPlaywright('browser', [
+      ...projects, 'browser.spec.ts', 'magic-link.spec.ts', 'mobile-pkce.spec.ts',
+    ]));
+  }
   try {
     await openTenantSession('OPERATOR', 'Administrator', process.env.E2E_ADMIN_PASSWORD);
     env.E2E_DELETE_TENANT_READER_COOKIE ||= env.E2E_OPERATOR_COOKIE;
