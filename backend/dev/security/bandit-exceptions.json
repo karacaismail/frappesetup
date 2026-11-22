@@ -592,5 +592,131 @@
     "reason": "The command runs the pinned ZAP image with networking disabled and structured local input.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/hooks.py",
+    "code": "\"frappe.core.doctype.user.user.reset_password\": \"platform_core.kimlik.login_policy.reset_password\",",
+    "statementSha256": "36db1fd3a6ad84076c1a7fee39e1a577ed6b5ef8c26e6f8d4be1a30708e51332",
+    "reason": "This string is a Python route mapping for a Frappe sign-in wrapper.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/hooks.py",
+    "code": "\"frappe.core.doctype.user.user.update_password\": \"platform_core.kimlik.login_policy.update_password\",",
+    "statementSha256": "36db1fd3a6ad84076c1a7fee39e1a577ed6b5ef8c26e6f8d4be1a30708e51332",
+    "reason": "This string is a Python route mapping for a Frappe sign-in wrapper.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/hooks.py",
+    "code": "\"frappe.www.login.login_via_token\": \"platform_core.kimlik.login_policy.login_via_token\",",
+    "statementSha256": "36db1fd3a6ad84076c1a7fee39e1a577ed6b5ef8c26e6f8d4be1a30708e51332",
+    "reason": "This string is a Python route mapping for a Frappe sign-in wrapper.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/provider_setup.py",
+    "code": "\"access_token_url\": \"/protocol/openid-connect/token\",",
+    "statementSha256": "0d31f3cfb950fd08afd65fc756c37a512f06a2069dc88af13391360edd9b4928",
+    "reason": "This string is the OpenID Connect token endpoint path.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/tests/helpers.py",
+    "code": "\"keycloak_client_secret\": \"test-client-secret-fake\",",
+    "statementSha256": "40a74283499ea0c27f5b434ffe6218554749ed56086ff81e75b629e673471228",
+    "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/tests/helpers.py",
+    "code": "\"access_token\": \"fake-access-token\",",
+    "statementSha256": "bca83bdab72b5b668d049ddd3cb5af8890b5b95fa4fefa9c942abe3214f19a01",
+    "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/tests/helpers.py",
+    "code": "\"token_type\": \"Bearer\",",
+    "statementSha256": "bca83bdab72b5b668d049ddd3cb5af8890b5b95fa4fefa9c942abe3214f19a01",
+    "reason": "This OAuth response type names the Bearer scheme in a mocked token response.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_login_page.py",
+    "code": "with h.SiteSettings({\"keycloak_client_secret\": \"\"}):",
+    "statementSha256": "f72fed1c2a146f789b8538a7ebb69738e251bd9cb1d8f5028a93ae03f0b53f0c",
+    "reason": "This test supplies an empty site setting to check the missing-setting response.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_login_policy.py",
+    "code": "{\"key\": \"x\", \"new_password\": \"A-long-password-123\"},",
+    "statementSha256": "612110415db2bced86a7be2fa7d159bd13fca6b6b6a1a29e8833652f15e70c0f",
+    "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_login_policy.py",
+    "code": "(\"get\", \"/api/method/frappe.www.login.login_via_token\", {\"login_token\": \"x\"}),",
+    "statementSha256": "612110415db2bced86a7be2fa7d159bd13fca6b6b6a1a29e8833652f15e70c0f",
+    "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_provider_setup.py",
+    "code": "\"access_token_url\": \"y\",",
+    "statementSha256": "b975091ecf75035ee90b56bf8a463eea3d7ff04d75151ea416a28ce21369cc95",
+    "reason": "This placeholder endpoint path is used only to construct a test record.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_provider_setup.py",
+    "code": "with h.SiteSettings({\"keycloak_client_secret\": \"\"}), self.assertRaises(KeycloakSettingsMissing):",
+    "statementSha256": "01076d46c6e9d690fb54ada5f93ff3d666d9e7e6db80d2bda10dbd8a4b07f9c1",
+    "reason": "This test supplies an empty site setting to check the missing-setting response.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_sign_in.py",
+    "code": "with h.SiteSettings({\"keycloak_client_secret\": \"\"}):",
+    "statementSha256": "af2d11d147b8b7b3f526387ada4f1a89a2bd61e358af911824017e4fc444ad37",
+    "reason": "This test supplies an empty site setting to check the missing-setting response.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B105",
+    "file": "backend/apps/platform_core/platform_core/kimlik/tests/test_sign_out.py",
+    "code": "data={\"logout_token\": \"x\", \"padding\": \"p\" * 20000},",
+    "statementSha256": "19c3dde4994a5839a40904931fed8a2a9795c85d5f875c900139363c1b819ba9",
+    "reason": "This fixture uses a synthetic credential with a mocked or rejected request.",
+    "owner": "platform-core-kimlik",
+    "ignoreUntil": "2027-02-22"
   }
 ]

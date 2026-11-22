@@ -5,15 +5,59 @@ app_description = "Platform backend modules"
 app_email = "noreply@example.test"
 app_license = "mit"
 
+# platform-core-kimlik: Keycloak sign-in, service tokens and the local sign-in gate (kimlik/README.md).
+# Other tasks append to the same list keys; do not replace them.
+before_login = ["platform_core.kimlik.login_policy.before_login"]
+before_request = [
+	"platform_core.kimlik.login_policy.before_request",
+	"platform_core.kimlik.session_policy.before_request",
+	"platform_core.kabuk.native_metadata.guard_website_rpc_before_request",
+]
+on_session_creation = ["platform_core.kimlik.session_policy.on_session_creation"]
+# Keep a single list assignment. Credential hooks must precede the metadata guard (platform-core-kabuk).
+auth_hooks = [
+	"platform_core.kimlik.service_token.validate",
+	"platform_core.yapay_zeka.agent_token.authenticate_request",
+	"platform_core.kabuk.native_metadata.guard_native_metadata",
+]
+# AU-19: local sign-in functions are replaced by gated wrappers (kimlik/login_policy.py).
+override_whitelisted_methods = {
+	"frappe.core.doctype.user.user.reset_password": "platform_core.kimlik.login_policy.reset_password",
+	"frappe.core.doctype.user.user.update_password": "platform_core.kimlik.login_policy.update_password",
+	"frappe.core.doctype.user.user.sign_up": "platform_core.kimlik.login_policy.sign_up",
+	"frappe.www.login.send_login_link": "platform_core.kimlik.login_policy.send_login_link",
+	"frappe.www.login.login_via_key": "platform_core.kimlik.login_policy.login_via_key",
+	"frappe.www.login.login_via_token": "platform_core.kimlik.login_policy.login_via_token",
+	"frappe.integrations.oauth2_logins.login_via_google": "platform_core.kimlik.login_policy.login_via_google",
+	"frappe.integrations.oauth2_logins.login_via_github": "platform_core.kimlik.login_policy.login_via_github",
+	"frappe.integrations.oauth2_logins.login_via_facebook": "platform_core.kimlik.login_policy.login_via_facebook",
+	"frappe.integrations.oauth2_logins.login_via_frappe": "platform_core.kimlik.login_policy.login_via_frappe",
+	"frappe.integrations.oauth2_logins.login_via_office365": "platform_core.kimlik.login_policy.login_via_office365",
+	"frappe.integrations.oauth2_logins.login_via_salesforce": "platform_core.kimlik.login_policy.login_via_salesforce",
+	"frappe.integrations.oauth2_logins.login_via_fairlogin": "platform_core.kimlik.login_policy.login_via_fairlogin",
+	"frappe.integrations.oauth2_logins.login_via_keycloak": "platform_core.kimlik.login_policy.login_via_keycloak",
+	"frappe.integrations.oauth2_logins.custom": "platform_core.kimlik.login_policy.custom",
+	"frappe.integrations.doctype.ldap_settings.ldap_settings.login": "platform_core.kimlik.login_policy.ldap_login",
+	# Access rule engine: on a document type with Access Rules every custom link search is refused.
+	# There is no allow-list.
+	"frappe.desk.search.search_link": "platform_core.erisim.link_search.search_link",
+	"frappe.desk.search.search_widget": "platform_core.erisim.link_search.search_widget",
+	# Link validation hands a search function from the request to the same search.
+	"frappe.client.validate_link_and_fetch": "platform_core.erisim.link_search.validate_link_and_fetch",
+}
+
+# platform-core-kimlik: Frappe idle timeout of 1 hour (O-25, kimlik/session_policy.py).
 # Mobile sync tables must exist before the sequence row is created.
 # The access rule engine switches off Auto Email Reports on governed data in the same two hooks.
 # The AI access layer turns off Frappe's built-in MCP endpoint.
 after_install = [
+	"platform_core.kimlik.session_policy.apply",
 	"platform_core.mobil.store.seed_sequence",
 	"platform_core.erisim.reports.switch_off_governed_auto_email_reports",
 	"platform_core.yapay_zeka.setup.disable_builtin_mcp",
 ]
 after_migrate = [
+	"platform_core.kimlik.session_policy.apply",
 	"platform_core.mobil.store.seed_sequence",
 	"platform_core.erisim.reports.switch_off_governed_auto_email_reports",
 	"platform_core.yapay_zeka.setup.disable_builtin_mcp",
@@ -22,7 +66,10 @@ after_migrate = [
 fixtures = [{"dt": "Role", "filters": [["name", "=", "AI Manager"]]}]
 
 # Access Rules change only through the engine's own AI tools, not the generic write tools (O-28).
+# O-28: the identity link changes only through the identity endpoints, never through generic AI writes.
 ai_write_closed_doctypes = [
+	"Platform Identity Link",
+	"Platform Identity Deletion",
 	"AI API",
 	"AI Account",
 	"Mobile Revoked Session",
@@ -30,6 +77,41 @@ ai_write_closed_doctypes = [
 	"Mobile Account State",
 	"Access Rule",
 ]
+# Website User method allow list (docs/sozlesmeler.md). Identity adds only the method a portal user calls.
+website_user_allowed_methods = [
+	"platform_core.api.auth.logout",
+	"platform_core.api.shell.get_bootstrap",
+	"platform_core.api.meta.get_doctype",
+	"frappe.auth.get_logged_user",
+	"logout",
+	"frappe.desk.search.search_link",
+	# AI access layer: an end user talks to the layer and decides on their own proposals.
+	# `purge_logs` is for the System Manager role and stays off this list.
+	"platform_core.api.ai.mcp",
+	"platform_core.api.ai.issue_agent_token",
+	"platform_core.api.ai.list_proposals",
+	"platform_core.api.ai.get_proposal",
+	"platform_core.api.ai.approve_proposal",
+	"platform_core.api.ai.reject_proposal",
+	"platform_core.api.ai.resolve_proposal",
+	"platform_core.api.mobile.v1_activity",
+	"platform_core.api.mobile.v1_list_installations",
+	"platform_core.api.mobile.v1_pull",
+	"platform_core.api.mobile.v1_push",
+	"platform_core.api.mobile.v1_register",
+	"platform_core.api.mobile.v1_revoke",
+	"platform_core.api.mobile.v1_revoke_installation",
+	"platform_core.api.mobile_pwa.v1_activity",
+	"platform_core.api.mobile_pwa.v1_list_installations",
+	"platform_core.api.mobile_pwa.v1_pull",
+	"platform_core.api.mobile_pwa.v1_push",
+	"platform_core.api.mobile_pwa.v1_register",
+	"platform_core.api.mobile_pwa.v1_revoke",
+	"platform_core.api.mobile_pwa.v1_revoke_installation",
+	# The user's own rule scopes. The explanation endpoint shows rule detail and is not listed.
+	"platform_core.api.access.get_access_summary",
+]
+
 
 ai_tools = [
 	"platform_core.model_gecidi.management_tools.declare",
@@ -155,60 +237,14 @@ doc_events = {
 	},
 }
 
-before_request = ["platform_core.kabuk.native_metadata.guard_website_rpc_before_request"]
 after_request = ["platform_core.kabuk.headers.add_security_headers"]
-
-# Keep a single list assignment. Credential hooks must precede the metadata guard when merged.
-auth_hooks = [
-	"platform_core.yapay_zeka.agent_token.authenticate_request",
-	"platform_core.kabuk.native_metadata.guard_native_metadata",
-]
-
-website_user_allowed_methods = [
-	"platform_core.api.shell.get_bootstrap",
-	"platform_core.api.meta.get_doctype",
-	"frappe.auth.get_logged_user",
-	"logout",
-	"frappe.desk.search.search_link",
-	# AI access layer: an end user talks to the layer and decides on their own proposals.
-	# `purge_logs` is for the System Manager role and stays off this list.
-	"platform_core.api.ai.mcp",
-	"platform_core.api.ai.issue_agent_token",
-	"platform_core.api.ai.list_proposals",
-	"platform_core.api.ai.get_proposal",
-	"platform_core.api.ai.approve_proposal",
-	"platform_core.api.ai.reject_proposal",
-	"platform_core.api.ai.resolve_proposal",
-	"platform_core.api.mobile.v1_activity",
-	"platform_core.api.mobile.v1_list_installations",
-	"platform_core.api.mobile.v1_pull",
-	"platform_core.api.mobile.v1_push",
-	"platform_core.api.mobile.v1_register",
-	"platform_core.api.mobile.v1_revoke",
-	"platform_core.api.mobile.v1_revoke_installation",
-	"platform_core.api.mobile_pwa.v1_activity",
-	"platform_core.api.mobile_pwa.v1_list_installations",
-	"platform_core.api.mobile_pwa.v1_pull",
-	"platform_core.api.mobile_pwa.v1_push",
-	"platform_core.api.mobile_pwa.v1_register",
-	"platform_core.api.mobile_pwa.v1_revoke",
-	"platform_core.api.mobile_pwa.v1_revoke_installation",
-	# The user's own rule scopes. The explanation endpoint shows rule detail and is not listed.
-	"platform_core.api.access.get_access_summary",
-]
 
 after_build = ["platform_core.kabuk.assets.remove_panel_source_maps"]
 
 # Access rule engine (erisim-kurali task). Decision note: docs/kararlar/0006-erisim-kurali.md
 permission_query_conditions = {"*": "platform_core.erisim.hooks.query_conditions"}
 has_permission = {"*": "platform_core.erisim.hooks.has_permission"}
-# On a document type with Access Rules every custom link search is refused. There is no allow-list.
-override_whitelisted_methods = {
-	"frappe.desk.search.search_link": "platform_core.erisim.link_search.search_link",
-	"frappe.desk.search.search_widget": "platform_core.erisim.link_search.search_widget",
-	# Link validation hands a search function from the request to the same search.
-	"frappe.client.validate_link_and_fetch": "platform_core.erisim.link_search.validate_link_and_fetch",
-}
+# The access rule engine's link search overrides are in override_whitelisted_methods above.
 # The report gate. Each extension class calls super(), so extensions of other apps keep running.
 extend_doctype_class = {
 	"Report": ["platform_core.erisim.reports.GuardedReport"],
