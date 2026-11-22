@@ -55,7 +55,7 @@ Kayıt: grup <kimlik> / candidate <kimlik> / build <kimlik>, başlangıç <UTC> 
 Durum: <Status>; ilk Failure: <sıra>. <Stage> / <Step>; sonraki satırlar: <Pending sayısı> Pending
 Kanıt: <Output satırı>; Error Log <kimlik veya "terminalden sonra boş">; Agent Job <kimlik veya "eşleşme yok">
 Sınıf: <failure-classes kimliği veya unknown>; güven: <kanıtlı | kısmi | unknown>
-Sahip: <team | operator | Hüseyin Cengiz | uygulama geliştiricisi | hesap sahibi>
+Sahip: <team | operator | DevOps sorumlusu | uygulama geliştiricisi | hesap sahibi>
 Tek sonraki adım: <işlem kimliği veya devir>; yapılmaması gereken: <madde>
 Okunamayan kanıt: <ör. Error Log team rolüyle okunamadı>; canlı doğrulama: not_run
 ```
