@@ -10,12 +10,14 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 | `contracts/platform_core-kabuk.openapi.yaml` | platform-core-kabuk |
 | `contracts/press_tr.openapi.yaml` | press-tr |
 | `contracts/identity_sync.openapi.yaml` | identity-sync |
+| `contracts/platform_core-model-gecidi.openapi.yaml` | platform-core-gecit |
+| `contracts/platform_core-yapay-zeka.openapi.yaml` | platform-core-yz |
 
 ## 1. Marka
 
 - Kimlik markasının adı “Atonota”dır.
 - Düğme metni “Atonota ile oturum aç” olur.
-- Üretimdeki alan adı atonota.net olur. Tam sunucu adı açık karardır (Proje kaydı A-1).
+- Keycloak'ın üretimdeki adresi `https://id.atonota.net` olur (Proje kaydı O-1).
 - Kod marka adını ve alan adını ayardan okur. Kodda sabit yazmayın.
 
 ## 2. Keycloak
@@ -27,6 +29,7 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 - Belirteçteki `iss` değeri `<keycloak_public_url>/realms/platform` olur.
 - Sunucu Keycloak'a başka adresten ulaşacaksa `keycloak_internal_url` ayarını kullanın. Bu ayar boşsa genel adres kullanılır.
 - Realm'in görünen adı “Atonota” olur. Giriş ve e-posta teması `atonota` adını taşır.
+- Tema Keycloak'ın kendi tema yapısıyla kurulur (Proje kaydı O-4).
 - Varsayılan dil Türkçedir. İkinci dil İngilizcedir.
 
 ### İstemciler
@@ -57,6 +60,8 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - Bu kapsamlar varsayılan değildir. İstekte `scope` ile istenir.
 - Servis belirteci yalnız bir `aud` değeri taşır.
 - Admin API yetkileri kiracıya giden belirtece girmez.
+- `identity-sync` Admin API belirtecini ayrı ister. İstekte `scope=admin-api kc-admin-api` olur. Bu belirtecin `aud` değeri `realm-management` ve Admin API adresidir. Keycloak 26.8 Admin API'si bu kapsamı ister.
+- `press-service` istemcisi `aud-press` kapsamını isteyemez. Keycloak bu isteği `invalid_scope` ile reddeder.
 
 ### Politikalar
 
@@ -84,7 +89,7 @@ Bu kuralları `libs/oidc_verify` kitaplığı uygular. `platform_core` ve `press
 - `exp` zorunludur. Saat payı 30 saniyedir.
 - Anahtar listesini 10 dakika saklayın. Bilinmeyen `kid` gelirse listeyi bir kez yenileyin.
 - İstekte `cmd` alanı varsa isteği reddedin.
-- İstek hem oturum çerezi hem belirteç taşıyorsa isteği reddedin.
+- İstek hem geçerli bir kullanıcı oturumu çerezi hem belirteç taşıyorsa isteği reddedin. Misafir çerezi oturum sayılmaz (AU-5).
 
 ### Çıkış belirteci
 
@@ -98,7 +103,7 @@ Keycloak çıkışta `logout_token` gönderir. Doğrulamada şunları denetleyin
 
 ### Kitaplığın arayüzü
 
-`press_tr` ve `platform_core` kitaplığı aynı anda kullanacak. Bu yüzden arayüz önceden belirlendi. Kitaplık Python 3.11 ve sonrasında çalışır. Frappe'ye bağlı değildir.
+`press_tr` ve `platform_core` kitaplığı aynı anda kullanacak. Bu yüzden arayüz önceden belirlendi. Kitaplık Python 3.11 ve sonrasında çalışır. Frappe 16 Python 3.14 kullanır. Kitaplık Frappe'ye bağlı değildir.
 
 ```python
 from oidc_verify import (
@@ -179,7 +184,30 @@ Açılan kullanıcının türü “Website User” olur (Proje kaydı D-5).
 | `press_tr.api.identity.ensure_team` | POST | Servis belirteci, `azp=identity-sync` | Takımı ve üyeliği hazırlar. Aynı istek iki kez gelirse aynı sonucu döner. |
 | `press_tr.api.identity.remove_team_member` | POST | Servis belirteci, `azp=identity-sync` | Üyeliği kaldırır. |
 
-- Press, Frappe 15 üzerinde çalışır. Frappe 15'te `on_social_login` kancası yoktur. Bu yüzden Press kendi dönüş ucunu kullanır (AU-4). press-tr işi bunu kaynak kodda doğrular.
+### Kuruluş ile takım eşlemesi
+
+Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşılık gelir (Rail 4). Bağ Press tarafında “Team” kaydının `keycloak_org_id` alanında durur. Bu alanı `press_tr` ekler.
+
+`ensure_team` isteğinin alanları şunlardır:
+
+| Alan | Tür | Not |
+| --- | --- | --- |
+| `issuer` | metin | Zorunlu |
+| `subject` | metin | Zorunlu |
+| `email` | metin | Zorunlu |
+| `email_verified` | doğru ya da yanlış | Zorunlu. Yanlışsa Press ilk bağı kurmaz. |
+| `organization_id` | metin | Zorunlu. Keycloak'taki kuruluşun kimliğidir. |
+| `organization_name` | metin | İsteğe bağlı. Yeni takımın görünen adı olur. |
+
+- Press takımı `keycloak_org_id` alanıyla arar. Takım yoksa açar ve alana kimliği yazar.
+- `keycloak_org_id` alanı veritabanında tekildir (V-8).
+- Girişte Press, kullanıcının hiç takımı yoksa takım açar. Kullanıcı başka bir takımın üyesiyse yeni takım açılmaz.
+- Takıma `free_account` bayrağı yazılmaz. Bu bayrak yalnız iç ve deneme siteleri içindir (G-24).
+- Yanıt `team` ve `created` alanlarını taşır. `team`, Press'teki takımın adıdır.
+- `remove_team_member` isteği `issuer`, `subject` ve `organization_id` alanlarını taşır.
+- Takım adı istekte gelmez. Takım adını Press üretir.
+
+- Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
 - G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
 
 ## 7. `identity_sync`
@@ -247,3 +275,145 @@ Tarayıcı ve container aynı adresi kullanmalıdır. Yoksa `iss` değeri tutmaz
 5. Container'lar aynı adresle Keycloak'a ulaşır.
 
 Kiracı ve Press sunucuları için de aynı yol geçerlidir. Keycloak çıkış bildirimini bu adreslere gönderir. Bu yolu ilk deneyen iş sonucu raporlar.
+
+## 10. Yapay zekâ erişim katmanı
+
+Proje sahibinin kararı şudur: Her şey yapay zekâyla yönetilebilir olacak. Katman model sağlayıcısından bağımsız olacak (Proje kaydı D-9). Bu bölüm bütün işler için geçerlidir.
+
+### Temel kurallar
+
+1. Her DocType ve her alan yapay zekâ katmanından görünür. Yeni DocType için ayrı kod gerekmez. Araçlar DocType tanımından çalışma anında üretilir.
+2. Yapay zekâ kullanıcının kimliğiyle çalışır. Yetki denetimi REST uçlarıyla aynıdır. `ignore_permissions` kullanılmaz (G-85).
+3. Yazma işi önce önizleme üretir. Önizlemeyi insan onaylar. Onay sunucuda üretilir ve tek kullanımlıktır (G-86). Model onay veremez.
+4. Her çağrı “AI Action Log” kaydına yazılır. Ret de yazılır (G-64).
+5. Ham SQL, ham Python, kabuk ve “Server Script” aracı yoktur. Veritabanı yalnız DocType katmanından açılır.
+6. Gizli alan hiç dönmez. Örneğin “Password” türündeki alanlar, belirteçler ve anahtarlar böyledir. Press'te okuma açık alan listesiyle yapılır.
+7. Kuyruğa alınma başarı sayılmaz. Başarı kaydın son durumundan okunur. Sonucu bilinmeyen iş “unknown” kalır. Aynı hedefe kör tekrar yapılmaz.
+8. Frappe uygulamalarına model sağlayıcısı kitaplığı eklenmez. Kodda model adı yazılmaz.
+9. Dış arayüz açık standartlardır: MCP ve OpenAPI. MCP, modellerin araç kullandığı açık protokoldür. Her sağlayıcının istemcisi bağlanabilir.
+
+### Araç türleri
+
+| Tür | Örnek | Kaynak |
+| --- | --- | --- |
+| Tanım | DocType'ı, alanları ve izinleri anlatır | DocType tanımı ve alan açıklamaları |
+| Okuma | Liste, kayıt, rapor | Kullanıcının okuma izni |
+| Yazma | Oluşturma, güncelleme, onaya gönderme, iptal, silme | Önizleme ve insan onayı |
+| Yönetim | Özel alan, alan ayarı, rol ve izin değişikliği | Yalnız yönetici rolü, önizleme ve insan onayı |
+| Uygulama aracı | Örneğin izin onayı | Uygulamanın `ai_tools` kancası (G-105) |
+| Geliştirme | DocType iskeleti, alan ekleme önerisi | İskelet davranış değildir. İş kuralı tek dosyalık onaylı öneriyle yazılır. Araç kod çalıştırmaz. |
+
+### Her işin uyacağı kurallar
+
+- Yazdığınız her DocType alanına `description` verin. Açıklama İngilizce yazılır. Türkçesi çeviri dosyasındadır. Yapay zekâ alanı bu açıklamadan anlar.
+- Yazdığınız her uca OpenAPI dosyasında özet ve açıklama yazın.
+- Ucu yıkıcı ya da ücretli bir iş yapıyorsa bunu sözleşmede belirtin.
+- Elle başlatılan her komut için bir HTTP ucu da yazın. Böylece yapay zekâ da komutu başlatabilir. Örneğin mutabakat komutu böyledir.
+- `press_tr` aynı kuralları uygular. Press işlemleri için depodaki `packages/press-ai` sözleşmesi temel alınır.
+
+### Karar sitesindeki AI kuralları
+
+Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md` dosyalarıdır. Özellikle şu kurallar bu katmana uyar:
+
+- Her yazma insan onaylıdır. Onay özete bağlı, tek kullanımlık ve sürelidir. Modelde onay aracı ya da `confirm` alanı yoktur.
+- Yürütme aynı işlem ve hedef için kilit alır. İstekten önce sonucu “unknown” olarak kaydeder.
+- Altyapı, DNS, yasal kutu ve ödeme işleri insanda kalır. Yapay zekâ bunlar için yalnız gereksinim metni üretir.
+- Resmî uygulamaların dosyası varsayılan olarak değiştirilmez.
+- AGPL lisanslı bir bileşen kendi kodumuzla birleşmeden önce lisans uyumu proje sahibine sorulur.
+
+### Sahiplik
+
+- `platform_core` içinde katmanı platform-core-yz işi kurar. Modül klasörü `yapay_zeka` olur.
+- Önce Frappe'nin hazır MCP yolunu inceleyin (T-1). Karar sitesi bunu `frappe_mcp` olarak anar (G-84).
+- Ayrıntılı tasarım `docs/kararlar/0002-yapay-zeka-katmani.md` dosyasındadır.
+- Frappe 16'nın hazır MCP ucu (`/api/v2/mcp`) kiracı sitesinde kapatılır. Bu uç önizleme, onay ve günlük taşımaz.
+
+### Uçlar
+
+| Yol | Yöntem | Kimlik | İşi |
+| --- | --- | --- | --- |
+| `platform_core.api.ai.mcp` | POST | İnsan oturumu ya da aracı belirteci | MCP ucu: araç listesi ve araç çağrısı |
+| `platform_core.api.ai.issue_agent_token` | POST | İnsan oturumu | 300 saniyelik, 20 çağrılık aracı belirteci üretir. |
+| `platform_core.api.ai.list_proposals` | GET | İnsan oturumu | Kullanıcının önerilerini listeler. |
+| `platform_core.api.ai.get_proposal` | GET | İnsan oturumu | Önerinin önizlemesini ve özetini döner. |
+| `platform_core.api.ai.approve_proposal` | POST | İnsan oturumu | Öneriyi onaylar ve yürütür. |
+| `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
+| `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
+| `platform_core.api.ai.purge_logs` | POST | “System Manager” rolü | Saklama süresi dolan günlükleri elle siler. Yıkıcıdır. |
+
+### Genel araçlar
+
+`search_doctypes`, `get_doctype_schema`, `list_documents`, `get_document`, `run_report`, `create_document`, `update_document`, `submit_document`, `cancel_document`, `delete_document` ve `get_proposal`.
+
+- Yazma araçları yalnız öneri açar. Öneri 10 dakika geçerlidir.
+- Uygulama araçlarının adı `<uygulama>_<araç>` biçimindedir. Uygulama araçlarını `ai_tools` kancasıyla bildirir.
+- Yönetim araçları şunlardır: `add_custom_field`, `set_field_property`, `set_role_permission`, `assign_role`, `remove_role` ve `purge_action_log`. Yalnız “System Manager” rolü kullanır. “System Manager” rolü yapay zekâ yoluyla verilmez.
+- MCP istemcisi konuşma kimliğini `Mcp-Conversation-Id` başlığıyla gönderir. Günlükler bu kimlikle eşleşir.
+- Panel, yazan her istekte `X-Frappe-CSRF-Token` başlığını gönderir. Oturumda CSRF belirteci yoksa onay reddedilir.
+
+### Öteki modüllerin araç bildirimi
+
+Her modül elle başlatılan komutlarını ve yazma işlerini `ai_tools` kancasıyla araç olarak bildirir. Bildirim biçimi `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir. Yazma araçları önizleme işlevi taşır. Bu bölüm platform-core-yz dalı birleşince geçerli olur.
+
+## 11. Model geçidi ve sağlayıcı kaydı
+
+Altyapı yapay zekâ tabanlıdır. Sisteme n tane sağlayıcı, her sağlayıcıdan n tane hesap ve her hesaptan n tane API eklenebilir (Proje kaydı D-11). Sağlayıcı, model sunan şirket ya da sunucudur. Hesap, o sağlayıcıdaki üyeliktir. API, hesaba bağlı bir adres ve anahtardır.
+
+### DocType'lar
+
+Bütün DocType'lar `model_gecidi` modülündedir. Her alan açıklama taşır (D-9).
+
+| DocType | Görevi | Önemli alanlar |
+| --- | --- | --- |
+| `AI Provider` | Sağlayıcı türü | ad, bağdaştırıcı, varsayılan adres, açık mı |
+| `AI Account` | Sağlayıcıdaki hesap | sağlayıcı, hesap adı, kurum ya da proje kimliği, aylık bütçe ve para birimi, açık mı |
+| `AI API` | Hesaba bağlı adres ve kimlik bilgisi | hesap, adres, kimlik türü, gizli anahtar, izinli modeller, dakika sınırları, öncelik, ağırlık, sağlık durumu, açık mı |
+| `AI Model` | Model ve yetenekleri | sağlayıcı, model kimliği, yetenekler, bağlam boyu, birim fiyatlar |
+| `AI Route` | İş türüne göre model sırası | ad, gereken yetenekler, seçme yolu, sıralı model ve API listesi, veri kısıtı |
+| `AI Usage Log` | Her çağrının kaydı | zaman, kullanıcı, yol, sağlayıcı, hesap, API, model, token sayıları, maliyet, süre, sonuç |
+
+### Bağdaştırıcılar
+
+Bağdaştırıcı, ortak çağrıyı sağlayıcının biçimine çeviren küçük koddur. İlk bağdaştırıcılar şunlardır:
+
+- OpenAI uyumlu sohbet biçimi,
+- Anthropic Messages biçimi,
+- Google Gemini biçimi,
+- yerel sunucu, örneğin Ollama.
+
+Yeni sağlayıcı eklemek kod istemez. Yeni bir biçim eklemek yalnız yeni bağdaştırıcı ister. Bağdaştırıcılar düz HTTP kullanır. Sağlayıcı kitaplığı eklenmez.
+
+Kimlik türleri şunlardır: API anahtarı, taşıyıcı belirteç, OAuth istemci kimlik bilgisi ve kimliksiz yerel sunucu.
+
+### Ortak çağrı
+
+`model_gecidi` dışarıya tek bir işlev açar. İşlev bir yol adı ve mesajları alır. Araç tanımı ve yanıt biçimi isteğe bağlıdır. Yanıt sağlayıcıdan bağımsız tek biçimdedir: metin, araç çağrıları, kullanım ve hangi model ile API'nin kullanıldığı.
+
+### Yönlendirme
+
+1. Yol kaydından aday modelleri ve API'leri alın.
+2. Kapalı, yeteneği eksik, bütçesi dolmuş ve devresi açık adayları çıkarın.
+3. Adayları yolun seçme biçimine göre sıralayın. Seçme biçimleri öncelik, ağırlık ve en düşük maliyettir.
+4. İlk adayı çağırın.
+5. 429, 5xx ya da zaman aşımı gelirse adayı bir süre dinlendirin ve sıradakine geçin.
+6. Kimlik hatası gelirse API'yi kapalı sayın ve yönetici kaydına yazın.
+7. Her denemeyi “AI Usage Log” kaydına yazın.
+
+Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinden döner. Zamanlanmış iş yoktur (O-15).
+
+### Güvenlik
+
+- Gizli anahtar “Password” alanında şifreli durur. Hiçbir uç ve hiçbir yapay zekâ aracı anahtarı dönmez.
+- Kayıt, günlük ve hata metni anahtarı içermez.
+- Kaydı yalnız “AI Manager” rolü ve “System Manager” rolü yönetir.
+- Yapay zekâ kaydı yönetim araçlarıyla değiştirebilir. Her değişiklik önizleme ve insan onayı ister.
+- Bağlantı denetimi ücretli bir çağrıdır. Bu yüzden ücretli işaretini taşır.
+- Mesaj içeriği varsayılan olarak günlüğe yazılmaz.
+- Yol kaydının veri kısıtı, model çağrısından önce veri seçimini ve maskelemeyi ister (G-90).
+
+### Uç
+
+| Yol | Yöntem | Kimlik | İşi |
+| --- | --- | --- | --- |
+| `platform_core.api.model.complete` | POST | Oturum ya da aracı belirteci | Ortak çağrıyı yapar. Yetki ve kota denetlenir. |
+| `platform_core.api.model.test_api` | POST | “AI Manager” rolü | Bir API'ye küçük deneme çağrısı yapar. Ücretlidir. |

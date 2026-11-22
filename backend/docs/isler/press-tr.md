@@ -4,6 +4,17 @@ Bu iş Press'i geliştirme ortamında kurar. `press_tr` uygulamasının kimlik b
 
 Önce `backend/AGENTS.md`, `backend/PROJE-KAYDI.md` ve `backend/docs/sozlesmeler.md` dosyalarını okuyun. Sonra karar sitesinin `rail-1-press.md` ve `rail-4-keycloak.md` sayfalarını okuyun. Rail 4 sayfasının 6. bölümü Press girişini anlatır (G-12).
 
+## Güncelleme: 22 Kasım 2026 Pazar
+
+Proje sahibi iki karar verdi. Bu bölüm aşağıdaki Frappe 15 bilgilerinin yerine geçer.
+
+1. Bütün uygulamalar Frappe 16 ile yazılır. `press_tr` aralığı `>=16.0.0,<17.0.0` olur (D-7).
+2. Bu Mac'te bir Press deneme kurulumu var (D-8). Sürümleri Frappe v16.50.0, ERPNext v16.50.0, Press v0.154.1, Python 3.14.8 ve MariaDB 11.8'dir.
+3. Var olan kurulumu değiştirmeyin. Onun container'larını durdurmayın ve içine uygulama kurmayın.
+4. Kurulumun imajını ve betiklerini yeniden kullanın. Betikleri `backend/dev/press/` altına alın. Sır taşıyan `.env` dosyasını almayın.
+5. Press bu sürümde yalnız yamalarla açılır. Ansible ve sunucu kurma çalışmaz. Bu tur için bu kabul edilir (A-11).
+6. Frappe 16'da `on_social_login` kancası var olabilir. Kaynakta doğrulayın. Kanca ya da kendi dönüş ucunuz arasında seçim yapın. Seçimi kontrol noktası 2'den önce raporlayın.
+
 ## Sahip olduğunuz yerler
 
 - `backend/dev/compose.press.yaml`
@@ -19,8 +30,7 @@ Bu iş Press'i geliştirme ortamında kurar. `press_tr` uygulamasının kimlik b
    - Web servisi ağda `press.localhost` takma adını taşısın.
 3. `colima` bağlamında `frappe/erpnext:v15.124.5` imajı var. Bu imajı kullanabilirsiniz. Kullanacaksanız `colima-factory` bağlamına kopyalayın.
 4. Press'in kendi ajanını, sunucularını ve Ansible kurulumunu bu turda kurmayın. Yalnız Press uygulaması ve sitesi yeterlidir.
-5. Container içinde `bench new-app press_tr --no-git` ile iskeleti üretin. Lisans MIT olsun. Yayıncı e-postası olarak `noreply@example.test` yazın.
-   - Lisans hukuk değerlendirmesi bekliyor (Proje kaydı A-8). Raporda bunu anın.
+5. Container içinde `bench new-app press_tr --no-git` ile iskeleti üretin. Lisans AGPL-3.0 olsun (O-8). Uygulama klasörüne lisans dosyasını koyun. Yayıncı e-postası olarak `noreply@example.test` yazın.
 6. `required_apps` listesine `press` ekleyin. Frappe aralığı `>=15.0.0,<16.0.0` olsun.
 7. Modül olarak `Kimlik` ekleyin. Klasör adı `kimlik` olsun.
 8. `press.localhost` sitesini açın. Press'i ve `press_tr` uygulamasını kurun.

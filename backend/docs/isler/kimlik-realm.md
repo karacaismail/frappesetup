@@ -55,11 +55,19 @@ Bu iş Keycloak'ı geliştirme ortamında kurar. `platform` realm'ini kod olarak
    - yanlış `nonce`.
 5. Canlı Keycloak'tan alınan belirteçle bütünleşme testi yazın.
 6. Kitaplığın `pyproject.toml` dosyasını yazın. Lisans MIT olsun.
-7. Commit atın ve `done` raporlayın.
+7. Commit atın ve `ready` raporlayın.
+
+## Kontrol noktası 3: sihirli bağlantı ve Apple ile giriş
+
+1. Bu iki yol MVP'ye girer (O-6). Keycloak ikisini hazır sunmaz.
+2. Açık kaynak eklentileri karşılaştırın. Lisans Apache-2.0 ya da MIT olsun. Keycloak 26.8 uyumunu ve bakımı yazın.
+3. T-2 notunu `backend/docs/kararlar/0003-keycloak-eklentileri.md` dosyasına yazın. Seçimi gerekçesiyle yapın. Soru sormayın.
+4. Eklentiyi compose kurulumuna ekleyin. Apple için gerçek anahtar yoktur. Sağlayıcıyı kapalı hazırlayın.
+5. Sihirli bağlantının kısa ömrünü ve tek kullanımını test edin.
+6. Commit atın ve `done` raporlayın.
 
 ## Kapsam dışı
 
-- Atonota teması kimlik-tema işinindir.
-- Sihirli bağlantı ve Apple ile giriş açık karardır (Proje kaydı A-6). Bu iki yol için eklenti kurmayın.
+- Atonota teması ayrı iştir. Tema Keycloak'ın kendi tema yapısıyla kurulacak (O-4).
 - Kiracı ve Press kurulumu başka işlerindir.
 - HA kurulumu ve sunucu ayarı DevOps sorumlusunundur.
