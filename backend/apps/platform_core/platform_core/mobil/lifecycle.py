@@ -39,6 +39,17 @@ def check_new_installation(identity):
 		raise MobileError("installation_limit", 409)
 
 
+def lock_revocation_scope(account):
+	"""Lock the account's mobile scope without creating state before approval."""
+	state = _account_state(account)
+	created_at = frappe.db.get_value("User", account, "creation", for_update=state is None)
+	if created_at is None:
+		raise MobileError("account_unavailable", 404)
+	target = state.name if state is not None else account
+	cutoff = state.revoked_through if state is not None else "0"
+	return target, cutoff, str(created_at)
+
+
 def record_revocation(account):
 	state = _account_state(account)
 	cutoff = int(time.time())

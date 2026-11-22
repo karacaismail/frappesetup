@@ -250,6 +250,20 @@ Anahtar değişirse telefonlar yeni bir tam kopya alır.
 Gövde sınırının sunucuya ulaşmadan da uygulanması için ters vekil ayarı gerekir.
 Site, `Retry-After` başlığını izinli tarayıcı kaynaklarına açar.
 
+## Yapay zekâ ile yönetim
+
+Sistem yöneticisi telefon kurulumlarını kullanıcıya göre listeleyebilir.
+Liste, kurulum kimliğini ve iptal durumunu gösterir.
+Yapay zekâ tek kurulumu veya bütün kurulumları iptal etmek için öneri açar.
+Kullanıcı öneriyi onaylayana kadar sunucu hiçbir kurulumu iptal etmez.
+Onaydan önce kurulumlar değişirse sunucu yeni bir önizleme ister.
+
+Yapay zekâ temizlik denemesini de öneri olarak açar.
+Önizleme süresi dolan kayıtların sayısını gösterir.
+Sunucu onaydan sonra sayımı tekrar çalıştırır.
+Onay ekranında ilk önizlemenin sayıları kalır.
+Bu araç kayıt silmez.
+
 ## Kaynakta doğrulanan Frappe davranışı
 
 Yerel `frappe/erpnext:v16.55.0` imajında Frappe 16.56.0 bulunur.

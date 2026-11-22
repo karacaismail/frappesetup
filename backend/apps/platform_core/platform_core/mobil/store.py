@@ -112,18 +112,30 @@ class MobileStore:
 			raise MobileError("installation_unavailable", 403)
 
 	def revoke(self, identity, installation_id):
-		filters = {
-			"account": identity.account,
-			"scope": identity.scope,
-			"principal": identity.principal,
-			"revoked": 0,
-		}
+		rows = self.revocation_targets(
+			identity.account,
+			installation_id,
+			scope=identity.scope,
+			principal=identity.principal,
+		)
+		return {"revoked": self.revoke_targets(row.name for row in rows)}
+
+	def revocation_targets(self, account, installation_id=None, *, scope=None, principal=None):
+		filters = {"account": account, "revoked": 0}
+		if scope is not None:
+			filters["scope"] = scope
+		if principal is not None:
+			filters["principal"] = principal
 		if installation_id is not None:
 			filters["name"] = installation_id
-		rows = _select("Mobile Installation", ["name"], filters, for_update=True)
-		for row in rows:
-			frappe.db.set_value("Mobile Installation", row.name, "revoked", 1)
-		return {"revoked": len(rows)}
+		return _select("Mobile Installation", ["name"], filters, order_by="name asc", for_update=True)
+
+	def revoke_targets(self, installation_ids):
+		count = 0
+		for installation_id in installation_ids:
+			frappe.db.set_value("Mobile Installation", installation_id, "revoked", 1)
+			count += 1
+		return count
 
 	def get_operation(self, key):
 		row = frappe.db.get_value(

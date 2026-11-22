@@ -6,3 +6,15 @@ Registration rejects tokens issued at or before this Unix timestamp.,"Kurulum, b
 Account,Hesap
 Last Audit At,Son denetim zamanı
 The UTC time when the installation last completed its delivery audit.,Kurulumun son teslim denetimini bitirdiği UTC zamanıdır.
+List mobile installations for a user.,Kullanıcının telefon kurulumlarını listele.
+Propose revoking one mobile installation.,Bir telefon kurulumunu iptal etmeyi öner.
+Propose revoking all mobile installations for a user.,Kullanıcının bütün telefon kurulumlarını iptal etmeyi öner.
+Request approval to run mobile cleanup in dry-run mode.,Temizlik denemesi için onay iste.
+Only a System Manager can administer mobile installations.,Telefon kurulumlarını yalnız sistem yöneticisi yönetebilir.
+The mobile account is unavailable.,Telefon hesabına erişilemiyor.
+The mobile installation is unavailable.,Telefon kurulumuna erişilemiyor.
+Revoke one installation and block earlier tokens from registering.,Bir kurulumu iptal et ve eski belirteçlerle yeni kurulumu engelle.
+Revoke all installations and block earlier tokens from registering.,Bütün kurulumları iptal et ve eski belirteçlerle yeni kurulumu engelle.
+A prepared mobile revocation is required.,Önce telefon kurulumu için iptal önerisi hazırlayın.
+Count expired mobile records without deleting them.,Süresi dolan mobil kayıtları say.
+A prepared mobile cleanup preview is required.,Önce mobil temizlik önerisi hazırlayın.
