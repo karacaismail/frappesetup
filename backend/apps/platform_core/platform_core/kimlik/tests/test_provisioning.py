@@ -46,7 +46,7 @@ class TestIdentityEndpoints(FrappeAPITestCase):
 		cls.portal_role = h.ensure_role("Kimlik Test Portal Role", desk_access=0)
 		cls.portal_profile = h.ensure_role_profile("Kimlik Test Portal", [cls.portal_role])
 		h.refresh()
-		cls.key = h.Key()
+		cls.key = h.key()
 		cls.patcher = h.jwks_patch(cls.key)
 		cls.patcher.start()
 		cls.addClassCleanup(cls.patcher.stop)
@@ -135,6 +135,43 @@ class TestIdentityEndpoints(FrappeAPITestCase):
 		response = self.call(PROVISION, provision_body(issuer="http://attacker.example/realms/platform"))
 		self.assertEqual(response.status_code, 400)
 		self.assertEqual(response.json.get("exc_type"), "UnknownIssuer")
+
+	def test_provision_does_not_adopt_a_system_user(self):
+		# A desk account must never be taken over by end-user provisioning (O3 in the security review).
+		admin = h.ensure_user("ops.kisi@example.test", user_type="System User", roles=["System Manager"])
+		h.refresh()
+		self.addCleanup(
+			lambda: (frappe.delete_doc("User", admin, force=True, ignore_permissions=True), h.refresh())
+		)
+		response = self.call(PROVISION, provision_body(email=admin, subject="sub-ops"))
+		self.assertEqual(response.status_code, 409, response.data[:300])
+		self.assertEqual(response.json.get("exc_type"), "IdentityConflict")
+		h.refresh()
+		self.assertFalse(
+			frappe.db.exists("Platform Identity Link", {"issuer": h.ISSUER, "subject": "sub-ops"})
+		)
+		self.assertEqual(frappe.db.get_value("User", admin, "user_type"), "System User")
+
+	def test_provision_requires_email_verified_and_text_names(self):
+		body = provision_body()
+		body.pop("email_verified")
+		response = self.call(PROVISION, body)
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(response.json.get("exc_type"), "InvalidInput")
+		response = self.call(PROVISION, provision_body(first_name=123))
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(response.json.get("exc_type"), "InvalidInput")
+		response = self.call(PROVISION, provision_body(enabled="yes"))
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(response.json.get("exc_type"), "InvalidInput")
+
+	def test_subject_and_issuer_lengths_follow_storage(self):
+		# DocType lengths: subject 140, issuer 255 (K2 in the security review).
+		ok = self.call(PROVISION, provision_body(subject="s" * 140))
+		self.assertEqual(ok.status_code, 200, ok.data[:300])
+		too_long = self.call(PROVISION, provision_body(subject="s" * 141, email=NEW_2))
+		self.assertEqual(too_long.status_code, 400)
+		self.assertEqual(too_long.json.get("exc_type"), "InvalidInput")
 
 	def test_provision_missing_field_is_400(self):
 		response = self.call(PROVISION, {"issuer": h.ISSUER, "subject": "sub-new"})

@@ -23,7 +23,12 @@ class KeycloakLoginNotConfigured(frappe.ValidationError):
 
 
 class KeycloakKeysUnavailable(frappe.ValidationError):
+	"""Expected outage of the identity provider. Frappe snapshots 5xx errors together with the request
+	body (frappe/app.py:428); `skip_error_log` keeps personal data of identity requests out of Error Log.
+	The module writes its own data-free log entry instead."""
+
 	http_status_code = 503
+	skip_error_log = True
 
 
 class InvalidLogoutToken(frappe.ValidationError):

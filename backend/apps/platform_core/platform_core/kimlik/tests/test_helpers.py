@@ -69,6 +69,24 @@ class TestPureHelpers(UnitTestCase):
 		)
 		self.assertNotIn("keycloak_sid", helpers.session_claims({"sub": "s-1"}, "iss"))
 
+	def test_normalize_path_matches_frappe_website_resolution(self):
+		for raw, expected in (
+			("//me", "/me"),
+			("/me.html", "/me"),
+			("/./me", "/me"),
+			("/me/", "/me"),
+			("/a/../me", "/me"),
+			("/update-password/x", "/update-password/x"),
+			("/", "/"),
+		):
+			self.assertEqual(helpers.normalize_path(raw), expected, raw)
+
+	def test_pkce_challenge_is_base64url_sha256(self):
+		self.assertEqual(
+			helpers.code_challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
+			"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+		)
+
 	def test_email_verified_accepts_bool_and_true_string(self):
 		self.assertTrue(helpers.email_verified({"email_verified": True}))
 		self.assertTrue(helpers.email_verified({"email_verified": "true"}))

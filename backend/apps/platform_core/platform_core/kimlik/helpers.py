@@ -5,7 +5,6 @@ from urllib.parse import urlencode
 
 PROVIDER = "keycloak"
 PROVIDER_BASE_NAME = "Keycloak"
-LOGIN_CALLBACK_PATH = "/api/method/frappe.integrations.oauth2_logins.login_via_keycloak"
 IDENTITY_API_PREFIX = "/api/method/platform_core.api.identity."
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 _CONTROL_OR_SPACE = re.compile(r"[\x00-\x20\x7f]")
@@ -74,3 +73,61 @@ def email_verified(claims: dict) -> bool:
 	if isinstance(value, bool):
 		return value
 	return isinstance(value, str) and value.strip().lower() == "true"
+
+
+CALLBACK_PATH = "/api/method/platform_core.api.auth.keycloak_callback"
+_SLASHES = re.compile(r"/+")
+
+
+def normalize_path(path: str) -> str:
+	"""Normalises a request path the way Frappe's website resolver does: repeated slashes, `.`/`..`,
+	trailing slash and a `.html` suffix are removed (frappe/website/path_resolver.py:34, :206)."""
+	import posixpath
+
+	collapsed = _SLASHES.sub("/", path or "/")
+	normalized = posixpath.normpath(collapsed)
+	if normalized.endswith(".html"):
+		normalized = normalized[: -len(".html")]
+	normalized = normalized.rstrip("/")
+	return normalized or "/"
+
+
+def sha256_hex(value: str) -> str:
+	import hashlib
+
+	return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def code_challenge(code_verifier: str) -> str:
+	"""PKCE S256 challenge (RFC 7636, section 4.2)."""
+	import base64
+	import hashlib
+
+	digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+	return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+
+
+def authorize_url(
+	public_url: str,
+	realm: str,
+	client_id: str,
+	redirect_uri: str,
+	state: str,
+	nonce: str,
+	challenge: str,
+) -> str:
+	params = {
+		"client_id": client_id,
+		"redirect_uri": redirect_uri,
+		"response_type": "code",
+		"scope": "openid",
+		"state": state,
+		"nonce": nonce,
+		"code_challenge": challenge,
+		"code_challenge_method": "S256",
+	}
+	return realm_url(public_url, realm) + "/protocol/openid-connect/auth?" + urlencode(params)
+
+
+def token_url(base_url: str, realm: str) -> str:
+	return realm_url(base_url, realm) + "/protocol/openid-connect/token"

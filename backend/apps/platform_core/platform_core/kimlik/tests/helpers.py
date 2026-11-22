@@ -8,7 +8,7 @@ Keys are generated locally on every run. There is no real person and no real sec
 """
 
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import frappe
 import jwt
@@ -17,9 +17,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from frappe.installer import update_site_config
 from frappe.tests.test_api import make_request
 from frappe.utils import get_test_client
-from frappe.utils.oauth import create_oauth_state
 from jwt.algorithms import RSAAlgorithm
-from rauth import OAuth2Service
 
 # Expected values come from docs/sozlesmeler.md sections 2 and 8 (D-1).
 TEST_SETTINGS = {
@@ -35,7 +33,8 @@ TEST_SETTINGS = {
 }
 ISSUER = "http://kimlik.localhost:8660/realms/platform"
 LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout"
-KEYCLOAK_CALLBACK = "/api/method/frappe.integrations.oauth2_logins.login_via_keycloak"
+CALLBACK = "/api/method/platform_core.api.auth.keycloak_callback"
+LOGIN_COOKIE = "kimlik_login"
 
 AYSE = "ayse.ornek@example.test"
 MEHMET = "mehmet.ornek@example.test"
@@ -142,13 +141,90 @@ def new_client():
 	return get_test_client()
 
 
+KEY = None
+"""Shared signing key for fake Keycloak tokens. Created lazily so that import stays cheap."""
+
+exchange_calls: list[dict] = []
+"""Arguments the fake code exchange received, for assertions on PKCE wiring."""
+
+
+def key() -> "Key":
+	global KEY
+	if KEY is None:
+		KEY = Key()
+	return KEY
+
+
+def start_login(client, redirect_to: str | None = None, headers: dict | None = None):
+	"""Calls get_login_url and returns (response, parsed authorize query)."""
+	from urllib.parse import parse_qs, urlparse
+
+	body = {"redirect_to": redirect_to} if redirect_to else {}
+	response = request(
+		client.post, "/api/method/platform_core.api.auth.get_login_url", json=body, headers=headers or {}
+	)
+	query = {}
+	if response.status_code == 200:
+		query = {k: v[0] for k, v in parse_qs(urlparse(response.json["message"]["login_url"]).query).items()}
+	return response, query
+
+
+def id_token(query: dict, claims: dict, signing_key: "Key | None" = None, **overrides) -> str:
+	"""Signs an ID token like Keycloak would for the authorize request described by `query`."""
+	now = int(time.time())
+	payload = {
+		"iss": ISSUER,
+		"aud": TEST_SETTINGS["keycloak_client_id"],
+		"azp": TEST_SETTINGS["keycloak_client_id"],
+		"iat": now,
+		"exp": now + 300,
+		"auth_time": now,
+		"nonce": query.get("nonce"),
+		"typ": "ID",
+	}
+	payload.update(claims)
+	payload.update(overrides)
+	return (signing_key or key()).sign({k: v for k, v in payload.items() if v is not None})
+
+
+def fake_exchange(token: str | None = None, **token_response):
+	"""Patch for `sign_in.exchange_code` that returns a Keycloak-like token response without network."""
+
+	def exchange(settings, code, code_verifier, redirect_uri):
+		exchange_calls.append(
+			{
+				"code": code,
+				"code_verifier": code_verifier,
+				"redirect_uri": redirect_uri,
+				"client_id": settings.client_id,
+			}
+		)
+		return {
+			"id_token": token,
+			"access_token": "fake-access-token",
+			"token_type": "Bearer",
+			**token_response,
+		}
+
+	return patch("platform_core.kimlik.sign_in.exchange_code", side_effect=exchange)
+
+
+def finish_login(client, query: dict, token: str, code: str = "test-code", state: str | None = None):
+	"""Calls the callback with the fake token exchange in place."""
+	with fake_exchange(token):
+		return request(
+			client.get,
+			CALLBACK,
+			query_string={"code": code, "state": state if state is not None else query.get("state")},
+		)
+
+
 def login_with_keycloak(client, claims: dict, redirect_to: str | None = None):
-	"""Simulates the Keycloak callback. Only the userinfo response is fake; the rest is the real Frappe path."""
-	state = create_oauth_state(redirect_to)
-	session = MagicMock()
-	session.get.return_value = MagicMock(status_code=200, json=MagicMock(return_value=claims))
-	with patch.object(OAuth2Service, "get_auth_session", return_value=session):
-		return request(client.get, KEYCLOAK_CALLBACK, query_string={"code": "test-code", "state": state})
+	"""Full sign-in through this app's own callback. Only Keycloak itself is faked (token exchange)."""
+	started, query = start_login(client, redirect_to)
+	if started.status_code != 200:
+		return started
+	return finish_login(client, query, id_token(query, claims))
 
 
 def logged_user(client) -> str:
@@ -237,12 +313,14 @@ def access_payload(**overrides) -> dict:
 	return {k: v for k, v in payload.items() if v is not None}
 
 
-def jwks_patch(key: Key):
+def jwks_patch(signing_key: "Key | None" = None):
 	"""Patch that feeds `platform_core.kimlik.jwks.jwks_cache` with the local key."""
 	from oidc_verify import JwksCache
 
+	signing_key = signing_key or key()
+
 	def fake(jwks_url: str):
-		return JwksCache(jwks_url, ttl_seconds=600, fetcher=key.jwks)
+		return JwksCache(jwks_url, ttl_seconds=600, fetcher=signing_key.jwks)
 
 	return patch("platform_core.kimlik.jwks.jwks_cache", side_effect=fake)
 

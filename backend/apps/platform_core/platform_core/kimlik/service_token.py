@@ -7,12 +7,14 @@ request that carries a Bearer header while the user stays Guest (frappe/auth.py:
 
 import frappe
 from frappe import _
-from oidc_verify import TokenError, verify_access_token
 
 from platform_core.kimlik import helpers, jwks, site_settings
 from platform_core.kimlik.exceptions import KeycloakKeysUnavailable, ServiceTokenRejected
 
 LEEWAY = 30
+IDENTITY_ENDPOINTS = frozenset(
+	helpers.IDENTITY_API_PREFIX + name for name in ("provision", "set_enabled", "change_email")
+)
 CLAIMS_ATTR = "kimlik_service_claims"
 # Service operations run as the administrator. The path and azp restrictions confine the token to these endpoints.
 SERVICE_USER = "Administrator"
@@ -22,7 +24,7 @@ def validate() -> None:
 	request = getattr(frappe.local, "request", None)
 	if request is None or request.method == "OPTIONS":
 		return
-	if not request.path.startswith(helpers.IDENTITY_API_PREFIX):
+	if request.path not in IDENTITY_ENDPOINTS:
 		return
 	parts = (frappe.get_request_header("Authorization") or "").split(" ", 1)
 	if len(parts) != 2 or parts[0].lower() != "bearer":
@@ -33,6 +35,8 @@ def validate() -> None:
 		_refuse(_("Service requests must not carry a cmd field."))
 	if frappe.session.user not in ("", "Guest"):
 		_refuse(_("Service requests must not carry a session cookie."))
+
+	from oidc_verify import TokenError, verify_access_token
 
 	settings = site_settings.get()
 	try:
@@ -49,6 +53,7 @@ def validate() -> None:
 	except Exception as error:
 		if not jwks.is_keys_unavailable(error):
 			raise
+		jwks.report_keys_unavailable(settings.jwks_url)
 		frappe.throw(_("Identity provider keys are not available."), KeycloakKeysUnavailable)
 
 	# `frappe.set_user` resets `form_dict` (frappe/__init__.py:388); keep the request arguments.

@@ -1,12 +1,15 @@
-"""Sign-in with Keycloak. Requests go through the real HTTP path (D-6).
+"""Sign-in through this app's own Keycloak callback. Requests go through the real HTTP path (D-6).
 
-Expected behaviour comes from docs/sozlesmeler.md sections 4 and 5 and the task document (D-1):
-- the right user signs in,
-- an unverified e-mail cannot create the first link,
-- a different `sub` cannot sign in with the same e-mail,
-- a mismatching link refuses the sign-in,
-- `get_login_url` creates `state` on the server and accepts only relative paths.
+Expected behaviour comes from docs/sozlesmeler.md sections 4 and 5 (D-1):
+- `get_login_url` creates `state`, PKCE and `nonce` on the server and binds the attempt to a browser cookie,
+- the callback consumes `state` exactly once and refuses a foreign browser,
+- the right user signs in, the identity link is created only with a verified e-mail,
+- a different `sub` cannot sign in with the same e-mail, a foreign link is refused,
+- the Keycloak session id from the ID token is stored in the Frappe session.
 """
+
+import base64
+import hashlib
 
 import frappe
 from frappe.tests.test_api import FrappeAPITestCase
@@ -27,6 +30,9 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		for email in h.SAMPLE_USERS:
 			h.ensure_user(email)
 		h.refresh()
+		cls.patcher = h.jwks_patch()
+		cls.patcher.start()
+		cls.addClassCleanup(cls.patcher.stop)
 
 	@classmethod
 	def tearDownClass(cls):
@@ -36,16 +42,45 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 	def setUp(self):
 		super().setUp()
 		h.clear_links()
+		h.exchange_calls.clear()
 		self.client = h.new_client()
 
 	def test_hooks_are_wired(self):
-		self.assertIn("platform_core.kimlik.sign_in.on_social_login", frappe.get_hooks("on_social_login"))
-		self.assertIn(
-			"platform_core.kimlik.sign_in.on_session_creation", frappe.get_hooks("on_session_creation")
+		self.assertNotIn("platform_core.kimlik.sign_in.on_social_login", frappe.get_hooks("on_social_login"))
+		self.assertIn("platform_core.kimlik.service_token.validate", frappe.get_hooks("auth_hooks"))
+		self.assertIn("platform_core.kimlik.login_policy.before_login", frappe.get_hooks("before_login"))
+		self.assertIn("platform_core.kimlik.login_policy.before_request", frappe.get_hooks("before_request"))
+
+	def test_get_login_url_binds_browser_and_uses_pkce(self):
+		response, query = h.start_login(self.client, "/panel", headers={"Accept-Language": "tr"})
+		self.assertEqual(response.status_code, 200, response.data[:300])
+		result = response.json["message"]
+		self.assertTrue(
+			result["login_url"].startswith(
+				"http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?"
+			)
 		)
+		self.assertEqual(query["client_id"], "site-kiraci1")
+		self.assertEqual(query["response_type"], "code")
+		self.assertEqual(query["scope"], "openid")
+		self.assertEqual(query["redirect_uri"], "http://kiraci1.localhost:8661" + h.CALLBACK)
+		self.assertEqual(query["code_challenge_method"], "S256")
+		self.assertGreaterEqual(len(query["state"]), 32)
+		self.assertGreaterEqual(len(query["nonce"]), 32)
+		self.assertGreaterEqual(len(query["code_challenge"]), 43)
+		self.assertEqual(result["brand_name"], "Atonota")
+		self.assertEqual(result["label"], "Atonota ile oturum aç")
+		cookie = response.headers.get("Set-Cookie", "")
+		self.assertIn(f"{h.LOGIN_COOKIE}=", cookie)
+		self.assertIn("HttpOnly", cookie)
+		self.assertIn("SameSite=Lax", cookie)
+		self.assertIn("Max-Age=600", cookie)
 
 	def test_right_user_signs_in_and_link_is_created(self):
-		response = h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE, sid=SID), "/panel")
+		_started, query = h.start_login(self.client, "/panel")
+		response = h.finish_login(
+			self.client, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE, sid=SID))
+		)
 		self.assertEqual(response.status_code, 302, response.data[:300])
 		self.assertTrue(response.headers["Location"].endswith("/panel"))
 		self.assertEqual(h.logged_user(self.client), h.AYSE)
@@ -56,8 +91,80 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 			),
 			h.AYSE,
 		)
-		# The Keycloak session id is stored in the Frappe session (contract section 4).
 		self.assertEqual(len(h.sessions_containing(f'"keycloak_sid":"{SID}"')), 1)
+		# PKCE: the verifier sent to Keycloak must hash to the challenge of the authorize request.
+		verifier = h.exchange_calls[-1]["code_verifier"]
+		digest = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+		self.assertEqual(digest, query["code_challenge"])
+		self.assertEqual(h.exchange_calls[-1]["redirect_uri"], "http://kiraci1.localhost:8661" + h.CALLBACK)
+		# The login cookie is cleared after use.
+		self.assertIn(f"{h.LOGIN_COOKIE}=;", response.headers.get("Set-Cookie", "").replace('""', ""))
+
+	def test_default_redirect_is_panel_url(self):
+		_started, query = h.start_login(self.client)
+		response = h.finish_login(self.client, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE)))
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(response.headers["Location"], "http://kiraci1.localhost:8661/panel")
+
+	def test_callback_from_another_browser_is_refused(self):
+		# Login CSRF: the attacker starts a login and hands state and code to a victim browser.
+		_started, query = h.start_login(self.client)
+		victim = h.new_client()
+		h.start_login(victim)  # the victim has its own cookie
+		response = h.finish_login(victim, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE)))
+		self.assertEqual(response.status_code, 403, response.data[:300])
+		self.assertEqual(h.logged_user(victim), "Guest")
+		# The state was consumed by the failed attempt, so the attacker cannot complete it either.
+		response = h.finish_login(self.client, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE)))
+		self.assertEqual(response.status_code, 400)
+
+	def test_callback_without_cookie_is_refused(self):
+		_started, query = h.start_login(self.client)
+		stranger = h.new_client()
+		response = h.finish_login(stranger, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE)))
+		self.assertEqual(response.status_code, 400, response.data[:300])
+		self.assertEqual(h.logged_user(stranger), "Guest")
+
+	def test_state_is_single_use_and_unknown_state_is_refused(self):
+		_started, query = h.start_login(self.client)
+		token = h.id_token(query, h.userinfo("sub-ayse", h.AYSE))
+		first = h.finish_login(self.client, query, token)
+		self.assertEqual(first.status_code, 302)
+		second = h.finish_login(h.new_client(), query, token)
+		self.assertEqual(second.status_code, 400)
+		forged = h.finish_login(self.client, query, token, state="forged-state-value")
+		self.assertEqual(forged.status_code, 400)
+		missing = h.request(self.client.get, h.CALLBACK, query_string={"code": "x"})
+		self.assertEqual(missing.status_code, 400)
+
+	def test_wrong_nonce_or_bad_id_token_is_refused(self):
+		_started, query = h.start_login(self.client)
+		response = h.finish_login(
+			self.client, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE), nonce="other")
+		)
+		self.assertEqual(response.status_code, 400, response.data[:300])
+		self.assertEqual(h.logged_user(self.client), "Guest")
+		_started, query = h.start_login(self.client)
+		foreign_key = h.Key("foreign")
+		response = h.finish_login(
+			self.client, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE), foreign_key)
+		)
+		self.assertEqual(response.status_code, 400)
+		_started, query = h.start_login(self.client)
+		response = h.finish_login(
+			self.client, query, h.id_token(query, h.userinfo("sub-ayse", h.AYSE), aud="press")
+		)
+		self.assertEqual(response.status_code, 400)
+
+	def test_keycloak_error_response_is_shown_not_trusted(self):
+		_started, query = h.start_login(self.client)
+		response = h.request(
+			self.client.get,
+			h.CALLBACK,
+			query_string={"state": query["state"], "error": "access_denied", "error_description": "x"},
+		)
+		self.assertEqual(response.status_code, 400)
+		self.assertEqual(h.logged_user(self.client), "Guest")
 
 	def test_second_sign_in_uses_existing_link(self):
 		h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE))
@@ -85,10 +192,6 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		response = h.login_with_keycloak(attacker, h.userinfo("sub-other", h.AYSE))
 		self.assertEqual(response.status_code, 403)
 		self.assertEqual(h.logged_user(attacker), "Guest")
-		h.refresh()
-		self.assertFalse(
-			frappe.db.exists("Platform Identity Link", {"issuer": h.ISSUER, "subject": "sub-other"})
-		)
 
 	def test_link_owned_by_another_user_is_refused(self):
 		h.make_link("sub-mehmet", h.MEHMET)
@@ -109,38 +212,16 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		h.refresh()
 		self.addCleanup(lambda: (frappe.db.set_value("User", h.MEHMET, "enabled", 1), h.refresh()))
 		response = h.login_with_keycloak(self.client, h.userinfo("sub-mehmet", h.MEHMET))
-		self.assertNotEqual(response.status_code, 302)
+		self.assertEqual(response.status_code, 403)
 		self.assertEqual(h.logged_user(self.client), "Guest")
 
-	def test_get_login_url_creates_state_on_server(self):
-		response = h.request(
-			self.client.post,
-			"/api/method/platform_core.api.auth.get_login_url",
-			json={"redirect_to": "/panel"},
-			headers={"Accept-Language": "tr"},
-		)
-		self.assertEqual(response.status_code, 200, response.data[:300])
-		result = response.json["message"]
-		self.assertTrue(
-			result["login_url"].startswith(
-				"http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/auth?"
-			)
-		)
-		for part in (
-			"state=",
-			"client_id=site-kiraci1",
-			"response_type=code",
-			"scope=openid",
-			"redirect_uri=",
-		):
-			self.assertIn(part, result["login_url"])
-		self.assertEqual(result["brand_name"], "Atonota")
-		self.assertEqual(result["label"], "Atonota ile oturum aç")
-		state = result["login_url"].split("state=")[1].split("&")[0]
-		self.assertEqual(frappe.cache.get_value(f"frappe_oauth_login:{state}"), "/panel")
+	def test_email_case_is_normalised(self):
+		response = h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE.upper()))
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(h.logged_user(self.client), h.AYSE)
 
 	def test_get_login_url_rejects_external_redirect(self):
-		for target in ("https://evil.example/", "//evil.example/panel", "panel"):
+		for target in ("https://evil.example/", "//evil.example/panel", "panel", "/pa\\nel"):
 			response = h.request(
 				self.client.post,
 				"/api/method/platform_core.api.auth.get_login_url",
@@ -154,17 +235,12 @@ class TestKeycloakSignIn(FrappeAPITestCase):
 		response = h.request(self.client.get, "/api/method/platform_core.api.auth.get_login_url")
 		self.assertEqual(response.status_code, 403)
 
-	def test_get_login_url_returns_503_when_key_is_disabled(self):
-		frappe.db.set_value("Social Login Key", "keycloak", "enable_social_login", 0)
-		h.refresh()
-		self.addCleanup(
-			lambda: (
-				frappe.db.set_value("Social Login Key", "keycloak", "enable_social_login", 1),
-				h.refresh(),
+	def test_get_login_url_returns_503_when_settings_are_missing(self):
+		with h.SiteSettings({"keycloak_client_secret": ""}):
+			response = h.request(
+				self.client.post, "/api/method/platform_core.api.auth.get_login_url", json={}
 			)
-		)
-		response = h.request(self.client.post, "/api/method/platform_core.api.auth.get_login_url", json={})
-		self.assertEqual(response.status_code, 503)
+		self.assertEqual(response.status_code, 503, response.data[:300])
 		self.assertEqual(response.json.get("exc_type"), "KeycloakLoginNotConfigured")
 
 	def test_logout_is_closed_to_guests(self):

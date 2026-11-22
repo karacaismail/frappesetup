@@ -1,6 +1,7 @@
 """Sign-in and sign-out endpoints. Business rules live in `platform_core.kimlik`; this file stays thin."""
 
 import frappe
+from frappe import _
 from frappe.rate_limiter import rate_limit
 
 from platform_core.kimlik import provider_setup, sign_in, sign_out
@@ -11,6 +12,27 @@ from platform_core.kimlik import provider_setup, sign_in, sign_out
 def get_login_url(redirect_to: str | None = None) -> dict:
 	"""Builds the Keycloak sign-in address. `state` is generated on the server. `redirect_to` must be a relative path."""
 	return sign_in.build_login_url(redirect_to)
+
+
+@frappe.whitelist(allow_guest=True, methods=["GET"])
+@rate_limit(limit=20, seconds=60)
+def keycloak_callback(
+	code: str | None = None,
+	state: str | None = None,
+	error: str | None = None,
+	error_description: str | None = None,
+) -> None:
+	"""Keycloak redirect target. Consumes the state once, checks the browser cookie, exchanges the code with
+	PKCE, verifies the ID token and opens the Frappe session. Answers with a redirect or an HTML error page."""
+	try:
+		target = sign_in.complete_callback(code, state, error)
+	except sign_in.SignInRefused as refusal:
+		frappe.respond_as_web_page(
+			_("Sign-in failed"), refusal.message, http_status_code=refusal.status, indicator_color="red"
+		)
+		return
+	frappe.local.response["type"] = "redirect"
+	frappe.local.response["location"] = target
 
 
 @frappe.whitelist(methods=["POST"])

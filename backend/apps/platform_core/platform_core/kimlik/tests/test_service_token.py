@@ -22,7 +22,7 @@ class TestServiceToken(FrappeAPITestCase):
 		provider_setup.ensure_social_login_key()
 		h.ensure_user(h.AYSE)
 		h.refresh()
-		cls.key = h.Key()
+		cls.key = h.key()
 		cls.patcher = h.jwks_patch(cls.key)
 		cls.patcher.start()
 		cls.addClassCleanup(cls.patcher.stop)
@@ -91,6 +91,16 @@ class TestServiceToken(FrappeAPITestCase):
 		admin.set_cookie("sid", self.sid)
 		response = self.call(None, client=admin)
 		self.assertEqual(response.status_code, 403, "a session alone must not open the service endpoint")
+
+	def test_token_is_accepted_only_on_the_three_identity_endpoints(self):
+		token = self.key.sign(h.access_payload())
+		response = h.request(
+			h.new_client().post,
+			"/api/method/platform_core.api.identity.nonexistent",
+			json={},
+			headers={"Authorization": f"Bearer {token}"},
+		)
+		self.assertEqual(response.status_code, 401)
 
 	def test_token_does_not_open_other_endpoints(self):
 		response = h.request(

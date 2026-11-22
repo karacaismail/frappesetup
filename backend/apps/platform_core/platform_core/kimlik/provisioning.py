@@ -24,15 +24,18 @@ from platform_core.kimlik.exceptions import (
 
 LINK = "Platform Identity Link"
 WEBSITE_USER = "Website User"
+MAX_SUBJECT = 140
+MAX_ISSUER = 255
 
 
 def provision(data: dict) -> dict:
 	issuer = _issuer(data)
-	subject = _text(data, "subject")
+	subject = _text(data, "subject", MAX_SUBJECT)
 	email = _email(data.get("email"))
+	email_verified = _bool(data, "email_verified")
 	enabled = _bool(data, "enabled")
-	first_name = (data.get("first_name") or "").strip()
-	last_name = (data.get("last_name") or "").strip()
+	first_name = _optional_text(data, "first_name")
+	last_name = _optional_text(data, "last_name")
 	role_profiles = _role_profiles(data.get("role_profiles"))
 
 	user = _linked_user(issuer, subject)
@@ -41,12 +44,15 @@ def provision(data: dict) -> dict:
 			frappe.throw(_("E-mail differs from the linked user. Use change_email."), EmailMismatch)
 		doc = frappe.get_doc("User", user)
 	else:
-		if not _bool(data, "email_verified", default=False):
+		if not email_verified:
 			frappe.throw(_("The first link requires a verified e-mail address."), EmailNotVerified)
 		if frappe.db.exists(LINK, {"issuer": issuer, "user": email}):
 			frappe.throw(_("This e-mail is already linked to a different identity."), IdentityConflict)
 		if frappe.db.exists("User", email):
 			doc = frappe.get_doc("User", email)
+			# End-user provisioning never takes over a desk account (O-3 in the security review).
+			if doc.user_type != WEBSITE_USER or doc.has_desk_access():
+				frappe.throw(_("This e-mail belongs to a desk user and cannot be provisioned."), IdentityConflict)
 		else:
 			doc = frappe.new_doc("User")
 			doc.update({"email": email, "user_type": WEBSITE_USER, "send_welcome_email": 0})
@@ -66,7 +72,7 @@ def provision(data: dict) -> dict:
 
 def set_enabled(data: dict) -> dict:
 	issuer = _issuer(data)
-	subject = _text(data, "subject")
+	subject = _text(data, "subject", MAX_SUBJECT)
 	enabled = _bool(data, "enabled")
 	doc = frappe.get_doc("User", _linked_user_or_404(issuer, subject))
 	if bool(doc.enabled) != enabled:
@@ -77,7 +83,7 @@ def set_enabled(data: dict) -> dict:
 
 def change_email(data: dict) -> dict:
 	issuer = _issuer(data)
-	subject = _text(data, "subject")
+	subject = _text(data, "subject", MAX_SUBJECT)
 	new_email = _email(data.get("new_email"))
 	user = _linked_user_or_404(issuer, subject)
 	if user == new_email:
@@ -100,16 +106,28 @@ def _linked_user_or_404(issuer: str, subject: str) -> str:
 
 
 def _issuer(data: dict) -> str:
-	issuer = _text(data, "issuer")
+	issuer = _text(data, "issuer", MAX_ISSUER)
 	if issuer != site_settings.issuer():
 		frappe.throw(_("Issuer is not the configured identity provider."), UnknownIssuer)
 	return issuer
 
 
-def _text(data: dict, field: str) -> str:
+def _text(data: dict, field: str, max_length: int | None = None) -> str:
 	value = data.get(field)
 	if not isinstance(value, str) or not value.strip():
 		frappe.throw(_("Field {0} is required.").format(field), InvalidInput)
+	value = value.strip()
+	if max_length and len(value) > max_length:
+		frappe.throw(_("Field {0} is longer than {1} characters.").format(field, max_length), InvalidInput)
+	return value
+
+
+def _optional_text(data: dict, field: str) -> str:
+	value = data.get(field)
+	if value is None:
+		return ""
+	if not isinstance(value, str):
+		frappe.throw(_("Field {0} must be text.").format(field), InvalidInput)
 	return value.strip()
 
 

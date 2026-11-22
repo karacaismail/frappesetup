@@ -23,7 +23,7 @@ class TestBackChannelLogout(FrappeAPITestCase):
 		for email in h.SAMPLE_USERS:
 			h.ensure_user(email)
 		h.refresh()
-		cls.key = h.Key()
+		cls.key = h.key()
 		cls.patcher = h.jwks_patch(cls.key)
 		cls.patcher.start()
 		cls.addClassCleanup(cls.patcher.stop)
@@ -57,6 +57,12 @@ class TestBackChannelLogout(FrappeAPITestCase):
 			"nonce_present": self.key.sign(h.logout_payload(nonce="n-1")),
 			"no_event": self.key.sign(h.logout_payload(events={})),
 			"no_sid_no_sub": self.key.sign(h.logout_payload(sid=None, sub=None)),
+			# OpenID Connect Back-Channel Logout 1.0, section 2.4: exp and jti are required,
+			# the event value must be a JSON object, sid must be a string.
+			"no_exp": self.key.sign(h.logout_payload(exp=None)),
+			"no_jti": self.key.sign(h.logout_payload(jti=None)),
+			"event_value_null": self.key.sign(h.logout_payload(events={h.LOGOUT_EVENT: None})),
+			"numeric_sid": self.key.sign(h.logout_payload(sid=12345)),
 		}
 		for name, token in cases.items():
 			response = self.send(token)
@@ -111,6 +117,31 @@ class TestBackChannelLogout(FrappeAPITestCase):
 		response = self.send(self.key.sign(h.logout_payload(sub="sub-ayse", sid=SID)), client=self.client)
 		self.assertEqual(response.status_code, 400)
 		self.assertEqual(response.json.get("exc_type"), "InvalidLogoutToken")
+		self.assertEqual(h.logged_user(self.client), h.AYSE)
+
+	def test_replayed_token_is_rejected_and_spares_new_sessions(self):
+		h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE, sid=SID))
+		token = self.key.sign(h.logout_payload(sub="sub-ayse", sid=SID))
+		first = self.send(token)
+		self.assertEqual(first.json["message"], {"closed_sessions": 1})
+		fresh = h.new_client()
+		h.login_with_keycloak(
+			fresh, h.userinfo("sub-ayse", h.AYSE, sid="55555555-5555-4555-8555-555555555555")
+		)
+		second = self.send(token)
+		self.assertEqual(second.status_code, 400, second.data[:200])
+		self.assertEqual(second.json.get("exc_type"), "InvalidLogoutToken")
+		self.assertEqual(h.logged_user(fresh), h.AYSE)
+
+	def test_sub_fallback_spares_sessions_opened_after_the_token(self):
+		old_iat = h.logout_payload()["iat"] - 120
+		token = self.key.sign(
+			h.logout_payload(sub="sub-ayse", sid="66666666-6666-4666-8666-666666666666", iat=old_iat)
+		)
+		h.login_with_keycloak(self.client, h.userinfo("sub-ayse", h.AYSE, sid=SID))
+		response = self.send(token)
+		self.assertEqual(response.status_code, 200, response.data[:200])
+		self.assertEqual(response.json["message"], {"closed_sessions": 0})
 		self.assertEqual(h.logged_user(self.client), h.AYSE)
 
 	def test_get_is_rejected(self):

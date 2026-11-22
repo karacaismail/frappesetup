@@ -1,22 +1,28 @@
 """Sign-out: closes the Frappe session, builds the Keycloak logout address, handles back-channel logout (G-58)."""
 
+import json
+import time
+
 import frappe
 from frappe import _
 from frappe.sessions import delete_session
-from oidc_verify import TokenError, verify_logout_token
+from frappe.utils import get_datetime, now_datetime
 
 from platform_core.kimlik import helpers, jwks, site_settings
 from platform_core.kimlik.exceptions import InvalidLogoutToken, KeycloakKeysUnavailable
 
 LEEWAY = 30
-MAX_SESSIONS = 100
+BATCH = 100
+MAX_BATCHES = 50
 LOGOUT_REASON = "Logged out by identity provider"
+LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout"
+JTI_PREFIX = "kimlik_logout_jti"
 
 
 def logout_current_session() -> dict:
 	"""Closes the Frappe session and returns the Keycloak logout address.
 
-	There is no `id_token_hint`: Frappe's built-in sign-in does not keep the ID token.
+	There is no `id_token_hint`: the ID token is not kept after sign-in.
 	"""
 	settings = site_settings.get()
 	frappe.local.login_manager.logout()
@@ -32,9 +38,11 @@ def handle_logout_token(logout_token: object) -> dict:
 	"""Verifies the logout token and closes the matching Frappe sessions."""
 	frappe.local.response_headers["Cache-Control"] = "no-store"
 	if frappe.session.user != "Guest":
-		frappe.throw(_("Back-channel logout must not carry a session cookie."), InvalidLogoutToken)
+		_reject(_("Back-channel logout must not carry a session cookie."))
 	if not isinstance(logout_token, str) or not logout_token:
-		frappe.throw(_("Logout token is missing."), InvalidLogoutToken)
+		_reject(_("Logout token is missing."))
+
+	from oidc_verify import TokenError, verify_logout_token
 
 	settings = site_settings.get()
 	try:
@@ -46,51 +54,111 @@ def handle_logout_token(logout_token: object) -> dict:
 			leeway=LEEWAY,
 		)
 	except TokenError as error:
-		frappe.throw(_("Logout token rejected: {0}").format(error.code), InvalidLogoutToken)
+		_reject(_("Logout token rejected: {0}").format(error.code))
 	except Exception as error:
 		if not jwks.is_keys_unavailable(error):
 			raise
+		jwks.report_keys_unavailable(settings.jwks_url)
 		frappe.throw(_("Identity provider keys are not available."), KeycloakKeysUnavailable)
+
+	_validate_logout_claims(claims)
+	_mark_used_or_reject(claims)
 
 	closed = 0
 	sid = claims.get("sid")
 	if helpers.is_session_id(sid):
-		for frappe_sid in sessions_for_keycloak_sid(sid):
-			delete_session(frappe_sid, reason=LOGOUT_REASON)
-			closed += 1
+		closed += _close(sessions_for_keycloak_sid, sid)
 
 	subject = claims.get("sub")
 	if closed == 0 and isinstance(subject, str) and subject:
-		user = frappe.db.get_value(
-			"Platform Identity Link", {"issuer": settings.issuer, "subject": subject}, "user"
-		)
+		user = frappe.db.get_value("Platform Identity Link", {"issuer": settings.issuer, "subject": subject}, "user")
 		if user:
-			for frappe_sid in sessions_for_user(user):
-				delete_session(frappe_sid, user=user, reason=LOGOUT_REASON)
-				closed += 1
+			closed += _close(sessions_for_user_before, user, int(claims["iat"]))
 
 	return {"closed_sessions": closed}
 
 
-def sessions_for_keycloak_sid(sid: str) -> list[str]:
+def _validate_logout_claims(claims: dict) -> None:
+	"""OpenID Connect Back-Channel Logout 1.0, section 2.4: exp and jti are required, the event value
+	is a JSON object and sid, when present, is a string. The shared library does not enforce these yet."""
+	if not isinstance(claims.get("exp"), int | float) or isinstance(claims.get("exp"), bool):
+		_reject(_("Logout token rejected: {0}").format("missing_exp"))
+	jti = claims.get("jti")
+	if not isinstance(jti, str) or not jti.strip():
+		_reject(_("Logout token rejected: {0}").format("missing_jti"))
+	events = claims.get("events")
+	if not isinstance(events, dict) or not isinstance(events.get(LOGOUT_EVENT), dict):
+		_reject(_("Logout token rejected: {0}").format("not_logout_token"))
+	if "sid" in claims and not isinstance(claims["sid"], str):
+		_reject(_("Logout token rejected: {0}").format("malformed"))
+
+
+def _mark_used_or_reject(claims: dict) -> None:
+	"""Replay protection: a `jti` is accepted once until the token expires (plus leeway)."""
+	ttl = max(int(claims["exp"] - time.time()) + LEEWAY, 1)
+	key = frappe.cache.make_key(f"{JTI_PREFIX}:{helpers.sha256_hex(claims['jti'])}")
+	if not frappe.cache.set(key, "1", ex=ttl, nx=True):
+		_reject(_("Logout token rejected: {0}").format("replayed"))
+
+
+def _close(finder, *args) -> int:
+	closed = 0
+	for _round in range(MAX_BATCHES):
+		rows = finder(*args)
+		if not rows:
+			break
+		for sid, user in rows:
+			delete_session(sid, user=user, reason=LOGOUT_REASON)
+			closed += 1
+		if len(rows) < BATCH:
+			break
+	return closed
+
+
+def sessions_for_keycloak_sid(sid: str) -> list[tuple[str, str]]:
 	"""Frappe sessions whose data carries this Keycloak `sid`. The format is restricted by `is_session_id`."""
 	sessions = frappe.qb.DocType("Sessions")
 	return (
 		frappe.qb.from_(sessions)
-		.select(sessions.sid)
+		.select(sessions.sid, sessions.user)
 		.where(sessions.sessiondata.like(f"%{helpers.session_marker(sid)}%"))
-		.limit(MAX_SESSIONS)
-		.run(pluck=True)
+		.limit(BATCH)
+		.run()
 	)
 
 
-def sessions_for_user(user: str) -> list[str]:
+def sessions_for_user_before(user: str, iat: int) -> list[tuple[str, str]]:
+	"""Sessions of the user that were created before the logout token was issued. A replayed or
+	delayed token therefore never closes a session that was opened after it."""
 	sessions = frappe.qb.DocType("Sessions")
-	return (
+	rows = (
 		frappe.qb.from_(sessions)
-		.select(sessions.sid)
+		.select(sessions.sid, sessions.user, sessions.sessiondata)
 		.where(sessions.user == user)
 		.orderby(sessions.lastupdate)
-		.limit(MAX_SESSIONS)
-		.run(pluck=True)
+		.limit(BATCH)
+		.run()
 	)
+	now = now_datetime()
+	selected = []
+	for sid, owner, raw in rows:
+		created = _created_epoch(raw, now)
+		if created is None or created <= iat:
+			selected.append((sid, owner))
+	return selected
+
+
+def _created_epoch(raw: str | None, now) -> float | None:
+	"""Session creation time as a UNIX timestamp, derived from the age of the session record."""
+	try:
+		creation = json.loads(raw or "{}").get("creation")
+	except ValueError:
+		return None
+	if not creation:
+		return None
+	age = (now - get_datetime(creation)).total_seconds()
+	return time.time() - age
+
+
+def _reject(message: str) -> None:
+	frappe.throw(message, InvalidLogoutToken)

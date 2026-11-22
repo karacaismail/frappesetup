@@ -18,6 +18,9 @@ class TestKeycloakOnly(FrappeAPITestCase):
 		cls.admin_password = frappe.generate_hash(length=24)
 		cls.admin_user = h.ensure_system_manager("kimlik.yonetici@example.test", cls.admin_password)
 		h.refresh()
+		cls.patcher = h.jwks_patch()
+		cls.patcher.start()
+		cls.addClassCleanup(cls.patcher.stop)
 
 	@classmethod
 	def tearDownClass(cls):
@@ -62,6 +65,89 @@ class TestKeycloakOnly(FrappeAPITestCase):
 			response = h.login_with_keycloak(client, h.userinfo("sub-ayse", h.AYSE))
 			self.assertEqual(response.status_code, 302)
 			self.assertEqual(h.logged_user(client), h.AYSE)
+
+	def test_gate_covers_every_local_login_function_and_api_shape(self):
+		# E2 in the security review: the gate applies to the function, not to one URL spelling.
+		with h.SiteSettings({"kimlik_yalniz_keycloak": 1}):
+			for path in (
+				"/api/method/frappe.www.login.send_login_link",
+				"/api/v1/method/frappe.www.login.send_login_link",
+				"/api/v2/method/frappe.www.login.send_login_link",
+			):
+				response = h.request(h.new_client().post, path, data={"email": h.AYSE})
+				self.assertEqual(response.status_code, 403, f"{path}: {response.status_code}")
+			via_cmd = h.request(
+				h.new_client().post, "/", data={"cmd": "frappe.www.login.send_login_link", "email": h.AYSE}
+			)
+			self.assertEqual(via_cmd.status_code, 403, via_cmd.data[:200])
+			via_get_cmd = h.request(
+				h.new_client().get, "/", query_string={"cmd": "frappe.www.login.login_via_key", "key": "x"}
+			)
+			self.assertEqual(via_get_cmd.status_code, 403, via_get_cmd.data[:200])
+			for method, path, body in (
+				(
+					"post",
+					"/api/method/frappe.core.doctype.user.user.update_password",
+					{"key": "x", "new_password": "A-long-password-123"},
+				),
+				("post", "/api/method/frappe.core.doctype.user.user.reset_password", {"user": h.AYSE}),
+				(
+					"post",
+					"/api/method/frappe.core.doctype.user.user.sign_up",
+					{"email": "x@example.test", "full_name": "X", "redirect_to": "/"},
+				),
+				("get", "/api/method/frappe.www.login.login_via_token", {"login_token": "x"}),
+				(
+					"get",
+					"/api/method/frappe.integrations.oauth2_logins.login_via_keycloak",
+					{"code": "x", "state": "y"},
+				),
+				(
+					"get",
+					"/api/method/frappe.integrations.oauth2_logins.login_via_google",
+					{"code": "x", "state": "y"},
+				),
+				(
+					"get",
+					"/api/method/frappe.integrations.oauth2_logins.custom/keycloak",
+					{"code": "x", "state": "y"},
+				),
+			):
+				client = h.new_client()
+				if method == "post":
+					response = h.request(client.post, path, data=body)
+				else:
+					response = h.request(client.get, path, query_string=body)
+				self.assertEqual(
+					response.status_code, 403, f"{path}: {response.status_code} {response.data[:120]}"
+				)
+			for path in ("/api/v2/method/login", "/api/v1/method/login"):
+				response = h.request(
+					h.new_client().post, path, data={"usr": self.admin_user, "pwd": self.admin_password}
+				)
+				self.assertEqual(response.status_code, 401, f"{path}: {response.status_code}")
+			via_cmd_login = h.request(
+				h.new_client().post,
+				"/",
+				data={"cmd": "login", "usr": self.admin_user, "pwd": self.admin_password},
+			)
+			self.assertEqual(via_cmd_login.status_code, 401, via_cmd_login.data[:200])
+
+	def test_gate_off_delegates_to_the_original_functions(self):
+		# With the gate off the wrappers must behave like Frappe: reset_password answers 200 for any address.
+		response = h.request(
+			h.new_client().post,
+			"/api/method/frappe.core.doctype.user.user.reset_password",
+			data={"user": h.AYSE},
+		)
+		self.assertEqual(response.status_code, 200, response.data[:200])
+
+	def test_portal_block_survives_path_tricks(self):
+		client = h.new_client()
+		h.login_with_keycloak(client, h.userinfo("sub-ayse", h.AYSE))
+		for path in ("//me", "/me.html", "/./me", "/me/", "/update-password/x"):
+			response = h.request(client.get, path, follow_redirects=True)
+			self.assertEqual(response.status_code, 403, f"{path}: {response.status_code}")
 
 	def test_portal_pages_are_closed_to_end_users(self):
 		client = h.new_client()

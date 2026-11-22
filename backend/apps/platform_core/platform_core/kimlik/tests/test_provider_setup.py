@@ -16,6 +16,28 @@ class TestSetup(FrappeAPITestCase):
 		cls.addClassCleanup(cls.settings.__exit__, None, None, None)
 		h.ensure_user(h.AYSE)
 		h.refresh()
+		cls.patcher = h.jwks_patch()
+		cls.patcher.start()
+		cls.addClassCleanup(cls.patcher.stop)
+
+	def test_custom_record_with_the_same_name_is_reused(self):
+		frappe.delete_doc(
+			"Social Login Key", "keycloak", force=True, ignore_permissions=True, ignore_missing=True
+		)
+		custom = frappe.new_doc("Social Login Key")
+		custom.update(
+			{
+				"provider_name": "Keycloak",
+				"social_login_provider": "Custom",
+				"authorize_url": "x",
+				"access_token_url": "y",
+				"redirect_url": "z",
+			}
+		)
+		custom.insert()
+		result = provider_setup.ensure_social_login_key()
+		self.assertEqual(result["social_login_key"], "keycloak")
+		self.assertEqual(frappe.db.get_value("Social Login Key", "keycloak", "user_id_property"), "sub")
 
 	def test_running_twice_keeps_one_record_with_expected_fields(self):
 		first = provider_setup.ensure_social_login_key()
@@ -27,13 +49,14 @@ class TestSetup(FrappeAPITestCase):
 		self.assertEqual(doc.user_id_property, "sub")
 		self.assertEqual(doc.sign_ups, "Deny")
 		self.assertEqual(doc.provider_name, "Atonota")
-		self.assertEqual(doc.enable_social_login, 1)
+		# Frappe's own button would send a state this app does not know, so the key stays disabled.
+		self.assertEqual(doc.enable_social_login, 0)
 		self.assertEqual(doc.custom_base_url, 1)
 		self.assertEqual(doc.base_url, "http://kimlik.localhost:8660/realms/platform")
 		self.assertEqual(doc.authorize_url, "/protocol/openid-connect/auth")
 		self.assertEqual(doc.access_token_url, "/protocol/openid-connect/token")
 		self.assertEqual(doc.api_endpoint, "/protocol/openid-connect/userinfo")
-		self.assertEqual(doc.redirect_url, "/api/method/frappe.integrations.oauth2_logins.login_via_keycloak")
+		self.assertEqual(doc.redirect_url, "/api/method/platform_core.api.auth.keycloak_callback")
 		self.assertEqual(doc.client_id, "site-kiraci1")
 		self.assertEqual(frappe.parse_json(doc.auth_url_data), {"response_type": "code", "scope": "openid"})
 		self.assertEqual(doc.get_password("client_secret"), "test-client-secret-fake")

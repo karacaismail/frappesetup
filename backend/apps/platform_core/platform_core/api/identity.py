@@ -12,10 +12,10 @@ def provision(
 	issuer: str | None = None,
 	subject: str | None = None,
 	email: str | None = None,
-	email_verified: bool | None = None,
+	email_verified: bool | str | int | None = None,
 	first_name: str | None = None,
 	last_name: str | None = None,
-	enabled: bool | None = None,
+	enabled: bool | str | int | None = None,
 	role_profiles: list | str | None = None,
 ) -> dict:
 	"""Creates or updates the user. The same request returns the same result twice."""
@@ -35,7 +35,9 @@ def provision(
 
 
 @frappe.whitelist(methods=["POST"])
-def set_enabled(issuer: str | None = None, subject: str | None = None, enabled: bool | None = None) -> dict:
+def set_enabled(
+	issuer: str | None = None, subject: str | None = None, enabled: bool | str | int | None = None
+) -> dict:
 	"""Enables or disables the user. Disabling closes all of the user's sessions."""
 	service_token.require_service(SERVICE)
 	return provisioning.set_enabled({"issuer": issuer, "subject": subject, "enabled": enabled})

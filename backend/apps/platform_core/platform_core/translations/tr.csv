@@ -30,3 +30,20 @@ Role profile grants desk access: {0},Rol profili masaüstü erişimi veriyor: {0
 Password sign-in is disabled. Sign in with the identity provider.,Parola ile giriş kapalı. Kimlik sunucusu ile oturum açın.
 E-mail link sign-in is disabled. Sign in with the identity provider.,E-posta bağlantısıyla giriş kapalı. Kimlik sunucusu ile oturum açın.
 This page is not available. Use the application.,Bu sayfa kullanılamaz. Uygulamayı kullanın.
+Sign in with the identity provider is not configured.,Kimlik sunucusu ile oturum açma kurulu değil.
+The identity provider refused or cancelled the sign-in.,Kimlik sunucusu girişi reddetti ya da iptal etti.
+The sign-in response is incomplete.,Giriş yanıtı eksik.
+"This sign-in attempt is unknown, expired or already used. Please try again.","Bu giriş denemesi bilinmiyor, süresi dolmuş ya da kullanılmış. Yeniden deneyin."
+The sign-in cookie is missing. Please start again in this browser.,Giriş çerezi yok. Bu tarayıcıda yeniden başlayın.
+This sign-in was started in a different browser.,Bu giriş başka bir tarayıcıda başlatıldı.
+The identity provider could not be reached.,Kimlik sunucusuna ulaşılamadı.
+The identity provider did not return an identity token.,Kimlik sunucusu kimlik belirteci göndermedi.
+The identity token is not valid ({0}).,Kimlik belirteci geçerli değil ({0}).
+The identity provider keys are not available.,Kimlik sunucusunun anahtarları alınamadı.
+There is no account for this e-mail address. Sign-up is closed.,Bu e-posta için hesap yok. Kayıt kapalı.
+This user is disabled.,Bu kullanıcı kapalı.
+Sign-in failed,Giriş başarısız
+Local sign-in is disabled. Sign in with the identity provider.,Yerel giriş kapalı. Kimlik sunucusu ile oturum açın.
+This e-mail belongs to a desk user and cannot be provisioned.,Bu e-posta bir yönetim kullanıcısına ait. Eşitleme ile açılamaz.
+Field {0} is longer than {1} characters.,{0} alanı {1} karakterden uzun.
+Field {0} must be text.,{0} alanı metin olmalıdır.
