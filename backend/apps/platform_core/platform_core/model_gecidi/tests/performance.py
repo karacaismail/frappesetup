@@ -29,12 +29,12 @@ def _p95(values):
 def summarize(samples, *, limit_ms):
 	if len(samples) < SAMPLES:
 		raise ValueError("O-31 needs at least 50 samples per operation.")
-	provider = _p95([provider for _, provider in samples])
+	provider = _p95([provider for _total, provider in samples])
 	gateway = _p95([max(0, total - provider) for total, provider in samples])
 	return {
 		"samples": len(samples),
 		"gateway_p95_ms": round(gateway, 3),
-		"http_server_p95_ms": round(_p95([total for total, _ in samples]), 3),
+		"http_server_p95_ms": round(_p95([total for total, _provider in samples]), 3),
 		"provider_p95_ms": round(provider, 3),
 		"limit_ms": limit_ms,
 		"pass": gateway <= limit_ms,
@@ -130,8 +130,8 @@ def _usage(fixture, result, attempted_at):
 	)
 
 
-def _sample(fixture, method, path, payload=None):
-	response = fixture["sessions"]["manager"].request(
+def _sample(fixture, method, path, payload=None, *, actor="manager"):
+	response = fixture["sessions"][actor].request(
 		method, fixture["base"] + path, json=payload, timeout=15, allow_redirects=False
 	)
 	if response.status_code != 200:
@@ -143,19 +143,18 @@ def _sample(fixture, method, path, payload=None):
 
 def _collect(fixture):
 	provider = frappe.db.get_value("AI Account", fixture["second_account"], "provider")
-	count = frappe.conf.get("model_gateway_usage_retention_days", 365)
-	old = now_datetime() - timedelta(days=count + 1)
+	old = now_datetime() - timedelta(days=366)
 	rpc = "/api/method/platform_core.api.model."
 	samples = {}
 	purged = []
 
-	def record(group, operation, method, path, payload=None):
-		body, sample = _sample(fixture, method, path, payload)
+	def record(group, operation, method, path, payload=None, *, actor="manager"):
+		body, sample = _sample(fixture, method, path, payload, actor=actor)
 		samples.setdefault((group, operation), []).append(sample)
 		return body
 
 	try:
-		for _ in range(SAMPLES):
+		for _sample_index in range(SAMPLES):
 			unknown = _usage(fixture, "unknown", now_datetime())
 			expired = _usage(fixture, "success", old)
 			set_encrypted_password("AI API", fixture["clearable_api"], fixture["credential"], "api_key")
@@ -204,7 +203,9 @@ def _collect(fixture):
 					"currency": "USD",
 				},
 			)
-			preview = record("read", "purge_preview", "POST", rpc + "purge_usage")["message"]
+			preview = record("read", "purge_preview", "POST", rpc + "purge_usage", actor="system_manager")[
+				"message"
+			]
 			if preview["targets"] != [expired]:
 				raise RuntimeError("The benchmark may only delete its own fixture record.")
 			purged.append(expired)
@@ -217,6 +218,7 @@ def _collect(fixture):
 					"dry_run": False,
 					"preview_token": preview["preview_token"],
 				},
+				actor="system_manager",
 			)
 			record(
 				"write",
@@ -231,7 +233,7 @@ def _collect(fixture):
 		frappe.db.delete(
 			"Activity Log",
 			{
-				"user": fixture["users"]["manager"],
+				"user": fixture["users"]["system_manager"],
 				"subject": "Model gateway usage logs purged",
 			},
 		)

@@ -3,8 +3,11 @@
 import argparse
 import json
 import os
+import socket
 from contextlib import contextmanager
+from contextvars import ContextVar
 from math import ceil
+from multiprocessing import get_context
 from pathlib import Path
 from statistics import median
 from threading import Thread
@@ -14,10 +17,9 @@ from urllib.error import HTTPError
 from urllib.request import Request
 from uuid import uuid4
 
-import erpnext
 import frappe
-import hrms
 from frappe.app import application
+from frappe.database.database import Database
 from platform_core.api import mobile
 from platform_core.mobil.protocol import PAGE_SIZE
 from platform_core.mobil.tests.loopback_http import open_loopback
@@ -29,19 +31,85 @@ from .performance_data import BACKLOG, EMPLOYEES, LEAVE_PER_EMPLOYEE, seed_backl
 LIMITS_MS = {"v1_register": 1000, "v1_push": 1000, "v1_pull": 500, "v1_activity": 1000, "v1_pull (1000)": 500}
 TIMING_HEADER = "X-Mobile-Test-Server-Ns"
 SAMPLES = 50
+DB_FAILURES = ContextVar("mobile_benchmark_db_failures", default=None)
+
+
+def capture_db_failures(sql):
+    def observed(db, query, *args, **kwargs):
+        try:
+            return sql(db, query, *args, **kwargs)
+        except (frappe.QueryDeadlockError, frappe.QueryTimeoutError) as error:
+            failures = DB_FAILURES.get()
+            if failures is not None:
+                original = error.__cause__ or error.__context__ or error
+                code = original.args[0] if original.args and isinstance(original.args[0], int) else 0
+                tables = (
+                    "Mobile Sequence",
+                    "Mobile Operation",
+                    "Mobile Delivery",
+                    "Mobile Change",
+                    "Mobile Installation",
+                    "User",
+                )
+                table = next((name for name in tables if f"tab{name}`" in str(query)), "other")
+                failures.append(f"{type(error).__name__}/{code}/{table}")
+            raise
+
+    return observed
+
+
+def run_gunicorn(fd, workers):
+    from gunicorn.app.base import BaseApplication
+
+    class BenchmarkApplication(BaseApplication):
+        def load_config(self):
+            self.cfg.set("bind", [f"fd://{fd}"])
+            self.cfg.set("workers", workers)
+
+        def load(self):
+            return timed_application
+
+    BenchmarkApplication().run()
+
+
+@contextmanager
+def gunicorn_server(workers):
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        server = get_context("fork").Process(target=run_gunicorn, args=(listener.fileno(), workers))
+        server.start()
+        try:
+            yield f"http://127.0.0.1:{listener.getsockname()[1]}"
+        finally:
+            server.terminate()
+            server.join(timeout=10)
+            if server.is_alive():
+                server.kill()
+                server.join()
 
 
 def timed_application(environ, start_response):
     started = perf_counter_ns()
+    failures = []
 
     def timed_response(status, headers, exc_info=None):
-        return start_response(status, [*headers, (TIMING_HEADER, str(perf_counter_ns() - started))], exc_info)
+        diagnostics = [
+            (TIMING_HEADER, str(perf_counter_ns() - started)),
+            ("X-Mobile-Test-Worker", str(os.getpid())),
+            ("X-Mobile-Test-DB-Failures", ",".join(failures)),
+        ]
+        return start_response(status, [*headers, *diagnostics], exc_info)
 
-    return application(environ, timed_response)
+    token = DB_FAILURES.set(failures)
+    try:
+        return application(environ, timed_response)
+    finally:
+        DB_FAILURES.reset(token)
 
 
 @contextmanager
-def benchmark_server(phones):
+def benchmark_server(phones, *, threaded=True, workers=0):
     auth = {f"Bearer {phone.token}": phone.account for phone in phones}
     original_override = frappe.override_whitelisted_method
 
@@ -53,12 +121,17 @@ def benchmark_server(phones):
     # Use the real Website User gate and original routes. Only the business adapter is synthetic.
     with (
         patch.dict(fixture.TOKENS, auth),
+        patch.object(Database, "sql", capture_db_failures(Database.sql)),
         patch.object(frappe, "override_whitelisted_method", resolve),
         patch.object(mobile, "COMMANDS", {"fixture.update": fixture.FixtureCommand("update")}),
         patch.object(mobile, "PROJECTIONS", {"fixture": fixture.projection}),
         patch.object(mobile, "INVENTORIES", {"fixture": fixture.scan_inventory}),
     ):
-        server = make_server("127.0.0.1", 0, timed_application)
+        if workers:
+            with gunicorn_server(workers) as url:
+                yield url
+            return
+        server = make_server("127.0.0.1", 0, timed_application, threaded=threaded)
         worker = Thread(target=server.serve_forever, daemon=True)
         worker.start()
         try:
@@ -69,8 +142,8 @@ def benchmark_server(phones):
             server.server_close()
 
 
-def call(url, phone, endpoint, payload=None):
-    request = Request(
+def mobile_request(url, phone, endpoint, payload=None):
+    return Request(
         f"{url}/api/method/platform_core.api.mobile.{endpoint}",
         data=json.dumps({"installation_id": phone.installation, **(payload or {})}).encode(),
         headers={
@@ -83,6 +156,10 @@ def call(url, phone, endpoint, payload=None):
         },
         method="POST",
     )
+
+
+def call(url, phone, endpoint, payload=None):
+    request = mobile_request(url, phone, endpoint, payload)
     started = perf_counter_ns()
     try:
         with open_loopback(request, timeout=15) as response:
@@ -158,6 +235,9 @@ def p95(values):
 
 
 def report(samples, catchups, label):
+    import erpnext
+    import hrms
+
     rows = [
         f"### O-31 mobil ölçümü ({label})",
         "",
@@ -196,7 +276,7 @@ def main():
     destination = args.status_file.resolve()
     os.chdir("sites")
     phones = seed_site(SAMPLES)
-    with benchmark_server(phones) as url:
+    with benchmark_server(phones, threaded=False) as url:
         samples = measure_base(url, phones[:SAMPLES])
         samples["v1_pull (1000)"], catchups = measure_backlog(url, phones[-1], SAMPLES)
     summary, passed = report(samples, catchups, args.label)

@@ -210,3 +210,14 @@ test('the shell script uses English names and messages', () => {
   // A list of words is an array, not an unquoted expansion.
   expect(script).not.toMatch(/for \w+ in \$\{/);
 });
+
+test('the tests hold no fixed password or TOTP secret', () => {
+  // Decision: the repository holds no fixed test secret. The values come from the environment.
+  const helpers = readFileSync(join(themeRoot, 'test', 'tests', 'helpers.ts'), 'utf8');
+  expect(helpers).toMatch(/PASSWORD = requiredSecret\('IDENTITY_TEST_PASSWORD'\)/);
+  expect(helpers).toMatch(/TOTP_SECRET = requiredSecret\('IDENTITY_TEST_TOTP_SECRET'\)/);
+  expect(helpers).not.toMatch(/(PASSWORD|SECRET)\s*=\s*['"`]/);
+  const example = readFileSync(join(themeRoot, 'test', '.env.example'), 'utf8');
+  expect(example).toMatch(/^IDENTITY_TEST_PASSWORD=$/m);
+  expect(example).toMatch(/^IDENTITY_TEST_TOTP_SECRET=$/m);
+});

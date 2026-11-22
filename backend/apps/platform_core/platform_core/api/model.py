@@ -118,7 +118,7 @@ def reconcile_stale_pending() -> ReconciledPending | ErrorResponse:
 
 @frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
 def purge_usage(dry_run: bool = True, preview_token: str | None = None) -> PurgedUsage | ErrorResponse:
-	"""Preview or delete closed usage records beyond the configured retention window."""
+	"""Preview or delete closed usage records beyond the fixed 365-day retention window."""
 	return _respond(maintenance.purge_usage, dry_run, preview_token)
 
 
