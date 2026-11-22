@@ -6,7 +6,8 @@ Frappe v16.50.0 ve Press v0.154.1 kullanılır.
 Paylaşılan yerel Press imajında Python sürümü 3.14.8.
 Yeni kurulumun Python yolu `install.sh` dosyasında yazılıdır.
 Uyum yamaları yalnız yerel Press denemesi içindir.
-Sunucu kurma ve Ansible bu kurulumda çalışmaz.
+Ansible `ansible-requirements.txt` sürümüne sabitlenir.
+Sunucu kurma akışının denemesi [kurma yolunda](provisioning-readiness.md) anlatılır.
 
 Komutları depo kökünde çalıştırın. Birleşik kaynakta `backend/libs/oidc_verify` bulunmalı.
 Press imajı bu kitaplığı bir Python kurulum paketi olarak taşır.
@@ -54,6 +55,9 @@ sh backend/apps/press_tr/tests/smoke.sh
 ```sh
 bash backend/dev/press/compose.sh down
 ```
+
+Yamasız adayın sonucu [uyum denemesinde](unpatched-runtime.md) açıklanır.
+Üç kaynak engeli ve bağımlılık uyumsuzluğu sürdüğü için O-18 borcu açıktır.
 
 `patch-py314.sh` Press kaynaklarına uyum yaması uygular.
 Bu yama yalnız `development` imajında bulunur ve çalışır (O-18).

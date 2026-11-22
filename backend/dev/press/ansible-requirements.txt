@@ -1,0 +1,8 @@
+# Ansible for Press server provisioning on the Python 3.14 control node (Frappe 16 bench).
+# Press v0.154.1 pins ansible==3.4.0 (ansible-base 2.10), which cannot import on Python 3.12+.
+# ansible-core 2.21 supports control-node Python 3.12-3.14 and managed-node Python 3.9-3.14.
+# Decision and alternatives: backend/docs/decisions/0018-press-ansible-python314.md
+# Bundled collections used by the playbooks: ansible.posix 2.2.2, community.general 13.5.1,
+# community.mysql 5.0.2 (fixed by the community package version below).
+ansible==14.6.0
+ansible-core==2.21.6
