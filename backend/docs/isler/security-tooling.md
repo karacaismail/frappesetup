@@ -6,14 +6,14 @@ Bu iş güvenlik taramalarını elle başlatılan komutlar olarak yazar. Proje s
 
 1. `backend/AGENTS.md`, özellikle “Container kuralları” ve “Bilinen ortam sorunları”
 2. `backend/PROJE-KAYDI.md`, özellikle D-6, D-15 ve O-29
-3. `docs/standartlar/frappe Güvenlik önlemleri.md`
+3. `backend/docs/security-requirements.md`. Bu liste proje sahibinin güvenlik önlemlerinden çıkarıldı.
 4. `backend/dev/bin/guvenlik-denetimi` ve `backend/dev/guvenlik/`. Bu var olan kapıdır. Yeni komutlar onun biçimini izler.
 5. `backend/docs/gap-backlog.md`
 
 ## Sahip olduğunuz yerler
 
 - `backend/dev/security/` (yeni klasör)
-- `backend/dev/bin/security-full`, `backend/dev/bin/dast-scan`, `backend/dev/bin/release-report` (yeni komutlar)
+- `backend/dev/bin/security-full`, `backend/dev/bin/dast-scan`, `backend/dev/bin/release-report`, `backend/dev/bin/security-scorecard` (yeni komutlar)
 - `backend/dev/guvenlik/` ve `backend/dev/bin/guvenlik-denetimi`. Önceki iş bitti. Bu yerler artık sizindir.
 - `backend/docs/handoff/ci-security.md` (yeni devir notu)
 - `backend/docs/kararlar/0011-security-tooling.md` (yeni karar notu)
@@ -29,6 +29,8 @@ Yeni dosya, işlev ve değişken adları İngilizce olur (D-12).
    - Sözleşme tabanlı API testi. Schemathesis, `backend/contracts/` dosyalarını çalışan yerel siteye karşı dener. Site kapalıysa bu adım `not_run` yazar.
 2. **`dast-scan`.** Çalışan yerel siteye ZAP temel taraması yapar. Hedef yalnız `127.0.0.1` ya da `*.localhost` olabilir. Başka adres reddedilir.
 3. **`release-report`.** Son taramaların sonucunu tek bir Markdown raporunda toplar. Her satırda araç, sürüm, komut ve sonuç bulunur. Sonuç `pass`, `fail`, `not_run` ya da `not_applicable` olur.
+
+4. **`security-scorecard`.** Güvenlik sayılarını tek tabloda verir. Örnekler açık bulgu sayısı, paket açıkları ve reddedilen istek sayısıdır. Komut elle başlatılır. Zamanlanmış iş yoktur.
 
 Her komut için bir HTTP ucu yazılmaz. Bu komutlar geliştirme aracıdır, ürün işlemi değildir.
 

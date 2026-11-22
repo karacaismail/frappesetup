@@ -56,6 +56,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 | --- | --- | --- |
 | `aud-site-kiraci1` | `site-kiraci1` | `identity-sync`, `press-service` |
 | `aud-press` | `press` | `identity-sync` |
+| `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri. Örnek: `site-kiraci1` |
 
 - Bu kapsamlar varsayılan değildir. İstekte `scope` ile istenir.
 - Servis belirteci yalnız bir `aud` değeri taşır.
@@ -158,6 +159,8 @@ Adres biçimi `/api/method/<yol>` olur.
 | `platform_core.api.identity.change_email` | POST | Servis belirteci, `azp=identity-sync` | E-postayı `rename_doc` ile değiştirir. |
 | `platform_core.api.shell.get_bootstrap` | GET | Oturum | Kullanıcıyı, rolleri, kurulu uygulamaları ve kenar çubuğunu döner. |
 | `platform_core.api.meta.get_doctype` | GET | Oturum | Kullanıcının görebildiği DocType tanımını döner. `ETag` başlığı taşır. |
+| `platform_core.api.mobile.revoke_user_installations` | POST | Servis belirteci, `azp=identity-sync` | Bir kullanıcının bütün telefon kurulumlarını iptal eder ve bildirim bağlarını siler (CK-7). Aynı istek iki kez gelirse aynı sonucu döner. Sahibi platform-core-mobil işidir. |
+| `platform_core.api.identity.anonymize_user` | POST | Servis belirteci, `azp=identity-sync` | Kiracıdaki kullanıcıyı kapatır ve kişiyi gösteren alanları anonim yapar. İş kayıtlarını silmez (Proje kaydı O-27). Frappe 16'nın hazır kişisel veri silme yolu uygunsa o kullanılır. Sahibi platform-core-kimlik işidir. |
 
 - Kiracı girişi kendi dönüş ucunu kullanır. Frappe'nin hazır `login_via_keycloak` ucu kullanılmaz. Nedeni şudur: hazır uç `state` değerini tarayıcıya bağlamaz. Ayrıca kimlik belirtecini saklamaz, bu yüzden `sid` bulunmaz.
 - `get_login_url` rastgele bir tarayıcı değeri üretir. Değer `HttpOnly`, `Secure` ve `SameSite=Lax` çerezinde durur. Üretimde çerez adı `__Host-` önekini taşır.
@@ -194,6 +197,7 @@ Açılan kullanıcının türü “Website User” olur (Proje kaydı D-5).
 | `press_tr.api.keycloak_backchannel_logout` | POST | Misafir, çıkış belirteci | Eşleşen Press oturumlarını kapatır. |
 | `press_tr.api.identity.ensure_team` | POST | Servis belirteci, `azp=identity-sync` | Takımı ve üyeliği hazırlar. Aynı istek iki kez gelirse aynı sonucu döner. |
 | `press_tr.api.identity.remove_team_member` | POST | Servis belirteci, `azp=identity-sync` | Üyeliği kaldırır. |
+| `press_tr.api.identity.anonymize_user` | POST | Servis belirteci, `azp=identity-sync` | Press kullanıcısını kapatır, API anahtarlarını geçersiz kılar ve kişiyi gösteren alanları anonim yapar. Fatura gibi iş kayıtları silinmez. |
 
 ### Kuruluş ile takım eşlemesi
 
@@ -253,6 +257,8 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
   4. Kişiyi gösteren alanlar anonim yapılır. İş kayıtları silinmez.
   5. Keycloak kullanıcısı silinir. İstek kaydı anonim yapılır.
 - Her adım tekrar edilebilir. Bir adım başarısız olursa istek hata kuyruğuna girer ve elle yeniden denenir.
+- `/v1/sessions/revoke` ucunu kiracı sitesi kendi servis istemcisiyle çağırır. Belirteç `aud-identity-sync` kapsamıyla istenir. İzinli istemciler `IDENTITY_SYNC_SESSION_AZP` ayarındadır.
+- Hesap silme akışının 3. ve 4. adımı şu uçları çağırır: `platform_core.api.mobile.revoke_user_installations`, `platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user`.
 
 ## 8. Site ayarları
 
