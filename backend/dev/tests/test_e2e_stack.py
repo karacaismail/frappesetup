@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 STACK = ROOT / "backend/e2e/stack"
+CONTAINER_ID = "0123456789ab"
 
 
 class StackTests(unittest.TestCase):
@@ -327,7 +328,7 @@ class StackTests(unittest.TestCase):
     def test_owner_rejects_foreign_containers_before_mutation(self):
         namespace = runpy.run_path(str(STACK))
         outputs = [
-            "container-id",
+            CONTAINER_ID,
             json.dumps(
                 [
                     {
@@ -346,7 +347,7 @@ class StackTests(unittest.TestCase):
         ) as execute:
             with self.assertRaisesRegex(ValueError, "another worktree"):
                 namespace["assert_owner"](
-                    ["docker"], ["compose", "--env-file", "/unused/.env"], {"PANE_PORT": "7150"}, create=True
+                    ["docker"], ["compose", "--env-file", self.env["E2E_ENV_FILE"]], {"PANE_PORT": "7150"}, create=True
                 )
         self.assertEqual(execute.call_count, 2)
 
@@ -364,7 +365,7 @@ class StackTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(ValueError, "saved volumes belong"):
                 namespace["assert_owner"](
-                    ["docker"], ["compose", "--env-file", "/unused/.env"], {"PANE_PORT": "7150"}
+                    ["docker"], ["compose", "--env-file", self.env["E2E_ENV_FILE"]], {"PANE_PORT": "7150"}
                 )
 
     def test_owner_rejects_unclaimed_volumes_before_creating_marker(self):
@@ -378,7 +379,7 @@ class StackTests(unittest.TestCase):
         ) as execute:
             with self.assertRaisesRegex(ValueError, "Unclaimed stack volumes"):
                 namespace["assert_owner"](
-                    ["docker"], ["compose", "--env-file", "/unused/.env"], {"PANE_PORT": "7150"}, create=True
+                    ["docker"], ["compose", "--env-file", self.env["E2E_ENV_FILE"]], {"PANE_PORT": "7150"}, create=True
                 )
         self.assertEqual(execute.call_count, 2)
 
@@ -413,7 +414,7 @@ class StackTests(unittest.TestCase):
 
         def record(command, environment, **kwargs):
             calls.append(command)
-            return subprocess.CompletedProcess(command, 0, stdout="container-id")
+            return subprocess.CompletedProcess(command, 0, stdout=CONTAINER_ID)
 
         with (
             patch.dict(
@@ -473,7 +474,7 @@ class StackTests(unittest.TestCase):
             calls.append(command)
             if "bench --site press.localhost migrate" in " ".join(command):
                 raise subprocess.CalledProcessError(1, command)
-            return subprocess.CompletedProcess(command, 0, stdout="container-id")
+            return subprocess.CompletedProcess(command, 0, stdout=CONTAINER_ID)
 
         with (
             patch.dict(
@@ -492,6 +493,111 @@ class StackTests(unittest.TestCase):
                 namespace["up"](["docker"], ["compose"], {})
         self.assertFalse(any("exec bench start" in " ".join(command) for command in calls))
 
+    def test_rejects_environment_file_outside_the_repository(self):
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        path = Path(outside.name) / ".env"
+        result = self.run_stack("config", E2E_ENV_FILE=str(path))
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("E2E_ENV_FILE", result.stderr)
+        self.assertFalse(path.exists())
+
+    def test_rejects_environment_file_that_escapes_through_a_parent_symlink(self):
+        outside = tempfile.TemporaryDirectory()
+        self.addCleanup(outside.cleanup)
+        alias = Path(self.temp.name) / "alias"
+        alias.symlink_to(outside.name, target_is_directory=True)
+        result = self.run_stack("config", E2E_ENV_FILE=str(alias / ".env"))
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertEqual(list(Path(outside.name).iterdir()), [])
+
+    def test_rejects_environment_file_names_with_control_characters(self):
+        for name in ("bad\nname.env", "bad\rname.env", "..", "."):
+            with self.subTest(name=name):
+                result = self.run_stack("config", E2E_ENV_FILE=str(Path(self.temp.name) / name))
+                self.assertEqual(result.returncode, 2, result.stderr)
+        # The OS refuses NUL in environment values, so check the validator directly.
+        with self.assertRaisesRegex(ValueError, "control character"):
+            runpy.run_path(str(STACK))["env_file"](str(Path(self.temp.name) / "bad\x00name.env"))
+
+    def test_run_rejects_an_unvalidated_environment_file_before_execution(self):
+        namespace = runpy.run_path(str(STACK))
+        with patch("subprocess.run") as execute:
+            for command in (
+                ["docker", "compose", "--env-file", "/elsewhere/.env", "ps"],
+                ["docker", "compose", "--env-file"],
+                ["docker", "ps", "bad\x00argument"],
+                ["docker", "ps", 7],
+                [],
+            ):
+                with self.subTest(command=command):
+                    with self.assertRaises(ValueError):
+                        namespace["run"](command, {})
+        execute.assert_not_called()
+
+    def test_owner_rejects_malformed_container_ids_before_inspect(self):
+        namespace = runpy.run_path(str(STACK))
+        for output in ("--format={{json .}}", "0123456789ab;rm", "XYZ", "0123"):
+            with self.subTest(output=output):
+                with patch(
+                    "subprocess.run", return_value=subprocess.CompletedProcess([], 0, stdout=output)
+                ) as execute:
+                    with self.assertRaisesRegex(ValueError, "container ID"):
+                        namespace["assert_owner"](
+                            ["docker"],
+                            ["compose", "--env-file", self.env["E2E_ENV_FILE"]],
+                            {"PANE_PORT": "7150"},
+                        )
+                self.assertEqual(execute.call_count, 1)
+
+    def test_up_rejects_malformed_container_ids_before_stats(self):
+        namespace = runpy.run_path(str(STACK))
+        calls = []
+
+        def record(command, environment, **kwargs):
+            calls.append(command)
+            stdout = "--no-trunc\n" if command[-2:] == ["ps", "-q"] else CONTAINER_ID
+            return subprocess.CompletedProcess(command, 0, stdout=stdout)
+
+        with patch.dict(
+            namespace["up"].__globals__,
+            {
+                "resources": lambda *args: (20 * 1024 * 1024, 4096),
+                "config": lambda *args: {},
+                "ensure_images": lambda *args: None,
+                "check": lambda *args: None,
+                "run": record,
+            },
+        ):
+            with self.assertRaisesRegex(ValueError, "container ID"):
+                namespace["up"](["docker"], ["compose"], {})
+        self.assertFalse(any("stats" in command for command in calls))
+
+    def test_ready_probe_uses_the_validating_runner(self):
+        namespace = runpy.run_path(str(STACK))
+        calls = []
+
+        def record(command, environment, check=True, **kwargs):
+            calls.append((command, check))
+            return subprocess.CompletedProcess(command, 0, stdout=CONTAINER_ID)
+
+        with (
+            patch.dict(
+                namespace["up"].__globals__,
+                {
+                    "resources": lambda *args: (20 * 1024 * 1024, 4096),
+                    "config": lambda *args: {},
+                    "ensure_images": lambda *args: None,
+                    "check": lambda *args: None,
+                    "run": record,
+                },
+            ),
+            patch("subprocess.run", side_effect=AssertionError("Direct subprocess call")),
+        ):
+            namespace["up"](["docker"], ["compose"], {})
+        probe = ["compose", "exec", "-T", "web", "test", "-f", "/home/frappe/benches/.stack-installed"]
+        self.assertIn((probe, False), calls)
+
     def owner_with_container(self, label_path, port="7150", volumes=""):
         namespace = runpy.run_path(str(STACK))
         containers = [
@@ -508,7 +614,7 @@ class StackTests(unittest.TestCase):
         with patch(
             "subprocess.run",
             side_effect=[
-                subprocess.CompletedProcess([], 0, stdout="container-id"),
+                subprocess.CompletedProcess([], 0, stdout=CONTAINER_ID),
                 subprocess.CompletedProcess([], 0, stdout=json.dumps(containers)),
                 subprocess.CompletedProcess([], 0, stdout=volumes),
             ],

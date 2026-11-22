@@ -32,7 +32,7 @@ class BashResolutionTest(unittest.TestCase):
             preview["run_live"].__globals__["SUITE"] = suite
             worktree = root / "worktree"
             with patch("subprocess.Popen") as popen:
-                preview["run_live"](worktree, {})
+                preview["run_live"](worktree, {}, root.resolve())
             self.assertEqual(popen.call_args.args[0][0], "/tools/bash")
         self.assertEqual(sum(call.args == ("bash",) for call in find.call_args_list), 1)
 
@@ -45,6 +45,6 @@ class BashResolutionTest(unittest.TestCase):
                 worktree = Path(directory)
                 with patch("subprocess.Popen") as popen:
                     with self.assertRaisesRegex(preview["MergeError"], "absolute.*Bash"):
-                        preview["run_live"](worktree, {})
+                        preview["run_live"](worktree, {}, worktree.resolve())
                     popen.assert_not_called()
                 self.assertEqual(list(worktree.iterdir()), [])

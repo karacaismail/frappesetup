@@ -15,6 +15,9 @@ import tempfile
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
+# Tests may move BACKEND. The trusted credential root stays this checkout.
+REPOSITORY = Path(__file__).resolve().parents[2]
+CONTAINER_ID = re.compile(r"[0-9a-f]{12,64}")
 REDIS = "redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
 
 
@@ -25,8 +28,37 @@ def project_name(environment):
     return f"fs-e2e-{port}-{digest}"
 
 
-def run(command, environment, **kwargs):
-    return subprocess.run(command, env=environment, check=True, **kwargs)
+def env_file(value):
+    """Return a canonical environment file path inside this checkout."""
+    value = str(value)
+    if any(character in value for character in "\0\r\n"):
+        raise ValueError("E2E_ENV_FILE contains a control character.")
+    path = Path(value)
+    if path.name in ("", ".", ".."):
+        raise ValueError("E2E_ENV_FILE must name a file.")
+    # Resolve only the parent: credentials() must still reject a symlinked file.
+    path = Path(os.path.abspath(path.parent)).resolve() / path.name
+    if not path.is_relative_to(REPOSITORY.resolve()):
+        raise ValueError(f"E2E_ENV_FILE must be inside {REPOSITORY}.")
+    return path
+
+
+def container_ids(output):
+    ids = output.split()
+    if not all(CONTAINER_ID.fullmatch(value) for value in ids):
+        raise ValueError("Docker returned an invalid container ID.")
+    return ids
+
+
+def run(command, environment, check=True, **kwargs):
+    """Run Docker without a shell after checking every argument."""
+    if not command or not all(isinstance(argument, str) and "\0" not in argument for argument in command):
+        raise ValueError("Commands must be non-empty text arguments without NUL bytes.")
+    if "--env-file" in command:
+        index = command.index("--env-file") + 1
+        if index >= len(command) or str(env_file(command[index])) != command[index]:
+            raise ValueError("The Compose environment file was not validated.")
+    return subprocess.run(command, env=environment, check=check, **kwargs)
 
 
 def credentials(path):
@@ -78,7 +110,7 @@ def setup():
         raise ValueError("FS_COLIMA_PROFILE must be factory or default.")
     port = int(port)
     context = "colima-factory" if profile == "factory" else "colima"
-    path = Path(os.environ.get("E2E_ENV_FILE", BACKEND / "e2e/.env"))
+    path = env_file(os.environ.get("E2E_ENV_FILE", BACKEND / "e2e/.env"))
     environment = dict(os.environ, **credentials(path))
     environment.update(
         {
@@ -127,12 +159,14 @@ def assert_owner(engine, compose, environment, create=False):
     ).hexdigest()
     marker = project + "-owner"
     label = "io.frappesetup.stack-owner"
-    ids = run(
-        [*engine, "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"],
-        environment,
-        capture_output=True,
-        text=True,
-    ).stdout.split()
+    ids = container_ids(
+        run(
+            [*engine, "ps", "-aq", "--filter", f"label=com.docker.compose.project={project}"],
+            environment,
+            capture_output=True,
+            text=True,
+        ).stdout
+    )
     if ids:
         containers = json.loads(
             run([*engine, "inspect", *ids], environment, capture_output=True, text=True).stdout
@@ -405,7 +439,7 @@ def up(engine, compose, environment):
         ],
         environment,
     )
-    ready = subprocess.run(
+    ready = run(
         [
             *compose,
             "exec",
@@ -415,7 +449,8 @@ def up(engine, compose, environment):
             "-f",
             "/home/frappe/benches/.stack-installed",
         ],
-        env=environment,
+        environment,
+        check=False,
     )
     if ready.returncode:
         with (BACKEND / "dev/press/install.sh").open() as stream:
@@ -474,7 +509,7 @@ def up(engine, compose, environment):
     )
     check(compose, environment)
     resources(engine, environment)
-    ids = run([*compose, "ps", "-q"], environment, capture_output=True, text=True).stdout.split()
+    ids = container_ids(run([*compose, "ps", "-q"], environment, capture_output=True, text=True).stdout)
     run(
         [*engine, "stats", "--no-stream", "--format", "{{.Name}}: {{.MemUsage}}", *ids],
         environment,
