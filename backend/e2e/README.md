@@ -15,7 +15,7 @@
 Kiracı ortamı açıldı. Kiracı, `ping` isteğine yanıt verdi.
 Container içinde Frappe 16.56.0 ve ERPNext 16.55.0 çalıştı.
 
-Playwright 1.64.0 güncel yapılandırmada 18 test buldu.
+Playwright 1.64.0 güncel yapılandırmada 21 test buldu.
 Chromium ve WebKit ön denemeleri giriş düğmesini bulamadı.
 Bu sonuç, kiracı girişi henüz birleşmediği için bekleniyordu.
 
@@ -78,3 +78,22 @@ Bu iki test grubu, örnek ortam hazır olunca açılır.
 
 Sihirli bağlantı için `magic-link.spec.ts` dosyasını seçin.
 Telefon paketi için `mobile-pkce.spec.ts` dosyasını seçin.
+
+## Hesap ve oturum testleri
+
+| Senaryo | Sonuç | Eksik önkoşul |
+| --- | --- | --- |
+| Müşteri hesabını siler. | `not_run` | Keycloak silme adımı, imzalı olay ve hesap kapatma akışı. |
+| Yönetici telefonu iptal eder. | `not_run` | Mobil kimlik doğrulaması ve Keycloak oturumu iptal ucu. |
+| Çalışan bir saat boşta kalır. | `not_run` | Çalışan için süre ayarı ve zorunlu yeniden doğrulama. |
+
+Bu senaryoları yalnız ayrı bir yerel test ortamında açın.
+Silme ve iptal için her koşuda yeni örnek veri hazırlayın.
+Önkoşullar eksikse ilgili ayarı kapalı bırakın. Playwright nedeni test kaydına yazar.
+
+- **Hesap silme.** `E2E_ACCOUNT_DELETION=1` kullanın. Müşteri e-postası `e2e-delete-` ile başlamalı ve `@example.test` ile bitmeli. `E2E_DELETE_*` ayarlarına müşteri kimliğini, erişim bilgilerini ve örnek iş kaydını verin. `E2E_DELETE_RECORD_ANONYMOUS_VALUE` alanına beklenen değeri JSON olarak verin. Örneğin boş değer için `null` kullanın.
+- **Telefon iptali.** `E2E_MOBILE_SESSION_REVOKE=1` kullanın. Telefon hesabı `e2e-revoke-` ile başlamalı ve `@example.test` ile bitmeli. `E2E_REVOKE_*` ayarlarına telefon kurulumunu, belirteçlerini ve yönetici oturumunu verin. `E2E_MOBILE_CLIENT_ID` herkese açık test istemcisini gösterir.
+- **Keycloak okuma yetkisi.** İlk iki senaryo `E2E_LIFECYCLE_KEYCLOAK_READER_TOKEN` ayarını ister. Bu belirteç yerel örnek kullanıcı ve oturumlarını okumalıdır.
+- **Çalışan oturumu.** `E2E_EMPLOYEE_IDLE=1` kullanın. Çalışan hesabı `e2e-employee-` ile başlamalı ve `@example.test` ile bitmeli. Hesabı `E2E_EMPLOYEE_EMAIL` ile verin. Parolayı `E2E_EMPLOYEE_PASSWORD` ile verin. Test gerçek saatte bir saat bekler. Test bu sırada yalnız Keycloak oturumunu kontrol eder.
+
+`playwright test -c backend/e2e/playwright.config.ts --project=chromium lifecycle.spec.ts` komutunu kullanın.
