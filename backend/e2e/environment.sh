@@ -41,8 +41,9 @@ case "${1:-}" in
         docker --context colima-factory run --detach --rm --name "$project-provider" \
             --network "${project}_default" --network-alias e2e-provider \
             --publish "127.0.0.1:$provider_port:$provider_port" --env PANE_PORT \
+            --env E2E_PROVIDER_BIND=0.0.0.0 \
             --entrypoint node "fs-kiraci-dev:$PANE_PORT" \
-            --input-type=module -e "$(cat "$test_dir/fake-provider.mjs")" -- 0.0.0.0
+            --input-type=module -e "$(cat "$test_dir/fake-provider.mjs")"
         ;;
     config)
         python3 "$dev_dir/init_env.py"

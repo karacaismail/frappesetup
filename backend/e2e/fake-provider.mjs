@@ -38,4 +38,4 @@ createServer((request, response) => {
   response.writeHead(status).end(JSON.stringify(
     status === 200 ? responseBody : { error: { message: 'Local test rate limit' } },
   ));
-}).listen(base + 7, process.argv[2] ?? '127.0.0.1');
+}).listen(base + 7, process.env.E2E_PROVIDER_BIND ?? '127.0.0.1');
