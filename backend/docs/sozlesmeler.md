@@ -114,13 +114,15 @@ Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_id
 | `account` | metin | Frappe kullanıcısının adı |
 | `scope` | metin | Her zaman `mobile` |
 | `site` | metin | İsteğin geldiği site |
-| `installation` | metin | Telefon kurulumunun kimliği |
+| `installation` | metin | Telefon kurulumunun kimliği. Telefon bu değeri `X-Platform-Installation` başlığında gönderir. |
 | `sid` | metin | Keycloak oturum kimliği |
 | `auth_time` | tamsayı | Belirteçteki son kimlik doğrulama zamanı (Unix saniyesi) |
 
 Kabuk ve mobil modülü bu değeri okur. Değer yoksa ya da biçimi tutmazsa istek telefon isteği sayılmaz.
 Kabuk, `installation` ve `sid` alanlarında boş olmayan metin ister.
 Yalnız boşluk içeren metin de geçersizdir.
+
+`X-Platform-Installation` başlığı yalnız harf, rakam, `_` ve `-` taşır. Uzunluğu 1 ile 128 karakter arasındadır. Başlık yoksa ya da biçimi tutmazsa `installation` boş metin olur. Başlık yetki vermez. Mobil modülü kurulumu kendi kaydıyla karşılaştırır.
 
 - Kiracı sitesinde ve telefon paketinde bütün kullanıcılar çalışan süresini alır: 1 saat boşta kalma, 24 saat toplam süre. Realm bu istemcilerde `employee` düzeyini ister. Müşteri süreleri yalnız Press'e uygulanır.
 - Sunucu boşta kalma sayacını `auth_time` değeri sayaç başlangıcından yeni olunca sıfırlar. Böylece aynı `sid` ile yeniden giriş de telefonu açar.
