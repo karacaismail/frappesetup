@@ -55,7 +55,27 @@ class SemgrepExceptionsTests(unittest.TestCase):
             result = self.run_cli(root, str(report), "1", "snapshot")
             self.assertEqual(result.returncode, 1)
             self.assertEqual(result.stdout, "")
-            self.assertEqual(result.stderr, "Semgrep did not complete cleanly.\n")
+            self.assertEqual(
+                result.stderr,
+                "Semgrep did not complete cleanly: exit=1, errors=0, findings=0.\n",
+            )
+
+    def test_cli_rejects_scanner_errors_without_dumping_report_contents(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            report = root / "report.json"
+            scanner_report = {
+                "errors": [{"message": "Untrusted scanner text"}],
+                "results": [{"extra": {"message": "Untrusted finding text"}}],
+            }
+            report.write_text(json.dumps(scanner_report))
+            result = self.run_cli(root, str(report), "2", "snapshot")
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(
+                result.stderr,
+                "Semgrep did not complete cleanly: exit=2, errors=1, findings=1.\n",
+            )
 
     def test_digest_ignores_cache_and_preserves_clean_digest(self):
         with tempfile.TemporaryDirectory() as temp:
