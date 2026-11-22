@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "field:delivery_key",
+ "creation": "2026-11-22 10:34:50.000000",
  "description": "Tracks records delivered to a mobile installation.",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -53,9 +54,13 @@
   }
  ],
  "links": [],
+ "modified": "2026-11-22 10:34:50.000000",
+ "modified_by": "Administrator",
  "module": "Mobil",
  "name": "Mobile Delivery",
+ "owner": "Administrator",
  "permissions": [],
+ "row_format": "Dynamic",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": []
