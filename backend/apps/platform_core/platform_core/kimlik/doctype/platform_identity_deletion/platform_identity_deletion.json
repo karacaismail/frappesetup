@@ -2,7 +2,7 @@
  "actions": [],
  "autoname": "field:identity_hash",
  "creation": "2026-11-22 11:00:00.000000",
- "description": "Records that an identity was deleted (PROJE-KAYDI.md O-27). It keeps no raw identity: only the HMAC-SHA256 digest of the issuer and subject pair. Provisioning, enabling and e-mail changes check this record first, so a deleted identity cannot come back.",
+ "description": "Records that an identity was deleted (project record O-27). It keeps no raw identity: only the HMAC-SHA256 digest of the issuer and subject pair. Provisioning, enabling and e-mail changes check this record first, so a deleted identity cannot come back.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [

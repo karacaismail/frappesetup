@@ -4,7 +4,7 @@ info:
   version: 0.5.0
   summary: Endpoints for Keycloak sign-in, callback, sign-out and user sync.
   description: |
-    This contract describes the endpoints of the `platform_core.kimlik` module.
+    This contract describes the identity endpoints of the `platform_core` app.
     The rules are in sections 3, 4, 5 and 8 of the `backend/docs/sozlesmeler.md` file.
 
     The goal is this. A user of the tenant site signs in with Keycloak.
@@ -16,7 +16,7 @@ info:
     The built-in Frappe endpoint `login_via_keycloak` is not used. The reason is this.
     The built-in endpoint does not bind `state` to the browser. The built-in endpoint also does not keep the ID token.
     So the Keycloak session id (`sid`) is not available.
-    This file holds only the endpoints written by the platform-core-kimlik work.
+    This file holds only the identity endpoints of `platform_core`.
 
     There are three kinds of identity.
 
@@ -46,7 +46,7 @@ info:
     `platform_core` overrides the tenant `/login` page with its own `www/login` page.
     The page has a brand button. The button label is built from the `kimlik_marka_adi` setting.
     The English source text of the label is “Sign in with {0}”. The brand name fills `{0}`.
-    The Turkish text comes from `translations/tr.csv` with the context `platform_core.kimlik`.
+    The Turkish text comes from `translations/tr.csv`. Its row carries the module context in the third column.
     The button goes to the `start_login` endpoint.
     While the `kimlik_yalniz_keycloak` setting is on, the page has only this button. There is no password form.
     While the setting is off, the page also has a plain password form. The form uses the Frappe `/api/method/login` endpoint.
@@ -67,7 +67,7 @@ info:
     No endpoint does paid work.
 
     Site settings are in the `x-site-settings` extension. Secret values are not in this file.
-    The scope of the local sign-in gate is in the `x-yerel-giris-kapisi` extension.
+    The scope of the local sign-in gate is in the gate extension below the site settings.
   license:
     name: MIT
     identifier: MIT
@@ -132,6 +132,13 @@ x-site-settings:
       example: ["identity-sync"]
       required: false
       note: List of `azp` values accepted in the service token. The default is `["identity-sync"]`.
+    - key: kimlik_deletion_hmac_key
+      example: "(secret, not written in this file)"
+      required: true
+      note: |
+        Secret key of the HMAC-SHA256 digest in the deletion record (docs/sozlesmeler.md section 7, rule 2).
+        It lives only in the site setting and in the `.env` file. Changing it later makes old deletion records unreadable.
+        If it is missing, `anonymize_user`, `provision`, `set_enabled` and `change_email` return 503 `DeletionKeyMissing`.
 
 x-yerel-giris-kapisi:
   description: |
@@ -157,6 +164,7 @@ x-yerel-giris-kapisi:
       - frappe.www.login.login_via_key
       - frappe.www.login.login_via_token
       - frappe.integrations.oauth2_logins.* (built-in social sign-in endpoints)
+      - frappe.integrations.doctype.ldap_settings.ldap_settings.login (LDAP sign-in, it skips `before_login`)
 
 paths:
   /platform_core.api.auth.get_login_url:
@@ -370,15 +378,20 @@ paths:
            An unknown e-mail gets 403. No record is created. The sync service creates the user.
            If the link belongs to another user, it returns 403. If the same e-mail is linked to another `sub` value, it returns 403.
            A disabled user gets 403.
-        7. If the user is an employee, the server checks the `auth_time` value of the ID token (O-25).
+        7. If the user is an employee, the server checks real activity (O-25).
            An employee is a “System User” user with a desk role.
-           If the value is missing or older than 3600 seconds, no session is opened.
-           The server generates a new `state` and sends the browser back to Keycloak with `prompt=login`. The response is 302.
+           If the employee made a real request on this site in the last 3600 seconds, the sign-in continues.
+           Otherwise no session is opened. The server generates a new `state` and records the start time of the new attempt.
+           It sends the browser back to Keycloak with `prompt=login`. The response is 302.
            So an open Keycloak cookie does not skip re-authentication.
-           If the value is still old on this second try, it returns 403. A customer does not go through this step.
+           On this forced attempt the ID token `auth_time` must not be older than the attempt start (30 seconds leeway).
+           If `auth_time` is missing or older, it returns 403. A customer does not go through this step.
         8. The server opens a Frappe session. The Keycloak session id (`sid`) is written to the session data.
            Back-channel logout matches on this value.
-           The session closes after 1 hour without activity. The duration is kept in the session data as `session_expiry`.
+           The session closes after 1 hour without real activity. Background requests do not count.
+           A request is a background request if it carries the `X-Platform-Background: 1` header,
+           or if it calls `frappe.realtime.*`, `frappe.desk.notifications.*`, `frappe.auth.get_logged_user` or `frappe.sessions.get*`.
+           Frappe's own idle limit of 1 hour (`session_expiry`) also stays.
         9. The server redirects the browser to the `redirect_to` path. If the record has no path, it redirects to the `platform_panel_url` address.
 
         If Keycloak cannot be reached or the key list cannot be fetched, it returns 503.
@@ -800,6 +813,8 @@ paths:
                     exc_type: IdentityConflict
                     exception: "platform_core.kimlik.hatalar.IdentityConflict: email"
                     _server_messages: '["{\"message\": \"This e-mail belongs to a desk user and cannot be provisioned.\"}"]'
+        "410":
+          $ref: "#/components/responses/KimlikSilindi"
         "417":
           $ref: "#/components/responses/GovdeBozuk"
         "503":
@@ -856,6 +871,8 @@ paths:
           $ref: "#/components/responses/ServisYetkisiYok"
         "404":
           $ref: "#/components/responses/BagYok"
+        "410":
+          $ref: "#/components/responses/KimlikSilindi"
         "417":
           $ref: "#/components/responses/GovdeBozuk"
         "503":
@@ -926,6 +943,8 @@ paths:
                     exc_type: EmailInUse
                     exception: "platform_core.kimlik.hatalar.EmailInUse: new_email"
                     _server_messages: '["{\"message\": \"The new e-mail address belongs to another user.\"}"]'
+        "410":
+          $ref: "#/components/responses/KimlikSilindi"
         "417":
           $ref: "#/components/responses/GovdeBozuk"
         "503":
@@ -940,23 +959,39 @@ paths:
         The sync service calls this endpoint in step 4 of the account deletion flow (project record O-27).
         The service token must carry `azp=identity-sync`.
 
-        **This endpoint cannot be undone.** The user is disabled. All sessions of the user close.
-        The user name is changed to an anonymous name of the form `deleted-user-<number>@<site>`.
-        The fields that identify the person are anonymized. For example first name, last name, phone and e-mail.
-        Business records are not deleted. For example a leave request stays. The person field in the request changes to the anonymous name.
+        **This endpoint cannot be undone.** The rules are in docs/sozlesmeler.md section 7, anonymization rules.
+        The same rules apply in Press (`press_tr.api.identity.anonymize_user`).
 
-        The endpoint uses the built-in anonymization path of Frappe 16.
-        Each app lists the fields to anonymize in its own `user_data_fields` hook.
-        The hooks of Frappe, ERPNext and the other installed apps are applied together.
-        The server creates one “Personal Data Deletion Request” record for each request.
-        The record keeps a trace of the work. When the work is done, the record status is “Deleted”. The original e-mail does not stay in the record.
-        The Frappe e-mail confirmation and admin approval steps are not used. No e-mail goes to the user.
+        The work has two steps. Both steps are safe to repeat.
+
+        1. Step 1 locks the identity link and the deletion record. It disables the user.
+           It deletes the API key, the API secret and the stored password.
+           It writes the deletion record with state “Disabled” and commits.
+           Then it closes every session of the user, page by page. Frappe returns at most 100 sessions per query.
+        2. Step 2 locks the same rows again. It anonymizes the personal data.
+           It renames the user to `deleted-user-<16 hex characters>@deleted.invalid`.
+           It deletes the identity link, so the raw `sub` value is gone.
+           It sets the record state to “Anonymized”.
+
+        The deletion record is the “Platform Identity Deletion” DocType. It does not keep the raw identity.
+        It keeps the HMAC-SHA256 digest of the `(issuer, subject)` pair. The key is the `kimlik_deletion_hmac_key` site setting.
+        `provision`, `set_enabled` and `change_email` check this record first and take the same row locks.
+        A deleted identity gets 410 `IdentityDeleted` there. It cannot be provisioned, enabled or renamed again.
+        This holds already after step 1. Sign-in with a deleted identity gets 403.
+
+        The scope comes from the `user_data_fields` hooks of all installed apps, plus the extra records in rule 4.
+        Only rows bound to the user change. Frappe's full-name search over every row is not used.
+        So another person with the same name keeps their data.
+        Business records are not deleted. For example a leave request stays. Its person field changes to the anonymous name.
+        Frappe's “Personal Data Deletion Request” is not used. No e-mail goes to the user.
         The sync service got the consent with the account deletion request.
 
-        The identity link is not deleted. The link points to the anonymous user.
-        If the same request comes a second time, the endpoint changes nothing. The endpoint returns the body of the first request.
-        If the `(issuer, subject)` link does not exist, it returns 404. The sync service reads the 404 response as “no user on this site”.
+        If step 2 fails, its changes roll back. The record stays “Disabled”. A retry finishes the work.
+        Two calls at the same time finish once. The second call returns the same body.
+        If the request comes again after the work is done, it returns the same body.
+        If neither the `(issuer, subject)` link nor a deletion record exists, it returns 404. The sync service reads 404 as “no user on this site”.
         The `Administrator` and `Guest` accounts cannot be anonymized. In this case it returns 409.
+        If the `kimlik_deletion_hmac_key` setting is missing, it returns 503 `DeletionKeyMissing`. Nothing changes.
         The request body is at most 16 KB.
       x-yikici: true
       security:
@@ -987,9 +1022,9 @@ paths:
                 anonim:
                   value:
                     message:
-                      user: deleted-user-0001@kiraci1.localhost
+                      user: deleted-user-3f9a1c7e5b2d8f40@deleted.invalid
                       enabled: false
-                      status: Deleted
+                      status: Anonymized
         "400":
           $ref: "#/components/responses/GirdiGecersiz"
         "401":
@@ -1010,596 +1045,928 @@ paths:
               schema: {$ref: "#/components/schemas/FrappeError"}
         "417":
           $ref: "#/components/responses/GovdeBozuk"
+        "410":
+          $ref: "#/components/responses/KimlikSilindi"
         "503":
-          $ref: "#/components/responses/AnahtarListesiYok"
+          description: |
+            Either the identity provider keys are not available (`KeycloakKeysUnavailable`),
+            or the `kimlik_deletion_hmac_key` setting is missing (`DeletionKeyMissing`).
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
 
   /platform_core.kimlik.login_policy.reset_password:
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedResetPassword
-      summary: Closed local sign-in function. The original function is the `frappe.core.doctype.user.user.reset_password` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.core.doctype.user.user.reset_password`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.reset_password`. The original function does this. It requests a password reset e-mail.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.core.doctype.user.user.reset_password` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.reset_password`. It requests a password reset e-mail.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.core.doctype.user.user.reset_password` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.core.doctype.user.user.reset_password
+      x-frappe-original: [frappe.core.doctype.user.user.reset_password]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.update_password:
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedUpdatePassword
-      summary: Closed local sign-in function. The original function is the `frappe.core.doctype.user.user.update_password` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.core.doctype.user.user.update_password`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.update_password`. The original function does this. It writes the new password.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.core.doctype.user.user.update_password` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.update_password`. It writes a new password.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.core.doctype.user.user.update_password` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.core.doctype.user.user.update_password
+      x-frappe-original: [frappe.core.doctype.user.user.update_password]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.sign_up:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedSignUpGet
-      summary: Closed local sign-in function. The original function is the `frappe.core.doctype.user.user.sign_up` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.core.doctype.user.user.sign_up`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.sign_up`. The original function does this. It creates a new account.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.core.doctype.user.user.sign_up` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.sign_up`. It creates a new account.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.core.doctype.user.user.sign_up` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.core.doctype.user.user.sign_up
+      x-frappe-original: [frappe.core.doctype.user.user.sign_up]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedSignUpPost
-      summary: Closed local sign-in function. The original function is the `frappe.core.doctype.user.user.sign_up` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.core.doctype.user.user.sign_up`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.sign_up`. The original function does this. It creates a new account.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.core.doctype.user.user.sign_up` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.core.doctype.user.user.sign_up`. It creates a new account.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.core.doctype.user.user.sign_up` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.core.doctype.user.user.sign_up
+      x-frappe-original: [frappe.core.doctype.user.user.sign_up]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.send_login_link:
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedSendLoginLink
-      summary: Closed local sign-in function. The original function is the `frappe.www.login.send_login_link` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.www.login.send_login_link`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.send_login_link`. The original function does this. It sends a sign-in link by e-mail.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.www.login.send_login_link` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.send_login_link`. It sends a sign-in link by e-mail.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.www.login.send_login_link` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.www.login.send_login_link
+      x-frappe-original: [frappe.www.login.send_login_link]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.login_via_key:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaKey
-      summary: Closed local sign-in function. The original function is the `frappe.www.login.login_via_key` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.www.login.login_via_key`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.login_via_key`. The original function does this. It signs in with the key from the e-mail.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.www.login.login_via_key` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.login_via_key`. It signs in with the key from the e-mail.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.www.login.login_via_key` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.www.login.login_via_key
+      x-frappe-original: [frappe.www.login.login_via_key]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.login_via_token:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaTokenGet
-      summary: Closed local sign-in function. The original function is the `frappe.www.login.login_via_token` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.www.login.login_via_token`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.login_via_token`. The original function does this. It signs in with a login token.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.www.login.login_via_token` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.login_via_token`. It signs in with a sign-in token.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.www.login.login_via_token` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.www.login.login_via_token
+      x-frappe-original: [frappe.www.login.login_via_token]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaTokenPost
-      summary: Closed local sign-in function. The original function is the `frappe.www.login.login_via_token` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.www.login.login_via_token`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.login_via_token`. The original function does this. It signs in with a login token.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.www.login.login_via_token` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.www.login.login_via_token`. It signs in with a sign-in token.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.www.login.login_via_token` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.www.login.login_via_token
+      x-frappe-original: [frappe.www.login.login_via_token]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.login_via_google:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaGoogleGet
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_google` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_google`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_google`. The original function does this. It signs in with Google.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_google` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_google`. It signs in with Google.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_google` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_google
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_google]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaGooglePost
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_google` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_google`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_google`. The original function does this. It signs in with Google.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_google` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_google`. It signs in with Google.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_google` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_google
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_google]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.login_via_github:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaGithubGet
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_github` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_github`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_github`. The original function does this. It signs in with GitHub.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_github` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_github`. It signs in with GitHub.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_github` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_github
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_github]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaGithubPost
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_github` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_github`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_github`. The original function does this. It signs in with GitHub.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_github` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_github`. It signs in with GitHub.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_github` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_github
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_github]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.login_via_facebook:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFacebookGet
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_facebook` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_facebook`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_facebook`. The original function does this. It signs in with Facebook.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_facebook` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_facebook`. It signs in with Facebook.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_facebook` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_facebook
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_facebook]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFacebookPost
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_facebook` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_facebook`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_facebook`. The original function does this. It signs in with Facebook.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_facebook` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_facebook`. It signs in with Facebook.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_facebook` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_facebook
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_facebook]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.login_via_frappe:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFrappeGet
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_frappe` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_frappe`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_frappe`. The original function does this. It signs in with a Frappe account.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_frappe` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_frappe`. It signs in with a Frappe account.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_frappe` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_frappe
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_frappe]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFrappePost
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_frappe` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_frappe`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_frappe`. The original function does this. It signs in with a Frappe account.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_frappe` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_frappe`. It signs in with a Frappe account.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_frappe` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_frappe
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_frappe]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.login_via_office365:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaOffice365Get
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_office365` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_office365`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_office365`. The original function does this. It signs in with Office 365.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_office365` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_office365`. It signs in with Office 365.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_office365` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_office365
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_office365]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaOffice365Post
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_office365` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_office365`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_office365`. The original function does this. It signs in with Office 365.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_office365` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_office365`. It signs in with Office 365.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_office365` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_office365
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_office365]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.login_via_salesforce:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaSalesforceGet
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_salesforce` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_salesforce`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_salesforce`. The original function does this. It signs in with Salesforce.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_salesforce` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_salesforce`. It signs in with Salesforce.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_salesforce` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_salesforce
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_salesforce]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaSalesforcePost
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_salesforce` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_salesforce`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_salesforce`. The original function does this. It signs in with Salesforce.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_salesforce` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_salesforce`. It signs in with Salesforce.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_salesforce` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_salesforce
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_salesforce]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.login_via_fairlogin:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFairloginGet
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_fairlogin` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_fairlogin`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_fairlogin`. The original function does this. It signs in with FairLogin.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_fairlogin` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_fairlogin`. It signs in with FairLogin.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_fairlogin` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_fairlogin
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_fairlogin]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaFairloginPost
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_fairlogin` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_fairlogin`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_fairlogin`. The original function does this. It signs in with FairLogin.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_fairlogin` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_fairlogin`. It signs in with FairLogin.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_fairlogin` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_fairlogin
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_fairlogin]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.login_via_keycloak:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaKeycloakGet
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_keycloak` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_keycloak`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_keycloak`. The original function does this. It is the built-in Frappe Keycloak callback endpoint.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_keycloak`. It is Frappe's built-in Keycloak callback.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_keycloak
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_keycloak]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedLoginViaKeycloakPost
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.login_via_keycloak` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.login_via_keycloak`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_keycloak`. The original function does this. It is the built-in Frappe Keycloak callback endpoint.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.login_via_keycloak`. It is Frappe's built-in Keycloak callback.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.login_via_keycloak
+      x-frappe-original: [frappe.integrations.oauth2_logins.login_via_keycloak]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
   /platform_core.kimlik.login_policy.custom:
     get:
       tags: [yerel-giris-kapisi]
       operationId: gatedCustomGet
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.custom` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.custom`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.custom`. The original function does this. It is the callback endpoint of a custom provider.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.custom` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.custom`. It is the callback of a custom provider.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.custom` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.custom
+      x-frappe-original: [frappe.integrations.oauth2_logins.custom]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
     post:
       tags: [yerel-giris-kapisi]
       operationId: gatedCustomPost
-      summary: Closed local sign-in function. The original function is the `frappe.integrations.oauth2_logins.custom` endpoint.
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.oauth2_logins.custom`.
       description: |
-        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.custom`. The original function does this. It is the callback endpoint of a custom provider.
-        The `override_whitelisted_methods` hook routes the Frappe path to this function.
-        So a call to `/api/method/frappe.integrations.oauth2_logins.custom` also gets the same response.
-        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are also covered.
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.oauth2_logins.custom`. It is the callback of a custom provider.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.oauth2_logins.custom` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
 
         While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
         Calls with and without sign-in get the same response. The endpoint changes no record.
         While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
         The scope is in the `x-yerel-giris-kapisi` extension.
       x-yikici: false
-      x-frappe-original: frappe.integrations.oauth2_logins.custom
+      x-frappe-original: [frappe.integrations.oauth2_logins.custom]
       security: []
       responses:
         "403":
           $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         default:
-          description: Response of the original Frappe function while the gate is off. This contract does not define that response.
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
+  /platform_core.kimlik.login_policy.ldap_login:
+    get:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLdapLoginGet
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.doctype.ldap_settings.ldap_settings.login`.
+      description: |
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.doctype.ldap_settings.ldap_settings.login`. It signs in with the LDAP directory of the organization.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.doctype.ldap_settings.ldap_settings.login` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
+
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
+        The scope is in the `x-yerel-giris-kapisi` extension.
+      x-yikici: false
+      x-frappe-original: [frappe.integrations.doctype.ldap_settings.ldap_settings.login]
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
+        default:
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
+    post:
+      tags: [yerel-giris-kapisi]
+      operationId: gatedLdapLoginPost
+      summary: Closed local sign-in function. It replaces the Frappe function `frappe.integrations.doctype.ldap_settings.ldap_settings.login`.
+      description: |
+        This endpoint is a gated wrapper of the Frappe function `frappe.integrations.doctype.ldap_settings.ldap_settings.login`. It signs in with the LDAP directory of the organization.
+        The `override_whitelisted_methods` hook routes the Frappe address to this function.
+        So `/api/method/frappe.integrations.doctype.ldap_settings.ldap_settings.login` gets the same response. The address is listed in `x-frappe-original`.
+        The `/api/v1/method`, `/api/v2/method` and `cmd` forms are covered too.
+
+        While the `kimlik_yalniz_keycloak` setting is 1, the endpoint returns 403 and `PermissionError` on every call.
+        Calls with and without sign-in get the same response. The endpoint changes no record.
+        While the setting is 0, the endpoint calls the original Frappe function with the same parameters. The response is the Frappe response.
+        Allowed HTTP methods: GET, POST. Other methods are refused by Frappe.
+        At most 20 requests per minute are accepted from the same IP address. Extra requests get 429.
+        The request body is at most 16 KB. A larger body gets 413.
+        The scope is in the `x-yerel-giris-kapisi` extension.
+      x-yikici: false
+      x-frappe-original: [frappe.integrations.doctype.ldap_settings.ldap_settings.login]
+      security: []
+      responses:
+        "403":
+          $ref: "#/components/responses/YerelGirisKapali"
+        "413":
+          description: The request body is larger than 16 KB. The `exc_type` value is `PayloadTooLarge`.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FrappeError"}
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
+        default:
+          description: While the gate is off, the response of the original Frappe function. This contract does not define it.
 
 components:
   securitySchemes:
@@ -1658,9 +2025,23 @@ components:
       content:
         application/json:
           schema: {$ref: "#/components/schemas/FrappeError"}
+    KimlikSilindi:
+      description: |
+        The identity `(issuer, subject)` was deleted. The `exc_type` value is `IdentityDeleted`.
+        The deletion record is checked first, under the same row locks as the deletion (docs/sozlesmeler.md section 7, rule 3).
+        If the `kimlik_deletion_hmac_key` setting is missing, the endpoint returns 503 `DeletionKeyMissing` instead.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/FrappeError"}
+          examples:
+            silindi:
+              value:
+                exc_type: IdentityDeleted
+                exception: "platform_core.kimlik.exceptions.IdentityDeleted: This identity was deleted and cannot be used again."
     OturumBitti:
       description: |
-        The session has expired. The user did nothing for 1 hour or the session was closed (O-25).
+        The session has expired. The user made no real request for 1 hour or the session was closed (O-25).
+        Background requests do not renew the time. The rule is in step 8 of `keycloak_callback`.
         The `exc_type` value is the Frappe value `SessionExpired`. Frappe deletes the `sid` cookie.
         This response is not a permission denial. The client sends the user to the sign-in page (SZ-8).
         If there is no cookie at all, this response is not returned. In that case it returns 403 and `PermissionError`.
@@ -1963,8 +2344,8 @@ components:
           description: The user is always disabled.
         status:
           type: string
-          const: Deleted
-          description: The latest status of the “Personal Data Deletion Request” record.
+          const: Anonymized
+          description: The state of the “Platform Identity Deletion” record. The response comes only after step 2.
 
     ChangeEmailResult:
       type: object

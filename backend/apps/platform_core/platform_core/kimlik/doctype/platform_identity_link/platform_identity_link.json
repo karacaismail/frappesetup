@@ -12,7 +12,7 @@
  ],
  "fields": [
   {
-   "description": "Identity provider address as written in the token's iss claim, for example http://kimlik.localhost:8660/realms/platform. Together with Subject it is unique.",
+   "description": "Identity provider address as written in the token's iss claim, for example https://idp.example.test/realms/platform. Together with Subject it is unique.",
    "fieldname": "issuer",
    "fieldtype": "Data",
    "in_list_view": 1,
