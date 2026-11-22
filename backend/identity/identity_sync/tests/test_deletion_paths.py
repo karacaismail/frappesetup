@@ -29,6 +29,7 @@ DELETE_EVENT = {"id": "e-del", "kind": "admin", "type": "USER_DELETE", "realm": 
 class DeletionPathsTest(ServerCase):
     def setUp(self) -> None:
         super().setUp()
+        fakes.without_repeat_spacing(self)
         issuer = self.stack.issuer
         self.stack.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID, api_keys=1)
         self.stack.tenant.seed_user(issuer, SUBJECT, "ayse@example.test")

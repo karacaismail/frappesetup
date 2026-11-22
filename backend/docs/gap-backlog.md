@@ -43,6 +43,8 @@ Kurallar şunlardır:
 2. `POST /v1/sessions/revoke` ucunu yazın (sözleşme 7. bölüm).
 3. Hesap silme akışını yazın (`POST /v1/account-deletions`, O-27).
 4. Kapatılan kullanıcının telefon kurulumları da iptal edilsin.
+5. `BORC(mvp)`: Bazı veritabanı okumaları son ana bağlı değildir. Örnekler `is_processed`, `dead_letter_state` ve `progress` okumalarıdır. Başka bir süreç yazarken bu okumalar en çok 5 saniye bekleyebilir. Yazmalar, iş ayırma ve kuyruk sorgusu son ana bağlıdır (inceleme 19). Kabul ölçütü şudur: iki bağlantılı bir test, okuma beklerken de olay yanıtının 5 saniyelik sınırı aşmadığını gösterir.
+6. `BORC(mvp)`: Gerçek TLS sunucusuyla süre denemesi yapılmadı. TLS kurulumu bağlantının kalan süresiyle bekler. Kabul ölçütü şudur: yavaş el sıkışan bir test sunucusuyla istek son anda biter.
 
 ## press-tr
 

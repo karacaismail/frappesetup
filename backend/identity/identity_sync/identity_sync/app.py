@@ -138,8 +138,12 @@ def build_app(settings: Settings, *, sleep: Callable[[float], object] = time.sle
         admin_scope=settings.admin_scope,
         timeout=settings.http_timeout,
     )
-    press = PressClient(settings.press_url, tokens, timeout=settings.http_timeout)
-    tenant_client = TenantClient(settings.tenants, tokens, timeout=settings.http_timeout)
+    press = PressClient(
+        settings.press_url, tokens, timeout=settings.http_timeout, anonymize_timeout=settings.anonymize_timeout
+    )
+    tenant_client = TenantClient(
+        settings.tenants, tokens, timeout=settings.http_timeout, anonymize_timeout=settings.anonymize_timeout
+    )
     processor = Processor(
         issuer=settings.issuer,
         realm=settings.realm,
@@ -150,5 +154,6 @@ def build_app(settings: Settings, *, sleep: Callable[[float], object] = time.sle
         store=store,
         digest_key=settings.digest_key.encode("utf-8"),
         sleep=sleep,
+        anonymize_timeout=settings.anonymize_timeout,
     )
     return App(settings, store, keycloak, press, tenant_client, processor)

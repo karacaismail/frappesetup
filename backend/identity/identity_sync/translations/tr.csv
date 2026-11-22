@@ -261,8 +261,8 @@ The shared contract defines the response: 200 with the `anonymized` and `found` 
 The endpoint disables the user and anonymizes the fields that identify the person. It does not delete business records.
 The endpoint in Press also invalidates the API keys.
 The request carries the `issuer` and `subject` fields. A repeated call gets the same response.
-If the endpoint does not know the identity, `found` is false. The service counts this response as success.
-Any HTTP 404 from either anonymize endpoint is a failure. The service stops the deletion flow.
+If the endpoint does not know the identity, it returns 200 with `found` false. The service counts this response as success.
+A 404 is not a result (project record O-43). The service keeps the job `unknown` and does not delete the Keycloak user.
 The endpoint returns 409 for a lock conflict or a timeout. The service then tries the request again.
 If a field is missing, the service does not know the result and does not continue with the next step.
 ","`platform_core.api.identity.anonymize_user` ve `press_tr.api.identity.anonymize_user` uçlarından beklenen yanıt.
@@ -271,8 +271,8 @@ Ortak sözleşme yanıtı tanımlar: 200 ile `anonymized` ve `found` alanları.
 Uç kullanıcıyı kapatır ve kişiyi gösteren alanları anonim yapar. İş kayıtlarını silmez.
 Press'teki uç API anahtarlarını da geçersiz yapar.
 İstek `issuer` ve `subject` alanlarını taşır. Tekrar çağrı aynı yanıtı alır.
-Uç kimliği tanımıyorsa `found` yanlış olur. Servis bu yanıtı başarı sayar.
-Anonim yapma isteği HTTP 404 dönerse servis silme akışını durdurur.
+Uç kimliği tanımıyorsa 200 ile `found` yanlış döner. Servis bu yanıtı başarı sayar.
+404 cevabı sonuç değildir (proje kaydı O-43). Servis işi `unknown` bırakır ve Keycloak kullanıcısını silmez.
 Uç kilit çakışmasında ya da zaman aşımında 409 döner. Servis o zaman isteği yeniden dener.
 Bir alan eksikse servis sonucu bilmez ve sonraki adıma geçmez.
 ",identity_sync.openapi.yaml: components.schemas.TargetAnonymizeUserResult.description
@@ -540,6 +540,60 @@ The shared contract defines the response of the two anonymize endpoints: 200 wit
 These endpoints return 409 for a lock conflict or a timeout. The service then tries the request again.
 The responses the service expects are in the `Target` schemas at the end of this file.
 
+### Timeout of an anonymize call (H-5)
+
+An anonymize call takes longer than the other calls. The tenant renames the user and closes every session.
+The `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` setting is the wait for this call. The default is 30 seconds, at most 80.
+The other calls use `IDENTITY_SYNC_HTTP_TIMEOUT`, 10 seconds by default.
+
+A deletion request carries one deadline, `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` after it starts.
+Name lookups, connections and TLS handshakes end at that deadline.
+So do the wait for the work lock, every database wait, every network read and every retry pause.
+A database wait has two parts: the shared connection and the database file. Together they end at the deadline.
+The outcome records share one later end, 5 seconds after the deadline. All of them together stay within it.
+So the service answers within `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 5 seconds: 35 seconds by default, 85 at most.
+Press waits at most 90 seconds. When Press stops waiting, it tells the customer that the deletion is in progress.
+When the work lock does not come free in time, the reply is 503 `busy` and the job does not start.
+
+A step can stop halfway, for example when a reply is late. The job then waits in the dead-letter queue.
+Its state is `unknown` when the result is not known.
+Every step of the deletion job can be repeated. A repeated call for the same identity gets the same reply.
+So the service calls the unfinished step again. It never concludes a result from an identity list.
+An anonymize step is done only on HTTP 200 with `anonymized` and `found`, both booleans.
+The step is done when `anonymized` is true, or `found` is false. An unknown identity gets 200 with `found` false.
+A 404 is not a result (project record O-43). The job stays `unknown` and the Keycloak user is not deleted.
+A reply with a missing field or a wrong type also keeps the job `unknown`.
+When the step is done, the job goes on from the next step. Step 5 deletes the Keycloak user.
+
+The service continues the job in two places: the next `POST /v1/account-deletions` request for the account,
+and every event handled by `POST /v1/events`.
+Both places keep a count and spacing limit, also after a definite failure.
+One job is tried at most 5 times. The timed-out request counts as one try. Two tries are at least 30 seconds apart.
+When a limit is reached, the service calls no target. The reply gives the queue state: `dead_lettered` or `unknown`.
+A human replay with `include_unknown` and an approved reconcile skip the limits.
+When every step is finished and only the final record is missing, no limit applies: no target is called.
+
+The event path has one deadline too, 5 seconds after the event is handled.
+The queue read, the claims, the connections, every network read and every retry pause end at that deadline.
+The outcome records share the same later end as in a deletion request.
+The database picks only jobs that may be tried now, at most 3 per event. A long queue is never read in full.
+The queue query itself stops at the deadline, even when it finds no job.
+The service does not hold the work lock while it calls a target. Other processes, for example a replay command, do not wait.
+The service handles HTTP requests one at a time, so the 5-second limit also bounds the wait of the next request.
+
+Two calls for the same job never run at the same time. Before each try the service claims the job.
+The claim and the completion check are one database step. A job another process finished is not run again.
+When another process holds the claim, the service leaves the job alone and replies with the queue state.
+Before every external write the service extends the claim to `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 30 seconds from that moment.
+Every retry of a step, for example after a 409, is a new write and extends the claim again.
+So the claim also covers a last call that starts late in the request.
+After an unknown outcome the claim stays: the target may still work on the last call. No second call goes out meanwhile.
+The claim ends by itself at that time, so a crashed process cannot keep it.
+If a target works even longer, a second call may rarely go out. It does not damage data:
+the target returns the same result for the same identity and takes a row lock.
+There is no scheduled job. When the tries are used up, the job stays in the queue.
+A human then checks the target and replays the job with `include_unknown`.
+
 ## Common errors of all endpoints
 
 These errors are not written separately on every endpoint.
@@ -572,6 +626,7 @@ A 202, an empty body or a body that does not fit the schema is not success.
 For a user with no tenant link, the tenant returns 404 and `IdentityNotFound`.
 The service counts this response as success in two operations. They are disabling the user and changing the email.
 The reason is that without a link there is no record to disable or to rename.
+The anonymize call is not one of them. There a 404 is not a result (project record O-43).
 If the `exc_type` field is not `IdentityNotFound`, a 404 is an error. A wrong address also returns 404.
 
 In the tenant the service calls `change_email` first and `provision` after it.
@@ -729,6 +784,60 @@ Ortak sözleşme iki anonim yapma ucunun yanıtını tanımlar: 200 ile `anonymi
 Bu uçlar kilit çakışmasında ya da zaman aşımında 409 döner. Servis o zaman isteği yeniden dener.
 Servisin beklediği yanıtlar bu dosyanın sonundaki `Target` şemalarındadır.
 
+### Anonim yapma çağrısında zaman aşımı (H-5)
+
+Anonim yapma çağrısı öteki çağrılardan uzun sürer. Kiracı kullanıcının adını değiştirir ve bütün oturumlarını kapatır.
+Bu çağrının bekleme süresi `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` ayarındadır. Varsayılan değer 30 saniyedir, en çok 80 saniyedir.
+Öteki çağrılar `IDENTITY_SYNC_HTTP_TIMEOUT` ayarını kullanır. Bu ayarın varsayılanı 10 saniyedir.
+
+Silme isteği tek bir son an taşır. Son an istek başladıktan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` sonra gelir.
+Adres çözümü, bağlantı kurulumu ve TLS kurulumu bu son anı aşmaz.
+İş kilidi beklemesi, veritabanı beklemeleri, ağ okumaları ve yeniden deneme araları da bu son anı aşmaz.
+Veritabanı beklemesi iki kilitten oluşur: ortak bağlantı ve veritabanı dosyası. İki bekleme birlikte bu son anı aşmaz.
+Sonuç kayıtları ortak ve daha geç bir son an kullanır. Bu son an ilk son andan 5 saniye sonra gelir. Bütün kayıtlar birlikte bu süreyi aşmaz.
+Bu yüzden servis en geç `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 5 saniyede cevap verir. Bu süre varsayılan olarak 35, en çok 85 saniyedir.
+Press en çok 90 saniye bekler. Press beklemeyi bırakınca müşteriye silmenin sürdüğünü söyler.
+İş kilidi zamanında boşalmazsa cevap 503 ve `busy` olur. İş o zaman başlamaz.
+
+Bir adım yarıda kalabilir. Örneğin bir cevap gecikir. İş o zaman bekleme kuyruğunda bekler.
+Sonuç belli değilse durum `unknown` olur.
+Silme işinin her adımı tekrar edilebilir. Aynı kimlik için yinelenen çağrı aynı cevabı alır.
+Servis bu yüzden bitmemiş adımı yeniden çağırır. Servis kimlik listesinden sonuç çıkarmaz.
+Anonim yapma adımı yalnız HTTP 200 cevabıyla biter. Cevap `anonymized` ve `found` alanlarını mantıksal değer olarak taşır.
+Adım, `anonymized` doğru ya da `found` yanlış olunca biter. Bilinmeyen kimlik 200 ile `found` yanlış alır.
+404 cevabı sonuç değildir (proje kaydı O-43). İş `unknown` kalır ve Keycloak kullanıcısı silinmez.
+Alanı eksik ya da türü yanlış cevap da işi `unknown` bırakır.
+Adım bitince iş sonraki adımdan sürer. 5. adım Keycloak kullanıcısını siler.
+
+Servis işi iki yerde sürdürür: hesabın bir sonraki `POST /v1/account-deletions` isteğinde
+ve `POST /v1/events` ucunun işlediği her olayda.
+İki yerde de sayı ve ara sınırı vardır. Sınır kesin bir hatadan sonra da geçerlidir.
+Bir iş en çok 5 kez denenir. Zaman aşımına uğrayan istek de bir deneme sayılır. İki deneme arasında en az 30 saniye geçer.
+Sınır dolunca servis hedefi çağırmaz. Cevap işin kuyruktaki durumunu verir: `dead_lettered` ya da `unknown`.
+`include_unknown` ile yapılan insan işletmesi ve onaylı mutabakat sınırları uygulamaz.
+Bütün adımlar bitmiş ve yalnız son kayıt eksikse sınır yoktur. Bu durumda hedefe çağrı gitmez.
+
+Olay yolunun da tek bir son anı vardır. Son an olay işlendikten 5 saniye sonra gelir.
+Kuyruk okuması, iş ayırma, bağlantılar, ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
+Sonuç kayıtları silme isteğindeki gibi ortak ve daha geç bir son an kullanır.
+Veritabanı yalnız şu anda denenebilecek işleri seçer. Bir olay en çok 3 iş okur. Uzun kuyruk baştan sona okunmaz.
+Kuyruk sorgusu da son anda durur. Uygun iş bulamasa bile süreyi aşmaz.
+Servis hedefi çağırırken iş kilidini tutmaz. Öteki süreçler, örneğin yeniden işletme komutu, beklemez.
+Servis HTTP isteklerini sırayla işler. Bu yüzden 5 saniyelik sınır sonraki isteğin beklemesini de sınırlar.
+
+Aynı iş için iki çağrı aynı anda çalışmaz. Servis her denemeden önce işi kendine ayırır.
+Ayırma ve tamamlanma denetimi aynı veritabanı adımıdır. Başka bir sürecin bitirdiği iş yeniden çalışmaz.
+İşi başka bir süreç ayırdıysa servis işe dokunmaz. Cevap işin kuyruktaki durumunu verir.
+Servis her dış yazmadan önce ayırmayı uzatır. Ayırma o andan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 30 saniye sürer.
+Bir adımın her yeniden denemesi de yeni bir yazmadır. Örneğin 409 cevabından sonraki deneme ayırmayı yeniden uzatır.
+Böylece ayırma, istekte geç başlayan son çağrıyı da kapsar.
+Sonuç belirsizse ayırma kalkmaz. Hedef son çağrı üzerinde hâlâ çalışıyor olabilir. Bu sürede ikinci çağrı gitmez.
+Ayırma bu sürenin sonunda kendiliğinden biter. Böylece çöken süreç işi tutamaz.
+Hedef bundan da uzun çalışırsa nadiren ikinci bir çağrı gidebilir. Bu çağrı veriyi bozmaz.
+Hedef aynı kimlik için aynı sonucu verir ve satır kilidi alır.
+Zamanlanmış iş yoktur. Denemeler biterse iş kuyrukta kalır.
+İnsan o zaman hedefi denetler. Sonra işi `include_unknown` ile yeniden işletir.
+
 ## Bütün uçların ortak hataları
 
 Bu hatalar her uçta ayrıca yazılmadı.
@@ -761,6 +870,7 @@ Hedef işi yanıt vermeden önce bitirmiş olmalıdır.
 Kiracı bağı olmayan kullanıcı için 404 ve `IdentityNotFound` döner.
 Servis bu yanıtı iki işte başarı sayar: kullanıcıyı kapatma ve e-postayı değiştirme.
 Çünkü bağ yoksa kapatılacak ya da adı değişecek kayıt yoktur.
+Anonim yapma çağrısı bunlardan biri değildir. Orada 404 sonuç sayılmaz (proje kaydı O-43).
 `exc_type` alanı `IdentityNotFound` değilse 404 bir hatadır. Yanlış adres de 404 döner.
 
 Servis kiracıda önce `change_email`, sonra `provision` çağırır.
@@ -813,6 +923,9 @@ The service records the request before it starts the work. The id of the request
 If a step fails, the response is still 200 and the status is `dead_lettered` or `unknown`. No later step is executed.
 The request is then in the dead-letter queue. A human replays the request with `POST /v1/dead-letters/replay`.
 Press can also send the same request again. The service continues from the first step that is not finished.
+The service answers within `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 5 seconds: 35 seconds by default, 85 at most. Press waits at most 90 seconds.
+A step that did not finish in that time stays queued. A later request or event continues the job.
+The rules are in the section ""Timeout of an anonymize call"" at the start of this file.
 ","Kaynak ortak sözleşmenin 7. bölümü ve proje kaydının O-27 kararıdır.
 Müşteri kendi hesabının silinmesini Press'te ister. Press o zaman bu ucu çağırır.
 Servis isteği kaydeder ve beş adımı sırayla yürütür.
@@ -831,6 +944,9 @@ Servis isteği işe başlamadan önce kaydeder. İsteğin kimliği hesabın anah
 Bir adım başarısız olursa yanıt yine 200 olur ve durum `dead_lettered` ya da `unknown` olur. Sonraki adımlar yürümez.
 İstek o zaman bekleme kuyruğundadır. İnsan isteği `POST /v1/dead-letters/replay` ile yeniden işletir.
 Press de aynı isteği yeniden gönderebilir. Servis bitmemiş ilk adımdan sürdürür.
+Servis en geç `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 5 saniyede cevap verir. Bu süre varsayılan olarak 35, en çok 85 saniyedir. Press en çok 90 saniye bekler.
+Bu sürede bitmeyen adım kuyrukta kalır. Sonraki bir istek ya da olay işi sürdürür.
+Kurallar bu dosyanın başındaki ""Anonim yapma çağrısında zaman aşımı"" bölümündedir.
 ",identity_sync.openapi.yaml: paths./v1/account-deletions.post.description
 "The result of the request. The status is `processed`, `dead_lettered`, `unknown` or `duplicate`.","İsteğin sonucu. Durum `processed`, `dead_lettered`, `unknown` ya da `duplicate` olur.",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.200.description
 "The body is invalid. For example, a field is missing, the body carries another field or `issuer` is not the issuer of the realm.","Gövde geçersiz. Örneğin bir alan eksiktir, gövde başka bir alan taşır ya da `issuer` realm'in yayıncı adresi değildir.",identity_sync.openapi.yaml: paths./v1/account-deletions.post.responses.400.description

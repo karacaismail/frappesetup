@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
 import unittest
 
 from identity_sync.events import Event
@@ -312,3 +313,116 @@ class StoreTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RepeatClaimTest(unittest.TestCase):
+    """Inceleme 18: the claim of a job repeat and the completion check are one database step."""
+
+    def setUp(self) -> None:
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.path = os.path.join(self.dir.name, "identity_sync.sqlite3")
+        self.now = 100.0
+
+    def open(self) -> Store:
+        store = Store(self.path, clock=lambda: self.now)
+        self.addCleanup(store.close)
+        return store
+
+    def test_claim_sees_a_job_another_connection_finished(self) -> None:
+        first, second = self.open(), self.open()
+        # The first connection read the job as unfinished. The second one finishes it meanwhile.
+        self.assertFalse(first.is_processed("del-1"))
+        second.mark_processed("del-1", "processed")
+
+        self.assertEqual(first.claim_repeat("del-1", hold=10.0), "done")
+        self.assertFalse(first.repeat_claimed("del-1"))
+
+    def test_claim_is_exclusive_across_connections(self) -> None:
+        first, second = self.open(), self.open()
+        self.assertEqual(first.claim_repeat("del-1", hold=10.0), "claimed")
+        self.assertEqual(second.claim_repeat("del-1", hold=10.0), "busy")
+        self.now += 11.0  # the hold ran out, for example after a crash
+        self.assertEqual(second.claim_repeat("del-1", hold=10.0), "claimed")
+
+    def test_limits_refuse_a_claim_too_soon_or_too_often(self) -> None:
+        store = self.open()
+        self.assertEqual(store.claim_repeat("del-1", hold=1.0, max_attempts=2, min_interval=30.0), "claimed")
+        store.release_repeat("del-1")
+        self.assertEqual(store.claim_repeat("del-1", hold=1.0, max_attempts=2, min_interval=30.0), "limited")
+        self.now += 30.0
+        self.assertEqual(store.claim_repeat("del-1", hold=1.0, max_attempts=2, min_interval=30.0), "claimed")
+        store.release_repeat("del-1")
+        self.now += 30.0
+        self.assertEqual(store.claim_repeat("del-1", hold=1.0, max_attempts=2, min_interval=30.0), "limited")
+
+    def test_repeatable_jobs_reads_only_jobs_that_may_be_tried_now(self) -> None:
+        store = self.open()
+        for number in range(3000):
+            store.add_dead_letter(Event(id=f"e-{number:04d}", kind="user", type="UPDATE_EMAIL", realm="platform",
+                                        time=1, user_id=f"u-{number}"), "failed")
+        jobs = [Event(id=f"del-{n}", kind="request", type="ACCOUNT_DELETION", realm="platform", time=1,
+                      user_id=f"s-{n}") for n in range(5)]
+        for job in jobs:
+            store.add_dead_letter(job, "unknown", state="unknown")
+        self.assertEqual(store.claim_repeat("del-0", hold=60.0), "claimed")  # busy now
+
+        found = store.repeatable_jobs(limit=3, max_attempts=5, min_interval=30.0)
+
+        self.assertEqual([letter.event.id for letter in found], ["del-1", "del-2", "del-3"])
+
+
+class TwoLockDeadlineTest(unittest.TestCase):
+    """Inceleme 20: the connection lock and the file lock together stay within one deadline."""
+
+    def setUp(self) -> None:
+        import sqlite3
+        import threading
+
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.path = os.path.join(self.dir.name, "identity_sync.sqlite3")
+        self.store = Store(self.path)
+        self.addCleanup(self.store.close)
+        self.release = threading.Event()
+        file_held, connection_held = threading.Event(), threading.Event()
+
+        def hold_file() -> None:
+            # Another process holds the database file. EXCLUSIVE blocks readers too.
+            other = sqlite3.connect(self.path, isolation_level=None)
+            other.execute("BEGIN EXCLUSIVE")
+            file_held.set()
+            self.release.wait(10)
+            other.execute("ROLLBACK")
+            other.close()
+
+        def hold_connection() -> None:
+            # Another thread of this process uses the shared connection for a while.
+            with self.store._db_lock:
+                connection_held.set()
+                time.sleep(0.25)
+
+        threads = [threading.Thread(target=hold_file), threading.Thread(target=hold_connection)]
+        for thread in threads:
+            thread.start()
+            self.addCleanup(thread.join, 10)
+        # Cleanups run last in, first out: the file is released before the threads are joined.
+        self.addCleanup(self.release.set)
+        self.assertTrue(file_held.wait(5) and connection_held.wait(5))
+
+    def assert_within(self, call, limit: float = 0.4) -> None:
+        from identity_sync.deadline import deadline
+
+        started = time.monotonic()
+        with deadline(limit, grace=0.0), self.assertRaises(Busy):
+            call()
+        self.assertLess(time.monotonic() - started, limit + 0.08)
+
+    def test_a_write_before_a_target_call(self) -> None:
+        self.assert_within(lambda: self.store.begin(EVENT))
+
+    def test_an_outcome_record(self) -> None:
+        self.assert_within(lambda: self.store.add_dead_letter(EVENT, "failed"))
+
+    def test_the_queue_query(self) -> None:
+        self.assert_within(lambda: self.store.repeatable_jobs(limit=3, max_attempts=5, min_interval=30.0))

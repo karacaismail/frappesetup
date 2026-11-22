@@ -456,6 +456,7 @@ class AccountDeletionTest(PipelineCase):
 
     def setUp(self) -> None:
         super().setUp()
+        fakes.without_repeat_spacing(self)
         issuer = self.stack.issuer
         self.add_member()
         self.stack.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID, api_keys=1)
@@ -946,7 +947,8 @@ class AccountDeletionTest(PipelineCase):
 
         result = self.stack.app.processor.handle(self.request())
 
-        self.assertEqual(result.status, "dead_lettered")
+        # O-43: a 404 is not a result. The job stays unknown and the Keycloak account stays.
+        self.assertEqual(result.status, "unknown")
         self.assertIn(SUBJECT, self.stack.keycloak.users)
 
     def test_user_unknown_to_the_targets_is_not_an_error(self) -> None:

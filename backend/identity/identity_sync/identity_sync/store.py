@@ -32,7 +32,8 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from identity_sync.events import REQUEST_KIND, USER_REMOVED_TYPES, Event
+from identity_sync.deadline import bounded, bounded_for_records, remaining
+from identity_sync.events import JOB_TYPES, REQUEST_KIND, USER_REMOVED_TYPES, Event
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS processed_events (
@@ -64,6 +65,12 @@ CREATE TABLE IF NOT EXISTS operations (
     resolution TEXT,
     created_at REAL NOT NULL,
     updated_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS job_repeats (
+    job_id TEXT PRIMARY KEY,
+    attempts INTEGER NOT NULL,
+    last_at REAL NOT NULL,
+    claimed_until REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS used_approvals (
     approval_id TEXT PRIMARY KEY,
@@ -128,6 +135,9 @@ class Store:
             path, timeout=_SQLITE_TIMEOUT_SECONDS, isolation_level=None, check_same_thread=False
         )
         self._thread_lock = threading.Lock()
+        # One connection serves every thread. A repeat of a deletion job writes without the work
+        # lock (H-5), so the transactions of two threads must not interleave on the connection.
+        self._db_lock = threading.RLock()
         self._db.executescript(_SCHEMA)
         self._migrate()
 
@@ -156,8 +166,10 @@ class Store:
         Raise `Busy` if the wait exceeds `lock_timeout`. The lock does not roll back records.
         Every record written under the lock becomes durable immediately.
         """
-        deadline = time.monotonic() + self._lock_timeout
-        if not self._thread_lock.acquire(timeout=self._lock_timeout):
+        # Inside a deadline the wait ends at the deadline too (inceleme 18).
+        wait = bounded(self._lock_timeout)
+        deadline = time.monotonic() + wait
+        if not self._thread_lock.acquire(timeout=wait):
             raise Busy
         try:
             if self._lock_fd is not None:
@@ -178,16 +190,45 @@ class Store:
             self._thread_lock.release()
 
     @contextmanager
-    def _transaction(self) -> Iterator[None]:
-        """A short write transaction. Roll back writes on error and always close the transaction."""
-        self._db.execute("BEGIN IMMEDIATE")
+    def _transaction(self, *, bound: str = "") -> Iterator[None]:
+        """A short write transaction. Roll back writes on error and always close the transaction.
+
+        `bound` ties the waits for the connection and for the database file to the current deadline
+        (inceleme 18 and 19). `Busy` is raised when the time is up.
+        - `work`: a step before or between target calls. It ends at the deadline.
+        - `record`: the record of an outcome. All records share one end, the deadline plus its grace.
+        Without `bound`, or outside a deadline, the usual wait applies.
+        """
+        measure = {"work": bounded, "record": bounded_for_records}.get(bound)
+        limited = measure is not None and remaining() is not None
+        wait = measure(_SQLITE_TIMEOUT_SECONDS) if limited else _SQLITE_TIMEOUT_SECONDS
+        if not self._db_lock.acquire(timeout=wait):
+            raise Busy
         try:
-            yield
-            self._db.execute("COMMIT")
-        except BaseException:
-            if self._db.in_transaction:
-                self._db.execute("ROLLBACK")
+            if limited:
+                # The wait for the connection used part of the time. Measure again, so the wait
+                # for the database file ends at the same deadline (inceleme 20).
+                left = measure(_SQLITE_TIMEOUT_SECONDS)
+                if left <= 0:
+                    raise Busy
+                self._db.execute(f"PRAGMA busy_timeout = {max(1, int(left * 1000))}")
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                yield
+                self._db.execute("COMMIT")
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                raise
+        except sqlite3.OperationalError as error:
+            # The wait for another process ran out at the deadline.
+            if limited and "locked" in str(error):
+                raise Busy from None
             raise
+        finally:
+            if limited:
+                self._db.execute(f"PRAGMA busy_timeout = {int(_SQLITE_TIMEOUT_SECONDS * 1000)}")
+            self._db_lock.release()
 
     def is_processed(self, event_id: str) -> bool:
         row = self._db.execute("SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)).fetchone()
@@ -206,7 +247,7 @@ class Store:
         The row counts no attempt yet.
         """
         now = self._clock()
-        with self._transaction():
+        with self._transaction(bound="work"):
             self._db.execute(
                 """
                 INSERT OR IGNORE INTO dead_letters
@@ -222,7 +263,7 @@ class Store:
         From here on a crash leaves the outcome unknown: a target may have done the write.
         The record is corrected once the outcome is known.
         """
-        with self._transaction():
+        with self._transaction(bound="work"):
             self._db.execute(
                 "UPDATE dead_letters SET state = 'unknown', error = 'interrupted after a write was started' "
                 "WHERE event_id = ?",
@@ -236,7 +277,7 @@ class Store:
 
     def add_progress(self, event_id: str, step_key: str) -> None:
         """Record one finished step. Written after each step, so a retry never calls it again."""
-        with self._transaction():
+        with self._transaction(bound="record"):
             row = self._db.execute("SELECT finished_steps FROM dead_letters WHERE event_id = ?", (event_id,)).fetchone()
             if row is None:
                 return
@@ -393,12 +434,13 @@ class Store:
         queued event of that user. Either the job is finished and no record names the user, or
         neither happened and a retry does both. A finished job can never leave the id behind.
         """
-        with self._transaction():
+        with self._transaction(bound="record"):
             self._db.execute(
                 "INSERT OR IGNORE INTO processed_events (event_id, status, processed_at) VALUES (?, ?, ?)",
                 (event_id, status, self._clock()),
             )
             self._db.execute("DELETE FROM dead_letters WHERE event_id = ?", (event_id,))
+            self._db.execute("DELETE FROM job_repeats WHERE job_id = ?", (event_id,))
             if forget_subject:
                 self._db.execute("UPDATE operations SET subject = '' WHERE subject = ?", (forget_subject,))
                 queued = self._db.execute("SELECT event_id, event FROM dead_letters").fetchall()
@@ -412,7 +454,7 @@ class Store:
         if state not in STATES:
             raise ValueError("invalid dead letter state")
         now = self._clock()
-        with self._transaction():
+        with self._transaction(bound="record"):
             self._db.execute(
                 """
                 INSERT INTO dead_letters (event_id, event, error, state, attempts, first_failed_at, last_failed_at)
@@ -426,8 +468,122 @@ class Store:
                 (event.id, json.dumps(event.to_dict()), error, state, now, now),
             )
 
+    def claim_repeat(
+        self,
+        job_id: str,
+        *,
+        hold: float,
+        max_attempts: int | None = None,
+        min_interval: float = 0.0,
+    ) -> str:
+        """Claim the right to run the steps of a queued account job (H-5). One transaction.
+
+        The completion check is in the same transaction (inceleme 18). A job that another
+        connection finished in the meantime cannot be claimed and run again.
+
+        - `claimed`: the caller may run the job. The claim lasts `hold` seconds at most.
+        - `done`: the job is finished. Nothing may run.
+        - `busy`: another caller holds the claim. Two runs of one job never overlap, in this
+          process or in another.
+        - `limited`: the job ran `max_attempts` times, or its last claim is less than
+          `min_interval` seconds old.
+
+        `hold` keeps the claim after a run whose outcome is unknown: the target may still work on
+        the call. The caller releases the claim only after a definite outcome.
+        """
+        now = self._clock()
+        with self._transaction(bound="work"):
+            if self._db.execute("SELECT 1 FROM processed_events WHERE event_id = ?", (job_id,)).fetchone():
+                return "done"
+            row = self._db.execute(
+                "SELECT attempts, last_at, claimed_until FROM job_repeats WHERE job_id = ?", (job_id,)
+            ).fetchone()
+            attempts = 0
+            if row is not None:
+                attempts, last_at, claimed_until = row
+                if claimed_until > now:
+                    return "busy"
+                if max_attempts is not None and (attempts >= max_attempts or now - last_at < min_interval):
+                    return "limited"
+            self._db.execute(
+                "INSERT OR REPLACE INTO job_repeats (job_id, attempts, last_at, claimed_until) VALUES (?, ?, ?, ?)",
+                (job_id, attempts + 1, now, now + hold),
+            )
+        return "claimed"
+
+    def repeatable_jobs(self, *, limit: int, max_attempts: int, min_interval: float) -> list[DeadLetter]:
+        """Queued account jobs that `claim_repeat` would accept now, oldest first, at most `limit`.
+
+        The database picks them, so a long queue is never read in full (inceleme 18).
+        A finished, claimed or limited job is left out.
+        """
+        now = self._clock()
+        placeholders = ", ".join("?" for _ in JOB_TYPES)
+        rows = self._interruptible(
+            f"""
+            SELECT d.event, d.error, d.attempts, d.first_failed_at, d.last_failed_at, d.state
+            FROM dead_letters AS d LEFT JOIN job_repeats AS r ON r.job_id = d.event_id
+            WHERE json_extract(d.event, '$.type') IN ({placeholders})
+              AND NOT EXISTS (SELECT 1 FROM processed_events AS p WHERE p.event_id = d.event_id)
+              AND (r.job_id IS NULL OR (r.claimed_until <= ? AND r.attempts < ? AND ? - r.last_at >= ?))
+            ORDER BY d.first_failed_at, d.event_id LIMIT ?
+            """,  # only question marks are formatted into the text; every value is bound
+            (*sorted(JOB_TYPES), now, max_attempts, now, min_interval, limit),
+        )
+        return [self._letter(*row) for row in rows]
+
+    def _interruptible(self, sql: str, args: tuple[object, ...]) -> list[tuple]:
+        """Run a read that stops at the current deadline (inceleme 19). `Busy` when the time is up.
+
+        SQLite calls the handler every few thousand steps of the query. A non-zero answer stops the
+        query. So a scan of a long queue with no matching job cannot run past the deadline.
+        """
+        if remaining() is None:
+            return self._db.execute(sql, args).fetchall()
+        if not self._db_lock.acquire(timeout=bounded(_SQLITE_TIMEOUT_SECONDS)):
+            raise Busy
+        try:
+            # Measured after the connection lock: the wait for the database file ends at the same
+            # deadline as the query (inceleme 20).
+            left = bounded(_SQLITE_TIMEOUT_SECONDS)
+            if left <= 0:
+                raise Busy
+            self._db.execute(f"PRAGMA busy_timeout = {max(1, int(left * 1000))}")
+            self._db.set_progress_handler(lambda: 1 if not remaining() else 0, 1000)
+            try:
+                return self._db.execute(sql, args).fetchall()
+            except sqlite3.OperationalError as error:
+                if "interrupted" in str(error) or "locked" in str(error):
+                    raise Busy from None
+                raise
+        finally:
+            self._db.set_progress_handler(None, 0)
+            self._db.execute(f"PRAGMA busy_timeout = {int(_SQLITE_TIMEOUT_SECONDS * 1000)}")
+            self._db_lock.release()
+
+    def extend_repeat(self, job_id: str, *, hold: float) -> None:
+        """Let the claim of a job last `hold` seconds from now. Called before every external write.
+
+        The claim then covers the last target call too, even when that call starts late in the
+        request (inceleme 19). The claim never gets shorter here.
+        """
+        now = self._clock()
+        with self._transaction(bound="work"):
+            self._db.execute(
+                "UPDATE job_repeats SET claimed_until = MAX(claimed_until, ?) WHERE job_id = ?", (now + hold, job_id)
+            )
+
+    def release_repeat(self, job_id: str) -> None:
+        with self._transaction(bound="record"):
+            self._db.execute("UPDATE job_repeats SET claimed_until = 0 WHERE job_id = ?", (job_id,))
+
+    def repeat_claimed(self, job_id: str) -> bool:
+        """Does another caller repeat the steps of this job right now?"""
+        row = self._db.execute("SELECT claimed_until FROM job_repeats WHERE job_id = ?", (job_id,)).fetchone()
+        return row is not None and row[0] > self._clock()
+
     def remove_dead_letter(self, event_id: str) -> None:
-        with self._transaction():
+        with self._transaction(bound="record"):
             self._db.execute("DELETE FROM dead_letters WHERE event_id = ?", (event_id,))
 
     def dead_letters(self, *, limit: int | None = None, offset: int = 0) -> list[DeadLetter]:
@@ -441,17 +597,18 @@ class Store:
             "ORDER BY first_failed_at, event_id LIMIT ? OFFSET ?",
             (-1 if limit is None else limit, offset),
         ).fetchall()
-        return [
-            DeadLetter(
-                event=Event(**json.loads(event)),
-                error=error,
-                attempts=attempts,
-                first_failed_at=first,
-                last_failed_at=last,
-                state=state,
-            )
-            for event, error, attempts, first, last, state in rows
-        ]
+        return [self._letter(*row) for row in rows]
+
+    @staticmethod
+    def _letter(event: str, error: str, attempts: int, first: float, last: float, state: str) -> DeadLetter:
+        return DeadLetter(
+            event=Event(**json.loads(event)),
+            error=error,
+            attempts=attempts,
+            first_failed_at=first,
+            last_failed_at=last,
+            state=state,
+        )
 
     def claim_signature(self, signature: str, *, now: float, expires_at: float) -> bool:
         """Record a signature as used. Return `False` if it was used before.

@@ -15,6 +15,7 @@ one, nothing is written.
 
 from __future__ import annotations
 
+import sqlite3
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, replace
@@ -30,6 +31,7 @@ from identity_sync.events import (
     Event,
     is_handled,
 )
+from identity_sync.deadline import deadline, remaining
 from identity_sync.httpjson import HttpError, TransportError, UnknownOutcome
 from identity_sync.keycloak_admin import KeycloakAdmin
 from identity_sync.mapping import (
@@ -52,13 +54,25 @@ from identity_sync.mapping import (
     plan_actions,
 )
 from identity_sync.sites import PressClient, TenantClient
-from identity_sync.store import DeadLetter, Store
+from identity_sync.store import Busy, DeadLetter, Store
 
 T = TypeVar("T")
 
 # After an organization was created, the state is read once more and the plan is renewed.
 _MAX_PASSES = 2
 _BACKOFF_SECONDS = 0.2
+# Repeats of a queued account deletion job (H-5). Every step of the job may be repeated.
+# One handled event settles at most this many jobs and spends at most this long on them.
+SETTLE_MAX_JOBS = 3
+SETTLE_BUDGET_SECONDS = 5.0
+# An event repeats one job at most this often, and waits this long between two repeats.
+SETTLE_MAX_ATTEMPTS = 5
+SETTLE_INTERVAL_SECONDS = 30.0
+# A claim stays this much longer than the anonymize timeout. After a client timeout the target
+# may still work on the first call. Until the claim ends, no second call is sent (inceleme 18).
+REPEAT_HOLD_MARGIN_SECONDS = 30.0
+# Recording outcomes may take this long after the deadline, all records together (inceleme 19).
+RECORD_GRACE_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -140,6 +154,7 @@ class Processor:
         digest_key: bytes,
         max_attempts: int = 3,
         sleep: Callable[[float], object] = time.sleep,
+        anonymize_timeout: float = 30.0,
     ) -> None:
         self._issuer = issuer
         self._realm = realm
@@ -151,6 +166,8 @@ class Processor:
         self._digest_key = digest_key
         self._max_attempts = max_attempts
         self._sleep = sleep
+        # The longest wait for one anonymize call. A claim lasts this long plus a margin.
+        self._anonymize_timeout = anonymize_timeout
 
     def handle(
         self,
@@ -304,7 +321,8 @@ class Processor:
         if self._store.is_processed(job.id):
             # The job finished before, yet a target still lists the account. A human must look.
             return {**result, "status": "failed", "error": "the deletion job finished before; check the target"}
-        status = self._handle_job(job, False, None).status
+        # A human approved this repair. Like a human replay, it skips the count and spacing limits.
+        status = self._handle_job(job, True, None).status
         if status == "processed":
             return {**result, "status": "done"}
         if status == "unknown":
@@ -349,12 +367,24 @@ class Processor:
             # A row left in the queue is a leftover. It would make every replay look failed.
             self._store.remove_dead_letter(event.id)
             return EventResult("duplicate")
+        if event.type in JOB_TYPES:
+            # Every step of an account job may be repeated: a repeated call gets the same reply
+            # (docs/sozlesmeler.md, section 7). So a queued job runs again from its first step that
+            # is not finished (H-5). Every caller claims the job first. The claim also checks, in
+            # the same database step, that the job is not finished (inceleme 18).
+            # The count and spacing limits apply to every resend (inceleme 19), so a job is not
+            # hammered. One case needs no limit: every step is recorded as finished and only the
+            # final record is missing. Nothing is sent to a target then. A human replay
+            # (`allow_unknown`) skips the limits.
+            limited = not allow_unknown and bool(self._pending(event, self._plan(event)))
+            return self._run_claimed(event, planned, limited=limited)
         if not allow_unknown and self._store.dead_letter_state(event.id) == "unknown":
             # The event came again but its earlier outcome is unknown. No blind repeat.
-            # One case is certain: every step of an account job is recorded as finished and only
-            # the final record is missing. Nothing will be written to a target, so it may finish.
-            if event.type not in JOB_TYPES or self._pending(event, self._plan(event)):
-                return EventResult("unknown")
+            return EventResult("unknown")
+        return self._execute_job(event, planned)
+
+    def _execute_job(self, event: Event, planned: tuple[Action, ...] | None) -> EventResult:
+        """Run the pending steps and record the outcome. The caller decided that the event may run."""
         # Keep the accepted event on record before any work. A crash must not lose it.
         self._store.begin(event)
         try:
@@ -369,6 +399,70 @@ class Processor:
         forget = event.user_id if event.type in JOB_TYPES else None
         self._store.mark_processed(event.id, "processed", forget_subject=forget)
         return EventResult("processed", actions=tuple(names))
+
+    def _run_claimed(self, job: Event, planned: tuple[Action, ...] | None, *, limited: bool) -> EventResult:
+        """Claim an account job, run it and end the claim. The caller may or may not hold the work lock.
+
+        After an unknown outcome the claim is kept until it runs out: the target may still work
+        on the call that timed out, so no second call is sent meanwhile (inceleme 18).
+        """
+        claim = self._store.claim_repeat(
+            job.id,
+            hold=self._hold(),
+            max_attempts=SETTLE_MAX_ATTEMPTS if limited else None,
+            min_interval=SETTLE_INTERVAL_SECONDS if limited else 0.0,
+        )
+        if claim == "done":
+            # Another caller finished the job meanwhile. A row left in the queue is a leftover.
+            self._store.remove_dead_letter(job.id)
+            return EventResult("duplicate")
+        if claim != "claimed":
+            # Busy or limited: the job stays queued as it is. The reply names its queue state.
+            state = self._store.dead_letter_state(job.id)
+            return EventResult("dead_lettered" if state == "failed" else "unknown")
+        result: EventResult | None = None
+        try:
+            result = self._execute_job(job, planned)
+            return result
+        finally:
+            # An error that escapes here comes from the store, not from an open target call.
+            if result is None or result.status != "unknown":
+                self._release(job.id)
+
+    def _hold(self) -> float:
+        """How long a claim lasts: the longest wait for one target call, plus a margin."""
+        return self._anonymize_timeout + REPEAT_HOLD_MARGIN_SECONDS
+
+    def _release(self, job_id: str) -> None:
+        try:
+            self._store.release_repeat(job_id)
+        except (sqlite3.Error, Busy):
+            pass  # the claim then ends by itself when its hold runs out
+
+    def settle_queued_jobs(self) -> list[tuple[str, EventResult]]:
+        """Continue queued account deletion jobs while an event is handled (H-5). No scheduler is involved.
+
+        Everything here ends at one deadline, `SETTLE_BUDGET_SECONDS` from the start: the queue
+        read, the claims, every network read and every retry pause (inceleme 18). Only the record
+        of an outcome may be written after it. The work lock is not taken: targets are called
+        without it. The claim of each job keeps every other caller away from that job.
+        The database picks at most `SETTLE_MAX_JOBS` jobs that may be tried now, so a long queue
+        is never read in full. One job is tried at most `SETTLE_MAX_ATTEMPTS` times, at least
+        `SETTLE_INTERVAL_SECONDS` apart. After that a human decides.
+        """
+        results: list[tuple[str, EventResult]] = []
+        with deadline(SETTLE_BUDGET_SECONDS, grace=RECORD_GRACE_SECONDS):
+            try:
+                letters = self._store.repeatable_jobs(
+                    limit=SETTLE_MAX_JOBS, max_attempts=SETTLE_MAX_ATTEMPTS, min_interval=SETTLE_INTERVAL_SECONDS
+                )
+                for letter in letters:
+                    if not remaining():
+                        break
+                    results.append((letter.event.id, self._run_claimed(letter.event, None, limited=True)))
+            except Busy:
+                pass  # the time ran out while waiting for the database; the next event goes on
+        return results
 
     def replay_dead_letters(
         self, *, dry_run: bool = False, include_unknown: bool = False, expected_digest: str | None = None
@@ -515,7 +609,7 @@ class Processor:
                 preview = action.preview()
                 label = f"{preview.operation} {preview.target}"
                 try:
-                    self._retry(label, lambda action=action: self._execute(action))
+                    self._retry(label, lambda action=action, label=label: self._attempt(event, action, label))
                 except _Failed as failure:
                     failures.append(str(failure))
                 except UnknownOutcome:
@@ -540,6 +634,19 @@ class Processor:
             if not any(isinstance(action, EnsureOrganization) for action in actions):
                 return names
         raise _Failed("keycloak.ensure_organization: membership not visible yet")
+
+    def _attempt(self, event: Event, action: Action, label: str) -> None:
+        """One network attempt of one step. A retry after a 409 or a 5xx is a new attempt.
+
+        For an account job the claim is extended right before every attempt, so it outlasts that
+        call even when the call starts late (inceleme 19 and 20).
+        """
+        if event.type in JOB_TYPES:
+            try:
+                self._store.extend_repeat(event.id, hold=self._hold())
+            except Busy:
+                raise _Failed(f"{label}: deadline passed") from None
+        self._execute(action)
 
     def _execute(self, action: Action) -> None:
         if isinstance(action, EnsureOrganization):
@@ -581,7 +688,10 @@ class Processor:
             except TransportError as error:
                 # These texts are fixed. They carry no response body.
                 reason, transient = str(error) or "network error", True
-            if not transient or attempt == self._max_attempts:
+            pause = _BACKOFF_SECONDS * 2 ** (attempt - 1)
+            left = remaining()
+            # A pause never runs past the deadline (inceleme 18). Without time for another try, give up.
+            if not transient or attempt == self._max_attempts or (left is not None and left <= pause):
                 raise _Failed(f"{label}: {reason}")
-            self._sleep(_BACKOFF_SECONDS * 2 ** (attempt - 1))
+            self._sleep(pause)
         raise _Failed(f"{label}: no attempt made")

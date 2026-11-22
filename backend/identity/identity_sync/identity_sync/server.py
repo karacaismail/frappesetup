@@ -38,9 +38,10 @@ from identity_sync.events import (
     looks_like_keycloak,
     parse_event,
 )
-from identity_sync.httpjson import HttpError, TransportError
+from identity_sync.httpjson import HttpError, TransportError, deadline
 from identity_sync.keycloak_admin import InviteResult, PlanChanged
 from identity_sync.mapping import Tenant, service_client_id
+from identity_sync import pipeline
 from identity_sync.pipeline import PreviewChanged, replay_report
 from identity_sync.store import Busy
 
@@ -204,7 +205,23 @@ class _Api:
         except EventError:
             raise _BadRequest from None
         result = self._app.processor.handle(event, dry_run=dry_run)
+        if not dry_run:
+            self._settle_queued_jobs()
         return (200 if dry_run else 202), result.to_dict()
+
+    def _settle_queued_jobs(self) -> None:
+        """Continue queued account deletion jobs after an event is handled (H-5).
+
+        The event is already handled. A failure here must not change its reply: the job stays
+        queued and the next request or event tries again. The work is bounded in time and jobs.
+        """
+        try:
+            results = self._app.processor.settle_queued_jobs()
+        except sqlite3.Error:
+            _LOG.warning("queued jobs were not continued; the next event tries again")
+            return
+        for job_id, result in results:
+            _LOG.info("settle job=%s outcome=%s", job_id, result.status)
 
     # --- read endpoints ---
 
@@ -412,7 +429,11 @@ class _Api:
         if age > REAUTHENTICATION_MAX_AGE_SECONDS or age < -CLOCK_SKEW_SECONDS:
             self._audit_deletion(azp, request_id, "reauthentication_required")
             return 403, {"error": "reauthentication_required"}
-        result = self._app.processor.handle(request)
+        # The whole request waits at most the anonymize timeout for the targets, after the wait for
+        # the work lock. Press waits longer than that (H-5). A step cut short stays queued and a later
+        # event or request continues the job.
+        with deadline(self._settings.anonymize_timeout, grace=pipeline.RECORD_GRACE_SECONDS):
+            result = self._app.processor.handle(request)
         self._audit_deletion(azp, request_id, result.status)
         return 200, {"status": result.status, "request_id": request_id, "actions": list(result.actions)}
 
