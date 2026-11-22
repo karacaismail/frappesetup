@@ -46,12 +46,10 @@ def _configured_url(key, *, origin_only=False):
 def _service_bearer():
 	global _cached_bearer
 	url = _configured_url("mobile_identity_sync_token_url")
-	client_id = frappe.conf.get("keycloak_service_client_id")
-	client_secret = frappe.conf.get("keycloak_service_client_secret")
+	client_id = frappe.conf.get("mobile_identity_sync_client_id")
+	client_secret = frappe.conf.get("mobile_identity_sync_client_secret")
 	if not all(isinstance(value, str) and value for value in (client_id, client_secret)):
 		raise ValueError("Missing identity-sync service credentials")
-	if client_id == frappe.conf.get("keycloak_client_id"):
-		raise ValueError("The browser client cannot request identity-sync service tokens")
 
 	cache_key = (url, client_id, client_secret)
 	cached = _cached_bearer
