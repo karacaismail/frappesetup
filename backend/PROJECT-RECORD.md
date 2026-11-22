@@ -264,7 +264,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Eğitim ve önceki iş alt tabloları bu kancayla temizlenmez. Bu tablolar açık teknik borçtur.
   - İzin, devam ve bordro kayıtlarındaki çalışan adı kopyaları kalır. Bu kopyalar için `platform_core` tarafında ayrı bir kanca gerekir.
 
-- **O-43. Kiracı, hesap silme sonucunu eşitleme hizmetine bildirir.**
+- **O-44. Kiracı, hesap silme sonucunu eşitleme hizmetine bildirir.**
   - Başarılı yanıtta `anonymized` ve `found` alanları `true` olur. Yanıt `user`, `enabled` ve `status` alanlarını da taşır.
   - Kiracı kimlik bağı veya silme kaydı bulamazsa HTTP 200 döner. Yanıt yalnız `anonymized: true` ve `found: false` alanlarını taşır.
   - Anonim yapma isteği HTTP 404 dönerse eşitleme hizmeti silme akışını durdurur.
