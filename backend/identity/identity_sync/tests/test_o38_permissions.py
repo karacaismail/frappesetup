@@ -8,8 +8,8 @@ from .test_config_cli import environment
 from .test_server import ServerCase
 from .fakes import ORG_ID
 
-SITE = "site-kiraci1-service"
-OTHER_SITE = "site-kiraci2-service"
+SITE = "site-tenant1-service"
+OTHER_SITE = "site-tenant2-service"
 OPERATOR = "identity-sync-operator"
 
 
@@ -62,7 +62,7 @@ class TenantOperatorHttpTest(ServerCase):
         self.stack.app.settings = settings
         self.start_server(lambda token: {"azp": token})
         kc = self.stack.keycloak
-        kc.add_organization("other-org", "kiraci2")
+        kc.add_organization("other-org", "tenant2")
         kc.on("GET", f"{kc.admin}/users", (200, []))
         kc.on("POST", f"{kc.admin}/users", (201, None, {"Location": f"{kc.url}{kc.admin}/users/new-user"}))
         kc.on("POST", f"{kc.admin}/organizations/{ORG_ID}/members", (201, None))
