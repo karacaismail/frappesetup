@@ -144,16 +144,48 @@ def require_route(route):
 		raise Denied(403, "permission_denied")
 
 
+def connection_policy(base, oauth_url):
+	"""Return the connection kind and the separate model and OAuth IP pins."""
+	endpoints = frappe.conf.get("model_gateway_endpoints") or {}
+	if not isinstance(endpoints, dict):
+		raise Denied(503, "endpoint_unavailable")
+
+	def entry(url):
+		if not isinstance(url, str):
+			raise Denied(503, "endpoint_unavailable")
+		try:
+			scheme = urlsplit(url).scheme
+		except ValueError:
+			raise Denied(503, "endpoint_unavailable") from None
+		setting = endpoints.get(url)
+		if setting == "external" or (isinstance(setting, dict) and setting.get("kind") == "external"):
+			if scheme == "https":
+				return "external", ()
+		elif isinstance(setting, dict) and setting.get("kind") == "local":
+			addresses = setting.get("addresses")
+			if (
+				isinstance(addresses, list)
+				and addresses
+				and all(isinstance(address, str) for address in addresses)
+				and scheme in {"http", "https"}
+			):
+				return "local", tuple(addresses)
+		raise Denied(503, "endpoint_unavailable")
+
+	kind, addresses = entry(base)
+	if not oauth_url:
+		return kind, addresses, ()
+	oauth_kind, oauth_addresses = entry(oauth_url)
+	if oauth_kind != kind:
+		raise Denied(503, "endpoint_unavailable")
+	return kind, addresses, oauth_addresses
+
+
 def outbound(base, oauth_url, route, request):
 	"""Use deployment-approved destinations and mask all external requests."""
-	endpoints = frappe.conf.get("model_gateway_endpoints") or {}
-	kind = endpoints.get(base)
-	if kind not in {"local", "external"} or (oauth_url and endpoints.get(oauth_url) != kind):
-		raise Denied(503, "endpoint_unavailable")
+	kind, _, _ = connection_policy(base, oauth_url)
 	if kind == "local":
 		return request
-	if urlsplit(base).scheme != "https" or (oauth_url and urlsplit(oauth_url).scheme != "https"):
-		raise Denied(503, "endpoint_unavailable")
 	if route is not None and route.data_policy != "masked":
 		raise Denied(403, "data_policy_denied")
 	return request.masked()

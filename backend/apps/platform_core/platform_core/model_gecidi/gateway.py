@@ -43,6 +43,7 @@ class Target:
 		return self.api.oauth_token_url if self.api.auth_type == "oauth_client_credentials" else ""
 
 	def endpoint(self):
+		kind, addresses, oauth_addresses = policy.connection_policy(self.base_url, self.oauth_url)
 		secret = (
 			get_decrypted_password("AI API", self.api.name, "api_key", raise_exception=False)
 			if self.api.auth_type != "none"
@@ -56,6 +57,9 @@ class Target:
 			secret or "",
 			self.oauth_url,
 			self.api.oauth_client_id or "",
+			kind=kind,
+			addresses=addresses,
+			oauth_addresses=oauth_addresses,
 		)
 
 
@@ -224,7 +228,11 @@ def lock_row(doctype, name, fields):
 	# Build a locking read without loading DocType metadata. On MariaDB,
 	# a consistent read before the locks would establish an old snapshot.
 	table = frappe.qb.DocType(doctype)
-	rows = frappe.qb.from_(table).select(*fields).where(table.name == name).for_update().run(as_dict=True)
+	columns = [
+		ledger.money_as_text(table, field) if doctype == "AI Account" and field == "monthly_budget" else field
+		for field in fields
+	]
+	rows = frappe.qb.from_(table).select(*columns).where(table.name == name).for_update().run(as_dict=True)
 	if not rows:
 		raise Denied(503, "provider_unavailable")
 	return rows[0]

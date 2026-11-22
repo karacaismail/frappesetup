@@ -20,7 +20,7 @@ Apply the monthly spending cap to the account.,Geçit hesabın aylık harcaması
 Attempt Cost,Deneme Maliyeti,
 Attempt Time,Deneme Zamanı,
 Authentication Type,Bağlantı Kimlik Türü,
-Base URL,Bağlantı Adresi,
+Base URL,Bağlantı Adresi,AI API
 Base URL inherited by APIs without an override.,API bağlantısının ayrı adresi yoksa geçit bu adresi kullanır.,
 "Calculated cost of the attempt, when known.",Geçit hesaplayabildiği deneme maliyetini burada tutar.,
 Calling User,Çağrıyı Yapan Kullanıcı,
@@ -41,7 +41,11 @@ Display name of the provider.,Sağlayıcının ekranda görünen adıdır.,
 Display name of the task route.,Yolun ekranda görünen adıdır.,
 Duration in Milliseconds,Süre (Milisaniye),
 Elapsed time of the attempt in milliseconds.,Denemenin milisaniye cinsinden süresidir.,
-Enabled,Açık,
+Enabled,Açık,AI API
+Enabled,Açık,AI Account
+Enabled,Açık,AI Model
+Enabled,Açık,AI Provider
+Enabled,Açık,AI Route
 Exact model identifier used by the provider API.,Geçit sağlayıcının API bağlantısına bu model kimliğini gönderir.,
 Fixed outcome code without provider error text.,Geçit yalnız sabit sonuç kodunu kaydeder.,
 HTTP protocol used to talk to the provider.,Geçit bu biçimle sağlayıcıya istek gönderir.,
@@ -92,7 +96,7 @@ Requests Per Minute,Dakikadaki İstek Sınırı,
 Required Capabilities,Gerekli Yetenekler,
 Required Role,Gerekli Rol,
 Result,Sonuç,
-Route,Yol,
+Route,Yol,AI Usage Log
 Route Name,Yol Adı,
 "Route used for completion, if applicable.",Tamamlama çağrısı bu yolu kullandı. Bağlantı testinde alan boş kalır.,
 Selection Mode,Seçim Yöntemi,
@@ -155,3 +159,12 @@ Stores a provider account and its optional monthly spending limit.,Sağlayıcı 
 "Defines the ordered model targets, selection rules, and data policy for a request.","İstek için hedef sırasını, model seçim kurallarını ve veri ayarını tanımlar.",
 "Records provider attempts, token usage, cost, and outcome without storing message content.","Sağlayıcı denemesini, token sayısını, maliyeti ve sonucu tutar. Mesajı saklamaz.",
 Links one model to one API connection in the route's target order.,Yolun hedef sırasında bir modeli bir API bağlantısıyla eşler.,
+Gateway registry management requires a manager role.,Geçit kayıtlarını yalnız yöneticiler değiştirebilir.,
+Review the gateway registry update.,Geçit kaydındaki değişikliği inceleyin.,
+Review the new gateway registry record.,Yeni geçit kaydını inceleyin.,
+Model gateway API credential cleared.,Model geçidi API anahtarı silindi.,
+Create a disabled model provider connection.,Kapalı bir model bağlantısı oluşturun.,
+Update a provider connection and clear its stored credential if its destination changes.,Sağlayıcı bağlantısını güncelleyin. Adres değişirse kayıtlı anahtar silinir.,
+Create a model provider account.,Model sağlayıcısı hesabı oluşturun.,
+Update model provider account settings.,Model sağlayıcısı hesabının ayarlarını güncelleyin.,
+Clear the affected API credentials before changing the provider destination.,Sağlayıcı adresini değiştirmeden önce ilgili API anahtarlarını silin.,

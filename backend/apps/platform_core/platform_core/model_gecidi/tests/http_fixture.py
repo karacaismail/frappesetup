@@ -1,7 +1,6 @@
 """Seed and exercise a disposable Frappe site through its real HTTP server."""
 
 import json
-import socket
 import unittest
 from contextlib import ExitStack, contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -16,7 +15,6 @@ from frappe.utils import add_to_date, now_datetime
 from werkzeug.serving import WSGIRequestHandler, make_server
 
 from platform_core.api.test_model import TestModelHTTP
-from platform_core.model_gecidi import adapters
 
 TEST_SITE = "test-platform-core.localhost"
 FIXTURE_PORT = 19091
@@ -214,15 +212,8 @@ class QuietRequestHandler(WSGIRequestHandler):
 @contextmanager
 def _fixture_webserver():
 	"""Test the real WSGI entry point without a development-server policy bypass."""
-	resolve = adapters._resolve_public_addresses
-
-	def resolve_fixture(host, port):
-		if host == "127.0.0.1" and port == FIXTURE_PORT:
-			return socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
-		return resolve(host, port)
 
 	with (
-		patch.object(adapters, "_resolve_public_addresses", resolve_fixture),
 		patch.object(frappe.app, "_sites_path", frappe.local.sites_path),
 		make_server(
 			"127.0.0.1",
@@ -246,7 +237,9 @@ def run():
 	if frappe.local.site != TEST_SITE or not frappe.conf.get("allow_tests"):
 		raise RuntimeError("The HTTP fixture requires the isolated test site")
 	if any(
-		frappe.conf.get("model_gateway_endpoints", {}).get(url) != "local" for url in (FIRST_URL, SECOND_URL)
+		frappe.conf.get("model_gateway_endpoints", {}).get(url)
+		!= {"kind": "local", "addresses": ["127.0.0.1"]}
+		for url in (FIRST_URL, SECOND_URL)
 	):
 		raise RuntimeError("Configure both loopback model gateway fixture endpoints first")
 

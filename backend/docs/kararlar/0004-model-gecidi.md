@@ -3,6 +3,11 @@
 Geçit, uygulamanın model sağlayıcılarıyla konuştuğu ortak giriş noktasıdır.
 Model adı ve bağlantı adresi site kaydından gelir.
 Yolun hedefleri bir alt tabloda sıralanır.
+`priority` kipinde geçit küçük öncelik değerini önce seçer.
+Değerler eşitse geçit alt tablodaki sırayı kullanır.
+Veri taşıma işlemi eski JSON sütununu bilinçli olarak bırakır.
+Bütün sütunları isteyen Frappe çağrısı bu eski değeri de döndürebilir.
+Geçit hedefleri artık alt tablodan okur.
 
 ## Ortak istek ve yanıt
 
@@ -83,6 +88,7 @@ Deneme ortamı `bench serve` kullanır. Temel imaj Gunicorn için 120 saniye ay�
 
 Yönetici, `model_gateway_endpoints` ayarına tam bağlantı adresini ekler.
 Yönetici kendi hizmeti için `local`, dış hizmet için `external` seçer.
+Yönetici yerel adresleri `addresses` listesine tek tek yazar.
 Geçit, OAuth adresini de aynı listeye göre denetler.
 Dış hizmet bağlantısı HTTPS ister.
 `local_only` yolu yalnız yöneticinin `local` olarak işaretlediği hizmeti çağırır.
@@ -115,6 +121,9 @@ Geçit ücret tutarını ondalık metin olarak döner.
 Yanıtta para birimi de bulunur.
 Geçit önceki sonucu saklar. Yönetici kısa bir not ekleyebilir.
 Yönetici kapalı bağlantının anahtarını ayrı bir uçla silebilir.
+Geçit yönetim araçları adres değişince bağlantıyı kapatır ve anahtarı siler.
+Yönetici yeni anahtarı Desk ekranında girer.
+Kayıtlı anahtarlar varsa geçit, onları etkileyen sağlayıcı adresi değişikliğini reddeder.
 Geçit bağlantı kaydına silme notu ekler.
 Boş anahtar alanıyla form kaydetmek mevcut anahtarı korur.
 Kullanım günlükleri varsayılan olarak 365 gün tutulur.

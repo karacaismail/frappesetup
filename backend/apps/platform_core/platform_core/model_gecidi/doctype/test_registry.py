@@ -1,6 +1,6 @@
 """Regression coverage for provider registry persistence and credentials."""
 
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 import frappe
@@ -166,6 +166,30 @@ class TestGatewayRegistry(IntegrationTestCase):
 			[(second["api"], second["model"], 1), (first["api"], first["model"], 2)],
 		)
 
+	def test_migration_execute_reads_legacy_target_column(self):
+		from platform_core.patches import migrate_route_targets
+
+		query = Mock()
+		query.select.return_value.run.return_value = [
+			frappe._dict(name="legacy-one", targets='[{"api":"api-b","model":"model-b"}]'),
+			frappe._dict(name="legacy-two", targets='[{"api":"api-a","model":"model-a"}]'),
+		]
+		with (
+			patch.object(frappe.db, "has_column", return_value=True) as has_column,
+			patch.object(frappe.qb, "from_", return_value=query),
+			patch.object(migrate_route_targets, "migrate_route") as migrate,
+		):
+			migrate_route_targets.execute()
+		has_column.assert_called_once_with("AI Route", "targets")
+		query.select.return_value.run.assert_called_once_with(as_dict=True)
+		self.assertEqual(
+			[call.args for call in migrate.call_args_list],
+			[
+				("legacy-one", '[{"api":"api-b","model":"model-b"}]'),
+				("legacy-two", '[{"api":"api-a","model":"model-a"}]'),
+			],
+		)
+
 	def test_migration_rejects_conflicting_existing_target_rows(self):
 		from platform_core.patches.migrate_route_targets import migrate_route
 
@@ -227,3 +251,29 @@ class TestGatewayRegistry(IntegrationTestCase):
 		field = frappe.get_meta("PLT AI Route Target").get_field("api")
 		self.assertEqual(frappe._(field.label, lang="tr"), "API Bağlant\u0131s\u0131")
 		self.assertEqual(frappe._(field.label, lang="en"), "API Connection")
+
+	def test_gateway_context_preserves_frappe_translations(self):
+		cases = [
+			("Base URL", "AI API", "Ana URL", "Bağlant\u0131 Adresi"),
+			("Enabled", "AI API", "Etkin", "Aç\u0131k"),
+			("Route", "AI Usage Log", "Rota", "Yol"),
+		]
+		for label, context, standard, gateway_label in cases:
+			with self.subTest(label=label):
+				self.assertEqual(frappe._(label, lang="tr"), standard)
+				self.assertEqual(frappe._(label, context=context, lang="tr"), gateway_label)
+				self.assertEqual(frappe._(label, context=context, lang="en"), label)
+
+	def test_provider_cannot_change_an_inherited_destination_with_a_saved_key(self):
+		self.provider.default_url = "https://old-provider.example.test"
+		self.provider.save()
+		_insert(
+			"AI API",
+			account=self.account.name,
+			api_name="Inherited test destination",
+			auth_type="api_key",
+			api_key="local-fixture-credential",
+		)
+		self.provider.default_url = "https://new-provider.example.test"
+		with self.assertRaises(frappe.ValidationError):
+			self.provider.save()

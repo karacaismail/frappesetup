@@ -8,3 +8,5 @@ app_license = "mit"
 fixtures = [{"dt": "Role", "filters": [["name", "=", "AI Manager"]]}]
 
 ai_write_closed_doctypes = ["AI API", "AI Account"]
+
+ai_tools = ["platform_core.model_gecidi.management_tools.declare"]

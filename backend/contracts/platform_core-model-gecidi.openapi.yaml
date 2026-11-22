@@ -24,17 +24,17 @@ paths:
         '200':
           $ref: '#/components/responses/Result'
         '400':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/PermissionError'
         '409':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/Conflict'
         '429':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/QuotaError'
         '503':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/Unavailable'
   /api/method/platform_core.api.model.test_api:
     post:
       summary: Test one configured API
@@ -65,17 +65,17 @@ paths:
         '200':
           $ref: '#/components/responses/Result'
         '400':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/PermissionError'
         '409':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/Conflict'
         '429':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/QuotaError'
         '503':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/Unavailable'
   /api/method/platform_core.api.model.resolve_usage:
     post:
       summary: Resolve an unsettled attempt
@@ -123,19 +123,19 @@ paths:
               example:
                 message: {name: fixture-attempt, result: resolved, cost: '0.125000001', currency: USD}
         '400':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/PermissionError'
         '409':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/Conflict'
         '417':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/ValidationError'
         '429':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/QuotaError'
         '503':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/Unavailable'
   /api/method/platform_core.api.model.purge_usage:
     post:
       summary: Preview or purge old usage records
@@ -171,19 +171,19 @@ paths:
               example:
                 message: {eligible: 3, deleted: 0, dry_run: true}
         '400':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/PermissionError'
         '409':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/Conflict'
         '417':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/ValidationError'
         '429':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/QuotaError'
         '503':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/Unavailable'
   /api/method/platform_core.api.model.clear_api_credential:
     post:
       summary: Clear a disabled API credential
@@ -219,19 +219,19 @@ paths:
               example:
                 message: {name: fixture-api, cleared: true}
         '400':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/AuthenticationError'
         '403':
           $ref: '#/components/responses/PermissionError'
         '409':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/Conflict'
         '417':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/ValidationError'
         '429':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/QuotaError'
         '503':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/Unavailable'
 components:
   securitySchemes:
     session:
@@ -245,28 +245,68 @@ components:
       name: Authorization
       description: Native Frappe User API credentials in token or Basic form.
   responses:
-    Error:
-      description: Gateway error or Frappe request rejection
+    BadRequest:
+      description: Invalid gateway request
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+          example:
+            message: {error: invalid_request}
     AuthenticationError:
-      description: Authentication required
+      description: Authentication required or the Frappe session has expired
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
-          example:
-            message: {error: authentication_required}
+          examples:
+            gateway:
+              value: {message: {error: authentication_required}}
+            expiredSession:
+              value: {exc_type: SessionExpired}
     PermissionError:
-      description: Permission denied
+      description: Permission denied by the gateway or Frappe
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            gateway:
+              value: {message: {error: permission_denied}}
+            framework:
+              value: {exc_type: PermissionError}
+    Conflict:
+      description: Operation conflicts with the current gateway state
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
           example:
-            message: {error: permission_denied}
+            message: {error: transaction_active}
+    ValidationError:
+      description: Frappe rejected the operation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            exc_type: ValidationError
+    QuotaError:
+      description: Request exceeded a quota or the account lock is busy
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: quota_exceeded}
+    Unavailable:
+      description: Gateway or provider unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: {error: provider_unavailable}
     Result:
       description: Normalized Frappe RPC response
       content:
@@ -296,7 +336,7 @@ components:
       pattern: '^[A-Z]{3}$'
       description: Three-letter uppercase currency code matching the usage record.
     Error:
-      oneOf:
+      anyOf:
         - type: object
           required: [message]
           properties:

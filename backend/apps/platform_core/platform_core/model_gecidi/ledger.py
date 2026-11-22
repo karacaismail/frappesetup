@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import frappe
 from frappe.utils import now_datetime
+from pypika.functions import Cast
 
 MILLION = Decimal("1000000")
 UNSETTLED = ("pending", "unknown", "upstream", "timeout", "invalid_response", "rejected")
@@ -20,23 +21,29 @@ def price(model, input_tokens, output_tokens):
 	) / MILLION
 
 
+def money_as_text(table, field):
+	# Frappe's MariaDB driver converts DECIMAL columns to Python float.
+	return Cast(table[field], "CHAR").as_(field)
+
+
 def _usage(filters):
-	return frappe.get_all(
+	log = frappe.qb.DocType("AI Usage Log")
+	return frappe.qb.get_query(
 		"AI Usage Log",
 		filters=filters,
 		fields=[
 			"input_tokens",
 			"output_tokens",
 			"usage_known",
-			"cost",
+			money_as_text(log, "cost"),
 			"currency",
 			"result",
 			"cost_known",
-			"reserved_cost",
+			money_as_text(log, "reserved_cost"),
 			"reservation_known",
 			"reserved_tokens",
 		],
-	)
+	).run(as_dict=True)
 
 
 def remaining(account):

@@ -27,6 +27,7 @@ from urllib3.exceptions import (
 
 LOGGER = logging.getLogger(__name__)
 _RESPONSE_DEADLINE = ContextVar("model_response_deadline", default=None)
+_DESTINATION = ContextVar("model_destination", default=("external", ()))
 CALL_ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 POTENTIALLY_BILLED = {"timeout", "upstream", "invalid_response"}
 PATHS = {
@@ -46,6 +47,9 @@ class Endpoint:
 	secret: str = field(default="", repr=False)
 	token_url: str = field(default="", repr=False)
 	client_id: str = field(default="", repr=False)
+	kind: str = "external"
+	addresses: tuple[str, ...] = field(default=(), repr=False)
+	oauth_addresses: tuple[str, ...] = field(default=(), repr=False)
 
 
 class GatewayError(Exception):
@@ -88,8 +92,24 @@ def _interrupt_socket(socket, deadline):
 		timer.join()
 
 
-# Standard translation prefixes can hide a nonpublic IPv4 destination.
-_TRANSLATION_NETWORKS = (ip_network("64:ff9b::/96"), ip_network("64:ff9b:1::/48"))
+# Plaintext is limited to loopback and private unicast prefixes.
+_LOCAL_NETWORKS = tuple(
+	ip_network(network)
+	for network in (
+		"10.0.0.0/8",
+		"127.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"::1/128",
+		"fc00::/7",
+	)
+)
+_GLOBAL_IPV6 = ip_network("2000::/3")
+_ZERO_NETWORK = ip_network("0.0.0.0/8")
+
+
+def _is_local_address(ip):
+	return any(ip in network for network in _LOCAL_NETWORKS)
 
 
 def _is_public_address(address):
@@ -97,25 +117,43 @@ def _is_public_address(address):
 		ip = ip_address(address)
 	except ValueError:
 		return False
-	if isinstance(ip, IPv6Address):
-		if ip.scope_id or ip.sixtofour is not None or ip.teredo is not None:
+	if isinstance(ip, IPv6Address) and (
+		ip not in _GLOBAL_IPV6 or ip.scope_id or ip.sixtofour is not None or ip.teredo is not None
+	):
+		return False
+	return ip.is_global and not (ip.is_multicast or ip.is_link_local or ip.is_unspecified)
+
+
+def _resolve_addresses(host, port, *, addresses=(), secure=True):
+	try:
+		resolved = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP)
+		pins = {ip_address(address) for address in addresses}
+	except (OSError, UnicodeError, ValueError):
+		raise GatewayError("endpoint_unavailable", may_be_billed=False) from None
+
+	def allowed(family, address):
+		try:
+			ip = ip_address(address[0])
+		except ValueError:
 			return False
-		if any(ip in network for network in _TRANSLATION_NETWORKS):
+		if family == socket.AF_INET6 and (not isinstance(ip, IPv6Address) or ip.scope_id or address[3]):
 			return False
-		ip = ip.ipv4_mapped or ip
-	return ip.is_global and not ip.is_multicast
+		if ip.is_link_local or ip.is_multicast or ip.is_unspecified or ip in _ZERO_NETWORK:
+			return False
+		if not pins:
+			return secure and _is_public_address(ip)
+		return ip in pins and _is_local_address(ip)
+
+	if not resolved or any(
+		family not in (socket.AF_INET, socket.AF_INET6) or not allowed(family, address)
+		for family, _kind, _proto, _canonical, address in resolved
+	):
+		raise GatewayError("endpoint_unavailable", may_be_billed=False)
+	return resolved
 
 
 def _resolve_public_addresses(host, port):
-	addresses = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP)
-	if not addresses or any(
-		family not in (socket.AF_INET, socket.AF_INET6)
-		or not _is_public_address(address[0])
-		or (family == socket.AF_INET6 and address[3])
-		for family, _kind, _proto, _canonical, address in addresses
-	):
-		raise GatewayError("endpoint_unavailable", may_be_billed=False)
-	return addresses
+	return _resolve_addresses(host, port)
 
 
 class _ProviderConnection:
@@ -126,10 +164,18 @@ class _ProviderConnection:
 		if isinstance(self.timeout, (float, int)):
 			connect_deadline = monotonic() + self.timeout
 			deadline = connect_deadline if deadline is None else min(deadline, connect_deadline)
-		try:
+		kind, pins = _DESTINATION.get()
+		if kind == "local":
+			if not pins:
+				raise GatewayError("endpoint_unavailable", may_be_billed=False)
+			addresses = _resolve_addresses(
+				self._dns_host,
+				self.port,
+				addresses=pins,
+				secure=isinstance(self, HTTPSConnection),
+			)
+		else:
 			addresses = _resolve_public_addresses(self._dns_host, self.port)
-		except OSError:
-			raise NewConnectionError(self, "Provider address resolution failed") from None
 		for family, kind, proto, _canonical, address in addresses:
 			remaining = deadline - monotonic() if deadline is not None else None
 			if remaining is not None and remaining <= 0:
@@ -230,7 +276,9 @@ def _read_body(response, deadline, max_bytes):
 		raise GatewayError("invalid_response") from None
 
 
-def _post_json(session, url, *, timeout, connect_timeout, deadline, max_bytes, before_post, **kwargs):
+def _post_json(
+	session, url, *, timeout, connect_timeout, deadline, max_bytes, before_post, kind, addresses, **kwargs
+):
 	if before_post is not None and not before_post():
 		raise GatewayError("reservation_lost")
 	remaining = deadline - monotonic()
@@ -240,6 +288,7 @@ def _post_json(session, url, *, timeout, connect_timeout, deadline, max_bytes, b
 	connect = min(connect_timeout, remaining / 2)
 	read = min(timeout, remaining - connect)
 	response_deadline = _RESPONSE_DEADLINE.set(deadline)
+	destination = _DESTINATION.set((kind, addresses))
 	try:
 		with session.post(
 			url, timeout=(connect, read), allow_redirects=False, stream=True, **kwargs
@@ -256,7 +305,9 @@ def _post_json(session, url, *, timeout, connect_timeout, deadline, max_bytes, b
 		if isinstance(reason, MaxRetryError) and isinstance(reason.reason, NewConnectionError):
 			raise GatewayError("connect_failed") from None
 		raise GatewayError("upstream") from None
-	except (requests.exceptions.InvalidURL, requests.exceptions.InvalidHeader):
+	except (requests.exceptions.InvalidURL, UnicodeError):
+		raise GatewayError("endpoint_unavailable", may_be_billed=False) from None
+	except requests.exceptions.InvalidHeader:
 		raise GatewayError("configuration") from None
 	except (requests.RequestException, HTTPError):
 		raise GatewayError("upstream") from None
@@ -267,6 +318,7 @@ def _post_json(session, url, *, timeout, connect_timeout, deadline, max_bytes, b
 		# a provider charge. Never expose the raw transport exception.
 		raise GatewayError("invalid_response") from None
 	finally:
+		_DESTINATION.reset(destination)
 		_RESPONSE_DEADLINE.reset(response_deadline)
 
 
@@ -280,7 +332,7 @@ def _contains_secret(value, secrets):
 	return False
 
 
-def _headers(endpoint, session, timeout, connect_timeout, deadline, *, allow_test_http, before_post):
+def _headers(endpoint, timeout, connect_timeout, deadline, *, before_post):
 	headers = {}
 	if endpoint.adapter == "anthropic":
 		headers["anthropic-version"] = "2023-06-01"
@@ -296,17 +348,22 @@ def _headers(endpoint, session, timeout, connect_timeout, deadline, *, allow_tes
 	elif endpoint.auth == "oauth_client_credentials":
 		if not endpoint.client_id or not endpoint.secret:
 			raise GatewayError("configuration")
-		status, token_body = _post_json(
-			session,
-			_url(endpoint.token_url, secure=not allow_test_http),
-			data={"grant_type": "client_credentials"},
-			auth=(quote_plus(endpoint.client_id), quote_plus(endpoint.secret)),
-			timeout=timeout,
-			connect_timeout=connect_timeout,
-			deadline=deadline,
-			max_bytes=65536,
-			before_post=before_post,
-		)
+		# Different exact URLs can have different pins even on the same origin.
+		# Use a fresh pool so the OAuth socket cannot carry a model request.
+		with _provider_session() as session:
+			status, token_body = _post_json(
+				session,
+				_url(endpoint.token_url, secure=endpoint.kind != "local"),
+				data={"grant_type": "client_credentials"},
+				auth=(quote_plus(endpoint.client_id), quote_plus(endpoint.secret)),
+				timeout=timeout,
+				connect_timeout=connect_timeout,
+				deadline=deadline,
+				max_bytes=65536,
+				before_post=before_post,
+				kind=endpoint.kind,
+				addresses=endpoint.oauth_addresses,
+			)
 		if status != 200:
 			raise GatewayError(_status_code(status), may_be_billed=False)
 		token = token_body.get("access_token") if isinstance(token_body, dict) else None
@@ -460,6 +517,14 @@ def _status_code(status):
 	return "rejected"
 
 
+@contextmanager
+def _provider_session():
+	with _ProviderSession() as session:
+		session.trust_env = False
+		session.headers["Accept-Encoding"] = "identity"
+		yield session
+
+
 def complete(
 	endpoint,
 	model,
@@ -471,7 +536,6 @@ def complete(
 	timeout=30,
 	connect_timeout=5,
 	deadline=None,
-	allow_test_http=False,
 	before_post=None,
 ):
 	"""Make one synchronous attempt. Exceptions and logs carry only fixed codes."""
@@ -479,25 +543,22 @@ def complete(
 	if deadline is None:
 		deadline = monotonic() + connect_timeout + timeout
 	try:
-		base = _url(
-			endpoint.base_url,
-			secure=not (allow_test_http or (endpoint.adapter == "ollama" and endpoint.auth == "none")),
-		)
+		if endpoint.kind not in {"local", "external"}:
+			raise error
+		if endpoint.kind == "external" and urlsplit(endpoint.base_url).scheme == "http":
+			raise GatewayError("endpoint_unavailable", may_be_billed=False)
+		base = _url(endpoint.base_url, secure=endpoint.kind != "local")
 		if endpoint.auth in {"api_key", "bearer"} and not endpoint.secret:
 			raise error
 		path = PATHS[endpoint.adapter].format(model=quote(model, safe=""))
 		payload = _payload(endpoint.adapter, model, messages, limit, tools, schema)
-		with _ProviderSession() as session:
-			session.trust_env = False
-			session.headers["Accept-Encoding"] = "identity"
+		with _provider_session() as session:
 			try:
 				headers = _headers(
 					endpoint,
-					session,
 					timeout,
 					connect_timeout,
 					deadline,
-					allow_test_http=allow_test_http,
 					before_post=before_post,
 				)
 			except GatewayError as failure:
@@ -514,6 +575,8 @@ def complete(
 				deadline=deadline,
 				max_bytes=2 * 1024 * 1024,
 				before_post=before_post,
+				kind=endpoint.kind,
+				addresses=endpoint.addresses,
 			)
 		if status != 200:
 			raise GatewayError(_status_code(status))

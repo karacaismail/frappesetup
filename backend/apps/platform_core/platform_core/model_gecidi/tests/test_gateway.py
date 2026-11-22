@@ -84,6 +84,113 @@ class NetworkPolicyTests(unittest.TestCase):
 			self.assertFalse(failure.exception.may_be_billed)
 			self.assertEqual(server.paths, [])
 
+	def test_local_connection_can_reach_its_listed_loopback(self):
+		with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
+			server.paths = []
+			server.header_delay = 0
+			server.header_chunks = []
+			server.location = None
+			server.content_encoding = None
+			server.chunks = []
+			thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.02})
+			thread.start()
+			try:
+				endpoint = Endpoint(
+					"fixture",
+					"ollama",
+					f"http://127.0.0.1:{server.server_port}",
+					kind="local",
+					addresses=("127.0.0.1",),
+				)
+				with patch.object(Handler, "response", {"message": {"content": "fixture"}}):
+					self.assertEqual(complete(endpoint, "fake", [], 20)["text"], "fixture")
+				self.assertEqual(server.paths, ["/api/chat"])
+			finally:
+				server.shutdown()
+				thread.join()
+
+	def test_local_http_cannot_dial_a_listed_public_address(self):
+		endpoint = Endpoint(
+			"fixture",
+			"ollama",
+			"http://provider.example",
+			kind="local",
+			addresses=("1.1.1.1",),
+		)
+		resolution = [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("1.1.1.1", 80))]
+		with (
+			patch("socket.getaddrinfo", return_value=resolution),
+			patch("socket.socket") as create_socket,
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(endpoint, "fake", [], 20)
+		self.assertEqual(failure.exception.code, "endpoint_unavailable")
+		create_socket.assert_not_called()
+
+	def test_local_https_cannot_dial_a_listed_public_address(self):
+		endpoint = Endpoint(
+			"fixture",
+			"ollama",
+			"https://provider.example",
+			kind="local",
+			addresses=("1.1.1.1",),
+		)
+		resolution = [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("1.1.1.1", 443))]
+		with (
+			patch("socket.getaddrinfo", return_value=resolution),
+			patch("socket.socket") as create_socket,
+			self.assertRaises(GatewayError) as failure,
+		):
+			complete(endpoint, "fake", [], 20)
+		self.assertEqual(failure.exception.code, "endpoint_unavailable")
+		create_socket.assert_not_called()
+
+	def test_local_pins_cannot_override_permanently_blocked_or_unlisted_addresses(self):
+		for address in ("0.0.0.1", "169.254.169.254", "224.0.0.1", "fe80::1", "10.1.2.3"):
+			if ":" in address:
+				family, sockaddr = socket.AF_INET6, (address, 80, 0, 0)
+			else:
+				family, sockaddr = socket.AF_INET, (address, 80)
+			resolution = [(family, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", sockaddr)]
+			pins = ("10.1.2.4",) if address == "10.1.2.3" else (address,)
+			with (
+				self.subTest(address=address),
+				patch("socket.getaddrinfo", return_value=resolution),
+				self.assertRaises(GatewayError) as failure,
+			):
+				adapters._resolve_addresses("fixture.test", 80, addresses=pins, secure=False)
+			self.assertEqual(failure.exception.code, "endpoint_unavailable")
+			self.assertFalse(failure.exception.may_be_billed)
+
+	def test_special_addresses_are_not_public(self):
+		for address in (
+			"0.0.0.0",
+			"100.64.0.1",
+			"169.254.169.254",
+			"::",
+			"::7f00:1",
+			"fec0::1",
+			"::ffff:10.0.0.1",
+			"64:ff9b::a00:1",
+			"224.0.0.1",
+			"::ffff:0:800:1",
+		):
+			with self.subTest(address=address):
+				self.assertFalse(adapters._is_public_address(address))
+
+	def test_name_resolution_failures_are_not_billable(self):
+		for error in (OSError("fixture resolution"), UnicodeError("fixture IDNA")):
+			with (
+				self.subTest(error=type(error)),
+				patch("socket.getaddrinfo", side_effect=error),
+				patch("socket.socket") as create_socket,
+				self.assertRaises(GatewayError) as failure,
+			):
+				adapters._ProviderHTTPSConnection("example.test")._new_conn()
+			self.assertEqual(failure.exception.code, "endpoint_unavailable")
+			self.assertFalse(failure.exception.may_be_billed)
+			create_socket.assert_not_called()
+
 	def test_mixed_resolution_is_denied_before_any_socket_is_created(self):
 		addresses = [
 			(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("1.1.1.1", 443)),
@@ -149,14 +256,15 @@ class AdapterTests(unittest.TestCase):
 		self.addCleanup(server.shutdown)
 		self.server = server
 		self.url = f"http://127.0.0.1:{server.server_port}"
-		resolve = adapters._resolve_public_addresses
 
-		def fixture_resolve(host, port):
-			if host == "127.0.0.1" and port == server.server_port:
-				return socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
-			return resolve(host, port)
-
-		self.enterContext(patch.object(adapters, "_resolve_public_addresses", fixture_resolve))
+	def _endpoint(self, *args, **kwargs):
+		return Endpoint(
+			*args,
+			**kwargs,
+			kind="local",
+			addresses=("127.0.0.1",),
+			oauth_addresses=("127.0.0.1",),
+		)
 
 	def test_header_drip_cannot_extend_absolute_deadline(self):
 		self.server.header_chunks = [
@@ -167,7 +275,7 @@ class AdapterTests(unittest.TestCase):
 		started = monotonic()
 		with self.assertRaises(GatewayError) as failure:
 			complete(
-				Endpoint("fixture", "ollama", self.url),
+				self._endpoint("fixture", "ollama", self.url),
 				"fake",
 				[],
 				20,
@@ -184,7 +292,7 @@ class AdapterTests(unittest.TestCase):
 			patch("requests.Session.post", side_effect=ValueError("Unexpected transport error")),
 			self.assertRaises(GatewayError) as failure,
 		):
-			complete(Endpoint("fixture", "ollama", self.url), "fake", [], 20)
+			complete(self._endpoint("fixture", "ollama", self.url), "fake", [], 20)
 		self.assertEqual(failure.exception.code, "invalid_response")
 		self.assertTrue(failure.exception.may_be_billed)
 
@@ -195,7 +303,7 @@ class AdapterTests(unittest.TestCase):
 			patch("requests.Session.__exit__", side_effect=ValueError("Unexpected teardown error")),
 			self.assertRaises(GatewayError) as failure,
 		):
-			complete(Endpoint("fixture", "ollama", self.url), "fake", [], 20)
+			complete(self._endpoint("fixture", "ollama", self.url), "fake", [], 20)
 		self.assertEqual(self.server.paths, ["/api/chat"])
 		self.assertEqual(failure.exception.code, "invalid_response")
 		self.assertTrue(failure.exception.may_be_billed)
@@ -233,11 +341,10 @@ class AdapterTests(unittest.TestCase):
 			with self.subTest(adapter=adapter):
 				Handler.response = body
 				result = complete(
-					Endpoint("fixture", adapter, self.url),
+					self._endpoint("fixture", adapter, self.url),
 					"fake",
 					[{"role": "user", "content": "test"}],
 					20,
-					allow_test_http=True,
 				)
 				self.assertEqual(self.server.path, path)
 				self.assertEqual(
@@ -293,13 +400,12 @@ class AdapterTests(unittest.TestCase):
 			with self.subTest(adapter=adapter):
 				Handler.response = body
 				result = complete(
-					Endpoint("fixture", adapter, self.url),
+					self._endpoint("fixture", adapter, self.url),
 					"fake",
 					[{"role": "user", "content": "test"}],
 					20,
 					tools=[tool],
 					schema=schema,
-					allow_test_http=True,
 				)
 				self.assertEqual(result["tool_calls"], [{"id": "call-0", **function}])
 				tools_key, schema_key = request_fields[adapter]
@@ -310,7 +416,7 @@ class AdapterTests(unittest.TestCase):
 		with self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"):
 			with self.assertRaises(GatewayError) as failure:
 				complete(
-					Endpoint("fixture", "ollama", self.url),
+					self._endpoint("fixture", "ollama", self.url),
 					"fake",
 					[],
 					20,
@@ -322,17 +428,17 @@ class AdapterTests(unittest.TestCase):
 	def test_provider_cannot_echo_a_credential_in_success(self):
 		Handler.status = 200
 		Handler.response = {"choices": [{"message": {"content": SECRET}}]}
-		endpoint = Endpoint("fixture", "openai", self.url, "api_key", SECRET)
+		endpoint = self._endpoint("fixture", "openai", self.url, "api_key", SECRET)
 		with self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING") as logs:
 			with self.assertRaises(GatewayError) as failure:
-				complete(endpoint, "fake", [], 20, allow_test_http=True)
+				complete(endpoint, "fake", [], 20)
 		self.assertEqual(failure.exception.code, "invalid_response")
 		self.assertNotIn(SECRET, str(logs.output))
 
 	def test_oauth_exchanges_credentials_for_a_bearer_token(self):
 		Handler.status = 200
 		Handler.response = {"choices": [{"message": {"content": "hello"}}]}
-		endpoint = Endpoint(
+		endpoint = self._endpoint(
 			"fixture",
 			"openai",
 			self.url,
@@ -341,19 +447,19 @@ class AdapterTests(unittest.TestCase):
 			self.url + "/token",
 			"fixture-client",
 		)
-		result = complete(endpoint, "fake", [], 20, allow_test_http=True)
+		result = complete(endpoint, "fake", [], 20)
 		auth, form = self.server.token_request
 		self.assertTrue(auth.startswith("Basic "))
 		self.assertEqual(form, b"grant_type=client_credentials")
 		self.assertEqual(self.server.headers["Authorization"], "Bearer fixture-token")
 		self.assertEqual(result["text"], "hello")
 
-	def test_rejects_http_for_credentialed_upstream(self):
+	def test_rejects_http_for_credentialed_external_upstream(self):
 		endpoint = Endpoint("fixture", "openai", self.url, "api_key", SECRET)
 		with self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"):
 			with self.assertRaises(GatewayError) as failure:
 				complete(endpoint, "fake", [], 20)
-		self.assertEqual(failure.exception.code, "configuration")
+		self.assertEqual(failure.exception.code, "endpoint_unavailable")
 		self.assertFalse(hasattr(self.server, "path"))
 
 	def test_http_status_drives_failover(self):
@@ -363,7 +469,7 @@ class AdapterTests(unittest.TestCase):
 				Handler.status = status
 				with self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"):
 					with self.assertRaises(GatewayError) as failure:
-						complete(Endpoint("first", "openai", self.url), "fake", [], 20, allow_test_http=True)
+						complete(self._endpoint("first", "openai", self.url), "fake", [], 20)
 				self.assertEqual(failure.exception.code, code)
 				self.assertTrue(on_failure(first, code, now=100, cooldown_seconds=30).try_next)
 
@@ -374,7 +480,12 @@ class AdapterTests(unittest.TestCase):
 			self.assertRaises(GatewayError) as failure,
 		):
 			complete(
-				Endpoint("first", "ollama", self.url), "fake", [], 4096, timeout=45, deadline=monotonic() + 60
+				self._endpoint("first", "ollama", self.url),
+				"fake",
+				[],
+				4096,
+				timeout=45,
+				deadline=monotonic() + 60,
 			)
 		self.assertEqual(post.call_args.kwargs["timeout"], (5, 45))
 		self.assertEqual(failure.exception.code, "connect_failed")
@@ -387,13 +498,13 @@ class AdapterTests(unittest.TestCase):
 			self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
 			self.assertRaises(GatewayError) as failure,
 		):
-			complete(Endpoint("first", "ollama", self.url), "fake", [], 20, timeout=0.025)
+			complete(self._endpoint("first", "ollama", self.url), "fake", [], 20, timeout=0.025)
 		self.assertEqual(failure.exception.code, "timeout")
 		self.assertTrue(failure.exception.may_be_billed)
 		self.assertEqual(self.server.paths, ["/api/chat"])
 
 	def test_redirects_are_not_followed_and_http_rejections_are_nonbillable(self):
-		endpoint = Endpoint("first", "ollama", self.url)
+		endpoint = self._endpoint("first", "ollama", self.url)
 		self.server.location = self.url + "/redirected"
 		for status, expected in ((307, "rejected"), (400, "rejected"), (403, "forbidden"), (404, "rejected")):
 			with (
@@ -408,7 +519,7 @@ class AdapterTests(unittest.TestCase):
 		self.assertEqual(self.server.paths, ["/api/chat"] * 4)
 
 	def test_accepted_and_request_timeout_statuses_may_have_incurred_cost(self):
-		endpoint = Endpoint("first", "ollama", self.url)
+		endpoint = self._endpoint("first", "ollama", self.url)
 		for status, expected in ((202, "invalid_response"), (408, "timeout")):
 			with (
 				self.subTest(status=status),
@@ -429,7 +540,7 @@ class AdapterTests(unittest.TestCase):
 			self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
 			self.assertRaises(GatewayError) as failure,
 		):
-			complete(Endpoint("first", "ollama", self.url), "fake", [], 20, deadline=started + 0.4)
+			complete(self._endpoint("first", "ollama", self.url), "fake", [], 20, deadline=started + 0.4)
 		self.assertEqual(failure.exception.code, "rejected")
 		self.assertLess(monotonic() - started, 0.7)
 		self.assertEqual(self.server.paths, ["/api/chat"])
@@ -443,12 +554,12 @@ class AdapterTests(unittest.TestCase):
 			self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING"),
 			self.assertRaises(GatewayError) as failure,
 		):
-			complete(Endpoint("first", "ollama", self.url), "fake", [], 20)
+			complete(self._endpoint("first", "ollama", self.url), "fake", [], 20)
 		self.assertEqual(self.server.headers["Accept-Encoding"], "identity")
 		self.assertEqual(failure.exception.code, "invalid_response")
 
 	def test_body_cannot_exceed_byte_or_elapsed_time_limits(self):
-		endpoint = Endpoint("first", "ollama", self.url)
+		endpoint = self._endpoint("first", "ollama", self.url)
 		Handler.status = 200
 		Handler.response = {"message": {"content": "x" * (2 * 1024 * 1024)}}
 		with (
@@ -470,7 +581,7 @@ class AdapterTests(unittest.TestCase):
 
 	def test_tool_calls_must_use_an_offered_name_and_unique_safe_identifier(self):
 		Handler.status = 200
-		endpoint = Endpoint("first", "openai", self.url)
+		endpoint = self._endpoint("first", "openai", self.url)
 		valid = {"id": "call-1", "function": {"name": "lookup", "arguments": "{}"}}
 		bad_id = {**valid, "id": "invalid id"}
 		bad_name = {**valid, "function": {**valid["function"], "name": "unlisted"}}
@@ -486,7 +597,6 @@ class AdapterTests(unittest.TestCase):
 					"fake",
 					[],
 					20,
-					allow_test_http=True,
 					tools=[{"name": "lookup", "parameters": {"type": "object"}}],
 				)
 			self.assertEqual(failure.exception.code, "invalid_response")
@@ -494,10 +604,10 @@ class AdapterTests(unittest.TestCase):
 	def test_error_does_not_expose_secret(self):
 		Handler.status = 401
 		Handler.response = {"error": SECRET}
-		endpoint = Endpoint("fixture", "openai", self.url, "api_key", SECRET)
+		endpoint = self._endpoint("fixture", "openai", self.url, "api_key", SECRET)
 		with self.assertLogs("platform_core.model_gecidi.adapters", level="WARNING") as logs:
 			with self.assertRaises(GatewayError) as failure:
-				complete(endpoint, "fake", [{"role": "user", "content": "test"}], 20, allow_test_http=True)
+				complete(endpoint, "fake", [{"role": "user", "content": "test"}], 20)
 		self.assertEqual(self.server.headers["Authorization"], f"Bearer {SECRET}")
 		self.assertEqual(failure.exception.code, "authentication")
 		self.assertNotIn(SECRET, repr(endpoint) + repr(failure.exception) + str(logs.output))

@@ -24,6 +24,9 @@ class TestModelHTTP(unittest.TestCase):
 	def setUpClass(cls):
 		if cls.fixture is None:
 			raise unittest.SkipTest("Run the disposable Frappe HTTP fixture")
+		from platform_core.model_gecidi.tests.contract_validation import GatewayContract
+
+		cls.gateway_contract = GatewayContract()
 
 	def setUp(self):
 		self.fixture["provider_payloads"].clear()
@@ -40,9 +43,12 @@ class TestModelHTTP(unittest.TestCase):
 		session = self.fixture["sessions"][actor]
 		if actor in {"oauth", "api_key", "manager_key"}:
 			session.cookies.clear()
-		return session.request(
+		response = session.request(
 			method, self.fixture["base"] + path, timeout=15, allow_redirects=False, **kwargs
 		)
+		if path in self.gateway_contract.spec["paths"]:
+			self.gateway_contract.validate_response(path, method, response.status_code, response.json())
+		return response
 
 	def resource(self, doctype, name=""):
 		path = "/api/resource/" + quote(doctype, safe="")
@@ -309,7 +315,13 @@ class TestModelHTTP(unittest.TestCase):
 		with patch.dict(frappe.conf, {"model_gateway_endpoints": {base: "external"}}):
 			outbound = policy.outbound(base, "", route, inbound)
 		adapters.complete(
-			adapters.Endpoint("fixture-api", "ollama", self.fixture["provider_url"]),
+			adapters.Endpoint(
+				"fixture-api",
+				"ollama",
+				self.fixture["provider_url"],
+				kind="local",
+				addresses=("127.0.0.1",),
+			),
 			"fixture-model",
 			outbound.messages,
 			outbound.limit,
