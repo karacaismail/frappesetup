@@ -95,13 +95,15 @@ def seed_lifecycle_identities(identities, issuer, tenant):
         return {}
 
     from frappe.core.doctype.user.user import generate_keys
-    from press_tr.press_identity.identity import bind_identity
+    from press_tr.press_identity.identity import bind_identity, ensure_personal_team
 
     fixture = {}
     for prefix, account in deletion_accounts(identities):
         link = bind_identity({
             "iss": issuer, "sub": account["subject"], "email": account["email"], "email_verified": True,
         })
+        if os.environ["E2E_FULL_BROWSER_FIXTURES"] == "1":
+            ensure_personal_team(link.user)
         keys = generate_keys(account["email"])
         fixture[prefix + "DELETE_PRESS_AUTHORIZATION"] = f"token {keys['api_key']}:{keys['api_secret']}"
         fixture[prefix + "DELETE_PRESS_ANONYMOUS_USER"] = (
