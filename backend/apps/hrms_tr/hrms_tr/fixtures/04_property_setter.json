@@ -1,0 +1,22 @@
+[
+  {
+    "doctype": "Property Setter",
+    "name": "Leave Application-leave_balance-permlevel",
+    "doc_type": "Leave Application",
+    "doctype_or_field": "DocField",
+    "field_name": "leave_balance",
+    "property": "permlevel",
+    "property_type": "Int",
+    "value": "2"
+  },
+  {
+    "doctype": "Property Setter",
+    "name": "Leave Application-leave_balance-description",
+    "doc_type": "Leave Application",
+    "doctype_or_field": "DocField",
+    "field_name": "leave_balance",
+    "property": "description",
+    "property_type": "Small Text",
+    "value": "Leave balance before the application."
+  }
+]
