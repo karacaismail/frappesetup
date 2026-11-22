@@ -98,21 +98,27 @@ rules:
     languages: [python]
     severity: ERROR
     message: "Dış isteğe açık bir süre sınırı verin."
-    patterns:
-      - pattern-either:
-          - patterns:
-              - pattern-either:
-                  - pattern: requests.$METHOD(...)
-                  - pattern: httpx.$METHOD(...)
-              - metavariable-regex:
-                  metavariable: $METHOD
-                  regex: ^(request|get|post|put|patch|delete|head|options|stream)$
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: requests.$METHOD(...)
+              - pattern: httpx.$METHOD(...)
+          - metavariable-regex:
+              metavariable: $METHOD
+              regex: ^(request|get|post|put|patch|delete|head|options|stream)$
+          - pattern-either:
+              - pattern: requests.$METHOD(..., timeout=None, ...)
+              - pattern: httpx.$METHOD(..., timeout=None, ...)
+              - patterns:
+                  - pattern-either:
+                      - pattern: requests.$METHOD(...)
+                      - pattern: httpx.$METHOD(...)
+                  - pattern-not: requests.$METHOD(..., timeout=$TIMEOUT, ...)
+                  - pattern-not: httpx.$METHOD(..., timeout=$TIMEOUT, ...)
+      - pattern: urllib.request.urlopen(..., timeout=None, ...)
+      - patterns:
           - pattern: urllib.request.urlopen(...)
-      - pattern-either:
-          - pattern: $CALL(..., timeout=None, ...)
-          - patterns:
-              - pattern: $CALL(...)
-              - pattern-not: $CALL(..., timeout=$TIMEOUT, ...)
+          - pattern-not: urllib.request.urlopen(..., timeout=$TIMEOUT, ...)
   - id: ai-provider-sdk
     languages: [python]
     severity: ERROR
