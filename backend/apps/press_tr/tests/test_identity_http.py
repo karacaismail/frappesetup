@@ -53,6 +53,7 @@ class IdentityHttpTest(
 		cls.codes = {}
 		cls.service_tokens = {}
 		cls.deletion_requests = []
+		cls.deletion_delays = {}
 
 		class IssuerHandler(BaseHTTPRequestHandler):
 			def do_GET(self):
@@ -68,7 +69,9 @@ class IdentityHttpTest(
 					if token not in cls.service_tokens:
 						self.send_error(403)
 						return
-					cls.deletion_requests.append(json.loads(body))
+					request = json.loads(body)
+					cls.deletion_requests.append(request)
+					time.sleep(cls.deletion_delays.get(request["subject"], 0))
 					self.send_json(b'{"status":"accepted"}')
 					return
 				if self.path != "/realms/platform/protocol/openid-connect/token":
@@ -160,7 +163,7 @@ class IdentityHttpTest(
 		self.assertEqual(query["max_age"], ["0"])
 		self.assertEqual(query["code_challenge_method"], ["S256"])
 
-	def test_account_deletion_sends_only_verified_identity(self):
+	def test_account_deletion_waits_for_slow_service_and_sends_only_verified_identity(self):
 		subject = uuid4().hex
 		email = f"{subject}@example.test"
 		session = self.sign_in(subject, email, uuid4().hex)
@@ -205,7 +208,10 @@ class IdentityHttpTest(
 
 		service_token = self.token(audience="identity-sync", authorized_party="press-service")
 		self.service_tokens[service_token] = True
-		status, _headers, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
+		self.deletion_delays[subject] = 11
+		status, _headers, payload = self.exchange(
+			"POST", DELETION_ROUTE, headers, '{"confirm": true}', timeout=20
+		)
 		self.assertEqual(status, 200)
 		self.assertEqual(json.loads(payload)["message"], {"submitted": True})
 		self.assertEqual(
@@ -416,7 +422,9 @@ class IdentityHttpTest(
 		self.assertEqual(self.identity_inventory({"limit": 2}, self.token())[0], 403)
 		self.assertIn(self.call("list_identities", {}, self.token())[0], {401, 403, 405})
 		headers = {"Authorization": f"Bearer {self.token()}", "Content-Type": "application/json"}
-		status, _headers, _body = self.exchange("GET", IDENTITY_INVENTORY_ROUTE, headers, json.dumps({"start": 1}))
+		status, _headers, _body = self.exchange(
+			"GET", IDENTITY_INVENTORY_ROUTE, headers, json.dumps({"start": 1})
+		)
 		self.assertEqual(status, 403)
 		for body in (
 			{"start": True},

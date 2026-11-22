@@ -30,9 +30,9 @@ class PressHttpClient:
 		octets = uuid4().bytes
 		self.request_ip = f"198.18.{octets[0]}.{octets[1]}"
 
-	def exchange(self, method, path, headers=None, body=None):
+	def exchange(self, method, path, headers=None, body=None, *, timeout=10):
 		port = int(os.environ["PANE_PORT"]) + 3
-		connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+		connection = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
 		try:
 			connection.request(
 				method,

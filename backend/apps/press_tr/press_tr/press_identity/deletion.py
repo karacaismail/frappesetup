@@ -13,6 +13,7 @@ from press_tr.press_identity.oidc import claim, issuer, reject, server_endpoint,
 ACCOUNT_DELETION_PAGE = "/account-deletion"
 REAUTHENTICATION_TTL = 300
 REAUTHENTICATION_CLOCK_SKEW = 5
+DEFAULT_DELETION_TIMEOUT = 45
 
 
 def human_identity(*, for_update=False):
@@ -76,7 +77,20 @@ def record_reauthentication(attempt: dict, claims: dict) -> None:
 	frappe.local.flags.commit = True
 
 
-def send_deletion_request(link, authenticated_at: int) -> None:
+def deletion_status() -> str | None:
+	for status in ("submitted", "pending"):
+		if frappe.cache.get_value(f"press_tr:deletion:{status}:{frappe.session.sid}"):
+			return status
+	return None
+
+
+def mark_deletion_status(status: str) -> None:
+	frappe.cache.set_value(
+		f"press_tr:deletion:{status}:{frappe.session.sid}", True, expires_in_sec=REAUTHENTICATION_TTL
+	)
+
+
+def send_deletion_request(link, authenticated_at: int) -> bool:
 	from oidc_verify import verify_access_token
 
 	service_url = frappe.conf.identity_sync_url
@@ -98,14 +112,27 @@ def send_deletion_request(link, authenticated_at: int) -> None:
 		if not isinstance(token, str) or not token:
 			raise BadGateway()
 		verify(verify_access_token, token, audience="identity-sync", allowed_azp={"press-service"})
+	except (requests.RequestException, ValueError, AttributeError):
+		raise BadGateway() from None
+
+	timeout = frappe.conf.get("press_deletion_request_timeout", DEFAULT_DELETION_TIMEOUT)
+	if type(timeout) is not int or timeout <= 0:
+		timeout = DEFAULT_DELETION_TIMEOUT
+	try:
 		response = requests.post(
 			f"{service_url.rstrip('/')}/v1/account-deletions",
 			headers={"Authorization": f"Bearer {token}"},
 			json={"issuer": link.issuer, "subject": link.subject, "reauthenticated_at": authenticated_at},
-			timeout=10,
+			timeout=timeout,
 			allow_redirects=False,
+			stream=True,
 		)
-	except (requests.RequestException, ValueError, AttributeError):
+	except requests.Timeout:
+		return False
+	except requests.RequestException:
 		raise BadGateway() from None
-	if response.status_code not in {200, 201, 202}:
+	status_code = response.status_code
+	response.close()
+	if status_code not in {200, 201, 202}:
 		raise BadGateway()
+	return True

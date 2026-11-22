@@ -26,7 +26,7 @@ form?.addEventListener("submit", async (event) => {
 		}
 
 		const { message } = await response.json();
-		if (typeof message?.url === "string" && message.submitted === undefined) {
+		if (typeof message?.url === "string" && message.submitted === undefined && message.pending === undefined) {
 			const destination = new URL(message.url);
 			if (destination.protocol !== "https:" && destination.protocol !== "http:") {
 				throw new Error();
@@ -34,7 +34,13 @@ form?.addEventListener("submit", async (event) => {
 			window.location.assign(destination.href);
 			return;
 		}
-		if (message?.submitted !== true || message.url !== undefined) {
+		if (message?.pending === true && message.url === undefined && message.submitted === undefined) {
+			status.textContent = form.dataset.pending;
+			restart.textContent = form.dataset.refresh;
+			restart.hidden = false;
+			return;
+		}
+		if (message?.submitted !== true || message.url !== undefined || message.pending !== undefined) {
 			throw new Error();
 		}
 		status.textContent = form.dataset.success;
