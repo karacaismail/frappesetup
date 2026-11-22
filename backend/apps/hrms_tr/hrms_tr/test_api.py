@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import frappe
 
 from hrms_tr import leave
-from hrms_tr.api import approve_leave
+from hrms_tr.api import approve_leave, cancel_leave, get_leave_approver
 
 
 def raise_permission_error(message, exc=frappe.PermissionError, **kwargs):
@@ -15,6 +15,15 @@ def raise_permission_error(message, exc=frappe.PermissionError, **kwargs):
 
 class ApprovalEndpointTest(TestCase):
 	def test_approve_leave_guest_denied(self):
+		self.assert_guest_denied(approve_leave)
+
+	def test_cancel_leave_guest_denied(self):
+		self.assert_guest_denied(cancel_leave)
+
+	def test_get_leave_approver_guest_denied(self):
+		self.assert_guest_denied(get_leave_approver)
+
+	def assert_guest_denied(self, endpoint):
 		with (
 			patch.object(frappe, "session", {"user": "Guest"}),
 			patch.object(frappe, "response", {}),
@@ -22,7 +31,33 @@ class ApprovalEndpointTest(TestCase):
 			patch.object(frappe, "throw", side_effect=raise_permission_error),
 		):
 			with self.assertRaises(frappe.PermissionError):
-				frappe.is_whitelisted(approve_leave)
+				frappe.is_whitelisted(endpoint)
+
+	def test_cancel_leave_foreign_data_denied(self):
+		doc = Mock()
+		doc.check_permission.side_effect = frappe.PermissionError("Foreign application")
+		with patch.object(leave, "frappe") as fake:
+			fake.get_roles.return_value = ["HRMS TR Admin"]
+			fake.get_doc.return_value = doc
+			with self.assertRaises(frappe.PermissionError):
+				cancel_leave("LEAVE-FOREIGN-0001", "2026-11-22 12:00:00")
+		fake.get_doc.assert_called_once_with("Leave Application", "LEAVE-FOREIGN-0001", for_update=True)
+		doc.check_permission.assert_called_once_with("read")
+		doc.cancel.assert_not_called()
+
+	def test_get_leave_approver_foreign_data_denied(self):
+		from hrms.hr.doctype.leave_application import leave_application as hrms_leave
+
+		with (
+			patch.object(leave, "frappe") as fake,
+			patch.object(hrms_leave, "validate_leave_access", side_effect=frappe.PermissionError) as validate,
+			patch.object(hrms_leave, "get_employee_leave_approver") as lookup,
+		):
+			fake.db.exists.return_value = True
+			with self.assertRaises(frappe.PermissionError):
+				get_leave_approver("EMP-FOREIGN-0001")
+		validate.assert_called_once_with("EMP-FOREIGN-0001", None)
+		lookup.assert_not_called()
 
 	def test_approve_leave_foreign_data_denied(self):
 		doc = Mock()
