@@ -16,6 +16,7 @@ import unittest
 import urllib.error
 import urllib.request
 
+from identity_sync.events import Event
 from identity_sync.server import TokenRejected, make_server
 
 from . import fakes
@@ -1306,3 +1307,94 @@ class ReconcileEndpointTest(ServerCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ListLimitTest(ServerCase):
+    """frappe-python-standartlari.md, P-3: a list that can grow has an explicit limit and a stable order."""
+
+    def queue(self, count: int) -> None:
+        store = self.stack.app.store
+        for number in range(count):
+            failed = Event(id=f"e-{number:03d}", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT)
+            store.add_dead_letter(failed, "tenant.provision kiraci1: HTTP 503")
+
+    def ids(self, query: str = "") -> tuple[list[str], object]:
+        status, body = self.call("GET", "/v1/dead-letters" + query, None, self.bearer(PREVIEW_TOKEN))
+        self.assertEqual(status, 200)
+        return [letter["event"]["id"] for letter in body["dead_letters"]], body.get("next_offset")
+
+    def test_dead_letter_list_is_cut_at_the_default_limit(self) -> None:
+        self.queue(101)
+
+        ids, next_offset = self.ids()
+
+        self.assertEqual((len(ids), ids[0], next_offset), (100, "e-000", 100))
+        self.assertEqual(self.ids("?offset=100"), (["e-100"], None))
+
+    def test_pages_do_not_overlap_and_cover_everything(self) -> None:
+        self.queue(7)
+        seen: list[str] = []
+        offset: object = 0
+        while offset is not None:
+            ids, offset = self.ids(f"?limit=3&offset={offset}")
+            self.assertLessEqual(len(ids), 3)
+            seen += ids
+
+        self.assertEqual(seen, [f"e-{number:03d}" for number in range(7)])
+
+    def test_bad_paging_values_are_refused(self) -> None:
+        for query in ("?limit=0", "?limit=501", "?limit=abc", "?offset=-1", "?limit=1&limit=2", "?offset=1.5"):
+            with self.subTest(query=query):
+                status, body = self.call("GET", "/v1/dead-letters" + query, None, self.bearer(PREVIEW_TOKEN))
+                self.assertEqual((status, body), (400, {"error": "bad_request"}))
+
+    def test_operation_list_has_the_same_limit(self) -> None:
+        store = self.stack.app.store
+        for number in range(5):
+            store.operation_begin(f"o-{number}", "invite_user", ORG_ID, ["s1"])
+
+        status, body = self.call("GET", "/v1/operations?limit=2", None, self.bearer(PREVIEW_TOKEN))
+
+        self.assertEqual(status, 200)
+        self.assertEqual(([o["operation_id"] for o in body["operations"]], body["next_offset"]), (["o-0", "o-1"], 2))
+        status, body = self.call("GET", "/v1/operations?limit=2&offset=4", None, self.bearer(PREVIEW_TOKEN))
+        self.assertEqual(([o["operation_id"] for o in body["operations"]], body.get("next_offset")), (["o-4"], None))
+
+
+class RateLimitTest(ServerCase):
+    """frappe-python-standartlari.md, G-7: endpoints that need no token limit the number of requests."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        import dataclasses
+
+        self.stack.app.settings = dataclasses.replace(self.stack.app.settings, rate_limit=5)
+        self.start_server(fake_verifier)
+
+    def test_requests_over_the_limit_get_429(self) -> None:
+        statuses = [self.call("GET", "/healthz")[0] for _ in range(7)]
+
+        self.assertEqual(statuses, [200] * 5 + [429] * 2)
+        self.assertEqual(self.call("GET", "/healthz"), (429, {"error": "rate_limited"}))
+
+    def test_unsigned_events_are_limited_too_and_write_nothing(self) -> None:
+        statuses = [self.call("POST", "/v1/events", json.dumps(EVENT).encode("utf-8"))[0] for _ in range(7)]
+
+        self.assertEqual(statuses, [401] * 5 + [429] * 2)
+        self.assertEqual(self.downstream_writes(), [])
+
+    def test_limit_opens_again_in_the_next_minute(self) -> None:
+        for _ in range(6):
+            self.call("GET", "/healthz")
+        self.assertEqual(self.call("GET", "/healthz")[0], 429)
+
+        self.now += 61
+
+        self.assertEqual(self.call("GET", "/healthz")[0], 200)
+
+    def test_default_limit_is_generous(self) -> None:
+        from identity_sync.config import load_settings
+
+        from .test_config_cli import ConfigTest
+
+        self.assertEqual(load_settings(ConfigTest.ENV).rate_limit, 600)

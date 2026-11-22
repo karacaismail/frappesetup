@@ -48,6 +48,8 @@ class Settings:
     service_audience: str = "identity-sync"
     # İş kilidini beklemenin en uzun süresi. Birim saniyedir.
     lock_timeout: float = 10.0
+    # Requests one client address may send in one minute. Over the limit the answer is 429.
+    rate_limit: int = 600
     # Keycloak realm'in iç kimliği. Keycloak olaylarındaki `realmId` bu değerdir, realm adı değildir.
     realm_id: str = ""
     # Yürütebilen istemciler: yalnız insan onayını denetleyen güvenilir servisler.
@@ -137,10 +139,11 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         port = int(get("PORT", "6115"))
         timeout = float(get("HTTP_TIMEOUT", "10"))
         lock_timeout = float(get("LOCK_TIMEOUT", "10"))
+        rate_limit = int(get("RATE_LIMIT", "600"))
     except ValueError:
-        raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT and {PREFIX}LOCK_TIMEOUT must be numbers") from None
-    if not 0 < port < 65536 or timeout <= 0 or lock_timeout <= 0:
-        raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT or {PREFIX}LOCK_TIMEOUT is out of range")
+        raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT, {PREFIX}LOCK_TIMEOUT and {PREFIX}RATE_LIMIT must be numbers") from None
+    if not 0 < port < 65536 or timeout <= 0 or lock_timeout <= 0 or not 0 < rate_limit <= 100_000:
+        raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT, {PREFIX}LOCK_TIMEOUT or {PREFIX}RATE_LIMIT is out of range")
     execute_azp, preview_azp = _names(get("EXECUTE_AZP")), _names(get("PREVIEW_AZP"))
     session_azp = _names(get("SESSION_AZP"))
     deletion_azp = _names(get("DELETION_AZP", DEFAULT_DELETION_AZP))
@@ -178,4 +181,5 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         session_azp=session_azp,
         deletion_azp=deletion_azp,
         lock_timeout=lock_timeout,
+        rate_limit=rate_limit,
     )

@@ -50,6 +50,8 @@ _MAX_DRAIN_BYTES = 1024 * 1024
 SIGNATURE_HEADER = "X-Identity-Sync-Signature"
 TIMESTAMP_HEADER = "X-Identity-Sync-Timestamp"
 SIGNATURE_WINDOW_SECONDS = 300
+DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_OFFSET = 100, 500, 1_000_000
+_NUMBER = re.compile(r"^[0-9]{1,7}$")
 # docs/sozlesmeler.md, section 7: a re-authentication older than this is refused.
 REAUTHENTICATION_MAX_AGE_SECONDS = 300
 CLOCK_SKEW_SECONDS = 30
@@ -135,6 +137,48 @@ def _event_mode(query: Query) -> str:
     raise _BadRequest
 
 
+def _page(query: Query) -> tuple[int, int]:
+    """Read `limit` and `offset` of a list request. A list that can grow always has a limit."""
+
+    def number(name: str, default: int, low: int, high: int) -> int:
+        values = query.get(name, [str(default)])
+        if len(values) != 1 or not _NUMBER.fullmatch(values[0]) or not low <= int(values[0]) <= high:
+            raise _BadRequest
+        return int(values[0])
+
+    if set(query) - {"limit", "offset"}:
+        raise _BadRequest
+    return number("limit", DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE), number("offset", 0, 0, MAX_OFFSET)
+
+
+def _paged(name: str, rows: list, limit: int, offset: int) -> dict[str, object]:
+    body: dict[str, object] = {name: rows[:limit]}
+    if len(rows) > limit:
+        body["next_offset"] = offset + limit
+    return body
+
+
+class _RateLimiter:
+    """Counts requests per client address in one-minute windows.
+
+    The service has endpoints that need no token: the health check and the signed event
+    endpoint, which reads the body before it can check the signature. The limit keeps one
+    address from flooding them. Counts live in memory and are dropped when the minute ends.
+    """
+
+    def __init__(self, per_minute: int) -> None:
+        self._per_minute = per_minute
+        self._window = -1
+        self._counts: dict[str, int] = {}
+
+    def allow(self, address: str, now: float) -> bool:
+        window = int(now // 60)
+        if window != self._window:
+            self._window, self._counts = window, {}
+        self._counts[address] = self._counts.get(address, 0) + 1
+        return self._counts[address] <= self._per_minute
+
+
 class _Api:
     """Uçların iş kısmı. HTTP ayrıntısını bilmez."""
 
@@ -176,8 +220,11 @@ class _Api:
         self._audit("reconcile", payload, azp, "executed")
         return 200, result
 
-    def get_dead_letters(self, _body: bytes, _azp: str) -> Reply:
-        return 200, {"dead_letters": [letter.to_dict() for letter in self._app.store.dead_letters()]}
+    def get_dead_letters(self, query: Query) -> Reply:
+        limit, offset = _page(query)
+        # One row more than asked tells whether another page exists.
+        letters = self._app.store.dead_letters(limit=limit + 1, offset=offset)
+        return 200, _paged("dead_letters", [letter.to_dict() for letter in letters], limit, offset)
 
     # --- yazma uçları: önizleme herkese, yürütme yalnız onay katmanına ---
 
@@ -407,8 +454,9 @@ class _Api:
 
     # --- unfinished multi-step work ---
 
-    def get_operations(self, _body: bytes, _azp: str) -> Reply:
-        return 200, {"operations": self._app.store.operations()}
+    def get_operations(self, query: Query) -> Reply:
+        limit, offset = _page(query)
+        return 200, _paged("operations", self._app.store.operations(limit=limit + 1, offset=offset), limit, offset)
 
     def post_resolve_operation(self, operation_id: str, body: bytes, azp: str) -> Reply:
         """Close an unfinished operation after a human settled it on the target.
@@ -453,17 +501,19 @@ def make_server(
     TokenHandler = Callable[[bytes, str], Reply]
     token_routes: dict[str, tuple[str, TokenHandler]] = {
         "/v1/reconcile": ("POST", api.post_reconcile),
-        "/v1/dead-letters": ("GET", api.get_dead_letters),
         "/v1/dead-letters/replay": ("POST", api.post_replay),
         "/v1/invitations": ("POST", api.post_invitation),
-        "/v1/operations": ("GET", api.get_operations),
         "/v1/sessions/revoke": ("POST", api.post_revoke_session),
         "/v1/account-deletions": ("POST", lambda body, azp: api.post_account_deletion(body, azp, clock())),
     }
     # Routes for platform_core site clients. Every other token route is for the preview and approval flow.
+    # Read-only lists. They take paging values from the query.
+    list_routes = {"/v1/dead-letters": api.get_dead_letters, "/v1/operations": api.get_operations}
+    limiter = _RateLimiter(settings.rate_limit)
     # Each of these routes has its own caller list. A client is in one list only.
     special_routes = {"/v1/sessions/revoke": settings.session_azp, "/v1/account-deletions": settings.deletion_azp}
     methods = {"/healthz": "GET", "/v1/events": "POST", **{path: route[0] for path, route in token_routes.items()}}
+    methods.update(dict.fromkeys(list_routes, "GET"))
 
     class RequestHandler(BaseHTTPRequestHandler):
         server_version = "identity_sync"
@@ -494,6 +544,9 @@ def make_server(
 
         def _guarded(self) -> Reply:
             parts = urlsplit(self.path)
+            if not limiter.allow(self.client_address[0], clock()):
+                self.close_connection = True  # the body was not read
+                return 429, {"error": "rate_limited"}
             try:
                 return self._respond(parts.path, parse_qs(parts.query, keep_blank_values=True))
             except _BadRequest:
@@ -542,6 +595,8 @@ def make_server(
                 return 403, {"error": "forbidden"}
             if resolve is not None:
                 return api.post_resolve_operation(resolve.group(1), body, azp)
+            if path in list_routes:
+                return list_routes[path](query)
             return token_routes[path][1](body, azp)
 
         def _read_body(self) -> bytes | None:

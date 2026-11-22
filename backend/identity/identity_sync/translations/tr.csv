@@ -1,3 +1,5 @@
+The largest number of records in the response. The default is 100. A value outside 1 to 500 returns 400.,Yanıttaki en çok kayıt sayısı. Varsayılan değer 100'dür. 1 ile 500 arasında olmayan değer 400 döner.,identity_sync.openapi.yaml: components.parameters.Limit.description
+"The number of records to skip. The default is 0. The order is stable, so pages do not overlap.","Atlanacak kayıt sayısı. Varsayılan değer 0'dır. Sıra kararlıdır, bu yüzden sayfalar çakışmaz.",identity_sync.openapi.yaml: components.parameters.Offset.description
 "The token is valid but the client has no permission for this operation. The error code is `forbidden`.
 For example, a client in the preview list asked for execution.
 ","Belirteç geçerli ama istemcinin bu işe izni yok. Hata kodu `forbidden` olur.
@@ -145,6 +147,7 @@ The service uses only the fields below. It drops the other fields.
 Servis yalnız aşağıdaki alanları kullanır. Öteki alanları atar.
 ",identity_sync.openapi.yaml: components.schemas.KeycloakUserEvent.description
 The internal id of the realm. It is not the realm name.,Realm'in iç kimliği. Realm adı değildir.,identity_sync.openapi.yaml: components.schemas.KeycloakUserEvent.properties.realmId.description
+Returned only when more records exist. Send this value as `offset` to read the next page.,Yalnız başka kayıt varsa döner. Sonraki sayfayı okumak için bu değeri `offset` olarak gönderin.,identity_sync.openapi.yaml: components.schemas.NextOffset.description
 One interrupted multi-step operation. It carries no email.,Yarıda kalan çok adımlı bir iş. E-posta taşımaz.,identity_sync.openapi.yaml: components.schemas.Operation.description
 "`failed` shows that a step failed for certain.
 `unknown` shows that the result of a step is not known. For example, the process stopped during a write.
@@ -497,6 +500,9 @@ These errors are not written separately on every endpoint.
 An unknown path returns 404 and `not_found`.
 A wrong method returns 405 and `method_not_allowed`.
 A body larger than 65,536 bytes returns 413 and `too_large`.
+One client address can send a limited number of requests in one minute. The default is 600.
+Over the limit the service returns 429 and `rate_limited` and does not read the body. The caller waits one minute.
+The limit also covers the endpoints that need no token. These are the health check and the event endpoint.
 An invalid `Content-Length` header also returns 413. The service does not support a chunked body.
 A storage file error returns 500 and `storage_failed`.
 If another process is handling an event, the service waits at most 10 seconds.
@@ -667,6 +673,9 @@ Bu hatalar her uçta ayrıca yazılmadı.
 Bilinmeyen yol 404 ve `not_found` döner.
 Yanlış yöntem 405 ve `method_not_allowed` döner.
 65.536 bayttan büyük gövde 413 ve `too_large` döner.
+Bir istemci adresi bir dakikada sınırlı sayıda istek gönderebilir. Varsayılan sınır 600'dür.
+Sınır aşılınca servis 429 ve `rate_limited` döner ve gövdeyi okumaz. Çağıran bir dakika bekler.
+Sınır belirteç istemeyen uçları da kapsar. Bunlar sağlık denetimi ve olay ucudur.
 Geçersiz `Content-Length` başlığı da 413 döner. Servis parçalı gövdeyi desteklemez.
 Kayıt dosyası hatası 500 ve `storage_failed` döner.
 Başka bir süreç bir olayı işliyorsa servis en çok 10 saniye bekler.
@@ -774,9 +783,11 @@ Requests the deletion of one account and executes the flow.,Bir hesabın silinme
 "This endpoint is the HTTP counterpart of the `dead-letters` command.
 The endpoint only reads. The records carry no email.
 Clients in the preview list and in the execute list can call this endpoint.
+The list is cut at the `limit` value. If more records exist, the response carries `next_offset`.
 ","Bu uç `dead-letters` komutunun HTTP karşılığıdır.
 Uç yalnız okur. Kayıtlar e-posta taşımaz.
 Önizleme listesindeki ve yürütme listesindeki istemciler bu ucu çağırabilir.
+Liste `limit` değerinde kesilir. Başka kayıt varsa yanıt `next_offset` taşır.
 ",identity_sync.openapi.yaml: paths./v1/dead-letters.get.description
 The waiting events. The oldest event comes first.,Bekleyen olaylar. En eski olay ilk sıradadır.,identity_sync.openapi.yaml: paths./v1/dead-letters.get.responses.200.description
 Lists the events in the dead-letter queue.,Bekleme kuyruğundaki olayları listeler.,identity_sync.openapi.yaml: paths./v1/dead-letters.get.summary
@@ -948,12 +959,14 @@ The service records every step before it writes it. When the step is done, it up
 If the process stops midway, the record shows which step stayed uncertain.
 Finished operations do not appear in the list. The record carries no email.
 Clients in the preview list and in the execute list can call this endpoint.
+The list is cut at the `limit` value. If more records exist, the response carries `next_offset`.
 ","Bu uç `operations` komutunun HTTP karşılığıdır. Uç yalnız okur.
 Davet Keycloak'a üç adımda yazar: kullanıcıyı açar, üye yapar ve e-posta gönderir.
 Servis her adımı yazmadan önce kaydeder. Adım bitince kaydı günceller.
 Süreç yarıda durursa kayıt hangi adımın belirsiz kaldığını gösterir.
 Biten işler listede görünmez. Kayıt e-posta taşımaz.
 Önizleme listesindeki ve yürütme listesindeki istemciler bu ucu çağırabilir.
+Liste `limit` değerinde kesilir. Başka kayıt varsa yanıt `next_offset` taşır.
 ",identity_sync.openapi.yaml: paths./v1/operations.get.description
 The interrupted operations. The oldest operation comes first.,Yarıda kalan işler. En eski iş ilk sıradadır.,identity_sync.openapi.yaml: paths./v1/operations.get.responses.200.description
 Lists the multi-step operations that were interrupted.,Yarıda kalan çok adımlı işleri listeler.,identity_sync.openapi.yaml: paths./v1/operations.get.summary

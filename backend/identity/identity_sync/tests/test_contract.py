@@ -409,6 +409,27 @@ class SchemaTest(ServerCase):
         self.assertRegex(job["target"], r"^del-[0-9a-f]{40}$")
         self.assertTrue(self.stack.tenant.user_of(issuer, "gone-1")["anonymized"])
 
+    def test_paged_lists(self) -> None:
+        from identity_sync.events import Event
+
+        store = self.stack.app.store
+        for number in range(3):
+            failed = Event(id=f"e-{number}", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT)
+            store.add_dead_letter(failed, "tenant.provision kiraci1: HTTP 503")
+            store.operation_begin(f"o-{number}", "invite_user", ORG_ID, ["s1"])
+        bearer = self.bearer(PREVIEW_TOKEN)
+        for path, key in (("/v1/dead-letters", "dead_letters"), ("/v1/operations", "operations")):
+            with self.subTest(path=path):
+                first = self.assert_response(self.call("GET", path + "?limit=2", None, bearer), "GET", path, 200)
+                self.assertEqual((len(first[key]), first["next_offset"]), (2, 2))
+                last = self.assert_response(self.call("GET", path + "?limit=2&offset=2", None, bearer), "GET", path, 200)
+                self.assertEqual((len(last[key]), "next_offset" in last), (1, False))
+                names = [p["$ref"].rsplit("/", 1)[1] for p in CONTRACT["paths"][path]["get"]["parameters"]]
+                self.assertEqual(names, ["Limit", "Offset"])
+        limit = CONTRACT["components"]["parameters"]["Limit"]["schema"]
+        self.assertEqual((limit["minimum"], limit["maximum"], limit["default"]), (1, 500, 100))
+        self.assertNotEqual(schema_errors({"dead_letters": [], "next_offset": 0}, CONTRACT["components"]["schemas"]["DeadLetterList"], CONTRACT), [])
+
     def test_every_difference_kind_is_in_the_contract(self) -> None:
         import inspect
 

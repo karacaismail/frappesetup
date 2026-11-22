@@ -186,7 +186,7 @@ def schema_errors(value: object, schema: dict, root: dict, path: str = "$") -> l
     """
     known = {
         "$ref", "type", "required", "properties", "additionalProperties", "enum", "const", "pattern",
-        "minLength", "maxLength", "items", "oneOf", "anyOf", "description", "examples",
+        "minLength", "maxLength", "items", "maxItems", "minimum", "maximum", "default", "oneOf", "anyOf", "description", "examples",
     }
     unknown = set(schema) - known
     if unknown:
@@ -227,6 +227,11 @@ def schema_errors(value: object, schema: dict, root: dict, path: str = "$") -> l
                 errors += schema_errors(item, properties[name], root, f"{path}.{name}")
             elif schema.get("additionalProperties") is False:
                 errors.append(f"{path}: unexpected {name}")
+    if isinstance(value, list) and len(value) > schema.get("maxItems", len(value)):
+        errors.append(f"{path}: more than {schema['maxItems']} items")
+    if isinstance(value, int) and not isinstance(value, bool):
+        if value < schema.get("minimum", value) or value > schema.get("maximum", value):
+            errors.append(f"{path}: out of range")
     if isinstance(value, list) and "items" in schema:
         for index, item in enumerate(value):
             errors += schema_errors(item, schema["items"], root, f"{path}[{index}]")

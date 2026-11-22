@@ -340,11 +340,12 @@ class Store:
         with self._transaction():
             self._db.execute("UPDATE operations SET subject = '' WHERE subject = ?", (subject,))
 
-    def operations(self) -> list[dict[str, object]]:
+    def operations(self, *, limit: int | None = None, offset: int = 0) -> list[dict[str, object]]:
         """Unfinished operations, oldest first. A human checks the target and resolves each one."""
         rows = self._db.execute(
             "SELECT operation_id, operation, organization_id, subject, steps, state FROM operations "
-            "WHERE state NOT IN ('done', 'resolved') ORDER BY created_at, operation_id"
+            "WHERE state NOT IN ('done', 'resolved') ORDER BY created_at, operation_id LIMIT ? OFFSET ?",
+            (-1 if limit is None else limit, offset),
         ).fetchall()
         result = []
         for operation_id, operation, organization_id, subject, steps, state in rows:
@@ -408,10 +409,16 @@ class Store:
         with self._transaction():
             self._db.execute("DELETE FROM dead_letters WHERE event_id = ?", (event_id,))
 
-    def dead_letters(self) -> list[DeadLetter]:
+    def dead_letters(self, *, limit: int | None = None, offset: int = 0) -> list[DeadLetter]:
+        """The queue, oldest first. The event id breaks ties, so paging is stable.
+
+        Without `limit` the whole queue is read. Only the replay does that: it must see every
+        event. A listing for a caller always passes a limit.
+        """
         rows = self._db.execute(
             "SELECT event, error, attempts, first_failed_at, last_failed_at, state FROM dead_letters "
-            "ORDER BY first_failed_at, event_id"
+            "ORDER BY first_failed_at, event_id LIMIT ? OFFSET ?",
+            (-1 if limit is None else limit, offset),
         ).fetchall()
         return [
             DeadLetter(

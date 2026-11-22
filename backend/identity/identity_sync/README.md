@@ -50,7 +50,15 @@ Komutları `backend/identity/identity_sync` klasöründe çalıştırın. Her ko
 | `python3 -m identity_sync dead-letters` | Bekleme kuyruğunu listeler. | `GET /v1/dead-letters` |
 | `python3 -m identity_sync replay-dead-letters` | Bekleyen olayları bir kez yeniden işler. | `POST /v1/dead-letters/replay` |
 
-- `replay-dead-letters --dry-run` hiçbir kaydı değiştirmez. Komut yalnız çalışacak işleri gösterir.
+`replay-dead-letters` komutu varsayılan olarak yalnız önizler. Yürütme için şu sırayı izleyin:
+
+1. `replay-dead-letters` komutunu çalıştırın. Komut çalışacak işleri ve `preview_digest` değerini gösterir. Hiçbir kaydı değiştirmez.
+2. İşleri inceleyin ve onay verin.
+3. `replay-dead-letters --execute --preview-digest <özet> --approval-id <onay kimliği>` komutunu çalıştırın.
+
+- Onay kimliği bir kez kullanılır.
+- Plan önizlemeden sonra değiştiyse komut hiçbir şey yazmaz. Yeni önizleme alın.
+- Liste uçları sayfalıdır. `GET /v1/dead-letters` ve `GET /v1/operations` en çok `limit` kadar kayıt döner. Varsayılan değer 100'dür. Başka kayıt varsa yanıt `next_offset` taşır.
 - `replay-dead-letters` sonucu bilinmeyen olayı atlar. `--include-unknown` bu olayları da işletir. Önce hedefi denetleyin.
 - `reconcile` fark bulursa 1 koduyla biter. Fark yoksa 0 koduyla biter.
 - `reconcile` varsayılan olarak yalnız rapor üretir. Hiçbir kaydı değiştirmez.
@@ -245,6 +253,14 @@ Kullanıcı bir telefon kurulumunu iptal edince kiracı sitesi `POST /v1/session
 - Yeni kiracı eklerken istemcisini bu listeye de yazın. Yazmazsanız o kiracı oturum kapatamaz.
 - Bu istemciler öteki uçları çağıramaz.
 
+## İstek sınırı
+
+Bir istemci adresi bir dakikada en çok 600 istek gönderebilir. Sınırı `IDENTITY_SYNC_RATE_LIMIT` ayarı değiştirir.
+
+- Sınır aşılınca servis 429 ve `rate_limited` döner. Servis o isteğin gövdesini okumaz.
+- Sınır belirteç istemeyen uçları da kapsar. Bunlar `/healthz` ve `/v1/events` uçlarıdır.
+- Sayaç bellekte durur ve dakika bitince sıfırlanır.
+
 ## Kimlik denetimi
 
 - Olay ucu imza ister. İmza HMAC-SHA256 ile üretilir.
@@ -260,9 +276,19 @@ Keycloak kendi olay biçiminde realm'in iç kimliğini gönderir. Realm adını 
 
 ## Kişisel veri
 
-- Servis e-postayı saklamaz. Kayıt dosyası yalnız olay kimliğini ve kullanıcı kimliğini tutar.
+Proje kaydı Keycloak kullanıcı kimliğini kişisel veri sayar. Servisin kayıt dosyası bu kimliği tutar. E-posta ve ad tutmaz.
+
+| Kayıt | Tutulan alan | Saklama süresi | Silme yolu |
+| --- | --- | --- | --- |
+| Bekleme kuyruğu | Olaydaki kullanıcı kimliği | Olay işlenene kadar | Olay işlenince servis satırı siler |
+| İşlem günlüğü | Davet edilen kullanıcının kimliği | İşlem bitene ya da çözülene kadar | Servis alanı boşaltır |
+| Bütün kayıtlar | Hesabı silinen kullanıcının kimliği | Silme işi bitene kadar | Silme işi bitince servis kalan alanları boşaltır |
+| İşlenen olaylar ve onaylar | Yalnız olay, iş ve onay kimliği | Süresiz | Kullanıcı kimliği taşımaz |
+
+- Silme işinin kimliği hesabın anahtarlı özetidir. Kimlikten kullanıcı bulunamaz.
 - Hata kaydı yanıt gövdesini taşımaz. Yalnız adımı ve durum kodunu taşır.
-- Mutabakat raporu e-posta taşımaz.
+- Günlük e-posta, belirteç ve oturum kimliği yazmaz.
+- Mutabakat raporu e-posta taşımaz. Kullanıcıyı Keycloak kimliğiyle anar.
 
 ## Testler
 
