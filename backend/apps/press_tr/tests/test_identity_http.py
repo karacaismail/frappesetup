@@ -72,10 +72,12 @@ class IdentityHttpTest(
 						return
 					request = json.loads(body)
 					cls.deletion_requests.append(request)
-					time.sleep(cls.deletion_delays.get(request["subject"], 0))
 					try:
 						status = cls.deletion_statuses.get(request["subject"], "accepted")
-						self.send_json(json.dumps({"status": status}).encode())
+						self.send_json(
+							json.dumps({"status": status}).encode(),
+							delay=cls.deletion_delays.get(request["subject"], 0),
+						)
 					except BrokenPipeError:
 						pass  # Press may have stopped waiting for the delayed response.
 					return
@@ -103,11 +105,14 @@ class IdentityHttpTest(
 					return
 				self.send_json(json.dumps({"id_token": fixture[1]}).encode())
 
-			def send_json(self, body):
+			def send_json(self, body, *, delay=0):
 				self.send_response(200)
 				self.send_header("Content-Type", "application/json")
 				self.send_header("Content-Length", str(len(body)))
 				self.end_headers()
+				self.wfile.flush()
+				if delay:
+					time.sleep(delay)
 				self.wfile.write(body)
 
 		cls.server = ThreadingHTTPServer(("127.0.0.1", 3205), IssuerHandler)
@@ -216,7 +221,7 @@ class IdentityHttpTest(
 		return subject, session, headers, auth_time
 
 	def test_account_deletion_waits_for_slow_service_and_sends_only_verified_identity(self):
-		subject, _, headers, auth_time = self.reauthenticate_deletion()
+		subject, _session, headers, auth_time = self.reauthenticate_deletion()
 		self.deletion_delays[subject] = 11
 		status, _headers, payload = self.exchange(
 			"POST", DELETION_ROUTE, headers, '{"confirm": true}', timeout=20
@@ -234,27 +239,38 @@ class IdentityHttpTest(
 		self.assertEqual(self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')[0], 403)
 
 	def test_account_deletion_timeout_refresh_and_retry(self):
-		subject, session, headers, _ = self.reauthenticate_deletion()
+		subject, session, headers, _auth_time = self.reauthenticate_deletion()
 		self.deletion_delays[subject] = 16
-		status, _, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}', timeout=25)
+		status, _headers, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}', timeout=25)
 		self.assertEqual(status, 200)
 		self.assertEqual(json.loads(payload)["message"], {"pending": True})
 
-		status, _, page = self.exchange("GET", "/account-deletion", session)
+		status, _headers, page = self.exchange("GET", "/account-deletion", session)
 		self.assertEqual(status, 200)
 		self.assertIn(b'id="account-deletion-status">Account deletion is in progress.', page)
 		self.assertEqual(sum(request["subject"] == subject for request in self.deletion_requests), 1)
 
 		self.deletion_delays[subject] = 0
 		self.deletion_statuses[subject] = "unknown"
-		status, _, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
+		status, _headers, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
 		self.assertEqual(status, 200)
-		self.assertEqual(json.loads(payload)["message"], {"submitted": True})
+		self.assertEqual(json.loads(payload)["message"], {"pending": True})
 		requests = [request for request in self.deletion_requests if request["subject"] == subject]
 		self.assertEqual(len(requests), 2)
 		self.assertEqual(requests[0], requests[1])
 
-		status, _, page = self.exchange("GET", "/account-deletion", session)
+		status, _headers, page = self.exchange("GET", "/account-deletion", session)
+		self.assertEqual(status, 200)
+		self.assertIn(b"Last status known to Press.", page)
+		self.assertIn(b'id="account-deletion-status">Account deletion is in progress.', page)
+		self.assertEqual(sum(request["subject"] == subject for request in self.deletion_requests), 2)
+
+		self.deletion_statuses[subject] = "processed"
+		status, _headers, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
+		self.assertEqual(status, 200)
+		self.assertEqual(json.loads(payload)["message"], {"submitted": True})
+
+		status, _headers, page = self.exchange("GET", "/account-deletion", session)
 		self.assertEqual(status, 200)
 		self.assertIn(b'role="status">Your deletion request was submitted.', page)
 

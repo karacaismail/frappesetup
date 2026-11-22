@@ -1,6 +1,6 @@
 {
   "scope": "backend/apps/press_tr",
-  "sha256": "1976dd6a42dacb543cf00ab25c4ccd5246337cbced681cf1de690a319bb3446b",
+  "sha256": "9c84489aaa10155d2efd1250b6b2b2bfcab404f65c68a6947a853df3ed580480",
   "findings": [
     {
       "rule": "frappe-guest-without-limit",
@@ -17,7 +17,7 @@
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/account.py",
-      "line": 17,
+      "line": 18,
       "reason": "Uses the current browser session, checks CSRF, and requires fresh reauthentication for deletion."
     },
     {

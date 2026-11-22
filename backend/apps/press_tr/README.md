@@ -114,6 +114,7 @@ Geçersiz ayar isteği durdurur. Press günlüğe bir uyarı yazar.
 Süreyi Identity Sync'in anonim yapma bekleme süresinden uzun tutun.
 Press bağlantı için en çok 10 saniye bekler. Bağlantı kurulamazsa sayfa hata gösterir.
 Yanıtı okuma süresi dolarsa sayfa silme işleminin sürdüğünü gösterir.
+Identity Sync sonucu `unknown` olarak bildirirse sayfa aynı durumu gösterir.
 Oturum açıkken sayfayı yenileyerek Press'in son bildiği durumu görün.
 Press bu bilgiyi aynı oturumda beş dakika saklar.
 İsteğin gönderilmesi, silmenin tamamlandığını göstermez.

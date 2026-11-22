@@ -1,11 +1,13 @@
 """Authorize deletion requests using a freshly verified Press browser session."""
 
+import json
 import logging
 import time
 
 import frappe
 import requests
 from frappe import _
+from urllib3.exceptions import HTTPError, ReadTimeoutError
 from werkzeug.exceptions import BadGateway, ServiceUnavailable
 
 from press_tr.press_identity.identity import IDENTITY_LINK, remember_press_session, validate_local_user
@@ -17,6 +19,7 @@ REAUTHENTICATION_CLOCK_SKEW = 5
 DEFAULT_DELETION_TIMEOUT = 45
 MAX_DELETION_TIMEOUT = 90
 DELETION_CONNECT_TIMEOUT = 10
+MAX_DELETION_RESPONSE_BYTES = 8 * 1024 * 1024
 
 
 def human_identity(*, for_update=False):
@@ -139,8 +142,21 @@ def send_deletion_request(link, authenticated_at: int) -> bool:
 		return False
 	except requests.RequestException:
 		raise BadGateway() from None
-	status_code = response.status_code
-	response.close()
-	if status_code not in {200, 201, 202}:
-		raise BadGateway()
-	return True
+	try:
+		if response.status_code not in {200, 201, 202}:
+			raise BadGateway()
+		if response.status_code != 200:
+			return True
+		body = response.raw.read(MAX_DELETION_RESPONSE_BYTES + 1, decode_content=True)
+		if len(body) > MAX_DELETION_RESPONSE_BYTES:
+			raise BadGateway()
+		result = json.loads(body)
+		if not isinstance(result, dict) or not isinstance(result.get("status"), str):
+			raise BadGateway()
+		return result["status"] != "unknown"
+	except (requests.ReadTimeout, ReadTimeoutError):
+		return False
+	except (requests.RequestException, HTTPError, ValueError):
+		raise BadGateway() from None
+	finally:
+		response.close()

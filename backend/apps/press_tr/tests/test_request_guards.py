@@ -6,6 +6,7 @@ from uuid import uuid4
 import frappe
 import requests
 from oidc_verify import JwksUnavailable
+from urllib3.exceptions import ReadTimeoutError
 from werkzeug.exceptions import Forbidden, ServiceUnavailable
 
 from press_tr import api, hooks
@@ -23,6 +24,8 @@ class RequestGuardsTest(unittest.TestCase):
 		)
 		token_response = Mock(status_code=200)
 		token_response.json.return_value = {"access_token": "fixture"}
+		processed = Mock(status_code=200)
+		processed.raw.read.return_value = b'{"status":"processed"}'
 		with (
 			patch.object(deletion, "frappe", SimpleNamespace(conf=config)),
 			patch.object(deletion, "server_endpoint", return_value="https://issuer.example.test/token"),
@@ -36,9 +39,18 @@ class RequestGuardsTest(unittest.TestCase):
 			for valid in (60.5, 90):
 				with self.subTest(timeout=valid):
 					config.press_deletion_request_timeout = valid
-					post.side_effect = [token_response, Mock(status_code=200)]
+					post.side_effect = [token_response, processed]
 					self.assertTrue(deletion.send_deletion_request(link, 1))
 					self.assertEqual(post.call_args.kwargs["timeout"], (10, valid))
+			unknown = Mock(status_code=200)
+			unknown.raw.read.return_value = b'{"status":"unknown"}'
+			post.side_effect = [token_response, unknown]
+			self.assertFalse(deletion.send_deletion_request(link, 1))
+			body_timeout = Mock(status_code=200)
+			body_timeout.raw.read.side_effect = ReadTimeoutError(None, "/fixture", "Read timed out.")
+			post.side_effect = [token_response, body_timeout]
+			self.assertFalse(deletion.send_deletion_request(link, 1))
+			body_timeout.close.assert_called_once()
 			post.side_effect = requests.ReadTimeout()
 			with self.assertRaises(deletion.BadGateway):
 				deletion.send_deletion_request(link, 1)

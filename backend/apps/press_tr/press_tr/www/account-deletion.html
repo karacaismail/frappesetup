@@ -4,6 +4,9 @@
 <section class="account-deletion-content">
 <h1>{{ _("Delete your account", context="press_tr") | e }}</h1>
 <p>{{ _("Deleting your account cannot be undone. Your access will end. Invoices and other business records will be kept.", context="press_tr") | e }}</p>
+{% if deletion_status | default(none) %}
+<p>{{ _("Last status known to Press.", context="press_tr") | e }}</p>
+{% endif %}
 {% if deletion_status | default(none) == "submitted" %}
 <p role="status">{{ _("Your deletion request was submitted.", context="press_tr") | e }}</p>
 {% elif deletion_csrf_token | default(false) %}

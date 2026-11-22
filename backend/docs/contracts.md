@@ -327,7 +327,7 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Press bağlantıyı 10 saniye, yanıtı varsayılan olarak 45 saniye bekler.
 - `press_deletion_request_timeout` yanıt süresini değiştirir. Sayı 0'dan büyük ve en çok 90 olmalıdır.
 - Ayar ondalıklı değer kabul eder. Geçersiz ayar isteği durdurur ve günlüğe uyarı yazılır.
-- Yalnız okuma süresi dolarsa Press `pending: true` döndürür. Bağlantı hatasında Press 502 döndürür.
+- Okuma süresi dolarsa veya Identity Sync `unknown` döndürürse Press `pending: true` döndürür. Bağlantı hatasında Press 502 döndürür.
 - Press son bildiği durumu aynı oturumda beş dakika saklar. Yenileme Identity Sync'e durum sormaz.
 - Press'in gönderildi yanıtı, işin tamamlandığını doğrulamaz.
 - Tekrar gönderim aynı hesap için yeni bir silme işi açmaz.
