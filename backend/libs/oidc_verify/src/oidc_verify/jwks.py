@@ -290,12 +290,12 @@ def _http_fetcher(
     return fetch
 
 
-def _anahtarlari_ayikla(veri: object) -> dict[str, object]:
+def _anahtarlari_ayikla(jwks_payload: object) -> dict[str, object]:
     """Listeden RS256 imza anahtarlarını çıkarır. Bozuk kayıt atlanır. Bozuk liste hata verir."""
-    if not isinstance(veri, dict) or not isinstance(veri.get("keys"), list):
+    if not isinstance(jwks_payload, dict) or not isinstance(jwks_payload.get("keys"), list):
         raise ValueError("JWKS gövdesi beklenen biçimde değil")
     keys: dict[str, object] = {}
-    for jwk in veri["keys"]:
+    for jwk in jwks_payload["keys"]:
         if not isinstance(jwk, dict):
             continue
         if jwk.get("kty") != "RSA" or jwk.get("use", "sig") != "sig":

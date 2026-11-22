@@ -14,7 +14,7 @@ import unittest
 import urllib.parse
 from hashlib import sha1
 
-from test_extensions import _open, _cookie_opener, _form_hedefi
+from test_extensions import _open, _cookie_opener, _form_action
 from helpers import admin, live_available, request, get_environment_value, tenant_authorize_url, tenant_authorize_with_pkce, tenant_callback_url, admin_token, safe_detail
 
 TOTP_USER = "totp.ornek@example.test"
@@ -90,18 +90,18 @@ class SecondFactorTest(unittest.TestCase):
         status, _, html = _open(opener, _authorize_url())
         self.assertEqual(status, 200)
         form = urllib.parse.urlencode({"username": TOTP_USER, "password": TOTP_PASSWORD, "credentialId": ""}).encode()
-        status, headers, html = _open(opener, _form_hedefi(html), form)
+        status, headers, html = _open(opener, _form_action(html), form)
         self.assertEqual(status, 200, "password alone must not finish the login")
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "the OTP form must be shown after the password")
         self._pause_for_quick_login_check()
         # A wrong code is rejected.
-        status, headers, html = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": "000000"}).encode())
+        status, headers, html = _open(opener, _form_action(html), urllib.parse.urlencode({"otp": "000000"}).encode())
         self.assertFalse("code=" in headers.get("Location", ""), f"HTTP {status}")
         self.assertTrue('name="otp"' in html, "wrong code must keep the OTP form")
         self._pause_for_quick_login_check()
         # The correct code completes the login with an authorization code.
-        status, headers, _ = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+        status, headers, _ = _open(opener, _form_action(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         self.assertEqual(status, 302)
         self.assertTrue("code=" in headers.get("Location", ""), f"HTTP {status}")
 
@@ -111,9 +111,9 @@ class SecondFactorTest(unittest.TestCase):
         opener = _cookie_opener()
         _, _, html = _open(opener, url)
         form = urllib.parse.urlencode({"username": TOTP_USER, "password": TOTP_PASSWORD, "credentialId": ""}).encode()
-        _, _, html = _open(opener, _form_hedefi(html), form)
+        _, _, html = _open(opener, _form_action(html), form)
         self._pause_for_quick_login_check()
-        _, headers, _ = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+        _, headers, _ = _open(opener, _form_action(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         code = urllib.parse.parse_qs(urllib.parse.urlsplit(headers["Location"]).query)["code"][0]
         token_url = f"{self.kc}/realms/platform/protocol/openid-connect/token"
         base = {
@@ -131,9 +131,9 @@ class SecondFactorTest(unittest.TestCase):
         url, verifier = tenant_authorize_with_pkce()
         opener = _cookie_opener()
         _, _, html = _open(opener, url)
-        _, _, html = _open(opener, _form_hedefi(html), form)
+        _, _, html = _open(opener, _form_action(html), form)
         self._pause_for_quick_login_check()
-        _, headers, _ = _open(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
+        _, headers, _ = _open(opener, _form_action(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         code = urllib.parse.parse_qs(urllib.parse.urlsplit(headers["Location"]).query)["code"][0]
         good = request("POST", token_url, form={**base, "code": code, "code_verifier": verifier})
         self.assertEqual(good.status, 200, safe_detail(good))

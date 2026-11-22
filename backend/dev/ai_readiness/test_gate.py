@@ -428,7 +428,8 @@ class GateTests(unittest.TestCase):
         self.assertEqual(self.run_gate("--json").returncode, 1)
 
     def test_naming_enforce_blocks_only_four_rule_codes(self):
-        self.write("dev/naming/enforcement.json", '{"mode": "enforce"}')
+        policy_path = "dev/naming/enforcement.json"
+        self.write(policy_path, (COMMAND.parents[2] / policy_path).read_text(encoding="utf-8"))
         blocking = ("legacy-name", "module-name", "translation-binding", "turkish-name")
         for rule in blocking:
             with self.subTest(rule=rule):
@@ -440,8 +441,18 @@ class GateTests(unittest.TestCase):
                 self.assertEqual(payload["checks"]["naming"], "fail")
                 severity = {finding["rule"]: finding["severity"] for finding in payload["findings"]}
                 self.assertEqual(severity, {f"naming.{rule}": "error", "naming.source-text": "warning"})
-        self.write_naming_findings("source-text")
-        self.assertEqual(self.run_gate("--json").returncode, 0)
+        for warning_rules in [(), ("source-text",)]:
+            with self.subTest(warnings=warning_rules):
+                self.write_naming_findings(*warning_rules)
+                result = self.run_gate("--json")
+                self.assertEqual(result.returncode, 0, result.stdout)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["checks"]["naming_mode"], "enforce")
+                self.assertEqual(payload["checks"]["naming"], "warn" if warning_rules else "pass")
+                self.assertEqual(
+                    [(finding["rule"], finding["severity"]) for finding in payload["findings"]],
+                    [(f"naming.{rule}", "warning") for rule in warning_rules],
+                )
 
     def test_naming_defaults_to_advisory_and_reports_missing_policy(self):
         self.write_naming_findings("module-name")

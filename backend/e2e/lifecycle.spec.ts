@@ -91,6 +91,7 @@ async function resource(request: APIRequestContext, origin: string, cookie: stri
 }
 
 test.describe('Press account deletion', () => {
+  test.skip(() => process.env.E2E_CHROMIUM_UNAVAILABLE === '1', 'Chromium could not launch.');
   test.skip(() => process.env.E2E_ACCOUNT_DELETION !== '1',
     'Requires the Press deletion page, identity-sync deletion workflow and dedicated synthetic fixtures.');
 
@@ -260,6 +261,7 @@ async function keycloakStillSignedIn(page: Page) {
 }
 
 test.describe('Employee idle session', () => {
+  test.skip(() => process.env.E2E_CHROMIUM_UNAVAILABLE === '1', 'Chromium could not launch.');
   test.skip(() => process.env.E2E_EMPLOYEE_IDLE !== '1',
       'Requires the employee one-hour idle configuration and the tenant forced re-authentication flow.');
 

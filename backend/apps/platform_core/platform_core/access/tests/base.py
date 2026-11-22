@@ -269,7 +269,7 @@ def ensure_fixtures() -> None:
 	frappe.db.commit()  # nosemgrep: frappe-request-commit
 
 
-class ErisimTestCase(IntegrationTestCase):
+class AccessRuleTestCase(IntegrationTestCase):
 	"""Each class sets up and deletes its own rules and records."""
 
 	# The shared test site has no worker, so a class runs the jobs that wait once many have

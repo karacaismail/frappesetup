@@ -11,7 +11,7 @@ class MaintenanceAccessTests:
 	def test_cleanup_expired_sessions_foreign_data_denied(self):
 		subject = uuid4().hex
 		session = self.sign_in(subject, f"{subject}@example.test", uuid4().hex)
-		status, _, page = self.exchange("GET", "/account-deletion", session)
+		status, _headers, page = self.exchange("GET", "/account-deletion", session)
 		self.assertEqual(status, 200)
 		csrf = re.search(rb'name="csrf_token" value="([^"]+)"', page).group(1).decode()
 		headers = {**session, "X-Frappe-CSRF-Token": csrf}

@@ -30,10 +30,10 @@ def validate() -> None:
 	request = getattr(frappe.local, "request", None)
 	if request is None or request.method == "OPTIONS":
 		return
-	from platform_core.identity import api as kimlik_api
+	from platform_core.identity import api as identity_api
 
 	service = request.path in SERVICE_ENDPOINTS
-	mobile = not service and kimlik_api.is_mobile_path(request.path)
+	mobile = not service and identity_api.is_mobile_path(request.path)
 	if not service and not mobile:
 		return
 	parts = (frappe.get_request_header("Authorization") or "").split(" ", 1)
@@ -49,7 +49,7 @@ def validate() -> None:
 		_refuse(_("Service requests must not carry a session cookie.", context="platform_core.identity"))
 
 	if mobile:
-		kimlik_api.authenticate_mobile_request(token)
+		identity_api.authenticate_mobile_request(token)
 		return
 
 	from oidc_verify import TokenError, verify_access_token
