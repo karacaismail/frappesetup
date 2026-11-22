@@ -7,6 +7,7 @@ import tokenize
 from pathlib import Path
 from typing import Iterator, Optional, Union
 
+from semgrep_exceptions import CONFIG, GUEST_LIMIT, approved_keys
 
 FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
 Function = Union[ast.FunctionDef, ast.AsyncFunctionDef]
@@ -129,7 +130,7 @@ def test_names(path: Path) -> set[str]:
     }
 
 
-def inventory(apps: Path) -> tuple[list[str], list[str], list[str]]:
+def inventory(apps: Path, reviewed: frozenset = frozenset()) -> tuple[list[str], list[str], list[str]]:
     routes = []
     guest_routes = []
     errors = []
@@ -165,7 +166,14 @@ def inventory(apps: Path) -> tuple[list[str], list[str], list[str]]:
                     routes.append(entry)
                     if guest is True:
                         guest_routes.append(entry)
-                        if not has_rate_limit(statement.decorator_list[index + 1:], modules, limiters):
+                        reviewed_logout = (
+                            module == "press_tr.api"
+                            and name == "keycloak_backchannel_logout"
+                            and (GUEST_LIMIT, f"backend/apps/{relative.as_posix()}", decorator.lineno) in reviewed
+                        )
+                        if not reviewed_logout and not has_rate_limit(
+                            statement.decorator_list[index + 1:], modules, limiters
+                        ):
                             errors.append(f"{relative}:{statement.lineno} rate_limit uç kaydının altında olmalı.")
                     if guest is None:
                         errors.append(f"{relative}:{statement.lineno} allow_guest belirsiz.")
@@ -188,7 +196,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Frappe uçlarını ve yetki testi adlarını denetler.")
     parser.add_argument("backend", type=Path, help="Backend klasörü")
     args = parser.parse_args()
-    routes, guest_routes, errors = inventory(args.backend / "apps")
+    reviewed = frozenset(approved_keys(args.backend.resolve().parent, CONFIG))
+    routes, guest_routes, errors = inventory(args.backend / "apps", reviewed)
     for heading, entries in (("Tüm uçlar", routes), ("Misafire açık uçlar", guest_routes)):
         print(f"{heading} ({len(entries)})")
         for entry in sorted(entries):

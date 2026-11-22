@@ -8,6 +8,8 @@ from pathlib import Path
 CONFIG = Path(__file__).with_name("semgrep-exceptions.json")
 RULES = Path("backend/dev/guvenlik/fixtures/rules.yaml")
 REVIEWABLE = {"frappe-missing-permission", "frappe-ignore-permissions"}
+PRESS_LOGOUT = "backend/apps/press_tr/press_tr/api/__init__.py"
+GUEST_LIMIT = "frappe-guest-without-limit"
 
 
 def source_digest(root, scope):
@@ -26,17 +28,25 @@ def source_digest(root, scope):
     return digest.hexdigest()
 
 
-def reviewed_findings(root, config, findings, before):
+def approved_keys(root, config, before=None):
     review = json.loads(config.read_text())
     scope = review["scope"]
-    if before != review["sha256"] or source_digest(root, scope) != before:
-        return findings
-    allowed = {
+    current = source_digest(root, scope)
+    if current is None or current != review["sha256"] or (before is not None and current != before):
+        return set()
+    return {
         (entry["rule"], entry["path"], entry["line"])
         for entry in review["findings"]
-        if entry["rule"] in REVIEWABLE and entry["reason"].strip()
+        if (entry["rule"] in REVIEWABLE or (entry["rule"], entry["path"]) == (GUEST_LIMIT, PRESS_LOGOUT))
+        and entry["reason"].strip()
         and Path(entry["path"]).is_relative_to(Path(scope))
     }
+
+
+def reviewed_findings(root, config, findings, before):
+    if before is None:
+        return findings
+    allowed = approved_keys(root, config, before)
     remaining = []
     for finding in findings:
         rule = finding["check_id"].rsplit(".", 1)[-1]

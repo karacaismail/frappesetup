@@ -1,11 +1,17 @@
 {
   "scope": "backend/apps/press_tr",
-  "sha256": "a8118c9862f7ae11e719e12a8af5c384e188881226a9fb8ac696b9b40f2dd1df",
+  "sha256": "f6b6f9a6e6d7e45f5bc00153b1d42297108bf5f4adabb399d90d81a40d649d0c",
   "findings": [
+    {
+      "rule": "frappe-guest-without-limit",
+      "path": "backend/apps/press_tr/press_tr/api/__init__.py",
+      "line": 34,
+      "reason": "The contract exempts signature-verified logout notifications from endpoint rate limiting. Rejected notifications are limited to 120 per minute."
+    },
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/__init__.py",
-      "line": 38,
+      "line": 34,
       "reason": "Verifies the signed logout notification and restricts revocation to matched sessions."
     },
     {
@@ -17,13 +23,13 @@
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/auth.py",
-      "line": 32,
+      "line": 33,
       "reason": "Starts browser-bound login without reading or modifying an application record."
     },
     {
       "rule": "frappe-missing-permission",
       "path": "backend/apps/press_tr/press_tr/api/auth.py",
-      "line": 142,
+      "line": 144,
       "reason": "Consumes browser-bound state once and verifies ID token claims before binding identity."
     },
     {
@@ -59,7 +65,7 @@
     {
       "rule": "frappe-ignore-permissions",
       "path": "backend/apps/press_tr/press_tr/api/__init__.py",
-      "line": 111,
+      "line": 93,
       "reason": "Deletes only session mappings selected by the verified logout notification."
     },
     {
