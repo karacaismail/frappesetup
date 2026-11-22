@@ -27,11 +27,11 @@ claims = verify_logout_token(token, cache=cache, issuer=iss, client_id="press", 
 - Eski anahtarlar sınırsız süre kullanılmaz. Son başarılı çekimden sonra `ttl_seconds + max_stale_seconds` saniye geçince eski anahtarlar da reddedilir. Bu durumda `JwksUnavailable` yükselir. Yeni bir çekim başarılı olunca süre yeniden başlar. `max_stale_seconds` varsayılan 3600 saniyedir ve `JwksCache` kurucusuna anahtar kelimeyle verilir.
 - Anahtar listesi yalnız HTTPS ile indirilir (G-13). Düz HTTP yalnız geliştirme adresinde kabul edilir. Geliştirme adresi `localhost`, `.localhost` ile biten bir ad ya da yerel IP adresidir. Örnek: `http://kimlik.localhost:5070`. Başka bir `http` adresi verilirse `JwksCache` kurucusu `ValueError` yükseltir.
 - İndirme yönlendirmeyi izlemez. Sunucu yönlendirme yanıtı verirse çekim başarısız olur. Önbellekte güvenilir anahtar yoksa `JwksUnavailable` yükselir.
-- İndirmenin toplam süresi `total_timeout` saniyedir. Varsayılan 10 saniyedir. Süre bağlantıyı, başlıkları ve gövdeyi birlikte kapsar. Süre dolunca bağlantı kesilir.
+- `total_timeout`, bir indirme çağrısının süre sınırıdır. Varsayılan 10 saniyedir. Önceki işi bekleme ve adres araması bu süreye girer. Bağlantı, şifreli bağlantı, başlıklar ve gövde de bu süreye girer. Süre dolunca açık bağlantı kesilir.
 - Önbellekteki anahtarın süresi geçmiş olabilir. Anahtar güvenilir süre içindeyse çağrı yenilemeyi beklemez. Başka bir çağrı yeniliyorsa önbellekteki anahtarı hemen alır.
-- Aynı anda yalnız bir çekim çalışır. Anahtarı önbellekte olan çağrı, süren çekimi beklemez. Bilinmeyen `kid` ile gelen çağrılar süren çekimi bekler ve ikinci bir çekim başlatmaz. Aynı anda başlayan iki yenileme tek çekim yapar. İkinci çağrı birincinin sonucunu okur.
+- Her önbellek aynı anda en çok bir indirme işi çalıştırır. Önceki iş sürüyorsa yeni iş başlamaz. Çağrı önceki işin bitmesini süre sınırına kadar bekler. Önceki iş zamanında biterse yeni iş kalan süreyi kullanır.
 - Çekilen yanıt en çok `max_bytes` bayt okunur. Varsayılan 1 MiB'dir. Daha büyük yanıt hata sayılır ve eski anahtarlar korunur.
-- Bir indirmenin tamamı en çok `total_timeout` saniye sürer. Varsayılan 10 saniyedir. `timeout` değeri tek bir soket işlemini sınırlar. Varsayılan 5 saniyedir. Sunucu yavaş yavaş birkaç bayt gönderebilir. İndirme yine `total_timeout` sonunda kesilir. Kesilen indirme başarısız çekim sayılır. Eski anahtarlar korunur. En kötü durumda indirme `total_timeout + timeout` saniye sürer.
+- `timeout` tek bir ağ işlemini sınırlar. Varsayılan 5 saniyedir. Sistem adres aramasını kesemez. Adres araması süre dolduktan sonra biterse iş bağlantı açmadan kapanır. [Süre sınırı kararı](../../docs/kararlar/0015-oidc-verify-key-download-limit.md)
 - Yenileme bekleyen çağrı en çok `wait_timeout` saniye bekler. Varsayılan `total_timeout + 1` saniyedir. Anahtar önbellekte varsa ve eski anahtar süresi dolmadıysa süre dolan çağrı o anahtarı kullanır. Başka durumda `JwksUnavailable` yükselir. Çekim kilidi her durumda bırakılır. Çekim hata verse ya da süre dolsa bile kilit bırakılır.
 - Kimlik belirtecinde `nonce=None` verilirse `nonce` denetimi atlanır. Bu yalnız `nonce` göndermeyen akışlar içindir. Giriş akışı `nonce` gönderdiyse çağıran değeri vermek zorundadır.
 - Çıkış belirtecinde imza, `iss`, `aud`, `exp`, `iat`, `jti`, `events` anahtarı, `sid` ya da `sub` varlığı ve `nonce` yokluğu denetlenir. `exp`, `iat` ve `jti` zorunludur. `jti` boş olmayan metin olmalıdır. `events` bir nesne olmalı ve `http://schemas.openid.net/event/backchannel-logout` anahtarının değeri de nesne olmalıdır. `sid` ve `sub` varsa boş olmayan metin olmalıdır.
@@ -80,4 +80,3 @@ Kalan fark şudur. Bu yüzden kendi önbelleğimiz kaldı:
 - İki PyJWT sürümünde de yönlendirme izlenmez. `PyJWKClient` bunu yalnız 2.15.1 sürümünde yapar.
 
 Geri dönüş koşulu: PyJWT bu farkları kapatırsa `JwksCache`, `PyJWKClient` üzerine kurulur. Dış arayüz değişmez.
-
