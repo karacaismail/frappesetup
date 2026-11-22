@@ -38,6 +38,7 @@ Hata kalırsa API denemesi, geçidin hata kodunu ve sahte sağlayıcı yanıtlar
 
 Tarayıcı girişi `site-kiraci1` istemcisini kullanır. Canlı önizleme bu istemcinin servis belirteci isteğini reddettiğini doğrular.
 `site-kiraci1-service` ayrı bir sır kullanır. Önizleme, bu istemcinin yalnız `identity-sync` hedefli belirteç aldığını doğrular.
+Önizleme bu sırrı her koşuda yeniden üretir. Keycloak ve Frappe süreçleri sırrı ortam değişkeninden alır.
 
 ## Sonuçlar
 

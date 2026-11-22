@@ -163,7 +163,8 @@ defaults = {}
 for line in source.read_text().splitlines():
     if line and not line.startswith("#") and "=" in line:
         key, _, value = line.partition("=")
-        defaults[key] = token_urlsafe(32) if value.startswith("degistir-") else value
+        if key != "ATONOTA_SITE_KIRACI1_SERVICE_SECRET":
+            defaults[key] = token_urlsafe(32) if value.startswith("degistir-") else value
 defaults.setdefault("IDENTITY_SYNC_WEBHOOK_SECRET", token_urlsafe(32))
 keycloak.write_text("".join(f"{key}={value}\n" for key, value in defaults.items()))
 press.write_text("".join(f"{key}={token_urlsafe(32)}\n" for key in ("PRESS_DB_PASSWORD", "PRESS_ADMIN_PASSWORD")))
@@ -174,7 +175,9 @@ E2E_ADMIN_PASSWORD="$(setting ADMIN_PASSWORD "$DEV_ENV_FILE")"
 E2E_KEYCLOAK_ADMIN_USER="$(setting KC_BOOTSTRAP_ADMIN_USERNAME "$keycloak_env")"
 E2E_KEYCLOAK_ADMIN_PASSWORD="$(setting KC_BOOTSTRAP_ADMIN_PASSWORD "$keycloak_env")"
 E2E_KEYCLOAK_CLIENT_SECRET="$(setting ATONOTA_SITE_KIRACI1_SECRET "$keycloak_env")"
-E2E_KEYCLOAK_SERVICE_CLIENT_SECRET="$(setting ATONOTA_SITE_KIRACI1_SERVICE_SECRET "$keycloak_env")"
+ATONOTA_SITE_KIRACI1_SERVICE_SECRET="$(python3 -c 'from secrets import token_urlsafe; print(token_urlsafe(32))')"
+export ATONOTA_SITE_KIRACI1_SERVICE_SECRET
+E2E_KEYCLOAK_SERVICE_CLIENT_SECRET="$ATONOTA_SITE_KIRACI1_SERVICE_SECRET"
 E2E_PRESS_CLIENT_SECRET="$(setting ATONOTA_PRESS_SECRET "$keycloak_env")"
 E2E_PRESS_ADMIN_PASSWORD="$(setting PRESS_ADMIN_PASSWORD "$press_env")"
 E2E_IDENTITY_SYNC_WEBHOOK_SECRET="$(setting IDENTITY_SYNC_WEBHOOK_SECRET "$keycloak_env")"
@@ -199,7 +202,10 @@ overrides = {
         "kiraci-socket": {"image": image, "pull_policy": "never", "mem_limit": "128m"},
     },
     "keycloak": {
-        "keycloak": {"image": f"{project}-keycloak", "pull_policy": "never", "mem_limit": "1100m"},
+        "keycloak": {
+            "image": f"{project}-keycloak", "pull_policy": "never", "mem_limit": "1100m",
+            "environment": {"ATONOTA_SITE_KIRACI1_SERVICE_SECRET": "${ATONOTA_SITE_KIRACI1_SERVICE_SECRET:?}"},
+        },
         "keycloak-db": {"mem_limit": "256m"},
         "mailpit": {"mem_limit": "64m"},
     },
@@ -296,9 +302,10 @@ wait_http "http://127.0.0.1:$sync_port/healthz"
 wait_http "http://127.0.0.1:$provider_port/attempts"
 
 # Frappe caches site settings on requests, including the readiness ping.
+docker_default cp "$suite_dir/preview/preview_site_config.py" "$tenant:/tmp/preview_site_config.py"
 python3 "$suite_dir/preview/fixtures.py" prepare
 docker_default exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c "exec bench serve --port \"\$PRESS_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
-docker_default exec -d "$tenant" bash -c "exec bench serve --port \"\$KIRACI_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
+docker_default exec -d -e PYTHONPATH=/tmp -e E2E_KEYCLOAK_SERVICE_CLIENT_SECRET "$tenant" bash -c "exec bench serve --port \"\$KIRACI_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
 wait_http "$ATONOTA_SITE_KIRACI1_URL/api/method/ping"
 wait_http "$ATONOTA_PRESS_URL/api/method/ping"
 node "$suite_dir/preview/run-tests.mjs" "$worktree"

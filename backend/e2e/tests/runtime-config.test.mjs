@@ -27,7 +27,7 @@ test('preview webhook uses the Keycloak development hostname and its network ali
     for (const path of [join(dev, 'press'), keycloak, bin]) mkdirSync(path, { recursive: true });
     writeFileSync(join(dev, 'press', 'install.sh'), '');
     copyFileSync(fileURLToPath(new URL('../../dev/init_env.py', import.meta.url)), join(dev, 'init_env.py'));
-    writeFileSync(join(keycloak, '.env.example'), '');
+    writeFileSync(join(keycloak, '.env.example'), 'ATONOTA_SITE_KIRACI1_SERVICE_SECRET=degistir-preview\n');
     const stubs = {
       nc: 'exit 1',
       colima: 'exit 17',
@@ -41,6 +41,10 @@ test('preview webhook uses the Keycloak development hostname and its network ali
           "compose --project-name")
             if [[ "$*" == *" config --quiet" ]]; then printf '%s\\n' "$IDENTITY_SYNC_EVENTS_URL" > "$PREVIEW_DIR/webhook"; fi ;;
           "create --label")
+            [[ -n "$ATONOTA_SITE_KIRACI1_SERVICE_SECRET" ]] && touch "$PREVIEW_DIR/service-secret-in-env"
+            if grep -q '^ATONOTA_SITE_KIRACI1_SERVICE_SECRET=' "$PREVIEW_DIR/keycloak.env"; then
+              touch "$PREVIEW_DIR/service-secret-on-disk"
+            fi
             for ((index = 1; index < $#; index++)); do
               if [[ "\${!index}" == --env-file ]]; then
                 next=$((index + 1))
@@ -75,6 +79,8 @@ test('preview webhook uses the Keycloak development hostname and its network ali
     assert.equal(webhook.hostname, 'event-sink.localhost');
     assert.equal(webhook.pathname, '/v1/events');
     assert.equal(readFileSync(join(root, 'alias'), 'utf8').trim(), webhook.hostname);
+    assert.equal(readFileSync(join(root, 'service-secret-in-env'), 'utf8'), '');
+    assert.throws(() => readFileSync(join(root, 'service-secret-on-disk')), { code: 'ENOENT' });
     assert.deepEqual(readFileSync(join(root, 'tenant-service-clients'), 'utf8').trim().split('\n'), [
       'IDENTITY_SYNC_SESSION_AZP=site-kiraci1-service',
       'IDENTITY_SYNC_EXECUTE_AZP=site-kiraci1-service',
