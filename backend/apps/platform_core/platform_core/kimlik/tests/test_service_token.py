@@ -94,7 +94,7 @@ class TestServiceToken(FrappeAPITestCase):
 		response = self.call(None, client=admin)
 		self.assertEqual(response.status_code, 403, "a session alone must not open the service endpoint")
 
-	def test_token_is_accepted_only_on_the_three_identity_endpoints(self):
+	def test_token_is_accepted_only_on_the_service_endpoints(self):
 		token = self.key.sign(h.access_payload())
 		response = h.request(
 			h.new_client().post,

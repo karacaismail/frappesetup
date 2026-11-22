@@ -29,7 +29,6 @@ def logout_current_session() -> dict:
 	if helpers.is_session_id(keycloak_sid):
 		sign_in.forget_keycloak_session(keycloak_sid, frappe.session.sid)
 	frappe.local.login_manager.logout()
-	frappe.db.commit()
 	return {
 		"logout_url": helpers.end_session_url(
 			settings.public_url, settings.realm, settings.client_id, settings.panel_url
@@ -95,7 +94,8 @@ def handle_logout_token(logout_token: object) -> dict:
 
 def _validate_logout_claims(claims: dict) -> None:
 	"""OpenID Connect Back-Channel Logout 1.0, section 2.4: exp and jti are required, the event value
-	is a JSON object and sid, when present, is a string. The shared library does not enforce these yet."""
+	is a JSON object and sid, when present, is a string. The shared library does not enforce these yet.
+	BORC(mvp): owner kimlik-realm. Closes when `oidc_verify` enforces these claims for logout tokens."""
 	if not isinstance(claims.get("exp"), int | float) or isinstance(claims.get("exp"), bool):
 		_reject(_("Logout token rejected: {0}", context="platform_core.kimlik").format("missing_exp"))
 	jti = claims.get("jti")
@@ -144,6 +144,7 @@ def sessions_for_user_before(user: str, iat: int) -> list[tuple[str, str]]:
 		.select(sessions.sid, sessions.user, sessions.sessiondata)
 		.where(sessions.user == user)
 		.orderby(sessions.lastupdate)
+		.orderby(sessions.sid)
 		.limit(BATCH)
 		.run()
 	)

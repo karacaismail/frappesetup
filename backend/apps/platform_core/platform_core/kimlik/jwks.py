@@ -14,6 +14,7 @@ def is_keys_unavailable(error: BaseException) -> bool:
 
 	The package does not export that class yet, and the module boundary check forbids importing
 	`oidc_verify.hatalar` directly. kimlik-realm was asked to export it; until then it is matched by name.
+	BORC(mvp): owner kimlik-realm. Closes when `oidc_verify` exports `JwksUnavailable`.
 	"""
 	return type(error).__name__ == "JwksUnavailable"
 

@@ -8,6 +8,8 @@ PROVIDER_BASE_NAME = "Keycloak"
 IDENTITY_API_PREFIX = "/api/method/platform_core.api.identity."
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
 _CONTROL_OR_SPACE = re.compile(r"[\x00-\x20\x7f]")
+# G-11: only characters that are safe inside an HTML attribute and a URL path, query and fragment.
+_SAFE_REDIRECT = re.compile(r"/[A-Za-z0-9\-._~/?#@!$&()*+,;=%:\[\]]*")
 MAX_REDIRECT_LENGTH = 2048
 MAX_GUEST_BODY_BYTES = 16 * 1024
 MAX_TOKEN_LENGTH = 8192
@@ -34,12 +36,9 @@ def end_session_url(
 	realm: str,
 	client_id: str,
 	post_logout_redirect_uri: str,
-	id_token_hint: str | None = None,
 ) -> str:
 	"""Keycloak RP-initiated logout address."""
 	params = {"client_id": client_id, "post_logout_redirect_uri": post_logout_redirect_uri}
-	if id_token_hint:
-		params["id_token_hint"] = id_token_hint
 	return realm_url(public_url, realm) + "/protocol/openid-connect/logout?" + urlencode(params)
 
 
@@ -51,7 +50,7 @@ def is_safe_redirect(path: object) -> bool:
 		return False
 	if "\\" in path or _CONTROL_OR_SPACE.search(path):
 		return False
-	return True
+	return bool(_SAFE_REDIRECT.fullmatch(path))
 
 
 def is_session_id(value: object) -> bool:

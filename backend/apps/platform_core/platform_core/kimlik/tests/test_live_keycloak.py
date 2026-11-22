@@ -1,10 +1,10 @@
 """Integration test against a live Keycloak.
 
 The test is skipped unless these environment variables are set:
-- `KIMLIK_CANLI_SITE_URL`: browser address of this site, for example http://kiraci1.localhost:8661
-- `KIMLIK_CANLI_KEYCLOAK_URL`: Keycloak address, for example http://kimlik.localhost:8660
-- `KIMLIK_CANLI_KULLANICI` and `KIMLIK_CANLI_PAROLA`: a fictional sample user of the realm
-- `KIMLIK_CANLI_ADMIN` and `KIMLIK_CANLI_ADMIN_PAROLA`: Keycloak bootstrap admin (triggers back-channel logout)
+- `IDENTITY_LIVE_SITE_URL`: browser address of this site, for example http://kiraci1.localhost:8661
+- `IDENTITY_LIVE_KEYCLOAK_URL`: Keycloak address, for example http://kimlik.localhost:8660
+- `IDENTITY_LIVE_USER` and `IDENTITY_LIVE_PASSWORD`: a fictional sample user of the realm
+- `IDENTITY_LIVE_ADMIN` and `IDENTITY_LIVE_ADMIN_PASSWORD`: Keycloak bootstrap admin (triggers back-channel logout)
 
 Site settings must point at the real Keycloak. The test creates the “Social Login Key” from site settings.
 """
@@ -22,12 +22,12 @@ from frappe.tests import IntegrationTestCase
 from platform_core.kimlik import provider_setup, site_settings
 from platform_core.kimlik.tests import helpers as h
 
-SITE_URL = os.environ.get("KIMLIK_CANLI_SITE_URL", "").rstrip("/")
-KC_URL = os.environ.get("KIMLIK_CANLI_KEYCLOAK_URL", "").rstrip("/")
-USER = os.environ.get("KIMLIK_CANLI_KULLANICI", "")
-PASSWORD = os.environ.get("KIMLIK_CANLI_PAROLA", "")
-ADMIN = os.environ.get("KIMLIK_CANLI_ADMIN", "")
-ADMIN_PASSWORD = os.environ.get("KIMLIK_CANLI_ADMIN_PAROLA", "")
+SITE_URL = os.environ.get("IDENTITY_LIVE_SITE_URL", "").rstrip("/")
+KC_URL = os.environ.get("IDENTITY_LIVE_KEYCLOAK_URL", "").rstrip("/")
+USER = os.environ.get("IDENTITY_LIVE_USER", "")
+PASSWORD = os.environ.get("IDENTITY_LIVE_PASSWORD", "")
+ADMIN = os.environ.get("IDENTITY_LIVE_ADMIN", "")
+ADMIN_PASSWORD = os.environ.get("IDENTITY_LIVE_ADMIN_PASSWORD", "")
 READY = all((SITE_URL, KC_URL, USER, PASSWORD, ADMIN, ADMIN_PASSWORD))
 TIMEOUT = 20
 

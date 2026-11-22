@@ -59,12 +59,14 @@ def keycloak_callback(
 
 
 @frappe.whitelist(methods=["POST"])
+@rate_limit(limit=20, seconds=60, user_based=True)
 def logout() -> dict:
 	"""Closes the Frappe session and returns the Keycloak logout address."""
 	return sign_out.logout_current_session()
 
 
 @frappe.whitelist(methods=["POST"])
+@rate_limit(limit=10, seconds=60, user_based=True)
 def setup_keycloak_login() -> dict:
 	"""Creates or updates the Keycloak “Social Login Key” from site settings. System Manager only."""
 	frappe.only_for("System Manager")

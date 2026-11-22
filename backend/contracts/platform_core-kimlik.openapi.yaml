@@ -59,6 +59,9 @@ info:
     The error body is the usual Frappe format. Its schema is under `FrappeError`.
     The client recognizes the error from the `exc_type` field. Each error response lists the expected `exc_type` values.
     On the `identity.*` endpoints, a missing or malformed field returns 400 and `InvalidInput`.
+    An unknown field in the body also returns 400 and `InvalidInput`, because the schemas forbid extra fields.
+    The `identity.*` endpoints accept at most 300 requests per minute from the service client. Extra requests get 429.
+    `logout` accepts 20 and `setup_keycloak_login` 10 requests per minute per signed-in user.
     If the body cannot be parsed as JSON, Frappe returns 417 and `DataError` before the endpoint runs.
     This happens before the `InvalidInput` check in the endpoint. This response can occur on every endpoint with a JSON body.
     If the Keycloak key list cannot be fetched, the token cannot be verified. Then the endpoint returns 503 and `KeycloakKeysUnavailable`.
@@ -189,6 +192,7 @@ paths:
         `redirect_to` is optional. After sign-in the browser returns to this path.
         Only a relative path that starts with `/` is accepted. A path that starts with `//` is rejected.
         A backslash is not accepted anywhere. A space or a control character is not accepted either.
+        Quotes, `<`, `>` and backticks are not accepted, so the path is safe inside an HTML attribute (G-11).
         It can be at most 2048 characters. An unsuitable path returns 400 and `InvalidRedirect`.
         If there is no `redirect_to`, the return address is the `platform_panel_url` setting.
 
@@ -303,11 +307,12 @@ paths:
           description: |
             Relative path to return to after sign-in. It starts with `/`. It cannot start with `//`.
             It cannot contain a backslash anywhere. It cannot contain a space or a control character.
+            It cannot contain quotes, `<`, `>` or backticks.
             It is at most 2048 characters. If it is not given, the return address is `platform_panel_url`.
           schema:
             type: string
             maxLength: 2048
-            pattern: '^/(?!/)[^\\\s\x00-\x1f\x7f]*$'
+            pattern: '^/(?!/)[A-Za-z0-9\-._~/?#@!$&()*+,;=%:\[\]]*$'
           examples:
             panel:
               value: /panel
@@ -521,6 +526,8 @@ paths:
                   value:
                     message:
                       logout_url: "http://kimlik.localhost:8660/realms/platform/protocol/openid-connect/logout?client_id=site-kiraci1&post_logout_redirect_uri=http%3A%2F%2Fkiraci1.localhost%3A8661%2Fpanel"
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         "403":
           description: |
             Guest request. There is no cookie at all. The `exc_type` value is `PermissionError`.
@@ -588,6 +595,8 @@ paths:
                     exc_type: KeycloakSettingsMissing
                     exception: "platform_core.kimlik.hatalar.KeycloakSettingsMissing: kimlik_marka_adi"
                     _server_messages: '["{\"message\": \"Keycloak settings are missing: kimlik_marka_adi\"}"]'
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         "403":
           description: |
             The caller is not a “System Manager” or is a guest. The `exc_type` value is `PermissionError`.
@@ -788,6 +797,8 @@ paths:
                     _server_messages: '["{\"message\": \"Field email_verified is required.\"}"]'
         "401":
           $ref: "#/components/responses/ServisBelirteciReddi"
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         "403":
           $ref: "#/components/responses/ServisYetkisiYok"
         "409":
@@ -867,6 +878,8 @@ paths:
           $ref: "#/components/responses/GirdiGecersiz"
         "401":
           $ref: "#/components/responses/ServisBelirteciReddi"
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         "403":
           $ref: "#/components/responses/ServisYetkisiYok"
         "404":
@@ -928,6 +941,8 @@ paths:
           $ref: "#/components/responses/GirdiGecersiz"
         "401":
           $ref: "#/components/responses/ServisBelirteciReddi"
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         "403":
           $ref: "#/components/responses/ServisYetkisiYok"
         "404":
@@ -1029,6 +1044,8 @@ paths:
           $ref: "#/components/responses/GirdiGecersiz"
         "401":
           $ref: "#/components/responses/ServisBelirteciReddi"
+        "429":
+          $ref: "#/components/responses/IstekSiniri"
         "403":
           $ref: "#/components/responses/ServisYetkisiYok"
         "404":
@@ -2166,10 +2183,11 @@ components:
         redirect_to:
           type: string
           maxLength: 2048
-          pattern: '^/(?!/)[^\\\s\x00-\x1f\x7f]*$'
+          pattern: '^/(?!/)[A-Za-z0-9\-._~/?#@!$&()*+,;=%:\[\]]*$'
           description: |
             Relative path to return to after sign-in. It starts with `/`. It cannot start with `//`.
             It cannot contain a backslash anywhere. It cannot contain a space or a control character.
+            It cannot contain quotes, `<`, `>` or backticks.
             It is at most 2048 characters. If it is not given, the return address is `platform_panel_url`.
           examples:
             - /panel

@@ -208,6 +208,7 @@ def complete_callback(code: str | None, state: str | None, error: str | None = N
 	# so the first write after sign-in already needs the X-Frappe-CSRF-Token header.
 	frappe.sessions.get_csrf_token()
 	frappe.local.session_obj.update(force=True)
+	# V-2: the callback is a GET request, and Frappe does not commit GET requests on its own.
 	frappe.db.commit()
 	frappe.local.cookie_manager.delete_cookie(_cookie_name())
 	return record.get("redirect_to") or settings.panel_url
@@ -311,8 +312,11 @@ def callback_url() -> str:
 SID_INDEX_PREFIX = "kimlik_kc_sid"
 
 
-def _sid_index_key(keycloak_sid: str) -> str:
-	return frappe.cache.make_key(f"{SID_INDEX_PREFIX}:{helpers.sha256_hex(keycloak_sid)}")
+def _sid_index_name(keycloak_sid: str) -> str:
+	"""Unprefixed name of the index set. RedisWrapper prefixes it itself in `sadd`, `smembers`, `srem`,
+	`expire_key` and `delete_value` (frappe/utils/redis_wrapper.py:365). One spelling for every call (T-4).
+	"""
+	return f"{SID_INDEX_PREFIX}:{helpers.sha256_hex(keycloak_sid)}"
 
 
 def remember_keycloak_session(keycloak_sid: object, frappe_sid: str) -> None:
@@ -325,22 +329,22 @@ def remember_keycloak_session(keycloak_sid: object, frappe_sid: str) -> None:
 		return
 	from frappe.sessions import get_expiry_in_seconds
 
-	key = _sid_index_key(keycloak_sid)
-	frappe.cache.sadd(key, frappe_sid)
-	frappe.cache.expire(key, get_expiry_in_seconds())
+	name = _sid_index_name(keycloak_sid)
+	frappe.cache.sadd(name, frappe_sid)
+	frappe.cache.expire_key(name, get_expiry_in_seconds())
 
 
 def frappe_sids_for(keycloak_sid: str) -> list[str]:
-	members = frappe.cache.smembers(_sid_index_key(keycloak_sid)) or set()
+	members = frappe.cache.smembers(_sid_index_name(keycloak_sid)) or set()
 	return sorted(m.decode() if isinstance(m, bytes) else str(m) for m in members)
 
 
 def forget_keycloak_session(keycloak_sid: str, frappe_sid: str | None = None) -> None:
-	key = _sid_index_key(keycloak_sid)
+	name = _sid_index_name(keycloak_sid)
 	if frappe_sid:
-		frappe.cache.srem(key, frappe_sid)
+		frappe.cache.srem(name, frappe_sid)
 	else:
-		frappe.cache.delete(key)
+		frappe.cache.delete_value(name)
 
 
 def _cookie_name() -> str:

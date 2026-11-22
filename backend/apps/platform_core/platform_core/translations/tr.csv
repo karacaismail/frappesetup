@@ -78,3 +78,4 @@ Anonymized,Anonim yapıldı,Platform Identity Deletion
 "Disabled: step 1 closed the account, its sessions and API keys. Anonymized: step 2 removed the personal data.","Disabled: 1. adım hesabı, oturumları ve API anahtarlarını kapattı. Anonymized: 2. adım kişisel veriyi kaldırdı.",Platform Identity Deletion
 Current name of the Frappe user. It is the anonymous name after step 2.,Frappe kullanıcısının şimdiki adı. 2. adımdan sonra anonim addır.,Platform Identity Deletion
 When step 1 recorded the deletion.,1. adımın silmeyi kaydettiği zaman.,Platform Identity Deletion
+Unknown field: {0},Bilinmeyen alan: {0},platform_core.kimlik
