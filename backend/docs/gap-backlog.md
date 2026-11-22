@@ -29,7 +29,7 @@ Kurallar şunlardır:
 2. Kapandı. `/login` sayfası Atonota girişini gösterir. `start_login` GET ucu OpenAPI sözleşmesinde ve `test_login_page.py` testinde yer alır.
 3. Kapandı. Frappe oturumu bir saat boşta kalınca sona erer. `test_session_policy.py` süreyi ve sona eren oturumu sınar.
 4. Kapandı. `ai_write_closed_doctypes` listesi `Platform Identity Link` kaydını içerir. `test_identity_link_is_closed_to_ai_writes` bu kuralı sınar.
-5. Sözleşmedeki insan uçlarına 401 yanıtı eklensin (SZ-8).
+5. Kapandı. OpenAPI, `logout` ve `setup_keycloak_login` için 401 yanıtını tanımlar. `test_idle_session_answers_401_session_expired` oturum reddini sınar.
 6. `oidc_verify` bağımlılığı `pyproject.toml` dosyasında yazılsın.
 
 ## identity-sync
