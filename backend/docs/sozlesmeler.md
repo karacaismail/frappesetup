@@ -214,7 +214,7 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Yanıt `team` ve `created` alanlarını taşır. `team`, Press'teki takımın adıdır.
 - `remove_team_member` isteği `issuer` ve `subject` alanlarını taşır. İstek ayrıca şu iki alandan yalnız birini taşır:
   - `organization_id`: Press üyeyi yalnız bu kuruluşun takımından çıkarır.
-  - `all_organizations: true`: Press üyeyi `keycloak_org_id` alanı dolu olan bütün takımlardan çıkarır. Bu biçim silinen kullanıcı içindir. Silinen kullanıcının kuruluşları Keycloak'tan artık okunamaz.
+  - `all_organizations: true`: Press üyeyi `keycloak_org_id` alanı dolu olan bütün takımlardan çıkarır. Bu biçim Keycloak'ta kapatılan ve silinen kullanıcı içindir. Silinen kullanıcının kuruluşları Keycloak'tan artık okunamaz. Press bu istekte kullanıcıyı da kapatır ve API anahtarlarını geçersiz yapar.
 - İki alan birlikte gelirse ya da ikisi de gelmezse Press 400 döner. Boş `organization_id` değeri “bütün takımlar” anlamına gelmez, 400 döner.
 - `keycloak_org_id` alanı boş takımlara `remove_team_member` dokunmaz. Bu takımlar Keycloak dışında elle açılmıştır.
 - Aynı `remove_team_member` isteği iki kez gelirse ikinci istek de 200 döner ve bir şey değiştirmez.
@@ -222,6 +222,11 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 
 - Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
 - G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
+- Press'te misafir için izin listesi uygulanır. Misafir yalnız listedeki yöntemleri çağırabilir. Liste şudur: `ping`, `press_tr.api.auth.get_login_url`, `press_tr.api.auth.keycloak_callback`, `press_tr.api.keycloak_backchannel_logout`. Öteki bütün yöntemler misafire 403 döner.
+- Denetim yöntemin adına değil, çağrılan işleve uygulanır. Böylece başka modülün içe aktardığı aynı işlev de kapanır. `/api/method`, `/api/v1/method`, `/api/v2/method` ve `cmd` biçimlerinin hepsi aynı denetimden geçer.
+- Takım üyeliği yalnız Keycloak kuruluşundan gelir. Press'in kendi takım davet ve davet kabul uçları kapanır.
+- Kullanıcı Keycloak'ta kapatılınca ya da silinince Press kullanıcıyı da kapatır. Kullanıcının Press API anahtarları geçersiz olur.
+- Misafir istek sınırı istemcinin gerçek adresine bağlıdır. Üretimdeki ara sunucu `X-Forwarded-For` başlığının üzerine yazar. Ara sunucu ayarı depoda durur.
 
 ## 7. `identity_sync`
 
@@ -408,7 +413,10 @@ Kimlik türleri şunlardır: API anahtarı, taşıyıcı belirteç, OAuth istemc
 2. Kapalı, yeteneği eksik, bütçesi dolmuş ve devresi açık adayları çıkarın.
 3. Adayları yolun seçme biçimine göre sıralayın. Seçme biçimleri öncelik, ağırlık ve en düşük maliyettir.
 4. İlk adayı çağırın.
-5. 429, 5xx ya da zaman aşımı gelirse adayı bir süre dinlendirin ve sıradakine geçin.
+5. 429 ya da 5xx gelirse adayı bir süre dinlendirin ve sıradakine geçin.
+   - Zaman aşımında sağlayıcı işi bitirip ücret almış olabilir. Bu yüzden bütçeli hesapta sıradakine geçilmez. Kayıt “unknown” kalır ve kullanıcı 503 alır.
+   - Bütçesiz hesapta zaman aşımı sıradakine geçebilir.
+   - Modelin çıktı hızı kayıtta durur (`output_tokens_per_second`). Yol süresine sığmayan `limit` değeri, bütçe ayrılmadan önce 400 ile reddedilir.
 6. Kimlik hatası gelirse API'yi kapalı sayın ve yönetici kaydına yazın.
 7. Her denemeyi “AI Usage Log” kaydına yazın.
 
@@ -424,7 +432,7 @@ Dinlenme süresi önbellekte süreli değerdir. Süre dolunca aday kendiliğinde
 - Mesaj içeriği varsayılan olarak günlüğe yazılmaz.
 - Yol kaydının veri kısıtı, model çağrısından önce veri seçimini ve maskelemeyi ister (G-90).
 - Dış sağlayıcıya giden içerik her zaman maskelenir. Yolun veri kısıtını “AI Manager” rolü seçer. Kısıt `masked` ise maskelenmiş içerik dış sağlayıcıya gidebilir. Ayrıca içerik bazında ön onay istenmez.
-- Aracı belirteci model ucunda geçmez. Aracı modele `yapay_zeka` katmanı üzerinden ulaşır. Bu katman `model_gecidi` modülünün açık işlevini çağırır. Böylece belirtecin biçimi tek yerde, `yapay_zeka` modülünde kalır.
+- Aracı belirteci model ucunda geçmez. Aracı modele `yapay_zeka` katmanı üzerinden ulaşır. Bu katman `platform_core.model_gecidi.api.complete` işlevini çağırır. Böylece belirtecin biçimi tek yerde, `yapay_zeka` modülünde kalır.
 - `model_gecidi` modülünün açık çağrı işlevi arka plan işinde de çalışır. İşlev o anki kullanıcının yetkisini denetler. Misafir kullanıcı çağıramaz.
 
 ### Uç
