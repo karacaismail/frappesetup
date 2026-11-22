@@ -14,8 +14,8 @@ CONTEXTS = ("colima-factory", "colima")
 PROJECT_LABEL = "com.docker.compose.project"
 DF_ROUTE = "/v1.47/system/df?type=container&type=volume&type=image"
 ACTIVE_STATES = {"running", "paused", "restarting"}
-UNKNOWN = "Bilinmiyor"
-IN_USE = "Kullanımda"
+UNKNOWN = "Unknown"
+IN_USE = "In use"
 
 
 class UnixConnection(http.client.HTTPConnection):
@@ -73,7 +73,7 @@ def in_scope(name, project):
 
 
 def size_text(size):
-    return f"{size} bayt" if type(size) is int and size >= 0 else UNKNOWN
+    return f"{size} bytes" if type(size) is int and size >= 0 else UNKNOWN
 
 
 def container_usage(socket_path, container):
@@ -161,9 +161,9 @@ def inventory(socket_path):
             continue
         references = volume_uses[name]
         project = resource_project(project_label(volume), references)
-        status = "sahipsiz" if fs_name(project) and project not in running_projects else ""
+        status = "Orphaned" if fs_name(project) and project not in running_projects else ""
         size = (volume.get("UsageData") or {}).get("Size")
-        rows.add(("Birim", name, size_text(size), project, latest_usage(references), status))
+        rows.add(("Volume", name, size_text(size), project, latest_usage(references), status))
 
     for image in images:
         references = image_uses[image["Id"]]
@@ -171,13 +171,13 @@ def inventory(socket_path):
         project = resource_project(label, references)
         for tag in image.get("RepoTags") or []:
             if in_scope(tag, label):
-                rows.add(("İmaj", tag, size_text(image.get("Size")), project, latest_usage(references), ""))
+                rows.add(("Image", tag, size_text(image.get("Size")), project, latest_usage(references), ""))
     return sorted(rows)
 
 
 def main():
     docker = shutil.which("docker")
-    print("| Bağlam | Tür | Ad | Boyut | Compose projesi | Son kullanım (UTC) | Durum |")
+    print("| Context | Type | Name | Size | Compose project | Last used (UTC) | Status |")
     print("| --- | --- | --- | --- | --- | --- | --- |")
     unavailable = []
     for context in CONTEXTS:

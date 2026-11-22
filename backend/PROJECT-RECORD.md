@@ -230,7 +230,7 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
 - **O-37. Birleştirmede ortak dosya ve bağımlılık kuralları.** 22 Kasım 2026 Pazar günü bütün backend dalları birleşti. Kurallar şunlardır:
   - `oidc_verify` kitaplığı iki uygulamada da `oidc_verify==0.1.0` kuralıyla istenir. Kitaplık depodadır ve sürüm paketiyle birlikte kurulur. Kural değişince güvenlik kilidi `backend/dev/security/compile-lock` ile yeniden üretilir.
   - `hooks.py` içinde her kanca bir kez atanır. Örneğin `override_whitelisted_methods` sözlüğü hem kimlik giriş kapılarını hem erişim kuralının bağlantı aramasını taşır. İkinci atama birinciyi sileceği için yazılmaz.
-  - `auth_hooks` sırası şudur: kimlik servis belirteci, yapay zekâ ajan belirteci, kabuk meta veri kapısı. Belirteç kancaları kapıdan önce çalışır.
+  - `auth_hooks` sırası şudur: kimlik servis belirteci, yapay zekâ ajan belirteci, MCP OAuth, kabuk meta veri kapısı. Belirteç kancaları kapıdan önce çalışır.
   - Press çıkış bildirim ucunda imzası doğrulanan bildirim sayaca girmez. Reddedilen bildirim dakikada 120 ile sınırlıdır. Sözleşme bu kuralı yazar. Uç denetimi bu ucu kodla eşleşen istisnayla kabul eder.
   - Semgrep istisna özeti yalnız Git'in izlediği ve yok saymadığı dosyalardan hesaplanır. Böylece geliştiricinin ön bellek klasörü özeti değiştirmez.
   - Bandit istisna listeleri birleşirken iki taraf korunur. Kod imzası artık eşleşmeyen kayıtları güvenlik işi sonraki taramada temizler.
@@ -239,8 +239,15 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Mutabakat, kuyruk yeniden oynatma ve platform listeleri yeni `IDENTITY_SYNC_OPERATOR_AZP` listesindeki istemcinindir.
   - Operatör, önizleme ve silme listelerinde `site-` ile başlayan istemci olmaz. Ayrıntı sözleşmenin 7. bölümündedir.
 - **O-39. Saklama komutu yalnız süresi dolan izin kayıtlarını siler.** Komut, çalışan kaydını ve diğer HR kayıtlarını korur.
-  - Hesap silme, çalışanın kişisel alanlarını anonim yapar. Ayrıntı sözleşmenin 6. bölümündedir.
+  - Hesap silme, çalışanın kişisel alanlarını anonim yapar. Ayrıntı sözleşmenin 5. ve 7. bölümlerindedir.
+  - Gönderilmiş izin kayıtları komutun kapsamı dışındadır. HRMS iptali izin hareketlerine ve devam kayıtlarına yazar. Bu izinlerin silme yolu hukuk kararından sonra ayrıca belirlenir.
   - Bağlı HR kayıtlarının saklama süresini hukuk sorumlusu belirler. Bu süre teknik borç tablosunda açık kalır.
+- **O-40. Kiracı yanıtları içerik güvenliği politikası taşır.** Desk satır içi betik kullanır. Taban politika bu betiklere izin verir.
+  - Taban yanıt `frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'` politikasını taşır.
+  - Giriş ve Panel `default-src 'self'; script-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'` politikasını taşır.
+  - Giriş ve Panel yanıtları `X-Frame-Options: DENY` taşır. Yönlendirme yanıtları da aynı başlıkları taşır.
+  - Başlığı `platform_core` kancası ekler. Kanca, varsa yanıtın kendi başlığını korur. Frappe kodu değişmez.
+  - Üretimde ters vekil başlığı ekleyebilir. Uygulamanın taban politikası da yürürlükte kalır.
 
 ## Karar sitesine işlenecek farklar
 
@@ -285,7 +292,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 
 | Borç | Etki | Sorumlu | Kapanma koşulu |
 | --- | --- | --- | --- |
-| `BORC(mvp)`: Dış MCP istemcileri OAuth 2.1 ile giremez | Dış yapay zekâ istemcisi yalnız oturum ya da API anahtarıyla bağlanır | platform-core-yz | MCP ucu OAuth 2.1 yetkilendirmesini Keycloak üzerinden destekler |
+| `BORC(mvp)`: Dış MCP istemcileri OAuth 2.1 ile giremez | Özellik varsayılan olarak kapalı. Yerel testler dönüş adresini, kaynak alanını ve 3 saniyelik süre sınırını doğruladı. | platform-core-yz | Tam realm, `resource-indicators` özelliğiyle hazırlanır. Hazır bir MCP istemcisiyle uçtan uca OAuth akışı doğrulanır. |
 | `BORC(mvp)`: Üretim işçi sayısı ölçülmedi | 50 eşzamanlı telefonda 4 Gunicorn işçisiyle istemci p95 1 saniyeyi aştı. Sunucu süresi sınırın altında kaldı | DevOps sorumlusu | Üretim kapasite ölçümü yapılır ve işçi sayısı ölçümle seçilir |
 | `BORC(mvp)`: identity-sync canlı Keycloak, Press ve kiracı ile denenmedi | Sahte hedeflerin kaçırdığı uyumsuzluk üretimde çıkabilir | integration-e2e | Uçtan uca test gerçek servislerle geçer |
 | `BORC(mvp)`: identity-sync testleri CI'da koşmaz | Bozulma yalnız elle çalışan testte görülür | DevOps sorumlusu | CI bu klasörün testlerini her değişiklikte koşar |
@@ -293,7 +300,7 @@ Kod dışı borç bu bölüme yazılır. Her satırda eksik, etki, sorumlu ve ka
 | `BORC(mvp)`: Bazı tema ekranları sınanmadı | Görünüm hatası fark edilmeyebilir | kimlik-tema | Sınanmamış ekranların listesi boşalır |
 | `BORC(mvp)`: Geçiş anahtarı testleri yük altında zaman aşımına uğruyor | Test sonucu güvenilmez olur | kimlik-tema | Testler yük altında da kararlı geçer |
 | `BORC(mvp)`: Performans ölçümü yalnız elle yapılır (O-31) | Canlı darboğaz görülmez | DevOps sorumlusu | P1'de Grafana ve gerçek kullanıcı ölçümü kurulur (G-149) |
-| `BORC(mvp)`: İzinlerin ve bağlı HR kayıtlarının yasal saklama süresi yok (O-39) | Silme zamanı belli değil | Hukuk sorumlusu | Hukuk sorumlusu süreleri proje kaydına yazar. İzin komutu site ayarındaki süreyi uygular. Bağlı HR kayıtları için silme yolu ayrıca belirlenir. |
+| `BORC(mvp)`: İzinlerin ve bağlı HR kayıtlarının yasal saklama süresi yok (O-39) | Silme zamanı belli değil | Hukuk sorumlusu | Hukuk sorumlusu süreleri proje kaydına yazar. İzin komutu yalnız taslak ve iptal edilmiş izinlerde site ayarındaki süreyi uygular. Bağlı HR kayıtları için silme yolu ayrıca belirlenir. |
 | `BORC(mvp)`: Press'in sunucu kurma akışı Frappe 16'da çalışmıyor | Press üretime çıkamaz | press-tr işi ve DevOps sorumlusu | Sunucu kurma akışı Frappe 16 ile hazırlık ortamında çalışır |
 | `BORC(mvp)`: Press geliştirme imajı `patch-py314.sh` ile Press kodunu değiştiriyor (O-18) | M-4 kuralına aykırı. Press yükseltmesinde yama bozulabilir | press-tr işi | Press, Python 3.14 ve Frappe 16 üzerinde yamasız açılır ya da yama Press'e gönderilip kabul edilir |
 | `BORC(mvp)`: CI'da güvenlik kapısı yok (O-29) | Taramalar yalnız elle çalışır | DevOps sorumlusu | Devir notundaki işler CI'da koşar ve başarısız tarama birleştirmeyi durdurur |

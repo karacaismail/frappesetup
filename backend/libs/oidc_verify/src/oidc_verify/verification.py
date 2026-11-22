@@ -1,4 +1,4 @@
-"""Belirteç doğrulama işlevleri."""
+"""Token verification functions."""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def _unverified_claims(token: str) -> dict:
 
 
 def _coz(token: str, *, cache: JwksCache, issuer: str, leeway: int, require: Iterable[str]) -> dict:
-    """İmzayı, iss ve süreyi denetler. aud ve azp denetimini çağırana bırakır."""
+    """Verify the signature, issuer and time claims. The caller checks `aud` and `azp`."""
     header = _header(token)
     if header.get("alg") != ALGORITHM:
         raise TokenError("invalid_signature")
@@ -155,7 +155,7 @@ def verify_access_token(
     allowed_azp: Iterable[str],
     leeway: int = 30,
 ) -> dict:
-    """Servis belirtecini doğrular. `aud` tek değer ve `audience` olmalı. `azp` izin listesinde olmalı."""
+    """Verify a service token. Only `audience` is allowed in `aud`. `azp` must be on the allowlist."""
     claims = _coz(token, cache=cache, issuer=issuer, leeway=leeway, require=["exp", "iss"])
     _check_token_type(claims, TYP_ACCESS, allow_events=False)
     _single_aud(claims, audience)
@@ -174,7 +174,7 @@ def verify_id_token(
     nonce: str | None,
     leeway: int = 30,
 ) -> dict:
-    """Kimlik belirtecini doğrular. `aud` tek değer ve `client_id` olmalı. `nonce` eşleşmeli."""
+    """Verify an ID token. Only `client_id` is allowed in `aud`. The expected `nonce` must match."""
     claims = _coz(token, cache=cache, issuer=issuer, leeway=leeway, require=["exp", "iss", "sub", "iat"])
     _check_token_type(claims, TYP_ID, allow_events=False)
     _single_aud(claims, client_id)
@@ -194,7 +194,7 @@ def verify_logout_token(
     client_id: str,
     leeway: int = 30,
 ) -> dict:
-    """Keycloak çıkış belirtecini doğrular (OpenID Connect Back-Channel Logout 1.0 section 2.4)."""
+    """Verify a Keycloak logout token (OpenID Connect Back-Channel Logout 1.0 section 2.4)."""
     claims = _coz(token, cache=cache, issuer=issuer, leeway=leeway, require=["iss", "exp", "iat", "jti"])
     # A well-formed token of another type is "not a logout token" rather than malformed.
     _check_token_type(claims, TYP_LOGOUT, allow_events=True, wrong_type_code="not_logout_token")

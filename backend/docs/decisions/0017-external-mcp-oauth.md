@@ -1,16 +1,16 @@
 # Dış MCP istemcileri için OAuth tasarımı
 
 22 Kasım 2026 Pazar günü hazırlandı. Bu belge uygulama planıdır.
-OAuth girişi henüz çalışmıyor. Teknik borç açık kalır.
+OAuth varsayılan olarak kapalıdır. Kabul durumu proje kaydında tutulur.
 
 MCP, yapay zekâ istemcisinin araç çağırdığı protokoldür.
 OAuth, kullanıcının parolasını paylaşmadan erişim izni verdiği yöntemdir.
 Bu plan, dış istemcinin Keycloak üzerinden kullanıcı adına bağlanmasını sağlar.
 
-## Mevcut durum ve eksikler
+## Tasarım öncesindeki durum
 
-`platform_core.api.ai.mcp` insan oturumunu ve kısa ömürlü aracı belirtecini kabul eder.
-API anahtarı ve OAuth belirteci kabul edilmez.
+Tasarım öncesinde MCP ucu, insan oturumunu ve aracı belirtecini kabul ediyordu.
+Uç API anahtarını ve OAuth belirtecini reddediyordu.
 Aracı belirteci 300 saniye yaşar. En çok 20 araç çağrısında kullanılır.
 Bağlı Frappe oturumu kapanınca belirteç geçersiz olur.
 İnsan onayı yalnız oturum çereziyle verilir.
@@ -83,6 +83,9 @@ Başarılı yanıt şu alanları taşır:
 - Bağlı oturum açıktır. Çıkış ve hesap kapatma sonraki isteği reddettirir.
 
 Geçersiz belirteç 401 üretir. Kimlik sağlayıcısına ulaşılamazsa 503 üretilir.
+Oturum sorgusunun toplam sınırı 3 saniyedir.
+Bu süre adres çözümünü, bağlantıyı ve tüm yanıtı kapsar.
+Süre dolarsa platform 503 döner ve erişim vermez.
 Hata metni sabittir. Belirteç veya kişisel bilgi hata kaydına girmez.
 İşlev oturum açmaz. `frappe.set_user` çağırmaz. HTTP başlığı da yazmaz.
 
@@ -101,7 +104,8 @@ PKCE yöntemi `S256` olur. Parola ve örtük izin akışları kapalıdır.
 Keycloak keşif belgesindeki `code_challenge_methods_supported` alanı `S256` değerini içerir.
 Realm kabul testi bu bildirimi de denetler.
 
-Her dönüş adresi tam eşleşmeyle kaydedilir. Joker adres kullanılmaz.
+Keycloak, istekteki dönüş adresini kayıtlı adresle tam olarak karşılaştırır.
+Keycloak joker, parça işareti veya kullanıcı bilgisi içeren adresi reddeder.
 Dönüş adresi HTTPS kullanır. Yalnız yerel geliştirmede localhost adresi HTTP kullanabilir.
 İzin ve belirteç uçları HTTPS kullanır.
 Genel istemcinin yenileme belirteci döndürülür ve eski değer yeniden kullanılamaz.
@@ -109,6 +113,9 @@ Genel istemcinin yenileme belirteci döndürülür ve eski değer yeniden kullan
 İstemci izin ve belirteç isteğinde `resource` alanını gönderir.
 Bu alan sitenin tam MCP adresidir.
 Keycloak aynı adresi `aud` alanına koyar.
+İstekte tek ve doğru kaynak varsa Keycloak `mcp_resource` alanını imzalar.
+Platform her istekte iki alanı da sitenin tam MCP adresiyle karşılaştırır.
+Platform `mcp_resource` alanı yoksa belirteci reddeder.
 Başka sitenin adresi ve bilinmeyen kaynak reddedilir.
 Aynı belirteçte birden çok site hedefi kabul edilmez.
 
@@ -186,11 +193,8 @@ Kurulum hatası başarısız davranış testinin yerine geçmez.
 
 ## Teslim sınırı ve geri dönüş
 
-Bu not tasarım teslimidir. OAuth kodu eklenmedi.
-Mevcut insan oturumu ve aracı belirteci yolları değişmedi.
-Kimlik ve realm sahiplerinin önkoşulları bekleniyor.
-Bu önkoşullar olmadan OAuth borcu kapatılmaz.
-Üretim ayarları ve çalışan servisler değiştirilmedi.
+Uygulama yerel ayarla açılır. İnsan oturumu ve aracı belirteci desteklenir.
+Tam realm kurulumu ve hazır bir MCP istemcisi birlikte sınanınca borç kapanır.
 
 Uygulama sonrasında geri dönüş, OAuth ayarını kapatmaktır.
 Bu işlem mevcut insan onay yolunu kapatmaz.
@@ -206,6 +210,7 @@ hedef bağını, PKCE yöntemini ve belirteç aktarımı yasağını açıklar.
 Uygulama bildirimi Python `>=3.14,<3.15` ve Frappe `>=16.56.0,<17.0.0` ister.
 Ortak kitaplık bildirimi `oidc_verify==0.1.0` değerini taşır.
 Bu tasarımda yeni paket veya sürüm değişikliği yoktur.
-Çalışan sürüm ve uçtan uca OAuth denemesi bu not için `not_run` durumundadır.
+Yerel denemeler Keycloak 26.8.2 ve Frappe 16.56.0 kullandı.
+Tam realm ve hazır MCP istemcisi denemesi `not_run` durumundadır.
 
 Gerçek okurla denenmedi.

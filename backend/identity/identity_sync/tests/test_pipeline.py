@@ -1,6 +1,6 @@
-"""Olayın uçtan uca işlenmesinin testleri. Ağ çağrıları sahte sunucuya gider.
+"""End-to-end event processing tests. Network calls go to fake servers.
 
-Beklenen uç adları ve alanlar `docs/sozlesmeler.md` dosyasının 2., 5. ve 6. bölümünden gelir.
+Expected endpoint names and fields come from sections 2, 5 and 6 of `docs/sozlesmeler.md`.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ class ProvisionTest(PipelineCase):
             },
         )
         (provision,) = self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)
-        # Alanlar sözleşmenin 5. bölümündeki `provision` tablosundan gelir.
+        # Fields come from the `provision` table in contract section 5.
         self.assertEqual(
             provision.json(),
             {
@@ -64,7 +64,7 @@ class ProvisionTest(PipelineCase):
         )
 
     def test_each_target_gets_a_token_with_only_its_own_audience(self) -> None:
-        # Servis belirteci yalnız bir `aud` değeri taşır (sözleşme, 2. bölüm).
+        # The service token carries only one `aud` value (contract, section 2).
         self.add_member()
 
         self.stack.app.processor.handle(event())
@@ -221,7 +221,7 @@ class ProvisionTest(PipelineCase):
         self.assertEqual(self.stack.press.requests, [])
 
     def test_team_reply_without_team_name_is_unknown(self) -> None:
-        # `ensure_team` yanıtı `team` ve `created` alanlarını taşır (sözleşme, 6. bölüm).
+        # The `ensure_team` reply contains `team` and `created` (contract, section 6).
         self.add_member()
         for reply in ((200, {"message": {"status": "done"}}), (200, {"message": {"team": "", "created": True}})):
             with self.subTest(reply=reply):
@@ -246,14 +246,14 @@ class ProvisionTest(PipelineCase):
 
 
 class AmbiguousReadTest(PipelineCase):
-    """Belirsiz Keycloak yanıtı kullanıcıyı kapatmamalıdır."""
+    """An ambiguous Keycloak response must not disable the user."""
 
     def assert_nothing_disabled(self, result) -> None:
         self.assertEqual(result.status, "dead_lettered")
         self.assertEqual(self.stack.press.writes() + self.stack.tenant.writes(), [])
 
     def test_404_from_wrong_realm_or_proxy_does_not_disable(self) -> None:
-        # Kullanıcı ucu 404 döner. Realm'in kendisi de yanıt vermez. Bu silinme kanıtı değildir.
+        # The user endpoint returns 404. The realm itself also fails to respond. This does not prove deletion.
         kc = self.stack.keycloak
         kc.on("GET", f"{kc.admin}/users/{SUBJECT}", (404, None))
         kc.on("GET", f"{kc.admin}/users/count", (404, None))
@@ -290,7 +290,7 @@ class AmbiguousReadTest(PipelineCase):
         self.assert_nothing_disabled(result)
 
     def test_confirmed_missing_user_is_deprovisioned(self) -> None:
-        # Kullanıcı ucu 404 döner. Realm kullanıcı sayısını verir. Bu silinme kanıtıdır.
+        # The user endpoint returns 404. The realm returns its user count. This proves deletion.
         # An administrator deleted the user. This event type reads the user's state.
         self.stack.keycloak.remove_user(SUBJECT)
 
@@ -1014,7 +1014,7 @@ class IdempotencyTest(PipelineCase):
         self.assertEqual(first.json(), second.json())
 
     def test_duplicate_clears_leftover_dead_letter(self) -> None:
-        # Süreç iki kayıt arasında durduysa olay hem işlenmiş hem kuyrukta görünür.
+        # If the process stopped between two writes, the event appears both processed and queued.
         self.add_member()
         self.stack.app.processor.handle(event())
         self.stack.app.store.add_dead_letter(event(), "kalıntı")
@@ -1051,7 +1051,7 @@ class FailureTest(PipelineCase):
         self.assertEqual(result.status, "dead_lettered")
         self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)), 3)
         self.assertEqual(len(self.stack.sleeps), 2)
-        # Başarısız adım öteki adımları durdurmaz.
+        # A failed step does not stop the other steps.
         self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_CHANGE_EMAIL)), 1)
         (letter,) = self.stack.app.store.dead_letters()
         self.assertEqual(letter.event, event())
@@ -1110,7 +1110,7 @@ class FailureTest(PipelineCase):
 
 
 class UnknownOutcomeTest(PipelineCase):
-    """Hedefin kesin başarı yanıtı `{"message": {"status": "done"}}` olur. Gerisi belirsizdir."""
+    """The target confirms success with `{"message": {"status": "done"}}`. Any other result is unknown."""
 
     UNCLEAR = (
         (202, {"message": {"status": "queued"}}),
@@ -1135,11 +1135,11 @@ class UnknownOutcomeTest(PipelineCase):
                 (letter,) = stack.app.store.dead_letters()
                 self.assertEqual(letter.state, "unknown")
                 self.assertEqual(letter.error, "tenant.provision tenant1: unknown outcome")
-                # Belirsiz sonuçta kör tekrar yapılmaz.
+                # An unknown outcome is not retried blindly.
                 self.assertEqual(len(stack.tenant.calls("POST", fakes.TENANT_PROVISION)), 1)
 
     def test_redelivery_of_unknown_event_does_not_repeat_the_write(self) -> None:
-        # Sonucu bilinmeyen olay yeniden gelirse servis yazmayı tekrarlamaz. Karar insanındır.
+        # When an event with an unknown outcome arrives again, the service does not repeat the write. A person decides.
         self.add_member()
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (202, {"message": {"status": "queued"}}))
         self.stack.app.processor.handle(event())
@@ -1154,7 +1154,7 @@ class UnknownOutcomeTest(PipelineCase):
         self.assertEqual((letter.state, letter.attempts), ("unknown", 1))
 
     def test_unclear_transport_results_of_a_write_are_unknown(self) -> None:
-        # İstek gitti ama yanıt okunamadı. İşin bitip bitmediği bilinmez. Kör tekrar yapılmaz.
+        # The request was sent but the reply could not be read. Completion is unknown. Do not retry blindly.
         cases = {
             "html": (200, "<html>vekil sunucu sayfası</html>"),
             "bad-gateway": (502, None),
@@ -1182,7 +1182,7 @@ class UnknownOutcomeTest(PipelineCase):
         self.assertEqual(len(self.stack.tenant.calls("POST", fakes.TENANT_PROVISION)), 1)
 
     def test_unreachable_target_is_a_plain_failure(self) -> None:
-        # Bağlantı hiç kurulmadı. İstek gitmedi. Bu durum belirsiz değildir.
+        # The connection was never established. The request was not sent. This outcome is not unknown.
         import dataclasses
 
         from identity_sync.app import build_app
@@ -1234,7 +1234,7 @@ class UnknownOutcomeTest(PipelineCase):
 
 
 class ApprovedPlanTest(PipelineCase):
-    """Onay katmanı bir planı onaylar. Servis yalnız o planı yürütür."""
+    """The approval layer approves a plan. The service executes only that plan."""
 
     def queue_failed(self, id_: str = "e-1") -> None:
         self.stack.tenant.on("POST", fakes.TENANT_PROVISION, (503, None))
@@ -1340,8 +1340,8 @@ class ApprovedPlanTest(PipelineCase):
         self.assertIn(ORG_ID, preview.summary)
 
     def test_event_whose_preview_failed_is_not_executed(self) -> None:
-        # Önizleme üretilemedi. İnsan bu olayın planını görmedi.
-        # Keycloak yürütme anında yanıt verse de servis bu olayı yürütmez.
+        # The preview could not be generated. The person did not see this event plan.
+        # The service does not execute this event even if Keycloak responds during execution.
         self.add_member()
         self.queue_failed()
         keycloak = self.stack.keycloak
@@ -1349,7 +1349,7 @@ class ApprovedPlanTest(PipelineCase):
 
         def user_route(_req: fakes.Recorded) -> fakes.Reply:
             reads["count"] += 1
-            # 1. okuma: insanın gördüğü önizleme. 2. okuma: özet denetimi. İkisi de başarısız.
+            # First read: the preview shown to the person. Second read: the digest check. Both fail.
             return (403, None) if reads["count"] <= 2 else (200, keycloak_user())
 
         keycloak.on("GET", f"{keycloak.admin}/users/{SUBJECT}", user_route)
@@ -1363,7 +1363,7 @@ class ApprovedPlanTest(PipelineCase):
         self.assertEqual(len(self.stack.app.store.dead_letters()), 1)
 
     def test_follow_up_actions_after_organization_need_a_new_preview(self) -> None:
-        # Önizleme yalnız "kuruluşu aç" işini gösterdi. Takım işi önizlemede yoktu.
+        # The preview showed only organization creation. It did not include the team action.
         keycloak = self.stack.keycloak
         keycloak.add_user(keycloak_user(), [])
         alias = f"t-{SUBJECT}"
@@ -1384,7 +1384,7 @@ class ApprovedPlanTest(PipelineCase):
 
         self.assertEqual([r.status for _i, r in first], ["dead_lettered"])
         self.assertEqual(self.stack.press.calls("POST", fakes.PRESS_ENSURE_TEAM), [])
-        # Yeni önizleme takım işini gösterir. Onaydan sonra iş biter.
+        # The new preview shows the team action. Approval allows the work to finish.
         second = self.stack.app.processor.replay_dead_letters(expected_digest=self.digest())
         self.assertEqual([r.status for _i, r in second], ["processed"])
         self.assertEqual(len(self.stack.press.calls("POST", fakes.PRESS_ENSURE_TEAM)), 1)
@@ -1540,7 +1540,7 @@ class InterruptedWorkTest(PipelineCase):
 
 class OrganizationPassTest(PipelineCase):
     def test_event_is_not_processed_when_membership_never_appears(self) -> None:
-        # Kuruluş açıldı ama üyelik okunamıyor. Takım işi çalışmadı. Olay işlenmiş sayılmaz.
+        # The organization was created but membership cannot be read. The team action did not run. The event is not processed.
         keycloak = self.stack.keycloak
         keycloak.add_user(keycloak_user(), [])
         keycloak.on("GET", f"{keycloak.admin}/organizations", (200, []))
@@ -1558,7 +1558,7 @@ class OrganizationPassTest(PipelineCase):
 
 
 class CrossProcessTest(unittest.TestCase):
-    """Sunucu ve `replay-dead-letters` komutu ayrı süreçlerdir. Aynı kayıt dosyasını açarlar."""
+    """The server and `replay-dead-letters` command are separate processes. They open the same store file."""
 
     def setUp(self) -> None:
         import os
@@ -1569,7 +1569,7 @@ class CrossProcessTest(unittest.TestCase):
         self.server_side = Stack(os.path.join(self.dir.name, "db.sqlite3"))
         self.addCleanup(self.server_side.close)
         self.server_side.keycloak.add_user(keycloak_user(), [{"id": ORG_ID, "name": "tenant1", "alias": "tenant1"}])
-        # İkinci süreç: aynı ayar, ayrı bağlantı.
+        # Second process: the same settings and a separate connection.
         from identity_sync.app import build_app
 
         self.command_side = build_app(self.server_side.settings, sleep=lambda _s: None)
@@ -1604,7 +1604,7 @@ class CrossProcessTest(unittest.TestCase):
         self.assertTrue(entered.wait(5))
         second = threading.Thread(target=deliver)
         second.start()
-        time.sleep(0.3)  # ikinci süreç kilitte beklemelidir
+        time.sleep(0.3)  # the second process must wait for the lock
         self.assertEqual(len(tenant.calls("POST", fakes.TENANT_PROVISION)) - before, 1)
         release.set()
         first.join(10)
@@ -1668,7 +1668,7 @@ class CrossProcessTest(unittest.TestCase):
         self.assertFalse(impatient.store.is_processed("bekleyen"))
 
     def test_events_of_one_user_are_serialized_across_processes(self) -> None:
-        # Eski "açık" durumla başlayan süreç, kapatma işleminden sonra kullanıcıyı yeniden açamaz.
+        # A process starting with stale enabled state cannot re-enable the user after closure.
         import threading
         import time
 
@@ -1688,7 +1688,7 @@ class CrossProcessTest(unittest.TestCase):
         disable = threading.Thread(target=lambda: self.command_side.processor.handle(event("USER_UPDATE", "admin", "kapat")))
         disable.start()
         time.sleep(0.3)
-        self.assertEqual(tenant.calls("POST", fakes.TENANT_SET_ENABLED), [])  # kapatma sırasını bekler
+        self.assertEqual(tenant.calls("POST", fakes.TENANT_SET_ENABLED), [])  # waits for the closure to finish
         release.set()
         enable.join(10)
         disable.join(10)

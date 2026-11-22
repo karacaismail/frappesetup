@@ -1,6 +1,5 @@
 <#--
-  Sihirli bağlantı e-postası. Şablonu sky-cloak/keycloak-magic-link eklentisi çağırır.
-  Eklenti yalnız "link" ve "clientName" değişkenlerini verir. Süre değişkeni vermez.
+  Cloudflight magic link email. The provider supplies the sign-in URL as "link".
 -->
 <#import "template.ftl" as layout>
 <@layout.actionEmail

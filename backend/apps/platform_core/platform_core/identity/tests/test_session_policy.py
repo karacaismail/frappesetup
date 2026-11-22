@@ -169,7 +169,7 @@ class TestSessionPolicy(FrappeAPITestCase):
 		self.assertNotEqual(real.status_code, 401, real.data[:200])
 		self.assertNotEqual(frappe.cache.get_value(key, expires=True, use_local_cache=False), last_activity)
 
-	# --- O-25 and Ö2: an idle employee authenticates again ---------------------------------------
+	# --- O-25 and important finding 2: an idle employee authenticates again ----------------------------
 
 	def test_idle_employee_is_sent_back_to_keycloak_even_with_a_fresh_keycloak_cookie(self):
 		# No real activity on this site in the last hour. Keycloak's open session does not count.
@@ -249,7 +249,7 @@ class TestSessionPolicy(FrappeAPITestCase):
 	# --- O-28: AI write closure -----------------------------------------------------------------
 
 	def test_website_user_allow_list_has_only_the_identity_methods_a_portal_user_calls(self):
-		# docs/sozlesmeler.md "Website User için yöntem izin listesi": each app adds only its own methods.
+		# The contract's Website User method allowlist: each app adds only its own methods.
 		# Guest endpoints (start_login and the others) and service endpoints stay out of the list.
 		allowed = set(frappe.get_hooks("website_user_allowed_methods"))
 		self.assertIn("platform_core.api.auth.logout", allowed)

@@ -49,6 +49,8 @@ Zamanlanmış tarama kurulmaz (D-6). Asıl dosya bazı taramaları her gece ya d
 | İptal edilen oturum çalışmaz. | kimlik-realm, platform-core-kimlik, platform-core-mobil | Karar 19 ve O-25 |
 | Kullanıcının kimliği, cihazı ve yetkisi her istekte denetlenir. | platform-core-kimlik, platform-core-mobil | Sıfır güven ilkesi |
 | Aynı kullanıcının çok sayıda isteği sınırlanır. | Her uç sahibi | Frappe 16 `rate_limit` kullanılır. |
+| Kiracı yanıtı içerik güvenliği politikası taşır. Giriş ve Panel betikleri yalnız kendi sitesinden yükler. | platform-core-kabuk | O-40. Giriş ve Panel yanıtları çerçevelemeyi de kapatır. |
+| Ters vekil `/files/` ve `/assets/` yanıtlarına en az O-40 taban politikasını ekler. | DevOps sorumlusu | DevOps sorumlusu, yüklenen dosyalar için `sandbox` yönergesini değerlendirir. |
 
 ## Süreç
 

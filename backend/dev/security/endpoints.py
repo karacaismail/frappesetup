@@ -96,19 +96,19 @@ def guest_access(decorator: ast.expr) -> Optional[bool]:
 
 def method_list(decorator: ast.expr) -> str:
     if not isinstance(decorator, ast.Call):
-        return "belirsiz"
+        return "unknown"
     value = next(
         (keyword.value for keyword in decorator.keywords if keyword.arg == "methods"),
         decorator.args[2] if len(decorator.args) > 2 else None,
     )
     if value is None:
-        return "yazılmamış"
+        return "unspecified"
     if isinstance(value, (ast.List, ast.Tuple)) and all(
         isinstance(item, ast.Constant) and isinstance(item.value, str)
         for item in value.elts
     ):
-        return ", ".join(item.value for item in value.elts) or "boş"
-    return "belirsiz"
+        return ", ".join(item.value for item in value.elts) or "empty"
+    return "unknown"
 
 
 def has_rate_limit(
@@ -135,7 +135,7 @@ def inventory(apps: Path, reviewed: frozenset = frozenset()) -> tuple[list[str],
     guest_routes = []
     errors = []
     if not apps.is_dir():
-        return routes, guest_routes, [f"Uygulama klasörü bulunamadı. {apps}"]
+        return routes, guest_routes, [f"Application directory not found: {apps}"]
 
     for path in sorted(apps.rglob("*.py")):
         relative = path.relative_to(apps)
@@ -160,7 +160,7 @@ def inventory(apps: Path, reviewed: frozenset = frozenset()) -> tuple[list[str],
                     if "." not in name:
                         route = f"/api/method/{route}"
                     guest = guest_access(decorator)
-                    access = {True: "misafir", False: "oturum", None: "belirsiz"}[guest]
+                    access = {True: "guest", False: "authenticated", None: "unknown"}[guest]
                     methods = method_list(decorator)
                     entry = f"{route} [{methods}] [{access}]"
                     routes.append(entry)
@@ -174,31 +174,31 @@ def inventory(apps: Path, reviewed: frozenset = frozenset()) -> tuple[list[str],
                         if not reviewed_logout and not has_rate_limit(
                             statement.decorator_list[index + 1:], modules, limiters
                         ):
-                            errors.append(f"{relative}:{statement.lineno} rate_limit uç kaydının altında olmalı.")
+                            errors.append(f"{relative}:{statement.lineno} rate_limit must appear below the endpoint decorator.")
                     if guest is None:
-                        errors.append(f"{relative}:{statement.lineno} allow_guest belirsiz.")
-                    if methods in {"belirsiz", "boş", "yazılmamış"}:
-                        errors.append(f"{relative}:{statement.lineno} methods açık ve dolu olmalı.")
+                        errors.append(f"{relative}:{statement.lineno} allow_guest is unclear.")
+                    if methods in {"unknown", "empty", "unspecified"}:
+                        errors.append(f"{relative}:{statement.lineno} methods must be explicit and nonempty.")
                     if covered is None:
                         covered = test_names(test_path)
                     for suffix in REQUIRED_TESTS:
                         expected = f"test_{name.replace('.', '_')}_{suffix}"
                         if expected not in covered:
                             test_file = test_path.relative_to(apps)
-                            errors.append(f"{route} için {test_file} dosyasında {expected} eksik.")
+                            errors.append(f"{test_file} is missing {expected} for {route}.")
         except (OSError, SyntaxError, UnicodeError) as error:
-            errors.append(f"{relative} okunamadı. {error}")
+            errors.append(f"Could not read {relative}: {error}")
 
     return routes, guest_routes, errors
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Frappe uçlarını ve yetki testi adlarını denetler.")
-    parser.add_argument("backend", type=Path, help="Backend klasörü")
+    parser = argparse.ArgumentParser(description="Check Frappe endpoints and permission test names.")
+    parser.add_argument("backend", type=Path, help="Backend directory")
     args = parser.parse_args()
     reviewed = frozenset(approved_keys(args.backend.resolve().parent, CONFIG))
     routes, guest_routes, errors = inventory(args.backend / "apps", reviewed)
-    for heading, entries in (("Tüm uçlar", routes), ("Misafire açık uçlar", guest_routes)):
+    for heading, entries in (("All endpoints", routes), ("Guest endpoints", guest_routes)):
         print(f"{heading} ({len(entries)})")
         for entry in sorted(entries):
             print(f"  {entry}")

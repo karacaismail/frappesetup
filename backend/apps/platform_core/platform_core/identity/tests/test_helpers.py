@@ -21,7 +21,10 @@ class TestPureHelpers(UnitTestCase):
 
 	def test_end_session_url(self):
 		url = helpers.end_session_url(
-			"http://identity.localhost:8660", "platform", "site-tenant1", "http://tenant1.localhost:8661/panel"
+			"http://identity.localhost:8660",
+			"platform",
+			"site-tenant1",
+			"http://tenant1.localhost:8661/panel",
 		)
 		self.assertTrue(
 			url.startswith("http://identity.localhost:8660/realms/platform/protocol/openid-connect/logout?")

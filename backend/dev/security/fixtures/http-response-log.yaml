@@ -2,7 +2,7 @@ rules:
   - id: http-raw-response-log
     languages: [python]
     severity: ERROR
-    message: "Yanıt gövdesi yerine durum kodunu veya sabit hata kodunu günlüğe yazın."
+    message: "Log the status code or a fixed error code instead of the response body."
     mode: taint
     pattern-sources:
       - exact: true
@@ -20,6 +20,7 @@ rules:
               regex: ^(?:[a-zA-Z_][a-zA-Z_0-9]*\.)*(?:response|resp|reply|http_response|error_response)$
     pattern-sinks:
       - pattern: print(...)
+      - pattern: frappe.log_error(...)
       - patterns:
           - pattern-either:
               - patterns:
