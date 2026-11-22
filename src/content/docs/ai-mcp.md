@@ -8,13 +8,13 @@ Bu sayfa iki kararı verir: hangi hazır MCP sunucusu neye kullanılır ve paket
 
 ## Kiracı MCP sözleşmesi
 
-Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `5c8d7fe` kaydını inceler.
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `c1fd2c6` kaydını inceler.
 
 MCP, ajanın araç listesini almasını ve araç çağırmasını sağlayan protokoldür. Kiracı ucu `platform_core.api.ai.mcp` olarak tasarlandı. Okuma ve araç çağrısı insan oturumu veya kısa süreli aracı belirteciyle yapılır. Yazma çağrısı 10 dakika geçerli bir öneri açar. İnsan öneriyi ayrı `approve_proposal` ucundan onaylar.
 
-Tasarım, Frappe 16'nın hazır `/api/v2/mcp` ucunu kiracıda kapatır. `frappe/mcp` deposu arşivlendi. İncelenen dalda kiracı MCP uç dosyası henüz yoktur. Gerçek MCP istemcisi ve canlı Keycloak denenmedi (`not_run`).
+Tasarım, Frappe 16'nın hazır `/api/v2/mcp` ucunu kiracıda kapatır. `frappe/mcp` deposu arşivlendi. İncelenen kayıtta kiracı MCP uç dosyası `platform_core/api/ai.py` yolundadır. Gerçek MCP istemcisi ve canlı Keycloak denenmedi (`not_run`).
 
-Kaynaklar `backend/docs/sozlesmeler.md` 10. bölüm, karar notu 0002 ve dalın dosya ağacıdır.
+Kaynaklar `backend/docs/contracts.md` 10. bölüm, karar notu 0002 ve dalın dosya ağacıdır.
 
 ## Kararlar
 

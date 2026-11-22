@@ -8,12 +8,12 @@ Bu sayfa [Press yetkinliğindeki](/frappesetup/ai-press-yetkinlik/) boşlukları
 
 ## Backend geliştirme durumu
 
-Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `5c8d7fe` kaydını inceler.
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `c1fd2c6` kaydını inceler.
 
 | Alan | Dalda görülen kanıt | Kalan doğrulama |
 | --- | --- | --- |
-| Model geçidi | `model_gecidi` kodu, HTTP uçları, OpenAPI sözleşmesi ve test dosyaları | Canlı sağlayıcı sonucu bu kayıtta yok |
-| Kiracı MCP | Karar notu 0002 ve sözleşme 10. bölüm | Kiracı ucu ve gerçek istemci oturumu |
+| Model geçidi | `platform_core.model_gateway` kodu, HTTP uçları, OpenAPI sözleşmesi ve test dosyaları | Canlı sağlayıcı sonucu bu kayıtta yok |
+| Kiracı MCP | `platform_core.api.ai` kodu ve sözleşmenin 10. bölümü | Gerçek istemci oturumu |
 | Kimlik | Proje kaydı ve Keycloak sözleşmesi | Canlı Keycloak, Press ve kiracıyla uçtan uca eşitleme |
 | Kod denetimi | `ai-readiness` ve elle başlatılan güvenlik komutları dalda yer alır | CI güvenlik kapısı açık iş olarak durur (O-29) |
 
@@ -21,7 +21,7 @@ Model geçidinde OpenAI uyumlu, Anthropic, Gemini ve Ollama bağlantı biçimler
 
 Test dosyalarının varlığı bu incelemede test sonucu olarak sayılmadı. Canlı Keycloak ve gerçek MCP istemci oturumu `not_run` durumundadır.
 
-Kaynaklar `backend/PROJE-KAYDI.md`, sözleşmenin 10. ve 11. bölümleri ile karar notları 0002, 0004, 0010 ve 0011'dir.
+Kaynaklar `backend/PROJECT-RECORD.md`, sözleşmenin 10. ve 11. bölümleri ile karar notları 0002, 0004, 0010 ve 0011'dir.
 
 ## Ne hazır alınır, ne yazılır
 

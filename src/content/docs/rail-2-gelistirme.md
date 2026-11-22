@@ -11,11 +11,12 @@ Bu ray, Frappe v16 / ERPNext v16 kiracı sitelerinde özel kodun tek evi olan `p
 | Modül | Bileşen | Frappe mekanizması | G-id |
 | --- | --- | --- | --- |
 | `access` | Access Rule doctype, derleyici, `has_permission` / `permission_query_conditions` hook'ları, `explain_permission` | Hook'lar, DocPerm, User Permission, permlevel | G-60, G-61, G-62, G-104 |
-| `meta` | `api.meta.get_doctype`, `api.shell.get_bootstrap`, meta hash/ETag | `/api/v2/doctype/<doctype>/meta`, `getdoctype`, Workspace Sidebar | G-63, G-94, X-12 |
-| `audit` | AI Action Log kaydı, elle başlatılan saklama temizliği, correlation-id | Version, Activity Log, Permission Log, Access Log | G-64, G-52, X-05 |
+| `shell` | `api.meta.get_doctype` ve `api.shell.get_bootstrap` | Kayıt tanımı, açılış verisi ve kenar çubuğu | G-63, G-94, X-12 |
+| `ai` | Araç kaydı, MCP, önizleme, insan onayı ve işlem günlüğü | `api.ai`, `ai_tools`, AI Action Log | G-64, G-84, G-86 |
+| `model_gateway` | Sağlayıcı seçimi ve kullanım kaydı | `api.model`, AI Usage Log | G-64, G-83, G-87 |
 | `flags` | `subscription.has_feature`, `@require_feature`, Platform Settings | site\_config, Press Developer API | G-35, G-106, G-38, G-90 |
 | `outbox` | Platform Event doctype, dağıtıcı, ölü mektup | `doc_events` ve `frappe.enqueue` | G-15, G-81, G-83, X-12 |
-| `identity` | provision, SLO, JWT auth\_hooks | `auth_hooks`, `on_logout`, Social Login Key | G-57, G-58, G-59 |
+| `identity` | Keycloak giriş dönüşü, kullanıcı bağı, çıkış ve servis belirteci | `api.auth`, `api.identity`, `auth_hooks` | G-44, G-57, G-58, G-59 |
 | `baseline` | TR System Settings, Desk yönlendirme, SPA www sayfası | `setup_wizard_complete`, `before_request`, `www/` | G-41, G-45, G-53, G-75 |
 | `support` | Support Session doctype, impersonate kapısı, Hocuspocus `onAuthenticate` doğrulama ucu | `user.impersonate`, Activity Log, Notification Log | SA-27, SA-28, SA-29 |
 | `ops` | `api.ops.customer_360` (operatör modu, salt okur birleştirme) | Press API + yerel doctype'lar | SA-24 |
@@ -136,4 +137,4 @@ Website User yalnız izin listesindeki yöntemleri çağırabilir. Sunucu diğer
 - Kayıt yöntemleri belge izinlerine uyar. Bunlar `/api/v2/document/<doctype>/<name>/method/<method>/` ve eski `run_method` çağrılarıdır.
 - Frappe masaüstü hesabı bu listeden etkilenmez.
 
-**Kaynak:** Backend sözleşmesi 5. bölüm.
+Website User yöntem izin listesini `backend/docs/contracts.md` dosyasının 5. bölümü tanımlar.

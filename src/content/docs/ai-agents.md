@@ -8,13 +8,13 @@ Bu sayfa paketteki dört ajanın görevlerini açıklar. Hazır Frappe ajanları
 
 ## Backend ajanının yetkisi
 
-Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `5c8d7fe` kaydını inceler.
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `c1fd2c6` kaydını inceler.
 
 Proje kaydı sağlayıcıdan bağımsız ajan servisini seçti. Claude desteklenebilecek sağlayıcılardan biridir. Model geçidinde sağlayıcı ve model ayarla seçilir.
 
 Kiracı için ajan, erişim listesinde yer alan araçları kullanır. Sözleşme, aracı belirtecini 300 saniye ve 20 çağrıyla sınırlar. Bu belirteçle öneri onaylanamaz. Onay, öneriyi açan insanın oturumundan gelir. Gerçek istemci oturumu denenmedi (`not_run`).
 
-Kaynaklar `backend/PROJE-KAYDI.md` O-10, sözleşmenin 10. bölümü ve karar notu 0002'dir.
+Kaynaklar `backend/PROJECT-RECORD.md` O-10, sözleşmenin 10. bölümü ve karar notu 0002'dir.
 
 ## Kararlar
 

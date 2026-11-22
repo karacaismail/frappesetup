@@ -94,7 +94,7 @@ Entegratör seçimi ve yükümlülük takvimi P2 başında ürün sahibi ve mali
 | Frappe Version | 'Version 16' default=1 (X-04) |
 | Scheduler | `press.signup_e2e.run_signup_e2e` devre dışı (kimlik Keycloak'ta) |
 | Roller | v0.8.0 yaması Press Admin/Member → Press User; takım içi yetki Press Role bayrakları (admin\_access, allow\_billing, allow\_apps, allow\_site\_creation, allow\_webhook\_configuration, allow\_local\_payment) ve press\_tr rol şablonları; operatör rolleri Rail 6'da (SA-2) |
-| Kimlik uçları | signup/send\_otp/verify\_otp/login\_link/reset\_password/2fa uçları 403; `/login`, `/signup`, `/dashboard/login` Keycloak'a yönlendirilir; Social Login Key provider 'Keycloak', user\_id\_property='sub', sign\_ups='Allow' |
+| Kimlik uçları | Press eski kayıt, parola ve ikinci adım uçlarını 403 ile kapatır. Press giriş adresleri Keycloak’a yönlenir. `press_tr.api.auth.keycloak_callback`, kullanıcıyı `(iss, sub)` bağıyla bulur (G-12). |
 | E-posta | 'Frappe Cloud' içeren 29 şablon + 13 string Türkçe markalı set ile değiştirilir; Press host için Email Account + SPF/DKIM |
 
 ## 6. Press altyapı envanteri — Hetzner (G-2..G-6, G-36, G-37)

@@ -561,7 +561,49 @@ async function frameStep(page: Page) {
 }
 
 /* ------------------------------------------------------------------ */
+test.describe('documents without JavaScript', () => {
+  test.use({ javaScriptEnabled: false, viewport: { width: 320, height: 720 } });
+
+  test('embeds stay under their headings and script controls are disabled @touch', async ({ page }) => {
+    await page.goto('yol-haritasi/');
+    await expect(page.locator('[data-embed]')).toHaveCount(0);
+    for (const [name, heading] of [['phase-table', 'Faz tablosu'], ['timeline', 'Zaman çizelgesi (göreli)']]) {
+      const block = page.locator(`.prose [data-embed-source="${name}"]`);
+      await expect(block).toBeVisible();
+      await expect(block.locator('xpath=preceding-sibling::h2[1]')).toHaveText(heading);
+    }
+    await expect(page.getByRole('button', { name: 'Menüyü aç' })).toBeDisabled();
+    await expect(page.getByTestId('color-scheme-toggle')).toBeDisabled();
+    await expect(page.getByTestId('nav-wrapper-ai')).toBeDisabled();
+  });
+});
+
 test.describe('AI nav group', () => {
+  test('keeps the focused AI link when the shell loads', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    let releaseShell!: () => void;
+    const shellGate = new Promise<void>((resolve) => { releaseShell = resolve; });
+    await page.route(/\/_astro\/Shell\.[^/]+\.js$/, async (route) => {
+      await shellGate;
+      await route.continue();
+    });
+
+    try {
+      await page.goto('kararlar/', { waitUntil: 'domcontentloaded' });
+      const firstLink = page.locator('#site-nav a[href*="/ai-"]').first();
+      await expect(firstLink).toBeVisible();
+      await firstLink.focus();
+      await expect(firstLink).toBeFocused();
+
+      releaseShell();
+      await waitForHydration(page);
+      await expect(page.getByTestId('nav-wrapper-ai')).toBeEnabled();
+      await expect(firstLink).toBeFocused();
+    } finally {
+      releaseShell();
+    }
+  });
+
   test('wrapper is collapsed elsewhere, open on AI pages, keyboard operable', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('kararlar/');
@@ -1490,7 +1532,7 @@ test.describe('diagrams', () => {
     expect(problems).toEqual([]);
   });
 
-  test('roadmap timeline is moved next to its placeholder', async ({ page }) => {
+  test('roadmap timeline renders in the document', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     await page.goto('yol-haritasi/');
     await expect(page.locator('.prose .diagram-timeline')).toHaveCount(1);

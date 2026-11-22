@@ -152,3 +152,13 @@ Bileşen adları kurulu @ant-design/x sürümünde doğrulanır (doğrulanacak).
 | 7 | Eval seti, kırmızı takım testleri, KVKK envanter güncellemesi | Platform ekibi + hukuk |
 
 Kabul: panelden en az üç tek tık akışı prod'da çalışır; her yazma ve yıkıcı/ücretli aksiyon onay olmadan yalnızca önizleme döner; her araç çağrısı kullanıcının Frappe/Press yetkisiyle yürütülüp AI Action Log'a düşer; prompt injection ve yetki aşımı negatif testleri geçer; dış sağlayıcı aktarımı KVKK envanterine işlenmiştir; AI tüketimi Press Usage Record'da görünür.
+
+## 8.8 Saklama süresi dolan kayıtlar
+
+Yönetici saklama temizliğini `platform_core.api.ai.purge_logs` ile elle başlatır. Sistem süresi dolan kayıtları kalıcı siler. Bu kural her modülde geçerlidir.
+
+Sistem `delete_permanently=True` kullanır. Böylece “Deleted Document” tablosunda kopya kalmaz. Geri dönüş gerekirse veritabanı yedeği kullanılır.
+
+Sistem geri yükleme kopyasını yalnız yönetici bir iş kaydını elle silerse tutar.
+
+Kalıcı silme kuralını proje kaydı O-32 ve sözleşmenin 10. bölümü tanımlar.

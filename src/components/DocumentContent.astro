@@ -1,0 +1,17 @@
+---
+// Yalnız depo içindeki Markdown içeriği ve Astro bileşenleri HTML olarak birleştirilir.
+const content = (await Astro.slots.render('default')) ?? '';
+const chunks: string[] = [];
+let offset = 0;
+
+for (const match of content.matchAll(/<div data-embed="([a-z0-9-]+)"><\/div>/g)) {
+  const [placeholder, name] = match;
+  const start = match.index!;
+  if (!Astro.slots.has(name)) throw new Error(`Bilinmeyen belge bileşeni: ${name}`);
+  chunks.push(content.slice(offset, start), await Astro.slots.render(name));
+  offset = start + placeholder.length;
+}
+chunks.push(content.slice(offset));
+---
+
+<div class="prose" set:html={chunks.join('')} />

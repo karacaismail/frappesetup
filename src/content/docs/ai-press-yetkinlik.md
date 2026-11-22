@@ -8,13 +8,13 @@ Soru: [Press kılavuzundaki](https://karacaismail.github.io/pressguide/) işleml
 
 ## Backend dalındaki Press kanıtı
 
-Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `5c8d7fe` kaydını inceler.
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `c1fd2c6` kaydını inceler.
 
 Proje kaydı yerel deneme kurulumunda üç sürüm bildirir. Bunlar Press 0.154.1, Frappe 16 ve Python 3.14'tür. Press bu kurulumda yamalarla açılır. Frappe 16'da sunucu kurma akışı açık iş olarak kalır.
 
 Yerel kurulum kaydı aşağıdaki paket kapsamını değiştirmez. Canlı Press üzerinde paket işlemleri ve gerçek MCP istemci oturumu denenmedi (`not_run`). Canlı Keycloak ile kullanıcı eşitlemesi de denenmedi (`not_run`).
 
-Kaynak `backend/PROJE-KAYDI.md` içindeki “Sürümler”, O-9 ve “Teknik borç” kayıtlarıdır.
+Kaynak `backend/PROJECT-RECORD.md` içindeki “Sürümler”, O-9 ve “Teknik borç” kayıtlarıdır.
 
 ## Statüler
 

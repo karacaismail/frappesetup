@@ -8,13 +8,13 @@ Skill, ajana bir işi nasıl yapacağını öğreten `SKILL.md` ve gerektiğinde
 
 ## Backend araç bildirimleri
 
-Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `5c8d7fe` kaydını inceler.
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `c1fd2c6` kaydını inceler.
 
 Paket skill'leri iş adımlarını anlatır. Backend sözleşmesinde uygulamalar, ajanın çağıracağı araçları `ai_tools` kancasıyla bildirir. Yazma aracı önizleme işlevi taşır. Hassas kayıt türleri için genel yazma yolu kapalı tutulur.
 
 Dalda `ai-readiness` denetimi ve test dosyaları vardır. Denetim araç bildirimini ve izin kurallarını kaynak koddan inceler. Kapı çevirileri, bağımlılık sürümlerini ve modül arayüzlerini de denetler. Skill davranışı ve canlı MCP istemci oturumu denenmedi (`not_run`).
 
-Kaynaklar `backend/PROJE-KAYDI.md` O-28, sözleşmenin 10. bölümü ve karar notu 0010'dur.
+Kaynaklar `backend/PROJECT-RECORD.md` O-28, sözleşmenin 10. bölümü ve karar notu 0010'dur.
 
 ## Kararlar
 

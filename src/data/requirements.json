@@ -112,7 +112,7 @@
  {
   "id": "G-12",
   "title": "Press'e Keycloak ile giriş ve yerel kimlik yüzeyinin kapatılması",
-  "detail": "Social Login Key: `social_login_provider='Keycloak'` (v15 yerleşik, doğrulandı), custom_base_url=1, base_url `https://<idp>/realms/<realm>`, openid-connect `auth/token/userinfo` uçları, auth_url_data {response_type: code, scope: openid}, sign_ups='Allow', `user_id_property='sub'`; ilk girişte `press_tr` kancası Account Request → Team oluşturur ve kullanıcıyı `(iss, sub)` çiftiyle bağlar (G-120). `press_tr` `before_request` Press'in `press.api.account.signup/send_otp/verify_otp/send_login_link/login_using_key/reset_password/enable_2fa/verify_2fa` ve `product_trial.send_verification_code_for_login` uçlarını 403 ile reddeder; `/login`, `/signup`, `/dashboard/login` panel/Keycloak'a yönlendirilir; User 2FA zorunluluğu etkinleştirilmez (MFA Keycloak'ta); Press Vue `/dashboard` yalnızca iç operasyon için kalır ve panel alan adından dışarıya kapatılır.",
+  "detail": "Press girişi `press_tr.api.auth.get_login_url` ile başlar. Keycloak, kodu `press_tr.api.auth.keycloak_callback` ucuna yollar. Press kullanıcıyı `(iss, sub)` ile eşler (G-120). Takım yoksa Press takımı açar. Eski giriş ve kayıt uçları 403 döner. Press Desk yalnız iç operasyon içindir. Ekip Frappe 16 üzerinde giriş, kayıt, çıkış ve takım açmayı doğrular (O-9). Bu akışı sözleşmenin 6. bölümü tanımlar.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P1",
@@ -431,8 +431,8 @@
  },
  {
   "id": "G-44",
-  "title": "Kiracı sitede Keycloak Social Login Key ve yerel giriş yüzeyinin kapatılması",
-  "detail": "Social Login Key provider 'Keycloak' (v16 yerleşik), base_url `https://<idp>/realms/<realm>`, client_id/secret (Password Site Config Key), redirect `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak`, sign_ups='Deny', `user_id_property='sub'` (yalnızca User Social Login.userid için; eşleme e-posta ile yapılır, doğrulandı), `enable_social_login=1`; Keycloak client Valid Redirect URI ve userinfo'da email + email_verified. Keycloak doğrulandıktan sonra `disable_user_pass_login=1`, `login_with_email_link=0`, `allow_login_using_mobile_number/user_name=0`, `Website Settings.disable_signup=1`, Frappe 2FA kapalı (MFA Keycloak'ta); Administrator break-glass yalnızca bench/Agent set-admin-password ile.",
+  "title": "Kiracıda Keycloak dönüş ucu ve yerel girişin kapatılması",
+  "detail": "Kiracı girişi `platform_core.api.auth.get_login_url` ile başlar. Keycloak kodu `platform_core.api.auth.keycloak_callback` ucuna yollar. Dönüş ucu kodu ve tarayıcı çerezine bağlı state değerini doğrular. Site kullanıcıyı `(iss, sub)` bağıyla bulur (G-120). Hazır `login_via_keycloak` ucu 403 döner. Yerel parola girişi doğrulama sonrasında kapatılır. Administrator hesabı acil erişim için kalır. Bu akışı sözleşmenin 5. bölümü tanımlar.",
   "rail": "R2 Frappe yapılandırma",
   "priority": "MUST",
   "phase": "P1",
@@ -802,7 +802,7 @@
  {
   "id": "G-81",
   "title": "identity-sync servisi: Keycloak olayları → Press ve Frappe provizyonu",
-  "detail": "identity-sync Keycloak olaylarını Press ve kiracı sitelerine işler. Kiracı hesabı Website User olur (G-57). Operatör fark denetimini elle başlatır. Komut önce farkları gösterir ve onay ister. Sistem aynı olayı tekrar işlediğinde sonuç değişmez. İşlenemeyen olaylar ayrı kuyrukta bekler. Kaynak: proje kaydı D-6 ve O-11, sözleşme 7. bölüm.",
+  "detail": "identity-sync Keycloak olaylarını Press ve kiracı sitelerine işler. Kiracı hesabı Website User olur (G-57). Operatör fark denetimini elle başlatır. Komut önce farkları gösterir ve onay ister. Sistem aynı olayı tekrar işlediğinde sonuç değişmez. İşlenemeyen olaylar ayrı kuyrukta bekler. Bu kuralı proje kaydı D-6 ve O-11, sözleşmenin 7. bölümü açıklar.",
   "rail": "R4 Keycloak",
   "priority": "MUST",
   "phase": "P1",
@@ -862,7 +862,7 @@
  {
   "id": "G-87",
   "title": "AI denetim izi, ölçüm ve maliyet",
-  "detail": "AI Action Log işlemi, AI Usage Log model kullanımını kaydeder (G-64). Her iki kayıt 365 gün saklanır. Öneriler karar veya süre dolumundan sonra 30 gün saklanır. Yönetici temizliği elle başlatır (O-32). Kaynak: proje kaydı, “Kişisel veri” bölümü ve sözleşme 10. bölüm.",
+  "detail": "AI Action Log işlemi, AI Usage Log model kullanımını kaydeder (G-64). Her iki kayıt 365 gün saklanır. Öneriler karar veya süre dolumundan sonra 30 gün saklanır. Yönetici temizliği elle başlatır (O-32). Bu kuralı proje kaydı, “Kişisel veri” bölümü ve sözleşmenin 10. bölümü açıklar.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",
@@ -912,7 +912,7 @@
  {
   "id": "G-92",
   "title": "Plan tabanlı AI kotası ve faturalama",
-  "detail": "Marketplace App Plan features'ta aylık AI mesaj/token kotası; agent servisi takım bazlı sayaç tutar ve kiracı siteye/panele kalan kotayı döner; aşımda yumuşak sınır + plan yükseltme önerisi; aşım satışı ön ödemeli kredi (Balance Transaction) ile MAY; AI kullanımı Press Usage Record'a yazılmaz, agent DB'si kaynaktır.",
+  "detail": "Marketplace App Plan aylık mesaj ve token kotasını belirler. Ajan servisi takım kotasını ve kalan krediyi panele döner. Sınırda panel plan yükseltmeyi önerebilir. Ön ödemeli kredi Balance Transaction kaydından düşer. Ajan servisi ücretli kullanımı Press Usage Record kaydına yazar (SA-15). AI Usage Log model, token ve maliyet ayrıntısını tutar (G-64).",
   "rail": "R5 AI",
   "priority": "SHOULD",
   "phase": "P4",
@@ -1112,7 +1112,7 @@
  {
   "id": "G-112",
   "title": "Sır yönetimi",
-  "detail": "Hiçbir sır depoda değildir; Press Site Config Password tipli anahtarlar, GitHub Actions secrets, sunucuda age/sops ile şifreli env, Keycloak client secret'ları identity-sync tarafından üretilip Press'e yazılır; iyzico/Anthropic/SMTP anahtarları rotasyon planı (90 gün); erişim Tailscale/özel ağ + SSH CA; sır sızıntısı için pre-commit ve CI taraması.",
+  "detail": "Ekip gizli değerleri depoya yazmaz. Press Site Config değerleri parola türünde saklanır. CI, GitHub Actions gizli değerlerini kullanır. Sunucuda age veya sops dosyaları şifreler. identity-sync, Keycloak istemci anahtarlarını üretir ve Press’e yazar. Ekip iyzico, model sağlayıcıları ve SMTP anahtarlarını 90 günde bir yeniler. Erişim özel ağ ve SSH sertifikasıyla sağlanır. Commit ve CI denetimleri gizli değer arar.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P0",
@@ -1472,7 +1472,7 @@
  {
   "id": "G-148",
   "title": "Tarayıcı belirteç modeli: BFF ve kısa ömürlü aracı belirteçleri",
-  "detail": "Önerilen teknik varsayım (K-25): tarayıcı kalıcı erişim veya yenileme belirteci tutmaz. Frappe siteleri OIDC kodunu sunucuda alır (Social Login Key) ve HttpOnly oturum + CSRF ile çalışır; agent servisi ve Hocuspocus için kiracı sitesi (`platform_core`) oturumdan tek amaçlı, kısa ömürlü (dakikalar), audience'ı tek servise ve tek siteye bağlı, `jti`'li bir aracı belirteci basar; belirteç yalnız bellekte tutulur, yeniden kullanımı ve kapsam dışı kullanımı sunucuda reddedilir. Press ticari araçları için Press OAuth belirteci agent servisinde kalır (G-28). Kabul: tarayıcı depolamasında belirteç yok; süresi dolan veya başka siteye sunulan belirteç reddedilir; oturum kapanınca yeni belirteç basılmaz.",
+  "detail": "Önerilen teknik varsayım (K-25): tarayıcı kalıcı erişim veya yenileme belirteci tutmaz. Frappe siteleri OIDC kodunu sunucuda alır (G-12, G-44) ve HttpOnly oturum + CSRF ile çalışır; agent servisi ve Hocuspocus için kiracı sitesi (platform_core) oturumdan tek amaçlı, kısa ömürlü (dakikalar), audience'ı tek servise ve tek siteye bağlı, `jti`'li bir aracı belirteci basar; belirteç yalnız bellekte tutulur, yeniden kullanımı ve kapsam dışı kullanımı sunucuda reddedilir. Press ticari araçları için Press OAuth belirteci agent servisinde kalır (G-28). Kabul: tarayıcı depolamasında belirteç yok; süresi dolan veya başka siteye sunulan belirteç reddedilir; oturum kapanınca yeni belirteç basılmaz.",
   "rail": "Çapraz",
   "priority": "MUST",
   "phase": "P1",

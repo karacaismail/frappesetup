@@ -22,7 +22,7 @@ Bu kontrol listesi, satılan her uygulamanın (HRMS TR, CRM, Webshop) içine otu
 
 | Kalem | Backend kaynağı | Yöntem | G-id |
 | --- | --- | --- | --- |
-| Keycloak SSO girişi; her site kendi OIDC dönüşüyle (kod sunucuda), tarayıcıya belirteç verilmez (K-25) | Social Login Key provider 'Keycloak' (Press ve kiracı Frappe 16, proje kaydı O-9) | configure | G-12, G-44, G-77 |
+| Her site Keycloak dönüş kodunu sunucuda alır. Tarayıcıya erişim belirteci verilmez (K-25). | Press ve kiracı kendi `keycloak_callback` uçlarını kullanır. | configure | G-12, G-44, G-77 |
 | Tekli çıkış: RP-initiated + back-channel | `on_logout`, `keycloak_backchannel_logout`; press\_tr aynı mekanizma | develop (platform\_core, press\_tr) | G-58 |
 | Host'a bağlı oturum çerezi, CSRF token enjeksiyonu; CORS yok (G-119) | `www/<panel>.py` csrf\_token; Release Group common\_site\_config (DevOps sorumlusu) | develop + configure | G-13, G-45, G-75 |
 | Profil (ad, avatar, dil, saat dilimi); parola/MFA/passkey/oturumlar Keycloak Account Console'a markalı yönlendirme (doğrulanacak: v3 tema desteği) | Frappe User, Keycloak Account Console | native | G-78, G-99 |

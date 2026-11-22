@@ -28,6 +28,8 @@ type TaskBoard = {
   levels: { id: string; label: string; rule: string; phases?: string[]; ids?: string[] }[];
   items: Record<string, TaskItem>;
 };
+const openDecisions = docs.find((doc) => doc.slug === 'acik-kararlar')!.text;
+const decisionIds = [...openDecisions.matchAll(/^[ \t]*\|[ \t]*(K-\d+)[ \t]*\|/gm)].map((match) => match[1]);
 const RAILS = ['R1 Press', 'R2 Frappe yapılandırma', 'R2 Frappe geliştirme', 'R3 Frontend', 'R4 Keycloak', 'R5 AI', 'Shell', 'App çerçevesi', 'Çapraz', 'R6 Operasyon düzlemi'];
 
 // Git yardımcıları: kanıt commit'leri backend dalındadır; main dalına her yayın tek commit olarak girer.
@@ -304,9 +306,18 @@ test.describe('content consistency', () => {
     expect(missing).toEqual([]);
   });
 
+  test('open decision ids are unique', () => {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const id of decisionIds) {
+      if (seen.has(id)) duplicates.add(id);
+      seen.add(id);
+    }
+    expect([...duplicates]).toEqual([]);
+  });
+
   test('every K decision reference exists in the open decisions page', () => {
-    const decisions = docs.find((d) => d.slug === 'acik-kararlar')!.text;
-    const defined = new Set([...decisions.matchAll(/^\| (K-\d+) \|/gm)].map((m) => m[1]));
+    const defined = new Set(decisionIds);
     const missing: string[] = [];
     const scan = (where: string, text: string) => {
       for (const m of text.matchAll(/\bK-(\d+)\b/g)) if (!defined.has(`K-${m[1]}`)) missing.push(`${where}: K-${m[1]}`);

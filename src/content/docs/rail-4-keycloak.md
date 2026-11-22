@@ -15,13 +15,13 @@ Keycloak; panel, Press, operasyon sitesi ve tüm kiracı siteleri için tek kiml
 | Kullanıcı | User; kalıcı anahtar `(iss, sub)` (G-120), e-posta yalnız iletişim özniteliği | Press User + Team üyesi; kiracı sitede son kullanıcı “Website User” olur (backend O-3; G-57) |
 | Operatör (sahibin personeli) | `platform-operator` grubu; realm rolleri `ops-admin`, `ops-billing`, `ops-support`, `ops-finance` | Press System User + Press Ops Billing / Support Agent rolleri; operasyon sitesi rolleri (SA-1, SA-2, SA-3) |
 | Panel | Ayrı istemci yok (K-25): panel host'u Press sitesidir ve `press` istemcisiyle oturum açar; tarayıcıya belirteç verilmez | — |
-| Press | `press` (confidential) | Press Social Login Key provider 'Keycloak' (G-12) |
-| Kiracı sitesi | `site-<kiracı>` (confidential) ve kiracının audience kapsamı (Audience mapper; `identity-sync`, `press-service` ve `ops-bff`'ye yalnız varsayılan olmayan kapsam olarak bağlı); ikisini identity-sync Admin API ile açar | Frappe Social Login Key, redirect `/api/method/frappe.integrations.oauth2_logins.login_via_keycloak` (G-44) |
+| Press | `press` gizli anahtarlı istemcisidir. | Dönüş ucu `press_tr.api.auth.keycloak_callback` olur (G-12). |
+| Kiracı sitesi | `site-<kiracı>` gizli anahtarlı istemcisidir. identity-sync istemciyi ve hedef kapsamını açar. | Dönüş ucu `platform_core.api.auth.keycloak_callback` olur. Sistem kullanıcıyı `(iss, sub)` bağıyla bulur (G-44, G-120). |
 | Operasyon sitesi | `site-ops` (confidential) ve audience kapsamı (yalnız `ops-bff`'ye, varsayılan olmayan) | Frappe Social Login Key; yalnız `platform-operator` grubu girer (SA-3) |
 | Servisler | `agent-service`, `identity-sync`, `press-service` (service account) | Press OAuth Client + platform\_core `auth_hooks` (G-28, G-59); Hocuspocus Keycloak istemcisi kullanmaz, site biletini doğrular (SA-29, G-148) |
 | Operatör BFF'i | `ops-bff` (confidential; servis hesabı yok; standart akış + PKCE ve standart token exchange açık; dönüş ve back-channel logout adresleri yalnız `operator.` üzerinde tam adres) | Operatör başına Press API key (SA-1); hedef sitenin `auth_hooks`'u (G-59) |
 
-Her iki Social Login Key'de `user_id_property='sub'` yazılır; Frappe v16 varsayılanı `preferred_username`'dir (doğrulandı: `social_login_key.py` providers\['Keycloak'\]). Frappe'nin OAuth ile kendiliğinden açtığı kullanıcı 'Website User' tipindedir ve eşleme e-posta ile yapılır (doğrulandı: `frappe/utils/oauth.py` `login_oauth_user`); bu yüzden kiracı sitede `sign_ups='Deny'` + ön provizyon (bölüm 4), Press'te `sign_ups='Allow'` + press\_tr on\_login kancasıyla Team oluşturma geçerlidir. Kalıcı eşleme giriş kancasında `(iss, sub)` ile yapılır; e-posta değişimi kimliği değiştirmez, aynı e-postayla yeniden açılan hesap eski kayda bağlanmaz (G-120). Hedef sürüm Keycloak 26.x (son sürüm 26.8.0, 2026-10-01; doğrulandı); Organizations 26.0'dan beri tam destekli, standart token exchange 26.2'den beri iç istemciler arasında destekli (doğrulandı: release notes).
+Press ve kiracı, kullanıcıyı belirteçteki `(iss, sub)` bağıyla eşler. E-posta iletişim alanıdır. Kiracıdaki hazır `login_via_keycloak` ucu 403 döner (sözleşme 5. bölüm).
 
 ## Origin ve oturum sözleşmesi (G-119)
 
@@ -62,7 +62,7 @@ sequenceDiagram
   P->>PR: press_tr.api.auth.get_login_url
   P-->>U: 302 Keycloak authorize (client press, scope openid)
   U->>K: parola + TOTP/passkey (G-78)
-  K-->>U: 302 code, login_via_keycloak (Press)
+  K-->>U: 302 kod, press_tr.api.auth.keycloak_callback
   PR->>K: token + userinfo
   PR->>PR: (iss, sub) ile User eşle (G-120), Team yoksa press_tr oluşturur (G-12), host'a bağlı sid
   PR-->>P: 302 redirect_to
@@ -70,9 +70,9 @@ sequenceDiagram
   T->>S: get_bootstrap (401, aynı origin)
   T->>S: platform_core.api.auth.get_login_url
   S-->>U: 302 Keycloak authorize (client site-kiraci)
-  K-->>U: SSO oturumu var, etkileşimsiz 302 code
+  K-->>U: 302 kod, platform_core.api.auth.keycloak_callback
   S->>K: token + userinfo
-  S->>S: (iss, sub) ile Website User eşle (sign_ups=Deny, G-120), host'a bağlı sid + csrf_token (G-45)
+  S->>S: (iss, sub) ile Website User eşle (G-120), host'a bağlı sid + csrf_token (G-45)
   S-->>T: get_bootstrap (G-63, aynı origin)
 ```
 
@@ -97,7 +97,7 @@ sequenceDiagram
   PR->>IS: site adı
   IS->>K: Admin API: client site-kiraci + secret
   IS->>PR: secret, Site Config keycloak_client_secret (Password, G-39)
-  PR->>PR: Product Trial Request, site Active, Social Login Key yazılır
+  PR->>PR: Product Trial Request, site Active, Keycloak istemcisi açılır
   PR-->>P: Agent Job realtime, yönlendirme
 ```
 
@@ -169,7 +169,7 @@ Social Login Key: provider 'Keycloak', `custom_base_url=1`, `base_url=https://ap
 
 ## 7. Realm politikaları (G-43, G-78, G-80)
 
-Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse proxy'de kapalı (ayrı `hostname-admin` tek başına yetmez; doğrulandı: Keycloak hostname rehberi), anonim dinamik istemci kaydı kapalı, redirect URI'leri tam adres, kullanılmayan özellikler (JWT Authorization Grant, stateless mod) kapalı, her minor sürüm Upgrading Guide ile rc ortamında. Politikalar: Login with email, Verify email Required, brute force detection (5 deneme / 300 sn), parola ≥12 + geçmiş + yaygın parola listesi, TOTP + WebAuthn/passkey, SSO Session Idle 30 dk / Max 12 saat (Frappe `session_expiry` ile hizalı), access token 5 dk, refresh token rotation, Remember me kapalı. Tema: Keycloak'ın kendi tema yapısıyla kurulur. Tema `keycloak.v2` temasından türer. Renk ve yazılar CSS değişkeniyle verilir (backend O-4). Keycloakify, panelin tasarım tokenları hazır olunca yeniden değerlendirilir. Giriş sayfası ve panel tasarım tokenlarını bugün iki ayrı dosyada tutar. Bu bir backend borcudur: bir dosyadaki değer değişince öteki eski kalabilir. Türkçe birinci dil, 320 px kabul, Playwright E2E (X-16).
+Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse proxy'de kapalı (ayrı `hostname-admin` tek başına yetmez; doğrulandı: Keycloak hostname rehberi), anonim dinamik istemci kaydı kapalı, redirect URI'leri tam adres, kullanılmayan özellikler (JWT Authorization Grant, stateless mod) kapalı, her minor sürüm Upgrading Guide ile rc ortamında. Politikalar: Login with email, Verify email Required, brute force detection (5 deneme / 300 sn), parola ≥12 + geçmiş + yaygın parola listesi, TOTP + WebAuthn/passkey, oturum süreleri 9. bölümdeki O-25 değerleridir (kiracı boşta 1 saat ve toplam 24 saat, Press 7 gün ve 30 gün), access token 5 dk, refresh token rotation, Remember me kapalı. Tema: Keycloak'ın kendi tema yapısıyla kurulur. Tema `keycloak.v2` temasından türer. Renk ve yazılar CSS değişkeniyle verilir (backend O-4). Keycloakify, panelin tasarım tokenları hazır olunca yeniden değerlendirilir. Giriş sayfası ve panel tasarım tokenlarını bugün iki ayrı dosyada tutar. Bu bir backend borcudur: bir dosyadaki değer değişince öteki eski kalabilir. Türkçe birinci dil, 320 px kabul, Playwright E2E (X-16).
 
 ## 8. HA kurulum ve sahipler (G-76)
 
@@ -198,7 +198,7 @@ Telefon paketi arka planda 2 dakika sonra kilitlenir. Paket internetsiz erişimi
 
 Arka plan eşitlemesi oturumu uzatmaz. Süre dolunca uygulama eşitlemeyi durdurur ve Keycloak ile yeniden giriş ister.
 
-**Kaynak:** Proje kaydı O-25 ile sözleşmenin 2. ve 3. bölümleri.
+Oturum sürelerini proje kaydı O-25 ve sözleşmenin 2. ve 3. bölümleri belirler.
 
 ## 10. Hesap silme
 
@@ -218,4 +218,4 @@ Kullanıcı takımın tek üyesiyse sistem takımı kapatır. Sistem siteleri as
 
 Bir adım başarısız olursa istek hata kuyruğuna girer. Operatör isteği elle yeniden dener. Sistem tamamlanan adımları tekrarlamaz.
 
-**Kaynak:** Proje kaydı O-27 ve sözleşme 7. bölüm.
+Hesap silme sırasını proje kaydı O-27 ve sözleşmenin 7. bölümü belirler.

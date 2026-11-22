@@ -62,6 +62,7 @@ function ColorSchemeToggle() {
       className="icon-btn"
       aria-label={label}
       title={label}
+      disabled={!mounted}
       data-testid="color-scheme-toggle"
       onClick={() => setColorScheme(dark ? 'light' : 'dark')}
     >
@@ -126,6 +127,13 @@ function CollapsibleGroup({
   children: ReactNode;
 }) {
   const [opened, setOpened] = useState(defaultOpened);
+  const [ready, setReady] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (panelRef.current?.contains(document.activeElement)) setOpened(true);
+    setReady(true);
+  }, []);
+  const expanded = !ready || opened;
   const GroupIcon = sectionIcon(icon);
   const panelId = `nav-group-${id}`;
   return (
@@ -133,7 +141,8 @@ function CollapsibleGroup({
       <button
         type="button"
         className="nav-link nav-wrapper"
-        aria-expanded={opened}
+        disabled={!ready}
+        aria-expanded={expanded}
         aria-controls={panelId}
         data-testid={`nav-wrapper-${id}`}
         onClick={() => setOpened((v) => !v)}
@@ -142,7 +151,7 @@ function CollapsibleGroup({
         <span className="nav-link-label">{label}</span>
         <IconChevronDown size={18} aria-hidden className="nav-wrapper-chevron" />
       </button>
-      <div id={panelId} hidden={!opened} className="nav-wrapper-panel">
+      <div id={panelId} ref={panelRef} hidden={!expanded} className="nav-wrapper-panel">
         <Stack gap={2}>{children}</Stack>
       </div>
     </>
@@ -151,6 +160,8 @@ function CollapsibleGroup({
 
 function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, children }: ShellProps) {
   const [opened, { toggle, close }] = useDisclosure(false);
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const navRef = useRef<HTMLDivElement>(null);
   // Etkin bölüm bağlantısı gezinme listesinin görünür alanında değilse yalnız liste kaydırılır (odak ve sayfa
   // kaydırması değişmez); mobil çekmece açılınca da aynı denetim yapılır.
@@ -216,6 +227,7 @@ function ShellInner({ nav, current, homeHref, repoUrl, headings = [], asOf, chil
               className="burger"
               opened={opened}
               onClick={toggle}
+              disabled={!ready}
               hiddenFrom="md"
               size="sm"
               aria-label={opened ? 'Menüyü kapat' : 'Menüyü aç'}

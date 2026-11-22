@@ -8,9 +8,9 @@ Bu bölüm kiracı yapay zekâ katmanını ve Press araç paketini belgeler. Haz
 
 ## Backend durumu
 
-Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `5c8d7fe` kaydını inceler.
+Backend incelemesi 22 Kasım 2026 Pazar gününe aittir. Bu bölüm `backend` dalındaki `c1fd2c6` kaydını inceler.
 
-Backend'in hedefi ilk kullanılabilir sürümdür. Model geçidinin kodu ve testleri dalda yer alır. Kiracı MCP katmanı bu kayıtta tasarım aşamasındadır. Dalda `yapay_zeka` modülünün yalnız başlangıç dosyası vardır.
+Backend ilk kullanılabilir sürümü hedefler. Dalda `platform_core.ai` ve `platform_core.model_gateway` kodu bulunur. Kiracı MCP uç dosyası `platform_core/api/ai.py` yolundadır.
 
 Ajan servisi sağlayıcıdan bağımsız tasarlanır. Sağlayıcı ve model ayardan gelir. İnsan, yazma önerisini kendi oturumundan onaylar. Modelin onay aracı yoktur.
 
