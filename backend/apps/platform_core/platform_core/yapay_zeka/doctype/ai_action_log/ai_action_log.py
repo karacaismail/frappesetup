@@ -14,4 +14,6 @@ class AIActionLog(Document):
 
 	def on_trash(self) -> None:
 		# Only the `retention.purge` command deletes old records, once the retention period is over.
+		if self.flags.retention_purge:
+			return
 		frappe.throw(_("AI Action Log entries cannot be deleted.", context=CONTEXT), frappe.PermissionError)

@@ -183,7 +183,8 @@ class TestStaticRules(YzTestCase):
 
 	def test_module_boundaries(self):
 		imports = re.compile(r"^\s*(?:from|import)\s+platform_core\.(\w+)", re.MULTILINE)
-		allowed = {"yapay_zeka", "model_gecidi", "erisim"}
+		# `api` holds public endpoint modules. The gap analysis test checks which of them are used.
+		allowed = {"yapay_zeka", "model_gecidi", "erisim", "api"}
 		outward = {
 			f"{path.name}: {module}"
 			for path in [*python_files(LAYER, tests=True), APP_ROOT / "api" / "ai.py"]

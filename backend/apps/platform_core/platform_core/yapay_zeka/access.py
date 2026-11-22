@@ -131,8 +131,13 @@ def args_hash(arguments: Any) -> str:
 
 
 def session_id() -> str | None:
+	"""SHA-256 of the conversation id the client sent. The id itself is never stored.
+
+	A client may put a credential into this header by mistake. Rows of one conversation still
+	share the same value, so they can be matched.
+	"""
 	value = frappe.get_request_header(CONVERSATION_HEADER) if frappe.request else None
-	return value[:140] if value else None
+	return hashlib.sha256(value.encode()).hexdigest() if value else None
 
 
 def record(

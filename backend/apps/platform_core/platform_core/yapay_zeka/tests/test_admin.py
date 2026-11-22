@@ -294,31 +294,3 @@ class TestAdminTools(YzTestCase):
 		self.assertEqual(short.status_code, 417)
 		self.assertFalse(real["dry_run"])
 		self.assertFalse(frappe.db.exists("AI Action Log", old))
-
-	def test_purge_keeps_proposals_with_unknown_result(self):
-		manager = self.login(MANAGER)
-		name = self.make_record(MANAGER)
-		done = self.propose(
-			manager, "update_document", {"doctype": DOCTYPE, "name": name, "data": {"title": "1"}}
-		)
-		self.human(manager, "POST", "reject_proposal", body={"proposal_id": done["proposal_id"]})
-		other = self.make_record(MANAGER)
-		stuck = self.propose(
-			manager, "update_document", {"doctype": DOCTYPE, "name": other, "data": {"title": "2"}}
-		)
-		frappe.db.set_value(
-			"AI Action Proposal", stuck["proposal_id"], {"status": "consumed", "result": "unknown"}
-		)
-		for proposal in (done, stuck):
-			frappe.db.set_value(
-				"AI Action Proposal",
-				proposal["proposal_id"],
-				"creation",
-				add_days(now_datetime(), -400),
-				update_modified=False,
-			)
-
-		self.human(manager, "POST", "purge_logs", body={"dry_run": False})
-
-		self.assertFalse(frappe.db.exists("AI Action Proposal", done["proposal_id"]))
-		self.assertTrue(frappe.db.exists("AI Action Proposal", stuck["proposal_id"]))

@@ -114,7 +114,8 @@ class TestTranslations(YzTestCase):
 			frappe.local.lang = original
 
 		self.assertEqual(
-			text, dict((row[0], row[1]) for row in rows() if row[2] == CONTEXT)["Proposal not found."]
+			text,
+			{row[0]: row[1] for row in rows() if len(row) == 3 and row[2] == CONTEXT}["Proposal not found."],
 		)
 
 	def test_source_text_of_the_layer_carries_no_turkish_letters(self):

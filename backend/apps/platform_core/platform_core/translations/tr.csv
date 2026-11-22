@@ -448,9 +448,9 @@ User on whose behalf the action ran.,İşlemin adına yapıldığı kullanıcı.
 Principal,Kimlik türü,AI Action Log
 How the caller proved its identity: a human session or an agent token.,Çağıranın kimliğini nasıl kanıtladığı: insan oturumu ya da aracı belirteci.,AI Action Log
 Session ID,Konuşma kimliği,AI Action Log
-Conversation id sent by the client. Untrusted text. Joins this log to the AI Usage Log.,İstemcinin gönderdiği konuşma kimliği. Güvenilmeyen metindir. Bu günlüğü yapay zekâ kullanım günlüğüne bağlar.,AI Action Log
+SHA-256 of the conversation id the client sent. The id itself is not stored. Rows of one conversation share this value.,İstemcinin gönderdiği konuşma kimliğinin SHA-256 özeti. Kimliğin kendisi saklanmaz. Aynı konuşmanın satırları bu değeri paylaşır.,AI Action Log
 Client Info,İstemci bilgisi,AI Action Log
-Name and version the MCP client reported. Untrusted text.,MCP istemcisinin bildirdiği ad ve sürüm. Güvenilmeyen metindir.,AI Action Log
+"Name and version the MCP client reported, stored only if they have the allowed shape.",MCP istemcisinin bildirdiği ad ve sürüm. Yalnız izinli biçimdeyse saklanır.,AI Action Log
 Stage,Adım,AI Action Log
 Step of the flow this row records.,Bu satırın kaydettiği akış adımı.,AI Action Log
 Tool,Araç,AI Action Log
@@ -485,7 +485,7 @@ User who asked for the write and who alone may approve it.,Yazmayı isteyen kull
 Principal,Kimlik türü,AI Action Proposal
 Identity type that opened the proposal.,Öneriyi açan kimlik türü.,AI Action Proposal
 Session ID,Konuşma kimliği,AI Action Proposal
-Conversation id sent by the client. Untrusted text.,İstemcinin gönderdiği konuşma kimliği. Güvenilmeyen metindir.,AI Action Proposal
+SHA-256 of the conversation id the client sent. The id itself is not stored.,İstemcinin gönderdiği konuşma kimliğinin SHA-256 özeti. Kimliğin kendisi saklanmaz.,AI Action Proposal
 Tool,Araç,AI Action Proposal
 Name of the write tool that will run after approval.,Onaydan sonra çalışacak yazma aracının adı.,AI Action Proposal
 Tool Class,Araç türü,AI Action Proposal

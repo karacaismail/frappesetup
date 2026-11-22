@@ -153,20 +153,41 @@ def latest_version(doctype: str | None, name: str | None) -> str | None:
 	)
 
 
-def purge_older_than(days: int, *, delete: bool) -> tuple[int, int]:
-	"""Count the records past the retention period and delete them if asked.
+def _delete_for_good(doctype: str, name: str) -> None:
+	"""Delete one of the layer's own records and keep no copy of it (decision O-32).
 
-	The delete is done directly in the database. The controller of the log blocks deleting
-	rows one by one. Only `retention.purge` calls this path. That function checks the admin role.
+	`delete_permanently` stops Frappe from writing a "Deleted Document" copy. `force` skips the
+	link check: a log row may still point at the proposal. The log's controller refuses every
+	other delete, so the retention flag is set for this one delete only.
 	"""
-	cutoff = add_days(now_datetime(), -days)
-	log_filters = {"creation": ("<", cutoff)}
-	proposal_filters = {"creation": ("<", cutoff)}
-	unresolved = frappe.get_all(PROPOSAL, filters={"status": "consumed", "result": "unknown"}, pluck="name")
-	if unresolved:
-		proposal_filters["name"] = ("not in", unresolved)
-	counts = frappe.db.count(LOG, log_filters), frappe.db.count(PROPOSAL, proposal_filters)
+	with _as_system(frappe.get_doc(doctype, name)) as doc:
+		doc.flags.retention_purge = True
+		doc.delete(force=True, delete_permanently=True)
+
+
+def purge_older_than(days: int, proposal_days: int, *, delete: bool) -> dict:
+	"""Count the records past their retention period and delete them if asked.
+
+	A log row goes `days` after it was written. A proposal goes `proposal_days` after its decision
+	or its expiry, whichever comes first. Every proposal has an expiry, so none stays forever.
+
+	Only `retention.purge` calls this path. That function checks the admin role.
+	"""
+	now = now_datetime()
+	cutoff = add_days(now, -proposal_days)
+	# A filter on an empty `decided_at` alone would match every undecided proposal, because the
+	# database layer reads an empty date as a very old one. So the decided ones are asked for first.
+	decided = [["decided_at", "is", "set"], ["decided_at", "<", cutoff]]
+	proposals = sorted(
+		{
+			*frappe.get_all(PROPOSAL, filters=decided, pluck="name"),
+			*frappe.get_all(PROPOSAL, filters={"expires_at": ("<", cutoff)}, pluck="name"),
+		}
+	)
+	logs = frappe.get_all(LOG, filters={"creation": ("<", add_days(now, -days))}, pluck="name")
+	counts = {"logs": len(logs), "proposals": len(proposals)}
 	if delete:
-		frappe.db.delete(LOG, log_filters)
-		frappe.db.delete(PROPOSAL, proposal_filters)
+		for doctype, names in ((LOG, logs), (PROPOSAL, proposals)):
+			for name in names:
+				_delete_for_good(doctype, name)
 	return counts

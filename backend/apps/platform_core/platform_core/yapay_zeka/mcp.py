@@ -6,6 +6,7 @@ Decision: docs/kararlar/0002-yapay-zeka-katmani.md.
 """
 
 import json
+import re
 import time
 from typing import Any
 
@@ -101,12 +102,28 @@ def _check_principal() -> None:
 		)
 
 
+# What a client may say about itself in the log: a short name of plain words, and a version that
+# starts with a number. A long unbroken word is refused, since a credential looks like one.
+CLIENT_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*(?: [A-Za-z0-9][A-Za-z0-9._-]*){0,5}", re.ASCII)
+CLIENT_VERSION = re.compile(r"\d{1,5}(?:\.\d{1,5}){0,3}(?:[-+][A-Za-z0-9.]{1,16})?", re.ASCII)
+CLIENT_NAME_CHARS = 40
+CLIENT_WORD_CHARS = 24
+
+
 def _client_info(params: dict) -> str | None:
 	meta = params.get("_meta")
 	info = (meta.get(protocol.META_CLIENT) if isinstance(meta, dict) else None) or params.get("clientInfo")
-	if isinstance(info, dict) and isinstance(info.get("name"), str):
-		return f"{info['name']} {info.get('version', '')}".strip()[:140]
-	return None
+	if not isinstance(info, dict):
+		return None
+	name, version = info.get("name"), info.get("version")
+	# Only text of the allowed shape is stored. Anything else may be a credential sent by mistake.
+	if not isinstance(name, str) or len(name) > CLIENT_NAME_CHARS or not CLIENT_NAME.fullmatch(name):
+		return None
+	if any(len(word) > CLIENT_WORD_CHARS for word in name.split()):
+		return None
+	if isinstance(version, str) and CLIENT_VERSION.fullmatch(version):
+		return f"{name} {version}"
+	return name
 
 
 def dispatch(method: str, params: dict[str, Any], version: str) -> dict:

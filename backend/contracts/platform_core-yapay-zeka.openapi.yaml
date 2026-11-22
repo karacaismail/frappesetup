@@ -85,7 +85,7 @@ paths:
         - name: Mcp-Conversation-Id
           in: header
           required: false
-          description: The client's conversation id. It is written to the `session_id` field of the log. It is untrusted text.
+          description: "The client's conversation id. The log stores its SHA-256 in the `session_id` field, never the id itself. The client's name and version are stored only if they have the allowed shape: a short name of plain words and a version that starts with a number."
           schema: {type: string, maxLength: 140}
       requestBody:
         required: true
@@ -326,7 +326,13 @@ paths:
       description: |
         DESTRUCTIVE. Cannot be undone. Only the "System Manager" role and a human session can call it.
         If `dry_run` is true, nothing is deleted. The response returns the number of records that would be deleted. This is the default.
-        The retention period is at least 365 days. Proposals with an unknown result are not deleted.
+        Retention periods:
+        - "AI Action Log" records go after `older_than_days`, at least 365 days.
+        - An "AI Action Proposal" goes 30 days after its decision or its expiry, whichever comes first. That period is fixed.
+          Every proposal has an expiry, so none stays forever. A proposal with an unknown result goes by the same rule.
+        - "AI Usage Log" records go after 365 days. The model gateway owns that log. This endpoint starts the gateway's own
+          command (`platform_core.api.model.purge_usage`), which deletes in batches and keeps unsettled attempts.
+        The counting mode (`dry_run`) counts exactly the records the delete would remove.
         There is no scheduled job. This endpoint is started by hand. The command for the same action is this:
         `bench --site <site> execute platform_core.yapay_zeka.retention.purge --kwargs "{'older_than_days': 365}"`.
         The AI starts the same action with the `purge_action_log` tool, with a preview and human approval.
@@ -539,11 +545,13 @@ components:
 
     PurgeResult:
       type: object
-      required: [dry_run, older_than_days, logs, proposals]
+      required: [dry_run, older_than_days, proposal_days, logs, usage_logs, proposals]
       properties:
         dry_run: {type: boolean}
-        older_than_days: {type: integer}
+        older_than_days: {type: integer, description: Retention period of the two logs in days.}
+        proposal_days: {type: integer, description: "Retention period of proposals in days, counted from the decision or the expiry. Fixed at 30."}
         logs: {type: integer, description: Number of AI Action Log records deleted or to be deleted.}
+        usage_logs: {type: [integer, "null"], description: "Number of AI Usage Log records deleted or to be deleted by the model gateway's command. Null if the gateway refused or is not installed."}
         proposals: {type: integer, description: Number of AI Action Proposal records deleted or to be deleted.}
 
     ApprovalRequired:

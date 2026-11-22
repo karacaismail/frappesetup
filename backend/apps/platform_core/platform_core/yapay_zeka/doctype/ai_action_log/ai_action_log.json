@@ -48,7 +48,7 @@
    "fieldname": "session_id",
    "fieldtype": "Data",
    "label": "Session ID",
-   "description": "Conversation id sent by the client. Untrusted text. Joins this log to the AI Usage Log.",
+   "description": "SHA-256 of the conversation id the client sent. The id itself is not stored. Rows of one conversation share this value.",
    "search_index": 1,
    "read_only": 1
   },
@@ -56,7 +56,7 @@
    "fieldname": "client_info",
    "fieldtype": "Data",
    "label": "Client Info",
-   "description": "Name and version the MCP client reported. Untrusted text.",
+   "description": "Name and version the MCP client reported, stored only if they have the allowed shape.",
    "read_only": 1
   },
   {
@@ -173,7 +173,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-22 13:30:00.000000",
+ "modified": "2026-11-22 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Yapay Zeka",
  "name": "AI Action Log",

@@ -1,5 +1,7 @@
 """Identity: human session, agent token and MCP transport (G-148)."""
 
+import hashlib
+
 import frappe
 from frappe.core.doctype.user.user import generate_keys
 
@@ -181,7 +183,8 @@ class TestIdentity(YzTestCase):
 		self.assertEqual(ok.json["result"]["resultType"], "complete")
 		self.assertEqual(mismatch.status_code, 400)
 		self.assertIn(LATEST, discover.json["result"]["supportedVersions"])
-		log = self.last_log(tool="search_doctypes", session_id="konusma-1")
+		# The conversation id is stored as its SHA-256.
+		log = self.last_log(tool="search_doctypes", session_id=hashlib.sha256(b"konusma-1").hexdigest())
 		self.assertEqual(log.client_info, "sahte-istemci 1.0")
 
 	def test_transport_rules(self):

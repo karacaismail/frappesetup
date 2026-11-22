@@ -550,7 +550,10 @@ def preview_purge(older_than_days: int = retention.MIN_DAYS) -> dict:
 	counts = retention.purge(older_than_days, dry_run=True)
 	return {
 		"action": "admin",
-		"summary": f"Delete AI action logs and proposals older than {older_than_days} days. Cannot be undone.",
+		"summary": (
+			f"Delete AI action and usage logs older than {older_than_days} days, and proposals "
+			f"{retention.PROPOSAL_DAYS} days after their decision or expiry. Cannot be undone."
+		),
 		"details": counts,
 	}
 
