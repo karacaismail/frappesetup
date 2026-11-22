@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "field:installation_id",
- "description": "Telefon kurulumunu hesabına bağlar.",
+ "description": "Links a mobile installation to its account.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -16,44 +16,44 @@
  ],
  "fields": [
   {
-   "description": "Bu değer telefon kurulumunu belirtir.",
+   "description": "Identifies the mobile installation.",
    "fieldname": "installation_id",
    "fieldtype": "Data",
-   "label": "Kurulum kimliği",
+   "label": "Installation ID",
    "length": 36,
    "reqd": 1,
    "unique": 1
   },
   {
-   "description": "Bu hesap telefon kurulumunun sahibidir.",
+   "description": "The account that owns the installation.",
    "fieldname": "account",
    "fieldtype": "Link",
-   "label": "Hesap",
+   "label": "Account",
    "options": "User",
    "reqd": 1,
    "search_index": 1
   },
   {
-   "description": "Sistem bu değeri sabit kimlik bağına göre üretir.",
+   "description": "The server derives this value from the stable identity link.",
    "fieldname": "principal",
    "fieldtype": "Data",
-   "label": "Sabit hesap anahtarı",
+   "label": "Stable account key",
    "length": 64,
    "reqd": 1
   },
   {
-   "description": "Kapsam, bu kurulumun eşitleme alanını belirtir.",
+   "description": "Identifies the sync scope for this installation.",
    "fieldname": "scope",
    "fieldtype": "Data",
-   "label": "Kapsam",
+   "label": "Scope",
    "reqd": 1
   },
   {
    "default": "0",
-   "description": "Bu işaret açıkken sunucu kurulumun eşitleme isteğini reddeder.",
+   "description": "The server rejects sync for a revoked installation.",
    "fieldname": "revoked",
    "fieldtype": "Check",
-   "label": "İptal edildi"
+   "label": "Revoked"
   },
   {
    "description": "The UTC time when the installation last completed its delivery audit.",

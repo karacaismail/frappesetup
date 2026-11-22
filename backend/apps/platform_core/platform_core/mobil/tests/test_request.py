@@ -134,7 +134,8 @@ class MobileRequestTest(unittest.TestCase):
 		action = Mock(side_effect=Timeout())
 		self.assertIsNone(request.endpoint_response("v1_register", action))
 		action.assert_called_once()
-		self.assertEqual(self.frappe.local.response, {"http_status_code": 503, "code": "mobile_busy"})
+		self.assertEqual(self.frappe.local.response["http_status_code"], 503)
+		self.assertEqual(self.frappe.local.response["code"], "mobile_busy")
 		self.assertEqual(self.frappe.local.response_headers, {"Retry-After": "1"})
 
 	def test_deadlocks_wait_after_rollbacks_only_between_attempts(self):
@@ -162,8 +163,9 @@ class MobileRequestTest(unittest.TestCase):
 		self.frappe.local.login_manager.user = self.frappe.session.user
 		self.frappe.session.sid = "cookie-session"
 		self.frappe.session.data = SimpleNamespace(csrf_token="csrf-token", creation="2026-11-22 07:00:00")
-		with patch.object(request, "_limit_and_count"), patch.object(
-			request, "get_system_timezone", return_value="UTC", create=True
+		with (
+			patch.object(request, "_limit_and_count"),
+			patch.object(request, "get_system_timezone", return_value="UTC", create=True),
 		):
 			identity, body = request.pwa_request("v1_pull")
 			self.assertEqual((identity.scope, identity.sid, body), ("pwa", None, {}))
@@ -183,11 +185,21 @@ class MobileRequestTest(unittest.TestCase):
 	def test_pwa_background_request_does_not_schedule_session_refresh(self):
 		session = Mock()
 		self.frappe.local.session_obj = session
-		with patch.object(request, "pwa_request", return_value=(Mock(), {})), patch.object(
-			request, "run_transaction", return_value={}
+		with (
+			patch.object(request, "pwa_request", return_value=(Mock(), {})),
+			patch.object(request, "run_transaction", return_value={}),
 		):
 			request.pwa_endpoint_response("v1_pull", Mock())
 			self.assertIsNone(self.frappe.local.session_obj)
 			self.frappe.local.session_obj = session
 			request.pwa_endpoint_response("v1_activity", Mock())
 			self.assertIs(self.frappe.local.session_obj, session)
+
+	def test_mobile_responses_include_server_time(self):
+		with patch.object(request.time, "time", return_value=self.issued_at + 1):
+			self.assertEqual(request.endpoint_response("v1_register", Mock(return_value={})), {})
+			self.assertEqual(self.frappe.local.response["server_time"], self.issued_at + 1)
+			self.frappe.local.response.clear()
+			self.request.headers.pop("Authorization")
+			self.assertIsNone(request.endpoint_response("v1_register", Mock()))
+			self.assertEqual(self.frappe.local.response["server_time"], self.issued_at + 1)

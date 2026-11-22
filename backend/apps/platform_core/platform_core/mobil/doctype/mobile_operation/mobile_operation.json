@@ -14,7 +14,7 @@
    "description": "Sunucu anahtar\u0131 site, hesap ve i\u015flem kimli\u011finden \u00fcretir.",
    "fieldname": "operation_key",
    "fieldtype": "Data",
-   "label": "\u0130\u015flem anahtar\u0131",
+   "label": "Operation key",
    "length": 64,
    "reqd": 1,
    "unique": 1
@@ -23,7 +23,7 @@
    "description": "Sunucu bu \u00f6zeti kullanarak yinelenen iste\u011fin i\u00e7eri\u011fini kar\u015f\u0131la\u015ft\u0131r\u0131r.",
    "fieldname": "content_digest",
    "fieldtype": "Data",
-   "label": "\u0130\u00e7erik \u00f6zeti",
+   "label": "Content digest",
    "length": 64,
    "reqd": 1
   },
@@ -31,7 +31,7 @@
    "description": "Sunucu ilk iste\u011fin sonucunu bu alanda saklar.",
    "fieldname": "result",
    "fieldtype": "JSON",
-   "label": "\u0130lk sonu\u00e7",
+   "label": "Original result",
    "reqd": 1
   }
  ],

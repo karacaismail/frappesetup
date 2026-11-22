@@ -96,13 +96,13 @@ def _push(identity, body):
 def _pull(identity, body):
 	_require_enabled_user(identity.account)
 	_keys(body, {"installation_id"}, {"limit", "cursor"})
+	installation = uuid4_id(body["installation_id"])
+	store = MobileStore()
+	store.require_installation(identity, installation)
 	site_secret = frappe.conf.get("mobile_cursor_key")
 	if not isinstance(site_secret, str) or len(site_secret) < 32:
 		raise MobileError("cursor_key_unavailable", 503)
 	secret = hashlib.sha256(site_secret.encode()).digest()
-	installation = uuid4_id(body["installation_id"])
-	store = MobileStore()
-	store.require_installation(identity, installation)
 	if "cursor" in body and not isinstance(body["cursor"], str):
 		raise MobileError("invalid_cursor", 410)
 	return pull(

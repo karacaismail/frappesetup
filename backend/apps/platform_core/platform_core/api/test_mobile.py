@@ -96,6 +96,13 @@ class MobileHTTPTest(unittest.TestCase):
 		status, payload, _ = self.post("v1_pull", self.register(), token=OTHER_TOKEN)
 		self.assertEqual(status, 403, payload)
 
+	def test_v1_activity_guest_denied(self):
+		self.guest_denied("v1_activity", {"installation_id": str(uuid4())})
+
+	def test_v1_activity_foreign_data_denied(self):
+		status, payload, _ = self.post("v1_activity", self.register(), token=OTHER_TOKEN)
+		self.assertEqual(status, 403, payload)
+
 	def test_v1_cleanup_guest_denied(self):
 		self.guest_denied("v1_cleanup", {})
 

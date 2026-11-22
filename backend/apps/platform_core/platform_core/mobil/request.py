@@ -147,8 +147,10 @@ def pwa_request(endpoint):
 	origin = request.headers.get("Origin")
 	csrf_token = request.headers.get("X-Frappe-CSRF-Token", "")
 	expected_csrf = frappe.session.data.csrf_token
-	if origin != request.host_url.rstrip("/") or not expected_csrf or not compare_digest(
-		csrf_token.encode(), expected_csrf.encode()
+	if (
+		origin != request.host_url.rstrip("/")
+		or not expected_csrf
+		or not compare_digest(csrf_token.encode(), expected_csrf.encode())
 	):
 		raise MobileError("pwa_request_forbidden", 403)
 
@@ -224,6 +226,7 @@ def _error_response(error):
 
 
 def endpoint_response(endpoint, action):
+	frappe.local.response["server_time"] = int(time.time())
 	try:
 		identity, body = mobile_request(endpoint)
 	except MobileError as error:
@@ -233,6 +236,7 @@ def endpoint_response(endpoint, action):
 
 
 def pwa_endpoint_response(endpoint, action):
+	frappe.local.response["server_time"] = int(time.time())
 	session = getattr(frappe.local, "session_obj", None)
 	# Frappe 16 schedules a refresh when this request-local object is present.
 	# Background sync must not extend the interactive browser session.
@@ -248,6 +252,7 @@ def pwa_endpoint_response(endpoint, action):
 
 
 def identity_sync_response(action):
+	frappe.local.response["server_time"] = int(time.time())
 	try:
 		body = identity_sync_request()
 	except MobileError as error:

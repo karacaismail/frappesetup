@@ -351,3 +351,41 @@ Sürüm `frappe/__init__.py:58` satırından doğrulandı.
 
 Kaynak denetimi canlı HTTP testi yerine geçmez.
 İkinci kontrol noktası gerçek istekle izin ve ret yollarını sınar.
+
+## Tarayıcı erişimi ve ters vekil
+
+PWA ve kiracı API'si aynı kökenden HTTPS ile sunulur.
+Köken, isteğin şemasını, sunucu adını ve portunu kapsar.
+PWA ayrı bir kökene istek izni veren CORS başlığına ihtiyaç duymaz.
+PWA, Frappe oturum çerezini ve `X-Frappe-CSRF-Token` başlığını gönderir.
+Sunucu, `Origin` başlığını kiracı adresiyle karşılaştırır.
+Ters vekil, istemcinin gönderdiği `X-Forwarded-*` başlıklarına güvenmez.
+Kendi doğruladığı kiracı adresini ve HTTPS bilgisini Frappe'ye iletir.
+
+Ters vekil, `mobile.` ve `mobile_pwa.` ile başlayan API yollarını kapsar.
+Örneğin Nginx, bu yolları `^/api/method/platform_core\.api\.(mobile|mobile_pwa)\.` ile seçebilir.
+Bu yolların mevcut vekil ayarına `client_max_body_size 256k;` eklenir.
+Ters vekil, `Retry-After` başlığını korur ve kişiye özel yanıtları önbelleğe almaz.
+Tarayıcıdan izinli bir ayrı köken kullanılacaksa yalnız o köken açıkça tanımlanır.
+Bu kural belirteçli uçlar içindir. Çerezli uçlar aynı kökende kalır.
+Ayrı kökenin izin listesi `POST`, `Authorization`, `Content-Type` ve iki sürüm başlığını kapsar.
+İzinli tarayıcıya `Retry-After` yanıt başlığı da açılır.
+
+İstemci, kullanıcı bir işlem yaptığında `v1_activity` ucunu çağırır.
+Sunucu kendi saatini kaydeder.
+Arka plan eşitlemesi bu saati veya PWA oturum süresini uzatmaz.
+Bu kayıt tek başına kullanıcının yeniden kimlik doğruladığını göstermez.
+
+## Telefon bildirimi gönderen olaylar
+
+İlk sürümde telefona bildirim gönderen olay listesi boştur.
+Aşağıdaki olayları sunucu eşitleme yanıtıyla iletir.
+
+| Olay | Telefon bildirimi | Eşitleme sonucu |
+| --- | --- | --- |
+| Kayıt eklendi veya değişti | Gönderilmez | Telefon izinli alanları alır. |
+| Kayıt silindi veya okuma izni kalktı | Gönderilmez | Telefon kaldırma işaretini alır. |
+| Kurulum ya da hesap iptal edildi | Gönderilmez | Sunucu sonraki eşitlemeyi reddeder. |
+| Bildirim bağı silindi | Gönderilmez | Sunucu bildirim adresini kaldırır. |
+
+Telefon bildirimi sonraki turun işidir. Olay listesi o turda onaylanır.

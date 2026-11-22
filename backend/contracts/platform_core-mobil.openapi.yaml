@@ -86,8 +86,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [message]
+                required: [message, server_time]
                 properties:
+                  server_time: { $ref: '#/components/schemas/ServerTime' }
                   message:
                     type: object
                     required: [last_user_activity_at]
@@ -211,8 +212,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [message]
+                required: [message, server_time]
                 properties:
+                  server_time: { $ref: '#/components/schemas/ServerTime' }
                   message: { $ref: '#/components/schemas/Revoked' }
         '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
@@ -309,8 +311,9 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [message]
+                required: [message, server_time]
                 properties:
+                  server_time: { $ref: '#/components/schemas/ServerTime' }
                   message:
                     type: object
                     required: [last_user_activity_at]
@@ -417,6 +420,9 @@ components:
       required: true
       schema: { type: string, const: '1' }
   schemas:
+    ServerTime:
+      type: integer
+      description: Sunucunun istek başındaki saati. Unix saniyesi olarak verilir.
     UUID:
       type: string
       format: uuid
@@ -479,10 +485,15 @@ components:
         eligible_deliveries: { type: integer, minimum: 0, maximum: 1000 }
     Error:
       type: object
+      if:
+        required: [code]
+      then:
+        required: [server_time]
       anyOf:
         - required: [code]
         - required: [exc_type]
       properties:
+        server_time: { $ref: '#/components/schemas/ServerTime' }
         code:
           type: string
           description: Mobil ucun verdiği hata kodu.
@@ -517,6 +528,8 @@ components:
             - mobile_token_revoked
             - operation_conflict
             - service_token_required
+            - pwa_request_forbidden
+            - pwa_session_required
             - rate_limit
             - record_not_found
             - unexpected_version
@@ -533,8 +546,9 @@ components:
         application/json:
           schema:
             type: object
-            required: [message]
+            required: [message, server_time]
             properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
               message: { $ref: '#/components/schemas/Device' }
     RevokedSuccess:
       description: İstek tamamlandı.
@@ -542,8 +556,9 @@ components:
         application/json:
           schema:
             type: object
-            required: [message]
+            required: [message, server_time]
             properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
               message: { $ref: '#/components/schemas/Revoked' }
     AppliedOperationsSuccess:
       description: İstek tamamlandı.
@@ -551,8 +566,9 @@ components:
         application/json:
           schema:
             type: object
-            required: [message]
+            required: [message, server_time]
             properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
               message: { $ref: '#/components/schemas/AppliedOperations' }
     CleanupResultSuccess:
       description: İstek tamamlandı.
@@ -560,8 +576,9 @@ components:
         application/json:
           schema:
             type: object
-            required: [message]
+            required: [message, server_time]
             properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
               message: { $ref: '#/components/schemas/CleanupResult' }
     Page:
       description: Kayıt sayfası ve sonraki çağrı için imleç.
@@ -569,8 +586,9 @@ components:
         application/json:
           schema:
             type: object
-            required: [message]
+            required: [message, server_time]
             properties:
+              server_time: { $ref: '#/components/schemas/ServerTime' }
               message:
                 type: object
                 required: [changes, cursor, has_more]
