@@ -26,7 +26,8 @@ class RealmDosyasiTesti(unittest.TestCase):
         self.assertEqual(REALM_DOSYASI.name, "platform-realm.json")
 
     def test_gorunen_ad_ve_diller(self):
-        self.assertEqual(self.realm["displayName"], "Atonota")
+        # D-4: the brand name comes from a variable. The development value is "Atonota" (test_realm_backlog).
+        self.assertEqual(self.realm["displayName"], "${ATONOTA_BRAND_NAME}")
         self.assertTrue(self.realm["internationalizationEnabled"])
         self.assertEqual(self.realm["defaultLocale"], "tr")
         self.assertEqual(set(self.realm["supportedLocales"]), {"tr", "en"})

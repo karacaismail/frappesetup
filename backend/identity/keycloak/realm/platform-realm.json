@@ -1,9 +1,9 @@
 {
   "realm": "platform",
   "enabled": true,
-  "displayName": "Atonota",
-  "displayNameHtml": "Atonota",
-  "sslRequired": "external",
+  "displayName": "${ATONOTA_BRAND_NAME}",
+  "displayNameHtml": "${ATONOTA_BRAND_NAME}",
+  "sslRequired": "${ATONOTA_SSL_REQUIRED}",
   "organizationsEnabled": true,
   "internationalizationEnabled": true,
   "supportedLocales": [
@@ -87,10 +87,12 @@
     "host": "${ATONOTA_SMTP_HOST}",
     "port": "${ATONOTA_SMTP_PORT}",
     "from": "${ATONOTA_SMTP_FROM}",
-    "fromDisplayName": "Atonota",
-    "auth": "false",
-    "ssl": "false",
-    "starttls": "false"
+    "fromDisplayName": "${ATONOTA_BRAND_NAME}",
+    "auth": "${ATONOTA_SMTP_AUTH}",
+    "ssl": "${ATONOTA_SMTP_SSL}",
+    "starttls": "${ATONOTA_SMTP_STARTTLS}",
+    "user": "${ATONOTA_SMTP_USER}",
+    "password": "${ATONOTA_SMTP_PASSWORD}"
   },
   "clientScopes": [
     {
@@ -639,6 +641,30 @@
           }
         }
       ]
+    },
+    {
+      "name": "aud-identity-sync",
+      "description": "Belirtece yalnız identity-sync hedefini ekler. Varsayılan değildir, scope ile istenir. Yalnız kiracı sitelerinin servis istemcileri ister.",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-identity-sync",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "identity-sync",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "lightweight.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "clientScopeMappings": {
@@ -667,7 +693,7 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false,
+      "serviceAccountsEnabled": true,
       "frontchannelLogout": false,
       "fullScopeAllowed": false,
       "consentRequired": false,
@@ -696,7 +722,9 @@
         "email",
         "basic"
       ],
-      "optionalClientScopes": []
+      "optionalClientScopes": [
+        "aud-identity-sync"
+      ]
     },
     {
       "clientId": "press",
@@ -727,7 +755,8 @@
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
         "use.refresh.tokens": "true",
-        "client_credentials.use_refresh_token": "false"
+        "client_credentials.use_refresh_token": "false",
+        "pkce.code.challenge.method": "S256"
       },
       "defaultClientScopes": [
         "web-origins",
@@ -803,6 +832,41 @@
       "optionalClientScopes": [
         "aud-site-kiraci1"
       ]
+    },
+    {
+      "clientId": "mobile-app",
+      "name": "Mobile app",
+      "description": "Phone app. Public client: no secret, authorization code with PKCE S256 only (mobile.md GR-2, GR-3).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": false,
+      "consentRequired": false,
+      "redirectUris": [
+        "${ATONOTA_MOBILE_REDIRECT_URI}"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "use.refresh.tokens": "true",
+        "post.logout.redirect.uris": "${ATONOTA_MOBILE_REDIRECT_URI}"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email",
+        "basic"
+      ],
+      "optionalClientScopes": []
     }
   ],
   "users": [
