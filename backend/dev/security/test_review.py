@@ -146,6 +146,17 @@ class ReviewTests(unittest.TestCase):
         for text in ("bandit-exceptions.json", ".gitleaksignore", "isteğe bağlı paketleri"):
             self.assertIn(text, decision)
 
+    def test_security_documents_use_current_paths_and_explain_snapshot(self):
+        readme = (scans.ROOT / scans.SECURITY / "README.md").read_text()
+        decision = (scans.ROOT / "backend/docs/decisions/0011-security-tooling.md").read_text()
+        handoff = (scans.ROOT / "backend/docs/handoff/ci-security.md").read_text()
+        for text in ("backend/dev/bin/security-audit", "backend/dev/security/fixtures/",
+                     "backend/dev/security/semgrep_exceptions.py --snapshot"):
+            self.assertIn(text, readme)
+        self.assertIn("`security-audit`", decision)
+        self.assertIn("backend/dev/security/semgrep-exceptions.json", decision)
+        self.assertIn("backend/dev/bin/tunnel open", handoff)
+
     def test_expiry_is_recorded(self):
         record = (scans.ROOT / "backend/PROJECT-RECORD.md").read_text()
         self.assertIn("Bandit istisnaları 22 Şubat 2027 Pazartesi günü", record)

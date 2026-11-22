@@ -18,6 +18,7 @@ rules:
               regex: ^(?:[a-zA-Z_][a-zA-Z_0-9]*\.)*(?:request|req|http_request)$
     pattern-sinks:
       - pattern: print(...)
+      - pattern: frappe.log_error(...)
       - patterns:
           - pattern-either:
               - patterns:

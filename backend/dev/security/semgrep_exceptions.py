@@ -23,7 +23,7 @@ def source_digest(root, scope):
     git = shutil.which("git")
     if not git or not Path(git).is_absolute():
         return None
-    # Match the source list used by the Gitleaks step in guvenlik-denetimi.
+    # Match the source list used by the Gitleaks step in security-audit.
     listing = subprocess.run(
         [git, "--literal-pathspecs", "ls-files", "-z", "--cached", "--others",
          "--deduplicate", "--exclude-standard", "--", scope],

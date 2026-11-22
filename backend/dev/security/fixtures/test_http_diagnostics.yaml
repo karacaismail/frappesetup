@@ -19,6 +19,7 @@ rules:
               - pattern: $RESPONSE.content
               - pattern: $RESPONSE.body
               - pattern: $RESPONSE.data
+              - pattern: $RESPONSE.json
               - pattern: $RESPONSE.json(...)
               - pattern: $RESPONSE.read(...)
           - metavariable-regex:
