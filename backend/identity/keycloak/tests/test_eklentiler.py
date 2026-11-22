@@ -14,7 +14,7 @@ import urllib.parse
 import urllib.request
 from http.cookiejar import CookieJar, DefaultCookiePolicy
 
-from yardimci import KLASOR, ORNEK_ENV, admin, canli_var_mi, istek, jwt_govdesi, ortam, realm_oku, yonetici_belirteci
+from yardimci import KLASOR, ORNEK_ENV, admin, canli_var_mi, istek, jwt_govdesi, ortam, realm_oku, tenant_authorize_url, yonetici_belirteci
 
 DOCKERFILE = KLASOR / "Dockerfile"
 YER_TUTUCU = re.compile(r"^\$\{[A-Z0-9_]+\}$")
@@ -173,17 +173,7 @@ class EklentiCanliTesti(unittest.TestCase):
         if not self._magic_link_enabled():
             self.skipTest("magic link step is disabled in the realm (review finding E1); flow test not run")
         acici = _cerezli_acici()
-        sorgu = urllib.parse.urlencode(
-            {
-                "client_id": "site-kiraci1",
-                "response_type": "code",
-                "scope": "openid",
-                "redirect_uri": f"{ortam('ATONOTA_SITE_KIRACI1_URL')}/api/method/frappe.integrations.oauth2_logins.login_via_keycloak",
-                "state": "test-state",
-                "nonce": "test-nonce",
-            }
-        )
-        durum, _, html = _ac(acici, f"{self.kc}/realms/platform/protocol/openid-connect/auth?{sorgu}")
+        durum, _, html = _ac(acici, tenant_authorize_url())
         self.assertEqual(durum, 200)
         self.assertTrue("tryAnotherWay" in html, "giriş sayfasında başka yol bağlantısı olmalı")
         hedef = _form_hedefi(html)

@@ -77,6 +77,13 @@ class RealmDosyasiTesti(unittest.TestCase):
             self.assertEqual(istemci["attributes"]["backchannel.logout.session.required"], "true", ad)
             self.assertIn("backchannel.logout.url", istemci["attributes"], ad)
 
+    def test_tenant_client_callback_and_pkce(self):
+        # Contract section 2 (66d9ad8): the tenant client returns to platform_core.api.auth.keycloak_callback
+        # and requires PKCE with S256.
+        istemci = self.istemciler["site-kiraci1"]
+        self.assertEqual(istemci["redirectUris"], ["${ATONOTA_SITE_KIRACI1_URL}/api/method/platform_core.api.auth.keycloak_callback"])
+        self.assertEqual(istemci["attributes"]["pkce.code.challenge.method"], "S256")
+
     def test_istemci_sirlari_yer_tutucu(self):
         for istemci in self.istemciler.values():
             if istemci["publicClient"]:

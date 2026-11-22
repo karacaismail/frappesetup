@@ -16,7 +16,7 @@ import urllib.parse
 from hashlib import sha1
 
 from test_eklentiler import AKIS, SIHIRLI, Mailpit, _ac, _cerezli_acici, _form_hedefi, _keycloak_icinde_izle
-from yardimci import admin, canli_var_mi, ortam, yonetici_belirteci
+from yardimci import admin, canli_var_mi, ortam, tenant_authorize_url, yonetici_belirteci
 
 TOTP_USER = "totp.ornek@example.test"
 TOTP_PASSWORD = "Ornek-Parola-Totp-2026"
@@ -40,17 +40,7 @@ class TotpCodeTest(unittest.TestCase):
 
 
 def _authorize_url() -> str:
-    query = urllib.parse.urlencode(
-        {
-            "client_id": "site-kiraci1",
-            "response_type": "code",
-            "scope": "openid",
-            "redirect_uri": f"{ortam('ATONOTA_SITE_KIRACI1_URL')}/api/method/frappe.integrations.oauth2_logins.login_via_keycloak",
-            "state": "test-state",
-            "nonce": "test-nonce",
-        }
-    )
-    return f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{query}"
+    return tenant_authorize_url()
 
 
 @unittest.skipUnless(canli_var_mi(), "KC_PUBLIC_URL missing, live Keycloak test skipped")

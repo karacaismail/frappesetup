@@ -671,7 +671,7 @@
       "rootUrl": "${ATONOTA_SITE_KIRACI1_URL}",
       "baseUrl": "${ATONOTA_SITE_KIRACI1_URL}/panel",
       "redirectUris": [
-        "${ATONOTA_SITE_KIRACI1_URL}/api/method/frappe.integrations.oauth2_logins.login_via_keycloak"
+        "${ATONOTA_SITE_KIRACI1_URL}/api/method/platform_core.api.auth.keycloak_callback"
       ],
       "webOrigins": [],
       "attributes": {
@@ -682,7 +682,8 @@
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
         "use.refresh.tokens": "true",
-        "client_credentials.use_refresh_token": "false"
+        "client_credentials.use_refresh_token": "false",
+        "pkce.code.challenge.method": "S256"
       },
       "defaultClientScopes": [
         "web-origins",

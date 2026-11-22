@@ -99,6 +99,50 @@ def admin(yol: str, belirtec: str, yontem: str = "GET", govde: dict | None = Non
     return istek(yontem, f"{ortam('KC_PUBLIC_URL')}/admin/realms/platform{yol}", belirtec=belirtec, govde=govde)
 
 
+def get_without_redirect(adres: str) -> HttpYanit:
+    """GET that does not follow redirects, so the Location header can be inspected."""
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    acici = urllib.request.build_opener(NoRedirect())
+    try:
+        with acici.open(urllib.request.Request(adres), timeout=30) as yanit:
+            return HttpYanit(yanit.status, yanit.read(), dict(yanit.headers))
+    except urllib.error.HTTPError as hata:
+        return HttpYanit(hata.code, hata.read(), dict(hata.headers))
+
+
+def pkce_pair() -> tuple:
+    """Returns (code_verifier, code_challenge) for S256 (RFC 7636)."""
+    import hashlib
+    import secrets
+
+    verifier = secrets.token_urlsafe(48)
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    return verifier, challenge
+
+
+def tenant_authorize_url(state: str = "test-state", nonce: str = "test-nonce") -> str:
+    """Authorize URL for the tenant client with the contract's callback and a fresh S256 challenge."""
+    _, challenge = pkce_pair()
+    sorgu = urllib.parse.urlencode(
+        {
+            "client_id": "site-kiraci1",
+            "response_type": "code",
+            "scope": "openid",
+            "redirect_uri": f"{ortam('ATONOTA_SITE_KIRACI1_URL')}/api/method/platform_core.api.auth.keycloak_callback",
+            "state": state,
+            "nonce": nonce,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+        }
+    )
+    return f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{sorgu}"
+
+
 def jwt_govdesi(jwt: str) -> dict:
     parcalar = jwt.split(".")
     if len(parcalar) != 3:

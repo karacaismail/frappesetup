@@ -6,8 +6,9 @@ Keycloak yoksa testler atlanır ve not_run sayılır.
 
 import hmac
 import unittest
+import urllib.parse
 
-from yardimci import admin, canli_var_mi, istek, istemci_belirteci, jwt_govdesi, ortam, yonetici_belirteci
+from yardimci import admin, canli_var_mi, get_without_redirect, istek, istemci_belirteci, jwt_govdesi, ortam, yonetici_belirteci
 
 LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout"
 
@@ -147,8 +148,9 @@ class RealmAyarlariTesti(unittest.TestCase):
         kiraci = admin("/clients?clientId=site-kiraci1", self.yonetici).json()[0]
         self.assertEqual(
             kiraci["redirectUris"],
-            [f"{ortam('ATONOTA_SITE_KIRACI1_URL')}/api/method/frappe.integrations.oauth2_logins.login_via_keycloak"],
+            [f"{ortam('ATONOTA_SITE_KIRACI1_URL')}/api/method/platform_core.api.auth.keycloak_callback"],
         )
+        self.assertEqual(kiraci["attributes"]["pkce.code.challenge.method"], "S256")
         self.assertEqual(
             kiraci["attributes"]["backchannel.logout.url"],
             f"{ortam('ATONOTA_SITE_KIRACI1_URL')}/api/method/platform_core.api.keycloak_backchannel_logout",
@@ -178,6 +180,21 @@ class RealmAyarlariTesti(unittest.TestCase):
         )
         self.assertIn(yanit.durum, (401, 403), yanit.govde[:200])
         self.assertEqual(admin("/clients?clientId=saldirgan-istemci", self.yonetici).json(), [])
+
+    def test_tenant_authorize_without_pkce_is_refused(self):
+        # D-6: the real authorize endpoint must refuse a tenant login request that carries no code_challenge.
+        sorgu = urllib.parse.urlencode({
+            "client_id": "site-kiraci1", "response_type": "code", "scope": "openid", "state": "s",
+            "redirect_uri": f"{ortam('ATONOTA_SITE_KIRACI1_URL')}/api/method/platform_core.api.auth.keycloak_callback",
+        })
+        yanit = get_without_redirect(f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{sorgu}")
+        konum = yanit.basliklar.get("Location", "")
+        self.assertNotIn('name="username"', yanit.govde.decode("utf-8", "replace"), "login form must not open without PKCE")
+        self.assertNotIn("code=", konum)
+        if yanit.durum in (302, 303):
+            self.assertIn("error=invalid_request", konum)
+        else:
+            self.assertEqual(yanit.durum, 400)
 
     def test_eposta_mailpit_uzerinden(self):
         self.assertEqual(self.realm["smtpServer"]["host"], ortam("ATONOTA_SMTP_HOST"))
