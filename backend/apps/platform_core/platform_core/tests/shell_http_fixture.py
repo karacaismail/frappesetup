@@ -24,6 +24,8 @@ DESK = "shell-desk@example.test"
 
 
 class ShellHTTPFixture(unittest.TestCase):
+	additional_users = ()
+
 	@classmethod
 	def setUpClass(cls):
 		cls.site = os.environ.get("KABUK_TEST_SITE")
@@ -163,6 +165,7 @@ class ShellHTTPFixture(unittest.TestCase):
 			(READER, ["Kabuk Test Reader"]),
 			(PRIVILEGED, ["Kabuk Test Reader", "Kabuk Test Privileged"]),
 			(DESK, ["Shell Test Desk", "Kabuk Test Reader", "Kabuk Test Privileged"]),
+			*cls.additional_users,
 		):
 			if not frappe.db.exists("User", email):
 				doc = frappe.get_doc(
