@@ -64,8 +64,8 @@ type DocumentTool = {
 };
 
 async function documentTools(token: string) {
-  // tools/list publishes the live registry. Match the contract's schemas so
-  // renaming a tool does not leave a stale name in a test.
+  // Read names from the live tools/list registry. test_registry.py checks
+  // that the registry agrees with the OpenAPI contract.
   const { tools }: { tools: DocumentTool[] } = await mcpRequest(token, {
     jsonrpc: '2.0', id: randomUUID(), method: 'tools/list',
   });
@@ -160,11 +160,16 @@ test('MCP rejects an agent token sent with a session cookie', async ({ request }
 
   await withFreshRequest(async (agent) => {
     const response = await agent.post(aiMethod('mcp'), {
-      headers: { ...bearer(token), Cookie: sessionHeaders('reader').Cookie, 'Mcp-Conversation-Id': randomUUID() },
+      headers: { ...sessionHeaders('reader'), ...bearer(token), 'Mcp-Conversation-Id': randomUUID() },
       data: mcpCall(name, args),
       maxRedirects: 0,
     });
     expect(response.status()).toBe(403);
+    const body = await response.json();
+    expect(body.exc_type).toBe('PermissionError');
+    const messages = (JSON.parse(body._server_messages) as string[])
+      .map((entry) => JSON.parse(entry).message);
+    expect(messages).toContain('Send either a session cookie or an agent token, not both.');
   });
 });
 
