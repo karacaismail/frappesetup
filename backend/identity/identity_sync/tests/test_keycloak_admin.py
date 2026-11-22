@@ -1,7 +1,7 @@
-"""Keycloak Admin API istemcisinin testleri.
+"""Keycloak Admin API client tests.
 
-Yolların kaynağı Keycloak 26.8.2 Admin REST API belgesidir.
-İstemci ayarlarının kaynağı `docs/sozlesmeler.md` dosyasının 2. bölümüdür.
+Paths come from the Keycloak 26.8.2 Admin REST API documentation.
+Client settings come from section 2 of `docs/sozlesmeler.md`.
 """
 
 from __future__ import annotations
@@ -120,7 +120,7 @@ class OrganizationTest(AdminCase):
         self.assertEqual(self.writes()[0].json(), SUBJECT)
 
     def test_add_member_twice_is_not_an_error(self) -> None:
-        # Keycloak üye zaten varsa 409 döner. İşlem tekrar edilebilir olmalıdır.
+        # Keycloak returns 409 when the member already exists. The operation must be repeatable.
         self.kc.on("POST", f"{self.base}/organizations/{ORG_ID}/members", (409, {"errorMessage": "exists"}))
 
         outcome = self.admin.add_organization_member(ORG_ID, SUBJECT)
@@ -279,7 +279,7 @@ class InviteTest(AdminCase):
             },
         )
         (email,) = self.kc.calls("PUT", f"{self.base}/users/{SUBJECT}/execute-actions-email")
-        # Davet eylemleri karar sitesinden gelir: UPDATE_PASSWORD ve CONFIGURE_TOTP.
+        # Invitation actions come from the decision site: UPDATE_PASSWORD and CONFIGURE_TOTP.
         self.assertEqual(email.json(), ["UPDATE_PASSWORD", "CONFIGURE_TOTP"])
 
     def test_invite_reuses_existing_user(self) -> None:
@@ -296,7 +296,7 @@ class InviteTest(AdminCase):
         self.assertEqual(lookup.query["exact"], ["true"])
 
     def test_invite_refuses_when_plan_differs_from_the_approved_one(self) -> None:
-        # Onay "yeni kullanıcı aç" planını gösterdi. Kullanıcı arada açıldı. Plan artık farklıdır.
+        # Approval showed a create-user plan. The user was created in the meantime. The plan has changed.
         from identity_sync.keycloak_admin import PlanChanged
 
         self.kc.on("GET", f"{self.base}/users", (200, []))
