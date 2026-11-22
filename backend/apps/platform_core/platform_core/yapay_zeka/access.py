@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import secrets
 import time
 from typing import Any
 
@@ -44,14 +45,53 @@ def require_human(stage: str, *, tool: str | None = None) -> None:
 
 
 def _csrf_checked() -> bool:
-	"""Yazan istekte oturumun CSRF belirteci olmalı.
+	"""Yazan istekte CSRF başlığı oturumdaki belirteçle aynı olmalı.
 
-	Frappe başlığı yalnız oturumda belirteç varsa doğrular (`frappe/auth.py`). Belirteci
-	olmayan oturumda doğrulama atlanır. Onay gibi işlerde bu boşluk burada kapatılır.
+	Frappe bu karşılaştırmayı oturumda belirteç yoksa, `ignore_csrf` açıksa ya da
+	izinli yönlendiren varsa atlar (`frappe/auth.py` içinde `validate_csrf_token`).
+	Onay gibi işlerde karşılaştırma burada her zaman yapılır.
 	"""
 	if frappe.request.method in ("GET", "HEAD", "OPTIONS"):
 		return True
-	return bool(frappe.session.data.get("csrf_token"))
+	expected = frappe.session.data.get("csrf_token")
+	sent = frappe.get_request_header("X-Frappe-CSRF-Token")
+	return bool(expected and sent) and secrets.compare_digest(str(sent), str(expected))
+
+
+class WrongState(frappe.ValidationError):
+	"""Öneri bu iş için uygun durumda değil."""
+
+
+def human_call(stage: str, tool: str, action, *, proposal: str | None = None, log_success: bool = True):
+	"""İnsan ucunun işini çalıştırır ve sonucu günlüğe yazar.
+
+	Hata yanıtı ve GET isteği işlemi geri alır (`frappe/app.py`). Günlük kaydı kalsın diye
+	kayıt burada kesinleştirilir. Ret durumunda bu noktaya kadar başka yazı yoktur.
+	"""
+	require_human(stage, tool=tool)
+	codes = (
+		(frappe.DoesNotExistError, "not_found"),
+		(WrongState, "not_pending"),
+		(frappe.PermissionError, "role_required" if proposal is None else "not_owner"),
+		(frappe.ValidationError, "invalid_arguments"),
+	)
+	try:
+		result = action()
+	except tuple(kind for kind, _code in codes) as error:
+		frappe.db.rollback()
+		code = next(code for kind, code in codes if isinstance(error, kind))
+		record(stage, decision="denied", deny_reason=code, tool=tool, proposal=_existing(proposal))
+		frappe.db.commit()  # nosemgrep
+		raise
+	if log_success:
+		record(stage, decision="allowed", tool=tool, proposal=_existing(proposal))
+	if frappe.request.method == "GET":
+		frappe.db.commit()  # nosemgrep: GET isteği yazıları geri alır
+	return result
+
+
+def _existing(proposal: str | None) -> str | None:
+	return proposal if proposal and store.load_proposal(proposal) is not None else None
 
 
 def args_hash(arguments: Any) -> str:

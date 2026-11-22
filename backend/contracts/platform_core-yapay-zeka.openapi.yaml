@@ -183,6 +183,9 @@ paths:
         Denetim başarısızsa iş yürümez ve yanıt `executed: false` ile ret nedenini taşır.
 
         Sunucu yürütmeden önce sonucu `unknown` olarak kaydeder. Süreç yarıda kesilirse sonuç `unknown` kalır.
+        Yürütme hata verirse sonuç yalnız geri almanın kesin olduğu durumda `failed` olur.
+        Yürütme o ana kadar veritabanına yazdıysa ya da işlemi kesinleştirdiyse sonuç `unknown` kalır.
+        Araç, hedefi yazmadan hemen önce kilitler ve sürümünü önizlemedekiyle karşılaştırır.
         Uygulama aracı hata verirse sonuç yine `unknown` kalır. Araç dış sisteme dokunmuş olabilir.
         Aynı hedefe kör tekrar yapılmaz. İnsan durumu `resolve_proposal` ile kapatır.
       security: [{insanOturumu: []}]
@@ -702,6 +705,29 @@ x-mcp-schemas:
     properties:
       user: {type: string, minLength: 1}
       role: {type: string, minLength: 1}
+
+# Alt tablo satırları için kurallar. `create_document` ve `update_document` araçları uygular.
+x-child-table-rules:
+  - Satır listesi tablonun tamamının yerine geçer. Listede olmayan satır silinir. Önizleme eski satırları gösterir.
+  - Satırın `name` değeri yalnız güncellenen kaydın aynı tablosundaki bir satırın adı olabilir.
+  - Yeni kayıtta ve yeni satırda `name` gönderilmez. Adı sunucu üretir.
+  - Satır `parent`, `parenttype`, `parentfield`, `owner`, `docstatus` ve `idx` alanlarını taşıyamaz.
+  - Satır alanlarında da alan düzeyi yazma izni aranır. Gizli alan satırda da yazılamaz.
+  - Bu denetimler önizlemede ve yürütmede yapılır.
+
+# Rapor sütunu şu durumlarda `run_report` yanıtından çıkar.
+x-report-secret-rules:
+  - Sütunun türü “Password” olur.
+  - Sütunun alan adı ya da etiketi gizli ad kalıbına uyar.
+  - Raporun kaynak DocType'ında aynı adlı alan gizlidir.
+  - Raporu yazan, başka kaynaktan gelen gizli değeri bu üç yoldan biriyle işaretler.
+
+# Uygulama bir DocType'ı genel yazma araçlarına kapatabilir.
+x-ai-write-closed-hook:
+  description: |
+    Uygulama `hooks.py` dosyasına `ai_write_closed_doctypes = ["DocType adı"]` yazar.
+    Listedeki DocType'a genel yazma araçları `blocked_doctype` döner.
+    Örneğin kimlik bağı ya da erişim kuralı tutan DocType böyle kapatılır.
 
 # Uygulamaların `ai_tools` kancasıyla bildirdiği aracın biçimi (G-105).
 x-ai-tools-hook:

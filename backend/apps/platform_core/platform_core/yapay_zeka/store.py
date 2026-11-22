@@ -58,6 +58,14 @@ def lock_target(target_key: str) -> list[dict]:
 	)
 
 
+def lock_row(doctype: str, name: str) -> bool:
+	"""Bir sistem kaydının satırını kilitler. Satır yoksa yanlış döner.
+
+	Yönetim araçları asıl hedefi yazmadan hemen önce bununla kilitler. Değer okunmaz.
+	"""
+	return bool(frappe.db.get_value(doctype, name, "name", for_update=True))
+
+
 def latest_version(doctype: str | None, name: str | None) -> str | None:
 	"""Yazmanın ürettiği “Version” kaydının adı. Yalnız günlüğe bağ olarak yazılır."""
 	if not doctype or not name:

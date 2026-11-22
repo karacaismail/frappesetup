@@ -55,7 +55,4 @@ def resolve_proposal(proposal_id: str, outcome: str) -> dict:
 @frappe.whitelist(methods=["POST"])
 def purge_logs(older_than_days: int = retention.MIN_DAYS, dry_run: bool = True) -> dict:
 	"""Saklama süresi dolan günlük ve öneri kayıtlarını siler. Yıkıcıdır. Varsayılan yalnız sayar."""
-	access.require_human("call", tool="purge_logs")
-	result = retention.purge(older_than_days, dry_run=dry_run)
-	access.record("call", decision="allowed", tool="purge_logs", tool_class="admin", arguments=result)
-	return result
+	return access.human_call("call", "purge_logs", lambda: retention.purge(older_than_days, dry_run=dry_run))

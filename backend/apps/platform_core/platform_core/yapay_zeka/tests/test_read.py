@@ -114,14 +114,16 @@ class TestReadTools(YzTestCase):
 	def test_doctype_without_permission_is_denied_and_logged(self):
 		client_a = self.login(USER_A)
 
-		result = self.call_tool(client_a, "list_documents", {"doctype": "Version"})
+		result = self.call_tool(client_a, "list_documents", {"doctype": "Custom Field"})
 		search = self.call_tool(client_a, "search_doctypes", {"query": "YZ Test"})
 		everything = self.call_tool(client_a, "search_doctypes", {})["structuredContent"]["doctypes"]
 
 		self.assert_denied(result, "permission")
-		self.assertEqual(self.last_log(tool="list_documents", target_doctype="Version").decision, "denied")
+		self.assertEqual(
+			self.last_log(tool="list_documents", target_doctype="Custom Field").decision, "denied"
+		)
 		self.assertIn(DOCTYPE, search["structuredContent"]["doctypes"])
-		self.assertNotIn("Version", everything)
+		self.assertNotIn("Custom Field", everything)
 
 	def test_credential_doctype_is_blocked_even_for_manager(self):
 		manager = self.login(MANAGER)

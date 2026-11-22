@@ -6,9 +6,12 @@ süreli durur ve kendiliğinden silinir. Zamanlanmış temizlik yoktur (D-6).
 
 import hashlib
 import secrets
+from datetime import UTC, datetime
 
 import frappe
 from frappe import _
+from frappe.sessions import get_expired_threshold, get_expiry_in_seconds
+from frappe.utils import now, time_diff_in_seconds
 
 from platform_core.yapay_zeka import access
 
@@ -31,6 +34,7 @@ def issue() -> dict:
 	record = {"user": frappe.session.user, "sid": frappe.session.sid, "audience": audience}
 	frappe.cache.set_value(_key(token), record, expires_in_sec=TTL_SECONDS)
 	frappe.cache.set(frappe.cache.make_key(_key(token, ":calls")), MAX_CALLS, ex=TTL_SECONDS)
+	access.record("auth", decision="allowed", tool="issue_agent_token")
 	return {"token": token, "expires_in": TTL_SECONDS, "max_calls": MAX_CALLS, "audience": audience}
 
 
@@ -41,10 +45,33 @@ def _bearer() -> str | None:
 	return None
 
 
-def _session_alive(sid: str) -> bool:
-	"""Belirteci alan Frappe oturumu hâlâ açık mı? Frappe oturumları bu tabloda tutar."""
+def _session_alive(sid: str, user: str) -> bool:
+	"""Belirteci alan Frappe oturumu hâlâ geçerli mi?
+
+	Ölçütler Frappe'nin oturum okumasıyla aynıdır (`frappe/sessions.py` içinde
+	`get_session_data_from_cache` ve `get_session_data_from_db`): hareketsizlik süresi,
+	`session_end` zamanı ve veritabanındaki son kullanım. Satırın durması yetmez.
+	"""
+	cached = frappe.cache.hget("session", sid)
+	if cached:
+		data = cached.get("data") or {}
+		idle = time_diff_in_seconds(now(), data.get("last_updated"))
+		if idle > get_expiry_in_seconds(data.get("session_expiry")):
+			return False
+		session_end = data.get("session_end")
+		if session_end and datetime.now(tz=UTC) > datetime.fromisoformat(session_end):
+			return False
+		return cached.get("user") == user
 	sessions = frappe.qb.DocType("Sessions")
-	return bool(frappe.qb.from_(sessions).select(sessions.sid).where(sessions.sid == sid).limit(1).run())
+	rows = (
+		frappe.qb.from_(sessions)
+		.select(sessions.user)
+		.where(sessions.sid == sid)
+		.where(sessions.lastupdate > get_expired_threshold())
+		.limit(1)
+		.run()
+	)
+	return bool(rows) and rows[0][0] == user
 
 
 def authenticate_request() -> None:
@@ -65,7 +92,7 @@ def authenticate_request() -> None:
 		return
 	if frappe.request.cookies.get("sid") not in (None, "", "Guest"):
 		raise frappe.PermissionError(_("Send either a session cookie or an agent token, not both."))
-	if not _session_alive(record["sid"]):
+	if not _session_alive(record["sid"], record["user"]):
 		frappe.cache.delete_value(_key(token))
 		return
 	frappe.set_user(record["user"])

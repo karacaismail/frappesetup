@@ -8,8 +8,8 @@ if TYPE_CHECKING:
 
 SECRET_FIELDTYPES = frozenset({"Password"})
 SECRET_NAME = re.compile(
-	r"(^|_)(password|passwd|pwd|passphrase|secret|secretkey|token|key|keys|apikey|credential|credentials"
-	r"|authorization|otp|signature|salt)(_|$)"
+	r"(^|_)(password|passwd|pwd|passphrase|secret|secrets|secretkey|clientsecret|token|accesstoken|key|keys"
+	r"|apikey|credential|credentials|authorization|otp|signature|salt|cookie|sid|pem)(_|$)"
 )
 
 # Kimlik bilgisi taşıyan kayıtlar. Okunmaz ve yazılmaz.
@@ -34,6 +34,13 @@ CREDENTIAL_DOCTYPES = frozenset(
 		"Webhook Header",
 		"Webhook Request Log",
 		"Error Log",
+		# Silinen ya da değişen kayıtların eski değerlerini ve iş girdilerini taşıyanlar.
+		"Deleted Document",
+		"Version",
+		"RQ Job",
+		"Console Log",
+		"Recorder",
+		"Scheduled Job Log",
 	}
 )
 
@@ -97,9 +104,21 @@ READ_BLOCKED = CREDENTIAL_DOCTYPES | LAYER_DOCTYPES
 WRITE_BLOCKED = CREDENTIAL_DOCTYPES | CODE_DOCTYPES | LAYER_DOCTYPES
 
 # Yapay zekâ yoluyla verilmeyen ve alınmayan roller.
-PROTECTED_ROLES = frozenset({"Administrator", "System Manager", "Guest", "All", "Desk User"})
+PROTECTED_ROLES = frozenset(
+	{
+		"Administrator",
+		"System Manager",
+		"Guest",
+		"All",
+		"Desk User",
+		"Script Manager",
+		"Report Manager",
+		"Website Manager",
+		"Workspace Manager",
+	}
+)
 # İzinleri yapay zekâ yoluyla değişmeyen roller. Bu roller herkesi ya da tam yetkiyi kapsar.
-PROTECTED_PERMISSION_ROLES = frozenset({"Administrator", "Guest", "All"})
+PROTECTED_PERMISSION_ROLES = frozenset({"Administrator", "Guest", "All", "Desk User"})
 
 FORBIDDEN_ARGUMENT_NAMES = frozenset({"confirm", "confirmed", "approve", "approved", "force"})
 
@@ -108,13 +127,25 @@ def is_framework_doctype(meta) -> bool:
 	"""DocType Frappe çatısına aitse ve açık listede değilse doğru döner.
 
 	Yeni bir sistem DocType'ı listeye eklenmese de kapalı kalır. Uygulamaların ve
-	kullanıcıların kendi DocType'ları bu kurala girmez.
+	kullanıcıların kendi DocType'ları bu kurala girmez. Modülün uygulaması bulunamazsa
+	DocType kapalı sayılır.
 	"""
 	import frappe
 
 	if meta.custom or meta.name in FRAMEWORK_OPEN:
 		return False
-	return (frappe.local.module_app or {}).get(frappe.scrub(meta.module or "")) == "frappe"
+	app = (frappe.local.module_app or {}).get(frappe.scrub(meta.module or ""))
+	return app is None or app == "frappe"
+
+
+def is_closed_by_app(doctype: str) -> bool:
+	"""Uygulama bu DocType'ı `ai_write_closed_doctypes` kancasıyla kapattıysa doğru döner.
+
+	Örneğin kimlik bağı ya da erişim kuralı tutan DocType'ın sahibi onu bu kancayla kapatır.
+	"""
+	import frappe
+
+	return doctype in (frappe.get_hooks("ai_write_closed_doctypes") or [])
 
 
 def is_secret_fieldname(fieldname: str) -> bool:

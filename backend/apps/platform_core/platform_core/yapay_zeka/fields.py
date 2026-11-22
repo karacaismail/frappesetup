@@ -22,9 +22,22 @@ def get_meta(doctype: str) -> "Meta":
 		raise ToolDenied("unknown_doctype", _("DocType {0} does not exist.").format(doctype)) from None
 
 
+def _permitted(meta: "Meta", ptype: str, parenttype: str | None) -> set[str]:
+	"""İzinli alan adları. Alt tablo alanı da izin seviyesine göre girer.
+
+	Frappe'nin `get_permitted_fieldnames` işlevi tablo alanlarını saymaz. Tablo alanının
+	izni, alanın izin seviyesinin kullanıcıya açık olmasıdır.
+	"""
+	names = set(meta.get_permitted_fieldnames(parenttype=parenttype, permission_type=ptype))
+	if not meta.istable:
+		levels = set(meta.get_permlevel_access(permission_type=ptype))
+		names |= {field.fieldname for field in meta.get_table_fields() if (field.permlevel or 0) in levels}
+	return names
+
+
 def readable(meta: "Meta", parenttype: str | None = None) -> set[str]:
 	"""Kullanıcının okuyabildiği, gizli olmayan alanlar."""
-	permitted = set(meta.get_permitted_fieldnames(parenttype=parenttype, permission_type="read"))
+	permitted = _permitted(meta, "read", parenttype)
 	names = {
 		field.fieldname
 		for field in meta.fields
@@ -33,9 +46,9 @@ def readable(meta: "Meta", parenttype: str | None = None) -> set[str]:
 	return names | set(STANDARD_FIELDS)
 
 
-def writable(meta: "Meta") -> set[str]:
+def writable(meta: "Meta", parenttype: str | None = None) -> set[str]:
 	"""Kullanıcının yazabildiği, gizli olmayan alanlar."""
-	permitted = set(meta.get_permitted_fieldnames(permission_type="write"))
+	permitted = _permitted(meta, "write", parenttype)
 	return {
 		field.fieldname
 		for field in meta.fields
@@ -75,6 +88,8 @@ def clean(data: dict[str, Any], meta: "Meta", parenttype: str | None = None) -> 
 			and field.fieldtype in ("Table", "Table MultiSelect")
 			and isinstance(value, list)
 		):
+			if field.options in policy.READ_BLOCKED:
+				continue
 			child_meta = frappe.get_meta(field.options)
 			value = [clean(row, child_meta, meta.name) if isinstance(row, dict) else row for row in value]
 		result[key] = value

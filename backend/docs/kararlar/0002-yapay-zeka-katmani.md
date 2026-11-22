@@ -270,6 +270,9 @@ Başka kullanıcının onayı 403 alır. Yanıt öneriyi taşımaz. Önizleme o 
 ### Yürütme ve “unknown” kuralı
 
 1. Sunucu aynı hedefin bütün öneri satırlarını veritabanında kilitler. Yarışan ikinci onay bekler. Kilit birden çok sunucuda da çalışır.
+   - Kilit sırası her istekte aynıdır. Sunucu önce hedefin önerilerini, sonra bu öneriyi kilitler.
+   - MariaDB, yarışan bir onayın değiştirdiği satırda kilitli okumayı reddedebilir (`frappe/database/mariadb/database.py:27`). O zaman sunucu işlemi geri alır ve denetimleri güncel veriyle yeniden yapar. En çok dört kez dener.
+   - Yarış testleri bu durumu sınar. İki onay aynı anda gelir ve yalnız biri yürür.
 2. Sunucu öneriyi `consumed` yapar ve sonucu `unknown` yazar. Bu yazıyı hemen kesinleştirir.
 3. Sunucu işi yürütür.
 4. İş başarılıysa sonuç `succeeded` olur. İş hata verirse yazılar geri alınır.
@@ -428,6 +431,39 @@ Açık kalan, bilinçli bırakılan noktalar şunlardır:
 - Kayıt yoksa `not_found`, izin yoksa `permission` döner. Frappe'nin REST ucu da aynı ayrımı yapar.
 - Her giriş yapmış kullanıcı alt tablo tanımını okuyabilir. Tanım veri değildir.
 - Uygulama araçlarının yürütme işlevi sürüm denetimini kendisi yapar. Katman önizlemeyi kilit altında yeniden çalıştırır.
+- Uygulamaların kendi DocType'ları genel yazma araçlarına açıktır. Sahibi hassas DocType'ı kancayla kapatır. Bu, D-9 kararının sonucudur.
+- Rapor, kaynağı belli olmayan gizli değeri yanlış adla döndürürse katman bunu tanıyamaz. Rapor yazarı sütunu işaretlemelidir.
+
+### İkinci inceleme: Codex
+
+İkinci bağımsız incelemeyi başka bir model yaptı. Bir engelleyici ve beş önemli bulgu verdi. Her bulgu için önce saldırıyı gösteren test yazıldı. Test başarısız oldu. Sonra kod düzeltildi. Testler `tests/test_codex.py` dosyasındadır.
+
+| Bulgu | Düzeltme |
+| --- | --- |
+| B1. Alt tablo satırı başka kayda ait olabiliyordu. Satır alanında izin aranmıyordu. | Satır adı yalnız aynı ana kaydın satırı olabilir. Yeni satırın adı istemciden alınmaz. Satır alanında da yazma izni aranır. Denetim önizlemede ve yürütmede çalışır. |
+| B2. Rapor, “Password” türündeki sütunu modele verebiliyordu. | Sütunun türü, adı, etiketi ve kaynak DocType'taki alanı denetlenir. |
+| B3. Kalıcı etki bırakan hata `failed` yazılıyordu. | Yürütme yazdıysa ya da işlemi kesinleştirdiyse sonuç `unknown` kalır. |
+| B4. Yönetim araçları araya giren değişikliğin üstüne yazabiliyordu. | Araç asıl hedefi kilitler. Sürümü yazmadan hemen önce yeniden karşılaştırır. |
+| B5. Aracı belirteci süresi dolmuş oturuma bağlı kalabiliyordu. | Oturumun hareketsizlik süresi ve bitiş zamanı Frappe'nin ölçütleriyle denetlenir. |
+| B6. Bazı insan çağrıları ve retleri günlüğe düşmüyordu. | Belirteç üretimi, öneri okuma, öneri listeleme ve bütün retler günlüğe düşer. |
+
+Bu incelemede Frappe'nin şu davranışları imajdaki kaynakta doğrulandı:
+
+- Frappe, gönderilen satır adını korur ve satıra yeni ana kaydı yazar (`frappe/model/document.py:2477`).
+- Frappe, yeni kayıtta alt tablonun alan iznini denetlemez (`frappe/model/document.py:1303`).
+- Frappe'nin izinli alan listesi tablo alanlarını saymaz. Bu yüzden katman alt tabloyu önce hiç döndürmüyor ve yazdırmıyordu. Artık tablo alanı kendi izin seviyesine göre okunur ve yazılır.
+- Frappe oturumu hareketsizlik süresi ve `session_end` değeriyle sınar (`frappe/sessions.py:363`).
+
+Aynı turda kendi başlattığım ikinci inceleme de şu ek düzeltmeleri getirdi:
+
+- Rol izni önizlemesi, yeni kuralın getirdiği okuma iznini de gösterir.
+- Kod ve yönetim DocType'larının izinleri yapay zekâ yoluyla değişmez. Örneğin “Server Script” ve “User” böyledir.
+- “Desk User” rolünün izinleri değişmez. “Script Manager” gibi dört rol daha verilemez.
+- Eski değerleri taşıyan DocType'lar okumaya kapandı. Örneğin “Version” ve “Deleted Document” böyledir.
+- Uygulama bir DocType'ı `ai_write_closed_doctypes` kancasıyla yazmaya kapatabilir.
+- Hedefi olmayan işte de “unknown” engeli çalışır. Anahtar araç ve girdiden üretilir.
+- CSRF başlığı her yazan insan isteğinde katmanın kendisi tarafından karşılaştırılır.
+- Aracı belirtecinin çağrı hakkı bilinmeyen araç adında da düşer.
 
 ## 13. Karar sitesiyle çelişkiler
 
@@ -442,6 +478,5 @@ Açık kalan, bilinçli bırakılan noktalar şunlardır:
 
 - `frappe/mcp` paketinin Frappe 16'da çalışıp çalışmadığı denenmedi.
 - Gerçek bir MCP istemcisiyle oturum açılmadı. Testler istemciyi taklit edecek.
-- Testler geçici bir test ortamında çalıştı. Ortak geliştirme ortamı ve gerçek `hooks.py` henüz bu dalda yoktur.
-- İki onayın aynı anda yarıştığı durum testle denenmedi. Kilit kodu okunarak incelendi.
+- Sürecin yürütme ortasında ölmesi testle denenmedi. Bu durumda sonuç `unknown` kalır. Kod okunarak incelendi.
 - GitHub'daki `version-16` dalı 16.60.2 sürümündedir. İmajdaki sürüm 16.56.0'dır. Aradaki fark incelenmedi.

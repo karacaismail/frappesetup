@@ -120,6 +120,14 @@ def call_tool(params: dict) -> dict:
 	"""Aracı çalıştırır. Her sonuç ve her ret “AI Action Log” kaydına yazılır."""
 	started = time.monotonic()
 	name = params.get("name")
+	# Çağrı hakkı araç aranmadan önce düşer. Bilinmeyen araç adı da hak harcar.
+	if not agent_token.spend_call():
+		access.record(
+			"call", decision="denied", deny_reason="token_call_limit", tool=str(name)[:140], started=started
+		)
+		# 401 yanıtı işlemi geri alır. Ret kaydı için burada kesinleştirilir.
+		frappe.db.commit()  # nosemgrep
+		raise McpError(protocol.INVALID_REQUEST, "The agent token has no calls left", status=401)
 	tool = registry.find(name) if isinstance(name, str) else None
 	if tool is None:
 		access.record(
@@ -132,12 +140,6 @@ def call_tool(params: dict) -> dict:
 	raw = params.get("arguments", {})
 	context = {"tool": tool.name, "tool_class": tool.tool_class, "started": started}
 	context.update(_target(raw if isinstance(raw, dict) else {}))
-
-	if not agent_token.spend_call():
-		access.record("call", decision="denied", deny_reason="token_call_limit", **context)
-		# 401 yanıtı işlemi geri alır. Ret kaydı için burada kesinleştirilir.
-		frappe.db.commit()  # nosemgrep
-		raise McpError(protocol.INVALID_REQUEST, "The agent token has no calls left", status=401)
 
 	try:
 		if not tool.visible():

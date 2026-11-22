@@ -12,7 +12,7 @@ from frappe.utils import add_to_date, get_datetime, now_datetime, strip_html
 from frappe.utils.response import json_handler
 from pydantic import Field
 
-from platform_core.yapay_zeka import access, registry, store
+from platform_core.yapay_zeka import access, registry, store, versioning
 from platform_core.yapay_zeka.errors import ToolDenied
 
 TTL_SECONDS = 600
@@ -66,27 +66,26 @@ def _run_preview(tool: registry.AiTool, arguments: dict) -> dict:
 	if not isinstance(spec, dict) or not isinstance(spec.get("summary"), str):
 		raise ToolDenied("internal_error", _("The preview of tool {0} is not valid.").format(tool.name))
 	spec.setdefault("action", "app_tool")
-	# Sürüm işareti uzun olabilir. Uzun işaretin özeti saklanır ve karşılaştırılır.
-	version = spec.get("target_version")
-	if version is not None:
-		version = str(version)
-		spec["target_version"] = (
-			version if len(version) <= 64 else hashlib.sha256(version.encode()).hexdigest()
-		)
+	spec["target_version"] = versioning.token(spec.get("target_version"))
 	return spec
 
 
 def open_proposal(tool: registry.AiTool, arguments: dict) -> tuple[dict, Any]:
 	"""Önizleme üretir ve öneri kaydını açar. Hedef kayda hiçbir şey yazılmaz."""
 	spec = _run_preview(tool, arguments)
-	target_key = _target_key(spec.get("target_doctype"), spec.get("target_name"))
-	if target_key and store.unresolved_unknown_exists(target_key):
+	args_json = _json(arguments)
+	# Hedefi olmayan işte (örneğin yeni kayıt) anahtar araç ve girdiden üretilir.
+	# Böylece sonucu bilinmeyen iş aynı girdiyle yeniden önerilemez.
+	target_key = _target_key(spec.get("target_doctype"), spec.get("target_name")) or _target_key(
+		tool.name, args_json
+	)
+	if store.unresolved_unknown_exists(target_key):
 		raise ToolDenied(
 			"unresolved_unknown",
 			_("An earlier action on this target has an unknown result. A human must resolve it first."),
 		)
 	preview = {key: spec[key] for key in PREVIEW_KEYS if spec.get(key) is not None}
-	args_json, preview_json = _json(arguments), _json(preview)
+	preview_json = _json(preview)
 	version = spec.get("target_version")
 	doc = store.insert_proposal(
 		{
@@ -157,19 +156,20 @@ def read_for_model(proposal_id: str) -> dict:
 
 
 def read_for_human(proposal_id: str) -> dict:
-	access.require_human("call", tool="get_proposal")
-	return public(_own(proposal_id))
+	return access.human_call("call", "get_proposal", lambda: public(_own(proposal_id)), proposal=proposal_id)
 
 
 def list_for_human(status: str | None = None, limit: int = 20) -> list[dict]:
-	access.require_human("call", tool="list_proposals")
-	if status and status not in STATUS_FILTERS:
-		frappe.throw(_("Unknown status."), frappe.ValidationError)
-	limit = min(max(int(limit), 1), 100)
-	# Süresi dolan bekleyen öneri okuma anında `expired` görünür. Bu yüzden süzme iki adımlıdır.
-	names = store.proposals_of(frappe.session.user, STATUS_FILTERS.get(status), 500)
-	rows = (public(store.load_proposal(name)) for name in names)
-	return [row for row in rows if not status or row["status"] == status][:limit]
+	def rows() -> list[dict]:
+		if status and status not in STATUS_FILTERS:
+			frappe.throw(_("Unknown status."), frappe.ValidationError)
+		count = min(max(int(limit), 1), 100)
+		# Süresi dolan bekleyen öneri okuma anında `expired` görünür. Bu yüzden süzme iki adımlıdır.
+		names = store.proposals_of(frappe.session.user, STATUS_FILTERS.get(status), 500)
+		found = (public(store.load_proposal(name)) for name in names)
+		return [row for row in found if not status or row["status"] == status][:count]
+
+	return access.human_call("call", "list_proposals", rows)
 
 
 def _log(stage: str, doc, *, decision: str, deny_reason: str | None = None, **extra) -> None:
@@ -206,6 +206,10 @@ def approve(proposal_id: str, digest: str) -> dict:
 	güncel veriyle yeniden yapılır. Kilit alınmadan önce hiçbir şey yazılmamıştır.
 	"""
 	access.require_human("approve")
+	if store.load_proposal(proposal_id) is None:
+		access.record("approve", decision="denied", deny_reason="not_found", tool="approve_proposal")
+		frappe.db.commit()  # nosemgrep: 404 yanıtı işlemi geri alır, ret kaydı kalmalı
+		raise frappe.DoesNotExistError(_("Proposal not found."))
 	for _attempt in range(APPROVE_ATTEMPTS - 1):
 		try:
 			return _approve(proposal_id, digest)
@@ -268,16 +272,19 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 	_log("approve", doc, decision="allowed")
 	frappe.db.commit()  # nosemgrep
 
-	extra = {"expected_version": doc.target_modified} if tool.versioned and doc.target_modified else {}
+	# Yürütme işlem ortasında kesinleştirirse geri alma eksik kalır. Örneğin özel alan
+	# eklemek tablo yapısını değiştirir ve Frappe o sırada kesinleştirir.
+	committed = []
+	frappe.db.after_commit.add(lambda: committed.append(True))
+	extra = {"expected_version": doc.target_modified} if tool.versioned else {}
 	try:
 		result = tool.handler(**arguments, **extra)
 	except Exception as error:
+		wrote = bool(committed) or bool(frappe.db.transaction_writes)
 		frappe.db.rollback()
 		frappe.clear_messages()
 		doc = store.load_proposal(doc.name, for_update=True)
-		# Yerleşik araçlar yalnız veritabanına yazar. Geri alma kesindir, sonuç `failed` olur.
-		# Uygulama aracı dış sisteme dokunmuş olabilir. Onun sonucu `unknown` kalır.
-		doc.result = "unknown" if tool.tool_class == "app" else "failed"
+		doc.result = "failed" if _certainly_undone(tool, error, wrote) else "unknown"
 		doc.error = _error_text(tool, error)
 		store.save_proposal(doc)
 		_log("execute", doc, decision="error", deny_reason="execution_failed")
@@ -298,6 +305,18 @@ def _execute(doc, tool: registry.AiTool, arguments: dict) -> dict:
 	return {"executed": True, "deny_reason": None, "proposal": public(doc)}
 
 
+def _certainly_undone(tool: registry.AiTool, error: Exception, wrote: bool) -> bool:
+	"""İş kesin olarak uygulanmadıysa doğru döner. Emin değilsek sonuç `unknown` kalır.
+
+	Kesin olan iki durum vardır. Birincisi yerleşik aracın yazmadan önceki kendi reddidir.
+	İkincisi yerleşik araçta hiç yazı ve kesinleştirme olmamasıdır. Yazıdan sonra çalışan
+	kayıt olayları dış sisteme dokunmuş olabilir. Uygulama aracı da dokunmuş olabilir.
+	"""
+	if tool.tool_class == "app":
+		return False
+	return isinstance(error, ToolDenied) or not wrote
+
+
 def _error_text(tool: registry.AiTool, error: Exception) -> str:
 	"""Kullanıcıya dönen hata metni. Beklenmeyen hatanın ayrıntısı yalnız hata kaydına gider."""
 	if isinstance(error, ToolDenied):
@@ -309,25 +328,30 @@ def _error_text(tool: registry.AiTool, error: Exception) -> str:
 
 
 def reject(proposal_id: str) -> dict:
-	access.require_human("reject")
-	doc = _own(proposal_id, for_update=True)
-	if doc.status != "pending":
-		frappe.throw(_("Only a pending proposal can be rejected."), frappe.ValidationError)
-	doc.status, doc.decided_at = "rejected", now_datetime()
-	store.save_proposal(doc)
-	_log("reject", doc, decision="allowed")
-	return public(doc)
+	def run() -> dict:
+		doc = _own(proposal_id, for_update=True)
+		if doc.status != "pending":
+			raise access.WrongState(_("Only a pending proposal can be rejected."))
+		doc.status, doc.decided_at = "rejected", now_datetime()
+		store.save_proposal(doc)
+		_log("reject", doc, decision="allowed")
+		return public(doc)
+
+	return access.human_call("reject", "reject_proposal", run, proposal=proposal_id, log_success=False)
 
 
 def resolve(proposal_id: str, outcome: str) -> dict:
 	"""Sonucu bilinmeyen öneriyi insan kararıyla kapatır. Hedef kayda yazmaz."""
-	access.require_human("resolve")
-	if outcome not in ("succeeded", "failed"):
-		frappe.throw(_("outcome must be succeeded or failed."), frappe.ValidationError)
-	doc = _own(proposal_id, for_update=True)
-	if doc.status != "consumed" or doc.result != "unknown":
-		frappe.throw(_("Only a proposal with an unknown result can be resolved."), frappe.ValidationError)
-	doc.result, doc.decided_at = outcome, now_datetime()
-	store.save_proposal(doc)
-	_log("resolve", doc, decision="allowed")
-	return public(doc)
+
+	def run() -> dict:
+		if outcome not in ("succeeded", "failed"):
+			frappe.throw(_("outcome must be succeeded or failed."), frappe.ValidationError)
+		doc = _own(proposal_id, for_update=True)
+		if doc.status != "consumed" or doc.result != "unknown":
+			raise access.WrongState(_("Only a proposal with an unknown result can be resolved."))
+		doc.result, doc.decided_at = outcome, now_datetime()
+		store.save_proposal(doc)
+		_log("resolve", doc, decision="allowed")
+		return public(doc)
+
+	return access.human_call("resolve", "resolve_proposal", run, proposal=proposal_id, log_success=False)

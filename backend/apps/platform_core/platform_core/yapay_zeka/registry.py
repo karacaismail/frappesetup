@@ -173,6 +173,7 @@ def builtin_tools() -> tuple[AiTool, ...]:
 				preview,
 				roles=(admin.ADMIN_ROLE,),
 				destructive=destructive,
+				versioned=name != "purge_action_log",
 			)
 			for name, description, arguments, handler, preview, destructive in (
 				(

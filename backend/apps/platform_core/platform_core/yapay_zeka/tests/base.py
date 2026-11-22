@@ -16,6 +16,7 @@ from frappe.utils.password import update_password
 MCP_PATH = "/api/method/platform_core.api.ai.mcp"
 API = "/api/method/platform_core.api.ai."
 DOCTYPE = "YZ Test Kayit"
+CHILD_DOCTYPE = "YZ Test Satir"
 RESTRICTED_ROLE = "YZ Kisitli"
 USER_A = "yz.a@example.test"
 USER_B = "yz.b@example.test"
@@ -27,6 +28,30 @@ def ensure_fixtures() -> None:
 	"""Uydurma rol, kayıt türü ve kullanıcıları bir kez kurar."""
 	if not frappe.db.exists("Role", RESTRICTED_ROLE):
 		frappe.get_doc(doctype="Role", role_name=RESTRICTED_ROLE, desk_access=0).insert()
+	if not frappe.db.exists("DocType", CHILD_DOCTYPE):
+		frappe.get_doc(
+			doctype="DocType",
+			name=CHILD_DOCTYPE,
+			module="Custom",
+			custom=1,
+			istable=1,
+			fields=[
+				{"fieldname": "item", "fieldtype": "Data", "label": "Item", "description": "Row text."},
+				{
+					"fieldname": "locked_note",
+					"fieldtype": "Data",
+					"label": "Locked Note",
+					"permlevel": 1,
+					"description": "Row note for managers only.",
+				},
+			],
+		).insert()
+	if frappe.db.exists("DocType", DOCTYPE) and not frappe.get_meta(DOCTYPE).has_field("rows"):
+		# Eski test tanımı alt tablo taşımaz. Tanım yeniden kurulur.
+		for name in frappe.get_all(DOCTYPE, pluck="name"):
+			frappe.db.set_value(DOCTYPE, name, "docstatus", 0)
+			frappe.delete_doc(DOCTYPE, name, force=True)
+		frappe.delete_doc("DocType", DOCTYPE, force=True)
 	if not frappe.db.exists("DocType", DOCTYPE):
 		frappe.get_doc(
 			doctype="DocType",
@@ -62,6 +87,13 @@ def ensure_fixtures() -> None:
 					"fieldtype": "Data",
 					"label": "Access Token",
 					"description": "A secret kept in a plain field.",
+				},
+				{
+					"fieldname": "rows",
+					"fieldtype": "Table",
+					"label": "Rows",
+					"options": CHILD_DOCTYPE,
+					"description": "Child rows of the record.",
 				},
 			],
 			permissions=[
@@ -120,6 +152,9 @@ class YzTestCase(IntegrationTestCase):
 	def tearDown(self):
 		frappe.set_user("Administrator")
 		frappe.db.rollback()
+		# Sonucu bilinmeyen öneri sonraki testin aynı hedefini kilitler. Test verisi temizlenir.
+		frappe.db.delete("AI Action Proposal", {"result": "unknown"})
+		frappe.db.commit()  # nosemgrep
 		super().tearDown()
 
 	# --- istek yardımcıları ---

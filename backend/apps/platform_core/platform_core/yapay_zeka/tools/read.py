@@ -104,10 +104,11 @@ def run_report(report: str, filters: dict[str, Any] | None = None, limit: int = 
 		raise ToolDenied("permission", _("You may not run report {0}.").format(report))
 
 	data = run(report_name=report, filters=filters or {}, ignore_prepared_report=True)
+	source = field_rules.get_meta(report_doc.ref_doctype)
 	columns, keep = [], []
 	for index, column in enumerate(data.get("columns") or []):
-		fieldname = column.get("fieldname") if isinstance(column, dict) else str(column).split(":")[0]
-		if not policy.is_secret_fieldname(frappe.scrub(fieldname or "")):
+		fieldname, fieldtype, label = _column(column)
+		if not _secret_column(source, fieldname, fieldtype, label):
 			keep.append((index, fieldname))
 			columns.append(column)
 
@@ -118,6 +119,33 @@ def run_report(report: str, filters: dict[str, Any] | None = None, limit: int = 
 		elif isinstance(row, list | tuple):
 			rows.append([row[index] for index, _name in keep if index < len(row)])
 	return {"columns": columns, "rows": rows, "truncated": len(data.get("result") or []) > limit}
+
+
+def _column(column: Any) -> tuple[str, str, str]:
+	"""Sütunun alan adını, türünü ve etiketini döner. Metin biçimi `Etiket:Tür/Seçenek:Genişlik` olur."""
+	if isinstance(column, dict):
+		label = str(column.get("label") or "")
+		return str(column.get("fieldname") or frappe.scrub(label)), str(column.get("fieldtype") or ""), label
+	parts = str(column).split(":")
+	fieldtype = parts[1].split("/")[0] if len(parts) > 1 else ""
+	return frappe.scrub(parts[0]), fieldtype, parts[0]
+
+
+def _secret_column(source, fieldname: str, fieldtype: str, label: str) -> bool:
+	"""Rapor sütunu şu durumlarda modele gitmez (rapor sözleşmesi):
+
+	- sütunun türü gizli türdür, örneğin “Password”,
+	- alan adı ya da etiketi gizli ad kalıbına uyar,
+	- raporun kaynak DocType'ında aynı adlı alan gizlidir.
+
+	Raporu yazan, başka kaynaktan gelen gizli değeri bu üç yoldan biriyle işaretlemelidir.
+	"""
+	if fieldtype.strip() in policy.SECRET_FIELDTYPES:
+		return True
+	if policy.is_secret_fieldname(frappe.scrub(fieldname)) or policy.is_secret_fieldname(frappe.scrub(label)):
+		return True
+	field = source.get_field(fieldname)
+	return field is not None and policy.is_secret_field(field)
 
 
 def _condition(condition: Any) -> Any:
