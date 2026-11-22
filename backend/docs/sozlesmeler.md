@@ -335,6 +335,7 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 | `platform_core.api.ai.approve_proposal` | POST | İnsan oturumu | Öneriyi onaylar ve yürütür. |
 | `platform_core.api.ai.reject_proposal` | POST | İnsan oturumu | Öneriyi reddeder. |
 | `platform_core.api.ai.resolve_proposal` | POST | İnsan oturumu | Sonucu bilinmeyen öneriyi kapatır. |
+| `platform_core.api.ai.purge_logs` | POST | “System Manager” rolü | Saklama süresi dolan günlükleri elle siler. Yıkıcıdır. |
 
 ### Genel araçlar
 
@@ -342,6 +343,13 @@ Karar sitesinin AI bölümü de geçerlidir. Sayfalar `src/content/docs/ai-*.md`
 
 - Yazma araçları yalnız öneri açar. Öneri 10 dakika geçerlidir.
 - Uygulama araçlarının adı `<uygulama>_<araç>` biçimindedir. Uygulama araçlarını `ai_tools` kancasıyla bildirir.
+- Yönetim araçları şunlardır: `add_custom_field`, `set_field_property`, `set_role_permission`, `assign_role`, `remove_role` ve `purge_action_log`. Yalnız “System Manager” rolü kullanır. “System Manager” rolü yapay zekâ yoluyla verilmez.
+- MCP istemcisi konuşma kimliğini `Mcp-Conversation-Id` başlığıyla gönderir. Günlükler bu kimlikle eşleşir.
+- Panel, yazan her istekte `X-Frappe-CSRF-Token` başlığını gönderir. Oturumda CSRF belirteci yoksa onay reddedilir.
+
+### Öteki modüllerin araç bildirimi
+
+Her modül elle başlatılan komutlarını ve yazma işlerini `ai_tools` kancasıyla araç olarak bildirir. Bildirim biçimi `contracts/platform_core-yapay-zeka.openapi.yaml` dosyasının `x-ai-tools-hook` bölümündedir. Yazma araçları önizleme işlevi taşır. Bu bölüm platform-core-yz dalı birleşince geçerli olur.
 
 ## 11. Model geçidi ve sağlayıcı kaydı
 
