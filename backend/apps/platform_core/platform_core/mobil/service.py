@@ -106,7 +106,7 @@ def pull(store, projections, secret, scope, cursor, limit, *, account, now, inve
 	if type(limit) is not int or not 1 <= limit <= PAGE_SIZE:
 		raise MobileError("invalid_page_size")
 
-	_, _, installation, _ = scope
+	_unused, _unused, installation, _unused = scope
 	if cursor is None:
 		after, ceiling, snapshot, delivery_after, snapshot_after = 0, store.sequence, True, None, None
 	else:

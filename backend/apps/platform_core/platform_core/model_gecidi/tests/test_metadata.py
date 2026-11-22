@@ -13,8 +13,12 @@ class GatewayMetadataTests(unittest.TestCase):
 		with (APP_ROOT / "translations" / "tr.csv").open(encoding="utf-8", newline="") as source:
 			rows = list(csv.reader(source))
 		self.assertTrue(rows)
-		self.assertTrue(all(len(row) == 3 for row in rows))
-		self.assertEqual(len(rows), len({(key, context) for key, _, context in rows}))
+		self.assertTrue(all(len(row) in (2, 3) for row in rows))
+		keys = {(row[0], row[2] if len(row) == 3 else "") for row in rows}
+		self.assertEqual(len(rows), len(keys))
+		for label, context in (("Base URL", "AI API"), ("Enabled", "AI Route"), ("Route", "AI Usage Log")):
+			self.assertIn((label, context), keys)
+			self.assertNotIn((label, ""), keys)
 
 	def test_sensitive_registry_doctypes_are_closed_to_general_ai_writes(self):
 		hooks = runpy.run_path(str(APP_ROOT / "hooks.py"))
