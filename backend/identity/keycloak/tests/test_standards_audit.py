@@ -24,7 +24,7 @@ TURKISH_LETTERS = re.compile("[\u00e7\u011f\u0131\u00f6\u015f\u00fc\u00c7\u011e\
 NEW_TEST_FILES = (
     "test_event_listener.py", "test_realm_backlog.py", "test_account_backlog.py", "test_session_lifetimes.py",
     "test_production_image.py", "test_dev_script_secrets.py", "test_synthetic_secrets.py",
-    "test_standards_audit.py",
+    "test_standards_audit.py", "test_create_tenant_client.py", "test_token_access_matrix.py",
 )
 
 

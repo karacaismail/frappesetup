@@ -133,15 +133,19 @@ Keycloak, her kiracı sitesini ayrı bir istemci kaydıyla tanır. İstemciyi bi
    ```
 
 3. Önizlemede Keycloak adresini ve kiracının dönüş adreslerini kontrol edin.
+   Hedef kapsamını ve kapsamı alacak servisleri de kontrol edin.
 4. Ayarlar doğruysa aynı komutu `--preview` olmadan çalıştırın.
 5. Komut sorunca `CREATE site-acme` yazın.
-6. Keycloak yönetim yetkisi olan kısa ömürlü erişim belirtecini girin. Komut girişi gizler.
-7. Keycloak 201 dönerse “Clients” ekranında `site-acme` kaydını açın.
+6. Keycloak yönetim yetkisi olan kısa ömürlü erişim belirtecini girin.
+   Yönetici tüm istemcileri görebilmeli. Komut girişi gizler.
+7. Komut “Ready” yazınca “Clients” ekranında `site-acme` kaydını açın.
 8. Keycloak'ın ürettiği istemci sırrını kiracı sitesinin gizli ayarına ekleyin.
 
-Komut, sözleşmenin 7. bölümündeki yönetim işini Keycloak'ın mevcut
-`POST /admin/realms/platform/clients` ucuyla yapar. Bu uç yönetim yetkisini denetler.
-`identity-sync` hesabına istemci açma yetkisi verilmez.
+Komut, sözleşmenin 7. bölümündeki yönetim işini Keycloak'ın mevcut uçlarıyla yapar.
+`aud-site-acme` kapsamı, belirtecin hedefini `site-acme` yapar.
+Komut bu kapsamı `identity-sync` ve `press-service` hesaplarına isteğe bağlı olarak bağlar.
+Servisler bu hedef için `scope=aud-site-acme` ister. İstemci açma yetkisi Keycloak yöneticisinde kalır.
 
-Keycloak 409 dönerse istemci adı zaten kayıtlıdır. Komut mevcut kaydı değiştirmez.
-Bağlantı kesilirse komutu yinelemeden önce “Clients” ekranını kontrol edin.
+Kurulum yarıda kalırsa aynı komutu yeniden çalıştırın.
+Komut mevcut istemci sırrını korur ve eksik adımları tamamlar.
+Mevcut ayar şablonla çelişirse komut durur. Keycloak yöneticisi çelişen ayarı inceleyebilir.
