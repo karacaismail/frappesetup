@@ -44,8 +44,6 @@ repos:
                 platform_core/templates/includes/.*|
                 platform_core/public/js/lib/.*
             )$
-
-
   - repo: https://github.com/pre-commit/mirrors-eslint
     rev: v8.44.0
     hooks:
@@ -63,7 +61,3 @@ repos:
                 platform_core/public/js/lib/.*
             )$
 
-ci:
-    autoupdate_schedule: weekly
-    skip: []
-    submodules: false
