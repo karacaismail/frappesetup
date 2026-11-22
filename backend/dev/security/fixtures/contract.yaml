@@ -1,0 +1,24 @@
+openapi: 3.1.0
+info:
+  title: Contract scan fixture
+  version: "1"
+  description: A known contract. The fixture server answers it with a server error.
+paths:
+  /api/method/fixture.read:
+    get:
+      description: Returns a fixed object.
+      responses:
+        "200":
+          description: The fixed object.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: {type: string}
+    post:
+      description: Must not be called unless writes are allowed.
+      responses:
+        "200":
+          description: Accepted.
