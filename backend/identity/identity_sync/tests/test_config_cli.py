@@ -28,7 +28,7 @@ def environment(keycloak: str, press: str, tenant: str, db: str) -> dict[str, st
         "IDENTITY_SYNC_REALM_ID": fakes.REALM_ID,
         "IDENTITY_SYNC_EXECUTE_AZP": "approval-service",
         "IDENTITY_SYNC_PREVIEW_AZP": "ai-agent, ops-bff",
-        "IDENTITY_SYNC_SESSION_AZP": "site-kiraci1",
+        "IDENTITY_SYNC_SESSION_AZP": "site-kiraci1-service",
     }
 
 
@@ -86,19 +86,33 @@ class ConfigTest(unittest.TestCase):
 
     def test_session_clients_are_their_own_list(self) -> None:
         settings = load_settings(self.ENV)
-        self.assertEqual(settings.session_azp, frozenset({"site-kiraci1"}))
-        self.assertIn("site-kiraci1", settings.known_azp)
+        self.assertEqual(settings.session_azp, frozenset({"site-kiraci1-service"}))
+        self.assertIn("site-kiraci1-service", settings.known_azp)
         with self.assertRaises(ConfigError):
-            load_settings({**self.ENV, "IDENTITY_SYNC_PREVIEW_AZP": "site-kiraci1"})
+            load_settings({**self.ENV, "IDENTITY_SYNC_PREVIEW_AZP": "site-kiraci1-service"})
 
     def test_tenant_site_client_may_execute_and_revoke_sessions(self) -> None:
         # docs/sozlesmeler.md, section 7: the approval is given on the tenant site, so the execute
         # list holds the tenant service clients. It carries the same clients as the session list.
-        both = {**self.ENV, "IDENTITY_SYNC_EXECUTE_AZP": "site-kiraci1", "IDENTITY_SYNC_SESSION_AZP": "site-kiraci1"}
+        both = {
+            **self.ENV,
+            "IDENTITY_SYNC_EXECUTE_AZP": "site-kiraci1-service",
+            "IDENTITY_SYNC_SESSION_AZP": "site-kiraci1-service",
+        }
 
         settings = load_settings(both)
 
-        self.assertEqual((settings.execute_azp, settings.session_azp), (frozenset({"site-kiraci1"}),) * 2)
+        self.assertEqual((settings.execute_azp, settings.session_azp), (frozenset({"site-kiraci1-service"}),) * 2)
+
+    def test_browser_client_of_a_tenant_cannot_be_in_any_list(self) -> None:
+        # docs/sozlesmeler.md, section 2: `site-<tenant>` is the browser login client. It has no
+        # service account. Only `site-<tenant>-service` may ask for the `aud-identity-sync` scope.
+        # A browser client in a list is a mistake that would let a login token call this service.
+        without = {key: value for key, value in self.ENV.items() if not key.endswith("_AZP")}
+        for name in ("EXECUTE", "SESSION", "PREVIEW", "DELETION"):
+            with self.subTest(list=name), self.assertRaises(ConfigError) as caught:
+                load_settings({**without, f"IDENTITY_SYNC_{name}_AZP": "site-kiraci1"})
+            self.assertIn("site-kiraci1-service", str(caught.exception))
 
     def test_every_other_pair_of_lists_stays_separate(self) -> None:
         pairs = (

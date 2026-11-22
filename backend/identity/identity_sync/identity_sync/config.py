@@ -10,7 +10,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from identity_sync.mapping import Tenant
+from identity_sync.mapping import Tenant, browser_client_id, service_client_id
 
 PREFIX = "IDENTITY_SYNC_"
 DEFAULT_ADMIN_SCOPE = "admin-api kc-admin-api"
@@ -150,6 +150,16 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     # Each list grants a different right. One overlap is intended: a tenant site client both
     # executes approved work and ends sessions (docs/sozlesmeler.md, section 7). A preview
     # client must never execute, and the Press client only requests deletions.
+    tenants = _tenants(get("TENANTS"))
+    listed = execute_azp | preview_azp | session_azp | deletion_azp
+    for tenant in tenants:
+        # `site-<tenant>` is the browser login client. It has no service account, so a token
+        # with that `azp` is a user's login token. It must never be accepted as a service caller.
+        if browser_client_id(tenant.name) in listed:
+            raise ConfigError(
+                f"{browser_client_id(tenant.name)} is a browser client and cannot be in a client list; "
+                f"use {service_client_id(tenant.name)}"
+            )
     tenant_clients = execute_azp | session_azp
     if preview_azp & tenant_clients or deletion_azp & (preview_azp | tenant_clients):
         raise ConfigError(
@@ -170,7 +180,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         admin_scope=get("ADMIN_SCOPE", DEFAULT_ADMIN_SCOPE),
         digest_key=get("DIGEST_KEY"),
         press_url=_url(f"{PREFIX}PRESS_URL", get("PRESS_URL")),
-        tenants=_tenants(get("TENANTS")),
+        tenants=tenants,
         webhook_secret=get("WEBHOOK_SECRET"),
         db_path=get("DB"),
         http_timeout=timeout,

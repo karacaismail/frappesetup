@@ -566,7 +566,7 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
         realm_id=REALM_ID,
         execute_azp=frozenset({"approval-service"}),
         preview_azp=frozenset({"ai-agent"}),
-        session_azp=frozenset({"site-kiraci1", "site-kiraci2"}),
+        session_azp=frozenset({"site-kiraci1-service", "site-kiraci2-service"}),
         deletion_azp=frozenset({"press-service"}),
     )
 

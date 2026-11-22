@@ -9,7 +9,6 @@ Admin API belirteci ayrı kapsamla istenir. Bu belirteç sitelere gitmez.
 
 from __future__ import annotations
 
-import re
 import urllib.parse
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -20,7 +19,6 @@ from identity_sync.tokens import TokenProvider
 
 PAGE_SIZE = 100
 INVITE_ACTIONS = ("UPDATE_PASSWORD", "CONFIGURE_TOTP")
-TENANT_NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 SITE_BACKCHANNEL_LOGOUT_PATH = "/api/method/platform_core.api.keycloak_backchannel_logout"
 
 
@@ -39,12 +37,6 @@ class InviteResult:
 
     subject: str | None
     previews: tuple[Preview, ...]
-
-
-def site_client_id(tenant: str) -> str:
-    if not TENANT_NAME.fullmatch(tenant):
-        raise ValueError("invalid tenant name")
-    return f"site-{tenant}"
 
 
 def _quote(value: str) -> str:

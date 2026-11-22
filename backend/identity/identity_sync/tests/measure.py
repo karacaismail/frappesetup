@@ -40,7 +40,7 @@ from .test_server import sign
 
 READ_LIMIT_MS, WRITE_LIMIT_MS = 500, 1000
 DEFAULT_SAMPLES, DEFAULT_CONCURRENCY, DEFAULT_USERS = 50, 20, 200
-SITE, AGENT, PRESS = "site-kiraci1", "ai-agent", "press-service"
+SITE, AGENT, PRESS = "site-kiraci1-service", "ai-agent", "press-service"
 
 
 def percentile(values: Sequence[float], rank: int) -> float:

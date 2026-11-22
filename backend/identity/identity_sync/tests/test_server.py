@@ -36,8 +36,8 @@ def fake_verifier(token: str) -> dict[str, object]:
     azp = {
         PREVIEW_TOKEN: "ai-agent",
         EXECUTE_TOKEN: "approval-service",
-        SESSION_TOKEN: "site-kiraci1",
-        OTHER_SITE_TOKEN: "site-kiraci2",
+        SESSION_TOKEN: "site-kiraci1-service",
+        OTHER_SITE_TOKEN: "site-kiraci2-service",
         PRESS_TOKEN: "press-service",
         "stranger-token": "baska-istemci",
     }.get(token)
@@ -762,7 +762,7 @@ class SessionRevokeTest(ServerCase):
         self.assertEqual(self.stack.keycloak.sessions[self.OTHER_USER], [self.OTHER_SID])
         audit = "\n".join(logs.output)
         self.assertIn("operation=revoke_session", audit)
-        self.assertIn("site-kiraci1", audit)
+        self.assertIn("site-kiraci1-service", audit)
 
     def test_closed_session_also_gets_200(self) -> None:
         # Repeatable: the same request twice gives the same answer.

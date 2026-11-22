@@ -39,8 +39,8 @@ from identity_sync.events import (
     parse_event,
 )
 from identity_sync.httpjson import HttpError, TransportError
-from identity_sync.keycloak_admin import InviteResult, PlanChanged, site_client_id
-from identity_sync.mapping import Tenant
+from identity_sync.keycloak_admin import InviteResult, PlanChanged
+from identity_sync.mapping import Tenant, service_client_id
 from identity_sync.pipeline import PreviewChanged, replay_report
 from identity_sync.store import Busy
 
@@ -450,8 +450,11 @@ class _Api:
         return 200, {"sid": sid, "revoked": True}
 
     def _tenant_of(self, azp: str) -> Tenant | None:
-        """The tenant whose site client is calling. The tenant comes from the token, never from the body."""
-        return next((tenant for tenant in self._settings.tenants if site_client_id(tenant.name) == azp), None)
+        """The tenant whose service client is calling. The tenant comes from the token, never from the body.
+
+        Only `site-<tenant>-service` maps to a tenant. The browser client `site-<tenant>` does not.
+        """
+        return next((tenant for tenant in self._settings.tenants if service_client_id(tenant.name) == azp), None)
 
     def _require_own_organization(self, azp: str, organization_id: str) -> None:
         """A tenant site may only invite into its own organization.

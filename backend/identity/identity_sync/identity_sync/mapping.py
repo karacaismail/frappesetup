@@ -72,6 +72,20 @@ class Tenant:
     organization: str
 
 
+def browser_client_id(tenant: str) -> str:
+    """The tenant's browser login client. It has no service account and never calls this service."""
+    return f"site-{tenant}"
+
+
+def service_client_id(tenant: str) -> str:
+    """The tenant's service account client (docs/sozlesmeler.md, section 2).
+
+    Only this client may ask for the `aud-identity-sync` scope, so only its `azp` identifies
+    the tenant on a service call.
+    """
+    return f"site-{tenant}-service"
+
+
 @dataclass(frozen=True)
 class UserSnapshot:
     """Kullanıcının Keycloak'taki güncel durumu."""

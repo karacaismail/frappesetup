@@ -121,7 +121,7 @@ python3 -m identity_sync resolve-operation <kimlik> --resolution completed
 Servis dört istemci listesi tutar:
 
 - `IDENTITY_SYNC_PREVIEW_AZP` listesindeki istemci yalnız okur ve önizler.
-- `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır. Örnek: `site-kiraci1`.
+- `IDENTITY_SYNC_EXECUTE_AZP` listesindeki istemci yürütebilir. Bu liste kiracı sitelerinin servis istemcilerini taşır. Örnek: `site-kiraci1-service`.
 - `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci oturum kapatabilir. Bu liste aynı kiracı istemcilerini taşır.
 - `IDENTITY_SYNC_DELETION_AZP` listesindeki istemci yalnız hesap silme isteyebilir. Bu istemci Press istemcisidir.
 
@@ -306,7 +306,10 @@ Keycloak olayları kimlik-realm işinin kurduğu eklentiden gelir. Eklenti olay�
 
 Kullanıcı bir telefon kurulumunu iptal edince kiracı sitesi `POST /v1/sessions/revoke` ucunu çağırır. Gövde `sid` ve `subject` alanlarını taşır.
 
-- Servis kiracıyı belirtecin `azp` değerinden bulur. Örneğin `site-kiraci1` istemcisi `kiraci1` kiracısıdır.
+- Servis kiracıyı belirtecin `azp` değerinden bulur. Örneğin `site-kiraci1-service` istemcisi `kiraci1` kiracısıdır.
+- Her kiracının iki istemcisi vardır. `site-kiraci1` yalnız tarayıcı girişi içindir ve servis hesabı yoktur. `site-kiraci1-service` yalnız servis hesabıdır.
+- Tarayıcı istemcisi hiçbir listeye yazılamaz. Yazılırsa servis açılmaz ve nedeni söyler.
+- Tarayıcı istemcisinin `azp` değeriyle gelen belirteç her uçta 401 alır.
 - Kullanıcı o kiracının kuruluşuna üye değilse servis 403 döner.
 - Servis yalnız o kullanıcının oturum listesindeki oturumu siler. Yenileme belirteci de geçersiz olur.
 - Uç tekrar edilebilir. Oturum zaten kapalıysa servis yine 200 döner.
@@ -335,6 +338,7 @@ Bu tablo her ucu her çağıran türüyle gösterir. Tabloyu `tests/test_access_
 | `GET /healthz` | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
 
 - “Kabul” şu demektir: istek yetki denetimini geçer ve işleyiciye ulaşır. Testte bu satırlar eski bir özet gönderir ve 409 alır. Çözme ucu olmayan bir işlem için 404 alır.
+- Tarayıcı istemcisi (`site-kiraci1`) hiçbir listede değildir. Bu yüzden “Listede olmayan istemci” sütunundaki gibi her belirteçli uçta 401 alır. Test bunu ayrı bir sütun olarak sınar.
 - “Yanlış `azp`” listede olan ama bu uç için yetkisi olmayan istemcidir. Örneğin önizleme istemcisi yürütme isterse 403 alır.
 - Yanlış `aud` ve süresi dolmuş belirteç sütunları gerçek `oidc_verify` kitaplığını ister. Kitaplık yoksa bu iki sütunun testi atlanır.
 - Olay ucu belirteç kabul etmez. Yalnız imzayı kabul eder. Bozuk imza, eski zaman damgası ve ikinci kez kullanılan imza 401 alır.

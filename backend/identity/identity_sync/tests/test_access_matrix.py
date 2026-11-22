@@ -35,7 +35,9 @@ from .fakes import ORG_ID, SUBJECT, Stack, keycloak_user
 from .test_auth import CERTS_PATH, HAVE_LIBRARY
 from .test_server import NOW, sign
 
-SITE, OTHER_SITE, AGENT, PRESS = "site-kiraci1", "site-kiraci2", "ai-agent", "press-service"
+SITE, OTHER_SITE, AGENT, PRESS = "site-kiraci1-service", "site-kiraci2-service", "ai-agent", "press-service"
+# The browser login client of the same tenant. It has no service account (docs/sozlesmeler.md, section 2).
+BROWSER = "site-kiraci1"
 SID = "55555555-5555-4555-8555-555555555555"
 STALE = {"dry_run": False, "preview_digest": "0" * 64, "approval_id": "onay-x1"}
 INVITATION = {"email": "davetli@example.test", "organization_id": ORG_ID}
@@ -132,6 +134,13 @@ class MatrixCase(unittest.TestCase):
     def credential(self, azp: str) -> str:
         raise NotImplementedError
 
+    def make_verifier(self):
+        raise NotImplementedError
+
+    def serve_again(self) -> None:
+        """Start a second server that reads the settings as they are now."""
+        self.serve(self.make_verifier())
+
     # --- the columns every verifier can test ---
 
     def check(self, column: str, authorization_of, expected_of) -> None:
@@ -149,9 +158,26 @@ class MatrixCase(unittest.TestCase):
         self.check("no credential", lambda row: None, lambda row: 401)
         self.check("not a bearer", lambda row: "Basic dXNlcjpwYXNz", lambda row: 401)
         self.check("unlisted client", lambda row: self.credential("stranger"), lambda row: 401)
+        # A token whose `azp` is the tenant's browser client is refused on every endpoint.
+        self.check("browser client", lambda row: self.credential(BROWSER), lambda row: 401)
         self.check("wrong azp", lambda row: self.credential(row.wrong_azp), lambda row: 403)
         self.check("other tenant", lambda row: self.credential(OTHER_SITE), lambda row: row.other_tenant)
         self.check("right client", lambda row: self.credential(row.right), lambda row: row.right_status)
+
+    def test_browser_client_is_not_a_tenant_even_when_someone_lists_it(self) -> None:
+        # Defence in depth. The settings refuse a browser client in a list. If a list held it
+        # anyway, the service would still not take it for the tenant: only the service client
+        # of a tenant maps to that tenant.
+        if type(self) is MatrixCase:
+            self.skipTest("the shared base has no verifier; the two subclasses run this test")
+        settings = self.stack.app.settings
+        self.stack.app.settings = dataclasses.replace(settings, session_azp=settings.session_azp | {BROWSER})
+        self.serve_again()
+        row = next(row for row in ROWS if row.name == "session revoke")
+
+        self.assertEqual(self.send(row, self.credential(BROWSER)), 403)
+        self.assertEqual(self.stack.keycloak.sessions[SUBJECT], [SID])
+        self.assertEqual(self.send(row, self.credential(SITE)), 200)
 
     def test_matrix_covers_every_token_endpoint_of_the_contract(self) -> None:
         from .test_contract import CONTRACT
@@ -168,6 +194,9 @@ class MatrixCase(unittest.TestCase):
 class AccessMatrixTest(MatrixCase):
     def setUp(self) -> None:
         super().setUp()
+        self.serve(self.make_verifier())
+
+    def make_verifier(self):
         listed = self.stack.app.settings.known_azp
 
         def verifier(token: str) -> dict[str, object]:
@@ -176,7 +205,7 @@ class AccessMatrixTest(MatrixCase):
                 raise TokenRejected("unknown_client")
             return {"azp": azp}
 
-        self.serve(verifier)
+        return verifier
 
     def credential(self, azp: str) -> str:
         return f"Bearer token-of-{azp}"
@@ -229,7 +258,10 @@ class RealTokenMatrixTest(MatrixCase):
         key = {"kty": "RSA", "use": "sig", "alg": "RS256", "kid": "k1", "n": _b64(numbers.n), "e": _b64(numbers.e)}
         self.stack.keycloak.on("GET", CERTS_PATH, (200, {"keys": [key]}))
         self.now = time.time()  # the library reads the real clock
-        self.serve(build_verifier(self.stack.app.settings))
+        self.serve(self.make_verifier())
+
+    def make_verifier(self):
+        return build_verifier(self.stack.app.settings)
 
     def credential(self, azp: str, *, key=None, **claims: object) -> str:
         import jwt

@@ -49,7 +49,7 @@ class MobileClientTest(ServerCase):
 
         def token(req: fakes.Recorded) -> fakes.Reply:
             form = req.form()
-            if form.get("client_id") != ["site-kiraci1"]:
+            if form.get("client_id") != ["site-kiraci1-service"]:
                 return keycloak._token(req)  # the service's own admin token
             self.token_forms.append(form)
             return 200, {"access_token": SESSION_TOKEN, "expires_in": 300, "token_type": "Bearer"}
@@ -61,7 +61,7 @@ class MobileClientTest(ServerCase):
             {
                 "mobile_identity_sync_url": f"http://127.0.0.1:{self.httpd.server_address[1]}",
                 "mobile_identity_sync_token_url": keycloak.url + token_path,
-                "mobile_identity_sync_client_id": "site-kiraci1",
+                "mobile_identity_sync_client_id": "site-kiraci1-service",
                 "mobile_identity_sync_client_secret": "made-up-site-secret",
             }
         )
