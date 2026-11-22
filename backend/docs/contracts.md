@@ -44,8 +44,11 @@ Ayrıntılı istek ve yanıt biçimi `contracts/` klasöründeki OpenAPI dosyala
 | `identity-sync` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `press-service` | Servis hesabı | İstemci kimlik bilgisi | Yok | Yok |
 | `mobile-app` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | `ATONOTA_MOBILE_REDIRECT_URI` | Yok |
+| `account-console` | Açık istemci | Yetkilendirme kodu ve PKCE (S256) | Realm dosyasındaki Keycloak hesap sayfaları | Yok |
 
 - Dönüş adresini tam adresle kaydedin. Joker karakter kullanmayın.
+- Keycloak hesap ekranı kendi belirtecini kullanır. Bu belirtecin hedefi `account` olur.
+- `account-console` yalnız kullanıcıya verilmiş hesap rollerini taşır. İstemci yönetim rolü alamaz.
 - Çıkış bildiriminde “oturum gerekli” ayarını açın.
 - Yeni kiracı için aynı biçimi kullanın. Örneğin `site-kiraci2` yazın.
 - Her kiracının iki istemcisi vardır. `site-<kiracı>` yalnız tarayıcı girişi içindir. Servis hesabı kapalıdır ve isteğe bağlı servis kapsamı taşımaz. `site-<kiracı>-service` yalnız servis hesabıdır. Tarayıcı akışı kapalıdır. Kiracının iki istemcisi içinde `aud-identity-sync` kapsamını yalnız servis istemcisi isteyebilir. Böylece tarayıcı girişi servis hedefli belirteç alamaz. Press'teki `press` ve `press-service` ayrımı da böyledir.
@@ -57,7 +60,7 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 
 | Kapsam | Eklediği `aud` | Kullanan |
 | --- | --- | --- |
-| `aud-site-tenant1` | `site-tenant1` | `identity-sync`, `press-service` |
+| `aud-site-tenant1` | `site-tenant1` | `identity-sync`, `press-service`, `mobile-app` |
 | `aud-press` | `press` | `identity-sync` |
 | `aud-identity-sync` | `identity-sync` | Kiracı sitelerinin servis istemcileri ve `press-service`. Örnek: `site-tenant1-service` |
 
@@ -71,6 +74,13 @@ Hedef kapsamı, belirtece tek bir `aud` değeri ekleyen isteğe bağlı kapsamd�
 - Sihirli bağlantı eklentisinin bağlantı üreten yönetim ucu kapalıdır. Bu uç, belirteçteki rolü değil hesabın kayıtlı rolünü denetliyordu. Kapalı olduğu canlı testle (404) gösterilir.
 
 ### Politikalar
+
+Keycloak giriş sayfası çerçeve içinde açılamaz. Yanıt `frame-ancestors 'none'` ve
+`X-Frame-Options: DENY` taşır. Keycloak yalnız kendi üç oturum denetimi belgesini çerçevede açar.
+
+Keycloak giriş sayfası kendi satır içi betiklerini kullanır. Giriş formu, kullanıcıyı
+doğrulanmış istemci adresine yönlendirir. O-40'ın kiracıya özgü betik ve form kuralları
+Frappe giriş ve panel sayfalarında uygulanır.
 
 Realm politikaları G-78 ve G-144'ü uygular. Örneğin şu ayarlar vardır:
 
@@ -109,6 +119,9 @@ Keycloak çıkışta `logout_token` gönderir. Doğrulamada şunları denetleyin
 - `nonce` alanının yokluğu.
 
 ### Telefon kimliği
+
+Telefon uygulaması giriş isteğinde `scope=openid aud-site-tenant1 mobile` gönderir.
+Keycloak, erişim belirtecine `aud=site-tenant1` ve `scope` alanına `mobile` ekler.
 
 Telefon belirteci doğrulanınca kimlik modülü isteğe `frappe.local.mobile_identity` değerini yazar. Değer şu alanları taşıyan bir sözlüktür:
 
@@ -311,6 +324,13 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Kurulum iptal edilince `platform_core` bu ucu çağırır. Aynı `sid` ile gelen belirteç de reddedilir (Proje kaydı O-25).
 - `POST /v1/account-deletions` ucu hesap silme isteğini kaydeder (Proje kaydı O-27). Ucu yalnız Press çağırır. Belirteç `azp=press-service` ve `aud=identity-sync` taşır. Gövde `issuer`, `subject` ve `reauthenticated_at` alanlarını taşır.
 - Müşteri silme isteğini Press'te verir. Press önce kullanıcıyı Keycloak'ta yeniden doğrular (`prompt=login`, `max_age=0`). `reauthenticated_at` bu doğrulamanın zamanıdır. identity-sync 300 saniyeden eski doğrulamayı reddeder.
+- Press bağlantıyı 10 saniye, yanıtı varsayılan olarak 45 saniye bekler.
+- `press_deletion_request_timeout` yanıt süresini değiştirir. Sayı 0'dan büyük ve en çok 90 olmalıdır.
+- Ayar ondalıklı değer kabul eder. Geçersiz ayar isteği durdurur ve günlüğe uyarı yazılır.
+- Okuma süresi dolarsa veya Identity Sync `unknown` döndürürse Press `pending: true` döndürür. Bağlantı hatasında Press 502 döndürür.
+- Press son bildiği durumu aynı oturumda beş dakika saklar. Yenileme Identity Sync'e durum sormaz.
+- Press'in gönderildi yanıtı, işin tamamlandığını doğrulamaz.
+- Tekrar gönderim aynı hesap için yeni bir silme işi açmaz.
 - Keycloak'ın kendi `delete_account` eylemi kapalıdır. Bu eylem kullanıcıyı ilk adımda siler. Hesap ekranındaki silme bağlantısı Press'teki silme sayfasına gider.
 - Yönetici kullanıcıyı Keycloak yönetim ekranından silerse olay dinleyici olayı gönderir. identity-sync 2., 3. ve 4. adımları yine çalıştırır. Olay kaybolursa elle başlatılan mutabakat komutu silinmiş kullanıcıyı bulur. Komut önce önizleme gösterir. İnsan onay verirse komut kalan silme adımlarını sırayla çalıştırır. Yerel hesap önceden kapalı olsa da bu adımlar çalışır.
 - Press isteği ve Keycloak silme olayı aynı hesap işine bağlanır. İş kimliği hesabın özetidir. Tamamlanan adım yeniden çağrılmaz. Yeniden deneme yanıtı hesap kimliğini değil iş kimliğini gösterir.
@@ -375,6 +395,7 @@ Ayarlar `site_config.json` dosyasında durur. Sır taşıyan ayar depoya girmez.
 | `keycloak_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
 | `keycloak_service_client_id` | `site-tenant1-service` ya da `press-service` | Servis belirteci için |
 | `keycloak_service_client_secret` | Sahte değer | Yalnız site ayarında ve `.env` dosyasında |
+| `mobile_allow_development_http` | Kapalı | Yalnız geliştirmede açılır. `developer_mode` da açık olmalıdır. Mobil iptal isteği yalnız yerel kimlik servisine HTTP ile gider. Keycloak belirteç adresi HTTPS kalır. |
 | `kimlik_marka_adi` | `Atonota` | Düğme metni bundan üretilir |
 | `platform_panel_url` | `http://kiraci1.localhost:<port>/panel` | Çıkıştan sonraki adres |
 | `hrms_tr_retention_days` | Ayar verilmez | Hukuk sorumlusu süreyi gün olarak belirler. |

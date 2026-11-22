@@ -245,7 +245,7 @@ after_request = ["platform_core.shell.headers.add_security_headers"]
 
 after_build = ["platform_core.shell.assets.remove_panel_source_maps"]
 
-# Access rule engine (erisim-kurali task). Decision note: docs/kararlar/0006-erisim-kurali.md
+# Access rule engine (erisim-kurali task). Decision note: docs/decisions/0006-access-rule.md
 permission_query_conditions = {"*": "platform_core.access.hooks.query_conditions"}
 has_permission = {"*": "platform_core.access.hooks.has_permission"}
 # The access rule engine's link search overrides are in override_whitelisted_methods above.

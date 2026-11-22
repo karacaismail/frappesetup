@@ -33,12 +33,14 @@ Kurulum parolaları Compose gizli dosyalarından okunur. Parolalar komut satır�
 MariaDB içe aktarımı, site parolasını geçici ve özel bir dosyadan okur.
 
 Site ayarları [Press TR kurulumunda](../../apps/press_tr/README.md) yer alır.
+Tam paket için [Press TR test komutunu](../../apps/press_tr/README.md#local-http-tests) kullanın.
 
 Anonim yapma süresini yalnız geçici test sitesinde ölçün.
 Betik 50 ayrı hesap kullanır. İlk çağrıların yüzde 95'i 1 saniyede bitmelidir.
 
 ```sh
-PRESS_TEST_MEASURE_ANONYMIZATION=1 PRESS_TEST_PANEL_URL=http://tenant1.localhost:3201/panel \
+PRESS_TEST_COMPOSE_PROJECT=press-test PRESS_TEST_MEASURE_ANONYMIZATION=1 \
+  PRESS_TEST_PANEL_URL=https://panel.example.test/ \
   sh backend/apps/press_tr/tests/run.sh
 ```
 

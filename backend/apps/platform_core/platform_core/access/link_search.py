@@ -9,7 +9,7 @@ function is refused, for every user, the Administrator user included. There is n
 check was tried and removed: the check could be bypassed and can never be complete.
 
 `hooks.py` puts `search_link` and `search_widget` in place of Frappe's two search endpoints.
-Python code must use `platform_core.erisim.api`: Frappe's own functions cannot be intercepted
+Python code must use `platform_core.access.api`: Frappe's own functions cannot be intercepted
 from Python without changing Frappe.
 
 Frappe itself calls its search from Python in one endpoint that takes a search function from
@@ -72,7 +72,7 @@ def search_link(
 		or not frappe.db.exists("DocType", doctype)
 		or not frappe.has_permission(doctype, "select")
 	):
-		frappe.throw(_("No permission to search {0}.").format(doctype), frappe.PermissionError)
+		frappe.throw(_("No permission to search this document type."), frappe.PermissionError)
 	guard(doctype, query)
 	return search.search_link(
 		doctype,
@@ -110,7 +110,7 @@ def search_widget(
 		or not frappe.db.exists("DocType", doctype)
 		or not frappe.has_permission(doctype, "select")
 	):
-		frappe.throw(_("No permission to search {0}.").format(doctype), frappe.PermissionError)
+		frappe.throw(_("No permission to search this document type."), frappe.PermissionError)
 	guard(doctype, query)
 	return search.search_widget(
 		doctype,
@@ -153,7 +153,7 @@ def validate_link_and_fetch(
 		or not frappe.db.exists("DocType", doctype)
 		or not frappe.has_permission(doctype, "select")
 	):
-		frappe.throw(_("No permission to search {0}.").format(doctype), frappe.PermissionError)
+		frappe.throw(_("No permission to search this document type."), frappe.PermissionError)
 	guard(doctype, query)
 	return client.validate_link_and_fetch(
 		doctype, docname, fields_to_fetch=fields_to_fetch, query=query, filters=filters, **search_args

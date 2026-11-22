@@ -36,6 +36,16 @@ def _stage(name: str) -> str:
 
 
 class ProductionImageFileTest(unittest.TestCase):
+    def test_production_image_installs_the_provider_selected_by_the_account_theme(self):
+        theme = DIRECTORY / "themes" / "atonota" / "account" / "theme.properties"
+        self.assertIn("accountResourceProvider=account-deletion-link", theme.read_text().splitlines())
+        self.assertIn("/provider/build.sh", _stage("account-provider-build"))
+        self.assertRegex(
+            _stage("prod"),
+            r"COPY --from=account-provider-build --chown=1000:0 \S+/account-deletion-link-provider\.jar "
+            r"/opt/keycloak/providers/",
+        )
+
     def test_production_configuration_turns_the_magic_link_side_doors_off(self):
         lines = {line.strip() for line in CONF.read_text(encoding="utf-8").splitlines()}
         for line in MAGIC_LINK_OFF:
@@ -47,12 +57,15 @@ class ProductionImageFileTest(unittest.TestCase):
         self.assertNotIn("MAGICLINK_CONTINUATION__ENABLED", COMPOSE)
 
     def test_plain_http_list_is_only_in_the_development_image(self):
-        self.assertNotIn("webhook-plain-http-hosts.txt", _stage("prod"))
+        for stage in re.findall(r"^FROM .+ AS (\S+)$", DOCKERFILE, re.M):
+            if stage != "dev":
+                with self.subTest(stage=stage):
+                    self.assertNotIn("webhook-plain-http-hosts.txt", _stage(stage))
         self.assertIn("COPY --chown=1000:0 conf/webhook-plain-http-hosts.txt "
                       "/opt/keycloak/conf/webhook-plain-http-hosts.txt", _stage("dev"))
         hosts = [line.strip() for line in HOSTS.read_text(encoding="utf-8").splitlines()
                  if line.strip() and not line.startswith("#")]
-        self.assertEqual(hosts, ["event-sink.localhost"])
+        self.assertCountEqual(hosts, ["event-sink.localhost", "identity-sync.localhost"])
 
 
 PROD_URL = os.environ.get("PROD_KC_URL", "")

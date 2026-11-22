@@ -53,6 +53,8 @@ class IdentityHttpTest(
 		cls.codes = {}
 		cls.service_tokens = {}
 		cls.deletion_requests = []
+		cls.deletion_delays = {}
+		cls.deletion_statuses = {}
 
 		class IssuerHandler(BaseHTTPRequestHandler):
 			def do_GET(self):
@@ -68,8 +70,16 @@ class IdentityHttpTest(
 					if token not in cls.service_tokens:
 						self.send_error(403)
 						return
-					cls.deletion_requests.append(json.loads(body))
-					self.send_json(b'{"status":"accepted"}')
+					request = json.loads(body)
+					cls.deletion_requests.append(request)
+					try:
+						status = cls.deletion_statuses.get(request["subject"], "accepted")
+						self.send_json(
+							json.dumps({"status": status}).encode(),
+							delay=cls.deletion_delays.get(request["subject"], 0),
+						)
+					except BrokenPipeError:
+						pass  # Press may have stopped waiting for the delayed response.
 					return
 				if self.path != "/realms/platform/protocol/openid-connect/token":
 					self.send_error(404)
@@ -95,11 +105,14 @@ class IdentityHttpTest(
 					return
 				self.send_json(json.dumps({"id_token": fixture[1]}).encode())
 
-			def send_json(self, body):
+			def send_json(self, body, *, delay=0):
 				self.send_response(200)
 				self.send_header("Content-Type", "application/json")
 				self.send_header("Content-Length", str(len(body)))
 				self.end_headers()
+				self.wfile.flush()
+				if delay:
+					time.sleep(delay)
 				self.wfile.write(body)
 
 		cls.server = ThreadingHTTPServer(("127.0.0.1", 3205), IssuerHandler)
@@ -160,7 +173,7 @@ class IdentityHttpTest(
 		self.assertEqual(query["max_age"], ["0"])
 		self.assertEqual(query["code_challenge_method"], ["S256"])
 
-	def test_account_deletion_sends_only_verified_identity(self):
+	def reauthenticate_deletion(self):
 		subject = uuid4().hex
 		email = f"{subject}@example.test"
 		session = self.sign_in(subject, email, uuid4().hex)
@@ -205,7 +218,14 @@ class IdentityHttpTest(
 
 		service_token = self.token(audience="identity-sync", authorized_party="press-service")
 		self.service_tokens[service_token] = True
-		status, _headers, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
+		return subject, session, headers, auth_time
+
+	def test_account_deletion_waits_for_slow_service_and_sends_only_verified_identity(self):
+		subject, _session, headers, auth_time = self.reauthenticate_deletion()
+		self.deletion_delays[subject] = 11
+		status, _headers, payload = self.exchange(
+			"POST", DELETION_ROUTE, headers, '{"confirm": true}', timeout=20
+		)
 		self.assertEqual(status, 200)
 		self.assertEqual(json.loads(payload)["message"], {"submitted": True})
 		self.assertEqual(
@@ -217,6 +237,42 @@ class IdentityHttpTest(
 			},
 		)
 		self.assertEqual(self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')[0], 403)
+
+	def test_account_deletion_timeout_refresh_and_retry(self):
+		subject, session, headers, _auth_time = self.reauthenticate_deletion()
+		self.deletion_delays[subject] = 16
+		status, _headers, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}', timeout=25)
+		self.assertEqual(status, 200)
+		self.assertEqual(json.loads(payload)["message"], {"pending": True})
+
+		status, _headers, page = self.exchange("GET", "/account-deletion", session)
+		self.assertEqual(status, 200)
+		self.assertIn(b'id="account-deletion-status">Account deletion is in progress.', page)
+		self.assertEqual(sum(request["subject"] == subject for request in self.deletion_requests), 1)
+
+		self.deletion_delays[subject] = 0
+		self.deletion_statuses[subject] = "unknown"
+		status, _headers, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
+		self.assertEqual(status, 200)
+		self.assertEqual(json.loads(payload)["message"], {"pending": True})
+		requests = [request for request in self.deletion_requests if request["subject"] == subject]
+		self.assertEqual(len(requests), 2)
+		self.assertEqual(requests[0], requests[1])
+
+		status, _headers, page = self.exchange("GET", "/account-deletion", session)
+		self.assertEqual(status, 200)
+		self.assertIn(b"Last status known to Press.", page)
+		self.assertIn(b'id="account-deletion-status">Account deletion is in progress.', page)
+		self.assertEqual(sum(request["subject"] == subject for request in self.deletion_requests), 2)
+
+		self.deletion_statuses[subject] = "processed"
+		status, _headers, payload = self.exchange("POST", DELETION_ROUTE, headers, '{"confirm": true}')
+		self.assertEqual(status, 200)
+		self.assertEqual(json.loads(payload)["message"], {"submitted": True})
+
+		status, _headers, page = self.exchange("GET", "/account-deletion", session)
+		self.assertEqual(status, 200)
+		self.assertIn(b'role="status">Your deletion request was submitted.', page)
 
 	def test_reauthentication_links_the_new_keycloak_session(self):
 		subject = uuid4().hex
@@ -416,7 +472,9 @@ class IdentityHttpTest(
 		self.assertEqual(self.identity_inventory({"limit": 2}, self.token())[0], 403)
 		self.assertIn(self.call("list_identities", {}, self.token())[0], {401, 403, 405})
 		headers = {"Authorization": f"Bearer {self.token()}", "Content-Type": "application/json"}
-		status, _headers, _body = self.exchange("GET", IDENTITY_INVENTORY_ROUTE, headers, json.dumps({"start": 1}))
+		status, _headers, _body = self.exchange(
+			"GET", IDENTITY_INVENTORY_ROUTE, headers, json.dumps({"start": 1})
+		)
 		self.assertEqual(status, 403)
 		for body in (
 			{"start": True},

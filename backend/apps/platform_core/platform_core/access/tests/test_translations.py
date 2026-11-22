@@ -150,3 +150,39 @@ class TestTranslations(AccessRuleTestCase):
 		frappe.clear_cache(user=user)
 		# Committed on purpose: the request uses another connection.
 		frappe.db.commit()  # nosemgrep: frappe-request-commit
+
+	def test_empty_document_type_has_a_complete_translated_permission_message(self):
+		# Contract introduction: read/search denials never interpolate an empty type name.
+		self.addCleanup(self.set_language, EMPLOYEE_1, "en")
+		for language, read_message, search_message in (
+			(
+				"en",
+				"No permission to read this document type.",
+				"No permission to search this document type.",
+			),
+			("tr", "Bu kayıt türünü okuma izniniz yok.", "Bu kayıt türünde arama izniniz yok."),
+		):
+			self.set_language(EMPLOYEE_1, language)
+			client = self.login(EMPLOYEE_1)
+			for endpoint, parameters, expected in (
+				("platform_core.api.access.explain_permission", {"name": "unused"}, read_message),
+				("platform_core.api.access.get_access_summary", {}, read_message),
+				("platform_core.access.link_search.search_link", {"txt": ""}, search_message),
+				("platform_core.access.link_search.search_widget", {"txt": ""}, search_message),
+				(
+					"platform_core.access.link_search.validate_link_and_fetch",
+					{"docname": "unused"},
+					search_message,
+				),
+			):
+				with self.subTest(language=language, endpoint=endpoint):
+					response = self.send(
+						client, "GET", f"/api/method/{endpoint}", query={"doctype": "", **parameters}
+					)
+					self.assertEqual(response.status_code, 403)
+					self.assertEqual(response.json["exc_type"], "PermissionError")
+					messages = [
+						json.loads(message)["message"]
+						for message in json.loads(response.json["_server_messages"])
+					]
+					self.assertIn(expected, messages)

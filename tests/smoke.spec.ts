@@ -276,6 +276,90 @@ test.describe('text scaling', () => {
     });
   }
 
+  test('semantic typography uses the shared body and page title scale', async ({ page }) => {
+    for (const width of [320, 1366]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const [path, body] of [['', '.lede'], ['kararlar/', '.prose']]) {
+        await page.goto(path);
+        await expect(page.locator(body)).toHaveCSS('font-size', '16px');
+        await expect(page.locator(body)).toHaveCSS('line-height', '24px');
+        const titleSize = parseFloat(await page.locator('h1').evaluate((title) => getComputedStyle(title).fontSize));
+        expect(titleSize).toBeGreaterThanOrEqual(24);
+        expect(titleSize).toBeLessThanOrEqual(32);
+      }
+    }
+  });
+
+  test('@touch page and section headings stay distinct at 320px', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    for (const [path, section] of [['', '.block-head h2'], ['kararlar/', '.prose h2']]) {
+      await page.goto(path);
+      await expectMinFont(page);
+      await noHorizontalOverflow(page);
+      const titleSize = await page.locator('h1').evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      const sectionSize = await page.locator(section).first().evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+      expect.soft(titleSize - sectionSize, `başlık boyutu farkı: /${path}`).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  test('card headings share a size and supporting copy uses body leading', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('');
+    const phaseTitle = page.locator('.phase h3').first();
+    const cardTitleSize = await phaseTitle.evaluate((title) => getComputedStyle(title).fontSize);
+    await expect.soft(page.locator('.decision h3').first()).toHaveCSS('font-size', cardTitleSize, { timeout: 1000 });
+    for (const selector of ['.rail-detail', '.section-title', '.decision p']) {
+      await expect.soft(page.locator(selector).first()).toHaveCSS('line-height', '24px', { timeout: 1000 });
+    }
+    await page.goto('gereksinimler/');
+    await expect.soft(page.locator('.req-meta').first()).toHaveCSS('line-height', '24px', { timeout: 1000 });
+  });
+
+  for (const { width, root } of [
+    { width: 320, root: 150 },
+    { width: 320, root: 200 },
+    { width: 360, root: 200 },
+    { width: 412, root: 200 },
+  ]) {
+    test(`@touch home action labels fit at ${width}px with ${root}% root font`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 640 });
+      await page.goto('');
+      await page.evaluate((pct) => { document.documentElement.style.fontSize = `${pct}%`; }, root);
+      await page.evaluate(() => document.fonts.ready);
+      await noHorizontalOverflow(page);
+      await expectMinFont(page, root);
+
+      const actions = page.locator('.hero .actions a');
+      await expect(actions).toHaveCount(3);
+      for (const action of await actions.all()) {
+        await expect(action).toBeVisible();
+        await expect(action).toHaveCSS('font-size', `${BROWSER_DEFAULT_PX * root / 100}px`);
+        const layout = await action.evaluate((link) => {
+          const hero = link.closest('.hero')!.getBoundingClientRect();
+          const actions = link.closest('.actions')!.getBoundingClientRect();
+          const button = link.getBoundingClientRect();
+          const label = document.createRange();
+          const text = (link.querySelector('span') ?? link).firstChild!;
+          label.selectNodeContents(text);
+          const labelRects = Array.from(label.getClientRects()).filter((rect) => rect.width > 0 && rect.height > 0);
+          const fits = labelRects.length > 0 && [button, ...labelRects].every((rect) =>
+            rect.left >= Math.max(hero.left, actions.left, button.left) - 0.5 &&
+            rect.right <= Math.min(hero.right, actions.right, button.right) + 0.5 &&
+            rect.top >= Math.max(hero.top, button.top) - 0.5 &&
+            rect.bottom <= Math.min(hero.bottom, button.bottom) + 0.5,
+          );
+          const splitWords = [...(text.textContent ?? '').matchAll(/\S+/g)].filter((word) => {
+            label.setStart(text, word.index);
+            label.setEnd(text, word.index + word[0].length);
+            return label.getClientRects().length > 1;
+          }).map(([word]) => word);
+          return { fits, splitWords };
+        });
+        expect(layout, await action.innerText()).toEqual({ fits: true, splitWords: [] });
+      }
+    });
+  }
+
   test('reduced motion disables smooth scrolling', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('kararlar/');
@@ -474,12 +558,12 @@ test.describe('AI nav group', () => {
     await expect(links.first()).toBeHidden();
     await wrapper.focus();
     await page.keyboard.press('Enter');
-    await expect(links).toHaveCount(6);
+    await expect(links).toHaveCount(7);
     await expect(links.first()).toBeVisible();
 
     await page.goto('ai-mcp/');
     await waitForHydration(page);
-    await expect(links).toHaveCount(6);
+    await expect(links).toHaveCount(7);
     await expect(page.locator('#site-nav a[aria-current="page"]')).toHaveText(/MCP sunucuları/);
   });
 });
@@ -496,6 +580,7 @@ test.describe('focus', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('gereksinimler/');
     await waitForHydration(page);
+    await expect(page.getByTestId('req-table')).toBeVisible();
     await page.mouse.move(1, 1);
     const tab = browserName === 'webkit' ? 'Alt+Tab' : 'Tab';
     const seen = new Set<string>();
@@ -665,6 +750,60 @@ test.describe('touch targets', () => {
 });
 
 test.describe('requirements explorer', () => {
+  test('desktop table waits for idle and an unread card list', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.addInitScript(() => {
+      const callbacks = new Map<number, IdleRequestCallback>();
+      let next = 0;
+      window.requestIdleCallback = (callback) => {
+        callbacks.set(++next, callback);
+        return next;
+      };
+      window.cancelIdleCallback = (id) => { callbacks.delete(id); };
+      Object.assign(window, {
+        runIdleWork: () => {
+          const pending = [...callbacks.values()];
+          callbacks.clear();
+          for (const callback of pending) callback({ didTimeout: false, timeRemaining: () => 50 });
+        },
+      });
+    });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    const table = page.getByTestId('req-table');
+    const runIdle = () => page.evaluate(() => {
+      (window as Window & { runIdleWork: () => void }).runIdleWork();
+    });
+    await expect(table).toHaveCount(0);
+    const card = page.locator('.req-card').nth(12);
+    await card.scrollIntoViewIfNeeded();
+    const top = (await card.boundingBox())!.y;
+    await runIdle();
+    await expect(card).toBeInViewport();
+    expect(Math.abs((await card.boundingBox())!.y - top)).toBeLessThanOrEqual(1);
+    await expect(table).toHaveCount(0);
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    await expect.poll(async () => {
+      await runIdle();
+      return table.count();
+    }).toBe(1);
+    await expect(table).toBeVisible();
+  });
+
+  test('server sends one readable requirements view without JavaScript @touch', async ({ browser, baseURL }) => {
+    const page = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 1366, height: 900 }, baseURL });
+    try {
+      await page.goto('gereksinimler/');
+      const cards = page.locator('.req-cards .req-card');
+      await expect(cards).toHaveCount(requirements.length);
+      await expect(cards.first().locator('.req-card-detail')).toBeVisible();
+      await expect(page.getByTestId('req-table')).toHaveCount(0);
+      await noHorizontalOverflow(page);
+    } finally {
+      await page.close();
+    }
+  });
+
   const shouldCount = requirements.filter((r) => r.priority === 'SHOULD').length;
   const mayCount = requirements.filter((r) => r.priority === 'MAY').length;
   const keycloakCount = requirements.filter((r) =>
@@ -730,6 +869,7 @@ test.describe('requirements explorer', () => {
       await page.setViewportSize({ width: v.width, height: 900 });
       await page.goto('gereksinimler/');
       await waitForHydration(page);
+      await expect(page.locator(v.title)).toHaveCount(requirements.length);
       const got = await page.evaluate(
         ({ t, d }) => ({
           titles: Array.from(document.querySelectorAll(t)).map((el) => el.textContent ?? ''),
@@ -769,7 +909,7 @@ test.describe('requirements explorer', () => {
     const cards = page.locator('.req-cards .req-card');
     await expect(cards.first()).toBeVisible();
     await expect(cards).toHaveCount(requirements.length);
-    await expect(page.getByTestId('req-table')).toBeHidden();
+    await expect(page.getByTestId('req-table')).toHaveCount(0);
     await page.getByRole('button', { name: new RegExp(`^MAY · ${mayCount}$`) }).click();
     await expect(cards).toHaveCount(mayCount);
     await noHorizontalOverflow(page);
@@ -798,8 +938,8 @@ test.describe('requirements explorer', () => {
   // eşleşir (alt dizgi değil): süzülmemiş "N / N" metni hiçbir veri durumunda kabul edilmez.
   const exactCount = (n: number) => new RegExp(`^${n} / ${requirements.length} gereksinim$`);
   for (const vp of [
-    { name: 'desktop', width: 1366, height: 900, detailSelector: '.req-detail', tag: '' },
-    { name: '320', width: 320, height: 640, detailSelector: '.req-card-detail', tag: ' @touch' },
+    { name: 'desktop', width: 1366, height: 900, tableVisible: true, tag: '' },
+    { name: '320', width: 320, height: 640, tableVisible: false, tag: ' @touch' },
   ]) {
     test(`text typed once before hydration is kept and applied at ${vp.name} (slow island JS)${vp.tag}`, async ({ page }) => {
       expect(keycloakCount).toBeGreaterThan(0);
@@ -816,7 +956,8 @@ test.describe('requirements explorer', () => {
       const search = page.getByRole('textbox', { name: 'Ara' });
       const detail = page.getByRole('switch', { name: 'Ayrıntıları göster' });
       await expect(island).toHaveAttribute('ssr', '');
-      await expect(page.locator(vp.detailSelector).first()).toBeVisible();
+      await expect(page.locator('.req-card-detail').first()).toBeVisible();
+      await expect(page.getByTestId('req-table')).toHaveCount(0);
       await search.fill('Keycloak');
       await detail.uncheck();
       // Girdi anında ada hâlâ sunucu HTML'idir (React bağlı değil).
@@ -827,8 +968,50 @@ test.describe('requirements explorer', () => {
       await expect(detail).not.toBeChecked();
       await expect(page.locator('.req-detail, .req-card-detail')).toHaveCount(0);
       await expect(island).not.toHaveAttribute('ssr', '');
+      const table = page.getByTestId('req-table');
+      if (vp.tableVisible) await expect(table).toBeVisible();
+      else await expect(table).toBeHidden();
     });
   }
+
+  test('desktop fallback keeps a focused code box while the table loads', async ({ page }) => {
+    await page.setViewportSize({ width: 770, height: 900 });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(/\/_astro\/RequirementsExplorer\.[^/]+\.js$/, async (route) => {
+      await gate;
+      await route.continue();
+    });
+    try {
+      await page.goto('gereksinimler/', { waitUntil: 'domcontentloaded' });
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = '200%';
+      });
+      const code = page.locator('.req-card-detail code[tabindex="0"]').first();
+      await code.focus();
+      await expect(code).toBeFocused();
+      release();
+      await waitForHydration(page);
+      await expect(code).toBeFocused();
+      await expect(page.getByTestId('req-table')).toHaveCount(0);
+      await page.getByRole('textbox', { name: 'Ara' }).focus();
+      await expect(page.getByTestId('req-table')).toBeVisible();
+    } finally {
+      release();
+    }
+  });
+
+  test('focus returns to search when resizing a focused desktop table', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto('gereksinimler/');
+    await waitForHydration(page);
+    const table = page.getByRole('region', { name: /Gereksinim tablosu/ });
+    await table.focus();
+    await expect(table).toBeFocused();
+    await page.setViewportSize({ width: 320, height: 640 });
+    await expect(page.getByTestId('req-table')).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Ara' })).toBeFocused();
+  });
 
   test('search text and focus survive orientation change', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -850,7 +1033,7 @@ test.describe('requirements explorer', () => {
 /* ------------------------------------------------------------------ */
 // Uzun satır içi kod bölünmez; satırdan uzunsa kendi kutusunda kayar (global.css). Yalnız gerçekten taşan kutu Tab
 // sırasındadır (sayfa betiği; WebKit taşan kutuyu kendiliğinden odaklamaz), ok tuşuyla kayar, sığınca sıradan çıkar.
-const INLINE_CODE = '.prose :not(pre, a) > code, .req-code';
+const INLINE_CODE = '.prose :not(pre, a) > code, :is(.req-card-detail, .req-detail) > code';
 async function codeBoxes(page: Page) {
   return page.evaluate((sel) =>
     Array.from(document.querySelectorAll<HTMLElement>(sel))
@@ -881,6 +1064,78 @@ async function codeOutsideLine(page: Page) {
 }
 
 test.describe('long inline code', () => {
+  test('requirement code tab stops are named and capped at 320px @touch', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    await page.evaluate(() => document.fonts.ready);
+    const codes = page.locator('.req-cards .req-card-detail > code');
+    const stops = codes.and(page.locator('[tabindex="0"]'));
+    const namedStops = stops.and(page.getByRole('group', { name: 'Kaydırılabilir kod', exact: true }));
+    await expect.poll(() => stops.count()).toBeGreaterThan(0);
+    const count = await stops.count();
+    console.log(`[kod durakları] ${test.info().project.name}: ${count}`);
+    expect(count, '320 px kod durakları').toBeLessThanOrEqual(186);
+    await expect(namedStops).toHaveCount(count);
+    expect(await namedStops.evaluateAll((elements) => elements.every((element) => element.textContent?.trim()))).toBe(true);
+    await expect(codes.and(page.locator('[role="group"]:not([tabindex="0"])'))).toHaveCount(0);
+  });
+
+  test('all requirement cards fit plain text without emergency breaks at 320px @touch', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    const details = page.locator('.req-card-detail');
+    await expect(details).toHaveCount(requirements.length);
+    await page.evaluate(() => document.fonts.ready);
+    const overflows = await details.evaluateAll((cards) => cards.flatMap((card) => {
+      const detail = card as HTMLElement;
+      const right = detail.getBoundingClientRect().right;
+      const range = document.createRange();
+      detail.style.overflowWrap = 'normal';
+      const escaping: string[] = [];
+      for (const text of detail.childNodes) {
+        if (text.nodeType !== Node.TEXT_NODE) continue;
+        range.selectNodeContents(text);
+        if ([...range.getClientRects()].some((rect) => rect.right > right + 1)) {
+          escaping.push(`${detail.closest('li')?.id}: ${text.textContent?.trim()}`);
+        }
+      }
+      detail.style.removeProperty('overflow-wrap');
+      return escaping;
+    }));
+    expect(overflows).toEqual([]);
+    expect(await midWordSplits(page)).toEqual([]);
+    await noHorizontalOverflow(page);
+  });
+
+  test('requirement code preserves complete identifiers and allows spaces to wrap', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto('gereksinimler/');
+    const code = page.locator('.req-table .req-detail code');
+    await expect(code.filter({ hasText: /^marketplace_app_subscription\.py$/ })).toHaveCount(1);
+    await expect(code.filter({ hasText: /^Press Settings\.enable_mcp=1$/ })).toHaveCSS('white-space', 'normal');
+    await expect(code.filter({ hasText: /^frappe\.local\.system_user\(\)$/ })).toHaveCount(1);
+  });
+
+  test('keeps long requirement settings and paths in their own scrollable code boxes @touch', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('gereksinimler/');
+    const examples = [
+      { id: 'SA-2', text: 'skip_team_filter_for_system_user_and_support_agent' },
+      { id: 'G-134', text: 'frappe/utils/telemetry/pulse/client.py' },
+    ];
+    for (const { id, text } of examples) {
+      const code = page.locator(`#req-${id} code`).filter({ hasText: text });
+      await expect(code).toHaveText(text);
+      await expect(code).toHaveAttribute('data-scroll', 'single-line');
+      await expect(code).toHaveAttribute('tabindex', '0');
+      expect(await code.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    }
+    const longCall = page.locator('#req-G-30 code').filter({ hasText: /^press\.api\.client\.run_doc_method\(/ });
+    await expect(longCall).toHaveAttribute('data-scroll', 'single-line');
+    await expect(longCall).toHaveCSS('white-space', 'nowrap');
+    await noHorizontalOverflow(page);
+  });
+
   test('scrolls in its own box, is keyboard reachable while it overflows and leaves the tab order when it fits', async ({
     page,
     browserName,
@@ -908,6 +1163,7 @@ test.describe('long inline code', () => {
     await page.keyboard.press(browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
     const code = page.locator('[data-test-code]');
     await expect(code).toBeFocused();
+    await expect(code).toHaveCSS('white-space', 'nowrap');
     expect(await code.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).outlineStyle !== 'none')).toBe(true);
     // WebKit odak değişiminden sonraki ilk ok tuşunu kaydırmaya kullanmaz ve kaydırmayı canlandırır: her basıştan sonra
     // sonuç 1 sn'ye kadar beklenir, en çok üç basış.
@@ -936,6 +1192,8 @@ test.describe('long inline code', () => {
     await page.locator('#icerik').focus();
     await expect.poll(() => mismatched(page), '1366 px: yalnız taşan kod Tab sırasında').toBe(0);
     await expect.poll(() => code.evaluate((el) => el.hasAttribute('tabindex')), '1366 px: sığan kod Tab sırasında değil').toBe(false);
+    await expect(code).not.toHaveAttribute('role', 'group');
+    await expect(code).not.toHaveAttribute('aria-label', /Kaydırılabilir kod/);
   });
 
   test('requirement card code stays keyboard reachable after filtering re-renders the cards', async ({ page }) => {
@@ -1178,9 +1436,9 @@ test.describe('network budget', () => {
 
     const reqs = await load(page, 'gereksinimler/');
     const reqsHtml = kb(reqs, 'html');
-    test.info().annotations.push({ type: 'ölçüm', description: `Gereksinimler HTML ${reqsHtml.toFixed(1)} KB gzip (bütçe 200)` });
+    test.info().annotations.push({ type: 'ölçüm', description: `Gereksinimler HTML ${reqsHtml.toFixed(1)} KB gzip (test sınırı 180)` });
     console.log(`[bütçe] Gereksinimler HTML ${reqsHtml.toFixed(1)} KB`);
-    expect(reqsHtml, 'Gereksinimler HTML').toBeLessThanOrEqual(200);
+    expect(reqsHtml, 'Gereksinimler HTML').toBeLessThanOrEqual(180);
     // Ada bütçesi: Gereksinimler sayfasının kabuğa EK olarak indirdiği tüm JS (adanın kendi parçası + yalnız onun
     // çektiği paylaşılmayan parçalar).
     const islandExtra = kb(reqs, 'js', (a) => !shellUrls.has(a.url));

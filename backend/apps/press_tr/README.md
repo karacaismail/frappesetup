@@ -78,19 +78,26 @@ Tests can run with `innodb_snapshot_isolation` enabled or disabled.
 
 ## Local HTTP tests
 
-Start and migrate the disposable `fs-press-tr` environment first. Set
+Start and migrate a disposable Press Compose project first. Use a unique Compose
+project name with `backend/dev/press/compose.sh -p <project>`. Set
 `keycloak_client_id` to `press` and use a fake client secret.
 Set the test issuer public URL to `http://keycloak.example.test`, its internal URL
 to `http://127.0.0.1:3205`, and its realm to `platform`.
 Set the site origin to HTTP for the local test and configure an enabled Website User
 for service requests. Set `throttle_user_limit` to `300` on this disposable site to allow repeated test runs.
-Set `PRESS_TEST_PANEL_URL` to the site's `platform_panel_url`.
+Set `PRESS_TEST_PANEL_URL` to the site's `platform_panel_url`. Set
+`PRESS_TEST_COMPOSE_PROJECT` to the project name. If the project runs on the
+default Colima profile, set `FS_COLIMA_PROFILE=default`.
 
-From the repository root, run this command. It starts a temporary bench web process,
-runs the checks, and stops that process. It creates fictional users, teams and sessions.
+Run the Press TR suite from the repository root. The runner selects the project's
+running `web` service. It starts and stops a temporary Bench web process.
+Use an unused container port for `PRESS_TEST_PORT` (default `3363`).
+The suite creates fictional users, teams and sessions.
+`bench run-tests --app press_tr` does not discover this HTTP suite.
 
 ```sh
-PRESS_TEST_PANEL_URL=http://kiraci1.localhost:3201/panel sh backend/apps/press_tr/tests/run.sh
+PRESS_TEST_COMPOSE_PROJECT=press-test PRESS_TEST_PANEL_URL=https://panel.example.test/ \
+  sh backend/apps/press_tr/tests/run.sh
 ```
 
 ## License
@@ -100,6 +107,18 @@ AGPL-3.0. See [license.txt](license.txt).
 ### Hesabı anonim yapma
 
 Identity Sync, silme uç noktasını servis belirteciyle çağırır.
+Press, Identity Sync yanıtını varsayılan olarak 45 saniye bekler.
+`press_deletion_request_timeout` site ayarı bu süreyi saniye olarak değiştirir.
+Bu ayar ondalıklı sayı kabul eder. Değer 0'dan büyük ve en çok 90 olmalıdır.
+Geçersiz ayar isteği durdurur. Press günlüğe bir uyarı yazar.
+Süreyi Identity Sync'in anonim yapma bekleme süresinden uzun tutun.
+Press bağlantı için en çok 10 saniye bekler. Bağlantı kurulamazsa sayfa hata gösterir.
+Yanıtı okuma süresi dolarsa sayfa silme işleminin sürdüğünü gösterir.
+Identity Sync sonucu `unknown` olarak bildirirse sayfa aynı durumu gösterir.
+Oturum açıkken sayfayı yenileyerek Press'in son bildiği durumu görün.
+Press bu bilgiyi aynı oturumda beş dakika saklar.
+İsteğin gönderilmesi, silmenin tamamlandığını göstermez.
+Tekrar gönderim aynı hesap için yeni bir silme işi açmaz.
 Silme kaydı, Keycloak kimliği yerine gizli anahtarla üretilen bir özet tutar.
 `press_anonymization_hmac_key` için sabit bir site sırrı kullanın.
 Bu ayar yoksa Press, Frappe'nin `encryption_key` değerini kullanır.
