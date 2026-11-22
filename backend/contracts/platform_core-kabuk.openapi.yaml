@@ -38,6 +38,19 @@
               }
             }
           },
+          "401": {
+            "description": "Frappe rejected an expired or invalid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "session_expired": 1
+                }
+              }
+            }
+          },
           "403": {
             "description": "System Manager permission required."
           },
@@ -60,8 +73,9 @@
     "/api/method/platform_core.api.shell.get_bootstrap": {
       "get": {
         "operationId": "getBootstrap",
+        "x-max-response-bytes": 262144,
         "summary": "Read the current user's shell data",
-        "description": "Returns the current user, installed applications and native permission-filtered navigation. No manually maintained menu is added. Unknown request parameters are rejected. Each signed-in account is limited to 120 requests per 60 seconds.",
+        "description": "Returns the current user, installed applications and native permission-filtered navigation. The uncompressed JSON response including its envelope is at most 262144 bytes. Oversized data returns HTTP 200 with truncated set to true, identity and formatting retained, and roles, installed applications and navigation emptied. Unknown request parameters are rejected. Each signed-in account is limited to 120 requests per 60 seconds.",
         "parameters": [
           {
             "name": "If-None-Match",
@@ -230,8 +244,9 @@
     "/api/method/platform_core.api.meta.get_doctype": {
       "get": {
         "operationId": "getDocType",
+        "x-max-response-bytes": 262144,
         "summary": "Read an effective DocType definition",
-        "description": "Checks DocType read permission and filters fields for the current user. Includes child schemas reached through readable parent table fields. Authorization is rechecked before 304. Unknown request parameters are rejected. Each signed-in account is limited to 240 requests per 60 seconds.",
+        "description": "Checks DocType read permission and filters fields for the current user. The uncompressed JSON response including its envelope is at most 262144 bytes. Oversized data returns HTTP 200 with truncated set to true and only summary metadata. Authorization is rechecked before 304. Unknown request parameters are rejected. Each signed-in account is limited to 240 requests per 60 seconds.",
         "parameters": [
           {
             "name": "doctype",
@@ -512,7 +527,34 @@
             "description": "Frappe metadata for a System User."
           },
           "403": {
-            "description": "Native metadata is unavailable to this user."
+            "description": "Native metadata is unavailable to this user. Website Users receive this status whether or not the DocType exists."
+          },
+          "404": {
+            "description": "The DocType does not exist. This status is available to System Users.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["errors"],
+                  "properties": {
+                    "errors": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "object",
+                        "required": ["type"],
+                        "properties": {
+                          "type": {"type": "string"}
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "errors": [{"type": "DoesNotExistError"}]
+                }
+              }
+            }
           }
         }
       }
@@ -692,6 +734,17 @@
       "Bootstrap": {
         "type": "object",
         "description": "Initial, read-only shell data. Subscription, branding and frontend rendering are outside this checkpoint.",
+        "if": {
+          "required": ["truncated"]
+        },
+        "then": {
+          "properties": {
+            "installed_apps": {"maxItems": 0},
+            "workspaces": {"maxItems": 0},
+            "sidebars": {"maxItems": 0},
+            "user": {"properties": {"roles": {"maxItems": 0}}}
+          }
+        },
         "required": [
           "user",
           "installed_apps",
@@ -737,6 +790,11 @@
           },
           "formatting": {
             "$ref": "#/components/schemas/Formatting"
+          },
+          "truncated": {
+            "type": "boolean",
+            "const": true,
+            "description": "Present only when the full response exceeds the byte budget. Navigation, role and installed application lists are empty."
           }
         },
         "additionalProperties": false
@@ -960,6 +1018,23 @@
       "Meta": {
         "type": "object",
         "description": "Effective metadata. Keep permission tokens in memory. A verified mobile response may permit offline storage of its non-sensitive definitions.",
+        "if": {
+          "required": ["truncated"]
+        },
+        "then": {
+          "properties": {
+            "child_tables": {"maxProperties": 0},
+            "mobile_cache_allowed": {"const": false},
+            "schema": {
+              "properties": {
+                "fields": {"maxItems": 0},
+                "title_field": {"const": null},
+                "search_fields": {"const": ""},
+                "sort_field": {"const": null}
+              }
+            }
+          }
+        },
         "required": [
           "schema",
           "meta_hash",
@@ -995,6 +1070,11 @@
           "mobile_cache_allowed": {
             "type": "boolean",
             "description": "Only a verified mobile response can be true. The approved non-sensitive schema and child definitions may be stored in authorized mobile offline storage. Never persist permission tokens or restricted definitions. Purge on scope change, logout or revocation."
+          },
+          "truncated": {
+            "type": "boolean",
+            "const": true,
+            "description": "Present only when the full response exceeds the byte budget. The summary retains DocType identity and version tokens, omits field and child definitions, clears field references and disables mobile caching."
           }
         },
         "additionalProperties": false

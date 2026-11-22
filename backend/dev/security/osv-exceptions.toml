@@ -1,0 +1,2 @@
+# Each [[IgnoredVulns]] entry must have an id, owner and reason.
+# Set ignoreUntil and OSV's effectiveUntil to the same date.
