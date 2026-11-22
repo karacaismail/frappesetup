@@ -197,3 +197,24 @@ class ReviewTests(unittest.TestCase):
                     self.assertEqual(result.returncode, exit_code)
                     self.assertIn(message, result.stderr)
                     self.assertEqual(result.stdout, "")
+
+    def test_missing_osv_binary_is_not_run(self):
+        with patch.object(scans, "git", return_value="backend/dev/security/requirements.txt"), \
+                patch.object(scans.subprocess, "check_output", side_effect=FileNotFoundError("osv-scanner")), \
+                patch.object(scans, "verify_python_lock") as verify:
+            result = scans.scan_dependencies()
+        self.assertEqual(result.status, "not_run")
+        verify.assert_not_called()
+
+    def test_full_gate_fails_when_osv_cannot_run(self):
+        passed = scans.Result("Other check", "1", "test", "pass")
+        missing = scans.Result("OSV-Scanner", scans.OSV, "osv-scanner", "not_run")
+        with patch.object(scans, "source_state", return_value={}), patch.object(scans, "save") as save, \
+                patch.object(scans, "run", return_value=passed), patch.object(scans, "scan_bandit", return_value=passed), \
+                patch.object(scans, "runtime_inventory", return_value=passed), \
+                patch.object(scans, "scan_contracts", return_value=passed), \
+                patch.object(scans, "scan_dependencies", return_value=missing):
+            for ci in (False, True):
+                with self.subTest(ci=ci):
+                    self.assertEqual(scans.scan_full(None, ci=ci), 1)
+                    self.assertIn(missing, save.call_args.args[2])

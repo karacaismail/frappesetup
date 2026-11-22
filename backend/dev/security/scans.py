@@ -329,12 +329,16 @@ def scan_dependencies(requirements=None, *, reproduce=False):
     locks = dependency_locks(git("ls-files", "-z").split("\0"))
     result = Result("OSV-Scanner", OSV, shlex.join(command) + " LOCKFILES", "fail")
     try:
+        try:
+            output = subprocess.check_output(["osv-scanner", "--version"], text=True, cwd=ROOT)
+        except FileNotFoundError:
+            print("OSV-Scanner is not available on PATH.")
+            return replace(result, status="not_run")
         if not locks:
             raise ValueError("No tracked dependency lock files.")
         verify_python_lock(locks, reproduce=reproduce)
         if requirements is not None:
             locks.append(str(requirements))
-        output = subprocess.check_output(["osv-scanner", "--version"], text=True, cwd=ROOT)
         if not re.search(rf"(?m)^osv-scanner version: v?{re.escape(OSV)}\s*$", output, re.IGNORECASE):
             raise ValueError(f"OSV-Scanner {OSV} is required.")
         validate_osv_inputs(locks)
@@ -368,8 +372,9 @@ def scan_dependencies(requirements=None, *, reproduce=False):
         return result
 
 
-def exit_status(results, *, ci):
-    return int(any(result.status == "fail" or (ci and result.required and result.status == "not_run")
+def exit_status(results, *, ci, must_run=()):
+    return int(any(result.status == "fail"
+                   or (result.status == "not_run" and (result.tool in must_run or (ci and result.required)))
                    for result in results))
 
 
@@ -564,7 +569,7 @@ def scan_full(requirements, *, ci=False, runtime_image=None, api_target=None, al
         scan_contracts(api_target, writes=allow_writes),
     ]
     save(RESULTS, "full", results, source)
-    return exit_status(results, ci=ci)
+    return exit_status(results, ci=ci, must_run=("OSV-Scanner",))
 
 
 def local_target(target):
