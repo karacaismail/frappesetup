@@ -7,4 +7,4 @@ app_license = "mit"
 
 fixtures = [{"dt": "Role", "filters": [["name", "=", "AI Manager"]]}]
 
-auth_hooks = ["platform_core.model_gateway.agent_access.authenticate_request"]
+auth_hooks = ["platform_core.model_gecidi.agent_access.authenticate_request"]

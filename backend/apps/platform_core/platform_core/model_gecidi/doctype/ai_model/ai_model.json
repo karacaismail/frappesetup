@@ -1,0 +1,119 @@
+{
+ "actions": [],
+ "autoname": "UUID",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "provider",
+  "model_id",
+  "capabilities",
+  "context_size",
+  "prices_known",
+  "input_price",
+  "output_price",
+  "cost_currency",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "description": "Provider that serves this model.",
+   "fieldname": "provider",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Provider",
+   "options": "AI Provider",
+   "reqd": 1
+  },
+  {
+   "description": "Exact model identifier used by the provider API.",
+   "fieldname": "model_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Provider Model ID",
+   "reqd": 1
+  },
+  {
+   "default": "[]",
+   "description": "JSON array of supported capability identifiers.",
+   "fieldname": "capabilities",
+   "fieldtype": "JSON",
+   "label": "Capabilities"
+  },
+  {
+   "description": "Maximum model context size in tokens.",
+   "fieldname": "context_size",
+   "fieldtype": "Int",
+   "label": "Context Size",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Treat the input and output prices as known, including when zero.",
+   "fieldname": "prices_known",
+   "fieldtype": "Check",
+   "label": "Prices Confirmed"
+  },
+  {
+   "default": "0",
+   "description": "Price per million input tokens.",
+   "fieldname": "input_price",
+   "fieldtype": "Currency",
+   "label": "Input Price",
+   "non_negative": 1,
+   "options": "cost_currency",
+   "precision": "9"
+  },
+  {
+   "default": "0",
+   "description": "Price per million output tokens.",
+   "fieldname": "output_price",
+   "fieldtype": "Currency",
+   "label": "Output Price",
+   "non_negative": 1,
+   "options": "cost_currency",
+   "precision": "9"
+  },
+  {
+   "default": "USD",
+   "description": "Currency of both model prices.",
+   "fieldname": "cost_currency",
+   "fieldtype": "Link",
+   "label": "Model Price Currency",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Allow the gateway to use this record.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  }
+ ],
+ "links": [],
+ "module": "Model Gecidi",
+ "name": "AI Model",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "AI Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "model_id"
+}

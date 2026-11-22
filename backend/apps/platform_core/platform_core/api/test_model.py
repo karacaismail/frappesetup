@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import frappe
 
-from platform_core.model_gateway import policy
+from platform_core.model_gecidi import policy
 
 
 class TestModelHTTP(unittest.TestCase):

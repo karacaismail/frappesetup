@@ -62,7 +62,7 @@ Maximum requests in a minute. Zero removes this limit.,Bağlantı bir dakikada e
 Maximum tokens in a minute. Zero removes this limit.,Bağlantı bir dakikada en çok bu kadar token kullanır. Sıfır sınırı kaldırır.
 Method used to authenticate the API request.,Geçit API isteğinde bu yöntemle kimliğini doğrular.
 Model,Model
-Model Gateway,Model Geçidi
+Model Gecidi,Model Geçidi
 Model Price Currency,Model Fiyatının Para Birimi
 Model selected for this attempt.,Geçit bu denemede bu modeli seçti.
 Monthly Budget,Aylık Bütçe

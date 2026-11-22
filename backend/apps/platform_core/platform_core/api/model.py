@@ -2,7 +2,7 @@
 
 import frappe
 
-from platform_core.model_gateway import gateway
+from platform_core.model_gecidi import gateway
 
 
 def _respond(call, *args):
@@ -14,14 +14,14 @@ def _respond(call, *args):
 
 
 # Access to a route is checked by gateway.complete and policy.require_route.
-@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
 def complete(route, messages, tools=None, schema=None, limit=1024):
 	"""Generate a response through one tenant route. Provider use may incur a charge."""
 	return _respond(gateway.complete, route, messages, tools, schema, limit)
 
 
 # gateway.test_api requires a human session and the registry-manager role.
-@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.security.fixtures.frappe-missing-permission
+@frappe.whitelist(methods=["POST"])  # nosemgrep: backend.dev.guvenlik.fixtures.frappe-missing-permission
 def test_api(api, model):
 	"""Send one bounded, billable test request as an AI or site manager."""
 	return _respond(gateway.test_api, api, model)

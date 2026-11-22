@@ -1,0 +1,47 @@
+#!/bin/bash
+# Forward only this task's loopback ports through a separate Colima SSH connection.
+set -euo pipefail
+DEV_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ ! "${PANE_PORT:-}" =~ ^[1-9][0-9]{3,4}$ ]] || (( PANE_PORT > 65526 )); then
+    printf '%s\n' 'PANE_PORT must be an integer from 1000 to 65526.' >&2
+    exit 2
+fi
+STATE_DIR="${PANE_SCRATCH_DIR:-$DEV_DIR/../../.pane/scratch}/tunnels"
+mkdir -p "$STATE_DIR"
+chmod 700 "$STATE_DIR"
+cd "$STATE_DIR"
+SOCKET="$PANE_PORT.sock"
+CONFIG="$HOME/.colima/_lima/colima-factory/ssh.config"
+ACTION="${1:-ac}"
+shift || true
+if [[ ! -f "$CONFIG" ]]; then
+    printf '%s\n' 'Colima factory SSH configuration is missing.' >&2
+    exit 1
+fi
+SSH=(ssh -F "$CONFIG" -o ControlPath="$SOCKET" -o ControlPersist=no)
+case "$ACTION" in
+    ac)
+        if "${SSH[@]}" -O check lima-colima-factory 2>/dev/null; then
+            exit 0
+        fi
+        if (( $# == 0 )); then
+            set -- "$((PANE_PORT + 1))" "$((PANE_PORT + 2))"
+        fi
+        FORWARDS=()
+        for port in "$@"; do
+            if [[ ! "$port" =~ ^[1-9][0-9]{3,4}$ ]] || (( port < PANE_PORT || port > PANE_PORT + 9 )); then
+                printf '%s\n' 'Each port must be inside this Pane port range.' >&2
+                exit 2
+            fi
+            FORWARDS+=(-L "127.0.0.1:$port:127.0.0.1:$port")
+        done
+        "${SSH[@]}" -M -f -N -o ExitOnForwardFailure=yes "${FORWARDS[@]}" lima-colima-factory
+        ;;
+    kapat)
+        if [[ -S "$SOCKET" ]]; then
+            "${SSH[@]}" -O exit lima-colima-factory
+        fi
+        ;;
+    durum) "${SSH[@]}" -O check lima-colima-factory ;;
+    *) printf '%s\n' 'Usage: tunel <ac|kapat|durum> [ports]' >&2; exit 2 ;;
+esac

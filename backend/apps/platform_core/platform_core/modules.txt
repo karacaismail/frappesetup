@@ -1,4 +1,4 @@
-Identity
-Shell
-AI
-Model Gateway
+Kimlik
+Kabuk
+Yapay Zeka
+Model Gecidi

@@ -1,0 +1,71 @@
+{
+ "actions": [],
+ "autoname": "UUID",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "provider_name",
+  "adapter",
+  "default_url",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "description": "Display name of the provider.",
+   "fieldname": "provider_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Provider Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "openai",
+   "description": "HTTP protocol used to talk to the provider.",
+   "fieldname": "adapter",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Adapter",
+   "options": "openai\nanthropic\ngemini\nollama",
+   "reqd": 1
+  },
+  {
+   "description": "Base URL inherited by APIs without an override.",
+   "fieldname": "default_url",
+   "fieldtype": "Data",
+   "label": "Default Base URL"
+  },
+  {
+   "default": "1",
+   "description": "Allow the gateway to use this record.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  }
+ ],
+ "links": [],
+ "module": "Model Gecidi",
+ "name": "AI Provider",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "AI Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "provider_name"
+}
