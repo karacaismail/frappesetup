@@ -71,11 +71,14 @@ class ServisBelirteciTesti(unittest.TestCase):
     def test_press_service_kiraci_kapsami_alir_press_kapsami_alamaz(self):
         veri = self.belirtec("press-service", "ATONOTA_PRESS_SERVICE_SECRET", "aud-site-kiraci1")
         self.assertEqual(jwt_govdesi(veri["access_token"])["aud"], "site-kiraci1")
-        # Sözleşme: aud-press kapsamını yalnız identity-sync kullanır. Keycloak 26.8.2 atanmamış
-        # kapsamı sessizce atlamaz, isteği invalid_scope ile reddeder (gözlenen davranış).
+        # Sözleşme: aud-press kapsamını yalnız identity-sync kullanır. press-service hiçbir yolla
+        # press hedefli belirteç alamaz. Keycloak 26.8.2 isteği invalid_scope ile reddeder.
         yanit = istemci_belirteci("press-service", ortam("ATONOTA_PRESS_SERVICE_SECRET"), "aud-press")
-        self.assertEqual(yanit.durum, 400, yanit.govde[:200])
-        self.assertEqual(yanit.json()["error"], "invalid_scope")
+        if yanit.durum == 200:
+            self.assertNotIn("press", aud_listesi(jwt_govdesi(yanit.json()["access_token"])))
+        else:
+            self.assertEqual(yanit.durum, 400, yanit.govde[:200])
+            self.assertEqual(yanit.json()["error"], "invalid_scope")
 
     def test_yanlis_sir_reddedilir(self):
         yanit = istemci_belirteci("identity-sync", "yanlis-sir", "aud-site-kiraci1")
@@ -159,6 +162,19 @@ class RealmAyarlariTesti(unittest.TestCase):
         self.assertGreaterEqual(len(kullanicilar), 1)
         for k in kullanicilar:
             self.assertTrue(k["email"].endswith("@example.test"))
+
+    def test_imza_algoritmasi_rs256(self):
+        self.assertEqual(self.realm["defaultSignatureAlgorithm"], "RS256")
+
+    def test_anonim_istemci_kaydi_kapali(self):
+        # G-144: anonim dinamik istemci kaydı kapalı kalır. Gerçek uçla denenir (D-6).
+        yanit = istek(
+            "POST",
+            f"{ortam('KC_PUBLIC_URL')}/realms/platform/clients-registrations/default",
+            govde={"clientId": "saldirgan-istemci", "redirectUris": ["https://kotu.example/*"]},
+        )
+        self.assertIn(yanit.durum, (401, 403), yanit.govde[:200])
+        self.assertEqual(admin("/clients?clientId=saldirgan-istemci", self.yonetici).json(), [])
 
     def test_eposta_mailpit_uzerinden(self):
         self.assertEqual(self.realm["smtpServer"]["host"], ortam("ATONOTA_SMTP_HOST"))

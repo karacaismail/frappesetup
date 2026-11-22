@@ -12,7 +12,8 @@ Bu klasör Atonota kimlik servisinin geliştirme kurulumunu tutar. Atonota, Keyc
 | `realm/password-blacklists/yaygin-parolalar.txt` | Parola politikasının yaygın parola listesi. Kaynağı `KAYNAK.md` dosyasındadır. |
 | `.env.example` | Gerekli ortam değişkenleri ve sahte değerler |
 | `bin/kc-dev.sh` | Ortamı açan, kapatan ve testleri çalıştıran betik |
-| `tests/` | Realm dosyası testleri ve canlı Keycloak testleri |
+| `Dockerfile` | Realm dosyalarını ve iki eklentiyi (sihirli bağlantı, Apple) imaja ekler |
+| `tests/` | Realm dosyası testleri, canlı Keycloak testleri ve eklenti testleri |
 
 ## Çalıştırma
 
@@ -44,10 +45,10 @@ cd tests && python3 -I -m unittest discover -s . -p 'test_realm_dosyalari.py'
 Keycloak var olan realm'i yeniden içe almaz. Realm dosyası değişince şu komut realm'i siler ve Keycloak'ı yeniden başlatır:
 
 ```bash
-bin/kc-dev.sh realm-sil
+bin/kc-dev.sh realm-sil --evet
 ```
 
-Bu komut geliştirme verisini siler. Yalnız geliştirme ortamında kullanın.
+Bu komut geliştirme realm'indeki bütün veriyi siler. `--evet` bayrağı olmadan çalışmaz. Yalnız geliştirme ortamında kullanın.
 
 ## Ana makineden erişim
 
@@ -62,6 +63,13 @@ Tünel Colima'nın kendi bağlantısına dokunmaz. `bin/kc-dev.sh down` tüneli 
 ## Realm dosyaları imajın içindedir
 
 Colima'nın factory profili depo klasörünü sanal makineye bağlamaz. Bu yüzden compose dosyası bind mount kullanmaz. `Dockerfile` realm dosyasını ve parola listesini imaja kopyalar. `dev` hedefi örnek kullanıcıları da ekler. Üretim imajı `prod` hedefinden alınır. `bin/kc-dev.sh up` her çalışmada imajı yeniden derler.
+
+## Eklentiler
+
+İki eklenti imaja eklenir. Seçim gerekçesi `backend/docs/kararlar/0003-keycloak-eklentileri.md` notundadır.
+
+- Sihirli bağlantıyı `sky-cloak/keycloak-magic-link` v0.3.0 eklentisi sağlar. Giriş sayfasında “Başka yol dene” bağlantısı sihirli bağlantıyı açar. Bağlantı 300 saniye geçerlidir ve tek kullanımlıktır. Bağlantı yalnız isteyen tarayıcıda çalışır.
+- Apple ile girişi `klausbetz/apple-identity-provider-keycloak` 1.17.0 eklentisi sağlar. Sağlayıcı realm'de kapalıdır. Gerçek anahtar gelince `.env` dosyasındaki `ATONOTA_APPLE_*` değerleri doldurulur. Sonra sağlayıcı açılır.
 
 ## Kapatma
 

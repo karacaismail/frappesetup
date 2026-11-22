@@ -105,6 +105,10 @@ class RealmDosyasiTesti(unittest.TestCase):
         self.assertEqual(r["refreshTokenMaxReuse"], 0)
         self.assertFalse(r["rememberMe"])
 
+    def test_imza_algoritmasi_rs256(self):
+        # Sözleşme 3. bölüm: kitaplık yalnız RS256 kabul eder. Realm de RS256 ile imzalar.
+        self.assertEqual(self.realm["defaultSignatureAlgorithm"], "RS256")
+
     def test_totp_ve_passkey(self):
         self.assertEqual(self.realm["otpPolicyType"], "totp")
         self.assertTrue(self.realm["webAuthnPolicyPasswordlessPasskeysEnabled"])

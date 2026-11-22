@@ -108,10 +108,15 @@ case "$komut" in
   tunel-kapat) tunel_kapat ;;
   realm-sil)
     # Realm'i siler, imajı yeniden derler ve Keycloak'ı yeniden kurar. Böylece realm dosyası yeniden içe alınır.
-    belirtec="$(curl -fsS -X POST "$KC_PUBLIC_URL/realms/master/protocol/openid-connect/token" \
-      -d grant_type=password -d client_id=admin-cli \
-      --data-urlencode "username=$KC_BOOTSTRAP_ADMIN_USERNAME" \
-      --data-urlencode "password=$KC_BOOTSTRAP_ADMIN_PASSWORD" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
+    # Bu komut geliştirme realm'indeki bütün veriyi siler. Onay bayrağı zorunludur.
+    if [ "${1:-}" != "--evet" ]; then
+      echo "Bu komut platform realm'ini ve içindeki bütün veriyi siler. Onaylamak için: $0 realm-sil --evet" >&2
+      exit 2
+    fi
+    # Parola komut satırında görünmesin diye curl'e standart girdiden verilir.
+    belirtec="$(printf 'data-urlencode = "username=%s"\ndata-urlencode = "password=%s"\n' "$KC_BOOTSTRAP_ADMIN_USERNAME" "$KC_BOOTSTRAP_ADMIN_PASSWORD" \
+      | curl -fsS -K - -X POST "$KC_PUBLIC_URL/realms/master/protocol/openid-connect/token" \
+      -d grant_type=password -d client_id=admin-cli | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
     curl -fsS -o /dev/null -w 'realm silindi: %{http_code}\n' -X DELETE "$KC_PUBLIC_URL/admin/realms/platform" -H "Authorization: Bearer $belirtec"
     compose up -d --build --force-recreate --wait keycloak
     ;;
