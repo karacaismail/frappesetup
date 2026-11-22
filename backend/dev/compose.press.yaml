@@ -1,7 +1,7 @@
 name: fs-press-tr
 services:
   mariadb:
-    image: mariadb:11.8.9
+    image: mariadb:11.8.9@sha256:e1d5495f445654134f226f55a41ce0da227116f6f27f283101f405c794d841fc
     environment:
       MARIADB_ROOT_PASSWORD: ${PRESS_DB_PASSWORD:?Set PRESS_DB_PASSWORD}
     healthcheck:
@@ -13,10 +13,13 @@ services:
       - db:/var/lib/mysql
 
   redis:
-    image: redis:7.4-alpine
+    image: redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
 
   web:
-    image: fs-press-tr-base:py3.14.8
+    build:
+      context: ../..
+      dockerfile: backend/dev/press/Dockerfile
+      target: development
     working_dir: /home/frappe/benches
     command: ["sleep", "infinity"]
     depends_on:

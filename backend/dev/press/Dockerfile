@@ -1,4 +1,14 @@
-FROM frappe/bench@sha256:a822a0aedf309582c1d5e49e461a88b5b891b446063b74263c896da92281bd70
+FROM frappe/bench@sha256:a822a0aedf309582c1d5e49e461a88b5b891b446063b74263c896da92281bd70 AS runtime
+
+USER root
+COPY backend/libs/oidc_verify/ /tmp/press-oidc-source/
+RUN /home/frappe/.local/bin/uv build --wheel --out-dir /opt/press-local/wheels /tmp/press-oidc-source \
+	&& rm -rf /tmp/press-oidc-source
+USER frappe
+
+FROM runtime AS production
+
+FROM runtime AS development
 
 USER root
 # `dockerfile==3.2.0` (pinned by press) has no linux-arm64 wheel; its sdist builds with GOPATH-mode
@@ -11,7 +21,10 @@ RUN curl -fsSLo /tmp/go.tgz "https://go.dev/dl/go${GO_VERSION}.linux-arm64.tar.g
 	&& tar -xzf /tmp/go.tgz -C /usr/local/go1.21 --strip-components=1 \
 	&& rm /tmp/go.tgz
 
-COPY uv-overrides.txt /opt/press-local/uv-overrides.txt
+COPY backend/dev/press/uv-overrides.txt /opt/press-local/uv-overrides.txt
+COPY backend/dev/press/patch-py314.sh /opt/press-local/scripts/patch-py314.sh
+COPY backend/dev/press/create_site.py /opt/press-local/scripts/create_site.py
+RUN touch /opt/press-local/development-image
 ENV GO111MODULE=off \
 	PATH=/usr/local/go1.21/bin:$PATH \
 	UV_OVERRIDE=/opt/press-local/uv-overrides.txt

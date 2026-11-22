@@ -1,0 +1,10 @@
+**
+!backend/dev/press/Dockerfile
+!backend/dev/press/create_site.py
+!backend/dev/press/patch-py314.sh
+!backend/dev/press/uv-overrides.txt
+!backend/libs/oidc_verify/LICENSE
+!backend/libs/oidc_verify/README.md
+!backend/libs/oidc_verify/pyproject.toml
+!backend/libs/oidc_verify/src/**
+**/__pycache__/

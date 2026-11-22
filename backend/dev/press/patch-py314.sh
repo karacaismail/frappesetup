@@ -3,6 +3,10 @@
 # Press's Ansible-based server provisioning still does NOT work: ansible-base 2.10's collection
 # loader relies on importlib APIs removed in Python 3.12.
 set -euo pipefail
+if [[ ! -f /opt/press-local/development-image ]]; then
+	echo "This patch is only available in the Press development image." >&2
+	exit 78
+fi
 cd /home/frappe/benches/frappe-bench
 SP=env/lib/python3.14/site-packages
 

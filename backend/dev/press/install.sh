@@ -1,11 +1,15 @@
 #!/bin/bash
 # Run in the isolated fs-press-tr web container.
 set -euo pipefail
+if [[ ! -f /opt/press-local/development-image ]]; then
+	echo "Site setup is only available in the Press development image." >&2
+	exit 78
+fi
 
 cd /home/frappe/benches
-python="$HOME/.pyenv/versions/3.14.8/bin/python3"
+python="$HOME/.pyenv/versions/3.14.10/bin/python3"
 if [ ! -x "$python" ]; then
-	echo "Python 3.14.8 is missing from the bench image" >&2
+	echo "Python 3.14.10 is missing from the bench image" >&2
 	exit 1
 fi
 
@@ -40,15 +44,16 @@ bench build --app frappe
 bench build --app press || test -f apps/press/press/public/dashboard/index.html
 
 if [ ! -f sites/press.localhost/site_config.json ]; then
-	bench new-site press.localhost \
-		--mariadb-root-password "$PRESS_DB_PASSWORD" \
-		--mariadb-user-host-login-scope='%' \
-		--admin-password "$PRESS_ADMIN_PASSWORD" \
-		--install-app press
+	(cd sites && ../env/bin/python /opt/press-local/scripts/create_site.py)
 fi
 
 ln -sfn /home/frappe/benches/source/press_tr apps/press_tr
-uv pip install --python env/bin/python -e apps/press_tr
+identity_wheels=(/opt/press-local/wheels/oidc_verify-*.whl)
+if (( ${#identity_wheels[@]} != 1 )) || [[ ! -f "${identity_wheels[0]}" ]]; then
+	echo "The Press image must provide exactly one oidc_verify wheel." >&2
+	exit 1
+fi
+uv pip install --python env/bin/python -e apps/press_tr "${identity_wheels[0]}"
 grep -qxF press_tr sites/apps.txt || printf '\n%s\n' press_tr >> sites/apps.txt
 bench --site press.localhost install-app press_tr
 bench --site press.localhost disable-scheduler

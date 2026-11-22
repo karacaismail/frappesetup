@@ -16,8 +16,7 @@ if json.load(sys.stdin)["message"] != "pong":
     raise SystemExit("Frappe ping did not return pong")
 '
 
-apps=$(docker --context colima-factory compose --env-file "$env_file" \
-    --file backend/dev/compose.press.yaml exec -T \
+apps=$(PRESS_ENV_FILE="$env_file" bash backend/dev/press/compose.sh exec -T \
     --workdir /home/frappe/benches/frappe-bench web \
     bench --site press.localhost execute frappe.get_installed_apps)
 printf '%s\n' "$apps" | python3 -c '
