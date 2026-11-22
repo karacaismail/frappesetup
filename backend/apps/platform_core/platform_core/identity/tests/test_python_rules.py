@@ -164,7 +164,7 @@ class TestPythonRules(FrappeAPITestCase):
 		with ThreadPoolExecutor(max_workers=1) as executor:
 			first = executor.submit(first_request).result(timeout=15)
 		# This connection opened its snapshot before the winner committed.
-		with self.assertRaises(sign_in.SignInRefused) as refused:
+		with self.assertRaises(sign_in.SignInRefusedError) as refused:
 			sign_in.create_link(h.ISSUER, SUBJECT, EMAIL)
 		self.assertEqual(refused.exception.status, 403)
 		frappe.db.rollback()
@@ -176,7 +176,7 @@ class TestPythonRules(FrappeAPITestCase):
 		h.ensure_user(h.AYSE)
 		sign_in.create_link(h.ISSUER, SUBJECT, h.AYSE)
 		frappe.db.commit()
-		with self.assertRaises(sign_in.SignInRefused) as refused:
+		with self.assertRaises(sign_in.SignInRefusedError) as refused:
 			sign_in.create_link(h.ISSUER, SUBJECT, EMAIL)
 		self.assertEqual(refused.exception.status, 403)
 

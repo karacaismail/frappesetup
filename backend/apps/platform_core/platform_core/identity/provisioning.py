@@ -38,7 +38,7 @@ def provision(data: dict) -> dict:
 	last_name = _optional_text(data, "last_name")
 	role_profiles = _role_profiles(data.get("role_profiles"))
 
-	user = _locked_user(issuer, subject)
+	user = _locked_user(issuer, subject, candidate_user=email)
 	if user:
 		if user != email:
 			frappe.throw(
@@ -83,7 +83,7 @@ def provision(data: dict) -> dict:
 	if not user:
 		try:
 			sign_in.create_link(issuer, subject, doc.name)
-		except sign_in.SignInRefused as error:
+		except sign_in.SignInRefusedError as error:
 			frappe.throw(error.message, IdentityConflict)
 	return {"user": doc.name, "enabled": bool(doc.enabled), "linked": True, "user_type": doc.user_type}
 
@@ -114,11 +114,11 @@ def change_email(data: dict) -> dict:
 	return {"user": new_email}
 
 
-def _locked_user(issuer: str, subject: str) -> str | None:
-	"""Contract section 7 rule 3: check the deletion record first, under the same row locks as deletion."""
+def _locked_user(issuer: str, subject: str, *, candidate_user: str | None = None) -> str | None:
+	"""Contract section 7 rule 3: check the deletion record before changes, under the same locks as deletion."""
 	from platform_core.identity import anonymization
 
-	link = anonymization.refuse_if_deleted(issuer, subject)
+	link = anonymization.refuse_if_deleted(issuer, subject, candidate_user=candidate_user)
 	return link.user if link else None
 
 
@@ -144,7 +144,9 @@ def _issuer(data: dict) -> str:
 def _text(data: dict, field: str, max_length: int | None = None) -> str:
 	value = data.get(field)
 	if not isinstance(value, str) or not value.strip():
-		frappe.throw(_("Field {0} is required.", context="platform_core.identity").format(field), InvalidInput)
+		frappe.throw(
+			_("Field {0} is required.", context="platform_core.identity").format(field), InvalidInput
+		)
 	value = value.strip()
 	if max_length and len(value) > max_length:
 		frappe.throw(
@@ -161,7 +163,9 @@ def _optional_text(data: dict, field: str) -> str:
 	if value is None:
 		return ""
 	if not isinstance(value, str):
-		frappe.throw(_("Field {0} must be text.", context="platform_core.identity").format(field), InvalidInput)
+		frappe.throw(
+			_("Field {0} must be text.", context="platform_core.identity").format(field), InvalidInput
+		)
 	return value.strip()
 
 

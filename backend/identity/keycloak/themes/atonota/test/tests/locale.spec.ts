@@ -21,6 +21,10 @@ test('Türkçe ve İngilizce ileti dosyaları aynı anahtarları taşır', () =>
   expect([...tr].filter(([, value]) => !value.trim()).map(([key]) => key), 'boş Türkçe ileti').toEqual([]);
 });
 
+test('giriş seçeneği e-posta bağlantısını açıkça adlandırır', () => {
+  expect(read('tr').get('magiclink-display-name')).toBe('E-posta bağlantısı');
+});
+
 test('Türkçe ve İngilizce iletiler aynı yer tutucuları taşır', () => {
   const tr = read('tr');
   const en = read('en');

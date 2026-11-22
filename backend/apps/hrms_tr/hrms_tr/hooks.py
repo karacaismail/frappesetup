@@ -52,3 +52,21 @@ override_whitelisted_methods = {
 	"hrms.payroll.doctype.salary_structure.salary_structure.make_salary_slip": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
 	"hrms.hr.doctype.leave_application.leave_application.get_events": "hrms_tr.hrms_endpoints.deny_legacy_leave_query",
 }
+
+
+user_data_fields = [
+	{
+		"doctype": "Employee",
+		"filter_by": "user_id",
+		"redact_fields": [
+			"first_name",
+			"middle_name",
+			"last_name",
+			"employee_name",
+			"personal_email",
+			"prefered_email",
+			"cell_number",
+			"date_of_birth",
+		],
+	},
+]

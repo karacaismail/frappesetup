@@ -8,6 +8,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+if sys.version_info < (3, 14):
+    raise unittest.SkipTest("Naming tests require Python 3.14 or newer. Run them with python3.14.")
+
 CHECK = Path(__file__).resolve().parents[1] / "check_names.py"
 
 

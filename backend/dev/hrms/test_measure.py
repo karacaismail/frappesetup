@@ -1,10 +1,33 @@
-"""Check O-35 safeguards without connecting to a site or a queue."""
+"""Check performance reporting and safeguards without connecting to a site or a queue."""
 
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import call, patch
 
 import measure
+
+
+class PerformanceReportTest(unittest.TestCase):
+    def test_report_renders_p95_budget_results_as_markdown(self):
+        output = StringIO()
+        with redirect_stdout(output):
+            exit_code = measure.report(
+                "abcdef0",
+                {
+                    ("GET", "/read", 500): [20.0] * 18 + [500.0, 520.0],
+                    ("POST", "/write", 1000): [900.0, 1010.0],
+                },
+            )
+
+        self.assertEqual(exit_code, 1)
+        lines = output.getvalue().splitlines()
+        self.assertIn("## HRMS TR O-31 performance report", lines)
+        self.assertIn("Git revision `abcdef0`.", lines)
+        self.assertIn("| Method and route | Calls | p95 (ms) | Budget (ms) | Result |", lines)
+        self.assertIn("| `GET /read` | 20 | 500.00 | 500 | pass |", lines)
+        self.assertIn("| `POST /write` | 2 | 1010.00 | 1000 | fail |", lines)
 
 
 class PerformanceSafetyTest(unittest.TestCase):
