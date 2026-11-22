@@ -177,7 +177,7 @@ Skip to main content,Ana içeriğe geçin,shell.panel
 Go to site home,Sitenin ana sayfasına gidin,shell.panel
 A valid metadata surface is required.,Tanım için geçerli bir kullanım alanı seçin.,shell.metadata
 The request has invalid parameters.,İstekte geçersiz alanlar var.,shell.request
-Mobile Account State,Mobil Hesap Durumu
+Mobile Account State,Mobil Hesap Durumu,
 Stores the token cutoff for mobile installation registration.,Yeni telefon kurulumunda geçerli belirteç zamanını tutar.,Mobile Account State
 The account that owns this revocation state.,Bu hesap iptal kaydının sahibidir.,Mobile Account State
 Revoked through,İptal zamanı,Mobile Account State
@@ -186,19 +186,19 @@ Account,Hesap,Mobile Account State
 Account,Hesap,Mobile Installation
 Last Audit At,Son denetim zamanı,Mobile Installation
 The UTC time when the installation last completed its delivery audit.,Kurulumun son teslim denetimini bitirdiği UTC zamanıdır.,Mobile Installation
-List mobile installations for a user.,Kullanıcının telefon kurulumlarını listele.
-Propose revoking one mobile installation.,Bir telefon kurulumunu iptal etmeyi öner.
-Propose revoking all mobile installations for a user.,Kullanıcının bütün telefon kurulumlarını iptal etmeyi öner.
-Request approval to run mobile cleanup in dry-run mode.,Temizlik denemesi için onay iste.
-Only a System Manager can administer mobile installations.,Telefon kurulumlarını yalnız sistem yöneticisi yönetebilir.
-The mobile account is unavailable.,Telefon hesabına erişilemiyor.
-The mobile installation is unavailable.,Telefon kurulumuna erişilemiyor.
-Revoke one installation and request Keycloak session closure.,Bir kurulumu iptal et ve Keycloak oturumunun kapanmasını iste.
-Revoke all installations and request Keycloak session closure.,Bütün kurulumları iptal et ve Keycloak oturumlarının kapanmasını iste.
-A prepared mobile revocation is required.,Önce telefon kurulumu için iptal önerisi hazırlayın.
-Count expired mobile records without deleting them.,Süresi dolan mobil kayıtları say.
-A prepared mobile cleanup preview is required.,Önce mobil temizlik önerisi hazırlayın.
-Mobile Revoked Session,İptal Edilen Mobil Oturum
+List mobile installations for a user.,Kullanıcının telefon kurulumlarını listele.,
+Propose revoking one mobile installation.,Bir telefon kurulumunu iptal etmeyi öner.,
+Propose revoking all mobile installations for a user.,Kullanıcının bütün telefon kurulumlarını iptal etmeyi öner.,
+Request approval to run mobile cleanup in dry-run mode.,Temizlik denemesi için onay iste.,
+Only a System Manager can administer mobile installations.,Telefon kurulumlarını yalnız sistem yöneticisi yönetebilir.,
+The mobile account is unavailable.,Telefon hesabına erişilemiyor.,
+The mobile installation is unavailable.,Telefon kurulumuna erişilemiyor.,
+Revoke one installation and request Keycloak session closure.,Bir kurulumu iptal et ve Keycloak oturumunun kapanmasını iste.,
+Revoke all installations and request Keycloak session closure.,Bütün kurulumları iptal et ve Keycloak oturumlarının kapanmasını iste.,
+A prepared mobile revocation is required.,Önce telefon kurulumu için iptal önerisi hazırlayın.,
+Count expired mobile records without deleting them.,Süresi dolan mobil kayıtları say.,
+A prepared mobile cleanup preview is required.,Önce mobil temizlik önerisi hazırlayın.,
+Mobile Revoked Session,İptal Edilen Mobil Oturum,
 Prevents a revoked Keycloak session from accessing mobile sync.,İptal edilen Keycloak oturumunun eşitlemeye erişimini engeller.,Mobile Revoked Session
 Session key,Oturum anahtarı,Mobile Revoked Session
 A digest of the revoked Keycloak session identifier.,İptal edilen Keycloak oturum kimliğinin özeti.,Mobile Revoked Session
