@@ -2472,7 +2472,7 @@
     "rule": "B603",
     "file": "backend/dev/press/test_ansible_playbook_syntax.py",
     "code": "completed_process = subprocess.run(",
-    "statementSha256": "5b89eac4938c6852f5adcbd49510389d0d902196dc5b70e8b02018562f159",
+    "statementSha256": "5b89eac4938c6852f5adcbd49510389d0c90d902196dc5b70e8b02018562f159",
     "reason": "Runs syntax checks without a shell against two fixed playbook names and a localhost inventory.",
     "owner": "press-tr",
     "ignoreUntil": "2027-02-22"
