@@ -16,7 +16,7 @@ import uuid
 from test_eklentiler import _ac, _cerezli_acici, _form_hedefi
 from test_second_factor import TOTP_PASSWORD, TOTP_USER, fresh_totp_code
 from yardimci import (admin, canli_var_mi, istek, ortam, realm_oku, tenant_authorize_url, tenant_authorize_with_pkce,
-                      tenant_callback_url, yonetici_belirteci)
+                      tenant_callback_url, yonetici_belirteci, safe_detail)
 
 REQUIRED_ON = {"CONFIGURE_TOTP", "UPDATE_PASSWORD", "VERIFY_EMAIL", "webauthn-register",
                "webauthn-register-passwordless"}
@@ -113,11 +113,12 @@ class AccountBacklogLiveTest(unittest.TestCase):
             "code": code, "code_verifier": verifier}).json()
         first = tokens["refresh_token"]
         second = self._refresh(first)
-        self.assertEqual(second.durum, 200, second.govde[:200])
-        self.assertNotEqual(second.json()["refresh_token"], first)
+        self.assertEqual(second.durum, 200, safe_detail(second))
+        second_refresh = second.json().get("refresh_token")
+        self.assertTrue(bool(second_refresh) and second_refresh != first, safe_detail(second))
         reused = self._refresh(first)
-        self.assertEqual(reused.durum, 400, reused.govde[:200])
-        self.assertEqual(reused.json()["error"], "invalid_grant")
+        self.assertEqual(reused.durum, 400, safe_detail(reused))
+        self.assertTrue(reused.json().get("error") == "invalid_grant", safe_detail(reused))
 
     def test_passkey_registration_step_is_enabled(self):
         actions = {a["alias"]: a for a in admin("/authentication/required-actions", self.admin_token).json()}
@@ -134,7 +135,7 @@ class AccountBacklogLiveTest(unittest.TestCase):
         username = f"customer-{uuid.uuid4().hex[:10]}"
         created = admin("/users", self.admin_token, "POST",
                         {"username": username, "email": f"{username}@example.test", "enabled": True})
-        self.assertEqual(created.durum, 201, created.govde[:200])
+        self.assertEqual(created.durum, 201, safe_detail(created))
         user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
         self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
         account = admin("/clients?clientId=account", self.admin_token).json()[0]["id"]
@@ -157,7 +158,7 @@ class AccountBacklogLiveTest(unittest.TestCase):
             "username": username, "email": f"{username}@example.test", "emailVerified": True,
             "firstName": "Deneme", "lastName": "Musteri", "enabled": True,
             "credentials": [{"type": "password", "value": password, "temporary": False}]})
-        self.assertEqual(created.durum, 201, created.govde[:200])
+        self.assertEqual(created.durum, 201, safe_detail(created))
         user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
         self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
 

@@ -15,7 +15,7 @@ import urllib.parse
 from hashlib import sha1
 
 from test_eklentiler import _ac, _cerezli_acici, _form_hedefi
-from yardimci import admin, canli_var_mi, istek, ortam, tenant_authorize_url, tenant_authorize_with_pkce, tenant_callback_url, yonetici_belirteci
+from yardimci import admin, canli_var_mi, istek, ortam, tenant_authorize_url, tenant_authorize_with_pkce, tenant_callback_url, yonetici_belirteci, safe_detail
 
 TOTP_USER = "totp.ornek@example.test"
 TOTP_PASSWORD = "Ornek-Parola-Totp-2026"  # gitleaks:allow (synthetic test value, development realm only)
@@ -125,7 +125,7 @@ class SecondFactorTest(unittest.TestCase):
         }
         wrong = istek("POST", token_url, form={**base, "code_verifier": "wrong-" + verifier[:20]})
         self.assertEqual(wrong.durum, 400, "a wrong verifier must be refused")
-        self.assertEqual(wrong.json()["error"], "invalid_grant")
+        self.assertTrue(wrong.json().get("error") == "invalid_grant", safe_detail(wrong))
         # Keycloak invalidates the code after a failed exchange, so a fresh login is needed for the good case.
         self._pause_for_quick_login_check()
         url, verifier = tenant_authorize_with_pkce()
@@ -136,5 +136,5 @@ class SecondFactorTest(unittest.TestCase):
         _, headers, _ = _ac(opener, _form_hedefi(html), urllib.parse.urlencode({"otp": fresh_totp_code()}).encode())
         code = urllib.parse.parse_qs(urllib.parse.urlsplit(headers["Location"]).query)["code"][0]
         good = istek("POST", token_url, form={**base, "code": code, "code_verifier": verifier})
-        self.assertEqual(good.durum, 200, good.govde[:200])
-        self.assertIn("access_token", good.json())
+        self.assertEqual(good.durum, 200, safe_detail(good))
+        self.assertTrue("access_token" in good.json(), safe_detail(good))

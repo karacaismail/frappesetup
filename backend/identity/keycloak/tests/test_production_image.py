@@ -14,7 +14,7 @@ import os
 import re
 import unittest
 
-from yardimci import KLASOR, istek
+from yardimci import KLASOR, istek, safe_detail
 
 DOCKERFILE = (KLASOR / "Dockerfile").read_text(encoding="utf-8")
 COMPOSE = (KLASOR.parents[1] / "dev" / "compose.keycloak.yaml").read_text(encoding="utf-8")
@@ -65,7 +65,7 @@ class ProductionImageLiveTest(unittest.TestCase):
             "grant_type": "password", "client_id": "admin-cli",
             "username": os.environ["KC_BOOTSTRAP_ADMIN_USERNAME"],
             "password": os.environ["KC_BOOTSTRAP_ADMIN_PASSWORD"]})
-        self.assertEqual(response.durum, 200, response.govde[:200])
+        self.assertEqual(response.durum, 200, safe_detail(response))
         return response.json()["access_token"]
 
     def test_rest_resource_answers_404(self):

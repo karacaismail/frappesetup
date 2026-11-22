@@ -8,7 +8,7 @@ import hmac
 import unittest
 import urllib.parse
 
-from yardimci import admin, canli_var_mi, get_without_redirect, istek, istemci_belirteci, jwt_govdesi, ortam, yonetici_belirteci
+from yardimci import admin, canli_var_mi, get_without_redirect, istek, istemci_belirteci, jwt_govdesi, ortam, yonetici_belirteci, safe_detail
 
 LOGOUT_EVENT = "http://schemas.openid.net/event/backchannel-logout"
 
@@ -28,7 +28,7 @@ class ServisBelirteciTesti(unittest.TestCase):
 
     def belirtec(self, istemci: str, sir_adi: str, kapsam=None) -> dict:
         yanit = istemci_belirteci(istemci, ortam(sir_adi), kapsam)
-        self.assertEqual(yanit.durum, 200, yanit.govde[:300])
+        self.assertEqual(yanit.durum, 200, safe_detail(yanit))
         return yanit.json()
 
     def test_identity_sync_kiraci_kapsamiyla_tek_aud_alir(self):
@@ -55,7 +55,10 @@ class ServisBelirteciTesti(unittest.TestCase):
         self.assertEqual(aud_listesi(govde), ["site-kiraci1"])
         # Gerçek giriş yolu: Admin API bu belirteci reddetmeli (D-6).
         yanit = admin("/users?max=1", veri["access_token"])
-        self.assertIn(yanit.durum, (401, 403), yanit.govde[:200])
+        # Keycloak 26.8.2 checks the Admin API audience first and answers 401 for a token without it
+        # (services/.../admin/AdminRoot.java lines 218-231). Contract section 2 says 403; a correction
+        # is requested from the contract owner. Exactly 401 is expected, nothing broader.
+        self.assertEqual(yanit.durum, 401, safe_detail(yanit))
 
     def test_yonetim_yetkisi_yalniz_ayri_kapsamda(self):
         # Keycloak 26.8 Admin API'si belirteçte kc-admin-api kapsamını ve Admin API hedefini ister
@@ -80,13 +83,13 @@ class ServisBelirteciTesti(unittest.TestCase):
         for u in admin(f"/users?username={kullanici}&exact=true", yonetici).json():
             admin(f"/users/{u['id']}", yonetici, yontem="DELETE")
         olustur = admin("/users", token, yontem="POST", govde={"username": kullanici, "email": kullanici, "enabled": True})
-        self.assertEqual(olustur.durum, 201, olustur.govde[:200])
+        self.assertEqual(olustur.durum, 201, safe_detail(olustur))
         kuruluslar = admin("/organizations?search=deneme-kurulus&exact=true", yonetici).json()
         for k in kuruluslar:
             admin(f"/organizations/{k['id']}", yonetici, yontem="DELETE")
         kurulus = admin("/organizations", token, yontem="POST",
                         govde={"name": "deneme-kurulus", "alias": "deneme-kurulus", "domains": [{"name": "deneme-kurulus.example.test"}]})
-        self.assertEqual(kurulus.durum, 201, kurulus.govde[:200])
+        self.assertEqual(kurulus.durum, 201, safe_detail(kurulus))
         # Realm-wide writes stay forbidden for this account.
         self.assertEqual(admin("/clients", token, yontem="POST", govde={"clientId": "yetki-denemesi"}).durum, 403)
         # Cleanup with the master admin.
@@ -97,7 +100,7 @@ class ServisBelirteciTesti(unittest.TestCase):
 
     def test_yonetim_rolleri_kc_admin_api_olmadan_admin_api_acmaz(self):
         veri = self.belirtec("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET", "admin-api")
-        self.assertIn(admin("/users?max=1", veri["access_token"]).durum, (401, 403))
+        self.assertEqual(admin("/users?max=1", veri["access_token"]).durum, 403)
 
     def test_press_service_kiraci_kapsami_alir_press_kapsami_alamaz(self):
         veri = self.belirtec("press-service", "ATONOTA_PRESS_SERVICE_SECRET", "aud-site-kiraci1")
@@ -105,11 +108,7 @@ class ServisBelirteciTesti(unittest.TestCase):
         # Sözleşme: aud-press kapsamını yalnız identity-sync kullanır. press-service hiçbir yolla
         # press hedefli belirteç alamaz. Keycloak 26.8.2 isteği invalid_scope ile reddeder.
         yanit = istemci_belirteci("press-service", ortam("ATONOTA_PRESS_SERVICE_SECRET"), "aud-press")
-        if yanit.durum == 200:
-            self.assertNotIn("press", aud_listesi(jwt_govdesi(yanit.json()["access_token"])))
-        else:
-            self.assertEqual(yanit.durum, 400, yanit.govde[:200])
-            self.assertEqual(yanit.json()["error"], "invalid_scope")
+        self.assertEqual(safe_detail(yanit), "HTTP 400 invalid_scope")
 
     def test_yanlis_sir_reddedilir(self):
         yanit = istemci_belirteci("identity-sync", "yanlis-sir", "aud-site-kiraci1")
@@ -127,7 +126,7 @@ class RealmAyarlariTesti(unittest.TestCase):
     def setUpClass(cls):
         cls.yonetici = yonetici_belirteci()
         yanit = admin("", cls.yonetici)
-        assert yanit.durum == 200, yanit.govde[:200]
+        assert yanit.durum == 200, safe_detail(yanit)
         cls.realm = yanit.json()
 
     def test_marka_dil_tema(self):
@@ -208,7 +207,7 @@ class RealmAyarlariTesti(unittest.TestCase):
             f"{ortam('KC_PUBLIC_URL')}/realms/platform/clients-registrations/default",
             govde={"clientId": "saldirgan-istemci", "redirectUris": ["https://kotu.example/*"]},
         )
-        self.assertIn(yanit.durum, (401, 403), yanit.govde[:200])
+        self.assertIn(yanit.durum, (401, 403), safe_detail(yanit))
         self.assertEqual(admin("/clients?clientId=saldirgan-istemci", self.yonetici).json(), [])
 
     def test_tenant_authorize_without_pkce_is_refused(self):
@@ -219,7 +218,7 @@ class RealmAyarlariTesti(unittest.TestCase):
         })
         yanit = get_without_redirect(f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/auth?{sorgu}")
         konum = yanit.basliklar.get("Location", "")
-        self.assertNotIn('name="username"', yanit.govde.decode("utf-8", "replace"), "login form must not open without PKCE")
+        self.assertFalse(b'name="username"' in yanit.govde, safe_detail(yanit))
         self.assertNotIn("code=", konum)
         if yanit.durum in (302, 303):
             self.assertIn("error=invalid_request", konum)

@@ -116,6 +116,79 @@ class SlowTlsHandshakeTest(unittest.TestCase):
         self.assertLess(time.monotonic() - begin, 2.0)
 
 
+DOWNLOAD_THREAD = "oidc-verify-jwks-download"
+
+
+def _open_downloads() -> int:
+    return sum(1 for thread in threading.enumerate() if thread.name == DOWNLOAD_THREAD and thread.is_alive())
+
+
+class InFlightLimitTest(unittest.TestCase):
+    """Third review: at most one download runs per cache, and an expired one never connects."""
+
+    def setUp(self):
+        self.real = socket.getaddrinfo
+        self.addCleanup(setattr, socket, "getaddrinfo", self.real)
+        # Let downloads left over from earlier tests finish first.
+        deadline = time.monotonic() + TRICKLE_SECONDS + 2
+        while _open_downloads() and time.monotonic() < deadline:
+            time.sleep(0.1)
+
+    def test_repeated_timeouts_keep_at_most_one_open_download(self):
+        def slow_getaddrinfo(*args, **kwargs):
+            time.sleep(TRICKLE_SECONDS)
+            return self.real(*args, **kwargs)
+
+        socket.getaddrinfo = slow_getaddrinfo
+        cache = JwksCache(
+            "https://slow-dns.example.test/certs",
+            timeout=5.0,
+            total_timeout=0.3,
+            min_refresh_seconds=0,
+            wait_timeout=0.3,
+        )
+        peak = 0
+        for _ in range(4):
+            begin = time.monotonic()
+            with self.assertRaises(JwksUnavailable):
+                cache.get_signing_key("kid-1")
+            self.assertLess(time.monotonic() - begin, 1.5)
+            peak = max(peak, _open_downloads())
+        self.assertLessEqual(peak, 1, f"{peak} downloads were open at the same time")
+
+    def test_expired_download_does_not_connect_after_name_resolution(self):
+        accepted = []
+        server = socketserver.ThreadingTCPServer(("127.0.0.1", 0), _SilentTlsHandler)
+        server.daemon_threads = True
+        original_handle = _SilentTlsHandler.handle
+        server.RequestHandlerClass = type(
+            "Recording",
+            (_SilentTlsHandler,),
+            {"handle": lambda handler: (accepted.append(1), original_handle(handler))},
+        )
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        port = server.server_address[1]
+
+        def late_getaddrinfo(host, *args, **kwargs):
+            time.sleep(1.0)  # resolution finishes after the 0.3 second deadline
+            return self.real("127.0.0.1", port, *args[1:], **kwargs)
+
+        socket.getaddrinfo = late_getaddrinfo
+        cache = JwksCache(
+            f"https://late-dns.example.test:{port}/certs",
+            timeout=5.0,
+            total_timeout=0.3,
+            min_refresh_seconds=0,
+        )
+        with self.assertRaises(JwksUnavailable):
+            cache.get_signing_key("kid-1")
+        time.sleep(1.5)  # the resolver has answered by now
+        self.assertEqual(accepted, [], "the expired download opened a connection")
+        self.assertEqual(_open_downloads(), 0)
+
+
 class _RacingLock:
     """A real lock whose `locked()` answers False once, as if the caller checked just before the other
     thread took it."""

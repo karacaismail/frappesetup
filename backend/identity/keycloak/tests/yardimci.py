@@ -48,6 +48,24 @@ class HttpYanit:
         return json.loads(self.govde.decode("utf-8"))
 
 
+def safe_detail(response: "HttpYanit") -> str:
+    """Status and OAuth error code of a response, for test failure messages.
+
+    Never the body: a token endpoint that wrongly accepts a request returns tokens in it.
+    """
+    detail = f"HTTP {response.durum}"
+    try:
+        error = json.loads(response.govde.decode("utf-8")).get("error")
+    except (ValueError, AttributeError):
+        return detail
+    if error in (
+        "access_denied", "invalid_client", "invalid_grant", "invalid_request", "invalid_scope",
+        "invalid_token", "unauthorized_client", "unsupported_grant_type",
+    ):
+        detail += f" {error}"
+    return detail
+
+
 def istek(yontem: str, adres: str, *, form: dict | None = None, govde: dict | None = None,
           belirtec: str | None = None, basliklar: dict | None = None) -> HttpYanit:
     veri = None

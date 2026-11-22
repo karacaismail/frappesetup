@@ -4,10 +4,12 @@ Plain HTTP is allowed only for a development address: `localhost`, a name under 
 (RFC 6761 keeps these names off the public DNS) or a loopback IP address.
 """
 
+import gc
 import http.server
 import json
 import threading
 import unittest
+import warnings
 
 from anahtarlar import Anahtar, jwks
 
@@ -51,6 +53,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         type(self).paths.append(self.path)
+        if self.path == "/missing":
+            self.send_response(404)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if self.path == "/redirect":
             self.send_response(302)
             self.send_header("Location", "/certs")
@@ -81,6 +88,19 @@ class RedirectTest(unittest.TestCase):
     def test_direct_download_works(self):
         cache = JwksCache(f"{self.base}/certs", min_refresh_seconds=0)
         self.assertIsNotNone(cache.get_signing_key("k1"))
+
+    def test_refused_redirect_and_http_error_close_their_sockets(self):
+        # Third review: an unclosed socket warning appeared in the test run.
+        for path in ("/redirect", "/missing"):
+            with self.subTest(path=path), warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", ResourceWarning)
+                cache = JwksCache(f"{self.base}{path}", min_refresh_seconds=0)
+                with self.assertRaises(JwksUnavailable):
+                    cache.get_signing_key("k1")
+                del cache
+                gc.collect()
+                leaked = [w for w in caught if issubclass(w.category, ResourceWarning)]
+                self.assertEqual(leaked, [], [str(w.message) for w in leaked])
 
     def test_redirect_is_not_followed(self):
         cache = JwksCache(f"{self.base}/redirect", min_refresh_seconds=0)

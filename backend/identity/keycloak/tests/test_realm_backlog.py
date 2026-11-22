@@ -11,7 +11,7 @@ import unittest
 import urllib.parse
 
 from yardimci import (KLASOR, ORNEK_ENV, admin, canli_var_mi, get_without_redirect, istemci_belirteci, istek,
-                      jwt_govdesi, ortam, pkce_pair, realm_oku, yonetici_belirteci)
+                      jwt_govdesi, ortam, pkce_pair, realm_oku, yonetici_belirteci, safe_detail)
 
 PLACEHOLDER = re.compile(r"^\$\{[A-Z0-9_]+\}$")
 PRODUCTION_ENV = KLASOR / "production.env.example"
@@ -131,7 +131,7 @@ def _authorize(client_id: str, redirect_uri: str, **extra) -> object:
 
 def _assert_refused_without_pkce(test: unittest.TestCase, response) -> None:
     location = response.basliklar.get("Location", "")
-    test.assertNotIn('name="username"', response.govde.decode("utf-8", "replace"))
+    test.assertFalse(b'name="username"' in response.govde, safe_detail(response))
     test.assertNotIn("code=", location)
     if response.durum in (302, 303):
         test.assertIn("error=invalid_request", location)
@@ -168,7 +168,7 @@ class RealmBacklogLiveTest(unittest.TestCase):
         response = _authorize("mobile-app", ortam("ATONOTA_MOBILE_REDIRECT_URI"),
                               code_challenge=challenge, code_challenge_method="S256")
         self.assertEqual(response.durum, 200, response.basliklar.get("Location"))
-        self.assertIn('name="username"', response.govde.decode("utf-8", "replace"))
+        self.assertTrue(b'name="username"' in response.govde, safe_detail(response))
 
     def test_mobile_client_refuses_a_plain_challenge(self):
         response = _authorize("mobile-app", ortam("ATONOTA_MOBILE_REDIRECT_URI"),
@@ -179,10 +179,10 @@ class RealmBacklogLiveTest(unittest.TestCase):
         token_url = f"{ortam('KC_PUBLIC_URL')}/realms/platform/protocol/openid-connect/token"
         password = istek("POST", token_url, form={"grant_type": "password", "client_id": "mobile-app",
                                                   "username": "nobody@example.test", "password": "x"})
-        self.assertIn(password.durum, (400, 401), password.govde[:200])
-        self.assertIn(password.json()["error"], ("unauthorized_client", "invalid_client"))
+        self.assertIn(password.durum, (400, 401), safe_detail(password))
+        self.assertTrue(password.json().get("error") in ("unauthorized_client", "invalid_client"), safe_detail(password))
         service = istek("POST", token_url, form={"grant_type": "client_credentials", "client_id": "mobile-app"})
-        self.assertIn(service.durum, (400, 401), service.govde[:200])
+        self.assertIn(service.durum, (400, 401), safe_detail(service))
 
     def test_press_client_refuses_login_without_pkce(self):
         redirect = f"{ortam('ATONOTA_PRESS_URL')}/api/method/press_tr.api.auth.keycloak_callback"
@@ -190,7 +190,7 @@ class RealmBacklogLiveTest(unittest.TestCase):
 
     def test_tenant_service_client_gets_identity_sync_audience(self):
         response = istemci_belirteci("site-kiraci1", ortam("ATONOTA_SITE_KIRACI1_SECRET"), "aud-identity-sync")
-        self.assertEqual(response.durum, 200, response.govde[:200])
+        self.assertEqual(response.durum, 200, safe_detail(response))
         claims = jwt_govdesi(response.json()["access_token"])
         self.assertEqual(claims["aud"], "identity-sync")
         self.assertEqual(claims["azp"], "site-kiraci1")
@@ -199,26 +199,24 @@ class RealmBacklogLiveTest(unittest.TestCase):
 
     def test_press_service_gets_identity_sync_audience(self):
         response = istemci_belirteci("press-service", ortam("ATONOTA_PRESS_SERVICE_SECRET"), "aud-identity-sync")
-        self.assertEqual(response.durum, 200, response.govde[:200])
+        self.assertEqual(response.durum, 200, safe_detail(response))
         claims = jwt_govdesi(response.json()["access_token"])
         self.assertEqual(claims["aud"], "identity-sync")
         self.assertEqual(claims["azp"], "press-service")
 
     def test_tenant_service_token_without_scope_has_no_identity_sync_audience(self):
         response = istemci_belirteci("site-kiraci1", ortam("ATONOTA_SITE_KIRACI1_SECRET"))
-        self.assertEqual(response.durum, 200, response.govde[:200])
+        self.assertEqual(response.durum, 200, safe_detail(response))
         self.assertNotIn("identity-sync", _audiences(jwt_govdesi(response.json()["access_token"])))
 
     def test_other_clients_cannot_get_identity_sync_audience(self):
         for client_id, secret in (("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET"),
                                   ("press", "ATONOTA_PRESS_SECRET")):
             response = istemci_belirteci(client_id, ortam(secret), "aud-identity-sync")
-            if response.durum == 200:
-                claims = jwt_govdesi(response.json()["access_token"])
-                self.assertNotIn("identity-sync", _audiences(claims), client_id)
-            else:
-                self.assertIn(response.durum, (400, 401), client_id)
-                self.assertIn(response.json()["error"], ("invalid_scope", "unauthorized_client"), client_id)
+            # identity-sync has a service account: the scope is refused. press is a browser client
+            # without client credentials grant: the grant is refused first.
+            expected = "HTTP 400 invalid_scope" if client_id == "identity-sync" else "HTTP 401 unauthorized_client"
+            self.assertEqual(safe_detail(response), expected, client_id)
 
 
 if __name__ == "__main__":

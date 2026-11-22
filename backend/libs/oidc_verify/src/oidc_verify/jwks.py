@@ -31,6 +31,7 @@ import json
 import socket
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
@@ -54,6 +55,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
     """Refuses every redirect. A redirect could move the download to another host or to plain HTTP."""
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
+        fp.close()  # the refused response still holds the socket
         raise OSError(f"JWKS redirect refused ({code})")
 
 
@@ -74,6 +76,34 @@ class _Deadline:
             if self.expired:
                 raise TimeoutError("JWKS download exceeded total_timeout")
             self._conn = conn
+        # http.client opens the socket through this attribute. The guarded version resolves the name
+        # first and does not connect when the deadline passed during the resolution.
+        conn._create_connection = self.create_connection  # type: ignore[attr-defined]
+
+    def create_connection(self, address, timeout=socket._GLOBAL_DEFAULT_TIMEOUT, source_address=None):  # type: ignore[attr-defined]
+        """Like socket.create_connection, but stops between name resolution and connect when expired.
+
+        Python cannot interrupt a name lookup. The lookup itself may outlive the deadline; what follows
+        it is skipped, so an expired download never opens a connection.
+        """
+        host, port = address
+        infos = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+        last_error: OSError | None = None
+        for family, kind, proto, _canonical, target in infos:
+            if self.expired:
+                raise TimeoutError("JWKS download exceeded total_timeout")
+            sock = socket.socket(family, kind, proto)
+            try:
+                if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:  # type: ignore[attr-defined]
+                    sock.settimeout(timeout)
+                if source_address:
+                    sock.bind(source_address)
+                sock.connect(target)
+                return sock
+            except OSError as error:
+                last_error = error
+                sock.close()
+        raise last_error or OSError("getaddrinfo returned no address")
 
     def cut(self) -> None:
         with self._lock:
@@ -156,7 +186,12 @@ def _http_fetcher(
     """
 
     def download(opener, request, deadline: _Deadline) -> dict:
-        with opener.open(request, timeout=timeout) as response:
+        try:
+            response = opener.open(request, timeout=timeout)
+        except urllib.error.HTTPError as error:
+            error.close()  # an error response still holds the socket
+            raise OSError(f"JWKS response status {error.code}") from None
+        with response:
             if response.status != 200:
                 raise OSError(f"JWKS response status {response.status}")
             chunks: list[bytes] = []
@@ -180,6 +215,13 @@ def _http_fetcher(
             body = b"".join(chunks)
         return json.loads(body.decode("utf-8"))
 
+    # At most one download per cache (third review). A call that comes while the previous download is
+    # still alive waits for it at most total_timeout and then fails without starting a new one; the cache
+    # then serves a cached key or raises JwksUnavailable. In the worst case one download stays open:
+    # a name lookup that never returns.
+    running: list[threading.Thread] = []
+    running_lock = threading.Lock()
+
     def fetch() -> dict:
         # The URL was checked in JwksCache.__init__ (_check_url). The opener refuses redirects.
         # S310 checks the scheme of a URL opened by urllib: _check_url allows only https and dev http.
@@ -200,7 +242,14 @@ def _http_fetcher(
                 finished.set()
 
         worker = threading.Thread(target=work, name="oidc-verify-jwks-download", daemon=True)
-        worker.start()
+        with running_lock:
+            if running and running[0].is_alive():
+                # A cut download ends within moments. Wait for it at most total_timeout, never longer.
+                running[0].join(total_timeout)
+                if running[0].is_alive():
+                    raise TimeoutError("the previous JWKS download is still running")
+            running[:] = [worker]
+            worker.start()
         if not finished.wait(total_timeout):
             deadline.cut()
             raise TimeoutError("JWKS download exceeded total_timeout")

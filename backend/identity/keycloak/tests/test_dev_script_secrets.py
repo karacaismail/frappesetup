@@ -7,6 +7,7 @@ environment file with a made-up secret, so no development secret is touched.
 
 from __future__ import annotations
 
+import shutil
 import stat
 import subprocess
 import tempfile
@@ -19,7 +20,11 @@ SCRIPT = KLASOR / "bin" / "kc-dev.sh"
 FAKE_SECRET = "fake-webhook-secret-for-the-argv-test-7f3a"  # gitleaks:allow (synthetic test value)
 
 STAND_IN = """#!/bin/sh
-printf '%s\\n' "$0 $*" >> "$ARGV_LOG"
+printf '%s\\n' "$(basename "$0") $*" >> "$ARGV_LOG"
+if [ -n "$KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET" ] && [ "$(basename "$0")" = docker ]; then
+  case "$*" in *" run "*) [ "$KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET" = "$EXPECTED_SECRET" ] \\
+    && echo "secret-in-env" >> "$ARGV_LOG" ;; esac
+fi
 case "$*" in
   *inspect*) echo false ;;
   *" logs "*) echo "webhook URL must use https" ;;
@@ -29,11 +34,20 @@ exit 0
 
 
 class ProdCheckSecretTest(unittest.TestCase):
+    """Runs a copy of the script in its own folder, so no real tunnel file, port or Python run is touched."""
+
     def setUp(self):
         self.dir = Path(tempfile.mkdtemp(prefix="kc-dev-argv-"))
-        bin_dir = self.dir / "bin"
+        root = self.dir / "backend" / "identity" / "keycloak"
+        (root / "bin").mkdir(parents=True)
+        (root / "tests").mkdir()
+        shutil.copy2(SCRIPT, root / "bin" / "kc-dev.sh")
+        shutil.copy2(KLASOR / ".env.example", root / ".env.example")
+        self.script = root / "bin" / "kc-dev.sh"
+        self.root = root
+        bin_dir = self.dir / "stand-ins"
         bin_dir.mkdir()
-        for name in ("docker", "curl", "ssh"):
+        for name in ("docker", "curl", "ssh", "python3"):
             path = bin_dir / name
             path.write_text(STAND_IN, encoding="utf-8")
             path.chmod(path.stat().st_mode | stat.S_IXUSR)
@@ -53,22 +67,25 @@ class ProdCheckSecretTest(unittest.TestCase):
             "PANE_PORT": "5990",
             "KC_ENV_FILE": str(env_file),
             "ARGV_LOG": str(self.log),
+            "EXPECTED_SECRET": FAKE_SECRET,
             "COMPOSE_PROJECT_NAME": "fs-kimlik-realm-argv-test",
         }
 
     def tearDown(self):
-        for path in sorted(self.dir.rglob("*"), reverse=True):
-            path.unlink() if path.is_file() else path.rmdir()
-        self.dir.rmdir()
+        shutil.rmtree(self.dir)
 
     def test_prod_check_keeps_the_secret_off_every_command_line(self):
-        subprocess.run(["bash", str(SCRIPT), "prod-check"], env=self.env, capture_output=True,
+        subprocess.run(["bash", str(self.script), "prod-check"], env=self.env, capture_output=True,
                        timeout=600, check=False)
         recorded = self.log.read_text(encoding="utf-8")
-        self.assertIn(" run ", recorded, "the stand-in docker must have been called")
+        runs = [line for line in recorded.splitlines() if line.startswith("docker ") and " run " in line]
+        self.assertEqual(len(runs), 2, "both prod containers must be started")
+        for run in runs:
+            self.assertIn(f"--env-file {self.env['KC_ENV_FILE']}", run, "the test's own env file must be used")
+            self.assertIn("-e KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET ", run, "pass the secret by name only")
         self.assertNotIn(FAKE_SECRET, recorded, "a secret value reached a command line")
-        self.assertIn(f"--env-file {self.env['KC_ENV_FILE']}", recorded, "the test's own env file must be used")
-
+        self.assertEqual(recorded.count("secret-in-env"), 2, "docker must get the secret from the environment")
+        self.assertIn("python3 -I -m unittest", recorded, "the final test run must be the stand-in")
 
 if __name__ == "__main__":
     unittest.main()

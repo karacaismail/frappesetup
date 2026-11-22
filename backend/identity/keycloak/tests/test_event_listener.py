@@ -17,7 +17,7 @@ import time
 import unittest
 import uuid
 
-from yardimci import KLASOR, ORNEK_ENV, admin, canli_var_mi, istek, ortam, realm_oku, yonetici_belirteci
+from yardimci import KLASOR, ORNEK_ENV, admin, canli_var_mi, istek, ortam, realm_oku, yonetici_belirteci, safe_detail
 
 LISTENER = KLASOR / "event-listener"
 DOCKERFILE = KLASOR / "Dockerfile"
@@ -117,7 +117,7 @@ class EventListenerLiveTest(unittest.TestCase):
         username = f"event-{uuid.uuid4().hex[:10]}"
         created = admin("/users", self.admin_token, "POST", {
             "username": username, "email": f"{username}@example.test", "enabled": True})
-        self.assertEqual(created.durum, 201, created.govde[:300])
+        self.assertEqual(created.durum, 201, safe_detail(created))
         user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
         self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
         sent_after = int(time.time()) - 5
@@ -150,7 +150,7 @@ class EventListenerLiveTest(unittest.TestCase):
     def test_events_the_service_ignores_are_not_sent(self):
         group = f"event-group-{uuid.uuid4().hex[:8]}"
         created = admin("/groups", self.admin_token, "POST", {"name": group})
-        self.assertEqual(created.durum, 201, created.govde[:300])
+        self.assertEqual(created.durum, 201, safe_detail(created))
         group_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
         self.addCleanup(admin, f"/groups/{group_id}", self.admin_token, "DELETE")
         time.sleep(3)

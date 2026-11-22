@@ -182,5 +182,26 @@ class EnvExampleTest(unittest.TestCase):
                 self.assertNotIn(" #", line, line)
 
 
+class NoRawResponseInMessagesTest(unittest.TestCase):
+    """Third review: a failing live test must not write a response body to the log. A token endpoint
+    that wrongly accepts a request returns tokens in that body."""
+
+    def test_tests_never_slice_a_raw_body_into_a_message(self):
+        for path in sorted((KLASOR / "tests").glob("*.py")):
+            text = path.read_text(encoding="utf-8")
+            # A slice of a response object's raw body; a local dict of decoded claims is fine.
+            self.assertIsNone(re.search(r"\.govde\[", text), path.name)
+
+    def test_safe_detail_keeps_status_and_error_code_only(self):
+        from yardimci import HttpYanit, safe_detail
+
+        token_body = b'{"access_token":"eyJhbGciOiJSUzI1NiJ9.secret","error":"invalid_grant"}'
+        detail = safe_detail(HttpYanit(400, token_body, {}))
+        self.assertEqual(detail, "HTTP 400 invalid_grant")
+        self.assertEqual(safe_detail(HttpYanit(200, b'{"access_token":"eyJ.x.y"}', {})), "HTTP 200")
+        self.assertEqual(safe_detail(HttpYanit(502, b"<html>bad gateway</html>", {})), "HTTP 502")
+        self.assertEqual(safe_detail(HttpYanit(400, b'{"error":"opaque_secret"}', {})), "HTTP 400")
+
+
 if __name__ == "__main__":
     unittest.main()
