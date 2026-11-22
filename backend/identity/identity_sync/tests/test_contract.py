@@ -186,6 +186,59 @@ class TargetReplyTest(unittest.TestCase):
                     self.assertNotEqual(schema_errors(body, schema, CONTRACT), [])
 
 
+class TranslationTest(unittest.TestCase):
+    """The contract's source text is English. The Turkish text lives in translations/tr.csv.
+
+    The file follows the Frappe layout: source, translation, context. The context names the
+    place of the text in the contract.
+    """
+
+    TRANSLATIONS = ROOT / "identity" / "identity_sync" / "translations" / "tr.csv"
+
+    def contract_texts(self) -> dict[str, str]:
+        texts: dict[str, str] = {}
+
+        def walk(node: object, path: str) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    here = f"{path}.{key}" if path else str(key)
+                    if key in ("summary", "description") and isinstance(value, str):
+                        texts[here] = value
+                    else:
+                        walk(value, here)
+            elif isinstance(node, list):
+                for index, value in enumerate(node):
+                    walk(value, f"{path}[{index}]")
+
+        walk(CONTRACT, "")
+        return texts
+
+    def rows(self) -> list[list[str]]:
+        import csv
+
+        with self.TRANSLATIONS.open(encoding="utf-8", newline="") as handle:
+            return list(csv.reader(handle))
+
+    def test_contract_source_text_has_no_turkish_letters(self) -> None:
+        turkish = re.compile("[\u00e7\u00c7\u011f\u011e\u0131\u0130\u00f6\u00d6\u015f\u015e\u00fc\u00dc]")
+        offenders = [path for path, text in self.contract_texts().items() if turkish.search(text)]
+        self.assertEqual(offenders, [])
+
+    def test_every_contract_text_has_a_turkish_translation_with_context(self) -> None:
+        texts = self.contract_texts()
+        rows = self.rows()
+        self.assertTrue(all(len(row) == 3 for row in rows))
+        by_context = {row[2]: row for row in rows}
+        self.assertEqual(len(by_context), len(rows))
+        self.assertEqual(set(by_context), {f"identity_sync.openapi.yaml: {path}" for path in texts})
+        for path, text in texts.items():
+            source, translation, _context = by_context[f"identity_sync.openapi.yaml: {path}"]
+            with self.subTest(path=path):
+                # The source column is exactly the contract text, so the two cannot drift apart.
+                self.assertEqual(source, text)
+                self.assertTrue(translation.strip())
+
+
 class ImplementationTest(ServerCase):
     def test_implemented_operations_need_credentials_and_planned_ones_do_not_exist(self) -> None:
         self.start_server(reject_all)

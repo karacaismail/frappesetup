@@ -167,6 +167,15 @@ Sunucu ve `replay-dead-letters` komutu ayrı süreçlerdir. İkisi aynı kayıt 
 - Servis her kaydı hemen kalıcı yazar. Yeniden işleme yarıda kesilirse biten olaylar kaybolmaz.
 - Süreç ölürse kilit kendiliğinden açılır.
 
+## Sözleşme metninin dili
+
+OpenAPI dosyasındaki özet ve açıklama metinleri İngilizcedir. Araçlar ve yapay zekâ bu metinleri okur.
+
+- Türkçe metin `translations/tr.csv` dosyasındadır.
+- Dosyanın üç sütunu vardır: İngilizce kaynak, Türkçe çeviri ve bağlam.
+- Bağlam, metnin sözleşmedeki yerini söyler. Örneğin `identity_sync.openapi.yaml: paths./healthz.get.summary` yazar.
+- Sözleşmedeki bir metni değiştirirseniz çeviri dosyasındaki satırı da değiştirin. Bir test iki dosyanın uyuştuğunu denetler.
+
 ## Ayarlar
 
 Servis ayarları ve sırları ortam değişkeninden okur. Örnek değerler `.env.example` dosyasındadır. O dosyadaki bütün değerler sahtedir. Gerçek sırrı depoya yazmayın.
