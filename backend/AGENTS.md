@@ -8,6 +8,8 @@ Bu klasör platformun sunucu kodunu tutar. Deponun kökündeki `AGENTS.md` karar
 2. [Proje kaydını](PROJE-KAYDI.md) okuyun. Seviye MVP'dir.
 3. [Sözleşmeleri](docs/sozlesmeler.md) okuyun. Bileşenler bu adlarla konuşur.
 4. Kod standartlarını okuyun. Standartlar `docs/standartlar/` klasöründedir.
+   - Bu dosyalar proje sahibinin son kararıdır (D-15). Yalnız Frappe 16.x kullanın. Dosyalardaki Frappe 15 notlarını uygulamayın. Frappe 16'nın hazır özelliklerini tercih edin.
+   - Telefon eşitlemesi ve giriş işinde `mobile.md` dosyasını da okuyun.
    - Python kodunda `frappe-python-standartlari.md` dosyasını uygulayın.
    - Öteki dosyalarda `frappe-python-disi-standartlari.md` dosyasını uygulayın.
    - Giriş temasında `headless-frontend-standartlari.md` dosyasının güvenlik ve erişilebilirlik kurallarını da uygulayın.
