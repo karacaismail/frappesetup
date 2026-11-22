@@ -170,6 +170,45 @@ class OrganizationTest(AdminCase):
         self.assertEqual(len(self.writes()), 1)
 
 
+class SessionTest(AdminCase):
+    """Source: Keycloak 26.8 Admin REST API, DELETE /admin/realms/{realm}/sessions/{session}."""
+
+    SID = "55555555-5555-4555-8555-555555555555"
+
+    def test_delete_session(self) -> None:
+        self.kc.on("DELETE", f"{self.base}/sessions/{self.SID}", (204, None))
+
+        self.admin.delete_session(self.SID)
+
+        (call,) = self.kc.calls("DELETE", f"{self.base}/sessions/{self.SID}")
+        self.assertEqual(call.headers["authorization"], f"Bearer token-for:{fakes.ADMIN_SCOPE}")
+
+    def test_session_that_is_already_gone_is_fine(self) -> None:
+        # Repeatable: Keycloak answers 404 for a closed session. The realm itself answers.
+        self.kc.on("DELETE", f"{self.base}/sessions/{self.SID}", (404, {"error": "Session not found"}))
+
+        self.admin.delete_session(self.SID)
+
+    def test_404_from_a_wrong_address_is_not_taken_as_closed(self) -> None:
+        self.kc.on("DELETE", f"{self.base}/sessions/{self.SID}", (404, None))
+        self.kc.on("GET", f"{self.base}/users/count", (404, None))
+
+        with self.assertRaises(HttpError):
+            self.admin.delete_session(self.SID)
+
+    def test_refusal_is_raised(self) -> None:
+        self.kc.on("DELETE", f"{self.base}/sessions/{self.SID}", (403, None))
+
+        with self.assertRaises(HttpError):
+            self.admin.delete_session(self.SID)
+
+    def test_path_segments_are_never_sent(self) -> None:
+        for bad in ("..", ".", ""):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                self.admin.delete_session(bad)
+        self.assertEqual(self.kc.requests, [])
+
+
 class RolesTest(AdminCase):
     """The fake follows the roles in docs/sozlesmeler.md, section 2."""
 

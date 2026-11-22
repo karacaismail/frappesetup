@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.5.0
+  version: 0.6.0
   summary: Kullanıcı eşitleme servisinin uçları
   description: |
     Bu servis Keycloak'taki kullanıcı değişikliklerini Press'e ve kiracı sitelerine taşır (G-81).
@@ -67,6 +67,35 @@ info:
     Bu servis onay vermez. Onayın süresini onay katmanı denetler.
     Onay kimliği ilk kullanıldığı özete bağlıdır ve bir daha kullanılamaz.
     Plan değiştiği için reddedilen istek de onayı tüketir. Yeni plan yeni onay ister.
+
+    ## Hesap silme ve kapalı hesap
+
+    Hesap silme akışının kaynağı ortak sözleşmenin 7. bölümü ve proje kaydının O-27 kararıdır.
+    Akış beş adımdır ve sırası sabittir.
+
+    1. Servis Keycloak kullanıcısını kapatır ve oturumlarını sonlandırır.
+    2. Servis Press'e `all_organizations: true` isteği gönderir. Press kullanıcıyı kapatır ve API anahtarlarını geçersiz yapar.
+    3. Servis kullanıcıyı her kiracıda kapatır. Sonra telefon kurulumlarını ve bildirim bağlarını sildirir.
+    4. Servis kişiyi gösteren alanları Press'te ve her kiracıda anonim yaptırır. İş kayıtları silinmez.
+    5. Servis Keycloak kullanıcısını siler.
+
+    Her adım tekrar edilebilir. Bir adım başarısız olursa istek bekleme kuyruğuna girer.
+    Önceki adımlardan biri başarısızsa servis 5. adımı atlar. Yani Keycloak kullanıcısını silmez.
+    İnsan isteği `POST /v1/dead-letters/replay` ucuyla yeniden işletir.
+    İş bitince servisin kaydında yalnız isteğin kimliği kalır. Kayıt e-posta taşımaz.
+    Servis kullanıcıyı `sub` kimliğiyle işler. E-postayı hiç saklamaz.
+
+    Keycloak'ın `DELETE_ACCOUNT` olayı da aynı akışı başlatır.
+    O durumda kullanıcı Keycloak'ta zaten silinmiştir. 1. ve 5. adım iş yapmaz.
+
+    Keycloak'ta kapatılan kullanıcı için servis telefon kurulumlarını da iptal ettirir.
+    Bu iş kapatma planının parçasıdır.
+
+    3. ve 4. adım kiracıda ve Press'te üç yeni uç ister. Bu uçlar o sözleşmelerde henüz yoktur.
+    Adları `platform_core.api.identity.revoke_installations`,
+    `platform_core.api.identity.anonymize` ve `press_tr.api.identity.anonymize` olur.
+    Beklenen yanıtlar bu dosyanın sonundaki `Target` şemalarındadır.
+    Bu uçlar gelene kadar o adımlar başarısız olur ve istek bekleme kuyruğunda kalır.
 
     ## Bütün uçların ortak hataları
 
@@ -506,6 +535,108 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /v1/sessions/revoke:
+    post:
+      operationId: revokeSession
+      summary: Bir Keycloak oturumunu kapatır.
+      description: |
+        Kaynak ortak sözleşmenin 7. bölümüdür.
+        Kullanıcı bir telefon kurulumunu iptal edince `platform_core` bu ucu çağırır.
+        Telefon kurulumu kayıt anında belirteçteki `sid` değerini saklar. Gövde bu değeri taşır.
+        Servis Keycloak Admin API ile o oturumu siler. Oturum silinince yenileme belirteci de geçersiz olur.
+
+        Uç tekrar edilebilir. Oturum zaten kapalıysa servis yine 200 döner.
+        Servis “oturum yok” yanıtını ancak realm'in yanıt verdiğini doğrulayınca başarı sayar.
+        Çünkü yanlış adres de 404 döner.
+
+        Ucu yalnız `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci çağırabilir.
+        Bu liste `platform_core` sitelerinin servis istemcilerini taşır.
+        Önizleme ve yürütme listelerindeki istemciler bu ucu çağıramaz.
+        Bu uç insan onayı istemez. Çünkü işi kullanıcının kendi iptal işlemi başlatır.
+        Bu uç yıkıcıdır: kapanan oturum geri açılamaz. Kullanıcı yeniden giriş yapar.
+      x-durum: uygulandi
+      x-yikici: true
+      x-yurutme: otomatik
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionRevokeRequest"
+      responses:
+        "200":
+          description: Oturum kapalı. Oturum bu istekten önce kapalıysa yanıt yine budur.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionRevokeResult"
+        "400":
+          description: Gövde hatalı. Örneğin `sid` yok ya da geçersiz.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          $ref: "#/components/responses/UpstreamFailed"
+  /v1/account-deletions:
+    post:
+      operationId: requestAccountDeletion
+      summary: Bir hesabın silinmesini ister ve akışı yürütür.
+      description: |
+        Kaynak ortak sözleşmenin 7. bölümü ve proje kaydının O-27 kararıdır.
+        Kullanıcı kendi hesabının silinmesini ister. Servis isteği kaydeder ve beş adımı sırayla yürütür.
+        Adımlar bu dosyanın başındaki “Hesap silme ve kapalı hesap” bölümündedir.
+
+        Bu uç yıkıcıdır ve geri alınamaz. Kullanıcı her yerde kapanır ve Keycloak'tan silinir.
+        Kişiyi gösteren alanlar anonim yapılır. İş kayıtları silinmez.
+
+        Önizleme herkese açıktır: `dry_run: true` isteğini iki listedeki istemci de gönderebilir.
+        Önizleme yalnız planı döner. Hiçbir kaydı değiştirmez.
+        Gerçek yürütmeyi yalnız onay katmanı başlatır.
+        Yürütme isteği `preview_digest` ve `approval_id` alanlarını taşımalıdır.
+        Buradaki onay, hesabın sahibinin kendi onayıdır. Onayı onay katmanı alır.
+
+        Servis isteği işe başlamadan önce kaydeder. İsteğin kimliği `approval_id` değeridir.
+        Bir adım başarısız olursa yanıt yine 200 olur ve durum `dead_lettered` ya da `unknown` olur.
+        İstek o zaman bekleme kuyruğundadır. İnsan isteği `POST /v1/dead-letters/replay` ile yeniden işletir.
+      x-durum: planlandi
+      x-yikici: true
+      x-yurutme: yalniz-onay-katmani
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountDeletionRequest"
+      responses:
+        "200":
+          description: |
+            Önizlemede plan ve `preview_digest` döner.
+            Yürütmede isteğin sonucu döner. Durum `processed`, `dead_lettered`, `unknown` ya da `duplicate` olur.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountDeletionResult"
+        "400":
+          description: Gövde hatalı. Örneğin `dry_run` yok ya da yürütmede onay alanları eksik.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/PreviewChanged"
   /v1/tenants/{tenant}/client:
     post:
       operationId: ensureTenantClient
@@ -643,6 +774,8 @@ components:
         Belirtecin `azp` değeri iki listeden birinde olmalıdır.
         `IDENTITY_SYNC_PREVIEW_AZP` listesi okuma ve önizleme izni verir.
         `IDENTITY_SYNC_EXECUTE_AZP` listesi ayrıca yürütme izni verir.
+        `IDENTITY_SYNC_SESSION_AZP` listesi yalnız `/v1/sessions/revoke` ucunu açar.
+        Bir istemci bu listelerden yalnız birinde durabilir.
         İki liste de boşsa servis her isteği reddeder.
         Kitaplık kurulu değilse servis yine her isteği reddeder.
         İstek çerez de taşıyorsa servis isteği reddeder.
@@ -830,6 +963,11 @@ components:
             - keycloak.create_user
             - keycloak.send_execute_actions_email
             - keycloak.create_site_client
+            - keycloak.disable_user
+            - keycloak.delete_user
+            - press.anonymize
+            - tenant.revoke_installations
+            - tenant.anonymize
             - press.ensure_team
             - press.remove_team_member
             - tenant.provision
@@ -1090,6 +1228,80 @@ components:
         resolution:
           type: string
           enum: [completed, abandoned]
+    SessionRevokeRequest:
+      type: object
+      required: [sid]
+      properties:
+        sid:
+          $ref: "#/components/schemas/ResourceId"
+      additionalProperties: false
+    SessionRevokeResult:
+      type: object
+      required: [sid, revoked]
+      properties:
+        sid:
+          type: string
+          description: Kapanan oturumun kimliği.
+        revoked:
+          type: boolean
+          const: true
+          description: Oturum artık yok.
+    AccountDeletionRequest:
+      description: Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.
+      oneOf:
+        - $ref: "#/components/schemas/AccountDeletionPreviewRequest"
+        - $ref: "#/components/schemas/AccountDeletionExecuteRequest"
+    AccountDeletionPreviewRequest:
+      type: object
+      description: Önizleme isteği. Servis hiçbir kaydı değiştirmez.
+      required: [subject, dry_run]
+      properties:
+        subject:
+          $ref: "#/components/schemas/ResourceId"
+        dry_run:
+          type: boolean
+          const: true
+    AccountDeletionExecuteRequest:
+      type: object
+      description: Yürütme isteği. Yalnız onay katmanı gönderebilir.
+      required: [subject, dry_run, preview_digest, approval_id]
+      properties:
+        subject:
+          $ref: "#/components/schemas/ResourceId"
+        dry_run:
+          type: boolean
+          const: false
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
+        approval_id:
+          $ref: "#/components/schemas/ApprovalId"
+    AccountDeletionResult:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [preview, processed, dead_lettered, unknown, duplicate]
+          description: |
+            `preview` değeri yalnız planın döndüğünü gösterir.
+            `processed` değeri beş adımın da bittiğini gösterir.
+            `dead_lettered` değeri bir adımın başarısız olduğunu ve isteğin kuyrukta beklediğini gösterir.
+            `unknown` değeri bir adımın sonucunun bilinmediğini gösterir.
+            `duplicate` değeri bu isteğin daha önce bittiğini gösterir.
+        request_id:
+          $ref: "#/components/schemas/ApprovalId"
+        actions:
+          type: array
+          description: Kesin başarıyla biten adımların adları.
+          items:
+            type: string
+        previews:
+          type: array
+          description: Yalnız önizlemede döner.
+          items:
+            $ref: "#/components/schemas/Preview"
+        preview_digest:
+          $ref: "#/components/schemas/PreviewDigest"
     ReconcileRequest:
       description: Çağıran `dry_run` alanını açıkça yazmalıdır. İki biçimden biri geçerlidir.
       oneOf:
@@ -1297,6 +1509,42 @@ components:
               minLength: 1
             enabled:
               type: boolean
+          additionalProperties: true
+    TargetRevokeInstallationsResult:
+      type: object
+      description: |
+        `platform_core.api.identity.revoke_installations` ucundan beklenen yanıt. Bu uç bir öneridir.
+        Uç kiracının sözleşmesinde henüz yoktur.
+        Uç kullanıcının bütün telefon kurulumlarını ve bildirim bağlarını siler.
+        İstek `issuer` ve `subject` alanlarını taşır. Uç tekrar edilebilir olmalıdır.
+        Bağ yoksa uç 404 ve `IdentityNotFound` döner. Servis bu yanıtı başarı sayar.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [revoked]
+          properties:
+            revoked:
+              type: integer
+              description: Bu istekte silinen kurulum sayısı. Kurulum kalmadıysa 0 olur.
+          additionalProperties: true
+    TargetAnonymizeResult:
+      type: object
+      description: |
+        `platform_core.api.identity.anonymize` ve `press_tr.api.identity.anonymize` uçlarından beklenen yanıt.
+        Bu uçlar bir öneridir. Kiracının ve Press'in sözleşmelerinde henüz yoktur.
+        Uç kişiyi gösteren alanları anonim yapar. İş kayıtlarını silmez.
+        İstek `issuer` ve `subject` alanlarını taşır. Uç tekrar edilebilir olmalıdır.
+        Bağ yoksa uç 404 ve `IdentityNotFound` döner. Servis bu yanıtı başarı sayar.
+      required: [message]
+      properties:
+        message:
+          type: object
+          required: [anonymized]
+          properties:
+            anonymized:
+              type: boolean
+              const: true
           additionalProperties: true
     TargetChangeEmailResult:
       type: object

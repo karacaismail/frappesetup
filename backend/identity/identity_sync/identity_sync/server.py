@@ -294,6 +294,25 @@ class _Api:
         self._audit("invite_user", payload, azp, "executed")
         return 200, {"subject": result.subject, "previews": [item.to_dict() for item in result.previews]}
 
+    # --- sessions: called by platform_core sites, not by the approval flow ---
+
+    def post_revoke_session(self, body: bytes, azp: str) -> Reply:
+        """End one Keycloak session (docs/sozlesmeler.md, section 7). Repeatable."""
+        payload = _json_object(body)
+        if set(payload) != {"sid"}:
+            raise _BadRequest
+        sid = _text(payload, "sid", required=True, max_length=128)
+        if not RESOURCE_ID.fullmatch(sid):
+            raise _BadRequest
+        try:
+            self._app.keycloak.delete_session(sid)
+        except (HttpError, TransportError):
+            _LOG.warning("execute operation=revoke_session azp=%s outcome=upstream_failed", azp)
+            raise
+        # The session id is not a secret, but it is not needed in the log either.
+        _LOG.info("execute operation=revoke_session azp=%s outcome=executed", azp)
+        return 200, {"sid": sid, "revoked": True}
+
     # --- unfinished multi-step work ---
 
     def get_operations(self, _body: bytes, _azp: str) -> Reply:
@@ -346,7 +365,10 @@ def make_server(
         "/v1/dead-letters/replay": ("POST", api.post_replay),
         "/v1/invitations": ("POST", api.post_invitation),
         "/v1/operations": ("GET", api.get_operations),
+        "/v1/sessions/revoke": ("POST", api.post_revoke_session),
     }
+    # Routes for platform_core site clients. Every other token route is for the preview and approval flow.
+    session_routes = frozenset({"/v1/sessions/revoke"})
     methods = {"/healthz": "GET", "/v1/events": "POST", **{path: route[0] for path, route in token_routes.items()}}
 
     class RequestHandler(BaseHTTPRequestHandler):
@@ -421,7 +443,8 @@ def make_server(
             azp = self._caller()
             if azp is None:
                 return 401, {"error": "unauthorized"}
-            if azp not in settings.known_azp:
+            allowed = settings.session_azp if path in session_routes else settings.staff_azp
+            if azp not in allowed:
                 return 403, {"error": "forbidden"}
             if resolve is not None:
                 return api.post_resolve_operation(resolve.group(1), body, azp)

@@ -28,6 +28,7 @@ def environment(keycloak: str, press: str, tenant: str, db: str) -> dict[str, st
         "IDENTITY_SYNC_REALM_ID": fakes.REALM_ID,
         "IDENTITY_SYNC_EXECUTE_AZP": "approval-service",
         "IDENTITY_SYNC_PREVIEW_AZP": "ai-agent, ops-bff",
+        "IDENTITY_SYNC_SESSION_AZP": "site-kiraci1",
     }
 
 
@@ -67,6 +68,14 @@ class ConfigTest(unittest.TestCase):
     def test_client_cannot_be_in_both_lists(self) -> None:
         with self.assertRaises(ConfigError):
             load_settings({**self.ENV, "IDENTITY_SYNC_PREVIEW_AZP": "ai-agent, approval-service"})
+
+    def test_session_clients_are_their_own_list(self) -> None:
+        settings = load_settings(self.ENV)
+        self.assertEqual(settings.session_azp, frozenset({"site-kiraci1"}))
+        self.assertIn("site-kiraci1", settings.known_azp)
+        for other in ("EXECUTE", "PREVIEW"):
+            with self.subTest(other=other), self.assertRaises(ConfigError):
+                load_settings({**self.ENV, f"IDENTITY_SYNC_{other}_AZP": "site-kiraci1"})
 
     def test_client_lists_default_to_empty(self) -> None:
         env = {k: v for k, v in self.ENV.items() if not k.endswith("_AZP")}

@@ -171,6 +171,15 @@ Sunucu ve `replay-dead-letters` komutu ayrı süreçlerdir. İkisi aynı kayıt 
 
 Servis ayarları ve sırları ortam değişkeninden okur. Örnek değerler `.env.example` dosyasındadır. O dosyadaki bütün değerler sahtedir. Gerçek sırrı depoya yazmayın.
 
+## Oturum kapatma
+
+Kullanıcı bir telefon kurulumunu iptal edince kiracı sitesi `POST /v1/sessions/revoke` ucunu çağırır. Gövde oturumun `sid` değerini taşır.
+
+- Servis o oturumu Keycloak'ta siler. Yenileme belirteci de geçersiz olur.
+- Uç tekrar edilebilir. Oturum zaten kapalıysa servis yine 200 döner.
+- Ucu yalnız `IDENTITY_SYNC_SESSION_AZP` listesindeki istemci çağırabilir. Bu liste kiracı sitelerinin servis istemcilerini taşır.
+- Bu istemciler öteki uçları çağıramaz.
+
 ## Kimlik denetimi
 
 - Olay ucu imza ister. İmza HMAC-SHA256 ile üretilir.

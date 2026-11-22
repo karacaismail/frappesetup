@@ -24,12 +24,18 @@ from .fakes import DONE, ORG_ID, REALM_ID, SUBJECT, WEBHOOK_SECRET, Stack, keycl
 NOW = 1_795_000_000
 PREVIEW_TOKEN = "preview-token"  # yapay zekâ aracısının belirteci: yalnız okur ve önizler
 EXECUTE_TOKEN = "execute-token"  # onay katmanının belirteci: yürütebilir
+SESSION_TOKEN = "session-token"  # a platform_core site's service token: may only revoke sessions
 EVENT = {"id": "e-1", "kind": "user", "type": "VERIFY_EMAIL", "realm": "platform", "time": 1, "user_id": SUBJECT}
 ALL_ACTIONS = ["press.ensure_team", "tenant.change_email", "tenant.provision"]
 
 
 def fake_verifier(token: str) -> dict[str, object]:
-    azp = {PREVIEW_TOKEN: "ai-agent", EXECUTE_TOKEN: "approval-service", "stranger-token": "baska-istemci"}.get(token)
+    azp = {
+        PREVIEW_TOKEN: "ai-agent",
+        EXECUTE_TOKEN: "approval-service",
+        SESSION_TOKEN: "site-kiraci1",
+        "stranger-token": "baska-istemci",
+    }.get(token)
     if azp is None:
         raise TokenRejected("invalid_signature")
     return {"azp": azp, "aud": "identity-sync"}
@@ -665,6 +671,62 @@ class ApprovalLayerTest(ServerCase):
             with self.subTest(payload=payload):
                 self.assertEqual(self.post_json("/v1/invitations", payload)[0], 400)
         self.assertEqual(self.stack.keycloak.requests, [])
+
+
+class SessionRevokeTest(ServerCase):
+    """POST /v1/sessions/revoke (docs/sozlesmeler.md, section 7)."""
+
+    PATH = "/v1/sessions/revoke"
+    SID = "55555555-5555-4555-8555-555555555555"
+
+    def session_path(self) -> str:
+        return f"{self.stack.keycloak.admin}/sessions/{self.SID}"
+
+    def revoke(self, payload: object = None, token: str = SESSION_TOKEN) -> tuple[int, object]:
+        return self.post_json(self.PATH, {"sid": self.SID} if payload is None else payload, token)
+
+    def test_site_revokes_a_session(self) -> None:
+        self.stack.keycloak.on("DELETE", self.session_path(), (204, None))
+
+        with self.assertLogs("identity_sync", level="INFO") as logs:
+            reply = self.revoke()
+
+        self.assertEqual(reply, (200, {"sid": self.SID, "revoked": True}))
+        self.assertEqual(len(self.stack.keycloak.calls("DELETE", self.session_path())), 1)
+        audit = "\n".join(logs.output)
+        self.assertIn("operation=revoke_session", audit)
+        self.assertIn("site-kiraci1", audit)
+
+    def test_closed_session_also_gets_200(self) -> None:
+        # Repeatable: the same request twice gives the same answer.
+        self.stack.keycloak.on("DELETE", self.session_path(), (404, {"error": "Session not found"}))
+
+        self.assertEqual(self.revoke(), (200, {"sid": self.SID, "revoked": True}))
+
+    def test_only_a_site_client_may_call(self) -> None:
+        self.stack.keycloak.on("DELETE", self.session_path(), (204, None))
+        for token in (PREVIEW_TOKEN, EXECUTE_TOKEN, "stranger-token"):
+            with self.subTest(token=token):
+                self.assertEqual(self.revoke(token=token), (403, {"error": "forbidden"}))
+        self.assertEqual(self.call("POST", self.PATH, b'{"sid": "x"}')[0], 401)
+        self.assertEqual(self.stack.keycloak.calls("DELETE", self.session_path()), [])
+
+    def test_site_client_cannot_use_the_other_endpoints(self) -> None:
+        for method, path, body in ServiceTokenTest.PROTECTED:
+            with self.subTest(path=path):
+                status, _reply = self.call(method, path, body, self.bearer(SESSION_TOKEN))
+                self.assertEqual(status, 403)
+
+    def test_bad_request_bodies(self) -> None:
+        for payload in ({}, {"sid": ""}, {"sid": ".."}, {"sid": 5}, {"sid": "a/b"}, {"sid": self.SID, "user": "x"}):
+            with self.subTest(payload=payload):
+                self.assertEqual(self.revoke(payload), (400, {"error": "bad_request"}))
+        self.assertEqual(self.keycloak_writes(), [])
+
+    def test_keycloak_failure_is_an_upstream_failure(self) -> None:
+        self.stack.keycloak.on("DELETE", self.session_path(), (500, None))
+
+        self.assertEqual(self.revoke(), (502, {"error": "upstream_failed"}))
 
 
 class OperationJournalTest(ServerCase):

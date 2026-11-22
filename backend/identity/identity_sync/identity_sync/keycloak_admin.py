@@ -334,6 +334,19 @@ class KeycloakAdmin:
         response = _expect(self._call("POST", "/clients", json_body=body), 201)
         return Outcome(preview, executed=True, value=_id_from_location(response))
 
+    def delete_session(self, session_id: str) -> None:
+        """End one Keycloak session. Its refresh token stops working too.
+
+        Repeatable: a session that is already gone counts as done. A 404 alone does not
+        prove that, because a wrong address answers 404 too, so the realm must answer.
+        """
+        try:
+            _expect(self._call("DELETE", f"/sessions/{_quote(session_id)}"), 200, 204)
+        except HttpError as error:
+            if error.status != 404:
+                raise
+            self._confirm_realm_answers()
+
     # --- birleşik işler: tekrar edilebilir ---
 
     def ensure_organization_member(

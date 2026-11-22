@@ -51,10 +51,17 @@ class Settings:
     execute_azp: frozenset[str] = frozenset()
     # Yalnız okuyabilen ve önizleyebilen istemciler. Yapay zekâ aracısı bu listeye girer.
     preview_azp: frozenset[str] = frozenset()
+    # Service clients of platform_core sites. They may only call /v1/sessions/revoke.
+    session_azp: frozenset[str] = frozenset()
+
+    @property
+    def staff_azp(self) -> frozenset[str]:
+        """Clients of the preview and approval flow."""
+        return self.execute_azp | self.preview_azp
 
     @property
     def known_azp(self) -> frozenset[str]:
-        return self.execute_azp | self.preview_azp
+        return self.execute_azp | self.preview_azp | self.session_azp
 
     @property
     def issuer(self) -> str:
@@ -130,9 +137,12 @@ def load_settings(env: Mapping[str, str]) -> Settings:
     if not 0 < port < 65536 or timeout <= 0 or lock_timeout <= 0:
         raise ConfigError(f"{PREFIX}PORT, {PREFIX}HTTP_TIMEOUT or {PREFIX}LOCK_TIMEOUT is out of range")
     execute_azp, preview_azp = _names(get("EXECUTE_AZP")), _names(get("PREVIEW_AZP"))
-    if execute_azp & preview_azp:
-        # Önizleme listesi yürütme izni vermez. İki listede birden duran istemci bu ayrımı bozar.
-        raise ConfigError(f"a client cannot be in both {PREFIX}EXECUTE_AZP and {PREFIX}PREVIEW_AZP")
+    session_azp = _names(get("SESSION_AZP"))
+    if execute_azp & preview_azp or session_azp & (execute_azp | preview_azp):
+        # Each list grants a different right. A client in two lists would blur that line.
+        raise ConfigError(
+            f"a client can be in only one of {PREFIX}EXECUTE_AZP, {PREFIX}PREVIEW_AZP and {PREFIX}SESSION_AZP"
+        )
     if len(get("DIGEST_KEY")) < MIN_DIGEST_KEY_LENGTH:
         raise ConfigError(f"{PREFIX}DIGEST_KEY must be at least {MIN_DIGEST_KEY_LENGTH} characters long")
     internal = get("KEYCLOAK_INTERNAL_URL")
@@ -155,5 +165,6 @@ def load_settings(env: Mapping[str, str]) -> Settings:
         realm_id=get("REALM_ID"),
         execute_azp=execute_azp,
         preview_azp=preview_azp,
+        session_azp=session_azp,
         lock_timeout=lock_timeout,
     )

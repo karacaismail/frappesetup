@@ -45,7 +45,7 @@ def request_schema(method: str, path: str) -> dict:
 
 class DocumentationTest(unittest.TestCase):
     def test_contract_lists_operations(self) -> None:
-        self.assertEqual(len(operations()), 9)
+        self.assertEqual(len(operations()), 11)
 
     def test_every_operation_is_documented(self) -> None:
         # Her uç özet, açıklama ve yıkıcılık bilgisi taşır (`docs/sozlesmeler.md`, 10. bölüm).
@@ -354,6 +354,25 @@ class SchemaTest(ServerCase):
         }
         self.assertEqual(len(used), 9)
         self.assertEqual(documented, used)
+
+    def test_session_revoke(self) -> None:
+        from .test_server import SESSION_TOKEN
+
+        path, sid = "/v1/sessions/revoke", "55555555-5555-4555-8555-555555555555"
+        kc = self.stack.keycloak
+        kc.on("DELETE", f"{kc.admin}/sessions/{sid}", (204, None))
+        request = {"sid": sid}
+
+        self.assert_request(request, "POST", path)
+        self.assert_response(self.post_json(path, request, SESSION_TOKEN), "POST", path, 200)
+        self.assert_response(self.post_json(path, request, PREVIEW_TOKEN), "POST", path, 403)
+        for rejected in ({}, {"sid": ".."}, {"sid": sid, "user": "x"}):
+            with self.subTest(rejected=rejected):
+                self.assertNotEqual(schema_errors(rejected, request_schema("POST", path), CONTRACT), [])
+                self.assert_response(self.post_json(path, rejected, SESSION_TOKEN), "POST", path, 400)
+        self.assert_response(self.call("POST", path, b"{}"), "POST", path, 401)
+        kc.on("DELETE", f"{kc.admin}/sessions/{sid}", (500, None))
+        self.assert_response(self.post_json(path, request, SESSION_TOKEN), "POST", path, 502)
 
     def test_operations(self) -> None:
         kc = self.stack.keycloak

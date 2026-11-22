@@ -137,7 +137,8 @@ def keycloak_user(
 ADMIN_SCOPE = "admin-api kc-admin-api"
 # Roles the identity-sync service account carries (docs/sozlesmeler.md, section 2). They reach only
 # a token requested with ADMIN_SCOPE. `manage-clients` is not among them.
-ADMIN_ROLE_PATHS = ("/users", "/organizations")
+# Ending a session needs manage-users (Keycloak: RealmAdminResource.deleteSession).
+ADMIN_ROLE_PATHS = ("/users", "/organizations", "/sessions")
 
 
 class FakeKeycloak(FakeServer):
@@ -465,6 +466,7 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
         realm_id=REALM_ID,
         execute_azp=frozenset({"approval-service"}),
         preview_azp=frozenset({"ai-agent"}),
+        session_azp=frozenset({"site-kiraci1"}),
     )
 
 
