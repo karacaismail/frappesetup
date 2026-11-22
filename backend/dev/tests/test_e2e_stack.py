@@ -50,6 +50,7 @@ class StackTests(unittest.TestCase):
                 "keycloak",
                 "keycloak-db",
                 "event-sink",
+                "identity-sync",
                 "mailpit",
                 "web",
                 "mariadb",
@@ -59,7 +60,7 @@ class StackTests(unittest.TestCase):
         ports = {
             port["published"] for service in config["services"].values() for port in service.get("ports", [])
         }
-        self.assertEqual(ports, {str(7150 + offset) for offset in (0, 1, 2, 3, 4, 6)})
+        self.assertEqual(ports, {str(7150 + offset) for offset in (0, 1, 2, 3, 4, 5, 6)})
         for service in config["services"].values():
             self.assertNotIn("environment", service)
             for port in service.get("ports", []):
@@ -84,6 +85,40 @@ class StackTests(unittest.TestCase):
             with self.subTest(values=values):
                 self.assertEqual(self.run_stack("config", **values).returncode, 2)
         self.assertFalse(Path(self.env["E2E_ENV_FILE"]).exists())
+
+    def test_listener_targets_real_identity_service_with_runtime_secret(self):
+        module = runpy.run_path(str(STACK))
+        with patch.dict(os.environ, self.env):
+            environment, _, compose = module["setup"]()
+        model = module["config"](compose, environment)
+        services = model["services"]
+        self.assertIn("identity-sync", set(services))
+        receiver = services["identity-sync"]
+        settings = receiver["environment"]
+        listener = services["keycloak"]["environment"]
+        self.assertEqual(
+            listener["KC_SPI_EVENTS_LISTENER__WEBHOOK__URL"], "http://identity-sync.localhost:6115/v1/events"
+        )
+        self.assertTrue(settings["IDENTITY_SYNC_WEBHOOK_SECRET"])
+        self.assertTrue(
+            settings["IDENTITY_SYNC_WEBHOOK_SECRET"] == listener["KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET"]
+        )
+        self.assertEqual(settings["IDENTITY_SYNC_KEYCLOAK_PUBLIC_URL"], "http://identity.localhost:7150")
+        self.assertEqual(receiver["ports"][0]["published"], "7155")
+        self.assertEqual(receiver["ports"][0]["host_ip"], "127.0.0.1")
+        self.assertNotIn("args", receiver["build"])
+
+    def test_up_refreshes_listener_and_receiver_even_when_images_exist(self):
+        module = runpy.run_path(str(STACK))
+        services = {
+            name: {"image": "local-test-" + name}
+            for name in ("tenant-web", "keycloak", "event-sink", "web", "identity-sync")
+        }
+        with patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0)) as execute:
+            module["ensure_images"](["docker"], ["compose"], {}, {"services": services})
+        commands = [call.args[0] for call in execute.call_args_list]
+        self.assertIn(["compose", "build", "keycloak"], commands)
+        self.assertIn(["compose", "build", "identity-sync"], commands)
 
     def test_rejects_public_credentials(self):
         path = Path(self.env["E2E_ENV_FILE"])
@@ -280,6 +315,15 @@ class StackTests(unittest.TestCase):
         )
         self.assertLess(copy_index, calls.index(migrations[0]))
         self.assertLess(calls.index(migrations[0]), start_index)
+        receiver_index = next(
+            index
+            for index, command in enumerate(calls)
+            if command[-1] == "identity-sync" and command[1] == "up"
+        )
+        bootstrap_index = next(
+            index for index, command in enumerate(calls) if "/workspace/dev/bootstrap.py" in command
+        )
+        self.assertLess(receiver_index, bootstrap_index)
 
     def test_resource_probe_uses_the_compose_redis_digest(self):
         namespace = runpy.run_path(str(STACK))
