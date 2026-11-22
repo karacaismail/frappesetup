@@ -339,10 +339,8 @@ paths:
         The endpoint does not change any record.
 
         The standard search is unchanged. Its result passes the record rules and field levels.
-        On a governed document type a custom search function runs only when it is on the allow
-        list (`access_rule_allowed_queries`) and its code reads through permission-aware calls only.
-        The check is repeated on every search. Any other custom search function is refused with 403,
-        for every user except “Administrator”. A custom search function can come from the `query`
+        On a governed document type every custom search function is refused with 403,
+        for every user except “Administrator”. There is no allow list. A custom search function can come from the `query`
         input or from the `standard_queries` hook. Both follow the same rule.
         On a document type that is not governed a custom search runs as Frappe runs it.
       security:
@@ -362,8 +360,7 @@ paths:
           in: query
           required: false
           description: |
-            Dotted path of a custom search function. On a governed document type it is refused
-            unless the function is on the allow list and its code passes the check.
+            Dotted path of a custom search function. On a governed document type it is always refused.
           schema: {type: string}
         - name: filters
           in: query
@@ -449,8 +446,7 @@ paths:
           in: query
           required: false
           description: |
-            Dotted path of a custom search function. On a governed document type it is refused
-            unless the function is on the allow list and its code passes the check.
+            Dotted path of a custom search function. On a governed document type it is always refused.
           schema: {type: string}
         - name: filters
           in: query
@@ -535,47 +531,48 @@ x-replaced-endpoints:
   behaviour:
     - The caller must have `select` or `read` permission on the searched document type. Otherwise the endpoint returns 403.
     - Frappe's standard search does not change. The result passes through the list rule and the field level.
-    - On a governed document type, a custom search function runs only when it is in the allow list.
+    - On a governed document type only Frappe's standard search runs. Every custom search function returns 403.
     - A custom search function comes through the `query` input or through the `standard_queries` hook. Both follow the same rule.
-    - The code of a function in the allow list is checked on every search. The code must use only the permitted read path.
-    - A custom search that does not follow the rule returns 403. This denial is for all users. The only exception is the “Administrator” user.
+    - There is no allow list. Whether a search function reads with permissions cannot be verified from its code.
+    - This denial is for all users. The only exception is the “Administrator” user.
     - On a document type that is not governed, a custom search runs with Frappe's usual behaviour.
     - An unknown input name is rejected. The wrappers accept Frappe's documented inputs.
 
 x-hooks:
-  description: The declarations that apps give to the engine in their `hooks.py` file.
+  description: Hooks the engine writes in `hooks.py` for other modules.
   hooks:
-    - name: access_rule_report_scopes
-      shape: '{"Report Name": {"Document Type": ["field", ...]}}'
-      description: |
-        It declares the document types and fields that a script report reads.
-        The declaration cannot be empty. Each document type must list at least one real field. `*` is not accepted.
-        The declaration is not enough on its own. The code of the report must read only with `frappe.get_list`.
-        This declaration does not open a query report.
-    - name: access_rule_allowed_queries
-      shape: '["app.module.function", ...]'
-      description: |
-        It lists the custom search functions that may run on a governed document type.
-        The module of the function must use only the permitted read path. The engine checks this on every search.
-
     - name: ai_write_closed_doctypes
       shape: '["Access Rule"]'
       description: |
-        The AI layer reads this hook. The engine writes the “Access Rule” document type into this list (O-28).
-        The generic write tools cannot change this type. For example `create_document` and `update_document` are rejected.
+        The AI layer reads this hook. The engine lists the “Access Rule” document type in it (O-28).
+        The generic write tools cannot change this type. For example `create_document` and `update_document` are refused.
         A rule changes only through the engine's own tools: `propose_access_rule` and `propose_access_rule_change`.
+    - name: ai_tools
+      shape: '["platform_core.erisim.ai_tools.declare"]'
+      description: Declares the four AI tools listed in `x-ai-tools`.
+  removed:
+    - name: access_rule_report_scopes
+      description: |
+        Removed. It let an app declare what a script report reads, together with a static check of the
+        report code. Reviews found ways around the check, and such a check can never be complete.
+        Declaring this hook has no effect.
+    - name: access_rule_allowed_queries
+      description: |
+        Removed. It let an app allow a custom link search function on a governed document type,
+        with the same static check. Declaring this hook has no effect.
 
 x-report-rules:
   description: |
-    The report endpoints are Frappe's own endpoints. The engine extends the report record.
-    The following rules apply while the site has at least one governed document type.
+    The report endpoints are Frappe's own endpoints. The engine extends the Report record.
+    The rules below apply while the site has at least one governed document type.
   rules:
-    - The list report (“Report Builder”) runs. The data passes through the list rule and the field level.
-    - The query report (“Query Report”) runs only for the “System Manager” role. Others get 403.
-    - The script report (“Script Report”) runs only when its declaration and its code check are valid. Otherwise everyone gets 403.
-    - The prepared report (“Prepared Report”) is closed for a report that touches governed data. Creating it, reading the stored result, downloading the file and the ZIP, and converting to CSV are rejected.
-    - The scheduled email report (“Auto Email Report”) follows the same rules for the user in the record.
-    - When the site has no governed type, the gate checks only the field level of the report's main type.
+    - A list report (“Report Builder”) runs. Its data passes the record rules and the field levels.
+    - A query report (“Query Report”) runs only for the “System Manager” role. Everyone else gets 403.
+    - A script report (“Script Report”) runs only for the “System Manager” role. Everyone else gets 403.
+    - What the SQL of a query report or the code of a script report reads cannot be verified. No declaration opens such a report.
+    - For a report that touches governed data the prepared report (“Prepared Report”) is closed. Creating one, reading a stored result, downloading its file alone or in a ZIP, and converting it to CSV are refused.
+    - A scheduled email report (“Auto Email Report”) follows the same rules for the user on the record. The report runs as that user, so its content holds only what that user may see.
+    - When the site has no governed document type, the gate checks only the field levels of the report's own document type.
 
 x-ai-tools:
   description: |

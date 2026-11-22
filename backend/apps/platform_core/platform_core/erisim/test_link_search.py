@@ -1,8 +1,8 @@
 """Link searches on governed document types.
 
-Rule: on a governed document type only Frappe's standard search and search functions on the
-engine's allow-list run. An allow-listed function must itself read through permission-aware
-calls. Every other custom search function is refused.
+Rule: on a governed document type only Frappe's standard search runs. Every custom search
+function is refused, for every user. There is no allow-list: whether a function reads with
+permissions cannot be verified from its code.
 """
 
 import re
@@ -26,7 +26,7 @@ from platform_core.erisim.tests.base import (
 SEARCH_LINK = "/api/method/frappe.desk.search.search_link"
 SEARCH_WIDGET = "/api/method/frappe.desk.search.search_widget"
 UNSAFE_QUERY = "platform_core.erisim.test_link_search.unscoped_query"
-SAFE_QUERY = "platform_core.erisim.tests.test_support_safe_query.scoped_query"
+SAFE_LOOKING_QUERY = "platform_core.erisim.test_link_search.safe_looking_query"
 SALARY = 987653
 
 
@@ -39,6 +39,12 @@ def unscoped_query(doctype, txt, searchfield, start, page_len, filters, **kwargs
 	"""
 	# System read on purpose: the test needs a search that ignores record rules.
 	return frappe.get_all(doctype, fields=["name", "title", "salary_amount"], as_list=True, limit=500)
+
+
+@frappe.validate_and_sanitize_search_inputs
+def safe_looking_query(doctype, txt, searchfield, start, page_len, filters, **kwargs):
+	"""A search that looks careful but reads as another user. It is not an endpoint either."""
+	return frappe.get_list(doctype, fields=["name", "title"], user="Administrator", as_list=True, limit=500)
 
 
 def register_for_test(test, *paths: str) -> None:
@@ -60,7 +66,7 @@ class TestLinkSearch(ErisimTestCase):
 
 	def setUp(self):
 		super().setUp()
-		register_for_test(self, UNSAFE_QUERY, SAFE_QUERY)
+		register_for_test(self, UNSAFE_QUERY, SAFE_LOOKING_QUERY)
 
 	def search(self, client, path: str = SEARCH_LINK, doctype: str = DOCTYPE, **extra):
 		body = {"doctype": doctype, "txt": "", "page_length": 500, **extra}
@@ -113,22 +119,28 @@ class TestLinkSearch(ErisimTestCase):
 
 		self.assert_refused(response)
 
-	def test_allow_listed_unsafe_function_is_still_refused(self):
-		"""Being on the list is not enough: the function must read through permission-aware calls."""
-		with patch.object(link_search, "allowed_queries", return_value={UNSAFE_QUERY}):
-			response = self.search(self.login(EMPLOYEE_1), query=UNSAFE_QUERY)
+	def test_function_that_looks_permission_aware_is_refused_too(self):
+		for user in (EMPLOYEE_1, HR):
+			with self.subTest(user=user):
+				self.assert_refused(self.search(self.login(user), query=SAFE_LOOKING_QUERY))
 
-		self.assert_refused(response)
+	def test_app_allow_list_does_not_open_a_custom_search(self):
+		"""The `access_rule_allowed_queries` hook is gone. Listing a function changes nothing."""
+		original = frappe.get_hooks
 
-	def test_allow_listed_safe_function_runs_and_respects_the_rule(self):
-		with patch.object(link_search, "allowed_queries", return_value={SAFE_QUERY}):
-			response = self.search(self.login(EMPLOYEE_1), query=SAFE_QUERY)
+		def with_allow_list(hook=None, *args, **kwargs):
+			if hook in ("access_rule_allowed_queries", "access_rule_verified_queries"):
+				return [UNSAFE_QUERY, SAFE_LOOKING_QUERY]
+			return original(hook, *args, **kwargs)
 
-		self.assertEqual(self.values(response), {self.records[EMPLOYEE_1]})
-		self.assertNotIn(str(SALARY), response.get_data(as_text=True))
+		client = self.login(EMPLOYEE_1)
+		with patch.object(frappe, "get_hooks", with_allow_list):
+			responses = [self.search(client, query=query) for query in (UNSAFE_QUERY, SAFE_LOOKING_QUERY)]
 
-	def test_safe_function_that_is_not_allow_listed_is_refused(self):
-		self.assert_refused(self.search(self.login(EMPLOYEE_1), query=SAFE_QUERY))
+		for response in responses:
+			self.assert_refused(response)
+		for name in ("allowed_queries", "verified_queries", "ALLOWED_QUERIES_HOOK", "query_source"):
+			self.assertFalse(hasattr(link_search, name), name)
 
 	def test_standard_search_is_unchanged(self):
 		governed = self.search(self.login(EMPLOYEE_1))
@@ -143,7 +155,7 @@ class TestLinkSearch(ErisimTestCase):
 		name = frappe.get_doc({"doctype": FREE_DOCTYPE, "title": "Free"}).insert().name
 		self.addCleanup(frappe.delete_doc, FREE_DOCTYPE, name, force=True)
 
-		response = self.search(self.login(NO_RULE), doctype=FREE_DOCTYPE, query=SAFE_QUERY)
+		response = self.search(self.login(NO_RULE), doctype=FREE_DOCTYPE, query=SAFE_LOOKING_QUERY)
 
 		self.assertIn(name, self.values(response))
 
@@ -156,7 +168,7 @@ class TestLinkSearch(ErisimTestCase):
 
 	def test_test_helpers_are_not_endpoints_outside_a_test(self):
 		"""Without `register_for_test` Frappe refuses to call the helper functions at all."""
-		for path in (UNSAFE_QUERY, SAFE_QUERY):
+		for path in (UNSAFE_QUERY, SAFE_LOOKING_QUERY):
 			function = frappe.get_attr(path)
 			frappe.whitelisted.discard(function)
 			self.assertNotIn(function, frappe.whitelisted)

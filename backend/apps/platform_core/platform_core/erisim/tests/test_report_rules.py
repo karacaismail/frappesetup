@@ -1,12 +1,13 @@
-"""Report rules on governed data (third review, orchestrator decisions A, B, C and E).
+"""Report rules on governed data.
 
 A. Prepared Report is closed for a report that touches governed data: creating one, reading a
    stored result, downloading its file alone or in a ZIP, and converting it to CSV.
 B. A query report runs only for a System Manager while any document type is governed. What its
    SQL reads cannot be verified.
-C. A script report runs only when an app declared what it reads and its code reads through
-   permission-aware calls. The check runs on every execution.
-E. Auto Email Report follows the same rules for the user it runs as.
+C. A script report follows the same rule. Its code cannot be verified either: a static check
+   was tried and two reviews found ways around it (an aliased import, a `user` argument).
+   There is no declaration and no code check any more.
+E. Auto Email Report follows the same rules for the user it runs as, and runs as that user.
 """
 
 import inspect
@@ -16,6 +17,7 @@ from unittest.mock import patch
 import frappe
 import frappe.share
 from frappe.core.doctype.prepared_report import prepared_report
+from frappe.core.doctype.report.report import Report
 from frappe.desk import query_report
 from frappe.email.doctype.auto_email_report import auto_email_report
 
@@ -28,8 +30,6 @@ from platform_core.erisim.tests.base import (
 	HR,
 	MANAGER_1,
 	NO_RULE,
-	ROLE_MANAGER,
-	RULE_DOCTYPE,
 	ErisimTestCase,
 )
 
@@ -45,12 +45,33 @@ BUILDER_REPORT = "AR Test Builder Report"
 SCRIPT_REPORT = "AR Test Script Report"
 SALARY = 987652
 
-SAFE_SCRIPT = (
+# Code that looks permission-aware. Each one is a way around the static check that was removed.
+SAFE_LOOKING_SCRIPT = (
 	f'rows = frappe.get_list("{DOCTYPE}", fields=["name", "title"])\nresult = [[row.name] for row in rows]\n'
 )
-UNSAFE_SCRIPT = f'result = frappe.db.sql("select name from `tab{DOCTYPE}`")\n'
-OTHER_TYPE_SCRIPT = f'result = frappe.get_list("{RULE_DOCTYPE}", fields=["name"])\n'
+ALIASED_SCRIPT = f'import frappe as f\nresult = f.get_all("{DOCTYPE}", fields=["name"], as_list=True)\n'
+REASSIGNED_SCRIPT = f'f = frappe\nresult = f.get_all("{DOCTYPE}", fields=["name"], as_list=True)\n'
+OTHER_USER_SCRIPT = (
+	f'result = frappe.get_list("{DOCTYPE}", fields=["name"], user="Administrator", as_list=True)\n'
+)
+POSITIONAL_SCRIPT = (
+	f'result = frappe.get_list("{DOCTYPE}", ["name"], None, None, None, None, None, None, True)\n'
+)
 SCOPE = {DOCTYPE: ["name", "title"]}
+
+
+def with_scope_declaration(report: str):
+	"""Pretend an app declared a scope for the report through the removed hooks."""
+	original = frappe.get_hooks
+
+	def get_hooks(hook=None, *args, **kwargs):
+		if hook == "access_rule_report_scopes":
+			return {report: [SCOPE]}
+		if hook == "access_rule_aware_reports":
+			return [report]
+		return original(hook, *args, **kwargs)
+
+	return patch.object(frappe, "get_hooks", get_hooks)
 
 
 def ensure_report(name: str, ref_doctype: str, report_type: str = "Query Report", **values) -> None:
@@ -77,7 +98,7 @@ def ensure_reports() -> None:
 	)
 	ensure_report(FREE_REPORT, FREE_DOCTYPE, query=f"select {columns} from `tab{FREE_DOCTYPE}`")
 	ensure_report(BUILDER_REPORT, DOCTYPE, "Report Builder")
-	ensure_report(SCRIPT_REPORT, DOCTYPE, "Script Report", report_script=SAFE_SCRIPT)
+	ensure_report(SCRIPT_REPORT, DOCTYPE, "Script Report", report_script=SAFE_LOOKING_SCRIPT)
 	frappe.db.commit()  # nosemgrep: the request uses another connection
 
 
@@ -122,7 +143,7 @@ class TestQueryReportRule(ReportRulesTestCase):
 		self.assert_refused(self.run_report(self.login(NO_RULE), FREE_REPORT))
 
 	def test_declaration_does_not_open_a_query_report(self):
-		with patch.object(reports, "declared_scope", return_value=SCOPE):
+		with with_scope_declaration(NAME_REPORT):
 			response = self.run_report(self.login(HR), NAME_REPORT)
 
 		self.assert_refused(response)
@@ -192,62 +213,64 @@ class TestReportsWithoutRules(ReportRulesTestCase):
 
 
 class TestScriptReportRule(ReportRulesTestCase):
-	"""Decision C."""
+	"""Decision C: a script report on a site with governed data runs for a System Manager only."""
 
 	def set_script(self, script: str) -> None:
+		frappe.set_user("Administrator")
 		frappe.db.set_value("Report", SCRIPT_REPORT, "report_script", script)
+		frappe.db.commit()  # nosemgrep: the request uses another connection
 
 	def setUp(self):
 		super().setUp()
-		self.addCleanup(self.set_script, SAFE_SCRIPT)
+		self.addCleanup(self.set_script, SAFE_LOOKING_SCRIPT)
 
-	def test_undeclared_script_report_does_not_run(self):
-		for user in (EMPLOYEE_1, HR, ADMIN):
+	def test_script_report_is_refused_for_everyone_but_a_system_manager(self):
+		for user in (EMPLOYEE_1, MANAGER_1, HR, NO_RULE):
 			with self.subTest(user=user):
 				self.assertTrue(self.denied(SCRIPT_REPORT, user))
-		self.assert_refused(self.run_report(self.login(HR), SCRIPT_REPORT))
+				self.assert_refused(self.run_report(self.login(user), SCRIPT_REPORT))
+		self.assertFalse(self.denied(SCRIPT_REPORT, ADMIN))
 
-	def test_empty_or_incomplete_declaration_does_not_run(self):
-		for scope in ({}, {DOCTYPE: []}, {DOCTYPE: None}, {"AR No Such Type": ["name"]}, {DOCTYPE: ["*"]}):
-			with self.subTest(scope=scope), patch.object(reports, "declared_hook", return_value=scope):
-				self.assertTrue(self.denied(SCRIPT_REPORT, HR))
+	def test_code_that_looks_permission_aware_is_refused_without_reading_data(self):
+		"""Each script got past the static check that was removed. None of them runs now."""
+		scripts = (
+			SAFE_LOOKING_SCRIPT,
+			ALIASED_SCRIPT,
+			REASSIGNED_SCRIPT,
+			OTHER_USER_SCRIPT,
+			POSITIONAL_SCRIPT,
+		)
+		for script in scripts:
+			self.set_script(script)
+			for user in (EMPLOYEE_1, HR):
+				with self.subTest(script=script.splitlines()[0], user=user):
+					frappe.set_user(user)
+					with patch.object(Report, "execute_script") as execute:
+						self.assertRaises(frappe.PermissionError, query_report.run, SCRIPT_REPORT, {})
+						self.assertRaises(
+							frappe.PermissionError, frappe.get_doc("Report", SCRIPT_REPORT).get_data
+						)
+					execute.assert_not_called()
+					frappe.set_user("Administrator")
+					self.assert_refused(self.run_report(self.login(user), SCRIPT_REPORT))
 
-	def test_declared_report_with_permission_aware_code_runs(self):
-		with patch.object(reports, "declared_hook", return_value=SCOPE):
-			self.assertFalse(self.denied(SCRIPT_REPORT, EMPLOYEE_1))
-			self.assertFalse(self.denied(SCRIPT_REPORT, HR))
-
-	def test_declared_report_with_raw_reads_does_not_run(self):
-		self.set_script(UNSAFE_SCRIPT)
-
-		with patch.object(reports, "declared_hook", return_value=SCOPE):
-			self.assertTrue(self.denied(SCRIPT_REPORT, HR))
-			self.assertTrue(self.denied(SCRIPT_REPORT, ADMIN))
-
-	def test_reading_a_type_outside_the_declaration_does_not_run(self):
-		self.set_script(OTHER_TYPE_SCRIPT)
-
-		with patch.object(reports, "declared_hook", return_value=SCOPE):
-			self.assertTrue(self.denied(SCRIPT_REPORT, ADMIN))
-
-	def test_user_needs_role_permission_on_every_declared_type(self):
-		scope = {**SCOPE, RULE_DOCTYPE: ["name"]}
-
-		with patch.object(reports, "declared_hook", return_value=scope):
+	def test_app_declaration_does_not_open_a_script_report(self):
+		"""The `access_rule_report_scopes` hook is gone. Declaring a scope changes nothing."""
+		client = self.login(HR)
+		with with_scope_declaration(SCRIPT_REPORT):
 			self.assertTrue(self.denied(SCRIPT_REPORT, EMPLOYEE_1))
-			self.assertFalse(self.denied(SCRIPT_REPORT, ADMIN))
-
-	def test_scope_is_verified_again_after_the_report_changes(self):
-		with patch.object(reports, "declared_hook", return_value=SCOPE):
-			self.assertFalse(self.denied(SCRIPT_REPORT, HR))
-			self.set_script(UNSAFE_SCRIPT)
 			self.assertTrue(self.denied(SCRIPT_REPORT, HR))
+			response = self.run_report(client, SCRIPT_REPORT)
 
-	def test_self_declared_aware_list_no_longer_exists(self):
-		"""A report cannot switch the scope check off by naming itself."""
-		self.assertFalse(hasattr(reports, "AWARE_REPORTS_HOOK"))
-		with patch.object(frappe, "get_hooks", return_value=[SCRIPT_REPORT, NAME_REPORT]):
-			self.assertIsNone(reports.declared_scope(SCRIPT_REPORT))
+		self.assert_refused(response)
+
+	def test_engine_offers_no_declaration_or_code_check(self):
+		for name in ("declared_scope", "declared_hook", "script_report_problem", "SCOPES_HOOK"):
+			self.assertFalse(hasattr(reports, name), name)
+		self.assertRaises(ImportError, frappe.get_module, "platform_core.erisim.code_check")
+
+	def test_script_report_is_closed_for_prepared_reports_too(self):
+		self.assertTrue(reports.touches_governed(SCRIPT_REPORT))
 
 
 class TestPreparedReportClosed(ReportRulesTestCase):
@@ -347,12 +370,7 @@ class TestPreparedReportClosed(ReportRulesTestCase):
 class TestAutoEmailReportRules(ReportRulesTestCase):
 	"""Decision E."""
 
-	RULES = (
-		*ErisimTestCase.RULES,
-		{"title": "Manager all records", "role": ROLE_MANAGER, "scope": "all", "allow_read": 1},
-	)
-
-	def auto_report(self, report: str, user: str, report_type: str = "Query Report"):
+	def auto_report(self, report: str, user: str, report_type: str = "Query Report", **values):
 		return frappe.get_doc(
 			doctype="Auto Email Report",
 			report=report,
@@ -362,6 +380,7 @@ class TestAutoEmailReportRules(ReportRulesTestCase):
 			email_to="ar.reader@example.test",
 			format="CSV",
 			frequency="Daily",
+			**values,
 		)
 
 	def gate_refuses(self, doc) -> bool:
@@ -374,16 +393,12 @@ class TestAutoEmailReportRules(ReportRulesTestCase):
 			return False
 		return False
 
-	def test_query_report_follows_rule_b_for_the_record_user(self):
-		for user in (EMPLOYEE_1, MANAGER_1, HR):
-			with self.subTest(user=user):
-				self.assertTrue(self.gate_refuses(self.auto_report(NAME_REPORT, user)))
-		self.assertFalse(self.gate_refuses(self.auto_report(NAME_REPORT, ADMIN)))
-
-	def test_script_report_follows_rule_c(self):
-		self.assertTrue(self.gate_refuses(self.auto_report(SCRIPT_REPORT, ADMIN, "Script Report")))
-		with patch.object(reports, "declared_hook", return_value=SCOPE):
-			self.assertFalse(self.gate_refuses(self.auto_report(SCRIPT_REPORT, EMPLOYEE_1, "Script Report")))
+	def test_query_and_script_reports_need_a_system_manager_as_the_record_user(self):
+		for report, report_type in ((NAME_REPORT, "Query Report"), (SCRIPT_REPORT, "Script Report")):
+			for user in (EMPLOYEE_1, MANAGER_1, HR):
+				with self.subTest(report=report, user=user):
+					self.assertTrue(self.gate_refuses(self.auto_report(report, user, report_type)))
+			self.assertFalse(self.gate_refuses(self.auto_report(report, ADMIN, report_type)))
 
 	def test_saved_record_cannot_be_inserted_for_a_refused_user(self):
 		self.assertRaises(frappe.PermissionError, self.auto_report(NAME_REPORT, HR).insert)
@@ -399,3 +414,46 @@ class TestAutoEmailReportRules(ReportRulesTestCase):
 		self.assertRaises(frappe.PermissionError, auto_email_report.download, doc.name)
 		self.assertRaises(frappe.PermissionError, auto_email_report.send_now, doc.name)
 		self.assertRaises(frappe.PermissionError, frappe.get_doc("Auto Email Report", doc.name).send)
+
+	def test_report_content_holds_only_what_the_record_user_may_see(self):
+		"""An administrator downloads a report made for an employee. Only the employee's record is in it."""
+		frappe.db.set_value(DOCTYPE, self.records[EMPLOYEE_1], "salary_amount", SALARY)
+		doc = self.auto_report(BUILDER_REPORT, EMPLOYEE_1, "Report Builder", no_of_rows=500)
+		frappe.set_user(ADMIN)
+
+		content = doc.get_report_content()
+
+		text = content.decode() if isinstance(content, bytes) else str(content)
+		self.assertIn(self.records[EMPLOYEE_1], text)
+		for owner, name in self.records.items():
+			if owner != EMPLOYEE_1:
+				self.assertNotIn(name, text)
+		self.assertNotIn(str(SALARY), text)
+
+	def test_report_runs_as_the_record_user_and_the_session_user_comes_back(self):
+		seen = []
+
+		def record_user(*args, **kwargs):
+			seen.append(frappe.session.user)
+			return [], []
+
+		doc = self.auto_report(BUILDER_REPORT, EMPLOYEE_1, "Report Builder")
+		frappe.set_user(ADMIN)
+
+		with patch.object(Report, "get_data", record_user):
+			doc.get_report_content()
+
+		self.assertEqual(seen, [EMPLOYEE_1])
+		self.assertEqual(frappe.session.user, ADMIN)
+
+	def test_session_user_comes_back_when_the_report_fails(self):
+		def fail(*args, **kwargs):
+			raise RuntimeError("report failed")
+
+		doc = self.auto_report(BUILDER_REPORT, EMPLOYEE_1, "Report Builder")
+		frappe.set_user(ADMIN)
+
+		with patch.object(Report, "get_data", fail):
+			self.assertRaises(RuntimeError, doc.get_report_content)
+
+		self.assertEqual(frappe.session.user, ADMIN)

@@ -4,30 +4,20 @@ A link field or an app can name its own search function, and Frappe returns what
 function returns (`frappe/desk/search.py:133`). Such a function may ignore record rules and
 field levels, and it may pick records by a field the user cannot read.
 
-Rule (decision D of the third review): on a governed document type only Frappe's standard
-search and the search functions on the engine's allow-list run. An allow-listed function must
-itself read through permission-aware calls; its module is checked on every search. Every other
-custom search function is refused, for every user.
+Rule: on a governed document type only Frappe's standard search runs. Every custom search
+function is refused, for every user. There is no allow-list. An allow-list with a static code
+check was tried and removed: the check could be bypassed and can never be complete.
 
 `hooks.py` puts `search_link` and `search_widget` in place of Frappe's two search endpoints.
 Python code must use `platform_core.erisim.api`: Frappe's own functions cannot be intercepted
 from Python without changing Frappe.
 """
 
-import inspect
-
 import frappe
 from frappe import _
 from frappe.desk import search
 
-from platform_core.erisim import code_check, rules
-
-ALLOWED_QUERIES_HOOK = "access_rule_allowed_queries"
-
-
-def allowed_queries() -> set[str]:
-	"""Search functions apps put on the allow-list in `hooks.py`."""
-	return set(frappe.get_hooks(ALLOWED_QUERIES_HOOK) or [])
+from platform_core.erisim import rules
 
 
 def custom_query(doctype: str, query: str | None) -> str | None:
@@ -38,33 +28,17 @@ def custom_query(doctype: str, query: str | None) -> str | None:
 	return standard[-1] if standard else None
 
 
-def query_source(query: str) -> str | None:
-	try:
-		return inspect.getsource(inspect.getmodule(frappe.get_attr(query)))
-	except (ImportError, AttributeError, OSError, TypeError):
-		return None
-
-
 def guard(doctype: str, query: str | None = None) -> None:
-	"""Refuse a custom search on a governed document type unless it is allow-listed and checked."""
+	"""Refuse every custom search function on a governed document type."""
 	used = custom_query(doctype, query)
 	if not used or frappe.session.user == "Administrator" or not rules.is_governed(doctype):
 		return
-	if used not in allowed_queries():
-		frappe.throw(
-			_("Search function {0} is not allowed on {1}, which is governed by Access Rules.").format(
-				frappe.bold(used), frappe.bold(doctype)
-			),
-			frappe.PermissionError,
-		)
-	found = code_check.problems(query_source(used), None)
-	if found:
-		frappe.throw(
-			_("Search function {0} does not read through permission-aware calls only: {1}").format(
-				frappe.bold(used), ", ".join(found)
-			),
-			frappe.PermissionError,
-		)
+	frappe.throw(
+		_("Search function {0} is not allowed on {1}, which is governed by Access Rules.").format(
+			frappe.bold(used), frappe.bold(doctype)
+		),
+		frappe.PermissionError,
+	)
 
 
 @frappe.whitelist(methods=["GET", "POST"])

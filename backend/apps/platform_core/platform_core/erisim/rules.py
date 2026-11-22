@@ -86,6 +86,11 @@ def active_rules() -> dict[str, list[dict]]:
 	if frappe.flags.in_install or frappe.flags.in_migrate:
 		# The table may not exist yet. Installation runs as Administrator.
 		return {}
+	cache = getattr(frappe.local, "request_cache", None)
+	if cache is not None and cache.get(_CHANGED_IN_REQUEST):
+		# A rule changed in this request. A partial rollback could undo the change without
+		# telling anyone, so the rules are read from the database for the rest of the request.
+		return _load()
 	return _request_rules()
 
 
@@ -107,19 +112,16 @@ def _load() -> dict[str, list[dict]]:
 
 
 _request_rules = request_cache(_load)
+# Key in `frappe.local.request_cache`. It lives and dies with the request.
+_CHANGED_IN_REQUEST = "platform_core.erisim.rules_changed"
 
 
 def clear_cache(*_args, **_kwargs) -> None:
 	"""Forget the rules read in this request. Called when a rule, role or document type changes."""
-	_forget_rules()
-	# A rolled back change must not leave the rolled back rules behind either.
-	frappe.db.after_rollback.add(_forget_rules)
-
-
-def _forget_rules() -> None:
 	cache = getattr(frappe.local, "request_cache", None)
 	if cache is not None:
 		cache.pop(_load, None)
+		cache[_CHANGED_IN_REQUEST] = True
 
 
 def rules_for(doctype: str) -> list[dict]:

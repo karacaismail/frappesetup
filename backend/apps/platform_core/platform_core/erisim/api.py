@@ -17,7 +17,7 @@ def report_guard(report_name: str, user: str | None = None) -> None:
 
 
 def link_search_guard(doctype: str, query: str | None = None) -> None:
-	"""Raise `frappe.PermissionError` when a custom search function may not run on the type."""
+	"""Raise `frappe.PermissionError` for a custom search function on a governed document type."""
 	link_search.guard(doctype, query)
 
 
