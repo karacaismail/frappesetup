@@ -33,6 +33,9 @@ python3 -m unittest discover -s backend/e2e/tests -v
 node --experimental-strip-types --test backend/e2e/tests/*.test.*
 ```
 
+Hata kalırsa API denemesi, geçidin hata kodunu ve sahte sağlayıcı yanıtlarını gösterir.
+Önizleme, kimlik eşitleme kuyruğundan işlem adını ve HTTP kodunu saklar.
+
 ## Sonuçlar
 
 Canlı Factory önizlemesi 22 Kasım 2026 Pazar günü çalıştı.
@@ -117,6 +120,11 @@ Telefon paketi için `mobile-pkce.spec.ts` dosyasını seçin.
 | Çalışan bir saat boşta kalır. | `not_run` | Çalışan için süre ayarı ve zorunlu yeniden doğrulama. |
 
 Bu senaryoları yalnız ayrı bir yerel test ortamında açın.
+Birleştirme önizlemesi her senaryo için ayrı bir örnek hesap hazırlar.
+Önizleme hesapları kiracıya bağlar. Silme hesabını Press’e de bağlar.
+Silme testi, kiracıda kalacak örnek iş kaydını kullanır.
+Telefon ve okuma oturumları hazır olmadan ilgili testleri açmayın.
+Çalışan testi için tarayıcı ve bir saatlik koşu süresi gerekir.
 Silme ve iptal için her koşuda yeni örnek veri hazırlayın.
 Önkoşullar eksikse ilgili ayarı kapalı bırakın. Playwright nedeni test kaydına yazar.
 

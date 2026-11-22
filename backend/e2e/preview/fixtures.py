@@ -59,27 +59,41 @@ def seed_keycloak(port, password):
         },
     )["access_token"]
     realm = "/admin/realms/platform"
-    for email in (LOGIN_EMAIL, SYNC_EMAIL):
+    lifecycle = {
+        scenario: {
+            "email": f"e2e-{scenario}-preview@example.test",
+            "password": "Aa9!" + secrets.token_urlsafe(24),
+        }
+        for scenario in ("delete", "revoke", "employee")
+    }
+    accounts = {email: password for email in (LOGIN_EMAIL, SYNC_EMAIL)}
+    accounts.update({item["email"]: item["password"] for item in lifecycle.values()})
+    subjects = {}
+    for email, credential in accounts.items():
         location = keycloak_request(
             port, realm + "/users", token=token,
             data={
                 "username": email, "email": email, "emailVerified": True, "enabled": True,
                 "firstName": "Preview", "lastName": "Fixture",
-                "credentials": [{"type": "password", "value": password, "temporary": False}],
+                "credentials": [{"type": "password", "value": credential, "temporary": False}],
             },
         )
-        if email == SYNC_EMAIL:
-            subject = created_identifier(location, "user")
+        if email != LOGIN_EMAIL:
+            subjects[email] = created_identifier(location, "user")
+    for item in lifecycle.values():
+        item["subject"] = subjects[item["email"]]
+    subject = subjects[SYNC_EMAIL]
     location = keycloak_request(
         port, realm + "/organizations", token=token,
         data={"name": "Preview Integration Tenant", "alias": "kiraci1", "enabled": True},
     )
     organization = created_identifier(location, "organization")
-    keycloak_request(
-        port, realm + "/organizations/" + quote(organization, safe="") + "/members",
-        token=token, data=subject,
-    )
-    return subject
+    for member in (subject, lifecycle["delete"]["subject"], lifecycle["revoke"]["subject"]):
+        keycloak_request(
+            port, realm + "/organizations/" + quote(organization, safe="") + "/members",
+            token=token, data=member,
+        )
+    return subject, lifecycle
 
 
 def seed_site(project, service, bench, environment):
@@ -92,9 +106,7 @@ def seed_site(project, service, bench, environment):
         command, input=source.read_text(), text=True, stdout=subprocess.PIPE,
         env={**os.environ, **environment}, check=True,
     )
-    if service == "kiraci-web":
-        return json.loads(completed.stdout.splitlines()[-1])
-    return {}
+    return json.loads(completed.stdout.splitlines()[-1])
 
 
 def main():
@@ -115,17 +127,42 @@ def main():
         raise SystemExit("The fake provider must use a private address on the preview network.")
 
     password = "Aa9!" + secrets.token_urlsafe(24)
-    subject = seed_keycloak(port, password)
-    common = {"PANE_PORT": str(port), "E2E_PREVIEW_LOGIN_EMAIL": LOGIN_EMAIL}
-    seed_site(project, "web", PRESS_BENCH, {
+    subject, lifecycle = seed_keycloak(port, password)
+    common = {
+        "PANE_PORT": str(port), "E2E_PREVIEW_LOGIN_EMAIL": LOGIN_EMAIL,
+        "E2E_LIFECYCLE_IDENTITIES": json.dumps({
+            key: {field: item[field] for field in ("email", "subject")}
+            for key, item in lifecycle.items()
+        }),
+    }
+    keycloak_settings = Path(os.environ["PREVIEW_DIR"]) / "keycloak.env"
+    press_service_secret = next(
+        (line.partition("=")[2] for line in keycloak_settings.read_text().splitlines()
+         if line.startswith("ATONOTA_PRESS_SERVICE_SECRET=")), "",
+    )
+    if not press_service_secret:
+        raise RuntimeError("The preview Keycloak settings are missing the Press service secret.")
+    press_fixture = seed_site(project, "web", PRESS_BENCH, {
         **common, "E2E_PRESS_CLIENT_SECRET": os.environ["E2E_PRESS_CLIENT_SECRET"],
+        "E2E_PRESS_SERVICE_SECRET": press_service_secret,
+        "E2E_PREVIEW_SYNC_ORIGIN": os.environ["IDENTITY_SYNC_EVENTS_URL"].rsplit("/v1/events", 1)[0],
     })
     fixture = seed_site(project, "kiraci-web", BENCH, {
         **common,
         "E2E_PROVIDER_IP": str(address),
         "E2E_KEYCLOAK_CLIENT_SECRET": os.environ["E2E_KEYCLOAK_CLIENT_SECRET"],
     })
+    fixture.update(press_fixture)
     fixture.update(
+        E2E_DELETE_EMAIL=lifecycle["delete"]["email"],
+        E2E_DELETE_PASSWORD=lifecycle["delete"]["password"],
+        E2E_DELETE_SUBJECT=lifecycle["delete"]["subject"],
+        E2E_REVOKE_SUBJECT=lifecycle["revoke"]["subject"],
+        E2E_REVOKE_EMAIL=lifecycle["revoke"]["email"],
+        E2E_REVOKE_PASSWORD=lifecycle["revoke"]["password"],
+        E2E_MOBILE_CLIENT_ID="mobile-app",
+        E2E_EMPLOYEE_EMAIL=lifecycle["employee"]["email"],
+        E2E_EMPLOYEE_PASSWORD=lifecycle["employee"]["password"],
         E2E_KEYCLOAK_PASSWORD=password,
         E2E_SYNC_EMAIL=SYNC_EMAIL,
         E2E_SYNC_SUBJECT=subject,

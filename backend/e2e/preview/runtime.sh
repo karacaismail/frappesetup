@@ -39,7 +39,7 @@ identity_dir="$worktree/backend/identity"
 tenant="$PREVIEW_PROJECT-kiraci-web-1"
 press="$PREVIEW_PROJECT-web-1"
 sync="$PREVIEW_PROJECT-identity"
-sync_host=identity-sync.localhost
+sync_host=event-sink.localhost
 provider="$PREVIEW_PROJECT-provider"
 network="${PREVIEW_PROJECT}_default"
 builder="$PREVIEW_PROJECT-builder"
@@ -90,6 +90,22 @@ cleanup() {
     if [[ -f "$PREVIEW_DIR/compose.yaml" ]]; then
         for container in "$sync" "$provider"; do
             if [[ "$(docker_default container inspect --format '{{index .Config.Labels "com.frappesetup.preview"}}' "$container" 2>/dev/null)" == "$PREVIEW_PROJECT" ]]; then
+                if [[ "$container" == "$sync" ]]; then
+                    docker_default exec -i "$sync" /home/frappe/frappe-bench/env/bin/python - \
+                        > "$PREVIEW_DIR/identity-diagnostics.log" 2>> "$PREVIEW_DIR/cleanup.log" <<'PYTHON'
+import os
+import re
+import sqlite3
+
+path = os.environ["IDENTITY_SYNC_DB"]
+with sqlite3.connect("file:" + path + "?mode=ro", uri=True) as database:
+    for (error,) in database.execute("SELECT error FROM dead_letters ORDER BY last_failed_at DESC LIMIT 20"):
+        for step in error.split("; "):
+            operation = re.match(r"^(?:keycloak|press|tenant)\.[a-z_]+", step)
+            status = re.search(r": (HTTP [1-5][0-9]{2}(?: [A-Za-z_][A-Za-z0-9_]{0,47})?)$", step)
+            print(operation[0] if operation else "unidentified_step", status[1] if status else "no_http_status")
+PYTHON
+                fi
                 docker_default rm -f "$container" >> "$PREVIEW_DIR/cleanup.log" 2>&1 || cleanup_failed=1
             fi
         done
@@ -216,7 +232,6 @@ BASH
     docker_default cp "$worktree/backend/apps/press_tr" "$press:/home/frappe/benches/source/press_tr"
     docker_default exec -u root "$press" bash -c "chown -R \"\$(id -u frappe):\$(id -g frappe)\" /home/frappe/benches/source/press_tr"
     docker_default exec -i -e GOMAXPROCS=2 -e NODE_OPTIONS=--max-old-space-size=2048 -e SENTRY_TELEMETRY=false "$press" bash -s < "$dev_dir/press/install.sh"
-    docker_default exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c "exec bench serve --port \"\$PRESS_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
 
     "${compose[@]}" up --no-build -d --wait --wait-timeout 120 kiraci-db kiraci-redis keycloak-db mailpit
     "${compose[@]}" up --no-build -d kiraci-web keycloak
@@ -230,7 +245,6 @@ chown -R "$(id -u frappe):$(id -g frappe)" apps/platform_core /tmp/oidc_verify
 BASH
     docker_default exec "$tenant" uv pip install --python env/bin/python --no-deps /tmp/oidc_verify -e apps/platform_core
     docker_default exec "$tenant" env/bin/python /tmp/preview-bootstrap.py kiraci1.localhost --app erpnext --app platform_core
-    docker_default exec -d "$tenant" bash -c "exec bench serve --port \"\$KIRACI_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
     "${compose[@]}" up --no-build -d kiraci-socket
 
     {
@@ -277,10 +291,13 @@ wait_http() {
 }
 
 wait_http "http://127.0.0.1:$KC_PORT/realms/platform/.well-known/openid-configuration"
-wait_http "$ATONOTA_SITE_KIRACI1_URL/api/method/ping"
-wait_http "$ATONOTA_PRESS_URL/api/method/ping"
 wait_http "http://127.0.0.1:$sync_port/healthz"
 wait_http "http://127.0.0.1:$provider_port/attempts"
 
+# Frappe caches site settings on requests, including the readiness ping.
 python3 "$suite_dir/preview/fixtures.py" prepare
+docker_default exec -d -w /home/frappe/benches/frappe-bench "$press" bash -c "exec bench serve --port \"\$PRESS_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
+docker_default exec -d "$tenant" bash -c "exec bench serve --port \"\$KIRACI_WEB_PORT\" --noreload > logs/e2e-preview-web.log 2>&1"
+wait_http "$ATONOTA_SITE_KIRACI1_URL/api/method/ping"
+wait_http "$ATONOTA_PRESS_URL/api/method/ping"
 node "$suite_dir/preview/run-tests.mjs" "$worktree"

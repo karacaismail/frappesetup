@@ -8,6 +8,15 @@ import { fileURLToPath } from 'node:url';
 
 const runtime = fileURLToPath(new URL('../preview/runtime.sh', import.meta.url));
 
+test('preview writes the fixture configuration before starting either Frappe web process', () => {
+  const script = readFileSync(runtime, 'utf8');
+  const fixture = script.indexOf('preview/fixtures.py" prepare');
+  const webProcesses = [...script.matchAll(/exec bench serve/g)];
+  assert.ok(fixture >= 0);
+  assert.equal(webProcesses.length, 2);
+  for (const process of webProcesses) assert.ok(process.index > fixture);
+});
+
 test('preview webhook uses the Keycloak development hostname and its network alias', () => {
   const root = mkdtempSync(join(process.env.PANE_SCRATCH_DIR || tmpdir(), 'runtime-config-'));
   try {
@@ -57,7 +66,7 @@ test('preview webhook uses the Keycloak development hostname and its network ali
     assert.match(readFileSync(join(root, 'memory-probe'), 'utf8'), /--pull never --network none --read-only/);
     const webhook = new URL(readFileSync(join(root, 'webhook'), 'utf8').trim());
     assert.equal(webhook.protocol, 'http:');
-    assert.match(webhook.hostname, /\.localhost$/);
+    assert.equal(webhook.hostname, 'event-sink.localhost');
     assert.equal(webhook.pathname, '/v1/events');
     assert.equal(readFileSync(join(root, 'alias'), 'utf8').trim(), webhook.hostname);
   } finally {
