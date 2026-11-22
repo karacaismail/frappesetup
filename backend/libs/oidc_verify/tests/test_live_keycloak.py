@@ -10,6 +10,7 @@ import os
 import unittest
 import urllib.parse
 from contextlib import closing
+from pathlib import Path
 from unittest.mock import patch
 
 from oidc_verify import JwksCache, TokenError, verify_access_token, verify_logout_token
@@ -81,31 +82,98 @@ class LocalTokenRequestTest(unittest.TestCase):
                     connect.return_value.request.assert_called_once()
 
 
+def read_realm_fixture():
+    realm_file = Path(__file__).resolve().parents[3] / "identity/keycloak/realm/platform-realm.json"
+    return json.loads(realm_file.read_text(encoding="utf-8"))
+
+
+def tenant_service_scope(realm):
+    """Resolve the sample tenant permission from contracts.md, section 2.
+
+    Both service clients may request the scope. Its sole audience is the tenant
+    browser client, which has a separate service client.
+    """
+    clients = {client["clientId"]: client for client in realm["clients"]}
+    shared = set(clients["identity-sync"]["optionalClientScopes"]) & set(
+        clients["press-service"]["optionalClientScopes"]
+    )
+    matches = []
+    for scope in realm["clientScopes"]:
+        if scope["name"] not in shared:
+            continue
+        mappers = scope.get("protocolMappers", [])
+        if len(mappers) != 1 or mappers[0]["protocolMapper"] != "oidc-audience-mapper":
+            continue
+        config = mappers[0]["config"]
+        audience = config.get("included.client.audience")
+        if (
+            audience in clients
+            and clients[audience].get("standardFlowEnabled")
+            and not clients[audience].get("serviceAccountsEnabled")
+            and clients.get(f"{audience}-service", {}).get("serviceAccountsEnabled")
+            and config.get("access.token.claim") == "true"
+            and not config.get("included.custom.audience")
+        ):
+            matches.append((scope["name"], audience))
+    if len(matches) != 1:
+        raise ValueError("Expected one shared scope for the sample tenant browser audience")
+    return matches[0]
+
+
+class TenantScopeSelectionTest(unittest.TestCase):
+    def test_scope_resolution_tolerates_a_renamed_realm_scope(self):
+        realm = read_realm_fixture()
+        old_scope, audience = tenant_service_scope(realm)
+        new_scope = "renamed-for-test"
+        for scope in realm["clientScopes"]:
+            if scope["name"] == old_scope:
+                scope["name"] = new_scope
+        for client in realm["clients"]:
+            optional = client.get("optionalClientScopes", [])
+            client["optionalClientScopes"] = [new_scope if name == old_scope else name for name in optional]
+        self.assertEqual(tenant_service_scope(realm), (new_scope, audience))
+
+    def test_combined_requests_use_the_scope_declared_by_the_realm(self):
+        case = LiveKeycloakTest()
+        case.tenant_scope = "renamed-sample-scope"
+        case.tenant_audience = "renamed-sample-site"
+        with patch.object(case, "assert_combined_scope_rejected") as check:
+            case.test_identity_sync_combined_scope_tokens_are_refused()
+        self.assertEqual(
+            [call.args[2:] for call in check.call_args_list],
+            [
+                ("renamed-sample-scope aud-press", ("renamed-sample-site", "press")),
+                ("renamed-sample-scope admin-api kc-admin-api", ("renamed-sample-site",)),
+            ],
+        )
+
+
 @unittest.skipUnless(KC and SECRET, "KC_PUBLIC_URL ve ATONOTA_IDENTITY_SYNC_SECRET yok, canlı test atlandı")
 class LiveKeycloakTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         parts = local_issuer_parts(ISS)
+        cls.tenant_scope, cls.tenant_audience = tenant_service_scope(read_realm_fixture())
         cls.cache = JwksCache(
             f"http://127.0.0.1:{parts.port}{parts.path}/protocol/openid-connect/certs",
             ttl_seconds=600,
         )
 
     def test_live_service_token_validates(self):
-        token = get_token("identity-sync", SECRET, "aud-site-tenant1")
+        token = get_token("identity-sync", SECRET, self.tenant_scope)
         claims = verify_access_token(
             token,
             cache=self.cache,
             issuer=ISS,
-            audience="site-tenant1",
+            audience=self.tenant_audience,
             allowed_azp={"identity-sync"},
             leeway=30,
         )
         self.assertEqual(claims["azp"], "identity-sync")
-        self.assertEqual(claims["aud"], "site-tenant1")
+        self.assertEqual(claims["aud"], self.tenant_audience)
 
     def test_live_token_rejects_wrong_audience(self):
-        token = get_token("identity-sync", SECRET, "aud-site-tenant1")
+        token = get_token("identity-sync", SECRET, self.tenant_scope)
         with self.assertRaises(TokenError) as caught:
             verify_access_token(
                 token, cache=self.cache, issuer=ISS, audience="press", allowed_azp={"identity-sync"}
@@ -113,7 +181,11 @@ class LiveKeycloakTest(unittest.TestCase):
         self.assertEqual(caught.exception.code, "wrong_audience")
         with self.assertRaises(TokenError) as caught:
             verify_access_token(
-                token, cache=self.cache, issuer=ISS, audience="site-tenant1", allowed_azp={"press-service"}
+                token,
+                cache=self.cache,
+                issuer=ISS,
+                audience=self.tenant_audience,
+                allowed_azp={"press-service"},
             )
         self.assertEqual(caught.exception.code, "wrong_azp")
 
@@ -135,14 +207,14 @@ class LiveKeycloakTest(unittest.TestCase):
         self.assert_combined_scope_rejected(
             "identity-sync",
             SECRET,
-            "aud-site-kiraci1 aud-press",
-            ("site-tenant1", "press"),
+            f"{self.tenant_scope} aud-press",
+            (self.tenant_audience, "press"),
         )
         self.assert_combined_scope_rejected(
             "identity-sync",
             SECRET,
-            "aud-site-kiraci1 admin-api kc-admin-api",
-            ("site-tenant1",),
+            f"{self.tenant_scope} admin-api kc-admin-api",
+            (self.tenant_audience,),
         )
 
     @unittest.skipUnless(os.environ.get("ATONOTA_PRESS_SERVICE_SECRET"), "Press service secret is required")
@@ -150,14 +222,14 @@ class LiveKeycloakTest(unittest.TestCase):
         self.assert_combined_scope_rejected(
             "press-service",
             os.environ["ATONOTA_PRESS_SERVICE_SECRET"],
-            "aud-site-kiraci1 aud-identity-sync",
-            ("site-tenant1", "identity-sync"),
+            f"{self.tenant_scope} aud-identity-sync",
+            (self.tenant_audience, "identity-sync"),
         )
 
     def test_live_token_is_not_logout_token(self):
-        token = get_token("identity-sync", SECRET, "aud-site-tenant1")
+        token = get_token("identity-sync", SECRET, self.tenant_scope)
         with self.assertRaises(TokenError) as caught:
-            verify_logout_token(token, cache=self.cache, issuer=ISS, client_id="site-tenant1")
+            verify_logout_token(token, cache=self.cache, issuer=ISS, client_id=self.tenant_audience)
         self.assertEqual(caught.exception.code, "not_logout_token")
 
     def test_key_list_comes_from_live_endpoint(self):
