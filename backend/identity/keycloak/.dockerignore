@@ -3,6 +3,11 @@
 !realm/
 !realm/**
 !themes/
+!event-listener/
+!event-listener/**
+event-listener/target/
+!event-sink/
+!event-sink/**
 !themes/**
 themes/**/*.md
 themes/atonota/test/

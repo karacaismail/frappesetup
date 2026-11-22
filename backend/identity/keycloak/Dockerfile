@@ -14,7 +14,16 @@ RUN tar -xzf /tmp/magiclink.tar.gz --strip-components=1 \
     && mvn -q -B -DskipTests -Dkeycloak.version=26.8.2 package \
     && cp target/keycloak-magic-link-*.jar /build/keycloak-magic-link.jar
 
+# Event listener (docs/kararlar/0003-keycloak-eklentileri.md, decision D-10 option 1): a fork of
+# sashyo/keycloak-webhook-listener kept in event-listener/. The JUnit tests run here and gate the image.
+FROM maven:3.9.16-eclipse-temurin-21@sha256:99e61abcff91a9b1333463bd8451fb18495d6eba9250ac66a338b518f8278320 AS event-listener-build
+WORKDIR /build
+COPY event-listener/ /build/
+RUN --mount=type=cache,target=/root/.m2 mvn -q -B package \
+    && cp target/keycloak-webhook-listener-*.jar /build/keycloak-webhook-listener.jar
+
 FROM quay.io/keycloak/keycloak:26.8.2 AS prod
+COPY --from=event-listener-build --chown=1000:0 /build/keycloak-webhook-listener.jar /opt/keycloak/providers/keycloak-webhook-listener-identity-sync.jar
 COPY --from=magiclink-build --chown=1000:0 /build/keycloak-magic-link.jar /opt/keycloak/providers/keycloak-magic-link-7b4ee94.jar
 # Eklenti (docs/kararlar/0003-keycloak-eklentileri.md). Sürüm ve SHA-256 özeti sabittir.
 ADD --checksum=sha256:4091dee2a1ec9e0771bef4bd46005197d86b0a2b1f25198c41738476b1d102bb --chown=1000:0 \
@@ -28,3 +37,10 @@ COPY --chown=1000:0 themes/ /opt/keycloak/themes/
 # Geliştirme hedefi örnek kullanıcıları da taşır. Üretim imajı prod hedefinden alınır.
 FROM prod AS dev
 COPY --chown=1000:0 realm/dev-users/platform-users-0.json /opt/keycloak/data/import/platform-users-0.json
+
+# Development-only receiver for the event listener tests (tests/test_event_listener.py). Not part of prod.
+FROM maven:3.9.16-eclipse-temurin-21@sha256:99e61abcff91a9b1333463bd8451fb18495d6eba9250ac66a338b518f8278320 AS event-sink
+WORKDIR /sink
+COPY event-sink/EventSink.java /sink/EventSink.java
+USER 1000
+CMD ["java", "/sink/EventSink.java"]

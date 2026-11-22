@@ -18,18 +18,34 @@ fi
 
 rastgele() { python3 -c 'import secrets; print(secrets.token_urlsafe(24))'; }
 
+ornek_satiri() {
+  case "$1" in
+    *=degistir-*) printf '%s=%s\n' "${1%%=*}" "$(rastgele)" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
 env_hazirla() {
-  if [ -f "$ENV_DOSYASI" ]; then
+  if [ ! -f "$ENV_DOSYASI" ]; then
+    echo ".env yok. .env.example dosyasından üretiliyor." >&2
+    while IFS= read -r satir; do
+      ornek_satiri "$satir"
+    done < "$KLASOR/.env.example" > "$ENV_DOSYASI"
+    chmod 600 "$ENV_DOSYASI"
     return
   fi
-  echo ".env yok. .env.example dosyasından üretiliyor." >&2
+  # Örnek dosyaya sonradan eklenen anahtarlar .env dosyasına da eklenir. Var olan değerler değişmez.
+  local satir anahtar
   while IFS= read -r satir; do
     case "$satir" in
-      *=degistir-*) printf '%s=%s\n' "${satir%%=*}" "$(rastgele)" ;;
-      *) printf '%s\n' "$satir" ;;
+      [A-Z]*=*) anahtar="${satir%%=*}" ;;
+      *) continue ;;
     esac
-  done < "$KLASOR/.env.example" > "$ENV_DOSYASI"
-  chmod 600 "$ENV_DOSYASI"
+    if ! grep -q "^${anahtar}=" "$ENV_DOSYASI"; then
+      echo ".env dosyasına yeni anahtar eklendi: $anahtar" >&2
+      ornek_satiri "$satir" >> "$ENV_DOSYASI"
+    fi
+  done < "$KLASOR/.env.example"
 }
 
 ortam_yukle() {

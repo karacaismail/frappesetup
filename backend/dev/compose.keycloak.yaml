@@ -1,5 +1,5 @@
 # Keycloak geliştirme ortamı. Sahibi kimlik-realm işidir.
-# Keycloak, PostgreSQL ve Mailpit servislerini kurar.
+# Keycloak, PostgreSQL, Mailpit ve olay testlerinin kayıt servisini kurar.
 # Gerekli ortam değişkenleri ../identity/keycloak/.env.example dosyasındadır.
 # Portları PANE_PORT değişkeninden ../identity/keycloak/bin/kc-dev.sh betiği üretir.
 # Keycloak container içinde de ana bilgisayardaki portu dinler. Böylece tarayıcı ve
@@ -25,6 +25,9 @@ services:
       # Magic link extension: no REST endpoint and no cross-device variant (security review condition 4).
       KC_SPI_REALM_RESTAPI_EXTENSION__MAGICLINK_LOGIN__ENABLED: "false"
       KC_SPI_AUTHENTICATOR__MAGICLINK_CONTINUATION__ENABLED: "false"
+      # Event listener (event-listener/NOTICE). The secret is shared with identity-sync.
+      KC_SPI_EVENTS_LISTENER__WEBHOOK__URL: ${IDENTITY_SYNC_EVENTS_URL:?}
+      KC_SPI_EVENTS_LISTENER__WEBHOOK__SECRET: ${IDENTITY_SYNC_WEBHOOK_SECRET:?}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
       KC_DB_USERNAME: keycloak
@@ -79,6 +82,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  # Development-only receiver for the event listener tests. It has no host port.
+  event-sink:
+    image: fs-kimlik-realm-event-sink:dev
+    build:
+      context: ../identity/keycloak
+      dockerfile: Dockerfile
+      target: event-sink
+    pull_policy: build
 
   mailpit:
     image: axllent/mailpit:v1.34.0
