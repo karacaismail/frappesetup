@@ -147,6 +147,7 @@ def sql_calls(nodes, aliases):
             "sql_ddl",
             "_cursor",
             "_conn",
+            "get_connection",
         }:
             yield item.lineno
 
