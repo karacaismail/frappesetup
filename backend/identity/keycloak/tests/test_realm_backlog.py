@@ -190,6 +190,19 @@ class RealmBacklogLiveTest(unittest.TestCase):
                               code_challenge=challenge, code_challenge_method="S256")
         self.assertEqual(response.status, 200, response.headers.get("Location"))
         self.assertTrue(b'name="username"' in response.body, safe_detail(response))
+        headers = {name.lower(): value for name, value in response.headers.items()}
+        self.assertEqual(headers.get("x-frame-options"), "DENY")
+        self.assertIn("frame-ancestors 'none'", headers["content-security-policy"])
+
+    def test_oidc_session_probe_documents_can_still_be_framed(self):
+        endpoint = get_environment_value("KC_PUBLIC_URL") + "/realms/platform/protocol/openid-connect/"
+        for path in ("3p-cookies/step1.html", "3p-cookies/step2.html", "login-status-iframe.html"):
+            with self.subTest(path=path):
+                response = request("GET", endpoint + path)
+                self.assertEqual(response.status, 200)
+                headers = {name.lower(): value for name, value in response.headers.items()}
+                self.assertNotIn("frame-ancestors", headers["content-security-policy"])
+                self.assertIsNone(headers.get("x-frame-options"))
 
     def test_mobile_client_refuses_a_plain_challenge(self):
         response = _authorize("mobile-app", get_environment_value("ATONOTA_MOBILE_REDIRECT_URI"),

@@ -6,7 +6,8 @@ Frappe v16.50.0 ve Press v0.154.1 kullanılır.
 Paylaşılan yerel Press imajında Python sürümü 3.14.8.
 Yeni kurulumun Python yolu `install.sh` dosyasında yazılıdır.
 Uyum yamaları yalnız yerel Press denemesi içindir.
-Sunucu kurma ve Ansible bu kurulumda çalışmaz.
+Ansible `ansible-requirements.txt` sürümüne sabitlenir.
+Sunucu kurma akışının denemesi [kurma yolunda](provisioning-readiness.md) anlatılır.
 
 Komutları depo kökünde çalıştırın. Birleşik kaynakta `backend/libs/oidc_verify` bulunmalı.
 Press imajı bu kitaplığı bir Python kurulum paketi olarak taşır.
@@ -32,12 +33,14 @@ Kurulum parolaları Compose gizli dosyalarından okunur. Parolalar komut satır�
 MariaDB içe aktarımı, site parolasını geçici ve özel bir dosyadan okur.
 
 Site ayarları [Press TR kurulumunda](../../apps/press_tr/README.md) yer alır.
+Tam paket için [Press TR test komutunu](../../apps/press_tr/README.md#local-http-tests) kullanın.
 
 Anonim yapma süresini yalnız geçici test sitesinde ölçün.
 Betik 50 ayrı hesap kullanır. İlk çağrıların yüzde 95'i 1 saniyede bitmelidir.
 
 ```sh
-PRESS_TEST_MEASURE_ANONYMIZATION=1 PRESS_TEST_PANEL_URL=http://tenant1.localhost:3201/panel \
+PRESS_TEST_COMPOSE_PROJECT=press-test PRESS_TEST_MEASURE_ANONYMIZATION=1 \
+  PRESS_TEST_PANEL_URL=https://panel.example.test/ \
   sh backend/apps/press_tr/tests/run.sh
 ```
 
@@ -52,6 +55,9 @@ sh backend/apps/press_tr/tests/smoke.sh
 ```sh
 bash backend/dev/press/compose.sh down
 ```
+
+Yamasız adayın sonucu [uyum denemesinde](unpatched-runtime.md) açıklanır.
+Üç kaynak engeli ve bağımlılık uyumsuzluğu sürdüğü için O-18 borcu açıktır.
 
 `patch-py314.sh` Press kaynaklarına uyum yaması uygular.
 Bu yama yalnız `development` imajında bulunur ve çalışır (O-18).

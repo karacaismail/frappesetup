@@ -32,7 +32,16 @@ COPY event-listener/ /build/
 RUN --mount=type=cache,target=/root/.m2 mvn -q -B -Dkeycloak.version=${KEYCLOAK_VERSION} package \
     && cp target/keycloak-webhook-listener-*.jar /build/keycloak-webhook-listener.jar
 
-FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION} AS prod
+FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION} AS keycloak-base
+
+# The account theme selects this provider. Compile it with the same Keycloak jars the server uses.
+FROM ${MAVEN_IMAGE} AS account-provider-build
+COPY --from=keycloak-base /opt/keycloak/lib/lib /keycloak-lib
+COPY themes/atonota/account-provider /provider
+RUN /provider/build.sh /keycloak-lib /provider/src /out
+
+FROM keycloak-base AS prod
+COPY --from=account-provider-build --chown=1000:0 /out/account-deletion-link-provider.jar /opt/keycloak/providers/account-deletion-link-provider.jar
 COPY --from=event-listener-build --chown=1000:0 /build/keycloak-webhook-listener.jar /opt/keycloak/providers/keycloak-webhook-listener-identity-sync.jar
 COPY --from=magiclink-build --chown=1000:0 /build/keycloak-magic-link.jar /opt/keycloak/providers/keycloak-magic-link-7b4ee94.jar
 # Eklenti (docs/decisions/0003-keycloak-extensions.md). Sürüm ve SHA-256 özeti sabittir.

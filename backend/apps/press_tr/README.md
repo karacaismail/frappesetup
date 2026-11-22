@@ -59,6 +59,14 @@ The request hook adds only documented RPC paths to Press's in-memory
 preserves native machine checks. The test suite requires Press tag `v0.154.1` so
 an upgrade reopens review of the allowlist and webhook credentials.
 
+`press_tr.ansible_bridge` lets Press's unchanged Ansible runner work on ansible-core 2.19
+and later: it initialises the plugin loader and forwards playbook events to Press's own
+callback through the `press_tr_bridge` stdout callback plugin. The `before_job` and
+`before_request` hooks activate it. For `bench` commands that run plays directly, export
+`ANSIBLE_STDOUT_CALLBACK=press_tr_bridge` and point `ANSIBLE_CALLBACK_PLUGINS` at
+`press_tr/ansible_bridge/callback_plugins`. Plays with `async` tasks still fail inside Press;
+see `backend/docs/decisions/0018-press-ansible-python314.md`.
+
 A System Manager can run `press_tr.api.maintenance.cleanup_expired_sessions` with
 an authenticated POST to remove expired Press session mappings.
 
@@ -70,19 +78,26 @@ Tests can run with `innodb_snapshot_isolation` enabled or disabled.
 
 ## Local HTTP tests
 
-Start and migrate the disposable `fs-press-tr` environment first. Set
+Start and migrate a disposable Press Compose project first. Use a unique Compose
+project name with `backend/dev/press/compose.sh -p <project>`. Set
 `keycloak_client_id` to `press` and use a fake client secret.
 Set the test issuer public URL to `http://keycloak.example.test`, its internal URL
 to `http://127.0.0.1:3205`, and its realm to `platform`.
 Set the site origin to HTTP for the local test and configure an enabled Website User
 for service requests. Set `throttle_user_limit` to `300` on this disposable site to allow repeated test runs.
-Set `PRESS_TEST_PANEL_URL` to the site's `platform_panel_url`.
+Set `PRESS_TEST_PANEL_URL` to the site's `platform_panel_url`. Set
+`PRESS_TEST_COMPOSE_PROJECT` to the project name. If the project runs on the
+default Colima profile, set `FS_COLIMA_PROFILE=default`.
 
-From the repository root, run this command. It starts a temporary bench web process,
-runs the checks, and stops that process. It creates fictional users, teams and sessions.
+Run the Press TR suite from the repository root. The runner selects the project's
+running `web` service. It starts and stops a temporary Bench web process.
+Use an unused container port for `PRESS_TEST_PORT` (default `3363`).
+The suite creates fictional users, teams and sessions.
+`bench run-tests --app press_tr` does not discover this HTTP suite.
 
 ```sh
-PRESS_TEST_PANEL_URL=http://kiraci1.localhost:3201/panel sh backend/apps/press_tr/tests/run.sh
+PRESS_TEST_COMPOSE_PROJECT=press-test PRESS_TEST_PANEL_URL=https://panel.example.test/ \
+  sh backend/apps/press_tr/tests/run.sh
 ```
 
 ## License
