@@ -81,6 +81,24 @@ test('@matris customer: the personal info page shows a link to the account delet
   });
   expect(reach.saveBottom, 'the save button is not covered by the section').toBeLessThanOrEqual(reach.sectionTop + 1);
   expect(reach.saveTop, 'the save button is on screen').toBeGreaterThanOrEqual(0);
+
+  // The section stays at the bottom of the screen, because it is outside the console application.
+  // On a phone, upright or turned, it must be one compact row so it takes little of the screen.
+  const viewport = page.viewportSize()!;
+  const compact = viewport.width < 480 || viewport.height < 480;
+  const sectionBox = (await page.locator(SECTION).boundingBox())!;
+  if (compact) expect(sectionBox.height, 'compact section height on a phone').toBeLessThanOrEqual(56);
+  expect(sectionBox.height / viewport.height, 'share of the screen height').toBeLessThanOrEqual(0.15);
+  // The question stays available to a screen reader also when it is not drawn.
+  await expect(page.locator(`${SECTION} .at-account-deletion__text`)).toHaveText('Hesabınızı silmek mi istiyorsunuz?');
+  // There is clear space between the form buttons and the section when the page is scrolled to its end.
+  await page.locator('#cancel-btn').evaluate((element) => element.scrollIntoView({ block: 'end' }));
+  const gap = await page.evaluate(() => {
+    const scroller = document.querySelector('.pf-v5-c-page__main')!;
+    scroller.scrollTop = scroller.scrollHeight;
+    return document.querySelector('#at-account-deletion')!.getBoundingClientRect().top - document.querySelector('#save-btn')!.getBoundingClientRect().bottom;
+  });
+  expect(gap, 'space between the buttons and the section').toBeGreaterThanOrEqual(16);
   expect(result.scroll, 'horizontal overflow').toBeLessThanOrEqual(result.client);
   expect(result.left, 'inside the viewport').toBeGreaterThanOrEqual(0);
   expect(result.right, 'inside the viewport').toBeLessThanOrEqual(result.client + 1);
@@ -245,5 +263,8 @@ for (const scheme of ['light', 'dark'] as const) {
     await page.locator('#cancel-btn').focus();
     await page.keyboard.press(tabKey(browserName));
     await page.screenshot({ path: `${out}account-deletion-link-focus-${scheme}.png` });
+    // A phone turned sideways: the shortest screen the section has to share.
+    await page.setViewportSize({ width: 667, height: 375 });
+    await page.screenshot({ path: `${out}account-deletion-link-landscape-${scheme}.png` });
   });
 }

@@ -838,6 +838,34 @@ body[data-page-id="account"] > #app {
   margin: 0;
 }
 
+/*
+ * The section cannot sit at the end of the scrolled content: the console scrolls inside its own region
+ * and the section is outside the console application. So it is a row at the bottom of the screen.
+ * On a wide screen the row is pushed to the end edge, away from the sidebar, like a page footer.
+ * On a phone, upright or turned, only the link is drawn, so the row stays one line high.
+ * The question stays in the page for a screen reader.
+ */
+@media (min-width: 30rem) {
+  .at-account-deletion {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 29.99rem), (max-height: 29.99rem) {
+  .at-account-deletion {
+    padding-block: 0;
+  }
+
+  .at-account-deletion__text {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 [data-page-id="account"] a.at-account-deletion__link {
   display: inline-flex;
   align-items: center;
