@@ -1,10 +1,18 @@
 ---
 // Yalnız depo içindeki Markdown içeriği ve Astro bileşenleri HTML olarak birleştirilir.
 const content = (await Astro.slots.render('default')) ?? '';
+const placeholderPattern = /<div data-embed="([a-z0-9-]+)"><\/div>/g;
+// Değerin içindeki açı işaretleri etiketi bitirmez.
+const malformedPlaceholder = /<[a-z][\w:-]*(?:[^"'<>]|"[^"]*"|'[^']*')*?\sdata-embed(?=\s|=|\/?>)/i;
+
+if (malformedPlaceholder.test(content.replace(placeholderPattern, ''))) {
+  throw new Error('Belge bileşeni yer tutucusu <div data-embed="ad"></div> biçiminde olmalıdır.');
+}
+
 const chunks: string[] = [];
 let offset = 0;
 
-for (const match of content.matchAll(/<div data-embed="([a-z0-9-]+)"><\/div>/g)) {
+for (const match of content.matchAll(placeholderPattern)) {
   const [placeholder, name] = match;
   const start = match.index!;
   if (!Astro.slots.has(name)) throw new Error(`Bilinmeyen belge bileşeni: ${name}`);

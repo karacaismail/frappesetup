@@ -512,7 +512,7 @@
  {
   "id": "G-52",
   "title": "KVKK denetim ve saklama ayarları, kişisel veri talepleri",
-  "detail": "Ayarlar: enable_telemetry=0, allow_error_traceback=0, log_api_requests=1. Ekip apply_strict_user_permissions değerini ürün kararına göre ayarlar. Yönetici saklama temizliğini elle başlatır (D-6, O-32). Saklama süreleri gün cinsindendir. Activity Log, Access Log, Permission Log ve Deleted Document 365 gün saklanır. API Request Log, View Log, Route History, Integration Request ve Webhook Request Log 90 gün saklanır. Error Log, Email Queue ve OAuth Bearer Token 30 gün saklanır. Scheduled Job Log ve Prepared Report 14 gün saklanır. Uygulamalar veri talepleri için `user_data_fields` bildirir. Satılan kayıt türlerinde track_changes açıktır.",
+  "detail": "Ayarlar: enable_telemetry=0, allow_error_traceback=0, log_api_requests=1. Ekip apply_strict_user_permissions değerini ürün kararına göre ayarlar. Yönetici saklama temizliğini elle başlatır (D-6, O-32). Saklama süreleri gün cinsindendir. Activity Log, Access Log, Permission Log ve Deleted Document 365 gün saklanır. API Request Log, View Log, Route History, Integration Request ve Webhook Request Log 90 gün saklanır. Error Log, Email Queue ve OAuth Bearer Token 30 gün saklanır. Scheduled Job Log ve Prepared Report 14 gün saklanır. Uygulamalar veri talepleri için `user_data_fields` bildirir. Satılan kayıt türlerinde track_changes açıktır. Sistem konuşma içeriğini 90 gün saklar (G-87).",
   "rail": "R2 Frappe yapılandırma",
   "priority": "MUST",
   "phase": "P1",
@@ -862,7 +862,7 @@
  {
   "id": "G-87",
   "title": "AI denetim izi, ölçüm ve maliyet",
-  "detail": "AI Action Log işlemi, AI Usage Log model kullanımını kaydeder (G-64). Her iki kayıt 365 gün saklanır. Öneriler karar veya süre dolumundan sonra 30 gün saklanır. Yönetici temizliği elle başlatır (O-32). Bu kuralı proje kaydı, “Kişisel veri” bölümü ve sözleşmenin 10. bölümü açıklar.",
+  "detail": "AI Action Log işlemi, AI Usage Log model kullanımını kaydeder (G-64). Her iki kayıt 365 gün, konuşma içeriği 90 gün saklanır. Öneriler karar veya süre dolumundan sonra 30 gün saklanır. Yönetici temizliği elle başlatır (O-32). Bu kuralı proje kaydı, “Kişisel veri” bölümü ve sözleşmenin 10. bölümü açıklar.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P3",

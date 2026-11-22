@@ -564,6 +564,16 @@ async function frameStep(page: Page) {
 test.describe('documents without JavaScript', () => {
   test.use({ javaScriptEnabled: false, viewport: { width: 320, height: 720 } });
 
+  test('desktop AI links remain usable without JavaScript', async ({ page }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await page.goto('kararlar/');
+    const links = page.locator('#site-nav a[href*="/ai-"]');
+    await expect(links).toHaveCount(6);
+    await expect(links.first()).toBeVisible();
+    await links.first().click();
+    await expect(page).toHaveURL(/\/ai-bakis\/$/);
+  });
+
   test('embeds stay under their headings and script controls are disabled @touch', async ({ page }) => {
     await page.goto('yol-haritasi/');
     await expect(page.locator('[data-embed]')).toHaveCount(0);
@@ -579,7 +589,7 @@ test.describe('documents without JavaScript', () => {
 });
 
 test.describe('AI nav group', () => {
-  test('keeps the focused AI link when the shell loads', async ({ page }) => {
+  test('keeps its initial AI group state when the shell loads', async ({ page }) => {
     await page.setViewportSize({ width: 1366, height: 900 });
     let releaseShell!: () => void;
     const shellGate = new Promise<void>((resolve) => { releaseShell = resolve; });
@@ -590,15 +600,17 @@ test.describe('AI nav group', () => {
 
     try {
       await page.goto('kararlar/', { waitUntil: 'domcontentloaded' });
+      const group = page.getByTestId('nav-wrapper-ai');
       const firstLink = page.locator('#site-nav a[href*="/ai-"]').first();
-      await expect(firstLink).toBeVisible();
-      await firstLink.focus();
-      await expect(firstLink).toBeFocused();
+      await expect(group).toBeDisabled();
+      await expect(group).toHaveAttribute('aria-expanded', 'false');
+      await expect(firstLink).toBeHidden();
 
       releaseShell();
       await waitForHydration(page);
-      await expect(page.getByTestId('nav-wrapper-ai')).toBeEnabled();
-      await expect(firstLink).toBeFocused();
+      await expect(group).toBeEnabled();
+      await expect(group).toHaveAttribute('aria-expanded', 'false');
+      await expect(firstLink).toBeHidden();
     } finally {
       releaseShell();
     }

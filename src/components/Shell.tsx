@@ -128,12 +128,7 @@ function CollapsibleGroup({
 }) {
   const [opened, setOpened] = useState(defaultOpened);
   const [ready, setReady] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (panelRef.current?.contains(document.activeElement)) setOpened(true);
-    setReady(true);
-  }, []);
-  const expanded = !ready || opened;
+  useEffect(() => setReady(true), []);
   const GroupIcon = sectionIcon(icon);
   const panelId = `nav-group-${id}`;
   return (
@@ -142,7 +137,7 @@ function CollapsibleGroup({
         type="button"
         className="nav-link nav-wrapper"
         disabled={!ready}
-        aria-expanded={expanded}
+        aria-expanded={opened}
         aria-controls={panelId}
         data-testid={`nav-wrapper-${id}`}
         onClick={() => setOpened((v) => !v)}
@@ -151,7 +146,7 @@ function CollapsibleGroup({
         <span className="nav-link-label">{label}</span>
         <IconChevronDown size={18} aria-hidden className="nav-wrapper-chevron" />
       </button>
-      <div id={panelId} ref={panelRef} hidden={!expanded} className="nav-wrapper-panel">
+      <div id={panelId} hidden={!opened} className="nav-wrapper-panel">
         <Stack gap={2}>{children}</Stack>
       </div>
     </>

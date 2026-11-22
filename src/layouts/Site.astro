@@ -58,6 +58,12 @@ const canonical = new URL(Astro.url.pathname, Astro.site).href;
     <link rel="icon" href={`${BASE}/favicon.svg`} type="image/svg+xml" />
     <link rel="sitemap" href={`${BASE}/sitemap-index.xml`} />
     <ColorSchemeScript defaultColorScheme="auto" />
+    <noscript>
+      <style is:inline>
+        #site-nav .nav-wrapper { display: none; }
+        #site-nav .nav-wrapper-panel[hidden] { display: block; }
+      </style>
+    </noscript>
   </head>
   <body>
     <Shell

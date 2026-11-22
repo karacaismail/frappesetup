@@ -4,7 +4,9 @@ nav: "Rail 1 · Press"
 order: 3
 ---
 
-Press v0.154.x ticari katmanın omurgasıdır: Site Plan, Marketplace App / App Plan, Subscription → Usage Record → Invoice zinciri, Team Tier, Product Trial standby havuzu ve App Source → Release Group → Deploy Candidate → Bench → Site Update dağıtım zinciri olduğu gibi kullanılır (doğrulandı). Frappe Cloud'a özgü varsayımları kendi ticari gerçekliğimize uyarlayan tek özel uygulama `press_tr`dir (G-7): ödeme, TRY, e-belge köprüsü, fixture temizliği, auth allowlist, Keycloak sarmalayıcıları ve Türkçe e-posta şablonları `hooks`, `override_doctype_class`, `doc_events` ve Custom Field ile burada yaşar; Press'te düzeltme gerektiren noktalar ayrıca upstream PR olarak açılır.
+Press ticari katmanı yönetir. Frappe 16 denemesindeki Press sürümü KD-05 kaydındadır. Press site planlarını, mağaza uygulamalarını, takım kademelerini ve hazır deneme sitelerini yönetir. Abonelik, kullanım kaydı ve fatura aynı akışa bağlıdır. Dağıtım, App Source kaydından Site Update adımına kadar Press üzerinden yürür.
+
+`press_tr` ödeme, TRY, e-belge ve Türkçe e-posta işlerini Press’e uyarlar (G-7). İzin listesi ve Keycloak giriş sarmalayıcıları da bu uygulamadadır. Uygulama kancalar, kayıt örnekleri, sınıf geçersiz kılma ve özel alanları kullanır. Ekip, Press düzeltmelerini ana projeye ayrı değişiklik olarak önerir.
 
 Press, Frappe 16 üzerinde yamalarla açılır. Sunucu kurma akışı doğrulanmadan üretime çıkılmaz. Kaynak: proje kaydı D-7 ve O-9.
 

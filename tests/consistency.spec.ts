@@ -275,6 +275,25 @@ test.describe('content consistency', () => {
     expect(read('src/data/task-board.json')).not.toMatch(/staging/i);
   });
 
+  test('published retention, AI safeguards and decision caveats remain documented', () => {
+    const text = (slug: string) => docs.find((doc) => doc.slug === slug)!.text;
+    expect(text('rail-5-ai')).toContain('konuşma içeriği 90 gün');
+    expect(reqs.find((req) => req.id === 'G-87')?.detail).toContain('konuşma içeriği 90 gün');
+
+    const k9 = text('kararlar').split('\n').find((line) => line.startsWith('| K9 |'));
+    const homeCard = read('src/pages/index.astro').split('\n').find((line) => line.includes("id: 'K9'"));
+    for (const decision of [k9, homeCard]) {
+      expect(decision).toContain('AI eylemleri aynı sunucu izinlerinden geçer');
+      expect(decision).toContain('yazma eylemleri önizleme + onay ister');
+      expect(decision).toContain("her eylem audit'e düşer");
+      expect(decision).toContain('KVKK uyumu zorunlu');
+    }
+
+    const introduction = text('acik-kararlar').split('\n## ')[0];
+    expect(introduction).toContain('Kararlar üç türdür ve **Tür** sütununda yazılıdır');
+    expect(introduction).toContain('"Öneri" sütunundaki sayılar ölçülmüş kapasite veya kabul edilmiş taahhüt değildir.');
+  });
+
   test('requirement ids are unique, contiguous and well formed', () => {
     expect(ids.size).toBe(reqs.length);
     for (const prefix of ['G', 'SA']) {
@@ -325,6 +344,17 @@ test.describe('content consistency', () => {
     for (const d of docs) scan(d.slug, d.text);
     for (const r of reqs) scan(r.id, r.detail);
     expect(missing).toEqual([]);
+  });
+
+  test('all document embeds render once without placeholders', () => {
+    for (const doc of docs) {
+      const names = [...doc.text.matchAll(/<div data-embed="([a-z0-9-]+)"><\/div>/g)].map((match) => match[1]);
+      if (names.length === 0) continue;
+      const html = read(`dist/${doc.slug}/index.html`);
+      expect(html, doc.slug).not.toMatch(/<[^>]*\sdata-embed=/);
+      const sources = [...html.matchAll(/data-embed-source="([a-z0-9-]+)"/g)].map((match) => match[1]);
+      expect(sources, doc.slug).toEqual(names);
+    }
   });
 
   test('internal links point to existing pages and anchors', () => {
