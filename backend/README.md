@@ -33,4 +33,4 @@ Sonra `backend/dev/bin/tunel ac` komutuna gereken tüm portları yazın.
 Test komutu `test-platform-core.localhost` sitesini kullanır.
 `allow_tests` ayarı yalnız test sitesinde açıktır.
 Bu ayar Frappe'nin testleri çalıştırmasına izin verir.
-[Denetim komutları](PROJE-KAYDI.md#denetim-komutları) proje kaydındadır.
+[Proje kaydında](PROJE-KAYDI.md) “Denetim komutları” bölümünü açın.

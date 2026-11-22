@@ -1,0 +1,6386 @@
+[
+  {
+    "old": "platform_core.kimlik",
+    "new": "platform_core.identity",
+    "type": "module"
+  },
+  {
+    "old": "platform_core/platform_core/kimlik",
+    "new": "platform_core/platform_core/identity",
+    "type": "reference"
+  },
+  {
+    "old": "Kimlik",
+    "new": "Identity",
+    "type": "module"
+  },
+  {
+    "old": "platform_core.kabuk",
+    "new": "platform_core.shell",
+    "type": "module"
+  },
+  {
+    "old": "platform_core/platform_core/kabuk",
+    "new": "platform_core/platform_core/shell",
+    "type": "reference"
+  },
+  {
+    "old": "Kabuk",
+    "new": "Shell",
+    "type": "module"
+  },
+  {
+    "old": "platform_core.erisim",
+    "new": "platform_core.access",
+    "type": "module"
+  },
+  {
+    "old": "platform_core/platform_core/erisim",
+    "new": "platform_core/platform_core/access",
+    "type": "reference"
+  },
+  {
+    "old": "Erisim",
+    "new": "Access",
+    "type": "module"
+  },
+  {
+    "old": "platform_core.mobil",
+    "new": "platform_core.mobile",
+    "type": "module"
+  },
+  {
+    "old": "platform_core/platform_core/mobil",
+    "new": "platform_core/platform_core/mobile",
+    "type": "reference"
+  },
+  {
+    "old": "Mobil",
+    "new": "Mobile",
+    "type": "module"
+  },
+  {
+    "old": "platform_core.model_gecidi",
+    "new": "platform_core.model_gateway",
+    "type": "module"
+  },
+  {
+    "old": "platform_core/platform_core/model_gecidi",
+    "new": "platform_core/platform_core/model_gateway",
+    "type": "reference"
+  },
+  {
+    "old": "Model Gecidi",
+    "new": "Model Gateway",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/modules.txt",
+      "backend/apps/platform_core/platform_core/model_gecidi/*.json",
+      "backend/apps/platform_core/platform_core/model_gecidi/*.py",
+      "backend/apps/platform_core/platform_core/tests/test_installation.py"
+    ]
+  },
+  {
+    "old": "platform_core.yapay_zeka",
+    "new": "platform_core.ai",
+    "type": "module"
+  },
+  {
+    "old": "platform_core/platform_core/yapay_zeka",
+    "new": "platform_core/platform_core/ai",
+    "type": "reference"
+  },
+  {
+    "old": "Yapay Zeka",
+    "new": "AI",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/modules.txt",
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.json",
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py",
+      "backend/apps/platform_core/platform_core/tests/test_installation.py"
+    ]
+  },
+  {
+    "old": "press_tr.kimlik",
+    "new": "press_tr.press_identity",
+    "type": "module"
+  },
+  {
+    "old": "press_tr/press_tr/kimlik",
+    "new": "press_tr/press_tr/press_identity",
+    "type": "reference"
+  },
+  {
+    "old": "Kimlik",
+    "new": "Press Identity",
+    "type": "module"
+  },
+  {
+    "old": "platform_core.erisim.doctype.access_rule.access_rule",
+    "new": "platform_core.access.doctype.plt_access_rule.plt_access_rule",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.erisim.doctype.access_rule",
+    "new": "platform_core.access.doctype.plt_access_rule",
+    "type": "reference"
+  },
+  {
+    "old": "Access Rule",
+    "new": "PLT Access Rule",
+    "type": "doctype"
+  },
+  {
+    "old": "tabAccess Rule",
+    "new": "tabPLT Access Rule",
+    "type": "doctype"
+  },
+  {
+    "old": "AccessRule",
+    "new": "PLTAccessRule",
+    "type": "identifier"
+  },
+  {
+    "old": "access_rule",
+    "new": "plt_access_rule",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/*.py",
+      "backend/apps/platform_core/platform_core/access/doctype/plt_access_rule/*.py"
+    ]
+  },
+  {
+    "old": "access_rule.json",
+    "new": "plt_access_rule.json",
+    "type": "reference"
+  },
+  {
+    "old": "access_rule.py",
+    "new": "plt_access_rule.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.kimlik.doctype.platform_identity_link.platform_identity_link",
+    "new": "platform_core.identity.doctype.plt_identity_link.plt_identity_link",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.kimlik.doctype.platform_identity_link",
+    "new": "platform_core.identity.doctype.plt_identity_link",
+    "type": "reference"
+  },
+  {
+    "old": "Platform Identity Link",
+    "new": "PLT Identity Link",
+    "type": "doctype"
+  },
+  {
+    "old": "tabPlatform Identity Link",
+    "new": "tabPLT Identity Link",
+    "type": "doctype"
+  },
+  {
+    "old": "PlatformIdentityLink",
+    "new": "PLTIdentityLink",
+    "type": "identifier"
+  },
+  {
+    "old": "platform_identity_link",
+    "new": "plt_identity_link",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/kimlik/doctype/platform_identity_link/*.py",
+      "backend/apps/platform_core/platform_core/identity/doctype/plt_identity_link/*.py"
+    ]
+  },
+  {
+    "old": "platform_identity_link.json",
+    "new": "plt_identity_link.json",
+    "type": "reference"
+  },
+  {
+    "old": "platform_identity_link.py",
+    "new": "plt_identity_link.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_account_state.mobile_account_state",
+    "new": "platform_core.mobile.doctype.plt_mobile_account_state.plt_mobile_account_state",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_account_state",
+    "new": "platform_core.mobile.doctype.plt_mobile_account_state",
+    "type": "reference"
+  },
+  {
+    "old": "Mobile Account State",
+    "new": "PLT Mobile Account State",
+    "type": "doctype"
+  },
+  {
+    "old": "tabMobile Account State",
+    "new": "tabPLT Mobile Account State",
+    "type": "doctype"
+  },
+  {
+    "old": "MobileAccountState",
+    "new": "PLTMobileAccountState",
+    "type": "identifier"
+  },
+  {
+    "old": "mobile_account_state",
+    "new": "plt_mobile_account_state",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/doctype/mobile_account_state/*.py",
+      "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_account_state/*.py"
+    ]
+  },
+  {
+    "old": "mobile_account_state.json",
+    "new": "plt_mobile_account_state.json",
+    "type": "reference"
+  },
+  {
+    "old": "mobile_account_state.py",
+    "new": "plt_mobile_account_state.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_change.mobile_change",
+    "new": "platform_core.mobile.doctype.plt_mobile_change.plt_mobile_change",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_change",
+    "new": "platform_core.mobile.doctype.plt_mobile_change",
+    "type": "reference"
+  },
+  {
+    "old": "Mobile Change",
+    "new": "PLT Mobile Change",
+    "type": "doctype"
+  },
+  {
+    "old": "tabMobile Change",
+    "new": "tabPLT Mobile Change",
+    "type": "doctype"
+  },
+  {
+    "old": "MobileChange",
+    "new": "PLTMobileChange",
+    "type": "identifier"
+  },
+  {
+    "old": "mobile_change",
+    "new": "plt_mobile_change",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/doctype/mobile_change/*.py",
+      "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_change/*.py"
+    ]
+  },
+  {
+    "old": "mobile_change.json",
+    "new": "plt_mobile_change.json",
+    "type": "reference"
+  },
+  {
+    "old": "mobile_change.py",
+    "new": "plt_mobile_change.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_delivery.mobile_delivery",
+    "new": "platform_core.mobile.doctype.plt_mobile_delivery.plt_mobile_delivery",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_delivery",
+    "new": "platform_core.mobile.doctype.plt_mobile_delivery",
+    "type": "reference"
+  },
+  {
+    "old": "Mobile Delivery",
+    "new": "PLT Mobile Delivery",
+    "type": "doctype"
+  },
+  {
+    "old": "tabMobile Delivery",
+    "new": "tabPLT Mobile Delivery",
+    "type": "doctype"
+  },
+  {
+    "old": "MobileDelivery",
+    "new": "PLTMobileDelivery",
+    "type": "identifier"
+  },
+  {
+    "old": "mobile_delivery",
+    "new": "plt_mobile_delivery",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/doctype/mobile_delivery/*.py",
+      "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_delivery/*.py"
+    ]
+  },
+  {
+    "old": "mobile_delivery.json",
+    "new": "plt_mobile_delivery.json",
+    "type": "reference"
+  },
+  {
+    "old": "mobile_delivery.py",
+    "new": "plt_mobile_delivery.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_installation.mobile_installation",
+    "new": "platform_core.mobile.doctype.plt_mobile_installation.plt_mobile_installation",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_installation",
+    "new": "platform_core.mobile.doctype.plt_mobile_installation",
+    "type": "reference"
+  },
+  {
+    "old": "Mobile Installation",
+    "new": "PLT Mobile Installation",
+    "type": "doctype"
+  },
+  {
+    "old": "tabMobile Installation",
+    "new": "tabPLT Mobile Installation",
+    "type": "doctype"
+  },
+  {
+    "old": "MobileInstallation",
+    "new": "PLTMobileInstallation",
+    "type": "identifier"
+  },
+  {
+    "old": "mobile_installation",
+    "new": "plt_mobile_installation",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/doctype/mobile_installation/*.py",
+      "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_installation/*.py"
+    ]
+  },
+  {
+    "old": "mobile_installation.json",
+    "new": "plt_mobile_installation.json",
+    "type": "reference"
+  },
+  {
+    "old": "mobile_installation.py",
+    "new": "plt_mobile_installation.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_operation.mobile_operation",
+    "new": "platform_core.mobile.doctype.plt_mobile_operation.plt_mobile_operation",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_operation",
+    "new": "platform_core.mobile.doctype.plt_mobile_operation",
+    "type": "reference"
+  },
+  {
+    "old": "Mobile Operation",
+    "new": "PLT Mobile Operation",
+    "type": "doctype"
+  },
+  {
+    "old": "tabMobile Operation",
+    "new": "tabPLT Mobile Operation",
+    "type": "doctype"
+  },
+  {
+    "old": "MobileOperation",
+    "new": "PLTMobileOperation",
+    "type": "identifier"
+  },
+  {
+    "old": "mobile_operation",
+    "new": "plt_mobile_operation",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/doctype/mobile_operation/*.py",
+      "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_operation/*.py"
+    ]
+  },
+  {
+    "old": "mobile_operation.json",
+    "new": "plt_mobile_operation.json",
+    "type": "reference"
+  },
+  {
+    "old": "mobile_operation.py",
+    "new": "plt_mobile_operation.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_sequence.mobile_sequence",
+    "new": "platform_core.mobile.doctype.plt_mobile_sequence.plt_mobile_sequence",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_sequence",
+    "new": "platform_core.mobile.doctype.plt_mobile_sequence",
+    "type": "reference"
+  },
+  {
+    "old": "Mobile Sequence",
+    "new": "PLT Mobile Sequence",
+    "type": "doctype"
+  },
+  {
+    "old": "tabMobile Sequence",
+    "new": "tabPLT Mobile Sequence",
+    "type": "doctype"
+  },
+  {
+    "old": "MobileSequence",
+    "new": "PLTMobileSequence",
+    "type": "identifier"
+  },
+  {
+    "old": "mobile_sequence",
+    "new": "plt_mobile_sequence",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/doctype/mobile_sequence/*.py",
+      "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_sequence/*.py"
+    ]
+  },
+  {
+    "old": "mobile_sequence.json",
+    "new": "plt_mobile_sequence.json",
+    "type": "reference"
+  },
+  {
+    "old": "mobile_sequence.py",
+    "new": "plt_mobile_sequence.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_account.ai_account",
+    "new": "platform_core.model_gateway.doctype.plt_ai_account.plt_ai_account",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_account",
+    "new": "platform_core.model_gateway.doctype.plt_ai_account",
+    "type": "reference"
+  },
+  {
+    "old": "AI Account",
+    "new": "PLT AI Account",
+    "type": "doctype"
+  },
+  {
+    "old": "tabAI Account",
+    "new": "tabPLT AI Account",
+    "type": "doctype"
+  },
+  {
+    "old": "AIAccount",
+    "new": "PLTAIAccount",
+    "type": "identifier"
+  },
+  {
+    "old": "ai_account",
+    "new": "plt_ai_account",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_account/*.py",
+      "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_account/*.py"
+    ]
+  },
+  {
+    "old": "ai_account.json",
+    "new": "plt_ai_account.json",
+    "type": "reference"
+  },
+  {
+    "old": "ai_account.py",
+    "new": "plt_ai_account.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_api.ai_api",
+    "new": "platform_core.model_gateway.doctype.plt_ai_api.plt_ai_api",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_api",
+    "new": "platform_core.model_gateway.doctype.plt_ai_api",
+    "type": "reference"
+  },
+  {
+    "old": "AI API",
+    "new": "PLT AI API",
+    "type": "doctype"
+  },
+  {
+    "old": "tabAI API",
+    "new": "tabPLT AI API",
+    "type": "doctype"
+  },
+  {
+    "old": "AIAPI",
+    "new": "PLTAIAPI",
+    "type": "identifier"
+  },
+  {
+    "old": "ai_api",
+    "new": "plt_ai_api",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_api/*.py",
+      "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_api/*.py"
+    ]
+  },
+  {
+    "old": "ai_api.json",
+    "new": "plt_ai_api.json",
+    "type": "reference"
+  },
+  {
+    "old": "ai_api.py",
+    "new": "plt_ai_api.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_model.ai_model",
+    "new": "platform_core.model_gateway.doctype.plt_ai_model.plt_ai_model",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_model",
+    "new": "platform_core.model_gateway.doctype.plt_ai_model",
+    "type": "reference"
+  },
+  {
+    "old": "AI Model",
+    "new": "PLT AI Model",
+    "type": "doctype"
+  },
+  {
+    "old": "tabAI Model",
+    "new": "tabPLT AI Model",
+    "type": "doctype"
+  },
+  {
+    "old": "AIModel",
+    "new": "PLTAIModel",
+    "type": "identifier"
+  },
+  {
+    "old": "ai_model",
+    "new": "plt_ai_model",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_model/*.py",
+      "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_model/*.py"
+    ]
+  },
+  {
+    "old": "ai_model.json",
+    "new": "plt_ai_model.json",
+    "type": "reference"
+  },
+  {
+    "old": "ai_model.py",
+    "new": "plt_ai_model.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_provider.ai_provider",
+    "new": "platform_core.model_gateway.doctype.plt_ai_provider.plt_ai_provider",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_provider",
+    "new": "platform_core.model_gateway.doctype.plt_ai_provider",
+    "type": "reference"
+  },
+  {
+    "old": "AI Provider",
+    "new": "PLT AI Provider",
+    "type": "doctype"
+  },
+  {
+    "old": "tabAI Provider",
+    "new": "tabPLT AI Provider",
+    "type": "doctype"
+  },
+  {
+    "old": "AIProvider",
+    "new": "PLTAIProvider",
+    "type": "identifier"
+  },
+  {
+    "old": "ai_provider",
+    "new": "plt_ai_provider",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_provider/*.py",
+      "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_provider/*.py"
+    ]
+  },
+  {
+    "old": "ai_provider.json",
+    "new": "plt_ai_provider.json",
+    "type": "reference"
+  },
+  {
+    "old": "ai_provider.py",
+    "new": "plt_ai_provider.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_route.ai_route",
+    "new": "platform_core.model_gateway.doctype.plt_ai_route.plt_ai_route",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_route",
+    "new": "platform_core.model_gateway.doctype.plt_ai_route",
+    "type": "reference"
+  },
+  {
+    "old": "AI Route",
+    "new": "PLT AI Route",
+    "type": "doctype"
+  },
+  {
+    "old": "tabAI Route",
+    "new": "tabPLT AI Route",
+    "type": "doctype"
+  },
+  {
+    "old": "AIRoute",
+    "new": "PLTAIRoute",
+    "type": "identifier"
+  },
+  {
+    "old": "ai_route",
+    "new": "plt_ai_route",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_route/*.py",
+      "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_route/*.py"
+    ]
+  },
+  {
+    "old": "ai_route.json",
+    "new": "plt_ai_route.json",
+    "type": "reference"
+  },
+  {
+    "old": "ai_route.py",
+    "new": "plt_ai_route.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_usage_log.ai_usage_log",
+    "new": "platform_core.model_gateway.doctype.plt_ai_usage_log.plt_ai_usage_log",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.model_gecidi.doctype.ai_usage_log",
+    "new": "platform_core.model_gateway.doctype.plt_ai_usage_log",
+    "type": "reference"
+  },
+  {
+    "old": "AI Usage Log",
+    "new": "PLT AI Usage Log",
+    "type": "doctype"
+  },
+  {
+    "old": "tabAI Usage Log",
+    "new": "tabPLT AI Usage Log",
+    "type": "doctype"
+  },
+  {
+    "old": "AIUsageLog",
+    "new": "PLTAIUsageLog",
+    "type": "identifier"
+  },
+  {
+    "old": "ai_usage_log",
+    "new": "plt_ai_usage_log",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_usage_log/*.py",
+      "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_usage_log/*.py"
+    ]
+  },
+  {
+    "old": "ai_usage_log.json",
+    "new": "plt_ai_usage_log.json",
+    "type": "reference"
+  },
+  {
+    "old": "ai_usage_log.py",
+    "new": "plt_ai_usage_log.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.yapay_zeka.doctype.ai_action_log.ai_action_log",
+    "new": "platform_core.ai.doctype.plt_ai_action_log.plt_ai_action_log",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.yapay_zeka.doctype.ai_action_log",
+    "new": "platform_core.ai.doctype.plt_ai_action_log",
+    "type": "reference"
+  },
+  {
+    "old": "AI Action Log",
+    "new": "PLT AI Action Log",
+    "type": "doctype"
+  },
+  {
+    "old": "tabAI Action Log",
+    "new": "tabPLT AI Action Log",
+    "type": "doctype"
+  },
+  {
+    "old": "AIActionLog",
+    "new": "PLTAIActionLog",
+    "type": "identifier"
+  },
+  {
+    "old": "ai_action_log",
+    "new": "plt_ai_action_log",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/doctype/ai_action_log/*.py",
+      "backend/apps/platform_core/platform_core/ai/doctype/plt_ai_action_log/*.py"
+    ]
+  },
+  {
+    "old": "ai_action_log.json",
+    "new": "plt_ai_action_log.json",
+    "type": "reference"
+  },
+  {
+    "old": "ai_action_log.py",
+    "new": "plt_ai_action_log.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.yapay_zeka.doctype.ai_action_proposal.ai_action_proposal",
+    "new": "platform_core.ai.doctype.plt_ai_action_proposal.plt_ai_action_proposal",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.yapay_zeka.doctype.ai_action_proposal",
+    "new": "platform_core.ai.doctype.plt_ai_action_proposal",
+    "type": "reference"
+  },
+  {
+    "old": "AI Action Proposal",
+    "new": "PLT AI Action Proposal",
+    "type": "doctype"
+  },
+  {
+    "old": "tabAI Action Proposal",
+    "new": "tabPLT AI Action Proposal",
+    "type": "doctype"
+  },
+  {
+    "old": "AIActionProposal",
+    "new": "PLTAIActionProposal",
+    "type": "identifier"
+  },
+  {
+    "old": "ai_action_proposal",
+    "new": "plt_ai_action_proposal",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/doctype/ai_action_proposal/*.py",
+      "backend/apps/platform_core/platform_core/ai/doctype/plt_ai_action_proposal/*.py"
+    ]
+  },
+  {
+    "old": "ai_action_proposal.json",
+    "new": "plt_ai_action_proposal.json",
+    "type": "reference"
+  },
+  {
+    "old": "ai_action_proposal.py",
+    "new": "plt_ai_action_proposal.py",
+    "type": "reference"
+  },
+  {
+    "old": "press_tr.kimlik.doctype.press_identity_link.press_identity_link",
+    "new": "press_tr.press_identity.doctype.ptr_identity_link.ptr_identity_link",
+    "type": "reference"
+  },
+  {
+    "old": "press_tr.kimlik.doctype.press_identity_link",
+    "new": "press_tr.press_identity.doctype.ptr_identity_link",
+    "type": "reference"
+  },
+  {
+    "old": "Press Identity Link",
+    "new": "PTR Identity Link",
+    "type": "doctype"
+  },
+  {
+    "old": "tabPress Identity Link",
+    "new": "tabPTR Identity Link",
+    "type": "doctype"
+  },
+  {
+    "old": "PressIdentityLink",
+    "new": "PTRIdentityLink",
+    "type": "identifier"
+  },
+  {
+    "old": "press_identity_link",
+    "new": "ptr_identity_link",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/press_tr/press_tr/kimlik/doctype/press_identity_link/*.py",
+      "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/*.py"
+    ]
+  },
+  {
+    "old": "press_identity_link.json",
+    "new": "ptr_identity_link.json",
+    "type": "reference"
+  },
+  {
+    "old": "press_identity_link.py",
+    "new": "ptr_identity_link.py",
+    "type": "reference"
+  },
+  {
+    "old": "press_tr.kimlik.doctype.press_keycloak_session.press_keycloak_session",
+    "new": "press_tr.press_identity.doctype.ptr_keycloak_session.ptr_keycloak_session",
+    "type": "reference"
+  },
+  {
+    "old": "press_tr.kimlik.doctype.press_keycloak_session",
+    "new": "press_tr.press_identity.doctype.ptr_keycloak_session",
+    "type": "reference"
+  },
+  {
+    "old": "Press Keycloak Session",
+    "new": "PTR Keycloak Session",
+    "type": "doctype"
+  },
+  {
+    "old": "tabPress Keycloak Session",
+    "new": "tabPTR Keycloak Session",
+    "type": "doctype"
+  },
+  {
+    "old": "PressKeycloakSession",
+    "new": "PTRKeycloakSession",
+    "type": "identifier"
+  },
+  {
+    "old": "press_keycloak_session",
+    "new": "ptr_keycloak_session",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/press_tr/press_tr/kimlik/doctype/press_keycloak_session/*.py",
+      "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/*.py"
+    ]
+  },
+  {
+    "old": "press_keycloak_session.json",
+    "new": "ptr_keycloak_session.json",
+    "type": "reference"
+  },
+  {
+    "old": "press_keycloak_session.py",
+    "new": "ptr_keycloak_session.py",
+    "type": "reference"
+  },
+  {
+    "old": "dev/guvenlik",
+    "new": "dev/security",
+    "type": "reference"
+  },
+  {
+    "old": "docs/isler",
+    "new": "docs/tasks",
+    "type": "reference"
+  },
+  {
+    "old": "docs/kararlar",
+    "new": "docs/decisions",
+    "type": "reference"
+  },
+  {
+    "old": "PROJE-KAYDI.md",
+    "new": "PROJECT-RECORD.md",
+    "type": "reference"
+  },
+  {
+    "old": "test_alan_duzeyi.py",
+    "new": "test_field_level.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_hiyerarsi.py",
+    "new": "test_hierarchy.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_inceleme.py",
+    "new": "test_review.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_kayit_kurali.py",
+    "new": "test_record_rule.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_kural_degisimi.py",
+    "new": "test_rule_changes.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_paylasim.py",
+    "new": "test_sharing.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_sorgu_sayisi.py",
+    "new": "test_query_count.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_uclar.py",
+    "new": "test_endpoints.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_yuzeyler.py",
+    "new": "test_surfaces.py",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core-erisim.openapi.yaml",
+    "new": "platform_core-access.openapi.yaml",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core-kabuk.openapi.yaml",
+    "new": "platform_core-shell.openapi.yaml",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core-kimlik.openapi.yaml",
+    "new": "platform_core-identity.openapi.yaml",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core-mobil.openapi.yaml",
+    "new": "platform_core-mobile.openapi.yaml",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core-model-gecidi.openapi.yaml",
+    "new": "platform_core-model-gateway.openapi.yaml",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core-yapay-zeka.openapi.yaml",
+    "new": "platform_core-ai.openapi.yaml",
+    "type": "reference"
+  },
+  {
+    "old": "Dockerfile.kiraci",
+    "new": "Dockerfile.tenant",
+    "type": "reference"
+  },
+  {
+    "old": "Dockerfile.kiraci.dockerignore",
+    "new": "Dockerfile.tenant.dockerignore",
+    "type": "reference"
+  },
+  {
+    "old": "bin/ac",
+    "new": "bin/start",
+    "type": "reference"
+  },
+  {
+    "old": "guvenlik-denetimi",
+    "new": "security-audit",
+    "type": "reference"
+  },
+  {
+    "old": "bin/kapat",
+    "new": "bin/stop",
+    "type": "reference"
+  },
+  {
+    "old": "modul-sinirlari",
+    "new": "module-boundaries",
+    "type": "reference"
+  },
+  {
+    "old": "bin/tunel",
+    "new": "bin/tunnel",
+    "type": "reference"
+  },
+  {
+    "old": "compose.kiraci.yaml",
+    "new": "compose.tenant.yaml",
+    "type": "reference"
+  },
+  {
+    "old": "kotuye-kullanim-karti.md",
+    "new": "abuse-case-card.md",
+    "type": "reference"
+  },
+  {
+    "old": "modul-sinirlari.json",
+    "new": "module-boundaries.json",
+    "type": "reference"
+  },
+  {
+    "old": "dev-ortam.md",
+    "new": "dev-environment.md",
+    "type": "reference"
+  },
+  {
+    "old": "erisim-kurali.md",
+    "new": "access-rule.md",
+    "type": "reference"
+  },
+  {
+    "old": "guvenlik-kapisi.md",
+    "new": "security-gate.md",
+    "type": "reference"
+  },
+  {
+    "old": "ilk-dikey-dilim.md",
+    "new": "first-vertical-slice.md",
+    "type": "reference"
+  },
+  {
+    "old": "kimlik-realm.md",
+    "new": "identity-realm.md",
+    "type": "reference"
+  },
+  {
+    "old": "kimlik-tema.md",
+    "new": "identity-theme.md",
+    "type": "reference"
+  },
+  {
+    "old": "platform-core-gecit.md",
+    "new": "platform-core-gateway.md",
+    "type": "reference"
+  },
+  {
+    "old": "platform-core-kabuk.md",
+    "new": "platform-core-shell.md",
+    "type": "reference"
+  },
+  {
+    "old": "platform-core-kimlik.md",
+    "new": "platform-core-identity.md",
+    "type": "reference"
+  },
+  {
+    "old": "platform-core-mobil.md",
+    "new": "platform-core-mobile.md",
+    "type": "reference"
+  },
+  {
+    "old": "platform-core-yz.md",
+    "new": "platform-core-ai.md",
+    "type": "reference"
+  },
+  {
+    "old": "0002-yapay-zeka-katmani.md",
+    "new": "0002-ai-layer.md",
+    "type": "reference"
+  },
+  {
+    "old": "0003-keycloak-eklentileri.md",
+    "new": "0003-keycloak-extensions.md",
+    "type": "reference"
+  },
+  {
+    "old": "0004-model-gecidi.md",
+    "new": "0004-model-gateway.md",
+    "type": "reference"
+  },
+  {
+    "old": "0005-guvenlik-kapisi.md",
+    "new": "0005-security-gate.md",
+    "type": "reference"
+  },
+  {
+    "old": "0006-erisim-kurali.md",
+    "new": "0006-access-rule.md",
+    "type": "reference"
+  },
+  {
+    "old": "0007-mobil-esitleme.md",
+    "new": "0007-mobile-sync.md",
+    "type": "reference"
+  },
+  {
+    "old": "sozlesmeler.md",
+    "new": "contracts.md",
+    "type": "reference"
+  },
+  {
+    "old": "KAYNAK.md",
+    "new": "SOURCE.md",
+    "type": "reference"
+  },
+  {
+    "old": "yaygin-parolalar.txt",
+    "new": "common-passwords.txt",
+    "type": "reference"
+  },
+  {
+    "old": "test_eklentiler.py",
+    "new": "test_extensions.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_eklentiler",
+    "new": "test_extensions",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*.py"
+    ]
+  },
+  {
+    "old": "test_keycloak_canli.py",
+    "new": "test_live_keycloak.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_realm_dosyalari.py",
+    "new": "test_realm_files.py",
+    "type": "reference"
+  },
+  {
+    "old": "yardimci.py",
+    "new": "helpers.py",
+    "type": "reference"
+  },
+  {
+    "old": "OKUBENI.md",
+    "new": "README.md",
+    "type": "reference"
+  },
+  {
+    "old": "tema-dev.sh",
+    "new": "theme-dev.sh",
+    "type": "reference"
+  },
+  {
+    "old": "tema-deneme-realm.json",
+    "new": "theme-test-realm.json",
+    "type": "reference"
+  },
+  {
+    "old": "akis.spec.ts",
+    "new": "flow.spec.ts",
+    "type": "reference"
+  },
+  {
+    "old": "dil.spec.ts",
+    "new": "language.spec.ts",
+    "type": "reference"
+  },
+  {
+    "old": "eposta.spec.ts",
+    "new": "email.spec.ts",
+    "type": "reference"
+  },
+  {
+    "old": "erisilebilirlik.spec.ts",
+    "new": "accessibility.spec.ts",
+    "type": "reference"
+  },
+  {
+    "old": "gorsel.spec.ts",
+    "new": "visual.spec.ts",
+    "type": "reference"
+  },
+  {
+    "old": "hareket.spec.ts",
+    "new": "motion.spec.ts",
+    "type": "reference"
+  },
+  {
+    "old": "odak.spec.ts",
+    "new": "focus.spec.ts",
+    "type": "reference"
+  },
+  {
+    "old": "yerlesim.spec.ts",
+    "new": "layout.spec.ts",
+    "type": "reference"
+  },
+  {
+    "old": "dogrulama.py",
+    "new": "verification.py",
+    "type": "reference"
+  },
+  {
+    "old": "hatalar.py",
+    "new": "errors.py",
+    "type": "reference"
+  },
+  {
+    "old": "anahtarlar.py",
+    "new": "keys.py",
+    "type": "reference"
+  },
+  {
+    "old": "test_canli_keycloak.py",
+    "new": "test_live_keycloak.py",
+    "type": "reference"
+  },
+  {
+    "old": "eposta-dogrulama-dark.png",
+    "new": "email-verification-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "eposta-dogrulama-light.png",
+    "new": "email-verification-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-dark.png",
+    "new": "login-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-hata-dark.png",
+    "new": "login-error-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-hata-light.png",
+    "new": "login-error-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-light.png",
+    "new": "login-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-yolu-dark.png",
+    "new": "login-method-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris-yolu-light.png",
+    "new": "login-method-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "kayit-dark.png",
+    "new": "registration-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "kayit-hata-dark.png",
+    "new": "registration-error-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "kayit-hata-light.png",
+    "new": "registration-error-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "kayit-light.png",
+    "new": "registration-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-1-parola.png",
+    "new": "focus-dark-1-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-2-goster.png",
+    "new": "focus-dark-2-show-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-3-unuttum.png",
+    "new": "focus-dark-3-forgot-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-4-oturum-ac.png",
+    "new": "focus-dark-4-sign-in.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-5-passkey.png",
+    "new": "focus-dark-5-passkey.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-6-hesap-ac.png",
+    "new": "focus-dark-6-create-account.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-7-dil.png",
+    "new": "focus-dark-7-language.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-8-giris-yolu.png",
+    "new": "focus-dark-8-login-method.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-dark-9-onay-kutusu.png",
+    "new": "focus-dark-9-checkbox.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-1-parola.png",
+    "new": "focus-light-1-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-2-goster.png",
+    "new": "focus-light-2-show-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-3-unuttum.png",
+    "new": "focus-light-3-forgot-password.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-4-oturum-ac.png",
+    "new": "focus-light-4-sign-in.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-5-passkey.png",
+    "new": "focus-light-5-passkey.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-6-hesap-ac.png",
+    "new": "focus-light-6-create-account.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-7-dil.png",
+    "new": "focus-light-7-language.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-8-giris-yolu.png",
+    "new": "focus-light-8-login-method.png",
+    "type": "reference"
+  },
+  {
+    "old": "odak-light-9-onay-kutusu.png",
+    "new": "focus-light-9-checkbox.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-sifirlama-dark.png",
+    "new": "password-reset-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-sifirlama-light.png",
+    "new": "password-reset-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-yenileme-dark.png",
+    "new": "password-update-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-yenileme-light.png",
+    "new": "password-update-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-giris-dark.png",
+    "new": "passkey-login-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-giris-light.png",
+    "new": "passkey-login-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-hata-dark.png",
+    "new": "passkey-error-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-hata-light.png",
+    "new": "passkey-error-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-kayit-dark.png",
+    "new": "passkey-registration-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "passkey-kayit-light.png",
+    "new": "passkey-registration-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "totp-giris-dark.png",
+    "new": "totp-login-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "totp-giris-light.png",
+    "new": "totp-login-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "totp-kurulum-dark.png",
+    "new": "totp-setup-dark.png",
+    "type": "reference"
+  },
+  {
+    "old": "totp-kurulum-light.png",
+    "new": "totp-setup-light.png",
+    "type": "reference"
+  },
+  {
+    "old": "dogrulama-tr-320-webkit.png",
+    "new": "verification-tr-320-webkit.png",
+    "type": "reference"
+  },
+  {
+    "old": "dogrulama-tr-600-chromium.png",
+    "new": "verification-tr-600-chromium.png",
+    "type": "reference"
+  },
+  {
+    "old": "islem-tr-320-webkit.png",
+    "new": "required-actions-tr-320-webkit.png",
+    "type": "reference"
+  },
+  {
+    "old": "islem-tr-600-chromium.png",
+    "new": "required-actions-tr-600-chromium.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-en-320-chromium.png",
+    "new": "password-reset-en-320-chromium.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-tr-320-webkit.png",
+    "new": "password-reset-tr-320-webkit.png",
+    "type": "reference"
+  },
+  {
+    "old": "parola-tr-600-chromium.png",
+    "new": "password-reset-tr-600-chromium.png",
+    "type": "reference"
+  },
+  {
+    "old": "giris",
+    "new": "login",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "giris-hata",
+    "new": "login-error",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "giris-yolu",
+    "new": "login-method",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "kayit",
+    "new": "registration",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "kayit-hata",
+    "new": "registration-error",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "parola-sifirlama",
+    "new": "password-reset",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "parola-yenileme",
+    "new": "password-update",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "totp-kurulum",
+    "new": "totp-setup",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "totp-giris",
+    "new": "totp-login",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "passkey-kayit",
+    "new": "passkey-registration",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "passkey-giris",
+    "new": "passkey-login",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "passkey-hata",
+    "new": "passkey-error",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "eposta-dogrulama",
+    "new": "email-verification",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/*.ts"
+    ]
+  },
+  {
+    "old": "referans",
+    "new": "reference",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+      "backend/identity/keycloak/themes/atonota/README.md"
+    ]
+  },
+  {
+    "old": "webkit-masaustu",
+    "new": "webkit-desktop",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+      "backend/identity/keycloak/themes/atonota/README.md"
+    ]
+  },
+  {
+    "old": "npx playwright test gorsel",
+    "new": "npx playwright test visual",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+      "backend/identity/keycloak/themes/atonota/README.md"
+    ]
+  },
+  {
+    "old": "GORSEL",
+    "new": "KC_THEME_VISUAL",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+      "backend/identity/keycloak/themes/atonota/README.md"
+    ]
+  },
+  {
+    "old": "EPOSTA_GORUNTU",
+    "new": "KC_THEME_EMAIL_SCREENSHOTS",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+      "backend/identity/keycloak/themes/atonota/README.md"
+    ]
+  },
+  {
+    "old": "masaustu",
+    "new": "desktop",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/playwright.config.ts"
+    ]
+  },
+  {
+    "old": "yatay",
+    "new": "landscape",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/playwright.config.ts"
+    ]
+  },
+  {
+    "old": "sihirli-${lang}-${width}-${browser}.png",
+    "new": "magic-link-${lang}-${width}-${browser}.png",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "backend/PROJE-KAYDI.md",
+    "new": "backend/PROJECT-RECORD.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim",
+    "new": "backend/apps/platform_core/platform_core/access",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/doctype/access_rule",
+    "new": "backend/apps/platform_core/platform_core/access/doctype/plt_access_rule",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/access_rule.json",
+    "new": "backend/apps/platform_core/platform_core/access/doctype/plt_access_rule/plt_access_rule.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/access_rule.py",
+    "new": "backend/apps/platform_core/platform_core/access/doctype/plt_access_rule/plt_access_rule.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/tests/test_alan_duzeyi.py",
+    "new": "backend/apps/platform_core/platform_core/access/tests/test_field_level.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/tests/test_hiyerarsi.py",
+    "new": "backend/apps/platform_core/platform_core/access/tests/test_hierarchy.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/tests/test_inceleme.py",
+    "new": "backend/apps/platform_core/platform_core/access/tests/test_review.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/tests/test_kayit_kurali.py",
+    "new": "backend/apps/platform_core/platform_core/access/tests/test_record_rule.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/tests/test_kural_degisimi.py",
+    "new": "backend/apps/platform_core/platform_core/access/tests/test_rule_changes.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/tests/test_paylasim.py",
+    "new": "backend/apps/platform_core/platform_core/access/tests/test_sharing.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/tests/test_sorgu_sayisi.py",
+    "new": "backend/apps/platform_core/platform_core/access/tests/test_query_count.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/tests/test_uclar.py",
+    "new": "backend/apps/platform_core/platform_core/access/tests/test_endpoints.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/erisim/tests/test_yuzeyler.py",
+    "new": "backend/apps/platform_core/platform_core/access/tests/test_surfaces.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/kabuk",
+    "new": "backend/apps/platform_core/platform_core/shell",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/kimlik",
+    "new": "backend/apps/platform_core/platform_core/identity",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/kimlik/doctype/platform_identity_link",
+    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_identity_link",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/kimlik/doctype/platform_identity_link/platform_identity_link.json",
+    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_identity_link/plt_identity_link.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/kimlik/doctype/platform_identity_link/platform_identity_link.py",
+    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_identity_link/plt_identity_link.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/kimlik/doctype/platform_identity_link/test_platform_identity_link.py",
+    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_identity_link/test_plt_identity_link.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil",
+    "new": "backend/apps/platform_core/platform_core/mobile",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_account_state",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_account_state",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_account_state/mobile_account_state.json",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_account_state/plt_mobile_account_state.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_account_state/mobile_account_state.py",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_account_state/plt_mobile_account_state.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_change",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_change",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_change/mobile_change.json",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_change/plt_mobile_change.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_change/mobile_change.py",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_change/plt_mobile_change.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_delivery",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_delivery",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_delivery/mobile_delivery.json",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_delivery/plt_mobile_delivery.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_delivery/mobile_delivery.py",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_delivery/plt_mobile_delivery.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_installation",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_installation",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_installation/mobile_installation.json",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_installation/plt_mobile_installation.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_installation/mobile_installation.py",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_installation/plt_mobile_installation.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_operation",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_operation",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_operation/mobile_operation.json",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_operation/plt_mobile_operation.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_operation/mobile_operation.py",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_operation/plt_mobile_operation.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_sequence",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_sequence",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_sequence/mobile_sequence.json",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_sequence/plt_mobile_sequence.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_sequence/mobile_sequence.py",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_sequence/plt_mobile_sequence.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi",
+    "new": "backend/apps/platform_core/platform_core/model_gateway",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_account",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_account",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_account/ai_account.json",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_account/plt_ai_account.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_account/ai_account.py",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_account/plt_ai_account.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_api",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_api",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_api/ai_api.json",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_api/plt_ai_api.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_api/ai_api.py",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_api/plt_ai_api.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_model",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_model",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_model/ai_model.json",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_model/plt_ai_model.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_model/ai_model.py",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_model/plt_ai_model.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_provider",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_provider",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_provider/ai_provider.json",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_provider/plt_ai_provider.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_provider/ai_provider.py",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_provider/plt_ai_provider.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_route",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_route",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_route/ai_route.json",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_route/plt_ai_route.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_route/ai_route.py",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_route/plt_ai_route.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_usage_log",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_usage_log",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_usage_log/ai_usage_log.json",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_usage_log/plt_ai_usage_log.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/model_gecidi/doctype/ai_usage_log/ai_usage_log.py",
+    "new": "backend/apps/platform_core/platform_core/model_gateway/doctype/plt_ai_usage_log/plt_ai_usage_log.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/yapay_zeka",
+    "new": "backend/apps/platform_core/platform_core/ai",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/yapay_zeka/doctype/ai_action_log",
+    "new": "backend/apps/platform_core/platform_core/ai/doctype/plt_ai_action_log",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/yapay_zeka/doctype/ai_action_log/ai_action_log.json",
+    "new": "backend/apps/platform_core/platform_core/ai/doctype/plt_ai_action_log/plt_ai_action_log.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/yapay_zeka/doctype/ai_action_log/ai_action_log.py",
+    "new": "backend/apps/platform_core/platform_core/ai/doctype/plt_ai_action_log/plt_ai_action_log.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/yapay_zeka/doctype/ai_action_proposal",
+    "new": "backend/apps/platform_core/platform_core/ai/doctype/plt_ai_action_proposal",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/yapay_zeka/doctype/ai_action_proposal/ai_action_proposal.json",
+    "new": "backend/apps/platform_core/platform_core/ai/doctype/plt_ai_action_proposal/plt_ai_action_proposal.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/yapay_zeka/doctype/ai_action_proposal/ai_action_proposal.py",
+    "new": "backend/apps/platform_core/platform_core/ai/doctype/plt_ai_action_proposal/plt_ai_action_proposal.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/press_tr/press_tr/kimlik",
+    "new": "backend/apps/press_tr/press_tr/press_identity",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_identity_link",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_identity_link/press_identity_link.json",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/ptr_identity_link.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_identity_link/press_identity_link.py",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/ptr_identity_link.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_keycloak_session",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_keycloak_session/press_keycloak_session.json",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/ptr_keycloak_session.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_keycloak_session/press_keycloak_session.py",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/ptr_keycloak_session.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/contracts/platform_core-erisim.openapi.yaml",
+    "new": "backend/contracts/platform_core-access.openapi.yaml",
+    "type": "path"
+  },
+  {
+    "old": "backend/contracts/platform_core-kabuk.openapi.yaml",
+    "new": "backend/contracts/platform_core-shell.openapi.yaml",
+    "type": "path"
+  },
+  {
+    "old": "backend/contracts/platform_core-kimlik.openapi.yaml",
+    "new": "backend/contracts/platform_core-identity.openapi.yaml",
+    "type": "path"
+  },
+  {
+    "old": "backend/contracts/platform_core-mobil.openapi.yaml",
+    "new": "backend/contracts/platform_core-mobile.openapi.yaml",
+    "type": "path"
+  },
+  {
+    "old": "backend/contracts/platform_core-model-gecidi.openapi.yaml",
+    "new": "backend/contracts/platform_core-model-gateway.openapi.yaml",
+    "type": "path"
+  },
+  {
+    "old": "backend/contracts/platform_core-yapay-zeka.openapi.yaml",
+    "new": "backend/contracts/platform_core-ai.openapi.yaml",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/Dockerfile.kiraci",
+    "new": "backend/dev/Dockerfile.tenant",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/Dockerfile.kiraci.dockerignore",
+    "new": "backend/dev/Dockerfile.tenant.dockerignore",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/bin/ac",
+    "new": "backend/dev/bin/start",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/bin/guvenlik-denetimi",
+    "new": "backend/dev/bin/security-audit",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/bin/kapat",
+    "new": "backend/dev/bin/stop",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/bin/modul-sinirlari",
+    "new": "backend/dev/bin/module-boundaries",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/bin/tunel",
+    "new": "backend/dev/bin/tunnel",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/compose.kiraci.yaml",
+    "new": "backend/dev/compose.tenant.yaml",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/guvenlik",
+    "new": "backend/dev/security",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/guvenlik/kotuye-kullanim-karti.md",
+    "new": "backend/dev/security/abuse-case-card.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/dev/modul-sinirlari.json",
+    "new": "backend/dev/module-boundaries.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler",
+    "new": "backend/docs/tasks",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/dev-ortam.md",
+    "new": "backend/docs/tasks/dev-environment.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/erisim-kurali.md",
+    "new": "backend/docs/tasks/access-rule.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/guvenlik-kapisi.md",
+    "new": "backend/docs/tasks/security-gate.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/ilk-dikey-dilim.md",
+    "new": "backend/docs/tasks/first-vertical-slice.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/kimlik-realm.md",
+    "new": "backend/docs/tasks/identity-realm.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/kimlik-tema.md",
+    "new": "backend/docs/tasks/identity-theme.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/platform-core-gecit.md",
+    "new": "backend/docs/tasks/platform-core-gateway.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/platform-core-kabuk.md",
+    "new": "backend/docs/tasks/platform-core-shell.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/platform-core-kimlik.md",
+    "new": "backend/docs/tasks/platform-core-identity.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/platform-core-mobil.md",
+    "new": "backend/docs/tasks/platform-core-mobile.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/isler/platform-core-yz.md",
+    "new": "backend/docs/tasks/platform-core-ai.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/kararlar",
+    "new": "backend/docs/decisions",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/kararlar/0002-yapay-zeka-katmani.md",
+    "new": "backend/docs/decisions/0002-ai-layer.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/kararlar/0003-keycloak-eklentileri.md",
+    "new": "backend/docs/decisions/0003-keycloak-extensions.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/kararlar/0004-model-gecidi.md",
+    "new": "backend/docs/decisions/0004-model-gateway.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/kararlar/0005-guvenlik-kapisi.md",
+    "new": "backend/docs/decisions/0005-security-gate.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/kararlar/0006-erisim-kurali.md",
+    "new": "backend/docs/decisions/0006-access-rule.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/kararlar/0007-mobil-esitleme.md",
+    "new": "backend/docs/decisions/0007-mobile-sync.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/docs/sozlesmeler.md",
+    "new": "backend/docs/contracts.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/realm/password-blacklists/KAYNAK.md",
+    "new": "backend/identity/keycloak/realm/password-blacklists/SOURCE.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/realm/password-blacklists/yaygin-parolalar.txt",
+    "new": "backend/identity/keycloak/realm/password-blacklists/common-passwords.txt",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/tests/test_eklentiler.py",
+    "new": "backend/identity/keycloak/tests/test_extensions.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/tests/test_keycloak_canli.py",
+    "new": "backend/identity/keycloak/tests/test_live_keycloak.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/tests/test_realm_dosyalari.py",
+    "new": "backend/identity/keycloak/tests/test_realm_files.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/tests/yardimci.py",
+    "new": "backend/identity/keycloak/tests/helpers.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/OKUBENI.md",
+    "new": "backend/identity/keycloak/themes/README.md",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh",
+    "new": "backend/identity/keycloak/themes/atonota/test/bin/theme-dev.sh",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/realm/tema-deneme-realm.json",
+    "new": "backend/identity/keycloak/themes/atonota/test/realm/theme-test-realm.json",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/eposta-dogrulama-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/email-verification-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/eposta-dogrulama-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/email-verification-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-yolu-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-method-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/giris-yolu-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/login-method-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/kayit-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/registration-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/kayit-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/registration-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/kayit-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/registration-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/kayit-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/registration-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-1-parola.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-1-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-2-goster.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-2-show-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-3-unuttum.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-3-forgot-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-4-oturum-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-4-sign-in.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-5-passkey.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-5-passkey.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-6-hesap-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-6-create-account.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-7-dil.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-7-language.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-8-giris-yolu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-8-login-method.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-dark-9-onay-kutusu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-dark-9-checkbox.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-1-parola.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-1-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-2-goster.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-2-show-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-3-unuttum.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-3-forgot-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-4-oturum-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-4-sign-in.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-5-passkey.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-5-passkey.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-6-hesap-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-6-create-account.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-7-dil.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-7-language.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-8-giris-yolu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-8-login-method.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/odak-light-9-onay-kutusu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/focus-light-9-checkbox.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/parola-sifirlama-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/password-reset-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/parola-sifirlama-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/password-reset-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/parola-yenileme-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/password-update-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/parola-yenileme-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/password-update-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-kayit-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-registration-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/passkey-kayit-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/passkey-registration-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/totp-giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/totp-login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/totp-giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/totp-login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/totp-kurulum-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/totp-setup-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/chromium-320/totp-kurulum-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/chromium-320/totp-setup-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/dogrulama-tr-320-webkit.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/verification-tr-320-webkit.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/dogrulama-tr-600-chromium.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/verification-tr-600-chromium.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/islem-tr-320-webkit.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/required-actions-tr-320-webkit.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/islem-tr-600-chromium.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/required-actions-tr-600-chromium.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/parola-en-320-chromium.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/password-reset-en-320-chromium.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/parola-tr-320-webkit.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/password-reset-tr-320-webkit.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/eposta/parola-tr-600-chromium.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/email/password-reset-tr-600-chromium.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/eposta-dogrulama-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/email-verification-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/eposta-dogrulama-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/email-verification-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-yolu-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-method-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/giris-yolu-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/login-method-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/kayit-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/registration-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/kayit-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/registration-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/kayit-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/registration-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/kayit-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/registration-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-1-parola.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-1-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-2-goster.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-2-show-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-3-unuttum.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-3-forgot-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-4-oturum-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-4-sign-in.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-5-passkey.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-5-passkey.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-6-hesap-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-6-create-account.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-7-dil.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-7-language.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-8-giris-yolu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-8-login-method.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-dark-9-onay-kutusu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-dark-9-checkbox.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-1-parola.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-1-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-2-goster.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-2-show-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-3-unuttum.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-3-forgot-password.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-4-oturum-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-4-sign-in.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-5-passkey.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-5-passkey.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-6-hesap-ac.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-6-create-account.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-7-dil.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-7-language.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-8-giris-yolu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-8-login-method.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/odak-light-9-onay-kutusu.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/focus-light-9-checkbox.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/parola-sifirlama-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/password-reset-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/parola-sifirlama-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/password-reset-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/parola-yenileme-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/password-update-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/parola-yenileme-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/password-update-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-hata-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-error-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-hata-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-error-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-kayit-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-registration-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/passkey-kayit-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/passkey-registration-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/totp-giris-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/totp-login-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/totp-giris-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/totp-login-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/totp-kurulum-dark.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/totp-setup-dark.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/referans/webkit-masaustu/totp-kurulum-light.png",
+    "new": "backend/identity/keycloak/themes/atonota/test/reference/webkit-desktop/totp-setup-light.png",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/tests/akis.spec.ts",
+    "new": "backend/identity/keycloak/themes/atonota/test/tests/flow.spec.ts",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/tests/dil.spec.ts",
+    "new": "backend/identity/keycloak/themes/atonota/test/tests/language.spec.ts",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts",
+    "new": "backend/identity/keycloak/themes/atonota/test/tests/email.spec.ts",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/tests/erisilebilirlik.spec.ts",
+    "new": "backend/identity/keycloak/themes/atonota/test/tests/accessibility.spec.ts",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/tests/gorsel.spec.ts",
+    "new": "backend/identity/keycloak/themes/atonota/test/tests/visual.spec.ts",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/tests/hareket.spec.ts",
+    "new": "backend/identity/keycloak/themes/atonota/test/tests/motion.spec.ts",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/tests/odak.spec.ts",
+    "new": "backend/identity/keycloak/themes/atonota/test/tests/focus.spec.ts",
+    "type": "path"
+  },
+  {
+    "old": "backend/identity/keycloak/themes/atonota/test/tests/yerlesim.spec.ts",
+    "new": "backend/identity/keycloak/themes/atonota/test/tests/layout.spec.ts",
+    "type": "path"
+  },
+  {
+    "old": "backend/libs/oidc_verify/src/oidc_verify/dogrulama.py",
+    "new": "backend/libs/oidc_verify/src/oidc_verify/verification.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/libs/oidc_verify/src/oidc_verify/hatalar.py",
+    "new": "backend/libs/oidc_verify/src/oidc_verify/errors.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/libs/oidc_verify/tests/anahtarlar.py",
+    "new": "backend/libs/oidc_verify/tests/keys.py",
+    "type": "path"
+  },
+  {
+    "old": "backend/libs/oidc_verify/tests/test_canli_keycloak.py",
+    "new": "backend/libs/oidc_verify/tests/test_live_keycloak.py",
+    "type": "path"
+  },
+  {
+    "old": "x-kiraci",
+    "new": "x-tenant",
+    "type": "reference"
+  },
+  {
+    "old": "kiraci-db",
+    "new": "tenant-db",
+    "type": "reference"
+  },
+  {
+    "old": "kiraci-redis",
+    "new": "tenant-redis",
+    "type": "reference"
+  },
+  {
+    "old": "kiraci-web",
+    "new": "tenant-web",
+    "type": "reference"
+  },
+  {
+    "old": "kiraci-socket",
+    "new": "tenant-socket",
+    "type": "reference"
+  },
+  {
+    "old": "kiraci-sites",
+    "new": "tenant-sites",
+    "type": "reference"
+  },
+  {
+    "old": "kiraci-logs",
+    "new": "tenant-logs",
+    "type": "reference"
+  },
+  {
+    "old": "fs-kiraci-dev",
+    "new": "fs-tenant-dev",
+    "type": "reference"
+  },
+  {
+    "old": "aud-site-kiraci1",
+    "new": "aud-site-tenant1",
+    "type": "reference"
+  },
+  {
+    "old": "aud-site-kiraci2",
+    "new": "aud-site-tenant2",
+    "type": "reference"
+  },
+  {
+    "old": "site-kiraci1",
+    "new": "site-tenant1",
+    "type": "reference"
+  },
+  {
+    "old": "site-kiraci2",
+    "new": "site-tenant2",
+    "type": "reference"
+  },
+  {
+    "old": "kiraci1",
+    "new": "tenant1",
+    "type": "reference"
+  },
+  {
+    "old": "kiraci2",
+    "new": "tenant2",
+    "type": "reference"
+  },
+  {
+    "old": "kiraci20",
+    "new": "tenant20",
+    "type": "reference"
+  },
+  {
+    "old": "2Fkiraci1",
+    "new": "2Ftenant1",
+    "type": "reference"
+  },
+  {
+    "old": "2Fkiraci2",
+    "new": "2Ftenant2",
+    "type": "reference"
+  },
+  {
+    "old": "tema-deneme",
+    "new": "theme-test",
+    "type": "reference"
+  },
+  {
+    "old": "tema-admin",
+    "new": "theme-admin",
+    "type": "reference"
+  },
+  {
+    "old": "kabuk-reader",
+    "new": "shell-reader",
+    "type": "reference"
+  },
+  {
+    "old": "kabuk-privileged",
+    "new": "shell-privileged",
+    "type": "reference"
+  },
+  {
+    "old": "AI Manager",
+    "new": "PLT AI Manager",
+    "type": "reference"
+  },
+  {
+    "old": "HRMS TR Employee",
+    "new": "HRT Employee",
+    "type": "reference"
+  },
+  {
+    "old": "HRMS TR Manager",
+    "new": "HRT Manager",
+    "type": "reference"
+  },
+  {
+    "old": "HRMS TR Admin",
+    "new": "HRT Admin",
+    "type": "reference"
+  },
+  {
+    "old": "HRMS TR {ROLES[actor]}",
+    "new": "HRT {ROLES[actor]}",
+    "type": "reference"
+  },
+  {
+    "old": "Team-keycloak_org_id",
+    "new": "Team-custom_ptr_keycloak_org_id",
+    "type": "reference"
+  },
+  {
+    "old": "keycloak_org_id",
+    "new": "custom_ptr_keycloak_org_id",
+    "type": "reference"
+  },
+  {
+    "old": "kiraci",
+    "new": "tenant",
+    "type": "setting",
+    "paths": [
+      "backend/dev/compose.kiraci.yaml",
+      "backend/dev/compose.tenant.yaml"
+    ]
+  },
+  {
+    "old": "KIRACI_WEB_PORT",
+    "new": "FS_TENANT_WEB_PORT",
+    "type": "setting"
+  },
+  {
+    "old": "KIRACI_SOCKET_PORT",
+    "new": "FS_TENANT_SOCKET_PORT",
+    "type": "setting"
+  },
+  {
+    "old": "ATONOTA_SITE_KIRACI1_SECRET",
+    "new": "ATONOTA_SITE_TENANT1_SECRET",
+    "type": "setting"
+  },
+  {
+    "old": "ATONOTA_SITE_KIRACI1_URL",
+    "new": "ATONOTA_SITE_TENANT1_URL",
+    "type": "setting"
+  },
+  {
+    "old": "KABUK_TEST_SITE",
+    "new": "PLT_SHELL_TEST_SITE",
+    "type": "setting"
+  },
+  {
+    "old": "KABUK_TEST_PORT",
+    "new": "PLT_SHELL_TEST_PORT",
+    "type": "setting"
+  },
+  {
+    "old": "KIMLIK_CANLI_ADMIN",
+    "new": "KC_LIVE_ADMIN",
+    "type": "setting"
+  },
+  {
+    "old": "KIMLIK_CANLI_ADMIN_PAROLA",
+    "new": "KC_LIVE_ADMIN_PASSWORD",
+    "type": "setting"
+  },
+  {
+    "old": "KIMLIK_CANLI_KEYCLOAK_URL",
+    "new": "KC_LIVE_KEYCLOAK_URL",
+    "type": "setting"
+  },
+  {
+    "old": "KIMLIK_CANLI_KULLANICI",
+    "new": "KC_LIVE_USER",
+    "type": "setting"
+  },
+  {
+    "old": "KIMLIK_CANLI_PAROLA",
+    "new": "KC_LIVE_PASSWORD",
+    "type": "setting"
+  },
+  {
+    "old": "KIMLIK_CANLI_SITE_URL",
+    "new": "KC_LIVE_SITE_URL",
+    "type": "setting"
+  },
+  {
+    "old": "kimlik_marka_adi",
+    "new": "identity_brand_name",
+    "type": "setting"
+  },
+  {
+    "old": "kimlik_yalniz_keycloak",
+    "new": "identity_keycloak_only",
+    "type": "setting"
+  },
+  {
+    "old": "kimlik_servis_azp",
+    "new": "identity_service_azp",
+    "type": "setting"
+  },
+  {
+    "old": "kimlik_service_claims",
+    "new": "identity_service_claims",
+    "type": "setting"
+  },
+  {
+    "old": "kimlik_login_state",
+    "new": "identity_login_state",
+    "type": "setting"
+  },
+  {
+    "old": "kimlik_login",
+    "new": "identity_login",
+    "type": "setting"
+  },
+  {
+    "old": "__Host-kimlik_login",
+    "new": "__Host-identity_login",
+    "type": "setting"
+  },
+  {
+    "old": "kimlik_logout_jti",
+    "new": "identity_logout_jti",
+    "type": "setting"
+  },
+  {
+    "old": "dogrulama",
+    "new": "verification",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "hatalar",
+    "new": "errors",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "anahtarlar",
+    "new": "keys",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*",
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py"
+    ]
+  },
+  {
+    "old": "SahteJwks",
+    "new": "FakeJwks",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "CikisBelirteciTesti",
+    "new": "LogoutTokenTest",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "ErisimBelirteciTesti",
+    "new": "AccessTokenTest",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "KimlikBelirteciTesti",
+    "new": "IdentityTokenTest",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "CanliKeycloakTesti",
+    "new": "LiveKeycloakTest",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "_baslik",
+    "new": "_header",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "baslik",
+    "new": "header",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "basliklar",
+    "new": "headers",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "hata",
+    "new": "error",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "_JWK_HATALARI",
+    "new": "_JWK_ERRORS",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "govde",
+    "new": "payload",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "yanit",
+    "new": "response",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "cikis_govdesi",
+    "new": "logout_payload",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "erisim_govdesi",
+    "new": "access_payload",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "kimlik_govdesi",
+    "new": "identity_payload",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "belirtec_al",
+    "new": "get_token",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "istemci",
+    "new": "client",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "kapsam",
+    "new": "scope",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "sir",
+    "new": "secret",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "SIR",
+    "new": "SECRET",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "yakalanan",
+    "new": "caught",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "alanlar",
+    "new": "fields",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "dosya",
+    "new": "file",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "dosyalar",
+    "new": "files",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "hata_kodu",
+    "new": "error_code",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "kimlik",
+    "new": "identity",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "zaman",
+    "new": "time_now",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/*"
+    ]
+  },
+  {
+    "old": "yardimci",
+    "new": "helpers",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "EklentiCanliTesti",
+    "new": "LiveExtensionTest",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "EklentiDosyaTesti",
+    "new": "ExtensionFileTest",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "ServisBelirteciTesti",
+    "new": "ServiceTokenTest",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "OrnekKullaniciTesti",
+    "new": "ExampleUserTest",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "RealmDosyasiTesti",
+    "new": "RealmFileTest",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "HttpYanit",
+    "new": "HttpResponse",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "basliklar",
+    "new": "headers",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "canli_var_mi",
+    "new": "live_available",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "durum",
+    "new": "status",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "govde",
+    "new": "body",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "hata",
+    "new": "error",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "istemci_belirteci",
+    "new": "client_token",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "parola",
+    "new": "password",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "uretim",
+    "new": "production",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "yanit",
+    "new": "response",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "yonetici_belirteci",
+    "new": "admin_token",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "aud_listesi",
+    "new": "audiences",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "belirtec",
+    "new": "token",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "istemci",
+    "new": "client",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "jwt_govdesi",
+    "new": "jwt_payload",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "kapsam",
+    "new": "scope",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "kimlik",
+    "new": "identity",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "kiraci",
+    "new": "tenant",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "kullanicilar",
+    "new": "users",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "sir",
+    "new": "secret",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "sir_adi",
+    "new": "secret_name",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "sorgu",
+    "new": "query",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "yonetici_token",
+    "new": "administrator_token",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "HEDEF_KAPSAMLARI",
+    "new": "AUDIENCE_SCOPES",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "ISTEMCILER",
+    "new": "CLIENTS",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "KULLANICI_DOSYASI",
+    "new": "USER_FILE",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "PAROLA_LISTESI",
+    "new": "PASSWORD_LIST",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "REALM_DOSYASI",
+    "new": "REALM_FILE",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "eslemeler",
+    "new": "mappers",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "kapsamlar",
+    "new": "scopes",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "kullanici",
+    "new": "user",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "kullanicilari_oku",
+    "new": "read_users",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "belirtec_ucu",
+    "new": "token_endpoint",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "deger",
+    "new": "environment_value",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "dosya",
+    "new": "file",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "test_anonim_istemci_kaydi_kapali",
+    "new": "test_anonymous_client_registration_is_disabled",
+    "type": "identifier"
+  },
+  {
+    "old": "test_g78_politikalari_yuklendi",
+    "new": "test_g78_policies_are_loaded",
+    "type": "identifier"
+  },
+  {
+    "old": "test_identity_sync_kiraci_kapsamiyla_tek_aud_alir",
+    "new": "test_identity_sync_gets_only_tenant_audience_with_tenant_scope",
+    "type": "identifier"
+  },
+  {
+    "old": "test_identity_sync_press_kapsamiyla_tek_aud_alir",
+    "new": "test_identity_sync_gets_only_press_audience_with_press_scope",
+    "type": "identifier"
+  },
+  {
+    "old": "test_kapsam_istenmezse_kiraci_aud_yok",
+    "new": "test_missing_scope_excludes_tenant_audience",
+    "type": "identifier"
+  },
+  {
+    "old": "test_kiraci_belirtecinde_yonetim_yetkisi_yok",
+    "new": "test_tenant_token_has_no_admin_permission",
+    "type": "identifier"
+  },
+  {
+    "old": "test_ornek_kullanicilar_yuklendi",
+    "new": "test_example_users_are_loaded",
+    "type": "identifier"
+  },
+  {
+    "old": "test_press_service_kiraci_kapsami_alir_press_kapsami_alamaz",
+    "new": "test_press_service_accepts_only_tenant_scope",
+    "type": "identifier"
+  },
+  {
+    "old": "test_sirlar_ortamdan_geldi",
+    "new": "test_secrets_come_from_environment",
+    "type": "identifier"
+  },
+  {
+    "old": "test_yanlis_sir_reddedilir",
+    "new": "test_wrong_secret_is_rejected",
+    "type": "identifier"
+  },
+  {
+    "old": "test_yonetim_rolleri_kc_admin_api_olmadan_admin_api_acmaz",
+    "new": "test_admin_roles_require_keycloak_admin_api_scope",
+    "type": "identifier"
+  },
+  {
+    "old": "test_yonetim_yetkisi_yalniz_ayri_kapsamda",
+    "new": "test_admin_permission_requires_separate_scope",
+    "type": "identifier"
+  },
+  {
+    "old": "test_dosya_adi_realm_adiyla_ayni",
+    "new": "test_filename_matches_realm_name",
+    "type": "identifier"
+  },
+  {
+    "old": "test_giris_ve_eposta_temasi_atonota",
+    "new": "test_login_and_email_use_project_theme",
+    "type": "identifier"
+  },
+  {
+    "old": "test_hedef_kapsamlari_tek_aud_ekler",
+    "new": "test_audience_scopes_add_one_audience",
+    "type": "identifier"
+  },
+  {
+    "old": "test_hedef_kapsamlari_varsayilan_degil",
+    "new": "test_audience_scopes_are_optional",
+    "type": "identifier"
+  },
+  {
+    "old": "test_istemci_sirlari_yer_tutucu",
+    "new": "test_client_secrets_are_placeholders",
+    "type": "identifier"
+  },
+  {
+    "old": "test_istemciler_var",
+    "new": "test_clients_exist",
+    "type": "identifier"
+  },
+  {
+    "old": "test_ornek_kullanicilar_ayri_dosyada_ve_example_test",
+    "new": "test_example_users_are_in_separate_file_with_example_test_domain",
+    "type": "identifier"
+  },
+  {
+    "old": "test_parola_listesi_var_ve_unix_satir_sonu",
+    "new": "test_password_list_exists_with_unix_line_endings",
+    "type": "identifier"
+  },
+  {
+    "old": "test_realm_dosyasinda_kisi_yok",
+    "new": "test_realm_file_has_no_users",
+    "type": "identifier"
+  },
+  {
+    "old": "test_realm_yer_tutuculari_ornek_env_dosyasinda",
+    "new": "test_example_env_lists_realm_placeholders",
+    "type": "identifier"
+  },
+  {
+    "old": "test_servis_istemcileri_kapsamlarini_sozlesmeye_gore_alir",
+    "new": "test_service_client_scopes_match_contract",
+    "type": "identifier"
+  },
+  {
+    "old": "test_servis_istemcileri_tam_kapsam_tasimaz",
+    "new": "test_service_clients_do_not_use_full_scope",
+    "type": "identifier"
+  },
+  {
+    "old": "test_tarayici_istemcileri_kod_akisi_ve_tam_donus_adresi",
+    "new": "test_browser_clients_use_code_flow_and_exact_redirect",
+    "type": "identifier"
+  },
+  {
+    "old": "test_yonetim_rolleri_yalniz_ayri_kapsamda",
+    "new": "test_admin_roles_require_separate_scope",
+    "type": "identifier"
+  },
+  {
+    "old": "test_anahtar_listesi_gercek_uctan_gelir",
+    "new": "test_key_list_comes_from_live_endpoint",
+    "type": "identifier"
+  },
+  {
+    "old": "test_gercek_belirtec_cikis_belirteci_degil",
+    "new": "test_live_token_is_not_logout_token",
+    "type": "identifier"
+  },
+  {
+    "old": "test_gercek_belirtec_yanlis_hedefte_reddedilir",
+    "new": "test_live_token_rejects_wrong_audience",
+    "type": "identifier"
+  },
+  {
+    "old": "test_gercek_servis_belirteci_dogrulanir",
+    "new": "test_live_service_token_validates",
+    "type": "identifier"
+  },
+  {
+    "old": "test_bilinmeyen_kid_listeyi_bir_kez_yeniler",
+    "new": "test_unknown_key_id_refreshes_list_once",
+    "type": "identifier"
+  },
+  {
+    "old": "test_birden_cok_aud_reddedilir",
+    "new": "test_multiple_audiences_are_rejected",
+    "type": "identifier"
+  },
+  {
+    "old": "test_bozuk_belirtec",
+    "new": "test_invalid_token",
+    "type": "identifier"
+  },
+  {
+    "old": "test_bozuk_json_ve_bozuk_govde_de_eski_anahtari_korur",
+    "new": "test_preserves_old_key_for_invalid_json_and_payload",
+    "type": "identifier"
+  },
+  {
+    "old": "test_dogru_belirtec_alanlari_doner",
+    "new": "test_returns_expected_token_claims",
+    "type": "identifier"
+  },
+  {
+    "old": "test_dogru_kimlik_belirteci",
+    "new": "test_valid_identity_token",
+    "type": "identifier"
+  },
+  {
+    "old": "test_events_yoksa_cikis_belirteci_degil",
+    "new": "test_logout_token_requires_events",
+    "type": "identifier"
+  },
+  {
+    "old": "test_gecerli_cikis_belirteci",
+    "new": "test_valid_logout_token",
+    "type": "identifier"
+  },
+  {
+    "old": "test_hata_mesaji_belirteci_icermez",
+    "new": "test_error_message_excludes_token",
+    "type": "identifier"
+  },
+  {
+    "old": "test_izinli_azp_kumesinden_biri",
+    "new": "test_accepts_an_allowed_authorized_party",
+    "type": "identifier"
+  },
+  {
+    "old": "test_liste_ttl_dolunca_yenilenir",
+    "new": "test_key_list_refreshes_after_expiration",
+    "type": "identifier"
+  },
+  {
+    "old": "test_nonce_none_denetimi_atlar",
+    "new": "test_skips_nonce_validation_when_unset",
+    "type": "identifier"
+  },
+  {
+    "old": "test_tek_elemanli_aud_listesi_kabul",
+    "new": "test_accepts_single_item_audience_list",
+    "type": "identifier"
+  },
+  {
+    "old": "test_varsayilan_sure_600",
+    "new": "test_default_lifetime_is_600_seconds",
+    "type": "identifier"
+  },
+  {
+    "old": "kimlik",
+    "new": "identity",
+    "type": "module"
+  },
+  {
+    "old": "kabuk",
+    "new": "shell",
+    "type": "module"
+  },
+  {
+    "old": "yapay_zeka",
+    "new": "ai",
+    "type": "module"
+  },
+  {
+    "old": "model_gecidi",
+    "new": "model_gateway",
+    "type": "module"
+  },
+  {
+    "old": "kimlik.localhost",
+    "new": "identity.localhost",
+    "type": "reference"
+  },
+  {
+    "old": "tema-deneme.localhost",
+    "new": "theme-test.localhost",
+    "type": "reference"
+  },
+  {
+    "old": "test-kabuk",
+    "new": "test-shell",
+    "type": "reference"
+  },
+  {
+    "old": "KLASOR",
+    "new": "DIRECTORY",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "ORNEK_ENV",
+    "new": "EXAMPLE_ENV",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "YER_TUTUCU",
+    "new": "PLACEHOLDER",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "realm_oku",
+    "new": "read_realm",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "ortam",
+    "new": "get_environment_value",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "istek",
+    "new": "request",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*",
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py"
+    ]
+  },
+  {
+    "old": "yontem",
+    "new": "method",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "adres",
+    "new": "address",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "veri",
+    "new": "request_body",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "ust",
+    "new": "request_headers",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "ist",
+    "new": "http_request",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "yol",
+    "new": "path",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "acici",
+    "new": "opener",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "ad",
+    "new": "name",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "hedef",
+    "new": "audience",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "eslesticiler",
+    "new": "mappers",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "istemciler",
+    "new": "clients",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "yonlendirme",
+    "new": "redirect",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "hesap",
+    "new": "account",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "saglayici",
+    "new": "provider",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*",
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_gorunen_ad_ve_diller",
+    "new": "test_display_name_and_languages",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "test_google_saglayicisi_kapali_ve_anahtarsiz",
+    "new": "test_google_provider_is_disabled_and_uses_placeholders",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "test_politikalar_g78",
+    "new": "test_g78_policies",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "test_imza_algoritmasi_rs256",
+    "new": "test_signature_algorithm_is_rs256",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "test_totp_ve_passkey",
+    "new": "test_totp_and_passkey",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*"
+    ]
+  },
+  {
+    "old": "KLASOR",
+    "new": "SCRIPT_DIR",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "COMPOSE_DOSYASI",
+    "new": "COMPOSE_FILE",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "ENV_DOSYASI",
+    "new": "ENV_FILE",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "PROJE",
+    "new": "PROJECT",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "BAGLAM",
+    "new": "CONTEXT",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "rastgele",
+    "new": "random_secret",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "env_hazirla",
+    "new": "prepare_env",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "ortam_yukle",
+    "new": "load_environment",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "satir",
+    "new": "line",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh",
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py",
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "TUNEL_PID",
+    "new": "TUNNEL_PID",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "tunel_ac",
+    "new": "open_tunnel",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "tunel_kapat",
+    "new": "close_tunnel",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "lima_ad",
+    "new": "lima_name",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "anahtar",
+    "new": "key_file",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "belirtec",
+    "new": "token",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "komut",
+    "new": "command",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh"
+    ]
+  },
+  {
+    "old": "realm-sil",
+    "new": "delete-realm",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh",
+      "backend/identity/keycloak/README.md"
+    ]
+  },
+  {
+    "old": "tunel-kapat",
+    "new": "close-tunnel",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh",
+      "backend/identity/keycloak/README.md"
+    ]
+  },
+  {
+    "old": "tunel",
+    "new": "tunnel",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/bin/kc-dev.sh",
+      "backend/identity/keycloak/README.md"
+    ]
+  },
+  {
+    "old": "ac",
+    "new": "open",
+    "type": "identifier",
+    "paths": [
+      "backend/dev/bin/tunel"
+    ]
+  },
+  {
+    "old": "kapat",
+    "new": "close",
+    "type": "identifier",
+    "paths": [
+      "backend/dev/bin/tunel"
+    ]
+  },
+  {
+    "old": "durum",
+    "new": "status",
+    "type": "identifier",
+    "paths": [
+      "backend/dev/bin/tunel"
+    ]
+  },
+  {
+    "old": "tunel",
+    "new": "tunnel",
+    "type": "identifier",
+    "paths": [
+      "backend/dev/bin/tunel"
+    ]
+  },
+  {
+    "old": "bin/tunel\" ac",
+    "new": "bin/tunnel\" open",
+    "type": "reference"
+  },
+  {
+    "old": "bin/tunel\" kapat",
+    "new": "bin/tunnel\" close",
+    "type": "reference"
+  },
+  {
+    "old": "bin/tunel ac",
+    "new": "bin/tunnel open",
+    "type": "reference"
+  },
+  {
+    "old": "bin/tunel kapat",
+    "new": "bin/tunnel close",
+    "type": "reference"
+  },
+  {
+    "old": "bin/tunel durum",
+    "new": "bin/tunnel status",
+    "type": "reference"
+  },
+  {
+    "old": "kc-dev.sh tunel",
+    "new": "kc-dev.sh tunnel",
+    "type": "reference"
+  },
+  {
+    "old": "kc-dev.sh tunel-kapat",
+    "new": "kc-dev.sh close-tunnel",
+    "type": "reference"
+  },
+  {
+    "old": "kc-dev.sh realm-sil",
+    "new": "kc-dev.sh delete-realm",
+    "type": "reference"
+  },
+  {
+    "old": "tema-dev.sh tunel",
+    "new": "theme-dev.sh tunnel",
+    "type": "reference"
+  },
+  {
+    "old": "tema-dev.sh tunel-kapat",
+    "new": "theme-dev.sh close-tunnel",
+    "type": "reference"
+  },
+  {
+    "old": "tunel",
+    "new": "tunnel",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh"
+    ]
+  },
+  {
+    "old": "tunel-kapat",
+    "new": "close-tunnel",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/bin/tema-dev.sh"
+    ]
+  },
+  {
+    "old": ".tunel.pid",
+    "new": ".tunnel.pid",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/*"
+    ]
+  },
+  {
+    "old": "./guvenlik/",
+    "new": "./security/",
+    "type": "reference"
+  },
+  {
+    "old": "/guvenlik/",
+    "new": "/security/",
+    "type": "reference"
+  },
+  {
+    "old": "/isler/",
+    "new": "/tasks/",
+    "type": "reference"
+  },
+  {
+    "old": "/kararlar/",
+    "new": "/decisions/",
+    "type": "reference"
+  },
+  {
+    "old": "dev/Dockerfile.kiraci",
+    "new": "dev/Dockerfile.tenant",
+    "type": "reference"
+  },
+  {
+    "old": "dockerfile: dev/Dockerfile.kiraci",
+    "new": "dockerfile: dev/Dockerfile.tenant",
+    "type": "reference"
+  },
+  {
+    "old": "from oidc_verify.dogrulama import verify_access_token, verify_id_token, verify_logout_token\nfrom oidc_verify.hatalar import JwksUnavailable, TokenError\nfrom oidc_verify.jwks import JwksCache",
+    "new": "from oidc_verify.errors import JwksUnavailable, TokenError\nfrom oidc_verify.jwks import JwksCache\nfrom oidc_verify.verification import verify_access_token, verify_id_token, verify_logout_token",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/__init__.py"
+    ]
+  },
+  {
+    "old": "from anahtarlar import ISSUER, LOGOUT_EVENT, Anahtar, SahteJwks, cikis_govdesi, erisim_govdesi, kimlik_govdesi",
+    "new": "from keys import ISSUER, LOGOUT_EVENT, Anahtar, FakeJwks, access_payload, identity_payload, logout_payload",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "from anahtarlar import ISSUER, LOGOUT_EVENT, Anahtar, SahteJwks, cikis_govdesi, erisim_govdesi, kimlik_govdesi\nfrom jwt.algorithms import RSAAlgorithm",
+    "new": "from jwt.algorithms import RSAAlgorithm\nfrom keys import ISSUER, LOGOUT_EVENT, Anahtar, FakeJwks, access_payload, identity_payload, logout_payload",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_security_findings.py"
+    ]
+  },
+  {
+    "old": "self.assertEqual(self.error_code(self.identity, self.key.imzala(kimlik_govdesi(typ=1))), \"malformed\")",
+    "new": "self.assertEqual(\n            self.error_code(self.identity, self.key.sign(identity_payload(typ=1))), \"malformed\"\n        )",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_security_findings.py"
+    ]
+  },
+  {
+    "old": "self.assertEqual(self.error_code(self.logout, self.key.imzala(cikis_govdesi(jti=[\"j\"]))), \"malformed\")",
+    "new": "self.assertEqual(\n            self.error_code(self.logout, self.key.sign(logout_payload(jti=[\"j\"]))), \"malformed\"\n        )",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_security_findings.py"
+    ]
+  },
+  {
+    "old": "self.error_code(self.logout, self.key.imzala(cikis_govdesi(sid=None, sub=\"\"))), \"not_logout_token\"",
+    "new": "self.error_code(self.logout, self.key.sign(logout_payload(sid=None, sub=\"\"))),\n            \"not_logout_token\",",
+    "type": "reference",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_security_findings.py"
+    ]
+  },
+  {
+    "old": "from press_tr.kimlik.oidc import callback_url, claim, client_id, issuer, reject, server_endpoint, verify",
+    "new": "from press_tr.press_identity.oidc import (\n\tcallback_url,\n\tclaim,\n\tclient_id,\n\tissuer,\n\treject,\n\tserver_endpoint,\n\tverify,\n)",
+    "type": "reference",
+    "paths": [
+      "backend/apps/press_tr/press_tr/api/auth.py"
+    ]
+  },
+  {
+    "old": "Kirmizi\\nMavi",
+    "new": "Red\\nBlue",
+    "type": "setting",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_admin.py"
+    ]
+  },
+  {
+    "old": "'dogrulama'",
+    "new": "'verification'",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "dogrulama: {",
+    "new": "verification: {",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "copy.dogrulama",
+    "new": "copy.verification",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "'parola'",
+    "new": "'password-reset'",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "parola: {",
+    "new": "'password-reset': {",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "copy.parola",
+    "new": "copy['password-reset']",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "'islem'",
+    "new": "'required-actions'",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "islem: {",
+    "new": "'required-actions': {",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "copy.islem",
+    "new": "copy['required-actions']",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "SIHIRLI_KC_URL",
+    "new": "KC_MAGIC_LINK_URL",
+    "type": "setting",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "SIHIRLI_MAILPIT_URL",
+    "new": "KC_MAGIC_LINK_MAILPIT_URL",
+    "type": "setting",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "SIHIRLI_REALM",
+    "new": "KC_MAGIC_LINK_REALM",
+    "type": "setting",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "SIHIRLI_ADMIN_TOKEN",
+    "new": "KC_MAGIC_LINK_ADMIN_TOKEN",
+    "type": "setting",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "erisim",
+    "new": "access",
+    "type": "module"
+  },
+  {
+    "old": "kimlik",
+    "new": "press_identity",
+    "type": "module"
+  },
+  {
+    "old": "platform_core\\.yapay_zeka",
+    "new": "platform_core\\.ai",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py"
+    ]
+  },
+  {
+    "old": "from platform_core import yapay_zeka",
+    "new": "from platform_core import ai",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py"
+    ]
+  },
+  {
+    "old": "yapay_zeka/read_card.py",
+    "new": "ai/read_card.py",
+    "type": "reference",
+    "paths": [
+      "backend/dev/ai_readiness/test_gate.py"
+    ]
+  },
+  {
+    "old": "r\"platform_core\\.yapay_zeka|from platform_core import yapay_zeka\"",
+    "new": "r\"platform_core\\.ai|from platform_core import ai\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py"
+    ]
+  },
+  {
+    "old": "guvenlik",
+    "new": "security",
+    "type": "module"
+  },
+  {
+    "old": "\"guvenlik\"",
+    "new": "\"security\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/ai_readiness/gate.py"
+    ]
+  },
+  {
+    "old": "f\"{APP}/yapay_zeka/read_card.py\"",
+    "new": "f\"{APP}/ai/read_card.py\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/ai_readiness/test_gate.py"
+    ]
+  },
+  {
+    "old": "ALGORITMA",
+    "new": "ALGORITHM",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/dogrulama.py"
+    ]
+  },
+  {
+    "old": "parca",
+    "new": "chunk",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py"
+    ]
+  },
+  {
+    "old": "parcalar",
+    "new": "chunks",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py",
+      "backend/identity/keycloak/tests/yardimci.py"
+    ]
+  },
+  {
+    "old": "uzunluk",
+    "new": "length",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py"
+    ]
+  },
+  {
+    "old": "imzala",
+    "new": "sign",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/*.py"
+    ]
+  },
+  {
+    "old": "ozel_pem",
+    "new": "private_pem",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/*.py"
+    ]
+  },
+  {
+    "old": "_ac",
+    "new": "_open",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*.py"
+    ]
+  },
+  {
+    "old": "konum",
+    "new": "location",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py",
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "roller",
+    "new": "roles",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "olustur",
+    "new": "created",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "YzTestCase",
+    "new": "AiTestCase",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "operationId: complete",
+    "new": "operationId: completeModelRequest",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: test_api",
+    "new": "operationId: testModelApi",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: resolve_usage",
+    "new": "operationId: resolveModelUsage",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: purge_usage",
+    "new": "operationId: purgeModelUsage",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: clear_api_credential",
+    "new": "operationId: clearApiCredential",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mcp",
+    "new": "operationId: callMcp",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: identityProvision",
+    "new": "operationId: provisionIdentity",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: identitySetEnabled",
+    "new": "operationId: setIdentityEnabled",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: identityChangeEmail",
+    "new": "operationId: changeIdentityEmail",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Register",
+    "new": "operationId: registerMobileInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Revoke",
+    "new": "operationId: revokeMobileInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Push",
+    "new": "operationId: pushMobileChangesV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Pull",
+    "new": "operationId: pullMobileChangesV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Cleanup",
+    "new": "operationId: cleanupMobileDataV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Activity",
+    "new": "operationId: recordMobileActivityV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileRevokeUserInstallations",
+    "new": "operationId: revokeUserMobileInstallations",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1Register",
+    "new": "operationId: registerMobilePwaInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1Revoke",
+    "new": "operationId: revokeMobilePwaInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1Activity",
+    "new": "operationId: recordMobilePwaActivityV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1Push",
+    "new": "operationId: pushMobilePwaChangesV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1Pull",
+    "new": "operationId: pullMobilePwaChangesV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1ListInstallations",
+    "new": "operationId: listMobileInstallationsV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1RevokeInstallation",
+    "new": "operationId: revokeOwnedMobileInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1ListInstallations",
+    "new": "operationId: listMobilePwaInstallationsV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobilePwaV1RevokeInstallation",
+    "new": "operationId: revokeOwnedMobilePwaInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-mobil.openapi.yaml",
+      "backend/contracts/platform_core-mobile.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: getLoginUrl",
+    "new": "operationId: getPlatformLoginUrl",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [aciklama]",
+    "new": "tags: [explanation]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: aciklama",
+    "new": "- name: explanation",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [alan-duzeyi]",
+    "new": "tags: [field-level]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: alan-duzeyi",
+    "new": "- name: field-level",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [giris]",
+    "new": "tags: [login]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: giris",
+    "new": "- name: login",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [kurulum]",
+    "new": "tags: [setup]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: kurulum",
+    "new": "- name: setup",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [eşitleme]",
+    "new": "tags: [sync]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: eşitleme",
+    "new": "- name: sync",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [belirtec]",
+    "new": "tags: [token]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: belirtec",
+    "new": "- name: token",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [oneri]",
+    "new": "tags: [proposal]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: oneri",
+    "new": "- name: proposal",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [yonetim]",
+    "new": "tags: [administration]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: yonetim",
+    "new": "- name: administration",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "oturum:",
+    "new": "frappeSession:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml"
+    ]
+  },
+  {
+    "old": "insanOturumu:",
+    "new": "humanSession:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "araciBelirteci:",
+    "new": "agentToken:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "column_break_scope",
+    "new": "scope_column",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/access_rule.json"
+    ]
+  },
+  {
+    "old": "section_break_operations",
+    "new": "operations_section",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/access_rule.json"
+    ]
+  },
+  {
+    "old": "column_break_operations",
+    "new": "operations_column",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/access_rule.json"
+    ]
+  },
+  {
+    "old": "section_break_filters",
+    "new": "filters_section",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/access_rule.json"
+    ]
+  },
+  {
+    "old": "HRMS_TR_TEST_PASSWORD",
+    "new": "HRT_TEST_PASSWORD",
+    "type": "setting"
+  },
+  {
+    "old": "PRESS_ADMIN_PASSWORD",
+    "new": "PTR_ADMIN_PASSWORD",
+    "type": "setting"
+  },
+  {
+    "old": "PRESS_DB_PASSWORD",
+    "new": "PTR_DB_PASSWORD",
+    "type": "setting"
+  },
+  {
+    "old": "PRESS_SOCKET_PORT",
+    "new": "PTR_SOCKET_PORT",
+    "type": "setting"
+  },
+  {
+    "old": "PRESS_WEB_PORT",
+    "new": "PTR_WEB_PORT",
+    "type": "setting"
+  },
+  {
+    "old": "\"search_doctypes\"",
+    "new": "\"plt_search_doctypes\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: search_doctypes",
+    "new": "  - name: plt_search_doctypes",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"get_doctype_schema\"",
+    "new": "\"plt_get_doctype_schema\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: get_doctype_schema",
+    "new": "  - name: plt_get_doctype_schema",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"list_documents\"",
+    "new": "\"plt_list_documents\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: list_documents",
+    "new": "  - name: plt_list_documents",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"get_document\"",
+    "new": "\"plt_get_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: get_document",
+    "new": "  - name: plt_get_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"run_report\"",
+    "new": "\"plt_run_report\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: run_report",
+    "new": "  - name: plt_run_report",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"create_document\"",
+    "new": "\"plt_create_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: create_document",
+    "new": "  - name: plt_create_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"update_document\"",
+    "new": "\"plt_update_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: update_document",
+    "new": "  - name: plt_update_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"submit_document\"",
+    "new": "\"plt_submit_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: submit_document",
+    "new": "  - name: plt_submit_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"cancel_document\"",
+    "new": "\"plt_cancel_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: cancel_document",
+    "new": "  - name: plt_cancel_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"delete_document\"",
+    "new": "\"plt_delete_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: delete_document",
+    "new": "  - name: plt_delete_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"get_proposal\"",
+    "new": "\"plt_get_proposal\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: get_proposal",
+    "new": "  - name: plt_get_proposal",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"add_custom_field\"",
+    "new": "\"plt_add_custom_field\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: add_custom_field",
+    "new": "  - name: plt_add_custom_field",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"set_field_property\"",
+    "new": "\"plt_set_field_property\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: set_field_property",
+    "new": "  - name: plt_set_field_property",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"set_role_permission\"",
+    "new": "\"plt_set_role_permission\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: set_role_permission",
+    "new": "  - name: plt_set_role_permission",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"assign_role\"",
+    "new": "\"plt_assign_role\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: assign_role",
+    "new": "  - name: plt_assign_role",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"remove_role\"",
+    "new": "\"plt_remove_role\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: remove_role",
+    "new": "  - name: plt_remove_role",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"purge_action_log\"",
+    "new": "\"plt_purge_action_log\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: purge_action_log",
+    "new": "  - name: plt_purge_action_log",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "name = f\"{app}_{short_name}\"",
+    "new": "prefix = {\"platform_core\": \"plt\", \"press_tr\": \"ptr\", \"hrms_tr\": \"hrt\"}.get(app, app)\n\tname = f\"{prefix}_{short_name}\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/registry.py"
+    ]
+  },
+  {
+    "old": "hrms_tr_approve_leave",
+    "new": "hrt_approve_leave",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_list_access_rules",
+    "new": "plt_list_access_rules",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_explain_access",
+    "new": "plt_explain_access",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_propose_access_rule",
+    "new": "plt_propose_access_rule",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_propose_access_rule_change",
+    "new": "plt_propose_access_rule_change",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_list_mobile_installations",
+    "new": "plt_list_mobile_installations",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_revoke_mobile_installation",
+    "new": "plt_revoke_mobile_installation",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_revoke_all_mobile_installations",
+    "new": "plt_revoke_all_mobile_installations",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_preview_mobile_cleanup",
+    "new": "plt_preview_mobile_cleanup",
+    "type": "reference"
+  },
+  {
+    "old": "\"import platform_core.kimlik.api\"",
+    "new": "\"import platform_core.identity.api\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from ..kimlik.api import resolve\"",
+    "new": "\"from ..identity.api import resolve\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core import kimlik\"",
+    "new": "\"from platform_core import identity\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from .. import kimlik\"",
+    "new": "\"from .. import identity\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core.kimlik.api import resolve\"",
+    "new": "\"from platform_core.identity.api import resolve\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core.kimlik.api import _resolve\"",
+    "new": "\"from platform_core.identity.api import _resolve\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core.kimlik.api import *\"",
+    "new": "\"from platform_core.identity.api import *\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"import platform_core.kimlik.internal\"",
+    "new": "\"import platform_core.identity.internal\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"import platform_core.kabuk.api\"",
+    "new": "\"import platform_core.shell.api\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"\"\"from importlib import import_module as load\nload(\"platform_core.kimlik.api\")\"\"\"",
+    "new": "\"\"\"from importlib import import_module as load\nload(\"platform_core.identity.api\")\"\"\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core.model_gecidi.api import complete\"",
+    "new": "\"from platform_core.model_gateway.api import complete\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core.model_gecidi.gateway import complete\"",
+    "new": "\"from platform_core.model_gateway.gateway import complete\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "platform_core_checked_title",
+    "new": "plt_checked_title",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_count_records",
+    "new": "plt_count_records",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_effect_in_prepare",
+    "new": "plt_effect_in_prepare",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_failing_write",
+    "new": "plt_failing_write",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_manager_only",
+    "new": "plt_manager_only",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_prepared_title",
+    "new": "plt_prepared_title",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_set_title",
+    "new": "plt_set_title",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_sneaky_write",
+    "new": "plt_sneaky_write",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_versioned_sometimes",
+    "new": "plt_versioned_sometimes",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_versioned_title",
+    "new": "plt_versioned_title",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_versioned_without_version",
+    "new": "plt_versioned_without_version",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "tenant.change_email kiraci1: HTTP 404",
+    "new": "tenant.change_email tenant1: HTTP 404",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "press.remove_team_member press: HTTP 403; tenant.set_enabled kiraci1: HTTP 404",
+    "new": "press.remove_team_member press: HTTP 403; tenant.set_enabled tenant1: HTTP 404",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "Bearer token-for:aud-site-kiraci1",
+    "new": "Bearer token-for:aud-site-tenant1",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "tenant.provision kiraci1: HTTP 503",
+    "new": "tenant.provision tenant1: HTTP 503",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "tenant.provision kiraci1: unknown outcome",
+    "new": "tenant.provision tenant1: unknown outcome",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "press.ensure_team press: HTTP 403; tenant.provision kiraci1: unknown outcome",
+    "new": "press.ensure_team press: HTTP 403; tenant.provision tenant1: unknown outcome",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "tenant.set_enabled kiraci1: HTTP 403",
+    "new": "tenant.set_enabled tenant1: HTTP 403",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "passwordBlacklist(yaygin-parolalar.txt)",
+    "new": "passwordBlacklist(common-passwords.txt)",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py",
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/public/kimlik",
+    "new": "backend/apps/platform_core/platform_core/public/identity",
+    "type": "path"
+  },
+  {
+    "old": "/assets/platform_core/kimlik",
+    "new": "/assets/platform_core/identity",
+    "type": "reference"
+  },
+  {
+    "old": "mobil",
+    "new": "mobile",
+    "type": "module"
+  },
+  {
+    "old": "'Eklentili Keycloak adresi (SIHIRLI_KC_URL) verilmedi. Tema deneme ortamında eklenti yok.'",
+    "new": "'Eklentili Keycloak adresi (KC_MAGIC_LINK_URL) verilmedi. Tema deneme ortamında eklenti yok.'",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "'SIHIRLI_ADMIN_TOKEN gerekli'",
+    "new": "'KC_MAGIC_LINK_ADMIN_TOKEN gerekli'",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "f\"/api/method/platform_core.kimlik.login_policy.{name}\"",
+    "new": "f\"/api/method/platform_core.identity.login_policy.{name}\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/kimlik/tests/test_login_policy.py"
+    ]
+  },
+  {
+    "old": "for path in (APP / \"kimlik\").rglob(\"*.py\"):",
+    "new": "identity_layer = APP / \"press_identity\"\n\t\tself.assertTrue(identity_layer.is_dir())\n\t\tfor path in identity_layer.rglob(\"*.py\"):",
+    "type": "reference",
+    "paths": [
+      "backend/apps/press_tr/tests/test_module_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"environment: PRESS_DB_PASSWORD\"",
+    "new": "\"environment: PTR_DB_PASSWORD\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/press/test_development_contract.py"
+    ]
+  },
+  {
+    "old": "_cerezli_acici",
+    "new": "_cookie_opener",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_account_backlog.py",
+      "backend/identity/keycloak/tests/test_eklentiler.py",
+      "backend/identity/keycloak/tests/test_magic_link.py",
+      "backend/identity/keycloak/tests/test_second_factor.py"
+    ]
+  },
+  {
+    "old": "_tek_aud",
+    "new": "_single_aud",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/dogrulama.py"
+    ]
+  },
+  {
+    "old": "cikis",
+    "new": "logout",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "degisiklik",
+    "new": "overrides",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/anahtarlar.py"
+    ]
+  },
+  {
+    "old": "erisim",
+    "new": "access",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "FrappeBagimsizligiTesti",
+    "new": "FrappeIndependenceTest",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "getir",
+    "new": "fetch",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py"
+    ]
+  },
+  {
+    "old": "JwksCacheTesti",
+    "new": "JwksCacheTest",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "ornek =",
+    "new": "example =",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py"
+    ]
+  },
+  {
+    "old": "ornek.splitlines",
+    "new": "example.splitlines",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py"
+    ]
+  },
+  {
+    "old": "OrnekEnvTesti",
+    "new": "ExampleEnvTest",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py"
+    ]
+  },
+  {
+    "old": "ozel",
+    "new": "private",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/anahtarlar.py"
+    ]
+  },
+  {
+    "old": "RealmAyarlariTesti",
+    "new": "RealmSettingsTest",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_30_saniyelik_pay_icinde_gecerli",
+    "new": "test_valid_within_30_second_leeway",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_apple_saglayicisi_kapali_ve_anahtarsiz",
+    "new": "test_apple_provider_disabled_without_keys",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "test_bozuk_jwk_kaydi_atlanir",
+    "new": "test_broken_jwk_entry_is_skipped",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_donus_adresleri_ortamdan_geldi",
+    "new": "test_redirect_uris_come_from_environment",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_eklentiler_sunucuda_yuklu",
+    "new": "test_extensions_loaded_on_server",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "test_eposta_mailpit_uzerinden",
+    "new": "test_email_goes_through_mailpit",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_google_kapali",
+    "new": "test_google_disabled",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_henuz_gecerli_degil",
+    "new": "test_not_yet_valid",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_imza_iss_aud",
+    "new": "test_signature_iss_aud",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_iss_well_known_ile_ayni",
+    "new": "test_iss_matches_well_known",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_kaynak_frappe_icermez",
+    "new": "test_source_has_no_frappe",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_kid_yoksa_bozuk",
+    "new": "test_missing_kid_is_malformed",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_nonce_varsa_reddedilir",
+    "new": "test_nonce_present_is_refused",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_none_algoritmasi",
+    "new": "test_none_algorithm",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_rs256_disi_algoritma",
+    "new": "test_non_rs256_algorithm",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_sid_ve_sub_yoksa_reddedilir",
+    "new": "test_refused_without_sid_and_sub",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_soguk_onbellekte_bilinmeyen_kid_tek_cekim",
+    "new": "test_cold_cache_unknown_kid_single_fetch",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_tarayici_akisi_bagli_ve_apple_kapali",
+    "new": "test_browser_flow_bound_and_apple_disabled",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "test_tarayici_akisinda_passkey_kosulu_ve_otp_var",
+    "new": "test_browser_flow_has_passkey_condition_and_otp",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "test_tarayici_akisinda_sihirli_baglanti_yok",
+    "new": "test_browser_flow_has_no_magic_link",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "test_totp_ve_passkey_acik",
+    "new": "test_totp_and_passkey_enabled",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "test_yalniz_http_ve_https_adresi",
+    "new": "test_only_http_and_https_url",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yalniz_sub_ile_gecerli",
+    "new": "test_valid_with_sub_only",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_aud",
+    "new": "test_wrong_aud",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_aud_ve_azp",
+    "new": "test_wrong_aud_and_azp",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_azp",
+    "new": "test_wrong_azp",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_imza",
+    "new": "test_wrong_signature",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_iss",
+    "new": "test_wrong_iss",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_iss_ve_sure",
+    "new": "test_wrong_iss_and_lifetime",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yanlis_nonce",
+    "new": "test_wrong_nonce",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yenileme_basarisizsa_eski_anahtarlar_kullanilir",
+    "new": "test_old_keys_used_when_refresh_fails",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "test_yenilemeden_sonra_da_bilinmeyen_kid",
+    "new": "test_kid_still_unknown_after_refresh",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/test_oidc_verify.py"
+    ]
+  },
+  {
+    "old": "yonetici",
+    "new": "admin_token",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py",
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "Yonlendirme",
+    "new": "NoRedirect",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "`apps/platform_core/.../mobil/identity_sync_client.py`",
+    "new": "`apps/platform_core/.../mobile/identity_sync_client.py`",
+    "type": "module",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_mobile_client.py"
+    ]
+  },
+  {
+    "old": "tags: [arama]",
+    "new": "tags: [search]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: arama",
+    "new": "- name: search",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "calisanReddedildi:",
+    "new": "employeeDenied:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "yonetici:",
+    "new": "manager:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "maas:",
+    "new": "salary:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "ik:",
+    "new": "hr:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml"
+    ]
+  },
+  {
+    "old": "ER Test Talep",
+    "new": "ER Test Request",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml",
+      "backend/apps/platform_core/platform_core/erisim/tests/*"
+    ]
+  },
+  {
+    "old": "er.calisan1@example.test",
+    "new": "er.employee1@example.test",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml",
+      "backend/apps/platform_core/platform_core/erisim/tests/*"
+    ]
+  },
+  {
+    "old": "ER IK",
+    "new": "ER HR",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml",
+      "backend/contracts/platform_core-access.openapi.yaml",
+      "backend/apps/platform_core/platform_core/erisim/tests/*"
+    ]
+  },
+  {
+    "old": "`platform_core.model_gecidi.api.complete`",
+    "new": "`platform_core.model_gateway.api.complete`",
+    "type": "module",
+    "paths": [
+      "backend/dev/tests/test_gateway_decision.py"
+    ]
+  },
+  {
+    "old": "platform_core\\.erisim",
+    "new": "platform_core\\.access",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/tests/test_static_files.py"
+    ]
+  },
+  {
+    "old": "platform_core.erisim.api",
+    "new": "platform_core.access.api",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/tests/test_static_files.py"
+    ]
+  },
+  {
+    "old": "platform_core.erisim.tests.performance.measure",
+    "new": "platform_core.access.tests.performance.measure",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/tests/performance.py"
+    ]
+  },
+  {
+    "old": "platform_core.yapay_zeka.retention.purge",
+    "new": "platform_core.ai.retention.purge",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/retention.py",
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "platform_core.model_gecidi.api.purge_usage",
+    "new": "platform_core.model_gateway.api.purge_usage",
+    "type": "module",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "TestKabukBoundary",
+    "new": "TestShellBoundary",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/kabuk/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "kabuk",
+    "new": "shell",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/kabuk/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_revoked_session/mobile_revoked_session.json",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_revoked_session/plt_mobile_revoked_session.json",
+    "type": "path"
+  },
+  {
+    "old": "mobile_revoked_session.json",
+    "new": "plt_mobile_revoked_session.json",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/*"
+    ]
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_revoked_session/mobile_revoked_session.py",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_revoked_session/plt_mobile_revoked_session.py",
+    "type": "path"
+  },
+  {
+    "old": "mobile_revoked_session.py",
+    "new": "plt_mobile_revoked_session.py",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/*"
+    ]
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/mobil/doctype/mobile_revoked_session",
+    "new": "backend/apps/platform_core/platform_core/mobile/doctype/plt_mobile_revoked_session",
+    "type": "path"
+  },
+  {
+    "old": "Mobile Revoked Session",
+    "new": "PLT Mobile Revoked Session",
+    "type": "doctype"
+  },
+  {
+    "old": "tabMobile Revoked Session",
+    "new": "tabPLT Mobile Revoked Session",
+    "type": "doctype"
+  },
+  {
+    "old": "MobileRevokedSession",
+    "new": "PLTMobileRevokedSession",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/mobil/*"
+    ]
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_revoked_session",
+    "new": "platform_core.mobile.doctype.plt_mobile_revoked_session",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core.mobil.doctype.mobile_revoked_session.mobile_revoked_session",
+    "new": "platform_core.mobile.doctype.plt_mobile_revoked_session.plt_mobile_revoked_session",
+    "type": "reference"
+  }
+]
