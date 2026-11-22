@@ -220,6 +220,87 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		self.assertEqual(status, 200)
 		self.assertNotIn(team, {row["name"] for row in json.loads(payload)["message"]["teams"]})
 
+	def test_remove_team_member_requires_exactly_one_selector(self):
+		body = {"issuer": ISSUER, "subject": uuid4().hex}
+		token = self.token()
+		for selectors in (
+			{},
+			{"organization_id": ""},
+			{"organization_id": "   "},
+			{"organization_id": 123},
+			{"all_organizations": False},
+			{"all_organizations": "true"},
+			{"all_organizations": None},
+			{"organization_id": "organization", "all_organizations": True},
+			{"organization_id": "organization", "all_organizations": False},
+			{"organization_id": None, "all_organizations": True},
+		):
+			with self.subTest(selectors=selectors):
+				status, result = self.call("remove_team_member", body | selectors, token)
+				self.assertEqual(status, 400, result)
+
+	def test_remove_all_organizations_keeps_the_personal_team(self):
+		member = uuid4().hex
+		email = f"{member}@example.test"
+		self.sign_in(member, email, uuid4().hex)
+		token = self.token()
+		organization_teams = []
+
+		for _ in range(2):
+			organization = uuid4().hex
+			owner = uuid4().hex
+			for subject in (owner, member):
+				body = {
+					"issuer": ISSUER,
+					"subject": subject,
+					"email": f"{subject}@example.test",
+					"email_verified": True,
+					"organization_id": organization,
+				}
+				status, result = self.call("ensure_team", body, token)
+				self.assertEqual(status, 200, result)
+			organization_teams.append(result["message"]["team"])
+
+		body = {"issuer": ISSUER, "subject": member, "all_organizations": True}
+		for _ in range(2):
+			status, result = self.call("remove_team_member", body, token)
+			self.assertEqual(status, 200, result)
+			self.assertEqual(result["message"], {"team": None, "member": False})
+
+		session = self.sign_in(member, email, uuid4().hex)
+		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, session)
+		self.assertEqual(status, 200)
+		account = json.loads(payload)["message"]
+		self.assertEqual([row["name"] for row in account["teams"]], [account["team"]["name"]])
+		self.assertNotIn(account["team"]["name"], organization_teams)
+
+	def test_bulk_remove_owner_conflict_leaves_other_membership_intact(self):
+		owner, other_owner = uuid4().hex, uuid4().hex
+		first_org, second_org = uuid4().hex, uuid4().hex
+		token = self.token()
+		teams = []
+		for subject, organization in ((owner, first_org), (other_owner, second_org), (owner, second_org)):
+			status, result = self.call(
+				"ensure_team",
+				{
+					"issuer": ISSUER,
+					"subject": subject,
+					"email": f"{subject}@example.test",
+					"email_verified": True,
+					"organization_id": organization,
+				},
+				token,
+			)
+			self.assertEqual(status, 200, result)
+			teams.append(result["message"]["team"])
+
+		body = {"issuer": ISSUER, "subject": owner, "all_organizations": True}
+		self.assertEqual(self.call("remove_team_member", body, token)[0], 403)
+		session = self.sign_in(owner, f"{owner}@example.test", uuid4().hex)
+		status, _, payload = self.exchange("GET", ACCOUNT_ROUTE, session)
+		self.assertEqual(status, 200)
+		self.assertEqual({row["name"] for row in json.loads(payload)["message"]["teams"]}, set(teams))
+
 	def sign_in(self, subject, email, keycloak_sid, expected_status=302, **overrides):
 		status, _, payload = self.exchange("POST", "/api/method/press_tr.api.auth.get_login_url")
 		self.assertEqual(status, 200)

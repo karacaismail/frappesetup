@@ -140,8 +140,8 @@ paths:
   /api/method/press_tr.api.identity.remove_team_member:
     post:
       operationId: removeTeamMember
-      summary: Revoke a Press team membership.
-      description: Removes the member and their team role assignments. This destructive operation preserves the user and the team. Team owner removal requires a separate ownership change.
+      summary: Revoke memberships in one or all Keycloak organizations.
+      description: Removes the member and their team role assignments. Bulk removal affects only teams mapped to Keycloak. This destructive operation preserves the user and teams. If any affected team is owned by the member, transfer ownership before retrying.
       security:
         - identitySync: []
       requestBody:
@@ -151,7 +151,10 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [issuer, subject, organization_id]
+              required: [issuer, subject]
+              oneOf:
+                - required: [organization_id]
+                - required: [all_organizations]
               properties:
                 issuer:
                   type: string
@@ -160,10 +163,17 @@ paths:
                   type: string
                 organization_id:
                   type: string
+                  minLength: 1
+                  maxLength: 255
+                  pattern: '\S'
                   description: Keycloak organization identifier.
+                all_organizations:
+                  type: boolean
+                  const: true
+                  description: Remove memberships in all teams mapped to Keycloak.
       responses:
         "200":
-          description: The user has no membership in the mapped team, including on retry. The team is null if no mapping exists.
+          description: The user has no membership in the mapped team, including on retry. The team is null for bulk removal or when no mapping exists.
           content:
             application/json:
               schema:
@@ -178,6 +188,8 @@ paths:
                         type: [string, "null"]
                       member:
                         const: false
+        "400":
+          description: The request must contain exactly one valid organization selector.
         "403":
           description: Service identity or owner removal was rejected.
         "503":
