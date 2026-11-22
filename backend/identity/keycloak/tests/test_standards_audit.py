@@ -182,6 +182,21 @@ class EnvExampleTest(unittest.TestCase):
                 self.assertNotIn(" #", line, line)
 
 
+class ResponseCleanupTest(unittest.TestCase):
+    def test_http_error_response_body_is_closed_after_reading(self):
+        import io
+        import urllib.error
+
+        from yardimci import istek
+
+        url = "https://example.test/"
+        body = io.BytesIO(b"error")
+        error = urllib.error.HTTPError(url, 404, "Not Found", {}, body)
+        with mock.patch("urllib.request.urlopen", side_effect=error):
+            self.assertEqual(istek("GET", url).durum, 404)
+        self.assertTrue(body.closed)
+
+
 class NoRawResponseInMessagesTest(unittest.TestCase):
     """Third review: a failing live test must not write a response body to the log. A token endpoint
     that wrongly accepts a request returns tokens in that body."""

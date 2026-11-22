@@ -85,7 +85,8 @@ def _ac(acici, adres, veri=None):
         with acici.open(urllib.request.Request(adres, data=veri), timeout=30) as yanit:
             return yanit.status, dict(yanit.headers), yanit.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as hata:
-        return hata.code, dict(hata.headers), hata.read().decode("utf-8", "replace")
+        with hata:
+            return hata.code, dict(hata.headers), hata.read().decode("utf-8", "replace")
 
 
 def _keycloak_icinde_izle(acici, adres: str, kc: str):

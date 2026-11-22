@@ -97,7 +97,8 @@ def istek(yontem: str, adres: str, *, form: dict | None = None, govde: dict | No
         with urllib.request.urlopen(ist, timeout=30) as yanit:
             return HttpYanit(yanit.status, yanit.read(), dict(yanit.headers))
     except urllib.error.HTTPError as hata:
-        return HttpYanit(hata.code, hata.read(), dict(hata.headers))
+        with hata:
+            return HttpYanit(hata.code, hata.read(), dict(hata.headers))
 
 
 def belirtec_ucu(realm: str = "platform") -> str:
@@ -143,7 +144,8 @@ def get_without_redirect(adres: str) -> HttpYanit:
         with acici.open(urllib.request.Request(adres), timeout=30) as yanit:
             return HttpYanit(yanit.status, yanit.read(), dict(yanit.headers))
     except urllib.error.HTTPError as hata:
-        return HttpYanit(hata.code, hata.read(), dict(hata.headers))
+        with hata:
+            return HttpYanit(hata.code, hata.read(), dict(hata.headers))
 
 
 def pkce_pair() -> tuple:
