@@ -28,6 +28,7 @@ Yalnız birleşme ve kanca denetimi için şu komutu kullanın.
 ```sh
 backend/e2e/bin/merge-preview --merge-only
 python3 -m unittest discover -s backend/e2e/tests -v
+node --experimental-strip-types --test backend/e2e/tests/*.test.*
 ```
 
 ## Sonuçlar
@@ -83,8 +84,10 @@ npx --no-install playwright test -c backend/e2e/playwright.config.ts --project=a
 ## Örnek veri
 
 Yalnız yerel test ortamını kullanın. Gerçek hesap veya veri kullanmayın.
-Önizleme, erişim kuralı örnek verisini `platform_core.erisim.tests.base` yolundan alır.
-Bu test dosyası değişirse örnek veri hazırlığı durabilir.
+Önizleme, erişim kuralı örnek verisini `seed_access_fixture()` ile hazırlar.
+İşlev bir okuyucu hesabı ve bir erişim kuralı oluşturur.
+İşlev iki örnek kayıt ekler.
+Okuyucu yalnız kendi kaydını görebilir. İşlev okuyucu için geçici parola üretir.
 Parolaları, oturum çerezlerini ve anahtarları yalnız yerel ortam değişkenlerine koyun.
 
 - **Tarayıcı.** Keycloak'a doğrulanmış `e2e-user@example.test` hesabını ekleyin. Kiracıya aynı e-postayla bir “Website User” ekleyin. Parolasını `E2E_KEYCLOAK_PASSWORD` değişkenine verin. Kiracı ile Keycloak'ı kendi yerel adreslerinde bağlayın.
@@ -121,3 +124,19 @@ Silme ve iptal için her koşuda yeni örnek veri hazırlayın.
 - **Çalışan oturumu.** `E2E_EMPLOYEE_IDLE=1` kullanın. Çalışan hesabı `e2e-employee-` ile başlamalı ve `@example.test` ile bitmeli. Hesabı `E2E_EMPLOYEE_EMAIL` ile verin. Parolayı `E2E_EMPLOYEE_PASSWORD` ile verin. Test gerçek saatte bir saat bekler. Test bu sırada yalnız Keycloak oturumunu kontrol eder.
 
 `playwright test -c backend/e2e/playwright.config.ts --project=chromium lifecycle.spec.ts` komutunu kullanın.
+
+### Press silme sayfası test sözleşmesi
+
+Press, hesap silme formunu `/account-deletion` sayfasında gösterir.
+Testler aşağıdaki seçicileri ve değerleri kullanır.
+
+| Seçici | Beklenen davranış |
+| --- | --- |
+| `#account-deletion` | Form, `POST /api/method/press_tr.api.account.request_deletion` ucuna bağlıdır. |
+| `#account-deletion[data-confirm="false"]` | Gönderme düğmesi yeniden giriş akışını başlatır. |
+| `#account-deletion[data-confirm="true"]` | Press bu değeri yeniden giriş doğrulandıktan sonra gösterir. |
+| `#account-deletion button[type=submit]` | Düğme, formun o adımdaki işlemini başlatır. |
+
+Son gönderim JSON gövdesinde `confirm: true` taşır.
+Press başarılı istekte `message.submitted: true` döndürür.
+Bu kayıt, Press şablonunun `3f53c3f` sürümüyle denetlendi.
