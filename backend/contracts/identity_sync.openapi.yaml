@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: identity_sync
-  version: 0.10.0
+  version: 0.10.1
   summary: Endpoints of the user sync service
   description: |
     This service carries user changes from Keycloak to Press and to the tenant sites (G-81).
@@ -106,6 +106,9 @@ info:
     The same holds for a Keycloak delete event that waits in the queue, whatever Keycloak answers about the user.
     When the job is done, the service records the end and removes the id of the account from its records in one storage transaction.
     If that write fails, the job is not done. A retry writes to no target and only completes the record.
+    After the job is done, the service knows the account only by the keyed digest of the job.
+    A later event of that account returns `duplicate`. The service does not execute it and does not record it.
+    A replay asks the storage before every event whether the record is still in the queue.
 
     If the delete event is lost, the reconcile command finds the deleted user. Its difference kind is `deleted_in_keycloak`.
     The reconcile preview shows the steps of the job that are left. After the human approves, these steps are executed in order.

@@ -52,7 +52,7 @@ from identity_sync.mapping import (
     plan_actions,
 )
 from identity_sync.sites import PressClient, TenantClient
-from identity_sync.store import Store
+from identity_sync.store import DeadLetter, Store
 
 T = TypeVar("T")
 
@@ -215,6 +215,34 @@ class Processor:
             return event  # Keycloak still has the user: the current state decides, nothing is anonymized
         return self.account_job(subject, time=event.time, removed=True)
 
+    def _job_id(self, subject: str) -> str:
+        return self.account_job(subject, time=0).id
+
+    def _account_deleted(self, subject: str) -> bool:
+        """Is the deletion job of this account finished? The finished record is the keyed digest."""
+        return self._store.is_processed(self._job_id(subject))
+
+    def hides_account(self, event: Event) -> bool:
+        """Must a reply about this event leave out the account id?
+
+        Yes for the account job, for a Keycloak delete event, and for any event of an account
+        whose deletion job exists, waiting or finished.
+        """
+        subject = event.user_id
+        if not subject:
+            return False
+        if event.kind == REQUEST_KIND or event.type in USER_REMOVED_TYPES:
+            return True
+        job_id = self._job_id(subject)
+        return self._store.dead_letter_state(job_id) is not None or self._store.is_processed(job_id)
+
+    def listed(self, letter: DeadLetter) -> dict[str, object]:
+        """A queue record as a reply shows it."""
+        record = letter.to_dict()
+        if self.hides_account(letter.event):
+            record["event"].pop("user_id", None)
+        return record
+
     def _step_key(self, action: Action) -> str:
         return plan_digest((action,), self._digest_key)
 
@@ -235,9 +263,9 @@ class Processor:
         """
         preview = action.preview()
         subject = event.user_id
-        if not subject or not (event.kind == REQUEST_KIND or event.type in USER_REMOVED_TYPES):
+        if not subject or not self.hides_account(event):
             return preview
-        job_id = self.account_job(subject, time=0).id
+        job_id = self._job_id(subject)
         summary = preview.summary.replace(f"user {subject}", f"the user of deletion job {job_id}")
         return replace(preview, summary=summary.replace(subject, job_id))
 
@@ -289,6 +317,12 @@ class Processor:
         `planned` is a plan that was already checked against an approval. It is written as it
         is, under the record it was planned for. Keycloak is not asked again.
         """
+        if event.kind != REQUEST_KIND and event.user_id and self._account_deleted(event.user_id):
+            # The account of this event is deleted. The service knows that only by the keyed
+            # digest of the finished job. The event is not run, and it is not recorded: a record
+            # would write the raw id of the deleted account back into the store.
+            self._store.remove_dead_letter(event.id)
+            return EventResult("duplicate")
         if planned is not None:
             result = self._handle_job(planned.record, allow_unknown, planned.actions)
             if planned.record.id != event.id:
@@ -353,17 +387,28 @@ class Processor:
             return self._ordered(self._replay_previews(include_unknown)[0])
         if expected_digest is None:
             letters, skipped = self._letters(include_unknown)
-            results = [(letter.event.id, self.handle(letter.event, allow_unknown=include_unknown)) for letter in letters]
+            results: ReplayResults = []
+            for letter in letters:
+                # The queue was read once, before the loop. An earlier event of this run may have
+                # removed this record. The database decides, not the copy in memory.
+                if self._store.dead_letter_state(letter.event.id) is None:
+                    results.append((letter.event.id, EventResult("duplicate")))
+                else:
+                    results.append((letter.event.id, self.handle(letter.event, allow_unknown=include_unknown)))
             return self._ordered(results + skipped)
         with self._store.work_lock():
             previews, plans = self._replay_previews(include_unknown)
             if digest_of(replay_report(self._ordered(previews)), self._digest_key) != expected_digest:
                 raise PreviewChanged
             letters, skipped = self._letters(include_unknown)
-            results: ReplayResults = []
+            results = []
             for letter in letters:
                 plan = plans.get(letter.event.id)
-                if plan is None:
+                if self._store.dead_letter_state(letter.event.id) is None:
+                    # Removed by an earlier event of this run, for example by the deletion job
+                    # of the same account. It is not run and not recorded again.
+                    results.append((letter.event.id, EventResult("duplicate")))
+                elif plan is None:
                     results.append((letter.event.id, EventResult("failed")))  # no plan was seen: do not run
                 else:
                     results.append((letter.event.id, self._handle_locked(letter.event, include_unknown, plan)))

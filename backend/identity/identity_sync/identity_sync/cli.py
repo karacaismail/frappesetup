@@ -143,7 +143,7 @@ def _run(args: argparse.Namespace, app: App) -> int:
         _print({"operation_id": args.operation_id, "state": "resolved", "resolution": args.resolution})
         return EXIT_OK
     if args.command == "dead-letters":
-        _print({"dead_letters": [letter.to_dict() for letter in app.store.dead_letters()]})
+        _print({"dead_letters": [app.processor.listed(letter) for letter in app.store.dead_letters()]})
         return EXIT_OK
     return _replay(args, app)
 

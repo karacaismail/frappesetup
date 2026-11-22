@@ -721,11 +721,48 @@ class AccountDeletionTest(PipelineCase):
 
         keycloak.on("GET", f"{keycloak.admin}/users/{SUBJECT}", read)
 
-    def test_recovered_read_after_a_finished_job_writes_nothing(self) -> None:
-        # The Press job finished. Its last step caused a delete event. Every attempt of the
-        # first read fails, and a later read would work. The deletion must be decided by one
-        # read only: the event waits in the queue and no target is written.
+    def test_delete_event_after_a_finished_job_needs_no_read(self) -> None:
+        # The Press job finished. Its last step caused a delete event, and Keycloak cannot be
+        # read. The finished record of the job decides: duplicate, no write, nothing queued.
         self.assertEqual(self.stack.app.processor.handle(self.job()).status, "processed")
+        before = self.target_writes()
+        self.flaky_user_read(3)
+
+        result = self.stack.app.processor.handle(event("USER_DELETE", "admin"))
+
+        self.assertEqual((result.status, result.actions), ("duplicate", ()))
+        self.assertEqual(self.target_writes(), before)
+        self.assertEqual(self.stack.app.store.dead_letters(), [])
+
+    def test_replay_checks_the_queue_before_every_event(self) -> None:
+        # The queue holds the deletion job and an older event of the same user. The replay reads
+        # the queue once. The job finishes and removes the older event from the database.
+        # The loop must ask the database again, and not run the copy it holds in memory.
+        # The other guard (the finished-job record) is switched off here to test this one alone.
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+        self.stack.app.processor.handle(self.job())
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, fakes.DONE)
+        old = Event(id="e-old", kind="user", type="VERIFY_EMAIL", realm="platform", time=1, user_id=SUBJECT)
+        self.stack.app.store.add_dead_letter(old, "tenant.provision kiraci1: HTTP 503")
+        self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, (503, None))
+        self.stack.app.processor._account_deleted = lambda _subject: False
+        for approved in (True, False):
+            with self.subTest(approved=approved):
+                results = self.approved_replay() if approved else [
+                    (id_, r.status) for id_, r in self.stack.app.processor.replay_dead_letters()
+                ]
+                if approved:
+                    self.assertEqual(results, [(self.job().id, "processed"), ("e-old", "duplicate")])
+                self.assertEqual(self.stack.app.store.dead_letters(), [])
+                self.assertNotIn(SUBJECT, "\n".join(self.stack.app.store._db.iterdump()))
+
+    def test_recovered_read_never_reruns_steps_of_an_open_job(self) -> None:
+        # The Press job stopped at its last step. The delete event comes while the first read
+        # fails. It waits and writes nothing. A replay then continues the same job.
+        keycloak = self.stack.keycloak
+        keycloak.on("DELETE", f"{keycloak.admin}/users/{SUBJECT}", (500, None))
+        self.assertEqual(self.stack.app.processor.handle(self.job()).status, "dead_lettered")
+        keycloak.remove_user(SUBJECT)
         before = self.target_writes()
         self.flaky_user_read(3)
 
@@ -733,13 +770,7 @@ class AccountDeletionTest(PipelineCase):
 
         self.assertEqual((result.status, result.actions), ("dead_lettered", ()))
         self.assertEqual(self.target_writes(), before)
-        (letter,) = self.stack.app.store.dead_letters()
-        self.assertEqual((letter.event.id, letter.state), ("e-1", "failed"))
-        # The replay reads once, sees the user is gone, and finds the finished job.
-        ((_id, replayed),) = self.stack.app.processor.replay_dead_letters()
-        self.assertEqual(replayed.status, "duplicate")
-        self.assertEqual(self.target_writes(), before)
-        self.assertEqual(self.stack.app.store.dead_letters(), [])
+        self.assertEqual(sorted(letter.event.id for letter in self.stack.app.store.dead_letters()), sorted(["e-1", self.job().id]))
 
     def test_failed_read_never_plans_a_deletion_under_the_event_id(self) -> None:
         # No job exists yet. The read fails, then recovers within the same call.

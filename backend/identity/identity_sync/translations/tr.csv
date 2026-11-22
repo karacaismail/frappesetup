@@ -492,6 +492,9 @@ A preview and the dead-letter list show the id of the job. They do not show the 
 The same holds for a Keycloak delete event that waits in the queue, whatever Keycloak answers about the user.
 When the job is done, the service records the end and removes the id of the account from its records in one storage transaction.
 If that write fails, the job is not done. A retry writes to no target and only completes the record.
+After the job is done, the service knows the account only by the keyed digest of the job.
+A later event of that account returns `duplicate`. The service does not execute it and does not record it.
+A replay asks the storage before every event whether the record is still in the queue.
 
 If the delete event is lost, the reconcile command finds the deleted user. Its difference kind is `deleted_in_keycloak`.
 The reconcile preview shows the steps of the job that are left. After the human approves, these steps are executed in order.
@@ -670,6 +673,9 @@ Press isteği bir adımda durduysa silme olayı aynı işi sürdürür. Servis b
 Kuyrukta bekleyen Keycloak silme olayı için de böyledir. Keycloak kullanıcı hakkında ne yanıt verirse versin sonuç değişmez.
 İş bitince servis bitişi kaydeder ve hesabın kimliğini kayıtlarından siler. İkisi tek kayıt işlemidir.
 Bu yazma başarısız olursa iş bitmiş sayılmaz. Yeniden deneme hiçbir hedefe yazmaz, yalnız kaydı tamamlar.
+İş bitince servis hesabı yalnız işin anahtarlı özetinden bilir.
+O hesabın sonradan gelen olayı `duplicate` döner. Servis o olayı yürütmez ve kaydetmez.
+Yeniden işletme her olaydan önce kaydın hâlâ kuyrukta olduğunu kayıttan sorar.
 
 Silme olayı kaybolursa mutabakat komutu silinen kullanıcıyı bulur. Bu farkın türü `deleted_in_keycloak` olur.
 Mutabakat önizlemesi işin kalan adımlarını gösterir. İnsan onay verince bu adımlar sırayla yürür.

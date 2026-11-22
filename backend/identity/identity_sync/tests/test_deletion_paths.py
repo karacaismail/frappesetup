@@ -275,18 +275,19 @@ class DeletionPathsTest(ServerCase):
                 self.assertEqual(self.writes(), 0)
                 self.assertEqual(self.record(), {"job_done": False, "event_done": False, "queue": ["e-del"]})
 
-    def test_row_16_replay_of_a_queued_event_finds_the_finished_job(self) -> None:
+    def test_row_16_event_after_a_finished_job_needs_no_keycloak_answer(self) -> None:
+        # The job is finished and Keycloak cannot be read. The finished record alone decides:
+        # the event is a duplicate. It is not queued, so nothing is left to replay.
         self.press_request()
         self.keycloak_answers("error")
-        self.delete_event()
-        self.keycloak_answers("gone")
         before = self.writes()
 
-        status, reply = self.replay(self.replay_preview())
+        reply = self.delete_event()
 
-        self.assertEqual((status, reply["results"][0]["status"]), (200, "duplicate"))
+        self.assertEqual(reply["status"], "duplicate")
         self.assertEqual(self.writes(), before)
         self.assertEqual(self.record(), {"job_done": True, "event_done": False, "queue": []})
+        self.assertEqual(self.replay_preview()["results"], [])
 
     # --- row 17: reconcile, when the delete event never arrived ---
 
@@ -366,3 +367,46 @@ class DeletionPathsTest(ServerCase):
         self.assertEqual(self.writes(), before)
         self.assertNotIn(SUBJECT, self.stored_text())
         self.assertEqual(self.record(), {"job_done": True, "event_done": False, "queue": []})
+
+    # --- rows 20 and 21: a finished deletion is never undone by an older or later event ---
+
+    def test_row_20_event_queued_next_to_the_job_does_not_write_the_id_back(self) -> None:
+        # The queue holds the deletion job and an older event of the same user. One approved
+        # replay runs both. The job finishes first and cleans the records. The older event was
+        # read into memory before that. It must not be recorded again, even if its target fails.
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (503, None))
+        self.press_request()
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, fakes.DONE)
+        self.leftovers()
+        self.assertEqual(self.record()["queue"], [self.job_id, "e-old"])
+        preview = self.replay_preview()
+        self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, (503, None))  # the older event's target fails
+        before = self.writes()
+
+        status, reply = self.replay(preview)
+
+        self.assertEqual(status, 200)
+        self.assertEqual([r["status"] for r in reply["results"]], ["processed", "duplicate"])
+        # Only the job's two remaining steps were written. The older event wrote nothing.
+        self.assertEqual(self.writes(), before + 2)
+        self.assertNotIn(SUBJECT, self.stored_text())
+        self.assertEqual(self.record(), {"job_done": True, "event_done": False, "queue": []})
+        self.queue_listing()
+
+    def test_row_21_late_event_of_a_deleted_account_is_not_recorded(self) -> None:
+        # The job is done. Later an event of the same account arrives and its target would fail.
+        # The service knows the account only by the keyed digest of the finished job. It writes
+        # nothing to a target and nothing to its own records.
+        self.press_request()
+        self.stack.press.on("POST", fakes.PRESS_REMOVE_MEMBER, (503, None))
+        before = self.writes()
+        late = {"id": "e-late", "kind": "user", "type": "VERIFY_EMAIL", "realm": "platform", "time": 9, "user_id": SUBJECT}
+
+        reply = self.seen(self.post_event(late))
+
+        self.assertEqual(reply["status"], "duplicate")
+        self.assertEqual(self.writes(), before)
+        self.assertNotIn(SUBJECT, self.stored_text())
+        self.assertFalse(self.store.is_processed("e-late"))
+        self.assertEqual(self.record(), {"job_done": True, "event_done": False, "queue": []})
+        self.queue_listing()

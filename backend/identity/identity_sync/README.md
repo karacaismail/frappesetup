@@ -265,10 +265,12 @@ Hiçbir satırda yanıt hesabın ham Keycloak kimliğini göstermez. Yanıt yaln
 | 13 | Onaylı yeniden deneme | Önce kapalı, yürütmeden sonra yok | Yalnız kapatma | Olay bitti, iş açık |
 | 14 | Onaylı yeniden deneme | Önce yok, yürütmeden sonra var | 2., 3. ve 4. adım | İş bitti |
 | 15 | Onaylı yeniden deneme | Onaydan sonra değişti | Yok, yanıt 409 | Olay kuyrukta |
-| 16 | Onaylı yeniden deneme, iş bitmiş | Kullanıcı yok | Yok | İş bitti, kuyruk boş |
+| 16 | Silme olayı, iş bitmiş | Okuma hatası | Yok | İş bitti, olay kuyruğa girmez |
 | 17 | Mutabakat, olay hiç gelmedi | Kullanıcı listede yok | 2., 3. ve 4. adım | İş bitti |
 | 18 | İş biter, eski kayıtlar var | Okuma yok | Beş adım | Hiçbir kayıt kimliği tutmaz |
 | 19 | İş biter, kayıt yazması hata verir | Okuma yok | Yeniden denemede yok | İş bitti, hiçbir kayıt kimliği tutmaz |
+| 20 | Onaylı yeniden deneme, kuyrukta iş ve aynı kullanıcının eski olayı var | Okuma yok | Yalnız işin kalan adımları | İş bitti, eski olay yeniden kaydedilmez |
+| 21 | İş bittikten sonra aynı hesabın başka olayı gelir | Okuma yok | Yok | Olay kaydedilmez, hiçbir kayıt kimliği tutmaz |
 
 Adımlar şunlardır:
 
@@ -282,6 +284,9 @@ Adımlar şunlardır:
 - 13. ve 14. satırda plan, onaylandığı kaydın altında kalır. Yürütme Keycloak'ı yeniden okumaz.
 - 17. satırda fark listesi kullanıcıyı Keycloak kimliğiyle anar. Sözleşme bu alanı mutabakat okuru için tanımlar. Önizleme ve sonuç iş kimliğini gösterir.
 - 19. satırda bitiş kaydı ve kimlik temizliği tek kayıt işlemidir. Yazma başarısız olursa iş bitmiş sayılmaz.
+- 20. satırda servis her olaydan önce kaydın hâlâ kuyrukta olduğunu veritabanından doğrular. Bellekteki kopyayı çalıştırmaz.
+- 16. ve 21. satırda servis hesabın silindiğini yalnız işin anahtarlı özetinden bilir. Geç gelen olayı çalıştırmaz ve kaydetmez.
+- Silme işi kuyrukta ya da bitmişse o hesabın öteki olayları da yanıtta hesap kimliğini göstermez.
 
 ## Olay dinleyici eklentisi
 

@@ -224,7 +224,7 @@ class _Api:
         limit, offset = _page(query)
         # One row more than asked tells whether another page exists.
         letters = self._app.store.dead_letters(limit=limit + 1, offset=offset)
-        return 200, _paged("dead_letters", [letter.to_dict() for letter in letters], limit, offset)
+        return 200, _paged("dead_letters", [self._app.processor.listed(letter) for letter in letters], limit, offset)
 
     # --- yazma uçları: önizleme herkese, yürütme yalnız onay katmanına ---
 
