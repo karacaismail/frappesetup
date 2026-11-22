@@ -1,0 +1,63 @@
+{
+ "actions": [],
+ "autoname": "field:installation_id",
+ "description": "Telefon kurulumunu hesabına bağlar.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "installation_id",
+  "account",
+  "principal",
+  "scope",
+  "revoked"
+ ],
+ "fields": [
+  {
+   "description": "Bu değer telefon kurulumunu belirtir.",
+   "fieldname": "installation_id",
+   "fieldtype": "Data",
+   "label": "Kurulum kimliği",
+   "length": 36,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Bu hesap telefon kurulumunun sahibidir.",
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "label": "Hesap",
+   "options": "User",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Sistem bu değeri sabit kimlik bağına göre üretir.",
+   "fieldname": "principal",
+   "fieldtype": "Data",
+   "label": "Sabit hesap anahtarı",
+   "length": 64,
+   "reqd": 1
+  },
+  {
+   "description": "Kapsam, bu kurulumun eşitleme alanını belirtir.",
+   "fieldname": "scope",
+   "fieldtype": "Data",
+   "label": "Kapsam",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Bu işaret açıkken sunucu kurulumun eşitleme isteğini reddeder.",
+   "fieldname": "revoked",
+   "fieldtype": "Check",
+   "label": "İptal edildi"
+  }
+ ],
+ "links": [],
+ "module": "Mobil",
+ "name": "Mobile Installation",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

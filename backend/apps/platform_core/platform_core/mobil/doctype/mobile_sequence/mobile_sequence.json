@@ -1,0 +1,46 @@
+{
+ "actions": [],
+ "autoname": "field:sequence_key",
+ "description": "Sitenin e\u015fitleme s\u0131ras\u0131n\u0131 tutar.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sequence_key",
+  "sequence",
+  "retention_floor"
+ ],
+ "fields": [
+  {
+   "description": "Site i\u00e7in tek saya\u00e7 kayd\u0131 bu anahtar\u0131 ta\u015f\u0131r.",
+   "fieldname": "sequence_key",
+   "fieldtype": "Data",
+   "label": "Saya\u00e7 anahtar\u0131",
+   "length": 16,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "description": "Sunucu her yeni de\u011fi\u015fikli\u011fe bu say\u0131dan b\u00fcy\u00fck bir s\u0131ra numaras\u0131 verir.",
+   "fieldname": "sequence",
+   "fieldtype": "Int",
+   "label": "Son s\u0131ra numaras\u0131",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Sunucu daha eski s\u0131ra numaras\u0131 olan imle\u00e7le gelen iste\u011fi reddeder.",
+   "fieldname": "retention_floor",
+   "fieldtype": "Int",
+   "label": "En eski ge\u00e7erli s\u0131ra",
+   "reqd": 1
+  }
+ ],
+ "links": [],
+ "module": "Mobil",
+ "name": "Mobile Sequence",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

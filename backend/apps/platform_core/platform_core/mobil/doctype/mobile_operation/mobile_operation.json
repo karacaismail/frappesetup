@@ -1,0 +1,45 @@
+{
+ "actions": [],
+ "autoname": "field:operation_key",
+ "description": "\u0130lk i\u015f sonucunu yeniden g\u00f6nderim i\u00e7in saklar.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "operation_key",
+  "content_digest",
+  "result"
+ ],
+ "fields": [
+  {
+   "description": "Sunucu anahtar\u0131 site, hesap ve i\u015flem kimli\u011finden \u00fcretir.",
+   "fieldname": "operation_key",
+   "fieldtype": "Data",
+   "label": "\u0130\u015flem anahtar\u0131",
+   "length": 64,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Sunucu bu \u00f6zeti kullanarak yinelenen iste\u011fin i\u00e7eri\u011fini kar\u015f\u0131la\u015ft\u0131r\u0131r.",
+   "fieldname": "content_digest",
+   "fieldtype": "Data",
+   "label": "\u0130\u00e7erik \u00f6zeti",
+   "length": 64,
+   "reqd": 1
+  },
+  {
+   "description": "Sunucu ilk iste\u011fin sonucunu bu alanda saklar.",
+   "fieldname": "result",
+   "fieldtype": "JSON",
+   "label": "\u0130lk sonu\u00e7",
+   "reqd": 1
+  }
+ ],
+ "links": [],
+ "module": "Mobil",
+ "name": "Mobile Operation",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

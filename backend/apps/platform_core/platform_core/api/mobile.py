@@ -5,10 +5,10 @@ import time
 
 import frappe
 
-from platform_core.mobile.protocol import PAGE_SIZE, MobileError, uuid4_id
-from platform_core.mobile.request import endpoint_response
-from platform_core.mobile.service import COMMANDS, pull, push
-from platform_core.mobile.store import MobileStore, cleanup
+from platform_core.mobil.protocol import PAGE_SIZE, MobileError, uuid4_id
+from platform_core.mobil.request import endpoint_response
+from platform_core.mobil.service import COMMANDS, pull, push
+from platform_core.mobil.store import MobileStore, cleanup
 
 # The shared request guard and each action check the installation, record or
 # administrator permission. The static rule cannot follow endpoint_response.

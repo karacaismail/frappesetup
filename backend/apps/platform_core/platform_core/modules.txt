@@ -1,5 +1,5 @@
-Identity
-Shell
-AI
-Model Gateway
-Mobile
+Kimlik
+Kabuk
+Yapay Zeka
+Model Gecidi
+Mobil
