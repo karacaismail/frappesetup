@@ -265,7 +265,7 @@
             }
           },
           "302": {
-            "description": "Guest redirect to /login?redirect-to=%2Fpanel. No CSRF token is returned.",
+            "description": "Guest redirect to /login?redirect-to=/panel. No CSRF token is returned.",
             "headers": {
               "Location": {
                 "description": "Same-origin login route.",
@@ -386,9 +386,7 @@
             "description": "Exact sidebar identity."
           },
           "data": {
-            "type": "object",
-            "description": "Frappe 16.56.0 as_boot_entry payload, filtered by the native resolver. No raw Workspace content.",
-            "additionalProperties": true
+            "$ref": "#/components/schemas/SidebarData"
           }
         },
         "additionalProperties": false
@@ -739,6 +737,246 @@
           "_server_messages": {
             "type": "string",
             "description": "Native serialized error messages."
+          }
+        },
+        "additionalProperties": true
+      },
+      "SidebarData": {
+        "type": "object",
+        "description": "Navigation returned by the native Frappe Sidebar resolver.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Sidebar identity."
+          },
+          "module": {
+            "type": "string",
+            "description": "Module that owns the sidebar."
+          },
+          "label": {
+            "type": "string",
+            "description": "Displayed sidebar label."
+          },
+          "app": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Installed application that owns the sidebar."
+          },
+          "header_icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Icon displayed beside the sidebar label."
+          },
+          "module_onboarding": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Onboarding reference when the user can open it."
+          },
+          "customized": {
+            "type": [
+              "integer",
+              "boolean",
+              "null"
+            ],
+            "description": "Whether a site or user customization was applied."
+          },
+          "computed": {
+            "type": [
+              "integer",
+              "boolean",
+              "null"
+            ],
+            "description": "Whether Frappe derived the items from module contents."
+          },
+          "workspaces": {
+            "type": "array",
+            "description": "Workspace names the user can open.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "items": {
+            "type": "array",
+            "description": "Navigation rows in display order.",
+            "items": {
+              "$ref": "#/components/schemas/SidebarItem"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "SidebarItem": {
+        "type": "object",
+        "description": "A permitted navigation row or a visual divider.",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Stable sidebar row identity."
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Translated text displayed for this row."
+          },
+          "link_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name of the linked target."
+          },
+          "link_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Target kind such as Workspace, DocType, Report or URL."
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Row kind such as Link, Section Break or Spacer."
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Icon displayed for this row."
+          },
+          "child": {
+            "type": [
+              "integer",
+              "boolean",
+              "null"
+            ],
+            "description": "Whether this row belongs to a section."
+          },
+          "collapsible": {
+            "type": [
+              "integer",
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the section can be collapsed."
+          },
+          "indent": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Nesting depth for this row."
+          },
+          "keep_closed": {
+            "type": [
+              "integer",
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the section starts collapsed."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Safe HTTP, HTTPS or same-origin relative URL."
+          },
+          "show_arrow": {
+            "type": [
+              "integer",
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the row displays a navigation arrow."
+          },
+          "filters": {
+            "type": [
+              "string",
+              "array",
+              "object",
+              "null"
+            ],
+            "description": "Native filters for the destination."
+          },
+          "route_options": {
+            "type": [
+              "string",
+              "array",
+              "object",
+              "null"
+            ],
+            "description": "Native options for the destination route."
+          },
+          "tab": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Tab to open at the destination."
+          },
+          "open_in_new_tab": {
+            "type": [
+              "integer",
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the destination should open in a new tab."
+          },
+          "is_default_module": {
+            "type": [
+              "integer",
+              "boolean",
+              "null"
+            ],
+            "description": "Whether this row points to the default module."
+          },
+          "hidden": {
+            "type": [
+              "integer",
+              "boolean",
+              "null"
+            ],
+            "description": "Native visibility setting if present."
+          },
+          "derived": {
+            "type": [
+              "integer",
+              "boolean",
+              "null"
+            ],
+            "description": "Whether Frappe added this row from a Workspace record."
+          },
+          "report": {
+            "type": "object",
+            "description": "Route details for an enabled report.",
+            "properties": {
+              "report_type": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Frappe report kind."
+              },
+              "ref_doctype": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "DocType the report reads."
+              }
+            },
+            "additionalProperties": true
           }
         },
         "additionalProperties": true

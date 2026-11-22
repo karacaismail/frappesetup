@@ -3,6 +3,8 @@
 import frappe
 from frappe.sessions import get_csrf_token
 
+from platform_core.kabuk.http import has_session_cookie
+
 no_cache = 1
 sitemap = 0
 
@@ -14,7 +16,7 @@ def get_context(context):
 			"Vary": "Cookie",
 		}
 	)
-	if frappe.session.user == "Guest" or frappe.session.sid in (None, "", "Guest"):
+	if not has_session_cookie():
 		frappe.local.flags.redirect_location = "/login?redirect-to=/panel"
 		raise frappe.Redirect(302)
 

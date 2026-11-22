@@ -115,6 +115,19 @@ class ShellHTTPFixture(unittest.TestCase):
 						"roles": [{"role": "Kabuk Test Privileged"}] if restricted else [],
 					}
 				).insert()
+		for title, owner in (("Kabuk Reader Private", READER), ("Kabuk Other Private", PRIVILEGED)):
+			if not frappe.db.exists("Workspace", title):
+				frappe.get_doc(
+					{
+						"doctype": "Workspace",
+						"title": title,
+						"label": title,
+						"module": "Kabuk",
+						"public": 0,
+						"for_user": owner,
+						"content": "[]",
+					}
+				).insert()
 		frappe.db.commit()
 		frappe.clear_cache()
 		frappe.db.commit()

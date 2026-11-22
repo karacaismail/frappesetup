@@ -4,18 +4,13 @@ import frappe
 from frappe.model import NO_VALUE_FIELDS
 
 from platform_core.kabuk.cache import CACHE_SECONDS, permission_version
-from platform_core.kabuk.http import conditional_response, require_session
+from platform_core.kabuk.http import conditional_response
 from platform_core.kabuk.serialization import digest, project_meta
 
 
-def get_doctype(doctype: str) -> dict | None:
-	user = require_session()
-	if not isinstance(doctype, str) or not doctype.strip() or len(doctype) > 140:
-		frappe.throw(frappe._("A valid DocType name is required."), frappe.ValidationError)
+def get_doctype(doctype: str, user: str) -> dict | None:
+	"""Project metadata after the HTTP entry point authorizes the current user."""
 	meta = frappe.get_meta(doctype)
-	# A child type has no independent record permission. Never infer its parent.
-	if meta.istable or not frappe.has_permission(doctype, "read", user=user):
-		frappe.throw(frappe._("You cannot read this DocType."), frappe.PermissionError)
 
 	readable = permitted_fields(meta, user, "read")
 	writable = permitted_fields(meta, user, "write")

@@ -31,7 +31,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertIn("private_note", [f["fieldname"] for f in high["schema"]["fields"]])
 		self.assertIn("private_section", [f["fieldname"] for f in high["schema"]["fields"]])
 		self.assertNotEqual(low_headers["ETag"], high_headers["ETag"])
-		self.assertIn("private", low_headers["Cache-Control"])
+		self.assertEqual(low_headers["Cache-Control"], "private, no-store")
 
 	def test_conditional_get_has_empty_304_body(self):
 		status, headers, _ = self.metadata(self.reader_sid)
@@ -40,6 +40,7 @@ class TestMetadataHTTP(ShellHTTPFixture):
 		self.assertEqual(status, 304)
 		self.assertEqual(body, b"")
 		self.assertEqual(new_headers["ETag"], headers["ETag"])
+		self.assertEqual(new_headers["Cache-Control"], "private, no-store")
 
 	def test_post_is_rejected(self):
 		status, _, _ = self.request(
