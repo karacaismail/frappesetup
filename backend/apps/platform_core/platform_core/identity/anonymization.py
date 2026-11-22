@@ -241,4 +241,4 @@ def _anonymous_name(record_name: str) -> str:
 
 
 def _result(user: str) -> dict:
-	return {"user": user, "enabled": False, "status": ANONYMIZED}
+	return {"user": user, "enabled": False, "status": ANONYMIZED, "anonymized": True, "found": True}

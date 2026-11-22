@@ -154,10 +154,12 @@ class TestAnonymizeUser(FrappeAPITestCase):
 		response = self.call()
 		self.assertEqual(response.status_code, 200, response.data[:500])
 		result = response.json["message"]
-		self.assertEqual(set(result), {"user", "enabled", "status"})
+		self.assertEqual(set(result), {"user", "enabled", "status", "anonymized", "found"})
 		self.assertRegex(result["user"], r"^deleted-user-[0-9a-f]{16}@deleted\.invalid$")
 		self.assertIs(result["enabled"], False)
 		self.assertEqual(result["status"], "Anonymized")
+		self.assertIs(result["anonymized"], True)
+		self.assertIs(result["found"], True)
 
 		h.refresh()
 		anon = result["user"]

@@ -1108,7 +1108,9 @@ paths:
         If step 2 fails, its changes roll back. The record stays “Disabled”. A retry finishes the work.
         Two calls at the same time finish once. The second call returns the same body.
         If the request comes again after the work is done, it returns the same body.
-        If neither the `(issuer, subject)` link nor a deletion record exists, it returns 404. The sync service reads 404 as “no user on this site”.
+        A successful response includes `anonymized: true` and `found: true`.
+        If neither the `(issuer, subject)` link nor a deletion record exists, it returns 404 `IdentityNotFound`.
+        The sync service treats this response as “no user on this site”.
         The `Administrator` and `Guest` accounts cannot be anonymized. In this case it returns 409.
         If the `kimlik_deletion_hmac_key` setting is missing, it returns 503 `DeletionKeyMissing`. Nothing changes.
         The request body is at most 16 KB.
@@ -1144,6 +1146,8 @@ paths:
                       user: deleted-user-3f9a1c7e5b2d8f40@deleted.invalid
                       enabled: false
                       status: Anonymized
+                      anonymized: true
+                      found: true
         "400":
           $ref: "#/components/responses/GirdiGecersiz"
         "401":
@@ -2471,7 +2475,7 @@ components:
 
     AnonymizeUserResult:
       type: object
-      required: [user, enabled, status]
+      required: [user, enabled, status, anonymized, found]
       additionalProperties: false
       properties:
         user:
@@ -2486,6 +2490,14 @@ components:
           type: string
           const: Anonymized
           description: The state of the “Platform Identity Deletion” record. The response comes only after step 2.
+        anonymized:
+          type: boolean
+          const: true
+          description: The account anonymization is complete.
+        found:
+          type: boolean
+          const: true
+          description: The endpoint found an identity link or a completed deletion record.
 
     ChangeEmailResult:
       type: object
