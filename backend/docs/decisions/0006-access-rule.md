@@ -638,7 +638,9 @@ Motor dört aracı `ai_tools` kancasıyla bildirir (D-9). Kod `erisim/ai_tools.p
 - Araçlar yalnız yapılandırılmış alan alır. SQL metni ya da ham koşul alan girdi yoktur. Girdi modeli bilinmeyen alanı reddeder.
 - Süzgeç satırları elle yazılan kuralla aynı doğrulamadan geçer.
 - Her araç iznini kendisi denetler. Araç `ignore_permissions` kullanmaz.
-- “Access Rule” türü genel yazma araçlarına kapalıdır (O-28). Motor türü `ai_write_closed_doctypes` kancasına yazar. Kural yalnız yukarıdaki iki yazma aracıyla değişir. O araçlar kuralı doğrular ve erişimi kaybedecek rolleri sayar.
+- “PLT Access Rule” türü genel yazma araçlarına kapalıdır (O-28). Motor türü `ai_write_closed_doctypes` kancasına yazar. Kural yalnız yukarıdaki iki yazma aracıyla değişir. O araçlar kuralı doğrular ve erişimi kaybedecek rolleri sayar.
+
+`access/tests/test_ai_tools.py` içindeki `TestGenericWriteToolsAreClosed` bu kancayı doğrular. Test ayrıca motorun kendi yazma araçlarının açık kaldığını denetler. Kanca sözleşmesi `backend/contracts/platform_core-access.openapi.yaml` dosyasının `x-hooks` bölümündedir.
 
 Yapay zekâ katmanı henüz `backend` dalında değildir. Testler araçları sözleşmenin anlattığı gibi çağırır: kullanıcı kimliğiyle ve doğrulanmış girdiyle. Araçlar gerçek MCP ucundan sınanmadı.
 
