@@ -1,0 +1,32 @@
+{
+ "doctype": "DocType",
+ "name": "Mobile Account State",
+ "module": "Mobil",
+ "engine": "InnoDB",
+ "autoname": "field:account",
+ "permissions": [],
+ "description": "Stores the token cutoff for mobile installation registration.",
+ "field_order": [
+  "account",
+  "revoked_through"
+ ],
+ "fields": [
+  {
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "label": "Account",
+   "options": "User",
+   "reqd": 1,
+   "unique": 1,
+   "description": "The account that owns this revocation state."
+  },
+  {
+   "fieldname": "revoked_through",
+   "fieldtype": "Data",
+   "label": "Revoked through",
+   "length": 16,
+   "reqd": 1,
+   "description": "Registration rejects tokens issued at or before this Unix timestamp."
+  }
+ ]
+}

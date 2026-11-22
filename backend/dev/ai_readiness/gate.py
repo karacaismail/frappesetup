@@ -13,6 +13,7 @@ from pathlib import Path
 
 from contracts import METHOD_PATH, operations
 from forbidden_name import find_path_code, match_lines, redact_path, tracked_findings
+from hook_validation import invalid_hook_uses
 from source import (
     FUNCTIONS,
     assignments,
@@ -136,6 +137,9 @@ def test_classes(sources):
     bases = {
         "unittest.TestCase",
         "unittest.IsolatedAsyncioTestCase",
+        "frappe.tests.classes.IntegrationTestCase",
+        "frappe.tests.classes.UnitTestCase",
+        "frappe.tests.test_api.FrappeAPITestCase",
         "frappe.tests.utils.FrappeTestCase",
         "frappe.tests.FrappeTestCase",
         "frappe.tests.IntegrationTestCase",
@@ -352,6 +356,10 @@ def naming_findings(root: Path) -> list[Finding]:
 
 
 def hook_checks(path, tree, bindings, emit):
+    for name, line in invalid_hook_uses(tree):
+        rule = "sql" if name == "ai_tools" else "endpoint"
+        emit(path, line, rule, f"{name} must use one direct top-level assignment.")
+
     if "scheduler_events" in bindings or any(
         isinstance(item, ast.Name)
         and isinstance(item.ctx, ast.Store)
@@ -422,6 +430,19 @@ def resolve_tool_function(name, functions, reexports):
     return name if name in functions else None
 
 
+def tool_helper_names(body, module, package, inherited_aliases):
+    nodes = list(scope_nodes(body))
+    aliases = inherited_aliases | imported_aliases(nodes, package)
+    for item in nodes:
+        if isinstance(item, FUNCTIONS):
+            yield from tool_helper_names(item.body, module, package, aliases)
+        if isinstance(item, (ast.Name, ast.Attribute)) and isinstance(item.ctx, ast.Load):
+            name = qualified(item, aliases)
+            if isinstance(item, ast.Name) and name == item.id:
+                name = f"{module}.{name}"
+            yield name
+
+
 def tool_sql_checks(targets, functions, sources, reexports, emit):
     pending = []
     for target, (hook, line) in targets.items():
@@ -452,12 +473,7 @@ def tool_sql_checks(targets, functions, sources, reexports, emit):
         for sql_line in sql_calls(walk(fn), outer_aliases | local_aliases):
             emit(path, sql_line, "sql", "Raw SQL is forbidden in AI tools.")
         app = module.partition(".")[0]
-        for item in local_nodes:
-            if not isinstance(item, ast.Call):
-                continue
-            name = qualified(item.func, module_aliases | local_aliases)
-            if isinstance(item.func, ast.Name) and name == item.func.id:
-                name = f"{module}.{name}"
+        for name in tool_helper_names(fn.body, module, package, module_aliases):
             if name.partition(".")[0] == app:
                 function = resolve_tool_function(name, functions, reexports)
                 if function is not None and function not in visited:
