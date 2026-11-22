@@ -83,7 +83,7 @@ Karar sitesi bazı yerlerde saatlik ya da gecelik iş anar. Bu işleri elle baş
 Kod tabanı İngilizcedir (D-12).
 
 - Yeni dosya, klasör, modül, DocType, işlev ve değişken adını İngilizce verin.
-- Koddaki yorumu, açıklama satırını, hata iletisini ve günlük metnini İngilizce yazın.
+- Koddaki yorumu, açıklama satırını, hata iletisini, günlük metnini ve commit mesajını İngilizce yazın.
 - Kullanıcıya görünen metni İngilizce yazın. Türkçesini çeviri dosyasına koyun.
 - Belgenin içeriği Türkçe olabilir. Belge dosyasının adı İngilizce olur.
 - Eski Türkçe adlar için proje kaydındaki ad eşleşme tablosunu kullanın.
@@ -139,7 +139,7 @@ kimlik-realm işi 22 Kasım 2026 Pazar günü bu sorunları buldu. Çözümler �
 
 - `--no-verify` kullanmayın. Yazar korumasını ve `core.hooksPath` ayarını değiştirmeyin.
 - Push yapmayın. Pull request açmayın. Dalları orkestratör birleştirir.
-- Commit mesajını yalın Türkçe yazın. Yapay zekâ imzası ve ortak yazar satırı eklemeyin.
+- Commit mesajını kısa ve açık İngilizceyle yazın (D-12). Yapay zekâ imzası ve ortak yazar satırı eklemeyin.
 
 ### Alt ajanlar
 
