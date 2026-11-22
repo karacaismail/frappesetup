@@ -63,11 +63,11 @@ Dış depo kayıtları 8 Ekim 2026 tarihinde doğrulandı. Backend kaynakları 2
 | KD-02 | ERPNext ve HRMS GPL-3.0 | [erpnext](https://github.com/frappe/erpnext/blob/v16.50.0/license.txt), [hrms](https://github.com/frappe/hrms/blob/v16.50.0/license.txt) | v16.50.0 (`7474d9e`, `7c03769`) | Kaynak dosya |
 | KD-03 | Press, Agent, CRM, Helpdesk AGPL-3.0 | [press](https://github.com/frappe/press/blob/v0.155.3/license.txt) | press v0.155.3 `8493bf8`; crm v1.86.0; helpdesk v1.30.1 | Kaynak dosya |
 | KD-04 | ERPNext destek: v14 31 Ocak 2026'da bitti, v15 2027 sonu, v16 2029 sonu (planlı) | [Supported Versions](https://github.com/frappe/erpnext/wiki/Supported-Versions/304a17ecd1c1e7d12576dc8c1745dda0d0e57c1c) | wiki `304a17e` | Resmi wiki revizyonu |
-| KD-05 | Press sürüm aralığı ve Frappe 16 denemesi | [Press sürüm aralığı](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/pyproject.toml#L91-L92) ve backend proje kaydı O-9 | Press v0.155.3 beyanı. Yerel deneme Press 0.154.1. | Yerel Press yamalarla açıldı. Sunucu kurma akışı açık iş. |
-| KD-06A | Backend kararları ve bilinen sınırlar | `backend/PROJE-KAYDI.md` | Yerel `backend` dalı, `5c8d7fe` | Proje kaydı |
-| KD-06B | Kimlik, MCP ve model geçidi sözleşmeleri | `backend/docs/sozlesmeler.md` | Yerel `backend` dalı, `5c8d7fe` | Tasarım sözleşmesi |
-| KD-06C | Kiracı yapay zekâ katmanı ve model geçidi | `backend/docs/kararlar/0002-yapay-zeka-katmani.md` ve `0004-model-gecidi.md` | Yerel `backend` dalı, `5c8d7fe` | Karar notları |
+| KD-05 | Press sürüm aralığı ve Frappe 16 denemesi | [Press sürüm aralığı](https://github.com/frappe/press/blob/8493bf87b8a6c34e7e35e5b06fa7d3f27dd77594/pyproject.toml#L91-L92) ve `backend/PROJE-KAYDI.md` O-9 | Press v0.155.3 beyanı. Yerel deneme Press 0.154.1, kayıt `5c8d7fe`. | Yerel Press yamalarla açıldı. Sunucu kurma akışı açık iş. |
 | KD-06 | `allow_cors` tam eşleşme; `"*"` origin'i kimlik bilgisiyle yansıtır | [app.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/app.py#L319-L353) | `6b450a1` | Kod okuma |
+| KD-06A | Backend kararları ve bilinen sınırlar | `backend/PROJE-KAYDI.md` | `5c8d7fe` | Proje kaydı |
+| KD-06B | Kimlik, MCP ve model geçidi sözleşmeleri | `backend/docs/sozlesmeler.md` | `5c8d7fe` | Tasarım sözleşmesi |
+| KD-06C | Kiracı yapay zekâ katmanı ve model geçidi | `backend/docs/kararlar/0002-yapay-zeka-katmani.md` ve `backend/docs/kararlar/0004-model-gecidi.md` | `5c8d7fe` | Karar notları |
 | KD-07 | Site `rate_limit` istek süresi toplamını site geneli ölçer | [rate\_limiter.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/rate_limiter.py#L48-L97) | `6b450a1` | Kod okuma |
 | KD-08 | `get_all` izin uygulamaz | [Database API](https://docs.frappe.io/framework/user/en/api/database) | Güncel doküman | Resmi doküman |
 | KD-09 | `override_whitelisted_methods` rastgele adı eşler | [handler.py](https://github.com/frappe/frappe/blob/6b450a166e076dd842e4db7ea0843f62881e62ac/frappe/handler.py#L66-L87) | `6b450a1` | Kod okuma |

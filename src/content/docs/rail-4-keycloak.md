@@ -186,7 +186,7 @@ Sertleştirme (G-144): yönetim konsolu ve Admin REST API public host'ta reverse
 
 ## 9. Oturum süreleri
 
-İlk sürümde kiracı sitesi ve telefon paketi herkese çalışan oturum sürelerini uygular. Keycloak bu istemcilerde `employee` düzeyini ister. Müşteri oturum süresi yalnız Press için geçerlidir.
+İlk sürümde kiracı sitesi ve telefon paketi herkese çalışan oturum sürelerini uygular. Keycloak bu istemcilerde çalışan süre profili olan `employee` düzeyini ister. Müşteri oturum süresi yalnız Press için geçerlidir.
 
 | Ayar | Kiracı sitesi ve telefon | Press |
 | --- | --- | --- |

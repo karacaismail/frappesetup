@@ -63,7 +63,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | K-38 | Magic link (KM-10) | Ürün sahibi | Özgün eklenti (bağımsız güvenlik incelemesiyle) / Phase Two ile ticari lisans / ertele | Notta öneri yok | — |
 | K-39 | Telefonla giriş (KM-11) | Ürün sahibi | E-postayla tanıma + SMS kodu / telefon = kullanıcı adı / özgün authenticator | Notta öneri yok; ilk seçenek bugün mümkün | — |
 | K-40 | E-postasız hesap (KM-12) | Ürün sahibi | E-posta zorunlu / ayrı model | Repo e-posta zorunlu varsayar | — |
-| K-41 | Oturum süreleri (KM-14) | Karar verildi | Boşta kalma ve toplam süre | Kiracı için 1 saat ve 24 saat. Press için 7 gün ve 30 gün. Kaynak: proje kaydı O-25. | Uygulanmaz |
+| K-41 | Oturum süreleri (KM-14) | Ürün sahibi | Boşta kalma ve toplam süre | Karar verildi. Kiracı ve telefon için sınırlar 1 ve 24 saattir. Press için 7 ve 30 gündür (O-25). | — |
 | K-42 | Giriş süresi hedefi (KM-15) | Ürün sahibi | Yük altında azami süre | PERF-01 k6 hipotezdir, sayı yok | — |
 | K-43 | Teknik inceleyici (KM-16) | Ürün sahibi | Ekipten geliştirici / dış güvenlik danışmanı | Notta öneri yok | — |
 | K-44 | Casdoor yeniden değerlendirme (KM-13) | Ürün sahibi | Hedef sürümde CERT/CC bildirimlerinin ve CVE-2026-90942'nin düzeldiği gösterilir; yeni imza/anahtar sınıfı kritik açık yok; bildirimlere yanıt veren güvenlik süreci | Koşullar sağlanana kadar aday değil | — |
@@ -80,6 +80,7 @@ Bu bölüm kapatılması gereken kararları, planı en çok etkileyen riskleri v
 | K-55 | Kaizen hook ve global talimat (KZ-10, KZ-11) | Ürün sahibi | Uygula / kullanıcının kalıcı politikası: kural değişikliği yalnız açık talimatla, genel hook otomatik kurulmaz | Uygulanmadı; bu depoya hook veya global dosya eklenmedi | — |
 | K-56 | Kanıt sonuç değerleri (KZ-12) | Teknik | pass, fail, blocked, unknown / repo: pass, fail, not_run, not_applicable | Onay bekliyor | — |
 | K-57 | Bütçe kümeleri (AU-17) | Ürün sahibi + teknik | Not: 20/8 KB kritik CSS, 150/250 ya da 120 KB JS / repo: G-66 ilk yük JS ≤ 300 KB, docs kabuğu ≤ 100 KB | Onay bekliyor | — |
+| K-58 | Keycloak fark denetimi (KM-22) | Platform ekibi | Eski gecelik rapor önerisi ve elle başlatılan denetim | Karar verildi. Operatör fark denetimini elle başlatır. Kaynak: D-6, O-11 ve SUS-03. | — |
 | K-58 | Notun küçük ölçüleri (AU-05) | Ürün sahibi | 15 px clamp, 32 px hedef / kalıcı kural: ≥ 1rem, 44/48 px | Kalıcı kural geçerli; notun değerleri uygulanmadı | — |
 | K-59 | Doğrulanamayan AI olguları (AI-15) | Ürün sahibi | Not: üç depo var, OpenAEC MIT / 8 Ekim klon denemesi: 404, LGPL v3 metni | Depoya dayanan öneriler doğrulanana kadar uygulanmaz | — |
 | K-60 | Mimari adı (AU-01) | Ürün sahibi | Üç not, üç ad | Resmi ad kaydı yok | — |

@@ -12,7 +12,7 @@ Bu ray, Frappe v16 / ERPNext v16 kiracı sitelerinde özel kodun tek evi olan `p
 | --- | --- | --- | --- |
 | `access` | Access Rule doctype, derleyici, `has_permission` / `permission_query_conditions` hook'ları, `explain_permission` | Hook'lar, DocPerm, User Permission, permlevel | G-60, G-61, G-62, G-104 |
 | `meta` | `api.meta.get_doctype`, `api.shell.get_bootstrap`, meta hash/ETag | `/api/v2/doctype/<doctype>/meta`, `getdoctype`, Workspace Sidebar | G-63, G-94, X-12 |
-| `audit` | AI Action Log doctype, saklama işi, correlation-id | Version, Activity Log, Permission Log, Access Log | G-64, G-52, X-05 |
+| `audit` | AI Action Log kaydı, elle başlatılan saklama temizliği, correlation-id | Version, Activity Log, Permission Log, Access Log | G-64, G-52, X-05 |
 | `flags` | `subscription.has_feature`, `@require_feature`, Platform Settings | site\_config, Press Developer API | G-35, G-106, G-38, G-90 |
 | `outbox` | Platform Event doctype, dağıtıcı, ölü mektup | `doc_events` ve `frappe.enqueue` | G-15, G-81, G-83, X-12 |
 | `identity` | provision, SLO, JWT auth\_hooks | `auth_hooks`, `on_logout`, Social Login Key | G-57, G-58, G-59 |
