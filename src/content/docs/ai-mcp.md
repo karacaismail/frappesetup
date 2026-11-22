@@ -18,7 +18,7 @@ Kaynaklar `backend/docs/contracts.md` 10. bölüm, karar notu 0002 ve dalın dos
 
 ## Kararlar
 
-- **Press teşhisi:** Press içi MCP (frappe/press `press/mcp`) okuma ve teşhis için kullanılabilir. Yalnız System Manager ve System User erişir, `Press Settings → Enable MCP` ile açılır; açmadan önce etkisini DevOps sorumlusu inceler.
+- **Press teşhisi:** Press içi MCP (frappe/press `press/mcp`) okuma ve teşhis için kullanılabilir. Yalnız System Manager ve System User erişir, `Press Settings → Enable MCP` ile açılır. DevOps sorumlusu açmadan önce etkisini inceler.
 - **Press kurulum ve dağıtımı:** hazır sunucu yok; paketin `press-ai` sunucusu yazılır (taslak).
 - **Site içi veri araçları:** `platform_core.ai` kullanıcı yetkisiyle çalışır. İnsan yazma önerisini ayrı uçtan onaylar. Kaynak: karar notu 0002 ve sözleşme 10. bölüm.
 - **Ağa açılmaz:** kimliksiz uç açan ya da keyfi komut çalıştıran sunucular.

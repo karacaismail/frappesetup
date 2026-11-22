@@ -25,7 +25,7 @@ order: 9
 | Temsil (impersonation) | Press + tenant sitesi | Ayrı kapsam ve rıza: belirli kullanıcının rızasıyla `user.impersonate` veya kapsamı daraltılmış destek kullanıcısı; Administrator yalnız ayrı yükseltme rızasıyla (SA-44, K-19) |
 | Co-browsing / uzaktan yardım | Tenant sitesi + Hocuspocus | Paylaşılan ekran durumu (rota, filtre, kaydırma, seçim, maskeli satır özeti, form taslağı) + imleç/presence; kontrol önerileri müşteri onayıyla, müşterinin oturumunda çalışır (SA-42..SA-44) |
 | Operatör kimliği | Keycloak → Press + ops sitesi | Operatör realm rolleri → Press System User hesapları + ops sitesi rolleri; operatör başına API key |
-| Infra ve AI destekli operasyon | Press Desk + Press MCP | `enable_mcp`, System Manager; yalnız ops-admin ve DevOps sorumlusu |
+| Infra ve AI destekli operasyon | Press Desk + Press MCP | `enable_mcp` açık olmalıdır ve System Manager rolü gerekir. Yalnız ops-admin ve DevOps sorumlusu kullanır. |
 
 ## Superadmin paneli (operatör modu)
 

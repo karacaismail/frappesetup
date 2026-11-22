@@ -106,9 +106,9 @@ Tüm paket ZIP'i depo yerleşimini izler: kökte lisans dosyaları ve `packages/
 | Aşama | Görev | Sahip | Bağımlılık | Kabul |
 | --- | --- | --- | --- | --- |
 | A1 | Fixture testleri, bağımsız inceleme, senaryo koşusu | Geliştirme ekibi | — | Testler ve senaryolar geçer; başarısız vaka gevşetilmez |
-| A2 | Canlı olmayan bir Press ortamında yalnız okuma araçları | Geliştirme ekibi; ortam DevOps sorumlusu | A1 | Okuma sonuçları kontrat alanlarıyla eşleşir; gizli alan dönmez |
-| A3 | Aynı ortamda tek zincir: app ekleme, release, candidate, build, deploy | Geliştirme ekibi; altyapı DevOps sorumlusu | A2 | Her adımda insan onayı; build Success olmadan deploy önerisi reddedilir |
-| A4 | DNS gereksinimi çıktısı | DevOps sorumlusu hazırlar, alan adı sorumlusu GoDaddy'de uygular, DevOps sorumlusu doğrular | A3 | Ajan DNS'e dokunmaz; yalnız kayıt gereksinimi üretir |
+| A2 | Canlı olmayan bir Press ortamında yalnız okuma araçları | Geliştirme ekibi ve ortamdan sorumlu DevOps sorumlusu | A1 | Sonuçlar sözleşme alanlarıyla eşleşir. Araç gizli alan döndürmez. |
+| A3 | Aynı ortamda tek zincir: app ekleme, release, candidate, build, deploy | Geliştirme ekibi ve altyapıdan sorumlu DevOps sorumlusu | A2 | İnsan her adımı onaylar. Derleme Success olmadan sistem dağıtım önerisini reddeder. |
+| A4 | DNS gereksinimi çıktısı | DevOps sorumlusu hazırlar, alan adı sorumlusu GoDaddy'de uygular, DevOps sorumlusu doğrular | A3 | Ajan DNS kaydını değiştirmez. Yalnız kayıt gereksinimini üretir. |
 | A5 | OAuth2 delegasyonu ve AI denetim izi | Geliştirme ekibi | Rail 5 | G-28 ve G-87 kabul ölçütleri |
 
 ## Riskler

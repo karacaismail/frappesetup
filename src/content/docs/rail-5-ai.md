@@ -92,7 +92,7 @@ flowchart LR
 ## 8.3 Niyet protokolü (G-86, G-88, G-105)
 
 1. Panel her turda yapılandırılmış bağlam zarfı gönderir: `{site, user, route, doctype, docname, selected_names[], filters, installed_apps[], roles[], locale}`; belge içeriği araç çağrısıyla sunucu tarafında okunur.
-2. Sınıflandırma rolündeki yol, maskelenmiş metin üzerinde mesajı yönlendirme sınıfına atar (`read`, `navigate`, `write`, `destructive`, `billable`, `unknown`). Sınıf yalnız ipucudur. Onay kapısını aracın tanımı ve sunucu belirler (G-86).
+2. Sınıflandırma rolündeki yol, maskelenmiş metin üzerinde mesajı yönlendirme sınıfına atar (`read`, `navigate`, `write`, `destructive`, `billable`, `unknown`). Sınıf yalnız ipucudur. Onay kapısını aracın tanımı ve sunucu belirler (G-86). Araç tanımı yetki gereksinimini, yıkıcı ve ücretli bayraklarını taşır (G-84).
 3. Araç listesi kullanıcının kurulu uygulamaları, rolleri ve sınıfa göre daraltılır (G-84).
 4. Yazma aracı (`write`, `destructive`, `billable`) kaydı yazmaz, yalnız öneri açar. Sunucu girdiyi ve izni denetler. Sonra her alanın eski ve yeni değerini gösteren önizlemeyi üretir. Öneri 10 dakika geçerlidir. Model `approval_required` durumunu, öneri kimliğini ve önizlemeyi alır.
 5. Panel öneriyi insana gösterir. İnsan onayı ayrı bir uçtan verir: `platform_core.api.ai.approve_proposal`. Bu istek insan oturumundan ve CSRF belirteciyle gelir. İstek öneri kimliğini ve önizleme özetini taşır.
@@ -110,6 +110,8 @@ flowchart LR
 | billable | install\_app, change\_app\_plan, change\_site\_plan, buy\_credits | öneri + insan onayı + Press Role allow\_billing/allow\_apps (G-16) |
 
 Uygulamalar `ai_tools` hook'uyla araç şemasını, gereken rolü, `destructive/billable` bayrağını, önizleme üreticisini ve Prompts (tek tık akışları) bildirir (G-105); HRMS TR ilk örnektir: izin onayı, bordro kontrol özeti (G-108).
+
+Kabul testleri süresi dolan onayı, tekrar gönderimi ve başka kullanıcının onayını reddetmelidir. Testler belge veya fiyat değiştiğinde eski onayı da reddetmelidir.
 
 ## 8.4 @ant-design/x arayüzü (G-88)
 
