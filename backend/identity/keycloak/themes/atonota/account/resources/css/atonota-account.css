@@ -802,6 +802,69 @@ body[data-page-id="account"] {
   text-underline-offset: var(--at-link-underline-offset);
 }
 
+/* ---------- Link to the account deletion page ---------- */
+
+/*
+ * The server adds this section after the console for customers only (see ../account-provider).
+ * It is not part of the React application, so the console cannot remove it.
+ * The page becomes a two-row grid: the console takes the free height and the section sits below it.
+ */
+body[data-page-id="account"] {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  block-size: 100dvh;
+}
+
+body[data-page-id="account"] > #app {
+  block-size: auto;
+  min-block-size: 0;
+}
+
+.at-account-deletion {
+  /* The section sits on the page colour, so the gap above the focus line uses that colour. */
+  --at-focus-gap-local: var(--at-color-page);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--at-space-3);
+  padding: var(--at-space-1) var(--at-card-padding);
+  background: var(--at-color-page);
+  color: var(--at-color-ink-soft);
+  font-family: var(--at-font-text);
+  font-size: var(--at-text-sm);
+}
+
+.at-account-deletion__text {
+  margin: 0;
+}
+
+[data-page-id="account"] a.at-account-deletion__link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--at-hit);
+  color: var(--at-color-link);
+  font-size: var(--at-text-sm);
+  font-weight: var(--at-weight-medium);
+  text-decoration: underline;
+  text-underline-offset: var(--at-link-underline-offset);
+  transition: color var(--at-motion-duration) var(--at-motion-ease);
+}
+
+[data-page-id="account"] a.at-account-deletion__link:hover {
+  color: var(--at-color-link-hover);
+}
+
+/*
+ * The link belongs to the personal info page. The console changes pages without a page load,
+ * so the rule follows the page content: the section shows only while the personal info form is on screen.
+ * A browser without :has() shows the section on every page.
+ */
+@supports selector(:has(*)) {
+  body[data-page-id="account"]:not(:has(#save-btn)) .at-account-deletion {
+    display: none;
+  }
+}
+
 /* ---------- Focus ---------- */
 
 /*

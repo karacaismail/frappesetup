@@ -18,6 +18,8 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?}
       # Brand name. The realm display name and the account console title read this variable.
       IDENTITY_BRAND_NAME: ${IDENTITY_BRAND_NAME:?}
+      # Address of the account deletion page. The account console links to it for customers.
+      IDENTITY_ACCOUNT_DELETION_URL: ${IDENTITY_ACCOUNT_DELETION_URL:?}
     ports:
       - "127.0.0.1:${KC_PORT:?}:${KC_PORT:?}"
     healthcheck:

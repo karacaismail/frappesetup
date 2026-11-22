@@ -11,6 +11,7 @@ Hedef sürüm Keycloak 26.8.2 sürümüdür. Giriş teması `keycloak.v2` temas�
 | `login/` | Giriş teması. Giriş, kayıt, parola sıfırlama, TOTP ve passkey ekranlarını kapsar. |
 | `email/` | E-posta teması. |
 | `account/` | Hesap konsolu teması. Kullanıcı parolasını, ikinci doğrulamasını ve oturumlarını bu ekranda yönetir. |
+| `account-provider/` | Hesap konsolunun küçük sunucu eklentisi. Hesap silme bağlantısını yalnız müşteriye ekler. |
 | `test/` | Deneme ortamı ve Playwright testleri. Bu klasör Keycloak imajına girmez. |
 
 TOTP, telefondaki doğrulama uygulamasının ürettiği tek kullanımlık koddur. Passkey, parola yerine kullanılan geçiş anahtarıdır.
@@ -113,34 +114,56 @@ Tema yalnız Keycloak'ın desteklediği ayarları kullanır. Bu ayarlar Keycloak
 | `scripts` | `account/resources/js/atonota-focus.js` dosyasını yükler. Bu betik klavye odak kipini yönetir. |
 | `logo` | Başlıktaki marka işaretini verir. |
 | `favIcon` | Sayfa simgesini verir. |
-| İleti dosyası | `account/messages/messages_tr.properties` 242 iletiyi yalın Türkçeyle yazar. İngilizce kaynak Keycloak'ın kendi dosyasıdır. |
+| `accountResourceProvider` | Hesap konsolunun sunucu eklentisini seçer. Ayrıntı “Hesap silme bağlantısı” bölümündedir. |
+| İleti dosyası | `account/messages/messages_tr.properties` Keycloak'ın 242 iletisini yalın Türkçeyle yazar. İngilizce kaynak Keycloak'ın kendi dosyasıdır. Temanın kendi anahtarları `messages_en.properties` dosyasında da durur. |
 
 - Tokenlar giriş temasıyla aynıdır. İki stil dosyasının başındaki token bölümü birebir aynı olmalıdır. Bir test iki bölümü karşılaştırır. Token değişince iki dosyayı birlikte değiştirin.
 - Outfit yazı tipi dosyaları `account/resources/fonts/` klasöründe de durur. Keycloak her tema türüne ayrı kaynak klasörü verir.
 - Geçerli sayfa kalın yazı ve yüzey tonuyla gösterilir. Temel temanın renkli kenar çizgisi kapatıldı.
 
-### Hesap silme
+### Hesap silme bağlantısı
 
-Kullanıcı hesabını hesap konsolundan silebilir (proje kaydı O-27).
+Müşteri hesabını Press'teki silme sayfasında siler (proje kaydı O-27, sözleşme 7. bölüm). Hesap konsolu o sayfaya bir bağlantı gösterir.
 
-1. Kullanıcı “Kişisel bilgiler” sayfasında “Hesabı silin” bölümünü açar.
-2. Kullanıcı “Silin” düğmesine basar.
-3. Keycloak onay ekranını açar. Bu ekran giriş temasına aittir.
-4. Kullanıcı “Silmeyi onaylayın” düğmesine basar. Keycloak hesabı siler.
+- Keycloak'ın kendi `delete_account` eylemi kapalıdır. Bu eylem kullanıcıyı ilk adımda siler. Konsol bu eylemi hiç sunmaz.
+- Bağlantı “Kişisel bilgiler” sayfasının altında görünür. Metni “Hesap silme sayfasına gidin” olur.
+- Bağlantının adresi ayardan gelir: `IDENTITY_ACCOUNT_DELETION_URL` ortam değişkeni.
+- Bağlantıyı yalnız müşteri görür. Müşteri, `account` istemcisinin `delete-account` rolünü taşıyan kullanıcıdır.
+- Çalışan bu rolü taşımaz. Sunucu çalışana giden sayfaya bağlantıyı hiç koymaz.
 
-Bölümün görünmesi için realm'de iki ayar gerekir. Bu ayarlar kimlik-realm işindedir:
+Görünürlük kararını sunucu verir, tarayıcı vermez. Kararı küçük bir Keycloak eklentisi verir. Eklenti `account-provider/` klasöründedir.
 
-- `delete_account` adlı gerekli işlem açık olmalıdır.
-- Müşteri, `account` istemcisinin `delete-account` rolünü taşımalıdır.
+| Parça | Görevi |
+| --- | --- |
+| `account/theme.properties`, `accountResourceProvider` satırı | Eklentiyi seçer. Bu, Keycloak'ın desteklediği tema ayarıdır. |
+| `account/theme.properties`, `accountDeletionUrl` satırı | Adresi ortam değişkeninden okur. |
+| `account-provider/.../AccountDeletionLinkConsole.java` | Kullanıcının rolüne bakar. Rol varsa bağlantıyı sayfanın sonuna ekler. |
+| `account/messages/`, `atAccountDeletionIntro` ve `atAccountDeletionLink` | Bağlantının metinleri |
 
-Konsol bölümü rolü olmayan kullanıcıya da gösterir. Keycloak o kullanıcının isteğini reddeder ve “Bu hesabı silme izniniz yok.” der. Bu yüzden rolü her müşteriye verin.
+Eklenti şu durumlarda bağlantıyı eklemez:
 
-Uyarı metni O-27 kararını anlatır: hesap silinir, iş kayıtları kalır ve kayıtlardan ad silinir. Keycloak'ın hazır metni “bütün veriler silinir” der. Bu metin İngilizcede de değiştirildi (`account/messages/messages_en.properties`).
+- kullanıcı oturum açmamışsa,
+- kullanıcının `delete-account` rolü yoksa,
+- adres boşsa,
+- adres `http` ya da `https` ile başlamıyorsa. Örneğin `javascript:` adresi reddedilir.
+
+Bağlantı bir yetki denetimi değildir. Silme sayfası kullanıcıyı yeniden doğrular.
+
+Eklentiyi Keycloak'a kurmak için kimlik-realm işi şunları yapmalıdır:
+
+1. Eklentiyi derleyin. Derleme adımı `test/Dockerfile` dosyasının ikinci aşamasındadır. Adım yalnız `javac` kullanır.
+2. Çıkan `account-deletion-link-provider.jar` dosyasını `/opt/keycloak/providers/` klasörüne koyun.
+3. Keycloak container'ına `IDENTITY_ACCOUNT_DELETION_URL` değişkenini verin.
+4. `delete-account` rolünü müşterilere verin. Çalışanlara vermeyin.
+5. `delete_account` gerekli işlemini kapalı tutun.
+
+Eklenti kurulu değilse hesap konsolu 404 yanıtı verir. Bu, bilerek seçilmiş güvenli davranıştır: tema eklentisiz çalışırsa görünürlük kuralı sessizce kaybolurdu.
+
+Eklenti Keycloak'ın iç sınıflarını genişletir. Keycloak başlarken bunu bir uyarıyla bildirir. Keycloak sürümü değişince eklentiyi yeniden derleyin ve testleri çalıştırın. Karar notu `backend/docs/kararlar/` klasöründedir.
 
 Hesap konsolunun bilinen sınırları şunlardır:
 
-- Hesap silme uyarısının başlığı `h4` öğesidir ve `h1` başlığından hemen sonra gelir. Tema bu sırayı değiştiremez. axe testi bu bölümde `heading-order` kuralını muaf tutar.
-- Keycloak bazı “daha fazla” düğmelerine erişilebilir ad vermez. Tema uygulamanın HTML'ini değiştiremez. axe testi bu düğmeleri bilerek dışarıda bırakır.
+- Keycloak bazı “daha fazla” düğmelerine erişilebilir ad vermez. Tema betiği bu düğmelere ileti dosyasından ad verir. Betik çalışmazsa düğmeler adsız kalır.
 - Yükleme yazısı İngilizcedir. Bu metin Keycloak'ın şablonunda sabit durur.
 - Sayfa başlığı marka adıdır. Başlık bütün dillerde aynıdır.
 - Yazarak aranan seçim alanının odak çizgisi için kural yazıldı ama sınanmadı. Deneme realm'inde böyle bir alan yok.
@@ -200,7 +223,8 @@ npx playwright test
 | `tests/eposta.spec.ts` | E-posta şablonları ve Mailpit |
 | `tests/account.spec.ts` | Hesap konsolu: yerleşim, odak, hareket, axe, Türkçe iletiler ve token eşliği |
 | `tests/focus-diff.ts` | Odak çizgisini ölçen ortak yardımcı |
-| `tests/delete-account.spec.ts` | Hesap silme bölümü, onay ekranı ve silme akışı |
+| `tests/delete-account.spec.ts` | Hesap silme bağlantısı: müşteri görür, çalışan görmez, adres ayardan gelir |
+| `tests/security.spec.ts` | Güvenlik başlıkları, XSS denemeleri, tarayıcı deposu ve kaynak denetimi |
 | `tests/brand.spec.ts` | Marka adı değişkenden gelir: giriş, e-posta, hesap konsolu ve kaynak denetimi |
 | `tests/gorsel.spec.ts` | Bağımsız inceleme için ekran görüntüsü üretimi |
 

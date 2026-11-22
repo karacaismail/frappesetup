@@ -13,11 +13,11 @@ COPY account-provider/src/main /src
 RUN mkdir -p /out/classes \
  && javac --release 21 -Xlint:all -Werror -proc:none -cp "/keycloak-lib/*" -d /out/classes $(find /src/java -name '*.java') \
  && cp -r /src/resources/META-INF /out/classes/META-INF \
- && jar --create --file /out/delete-role-account-provider.jar -C /out/classes .
+ && jar --create --file /out/account-deletion-link-provider.jar -C /out/classes .
 
 # Stage 3: Keycloak with the themes, the provider and the test realm.
 FROM keycloak
-COPY --from=provider --chown=1000:0 /out/delete-role-account-provider.jar /opt/keycloak/providers/delete-role-account-provider.jar
+COPY --from=provider --chown=1000:0 /out/account-deletion-link-provider.jar /opt/keycloak/providers/account-deletion-link-provider.jar
 COPY --chown=1000:0 login /opt/keycloak/themes/atonota/login
 COPY --chown=1000:0 email /opt/keycloak/themes/atonota/email
 COPY --chown=1000:0 account /opt/keycloak/themes/atonota/account

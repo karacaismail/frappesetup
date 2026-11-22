@@ -39,6 +39,7 @@ ensure_env() {
 write_env() {
   if [[ -f "$env_file" ]]; then
     ensure_env IDENTITY_BRAND_NAME "Sample Brand"
+    ensure_env IDENTITY_ACCOUNT_DELETION_URL "http://press.localhost:$(( $(env_value KC_PORT) + 3 ))/account/delete"
     return
   fi
   local base="${PANE_PORT:-3950}"
@@ -51,6 +52,8 @@ write_env() {
     echo "KC_BOOTSTRAP_ADMIN_PASSWORD=$(openssl rand -hex 16)"
     # The brand name shown by the themes. The test value differs from the theme name on purpose.
     echo "IDENTITY_BRAND_NAME=Sample Brand"
+    # The deletion page belongs to Press. In this environment the address is only a link target.
+    echo "IDENTITY_ACCOUNT_DELETION_URL=http://press.localhost:$((base + 3))/account/delete"
   } > "$env_file"
 }
 

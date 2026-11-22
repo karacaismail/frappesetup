@@ -15,6 +15,8 @@ const env = Object.fromEntries(
 export const KC = env.KC_PUBLIC_URL;
 export const MAILPIT = `http://127.0.0.1:${env.MAILPIT_UI_PORT}`;
 export const REALM = 'tema-deneme';
+/** Address of the account deletion page of the test environment. It comes from the IDENTITY_ACCOUNT_DELETION_URL variable. */
+export const ACCOUNT_DELETION_URL: string = env.IDENTITY_ACCOUNT_DELETION_URL ?? '';
 /** Brand name of the test environment. It comes from the IDENTITY_BRAND_NAME variable, never from the theme. */
 export const BRAND: string = env.IDENTITY_BRAND_NAME ?? '';
 // Uydurma deneme parolası. Gerçek hesapta kullanılmaz.
@@ -54,7 +56,7 @@ type UserOptions = {
   webauthn?: boolean;
   locale?: string;
   emailVerified?: boolean;
-  /** Grants the account client role that lets the user delete the own account. */
+  /** Marks the user as a customer: grants the "delete-account" role of the "account" client. An employee does not have it. */
   canDeleteAccount?: boolean;
 };
 
@@ -298,19 +300,18 @@ export const screen = (name: string): Screen => {
 };
 
 /**
- * Turns on the "delete_account" required action in the test realm.
- * The account console shows its delete section only when this action is enabled
- * and the user holds the "delete-account" role of the "account" client.
+ * Keeps the Keycloak "delete_account" required action switched off in the test realm, as the contract says.
+ * Keycloak's own action deletes the user in the first step, so the product does not use it.
  */
-export async function enableDeleteAccount(): Promise<void> {
+export async function ensureKeycloakDeleteActionOff(): Promise<void> {
   const action = (await (await admin('/authentication/required-actions/delete_account')).json()) as { enabled: boolean };
-  if (action.enabled) return;
-  const res = await admin('/authentication/required-actions/delete_account', { method: 'PUT', body: { ...action, enabled: true } });
-  if (!res.ok) throw new Error(`Could not enable delete_account: ${res.status}`);
+  if (!action.enabled) return;
+  const res = await admin('/authentication/required-actions/delete_account', { method: 'PUT', body: { ...action, enabled: false } });
+  if (!res.ok) throw new Error(`Could not disable delete_account: ${res.status}`);
 }
 
 async function grantDeleteAccount(userId: string): Promise<void> {
-  await enableDeleteAccount();
+  await ensureKeycloakDeleteActionOff();
   const [client] = (await (await admin('/clients?clientId=account')).json()) as { id: string }[];
   const role = await (await admin(`/clients/${client.id}/roles/delete-account`)).json();
   const res = await admin(`/users/${userId}/role-mappings/clients/${client.id}`, { method: 'POST', body: [role] });

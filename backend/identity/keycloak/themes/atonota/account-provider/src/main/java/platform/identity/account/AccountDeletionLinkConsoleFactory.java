@@ -7,15 +7,15 @@ import org.keycloak.services.resources.account.AccountConsoleFactory;
 import org.keycloak.theme.Theme;
 
 /**
- * Registers {@link DeleteRoleAccountConsole} under its own provider id.
+ * Registers {@link AccountDeletionLinkConsole} under its own provider id.
  *
  * <p>An account theme selects it with the supported theme property
- * {@code accountResourceProvider=delete-role-account}. Themes without that property keep the stock
+ * {@code accountResourceProvider=account-deletion-link}. Themes without that property keep the stock
  * console.
  */
-public class DeleteRoleAccountConsoleFactory extends AccountConsoleFactory {
+public class AccountDeletionLinkConsoleFactory extends AccountConsoleFactory {
 
-    public static final String PROVIDER_ID = "delete-role-account";
+    public static final String PROVIDER_ID = "account-deletion-link";
 
     @Override
     public String getId() {
@@ -24,6 +24,6 @@ public class DeleteRoleAccountConsoleFactory extends AccountConsoleFactory {
 
     @Override
     protected AccountConsole createAccountConsole(KeycloakSession session, ClientModel client, Theme theme) {
-        return new DeleteRoleAccountConsole(session, client, theme);
+        return new AccountDeletionLinkConsole(session, client, theme);
     }
 }

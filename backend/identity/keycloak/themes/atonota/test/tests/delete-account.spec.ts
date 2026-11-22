@@ -1,140 +1,87 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { focusDiff } from './focus-diff';
-import { createUser, enableDeleteAccount, KC, loginUrl, PASSWORD, REALM, submitPassword, userExists } from './helpers';
+import { ACCOUNT_DELETION_URL, createUser, ensureKeycloakDeleteActionOff, KC, loginUrl, REALM, submitPassword, userExists } from './helpers';
 
-// Account deletion path (project record O-27): the account console shows a delete section,
-// and the confirmation screen of the login theme finishes the request.
+// Account deletion path (project record O-27, contract section 7).
+// - Keycloak's own "delete_account" action is switched off. It deletes the user in the first step.
+// - The account console shows a link to the account deletion page of Press instead.
+// - The address comes from a setting (IDENTITY_ACCOUNT_DELETION_URL).
+// - Only a customer sees the link. A customer holds the "delete-account" role of the "account" client.
+//   An invited employee does not hold it and never receives the link.
+// The server decides: the link is part of the page that Keycloak sends. It is not added or hidden in the browser.
 
-/** Signs in a user who may delete the own account and opens the personal info page. */
-async function openPersonalInfo(page: Page): Promise<string> {
-  const email = await createUser({ canDeleteAccount: true });
+const LINK = '#at-account-deletion-link';
+const SECTION = '#at-account-deletion';
+
+async function signIn(page: Page, options: { customer: boolean }): Promise<string> {
+  const email = await createUser({ canDeleteAccount: options.customer });
+  await ensureKeycloakDeleteActionOff();
   await page.goto(`${KC}/realms/${REALM}/account/`);
   await submitPassword(page, email);
-  await expect(page.locator('#save-btn')).toBeVisible();
+  await expect(page.locator('#save-btn')).toBeVisible({ timeout: 20_000 });
   return email;
 }
 
-const openSection = async (page: Page) => {
-  const toggle = page.locator('[data-testid="delete-account"] .pf-v5-c-expandable-section__toggle');
-  await toggle.click();
-  await expect(page.locator('#delete-account-btn')).toBeVisible();
-};
-
-/** Keycloak may ask for the password again before a sensitive action. This helper handles both paths. */
-async function reachConfirmation(page: Page): Promise<void> {
-  await expect(page.locator('#kc-form-login, #kc-deleteaccount-form').first()).toBeVisible();
-  if (await page.locator('#kc-form-login').isVisible()) {
-    await page.locator('#password').fill(PASSWORD);
-    await page.locator('#kc-login').click();
-  }
-  await expect(page.locator('#kc-deleteaccount-form')).toBeVisible();
-}
+/** Returns the account console page exactly as the server sends it to this browser session, before any script runs. */
+const serverPage = async (page: Page) => (await page.request.get(`${KC}/realms/${REALM}/account/`)).text();
 
 const tabKey = (browserName: string) => (browserName === 'webkit' ? 'Alt+Tab' : 'Tab');
 
-test('@matris account: the delete account section is visible and fits the screen', async ({ page }) => {
-  await openPersonalInfo(page);
-  const section = page.locator('[data-testid="delete-account"]');
-  await expect(section).toBeVisible();
-  await expect(section.locator('.pf-v5-c-expandable-section__toggle')).toHaveText('Hesabı silin');
-  await openSection(page);
+test('the test environment sets the address of the deletion page', () => {
+  expect(ACCOUNT_DELETION_URL, 'IDENTITY_ACCOUNT_DELETION_URL is set in test/.env').toMatch(/^https?:\/\/.+/);
+});
 
-  // The warning says what really happens (O-27): the account is deleted, work records stay without the name.
-  await expect(section.locator('.pf-v5-c-alert')).toContainText('Hesabınız kalıcı olarak silinir.');
-  await expect(section.locator('.pf-v5-c-alert')).toContainText('İş kayıtlarınız silinmez.');
-  await expect(page.locator('#delete-account-btn')).toHaveText('Silin');
+test('@matris customer: the personal info page shows a link to the account deletion page', async ({ page }) => {
+  await signIn(page, { customer: true });
+  const html = await serverPage(page);
+  expect(html, 'the server sends the link').toContain(`id="at-account-deletion-link" href="${ACCOUNT_DELETION_URL}"`);
+
+  const section = page.locator(SECTION);
+  const link = page.locator(LINK);
+  await expect(section).toBeVisible();
+  await expect(section).toContainText('Hesabınızı silmek mi istiyorsunuz?');
+  await expect(link).toHaveText('Hesap silme sayfasına gidin');
+  await expect(link).toHaveAttribute('href', ACCOUNT_DELETION_URL);
+  await expect(page.getByRole('link', { name: 'Hesap silme sayfasına gidin' })).toBeVisible();
 
   const result = await page.evaluate(() => {
-    const beyond = [...document.querySelectorAll<HTMLElement>('[data-testid="delete-account"] *')]
-      .filter((element) => element.checkVisibility())
-      .filter((element) => element.getBoundingClientRect().right > innerWidth + 1)
-      .map((element) => element.className);
-    const small = [...document.querySelectorAll<HTMLElement>('[data-testid="delete-account"] *')]
-      .filter((element) => element.checkVisibility() && element.childNodes.length > 0)
-      .filter((element) => [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim()))
-      .filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) < 14)
-      .map((element) => element.className);
-    const min = matchMedia('(any-pointer: coarse)').matches ? 48 : 44;
-    const targets = [...document.querySelectorAll<HTMLElement>('[data-testid="delete-account"] button')]
-      .filter((element) => element.checkVisibility())
-      .filter((element) => element.getBoundingClientRect().height < min - 0.5)
-      .map((element) => `${element.id} ${Math.round(element.getBoundingClientRect().height)}`);
-    return { beyond, small, targets };
+    const element = document.querySelector<HTMLElement>('#at-account-deletion')!;
+    const anchor = document.querySelector<HTMLElement>('#at-account-deletion-link')!;
+    const box = element.getBoundingClientRect();
+    const texts = [element, ...element.querySelectorAll<HTMLElement>('*')].filter((node) => [...node.childNodes].some((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim()));
+    return {
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+      left: box.left,
+      right: box.right,
+      bottom: box.bottom,
+      viewport: innerHeight,
+      small: texts.filter((node) => Number.parseFloat(getComputedStyle(node).fontSize) < 14).length,
+      fonts: texts.map((node) => getComputedStyle(node).fontFamily).filter((family) => !/^"?Outfit/.test(family)),
+      linkHeight: anchor.getBoundingClientRect().height,
+      minimum: matchMedia('(any-pointer: coarse)').matches ? 48 : 44,
+      saveVisible: document.querySelector('#save-btn')!.getBoundingClientRect().height > 0,
+    };
   });
-  expect(result.beyond, 'element beyond the viewport edge').toEqual([]);
-  expect(result.small, 'text below 14px').toEqual([]);
-  expect(result.targets, 'small touch target').toEqual([]);
+  expect(result.scroll, 'horizontal overflow').toBeLessThanOrEqual(result.client);
+  expect(result.left, 'inside the viewport').toBeGreaterThanOrEqual(0);
+  expect(result.right, 'inside the viewport').toBeLessThanOrEqual(result.client + 1);
+  expect(result.bottom, 'inside the viewport').toBeLessThanOrEqual(result.viewport + 1);
+  expect(result.small, 'text below 14px').toBe(0);
+  expect(result.fonts, 'font other than Outfit').toEqual([]);
+  expect(result.linkHeight, 'touch target').toBeGreaterThanOrEqual(result.minimum - 0.5);
+  expect(result.saveVisible).toBe(true);
 });
 
-test('account: the delete section works with the keyboard and shows the focus line', async ({ page, browserName }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await openPersonalInfo(page);
-  await page.addStyleTag({ content: '* { caret-color: transparent !important; }' });
-  const toggle = page.locator('[data-testid="delete-account"] .pf-v5-c-expandable-section__toggle');
-  await page.locator('#cancel-btn').focus();
-  await page.keyboard.press(tabKey(browserName));
-  await expect(toggle).toBeFocused();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  for (const target of [toggle]) {
-    await target.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-    const { diff, rect } = await focusDiff(page, target);
-    expect(diff.count, 'visible focus indicator on the toggle').toBeGreaterThanOrEqual(24);
-    expect(diff.minY, 'no line on the top edge').toBeGreaterThanOrEqual(rect.top + rect.height / 2);
-  }
-  await page.keyboard.press('Enter');
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await page.keyboard.press(tabKey(browserName));
-  const button = page.locator('#delete-account-btn');
-  await expect(button).toBeFocused();
-  await button.evaluate((element) => element.scrollIntoView({ block: 'center' }));
-  const { diff, rect } = await focusDiff(page, button);
-  expect(diff.count, 'visible focus indicator on the delete button').toBeGreaterThanOrEqual(24);
-  expect(diff.minY, 'no line on the top edge').toBeGreaterThanOrEqual(rect.top + rect.height / 2);
-  expect(diff.maxY - diff.minY, 'one straight line').toBeLessThanOrEqual(6);
-});
-
-for (const scheme of ['light', 'dark'] as const) {
-  test(`account: delete section passes axe (${scheme})`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
-    await openPersonalInfo(page);
-    if (scheme === 'dark') await expect(page.locator('html')).toHaveClass(/pf-v5-theme-dark/);
-    await openSection(page);
-    const results = await new AxeBuilder({ page })
-      .include('[data-testid="delete-account"]')
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'])
-      .analyze();
-    // No rule is waived. The theme script gives the stock alert title the right heading level.
-    expect(results.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(' | ')}`)).toEqual([]);
-  });
-}
-
-// Project record O-27: only a customer may delete the own account. An employee is invited and must not see the path.
-// A customer holds the "delete-account" role of the "account" client. An employee does not.
-// The decision is made on the server: the page that Keycloak sends to an employee has the feature switched off,
-// so the console never creates the section. Hiding it with CSS would not be enough.
-
-/** Reads the feature flag from the page that the server sent, before any script runs. */
-async function serverSaysDeleteAllowed(page: Page): Promise<boolean> {
-  const html = await (await page.request.get(`${KC}/realms/${REALM}/account/`)).text();
-  const json = html.slice(html.indexOf('<script id="environment"'));
-  const match = /"deleteAccountAllowed":\s*(true|false)/.exec(json);
-  expect(match, 'the page carries the deleteAccountAllowed flag').not.toBeNull();
-  return match![1] === 'true';
-}
-
-test('@matris employee: the server switches the delete feature off and the section is never created', async ({ page }) => {
-  // An employee can use the account console (default roles, including "manage-account") but has no "delete-account" role.
-  const email = await createUser();
-  await enableDeleteAccount();
-  await page.goto(`${KC}/realms/${REALM}/account/`);
-  await submitPassword(page, email);
-  await expect(page.locator('#save-btn')).toBeVisible();
-
-  expect(await serverSaysDeleteAllowed(page), 'server flag for an employee').toBe(false);
-  await expect(page.locator('[data-testid="delete-account"]')).toHaveCount(0);
-  await expect(page.locator('#delete-account-btn')).toHaveCount(0);
-  await expect(page.getByText('Hesabı silin')).toHaveCount(0);
+test('@matris employee: the server sends no deletion link and the page has none', async ({ page }) => {
+  await signIn(page, { customer: false });
+  const html = await serverPage(page);
+  expect(html, 'server page for an employee').not.toContain('at-account-deletion');
+  expect(html).not.toContain(ACCOUNT_DELETION_URL);
+  await expect(page.locator(SECTION)).toHaveCount(0);
+  await expect(page.locator(LINK)).toHaveCount(0);
+  await expect(page.getByText(/Hesabınızı silmek|Hesap silme/)).toHaveCount(0);
 
   // The rest of the console still works for the employee.
   await page.locator('#firstName').fill('Calisan');
@@ -142,134 +89,99 @@ test('@matris employee: the server switches the delete feature off and the secti
   await expect(page.locator('.pf-v5-c-alert.pf-m-success')).toBeVisible();
 });
 
-test('customer: the server switches the delete feature on', async ({ page }) => {
-  await openPersonalInfo(page);
-  expect(await serverSaysDeleteAllowed(page), 'server flag for a customer').toBe(true);
-  await expect(page.locator('[data-testid="delete-account"]')).toHaveCount(1);
+test('signed-out visitor: the server sends no deletion link', async ({ page }) => {
+  const html = await serverPage(page);
+  expect(html).not.toContain('at-account-deletion');
+  expect(html).not.toContain(ACCOUNT_DELETION_URL);
 });
 
-test('signed-out visitor: the server keeps the delete feature off', async ({ page }) => {
-  await enableDeleteAccount();
-  expect(await serverSaysDeleteAllowed(page)).toBe(false);
+test('the link shows on the personal info page only', async ({ page }) => {
+  await signIn(page, { customer: true });
+  await expect(page.locator(SECTION)).toBeVisible();
+  for (const path of ['account-security/signing-in', 'account-security/device-activity', 'applications']) {
+    await page.goto(`${KC}/realms/${REALM}/account/${path}`);
+    await expect(page.locator('.pf-v5-c-page__main-section').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(SECTION), path).toBeHidden();
+  }
+  // Moving inside the console without a page load keeps the rule.
+  await page.goto(`${KC}/realms/${REALM}/account/`);
+  await expect(page.locator(SECTION)).toBeVisible();
 });
 
-test('employee: a direct delete request is refused and the account stays', async ({ page }) => {
-  const email = await createUser();
-  await enableDeleteAccount();
-  // The employee skips the console and asks Keycloak for the delete action directly.
+test('customer: the link is reached with the keyboard and shows the focus line', async ({ page, browserName }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await signIn(page, { customer: true });
+  await page.addStyleTag({ content: '* { caret-color: transparent !important; }' });
+  await page.locator('#cancel-btn').focus();
+  await page.keyboard.press(tabKey(browserName));
+  const link = page.locator(LINK);
+  await expect(link).toBeFocused();
+  expect(await link.evaluate((element) => getComputedStyle(element).outlineStyle === 'none' || getComputedStyle(element).outlineWidth === '0px')).toBe(true);
+  const { diff, rect } = await focusDiff(page, link);
+  expect(diff.count, 'visible focus indicator').toBeGreaterThanOrEqual(24);
+  expect(diff.contrast, 'indicator contrast').toBeGreaterThanOrEqual(3);
+  expect(diff.minY, 'no line on the top edge').toBeGreaterThanOrEqual(rect.top + rect.height / 2);
+  expect(diff.maxY - diff.minY, 'one straight line').toBeLessThanOrEqual(6);
+});
+
+test('customer: the link leads to the configured deletion page', async ({ page }) => {
+  await signIn(page, { customer: true });
+  // The deletion page belongs to Press. It is not part of this test environment, so the address is answered here.
+  await page.route(`${ACCOUNT_DELETION_URL}**`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<h1>stub deletion page</h1>' }));
+  await page.locator(LINK).click();
+  await expect(page).toHaveURL(ACCOUNT_DELETION_URL);
+  await expect(page.locator('h1')).toHaveText('stub deletion page');
+});
+
+for (const scheme of ['light', 'dark'] as const) {
+  test(`customer: the page with the deletion link passes axe (${scheme})`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
+    await signIn(page, { customer: true });
+    if (scheme === 'dark') await expect(page.locator('html')).toHaveClass(/pf-v5-theme-dark/);
+    await expect(page.locator(SECTION)).toBeVisible();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze();
+    expect(results.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(' | ')}`)).toEqual([]);
+  });
+}
+
+test("Keycloak's own delete action stays off, also for a customer", async ({ page }) => {
+  const email = await signIn(page, { customer: true });
+  const html = await serverPage(page);
+  expect(/"deleteAccountAllowed":\s*false/.test(html), 'the stock delete feature is off in the server page').toBe(true);
+  await expect(page.locator('[data-testid="delete-account"]')).toHaveCount(0);
+  await expect(page.locator('#delete-account-btn')).toHaveCount(0);
+
+  // A direct request for the Keycloak action does not open a delete confirmation and deletes nothing.
+  await page.context().clearCookies();
   await page.goto(`${loginUrl()}&kc_action=delete_account`);
   await submitPassword(page, email);
-  await expect(page.locator('#kc-error-message')).toContainText('Bu hesabı silme izniniz yok.');
+  await expect(page.locator('#save-btn, #kc-error-message').first()).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('#kc-deleteaccount-form')).toHaveCount(0);
   expect(await userExists(email)).toBe(true);
 });
 
-for (const scheme of ['light', 'dark'] as const) {
-  test(`delete confirmation screen (${scheme}): the deleting button takes its colour from the shared danger token`, async ({ page }) => {
-    await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
-    await openPersonalInfo(page);
-    if (scheme === 'dark') await expect(page.locator('html')).toHaveClass(/pf-v5-theme-dark/);
-    await openSection(page);
-    const resolve = (target: Page) =>
-      target.evaluate(() => {
-        const probe = document.createElement('span');
-        document.body.append(probe);
-        probe.style.backgroundColor = 'var(--at-color-danger)';
-        const danger = getComputedStyle(probe).backgroundColor;
-        probe.style.backgroundColor = 'var(--at-color-action)';
-        const action = getComputedStyle(probe).backgroundColor;
-        probe.remove();
-        return { danger, action };
-      });
-    // The console button and the final button use the same token, so both show the same colour.
-    const consoleTokens = await resolve(page);
-    const consoleButton = await page.locator('#delete-account-btn').evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(consoleButton, 'console delete button').toBe(consoleTokens.danger);
-    await page.locator('#delete-account-btn').click();
-    await reachConfirmation(page);
-    if (scheme === 'dark') await expect(page.locator('html')).toHaveClass(/pf-v5-theme-dark/);
-    const tokens = await resolve(page);
-    const submit = await page.locator('#kc-submit').evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(tokens.danger, 'the two themes share the danger token').toBe(consoleTokens.danger);
-    expect(submit, 'final delete button').toBe(tokens.danger);
-    expect(submit).not.toBe(tokens.action);
-    await expect(page.locator('#kc-cancel')).toBeVisible();
-  });
-}
-
-test('@matris delete confirmation screen: plain Turkish, no overflow, readable text', async ({ page }) => {
-  await openPersonalInfo(page);
-  await openSection(page);
-  await page.locator('#delete-account-btn').click();
-  await reachConfirmation(page);
-  await expect(page.locator('#kc-page-title')).toHaveText('Hesabınızı silin');
-  await expect(page.locator('#kc-deleteaccount-form')).toContainText('Bu işlem geri alınamaz.');
-  await expect(page.locator('#kc-deleteaccount-form')).toContainText('İş kayıtlarınız silinmez.');
-  await expect(page.locator('#kc-submit')).toHaveText('Silmeyi onaylayın');
-  await expect(page.locator('#kc-cancel')).toHaveText('Vazgeçin');
-  // The deleting button uses the danger colour, like the delete button in the console.
-  // It must not look like the safe primary action.
-  const colours = await page.evaluate(() => {
-    const probe = document.createElement('span');
-    document.body.append(probe);
-    const resolve = (token: string) => {
-      probe.style.backgroundColor = `var(${token})`;
-      return getComputedStyle(probe).backgroundColor;
-    };
-    const result = {
-      submit: getComputedStyle(document.querySelector('#kc-submit')!).backgroundColor,
-      danger: resolve('--at-color-danger'),
-      action: resolve('--at-color-action'),
-    };
-    probe.remove();
-    return result;
-  });
-  expect(colours.submit, 'the deleting button has the danger colour').toBe(colours.danger);
-  expect(colours.submit).not.toBe(colours.action);
-  const size = await page.evaluate(() => ({
-    scroll: document.documentElement.scrollWidth,
-    client: document.documentElement.clientWidth,
-    small: [...document.querySelectorAll<HTMLElement>('#kc-deleteaccount-form *, #kc-page-title')]
-      .filter((element) => element.checkVisibility() && [...element.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim()))
-      .filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) < 14).length,
-    buttons: [...document.querySelectorAll<HTMLElement>('#kc-deleteaccount-form button')].map((element) => Math.round(element.getBoundingClientRect().height)),
-  }));
-  expect(size.scroll, 'horizontal overflow').toBeLessThanOrEqual(size.client);
-  expect(size.small, 'text below 14px').toBe(0);
-  expect(Math.min(...size.buttons), 'button height').toBeGreaterThanOrEqual(44);
-  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze();
-  expect(results.violations.map((violation) => violation.id)).toEqual([]);
-});
-
-test('delete flow: cancel keeps the account, confirm deletes it', async ({ page }) => {
-  const email = await openPersonalInfo(page);
-  const start = async () => {
-    await openSection(page);
-    await page.locator('#delete-account-btn').click();
-    await reachConfirmation(page);
-  };
-  await start();
-  await page.locator('#kc-cancel').click();
-  await expect(page.locator('#save-btn')).toBeVisible();
-  expect(await userExists(email), 'the account stays after cancel').toBe(true);
-
-  await start();
-  await page.locator('#kc-submit').click();
-  await expect.poll(() => userExists(email), { message: 'the account is deleted after confirm' }).toBe(false);
+// The three cases below need a different server setting, so they do not run in the normal suite.
+// Run one case at a time after changing "accountDeletionUrl" in account/theme.properties and "tema-dev.sh sync account":
+//   DELETION_URL_CASE=missing|script|relative npx playwright test delete-account -g "bad address"
+test('bad address: a customer gets no link when the setting is missing or unsafe', async ({ page }) => {
+  test.skip(!process.env.DELETION_URL_CASE, 'Runs only with DELETION_URL_CASE and a changed server setting');
+  await signIn(page, { customer: true });
+  const html = await serverPage(page);
+  expect(html).not.toContain('at-account-deletion');
+  expect(html).not.toContain('javascript:');
+  await expect(page.locator(SECTION)).toHaveCount(0);
 });
 
 // Produces screenshots for an independent review. Runs only with VISUAL=1.
 for (const scheme of ['light', 'dark'] as const) {
-  test(`delete account screenshot (${scheme})`, async ({ page }, info) => {
+  test(`account deletion link screenshot (${scheme})`, async ({ page, browserName }, info) => {
     test.skip(!process.env.VISUAL, 'Screenshots are produced only with VISUAL=1');
     await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
-    await openPersonalInfo(page);
-    await openSection(page);
+    await signIn(page, { customer: true });
     const out = `referans/${info.project.name}/`;
-    await page.locator('[data-testid="delete-account"]').evaluate((element) => element.scrollIntoView({ block: 'center' }));
-    await page.screenshot({ path: `${out}delete-account-section-${scheme}.png` });
-    await page.locator('#delete-account-btn').click();
-    await reachConfirmation(page);
-    await page.screenshot({ path: `${out}delete-account-confirm-${scheme}.png`, fullPage: true });
+    await page.screenshot({ path: `${out}account-deletion-link-${scheme}.png` });
+    await page.locator('#cancel-btn').focus();
+    await page.keyboard.press(tabKey(browserName));
+    await page.screenshot({ path: `${out}account-deletion-link-focus-${scheme}.png` });
   });
 }
