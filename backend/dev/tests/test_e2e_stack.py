@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import runpy
 import subprocess
 import tempfile
@@ -221,6 +222,151 @@ class StackTests(unittest.TestCase):
                     ["docker"], ["compose", "--env-file", "/unused/.env"], {"PANE_PORT": "7150"}, create=True
                 )
         self.assertEqual(execute.call_count, 2)
+
+    def test_build_explicitly_rebuilds_press_without_starting_services(self):
+        namespace = runpy.run_path(str(STACK))
+        calls = []
+
+        def record(command, environment, **kwargs):
+            calls.append(command)
+            return subprocess.CompletedProcess(command, 0, stdout="")
+
+        with (
+            patch("sys.argv", [str(STACK), "build"]),
+            patch.dict(
+                namespace["main"].__globals__,
+                {
+                    "setup": lambda: ({}, ["docker"], ["compose"]),
+                    "assert_owner": lambda *args, **kwargs: calls.append(
+                        ["owner", kwargs.get("create", False)]
+                    ),
+                    "resources": lambda *args: (20 * 1024 * 1024, 4096),
+                    "run": record,
+                },
+            ),
+        ):
+            self.assertEqual(namespace["main"](), 0)
+        self.assertEqual(calls, [["owner", False], ["compose", "build", "web"]])
+
+    def test_existing_press_site_migrates_after_source_copy(self):
+        namespace = runpy.run_path(str(STACK))
+        calls = []
+
+        def record(command, environment, **kwargs):
+            calls.append(command)
+            return subprocess.CompletedProcess(command, 0, stdout="container-id")
+
+        with (
+            patch.dict(
+                namespace["up"].__globals__,
+                {
+                    "resources": lambda *args: (20 * 1024 * 1024, 4096),
+                    "config": lambda *args: {},
+                    "ensure_images": lambda *args: None,
+                    "check": lambda *args: None,
+                    "run": record,
+                },
+            ),
+            patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0)),
+        ):
+            namespace["up"](["docker"], ["compose"], {})
+        migrations = [
+            command for command in calls if "bench --site press.localhost migrate" in " ".join(command)
+        ]
+        self.assertEqual(len(migrations), 1)
+        copy_index = next(index for index, command in enumerate(calls) if command[1] == "cp")
+        start_index = next(
+            index for index, command in enumerate(calls) if "exec bench start" in " ".join(command)
+        )
+        self.assertLess(copy_index, calls.index(migrations[0]))
+        self.assertLess(calls.index(migrations[0]), start_index)
+
+    def test_resource_probe_uses_the_compose_redis_digest(self):
+        namespace = runpy.run_path(str(STACK))
+        manifest = (ROOT / "backend/dev/compose.tenant.yaml").read_text()
+        expected = re.search(r"redis:7\.4-alpine@sha256:[a-f0-9]{64}", manifest).group()
+        calls = []
+
+        def record(command, environment, **kwargs):
+            calls.append(command)
+            return subprocess.CompletedProcess(
+                command, 0, stdout="Filesystem blocks used free\noverlay 30 10 20\nMem: 10 2 3 0 5 8\n"
+            )
+
+        with patch.dict(namespace["resources"].__globals__, {"run": record}):
+            namespace["resources"](["docker"], {})
+        self.assertIn(expected, calls[0])
+
+    def test_migration_failure_stops_startup(self):
+        namespace = runpy.run_path(str(STACK))
+        calls = []
+
+        def record(command, environment, **kwargs):
+            calls.append(command)
+            if "bench --site press.localhost migrate" in " ".join(command):
+                raise subprocess.CalledProcessError(1, command)
+            return subprocess.CompletedProcess(command, 0, stdout="container-id")
+
+        with (
+            patch.dict(
+                namespace["up"].__globals__,
+                {
+                    "resources": lambda *args: (20 * 1024 * 1024, 4096),
+                    "config": lambda *args: {},
+                    "ensure_images": lambda *args: None,
+                    "check": lambda *args: self.fail("Migration failure must stop readiness checks"),
+                    "run": record,
+                },
+            ),
+            patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0)),
+        ):
+            with self.assertRaises(subprocess.CalledProcessError):
+                namespace["up"](["docker"], ["compose"], {})
+        self.assertFalse(any("exec bench start" in " ".join(command) for command in calls))
+
+    def owner_with_container(self, label_path, port="7150"):
+        namespace = runpy.run_path(str(STACK))
+        containers = [
+            {
+                "Config": {
+                    "Labels": {
+                        "com.docker.compose.project.working_dir": str(ROOT / "backend/dev"),
+                        "com.docker.compose.project.environment_file": str(label_path),
+                    },
+                    "Env": [f"KC_HTTP_PORT={port}"],
+                }
+            }
+        ]
+        with patch(
+            "subprocess.run",
+            side_effect=[
+                subprocess.CompletedProcess([], 0, stdout="container-id"),
+                subprocess.CompletedProcess([], 0, stdout=json.dumps(containers)),
+                subprocess.CompletedProcess([], 0, stdout=""),
+            ],
+        ):
+            namespace["assert_owner"](
+                ["docker"],
+                ["compose", "--env-file", self.env["E2E_ENV_FILE"]],
+                {"PANE_PORT": "7150", "KC_PORT": "7150"},
+            )
+
+    def test_owner_accepts_environment_path_through_parent_symlink(self):
+        parent = Path(self.temp.name)
+        actual = parent / "actual"
+        actual.mkdir()
+        alias = parent / "alias"
+        alias.symlink_to(actual, target_is_directory=True)
+        self.env["E2E_ENV_FILE"] = str(actual / ".env")
+        self.owner_with_container(alias / ".env")
+
+    def test_owner_rejects_other_environment_file(self):
+        with self.assertRaisesRegex(ValueError, "another environment file"):
+            self.owner_with_container(Path(self.temp.name) / "another.env")
+
+    def test_owner_rejects_other_port_range(self):
+        with self.assertRaisesRegex(ValueError, "another Pane port range"):
+            self.owner_with_container(self.env["E2E_ENV_FILE"], port="7160")
 
 
 if __name__ == "__main__":

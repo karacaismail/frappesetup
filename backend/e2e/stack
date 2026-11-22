@@ -15,7 +15,7 @@ from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
 PROJECT = "fs-e2e-ortam"
-REDIS = "redis:7.4-alpine"
+REDIS = "redis:7.4-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
 
 
 def run(command, environment, **kwargs):
@@ -124,7 +124,8 @@ def assert_owner(engine, compose, environment, create=False):
             labels = container["Config"].get("Labels", {})
             if labels.get("com.docker.compose.project.working_dir") != str(BACKEND / "dev"):
                 raise ValueError("This Compose project belongs to another worktree.")
-            if labels.get("com.docker.compose.project.environment_file") != env_path:
+            recorded_env = labels.get("com.docker.compose.project.environment_file")
+            if not recorded_env or str(Path(recorded_env).resolve()) != env_path:
                 raise ValueError("This Compose project uses another environment file.")
             for item in container["Config"].get("Env", []):
                 key, _, value = item.partition("=")
@@ -282,10 +283,14 @@ def check(compose, environment):
     run([*compose, "ps"], environment)
 
 
-def up(engine, compose, environment):
+def check_resources(engine, environment):
     disk, memory = resources(engine, environment)
     if disk < 10 * 1024 * 1024 or memory < 3 * 1024:
         raise ValueError("Startup requires 10 GiB free disk and 3 GiB available memory.")
+
+
+def up(engine, compose, environment):
+    check_resources(engine, environment)
     model = config(compose, environment)
     ensure_images(engine, compose, environment, model)
     run(
@@ -381,6 +386,19 @@ def up(engine, compose, environment):
             ],
             environment,
         )
+    else:
+        run(
+            [
+                *compose,
+                "exec",
+                "-T",
+                "web",
+                "bash",
+                "-lc",
+                "cd /home/frappe/benches/frappe-bench && bench --site press.localhost migrate",
+            ],
+            environment,
+        )
     run(
         [
             *compose,
@@ -420,7 +438,7 @@ def up(engine, compose, environment):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("config", "up", "down", "check", "resources"))
+    parser.add_argument("action", choices=("config", "build", "up", "down", "check", "resources"))
     args = parser.parse_args()
     try:
         environment, engine, compose = setup()
@@ -441,6 +459,10 @@ def main():
                     indent=2,
                 )
             )
+        elif args.action == "build":
+            assert_owner(engine, compose, environment)
+            check_resources(engine, environment)
+            run([*compose, "build", "web"], environment)
         elif args.action == "up":
             assert_owner(engine, compose, environment, create=True)
             up(engine, compose, environment)
