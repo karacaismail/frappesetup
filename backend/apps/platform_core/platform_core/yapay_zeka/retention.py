@@ -180,6 +180,9 @@ def _stop(kind: type[Exception]) -> None:
 		),
 	}
 	error = kind(texts[kind])
+	# In developer mode Frappe stores an error record with the values of local variables. Here
+	# those hold the chosen record names and the user. The denial is already in the action log.
+	error.skip_error_log = True
 	frappe.msgprint(texts[kind], indicator="red")
 	raise error from None
 

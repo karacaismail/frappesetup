@@ -300,3 +300,43 @@ class TestDeleteErrorAnswers(PurgeRequests, YzTestCase):
 
 		self.assertEqual(response.status_code, 417)
 		self.assertIn(TEXTS["preview_required"], response.get_data(as_text=True))
+
+	def test_developer_mode_error_record_gets_nothing_of_the_selection(self):
+		"""In developer mode Frappe writes an error record with the values of local variables.
+
+		The stopped delete holds the chosen record names and the manager's id in such variables.
+		The fixed error tells Frappe to write no record. The same function Frappe calls for a
+		failed request is called here with the error the delete raised.
+		"""
+		from frappe.utils.error import log_error_snapshot
+
+		from platform_core.yapay_zeka import retention
+
+		chosen = "usage-record-name-4815"
+		cases = (
+			RuntimeError("crash"),
+			frappe.ValidationError("changed"),
+			frappe.PermissionError("no"),
+		)
+		for cause in cases:
+			written = []
+
+			def record(*args, **kwargs):
+				# What Frappe would store: the traceback with the values of local variables.
+				written.append(frappe.get_traceback(with_context=True))
+
+			frappe.set_user(MANAGER)
+			with installed(Gateway([chosen], fail_delete=cause)):
+				token = retention.purge_from_web()["confirmation_token"]
+				try:
+					retention.purge_from_web(dry_run=False, confirmation_token=token)
+				except Exception as error:
+					with patch("frappe.utils.error.log_error", record):
+						log_error_snapshot(error)
+				else:
+					self.fail("The delete did not stop.")
+			frappe.set_user("Administrator")
+			frappe.db.rollback()
+			self.assertNotIn(chosen, str(written), type(cause).__name__)
+			self.assertNotIn(MANAGER, str(written), type(cause).__name__)
+			self.assertEqual(written, [], type(cause).__name__)
