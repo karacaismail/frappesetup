@@ -28,6 +28,9 @@ class Sample:
     ok: bool
     server_ms: float | None
     client_ms: float
+    error_code: str = ""
+    worker: str = ""
+    db_failures: tuple[str, ...] = ()
 
 
 def lock_counters():
@@ -51,9 +54,10 @@ def exchange(request, expected_updates):
 
     with response:
         try:
-            message = json.load(response).get("message", {})
+            body = json.load(response)
+            message = body.get("message") or {}
         except ValueError:
-            message = {}
+            body = message = {}
         measured_ns = response.headers.get(TIMING_HEADER)
         if expected_updates is not None:
             valid = message.get("operations") == expected_updates
@@ -64,6 +68,9 @@ def exchange(request, expected_updates):
             response.status == 200 and valid,
             int(measured_ns) / 1e6 if measured_ns else None,
             (perf_counter_ns() - start) / 1e6,
+            body.get("code") or message.get("code", ""),
+            response.headers.get("X-Mobile-Test-Worker", ""),
+            tuple(filter(None, response.headers.get("X-Mobile-Test-DB-Failures", "").split(","))),
         )
 
 
@@ -132,6 +139,13 @@ def render(samples, locks):
             f"| {errors}/{len(values)} (%{100 * errors / len(values):.1f}) | {limit} | {result} |"
         )
         status_lines.append(f"- `{endpoint}` HTTP sonuçları {dict(statuses)}.")
+        workers = Counter(sample.worker for sample in values if sample.worker)
+        errors_by_code = Counter(sample.error_code for sample in values if sample.error_code)
+        failures = Counter(failure for sample in values for failure in sample.db_failures)
+        status_lines.append(
+            f"  İşçiler {dict(workers)}. Hata kodları {dict(errors_by_code)}."
+            f" Veri tabanı hataları {dict(failures)}."
+        )
     rows.extend(
         (
             "",
@@ -147,11 +161,14 @@ def render(samples, locks):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--status-file", type=Path, required=True)
+    parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
+    if args.workers < 0:
+        parser.error("--workers must be zero or greater")
     destination = args.status_file.resolve()
     os.chdir("sites")
     phones = seed_site(PHONES)
-    with benchmark_server(phones[:PHONES]) as url:
+    with benchmark_server(phones[:PHONES], workers=args.workers) as url:
         for phone in phones[:PHONES]:
             message, _unused = call(url, phone, "v1_register")
             if message != {"installation_id": phone.installation}:

@@ -40,3 +40,15 @@ class PerformanceServerTest(unittest.TestCase):
             ThreadPoolExecutor(max_workers=2) as pool,
         ):
             self.assertEqual(list(pool.map(request, [url, url])), [200, 200])
+
+    def test_gunicorn_reports_the_worker_that_handled_requests(self):
+        def application(_environ, start_response):
+            start_response("200 OK", [("Content-Length", "0")])
+            return [b""]
+
+        with (
+            patch.object(measure_performance, "application", application),
+            measure_performance.benchmark_server([], workers=4) as url,
+            open_loopback(Request(url), timeout=5) as response,
+        ):
+            self.assertGreater(int(response.headers["X-Mobile-Test-Worker"]), 0)

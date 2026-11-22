@@ -38,11 +38,14 @@ uv run --no-project --with-requirements backend/dev/requirements-contract-tests.
 Aynı boş site koşullarını kullanın. MariaDB, bu test sitesine ayrılmış olmalı.
 
 ```bash
-env/bin/python -m mobile_test_app.measure_concurrent --status-file /yol/durum.md
+env/bin/python -m mobile_test_app.measure_concurrent --workers 4 --status-file /yol/durum.md
 ```
 
 50 telefon birlikte 50 gönderme ve 50 çekme isteği açar.
 Komut, her uç için p95 süresini ve hata oranını yazar.
 MariaDB'deki satır kilidi bekleme sayısını ve toplam süreyi de yazar.
 Kilit sayaçları iki işin ortak sonucudur.
+Komut Gunicorn işçilerini, yanıt kodlarını ve MariaDB hata numaralarını da yazar.
+Eski Werkzeug yükünü karşılaştırmak için boş bir sitede `--workers 0` kullanın.
+İstemci süresine Gunicorn kuyruğu da girer. O-31 sınırı sunucu süresine uygulanır.
 Komut, hata veya sınır aşımı varsa 1 döndürür.
