@@ -36,8 +36,10 @@ class RenameTests(unittest.TestCase):
         return path
 
     def rename(self, entries, *options):
-        mapping = self.workspace / "rename-map.json"
-        mapping.write_text(json.dumps(entries), encoding="utf-8")
+        mapping = NAMING / "rename-map.json"
+        if entries is not None:
+            mapping = self.workspace / "rename-map.json"
+            mapping.write_text(json.dumps(entries), encoding="utf-8")
         return subprocess.run(
             [
                 sys.executable,
@@ -51,6 +53,97 @@ class RenameTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
+
+    def test_real_map_renames_module_gate_literals(self):
+        paths = {
+            "backend/dev/ai_readiness/gate.py": ('module == "yapay_zeka"\n', 'module == "ai"\n'),
+            "backend/apps/press_tr/tests/test_module_boundaries.py": (
+                'layer = APP / "kimlik"\n',
+                'layer = APP / "press_identity"\n',
+            ),
+        }
+        for path, (source, _) in paths.items():
+            self.write(path, source)
+        self.git("add", ".")
+        self.assertEqual(self.rename(None, "--check-modules").returncode, 1)
+        result = self.rename(None)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for path, (_, expected) in paths.items():
+            self.assertEqual((self.root / path).read_text(), expected)
+        self.assertEqual(self.rename(None, "--check-modules").returncode, 0)
+
+    def test_real_map_distinguishes_email_properties_slugs_and_copy(self):
+        directory = "backend/identity/keycloak/themes/atonota/test/tests"
+        pattern = "const pattern = /https?:\\/\\/[^\\s\"'<>]+/g;\n"
+        self.write(
+            f"{directory}/eposta.spec.ts",
+            "const copy = { parola: { title: 'Yeni parola oluşturun' }, islem: {} };\n"
+            + pattern
+            + "const slug = 'parola';\n"
+            + "expect(copy.parola.title).toBe('Yeni parola oluşturun');\n",
+        )
+        self.git("add", ".")
+        result = self.rename(None)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        target = self.root / directory / "email.spec.ts"
+        self.assertEqual(
+            target.read_text(),
+            "const copy = { 'password-reset': { title: 'Yeni parola oluşturun' }, 'required-actions': {} };\n"
+            + pattern
+            + "const slug = 'password-reset';\n"
+            + "expect(copy['password-reset'].title).toBe('Yeni parola oluşturun');\n",
+        )
+
+    def test_preserves_copy_and_changes_only_translation_source_keys(self):
+        script = self.write(
+            "backend/app/feature.py",
+            'ad = "Dağıtım adı"  # ad değişkeni\nkind = "AI Provider"\nmessage = "AI Provider kaydı"\n',
+        )
+        document = self.write("backend/PROJE-KAYDI.md", "AI Provider adı bu kayıtta kalır.\n")
+        metadata = self.write("backend/app/record.json", '{"name":"AI Provider","label":"AI Provider"}\n')
+        csv_path = self.write("backend/app/translations/tr.csv", 'AI Provider,"AI Provider, sağlayıcı"\n')
+        po_path = self.write(
+            "backend/app/locale/tr.po", 'msgid ""\n"AI "\n"Provider"\nmsgstr "AI Provider sağlayıcı"\n'
+        )
+        self.git("add", ".")
+        entries = [
+            {"old": "ad", "new": "name", "type": "identifier"},
+            {"old": "AI Provider", "new": "PLT AI Provider", "type": "doctype"},
+            {"old": "backend/PROJE-KAYDI.md", "new": "backend/PROJECT-RECORD.md", "type": "path"},
+        ]
+        result = self.rename(entries)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            script.read_text(),
+            'name = "Dağıtım adı"  # ad değişkeni\nkind = "PLT AI Provider"\nmessage = "AI Provider kaydı"\n',
+        )
+        self.assertEqual(
+            (document.parent / "PROJECT-RECORD.md").read_text(), "AI Provider adı bu kayıtta kalır.\n"
+        )
+        self.assertEqual(document.read_text(), "[Yeni dosyayı açın.](PROJECT-RECORD.md)\n")
+        self.assertEqual(metadata.read_text(), '{"name":"PLT AI Provider","label":"AI Provider"}\n')
+        self.assertEqual(csv_path.read_text(), 'PLT AI Provider,"AI Provider, sağlayıcı"\n')
+        self.assertEqual(po_path.read_text(), 'msgid "PLT AI Provider"\nmsgstr "AI Provider sağlayıcı"\n')
+        self.assertIn("0 tracked file(s)", self.rename(entries, "--dry-run").stdout)
+
+    def test_rejects_a_python_binding_collision(self):
+        source = self.write(
+            "backend/app/feature.py", "def some_function(name):\n    ad = name\n    return ad\n"
+        )
+        self.git("add", ".")
+        result = self.rename([{"old": "ad", "new": "name", "type": "identifier"}])
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("Name collision", result.stderr)
+        self.assertIn("ad = name", source.read_text())
+
+    def test_settings_check_only_prints_legacy_keys(self):
+        config = self.write("backend/config.env", "export LEGACY_KEY=never-print-this\n")
+        self.git("add", ".")
+        entries = [{"old": "LEGACY_KEY", "new": "NEW_KEY", "type": "setting"}]
+        result = self.rename(entries, "--check-settings", str(config))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("LEGACY_KEY", result.stdout)
+        self.assertNotIn("never-print-this", result.stdout)
 
     def test_prefixed_doctype_and_path_moves_are_repeatable(self):
         original = "backend/app/legacy/ai_provider.json"
@@ -98,7 +191,7 @@ class RenameTests(unittest.TestCase):
         )
         fixtures = {
             "backend/other/hooks.py": "from app.kimlik import resolve\n",
-            "backend/docs/standartlar/guide.md": "`app.kimlik`\n",
+            "docs/standartlar/guide.md": "`app.kimlik`\n",
             "backend/app/translations/tr.csv": "app.kimlik,Identity\n",
             "backend/app/locale/tr.po": 'msgid "app.kimlik"\n',
             "src/docs.md": "`app.kimlik`\n",
@@ -114,7 +207,7 @@ class RenameTests(unittest.TestCase):
                 "old": "app.kimlik",
                 "new": "app.identity",
                 "type": "reference",
-                "paths": ["backend/docs/standartlar/*"],
+                "paths": ["docs/standartlar/*"],
             },
         ]
 

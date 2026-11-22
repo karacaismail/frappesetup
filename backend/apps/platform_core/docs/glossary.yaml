@@ -28,8 +28,8 @@
   doctype: PLT Access Rule
   definition_tr: Bu kayıt bir rolün kayıt ve alan izinlerini belirler.
 - term_tr: Platform kimlik bağı
-  code: plt_platform_identity_link
-  doctype: PLT Platform Identity Link
+  code: plt_identity_link
+  doctype: PLT Identity Link
   definition_tr: Bu kayıt Frappe kullanıcısını Keycloak kimliğine bağlar.
 - term_tr: Telefon hesap durumu
   code: plt_mobile_account_state

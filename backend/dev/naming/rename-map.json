@@ -16,7 +16,8 @@
     "paths": [
       "backend/apps/platform_core/platform_core/modules.txt",
       "backend/apps/platform_core/platform_core/kimlik/*.json",
-      "backend/apps/platform_core/platform_core/kimlik/*.py"
+      "backend/apps/platform_core/platform_core/kimlik/*.py",
+      "backend/apps/platform_core/platform_core/tests/test_installation.py"
     ]
   },
   {
@@ -36,7 +37,9 @@
     "paths": [
       "backend/apps/platform_core/platform_core/modules.txt",
       "backend/apps/platform_core/platform_core/kabuk/*.json",
-      "backend/apps/platform_core/platform_core/kabuk/*.py"
+      "backend/apps/platform_core/platform_core/kabuk/*.py",
+      "backend/apps/platform_core/platform_core/tests/test_installation.py",
+      "backend/apps/platform_core/platform_core/tests/shell_http_fixture.py"
     ]
   },
   {
@@ -56,7 +59,8 @@
     "paths": [
       "backend/apps/platform_core/platform_core/modules.txt",
       "backend/apps/platform_core/platform_core/erisim/*.json",
-      "backend/apps/platform_core/platform_core/erisim/*.py"
+      "backend/apps/platform_core/platform_core/erisim/*.py",
+      "backend/apps/platform_core/platform_core/tests/test_installation.py"
     ]
   },
   {
@@ -76,7 +80,8 @@
     "paths": [
       "backend/apps/platform_core/platform_core/modules.txt",
       "backend/apps/platform_core/platform_core/mobil/*.json",
-      "backend/apps/platform_core/platform_core/mobil/*.py"
+      "backend/apps/platform_core/platform_core/mobil/*.py",
+      "backend/apps/platform_core/platform_core/tests/test_installation.py"
     ]
   },
   {
@@ -96,7 +101,8 @@
     "paths": [
       "backend/apps/platform_core/platform_core/modules.txt",
       "backend/apps/platform_core/platform_core/model_gecidi/*.json",
-      "backend/apps/platform_core/platform_core/model_gecidi/*.py"
+      "backend/apps/platform_core/platform_core/model_gecidi/*.py",
+      "backend/apps/platform_core/platform_core/tests/test_installation.py"
     ]
   },
   {
@@ -116,7 +122,8 @@
     "paths": [
       "backend/apps/platform_core/platform_core/modules.txt",
       "backend/apps/platform_core/platform_core/yapay_zeka/*.json",
-      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py",
+      "backend/apps/platform_core/platform_core/tests/test_installation.py"
     ]
   },
   {
@@ -185,46 +192,46 @@
   },
   {
     "old": "platform_core.kimlik.doctype.platform_identity_link.platform_identity_link",
-    "new": "platform_core.identity.doctype.plt_platform_identity_link.plt_platform_identity_link",
+    "new": "platform_core.identity.doctype.plt_identity_link.plt_identity_link",
     "type": "reference"
   },
   {
     "old": "platform_core.kimlik.doctype.platform_identity_link",
-    "new": "platform_core.identity.doctype.plt_platform_identity_link",
+    "new": "platform_core.identity.doctype.plt_identity_link",
     "type": "reference"
   },
   {
     "old": "Platform Identity Link",
-    "new": "PLT Platform Identity Link",
+    "new": "PLT Identity Link",
     "type": "doctype"
   },
   {
     "old": "tabPlatform Identity Link",
-    "new": "tabPLT Platform Identity Link",
+    "new": "tabPLT Identity Link",
     "type": "doctype"
   },
   {
     "old": "PlatformIdentityLink",
-    "new": "PLTPlatformIdentityLink",
+    "new": "PLTIdentityLink",
     "type": "identifier"
   },
   {
     "old": "platform_identity_link",
-    "new": "plt_platform_identity_link",
+    "new": "plt_identity_link",
     "type": "identifier",
     "paths": [
       "backend/apps/platform_core/platform_core/kimlik/doctype/platform_identity_link/*.py",
-      "backend/apps/platform_core/platform_core/identity/doctype/plt_platform_identity_link/*.py"
+      "backend/apps/platform_core/platform_core/identity/doctype/plt_identity_link/*.py"
     ]
   },
   {
     "old": "platform_identity_link.json",
-    "new": "plt_platform_identity_link.json",
+    "new": "plt_identity_link.json",
     "type": "reference"
   },
   {
     "old": "platform_identity_link.py",
-    "new": "plt_platform_identity_link.py",
+    "new": "plt_identity_link.py",
     "type": "reference"
   },
   {
@@ -845,90 +852,90 @@
   },
   {
     "old": "press_tr.kimlik.doctype.press_identity_link.press_identity_link",
-    "new": "press_tr.press_identity.doctype.ptr_press_identity_link.ptr_press_identity_link",
+    "new": "press_tr.press_identity.doctype.ptr_identity_link.ptr_identity_link",
     "type": "reference"
   },
   {
     "old": "press_tr.kimlik.doctype.press_identity_link",
-    "new": "press_tr.press_identity.doctype.ptr_press_identity_link",
+    "new": "press_tr.press_identity.doctype.ptr_identity_link",
     "type": "reference"
   },
   {
     "old": "Press Identity Link",
-    "new": "PTR Press Identity Link",
+    "new": "PTR Identity Link",
     "type": "doctype"
   },
   {
     "old": "tabPress Identity Link",
-    "new": "tabPTR Press Identity Link",
+    "new": "tabPTR Identity Link",
     "type": "doctype"
   },
   {
     "old": "PressIdentityLink",
-    "new": "PTRPressIdentityLink",
+    "new": "PTRIdentityLink",
     "type": "identifier"
   },
   {
     "old": "press_identity_link",
-    "new": "ptr_press_identity_link",
+    "new": "ptr_identity_link",
     "type": "identifier",
     "paths": [
       "backend/apps/press_tr/press_tr/kimlik/doctype/press_identity_link/*.py",
-      "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_press_identity_link/*.py"
+      "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/*.py"
     ]
   },
   {
     "old": "press_identity_link.json",
-    "new": "ptr_press_identity_link.json",
+    "new": "ptr_identity_link.json",
     "type": "reference"
   },
   {
     "old": "press_identity_link.py",
-    "new": "ptr_press_identity_link.py",
+    "new": "ptr_identity_link.py",
     "type": "reference"
   },
   {
     "old": "press_tr.kimlik.doctype.press_keycloak_session.press_keycloak_session",
-    "new": "press_tr.press_identity.doctype.ptr_press_keycloak_session.ptr_press_keycloak_session",
+    "new": "press_tr.press_identity.doctype.ptr_keycloak_session.ptr_keycloak_session",
     "type": "reference"
   },
   {
     "old": "press_tr.kimlik.doctype.press_keycloak_session",
-    "new": "press_tr.press_identity.doctype.ptr_press_keycloak_session",
+    "new": "press_tr.press_identity.doctype.ptr_keycloak_session",
     "type": "reference"
   },
   {
     "old": "Press Keycloak Session",
-    "new": "PTR Press Keycloak Session",
+    "new": "PTR Keycloak Session",
     "type": "doctype"
   },
   {
     "old": "tabPress Keycloak Session",
-    "new": "tabPTR Press Keycloak Session",
+    "new": "tabPTR Keycloak Session",
     "type": "doctype"
   },
   {
     "old": "PressKeycloakSession",
-    "new": "PTRPressKeycloakSession",
+    "new": "PTRKeycloakSession",
     "type": "identifier"
   },
   {
     "old": "press_keycloak_session",
-    "new": "ptr_press_keycloak_session",
+    "new": "ptr_keycloak_session",
     "type": "identifier",
     "paths": [
       "backend/apps/press_tr/press_tr/kimlik/doctype/press_keycloak_session/*.py",
-      "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_press_keycloak_session/*.py"
+      "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/*.py"
     ]
   },
   {
     "old": "press_keycloak_session.json",
-    "new": "ptr_press_keycloak_session.json",
+    "new": "ptr_keycloak_session.json",
     "type": "reference"
   },
   {
     "old": "press_keycloak_session.py",
-    "new": "ptr_press_keycloak_session.py",
+    "new": "ptr_keycloak_session.py",
     "type": "reference"
   },
   {
@@ -942,18 +949,8 @@
     "type": "reference"
   },
   {
-    "old": "isler",
-    "new": "tasks",
-    "type": "reference"
-  },
-  {
     "old": "docs/kararlar",
     "new": "docs/decisions",
-    "type": "reference"
-  },
-  {
-    "old": "kararlar",
-    "new": "decisions",
     "type": "reference"
   },
   {
@@ -1271,7 +1268,7 @@
   },
   {
     "old": "dogrulama.py",
-    "new": "validation.py",
+    "new": "verification.py",
     "type": "reference"
   },
   {
@@ -1649,30 +1646,6 @@
     ]
   },
   {
-    "old": "dogrulama",
-    "new": "verification",
-    "type": "identifier",
-    "paths": [
-      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
-    ]
-  },
-  {
-    "old": "islem",
-    "new": "required-actions",
-    "type": "identifier",
-    "paths": [
-      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
-    ]
-  },
-  {
-    "old": "parola",
-    "new": "password-reset",
-    "type": "identifier",
-    "paths": [
-      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
-    ]
-  },
-  {
     "old": "referans",
     "new": "reference",
     "type": "reference",
@@ -1828,22 +1801,22 @@
   },
   {
     "old": "backend/apps/platform_core/platform_core/kimlik/doctype/platform_identity_link",
-    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_platform_identity_link",
+    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_identity_link",
     "type": "path"
   },
   {
     "old": "backend/apps/platform_core/platform_core/kimlik/doctype/platform_identity_link/platform_identity_link.json",
-    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_platform_identity_link/plt_platform_identity_link.json",
+    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_identity_link/plt_identity_link.json",
     "type": "path"
   },
   {
     "old": "backend/apps/platform_core/platform_core/kimlik/doctype/platform_identity_link/platform_identity_link.py",
-    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_platform_identity_link/plt_platform_identity_link.py",
+    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_identity_link/plt_identity_link.py",
     "type": "path"
   },
   {
     "old": "backend/apps/platform_core/platform_core/kimlik/doctype/platform_identity_link/test_platform_identity_link.py",
-    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_platform_identity_link/test_plt_platform_identity_link.py",
+    "new": "backend/apps/platform_core/platform_core/identity/doctype/plt_identity_link/test_plt_identity_link.py",
     "type": "path"
   },
   {
@@ -2078,32 +2051,32 @@
   },
   {
     "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_identity_link",
-    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_press_identity_link",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link",
     "type": "path"
   },
   {
     "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_identity_link/press_identity_link.json",
-    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_press_identity_link/ptr_press_identity_link.json",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/ptr_identity_link.json",
     "type": "path"
   },
   {
     "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_identity_link/press_identity_link.py",
-    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_press_identity_link/ptr_press_identity_link.py",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_identity_link/ptr_identity_link.py",
     "type": "path"
   },
   {
     "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_keycloak_session",
-    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_press_keycloak_session",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session",
     "type": "path"
   },
   {
     "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_keycloak_session/press_keycloak_session.json",
-    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_press_keycloak_session/ptr_press_keycloak_session.json",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/ptr_keycloak_session.json",
     "type": "path"
   },
   {
     "old": "backend/apps/press_tr/press_tr/kimlik/doctype/press_keycloak_session/press_keycloak_session.py",
-    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_press_keycloak_session/ptr_press_keycloak_session.py",
+    "new": "backend/apps/press_tr/press_tr/press_identity/doctype/ptr_keycloak_session/ptr_keycloak_session.py",
     "type": "path"
   },
   {
@@ -2873,7 +2846,7 @@
   },
   {
     "old": "backend/libs/oidc_verify/src/oidc_verify/dogrulama.py",
-    "new": "backend/libs/oidc_verify/src/oidc_verify/validation.py",
+    "new": "backend/libs/oidc_verify/src/oidc_verify/verification.py",
     "type": "path"
   },
   {
@@ -2984,11 +2957,6 @@
   {
     "old": "tema-admin",
     "new": "theme-admin",
-    "type": "reference"
-  },
-  {
-    "old": "fs-kimlik-tema-keycloak",
-    "new": "fs-identity-theme-keycloak",
     "type": "reference"
   },
   {
@@ -3147,7 +3115,7 @@
   },
   {
     "old": "dogrulama",
-    "new": "validation",
+    "new": "verification",
     "type": "identifier",
     "paths": [
       "backend/libs/oidc_verify/*"
@@ -3938,7 +3906,8 @@
     "new": "identity",
     "type": "module",
     "paths": [
-      "backend/dev/tests/test_boundaries.py"
+      "backend/dev/tests/test_boundaries.py",
+      "backend/apps/platform_core/platform_core/kimlik/jwks.py"
     ]
   },
   {
@@ -3955,7 +3924,10 @@
     "new": "ai",
     "type": "module",
     "paths": [
-      "backend/dev/tests/test_boundaries.py"
+      "backend/dev/tests/test_boundaries.py",
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py",
+      "backend/dev/ai_readiness/gate.py",
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_gap_analysis.py"
     ]
   },
   {
@@ -3963,7 +3935,8 @@
     "new": "model_gateway",
     "type": "module",
     "paths": [
-      "backend/dev/tests/test_boundaries.py"
+      "backend/dev/tests/test_boundaries.py",
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py"
     ]
   },
   {
@@ -4482,7 +4455,7 @@
   },
   {
     "old": "from oidc_verify.dogrulama import verify_access_token, verify_id_token, verify_logout_token\nfrom oidc_verify.hatalar import JwksUnavailable, TokenError\nfrom oidc_verify.jwks import JwksCache",
-    "new": "from oidc_verify.errors import JwksUnavailable, TokenError\nfrom oidc_verify.jwks import JwksCache\nfrom oidc_verify.validation import verify_access_token, verify_id_token, verify_logout_token",
+    "new": "from oidc_verify.errors import JwksUnavailable, TokenError\nfrom oidc_verify.jwks import JwksCache\nfrom oidc_verify.verification import verify_access_token, verify_id_token, verify_logout_token",
     "type": "reference",
     "paths": [
       "backend/libs/oidc_verify/src/oidc_verify/__init__.py"
@@ -4506,7 +4479,7 @@
   },
   {
     "old": "self.assertEqual(self.error_code(self.identity, self.key.imzala(kimlik_govdesi(typ=1))), \"malformed\")",
-    "new": "self.assertEqual(\n            self.error_code(self.identity, self.key.imzala(identity_payload(typ=1))), \"malformed\"\n        )",
+    "new": "self.assertEqual(\n            self.error_code(self.identity, self.key.sign(identity_payload(typ=1))), \"malformed\"\n        )",
     "type": "reference",
     "paths": [
       "backend/libs/oidc_verify/tests/test_security_findings.py"
@@ -4514,7 +4487,7 @@
   },
   {
     "old": "self.assertEqual(self.error_code(self.logout, self.key.imzala(cikis_govdesi(jti=[\"j\"]))), \"malformed\")",
-    "new": "self.assertEqual(\n            self.error_code(self.logout, self.key.imzala(logout_payload(jti=[\"j\"]))), \"malformed\"\n        )",
+    "new": "self.assertEqual(\n            self.error_code(self.logout, self.key.sign(logout_payload(jti=[\"j\"]))), \"malformed\"\n        )",
     "type": "reference",
     "paths": [
       "backend/libs/oidc_verify/tests/test_security_findings.py"
@@ -4522,7 +4495,7 @@
   },
   {
     "old": "self.error_code(self.logout, self.key.imzala(cikis_govdesi(sid=None, sub=\"\"))), \"not_logout_token\"",
-    "new": "self.error_code(self.logout, self.key.imzala(logout_payload(sid=None, sub=\"\"))),\n            \"not_logout_token\",",
+    "new": "self.error_code(self.logout, self.key.sign(logout_payload(sid=None, sub=\"\"))),\n            \"not_logout_token\",",
     "type": "reference",
     "paths": [
       "backend/libs/oidc_verify/tests/test_security_findings.py"
@@ -4543,5 +4516,1190 @@
     "paths": [
       "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_admin.py"
     ]
+  },
+  {
+    "old": "'dogrulama'",
+    "new": "'verification'",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "dogrulama: {",
+    "new": "verification: {",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "copy.dogrulama",
+    "new": "copy.verification",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "'parola'",
+    "new": "'password-reset'",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "parola: {",
+    "new": "'password-reset': {",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "copy.parola",
+    "new": "copy['password-reset']",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "'islem'",
+    "new": "'required-actions'",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "islem: {",
+    "new": "'required-actions': {",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "copy.islem",
+    "new": "copy['required-actions']",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "SIHIRLI_KC_URL",
+    "new": "KC_MAGIC_LINK_URL",
+    "type": "setting",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "SIHIRLI_MAILPIT_URL",
+    "new": "KC_MAGIC_LINK_MAILPIT_URL",
+    "type": "setting",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "SIHIRLI_REALM",
+    "new": "KC_MAGIC_LINK_REALM",
+    "type": "setting",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "SIHIRLI_ADMIN_TOKEN",
+    "new": "KC_MAGIC_LINK_ADMIN_TOKEN",
+    "type": "setting",
+    "paths": [
+      "backend/identity/keycloak/themes/atonota/test/tests/eposta.spec.ts"
+    ]
+  },
+  {
+    "old": "erisim",
+    "new": "access",
+    "type": "module",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py",
+      "backend/apps/platform_core/platform_core/erisim/test_link_search.py"
+    ]
+  },
+  {
+    "old": "kimlik",
+    "new": "press_identity",
+    "type": "module",
+    "paths": [
+      "backend/apps/press_tr/tests/test_module_boundaries.py"
+    ]
+  },
+  {
+    "old": "platform_core\\.yapay_zeka",
+    "new": "platform_core\\.ai",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py"
+    ]
+  },
+  {
+    "old": "from platform_core import yapay_zeka",
+    "new": "from platform_core import ai",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py"
+    ]
+  },
+  {
+    "old": "yapay_zeka/read_card.py",
+    "new": "ai/read_card.py",
+    "type": "reference",
+    "paths": [
+      "backend/dev/ai_readiness/test_gate.py"
+    ]
+  },
+  {
+    "old": "r\"platform_core\\.yapay_zeka|from platform_core import yapay_zeka\"",
+    "new": "r\"platform_core\\.ai|from platform_core import ai\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/test_registry.py"
+    ]
+  },
+  {
+    "old": "guvenlik",
+    "new": "security",
+    "type": "module",
+    "paths": [
+      "backend/dev/ai_readiness/gate.py"
+    ]
+  },
+  {
+    "old": "\"guvenlik\"",
+    "new": "\"security\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/ai_readiness/gate.py"
+    ]
+  },
+  {
+    "old": "f\"{APP}/yapay_zeka/read_card.py\"",
+    "new": "f\"{APP}/ai/read_card.py\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/ai_readiness/test_gate.py"
+    ]
+  },
+  {
+    "old": "ALGORITMA",
+    "new": "ALGORITHM",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/dogrulama.py"
+    ]
+  },
+  {
+    "old": "parca",
+    "new": "chunk",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py"
+    ]
+  },
+  {
+    "old": "parcalar",
+    "new": "chunks",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py"
+    ]
+  },
+  {
+    "old": "uzunluk",
+    "new": "length",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/src/oidc_verify/jwks.py"
+    ]
+  },
+  {
+    "old": "imzala",
+    "new": "sign",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/*.py"
+    ]
+  },
+  {
+    "old": "ozel_pem",
+    "new": "private_pem",
+    "type": "identifier",
+    "paths": [
+      "backend/libs/oidc_verify/tests/*.py"
+    ]
+  },
+  {
+    "old": "_ac",
+    "new": "_open",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/*.py"
+    ]
+  },
+  {
+    "old": "konum",
+    "new": "location",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_eklentiler.py"
+    ]
+  },
+  {
+    "old": "roller",
+    "new": "roles",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "olustur",
+    "new": "created",
+    "type": "identifier",
+    "paths": [
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "YzTestCase",
+    "new": "AiTestCase",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "operationId: complete",
+    "new": "operationId: completeModelRequest",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: test_api",
+    "new": "operationId: testModelApi",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: resolve_usage",
+    "new": "operationId: resolveModelUsage",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: purge_usage",
+    "new": "operationId: purgeModelUsage",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: clear_api_credential",
+    "new": "operationId: clearApiCredential",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mcp",
+    "new": "operationId: callMcp",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: identityProvision",
+    "new": "operationId: provisionIdentity",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: identitySetEnabled",
+    "new": "operationId: setIdentityEnabled",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: identityChangeEmail",
+    "new": "operationId: changeIdentityEmail",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Register",
+    "new": "operationId: registerMobileInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Revoke",
+    "new": "operationId: revokeMobileInstallationV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Push",
+    "new": "operationId: pushMobileChangesV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Pull",
+    "new": "operationId: pullMobileChangesV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: mobileV1Cleanup",
+    "new": "operationId: cleanupMobileDataV1",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/*.openapi.yaml"
+    ]
+  },
+  {
+    "old": "operationId: getLoginUrl",
+    "new": "operationId: getPlatformLoginUrl",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [aciklama]",
+    "new": "tags: [explanation]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: aciklama",
+    "new": "- name: explanation",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [alan-duzeyi]",
+    "new": "tags: [field-level]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: alan-duzeyi",
+    "new": "- name: field-level",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [giris]",
+    "new": "tags: [login]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: giris",
+    "new": "- name: login",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [kurulum]",
+    "new": "tags: [setup]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: kurulum",
+    "new": "- name: setup",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [eşitleme]",
+    "new": "tags: [sync]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: eşitleme",
+    "new": "- name: sync",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-kimlik.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [belirtec]",
+    "new": "tags: [token]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: belirtec",
+    "new": "- name: token",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [oneri]",
+    "new": "tags: [proposal]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: oneri",
+    "new": "- name: proposal",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "tags: [yonetim]",
+    "new": "tags: [administration]",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "- name: yonetim",
+    "new": "- name: administration",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "oturum:",
+    "new": "frappeSession:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-erisim.openapi.yaml"
+    ]
+  },
+  {
+    "old": "insanOturumu:",
+    "new": "humanSession:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "araciBelirteci:",
+    "new": "agentToken:",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "column_break_scope",
+    "new": "scope_column",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/access_rule.json"
+    ]
+  },
+  {
+    "old": "section_break_operations",
+    "new": "operations_section",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/access_rule.json"
+    ]
+  },
+  {
+    "old": "column_break_operations",
+    "new": "operations_column",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/access_rule.json"
+    ]
+  },
+  {
+    "old": "section_break_filters",
+    "new": "filters_section",
+    "type": "identifier",
+    "paths": [
+      "backend/apps/platform_core/platform_core/erisim/doctype/access_rule/access_rule.json"
+    ]
+  },
+  {
+    "old": "HRMS_TR_TEST_PASSWORD",
+    "new": "HRT_TEST_PASSWORD",
+    "type": "setting"
+  },
+  {
+    "old": "PRESS_ADMIN_PASSWORD",
+    "new": "PTR_ADMIN_PASSWORD",
+    "type": "setting"
+  },
+  {
+    "old": "PRESS_DB_PASSWORD",
+    "new": "PTR_DB_PASSWORD",
+    "type": "setting"
+  },
+  {
+    "old": "PRESS_SOCKET_PORT",
+    "new": "PTR_SOCKET_PORT",
+    "type": "setting"
+  },
+  {
+    "old": "PRESS_WEB_PORT",
+    "new": "PTR_WEB_PORT",
+    "type": "setting"
+  },
+  {
+    "old": "\"search_doctypes\"",
+    "new": "\"plt_search_doctypes\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: search_doctypes",
+    "new": "  - name: plt_search_doctypes",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"get_doctype_schema\"",
+    "new": "\"plt_get_doctype_schema\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: get_doctype_schema",
+    "new": "  - name: plt_get_doctype_schema",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"list_documents\"",
+    "new": "\"plt_list_documents\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: list_documents",
+    "new": "  - name: plt_list_documents",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"get_document\"",
+    "new": "\"plt_get_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: get_document",
+    "new": "  - name: plt_get_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"run_report\"",
+    "new": "\"plt_run_report\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: run_report",
+    "new": "  - name: plt_run_report",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"create_document\"",
+    "new": "\"plt_create_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: create_document",
+    "new": "  - name: plt_create_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"update_document\"",
+    "new": "\"plt_update_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: update_document",
+    "new": "  - name: plt_update_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"submit_document\"",
+    "new": "\"plt_submit_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: submit_document",
+    "new": "  - name: plt_submit_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"cancel_document\"",
+    "new": "\"plt_cancel_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: cancel_document",
+    "new": "  - name: plt_cancel_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"delete_document\"",
+    "new": "\"plt_delete_document\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: delete_document",
+    "new": "  - name: plt_delete_document",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"get_proposal\"",
+    "new": "\"plt_get_proposal\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: get_proposal",
+    "new": "  - name: plt_get_proposal",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"add_custom_field\"",
+    "new": "\"plt_add_custom_field\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: add_custom_field",
+    "new": "  - name: plt_add_custom_field",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"set_field_property\"",
+    "new": "\"plt_set_field_property\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: set_field_property",
+    "new": "  - name: plt_set_field_property",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"set_role_permission\"",
+    "new": "\"plt_set_role_permission\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: set_role_permission",
+    "new": "  - name: plt_set_role_permission",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"assign_role\"",
+    "new": "\"plt_assign_role\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: assign_role",
+    "new": "  - name: plt_assign_role",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"remove_role\"",
+    "new": "\"plt_remove_role\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: remove_role",
+    "new": "  - name: plt_remove_role",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "\"purge_action_log\"",
+    "new": "\"plt_purge_action_log\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/*.py"
+    ]
+  },
+  {
+    "old": "  - name: purge_action_log",
+    "new": "  - name: plt_purge_action_log",
+    "type": "reference",
+    "paths": [
+      "backend/contracts/platform_core-yapay-zeka.openapi.yaml"
+    ]
+  },
+  {
+    "old": "name = f\"{app}_{short_name}\"",
+    "new": "prefix = {\"platform_core\": \"plt\", \"press_tr\": \"ptr\", \"hrms_tr\": \"hrt\"}.get(app, app)\n\tname = f\"{prefix}_{short_name}\"",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/registry.py"
+    ]
+  },
+  {
+    "old": "hrms_tr_approve_leave",
+    "new": "hrt_approve_leave",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_list_access_rules",
+    "new": "plt_list_access_rules",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_explain_access",
+    "new": "plt_explain_access",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_propose_access_rule",
+    "new": "plt_propose_access_rule",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_propose_access_rule_change",
+    "new": "plt_propose_access_rule_change",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_list_mobile_installations",
+    "new": "plt_list_mobile_installations",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_revoke_mobile_installation",
+    "new": "plt_revoke_mobile_installation",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_revoke_all_mobile_installations",
+    "new": "plt_revoke_all_mobile_installations",
+    "type": "reference"
+  },
+  {
+    "old": "platform_core_preview_mobile_cleanup",
+    "new": "plt_preview_mobile_cleanup",
+    "type": "reference"
+  },
+  {
+    "old": "\"import platform_core.kimlik.api\"",
+    "new": "\"import platform_core.identity.api\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from ..kimlik.api import resolve\"",
+    "new": "\"from ..identity.api import resolve\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core import kimlik\"",
+    "new": "\"from platform_core import identity\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from .. import kimlik\"",
+    "new": "\"from .. import identity\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core.kimlik.api import resolve\"",
+    "new": "\"from platform_core.identity.api import resolve\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core.kimlik.api import _resolve\"",
+    "new": "\"from platform_core.identity.api import _resolve\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core.kimlik.api import *\"",
+    "new": "\"from platform_core.identity.api import *\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"import platform_core.kimlik.internal\"",
+    "new": "\"import platform_core.identity.internal\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"import platform_core.kabuk.api\"",
+    "new": "\"import platform_core.shell.api\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"\"\"from importlib import import_module as load\nload(\"platform_core.kimlik.api\")\"\"\"",
+    "new": "\"\"\"from importlib import import_module as load\nload(\"platform_core.identity.api\")\"\"\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core.model_gecidi.api import complete\"",
+    "new": "\"from platform_core.model_gateway.api import complete\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "\"from platform_core.model_gecidi.gateway import complete\"",
+    "new": "\"from platform_core.model_gateway.gateway import complete\"",
+    "type": "reference",
+    "paths": [
+      "backend/dev/tests/test_boundaries.py"
+    ]
+  },
+  {
+    "old": "platform_core_checked_title",
+    "new": "plt_checked_title",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_count_records",
+    "new": "plt_count_records",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_effect_in_prepare",
+    "new": "plt_effect_in_prepare",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_failing_write",
+    "new": "plt_failing_write",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_manager_only",
+    "new": "plt_manager_only",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_prepared_title",
+    "new": "plt_prepared_title",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_set_title",
+    "new": "plt_set_title",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_sneaky_write",
+    "new": "plt_sneaky_write",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_versioned_sometimes",
+    "new": "plt_versioned_sometimes",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_versioned_title",
+    "new": "plt_versioned_title",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "platform_core_versioned_without_version",
+    "new": "plt_versioned_without_version",
+    "type": "reference",
+    "paths": [
+      "backend/apps/platform_core/platform_core/yapay_zeka/tests/*.py"
+    ]
+  },
+  {
+    "old": "tenant.change_email kiraci1: HTTP 404",
+    "new": "tenant.change_email tenant1: HTTP 404",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "press.remove_team_member press: HTTP 403; tenant.set_enabled kiraci1: HTTP 404",
+    "new": "press.remove_team_member press: HTTP 403; tenant.set_enabled tenant1: HTTP 404",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "Bearer token-for:aud-site-kiraci1",
+    "new": "Bearer token-for:aud-site-tenant1",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "tenant.provision kiraci1: HTTP 503",
+    "new": "tenant.provision tenant1: HTTP 503",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "tenant.provision kiraci1: unknown outcome",
+    "new": "tenant.provision tenant1: unknown outcome",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "press.ensure_team press: HTTP 403; tenant.provision kiraci1: unknown outcome",
+    "new": "press.ensure_team press: HTTP 403; tenant.provision tenant1: unknown outcome",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "tenant.set_enabled kiraci1: HTTP 403",
+    "new": "tenant.set_enabled tenant1: HTTP 403",
+    "type": "reference",
+    "paths": [
+      "backend/identity/identity_sync/tests/test_pipeline.py",
+      "backend/identity/identity_sync/tests/test_server.py"
+    ]
+  },
+  {
+    "old": "passwordBlacklist(yaygin-parolalar.txt)",
+    "new": "passwordBlacklist(common-passwords.txt)",
+    "type": "reference",
+    "paths": [
+      "backend/identity/keycloak/tests/test_realm_dosyalari.py",
+      "backend/identity/keycloak/tests/test_keycloak_canli.py"
+    ]
+  },
+  {
+    "old": "backend/apps/platform_core/platform_core/public/kimlik",
+    "new": "backend/apps/platform_core/platform_core/public/identity",
+    "type": "path"
+  },
+  {
+    "old": "/assets/platform_core/kimlik",
+    "new": "/assets/platform_core/identity",
+    "type": "reference"
   }
 ]
