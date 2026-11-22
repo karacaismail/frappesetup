@@ -10,12 +10,13 @@ from press_tr.kimlik.oidc import claim, reject
 IDENTITY_LINK = "Press Identity Link"
 
 
-def find_identity(issuer, subject):
+def find_identity(issuer, subject, *, for_update=False):
 	link = frappe.db.get_value(
 		IDENTITY_LINK,
 		{"issuer": issuer, "subject": subject},
 		["name", "user", "issuer", "subject"],
 		as_dict=True,
+		for_update=for_update,
 	)
 	if link and (link.issuer != issuer or link.subject != subject):
 		reject()

@@ -315,6 +315,101 @@ class IdentityHttpTest(PressHttpClient, unittest.TestCase):
 		finally:
 			frappe.destroy()
 
+	def test_anonymize_user_preserves_linked_records_on_retry(self):
+		from frappe.utils.password import set_encrypted_password
+
+		subject = uuid4().hex
+		email = f"{subject}@example.test"
+		session = self.sign_in(subject, email, uuid4().hex)
+		key, secret = uuid4().hex, uuid4().hex
+		body = {"issuer": ISSUER, "subject": subject}
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			team = frappe.db.get_value("Team", {"user": email}, "name")
+			self.assertTrue(team)
+			invoice_name = f"anonymization-fixture-{subject}"
+			# Persist a representative invoice without running Press billing hooks.
+			frappe.get_doc({"doctype": "Invoice", "name": invoice_name, "team": team}).db_insert()
+			frappe.db.set_value("Invoice", invoice_name, "owner", email)
+			self.assertEqual(frappe.db.get_value("Invoice", invoice_name, "owner"), email)
+			frappe.db.set_value("User", email, {"api_key": key, "phone": "5550100", "first_name": "Private"})
+			set_encrypted_password("User", email, secret, "api_secret")
+			contact = frappe.get_doc(
+				{
+					"doctype": "Contact",
+					"user": email,
+					"first_name": f"Private {subject}",
+					"email_ids": [{"email_id": email, "is_primary": 1}],
+					"phone_nos": [{"phone": "5550100", "is_primary_phone": 1}],
+				}
+			).insert(ignore_permissions=True)
+			frappe.db.commit()
+		finally:
+			frappe.destroy()
+
+		for _ in range(2):
+			status, result = self.call("anonymize_user", body, self.token())
+			self.assertEqual(status, 200, result)
+			self.assertEqual(result["message"], {"anonymized": True})
+
+		self.assertEqual(self.exchange("GET", ACCOUNT_ROUTE, session)[0], 403)
+		frappe.init("press.localhost")
+		frappe.connect()
+		try:
+			user = frappe.db.get_value("Press Identity Link", body, "user")
+			self.assertNotEqual(user, email)
+			self.assertTrue(user.endswith("@invalid.example"))
+			self.assertEqual(frappe.db.get_value("Team", team, "user"), user)
+			self.assertEqual(frappe.db.get_value("Invoice", invoice_name, ["team", "owner"]), (team, user))
+			self.assertFalse(
+				any(
+					email in (content or "")
+					for content in frappe.get_all(
+						"Comment", {"reference_name": user, "comment_type": "Edit"}, pluck="content"
+					)
+				)
+			)
+			self.assertFalse(frappe.db.exists("User", email))
+			doc = frappe.get_doc("User", user)
+			self.assertEqual(doc.email, user)
+			self.assertEqual(doc.first_name, "Deleted")
+			self.assertFalse(doc.phone)
+			self.assertFalse(doc.enabled)
+			self.assertFalse(doc.api_key)
+			self.assertFalse(frappe.db.exists("Contact", contact.name))
+			contacts = frappe.get_all("Contact", filters={"user": user}, pluck="name")
+			self.assertTrue(contacts)
+			for name in contacts:
+				profile = frappe.get_doc("Contact", name)
+				self.assertEqual(profile.first_name, "Deleted")
+				self.assertFalse(profile.email_ids)
+				self.assertFalse(profile.phone_nos)
+			self.assertFalse(
+				frappe.db.exists(
+					"__Auth", {"doctype": "User", "fieldname": "api_secret", "name": ("in", [email, user])}
+				)
+			)
+		finally:
+			frappe.destroy()
+
+	def test_anonymize_unknown_identity_is_a_noop(self):
+		body = {"issuer": ISSUER, "subject": uuid4().hex}
+		self.assertEqual(
+			self.call("anonymize_user", body, self.token()),
+			(200, {"message": {"anonymized": True}}),
+		)
+
+	def test_anonymize_requires_identity_sync_token(self):
+		body = {"issuer": ISSUER, "subject": uuid4().hex}
+		for token in (
+			None,
+			self.token(authorized_party="press-service"),
+			self.token(audience="site-kiraci1"),
+		):
+			with self.subTest(token_present=token is not None):
+				self.assertEqual(self.call("anonymize_user", body, token)[0], 403)
+
 	def test_bulk_remove_disables_owner_and_preserves_team_ownership(self):
 		owner, other_owner = uuid4().hex, uuid4().hex
 		first_org, second_org = uuid4().hex, uuid4().hex

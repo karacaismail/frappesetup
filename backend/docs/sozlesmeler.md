@@ -227,6 +227,15 @@ Keycloak'taki “Organization” kaydı Press'teki “Team” kaydına karşıl�
 - Aynı `remove_team_member` isteği iki kez gelirse ikinci istek de 200 döner ve bir şey değiştirmez.
 - Takım adı istekte gelmez. Takım adını Press üretir.
 
+### Press kullanıcısını anonim yapma
+
+- `anonymize_user` isteği `issuer` ve `subject` alanlarını taşır. İki alan da zorunludur.
+- Press kullanıcıyı kapatır. API anahtarlarını ve açık oturumları iptal eder.
+- Press kullanıcı ve bağlı kişi kayıtlarındaki kimlik alanlarını temizler. Kullanıcı adına geçici bir adres yazar.
+- Fatura, takım ve diğer iş kayıtları korunur. Kullanıcı bağlantıları yeni adı gösterir.
+- Press, kapatılan hesabın yeniden açılmasını engellemek için kimlik bağını saklar.
+- İlk çağrı, tekrar çağrısı ve bulunamayan kimlik aynı yanıtı alır. Yanıt 200 ve `{"message":{"anonymized":true}}` olur.
+
 - Press de Frappe 16 üzerinde çalışır (Proje kaydı D-7). press-tr işi `on_social_login` kancasını kaynakta doğrular. Sonra kancayı ya da kendi dönüş ucunu seçer. Yukarıdaki dönüş adresi bu seçime göre değişebilir.
 - G-12'deki Press giriş, kayıt ve parola uçları 403 döner.
 - Press'te misafir için izin listesi uygulanır. Misafir yalnız listedeki yöntemleri çağırabilir. Liste şudur: `ping`, `press_tr.api.auth.get_login_url`, `press_tr.api.auth.keycloak_callback`, `press_tr.api.keycloak_backchannel_logout`. Öteki bütün yöntemler misafire 403 döner.

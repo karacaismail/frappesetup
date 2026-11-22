@@ -7,6 +7,7 @@ from redis.exceptions import LockNotOwnedError
 from werkzeug.exceptions import Conflict
 
 from press_tr.kimlik.accounts import disable_user as disable_linked_user
+from press_tr.kimlik.anonymization import anonymize_linked_user
 from press_tr.kimlik.identity import as_press_user, bind_identity, create_team, find_identity
 from press_tr.kimlik.oidc import claim, reject
 from press_tr.kimlik.service import require_service
@@ -163,3 +164,12 @@ def remove_memberships(teams, user: str, *, allow_owner: bool = False) -> None:
 			# This authorized service operation does not open a user session.
 			with as_press_user(team.user, allow_disabled=True):
 				team.remove_team_member(user)
+
+
+@frappe.whitelist(methods=["POST"])
+def anonymize_user(issuer: str, subject: str) -> dict[str, bool]:
+	require_service(issuer)
+	subject = claim({"subject": subject}, "subject")
+	reset_read_snapshot()
+	anonymize_linked_user(issuer, subject)
+	return {"anonymized": True}

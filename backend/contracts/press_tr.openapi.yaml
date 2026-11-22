@@ -199,6 +199,48 @@ paths:
           description: Service identity or owner removal was rejected.
         "503":
           description: Keycloak configuration or verification keys are unavailable.
+  /api/method/press_tr.api.identity.anonymize_user:
+    post:
+      operationId: anonymizeUser
+      summary: Anonymize a linked Press user and revoke access.
+      description: Disables the linked user, invalidates API credentials, and replaces personal account fields. Linked business records are retained. An unknown identity and repeated requests succeed with the same response.
+      security:
+        - identitySync: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [issuer, subject]
+              properties:
+                issuer:
+                  type: string
+                  format: uri
+                subject:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+      responses:
+        "200":
+          description: The operation completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: object
+                    required: [anonymized]
+                    properties:
+                      anonymized:
+                        const: true
+        "403":
+          description: Service identity or issuer was rejected.
+        "503":
+          description: Keycloak configuration or verification keys are unavailable.
   /api/method/press_tr.api.maintenance.cleanup_expired_sessions:
     post:
       operationId: cleanupExpiredPressSessions

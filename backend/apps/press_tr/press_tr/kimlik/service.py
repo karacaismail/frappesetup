@@ -4,6 +4,7 @@ from press_tr.kimlik.oidc import client_id, reject, verify
 from press_tr.kimlik.oidc import issuer as configured_issuer
 
 SERVICE_PARAMETERS = {
+	"press_tr.api.identity.anonymize_user": {"issuer", "subject"},
 	"press_tr.api.identity.ensure_team": {
 		"issuer",
 		"subject",
