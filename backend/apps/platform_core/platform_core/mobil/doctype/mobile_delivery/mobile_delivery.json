@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "autoname": "field:delivery_key",
+ "description": "Bir telefon kurulumuna gönderilen kayıtları izler.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "delivery_key",
+  "installation_id",
+  "record_type",
+  "record_id",
+  "visible"
+ ],
+ "fields": [
+  {
+   "description": "Sunucu anahtarı kurulum kimliği, kayıt türü ve kayıt kimliğinden üretir.",
+   "fieldname": "delivery_key",
+   "fieldtype": "Data",
+   "label": "Teslim anahtarı",
+   "length": 64,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Bu kimlik kaydı alan telefon kurulumunu belirtir.",
+   "fieldname": "installation_id",
+   "fieldtype": "Link",
+   "label": "Kurulum kimliği",
+   "options": "Mobile Installation",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Bu kod telefona gönderilen kaydın türünü belirtir.",
+   "fieldname": "record_type",
+   "fieldtype": "Data",
+   "label": "Kayıt türü",
+   "reqd": 1
+  },
+  {
+   "description": "Bu değer telefona gönderilen kaydı belirtir.",
+   "fieldname": "record_id",
+   "fieldtype": "Data",
+   "label": "Kayıt kimliği",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Sunucunun bildirdiği son okuma iznini gösterir.",
+   "fieldname": "visible",
+   "fieldtype": "Check",
+   "label": "Görünür"
+  }
+ ],
+ "links": [],
+ "module": "Mobil",
+ "name": "Mobile Delivery",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

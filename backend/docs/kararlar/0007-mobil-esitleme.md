@@ -16,10 +16,16 @@ Uçların tam adresleri sürümlü OpenAPI dosyasında yer alır.
 - `v1_cleanup` süreyi aşan kaldırma işaretlerini yetkili görevli için temizler.
 
 Kimlik modülünün `auth_hooks` kancası erişim belirtecini doğrular.
+Kanca, istek sırasında çalışan bir işlevdir.
 Mobil uçlar, kancanın bu istek için doğruladığı hesap ve site bağını kullanır.
 Bu uçlar, kimlik sunucusunun doğruladığı sonucu arar.
 Yalnız Frappe kullanıcı adının dolu olması yeterli olmaz.
 Kanca izinli adres listesini tam adresle eşler.
+Kanca doğrulamadan sonra `frappe.local.mobile_identity` alanını doldurur.
+Bu alan `site`, `account`, `issuer`, `subject` ve `scope` değerlerini taşır.
+`account`, Frappe kullanıcısıdır. `scope` bu uçlarda `mobile` olur.
+Sistem hesap anahtarını sabit veren ve kullanıcı kimliğinden üretir.
+E-posta değişse de bu anahtar aynı kalır.
 Sistem `cmd` alanını, boş bile olsa, gövdede ve adres parametrelerinde reddeder.
 Sistem etkin oturum çereziyle belirteç birlikte gelirse isteği reddeder.
 Misafir çerezi etkin oturum sayılmaz.
@@ -35,6 +41,20 @@ Mobil modülü bu motoru doğrudan çağırmaz.
 Modül sınırı denetimi başka modüllere doğrudan yazmayı yakalar.
 Mobil uçlar genel kayıt uçlarını veya telefonun seçtiği kayıt türlerini açmaz.
 
+### Kod denetimi istisnaları
+
+Semgrep, kodda belirli kalıpları arayan denetim aracıdır.
+Semgrep, uçların çağırdığı ortak izin işlevini izleyemez.
+Beş uçta yalnız bu denetim için dar istisna vardır.
+Gerçek HTTP testleri korunan işlemlere izinsiz erişimi sınar.
+
+İç kayıt türleri genel kayıt uçlarına açılmaz.
+Sunucu, işlem iznini denetledikten sonra kendi takip kaydını ekler.
+Bu ekleme yalnız mobil modülünün beş iç kayıt türünde çalışır.
+Ekleme bitince geçici izin bayrağı eski değerine döner.
+Semgrep istisnası yalnız bu ekleme satırını kapsar.
+İş kayıtlarında Frappe izinleri uygulanır.
+
 ## Açılacak komutlar
 
 Sunucu tek bir komut izin listesi tutar (AU-2).
@@ -49,7 +69,7 @@ Bir iş kaydı açılırsa sahibi kayıt türü için önce tam plan yazar (AU-1
 Plan bağlı kayıtları, izinleri ve geçerli durum değişimlerini belirtir.
 Plan ayrıca alanları, ekleri, çevrimdışı okuma süresini ve taslak ömrünü belirtir.
 Testler sahte kayıt türüyle sözleşme davranışını sınar.
-Sahte komutlar çalışan siteye yüklenmez.
+Sahte komutlar yalnız ayrı deneme sitesine bağlanır.
 
 ## Sunucudaki kayıtlar
 
@@ -90,8 +110,10 @@ Sunucu aynı kimlikle gelen iki isteği veri tabanında sıraya alır.
 İlk yazma geri alınırsa yeniden gönderim işlemi baştan çalıştırabilir.
 İçerik aynıysa sunucu aynı iş sonucunu döner.
 İçerik farklıysa sunucu kimlik çakışması döner.
-Sunucu, izin kaybından sonra saklı sonucu kullanarak kayıt içeriği göstermez.
-Sunucu tekrar oynatmada da güncel hesap ve kayıt izinlerini denetler.
+Sunucu tekrar isteğini yalnız etkin kurulumdan ve aynı hesaptan kabul eder.
+Sonuç yalnız işlem kimliğini ve işlemin uygulandığı bilgisini taşır.
+Sunucu bu yanıtta iş kaydının içeriğini göstermez.
+Bir işlem başarısız olursa sunucu gruptaki bütün yazmaları geri alır.
 
 Güncelleme ve silme, telefonun okuduğu sürümü gerektirir (AU-8).
 Sunucu kayıt satırını kilitler.
@@ -126,6 +148,10 @@ Sonraki yazma ilk yazma kesinleşene kadar yeni sıra numarası alamaz.
 Örneğin 8 numaralı kayıt beklerse 9 numaralı kayıt önce kesinleşemez.
 Telefon bu yüzden geç kesinleşen 8 numaralı kaydı atlamaz.
 Geri alınan yazma kayıt ve sıra ilerlemesini birlikte geri alır.
+MariaDB eski okuma görünümünden yeni bir satır kilidine geçişi reddedebilir.
+Sunucu bu hatada işlemi geri alır ve en çok üç kez dener.
+Üç deneme de başarısız olursa sunucu `503` ile yeniden deneme süresini döner.
+Bu deneme, veritabanı dışında etkisi olan komutu çalıştırmaz.
 Aynı kayıt türünü değiştiren bütün onaylı yollar bu sıraya katılır.
 Bu şart sağlanana kadar tür eşitlemeye açılmaz.
 
@@ -140,15 +166,25 @@ Telefon en son uyguladığı sayfanın imlecini geri gönderir.
 Sunucu silme işaretini geçerli bir imleç yeniden isteyebildiği sürece korur.
 Sistem, telefonun daha önce alabildiği kayıtlar için güncel izni yeniden denetler.
 Bu denetim, iş kaydı değişmemiş olsa bile çalışır.
-İşaret yalnız eski kimliği ve kaldırma nedenini taşır (AU-11).
+Sunucu her istekte en çok 100 eski teslimi denetler.
+Telefon, denetim sürüyorsa `has_more` değeriyle sonraki sayfayı ister.
+Yeni bir okuma izni, kayıt değişmese bile bir değişiklik olayı üretmelidir.
+Bu kural, telefonun daha önce hiç almadığı kaydı görmesini sağlar.
+Bu olay üretimi sınanmadan kayıt türü eşitlemeye açılmaz.
+İşaret yalnız kayıt türü ve eski kayıt kimliğini taşır (AU-11).
 İzin kaybı bildirimi iş kaydının içeriğini taşımaz.
 Frappe'nin yönetici kurtarma kayıtları telefona açılmaz.
 
 Sunucu kaldırma işaretlerini 30 gün saklar.
+Bir yanıt kaybolursa telefon aynı imleçle kaldırma işaretini yeniden alabilir.
+İşaretin yeniden alınması eski iş kaydını geri getirmez.
 İmleç en çok 7 gün geçerlidir.
 Temizlik, geçerli imlecin ihtiyaç duyduğu değişikliği silmez.
 Eski imlece dayanan güvenli bir değişiklik listesi kalmazsa ilk kopya istenir.
 Yetkili görevli temizliği elle başlatır.
+Görevli komut satırında `bench --site <site> execute platform_core.mobil.store.cleanup` komutunu çalıştırır.
+Görevli HTTP üzerinden `v1_cleanup` ucunu çağırır.
+HTTP ucu Frappe içindeki `System Manager` rolünü arar.
 Komut ve HTTP ucu aynı temizlik işlevini kullanır.
 Zamanlanmış bir temizlik işi kurulmaz.
 
@@ -176,6 +212,11 @@ Yayımlanan alanın adı, anlamı ve türü korunur.
 Uyumu bozan değişiklik yeni uç sürümünde yapılır.
 Eski uç proje kararıyla kapanana kadar bekleyen eski işlemleri kabul eder (AU-15).
 
+Kurulumda site ayarına 32 bayt rastgele veriyle üretilen gizli bir `mobile_cursor_key` eklenir.
+Anahtar değişirse telefonlar yeni bir tam kopya alır.
+Gövde sınırının sunucuya ulaşmadan da uygulanması için ters vekil ayarı gerekir.
+Site, `Retry-After` başlığını izinli tarayıcı kaynaklarına açar.
+
 ## Kaynakta doğrulanan Frappe davranışı
 
 Yerel `frappe/erpnext:v16.55.0` imajında Frappe 16.56.0 bulunur.
@@ -185,6 +226,8 @@ Sürüm `frappe/__init__.py:58` satırından doğrulandı.
   API yolu bu denetimlerden sonra çalışır.
 - `frappe/app.py:338–351` JSON gövdesini adres parametrelerinden ayrı işler.
   Bu yüzden kanca her iki kaynağı ayrı denetler.
+- `frappe/api/v1.py:35–41` mobil uç çalışmadan önce `cmd` alanını ekler.
+  Mobil uç, gelen ham gövdeyi ve adres parametrelerini ayrı denetler.
 - `frappe/auth.py:638–650,755–757` yerleşik belirteç yollarından sonra kancayı çağırır.
   İlk Frappe oturumu kancanın onayı yerine geçmez.
 - `frappe/app.py:214–220` oturumu belirteç kancasından önce açar.

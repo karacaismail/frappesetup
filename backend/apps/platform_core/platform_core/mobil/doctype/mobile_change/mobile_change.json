@@ -1,0 +1,60 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "description": "Telefon eşitlemesi için bir değişiklik kaydeder.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sequence",
+  "record_type",
+  "record_id",
+  "kind",
+  "target_installation"
+ ],
+ "fields": [
+  {
+   "description": "Sunucu değişiklikleri bu numaraya göre sıraya koyar.",
+   "fieldname": "sequence",
+   "fieldtype": "Int",
+   "label": "Sıra numarası",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "description": "Bu kod değişen kaydın türünü belirtir.",
+   "fieldname": "record_type",
+   "fieldtype": "Data",
+   "label": "Kayıt türü",
+   "reqd": 1
+  },
+  {
+   "description": "Bu değer değişen kaydı belirtir.",
+   "fieldname": "record_id",
+   "fieldtype": "Data",
+   "label": "Kayıt kimliği",
+   "reqd": 1
+  },
+  {
+   "description": "Tür, kaydın yenilendiğini veya kaldırıldığını belirtir.",
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Değişiklik türü",
+   "options": "upsert\nremove",
+   "reqd": 1
+  },
+  {
+   "description": "Bu alan doluysa değişikliği yalnız bu kurulum alır.",
+   "fieldname": "target_installation",
+   "fieldtype": "Link",
+   "label": "Hedef kurulum",
+   "options": "Mobile Installation"
+  }
+ ],
+ "links": [],
+ "module": "Mobil",
+ "name": "Mobile Change",
+ "permissions": [],
+ "sort_field": "sequence",
+ "sort_order": "DESC",
+ "states": []
+}
