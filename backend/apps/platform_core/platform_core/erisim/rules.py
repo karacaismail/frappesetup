@@ -111,6 +111,12 @@ _request_rules = request_cache(_load)
 
 def clear_cache(*_args, **_kwargs) -> None:
 	"""Forget the rules read in this request. Called when a rule, role or document type changes."""
+	_forget_rules()
+	# A rolled back change must not leave the rolled back rules behind either.
+	frappe.db.after_rollback.add(_forget_rules)
+
+
+def _forget_rules() -> None:
 	cache = getattr(frappe.local, "request_cache", None)
 	if cache is not None:
 		cache.pop(_load, None)
