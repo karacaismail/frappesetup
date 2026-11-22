@@ -13,7 +13,10 @@ info:
       A request that carries an `Authorization` header does not count as a human session.
     - Agent token: the `Authorization: Bearer fsat_...` header. It is valid only on the MCP endpoint.
 
-    API keys and OAuth tokens are not accepted on these endpoints.
+    - External OAuth: a Keycloak access token in the Authorization Bearer header. It is
+      valid only on the exact MCP endpoint when the site enables OAuth.
+
+    These endpoints reject API keys. Human approval always needs a human session.
     A request that carries both a cookie and an `Authorization` header is denied.
 
     No schema has a `confirm`, `approved` or `force` field.
@@ -66,6 +69,7 @@ paths:
       security:
         - humanSession: []
         - agentToken: []
+        - mcpOAuth: []
       parameters:
         - name: MCP-Protocol-Version
           in: header
@@ -100,11 +104,34 @@ paths:
               schema: {$ref: "#/components/schemas/JsonRpcResponse"}
         "202": {description: Notification accepted. There is no body.}
         "400": {description: "Invalid JSON-RPC body, header mismatch or unsupported version. The early denial of a user whose identity is known is written to the log with the code `protocol_error` or `origin_not_allowed`."}
-        "401": {description: "The token is unknown, has expired, its bound session has ended or its call allowance is used up."}
-        "403": {description: "The request carries no identity, the origin is not allowed, the identity type is not accepted or a cookie came together with a token. The endpoint is not open to guests. Frappe denies a request without identity with 403."}
+        "401":
+          description: Authentication is required or the credential was rejected or exhausted.
+          headers:
+            WWW-Authenticate:
+              description: Bearer challenge with a resource_metadata URL and scope mcp when OAuth is available.
+              schema: {type: string}
+        "403": {description: "The origin or identity type is refused, a cookie came together with a token, or the guest called a site with OAuth disabled."}
         "404": {description: Unknown method or unknown tool.}
         "406": {description: "The `Accept` header does not allow the value `application/json`."}
         "415": {description: "The `Content-Type` value is not `application/json`."}
+        "429": {description: MCP allows 120 requests per minute per signed-in account or guest IP. External OAuth verification also allows 120 requests per minute per IP before contacting Keycloak.}
+        "503": {description: The OAuth identity provider or call allowance store is unavailable.}
+
+  /platform_core.api.ai.mcp_resource_metadata:
+    get:
+      tags: [mcp]
+      operationId: getMcpResourceMetadata
+      summary: Read the OAuth protected resource metadata.
+      description: The discovery document is public when OAuth is configured and enabled. The response is bare JSON.
+      security: []
+      responses:
+        "200":
+          description: OAuth protected resource metadata.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/McpResourceMetadata"}
+        "404": {description: OAuth metadata is unavailable on this site.}
+        "429": {description: Discovery allows 60 requests per minute per IP.}
 
   /platform_core.api.ai.issue_agent_token:
     post:
@@ -387,7 +414,26 @@ components:
       scheme: bearer
       description: "The token with the `fsat_` prefix that the `issue_agent_token` endpoint issues."
 
+    mcpOAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A Keycloak access token obtained by Authorization Code with PKCE S256. See x-mcp-oauth.
+
   schemas:
+    McpResourceMetadata:
+      type: object
+      required: [resource, authorization_servers, scopes_supported, bearer_methods_supported]
+      properties:
+        resource: {type: string, format: uri}
+        authorization_servers:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items: {type: string, format: uri}
+        scopes_supported: {const: [mcp]}
+        bearer_methods_supported: {const: [header]}
+
     JsonRpcRequest:
       type: object
       required: [jsonrpc, method]
@@ -477,6 +523,8 @@ components:
         - report_too_large
         - transaction_active
         - token_call_limit
+        - token_call_state_lost
+        - token_expired
         - unknown_tool
         - preview_required
         - purge_failed
@@ -599,6 +647,26 @@ components:
 
 # Tool schema. `tools/list` returns these names and input schemas.
 # Every input schema carries `additionalProperties: false`. An unknown field makes the call be denied.
+x-mcp-oauth:
+  enabledByDefault: false
+  authorizationServer: Keycloak
+  registration: administrator
+  grantType: authorization_code
+  pkce: S256
+  userConsentRequired: true
+  redirectUriMatching: exact
+  scope: mcp
+  audience: exact MCP resource URL
+  requiredSignedResourceClaim: mcp_resource
+  resourceParameterRequiredOnTokenRequests: true
+  tokenLocation: Authorization Bearer header
+  maxTokenAgeSeconds: 300
+  maxToolCallsPerToken: 20
+  liveSessionRequired: true
+  sessionCheckDeadlineSeconds: 3
+  sessionCheckResponseLimitBytes: 8192
+  humanApprovalGranted: false
+
 x-mcp-tools:
   - name: plt_search_doctypes
     class: definition

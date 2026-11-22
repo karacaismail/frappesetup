@@ -1,7 +1,7 @@
-"""Canlı Keycloak ile bütünleşme testi.
+"""Integration test against a live Keycloak instance.
 
-Keycloak'ın verdiği gerçek belirteç kitaplıkla doğrulanır. Ortam değişkenleri yoksa test atlanır.
-Çalıştırma: backend/identity/keycloak/bin/kc-dev.sh ortamını yükleyin ve bu klasörde testi koşun.
+Verify a token issued by Keycloak. Skip the test if the environment variables are missing.
+Load the environment from backend/identity/keycloak/bin/kc-dev.sh, then run the test from this directory.
 """
 
 import http.client
@@ -17,6 +17,10 @@ from oidc_verify import JwksCache, TokenError, verify_access_token, verify_logou
 KC = os.environ.get("KC_PUBLIC_URL", "")
 SECRET = os.environ.get("ATONOTA_IDENTITY_SYNC_SECRET", "")
 ISS = f"{KC}/realms/platform"
+
+# Sample tenant scope and audience from contracts.md, section 2.
+TENANT_SCOPE = "aud-site-tenant1"
+TENANT_AUDIENCE = "site-tenant1"
 
 
 def local_issuer_parts(issuer):
@@ -81,7 +85,7 @@ class LocalTokenRequestTest(unittest.TestCase):
                     connect.return_value.request.assert_called_once()
 
 
-@unittest.skipUnless(KC and SECRET, "KC_PUBLIC_URL ve ATONOTA_IDENTITY_SYNC_SECRET yok, canlı test atlandı")
+@unittest.skipUnless(KC and SECRET, "Live test requires KC_PUBLIC_URL and ATONOTA_IDENTITY_SYNC_SECRET")
 class LiveKeycloakTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -92,20 +96,20 @@ class LiveKeycloakTest(unittest.TestCase):
         )
 
     def test_live_service_token_validates(self):
-        token = get_token("identity-sync", SECRET, "aud-site-tenant1")
+        token = get_token("identity-sync", SECRET, TENANT_SCOPE)
         claims = verify_access_token(
             token,
             cache=self.cache,
             issuer=ISS,
-            audience="site-tenant1",
+            audience=TENANT_AUDIENCE,
             allowed_azp={"identity-sync"},
             leeway=30,
         )
         self.assertEqual(claims["azp"], "identity-sync")
-        self.assertEqual(claims["aud"], "site-tenant1")
+        self.assertEqual(claims["aud"], TENANT_AUDIENCE)
 
     def test_live_token_rejects_wrong_audience(self):
-        token = get_token("identity-sync", SECRET, "aud-site-tenant1")
+        token = get_token("identity-sync", SECRET, TENANT_SCOPE)
         with self.assertRaises(TokenError) as caught:
             verify_access_token(
                 token, cache=self.cache, issuer=ISS, audience="press", allowed_azp={"identity-sync"}
@@ -113,7 +117,11 @@ class LiveKeycloakTest(unittest.TestCase):
         self.assertEqual(caught.exception.code, "wrong_audience")
         with self.assertRaises(TokenError) as caught:
             verify_access_token(
-                token, cache=self.cache, issuer=ISS, audience="site-tenant1", allowed_azp={"press-service"}
+                token,
+                cache=self.cache,
+                issuer=ISS,
+                audience=TENANT_AUDIENCE,
+                allowed_azp={"press-service"},
             )
         self.assertEqual(caught.exception.code, "wrong_azp")
 
@@ -135,14 +143,14 @@ class LiveKeycloakTest(unittest.TestCase):
         self.assert_combined_scope_rejected(
             "identity-sync",
             SECRET,
-            "aud-site-kiraci1 aud-press",
-            ("site-tenant1", "press"),
+            f"{TENANT_SCOPE} aud-press",
+            (TENANT_AUDIENCE, "press"),
         )
         self.assert_combined_scope_rejected(
             "identity-sync",
             SECRET,
-            "aud-site-kiraci1 admin-api kc-admin-api",
-            ("site-tenant1",),
+            f"{TENANT_SCOPE} admin-api kc-admin-api",
+            (TENANT_AUDIENCE,),
         )
 
     @unittest.skipUnless(os.environ.get("ATONOTA_PRESS_SERVICE_SECRET"), "Press service secret is required")
@@ -150,14 +158,14 @@ class LiveKeycloakTest(unittest.TestCase):
         self.assert_combined_scope_rejected(
             "press-service",
             os.environ["ATONOTA_PRESS_SERVICE_SECRET"],
-            "aud-site-kiraci1 aud-identity-sync",
-            ("site-tenant1", "identity-sync"),
+            f"{TENANT_SCOPE} aud-identity-sync",
+            (TENANT_AUDIENCE, "identity-sync"),
         )
 
     def test_live_token_is_not_logout_token(self):
-        token = get_token("identity-sync", SECRET, "aud-site-tenant1")
+        token = get_token("identity-sync", SECRET, TENANT_SCOPE)
         with self.assertRaises(TokenError) as caught:
-            verify_logout_token(token, cache=self.cache, issuer=ISS, client_id="site-tenant1")
+            verify_logout_token(token, cache=self.cache, issuer=ISS, client_id=TENANT_AUDIENCE)
         self.assertEqual(caught.exception.code, "not_logout_token")
 
     def test_key_list_comes_from_live_endpoint(self):

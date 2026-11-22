@@ -45,11 +45,12 @@ DevOps sorumlusu araç sürümlerini ve açık veritabanını günceller.
 Her yanlış alarm için sorumlu rolü ve gerekçeyi yazın.
 OSV istisnalarını `backend/dev/security/osv-exceptions.toml` dosyasına girin.
 Bandit istisnaları `backend/dev/security/bandit-exceptions.json` dosyasındadır.
+Semgrep istisnaları `backend/dev/security/semgrep-exceptions.json` dosyasındadır.
 Gitleaks istisnaları `backend/dev/security/.gitleaksignore` dosyasındadır.
 Yalnız incelemesi tamamlanan bulguları istisna sayın.
 
 Geri dönüş için bu araçların eklendiği değişikliği geri alın.
-Mevcut `guvenlik-denetimi` komutu tek başına çalışır.
+Mevcut `security-audit` komutu tek başına çalışır.
 
 ## Tarama ve istisna kapsamı
 

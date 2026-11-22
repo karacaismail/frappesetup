@@ -87,6 +87,10 @@
   code: plt_ai_action_proposal
   doctype: PLT AI Action Proposal
   definition_tr: Bu kayıt bir yazma işlemini onay için bekletir.
+- term_tr: MCP çağrı sayacı
+  code: plt_mcp_call_budget
+  doctype: PLT MCP Call Budget
+  definition_tr: Bu kayıt bir MCP belirteciyle yapılan araç çağrılarını sayar.
 - term_tr: Yapay zekâ yöneticisi
   code: PLT AI Manager
   scope: platform_core role

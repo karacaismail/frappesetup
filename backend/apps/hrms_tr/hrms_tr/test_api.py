@@ -181,3 +181,69 @@ class RetentionIntegrationTest(IntegrationTestCase):
 			self.assertTrue(frappe.db.exists("Leave Allocation", allocation.name))
 			for name in (other, submitted, recent):
 				self.assertTrue(frappe.db.exists("Leave Application", name))
+
+
+class EmployeeAnonymizationTest(IntegrationTestCase):
+	def test_account_deletion_redacts_employee_and_keeps_leave(self):
+		suffix = frappe.generate_hash(length=12)
+		user = f"retention-{suffix}@example.test"
+		frappe.get_doc(
+			doctype="User", email=user, first_name="Synthetic", last_name="Employee", send_welcome_email=0
+		).insert()
+		issuer = "http://identity.localhost:8660/realms/platform"
+		frappe.get_doc(doctype="PLT Identity Link", issuer=issuer, subject=suffix, user=user).insert()
+		personal_fields = {
+			"first_name": "Synthetic",
+			"middle_name": "Example",
+			"last_name": "Employee",
+			"employee_name": "Synthetic Example Employee",
+			"personal_email": f"personal-{suffix}@example.test",
+			"prefered_email": f"personal-{suffix}@example.test",
+			"cell_number": "+90 200 000 00 00",
+			"date_of_birth": "1990-01-01",
+		}
+		employee = frappe.get_doc(
+			doctype="Employee", name=f"{suffix}-employee", user_id=user, status="Active", **personal_fields
+		)
+		employee.db_insert()
+		other = frappe.get_doc(doctype="Employee", name=f"{suffix}-other", **personal_fields)
+		other.db_insert()
+		application = frappe.get_doc(
+			doctype="Leave Application",
+			name=f"{suffix}-leave",
+			employee=employee.name,
+			from_date=today(),
+			to_date=today(),
+		)
+		application.db_insert()
+		delete_account = frappe.get_attr("platform_core.api.identity.anonymize_user")
+		with (
+			patch.dict(
+				frappe.conf,
+				{
+					"keycloak_public_url": "http://identity.localhost:8660",
+					"keycloak_realm": "platform",
+					"kimlik_deletion_hmac_key": "synthetic-anonymization-test-key",
+				},
+			),
+			patch.object(frappe.local, "identity_service_claims", {"azp": "identity-sync"}, create=True),
+			patch.object(frappe.local, "form_dict", {"issuer": issuer, "subject": suffix}, create=True),
+			# Keep the real two-stage write inside the integration test's rollback.
+			patch.object(frappe.db, "commit"),
+		):
+			deleted_account = delete_account(issuer=issuer, subject=suffix)
+		self.assertEqual(deleted_account["status"], "Anonymized")
+		employee.reload()
+		self.assertEqual(employee.user_id, deleted_account["user"])
+		for field in ("first_name", "middle_name", "last_name", "employee_name"):
+			self.assertEqual(employee.get(field), "[REDACTED]", field)
+		self.assertEqual(employee.personal_email, deleted_account["user"])
+		self.assertEqual(employee.prefered_email, deleted_account["user"])
+		self.assertEqual(employee.cell_number, "[REDACTED]")
+		self.assertIsNone(employee.date_of_birth)
+		other.reload()
+		self.assertEqual(other.employee_name, personal_fields["employee_name"])
+		self.assertEqual(other.personal_email, personal_fields["personal_email"])
+		application.reload()
+		self.assertEqual(application.employee, employee.name)
+		self.assertEqual(employee.status, "Active")

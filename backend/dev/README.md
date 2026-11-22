@@ -1,7 +1,16 @@
 # Yerel geliştirme ortamı
 
 Bu ortam kiracı sitesini, Keycloak giriş sunucusunu ve Press sitesini birlikte açar.
-Compose, bu servisleri tek proje altında yönetir. Projenin adı `fs-e2e-ortam` olur.
+Compose, bu servisleri tek proje altında yönetir.
+Proje adı `fs-e2e-<port>-<özet>` biçimindedir.
+Betik özeti çalışma ağacının tam yolundan ve `PANE_PORT` değerinden üretir.
+Her çalışma ağacı ve port birleşimi ayrı veri birimleri kullanır.
+Ortak yığında yerel kaynaklardan derlenen imajların adları da ayrıdır.
+Ayrı kiracı ve Keycloak betikleri mevcut imaj adlarını korur.
+Aynı anda açık yığınların port aralıkları çakışmamalıdır.
+Sahiplik koruması başka sahibin verisini kullanmayı veya değiştirmeyi reddeder.
+Eski `fs-e2e-ortam` birimleri korunur. Yeni yığın bu verileri kendiliğinden taşımaz.
+`stack config` çıktısındaki `name` alanı geçerli proje adını gösterir.
 Bu kurulum yalnız yerel geliştirme içindir. Gerçek müşteri verisi kullanmayın.
 Press'in sunucu kurma işlemleri bu ortamda desteklenmez.
 
@@ -42,7 +51,8 @@ Kiracı ortamınızı kapatmak için `backend/dev/bin/stop` komutunu çalıştı
 
    Betik önce boş disk alanını ve kullanılabilir belleği ölçer.
    Başlatma için en az 10 GiB disk ve 3 GiB bellek gerekir.
-   Betik mevcut imajları yeniden kullanır. Eksik imajları derler.
+   Betik Keycloak ve eşitleme servisini güncel kaynaktan derler.
+   Diğer mevcut imajları yeniden kullanır. Eksik imajları derler.
    Kiracıya ERPNext ve `platform_core` kurulur. Press sitesine `press_tr` kurulur.
    `up`, `press_tr` kaynak kodunu kopyalar.
    Press kurulum işareti varsa `up`, `bench migrate` komutuyla Press veritabanını günceller.
@@ -79,6 +89,7 @@ Servisler ortak ağda aynı adlarla birbirine ulaşır.
 | Kiracı anlık bağlantısı | `http://tenant1.localhost` | P + 2 |
 | Press | `http://press.localhost` | P + 3 |
 | Press anlık bağlantısı | `http://press.localhost` | P + 4 |
+| Kimlik eşitleme servisi | `http://127.0.0.1` | P + 5 |
 | Yerel e-posta kutusu | `http://127.0.0.1` | P + 6 |
 
 Colima portları bilgisayara taşımıyorsa ayrı bağlantıyı açın.
@@ -87,7 +98,7 @@ Bu bağlantı Colima'yı veya başka servisleri yeniden başlatmaz.
 ```sh
 backend/dev/bin/tunnel open "$PANE_PORT" "$((PANE_PORT + 1))" \
   "$((PANE_PORT + 2))" "$((PANE_PORT + 3))" \
-  "$((PANE_PORT + 4))" "$((PANE_PORT + 6))"
+  "$((PANE_PORT + 4))" "$((PANE_PORT + 5))" "$((PANE_PORT + 6))"
 ```
 
 ## Denetleyin ve kapatın
@@ -101,7 +112,31 @@ backend/e2e/stack resources
 
 `check` kapalı servisleri açmaz. Eksik veya sağlıksız servis varsa başarısız olur.
 Bu denetim giriş senaryolarının tamamını doğrulamaz.
-Keycloak olayları yerel kayıt servisine gider. Gerçek sağlayıcılara istek gönderilmez.
+Keycloak olayları gerçek `identity-sync` servisine gider.
+Adres ortak ağda `http://identity-sync.localhost:6115/v1/events` olur.
+Sahte kayıt servisi olay dinleyicisinin ayrı testleri için kalır.
+Gerçek sağlayıcılara istek gönderilmez.
+
+`up`, Keycloak veritabanından `platform` alanının iç kimliğini okur.
+Betik bu kimliği eşitleme servisine ortam değişkeniyle verir.
+İki servis aynı `IDENTITY_SYNC_WEBHOOK_SECRET` ortam değişkenini kullanır.
+Sır imaja veya kaynak koda yazılmaz.
+Önizleme anahtarı aynı sırdan ayrı bir HMAC etiketiyle türetilir.
+HMAC, anahtarla hesaplanan doğrulama değeridir. Bu türetme yalnız yerel yığın içindir.
+Eşitleme kayıtları `identity-sync-data` biriminde saklanır.
+
+Canlı olay testini çalıştırın.
+
+```sh
+python3.14 backend/e2e/keycloak_delivery.py
+```
+
+Test, Keycloak'ta yalnız örnek bir hesap oluşturur ve değiştirir.
+Test başarılı olayı elle göndermez. Keycloak olayı kendisi gönderir.
+Test aynı olay kimliği için `processed` kaydını bekler.
+Bozuk imza ve eski zaman damgası için HTTP 401 yanıtını denetler.
+Örnek hesap geliştirme veritabanında kalır. Test gerçek müşteri hesabını değiştirmez.
+Son koşunun kaydı [canlı olay kanıtı](../e2e/keycloak-delivery-result.md) dosyasındadır.
 
 İş bitince bu projenin servislerini kapatın.
 

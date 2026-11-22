@@ -23,7 +23,7 @@ def source_digest(root, scope):
     git = shutil.which("git")
     if not git or not Path(git).is_absolute():
         return None
-    # Match the source list used by the Gitleaks step in guvenlik-denetimi.
+    # Match the source list used by the Gitleaks step in security-audit.
     listing = subprocess.run(
         [git, "--literal-pathspecs", "ls-files", "-z", "--cached", "--others",
          "--deduplicate", "--exclude-standard", "--", scope],
@@ -82,10 +82,18 @@ def main():
         raise ValueError("Expected report path, scan status and pre-scan signature.")
     report = json.loads(Path(sys.argv[1]).read_text())
     status = int(sys.argv[2])
-    if status not in (0, 1) or report["errors"] or bool(report["results"]) != (status == 1):
-        print("Semgrep did not complete cleanly.", file=sys.stderr)
+    errors = report["errors"]
+    findings = report["results"]
+    if not isinstance(errors, list) or not isinstance(findings, list):
+        raise TypeError("Expected Semgrep errors and results to be lists.")
+    if status not in (0, 1) or errors or bool(findings) != (status == 1):
+        print(
+            f"Semgrep did not complete cleanly: exit={status}, "
+            f"errors={len(errors)}, findings={len(findings)}.",
+            file=sys.stderr,
+        )
         return 1
-    remaining = reviewed_findings(root, CONFIG, report["results"], sys.argv[3])
+    remaining = reviewed_findings(root, CONFIG, findings, sys.argv[3])
     for finding in remaining:
         print(f"{finding['path']}:{finding['start']['line']} [{finding['check_id']}]")
     return int(bool(remaining))

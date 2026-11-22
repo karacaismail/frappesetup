@@ -19,8 +19,9 @@ from frappe.utils.response import json_handler
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
-from platform_core.ai import access, agent_token, policy, proposals, registry
+from platform_core.ai import access, agent_token, oauth, policy, proposals, registry
 from platform_core.ai.errors import CONTEXT, ToolDenied, log_tool_error, traceback_without_text
+from platform_core.identity import api as identity_api
 
 LIST_TTL_MS = 60000
 
@@ -84,21 +85,19 @@ def _handle() -> Response:
 def _check_principal() -> None:
 	kind = access.principal()
 	if kind == access.GUEST:
-		# Not reachable today: Frappe refuses a guest with 403 before this code runs, because the
-		# endpoint does not allow guests. The check stays as a second guard.
-		raise McpError(protocol.INVALID_REQUEST, "Authentication required", status=401)
+		config = identity_api.mcp_oauth_config()
+		if config and frappe.request.path == agent_token.MCP_PATH:
+			oauth.add_challenge(config)
+			raise McpError(protocol.INVALID_REQUEST, "Authentication required", status=401)
+		raise frappe.PermissionError(_("Authentication required", context=CONTEXT))
 	if kind == access.OTHER:
-		# BORC(scale): outside MCP clients cannot sign in with OAuth 2.1 yet. Effect: a client outside
-		# the panel has no way in. Owner: platform-core-yz. Closes when decision note 0002, section 6,
-		# gets an approved OAuth design.
-		# API keys and OAuth tokens are long-lived and do not carry the G-148 limits.
 		# The user is known here, so the denial is logged. The 403 response rolls the request
 		# back, so the log row is committed first. Nothing else has been written yet.
 		access.record_denial("auth", "credential_not_accepted")
 		raise _logged(
 			McpError(
 				protocol.INVALID_REQUEST,
-				"Use a session cookie or an agent token on this endpoint",
+				"Use an accepted session or bearer credential on this endpoint",
 				status=403,
 			)
 		)
@@ -171,6 +170,15 @@ def call_tool(params: dict) -> dict:
 	# Only the name of a registered tool is stored or returned. An unknown name is the caller's
 	# own text and may carry anything.
 	known_name = tool.name if tool else None
+	external_identity = getattr(frappe.local, "mcp_oauth", None)
+	if external_identity:
+		reason = oauth.spend_call(external_identity)
+		if reason:
+			access.record_denial("call", reason, tool=known_name, started=started)
+			config = identity_api.mcp_oauth_config()
+			if config:
+				oauth.add_challenge(config)
+			raise _logged(McpError(protocol.INVALID_REQUEST, "MCP token rejected", status=401))
 	if not agent_token.spend_call():
 		access.record_denial("call", "token_call_limit", tool=known_name, started=started)
 		raise _logged(McpError(protocol.INVALID_REQUEST, "The agent token has no calls left", status=401))
