@@ -38,7 +38,9 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 - `platform_core.kimlik` ve `press_tr.kimlik` yalnız `oidc_verify` kitaplığını kullanır.
 - `platform_core.kabuk` ile `platform_core.kimlik` birbirini çağırmaz.
 - `platform_core.mobil` yalnız `kimlik` modülünün açık doğrulama işlevini çağırabilir. Öteki modüller `mobil` modülünü çağırmaz.
-- `platform_core.erisim` öteki modülleri çağırmaz. Öteki modüller onu içe aktarmaz. Motor Frappe'nin izin kancalarıyla çalışır.
+- `platform_core.erisim` öteki modülleri çağırmaz. Motor Frappe'nin izin kancalarıyla çalışır.
+  - Öteki modüller yalnız `platform_core.erisim.api` yolunu çağırabilir. Örneğin `yapay_zeka` modülü `platform_core.erisim.api.report_guard` işlevini çağırır.
+  - `kabuk` modülü “Access Rule” kayıt olaylarını `doc_events` kancasıyla dinler. Bu yüzden kuralı değiştiren kod kaydı `save` ile yazar. `frappe.db.set_value` kayıt olaylarını çalıştırmaz.
 - `platform_core.model_gecidi` öteki modülleri çağırmaz. `yapay_zeka` modülü `model_gecidi` modülünün açık işlevlerini çağırabilir.
 - `platform_core.yapay_zeka` öteki modüllerin açık işlevlerini çağırabilir. Öteki modüller `yapay_zeka` modülünü çağırmaz. Uygulamalar araçlarını `ai_tools` kancasıyla bildirir.
 - `identity_sync` sitelerin açık uçlarını HTTP ile çağırır. Siteler `identity_sync` kodunu çağırmaz.
