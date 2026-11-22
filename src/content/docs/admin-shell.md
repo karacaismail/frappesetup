@@ -4,7 +4,7 @@ nav: "Admin shell"
 order: 15
 ---
 
-Bu kontrol listesi, satılan her uygulamanın (CronHR, CRM, Webshop) içine oturduğu ortak kabuğun asgari kapsamıdır. Her kalem backend kaynağını, uygulama yöntemini (native = Press/Frappe/Keycloak yerleşik; configure = yalnızca ayar/kayıt; develop = özel kod, yaşadığı uygulama parantezde) ve bağlı gereksinimi gösterir. Liste aynı zamanda X-09 "Admin Shell Uyumluluk Listesi"nin shell tarafıdır: bir uygulama Marketplace'te yayımlanmadan önce bu kalemlerin tamamı kabul testinden geçmiş olmalıdır.
+Bu kontrol listesi, satılan her uygulamanın (HRMS TR, CRM, Webshop) içine oturduğu ortak kabuğun asgari kapsamıdır. Her kalem backend kaynağını, uygulama yöntemini (native = Press/Frappe/Keycloak yerleşik; configure = yalnızca ayar/kayıt; develop = özel kod, yaşadığı uygulama parantezde) ve bağlı gereksinimi gösterir. Liste aynı zamanda X-09 "Admin Shell Uyumluluk Listesi"nin shell tarafıdır: bir uygulama Marketplace'te yayımlanmadan önce bu kalemlerin tamamı kabul testinden geçmiş olmalıdır.
 
 ## 1. Yerleşim, gezinme ve arama
 

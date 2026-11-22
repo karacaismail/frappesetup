@@ -46,11 +46,14 @@ Sürüm aralığını `pyproject.toml` dosyasından okuyun. Yorum satırını ar
 
 ## Denetim komutları
 
-Bu bölümü dev-ortam işi doldurur. Her komutun çalıştığı klasör de yazılır.
+Ortam komutları Pane'in verdiği `PANE_PORT` değerini kullanır.
 
 | Denetim | Komut | Klasör |
 | --- | --- | --- |
-| Henüz yok | Yok | Yok |
+| Frappe kurulum testleri | `backend/dev/bin/test platform_core` | Depo kökü |
+| Python kod ve biçim denetimi | `backend/dev/bin/ruff` | Depo kökü |
+| Modül sınırları | `backend/dev/bin/modul-sinirlari` | Depo kökü |
+| Ortam betiklerinin Python testleri | `python3 -m unittest discover -s backend/dev/tests` | Depo kökü |
 
 ## Proje sahibinin kararları
 
@@ -81,6 +84,12 @@ Kararlar 22 Kasım 2026 Pazar günü alındı.
   - Var olan dosya, klasör ve modül adları değişmez. Örneğin `kimlik`, `kabuk` ve `PROJE-KAYDI.md` adları kalır.
   - Var olan bir klasörün içine yeni dosya eklenince yalnız yeni dosyanın adı İngilizce olur.
   - Kullanıcıya görünen yeni metnin kaynağı İngilizcedir. Türkçesi çeviri dosyasında durur (V-2).
+- **D-13. Başka bir projenin ürün adı bu depoda yasaktır.** Proje sahibi bu kararı 22 Kasım 2026 Pazar günü verdi. Ad bu projeyle ilgili değildir. Ad bir ajan tarafından yanlışlıkla belgelere eklenmişti.
+  - Ad ve bütün yazım biçimleri hiçbir dosyada geçmez. Klasör adı, commit mesajı, imaj adı ve container adı da buna dahildir.
+  - Adın kendisi bu kayda da yazılmaz.
+  - İK uygulamasının teknik adı `hrms_tr` olur. Görünen adı “HRMS TR” olur. Ad, `press_tr` adıyla aynı kalıbı izler.
+  - Yapay zekâ uygunluk kapısı yasaklı adı SHA-256 özetiyle tanır. Böylece kapının kendisi de adı taşımaz.
+  - Eski commit mesajlarında ad geçer. Geçmiş yeniden yazılmadı, çünkü bu on dört dalı bozar. `backend` dalı `main` dalına birleşirken geçmiş tek commit'e indirilebilir.
 
 ## Orkestratörün seçtiği varsayılanlar
 
@@ -128,7 +137,7 @@ Backend kararları karar sitesinin bazı maddelerini değiştirdi. Site ayrı bi
 | G-80: Tema Keycloakify ile yapılır. | Tema Keycloak'ın kendi tema yapısıyla yapılır. | O-4 |
 | Rail 4: Saatlik yoklama ve gece mutabakatı | Zamanlanmış iş yok. Mutabakat elle başlar. | D-6, O-11 |
 
-- **O-16. `cronhr` lisansı GPL-3.0 olur.** `cronhr`, GPL-3.0 lisanslı `hrms` uygulamasını aynı süreçte kullanır. En güvenli seçim budur. Hukuk görüşü alınmadı.
+- **O-16. `hrms_tr` lisansı GPL-3.0 olur.** `hrms_tr`, GPL-3.0 lisanslı `hrms` uygulamasını aynı süreçte kullanır. En güvenli seçim budur. Hukuk görüşü alınmadı.
 - **O-17. Yapay zekâ katmanı her sitede çalışacak.** Press ve operasyon sitesi de aynı katmanı kullanmalı. Katmanın ayrı bir uygulamaya bölünmesi sonraki turda karara bağlanır.
 
 ## Değişmeyen sınırlar

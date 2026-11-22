@@ -1,0 +1,4 @@
+#!/bin/bash
+set -euo pipefail
+DEV_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+exec python3 -B "$DEV_DIR/check_boundaries.py" "$@"

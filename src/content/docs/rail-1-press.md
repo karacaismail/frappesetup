@@ -18,7 +18,7 @@ sequenceDiagram
     participant IY as iyzico
     participant AG as Agent (f1)
     participant S as Kiracı sitesi (ERPNext v16)
-    K->>P: Uygulamalar > CronHR > Etkinleştir
+    K->>P: Uygulamalar > HRMS TR > Etkinleştir
     P->>PT: get_apps_with_plans (TRY sarmalayıcı)
     PT-->>P: planlar, price_try, features
     K->>P: Plan seç
@@ -33,13 +33,13 @@ sequenceDiagram
     P->>PR: press.api.site.install_app(site, app, plan)
     PR->>PR: Site Active kontrolü, status=Pending
     PR->>AG: Agent Job "Install App on Site"
-    PR->>PR: install_marketplace_conf → Subscription, site_config sk_cronhr
-    AG->>S: bench install-app cronhr
+    PR->>PR: install_marketplace_conf → Subscription, site_config sk_hrms_tr
+    AG->>S: bench install-app hrms_tr
     AG-->>PR: Job Success → after_install_script, Site Active
     PR-->>P: realtime agent_job_update
     P->>S: api.shell.get_bootstrap (installed apps, Workspace Sidebar)
-    S-->>P: CronHR üst menü + çocuklar
-    S->>PR: get_subscription_info(sk_cronhr) → özellik kapıları
+    S-->>P: HRMS TR üst menü + çocuklar
+    S->>PR: get_subscription_info(sk_hrms_tr) → özellik kapıları
 ```
 
 Satın alma ödeme → abonelik → kurulum geçişleri tek durum makinesidir; yinelenen callback, kayıp iş sonucu ve ödeme alınıp kurulumun başarısız olduğu durumların telafisi G-125'tedir. Sabit kurallar: `install_app` yalnızca Site `Active` iken kabul edilir; Pending/Updating durumunda panel düğmeyi pasifler ve isteği kuyruğa alır (G-30). Her Free/Freemium uygulama için `price_usd=0` olan enabled bir Marketplace App Plan ve `run_after_install_script=1` şarttır; aksi halde Subscription ve `sk_<app>` anahtarı yazılmaz (doğrulandı, G-29). Kaldırma `press.api.client.run_doc_method(dt='Site', method='uninstall_app', args={app, create_offsite_backup, feedback})`, plan değişimi `change_app_plan` / `change_plan` + Site Plan Change ile yapılır. Ücret etkili her aksiyon önizle → onayla sözleşmesinden geçer; AI sağ paneli aynı araçları `press_tr.mcp.handler` üzerinden `confirm` bayrağıyla çağırır (G-27).
@@ -49,7 +49,7 @@ Satın alma ödeme → abonelik → kurulum geçişleri tek durum makinesidir; y
 | Katman | Press nesnesi | Karar |
 | --- | --- | --- |
 | Site planı | Site Plan: Trial (is\_trial\_plan=1, 14 gün), Başlangıç, Büyüme, Kurumsal | cpu\_time\_per\_day, max\_database\_usage, max\_storage\_usage, offsite\_backups=1, release\_groups = ERPNext v16 TR, roles ile görünürlük |
-| Uygulama planı | Marketplace App Plan (CronHR, CRM, Webshop) | interval Monthly, available\_on\_versions 'Version 16', features listesi (AI kotası dahil, G-92), her uygulamada bir ücretsiz plan |
+| Uygulama planı | Marketplace App Plan (HRMS TR, CRM, Webshop) | interval Monthly, available\_on\_versions 'Version 16', features listesi (AI kotası dahil, G-92), her uygulamada bir ücretsiz plan |
 | Para birimi | `price_try` Custom Field + USD karşılığı | `Team.before_insert` country='Türkiye' → currency='TRY'; `get_price_per_day` override TRY seçer; ücretli-uygulama kapıları `price_usd` okuduğu için her TRY planına USD karşılığı yazılır (doğrulandı) |
 | Harcama sınırı | Team Tier, spending\_limit (USD eşdeğeri), apply\_limits=1 | `check_budget_alerts` eşiği panelde TRY ile ayarlanır; `billing_forecast` faturalama ekranında |
 | Fiyat değişikliği | Yeni Site Plan kaydı; eski plan legacy\_plan=1 + allow\_downgrading\_from\_other\_plan | Fiyat anında yürürlüğe girer (doğrulandı); 30 gün önce e-posta + Press Notification, zamanlanmış Site Plan Change |

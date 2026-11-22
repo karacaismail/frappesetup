@@ -222,7 +222,7 @@
  {
   "id": "G-23",
   "title": "Sözleşme, aydınlatma ve ticari ileti onayları Team üzerinde",
-  "detail": "Mesafeli satış sözleşmesi, ön bilgilendirme formu ve KVKK aydınlatma metni checkout ve plan değişiminde onaylanır; consent_version/consent_at/consent_ip Team Custom Field'larında saklanır (6502 ve KVKK). Pazarlama iletileri için ayrı `marketing_consent`/`marketing_consent_at` kutusu ve İYS kaydı; Press Drip Email dizisi Türkçe ve CronHR kurulum rehberine bağlı, onaysız takımlara yalnızca işlemsel e-posta (ETK yorumu: olası, hukuk teyidi).",
+  "detail": "Mesafeli satış sözleşmesi, ön bilgilendirme formu ve KVKK aydınlatma metni checkout ve plan değişiminde onaylanır; consent_version/consent_at/consent_ip Team Custom Field'larında saklanır (6502 ve KVKK). Pazarlama iletileri için ayrı `marketing_consent`/`marketing_consent_at` kutusu ve İYS kaydı; Press Drip Email dizisi Türkçe ve HRMS TR kurulum rehberine bağlı, onaysız takımlara yalnızca işlemsel e-posta (ETK yorumu: olası, hukuk teyidi).",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P2",
@@ -281,7 +281,7 @@
  },
  {
   "id": "G-29",
-  "title": "CronHR Marketplace App ve App Plan kayıtları",
+  "title": "HRMS TR Marketplace App ve App Plan kayıtları",
   "detail": "Marketplace App: team = yayıncı takımımız, status Published, frappe_approved=1, subscription_type Paid/Freemium, sources → App Source (Version 16), site_config varsayılanları, after_install_script + `run_after_install_script=1` (ve uninstall karşılıkları), collect_feedback=1. Marketplace App Plan'lar TRY fiyat + USD karşılığı, interval Monthly, available_on_versions 'Version 16', features listesi; her Free/Freemium uygulama için enabled ve price_usd=0 olan plan şarttır, aksi halde Subscription ve `sk_<app>` anahtarı yazılmaz (doğrulandı).",
   "rail": "R1 Press",
   "priority": "MUST",
@@ -302,7 +302,7 @@
  {
   "id": "G-31",
   "title": "Product Trial: Keycloak sarmalayıcısı ve Türkçe kurulum yükü",
-  "detail": "Press trial girişi OTP'ye bağlıdır ve kurulum sihirbazına language 'en' / Asia-Kolkata yazar (doğrulandı). `press_tr.api.trial.start(product)` Keycloak oturumundaki Team ile `_get_or_create_site_request` → `ProductTrialRequest.create_site` zincirini çağırır; `override_doctype_class Product Trial Request` ile `get_setup_wizard_payload` country='Türkiye', time_zone='Europe/Istanbul', language='tr', currency='TRY' döner. Product Trial: apps (frappe, erpnext, tr_localization, cronhr), domain Root Domain, release_group prod, enable_pooling=1, standby_pool_size/queue, trial_days=14, trial_plan, redirect_to_after_login panel URL'si; deneme bitiminde `change_plan` ile ücretli plana geçiş ve kart zorunluluğu.",
+  "detail": "Press trial girişi OTP'ye bağlıdır ve kurulum sihirbazına language 'en' / Asia-Kolkata yazar (doğrulandı). `press_tr.api.trial.start(product)` Keycloak oturumundaki Team ile `_get_or_create_site_request` → `ProductTrialRequest.create_site` zincirini çağırır; `override_doctype_class Product Trial Request` ile `get_setup_wizard_payload` country='Türkiye', time_zone='Europe/Istanbul', language='tr', currency='TRY' döner. Product Trial: apps (frappe, erpnext, tr_localization, hrms_tr), domain Root Domain, release_group prod, enable_pooling=1, standby_pool_size/queue, trial_days=14, trial_plan, redirect_to_after_login panel URL'si; deneme bitiminde `change_plan` ile ücretli plana geçiş ve kart zorunluluğu.",
   "rail": "R1 Press",
   "priority": "MUST",
   "phase": "P4",
@@ -652,7 +652,7 @@
  {
   "id": "G-66",
   "title": "Frontend teknoloji yığını, monorepo ve koşullu yükleme",
-  "detail": "React + TypeScript + Vite monorepo (pnpm workspaces): `@platform/shell`, `@platform/frappe-sdk`, `@platform/meta-ui`, `@platform/design-tokens`, `@platform/ai-sidebar`, uygulama paketleri (`@apps/cronhr` ...); Ant Design 6 + @ant-design/x 2 (X 2.9.0 eş bağımlılığı `antd ^6.1.1`; doğrulandı: npm, 2026-10-08), @ant-design/x tüm AI/sohbet/agent UI'ında birinci sınıf, TanStack Query/Router/Table/Form. Uygulama modülleri yalnızca kurulu uygulamalar için dinamik import ile yüklenir; performans bütçesi (ilk yük JS ≤ 300 KB gzip, LCP ≤ 2,5 s 4G) CI'da Lighthouse ile ölçülür.",
+  "detail": "React + TypeScript + Vite monorepo (pnpm workspaces): `@platform/shell`, `@platform/frappe-sdk`, `@platform/meta-ui`, `@platform/design-tokens`, `@platform/ai-sidebar`, uygulama paketleri (`@apps/hrms_tr` ...); Ant Design 6 + @ant-design/x 2 (X 2.9.0 eş bağımlılığı `antd ^6.1.1`; doğrulandı: npm, 2026-10-08), @ant-design/x tüm AI/sohbet/agent UI'ında birinci sınıf, TanStack Query/Router/Table/Form. Uygulama modülleri yalnızca kurulu uygulamalar için dinamik import ile yüklenir; performans bütçesi (ilk yük JS ≤ 300 KB gzip, LCP ≤ 2,5 s 4G) CI'da Lighthouse ile ölçülür.",
   "rail": "R3 Frontend",
   "priority": "MUST",
   "phase": "P1",
@@ -1032,7 +1032,7 @@
  {
   "id": "G-104",
   "title": "Yetki sözleşmesi: roller, Role Profile, kayıt kuralı şablonları, alan düzeyleri",
-  "detail": "Her uygulama roller (ön ekli, örn. 'CronHR Admin/Manager/Employee'), Role Profile fixture'ları, Module Profile ile gizlenecek ERPNext modülleri, hiyerarşi alanları (Employee.reports_to, Department), varsayılan Access Rule şablonları (örn. çalışan yalnızca kendi kayıtlarını, yönetici ekibini görür) ve hassas alan permlevel'lerini bildirir; kiracı admin bunları G-98 ile değiştirir; sözleşme testleri yetki matrisini doğrular.",
+  "detail": "Her uygulama roller (ön ekli, örn. 'HRMS TR Admin/Manager/Employee'), Role Profile fixture'ları, Module Profile ile gizlenecek ERPNext modülleri, hiyerarşi alanları (Employee.reports_to, Department), varsayılan Access Rule şablonları (örn. çalışan yalnızca kendi kayıtlarını, yönetici ekibini görür) ve hassas alan permlevel'lerini bildirir; kiracı admin bunları G-98 ile değiştirir; sözleşme testleri yetki matrisini doğrular.",
   "rail": "App çerçevesi",
   "priority": "MUST",
   "phase": "P4",
@@ -1071,8 +1071,8 @@
  },
  {
   "id": "G-108",
-  "title": "CronHR kapsamı: hrms version-16 üzerine Türkiye bordro ve İK",
-  "detail": "CronHR, frappe/hrms version-16'ya bağımlı ayrı Frappe uygulamasıdır; Türkiye bordro (SGK işçi/işveren primleri, gelir vergisi dilimleri ve asgari ücret istisnası, damga vergisi, AGİ sonrası düzen, kıdem/ihbar, yıllık izin hak edişi 4857), e-bildirge/APHB dışa aktarım hazırlığı, Türkçe izin türleri ve resmi tatiller, organizasyon şeması; metadata-driven ekranlar + CronHR override'ları; AI tek tık akışları (izin onayı, bordro kontrol özeti); kapsam dışı: muhasebe entegrasyonu dışındaki finans modülleri. Mevzuat parametreleri yıllık güncellenen fixture tablosunda (mali müşavir teyidi).",
+  "title": "HRMS TR kapsamı: hrms version-16 üzerine Türkiye bordro ve İK",
+  "detail": "HRMS TR, frappe/hrms version-16'ya bağımlı ayrı Frappe uygulamasıdır; Türkiye bordro (SGK işçi/işveren primleri, gelir vergisi dilimleri ve asgari ücret istisnası, damga vergisi, AGİ sonrası düzen, kıdem/ihbar, yıllık izin hak edişi 4857), e-bildirge/APHB dışa aktarım hazırlığı, Türkçe izin türleri ve resmi tatiller, organizasyon şeması; metadata-driven ekranlar + HRMS TR override'ları; AI tek tık akışları (izin onayı, bordro kontrol özeti); kapsam dışı: muhasebe entegrasyonu dışındaki finans modülleri. Mevzuat parametreleri yıllık güncellenen fixture tablosunda (mali müşavir teyidi).",
   "rail": "App çerçevesi",
   "priority": "MUST",
   "phase": "P4",
@@ -1282,7 +1282,7 @@
  {
   "id": "G-129",
   "title": "P1 AI yetki devri prototipi (staging, tek araç)",
-  "detail": "İlk dikey dilimin AI adımı tam P3 teslimi değildir: staging'de tek araç (`cronhr.approve_leave`) site tarafından basılan kısa ömürlü aracı belirteciyle (G-148) kullanıcının kimliğinde çalışır, onay G-86 sözleşmesiyle sunucuda bağlanır ve AI Action Log'a yazılır. Kapsam dışı: niyet sınıflandırıcı, kredi ölçümü, müşteriye açılış. Kabul: yetkisiz kullanıcı için `denied`, onaysız yazma reddi, onaydan sonra belge değişmişse yeniden önizleme; tam teslim P3'te G-59, G-84..G-86 ile.",
+  "detail": "İlk dikey dilimin AI adımı tam P3 teslimi değildir: staging'de tek araç (`hrms_tr.approve_leave`) site tarafından basılan kısa ömürlü aracı belirteciyle (G-148) kullanıcının kimliğinde çalışır, onay G-86 sözleşmesiyle sunucuda bağlanır ve AI Action Log'a yazılır. Kapsam dışı: niyet sınıflandırıcı, kredi ölçümü, müşteriye açılış. Kabul: yetkisiz kullanıcı için `denied`, onaysız yazma reddi, onaydan sonra belge değişmişse yeniden önizleme; tam teslim P3'te G-59, G-84..G-86 ile.",
   "rail": "R5 AI",
   "priority": "MUST",
   "phase": "P1",
@@ -1692,7 +1692,7 @@
  {
   "id": "SA-16",
   "title": "Modül ürünleştirme ve aktivasyon hook'u",
-  "detail": "CronHR, CRM ve Webshop için Marketplace App + Marketplace App Plan (price_try, interval Monthly/Yearly, features) tanımlanır; platform core uygulamasında whitelisted subscription_update_hook metodu site_config sk_{app}/subscription anahtarlarını okuyup Workspace ve modül görünürlüğünü açar/kapar. marketplace_app_subscription.py'deki yalnız erpnext/hrms için çalışan koşul tüm platform uygulamalarını kapsayacak şekilde genişletilir; tenant app doğrulaması get_subscription_info(secret_key) ile yapılır.",
+  "detail": "HRMS TR, CRM ve Webshop için Marketplace App + Marketplace App Plan (price_try, interval Monthly/Yearly, features) tanımlanır; platform core uygulamasında whitelisted subscription_update_hook metodu site_config sk_{app}/subscription anahtarlarını okuyup Workspace ve modül görünürlüğünü açar/kapar. marketplace_app_subscription.py'deki yalnız erpnext/hrms için çalışan koşul tüm platform uygulamalarını kapsayacak şekilde genişletilir; tenant app doğrulaması get_subscription_info(secret_key) ile yapılır.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "MUST",
   "phase": "P4",
@@ -1842,7 +1842,7 @@
  {
   "id": "SA-31",
   "title": "SLA, atama ve bilgi bankası",
-  "detail": "Plan kademesi başına HD Service Level Agreement (condition customer.custom_plan_tier, Türkiye tatil listesi, TRT çalışma saatleri), ürün bazlı HD Team (CronHR, CRM, Webshop, Billing, Infra) + Assignment Rule, assign_within_team açık; Site Plan.support_included → SLA eşlemesi. HD Article/HD Article Category ürün bazlı yayınlanır ve REST ile SPA ve AI sidebar retrieval kaynağı olur; HD Ticket Feedback Option ile CSAT.",
+  "detail": "Plan kademesi başına HD Service Level Agreement (condition customer.custom_plan_tier, Türkiye tatil listesi, TRT çalışma saatleri), ürün bazlı HD Team (HRMS TR, CRM, Webshop, Billing, Infra) + Assignment Rule, assign_within_team açık; Site Plan.support_included → SLA eşlemesi. HD Article/HD Article Category ürün bazlı yayınlanır ve REST ile SPA ve AI sidebar retrieval kaynağı olur; HD Ticket Feedback Option ile CSAT.",
   "rail": "R6 Operasyon düzlemi",
   "priority": "SHOULD",
   "phase": "P6",
