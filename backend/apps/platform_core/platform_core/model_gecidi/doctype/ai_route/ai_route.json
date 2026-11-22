@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "UUID",
+ "description": "Defines the ordered model targets, selection rules, and data policy for a request.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [

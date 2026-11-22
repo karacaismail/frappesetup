@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "UUID",
+ "description": "Stores a provider model's capabilities, context size, output speed, and prices.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [

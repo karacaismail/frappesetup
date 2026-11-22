@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "UUID",
+ "description": "Stores a provider account and its optional monthly spending limit.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [

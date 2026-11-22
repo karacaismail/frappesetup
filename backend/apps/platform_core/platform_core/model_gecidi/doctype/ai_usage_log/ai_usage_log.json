@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "UUID",
+ "description": "Records provider attempts, token usage, cost, and outcome without storing message content.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [

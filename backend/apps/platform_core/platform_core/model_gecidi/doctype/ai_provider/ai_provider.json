@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "UUID",
+ "description": "Identifies a model provider, its API format, and its default connection address.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [

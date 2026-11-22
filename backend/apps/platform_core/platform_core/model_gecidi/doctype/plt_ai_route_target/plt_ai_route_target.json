@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "description": "Links one model to one API connection in the route's target order.",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",

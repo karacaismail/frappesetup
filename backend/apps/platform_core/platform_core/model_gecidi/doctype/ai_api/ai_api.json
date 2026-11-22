@@ -1,6 +1,7 @@
 {
  "actions": [],
  "autoname": "UUID",
+ "description": "Stores a provider connection, its authentication settings, and its usage limits.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
