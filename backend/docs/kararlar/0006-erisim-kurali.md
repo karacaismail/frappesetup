@@ -340,36 +340,100 @@ Aynı sonuç iki şeye dayanır. Birincisi tek değerlendiricidir (6. bölüm). 
 | Bağlantı araması | `frappe.get_list` | Liste kancası | `desk/search.py:263` |
 | Yazdırma ve PDF | Kayıtla izin denetimi | Kayıt kancası | `www/printview.py:544`, `:549` |
 | Paylaşma | `share` izni kayıtla denetlenir | Kayıt kancası | `share.py:143` |
-| Sorgu raporu | Raporun kendi SQL'i | **Kanca çalışmaz** | `desk/query_report.py:968` |
+| Bağlantı araması, özel işlevle | Uygulamanın arama işlevi | Motor sonucu süzer | `desk/search.py:133` |
+| Sorgu raporu | Raporun kendi SQL'i | Kanca çalışmaz. Rapor kapısı karar verir. | `desk/query_report.py:968` |
+| Hazır rapor dosyası | Özel dosya indirme | Rapor kapısı her okuyuşta karar verir | `core/doctype/file/file.py:976` |
 | Sistem kodu | `frappe.get_all`, ham SQL | **Kanca çalışmaz** | `__init__.py:1400` |
 
 ### Sorgu raporu açığı
 
-Sorgu raporu (“Query Report” ve “Script Report”) veriyi kendi SQL'iyle okur. Frappe sonucu yalnız “User Permission” kayıtlarına göre süzer (`desk/query_report.py:971`, `:1199`). Liste kancası bu yolda çağrılmaz. Bu yüzden kural sorgu raporuna kendiliğinden girmez.
+Sorgu raporu (“Query Report” ve “Script Report”) veriyi kendi SQL'iyle ya da koduyla okur. Frappe sonucu yalnız “User Permission” kayıtlarına göre süzer (`desk/query_report.py:971`, `:1199`). Liste kancası bu yolda çağrılmaz. Frappe bu yolda alanı izin seviyesine göre de çıkarmaz. Bu yüzden kural sorgu raporuna kendiliğinden girmez.
 
 Karar şudur: Motor bu raporlara bir kapı koyar. Kapı güvenli tarafta kalır.
 
-1. Kapı önce alan seviyesine bakar. Öznenin ana kayıt türündeki bütün izin seviyelerinde okuma izni olmalıdır. Yoksa kapı raporu reddeder. Bu denetim kuralsız kayıt türünde de çalışır.
-2. Raporun ana kayıt türü kurallı değilse kapı kayıt kuralına bakmaz.
-3. Öznenin o türde `all` kapsamlı ve süzgeçsiz bir okuma kuralı varsa kapı raporu geçirir. Özne zaten bütün kayıtları görür.
-4. Öteki durumda kapı raporu izin hatasıyla reddeder.
-5. Bir uygulama raporunu kurala uyumlu yazabilir. Örneğin rapor veriyi `frappe.get_list` ile okur. Uygulama bu raporu `access_rule_aware_reports` kancasıyla bildirir. Kapı bildirilen raporu geçirir. Bildiren uygulama kayıt kuralını ve alan seviyesini birlikte üstlenir.
+#### Kapı nerede durur?
 
-Alan seviyesi denetiminin nedeni şudur: Sorgu raporu SQL'in seçtiği her sütunu döner. Frappe bu yolda alanı izin seviyesine göre çıkarmaz. Bütün kayıtları gören kullanıcı maaş alanını okuyamayabilir. Rapor o alanı yine de dönerdi.
+Rapor verisine giden her yol “Report” kaydının iki yönteminde biter. Yöntemler `execute_query_report` ve `execute_script_report` olur (`desk/query_report.py:93`). Kapı bu iki yöntemin başındadır.
 
-Kapı Frappe'nin `override_whitelisted_methods` kancasıyla bağlanır. Bu kanca bir ucun yerine başka işlev koyar (`__init__.py:1577`). Kapı `frappe.desk.query_report.run` ve `frappe.desk.query_report.export_query` uçlarını sarar. Frappe'nin kodu değişmez (M-4).
+Motor “Report” kayıt türünü Frappe'nin `extend_doctype_class` kancasıyla genişletir (`model/document.py:218`). Frappe'nin kodu değişmez (M-4). Böylece şu yolların hepsi aynı kapıdan geçer:
 
-Hazır rapor (“Prepared Report”) arka planda üretilir ve uçtaki kapıdan geçmez. Bu yüzden kapı “Prepared Report” kaydı açılırken de çalışır. Kapı o kayıt okunurken de çalışır. Böylece başkasının hazırladığı rapor da indirilemez. Rapora bağlı dosya da aynı denetimden geçer (`core/doctype/file/file.py:1108`). Zamanlanmış e-posta raporu (“Auto Email Report”) kaydı doğrulanırken de çalışır. İkisi `doc_events` kancasıyla bağlanır.
+- HTTP ucundan rapor çalıştırma ve dışa aktarma,
+- arka planda dışa aktarma işi,
+- hazır rapor (“Prepared Report”) üretimi,
+- raporu Python'dan çağıran kod. Örneğin yapay zekâ katmanının `run_report` aracı böyledir.
 
-Kapının iki sınırı vardır:
+Arka plan işi veriyi okurken kapıdan yeniden geçer. Yetki sıraya alma ile çalışma arasında düşerse iş reddedilir.
 
-- Kapı yalnız raporun ana kayıt türüne bakar. Rapor başka bir kurallı türü de okuyabilir. Kapı bunu göremez.
-- Kapı yalnız HTTP ucunda çalışır. Raporu Python'dan çağıran kod kapıyı atlar.
+#### Rapor okuduğu türleri bildirir
 
-Bu sınırlar için iki önlem yazıldı:
+Kapı raporun hangi kayıt türlerini ve alanları okuduğunu bilmelidir. Uygulama bunu `hooks.py` dosyasında bildirir:
 
-- Kendi uygulamalarımızda kullanıcıya dönen veri `frappe.get_list` ile okunur (G-3). `frappe.get_all` ve ham SQL gerekçeli istisnadır.
-- `yapay_zeka` modülünün `run_report` aracı raporu Python'dan çağırıyor. Araç, çağıracağı işlevi `frappe.override_whitelisted_method` ile bulmalıdır. Böylece kapı o yolda da çalışır. Bu istek raporda orkestratöre iletildi.
+```python
+access_rule_report_scopes = {
+    "Leave Summary": {"Leave Application": ["employee", "status"], "Employee": ["department"]},
+}
+```
+
+Alan listesi `["*"]` ise raporun o türün bütün alanlarını okuduğu sayılır.
+
+Kapı bildirilen her kayıt türü için üç şeye bakar:
+
+1. Öznenin o türde okuma rol izni var mı?
+2. Tür kurallıysa öznenin süzgeçsiz `all` kuralı var mı? Yoksa özne bütün kayıtları göremez.
+3. Öznenin bildirilen alanların izin seviyesinde okuma izni var mı?
+
+Biri eksikse kapı raporu izin hatasıyla reddeder.
+
+#### Bildirimi olmayan rapor
+
+Bildirimi olmayan raporun kapsamı bilinmez. Kapı en kötü durumu varsayar. Rapor kendi ana türünü ve bütün kurallı türleri, bütün alanlarıyla okuyor sayılır.
+
+Sonucu şudur: Sitede bir kural varsa bildirimsiz rapor daraltılmış kullanıcıya çalışmaz. Bu, standart ERPNext raporlarını da kapsar. Uygulama raporunu bildirince rapor yeniden açılır.
+
+Bir sınır kalır. Bildirimsiz rapor kuralsız başka bir türün gizli alanını okuyabilir. Kapı o türü bilemez. Kapı yalnız ana türün ve kurallı türlerin alan seviyesini denetler.
+
+Bir rapor veriyi `frappe.get_list` ile okuyabilir. O rapor kuralı ve alan seviyesini kendisi uygular. Uygulama bu raporu `access_rule_aware_reports` kancasıyla bildirir. Kapı bu raporu geçirir.
+
+Yanlış bildirim kapıyı yanıltır. Bildirimi yazan uygulama doğruluğundan sorumludur. Bildirim kod incelemesinden geçmelidir.
+
+#### Hazır rapor
+
+Hazır raporun sonucu dosyada saklanır. Saklı sonuç, raporu şimdi çalıştırmak kadar hassastır. Bu yüzden üç denetim vardır:
+
+- “Prepared Report” kaydı açılırken kapı çalışır.
+- “Prepared Report” kaydı okunurken kapı çalışır. İndirme ucu bu okumayı yapar (`core/doctype/prepared_report/prepared_report.py:351`).
+- Rapora bağlı dosya her okunuşta denetlenir. Motor “File” kayıt türünü de genişletir.
+
+Frappe dosyanın sahibine ve dosyanın paylaşıldığı kişiye bağlı kayda bakmadan izin verir (`core/doctype/file/file.py:1097`). Motorun denetimi bu karardan önce çalışır. Dosya sahibi de istisna değildir. Yetkisi düşen kullanıcı kendi hazırladığı dosyayı da okuyamaz.
+
+#### Zamanlanmış e-posta raporu
+
+“Auto Email Report” raporu sonradan, kayıttaki kullanıcı adına çalıştırır. Proje zamanlanmış iş kurmaz (D-6). Bu yüzden karar en dar olandır:
+
+- Kurallı veriye dokunan “Auto Email Report” kaydı kaydedilemez.
+- Var olan böyle bir kayıt çalışmaz. İndirme, elle gönderme ve zamanlanmış gönderme reddedilir.
+- Kapsamı bilinmeyen rapor, sitede kural varsa kurallı veriye dokunuyor sayılır.
+
+Bu denetim “Administrator” için de geçerlidir. Motor “Auto Email Report” kayıt türünü de genişletir.
+
+### Bağlantı araması
+
+Bağlantı araması olağan yolda `frappe.get_list` kullanır. Liste kancası çalışır.
+
+Bir bağlantı alanı ya da uygulama kendi arama işlevini verebilir. Frappe o işlevin sonucunu olduğu gibi döner (`desk/search.py:133`). Uygulama türün aramasını `standard_queries` kancasıyla da değiştirebilir (`desk/search.py:125`). Böyle bir işlev kuralı ve alan seviyesini atlayabilir. Motor işlevin içini göremez.
+
+Bu yüzden motor sonucu kendisi süzer. Motor Frappe'nin iki arama ucunu `override_whitelisted_methods` kancasıyla sarar (`__init__.py:1577`).
+
+- Özel arama işlevi kullanıldıysa motor dönen adları `frappe.get_list` ile yeniden sorar. Yalnız öznenin görebildiği kayıtlar kalır.
+- Motor ek sütunları atar. Özel işlev gizli bir alanı açıklama sütununa koymuş olabilir.
+- Özne bütün kayıtları ve bütün alanları görüyorsa sonuç değişmez.
+- Uygulama güvendiği arama işlevini `access_rule_verified_queries` kancasıyla bildirir. Motor o işlevin sonucuna dokunmaz.
+
+Süzme 1 ek sorgu açar. Olağan aramada ek sorgu yoktur.
+
+İki sarmalayıcı aramadan önce `select` iznini arar. Güvenlik kapısı her uçta açık izin denetimi ister. Bunun bir yan etkisi vardır. “DocType” türünde okuma izni olmayan kullanıcı kayıt türü adı arayamaz.
+
+Sitede kurulu özel arama işlevleri tek tek incelenmedi. Süzgeç bu yüzden işlevin kendisine güvenmez.
 
 ### Kapsanmayan yüzeyler
 
@@ -426,7 +490,7 @@ Yapay zekâ katmanı ayrı bir yetki yolu kurmaz. Katman kullanıcının kimliğ
 | `list_documents` | `frappe.get_list` | Liste kancası çalışır. |
 | `get_document` | `check_permission("read")` ve alan silme | Kayıt kancası ve izin seviyesi çalışır. |
 | Yazma araçları | Onaydan sonra kaydın `save` yolu | Kayıt kancası çalışır. |
-| `run_report` | `frappe.desk.query_report.run`, Python'dan | Rapor kapısı çalışmaz. 9. bölümdeki istek bunu kapatır. |
+| `run_report` | `frappe.desk.query_report.run`, Python'dan | Rapor kapısı çalışır. Kapı “Report” kaydının içindedir. |
 
 - `erisim` modülü `yapay_zeka` modülünü içe aktarmaz. `yapay_zeka` da `erisim` modülünü içe aktarmaz. İki modül yalnız Frappe'nin kancalarında buluşur.
 - Yapay zekâ kuralları genel kayıt araçlarıyla yönetir. “Access Rule” olağan bir kayıt türüdür. Yazma yine öneri ve insan onayı ister.
@@ -490,11 +554,13 @@ Beklenen sonuçlar bu nottan, sözleşmeden ve karar sitesinden gelir (D-1).
 | `test_sorgu_sayisi.py` | Liste sorgu sayısı kayıt sayısıyla artmaz. | P-1 |
 | `test_inceleme.py` | Bağımsız incelemenin bulguları, bölüm ve şirket kapsamları, işleçler. | R-9 |
 | `test_second_review.py` | İkinci incelemenin üç bulgusu. | R-9 |
+| `test_third_review.py` | Hazır rapor dosyası, zamanlanmış e-posta raporu, rapor kapsamı, arka plan dışa aktarması. | R-9 |
 
 Güvenlik kapısı uç testlerini modülün yanında ister. Bu yüzden iki dosya daha vardır:
 
 - `api/test_access.py` dört ucun misafir ve yabancı veri reddini sınar.
 - `erisim/test_reports.py` sorgu raporu kapısını sınar.
+- `erisim/test_link_search.py` bağlantı araması süzgecini sınar.
 
 Testler önce kancalar kapalıyken çalıştırıldı. 83 testten 80'i beklenen nedenle başarısız oldu (D-2). Örneğin çalışan bütün kayıtları gördü ve başkasının kaydı 200 döndü. Kancalar açılınca testler geçti.
 
@@ -524,6 +590,19 @@ Orkestratör ikinci bir bağımsız inceleme yaptırdı. İnceleme üç engelley
 | Eşzamanlı istek kaldırılmış yetkiyi önbelleğe geri koyuyor. | Ortak önbellek kaldırıldı. |
 
 İnceleme dört uçta istek sayısı sınırı olmadığını da yazdı. Uçlar oturum ister ve misafire kapalıdır. Sınır bu turda eklenmedi.
+
+### Üçüncü inceleme
+
+İkinci incelemenin düzeltmeleri yeniden incelendi. Orkestratör altı karar verdi. Her karar için önce test yazıldı. Testler `tests/test_third_review.py` ve `test_link_search.py` dosyalarındadır.
+
+| Karar | Düzeltme |
+| --- | --- |
+| Hazır rapor dosyası her okunuşta denetlensin. Dosya sahibi istisna olmasın. | “File” kayıt türü genişletildi. |
+| Kurallı veriye dokunan “Auto Email Report” açılamasın ve çalışmasın. | “Auto Email Report” kayıt türü genişletildi. |
+| Kapsamı bilinmeyen rapor çalışmasın. Rapor okuduğu türleri bildirsin. | `access_rule_report_scopes` kancası eklendi. |
+| Arka planda dışa aktarma izni yeniden denetlesin. | Kapı “Report” kaydının içine taşındı. |
+| Özel bağlantı aramalarının kapsamı doğrulansın. | Motor özel arama sonucunu süzüyor. |
+| Varsayılan test komutu gereken uygulamayı kursun. | `backend/dev/bin/test` ERPNext'i de kuruyor. |
 
 ### Özne alanlarını koruyun
 

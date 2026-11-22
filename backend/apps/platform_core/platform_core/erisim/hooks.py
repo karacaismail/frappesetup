@@ -15,9 +15,11 @@ def has_permission(doc, ptype: str | None = None, user: str | None = None, debug
 	user = user or frappe.session.user
 	if user == "Administrator":
 		return True
-	if doc.doctype == "Prepared Report":
+	if doc.doctype == reports.PREPARED_REPORT:
 		# A stored report result is as sensitive as running the report now.
 		return not reports.denial(doc.report_name, user)
+	if doc.doctype == "File" and doc.get("attached_to_doctype") == reports.PREPARED_REPORT:
+		return not reports.prepared_report_denial(doc.get("attached_to_name"), user)
 	if not rules.is_governed(doc.doctype):
 		return True
 	return engine.decide(doc, ptype, user)
