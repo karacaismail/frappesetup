@@ -152,6 +152,12 @@
 
 /* tokens:end */
 
+/* Login-only layout tokens. */
+:root {
+  --at-recovery-code-column: 16ch;
+  --at-checkbox-box: 1.25rem;
+}
+
 /* PatternFly değişkenleri Atonota tokenlarına bağlanır. Böylece temel bileşenler de aynı kimliği taşır. */
 :root,
 :root.pf-v5-theme-dark {
@@ -502,8 +508,8 @@
 
 .login-pf .pf-v5-c-check__input {
   accent-color: var(--at-color-action);
-  inline-size: 1.25rem;
-  block-size: 1.25rem;
+  inline-size: var(--at-checkbox-box);
+  block-size: var(--at-checkbox-box);
 }
 
 .login-pf .pf-v5-c-input-group {
@@ -572,6 +578,33 @@
   background: var(--at-color-surface-sunken);
   border-color: var(--at-color-line-strong);
   color: var(--at-color-ink);
+}
+
+/* Make room for an entire recovery code before adding another column. */
+.login-pf #kc-recovery-codes-list {
+  column-count: auto;
+  column-width: var(--at-recovery-code-column);
+  column-gap: var(--at-space-5);
+}
+
+.login-pf #kc-recovery-codes-list > li {
+  break-inside: avoid;
+}
+
+/*
+ * Link-style button, for example the print, download and copy actions of the recovery codes screen.
+ * The base theme gives it its own blue and changes colour and background on plain focus.
+ * Here it uses the link tokens. Focus alone changes nothing. The shared focus line shows keyboard focus.
+ */
+.login-pf .pf-v5-c-button.pf-m-link {
+  --pf-v5-c-button--m-link--Color: var(--at-color-link);
+  --pf-v5-c-button--m-link--BackgroundColor: transparent;
+  --pf-v5-c-button--m-link--focus--Color: var(--at-color-link);
+  --pf-v5-c-button--m-link--focus--BackgroundColor: transparent;
+  --pf-v5-c-button--m-link--hover--Color: var(--at-color-link-hover);
+  --pf-v5-c-button--m-link--hover--BackgroundColor: var(--at-color-surface-sunken);
+  --pf-v5-c-button--m-link--active--Color: var(--at-color-link-hover);
+  --pf-v5-c-button--m-link--active--BackgroundColor: var(--at-color-surface-sunken-hover);
 }
 
 .login-pf .pf-v5-c-button.pf-m-control {

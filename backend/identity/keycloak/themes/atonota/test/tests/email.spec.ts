@@ -1,8 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { KC, MAILPIT, REALM, admin, createUser, screen } from './helpers';
+import { KC, MAILPIT, REALM, admin, createUser, loginUrl, screen } from './helpers';
 
 // Atonota e-posta temasının testleri. E-postalar Mailpit kutusundan okunur.
 // Her test kendi uydurma alıcısını açar ve yalnız o alıcının postasını arar.
@@ -279,11 +280,11 @@ async function expectMail(
   return link;
 }
 
-const readMessages = (lang: Lang): Map<string, string> => {
+const readMessages = (lang: Lang, directory = emailDir): Map<string, string> => {
   const entries = new Map<string, string>();
-  for (const line of readFileSync(join(emailDir, 'messages', `messages_${lang}.properties`), 'utf8').split('\n')) {
+  for (const line of readFileSync(join(directory, 'messages', `messages_${lang}.properties`), 'utf8').split('\n')) {
     if (!line.trim() || line.startsWith('#') || !line.includes('=')) continue;
-    entries.set(line.slice(0, line.indexOf('=')).trim(), line.slice(line.indexOf('=') + 1));
+    entries.set(line.slice(0, line.indexOf('=')).trim().replace(/\\ /g, ' '), line.slice(line.indexOf('=') + 1));
   }
   return entries;
 };
@@ -324,18 +325,51 @@ test.describe('e-posta ileti dosyaları', () => {
     }
   });
 
-  test('sihirli bağlantı şablonu eklentinin beklediği adı ve değişkenleri kullanır', () => {
-    // Ad ve değişkenler sky-cloak/keycloak-magic-link v0.3.0 dosyasından okundu:
-    // şablon skycloak-magic-link-email.ftl, konu anahtarı magicLinkEmailSubject, değişkenler link ve clientName.
-    for (const kind of ['html', 'text']) {
-      const path = join(emailDir, kind, 'skycloak-magic-link-email.ftl');
-      expect(existsSync(path), path).toBe(true);
-      const source = readFileSync(path, 'utf8');
-      expect(source).toMatch(/\blink\b/);
-      // Eklenti süre değişkeni vermez. Şablon verilmeyen değişkene dayanmamalıdır.
-      expect(source).not.toMatch(/linkExpiration/);
+  test('sihirli bağlantı şablonları ve iletileri kurulu eklentiyle eşleşir', () => {
+    const jar = process.env.MAGIC_LINK_PROVIDER_JAR;
+    test.skip(!jar, 'Kurulu eklentinin arşiv yolu MAGIC_LINK_PROVIDER_JAR ile verilir.');
+    if (!jar) return;
+
+    const entries = execFileSync('unzip', ['-Z1', jar], { encoding: 'utf8' }).trim().split(/\r?\n/);
+    const templates = entries.flatMap((entry) => {
+      const template = /^theme-resources\/templates\/((?:html|text)\/[^/]+\.ftl)$/.exec(entry);
+      return template ? [template[1]] : [];
+    });
+    expect(templates.map((template) => template.split('/')[0]).sort()).toEqual(['html', 'text']);
+
+    const messagesEntry = 'theme-resources/messages/messages_en.properties';
+    expect(entries).toContain(messagesEntry);
+    const messages = execFileSync('unzip', ['-p', jar, messagesEntry], { encoding: 'utf8' });
+    const subjectKeys = [...messages.matchAll(/^([^#=\s]+[Ss]ubject)\s*=/gm)].map((match) => match[1]);
+    expect(subjectKeys).toHaveLength(1);
+
+    const constants = (className: string) => {
+      const entry = entries.find((path) => path.endsWith(`/${className}.class`));
+      if (!entry) throw new Error(`Provider class missing from archive: ${className}`);
+      return execFileSync('unzip', ['-p', jar, entry]).toString('latin1').split(/[^ -~]+/);
+    };
+    const providerId = constants('MagicLinkAuthenticatorNormalFactory').find((value) => value === 'magiclink');
+    const sentKey = constants('MagicLinkAuthenticatorNormal').find((value) => value.endsWith('-emailSentText'));
+    const emptyEmailKey = constants('AbstractMagicLinkAuthenticator').find((value) => value === 'Email cannot be empty');
+    expect(providerId).toBeDefined();
+    expect(sentKey).toBeDefined();
+    expect(emptyEmailKey).toBeDefined();
+    expect(messages).toContain(`${sentKey}=`);
+    // Keycloak looks up the alternatives using the provider ID and these suffixes.
+    const loginKeys = [`${providerId}-display-name`, `${providerId}-help-text`, sentKey!, emptyEmailKey!];
+    const loginDir = fileURLToPath(new URL('../../login/', import.meta.url));
+
+    const missing = templates.filter((template) => !existsSync(join(emailDir, template)));
+    for (const lang of ['tr', 'en'] as const) {
+      if (!readMessages(lang).get(subjectKeys[0])?.trim()) {
+        missing.push(`email/messages/messages_${lang}.properties: ${subjectKeys[0]}`);
+      }
+      const loginMessages = readMessages(lang, loginDir);
+      for (const key of loginKeys) {
+        if (!loginMessages.get(key)?.trim()) missing.push(`login/messages/messages_${lang}.properties: ${key}`);
+      }
     }
-    for (const lang of ['tr', 'en'] as const) expect(readMessages(lang).has('magicLinkEmailSubject')).toBe(true);
+    expect(missing, 'temada eksik şablon veya ileti anahtarı').toEqual([]);
   });
 });
 
@@ -413,17 +447,17 @@ test.describe('sihirli bağlantı e-postası', () => {
         body: JSON.stringify({ username: email, email, enabled: true, emailVerified: true, attributes: { locale: [lang] } }),
       });
       expect(created.status).toBe(201);
-      const sent = await fetch(`${base}/realms/${realmName}/skycloak-magic-link`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          email,
-          clientId: 'account-console',
-          redirectUri: `${base}/realms/${realmName}/account/`,
-          send: true,
-        }),
-      });
-      expect(sent.ok, `sihirli bağlantı isteği: ${sent.status}`).toBe(true);
+      await page.goto(loginUrl(lang, realmName, base));
+      const alternative = page.locator('form:has([name="tryAnotherWay"])');
+      await alternative.evaluate((form: HTMLFormElement) => form.requestSubmit());
+      const signInOption = {
+        tr: 'Sihirli bağlantı E-postanıza gelen bağlantıyla oturum açın.',
+        en: 'Magic link Sign in with a link sent to your email.',
+      };
+      await page.getByRole('button', { name: signInOption[lang], exact: true }).click();
+      const username = page.locator('input[name="username"]:visible');
+      await username.fill(email);
+      await username.evaluate((input: HTMLInputElement) => input.form!.requestSubmit());
 
       const mail = await waitMail(email, mailpit);
       const expected: Record<Lang, Copy & { expiry: string; browser: string }> = {
@@ -475,7 +509,11 @@ test('email colours are the light design tokens of the login theme', () => {
   // An email cannot read CSS variables, so the template repeats the values. This test keeps the copy equal.
   const root = fileURLToPath(new URL('../../', import.meta.url));
   const css = readFileSync(`${root}login/resources/css/atonota.css`, 'utf8');
-  const lightBlock = css.slice(css.indexOf('/* tokens:start */'), css.indexOf('@media (prefers-color-scheme: dark)'));
+  const lightStart = css.indexOf('/* tokens:start */');
+  const darkStart = css.indexOf(':root.pf-v5-theme-dark');
+  expect(lightStart).toBeGreaterThanOrEqual(0);
+  expect(darkStart).toBeGreaterThan(lightStart);
+  const lightBlock = css.slice(lightStart, darkStart);
   const token = (name: string) => new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,8})`).exec(lightBlock)?.[1].toLowerCase();
   const template = readFileSync(`${root}email/html/template.ftl`, 'utf8');
   const value = (name: string) => new RegExp(`${name} = "(#[0-9a-fA-F]{3,8})"`).exec(template)?.[1].toLowerCase();
