@@ -187,7 +187,7 @@ Hesap konsolunun bilinen sınırları şunlardır:
 
 ## Temel temadan kopyalanan şablonlar
 
-Altı şablon Keycloak 26.8.2 kaynağından kopyalandı ve değiştirildi. Keycloak sürümü değişince bu dosyaları yeni temel şablonla karşılaştırın.
+Tema, Keycloak 26.8.2 kaynağındaki sekiz şablonun değiştirilmiş kopyasını kullanır. Keycloak sürümü değişince bu dosyaları yeni temel şablonla karşılaştırın.
 
 | Dosya | Fark |
 | --- | --- |
@@ -196,7 +196,9 @@ Altı şablon Keycloak 26.8.2 kaynağından kopyalandı ve değiştirildi. Keycl
 | `login/select-authenticator.ftl` | Her giriş yolu gerçek bir düğmedir. Temel şablondaki satır Enter ve Space tuşuyla çalışmaz. |
 | `login/login-verify-email.ftl` | Yeniden gönderme bağlantısı tam bir cümledir. Temel şablon cümleyi parçalardan birleştirir. |
 | `login/webauthn-register.ftl` | Formun üstünde geçiş anahtarını anlatan bir açıklama vardır. |
-| `login/login-page-expired.ftl` | İki bağlantı tam birer cümledir. Bu ekran testle sınanmadı. |
+| `login/login-page-expired.ftl` | İki bağlantı tam birer cümledir. |
+| `login/login-recovery-authn-code-config.ftl` | Uyarı çevrilir. Başlık sırası düzeltilir. Dosya ve çıktı tarihi ekranın dilini kullanır. |
+| `login/logout-confirm.ftl` | Onay düğmesi doğal Tab sırasını izler. |
 
 ## Deneme ortamı
 
@@ -231,7 +233,9 @@ npx playwright test
 | --- | --- |
 | `tests/layout.spec.ts` | Yatay taşma, yazı boyutu, yazı tipi, dış istek, dokunma alanı ve büyük kök yazı |
 | `tests/focus.spec.ts` | Tab sırası, klavye odak kipi, odak çizgisinin biçimi ve zorlanmış renkler |
-| `tests/flow.spec.ts` | Kayıt, giriş, parola sıfırlama, TOTP ve passkey akışları |
+| `tests/flow.spec.ts` | Kayıt, giriş, parola sıfırlama, doğrulama kodu ve geçiş anahtarı |
+| `tests/flow.spec.ts` | Kurtarma kodu kurulumu, oturum kapatma ve giriş yöntemi silme |
+| `tests/screens-text.spec.ts` | Yedi ekranda Türkçe metin, düğme adları ve bağlantı adları |
 | `tests/locale.spec.ts` | Türkçe varsayılan dil, dil bağlantıları ve ileti anahtarları |
 | `tests/motion.spec.ts` | Hareket eğrisi, süre, azaltılmış hareket ve stil kaynağı denetimi |
 | `tests/accessibility.spec.ts` | axe denetimi, açık ve koyu tema |
@@ -271,7 +275,7 @@ Görüntüler `test/reference/` klasörüne yazılır. Bu görüntüler macOS'ta
 ## Bilinen sınırlar
 
 - İletiler kullanıcı adının e-posta adresi olduğunu varsayar. Realm bu ayarı kapatırsa iletileri güncelleyin.
-- Tema 203 iletiyi yalın Türkçeyle yazar. Öteki iletiler Keycloak'ın kendi Türkçe dosyasından gelir. Örneğin kurtarma kodu, hesap bağlama ve kullanım koşulu ekranları böyledir.
+- Tema, kendi çevirisi yoksa Keycloak’ın Türkçe metnini kullanır. Hesap bağlama ve kullanım koşulu ekranları bu metni kullanır.
 - Kayıt formuna seçmeli alan eklenirse Keycloak işletim sisteminin açılır listesini çizer. Bu liste markalı değildir. Realm'e seçmeli profil alanı eklemeyin.
 - Geçiş anahtarının tarihini ve bağlantı türünü Keycloak yazar. Örneğin “USB” yazısı Keycloak'tan gelir.
 - Sihirli bağlantı eklentisinin giriş ekranı iletileri çevrildi ama canlı denenmedi. Deneme ortamında eklenti kurulu değildir.
