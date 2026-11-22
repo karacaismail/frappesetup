@@ -131,7 +131,21 @@ class PressClient:
         self._call("press_tr.api.identity.ensure_team", body, _is_team)
 
     def remove_team_member(self, action: PressRemoveTeamMember) -> None:
-        self._call("press_tr.api.identity.remove_team_member", asdict(action))
+        """Remove the user from one organization's team, or from every team.
+
+        The request carries exactly one of `organization_id` and `all_organizations: true`
+        (docs/sozlesmeler.md, section 6). Press answers 400 to both, to neither, and to an
+        empty `organization_id`.
+        """
+        body: dict[str, object] = {"issuer": action.issuer, "subject": action.subject}
+        if action.organization_id is None:
+            # Deleted user: the organizations can no longer be read from Keycloak.
+            body["all_organizations"] = True
+        elif action.organization_id:
+            body["organization_id"] = action.organization_id
+        else:
+            raise ValueError("organization_id must not be empty")
+        self._call("press_tr.api.identity.remove_team_member", body)
 
     def list_identities(self) -> list[Identity]:
         return _identities(self._call("press_tr.api.identity.list_identities"))

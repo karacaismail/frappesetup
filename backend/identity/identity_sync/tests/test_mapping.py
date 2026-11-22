@@ -189,6 +189,11 @@ class MembershipTest(unittest.TestCase):
         # Yönetici e-postayı değiştirdi. Kullanıcı sonra doğruladı. Kiracıda ad yine değişmelidir (G-57).
         self.assertIn(CHANGE_EMAIL, plan(event("user", "VERIFY_EMAIL"), user()))
 
+    def test_membership_event_without_organization_plans_nothing(self) -> None:
+        # Without an organization id there is no team to name. An empty id must never reach Press.
+        ev = event("admin", "ORGANIZATION_MEMBERSHIP_DELETE", None)
+        self.assertEqual(plan(ev, user(orgs=()), None), ())
+
     def test_membership_of_unverified_user_waits(self) -> None:
         ev = event("admin", "ORGANIZATION_MEMBERSHIP_CREATE", ORG.id)
         self.assertEqual(plan(ev, user(verified=False), ORG), ())

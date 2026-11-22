@@ -128,7 +128,12 @@ class ProvisionTest(PipelineCase):
 
         self.assertEqual(result.status, "processed")
         (removed,) = self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)
-        self.assertEqual(removed.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "organization_id": None})
+        # Source: docs/sozlesmeler.md, section 6. A deleted user's organizations can no longer be
+        # read from Keycloak, so the request carries all_organizations instead of organization_id.
+        # Press answers 400 to an empty organization_id, so the key must be absent, not null.
+        self.assertEqual(
+            removed.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "all_organizations": True}
+        )
         (disabled,) = self.stack.tenant.calls("POST", fakes.TENANT_SET_ENABLED)
         self.assertEqual(disabled.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "enabled": False})
 
@@ -161,7 +166,18 @@ class ProvisionTest(PipelineCase):
         self.stack.app.processor.handle(event("USER_UPDATE", "admin"))
 
         (removed,) = self.stack.press.calls("POST", fakes.PRESS_REMOVE_MEMBER)
+        # A request for one organization never carries all_organizations.
         self.assertEqual(removed.json(), {"issuer": self.stack.issuer, "subject": SUBJECT, "organization_id": ORG_ID})
+
+    def test_empty_organization_id_is_never_sent(self) -> None:
+        # Press answers 400 to an empty organization_id; it does not mean "all teams".
+        from identity_sync.mapping import PressRemoveTeamMember
+
+        action = PressRemoveTeamMember(issuer=self.stack.issuer, subject=SUBJECT, organization_id="")
+
+        with self.assertRaises(ValueError):
+            self.stack.app.press.remove_team_member(action)
+        self.assertEqual(self.stack.press.requests, [])
 
     def test_team_reply_without_team_name_is_unknown(self) -> None:
         # `ensure_team` yanıtı `team` ve `created` alanlarını taşır (sözleşme, 6. bölüm).

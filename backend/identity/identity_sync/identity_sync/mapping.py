@@ -115,7 +115,11 @@ class PressEnsureTeam:
 
 @dataclass(frozen=True)
 class PressRemoveTeamMember:
-    """`organization_id` boşsa kullanıcı bütün takımlardan çıkar."""
+    """Remove the user from a Press team.
+
+    `organization_id` set: only that organization's team. `organization_id` None: every team,
+    sent as `all_organizations: true`. That form is for a deleted user.
+    """
 
     issuer: str
     subject: str
@@ -250,7 +254,10 @@ def _plan_membership(
     tenants: Sequence[Tenant],
     organization: Organization | None,
 ) -> tuple[Action, ...]:
-    org_id = event.organization_id or ""
+    org_id = event.organization_id
+    if not org_id:
+        # No organization id, so there is no team to name. Press rejects an empty id.
+        return ()
     if organization is None:
         # Organization silindi. Takma adı bilinmez. Kullanıcı üyesi olmadığı her kiracıda kapanır.
         aliases = {org.alias for org in snapshot.organizations}

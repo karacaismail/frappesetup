@@ -155,4 +155,3 @@ Bu komutta hiçbir test atlanmamalıdır. Testler RSA anahtarını kendisi üret
 - Servis belirteci için `aud-identity-sync` kapsamı ortak sözleşmede henüz yok.
 - Onay katmanının istemci adı ortak sözleşmede henüz yok.
 - `provision` gibi kiracı uçlarının başarı yanıtı ortak sözleşmede henüz yok. Bu servis `{"message": {"status": "done"}}` bekler.
-- Silinen kullanıcının kuruluşları okunamaz. Servis bu durumda `remove_team_member` isteğini `organization_id` olmadan gönderir.
