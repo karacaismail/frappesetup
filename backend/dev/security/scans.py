@@ -13,10 +13,12 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 ROOT = Path(__file__).resolve().parents[3]
 RESULTS = ROOT / ".pane/prompts/security-results"
@@ -26,6 +28,10 @@ OSV_CONFIG = SECURITY / "osv-exceptions.toml"
 VERSIONS = dict(line.split("=", 1) for line in (ROOT / SECURITY / "tool-versions.env").read_text().splitlines())
 BANDIT = VERSIONS["BANDIT_VERSION"]
 OSV = VERSIONS["OSV_VERSION"]
+SCHEMATHESIS = VERSIONS["SCHEMATHESIS_VERSION"]
+CONTRACTS = Path("backend/contracts")
+CONTRACT_CHECKS = ("not_a_server_error,status_code_conformance,content_type_conformance,"
+                   "response_headers_conformance,response_schema_conformance")
 
 
 @dataclass(frozen=True)
@@ -346,7 +352,165 @@ def runtime_inventory(image):
         return replace(result, status="fail")
 
 
-def scan_full(requirements, *, ci=False, runtime_image=None):
+def contract_command(contract, port, config, report, *, writes=False):
+    command = ["uvx", "--python", "3.12", "--exclude-newer", VERSIONS["TOOL_CUTOFF"],
+               f"schemathesis@{SCHEMATHESIS}", "--config-file", str(config), "run", str(contract),
+               "--origin", f"http://127.0.0.1:{port}", "--checks", CONTRACT_CHECKS,
+               "--mode", "positive", "--phases", "examples,coverage,fuzzing", "--max-examples", "20",
+               "--generation-deterministic", "--workers", "1", "--max-redirects", "0",
+               "--request-timeout", "10", "--no-color", "--report", "json", "--report-json-path", str(report)]
+    if not writes:
+        command[command.index("--checks"):command.index("--checks")] = ["--include-method", "GET"]
+    return command
+
+
+def contract_findings(report, contract):
+    if report.get("complete") is not True or report.get("errors"):
+        raise ValueError(f"Schemathesis did not complete {contract}.")
+    return tuple(f"{contract} · {failure['code']} {failure['title']} · {operation}"
+                 for failure in report["failures"] for operation in failure["operations"])
+
+
+def contract_session(host, port):
+    user = os.environ.get("FS_API_TEST_USER")
+    password = os.environ.get("FS_API_TEST_PASSWORD")
+    if not user and not password:
+        return None
+    if not user or not password or user.lower() in ("administrator", "guest"):
+        raise ValueError("Use only the fabricated development test user for contract checks.")
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    try:
+        connection.request("POST", "/api/method/login", urlencode({"usr": user, "pwd": password}),
+                           {"Host": f"{host}:{port}", "Content-Type": "application/x-www-form-urlencoded"})
+        with connection.getresponse() as response:
+            response.read()
+            cookies = [value for name, value in response.getheaders() if name.lower() == "set-cookie"]
+            if response.status != 200:
+                raise ValueError(f"Test user sign-in returned HTTP {response.status}.")
+    finally:
+        connection.close()
+    sid = next((cookie.split(";", 1)[0][4:] for cookie in cookies if cookie.startswith("sid=")), "")
+    if not sid or sid == "Guest":
+        raise ValueError("Test user sign-in returned no session.")
+    return sid
+
+
+def mask_session(text):
+    return re.sub(r"sid=[^;'\" \s]+", "sid=[masked]", text)
+
+
+def run_contract(contract, host, port, *, writes=False, sid=None):
+    with tempfile.TemporaryDirectory() as directory:
+        config = Path(directory) / "schemathesis.toml"
+        headers = {"Host": f"{host}:{port}"}
+        if sid:
+            headers["Cookie"] = "sid=${FS_SCHEMATHESIS_SID}"
+        config.write_text("headers = { " + ", ".join(f"{json.dumps(name)} = {json.dumps(value)}"
+                                                     for name, value in headers.items()) + " }\n")
+        report_path = Path(directory) / "report.json"
+        command = contract_command(ROOT / contract, port, config, report_path, writes=writes)
+        environment = {name: value for name, value in os.environ.items()
+                       if name not in ("FS_API_TEST_USER", "FS_API_TEST_PASSWORD")}
+        environment["FS_SCHEMATHESIS_SID"] = sid or ""
+        print(f"Running Schemathesis: {contract}", flush=True)
+        # The tool keeps a crash cache in its working directory; keep it out of the repository.
+        process = subprocess.run(command, cwd=directory, check=False, env=environment, timeout=600,
+                                 capture_output=True, text=True)
+        try:
+            report = json.loads(report_path.read_text())
+        except (OSError, ValueError):
+            print(mask_session(process.stdout[-4000:]), mask_session(process.stderr[-4000:]), sep="\n")
+            raise ValueError(f"Schemathesis wrote no report for {contract}.") from None
+        if process.returncode == 2 and report.get("operations", {}).get("selected") == 0:
+            print(f"Schemathesis: {contract} has no operations for this mode.")
+            return (), 0
+        findings = contract_findings(report, contract)
+        if process.returncode not in (0, 1) or (process.returncode == 1) != bool(findings):
+            print(mask_session(process.stdout[-4000:]), mask_session(process.stderr[-4000:]), sep="\n")
+            raise ValueError(f"Schemathesis exited with code {process.returncode} for {contract}.")
+        return findings, report["operations"]["tested"]
+
+
+class ContractFixture(BaseHTTPRequestHandler):
+    """Answer the fixture contract with a server error."""
+
+    def do_GET(self):
+        self.send_response(500)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", "2")
+        self.end_headers()
+        self.wfile.write(b"{}")
+
+    def log_message(self, *_args):
+        pass
+
+
+def contract_fixture_found():
+    with HTTPServer(("127.0.0.1", 0), ContractFixture) as server:
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        try:
+            findings, _tested = run_contract(str(FIXTURES / "contract.yaml"), "fixture.localhost",
+                                             server.server_port)
+        finally:
+            server.shutdown()
+            thread.join()
+    return any(" ST101 " in finding and "GET /api/method/fixture.read" in finding for finding in findings)
+
+
+def scan_contracts(target, *, writes=False, contracts=None):
+    mode = "--allow-writes" if writes else "GET only"
+    result = Result("Schemathesis API contract", SCHEMATHESIS,
+                    f"backend/dev/bin/security-full --api-target LOCAL_URL ({mode})", "fail")
+    if target is None:
+        print("Schemathesis: no local API target. Use --api-target or FS_API_TARGET.")
+        return replace(result, status="not_run")
+    host, port = local_target(target)
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        connection.request("GET", "/api/method/ping", headers={"Host": f"{host}:{port}"})
+        with connection.getresponse() as response:
+            response.read()
+    except ConnectionRefusedError:
+        print("Schemathesis: local site is not listening.")
+        return replace(result, status="not_run")
+    except (OSError, http.client.HTTPException) as error:
+        print(f"Schemathesis: local site check failed: {error}")
+        return result
+    finally:
+        connection.close()
+    try:
+        sid = contract_session(host, port)
+        if contracts is None:
+            contracts = [path for path in git("ls-files", "-z", "--", str(CONTRACTS)).split("\0")
+                         if path.endswith((".yaml", ".yml", ".json"))]
+        if not contracts:
+            raise ValueError("No tracked API contracts.")
+        if not contract_fixture_found():
+            raise ValueError("Schemathesis missed its fixture.")
+        runs = [run_contract(contract, host, port, writes=writes, sid=sid) for contract in contracts]
+        findings = tuple(finding for items, _tested in runs for finding in items)
+        for finding in findings:
+            print(f"Schemathesis: {finding}")
+        if not findings and not sum(tested for _findings, tested in runs):
+            print("Schemathesis: no operation was tested.")
+            return replace(result, status="not_run")
+        return replace(result, status="fail" if findings else "pass", findings=findings)
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        print(f"Schemathesis check failed: {error}")
+        return result
+
+
+def default_api_target():
+    if os.environ.get("FS_API_TARGET"):
+        return os.environ["FS_API_TARGET"]
+    port = os.environ.get("PANE_PORT", "")
+    return f"http://kiraci1.localhost:{int(port) + 1}" if port.isdigit() else None
+
+
+def scan_full(requirements, *, ci=False, runtime_image=None, api_target=None, allow_writes=False):
+    if api_target is not None:
+        local_target(api_target)
     source = source_state()
     save(RESULTS, "full", [], source)
     results = [
@@ -358,7 +522,7 @@ def scan_full(requirements, *, ci=False, runtime_image=None):
         run("Gitleaks", VERSIONS["GITLEAKS_VERSION"], [str(SECURITY / "history-scan")]),
         scan_dependencies(requirements, reproduce=ci),
         runtime_inventory(runtime_image),
-        Result("Live API contract checks", "—", "—", "not_run"),
+        scan_contracts(api_target, writes=allow_writes),
     ]
     save(RESULTS, "full", results, source)
     return exit_status(results, ci=ci)
@@ -468,6 +632,9 @@ def main():
     full = subcommands.add_parser("full")
     full.add_argument("--requirements", type=lambda value: Path(value).resolve())
     full.add_argument("--runtime-image")
+    full.add_argument("--api-target", default=default_api_target())
+    full.add_argument("--allow-writes", action="store_true",
+                      help="Also send generated POST, PUT, PATCH and DELETE requests to the local site.")
     local = subcommands.add_parser("local")
     local.add_argument("target")
     for scan in (full, local):
@@ -480,7 +647,11 @@ def main():
     card.add_argument("--rejected-requests", type=nonnegative_count)
     args = parser.parse_args()
     if args.mode == "full":
-        return scan_full(args.requirements, ci=args.ci, runtime_image=args.runtime_image)
+        try:
+            return scan_full(args.requirements, ci=args.ci, runtime_image=args.runtime_image,
+                             api_target=args.api_target, allow_writes=args.allow_writes)
+        except ValueError as error:
+            parser.error(str(error))
     if args.mode == "local":
         try:
             return scan_local(args.target, ci=args.ci)

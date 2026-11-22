@@ -1,3 +1,5 @@
+import secrets
+import shutil
 import tempfile
 import threading
 import unittest
@@ -111,6 +113,185 @@ class SecurityScanTests(unittest.TestCase):
                 report = scans.report(path)
             self.assertIn("| Bandit | 1.9.4 | `bandit -r backend` | `fail` |", report)
             self.assertIn("`not_run`", report)
+
+
+class FixtureApi(BaseHTTPRequestHandler):
+    """Serve the fixture contract with a configurable answer."""
+
+    answer = 500
+    calls = []
+
+    def do_GET(self):
+        type(self).calls.append(("GET", self.path, self.headers.get("Host"), self.headers.get("Cookie")))
+        body = b'{"message": "ok"}' if type(self).answer == 200 else b'{"error": "boom"}'
+        self.send_response(type(self).answer if self.path.startswith("/api/method/fixture.read") else 404)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        type(self).calls.append(("POST", self.path, self.headers.get("Host"), self.headers.get("Cookie")))
+        self.send_response(200)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def log_message(self, *_args):
+        pass
+
+
+def serve(answer):
+    handler = type("Api", (FixtureApi,), {"answer": answer, "calls": []})
+    server = HTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever)
+    thread.start()
+    return server, thread, handler
+
+
+def stop(server, thread):
+    server.shutdown()
+    thread.join()
+    server.server_close()
+
+
+class CleanEnvironment(unittest.TestCase):
+    """Keep a developer's test user out of these runs."""
+
+    def setUp(self):
+        environment = patch.dict(scans.os.environ)
+        environment.start()
+        self.addCleanup(environment.stop)
+        for name in ("FS_API_TEST_USER", "FS_API_TEST_PASSWORD"):
+            scans.os.environ.pop(name, None)
+
+
+class ContractScanTests(CleanEnvironment):
+    fixture = [str(scans.FIXTURES / "contract.yaml")]
+
+    def test_external_contract_targets_are_rejected(self):
+        for target in ("http://example.com", "http://10.0.0.1:8000", "http://localhost:8000"):
+            with self.subTest(target=target), self.assertRaises(ValueError):
+                scans.scan_contracts(target)
+
+    def test_missing_target_is_not_run(self):
+        self.assertEqual(scans.scan_contracts(None).status, "not_run")
+
+    def test_closed_site_is_not_run(self):
+        with HTTPServer(("127.0.0.1", 0), FixtureApi) as server:
+            port = server.server_port
+        result = scans.scan_contracts(f"http://dev.localhost:{port}")
+        self.assertEqual(result.status, "not_run")
+        self.assertEqual(scans.exit_status([result], ci=True), 1)
+
+    def test_command_reads_only_by_default(self):
+        command = scans.contract_command("c.yaml", 8001, "config.toml", "report.json")
+        self.assertEqual(command[command.index("--include-method") + 1], "GET")
+        self.assertIn("--max-redirects", command)
+        self.assertIn("schemathesis@" + scans.VERSIONS["SCHEMATHESIS_VERSION"], command)
+        self.assertEqual(command[command.index("--origin") + 1], "http://127.0.0.1:8001")
+        writes = scans.contract_command("c.yaml", 8001, "config.toml", "report.json", writes=True)
+        self.assertNotIn("--include-method", writes)
+
+    def test_version_is_exact(self):
+        self.assertRegex(scans.VERSIONS["SCHEMATHESIS_VERSION"], r"^\d+\.\d+\.\d+$")
+
+    def test_administrator_is_refused(self):
+        server, thread, _handler = serve(200)
+        try:
+            with patch.dict(scans.os.environ, {"FS_API_TEST_USER": "Administrator",
+                                               "FS_API_TEST_PASSWORD": secrets.token_hex(8)}):
+                result = scans.scan_contracts(f"http://127.0.0.1:{server.server_port}",
+                                              contracts=self.fixture)
+        finally:
+            stop(server, thread)
+        self.assertEqual(result.status, "fail")
+
+    @unittest.skipUnless(shutil.which("uvx"), "uvx is required for the Schemathesis run.")
+    def test_contracts_without_read_operations_are_not_run(self):
+        server, thread, _handler = serve(200)
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                contract = Path(directory) / "writes.yaml"
+                contract.write_text('openapi: 3.1.0\ninfo: {title: W, version: "1"}\npaths:\n'
+                                    '  /api/method/fixture.write:\n    post:\n'
+                                    '      responses: {"200": {description: OK}}\n')
+                with patch.object(scans, "contract_fixture_found", return_value=True):
+                    result = scans.scan_contracts(f"http://127.0.0.1:{server.server_port}",
+                                                  contracts=[str(contract)])
+        finally:
+            stop(server, thread)
+        self.assertEqual(result.status, "not_run")
+        self.assertEqual(scans.exit_status([result], ci=True), 1)
+
+    def test_findings_name_contract_check_and_operation(self):
+        report = {"complete": True, "errors": [], "failures": [
+            {"code": "ST101", "title": "Server error", "operations": ["GET /a", "GET /b"]}]}
+        self.assertEqual(scans.contract_findings(report, "backend/contracts/x.yaml"), (
+            "backend/contracts/x.yaml · ST101 Server error · GET /a",
+            "backend/contracts/x.yaml · ST101 Server error · GET /b"))
+        with self.assertRaises(ValueError):
+            scans.contract_findings({"complete": False, "errors": [], "failures": []}, "x.yaml")
+
+
+@unittest.skipUnless(shutil.which("uvx"), "uvx is required for the Schemathesis run.")
+class SchemathesisRunTests(CleanEnvironment):
+    fixture = [str(scans.FIXTURES / "contract.yaml")]
+
+    def run_against(self, answer, **options):
+        server, thread, handler = serve(answer)
+        try:
+            result = scans.scan_contracts(f"http://dev.localhost:{server.server_port}",
+                                          contracts=self.fixture, **options)
+        finally:
+            stop(server, thread)
+        return result, handler.calls
+
+    def test_server_error_fails_and_writes_are_not_sent(self):
+        result, calls = self.run_against(500)
+        self.assertEqual(result.status, "fail")
+        self.assertTrue(any("ST101" in finding and "GET /api/method/fixture.read" in finding
+                            for finding in result.findings), result.findings)
+        self.assertNotIn("POST", {method for method, *_rest in calls})
+        self.assertTrue(all(host.startswith("dev.localhost:") for _method, _path, host, _cookie in calls))
+
+    def test_conforming_site_passes(self):
+        result, _calls = self.run_against(200)
+        self.assertEqual(result.status, "pass", result.findings)
+
+    def test_session_cookie_comes_from_environment(self):
+        server, thread, handler = serve(200)
+        try:
+            findings = scans.run_contract(self.fixture[0], "dev.localhost", server.server_port,
+                                          sid="fixture-sid")
+        finally:
+            stop(server, thread)
+        self.assertEqual(findings[0], ())
+        self.assertEqual({cookie for *_rest, cookie in handler.calls}, {"sid=fixture-sid"})
+
+    def test_absolute_and_relative_servers_stay_on_loopback(self):
+        for base in ("https://example.com/api/method", "/api/method"):
+            server, thread, handler = serve(200)
+            try:
+                with tempfile.TemporaryDirectory() as directory:
+                    contract = Path(directory) / "servers.yaml"
+                    contract.write_text(f'openapi: 3.1.0\ninfo: {{title: S, version: "1"}}\n'
+                                        f'servers: [{{url: "{base}"}}]\npaths:\n'
+                                        '  /fixture.read:\n    get:\n'
+                                        '      responses: {"200": {description: OK}}\n')
+                    scans.run_contract(str(contract), "dev.localhost", server.server_port)
+            finally:
+                stop(server, thread)
+            paths = {path.split("?")[0] for _method, path, _host, _cookie in handler.calls}
+            with self.subTest(base=base):
+                self.assertIn("/api/method/fixture.read", paths)
+
+    def test_output_masks_session(self):
+        self.assertEqual(scans.mask_session("curl -H 'Cookie: sid=abc123; x=1'"),
+                         "curl -H 'Cookie: sid=[masked]; x=1'")
+
+    def test_writes_require_explicit_option(self):
+        _result, calls = self.run_against(200, writes=True)
+        self.assertIn("POST", {method for method, *_rest in calls})
 
 
 if __name__ == "__main__":

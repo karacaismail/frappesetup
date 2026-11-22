@@ -34,7 +34,7 @@
   {
     "rule": "B607",
     "file": "backend/dev/security/scans.py",
-    "line": 42,
+    "line": 48,
     "reason": "The local Git executable reads source metadata with fixed invocations.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
@@ -42,7 +42,7 @@
   {
     "rule": "B603",
     "file": "backend/dev/security/scans.py",
-    "line": 42,
+    "line": 48,
     "reason": "The local Git executable reads source metadata with fixed invocations.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
@@ -50,7 +50,7 @@
   {
     "rule": "B603",
     "file": "backend/dev/security/scans.py",
-    "line": 139,
+    "line": 145,
     "reason": "Fixed tool and arguments are passed directly without a shell.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
@@ -58,7 +58,7 @@
   {
     "rule": "B603",
     "file": "backend/dev/security/scans.py",
-    "line": 157,
+    "line": 163,
     "reason": "Fixed scanner commands capture structured output without a shell.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
@@ -66,7 +66,7 @@
   {
     "rule": "B603",
     "file": "backend/dev/security/scans.py",
-    "line": 236,
+    "line": 242,
     "reason": "Fixed uv command reads package requirements from stdin.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
@@ -74,7 +74,7 @@
   {
     "rule": "B607",
     "file": "backend/dev/security/scans.py",
-    "line": 292,
+    "line": 298,
     "reason": "The only arguments are the configured OSV executable and its version flag.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
@@ -82,7 +82,7 @@
   {
     "rule": "B603",
     "file": "backend/dev/security/scans.py",
-    "line": 292,
+    "line": 298,
     "reason": "The only arguments are the configured OSV executable and its version flag.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
@@ -130,8 +130,16 @@
   {
     "rule": "B108",
     "file": "backend/dev/security/scans.py",
-    "line": 409,
+    "line": 573,
     "reason": "The path is inside a new network-isolated container and is populated from stdin.",
+    "owner": "security-tooling",
+    "ignoreUntil": "2027-02-22"
+  },
+  {
+    "rule": "B603",
+    "file": "backend/dev/security/scans.py",
+    "line": 417,
+    "reason": "The pinned Schemathesis command runs without a shell against a validated loopback port.",
     "owner": "security-tooling",
     "ignoreUntil": "2027-02-22"
   },
