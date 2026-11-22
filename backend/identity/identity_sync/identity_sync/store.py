@@ -32,7 +32,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from identity_sync.deadline import bounded
+from identity_sync.deadline import bounded, bounded_for_records, remaining
 from identity_sync.events import JOB_TYPES, REQUEST_KIND, USER_REMOVED_TYPES, Event
 
 _SCHEMA = """
@@ -190,40 +190,42 @@ class Store:
             self._thread_lock.release()
 
     @contextmanager
-    def _transaction(self, *, within_deadline: bool = False) -> Iterator[None]:
+    def _transaction(self, *, bound: str = "") -> Iterator[None]:
         """A short write transaction. Roll back writes on error and always close the transaction.
 
-        `within_deadline`: the waits for the connection and for the database file end at the
-        current deadline (inceleme 18). `Busy` is raised when the time is up. A write that records
-        an outcome does not pass it: an outcome must be recorded even after the deadline.
+        `bound` ties the waits for the connection and for the database file to the current deadline
+        (inceleme 18 and 19). `Busy` is raised when the time is up.
+        - `work`: a step before or between target calls. It ends at the deadline.
+        - `record`: the record of an outcome. All records share one end, the deadline plus its grace.
+        Without `bound`, or outside a deadline, the usual wait applies.
         """
-        wait = bounded(_SQLITE_TIMEOUT_SECONDS) if within_deadline else _SQLITE_TIMEOUT_SECONDS
+        if bound == "work":
+            wait = bounded(_SQLITE_TIMEOUT_SECONDS)
+        elif bound == "record":
+            wait = bounded_for_records(_SQLITE_TIMEOUT_SECONDS)
+        else:
+            wait = _SQLITE_TIMEOUT_SECONDS
+        limited = wait != _SQLITE_TIMEOUT_SECONDS
         if not self._db_lock.acquire(timeout=wait):
             raise Busy
         try:
-            if within_deadline:
+            if limited:
                 self._db.execute(f"PRAGMA busy_timeout = {int(wait * 1000)}")
             self._db.execute("BEGIN IMMEDIATE")
             try:
                 yield
                 self._db.execute("COMMIT")
-            except sqlite3.OperationalError as error:
-                if self._db.in_transaction:
-                    self._db.execute("ROLLBACK")
-                if within_deadline and "locked" in str(error):
-                    raise Busy from None
-                raise
             except BaseException:
                 if self._db.in_transaction:
                     self._db.execute("ROLLBACK")
                 raise
         except sqlite3.OperationalError as error:
-            # BEGIN itself waited for another process and the time ran out.
-            if within_deadline and "locked" in str(error):
+            # The wait for another process ran out at the deadline.
+            if limited and "locked" in str(error):
                 raise Busy from None
             raise
         finally:
-            if within_deadline:
+            if limited:
                 self._db.execute(f"PRAGMA busy_timeout = {int(_SQLITE_TIMEOUT_SECONDS * 1000)}")
             self._db_lock.release()
 
@@ -244,7 +246,7 @@ class Store:
         The row counts no attempt yet.
         """
         now = self._clock()
-        with self._transaction():
+        with self._transaction(bound="work"):
             self._db.execute(
                 """
                 INSERT OR IGNORE INTO dead_letters
@@ -260,7 +262,7 @@ class Store:
         From here on a crash leaves the outcome unknown: a target may have done the write.
         The record is corrected once the outcome is known.
         """
-        with self._transaction():
+        with self._transaction(bound="work"):
             self._db.execute(
                 "UPDATE dead_letters SET state = 'unknown', error = 'interrupted after a write was started' "
                 "WHERE event_id = ?",
@@ -274,7 +276,7 @@ class Store:
 
     def add_progress(self, event_id: str, step_key: str) -> None:
         """Record one finished step. Written after each step, so a retry never calls it again."""
-        with self._transaction():
+        with self._transaction(bound="record"):
             row = self._db.execute("SELECT finished_steps FROM dead_letters WHERE event_id = ?", (event_id,)).fetchone()
             if row is None:
                 return
@@ -431,7 +433,7 @@ class Store:
         queued event of that user. Either the job is finished and no record names the user, or
         neither happened and a retry does both. A finished job can never leave the id behind.
         """
-        with self._transaction():
+        with self._transaction(bound="record"):
             self._db.execute(
                 "INSERT OR IGNORE INTO processed_events (event_id, status, processed_at) VALUES (?, ?, ?)",
                 (event_id, status, self._clock()),
@@ -451,7 +453,7 @@ class Store:
         if state not in STATES:
             raise ValueError("invalid dead letter state")
         now = self._clock()
-        with self._transaction():
+        with self._transaction(bound="record"):
             self._db.execute(
                 """
                 INSERT INTO dead_letters (event_id, event, error, state, attempts, first_failed_at, last_failed_at)
@@ -489,7 +491,7 @@ class Store:
         the call. The caller releases the claim only after a definite outcome.
         """
         now = self._clock()
-        with self._transaction(within_deadline=True):
+        with self._transaction(bound="work"):
             if self._db.execute("SELECT 1 FROM processed_events WHERE event_id = ?", (job_id,)).fetchone():
                 return "done"
             row = self._db.execute(
@@ -516,7 +518,7 @@ class Store:
         """
         now = self._clock()
         placeholders = ", ".join("?" for _ in JOB_TYPES)
-        rows = self._db.execute(
+        rows = self._interruptible(
             f"""
             SELECT d.event, d.error, d.attempts, d.first_failed_at, d.last_failed_at, d.state
             FROM dead_letters AS d LEFT JOIN job_repeats AS r ON r.job_id = d.event_id
@@ -526,11 +528,46 @@ class Store:
             ORDER BY d.first_failed_at, d.event_id LIMIT ?
             """,  # only question marks are formatted into the text; every value is bound
             (*sorted(JOB_TYPES), now, max_attempts, now, min_interval, limit),
-        ).fetchall()
+        )
         return [self._letter(*row) for row in rows]
 
+    def _interruptible(self, sql: str, args: tuple[object, ...]) -> list[tuple]:
+        """Run a read that stops at the current deadline (inceleme 19). `Busy` when the time is up.
+
+        SQLite calls the handler every few thousand steps of the query. A non-zero answer stops the
+        query. So a scan of a long queue with no matching job cannot run past the deadline.
+        """
+        if remaining() is None:
+            return self._db.execute(sql, args).fetchall()
+        wait = bounded(_SQLITE_TIMEOUT_SECONDS)
+        if not self._db_lock.acquire(timeout=wait):
+            raise Busy
+        try:
+            self._db.set_progress_handler(lambda: 1 if not remaining() else 0, 1000)
+            try:
+                return self._db.execute(sql, args).fetchall()
+            except sqlite3.OperationalError as error:
+                if "interrupted" in str(error) or "locked" in str(error):
+                    raise Busy from None
+                raise
+        finally:
+            self._db.set_progress_handler(None, 0)
+            self._db_lock.release()
+
+    def extend_repeat(self, job_id: str, *, hold: float) -> None:
+        """Let the claim of a job last `hold` seconds from now. Called before every external write.
+
+        The claim then covers the last target call too, even when that call starts late in the
+        request (inceleme 19). The claim never gets shorter here.
+        """
+        now = self._clock()
+        with self._transaction(bound="work"):
+            self._db.execute(
+                "UPDATE job_repeats SET claimed_until = MAX(claimed_until, ?) WHERE job_id = ?", (now + hold, job_id)
+            )
+
     def release_repeat(self, job_id: str) -> None:
-        with self._transaction():
+        with self._transaction(bound="record"):
             self._db.execute("UPDATE job_repeats SET claimed_until = 0 WHERE job_id = ?", (job_id,))
 
     def repeat_claimed(self, job_id: str) -> bool:
@@ -539,7 +576,7 @@ class Store:
         return row is not None and row[0] > self._clock()
 
     def remove_dead_letter(self, event_id: str) -> None:
-        with self._transaction():
+        with self._transaction(bound="record"):
             self._db.execute("DELETE FROM dead_letters WHERE event_id = ?", (event_id,))
 
     def dead_letters(self, *, limit: int | None = None, offset: int = 0) -> list[DeadLetter]:

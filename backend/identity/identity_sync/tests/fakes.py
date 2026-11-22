@@ -600,6 +600,21 @@ def make_settings(keycloak: FakeServer, press: FakeServer, tenant: FakeServer, d
     )
 
 
+def without_repeat_spacing(case) -> None:
+    """Let a test resend a deletion job at once.
+
+    A resend of a queued job waits `SETTLE_INTERVAL_SECONDS` (inceleme 19). Tests of the resume
+    logic resend right away. The spacing itself is checked in tests/test_unknown_deletion.py.
+    """
+    from unittest import mock
+
+    from identity_sync import pipeline
+
+    patcher = mock.patch.object(pipeline, "SETTLE_INTERVAL_SECONDS", 0.0)
+    patcher.start()
+    case.addCleanup(patcher.stop)
+
+
 class Stack:
     """Set up the three fake servers and the service together."""
 

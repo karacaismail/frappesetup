@@ -11,6 +11,7 @@ import http.client
 import io
 import json
 import socket
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -147,7 +148,68 @@ class _DeadlineSocket:
         return getattr(self._sock, name)
 
 
+class _NotSent(OSError):
+    """The request never left this host: the name lookup or the connection did not finish in time."""
+
+
+def _lookup(host: str, port: int, left: float) -> list[tuple]:
+    """Resolve the name, but wait at most `left` seconds (inceleme 19).
+
+    `getaddrinfo` has no timeout of its own. It runs in a helper thread. When the time is up the
+    request gives up. The helper thread ends by itself when the lookup returns.
+    """
+    found: dict[str, object] = {}
+
+    def work() -> None:
+        try:
+            found["infos"] = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+        except OSError as error:
+            found["error"] = error
+
+    helper = threading.Thread(target=work, name="identity-sync-lookup", daemon=True)
+    helper.start()
+    helper.join(left)
+    if helper.is_alive():
+        raise _NotSent("deadline passed during the name lookup")
+    if "error" in found:
+        raise found["error"]  # a gaierror: the request was not sent
+    return found["infos"]
+
+
+def _create_connection(
+    address: tuple[str, int], timeout: object = None, source_address: tuple[str, int] | None = None
+) -> socket.socket:
+    """`socket.create_connection` whose lookup and connect end at the deadline (inceleme 19)."""
+    if remaining() is None:
+        return socket.create_connection(address, timeout, source_address)
+    host, port = address
+    infos = _lookup(host, port, remaining() or 0.0)
+    last: OSError | None = None
+    for family, kind, proto, _name, target in infos:
+        left = remaining()
+        if not left:
+            break
+        sock = socket.socket(family, kind, proto)
+        sock.settimeout(min(timeout, left) if isinstance(timeout, (int, float)) else left)
+        try:
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(target)
+        except OSError as error:
+            sock.close()
+            last = error
+            continue
+        # The TLS handshake that follows waits at most the time left.
+        sock.settimeout(min(timeout, remaining() or 0.001) if isinstance(timeout, (int, float)) else remaining())
+        return sock
+    raise _NotSent("connection not made before the deadline") from last
+
+
 class _DeadlineHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self._create_connection = _create_connection
+
     def connect(self) -> None:
         super().connect()
         if remaining() is not None:
@@ -155,6 +217,10 @@ class _DeadlineHTTPConnection(http.client.HTTPConnection):
 
 
 class _DeadlineHTTPSConnection(http.client.HTTPSConnection):
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self._create_connection = _create_connection
+
     def connect(self) -> None:
         super().connect()
         if remaining() is not None:
@@ -228,7 +294,7 @@ def request_json(
         error.close()
         raise HttpError(error.code, code) from None
     except urllib.error.URLError as error:
-        if isinstance(error.reason, (ConnectionRefusedError, socket.gaierror)):
+        if isinstance(error.reason, (ConnectionRefusedError, socket.gaierror, _NotSent)):
             raise ConnectFailed("connection failed") from None
         raise TransportError(type(error.reason).__name__) from None
     except (TimeoutError, ConnectionError, OSError) as error:

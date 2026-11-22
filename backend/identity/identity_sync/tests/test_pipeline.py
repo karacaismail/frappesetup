@@ -456,6 +456,7 @@ class AccountDeletionTest(PipelineCase):
 
     def setUp(self) -> None:
         super().setUp()
+        fakes.without_repeat_spacing(self)
         issuer = self.stack.issuer
         self.add_member()
         self.stack.press.seed_member(issuer, SUBJECT, "ayse@example.test", ORG_ID, api_keys=1)

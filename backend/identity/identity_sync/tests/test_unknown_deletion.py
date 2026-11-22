@@ -25,12 +25,13 @@ import os
 import tempfile
 import threading
 import time
+import unittest
 from unittest import mock
 
 from identity_sync import pipeline
 from identity_sync.events import Event
 from identity_sync.httpjson import TransportError, deadline
-from identity_sync.store import Store
+from identity_sync.store import Busy, Store
 
 from . import fakes
 from .fakes import ORG_ID, SUBJECT, keycloak_user
@@ -294,7 +295,9 @@ class DeadlineTest(UnknownDeletionCase):
         self.assertLess(spent, TIMEOUT + 1.0)
         self.assertIn(reply["status"], ("unknown", "dead_lettered"))
         self.assertIn(SUBJECT, self.stack.keycloak.users)
-        # The next event finishes the job.
+        # The tenant call that was cut short keeps the claim for one more timeout. After that,
+        # the next event finishes the job.
+        time.sleep(TIMEOUT + 0.1)
         self.post_event(OTHER_EVENT)
         self.assertNotIn(SUBJECT, self.stack.keycloak.users)
         self.assertTrue(self.done(self.job_id))
@@ -459,3 +462,154 @@ class FinishedMeanwhileTest(UnknownDeletionCase):
         self.assertEqual(result.status, "duplicate")
         self.assertEqual(len(self.downstream_writes()), writes)
         self.assertIn(SUBJECT, self.stack.keycloak.users)
+
+
+class PressLimitAfterFailureTest(UnknownDeletionCase):
+    def test_press_path_keeps_the_limits_after_a_definite_failure(self) -> None:
+        # The tenant rejects the anonymize call for good. Press sends the request again and again.
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, (400, None))
+        self.assertEqual(self.press_request()["status"], "dead_lettered")
+
+        with mock.patch.object(pipeline, "SETTLE_INTERVAL_SECONDS", 60.0):
+            reply = self.press_request()
+        # Too soon after the first try: nothing was sent and the job stays queued.
+        self.assertEqual(reply["status"], "dead_lettered")
+        self.assertEqual(self.tenant_anonymize_calls(), 1)
+
+        with mock.patch.object(pipeline, "SETTLE_MAX_ATTEMPTS", 2):
+            self.press_request()
+            self.press_request()
+        self.assertEqual(self.tenant_anonymize_calls(), 2)  # try 2 was the last one
+        self.assertIn(SUBJECT, self.stack.keycloak.users)
+
+
+class LateLastCallTest(UnknownDeletionCase):
+    """The last target call starts late in the request. Its claim must last from that call on."""
+
+    stack_settings = {"anonymize_timeout": 1.0}
+
+    def test_new_request_after_the_first_claim_would_end_sends_no_second_call(self) -> None:
+        # Press takes most of the request. The tenant call starts late and runs past the deadline.
+        self.slow(self.stack.press, fakes.PRESS_ANONYMIZE, 0.8, times=1)
+        self.slow(self.stack.tenant, fakes.TENANT_ANONYMIZE, 3.0, times=1)
+        started = time.monotonic()
+        self.assertEqual(self.press_request()["status"], "unknown")
+        # A claim taken at the start would end 1 second after it. The tenant call started later.
+        while time.monotonic() - started < 1.1:
+            time.sleep(0.02)
+
+        reply = self.press_request()
+
+        self.assertEqual(reply["status"], "unknown")
+        self.assertEqual(self.tenant_anonymize_calls(), 1)
+
+
+class SharedDatabaseCase(UnknownDeletionCase):
+    """Two connections to one database file, like two processes of the service."""
+
+    def setUp(self) -> None:
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.db_path = os.path.join(folder.name, "identity_sync.sqlite3")
+        self.stack_settings = {**self.stack_settings, "db_path": self.db_path}
+        super().setUp()
+
+    def hold_database(self, seconds: float, started: threading.Event | None = None) -> threading.Thread:
+        """Another connection keeps a write transaction open for `seconds`."""
+        import sqlite3
+
+        ready = started or threading.Event()
+
+        def hold() -> None:
+            other = sqlite3.connect(self.db_path, isolation_level=None)
+            other.execute("BEGIN IMMEDIATE")
+            ready.set()
+            time.sleep(seconds)
+            other.execute("ROLLBACK")
+            other.close()
+
+        thread = threading.Thread(target=hold)
+        thread.start()
+        self.addCleanup(thread.join, seconds + 5)
+        return thread
+
+
+class DatabaseWaitTest(SharedDatabaseCase):
+    def test_steps_before_the_first_call_end_at_the_deadline(self) -> None:
+        held = threading.Event()
+        self.hold_database(3.0, held)
+        self.assertTrue(held.wait(5))
+
+        body = {"issuer": self.stack.issuer, "subject": SUBJECT, "reauthenticated_at": int(self.now) - 10}
+        started = time.monotonic()
+        status, reply = self.post_json("/v1/account-deletions", body, PRESS_TOKEN)
+        spent = time.monotonic() - started
+
+        self.assertEqual((status, reply), (503, {"error": "busy"}))
+        self.assertLess(spent, TIMEOUT + 1.0)
+        self.assertEqual(self.tenant_anonymize_calls(), 0)
+
+    def test_outcome_records_share_one_end(self) -> None:
+        # The database is locked while the tenant works, so every outcome record has to wait.
+        work = self.stack.tenant._defaults[("POST", fakes.TENANT_ANONYMIZE)]
+
+        def locking(req: fakes.Recorded) -> fakes.Reply:
+            held = threading.Event()
+            self.hold_database(4.0, held)
+            held.wait(5)
+            return work(req)
+
+        self.stack.tenant.on("POST", fakes.TENANT_ANONYMIZE, locking)
+        with mock.patch.object(pipeline, "RECORD_GRACE_SECONDS", 0.5):
+            started = time.monotonic()
+            status, _reply = self.post_json(
+                "/v1/account-deletions",
+                {"issuer": self.stack.issuer, "subject": SUBJECT, "reauthenticated_at": int(self.now) - 10},
+                PRESS_TOKEN,
+            )
+            spent = time.monotonic() - started
+
+        # The deadline is the timeout. The records may take the grace on top, all together.
+        self.assertLess(spent, TIMEOUT + 0.5 + 1.0)
+        self.assertIn(status, (200, 503))
+        self.assertFalse(self.done(self.job_id))
+
+
+class QueueQueryTest(SharedDatabaseCase):
+    def test_queue_query_stops_at_the_deadline(self) -> None:
+        import sqlite3
+
+        db = sqlite3.connect(self.db_path, isolation_level=None)
+        rows = [(f"e-{n:06d}", '{"id": "x", "kind": "user", "type": "UPDATE_EMAIL", "realm": "platform", "time": 1}',
+                 "failed", "failed", 1, 1.0, 1.0) for n in range(300_000)]
+        db.execute("BEGIN")
+        db.executemany(
+            "INSERT INTO dead_letters (event_id, event, error, state, attempts, first_failed_at, last_failed_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
+        db.execute("COMMIT")
+        db.close()
+        store = self.stack.app.store
+
+        started = time.monotonic()
+        with deadline(0.02), self.assertRaises(Busy):
+            store.repeatable_jobs(limit=3, max_attempts=5, min_interval=30.0)
+        self.assertLess(time.monotonic() - started, 0.5)
+
+
+class NetworkDeadlineTest(unittest.TestCase):
+    def test_name_lookup_ends_at_the_deadline(self) -> None:
+        import socket
+
+        from identity_sync.httpjson import ConnectFailed, request_json
+
+        real = socket.getaddrinfo
+
+        def slow_lookup(*args, **kwargs):
+            time.sleep(2.0)
+            return real(*args, **kwargs)
+
+        started = time.monotonic()
+        with mock.patch.object(socket, "getaddrinfo", slow_lookup), deadline(0.3):
+            with self.assertRaises(ConnectFailed):  # nothing was sent, so the outcome is not unknown
+                request_json("POST", "http://slow-name.invalid:9/x", timeout=10.0, json_body={})
+        self.assertLess(time.monotonic() - started, 0.8)

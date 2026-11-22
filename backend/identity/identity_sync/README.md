@@ -259,8 +259,9 @@ Varsayılan değeri ölçüm belirledi:
 Silme isteğinin toplam süresi de sınırlıdır:
 
 - İstek tek bir son an taşır. Son an `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` sonra gelir.
-- İş kilidi beklemesi, bütün ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
-- Servis sonucu kayda yazmak için en çok 5 saniye daha harcar.
+- Adres çözümü, bağlantı kurulumu ve TLS kurulumu bu son anı aşmaz.
+- İş kilidi beklemesi, veritabanı beklemesi, ağ okumaları ve yeniden deneme araları da bu son anı aşmaz.
+- Sonuç kayıtları ortak bir son an kullanır. Bu son an ilk son andan 5 saniye sonra gelir. Bütün kayıtlar birlikte bu süreyi aşmaz.
 - Varsayılan ayarlarla servis en geç 35 saniyede cevap verir. En büyük ayarla bu süre 85 saniyedir.
 - Press en çok 90 saniye bekler. Press zaman aşımında müşteriye "silme sürüyor" der.
 - İş kilidi zamanında boşalmazsa servis 503 ve `busy` döner. Bu durumda iş başlamaz.
@@ -280,19 +281,22 @@ Servis işi iki yerde sürdürür:
 - Press aynı silme isteğini yeniden gönderdiğinde.
 - Servis `/v1/events` ucunda bir olay işlediğinde. Olay başka bir kullanıcıya ait olabilir.
 
-Sonucu belirsiz kalan iş için sayı ve ara sınırı vardır. Bu sınırlar iki yolda da geçerlidir:
+Her yeniden deneme için sayı ve ara sınırı vardır. Bu sınırlar iki yolda da geçerlidir:
 
 - Servis bir işi en çok 5 kez dener. Önceki zaman aşımı da bir deneme sayılır.
 - İki deneme arasında en az 30 saniye geçer.
-- Adım kesin bir hatayla bittiyse hedefte açık çağrı kalmaz. Press isteği o zaman işi hemen sürdürür.
-- Olay yolu bu sınırları her işte uygular.
-- İnsan işi `--include-unknown` ile işletirse sınırlar uygulanmaz.
+- Sınırlar kesin bir hatadan sonra da geçerlidir.
+- Sınır dolarsa servis hedefi çağırmaz. Cevap işin kuyruktaki durumunu verir: `dead_lettered` ya da `unknown`.
+- İnsan işi `--include-unknown` ile işletirse sınırlar uygulanmaz. Onaylı mutabakat da insan kararıdır ve sınırları uygulamaz.
+- Bütün adımlar bitmiş ve yalnız son kayıt eksikse sınır yoktur. Bu durumda hedefe çağrı gitmez.
 
 Olay yolunun ek sınırları şunlardır:
 
 - Olay yolu tek bir son an taşır. Son an olay işlendikten 5 saniye sonra gelir.
-- Kuyruk okuması, iş ayırma, ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
+- Kuyruk okuması, iş ayırma, bağlantılar, ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
+- Sonuç kayıtları silme isteğindeki gibi ortak bir son an kullanır.
 - Veritabanı yalnız şu anda denenebilecek işleri seçer. Bir olay en çok 3 iş okur. Uzun kuyruk baştan sona okunmaz.
+- Kuyruk sorgusu da son anda durur. Uygun iş bulamasa bile süreyi aşmaz.
 - Servis hedefi çağırırken iş kilidini tutmaz. Böylece elle çalışan komutlar beklemez.
 - Servis HTTP isteklerini sırayla işler. Bu yüzden 5 saniyelik sınır öteki istekleri de korur.
 
@@ -300,10 +304,12 @@ Aynı iş için iki çağrı aynı anda çalışmaz:
 
 - Servis her denemeden önce işi kendine ayırır.
 - Ayırma ve tamamlanma denetimi aynı veritabanı adımındadır. Başka bir süreç işi bitirdiyse servis işi yeniden çalıştırmaz.
-- İşi başka bir süreç ayırdıysa servis o işe dokunmaz ve `unknown` döner.
-- Sonuç belirsizse ayırma hemen kalkmaz. Hedef ilk çağrı üzerinde hâlâ çalışıyor olabilir.
-- Ayırma o zaman `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 30 saniye sürer. Bu sürede ikinci çağrı gitmez.
+- İşi başka bir süreç ayırdıysa servis o işe dokunmaz. Cevap işin kuyruktaki durumunu verir.
+- Servis her dış yazmadan önce ayırmayı uzatır. Ayırma o andan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 30 saniye sürer.
+- Böylece ayırma geç başlayan son çağrıyı da kapsar.
+- Sonuç belirsizse ayırma hemen kalkmaz. Hedef son çağrı üzerinde hâlâ çalışıyor olabilir. Bu sürede ikinci çağrı gitmez.
 - Ayırma bu sürenin sonunda kendiliğinden biter. Böylece çöken bir süreç işi kilitli bırakmaz.
+- Hedef bu süreden de uzun çalışırsa nadiren ikinci bir çağrı gidebilir. Bu çağrı veriyi bozmaz. Hedef aynı kimlik için aynı sonucu verir ve satır kilidi alır.
 
 Servis zamanlanmış iş kurmaz. Denemeler biterse iş kuyrukta kalır. İnsan o zaman hedefi denetler. Sonra işi `--include-unknown` ile yeniden işletir.
 

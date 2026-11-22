@@ -41,6 +41,7 @@ from identity_sync.events import (
 from identity_sync.httpjson import HttpError, TransportError, deadline
 from identity_sync.keycloak_admin import InviteResult, PlanChanged
 from identity_sync.mapping import Tenant, service_client_id
+from identity_sync import pipeline
 from identity_sync.pipeline import PreviewChanged, replay_report
 from identity_sync.store import Busy
 
@@ -431,7 +432,7 @@ class _Api:
         # The whole request waits at most the anonymize timeout for the targets, after the wait for
         # the work lock. Press waits longer than that (H-5). A step cut short stays queued and a later
         # event or request continues the job.
-        with deadline(self._settings.anonymize_timeout):
+        with deadline(self._settings.anonymize_timeout, grace=pipeline.RECORD_GRACE_SECONDS):
             result = self._app.processor.handle(request)
         self._audit_deletion(azp, request_id, result.status)
         return 200, {"status": result.status, "request_id": request_id, "actions": list(result.actions)}

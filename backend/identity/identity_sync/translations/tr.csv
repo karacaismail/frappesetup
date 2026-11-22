@@ -547,8 +547,9 @@ The `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` setting is the wait for this call. The def
 The other calls use `IDENTITY_SYNC_HTTP_TIMEOUT`, 10 seconds by default.
 
 A deletion request carries one deadline, `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` after it starts.
-The wait for the work lock, every network read and every retry pause end at that deadline.
-Recording the outcome takes at most 5 seconds more.
+Name lookups, connections and TLS handshakes end at that deadline.
+So do the wait for the work lock, every database wait, every network read and every retry pause.
+The outcome records share one later end, 5 seconds after the deadline. All of them together stay within it.
 So the service answers within `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 5 seconds: 35 seconds by default, 85 at most.
 Press waits at most 90 seconds. When Press stops waiting, it tells the customer that the deletion is in progress.
 When the work lock does not come free in time, the reply is 503 `busy` and the job does not start.
@@ -565,23 +566,29 @@ When the step is done, the job goes on from the next step. Step 5 deletes the Ke
 
 The service continues the job in two places: the next `POST /v1/account-deletions` request for the account,
 and every event handled by `POST /v1/events`.
-After an unknown outcome both places keep a count and spacing limit.
+Both places keep a count and spacing limit, also after a definite failure.
 One job is tried at most 5 times. The timed-out request counts as one try. Two tries are at least 30 seconds apart.
-After a definite failure no call is open on the target, so a Press request continues the job at once.
-The event path keeps the limits for every job. A human replay with `include_unknown` skips them.
+When a limit is reached, the service calls no target. The reply gives the queue state: `dead_lettered` or `unknown`.
+A human replay with `include_unknown` and an approved reconcile skip the limits.
+When every step is finished and only the final record is missing, no limit applies: no target is called.
 
 The event path has one deadline too, 5 seconds after the event is handled.
-The queue read, the claims, every network read and every retry pause end at that deadline.
+The queue read, the claims, the connections, every network read and every retry pause end at that deadline.
+The outcome records share the same later end as in a deletion request.
 The database picks only jobs that may be tried now, at most 3 per event. A long queue is never read in full.
+The queue query itself stops at the deadline, even when it finds no job.
 The service does not hold the work lock while it calls a target. Other processes, for example a replay command, do not wait.
 The service handles HTTP requests one at a time, so the 5-second limit also bounds the wait of the next request.
 
 Two calls for the same job never run at the same time. Before each try the service claims the job.
 The claim and the completion check are one database step. A job another process finished is not run again.
-When another process holds the claim, the service leaves the job alone and returns `unknown`.
-After an unknown outcome the claim stays: the target may still work on the first call.
-The claim then lasts `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 30 seconds, and no second call goes out meanwhile.
+When another process holds the claim, the service leaves the job alone and replies with the queue state.
+Before every external write the service extends the claim to `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` plus 30 seconds from that moment.
+So the claim also covers a last call that starts late in the request.
+After an unknown outcome the claim stays: the target may still work on the last call. No second call goes out meanwhile.
 The claim ends by itself at that time, so a crashed process cannot keep it.
+If a target works even longer, a second call may rarely go out. It does not damage data:
+the target returns the same result for the same identity and takes a row lock.
 There is no scheduled job. When the tries are used up, the job stays in the queue.
 A human then checks the target and replays the job with `include_unknown`.
 
@@ -782,8 +789,9 @@ Bu çağrının bekleme süresi `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` ayarındadır.
 Öteki çağrılar `IDENTITY_SYNC_HTTP_TIMEOUT` ayarını kullanır. Bu ayarın varsayılanı 10 saniyedir.
 
 Silme isteği tek bir son an taşır. Son an istek başladıktan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` sonra gelir.
-İş kilidi beklemesi, bütün ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
-Sonucu kayda yazmak en çok 5 saniye daha sürer.
+Adres çözümü, bağlantı kurulumu ve TLS kurulumu bu son anı aşmaz.
+İş kilidi beklemesi, veritabanı beklemeleri, ağ okumaları ve yeniden deneme araları da bu son anı aşmaz.
+Sonuç kayıtları ortak ve daha geç bir son an kullanır. Bu son an ilk son andan 5 saniye sonra gelir. Bütün kayıtlar birlikte bu süreyi aşmaz.
 Bu yüzden servis en geç `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 5 saniyede cevap verir. Bu süre varsayılan olarak 35, en çok 85 saniyedir.
 Press en çok 90 saniye bekler. Press beklemeyi bırakınca müşteriye silmenin sürdüğünü söyler.
 İş kilidi zamanında boşalmazsa cevap 503 ve `busy` olur. İş o zaman başlamaz.
@@ -800,23 +808,29 @@ Adım bitince iş sonraki adımdan sürer. 5. adım Keycloak kullanıcısını s
 
 Servis işi iki yerde sürdürür: hesabın bir sonraki `POST /v1/account-deletions` isteğinde
 ve `POST /v1/events` ucunun işlediği her olayda.
-Sonuç belirsiz kaldıysa iki yerde de sayı ve ara sınırı geçerlidir.
+İki yerde de sayı ve ara sınırı vardır. Sınır kesin bir hatadan sonra da geçerlidir.
 Bir iş en çok 5 kez denenir. Zaman aşımına uğrayan istek de bir deneme sayılır. İki deneme arasında en az 30 saniye geçer.
-Adım kesin bir hatayla bittiyse hedefte açık çağrı kalmaz. Press isteği işi o zaman hemen sürdürür.
-Olay yolu sınırları her işte uygular. `include_unknown` ile yapılan insan işletmesi sınırları uygulamaz.
+Sınır dolunca servis hedefi çağırmaz. Cevap işin kuyruktaki durumunu verir: `dead_lettered` ya da `unknown`.
+`include_unknown` ile yapılan insan işletmesi ve onaylı mutabakat sınırları uygulamaz.
+Bütün adımlar bitmiş ve yalnız son kayıt eksikse sınır yoktur. Bu durumda hedefe çağrı gitmez.
 
 Olay yolunun da tek bir son anı vardır. Son an olay işlendikten 5 saniye sonra gelir.
-Kuyruk okuması, iş ayırma, bütün ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
+Kuyruk okuması, iş ayırma, bağlantılar, ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
+Sonuç kayıtları silme isteğindeki gibi ortak ve daha geç bir son an kullanır.
 Veritabanı yalnız şu anda denenebilecek işleri seçer. Bir olay en çok 3 iş okur. Uzun kuyruk baştan sona okunmaz.
+Kuyruk sorgusu da son anda durur. Uygun iş bulamasa bile süreyi aşmaz.
 Servis hedefi çağırırken iş kilidini tutmaz. Öteki süreçler, örneğin yeniden işletme komutu, beklemez.
 Servis HTTP isteklerini sırayla işler. Bu yüzden 5 saniyelik sınır sonraki isteğin beklemesini de sınırlar.
 
 Aynı iş için iki çağrı aynı anda çalışmaz. Servis her denemeden önce işi kendine ayırır.
 Ayırma ve tamamlanma denetimi aynı veritabanı adımıdır. Başka bir sürecin bitirdiği iş yeniden çalışmaz.
-İşi başka bir süreç ayırdıysa servis işe dokunmaz ve `unknown` döner.
-Sonuç belirsizse ayırma kalkmaz, çünkü hedef ilk çağrı üzerinde hâlâ çalışıyor olabilir.
-Ayırma o zaman `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 30 saniye sürer. Bu sürede ikinci çağrı gitmez.
+İşi başka bir süreç ayırdıysa servis işe dokunmaz. Cevap işin kuyruktaki durumunu verir.
+Servis her dış yazmadan önce ayırmayı uzatır. Ayırma o andan `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` artı 30 saniye sürer.
+Böylece ayırma, istekte geç başlayan son çağrıyı da kapsar.
+Sonuç belirsizse ayırma kalkmaz. Hedef son çağrı üzerinde hâlâ çalışıyor olabilir. Bu sürede ikinci çağrı gitmez.
 Ayırma bu sürenin sonunda kendiliğinden biter. Böylece çöken süreç işi tutamaz.
+Hedef bundan da uzun çalışırsa nadiren ikinci bir çağrı gidebilir. Bu çağrı veriyi bozmaz.
+Hedef aynı kimlik için aynı sonucu verir ve satır kilidi alır.
 Zamanlanmış iş yoktur. Denemeler biterse iş kuyrukta kalır.
 İnsan o zaman hedefi denetler. Sonra işi `include_unknown` ile yeniden işletir.
 

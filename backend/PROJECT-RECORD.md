@@ -206,17 +206,20 @@ Proje sahibi 22 Kasım 2026 Pazar günü şöyle yazdı: “Herşeyi onaylıyoru
   - Sistem, anonim yaptığı alanların eski ve yeni değerlerini kart geçmişinden temizler. Sistem bu işlemi geçmişi kimin yazdığına bakmadan yapar. Diğer alanların geçmişi kalır.
   - Anonim yapma çağrısının kendi bekleme süresi vardır (H-5). Ayarın adı `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` olur. Varsayılan değer 30 saniyedir.
   - Bu değer 22 Kasım 2026 Pazar günü ölçüldü. Boş kiracıda iş en çok 2,5 saniye sürdü. Son MVP testinde yük altında yaklaşık 12 saniye sürdü.
-  - Silme isteği tek bir son an taşır. Son an `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` sonra gelir. Kilit beklemesi, ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
+  - Silme isteği tek bir son an taşır. Son an `IDENTITY_SYNC_ANONYMIZE_TIMEOUT` sonra gelir. Adres çözümü, bağlantı, kilit beklemesi, veritabanı beklemesi, ağ okumaları ve yeniden deneme araları bu son anı aşmaz.
+  - Sonuç kayıtları ortak bir son an kullanır. Bu son an ilk son andan 5 saniye sonra gelir.
   - Servis en geç anonim yapma süresi artı 5 saniyede cevap verir. Varsayılan ayarla bu süre 35 saniyedir. Ayarın en büyük değeri 80 saniyedir.
-  - Press en çok 90 saniye bekler. Press zaman aşımında müşteriye "silme sürüyor" der.
+  - Press varsayılan olarak 45 saniye, en çok 90 saniye bekler. Press zaman aşımında müşteriye "silme sürüyor" der. `dev/tests/test_deletion_timeouts.py` iki servisin sürelerini karşılaştırır.
   - Silme işinin her adımı tekrar edilebilir. Yarım kalan adımı identity-sync yeniden çağırır. Kimlik listesinden sonuç çıkarılmaz.
   - Anonim yapma adımı yalnız HTTP 200 cevabı ve iki zorunlu alanla biter (O-43). Alanı eksik ya da türü yanlış cevap işi `unknown` bırakır.
   - İş bir sonraki silme isteğinde ya da bir sonraki olayda sürer.
-  - Sonuç belirsiz kaldıysa iki yolda da sınır vardır. Bir iş en çok 5 kez denenir. İki deneme arasında en az 30 saniye geçer.
-  - Kesin hatadan sonra hedefte açık çağrı kalmaz. Press isteği işi o zaman hemen sürdürür.
+  - Her yeniden denemede iki yolda da sınır vardır. Bir iş en çok 5 kez denenir. İki deneme arasında en az 30 saniye geçer. Sınır kesin hatadan sonra da geçerlidir.
+  - İnsanın yeniden işletmesi ve onaylı mutabakat sınırları uygulamaz.
   - Bir olay en çok 3 iş seçer. Kuyruk okuması, ağ okumaları ve yeniden deneme araları 5 saniyelik tek son anı aşmaz.
   - Her deneme işi önce kendine ayırır. Ayırma ve tamamlanma denetimi aynı veritabanı adımındadır. Aynı iş için iki deneme aynı anda çalışmaz.
-  - Sonuç belirsizse ayırma hemen kalkmaz. Ayırma anonim yapma süresi artı 30 saniye sürer. Hedef ilk çağrı üzerinde hâlâ çalışıyor olabilir.
+  - Servis her dış yazmadan önce ayırmayı uzatır. Ayırma o andan anonim yapma süresi artı 30 saniye sürer. Böylece geç başlayan son çağrı da kapsanır.
+  - Sonuç belirsizse ayırma hemen kalkmaz. Hedef son çağrı üzerinde hâlâ çalışıyor olabilir.
+  - Hedef bundan da uzun çalışırsa nadiren ikinci bir çağrı gidebilir. Bu çağrı veriyi bozmaz. Kiracı aynı kimlik için aynı sonucu verir ve satır kilidi alır.
   - Hedef çağrılırken iş kilidi tutulmaz. Zamanlanmış iş kurulmaz. Denemeler biterse işi insan yeniden işletir.
 - **O-28. Yapay zekâ katmanı genel Frappe erişimi değildir.** D-9 her şeyin yapay zekâyla yönetilmesini ister. AX-2 modele genel Frappe erişimi vermeyi yasaklar. İki kural şöyle birleşir:
   - Model yalnız kayıtlı araçları çağırır. Her araç kullanıcının yetkisiyle çalışır.

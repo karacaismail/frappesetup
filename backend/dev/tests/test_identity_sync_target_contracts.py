@@ -6,10 +6,13 @@ Each of those endpoints has its own contract: contracts/press_tr.openapi.yaml,
 contracts/platform_core-identity.openapi.yaml and contracts/platform_core-mobile.openapi.yaml.
 
 This test reads both sides. Every field the service requires in a target reply must be a required
-field of the 200 reply in the target's contract. A field the target does not promise makes the
-service record the step as `unknown` on every call. That happened in the final MVP test (H-5):
-the tenant `anonymize_user` reply carried `user`, `enabled` and `status`, but no `anonymized`
-and no `found`.
+field of the 200 reply in the target's contract, with a type the service accepts. A reply that may
+take several shapes (`oneOf` or `anyOf`) is checked shape by shape: every shape must carry the fields.
+
+A field the target does not promise leaves the step `unknown` on every call. That happened in the
+final MVP test (H-5): the tenant `anonymize_user` reply carried `user`, `enabled` and `status`, but no
+`anonymized` and no `found`. The deletion job then never finished. After a timeout the service
+repeats the step and accepts only this reply (project record O-27 and O-43). It reads no identity list.
 """
 
 import unittest
@@ -83,18 +86,55 @@ def required_fields(spec, schema, prefix=""):
 
 
 def required_schemas(spec, schema, prefix=""):
-    """Every required field of a schema with its own resolved schema, keyed by dotted path."""
+    """The required fields of a schema that has one shape, keyed by dotted path."""
+    variants = reply_variants(spec, schema, prefix)
+    if len(variants) != 1:
+        raise AssertionError("the schema has several shapes; check them with reply_variants")
+    return variants[0]
+
+
+def _shapes(spec, schema):
+    """The shapes a schema allows. `oneOf` and `anyOf` give one shape per part."""
     schema = resolve(spec, schema)
-    found = {}
-    for name in schema.get("required", []):
-        path = f"{prefix}{name}"
-        child = resolve(spec, schema.get("properties", {}).get(name))
-        found[path] = child if isinstance(child, dict) else {}
-        if isinstance(child, dict) and "items" in child:
-            found.update(required_schemas(spec, child["items"], f"{path}[]."))
-        elif child is not None:
-            found.update(required_schemas(spec, child, f"{path}."))
-    return found
+    if not isinstance(schema, dict):
+        return [{}]
+    for key in ("oneOf", "anyOf"):
+        if key in schema:
+            rest = {name: value for name, value in schema.items() if name != key}
+            return [shape for part in schema[key] for shape in _shapes(spec, {"allOf": [rest, part]})]
+    return [schema]
+
+
+def reply_variants(spec, schema, prefix=""):
+    """Every shape of a reply as a map from dotted path to the field's own schema.
+
+    Only required fields are listed. A required field that has several shapes multiplies the result,
+    so each map is one complete reply the target may send.
+    """
+    variants = []
+    for shape in _shapes(spec, schema):
+        maps = [{}]
+        for name in shape.get("required", []):
+            path = f"{prefix}{name}"
+            child_maps = []
+            for child in _shapes(spec, shape.get("properties", {}).get(name, {})):
+                if "items" in child:
+                    nested = reply_variants(spec, child["items"], f"{path}[].")
+                elif child.get("required"):
+                    nested = reply_variants(spec, child, f"{path}.")
+                else:
+                    nested = [{}]
+                child_maps += [{path: child, **inner} for inner in nested]
+            maps = [{**done, **more} for done in maps for more in child_maps]
+        variants += maps
+    return variants
+
+
+def variant_problems(expected, variant):
+    """What one reply shape lacks: missing required fields and types the service would not accept."""
+    problems = [f"missing {path}" for path in expected if path not in variant]
+    problems += [f"type {path}" for path in type_mismatches(expected, variant)]
+    return problems
 
 
 _JSON_TYPES = {bool: "boolean", int: "integer", float: "number", str: "string", type(None): "null"}
@@ -147,14 +187,20 @@ class IdentitySyncTargetContractTests(unittest.TestCase):
     def test_target_contracts_promise_every_field_the_service_requires(self):
         service = load(SERVICE)
         for schema_name, endpoints in TARGETS.items():
-            expected = required_fields(service, service["components"]["schemas"][schema_name])
+            expected = required_schemas(service, service["components"]["schemas"][schema_name])
             for contract, path, *method in endpoints:
                 spec = load(contract)
-                schema = reply_schema(spec, path, method[0] if method else "post")
-                promised = set(required_fields(spec, schema))
-                with self.subTest(target=schema_name, contract=contract, path=path):
-                    missing = [field for field in expected if field not in promised]
-                    self.assertEqual(missing, [], f"{contract} {path} does not promise these reply fields")
+                variants = reply_variants(spec, reply_schema(spec, path, method[0] if method else "post"))
+                for number, variant in enumerate(variants, 1):
+                    with self.subTest(target=schema_name, contract=contract, path=path, shape=number):
+                        missing = [
+                            problem
+                            for problem in variant_problems(expected, variant)
+                            if problem.startswith("missing")
+                        ]
+                        self.assertEqual(
+                            missing, [], f"{contract} {path} shape {number} does not promise these fields"
+                        )
 
     def test_target_contracts_promise_the_types_the_service_accepts(self):
         service = load(SERVICE)
@@ -162,10 +208,11 @@ class IdentitySyncTargetContractTests(unittest.TestCase):
             expected = required_schemas(service, service["components"]["schemas"][schema_name])
             for contract, path, *method in endpoints:
                 spec = load(contract)
-                promised = required_schemas(spec, reply_schema(spec, path, method[0] if method else "post"))
-                with self.subTest(target=schema_name, contract=contract, path=path):
-                    wrong = type_mismatches(expected, promised)
-                    self.assertEqual(wrong, [], f"{contract} {path} promises other types for these fields")
+                variants = reply_variants(spec, reply_schema(spec, path, method[0] if method else "post"))
+                for number, variant in enumerate(variants, 1):
+                    with self.subTest(target=schema_name, contract=contract, path=path, shape=number):
+                        wrong = type_mismatches(expected, variant)
+                        self.assertEqual(wrong, [], f"{contract} {path} shape {number} promises other types")
 
     def test_type_check_catches_a_text_value_for_a_boolean_field(self):
         service = {
@@ -179,6 +226,48 @@ class IdentitySyncTargetContractTests(unittest.TestCase):
         self.assertEqual(
             type_mismatches(service, {"found": {"type": "boolean"}, "member": {"const": False}}), []
         )
+
+    def test_every_variant_of_a_one_of_reply_is_checked(self):
+        # The tenant reply has two shapes: an anonymized account and an unknown identity.
+        spec = {
+            "components": {
+                "schemas": {
+                    "Done": {
+                        "type": "object",
+                        "required": ["anonymized", "found", "user"],
+                        "properties": {
+                            "anonymized": {"type": "boolean", "const": True},
+                            "found": {"type": "boolean", "const": True},
+                            "user": {"type": "string"},
+                        },
+                    },
+                    "Unknown": {
+                        "type": "object",
+                        "required": ["anonymized"],
+                        "properties": {"anonymized": {"type": "boolean"}, "found": {"type": "string"}},
+                    },
+                }
+            }
+        }
+        reply = {
+            "type": "object",
+            "required": ["message"],
+            "properties": {
+                "message": {
+                    "oneOf": [{"$ref": "#/components/schemas/Done"}, {"$ref": "#/components/schemas/Unknown"}]
+                }
+            },
+        }
+        variants = reply_variants(spec, reply)
+        self.assertEqual(len(variants), 2)
+        expected = {
+            "message": {},
+            "message.anonymized": {"type": "boolean"},
+            "message.found": {"type": "boolean"},
+        }
+        problems = [variant_problems(expected, variant) for variant in variants]
+        self.assertEqual(problems[0], [])
+        self.assertEqual(problems[1], ["missing message.found"])
 
 
 if __name__ == "__main__":

@@ -71,6 +71,8 @@ SETTLE_INTERVAL_SECONDS = 30.0
 # A claim stays this much longer than the anonymize timeout. After a client timeout the target
 # may still work on the first call. Until the claim ends, no second call is sent (inceleme 18).
 REPEAT_HOLD_MARGIN_SECONDS = 30.0
+# Recording outcomes may take this long after the deadline, all records together (inceleme 19).
+RECORD_GRACE_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -319,7 +321,8 @@ class Processor:
         if self._store.is_processed(job.id):
             # The job finished before, yet a target still lists the account. A human must look.
             return {**result, "status": "failed", "error": "the deletion job finished before; check the target"}
-        status = self._handle_job(job, False, None).status
+        # A human approved this repair. Like a human replay, it skips the count and spacing limits.
+        status = self._handle_job(job, True, None).status
         if status == "processed":
             return {**result, "status": "done"}
         if status == "unknown":
@@ -369,16 +372,11 @@ class Processor:
             # (docs/sozlesmeler.md, section 7). So a queued job runs again from its first step that
             # is not finished (H-5). Every caller claims the job first. The claim also checks, in
             # the same database step, that the job is not finished (inceleme 18).
-            # After an unknown outcome the count and spacing limits apply, so a call that may still
-            # run on the target is not repeated at once. After a definite failure no call is open,
-            # and a resend continues at once. A human replay (`allow_unknown`) skips the limits.
-            # One case needs no limit: every step is recorded as finished and only the final record
-            # is missing. Nothing is sent to a target then, so the job may finish at once.
-            limited = (
-                not allow_unknown
-                and self._store.dead_letter_state(event.id) == "unknown"
-                and bool(self._pending(event, self._plan(event)))
-            )
+            # The count and spacing limits apply to every resend (inceleme 19), so a job is not
+            # hammered. One case needs no limit: every step is recorded as finished and only the
+            # final record is missing. Nothing is sent to a target then. A human replay
+            # (`allow_unknown`) skips the limits.
+            limited = not allow_unknown and bool(self._pending(event, self._plan(event)))
             return self._run_claimed(event, planned, limited=limited)
         if not allow_unknown and self._store.dead_letter_state(event.id) == "unknown":
             # The event came again but its earlier outcome is unknown. No blind repeat.
@@ -410,7 +408,7 @@ class Processor:
         """
         claim = self._store.claim_repeat(
             job.id,
-            hold=self._anonymize_timeout + REPEAT_HOLD_MARGIN_SECONDS,
+            hold=self._hold(),
             max_attempts=SETTLE_MAX_ATTEMPTS if limited else None,
             min_interval=SETTLE_INTERVAL_SECONDS if limited else 0.0,
         )
@@ -419,7 +417,9 @@ class Processor:
             self._store.remove_dead_letter(job.id)
             return EventResult("duplicate")
         if claim != "claimed":
-            return EventResult("unknown")  # busy or limited: the job stays queued as it is
+            # Busy or limited: the job stays queued as it is. The reply names its queue state.
+            state = self._store.dead_letter_state(job.id)
+            return EventResult("dead_lettered" if state == "failed" else "unknown")
         result: EventResult | None = None
         try:
             result = self._execute_job(job, planned)
@@ -429,10 +429,14 @@ class Processor:
             if result is None or result.status != "unknown":
                 self._release(job.id)
 
+    def _hold(self) -> float:
+        """How long a claim lasts: the longest wait for one target call, plus a margin."""
+        return self._anonymize_timeout + REPEAT_HOLD_MARGIN_SECONDS
+
     def _release(self, job_id: str) -> None:
         try:
             self._store.release_repeat(job_id)
-        except sqlite3.Error:
+        except (sqlite3.Error, Busy):
             pass  # the claim then ends by itself when its hold runs out
 
     def settle_queued_jobs(self) -> list[tuple[str, EventResult]]:
@@ -447,7 +451,7 @@ class Processor:
         `SETTLE_INTERVAL_SECONDS` apart. After that a human decides.
         """
         results: list[tuple[str, EventResult]] = []
-        with deadline(SETTLE_BUDGET_SECONDS):
+        with deadline(SETTLE_BUDGET_SECONDS, grace=RECORD_GRACE_SECONDS):
             try:
                 letters = self._store.repeatable_jobs(
                     limit=SETTLE_MAX_JOBS, max_attempts=SETTLE_MAX_ATTEMPTS, min_interval=SETTLE_INTERVAL_SECONDS
@@ -604,6 +608,12 @@ class Processor:
             for action in pending:
                 preview = action.preview()
                 label = f"{preview.operation} {preview.target}"
+                if event.type in JOB_TYPES:
+                    # The claim must outlast this call, even when it starts late (inceleme 19).
+                    try:
+                        self._store.extend_repeat(event.id, hold=self._hold())
+                    except Busy:
+                        raise _Failed(f"{label}: deadline passed") from None
                 try:
                     self._retry(label, lambda action=action: self._execute(action))
                 except _Failed as failure:
