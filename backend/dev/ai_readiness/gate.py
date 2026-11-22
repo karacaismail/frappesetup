@@ -28,6 +28,7 @@ from source import (
     string,
     walk,
 )
+from translations import translation_checks
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "guvenlik"))
 # Reuse the sibling endpoint checker after adding its directory for direct CLI execution.
@@ -100,7 +101,7 @@ def module_name(path, root):
     return ".".join(parts)
 
 
-def source_files(directory, emit):
+def source_files(directory, emit, *, exclude=frozenset()):
     def unreadable(error):
         emit(Path(error.filename), 1, "input", "Could not list source directory.")
 
@@ -109,7 +110,12 @@ def source_files(directory, emit):
         return
     for current, folders, files in os.walk(directory, onerror=unreadable):
         base = Path(current)
-        folders[:] = sorted(name for name in folders if not name.startswith(".") and name != "node_modules")
+        folders[:] = sorted(
+            name
+            for name in folders
+            if not name.startswith(".") and name != "node_modules" and base / name not in exclude
+        )
+        files = [name for name in files if base / name not in exclude]
         for name in [*folders, *sorted(files)]:
             path = base / name
             if path.is_symlink():
@@ -673,11 +679,12 @@ def website_method_checks(entries, endpoints, functions, sources, reexports, ove
                 break
 
 
-def scan(root, commit_base=None):
+def scan(root, commit_base=None, frappe_root=None):
     findings = set()
     functions = {}
     endpoints = {}
     sources = {}
+    translation_paths = []
     registered = {}
     overrides = {}
     override_candidates = {}
@@ -698,7 +705,16 @@ def scan(root, commit_base=None):
 
     if not (root / "apps").is_dir():
         emit(root / "apps", 1, "input", "Backend apps directory is missing.")
-    for path in source_files(root / "apps", emit):
+    default_frappe_checkout = root / "apps" / "frappe"
+    frappe_checkout = frappe_root or default_frappe_checkout
+    frappe_package = frappe_checkout / "frappe" if (frappe_checkout / "frappe").is_dir() else frappe_checkout
+    for path in source_files(root / "apps", emit, exclude={default_frappe_checkout}):
+        if (
+            path.suffix == ".csv"
+            and path.parent.name == "translations"
+            and len(path.relative_to(root).parts) in {4, 5}
+        ):
+            translation_paths.append(path)
         try:
             if path.suffix == ".json":
                 doctype_checks(path, emit)
@@ -834,6 +850,7 @@ def scan(root, commit_base=None):
     for path, line, message in tracked_findings(root, commit_base):
         findings.add(Finding(path, line, "forbidden-name", message))
     checks = naming_checks(root, findings)
+    checks["translation_core"] = translation_checks(translation_paths, frappe_package, emit)
     return sorted(findings), checks
 
 
@@ -850,8 +867,11 @@ def main():
     )
     parser.add_argument("--path-code", help="Locate a redacted path by its Git index slot.")
     parser.add_argument("--commit-base", help="Check commit messages after this revision through HEAD.")
+    parser.add_argument(
+        "--frappe-root", type=Path, help="Read core translation catalogs from this Frappe checkout."
+    )
     args = parser.parse_args()
-    if args.list_interfaces and (args.json or args.path_code or args.commit_base):
+    if args.list_interfaces and (args.json or args.path_code or args.commit_base or args.frappe_root):
         parser.error("--list-interfaces only accepts --root.")
     if not supports_python():
         print("ai-readiness requires Python 3.14 or newer.", file=sys.stderr)
@@ -880,7 +900,8 @@ def main():
             return 1
         print(json.dumps(location))
         return 0
-    raw_findings, checks = scan(root, args.commit_base)
+    frappe_root = args.frappe_root.resolve() if args.frappe_root else None
+    raw_findings, checks = scan(root, args.commit_base, frappe_root)
     findings = [
         Finding(
             redact_path(finding.path),
@@ -898,6 +919,8 @@ def main():
             print("naming: not_run (checker unavailable)", file=sys.stderr)
         if checks["naming_mode_source"] == "default":
             print("naming mode: advisory (enforcement.json missing)", file=sys.stderr)
+        if checks["translation_core"] == "not_run":
+            print("translation_core: not_run (Frappe core catalog unavailable)", file=sys.stderr)
         for finding in findings:
             prefix = "Warning: " if finding.severity == "warning" else ""
             print(f"{prefix}{finding.path}:{finding.line} [{finding.rule}] {finding.message}")

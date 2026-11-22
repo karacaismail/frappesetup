@@ -41,6 +41,21 @@ JSON çıktısı kipi `checks.naming_mode` alanında gösterir.
 Kip dosyası geçersizse veya ad betiği çalışmazsa kapı hata verir.
 Ad betiği yoksa kapı `not_run` yazar.
 
+## Çeviri denetimi
+
+Kapı uygulama çeviri dosyalarında her kayıtta üç sütun arar.
+Sütunlar kaynak metin, çeviri ve bağlamdır.
+Aynı dosyada kaynak metin ile bağlam çifti yalnız bir kez yazılır.
+Bağlam boşsa kapı kaynak metni Frappe çekirdek çevirisiyle karşılaştırır.
+Kaynak iki yerde de varsa kapı bulgu yazar.
+
+Kapı çekirdek katalog için `backend/apps/frappe/frappe` yoluna bakar.
+Başka bir Frappe çalışma kopyası için `--frappe-root <yol>` kullanın.
+Kapı aynı dilin CSV ve PO dosyalarını okur.
+Örneğin `tr-TR` dosyası için `tr` dosyasına da bakar.
+Bir dilin çekirdek kataloğu yoksa `translation_core` sonucu `not_run` olur.
+Bu durumda da sütun ve tekrar denetimleri çalışır.
+
 ## Kapsam
 
 - Kapı karar notlarının dosya adındaki dört haneli sayıyı denetler.

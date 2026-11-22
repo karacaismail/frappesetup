@@ -471,6 +471,7 @@ class GateTests(unittest.TestCase):
                     "naming": "not_run",
                     "naming_mode": "advisory",
                     "naming_mode_source": "default",
+                    "translation_core": "not_run",
                 },
             },
         )
