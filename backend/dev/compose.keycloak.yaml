@@ -9,8 +9,8 @@
 # İmaj varsa `kc-dev.sh up` onu yeniden kullanır. Realm dosyası değişince `kc-dev.sh build` çalıştırın.
 services:
   keycloak:
-    # The tag carries the Pane port so parallel Panes do not overwrite each other's image.
-    image: fs-keycloak-atonota:dev-${KC_PORT:?}
+    # The shared stack supplies its worktree namespace; standalone runs keep their port tag.
+    image: fs-keycloak-atonota:dev-${FS_STACK_IMAGE_TAG:-${KC_PORT:?}}
     build:
       context: ../identity/keycloak
       dockerfile: Dockerfile
@@ -97,7 +97,7 @@ services:
 
   # Development-only receiver for the event listener tests. It has no host port.
   event-sink:
-    image: fs-kimlik-realm-event-sink:dev
+    image: fs-kimlik-realm-event-sink:${FS_STACK_IMAGE_TAG:-dev}
     build:
       context: ../identity/keycloak
       dockerfile: Dockerfile
