@@ -18,6 +18,8 @@ PRODUCTION_ENV = KLASOR / "production.env.example"
 COMPOSE = KLASOR.parents[1] / "dev" / "compose.keycloak.yaml"
 MOBILE_CLIENT = "mobile-app"
 TENANT_SERVICE_CLIENTS = {"site-kiraci1"}
+# Contract 42f8e32: press-service may also request aud-identity-sync.
+IDENTITY_SYNC_AUDIENCE_CLIENTS = TENANT_SERVICE_CLIENTS | {"press-service"}
 
 
 def _env_values(path) -> dict:
@@ -112,12 +114,12 @@ class RealmBacklogFileTest(unittest.TestCase):
         self.assertEqual(mappers[0]["config"]["id.token.claim"], "false")
         self.assertEqual(len(scope["protocolMappers"]), 1)
 
-    def test_only_tenant_service_clients_may_request_identity_sync_audience(self):
+    def test_only_allowed_service_clients_may_request_identity_sync_audience(self):
         for client_id, client in self.clients.items():
             self.assertNotIn("aud-identity-sync", client.get("defaultClientScopes", []), client_id)
             optional = "aud-identity-sync" in client.get("optionalClientScopes", [])
-            self.assertEqual(optional, client_id in TENANT_SERVICE_CLIENTS, client_id)
-        for client_id in TENANT_SERVICE_CLIENTS:
+            self.assertEqual(optional, client_id in IDENTITY_SYNC_AUDIENCE_CLIENTS, client_id)
+        for client_id in IDENTITY_SYNC_AUDIENCE_CLIENTS:
             self.assertTrue(self.clients[client_id]["serviceAccountsEnabled"], client_id)
 
 
@@ -195,6 +197,13 @@ class RealmBacklogLiveTest(unittest.TestCase):
         self.assertNotIn("realm_access", claims)
         self.assertNotIn("resource_access", claims)
 
+    def test_press_service_gets_identity_sync_audience(self):
+        response = istemci_belirteci("press-service", ortam("ATONOTA_PRESS_SERVICE_SECRET"), "aud-identity-sync")
+        self.assertEqual(response.durum, 200, response.govde[:200])
+        claims = jwt_govdesi(response.json()["access_token"])
+        self.assertEqual(claims["aud"], "identity-sync")
+        self.assertEqual(claims["azp"], "press-service")
+
     def test_tenant_service_token_without_scope_has_no_identity_sync_audience(self):
         response = istemci_belirteci("site-kiraci1", ortam("ATONOTA_SITE_KIRACI1_SECRET"))
         self.assertEqual(response.durum, 200, response.govde[:200])
@@ -202,7 +211,6 @@ class RealmBacklogLiveTest(unittest.TestCase):
 
     def test_other_clients_cannot_get_identity_sync_audience(self):
         for client_id, secret in (("identity-sync", "ATONOTA_IDENTITY_SYNC_SECRET"),
-                                  ("press-service", "ATONOTA_PRESS_SERVICE_SECRET"),
                                   ("press", "ATONOTA_PRESS_SECRET")):
             response = istemci_belirteci(client_id, ortam(secret), "aud-identity-sync")
             if response.durum == 200:

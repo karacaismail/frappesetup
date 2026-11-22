@@ -835,7 +835,8 @@
         "basic"
       ],
       "optionalClientScopes": [
-        "aud-site-kiraci1"
+        "aud-site-kiraci1",
+        "aud-identity-sync"
       ]
     },
     {
@@ -1296,7 +1297,7 @@
       "alias": "delete_account",
       "name": "Delete Account",
       "providerId": "delete_account",
-      "enabled": true,
+      "enabled": false,
       "defaultAction": false,
       "priority": 60,
       "config": {}
@@ -1360,8 +1361,7 @@
           "client": {
             "account": [
               "view-profile",
-              "manage-account",
-              "delete-account"
+              "manage-account"
             ]
           }
         },
@@ -1375,23 +1375,6 @@
       {
         "name": "uma_authorization",
         "composite": false,
-        "clientRole": false
-      },
-      {
-        "name": "employee",
-        "composite": true,
-        "composites": {
-          "realm": [
-            "offline_access",
-            "uma_authorization"
-          ],
-          "client": {
-            "account": [
-              "view-profile",
-              "manage-account"
-            ]
-          }
-        },
         "clientRole": false
       }
     ]

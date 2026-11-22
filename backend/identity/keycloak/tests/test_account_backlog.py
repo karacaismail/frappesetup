@@ -2,7 +2,8 @@
 
 7: an old refresh token is refused (contract section 2: the refresh token changes on every use).
 8: the passkey registration step is enabled; disabled providers are not shown on the login page.
-11: a customer can delete their own account through Keycloak's delete account step (O-27).
+11: account deletion starts in Press, identity-sync deletes the Keycloak user last (contract 42f8e32).
+    Keycloak's own delete_account action stays disabled and nobody gets the delete-account role.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from yardimci import (admin, canli_var_mi, istek, ortam, realm_oku, tenant_autho
                       tenant_callback_url, yonetici_belirteci)
 
 REQUIRED_ON = {"CONFIGURE_TOTP", "UPDATE_PASSWORD", "VERIFY_EMAIL", "webauthn-register",
-               "webauthn-register-passwordless", "delete_account"}
+               "webauthn-register-passwordless"}
 
 
 class AccountBacklogFileTest(unittest.TestCase):
@@ -34,33 +35,28 @@ class AccountBacklogFileTest(unittest.TestCase):
 
     def test_no_required_action_is_forced_on_every_new_user(self):
         # A default action would run for invited employees too. Keycloak asks for TOTP and e-mail by policy.
-        for alias in ("delete_account", "webauthn-register-passwordless"):
-            self.assertFalse(self.actions[alias]["defaultAction"], alias)
+        self.assertFalse(self.actions["webauthn-register-passwordless"]["defaultAction"])
+
+    def test_keycloak_delete_account_action_is_disabled(self):
+        # Contract 42f8e32: the action deletes the user in its first step, before Press and the tenants.
+        self.assertFalse(self.actions["delete_account"]["enabled"])
+        self.assertFalse(self.actions["delete_account"]["defaultAction"])
 
     def test_disabled_providers_are_hidden(self):
         for provider in self.realm["identityProviders"]:
             if not provider["enabled"]:
                 self.assertTrue(provider["hideOnLogin"], provider["alias"])
 
-    def test_default_role_lets_a_customer_delete_the_account(self):
+    def test_no_role_grants_delete_account(self):
         default_role = self.realm["defaultRole"]["name"]
         role = next(r for r in self.realm["roles"]["realm"] if r["name"] == default_role)
-        self.assertTrue(role["composite"])
-        self.assertIn("delete-account", role["composites"]["client"]["account"])
-        # Keycloak's own default composites stay.
-        self.assertTrue({"view-profile", "manage-account"} <= set(role["composites"]["client"]["account"]))
+        # Keycloak's own default composites stay; delete-account is not among them.
+        self.assertEqual(set(role["composites"]["client"]["account"]), {"view-profile", "manage-account"})
         self.assertTrue({"offline_access", "uma_authorization"} <= set(role["composites"]["realm"]))
-
-    def test_employee_role_has_no_delete_account(self):
-        # O-27: employees come only by invitation and do not get delete-account. identity-sync gives an
-        # invited employee the "employee" role in place of the default role.
-        role = next(r for r in self.realm["roles"]["realm"] if r["name"] == "employee")
-        self.assertTrue(role["composite"])
-        account = set(role["composites"]["client"]["account"])
-        self.assertNotIn("delete-account", account)
-        self.assertTrue({"view-profile", "manage-account"} <= account)
-        self.assertTrue({"offline_access", "uma_authorization"} <= set(role["composites"]["realm"]))
-        self.assertNotIn(self.realm["defaultRole"]["name"], role["composites"]["realm"])
+        for realm_role in self.realm["roles"]["realm"]:
+            account = realm_role.get("composites", {}).get("client", {}).get("account", [])
+            self.assertNotIn("delete-account", account, realm_role["name"])
+        self.assertNotIn("employee", {r["name"] for r in self.realm["roles"]["realm"]})
 
     def test_refresh_token_changes_on_every_use(self):
         self.assertTrue(self.realm["revokeRefreshToken"])
@@ -134,7 +130,7 @@ class AccountBacklogLiveTest(unittest.TestCase):
             self.assertNotIn(f"/broker/{alias}/login", html, alias)
             self.assertNotIn(f'id="social-{alias}"', html, alias)
 
-    def test_new_customer_gets_the_delete_account_role(self):
+    def test_new_user_does_not_get_the_delete_account_role(self):
         username = f"customer-{uuid.uuid4().hex[:10]}"
         created = admin("/users", self.admin_token, "POST",
                         {"username": username, "email": f"{username}@example.test", "enabled": True})
@@ -142,37 +138,18 @@ class AccountBacklogLiveTest(unittest.TestCase):
         user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
         self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
         account = admin("/clients?clientId=account", self.admin_token).json()[0]["id"]
-        roles = admin(f"/users/{user_id}/role-mappings/clients/{account}/composite", self.admin_token).json()
-        self.assertIn("delete-account", {r["name"] for r in roles})
-
-    def test_employee_does_not_get_the_delete_account_role(self):
-        username = f"employee-{uuid.uuid4().hex[:10]}"
-        created = admin("/users", self.admin_token, "POST",
-                        {"username": username, "email": f"{username}@example.test", "enabled": True})
-        self.assertEqual(created.durum, 201, created.govde[:200])
-        user_id = created.basliklar["Location"].rstrip("/").rsplit("/", 1)[1]
-        self.addCleanup(admin, f"/users/{user_id}", self.admin_token, "DELETE")
-        roles = {r["name"]: r for r in admin("/roles", self.admin_token).json()}
-        # The invitation step identity-sync runs: employee role in, default role out.
-        added = admin(f"/users/{user_id}/role-mappings/realm", self.admin_token, "POST", [roles["employee"]])
-        self.assertEqual(added.durum, 204, added.govde[:200])
-        removed = istek("DELETE", f"{self.kc}/admin/realms/platform/users/{user_id}/role-mappings/realm",
-                        belirtec=self.admin_token, govde=[roles["default-roles-platform"]])
-        self.assertEqual(removed.durum, 204, removed.govde[:200])
-        account = admin("/clients?clientId=account", self.admin_token).json()[0]["id"]
-        effective = {r["name"] for r in admin(
+        roles = {r["name"] for r in admin(
             f"/users/{user_id}/role-mappings/clients/{account}/composite", self.admin_token).json()}
-        self.assertNotIn("delete-account", effective)
-        self.assertIn("manage-account", effective)
+        self.assertNotIn("delete-account", roles)
+        self.assertIn("manage-account", roles)
 
-    def test_customer_deletes_the_account_through_the_delete_step(self):
+    def test_keycloak_delete_account_action_is_off_live(self):
+        actions = {a["alias"]: a for a in admin("/authentication/required-actions", self.admin_token).json()}
+        self.assertFalse(actions["delete_account"]["enabled"])
+
+    def test_delete_step_does_not_delete_the_user(self):
         # A throwaway customer without a second factor, so the test does not share TOTP codes.
-        import base64
-        import json as jsonlib
-        import re
         import secrets
-
-        from test_event_listener import _sink_requests
 
         username = f"customer-{uuid.uuid4().hex[:10]}"
         password = "Musteri-" + secrets.token_urlsafe(12)
@@ -190,25 +167,11 @@ class AccountBacklogLiveTest(unittest.TestCase):
                                        "credentialId": ""}).encode()
         status, headers, html = _ac(opener, _form_hedefi(html), form)
         location = headers.get("Location", "")
-        self.assertNotIn("code=", location, "the step must ask before it returns a code")
         if status in (302, 303) and location.startswith(self.kc):
             status, headers, html = _ac(opener, location)
-        self.assertEqual(status, 200, location)
-        # Keycloak 26.8.2 delete-account-confirm.ftl: form "kc-deleteaccount-form" with a "cancel-aia" button.
-        self.assertIn('id="kc-deleteaccount-form"', html, html[:400])
-        self.assertIn('name="cancel-aia"', html)
-        target = re.search(r'<form action="([^"]+)"[^>]*id="kc-deleteaccount-form"', html).group(1).replace("&amp;", "&")
-        _ac(opener, target, b"")
-        self.assertEqual(admin(f"/users/{user_id}", yonetici_belirteci()).durum, 404, "the account must be gone")
+        self.assertNotIn('id="kc-deleteaccount-form"', html, "Keycloak must not offer its own delete step")
+        self.assertEqual(admin(f"/users/{user_id}", yonetici_belirteci()).durum, 200, "the user must still exist")
 
-        deadline = time.monotonic() + 20
-        sent = []
-        while time.monotonic() < deadline and not sent:
-            sent = [r for r in _sink_requests()
-                    if jsonlib.loads(base64.b64decode(r["body"])).get("type") == "DELETE_ACCOUNT"
-                    and jsonlib.loads(base64.b64decode(r["body"])).get("userId") == user_id]
-            time.sleep(0.5)
-        self.assertEqual(len(sent), 1, "identity-sync must hear about the deletion")
 
 if __name__ == "__main__":
     unittest.main()

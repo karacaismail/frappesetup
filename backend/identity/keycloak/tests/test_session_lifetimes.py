@@ -104,10 +104,10 @@ class SessionLifetimeLiveTest(unittest.TestCase):
         token = yonetici_belirteci()
         admin(f"/authentication/config/{self.config_id}", token, "PUT", self.original)
 
-    def _press_authorize_url(self) -> str:
+    def _press_authorize_url(self, **extra) -> str:
         from yardimci import pkce_pair
         _, challenge = pkce_pair()
-        query = urllib.parse.urlencode({
+        query = urllib.parse.urlencode({**extra,
             "client_id": "press", "response_type": "code", "scope": "openid", "state": "s", "nonce": "n",
             "redirect_uri": f"{ortam('ATONOTA_PRESS_URL')}/api/method/press_tr.api.auth.keycloak_callback",
             "code_challenge": challenge, "code_challenge_method": "S256"})
@@ -139,6 +139,24 @@ class SessionLifetimeLiveTest(unittest.TestCase):
         self.assertEqual(status, 302, "the customer client requests no level, so the 7 day cookie is enough")
         self.assertIn("code=", headers["Location"])
 
+
+    def test_press_can_force_a_fresh_login(self):
+        # Contract 42f8e32: before an account deletion Press asks Keycloak for a fresh login
+        # (prompt=login, max_age=0). The open cookie must not answer either request.
+        opener, status, headers, _ = _login(tenant_authorize_url())
+        self.assertIn("code=", headers["Location"])
+        status, headers, _ = _ac(opener, self._press_authorize_url())
+        self.assertIn("code=", headers.get("Location", ""), "without the parameters the cookie is enough")
+        # OIDCLoginProtocol.requireReauthentication (26.8.2, line 570) asks again only when
+        # auth_time + max_age < now, counted in whole seconds. A max_age=0 request in the same second as the
+        # login is answered by the cookie. prompt=login always asks again. Press sends both parameters.
+        time.sleep(2)
+        for extra in ({"prompt": "login"}, {"max_age": "0"}, {"prompt": "login", "max_age": "0"}):
+            with self.subTest(**extra):
+                status, headers, html = _ac(opener, self._press_authorize_url(**extra))
+                self.assertNotIn("code=", headers.get("Location", ""), "the cookie must not skip the login")
+                self.assertEqual(status, 200)
+                self.assertIn('name="password"', html)
 
 if __name__ == "__main__":
     unittest.main()
